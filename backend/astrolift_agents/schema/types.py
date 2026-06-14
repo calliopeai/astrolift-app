@@ -67,6 +67,11 @@ class AgentTaskType:
     started_at: dt.datetime | None
     # Maps to the model's ``ended_at`` (any terminal transition stamps it).
     finished_at: dt.datetime | None
+    # True when this task launched on a VNC-capable pod.
+    vnc_enabled: bool
+    # Relay path to the live noVNC framebuffer; empty until the task is
+    # RUNNING on a VNC-capable pod. The client derives the ws URL from it.
+    vnc_url: str
 
 
 @strawberry.type(name="AstroliftDispatcherInstance")
@@ -129,6 +134,8 @@ def agent_task_to_type(t) -> AgentTaskType:
         created_at=t.created_at,
         started_at=t.started_at,
         finished_at=t.ended_at,
+        vnc_enabled=t.vnc_enabled,
+        vnc_url=t.vnc_url or "",
     )
 
 

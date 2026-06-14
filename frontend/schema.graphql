@@ -184,6 +184,8 @@ type AstroliftAgentTask {
   createdAt: DateTime!
   startedAt: DateTime
   finishedAt: DateTime
+  vncEnabled: Boolean!
+  vncUrl: String!
 }
 
 type AstroliftAggregatedEvent {
@@ -1649,6 +1651,18 @@ type AstroliftIdentityProviderMutationResult {
   data: AstroliftIdentityProvider
 }
 
+type AstroliftImportSkillsResult {
+  importedSkills: [String!]!
+  importedTools: [String!]!
+  sourceRef: String!
+}
+
+type AstroliftImportSkillsResultMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftImportSkillsResult
+}
+
 type AstroliftInstallSourceWebhookPayload {
   status: String!
   hookId: String!
@@ -2252,6 +2266,7 @@ type AstroliftRegisteredApp {
   cronPaused: Boolean!
   deployBranch: String!
   previewScreenshotUrl: String!
+  buildStrategy: String!
   isArchived: Boolean!
   archivedAt: DateTime
   archivedByEmail: String
@@ -3489,6 +3504,10 @@ input DeleteWebhookSubscriptionInput {
   id: GUID!
 }
 
+input DeployClusterAgentInput {
+  clusterId: GUID!
+}
+
 type DeployTokenSecretReveal {
   token: AstroliftDeployToken!
   plaintextSecret: String!
@@ -4094,6 +4113,7 @@ type Mutation {
   bulkResyncManifest(input: BulkResyncManifestInput!): BulkOperationResult!
   registerTenantCluster(input: RegisterTenantClusterInput!): AstroliftTenantClusterMutationResult!
   issueClusterAgentKey(input: IssueClusterAgentKeyInput!): ClusteragentkeyissuedpayloadMutationResult!
+  deployClusterAgent(input: DeployClusterAgentInput!): AstroliftTenantClusterMutationResult!
   updateTenantCluster(input: UpdateTenantClusterInput!): AstroliftTenantClusterMutationResult!
   reconcileClusterIngresses(input: ReconcileClusterIngressesInput!): ReconcileClusterIngressesResultMutationResult!
   bringClusterIntoManagement(input: BringClusterIntoManagementInputType!): AstroliftTenantClusterMutationResult!
@@ -4215,6 +4235,7 @@ type Mutation {
   assembleBrief(skillIds: [ID!]!, orgId: ID!, config: JSON = null): AstroliftAssembleBriefResultMutationResult!
   launchTask(briefId: ID!, orgId: ID!, callbackUrl: String = null): AstroliftLaunchTaskResultMutationResult!
   cancelTask(id: ID!): NoneTypeMutationResult!
+  importSkillsFromRepo(repoUrl: String!, branch: String! = "main"): AstroliftImportSkillsResultMutationResult!
 
   """Start a workflow for an object."""
   startWorkflow(workflowSlug: String!, modelLabel: String!, objectId: Int!): StartWorkflowResult!
@@ -4643,6 +4664,7 @@ type Query {
   skills(orgId: ID!, isGlobal: Boolean! = false): [AstroliftSkill!]!
   skill(id: ID!): AstroliftSkill
   toolDefs(skillId: ID!): [AstroliftToolDef!]!
+  orgToolDefs(orgId: ID!): [AstroliftToolDef!]!
   brief(id: ID!): AstroliftBrief
   agentTasks(orgId: ID!, status: String = null): [AstroliftAgentTask!]!
   agentTask(id: ID!): AstroliftAgentTask

@@ -172,6 +172,9 @@ def _create_agent_task_sync(params: dict[str, Any]) -> int:
         environment_spec=env_spec,
         status=AgentTask.Status.DRAFT,
         timeout_seconds=timeout_seconds,
+        # Freeze VNC eligibility from the spec so the task stays
+        # self-describing if the spec is later edited or deleted.
+        vnc_enabled=bool(env_spec and env_spec.vnc_enabled),
     )
 
     # Context folded into the Brief / dispatch handshake. ``output_key`` is

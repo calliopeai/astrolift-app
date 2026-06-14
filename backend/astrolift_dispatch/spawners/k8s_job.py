@@ -19,6 +19,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Container port the agent's noVNC server listens on when VNC is enabled
+# (mirrors core.schema.vnc_ws.VNC_PORT, the relay's port-forward target).
+VNC_PORT = 6080
+
 
 class K8sJobSpawner(ContainerSpawner):
     """Spawn agent tasks as batch/v1 K8s Jobs."""
@@ -99,11 +103,46 @@ class K8sJobSpawner(ContainerSpawner):
             logger.exception("k8s_job_spawner: failed to delete Job %s", external_id)
 
 
+def _vnc_image(image: str) -> str:
+    """Return the ``-vnc`` variant of an image ref.
+
+    Appends ``-vnc`` to the repository component while preserving the tag
+    (and any digest), e.g.::
+
+        ghcr.io/calliopeai/astrolift-agent-claude:1.2  ->
+        ghcr.io/calliopeai/astrolift-agent-claude-vnc:1.2
+
+    The tag separator is the last ``:`` that is not part of a registry
+    ``host:port`` (i.e. it must come after the last ``/``). Idempotent:
+    an already ``-vnc`` repo is returned unchanged.
+    """
+    repo, sep, tag = image.rpartition(":")
+    # A ":" before the final "/" is a registry port, not a tag separator.
+    if not sep or "/" not in repo or "/" in tag:
+        repo, sep, tag = image, "", ""
+    if repo.endswith("-vnc"):
+        return image
+    return f"{repo}-vnc{sep}{tag}"
+
+
 def _render_agent_job(*, job_name: str, workload, namespace: str, task) -> dict:
     """Build a minimal batch/v1 Job manifest for an agent workload."""
     primary_container = workload.container_set.filter(is_primary=True).first()
     image = primary_container.image_ref if primary_container else "gcr.io/distroless/base"
     port = primary_container.port if primary_container else 0
+
+    # VNC-capable runs swap to the -vnc image variant and expose the
+    # noVNC port (6080) so the ASGI relay can port-forward into it.
+    vnc = bool(getattr(task, "vnc_enabled", False))
+    if vnc:
+        spec = getattr(task, "environment_spec", None)
+        base = spec.image_tag if (spec and spec.image_tag) else image
+        image = _vnc_image(base)
+
+    ports = [{"containerPort": port}] if port else []
+    if vnc:
+        ports = [p for p in ports if p["containerPort"] != VNC_PORT]
+        ports.append({"containerPort": VNC_PORT})
 
     return {
         "apiVersion": "batch/v1",
@@ -133,7 +172,7 @@ def _render_agent_job(*, job_name: str, workload, namespace: str, task) -> dict:
                             "name": "agent",
                             "image": image,
                             "env": [],
-                            **({"ports": [{"containerPort": port}]} if port else {}),
+                            **({"ports": ports} if ports else {}),
                         }
                     ],
                 },

@@ -110,6 +110,69 @@ def test_cancel_from_provisioning_is_valid(draft_task):
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# VNC url population (#877)
+# ---------------------------------------------------------------------------
+
+
+def test_vnc_url_set_on_running_when_vnc_enabled(org):
+    """A VNC-capable task publishes the relay path when it reaches RUNNING."""
+    task = AgentTask.objects.create(organization=org, vnc_enabled=True)
+    task.transition_to(AgentTask.Status.QUEUED)
+    task.transition_to(AgentTask.Status.PROVISIONING)
+    assert task.vnc_url == ""  # not RUNNING yet — no framebuffer
+
+    task.transition_to(AgentTask.Status.RUNNING)
+    task.refresh_from_db()
+    assert task.vnc_url == f"/app/vnc/{task.guid}"
+
+
+def test_vnc_url_empty_when_vnc_disabled(org):
+    """A non-VNC task never publishes a relay path."""
+    task = AgentTask.objects.create(organization=org, vnc_enabled=False)
+    task.transition_to(AgentTask.Status.QUEUED)
+    task.transition_to(AgentTask.Status.PROVISIONING)
+    task.transition_to(AgentTask.Status.RUNNING)
+    task.refresh_from_db()
+    assert task.vnc_url == ""
+
+
+def test_vnc_url_not_set_before_running(org):
+    """Provisioning a VNC task does not yet expose a framebuffer path."""
+    task = AgentTask.objects.create(organization=org, vnc_enabled=True)
+    task.transition_to(AgentTask.Status.QUEUED)
+    task.refresh_from_db()
+    assert task.vnc_url == ""
+
+
+def test_graphql_type_exposes_vnc_fields_when_running(org):
+    """The GraphQL mapper surfaces vnc_enabled + vnc_url to the frontend."""
+    from astrolift_agents.schema.types import agent_task_to_type
+
+    task = AgentTask.objects.create(organization=org, vnc_enabled=True)
+    task.transition_to(AgentTask.Status.QUEUED)
+    task.transition_to(AgentTask.Status.PROVISIONING)
+    task.transition_to(AgentTask.Status.RUNNING)
+
+    gql = agent_task_to_type(task)
+    assert gql.vnc_enabled is True
+    assert gql.vnc_url == f"/app/vnc/{task.guid}"
+
+
+def test_graphql_type_vnc_fields_empty_when_disabled(org):
+    """A non-VNC task maps to vnc_enabled False and an empty url."""
+    from astrolift_agents.schema.types import agent_task_to_type
+
+    task = AgentTask.objects.create(organization=org, vnc_enabled=False)
+    task.transition_to(AgentTask.Status.QUEUED)
+    task.transition_to(AgentTask.Status.PROVISIONING)
+    task.transition_to(AgentTask.Status.RUNNING)
+
+    gql = agent_task_to_type(task)
+    assert gql.vnc_enabled is False
+    assert gql.vnc_url == ""
+
+
 def test_dispatcher_heartbeat_ttl_default(org):
     dispatcher = DispatcherInstance.objects.create(
         organization=org,

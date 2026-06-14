@@ -210,6 +210,8 @@ export type AstroliftAgentTask = {
   result?: Maybe<Scalars['JSON']['output']>;
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
+  vncEnabled: Scalars['Boolean']['output'];
+  vncUrl: Scalars['String']['output'];
 };
 
 export type AstroliftAggregatedEvent = {
@@ -1672,6 +1674,18 @@ export type AstroliftIdentityProviderMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftImportSkillsResult = {
+  importedSkills: Array<Scalars['String']['output']>;
+  importedTools: Array<Scalars['String']['output']>;
+  sourceRef: Scalars['String']['output'];
+};
+
+export type AstroliftImportSkillsResultMutationResult = {
+  data?: Maybe<AstroliftImportSkillsResult>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftInstallSourceWebhookPayload = {
   hookId: Scalars['String']['output'];
   receiverUrl: Scalars['String']['output'];
@@ -2239,6 +2253,7 @@ export type AstroliftRegisteredApp = {
   buildArgs: Scalars['JSON']['output'];
   buildContext: Scalars['String']['output'];
   buildMode: Scalars['String']['output'];
+  buildStrategy: Scalars['String']['output'];
   configDrift?: Maybe<AstroliftAppConfigDrift>;
   createdAt: Scalars['DateTime']['output'];
   cronExpression: Scalars['String']['output'];
@@ -3505,6 +3520,10 @@ export type DeleteWebhookSubscriptionInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type DeployClusterAgentInput = {
+  clusterId: Scalars['GUID']['input'];
+};
+
 export type DeployTokenSecretReveal = {
   plaintextSecret: Scalars['String']['output'];
   rotationGraceSeconds: Scalars['Int']['output'];
@@ -3974,6 +3993,7 @@ export type Mutation = {
   deleteAppIdentityRole: AstroliftCapabilityDeprovisionPayloadMutationResult;
   deleteAppIngress: AstroliftCapabilityDeprovisionPayloadMutationResult;
   deleteAppSecret: AppsecretwritepayloadMutationResult;
+  deleteDeployment: AstroliftDeploymentMutationResult;
   deleteEmailTemplate: EmailtemplatedeletedpayloadMutationResult;
   deleteFormDefinition: AstroliftFormDefinitionMutationResult;
   deletePipeline: AstroliftPipelineMutationResult;
@@ -3983,6 +4003,7 @@ export type Mutation = {
   deleteWebhookSubscription: SoftdeletepayloadMutationResult;
   /** Delete a workflow definition by slug (staff only). */
   deleteWorkflowDefinition: MutationResult;
+  deployClusterAgent: AstroliftTenantClusterMutationResult;
   deprovisionManagedService: ManagedservicedeletedpayloadMutationResult;
   deregisterAstroliftApp: AstroliftDeregisterAppPayloadMutationResult;
   detachSecretBundle: AttachmentremovedpayloadMutationResult;
@@ -4001,6 +4022,7 @@ export type Mutation = {
   grantRole: AstroliftRoleBindingMutationResult;
   grantTeamAccessToApp: AstroliftAppTeamAccessMutationResult;
   heartbeatSession: AstroliftHeartbeatSessionPayloadMutationResult;
+  importSkillsFromRepo: AstroliftImportSkillsResultMutationResult;
   installAstroliftSourceWebhook: AstroliftInstallSourceWebhookPayloadMutationResult;
   installClusterPrereqs: AstroliftTenantClusterMutationResult;
   installScmWebhook: AstroliftScmWebhookInstallationMutationResult;
@@ -4554,6 +4576,11 @@ export type MutationDeleteAppSecretArgs = {
 };
 
 
+export type MutationDeleteDeploymentArgs = {
+  input: DeploymentByIdInput;
+};
+
+
 export type MutationDeleteEmailTemplateArgs = {
   input: DeleteEmailTemplateInput;
 };
@@ -4591,6 +4618,11 @@ export type MutationDeleteWebhookSubscriptionArgs = {
 
 export type MutationDeleteWorkflowDefinitionArgs = {
   slug: Scalars['String']['input'];
+};
+
+
+export type MutationDeployClusterAgentArgs = {
+  input: DeployClusterAgentInput;
 };
 
 
@@ -4666,6 +4698,12 @@ export type MutationGrantRoleArgs = {
 
 export type MutationGrantTeamAccessToAppArgs = {
   input: GrantTeamAccessInput;
+};
+
+
+export type MutationImportSkillsFromRepoArgs = {
+  branch?: Scalars['String']['input'];
+  repoUrl: Scalars['String']['input'];
 };
 
 
@@ -5880,6 +5918,7 @@ export type Query = {
   formSubmissions: Array<AstroliftFormSubmission>;
   me?: Maybe<AstroliftMe>;
   members: Array<OrganizationMemberType>;
+  orgToolDefs: Array<AstroliftToolDef>;
   organization?: Maybe<OrganizationType>;
   organizations: Array<OrganizationType>;
   /** Compare effective permissions between two users. */
@@ -6653,6 +6692,11 @@ export type QueryFormDefinitionsArgs = {
 export type QueryFormSubmissionsArgs = {
   slug: Scalars['String']['input'];
   status?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryOrgToolDefsArgs = {
+  orgId: Scalars['ID']['input'];
 };
 
 
