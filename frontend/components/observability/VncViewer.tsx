@@ -54,12 +54,12 @@ export function VncViewer({ vncPath, className }: VncViewerProps) {
     // RFB instance type is loaded dynamically so the noVNC bundle
     // stays out of the server render path (it touches window/document
     // at import time).
-    let rfb: import("@novnc/novnc/core/rfb.js").default | null = null;
+    let rfb: import("@novnc/novnc").default | null = null;
 
     setState("connecting");
     setErrorMessage(null);
 
-    void import("@novnc/novnc/core/rfb.js").then(({ default: RFB }) => {
+    void import("@novnc/novnc").then(({ default: RFB }) => {
       if (disposed || !containerRef.current) return;
       let client: InstanceType<typeof RFB>;
       try {

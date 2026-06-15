@@ -1,7 +1,9 @@
 // Minimal ambient types for @novnc/novnc (the package ships no .d.ts).
 // Only the surface used by components/observability/VncViewer.tsx is
 // declared — extend here if more of the RFB API is consumed.
-declare module "@novnc/novnc/core/rfb.js" {
+// noVNC 1.7's package.json `exports` maps the package root to core/rfb.js,
+// so RFB is imported from "@novnc/novnc" (the deep subpath is not exported).
+declare module "@novnc/novnc" {
   export interface RFBOptions {
     credentials?: { username?: string; password?: string; target?: string };
     shared?: boolean;
