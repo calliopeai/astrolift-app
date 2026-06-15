@@ -90,6 +90,7 @@ export const LIST_AGENT_TASKS = gql`
       finishedAt
       vncEnabled
       vncUrl
+      snapshotUrl
     }
   }
 `;
@@ -106,6 +107,24 @@ export const GET_AGENT_TASK = gql`
       finishedAt
       vncEnabled
       vncUrl
+      snapshotUrl
+    }
+  }
+`;
+
+// The VNC theatre roster: RUNNING, watchable agent tasks (vnc-capable
+// with a published relay path). Gated on agent_task.watch server-side.
+// Each row carries vncUrl (the live RFB relay the theatre connects to)
+// and snapshotUrl (a short-lived presigned GET the gallery tiles poll).
+export const AGENT_GALLERY = gql`
+  query AgentGallery($orgId: ID!) {
+    agentGallery(orgId: $orgId) {
+      id
+      status
+      startedAt
+      vncEnabled
+      vncUrl
+      snapshotUrl
     }
   }
 `;

@@ -175,7 +175,39 @@ class AgentsQuery:
         qs = AgentTask.objects.filter(organization_id=org_pk, deleted_at__isnull=True)
         if status:
             qs = qs.filter(status=status)
-        qs = qs.order_by("-created_at")[:200]
+        # select_related the org so snapshot_url presigning (per RUNNING vnc
+        # row) doesn't fire a query per task — the org is the only related
+        # object agent_task_to_type touches.
+        qs = qs.select_related("organization").order_by("-created_at")[:200]
+        return [agent_task_to_type(t) for t in qs]
+
+    @strawberry.field
+    @require_permission(Permission.AGENT_TASK_WATCH)
+    @tenant_scoped()
+    def agent_gallery(self, info: Info, org_id: strawberry.ID) -> list[AgentTaskType]:
+        """The org's *watchable* agent tasks — the VNC theatre roster.
+
+        Narrows to RUNNING, VNC-capable tasks that have a published relay
+        path (``vnc_url``), newest first. Each row carries ``vnc_url`` (the
+        live RFB relay the theatre connects to) and ``snapshot_url`` (a
+        short-lived presigned GET for the latest framebuffer JPEG the gallery
+        tiles poll). Gated on ``agent_task.watch`` — the same operator-grade
+        permission the live VNC relay enforces — rather than plain
+        ``app.read``, so the gallery never lists a session the caller could
+        not actually open.
+        """
+        org_pk = _caller_org_id(info, org_id)
+        qs = (
+            AgentTask.objects.filter(
+                organization_id=org_pk,
+                status=AgentTask.Status.RUNNING,
+                vnc_enabled=True,
+                deleted_at__isnull=True,
+            )
+            .exclude(vnc_url="")
+            .select_related("organization")
+            .order_by("-started_at", "-created_at")[:200]
+        )
         return [agent_task_to_type(t) for t in qs]
 
     @strawberry.field
@@ -185,9 +217,11 @@ class AgentsQuery:
         """One AgentTask by GUID, scoped to the caller's org."""
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
-        row = AgentTask.objects.filter(
-            guid=str(id), organization_id=org_pk, deleted_at__isnull=True
-        ).first()
+        row = (
+            AgentTask.objects.filter(guid=str(id), organization_id=org_pk, deleted_at__isnull=True)
+            .select_related("organization")
+            .first()
+        )
         return agent_task_to_type(row) if row is not None else None
 
     @strawberry.field

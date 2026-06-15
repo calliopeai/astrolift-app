@@ -191,6 +191,7 @@ type AstroliftAgentTask {
   finishedAt: DateTime
   vncEnabled: Boolean!
   vncUrl: String!
+  snapshotUrl: String
 }
 
 type AstroliftAggregatedEvent {
@@ -4672,6 +4673,7 @@ type Query {
   orgToolDefs(orgId: ID!): [AstroliftToolDef!]!
   brief(id: ID!): AstroliftBrief
   agentTasks(orgId: ID!, status: String = null): [AstroliftAgentTask!]!
+  agentGallery(orgId: ID!): [AstroliftAgentTask!]!
   agentTask(id: ID!): AstroliftAgentTask
   agentRuntimes: [AstroliftAgentRuntime!]!
   dispatchers: [AstroliftDispatcherInstance!]!

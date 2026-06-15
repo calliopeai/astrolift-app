@@ -8,12 +8,14 @@ import {
   BrainIcon,
   ExternalLinkIcon,
   LayersIcon,
+  MonitorPlayIcon,
   ScrollIcon,
   ShieldCheckIcon,
   ZapIcon,
 } from "lucide-react";
 import Link from "next/link";
 
+import { AgentTheatre } from "@/components/observability/AgentTheatre";
 import { EmptyState } from "@/components/EmptyState";
 import { ListControls, SortableHeader } from "@/components/ListControls";
 import { PageShell } from "@/components/PageShell";
@@ -31,10 +33,28 @@ import { useListControls } from "@/hooks/use-list-controls";
 import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
 
-type Tab = "fleet" | "metrics" | "logs" | "activity" | "reasoning" | "token-usage" | "compliance";
-const TABS: readonly Tab[] = ["fleet", "metrics", "logs", "activity", "reasoning", "token-usage", "compliance"];
+type Tab =
+  | "fleet"
+  | "theatre"
+  | "metrics"
+  | "logs"
+  | "activity"
+  | "reasoning"
+  | "token-usage"
+  | "compliance";
+const TABS: readonly Tab[] = [
+  "fleet",
+  "theatre",
+  "metrics",
+  "logs",
+  "activity",
+  "reasoning",
+  "token-usage",
+  "compliance",
+];
 const TAB_LABELS: Record<Tab, string> = {
   fleet: "Fleet",
+  theatre: "Theatre",
   metrics: "Metrics",
   logs: "Logs",
   activity: "Activity",
@@ -44,6 +64,7 @@ const TAB_LABELS: Record<Tab, string> = {
 };
 const TAB_ICONS: Record<Tab, React.ReactNode> = {
   fleet: <LayersIcon className="size-4" />,
+  theatre: <MonitorPlayIcon className="size-4" />,
   metrics: <BarChart3Icon className="size-4" />,
   logs: <ScrollIcon className="size-4" />,
   activity: <ShieldCheckIcon className="size-4" />,
@@ -168,6 +189,7 @@ export default function ObserveAgentsPage() {
         ))}
       </div>
       {tab === "fleet" ? <FleetTab /> :
+       tab === "theatre" ? <AgentTheatre /> :
        tab === "metrics" ? <EmptyState icon={<BarChart3Icon className="size-5" />} title="Agent Metrics" description="Dispatch rate, run duration (p50/p95), retry rate, and success counts — aggregated across all agent workloads." /> :
        tab === "logs" ? <EmptyState icon={<ScrollIcon className="size-5" />} title="Agent Logs" description="Container stdout/stderr from agent workload pods. Filter by app, workload, or pod." /> :
        <ZentinelleGate tab={tab} />}

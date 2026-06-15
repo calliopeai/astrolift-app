@@ -72,6 +72,13 @@ class AgentTaskType:
     # Relay path to the live RFB framebuffer; empty until the task is
     # RUNNING on a VNC-capable pod. The client derives the ws URL from it.
     vnc_url: str
+    # Short-lived presigned GET URL for the task's latest framebuffer JPEG
+    # snapshot (``snapshots/<guid>/latest.jpg``). Non-null only for a RUNNING
+    # VNC task whose pod-side uploader has written at least one frame; null
+    # otherwise (non-VNC task, no frame yet, or no blob store configured).
+    # The gallery polls this to render snapshot tiles before exploding into
+    # the live VncViewer session at ``vnc_url``.
+    snapshot_url: str | None
 
 
 @strawberry.type(name="AstroliftAgentRuntime")
@@ -138,6 +145,42 @@ def brief_to_type(b) -> BriefType:
     )
 
 
+def _resolve_snapshot_url(t) -> str | None:
+    """Mint a short-lived presigned GET URL for ``t``'s latest snapshot.
+
+    Returns ``None`` (never raises) unless the task is a RUNNING, VNC-capable
+    task that has a frozen ``snapshot_key`` *and* the pod-side uploader has
+    written at least one frame to it. The presign is deliberately gated so the
+    common case (non-VNC or not-yet-running tasks) short-circuits before
+    touching the blob store — keeping the list resolvers free of per-row blob
+    calls for tasks that can't be watched.
+
+    ``BlobStoreNotFoundError`` (no frame uploaded yet) and
+    ``BlobStoreNotConfiguredError`` (no blob store on this install) both map to
+    ``None`` so the gallery renders a placeholder tile instead of erroring.
+    """
+    from astrolift_agents.models import AgentTask
+
+    if t.status != AgentTask.Status.RUNNING:
+        return None
+    if not t.vnc_enabled or not t.snapshot_key:
+        return None
+
+    from astrolift_agents.snapshot_store import presigned_snapshot_download_url
+    from providers._sdk.blob_store import (
+        BlobStoreNotConfiguredError,
+        BlobStoreNotFoundError,
+    )
+
+    try:
+        return presigned_snapshot_download_url(
+            org=t.organization,
+            task_guid=str(t.guid),
+        )
+    except (BlobStoreNotFoundError, BlobStoreNotConfiguredError):
+        return None
+
+
 def agent_task_to_type(t) -> AgentTaskType:
     return AgentTaskType(
         id=GUID(str(t.guid)),
@@ -149,6 +192,7 @@ def agent_task_to_type(t) -> AgentTaskType:
         finished_at=t.ended_at,
         vnc_enabled=t.vnc_enabled,
         vnc_url=t.vnc_url or "",
+        snapshot_url=_resolve_snapshot_url(t),
     )
 
 

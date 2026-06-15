@@ -213,6 +213,7 @@ export type AstroliftAgentTask = {
   finishedAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
   result?: Maybe<Scalars['JSON']['output']>;
+  snapshotUrl?: Maybe<Scalars['String']['output']>;
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
   vncEnabled: Scalars['Boolean']['output'];
@@ -5767,6 +5768,7 @@ export type PushManifestToRepoInput = {
 export type Query = {
   ObjectStoreMetrics: Array<Array<Scalars['String']['output']>>;
   PostgresMetrics: Array<Array<Scalars['String']['output']>>;
+  agentGallery: Array<AstroliftAgentTask>;
   agentRuntimes: Array<AstroliftAgentRuntime>;
   agentTask?: Maybe<AstroliftAgentTask>;
   agentTasks: Array<AstroliftAgentTask>;
@@ -5948,6 +5950,11 @@ export type Query = {
   workflowStageExecutions: Array<WorkflowStageExecutionType>;
   /** List stages for a workflow definition by slug. */
   workflowStages: Array<WorkflowStageType>;
+};
+
+
+export type QueryAgentGalleryArgs = {
+  orgId: Scalars['ID']['input'];
 };
 
 
