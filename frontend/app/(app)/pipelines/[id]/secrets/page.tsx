@@ -2,10 +2,11 @@ import { PipelineDetailClient } from "../pipeline-detail-client";
 
 export const metadata = { title: "Pipeline Secrets · Astrolift" };
 
-export default function PipelineSecretsPage({
+export default async function PipelineSecretsPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  return <PipelineDetailClient pipelineId={params.id} />;
+  const { id } = await params;
+  return <PipelineDetailClient pipelineId={id} />;
 }
