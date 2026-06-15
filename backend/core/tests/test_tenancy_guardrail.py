@@ -37,6 +37,14 @@ EXEMPT: dict[str, str] = {
     "IdentityQuery.my_memberships": (
         "self-service: enumerates orgs the caller belongs to — needed before any tenant context can be picked"
     ),
+    "IdentityQuery.astrolift_organizations": (
+        "self-service bootstrap: returns the orgs the caller can pick as "
+        "the active tenant (superusers see all; regular users see only "
+        "orgs they're an active Member of). Can't be @tenant_scoped — "
+        "it's the chicken-and-egg resolver the FE calls to discover which "
+        "org to set as the tenant in the first place. The Member filter "
+        "on the caller's pk IS the gate; same category as my_memberships."
+    ),
     "IdentityQuery.astrolift_my_permissions": (
         "self-service: returns the caller's effective permissions — "
         "ordering matters because permissions drive nav rendering"
@@ -142,6 +150,26 @@ EXEMPT: dict[str, str] = {
     # Notifications are user-scoped: the resolver filters by the
     # caller's user_id directly, not by tenant.
     "OperationsQuery.astrolift_my_notifications": "self-service: caller's own notifications",
+    # Push device registry / notification prefs / alert subscriptions
+    # (#476, #490, #499, #747) — all self-service: each resolver filters
+    # by the caller's own user (viewer.pk / tenant.actor_user_id), never
+    # by org. A DeviceRegistration / NotificationPreference / alert
+    # subscription belongs to a *user*, not a tenant, so there is no org
+    # to scope on. Same category as astrolift_my_notifications. Auth is
+    # is_authenticated (every authed user may see/manage their own); no
+    # meaningful org-scoped permission applies.
+    "OperationsQuery.astrolift_my_mobile_devices": (
+        "self-service: caller's own push registrations, filtered by viewer pk"
+    ),
+    "OperationsQuery.astrolift_my_notification_preferences": (
+        "self-service: caller's own notification preferences, filtered by viewer pk"
+    ),
+    "OperationsQuery.astrolift_my_devices": (
+        "self-service: caller's own registered push devices, filtered by tenant.actor_user_id"
+    ),
+    "OperationsQuery.astrolift_my_alert_subscriptions": (
+        "self-service: caller's own per-app alert subscriptions, filtered by tenant.actor_user_id"
+    ),
     "RegistryQuery.astrolift_my_apps": (
         "self-service: returns apps the caller can reach via their own RoleBindings"
         " (any scope from app up to org). Permission visibility IS the gate."
@@ -172,6 +200,29 @@ EXEMPT: dict[str, str] = {
     ),
     "OperationsMutation.mark_notification_read": "self-service: marks the caller's own notification",
     "OperationsMutation.mark_all_notifications_read": "self-service: marks all the caller's notifications",
+    # Push device registry / notification prefs / alert subscriptions
+    # (#476, #499, #747) — self-service writes: each binds the row to the
+    # caller's own user (viewer.pk / tenant.actor_user_id), never to a
+    # tenant. Registering a phone, toggling a notification preference, or
+    # subscribing to an app's alerts is "manage my own settings"; the
+    # device/preference/subscription belongs to a user, not an org, so
+    # there is no org to scope on. is_authenticated IS the gate (same
+    # pattern as generate_install_enrollment_qr / mark_notification_read).
+    "OperationsMutation.register_mobile_device": (
+        "self-service: registers a push device on the caller's own account (viewer.pk)"
+    ),
+    "OperationsMutation.revoke_mobile_device": (
+        "self-service: soft-deletes one of the caller's own push registrations (viewer.pk)"
+    ),
+    "OperationsMutation.set_notification_preference": (
+        "self-service: upserts one notification preference row for the caller (viewer.pk)"
+    ),
+    "OperationsMutation.set_alert_subscription": (
+        "self-service: upserts the caller's own per-app alert subscription (tenant.actor_user_id)"
+    ),
+    "OperationsMutation.clear_alert_subscription": (
+        "self-service: soft-deletes one of the caller's own alert subscriptions (tenant.actor_user_id)"
+    ),
     "ClustersQuery.astrolift_provider_plugins": (
         "platform-level reference data — the list of provider plugins is "
         "install-wide (not per-tenant). Surfaced on /resources/drivers to "

@@ -844,49 +844,6 @@ class IdentityQuery:
             active_session_to_type(row, is_current=(bool(current_key) and row.session_key == current_key))
             for row in qs
         ]
-        from astrolift_identity.session_elevation import (
-            SESSION_KEY_ELEVATED_UNTIL,
-            SESSION_KEY_ELEVATION_METHOD,
-            _parse_iso,
-        )
-
-        current_key = getattr(getattr(request, "session", None), "session_key", None)
-        viewer_pk = str(viewer.pk)
-        now = timezone.now()
-        out: list[ActiveSessionType] = []
-        for s in Session.objects.filter(expire_date__gt=now):
-            try:
-                data = s.get_decoded()
-            except Exception:
-                # Corrupt session row — skip rather than 500 the page.
-                continue
-            if str(data.get("_auth_user_id", "")) != viewer_pk:
-                continue
-            elevated_until = _parse_iso(data.get(SESSION_KEY_ELEVATED_UNTIL))
-            # Lapsed elevations aren't surfaced as "elevated" — the
-            # client should treat them as None so the indicator goes
-            # away the moment the timer runs out without waiting for
-            # a deelevate mutation.
-            if elevated_until is not None and elevated_until <= now:
-                elevated_until = None
-            method = data.get(SESSION_KEY_ELEVATION_METHOD) if elevated_until else None
-            # Return only the last 8 chars of the session key as a
-            # display-safe identifier. The full key never leaves the
-            # cookie jar; logout_all_sessions doesn't need it.
-            out.append(
-                ActiveSessionType(
-                    id=s.session_key[-8:],
-                    expires_at=s.expire_date,
-                    is_current=(s.session_key == current_key),
-                    created_at=None,
-                    last_seen_at=None,
-                    ip_address=None,
-                    user_agent=None,
-                    elevated_until=elevated_until,
-                    elevation_method=method if isinstance(method, str) else None,
-                )
-            )
-        return out
 
     @strawberry.field
     def astrolift_elevation_status(self, info: Info) -> ElevationStatusType:
