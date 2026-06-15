@@ -78,8 +78,7 @@ class WorkflowSchedule(models.Model):
     def __str__(self) -> str:
         state = "enabled" if self.enabled else "disabled"
         return (
-            f"WorkflowSchedule(def={self.workflow_definition_id}, "
-            f"cron={self.cron_expression!r}, {state})"
+            f"WorkflowSchedule(def={self.workflow_definition_id}, " f"cron={self.cron_expression!r}, {state})"
         )
 
 
@@ -141,8 +140,7 @@ class WorkflowWebhook(models.Model):
         default=dict,
         blank=True,
         help_text=(
-            "JSONPath / key-mapping spec that maps incoming payload fields "
-            "to the workflow's input schema."
+            "JSONPath / key-mapping spec that maps incoming payload fields " "to the workflow's input schema."
         ),
     )
     enabled = models.BooleanField(default=True, db_index=True)

@@ -12,7 +12,8 @@ if TYPE_CHECKING:
 @dataclasses.dataclass
 class SpawnResult:
     """Result of a container spawn operation."""
-    external_id: str    # Pod/Job/Task name assigned by the backend
+
+    external_id: str  # Pod/Job/Task name assigned by the backend
     ok: bool = True
     error: str = ""
 
@@ -20,6 +21,7 @@ class SpawnResult:
 @dataclasses.dataclass
 class TaskStatus:
     """Current status of a spawned container."""
+
     running: bool = False
     succeeded: bool = False
     failed: bool = False
@@ -33,7 +35,7 @@ class ContainerSpawner:
     Each backend (K8s Job, ECS Task, local Docker) implements these methods.
     """
 
-    def spawn(self, task: "AgentTask") -> SpawnResult:
+    def spawn(self, task: AgentTask) -> SpawnResult:
         """Spawn a container for the given AgentTask.
 
         Returns SpawnResult with the backend-assigned external_id.

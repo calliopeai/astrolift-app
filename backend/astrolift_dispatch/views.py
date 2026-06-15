@@ -36,6 +36,7 @@ _BOOTSTRAP_TOKEN_SETTING = "DISPATCHER_BOOTSTRAP_TOKEN"
 def _get_bootstrap_token() -> str | None:
     """Return the bootstrap token from settings, or None if not configured."""
     from django.conf import settings
+
     return getattr(settings, _BOOTSTRAP_TOKEN_SETTING, None) or None
 
 
@@ -52,7 +53,7 @@ def _get_dispatcher_from_request(request: HttpRequest) -> DispatcherInstance | N
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         return None
-    raw_key = auth[len("Bearer "):]
+    raw_key = auth[len("Bearer ") :]
     key_hash = _hash_key(raw_key)
     return DispatcherInstance.objects.filter(
         api_key_hash=key_hash,
@@ -63,6 +64,7 @@ def _get_dispatcher_from_request(request: HttpRequest) -> DispatcherInstance | N
 
 def _require_dispatcher(view_func):
     """Decorator: authenticate the request as a Dispatch Service call."""
+
     @wraps(view_func)
     def wrapper(request: HttpRequest, *args, **kwargs):
         dispatcher = _get_dispatcher_from_request(request)
@@ -70,6 +72,7 @@ def _require_dispatcher(view_func):
             return JsonResponse({"error": "unauthorized"}, status=401)
         request.dispatcher = dispatcher
         return view_func(request, *args, **kwargs)
+
     return wrapper
 
 
@@ -136,10 +139,13 @@ def register(request: HttpRequest) -> JsonResponse:
 
     logger.info("dispatch.register: registered dispatcher %s for org %s", name, org_slug)
 
-    return JsonResponse({
-        "dispatcher_id": str(dispatcher.guid),
-        "api_key": raw_key,  # Returned only once — must be stored by the client
-    }, status=201)
+    return JsonResponse(
+        {
+            "dispatcher_id": str(dispatcher.guid),
+            "api_key": raw_key,  # Returned only once — must be stored by the client
+        },
+        status=201,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -188,18 +194,20 @@ def list_tasks(request: HttpRequest) -> JsonResponse:
         deleted_at__isnull=True,
     ).select_related("agent_definition", "brief")[:50]
 
-    return JsonResponse({
-        "tasks": [
-            {
-                "id": str(t.guid),
-                "agent_workload_slug": t.agent_definition.slug if t.agent_definition_id else None,
-                "brief_id": str(t.brief.guid) if t.brief_id else None,
-                "timeout_seconds": t.timeout_seconds,
-                "callback_url": t.callback_url or "",
-            }
-            for t in tasks
-        ]
-    })
+    return JsonResponse(
+        {
+            "tasks": [
+                {
+                    "id": str(t.guid),
+                    "agent_workload_slug": t.agent_definition.slug if t.agent_definition_id else None,
+                    "brief_id": str(t.brief.guid) if t.brief_id else None,
+                    "timeout_seconds": t.timeout_seconds,
+                    "callback_url": t.callback_url or "",
+                }
+                for t in tasks
+            ]
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -447,8 +455,8 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
 # ---------------------------------------------------------------------------
 
 
-from astrolift_dispatch.log_collector import store_agent_log_lines  # noqa: E402
 from astrolift_agents.models.task_meter import TaskMeteringRecord  # noqa: E402
+from astrolift_dispatch.log_collector import store_agent_log_lines  # noqa: E402
 from astrolift_lifecycle.models import AgentRun  # noqa: E402
 
 
@@ -478,7 +486,7 @@ def ingest_task_logs(request: HttpRequest, task_id: str) -> JsonResponse:
     except AgentRun.DoesNotExist:
         return JsonResponse({"error": "task not found"}, status=404)
     except Exception as exc:
-        log.exception("log ingestion error for task %s", task_id)
+        logger.exception("log ingestion error for task %s", task_id)
         return JsonResponse({"error": str(exc)}, status=500)
 
     return JsonResponse({"stored": stored})
@@ -529,7 +537,7 @@ def ingest_task_meter(request: HttpRequest, task_id: str) -> JsonResponse:
             metering_source=source,
         )
     except Exception as exc:
-        log.exception("metering write error for task %s", task_id)
+        logger.exception("metering write error for task %s", task_id)
         return JsonResponse({"error": str(exc)}, status=500)
 
     return JsonResponse({"id": str(record.pk), "task_id": task_id}, status=201)

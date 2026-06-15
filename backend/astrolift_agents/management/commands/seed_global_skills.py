@@ -56,8 +56,7 @@ GLOBAL_SKILLS: dict[str, tuple[str, str, list[str], str]] = {
         "Workflow Supervisor",
         "claude",
         ["supervisor"],
-        "You are a workflow supervisor. Monitor step results and decide: "
-        "retry, skip, escalate, or abort.",
+        "You are a workflow supervisor. Monitor step results and decide: " "retry, skip, escalate, or abort.",
     ),
 }
 
@@ -96,7 +95,5 @@ class Command(BaseCommand):
                 updated += 1
 
         self.stdout.write(
-            self.style.SUCCESS(
-                f"seed_global_skills: {created} skill(s) created, {updated} updated."
-            )
+            self.style.SUCCESS(f"seed_global_skills: {created} skill(s) created, {updated} updated.")
         )

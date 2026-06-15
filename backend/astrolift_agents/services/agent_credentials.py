@@ -27,7 +27,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import secrets
-from datetime import datetime, timedelta, timezone as dt_timezone
+from datetime import timedelta
 
 from django.utils import timezone
 
@@ -53,8 +53,7 @@ def issue_task_credential(task: AgentRun) -> str:
     """
     if TaskToken.objects.filter(agent_run=task).exists():
         raise ValueError(
-            f"AgentRun {task.guid} already has a TaskToken. "
-            "Revoke the existing token before re-issuing."
+            f"AgentRun {task.guid} already has a TaskToken. " "Revoke the existing token before re-issuing."
         )
 
     ttl_hours = min(
@@ -92,9 +91,7 @@ def validate_task_credential(token: str, task_guid: str) -> bool:
     token_hash = _hash(token)
 
     try:
-        task_token = TaskToken.objects.select_related("agent_run").get(
-            token_hash=token_hash
-        )
+        task_token = TaskToken.objects.select_related("agent_run").get(token_hash=token_hash)
     except TaskToken.DoesNotExist:
         return False
 

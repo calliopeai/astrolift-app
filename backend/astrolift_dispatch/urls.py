@@ -30,5 +30,7 @@ urlpatterns = [
     path("api/dispatch/v1/agents/<str:task_id>/callback/", agent_callback, name="agent-callback"),
     # Log streaming and metering (#51, #56)
     path("api/dispatch/v1/tasks/<str:task_id>/logs/", csrf_exempt(ingest_task_logs), name="task-logs-ingest"),
-    path("api/dispatch/v1/tasks/<str:task_id>/meter/", csrf_exempt(ingest_task_meter), name="task-meter-ingest"),
+    path(
+        "api/dispatch/v1/tasks/<str:task_id>/meter/", csrf_exempt(ingest_task_meter), name="task-meter-ingest"
+    ),
 ]

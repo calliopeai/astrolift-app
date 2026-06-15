@@ -230,7 +230,6 @@ def _make_running_vnc_task(org, *, vnc_enabled: bool = True, pod_name: str = "ag
 def _grant_watch(user, org):
     """Bind ``user`` to a role carrying agent_task.watch in ``org``."""
     from astrolift_identity.models import Role, RoleBinding
-
     from core.permissions import Permission
 
     role = Role.objects.create(
@@ -324,17 +323,11 @@ def test_check_vnc_permission_grants_only_with_watch() -> None:
 
     try:
         # No binding yet -> deny-by-default.
-        assert (
-            _check_vnc_permission.func(tenant_org_id=org.id, actor_user_id=user.id)
-            is False
-        )
+        assert _check_vnc_permission.func(tenant_org_id=org.id, actor_user_id=user.id) is False
 
         # Grant agent_task.watch in this org -> now allowed.
         _grant_watch(user, org)
-        assert (
-            _check_vnc_permission.func(tenant_org_id=org.id, actor_user_id=user.id)
-            is True
-        )
+        assert _check_vnc_permission.func(tenant_org_id=org.id, actor_user_id=user.id) is True
     finally:
         # _check_vnc_permission sets the tenant contextvar; don't leak it.
         clear_current_tenant()
@@ -352,15 +345,9 @@ def test_check_vnc_permission_is_org_scoped() -> None:
     _grant_watch(user, org_a)
 
     try:
-        assert (
-            _check_vnc_permission.func(tenant_org_id=org_a.id, actor_user_id=user.id)
-            is True
-        )
+        assert _check_vnc_permission.func(tenant_org_id=org_a.id, actor_user_id=user.id) is True
         # Same user, different org, no binding there -> denied.
-        assert (
-            _check_vnc_permission.func(tenant_org_id=org_b.id, actor_user_id=user.id)
-            is False
-        )
+        assert _check_vnc_permission.func(tenant_org_id=org_b.id, actor_user_id=user.id) is False
     finally:
         clear_current_tenant()
 

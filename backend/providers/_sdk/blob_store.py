@@ -142,10 +142,7 @@ class BlobStoreSizeError(BlobStoreError):
         self.key = key
         self.limit_bytes = limit_bytes
         self.actual_bytes = actual_bytes
-        super().__init__(
-            f"Blob {key!r} exceeds size limit: "
-            f"{actual_bytes} > {limit_bytes} bytes"
-        )
+        super().__init__(f"Blob {key!r} exceeds size limit: " f"{actual_bytes} > {limit_bytes} bytes")
 
 
 class BlobStoreNotConfiguredError(BlobStoreError):
@@ -246,9 +243,7 @@ class LocalFsBlobStoreDriver:
                 BlobInfo(
                     key=rel,
                     size_bytes=stat.st_size,
-                    last_modified=datetime.datetime.fromtimestamp(
-                        stat.st_mtime, tz=datetime.timezone.utc
-                    ).isoformat(),
+                    last_modified=datetime.datetime.fromtimestamp(stat.st_mtime, tz=datetime.timezone.utc).isoformat(),
                 )
             )
             return results
@@ -334,9 +329,9 @@ class S3BlobStoreDriver:
             import io
 
             buf = io.BytesIO(b"".join(data))
-            self._s3.upload_fileobj(buf, self._bucket, full_key, ExtraArgs={
-                k: v for k, v in kwargs.items() if k not in ("Bucket", "Key")
-            })
+            self._s3.upload_fileobj(
+                buf, self._bucket, full_key, ExtraArgs={k: v for k, v in kwargs.items() if k not in ("Bucket", "Key")}
+            )
 
     def download(self, key: str) -> bytes:
         full_key = self._full_key(key)
@@ -401,7 +396,7 @@ class S3BlobStoreDriver:
                 # see the same key space they uploaded to.
                 raw_key = obj["Key"]
                 if self._prefix and raw_key.startswith(self._prefix + "/"):
-                    display_key = raw_key[len(self._prefix) + 1:]
+                    display_key = raw_key[len(self._prefix) + 1 :]
                 else:
                     display_key = raw_key
                 results.append(
@@ -518,7 +513,7 @@ class GCSBlobStoreDriver:
         for blob in self._client.list_blobs(self._bucket_name, prefix=full_prefix):
             raw_key = blob.name
             if self._prefix and raw_key.startswith(self._prefix + "/"):
-                display_key = raw_key[len(self._prefix) + 1:]
+                display_key = raw_key[len(self._prefix) + 1 :]
             else:
                 display_key = raw_key
             results.append(
@@ -560,9 +555,7 @@ class ABSBlobStoreDriver:
         else:
             from azure.storage.blob import BlobServiceClient  # type: ignore[import-untyped]
 
-            self._service = BlobServiceClient(
-                account_url=account_url, credential=credential
-            )
+            self._service = BlobServiceClient(account_url=account_url, credential=credential)
 
     def _full_key(self, key: str) -> str:
         if self._prefix:
@@ -577,9 +570,7 @@ class ABSBlobStoreDriver:
         content_type: str = "application/octet-stream",
     ) -> None:
         payload = data if isinstance(data, bytes) else b"".join(data)
-        client = self._service.get_blob_client(
-            container=self._container, blob=self._full_key(key)
-        )
+        client = self._service.get_blob_client(container=self._container, blob=self._full_key(key))
         client.upload_blob(
             payload,
             overwrite=True,
@@ -589,9 +580,7 @@ class ABSBlobStoreDriver:
     def download(self, key: str) -> bytes:
         from azure.core.exceptions import ResourceNotFoundError  # type: ignore[import-untyped]
 
-        client = self._service.get_blob_client(
-            container=self._container, blob=self._full_key(key)
-        )
+        client = self._service.get_blob_client(container=self._container, blob=self._full_key(key))
         try:
             return client.download_blob().readall()
         except ResourceNotFoundError:
@@ -607,9 +596,7 @@ class ABSBlobStoreDriver:
         )
 
         full_key = self._full_key(key)
-        client = self._service.get_blob_client(
-            container=self._container, blob=full_key
-        )
+        client = self._service.get_blob_client(container=self._container, blob=full_key)
         try:
             client.get_blob_properties()
         except ResourceNotFoundError:
@@ -656,9 +643,7 @@ class ABSBlobStoreDriver:
     def delete(self, key: str) -> None:
         from azure.core.exceptions import ResourceNotFoundError  # type: ignore[import-untyped]
 
-        client = self._service.get_blob_client(
-            container=self._container, blob=self._full_key(key)
-        )
+        client = self._service.get_blob_client(container=self._container, blob=self._full_key(key))
         try:
             client.delete_blob()
         except ResourceNotFoundError:
@@ -671,7 +656,7 @@ class ABSBlobStoreDriver:
         for blob in container_client.list_blobs(name_starts_with=full_prefix):
             raw_key = blob.name
             if self._prefix and raw_key.startswith(self._prefix + "/"):
-                display_key = raw_key[len(self._prefix) + 1:]
+                display_key = raw_key[len(self._prefix) + 1 :]
             else:
                 display_key = raw_key
             results.append(
@@ -777,10 +762,7 @@ def artifact_blob_key(
     All path components are URL-safe by convention; callers must validate
     ``artifact_name`` before passing it here.
     """
-    return (
-        f"astrolift/{env}/{org_id}/pipelines/{pipeline_id}"
-        f"/runs/{run_number}/{job_id}/{artifact_name}"
-    )
+    return f"astrolift/{env}/{org_id}/pipelines/{pipeline_id}" f"/runs/{run_number}/{job_id}/{artifact_name}"
 
 
 def run_blob_prefix(
@@ -794,9 +776,7 @@ def run_blob_prefix(
 
     Used to list or delete all artifacts for a given run.
     """
-    return (
-        f"astrolift/{env}/{org_id}/pipelines/{pipeline_id}/runs/{run_number}/"
-    )
+    return f"astrolift/{env}/{org_id}/pipelines/{pipeline_id}/runs/{run_number}/"
 
 
 # ---------------------------------------------------------------------------

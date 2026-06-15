@@ -33,7 +33,7 @@ class K8sJobSpawner(ContainerSpawner):
         self._cluster = cluster
         self._namespace = namespace
 
-    def spawn(self, task: "AgentTask") -> SpawnResult:
+    def spawn(self, task: AgentTask) -> SpawnResult:
         """Create a K8s Job for the given AgentTask."""
         from astrolift_dispatch.brief_injector import inject_brief_into_job_spec
         from astrolift_dispatch.snapshot_injector import inject_snapshot_into_job_spec
@@ -205,7 +205,7 @@ def _render_agent_job(*, job_name: str, workload, namespace: str, task) -> dict:
             },
         },
         "spec": {
-            "backoffLimit": 0,         # No retries — AgentTask handles retry logic
+            "backoffLimit": 0,  # No retries — AgentTask handles retry logic
             "completions": 1,
             "template": {
                 "metadata": {

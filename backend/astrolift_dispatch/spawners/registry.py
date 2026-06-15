@@ -15,8 +15,10 @@ def get_spawner(backend: str, *, cluster=None, namespace: str = "default") -> Co
     """
     if backend == "k8s_job":
         from astrolift_dispatch.spawners.k8s_job import K8sJobSpawner
+
         return K8sJobSpawner(cluster=cluster, namespace=namespace)
     if backend == "local_docker":
         from astrolift_dispatch.spawners.local_docker import LocalDockerSpawner
+
         return LocalDockerSpawner()
     raise ValueError(f"Unknown spawn backend: {backend!r}. Valid: k8s_job, local_docker")

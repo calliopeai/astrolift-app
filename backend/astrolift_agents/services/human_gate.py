@@ -27,10 +27,9 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+import requests
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
-from django.urls import reverse
-import requests
 
 from core.events import Event
 
@@ -43,7 +42,7 @@ log = logging.getLogger(__name__)
 DEFAULT_REMINDER_HOURS = 24
 
 
-def notify_human_gate(workflow_run: "WorkflowInstance", stage: dict) -> dict[str, bool]:
+def notify_human_gate(workflow_run: WorkflowInstance, stage: dict) -> dict[str, bool]:
     """Notify reviewers that a human_gate stage needs their attention.
 
     *workflow_run* is a ``workflows.WorkflowInstance``. *stage* is the
@@ -99,7 +98,7 @@ def notify_human_gate(workflow_run: "WorkflowInstance", stage: dict) -> dict[str
 
 def send_gate_notification_email(
     recipient_email: str,
-    workflow_run: "WorkflowInstance",
+    workflow_run: WorkflowInstance,
     stage: dict,
 ) -> bool:
     """Send a human-gate review request email to *recipient_email*.
@@ -157,7 +156,7 @@ def send_gate_notification_email(
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
 
-def _resolve_recipients(workflow_run: "WorkflowInstance", stage: dict) -> list[str]:
+def _resolve_recipients(workflow_run: WorkflowInstance, stage: dict) -> list[str]:
     """Return the list of email addresses to notify.
 
     Resolution order (matches spec #59):
@@ -194,7 +193,7 @@ def _resolve_recipients(workflow_run: "WorkflowInstance", stage: dict) -> list[s
     return emails
 
 
-def _build_review_url(workflow_run: "WorkflowInstance") -> str:
+def _build_review_url(workflow_run: WorkflowInstance) -> str:
     """Best-effort deep link to the workflow instance review UI."""
     try:
         return (
@@ -205,7 +204,7 @@ def _build_review_url(workflow_run: "WorkflowInstance") -> str:
         return ""
 
 
-def _resolve_triggered_by(workflow_run: "WorkflowInstance") -> str:
+def _resolve_triggered_by(workflow_run: WorkflowInstance) -> str:
     try:
         user = getattr(workflow_run, "created_by", None)
         if user is None:
@@ -218,7 +217,7 @@ def _resolve_triggered_by(workflow_run: "WorkflowInstance") -> str:
 
 def _send_slack_notification(
     webhook_url: str,
-    workflow_run: "WorkflowInstance",
+    workflow_run: WorkflowInstance,
     stage: dict,
 ) -> bool:
     """Post a Block Kit message to the configured Slack webhook."""
@@ -265,7 +264,7 @@ def _send_slack_notification(
 
 
 def _emit_gate_event(
-    workflow_run: "WorkflowInstance",
+    workflow_run: WorkflowInstance,
     stage: dict,
     delivery_results: dict[str, bool],
 ) -> None:

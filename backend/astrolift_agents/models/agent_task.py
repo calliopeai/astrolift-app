@@ -155,9 +155,7 @@ class AgentTask(BaseCoreModel):
         """
         if self.pk is not None:
             try:
-                current_db = AgentTask.all_objects.filter(pk=self.pk).values_list(
-                    "status", flat=True
-                ).first()
+                current_db = AgentTask.all_objects.filter(pk=self.pk).values_list("status", flat=True).first()
             except Exception:
                 current_db = None
 
@@ -165,8 +163,7 @@ class AgentTask(BaseCoreModel):
                 allowed = self._TRANSITIONS.get(current_db, set())
                 if self.status not in allowed:
                     raise ValidationError(
-                        f"AgentTask({self.pk}) cannot transition "
-                        f"{current_db!r} → {self.status!r}"
+                        f"AgentTask({self.pk}) cannot transition " f"{current_db!r} → {self.status!r}"
                     )
 
     def transition_to(self, new_status: str) -> None:
@@ -178,9 +175,7 @@ class AgentTask(BaseCoreModel):
         current = self.status
         allowed = self._TRANSITIONS.get(current, set())
         if new_status not in allowed:
-            raise ValueError(
-                f"AgentTask({self.pk}) cannot transition {current!r} → {new_status!r}"
-            )
+            raise ValueError(f"AgentTask({self.pk}) cannot transition {current!r} → {new_status!r}")
         now = timezone.now()
         self.status = new_status
         if new_status == self.Status.QUEUED:

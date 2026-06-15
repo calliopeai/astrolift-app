@@ -19,13 +19,13 @@ This approach keeps secret values out of env vars and out of the Brief blob.
 from __future__ import annotations
 
 import json
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from astrolift_agents.models import AgentTask, Brief
 
 
-def brief_env_vars(task: "AgentTask") -> list[dict[str, str]]:
+def brief_env_vars(task: AgentTask) -> list[dict[str, str]]:
     """Return the env vars that inject Brief identity into the agent container.
 
     Returns a list of K8s env var specs (name + value).
@@ -42,7 +42,7 @@ def brief_env_vars(task: "AgentTask") -> list[dict[str, str]]:
     ]
 
 
-def inject_brief_into_job_spec(job_spec: dict[str, Any], task: "AgentTask") -> dict[str, Any]:
+def inject_brief_into_job_spec(job_spec: dict[str, Any], task: AgentTask) -> dict[str, Any]:
     """Add Brief environment variables to a K8s Job pod spec.
 
     Mutates the first container's env list in the pod template spec.
@@ -72,7 +72,7 @@ def inject_brief_into_job_spec(job_spec: dict[str, Any], task: "AgentTask") -> d
     return job_spec
 
 
-def serialize_brief_for_env(brief: "Brief") -> str:
+def serialize_brief_for_env(brief: Brief) -> str:
     """Serialize a Brief to a compact JSON string for env var injection.
 
     This is an alternative to the ID-based approach: the full Brief
@@ -81,16 +81,20 @@ def serialize_brief_for_env(brief: "Brief") -> str:
 
     The serialized form omits secrets_refs values — only names are included.
     """
-    return json.dumps({
-        "id": str(brief.guid),
-        "hash": brief.content_hash,
-        "manifest": brief.manifest_snapshot,
-        "context": brief.context,
-        "secret_names": [ref["name"] for ref in (brief.secrets_refs or []) if isinstance(ref, dict)],
-    }, separators=(",", ":"))
+    return json.dumps(
+        {
+            "id": str(brief.guid),
+            "hash": brief.content_hash,
+            "manifest": brief.manifest_snapshot,
+            "context": brief.context,
+            "secret_names": [ref["name"] for ref in (brief.secrets_refs or []) if isinstance(ref, dict)],
+        },
+        separators=(",", ":"),
+    )
 
 
 def _get_controller_url() -> str:
     """Return the Controller API URL that agents should call back to."""
     from django.conf import settings
+
     return getattr(settings, "PLATFORM_API_URL", "")

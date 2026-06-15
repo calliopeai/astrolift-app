@@ -258,8 +258,7 @@ def route_scm_push_to_workflow_webhooks(event: ScmEvent) -> list[WorkflowInstanc
             )
         except Exception:
             log.exception(
-                "route_scm_push_to_workflow_webhooks: failed to trigger "
-                "instance for webhook %s (def=%s)",
+                "route_scm_push_to_workflow_webhooks: failed to trigger " "instance for webhook %s (def=%s)",
                 hook.pk,
                 hook.workflow_definition_id,
             )
@@ -316,9 +315,7 @@ def _enqueue_temporal(
             instance.temporal_workflow_id = handle.workflow_id
             instance.save(update_fields=["temporal_workflow_id", "updated_at"])
     except Exception:
-        log.exception(
-            "failed to enqueue Temporal workflow for instance %s", instance.pk
-        )
+        log.exception("failed to enqueue Temporal workflow for instance %s", instance.pk)
 
 
 def _schedule_id(definition: WorkflowDefinition, cron_expression: str) -> str:
@@ -339,6 +336,7 @@ def _create_temporal_schedule(
 ) -> None:
     """Create a Temporal schedule (sync wrapper)."""
     from asgiref.sync import async_to_sync
+
     from astrolift_workflows.client import _get_client_async
 
     @async_to_sync
@@ -346,8 +344,8 @@ def _create_temporal_schedule(
         from temporalio.client import (
             Schedule,
             ScheduleActionStartWorkflow,
-            ScheduleSpec,
             ScheduleCronString,
+            ScheduleSpec,
             ScheduleState,
         )
 
@@ -360,7 +358,11 @@ def _create_temporal_schedule(
                 "trigger_kind": "scheduled",
             },
             id=f"{schedule_id}-run",
-            task_queue=getattr(__import__("django.conf", fromlist=["settings"]).settings, "TEMPORAL_TASK_QUEUE", "astrolift-main"),
+            task_queue=getattr(
+                __import__("django.conf", fromlist=["settings"]).settings,
+                "TEMPORAL_TASK_QUEUE",
+                "astrolift-main",
+            ),
         )
         spec = ScheduleSpec(cron_strings=[ScheduleCronString(cron_expression)])
         await client.create_schedule(

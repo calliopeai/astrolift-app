@@ -17,7 +17,6 @@ import pytest
 from astrolift_agents.models import AgentTask, DispatcherInstance
 from astrolift_identity.models import Organization
 
-
 pytestmark = pytest.mark.django_db
 
 

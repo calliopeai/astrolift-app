@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class LocalDockerSpawner(ContainerSpawner):
     """Spawn agent tasks via local Docker (for dev/test without a cluster)."""
 
-    def spawn(self, task: "AgentTask") -> SpawnResult:
+    def spawn(self, task: AgentTask) -> SpawnResult:
         from astrolift_dispatch.brief_injector import brief_env_vars
         from astrolift_dispatch.snapshot_injector import snapshot_env_vars
         from astrolift_dispatch.spawners.k8s_job import _resolve_base_image, _vnc_image
@@ -53,7 +53,9 @@ class LocalDockerSpawner(ContainerSpawner):
         try:
             result = subprocess.run(
                 ["docker", "inspect", "--format", "{{.State.Status}} {{.State.ExitCode}}", external_id],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             if result.returncode != 0:
                 return TaskStatus(failed=True, error_message="container not found")
