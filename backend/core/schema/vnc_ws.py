@@ -1,12 +1,14 @@
-"""WebSocket noVNC relay — RFB-over-WS into a running agent task (#877).
+"""WebSocket VNC relay — RFB-over-WS into a running agent task (#877).
 
 Endpoint: ``/app/vnc/<task-guid>``
 
-Unlike the exec relay (:mod:`core.schema.exec_ws`), there is no JSON
-control protocol: noVNC speaks RFB over the websocket as a raw binary
-stream, so this handler just pumps bytes in both directions between the
-browser WebSocket and the agent pod's noVNC port (6080) reached via a
-kubernetes port-forward.
+This relay IS the websockify: the agent pod serves raw RFB on :5900
+(x11vnc) and ships no noVNC/websockify of its own; the browser runs the
+noVNC client and speaks RFB over this websocket. Unlike the exec relay
+(:mod:`core.schema.exec_ws`) there is no JSON control protocol — RFB is
+a raw binary stream — so this handler just pumps bytes in both directions
+between the browser WebSocket and the agent pod's raw RFB port (5900)
+reached via a kubernetes port-forward.
 
 Auth mirrors the exec relay and reuses the shared cookie/session/tenant
 resolution from :mod:`core.schema.ws_auth`. The caller must be:
@@ -45,16 +47,16 @@ from asgiref.sync import sync_to_async
 
 logger = logging.getLogger(__name__)
 
-# Container port the agent's noVNC server listens on (see the k8s_job
-# spawner, which adds containerPort 6080 when vnc is enabled).
-VNC_PORT = 6080
+# Container port the agent's raw RFB server (x11vnc) listens on (see the
+# k8s_job spawner, which adds containerPort 5900 when vnc is enabled).
+VNC_PORT = 5900
 
 
 # ---- Backend protocol ------------------------------------------------
 
 
 class VncSession:
-    """Open port-forward to a pod's noVNC port.
+    """Open port-forward to a pod's raw RFB port.
 
     ``recv`` returns the next chunk of bytes from the pod (``b""`` on
     EOF); ``sendall`` writes client bytes to the pod; ``close`` tears
@@ -283,8 +285,8 @@ async def vnc_ws_application(scope: dict, receive, send) -> None:
         )
 
         # Both directions run as concurrent pumps; the relay lives until
-        # whichever side closes first. noVNC is a raw RFB byte stream, so
-        # neither pump interprets frame contents — they just move bytes.
+        # whichever side closes first. RFB is a raw byte stream, so neither
+        # pump interprets frame contents — they just move bytes.
         async def _pump_pod_to_client() -> None:
             while True:
                 chunk = await session.recv()

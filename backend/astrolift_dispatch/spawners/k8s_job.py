@@ -19,9 +19,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Container port the agent's noVNC server listens on when VNC is enabled
-# (mirrors core.schema.vnc_ws.VNC_PORT, the relay's port-forward target).
-VNC_PORT = 6080
+# Container port the agent's raw RFB server (x11vnc) listens on when VNC
+# is enabled (mirrors core.schema.vnc_ws.VNC_PORT, the relay's
+# port-forward target). The -vnc image serves raw RFB here; there is no
+# noVNC/websockify in the pod — the control-plane relay is the websockify.
+VNC_PORT = 5900
 
 
 class K8sJobSpawner(ContainerSpawner):
@@ -146,7 +148,7 @@ def _render_agent_job(*, job_name: str, workload, namespace: str, task) -> dict:
     port = primary_container.port if primary_container else 0
 
     # VNC-capable runs swap to the -vnc image variant and expose the
-    # noVNC port (6080) so the ASGI relay can port-forward into it.
+    # raw RFB port (5900) so the ASGI relay can port-forward into it.
     vnc = bool(getattr(task, "vnc_enabled", False))
     if vnc:
         spec = getattr(task, "environment_spec", None)

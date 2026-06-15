@@ -45,7 +45,7 @@ async def test_open_recv_sendall_close() -> None:
     sock = _FakeSock([b"chunk-1", b"chunk-2"])
     handle = _FakeHandle(sock)
 
-    fwd = await AsyncK8sPortForward.open(open_fn=lambda: handle, port=6080)
+    fwd = await AsyncK8sPortForward.open(open_fn=lambda: handle, port=5900)
 
     # recv drains the scripted chunks, then EOFs.
     assert await fwd.recv() == b"chunk-1"
@@ -74,5 +74,5 @@ async def test_open_runs_open_fn_once() -> None:
         calls.append(1)
         return handle
 
-    await AsyncK8sPortForward.open(open_fn=_open, port=6080)
+    await AsyncK8sPortForward.open(open_fn=_open, port=5900)
     assert calls == [1]

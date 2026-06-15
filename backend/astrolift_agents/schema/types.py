@@ -69,7 +69,7 @@ class AgentTaskType:
     finished_at: dt.datetime | None
     # True when this task launched on a VNC-capable pod.
     vnc_enabled: bool
-    # Relay path to the live noVNC framebuffer; empty until the task is
+    # Relay path to the live RFB framebuffer; empty until the task is
     # RUNNING on a VNC-capable pod. The client derives the ws URL from it.
     vnc_url: str
 

@@ -115,9 +115,9 @@ class AgentTask(BaseCoreModel):
     source_ref = models.CharField(max_length=512, blank=True, default="")
     # Frozen at spawn from the env spec's ``vnc_enabled`` so the task is
     # self-describing even after the spec is edited/deleted. Drives the
-    # -vnc image variant + containerPort 6080 in the spawner.
+    # -vnc image variant + containerPort 5900 (raw RFB) in the spawner.
     vnc_enabled = models.BooleanField(default=False)
-    # Relay path to the live noVNC framebuffer, set when the task reaches
+    # Relay path to the live RFB framebuffer, set when the task reaches
     # RUNNING on a VNC-capable pod. Empty otherwise. Matches the ASGI
     # relay registered at ``/app/vnc/<guid>`` (see core.schema.vnc_ws).
     vnc_url = models.CharField(max_length=512, blank=True, default="")

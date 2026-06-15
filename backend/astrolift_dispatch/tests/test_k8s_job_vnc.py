@@ -4,7 +4,7 @@
 these exercise them directly with lightweight stand-ins. The contract:
 
   vnc disabled -> base image untouched, only the app port (if any) exposed
-  vnc enabled  -> -vnc image variant + containerPort 6080 exposed
+  vnc enabled  -> -vnc image variant + containerPort 5900 (raw RFB) exposed
 """
 
 from __future__ import annotations
@@ -134,7 +134,7 @@ def test_render_vnc_disabled_no_app_port_omits_ports():
     assert "ports" not in _container_of(manifest)
 
 
-def test_render_vnc_enabled_uses_spec_image_variant_and_port_6080():
+def test_render_vnc_enabled_uses_spec_image_variant_and_raw_rfb_port():
     # Spec image_tag is the authoritative ECR/GHCR URI; the spawner must
     # consult it and swap to the -vnc variant when vnc is enabled.
     workload = _FakeWorkload("ghcr.io/old/ignored:0", 8080)
@@ -151,7 +151,10 @@ def test_render_vnc_enabled_uses_spec_image_variant_and_port_6080():
 
     assert container["image"] == "ghcr.io/calliopeai/astrolift-agent-claude-vnc:1.2"
     ports = [p["containerPort"] for p in container["ports"]]
-    assert VNC_PORT in ports
+    # The pod serves raw RFB on 5900 (x11vnc) — no noVNC/websockify in the
+    # pod, so the exposed VNC port must be 5900, not the old noVNC 6080.
+    assert VNC_PORT == 5900
+    assert 5900 in ports
     # The original app port is preserved alongside the VNC port.
     assert 8080 in ports
     # VNC port is not duplicated.

@@ -2,7 +2,7 @@
 cluster driver SDK port-forward.
 
 The WS relay in :mod:`core.schema.vnc_ws` calls into a :class:`VncBackend`
-to open a port-forward to a RUNNING agent task's pod noVNC port (6080).
+to open a port-forward to a RUNNING agent task's pod raw RFB port (5900).
 The backend's job is to:
 
 1. Re-resolve the AgentTask to its managed cluster + namespace + pod.
@@ -112,7 +112,7 @@ class _ClosedVncSession(VncSession):
 
 class K8sVncBackend(VncBackend):
     """Production backend — resolves the task's cluster + namespace +
-    pod and opens a kubernetes port-forward to the noVNC port, wrapped
+    pod and opens a kubernetes port-forward to the raw RFB port, wrapped
     in an asyncio-friendly session for the relay's byte pump."""
 
     async def open(self, *, task_guid: str) -> VncSession:

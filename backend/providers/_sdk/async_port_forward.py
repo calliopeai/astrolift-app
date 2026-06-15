@@ -5,7 +5,7 @@ port_forward` -> :class:`PortForwardHandle`) is fully blocking: opening
 the websocket blocks, and the per-port socket returned by
 ``handle.socket(port)`` is a blocking socket-like object. The VNC WS
 relay needs an asyncio-friendly read/write surface so it can pump
-frames between a browser WebSocket and the pod's noVNC port without
+frames between a browser WebSocket and the pod's raw RFB port without
 stalling the event loop.
 
 :class:`AsyncK8sPortForward` is the analogue of
@@ -13,7 +13,7 @@ stalling the event loop.
 the default executor, and ``recv`` / ``sendall`` wrap the blocking
 socket calls in ``run_in_executor`` so the coroutine yields while the
 kubelet relay does its work. There is no JSON control protocol here —
-noVNC speaks RFB over a raw byte stream, so the relay just moves bytes.
+RFB is a raw byte stream, so the relay just moves bytes.
 
 The class is cloud-neutral: it takes a synchronous ``open_fn`` callable
 (returning a ``PortForwardHandle``) so the caller decides which driver
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Per-read chunk size off the pod socket. noVNC framebuffer updates are
+# Per-read chunk size off the pod socket. RFB framebuffer updates are
 # bursty; 64 KiB keeps the executor round-trip count low without pinning
 # much memory per session.
 _RECV_CHUNK = 65536
