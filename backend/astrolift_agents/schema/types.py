@@ -74,6 +74,19 @@ class AgentTaskType:
     vnc_url: str
 
 
+@strawberry.type(name="AstroliftAgentRuntime")
+class AgentRuntimeType:
+    """A selectable agent runtime from the public runtime catalog.
+
+    ``name`` is the short-name an AgentEnvironmentSpec references; ``image``
+    is the default-tagged public base image it resolves to. The watchable
+    ``-vnc`` variant is derived at spawn, not surfaced here.
+    """
+
+    name: str
+    image: str
+
+
 @strawberry.type(name="AstroliftDispatcherInstance")
 class DispatcherInstanceType:
     id: GUID

@@ -202,6 +202,11 @@ export type AstroliftAgentRun = {
   workloadSlug: Scalars['String']['output'];
 };
 
+export type AstroliftAgentRuntime = {
+  image: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+};
+
 export type AstroliftAgentTask = {
   callbackUrl: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
@@ -5762,6 +5767,7 @@ export type PushManifestToRepoInput = {
 export type Query = {
   ObjectStoreMetrics: Array<Array<Scalars['String']['output']>>;
   PostgresMetrics: Array<Array<Scalars['String']['output']>>;
+  agentRuntimes: Array<AstroliftAgentRuntime>;
   agentTask?: Maybe<AstroliftAgentTask>;
   agentTasks: Array<AstroliftAgentTask>;
   assignableAstroliftProjects: Array<AstroliftProject>;

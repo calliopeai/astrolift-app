@@ -176,6 +176,11 @@ type AstroliftAgentRun {
   createdAt: DateTime!
 }
 
+type AstroliftAgentRuntime {
+  name: String!
+  image: String!
+}
+
 type AstroliftAgentTask {
   id: GUID!
   status: String!
@@ -4668,6 +4673,7 @@ type Query {
   brief(id: ID!): AstroliftBrief
   agentTasks(orgId: ID!, status: String = null): [AstroliftAgentTask!]!
   agentTask(id: ID!): AstroliftAgentTask
+  agentRuntimes: [AstroliftAgentRuntime!]!
   dispatchers: [AstroliftDispatcherInstance!]!
 
   """List all workflow definitions."""

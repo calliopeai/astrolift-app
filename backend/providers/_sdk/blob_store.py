@@ -84,6 +84,23 @@ class BlobStoreDriver(Protocol):
         """
         ...
 
+    def presigned_upload_url(
+        self,
+        key: str,
+        *,
+        expires_in: int = 900,
+        content_type: str = "application/octet-stream",
+    ) -> str:
+        """Return a time-limited, write-only (PUT) URL scoped to ``key``.
+
+        Unlike :meth:`presigned_url` this does not require the object to
+        already exist — it grants a single PUT to that exact key. Used by the
+        agent VNC snapshot uploader, which PUTs a JPEG to the URL every N
+        seconds. ``content_type`` is bound into the signature so the upload
+        must use the matching header. ``expires_in`` is TTL in seconds.
+        """
+        ...
+
     def delete(self, key: str) -> None:
         """Delete the blob at ``key``.
 
@@ -196,6 +213,19 @@ class LocalFsBlobStoreDriver:
         # Unused by local dev but preserved in the signature for protocol parity.
         _ = expires_in
         return f"file://{path}"
+
+    def presigned_upload_url(
+        self,
+        key: str,
+        *,
+        expires_in: int = 900,
+        content_type: str = "application/octet-stream",
+    ) -> str:
+        # The dev driver has no network PUT endpoint; return the target
+        # ``file://`` path (no existence check — this is a write target).
+        # ``expires_in``/``content_type`` are accepted for protocol parity.
+        _ = (expires_in, content_type)
+        return f"file://{self._full_path(key)}"
 
     def delete(self, key: str) -> None:
         path = self._full_path(key)
@@ -330,6 +360,32 @@ class S3BlobStoreDriver:
             ExpiresIn=expires_in,
         )
 
+    def presigned_upload_url(
+        self,
+        key: str,
+        *,
+        expires_in: int = 900,
+        content_type: str = "application/octet-stream",
+    ) -> str:
+        full_key = self._full_key(key)
+        params: dict = {
+            "Bucket": self._bucket,
+            "Key": full_key,
+            "ContentType": content_type,
+        }
+        # Bind the same SSE the bucket policy requires so the PUT isn't
+        # rejected by an encryption-enforcing bucket policy.
+        if self._kms_key_id:
+            params["ServerSideEncryption"] = "aws:kms"
+            params["SSEKMSKeyId"] = self._kms_key_id
+        else:
+            params["ServerSideEncryption"] = "AES256"
+        return self._s3.generate_presigned_url(
+            "put_object",
+            Params=params,
+            ExpiresIn=expires_in,
+        )
+
     def delete(self, key: str) -> None:
         full_key = self._full_key(key)
         # S3 delete_object is idempotent; missing keys return 204.
@@ -426,6 +482,25 @@ class GCSBlobStoreDriver:
             version="v4",
             expiration=datetime.timedelta(seconds=expires_in),
             method="GET",
+        )
+
+    def presigned_upload_url(
+        self,
+        key: str,
+        *,
+        expires_in: int = 900,
+        content_type: str = "application/octet-stream",
+    ) -> str:
+        import datetime
+
+        # No existence check — this is a write target. The signed URL binds
+        # the content type so the PUT must send a matching Content-Type.
+        blob = self._bucket.blob(self._full_key(key))
+        return blob.generate_signed_url(
+            version="v4",
+            expiration=datetime.timedelta(seconds=expires_in),
+            method="PUT",
+            content_type=content_type,
         )
 
     def delete(self, key: str) -> None:
@@ -550,6 +625,34 @@ class ABSBlobStoreDriver:
         )
         return f"{self._service.url}/{self._container}/{full_key}?{sas}"
 
+    def presigned_upload_url(
+        self,
+        key: str,
+        *,
+        expires_in: int = 900,
+        content_type: str = "application/octet-stream",
+    ) -> str:
+        import datetime
+
+        from azure.storage.blob import (  # type: ignore[import-untyped]
+            BlobSasPermissions,
+            generate_blob_sas,
+        )
+
+        # No existence check — write target. ``create``+``write`` grant the
+        # snapshot uploader a single PUT to the exact blob.
+        _ = content_type
+        full_key = self._full_key(key)
+        sas = generate_blob_sas(
+            account_name=self._service.account_name,
+            container_name=self._container,
+            blob_name=full_key,
+            account_key=self._service.credential.account_key,
+            permission=BlobSasPermissions(create=True, write=True),
+            expiry=datetime.datetime.utcnow() + datetime.timedelta(seconds=expires_in),
+        )
+        return f"{self._service.url}/{self._container}/{full_key}?{sas}"
+
     def delete(self, key: str) -> None:
         from azure.core.exceptions import ResourceNotFoundError  # type: ignore[import-untyped]
 
@@ -635,6 +738,15 @@ class MinioBlobStoreDriver:
 
     def presigned_url(self, key: str, *, expires_in: int = 900) -> str:
         return self._inner.presigned_url(key, expires_in=expires_in)
+
+    def presigned_upload_url(
+        self,
+        key: str,
+        *,
+        expires_in: int = 900,
+        content_type: str = "application/octet-stream",
+    ) -> str:
+        return self._inner.presigned_upload_url(key, expires_in=expires_in, content_type=content_type)
 
     def delete(self, key: str) -> None:
         self._inner.delete(key)

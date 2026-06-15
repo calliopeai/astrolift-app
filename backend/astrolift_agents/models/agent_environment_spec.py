@@ -29,8 +29,15 @@ class AgentEnvironmentSpec(BaseCoreModel):
     )
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=128)
-    # ECR image URI the dispatcher pulls for this spec.
-    image_tag = models.CharField(max_length=512)
+    # Explicit image ref (e.g. a pinned ECR/private URI) the dispatcher pulls
+    # for this spec. When set it WINS over ``runtime``; leave blank to resolve
+    # the image from the runtime catalog instead.
+    image_tag = models.CharField(max_length=512, blank=True, default="")
+    # Catalog runtime short-name (e.g. "claude", "aider"). Resolves to the
+    # public image ``docker.io/calliopeai/astrolift-agent-<name>`` via
+    # astrolift_agents.runtime_catalog when ``image_tag`` is blank. Empty =
+    # no catalog runtime (the dispatcher falls back to the workload image).
+    runtime = models.CharField(max_length=64, blank=True, default="")
     agent_type = models.CharField(max_length=50, choices=AgentType.choices)
     # Named tool bundle, e.g. "dev+k8s".  Empty = image defaults only.
     tool_preset = models.CharField(max_length=128, blank=True, default="")

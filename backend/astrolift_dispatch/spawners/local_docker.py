@@ -19,17 +19,21 @@ class LocalDockerSpawner(ContainerSpawner):
 
     def spawn(self, task: "AgentTask") -> SpawnResult:
         from astrolift_dispatch.brief_injector import brief_env_vars
+        from astrolift_dispatch.snapshot_injector import snapshot_env_vars
+        from astrolift_dispatch.spawners.k8s_job import _resolve_base_image, _vnc_image
 
         workload = task.agent_definition
-        image = "ubuntu:22.04"
-        if workload:
-            primary = workload.container_set.filter(is_primary=True).first()
-            if primary and primary.image_ref:
-                image = primary.image_ref
+        spec = getattr(task, "environment_spec", None)
+        # Honour the runtime catalog / explicit image_tag precedence, same as
+        # the K8s spawner; fall back to ubuntu only when nothing resolves.
+        image = _resolve_base_image(workload, spec) if (workload or spec) else "ubuntu:22.04"
+        if getattr(task, "vnc_enabled", False):
+            image = _vnc_image(image)
 
         container_name = f"agent-task-{str(task.guid)[:12]}"
 
-        env_vars = brief_env_vars(task)
+        # Brief identity + (for VNC tasks) the snapshot PUT URL env vars.
+        env_vars = brief_env_vars(task) + snapshot_env_vars(task)
         env_args = []
         for ev in env_vars:
             env_args += ["-e", f"{ev['name']}={ev['value']}"]

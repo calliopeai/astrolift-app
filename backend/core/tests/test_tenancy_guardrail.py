@@ -212,6 +212,14 @@ EXEMPT: dict[str, str] = {
         "the form builder UI offers. Knowing which renderers exist "
         "leaks nothing about any tenant."
     ),
+    "AgentsQuery.agent_runtimes": (
+        "platform-level reference data: the public runtime catalog is "
+        "install-wide (not per-tenant) — the same 12 published agent images "
+        "are selectable by every org, same shape as astrolift_provider_plugins "
+        "and form_field_types. tenant_scoped() would have nothing to filter. "
+        "The resolver rejects anonymous callers inline so the catalog doesn't "
+        "leak to unauthenticated probes; no tenant data is exposed."
+    ),
     "AgentsQuery.dispatchers": (
         "platform-level routing fabric: DispatcherInstances span tenants "
         "(one per cluster/cloud/region) and are the dispatch router's "

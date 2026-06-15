@@ -19,6 +19,7 @@ from strawberry.types import Info
 
 from astrolift_agents.models import AgentTask, Brief, DispatcherInstance, Skill, ToolDef
 from astrolift_agents.schema.types import (
+    AgentRuntimeType,
     AgentTaskType,
     BriefType,
     DispatcherInstanceType,
@@ -188,6 +189,22 @@ class AgentsQuery:
             guid=str(id), organization_id=org_pk, deleted_at__isnull=True
         ).first()
         return agent_task_to_type(row) if row is not None else None
+
+    @strawberry.field
+    def agent_runtimes(self, info: Info) -> list[AgentRuntimeType]:
+        # Platform-level reference data: the public runtime catalog is
+        # install-wide (not per-tenant) — the same 12 published images are
+        # selectable by every org, so this intentionally escapes
+        # @tenant_scoped (same shape as astrolift_provider_plugins /
+        # form_field_types). Requires an authenticated caller inline so the
+        # catalog doesn't leak to anonymous probes. See EXEMPT entry in
+        # test_tenancy_guardrail.py.
+        from astrolift_agents.runtime_catalog import catalog_entries
+
+        user = getattr(getattr(info.context, "request", None), "user", None)
+        if user is None or not getattr(user, "is_authenticated", False):
+            raise GraphQLError("authentication required")
+        return [AgentRuntimeType(name=e["name"], image=e["image"]) for e in catalog_entries()]
 
     @strawberry.field
     def dispatchers(self, info: Info) -> list[DispatcherInstanceType]:

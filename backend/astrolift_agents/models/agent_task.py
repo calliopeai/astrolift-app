@@ -121,6 +121,10 @@ class AgentTask(BaseCoreModel):
     # RUNNING on a VNC-capable pod. Empty otherwise. Matches the ASGI
     # relay registered at ``/app/vnc/<guid>`` (see core.schema.vnc_ws).
     vnc_url = models.CharField(max_length=512, blank=True, default="")
+    # Blob key the pod-side snapshot uploader PUTs framebuffer JPEGs to,
+    # frozen at spawn for VNC tasks (``snapshots/<guid>/latest.jpg``). Empty
+    # for non-VNC tasks. The gallery resolves this to a presigned GET URL.
+    snapshot_key = models.CharField(max_length=512, blank=True, default="")
 
     class Meta:
         indexes = [

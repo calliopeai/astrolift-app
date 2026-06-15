@@ -36,6 +36,7 @@ class K8sJobSpawner(ContainerSpawner):
     def spawn(self, task: "AgentTask") -> SpawnResult:
         """Create a K8s Job for the given AgentTask."""
         from astrolift_dispatch.brief_injector import inject_brief_into_job_spec
+        from astrolift_dispatch.snapshot_injector import inject_snapshot_into_job_spec
         from core.cluster_observability import get_dynamic_client
 
         workload = task.agent_definition
@@ -54,6 +55,9 @@ class K8sJobSpawner(ContainerSpawner):
 
         # Inject Brief env vars
         job_manifest = inject_brief_into_job_spec(job_manifest, task)
+        # Provision + inject the per-task VNC snapshot PUT URL (no-op for
+        # non-VNC tasks and when no blob store is configured).
+        job_manifest = inject_snapshot_into_job_spec(job_manifest, task)
 
         try:
             client = get_dynamic_client(self._cluster)
@@ -111,11 +115,11 @@ def _vnc_image(image: str) -> str:
     Appends ``-vnc`` to the repository component while preserving the tag
     or digest, e.g.::
 
-        ghcr.io/calliopeai/astrolift-agent-claude:1.2  ->
-        ghcr.io/calliopeai/astrolift-agent-claude-vnc:1.2
+        docker.io/calliopeai/astrolift-agent-claude:latest  ->
+        docker.io/calliopeai/astrolift-agent-claude-vnc:latest
 
-        ghcr.io/calliopeai/agent@sha256:abcd  ->
-        ghcr.io/calliopeai/agent-vnc@sha256:abcd
+        docker.io/calliopeai/agent@sha256:abcd  ->
+        docker.io/calliopeai/agent-vnc@sha256:abcd
 
     A digest-pinned ref (``...@sha256:...``) must be split on ``@``: the
     digest itself contains a ``:`` so an rpartition on ``:`` would slice
@@ -141,19 +145,48 @@ def _vnc_image(image: str) -> str:
     return f"{repo}-vnc{sep}{tag}"
 
 
+def _resolve_base_image(workload, spec) -> str:
+    """Resolve the base agent image, honouring the runtime catalog.
+
+    Precedence (most specific wins):
+      1. An explicit ``spec.image_tag`` — a pinned private/ECR ref.
+      2. The spec's ``runtime`` short-name resolved through the public
+         runtime catalog (``docker.io/calliopeai/astrolift-agent-<name>``).
+      3. The workload's primary container image.
+      4. A distroless placeholder when the workload has no container.
+
+    The ``-vnc`` watchable variant is applied by the caller on top of this
+    base, never here.
+    """
+    if spec is not None and spec.image_tag:
+        return spec.image_tag
+    if spec is not None and getattr(spec, "runtime", ""):
+        from astrolift_agents.runtime_catalog import (
+            is_known_runtime,
+            resolve_runtime_image,
+        )
+
+        if is_known_runtime(spec.runtime):
+            return resolve_runtime_image(spec.runtime)
+    primary_container = workload.container_set.filter(is_primary=True).first() if workload else None
+    if primary_container and primary_container.image_ref:
+        return primary_container.image_ref
+    return "gcr.io/distroless/base"
+
+
 def _render_agent_job(*, job_name: str, workload, namespace: str, task) -> dict:
     """Build a minimal batch/v1 Job manifest for an agent workload."""
     primary_container = workload.container_set.filter(is_primary=True).first()
-    image = primary_container.image_ref if primary_container else "gcr.io/distroless/base"
     port = primary_container.port if primary_container else 0
+
+    spec = getattr(task, "environment_spec", None)
+    image = _resolve_base_image(workload, spec)
 
     # VNC-capable runs swap to the -vnc image variant and expose the
     # raw RFB port (5900) so the ASGI relay can port-forward into it.
     vnc = bool(getattr(task, "vnc_enabled", False))
     if vnc:
-        spec = getattr(task, "environment_spec", None)
-        base = spec.image_tag if (spec and spec.image_tag) else image
-        image = _vnc_image(base)
+        image = _vnc_image(image)
 
     ports = [{"containerPort": port}] if port else []
     if vnc:
