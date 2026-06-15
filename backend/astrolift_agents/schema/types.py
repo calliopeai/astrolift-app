@@ -81,6 +81,33 @@ class AgentTaskType:
     snapshot_url: str | None
 
 
+@strawberry.type(name="AstroliftAgentEnvironmentSpec")
+class AgentEnvironmentSpecType:
+    """A reusable, org-scoped recipe for the container environment an
+    agent task runs in.
+
+    ``secret_refs`` carries only the URIs/env-var bindings — never the
+    secret values (those are resolved by the dispatcher at launch). The
+    read surface is operator-facing.
+    """
+
+    id: GUID
+    name: str
+    slug: str
+    image_tag: str
+    runtime: str
+    agent_type: str
+    tool_preset: str
+    allow_install: bool
+    vnc_enabled: bool
+    secret_refs: JSON
+    env_vars: JSON
+    config_repo: str
+    config_branch: str
+    created_at: dt.datetime
+    updated_at: dt.datetime
+
+
 @strawberry.type(name="AstroliftAgentRuntime")
 class AgentRuntimeType:
     """A selectable agent runtime from the public runtime catalog.
@@ -203,4 +230,24 @@ def dispatcher_to_type(d) -> DispatcherInstanceType:
         capabilities=d.capability_labels or {},
         last_heartbeat=d.last_heartbeat_at,
         registered_at=d.created_at,
+    )
+
+
+def agent_env_spec_to_type(s) -> AgentEnvironmentSpecType:
+    return AgentEnvironmentSpecType(
+        id=GUID(str(s.guid)),
+        name=s.name,
+        slug=s.slug,
+        image_tag=s.image_tag or "",
+        runtime=s.runtime or "",
+        agent_type=s.agent_type,
+        tool_preset=s.tool_preset or "",
+        allow_install=s.allow_install,
+        vnc_enabled=s.vnc_enabled,
+        secret_refs=s.secret_refs or [],
+        env_vars=s.env_vars or {},
+        config_repo=s.config_repo or "",
+        config_branch=s.config_branch or "main",
+        created_at=s.created_at,
+        updated_at=s.updated_at,
     )

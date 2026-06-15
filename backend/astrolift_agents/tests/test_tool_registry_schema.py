@@ -19,7 +19,7 @@ from astrolift_agents.schema.mutations import AgentsMutation
 from astrolift_agents.schema.queries import AgentsQuery
 from astrolift_agents.services import brief_assembler
 from astrolift_identity.models import Organization
-from core.permissions import Permission
+from core.permissions import Permission, PermissionDenied
 from core.tenancy import TenantContext
 from core.tenancy import tenant_context as _tenant_ctx
 
@@ -68,7 +68,9 @@ def with_tenant_org():
 
 
 def _grant_all(resolver):
-    for p in (Permission.SKILL_READ, Permission.SKILL_WRITE, Permission.SKILL_IMPORT):
+    # The live registry resolvers gate reads on APP_READ and import on
+    # SKILL_IMPORT (see astrolift_agents/schema/{queries,mutations}.py).
+    for p in (Permission.APP_READ, Permission.SKILL_IMPORT):
         resolver.grant(p)
 
 
@@ -103,9 +105,7 @@ def test_org_tool_defs_returns_own_tools(permission_resolver, info, org, with_te
     assert rows[0].slug == "my-tool"
 
 
-def test_org_tool_defs_excludes_other_org_tools(
-    permission_resolver, info, org, other_org, with_tenant_org
-):
+def test_org_tool_defs_excludes_other_org_tools(permission_resolver, info, org, other_org, with_tenant_org):
     _grant_all(permission_resolver)
     _mk_skill_with_tool(org, "my-skill", "my-tool")
     _mk_skill_with_tool(other_org, "their-skill", "their-tool")
@@ -118,9 +118,7 @@ def test_org_tool_defs_excludes_other_org_tools(
     assert "their-tool" not in slugs
 
 
-def test_org_tool_defs_includes_global_skill_tools(
-    permission_resolver, info, org, with_tenant_org
-):
+def test_org_tool_defs_includes_global_skill_tools(permission_resolver, info, org, with_tenant_org):
     _grant_all(permission_resolver)
     global_skill = Skill.objects.create(
         organization=None,
@@ -147,8 +145,9 @@ def test_org_tool_defs_includes_global_skill_tools(
 
 
 def test_org_tool_defs_requires_permission(permission_resolver, info, org, with_tenant_org):
-    # No grants.
-    with pytest.raises(Exception):
+    # No grants. orgToolDefs is a query (no @mutation_audit), so the
+    # @require_permission denial propagates as PermissionDenied.
+    with pytest.raises(PermissionDenied):
         with with_tenant_org(org):
             AgentsQuery().org_tool_defs(info(), org_id=str(org.guid))
 
@@ -190,9 +189,7 @@ def _patch_get(monkeypatch, response: _FakeResponse):
     monkeypatch.setattr(brief_assembler.requests, "get", lambda url, **kw: response)
 
 
-def test_import_skills_from_repo_wires_through(
-    permission_resolver, info, org, with_tenant_org, monkeypatch
-):
+def test_import_skills_from_repo_wires_through(permission_resolver, info, org, with_tenant_org, monkeypatch):
     """The importSkillsFromRepo resolver delegates to the service and
     returns an ImportSkillsResult payload."""
     _grant_all(permission_resolver)
@@ -211,9 +208,7 @@ def test_import_skills_from_repo_wires_through(
     assert result.data.source_ref == "acme/agent-config@main"
 
 
-def test_import_skills_from_repo_rejects_non_github(
-    permission_resolver, info, org, with_tenant_org
-):
+def test_import_skills_from_repo_rejects_non_github(permission_resolver, info, org, with_tenant_org):
     _grant_all(permission_resolver)
 
     with with_tenant_org(org):
@@ -227,13 +222,14 @@ def test_import_skills_from_repo_rejects_non_github(
     assert any("github.com" in e.message for e in result.errors)
 
 
-def test_import_skills_from_repo_requires_permission(
-    permission_resolver, info, org, with_tenant_org
-):
-    # No grants — resolver must reject before hitting the service.
-    with pytest.raises(Exception):
-        with with_tenant_org(org):
-            AgentsMutation().import_skills_from_repo(
-                info(),
-                repo_url="https://github.com/acme/agent-config",
-            )
+def test_import_skills_from_repo_requires_permission(permission_resolver, info, org, with_tenant_org):
+    # No grants. ``@mutation_audit`` converts the PermissionDenied raised
+    # by ``@require_permission`` into a PERMISSION_DENIED envelope rather
+    # than letting it propagate (the mutation contract).
+    with with_tenant_org(org):
+        result = AgentsMutation().import_skills_from_repo(
+            info(),
+            repo_url="https://github.com/acme/agent-config",
+        )
+    assert result.ok is False
+    assert result.errors[0].code == "PERMISSION_DENIED"

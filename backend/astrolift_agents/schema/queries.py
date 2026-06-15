@@ -17,14 +17,23 @@ import strawberry
 from graphql import GraphQLError
 from strawberry.types import Info
 
-from astrolift_agents.models import AgentTask, Brief, DispatcherInstance, Skill, ToolDef
+from astrolift_agents.models import (
+    AgentEnvironmentSpec,
+    AgentTask,
+    Brief,
+    DispatcherInstance,
+    Skill,
+    ToolDef,
+)
 from astrolift_agents.schema.types import (
+    AgentEnvironmentSpecType,
     AgentRuntimeType,
     AgentTaskType,
     BriefType,
     DispatcherInstanceType,
     SkillType,
     ToolDefType,
+    agent_env_spec_to_type,
     agent_task_to_type,
     brief_to_type,
     dispatcher_to_type,
@@ -68,9 +77,7 @@ class AgentsQuery:
     @strawberry.field
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
-    def skills(
-        self, info: Info, org_id: strawberry.ID, is_global: bool = False
-    ) -> list[SkillType]:
+    def skills(self, info: Info, org_id: strawberry.ID, is_global: bool = False) -> list[SkillType]:
         """Org skills plus all global skills.
 
         ``is_global=True`` narrows to global skills only; otherwise the
@@ -84,10 +91,7 @@ class AgentsQuery:
             scope = Q(is_global=True)
         else:
             scope = Q(organization_id=org_pk) | Q(is_global=True)
-        qs = (
-            Skill.objects.filter(scope, deleted_at__isnull=True)
-            .order_by("-is_global", "slug")[:200]
-        )
+        qs = Skill.objects.filter(scope, deleted_at__isnull=True).order_by("-is_global", "slug")[:200]
         return [skill_to_type(s) for s in qs]
 
     @strawberry.field
@@ -101,13 +105,11 @@ class AgentsQuery:
 
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
-        row = (
-            Skill.objects.filter(
-                Q(organization_id=org_pk) | Q(is_global=True),
-                guid=str(id),
-                deleted_at__isnull=True,
-            ).first()
-        )
+        row = Skill.objects.filter(
+            Q(organization_id=org_pk) | Q(is_global=True),
+            guid=str(id),
+            deleted_at__isnull=True,
+        ).first()
         return skill_to_type(row) if row is not None else None
 
     @strawberry.field
@@ -120,13 +122,11 @@ class AgentsQuery:
 
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
-        skill = (
-            Skill.objects.filter(
-                Q(organization_id=org_pk) | Q(is_global=True),
-                guid=str(skill_id),
-                deleted_at__isnull=True,
-            ).first()
-        )
+        skill = Skill.objects.filter(
+            Q(organization_id=org_pk) | Q(is_global=True),
+            guid=str(skill_id),
+            deleted_at__isnull=True,
+        ).first()
         if skill is None:
             return []
         qs = ToolDef.objects.filter(skill=skill, deleted_at__isnull=True).order_by("slug")[:200]
@@ -157,9 +157,7 @@ class AgentsQuery:
         """One Brief by GUID, scoped to the caller's org."""
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
-        row = Brief.objects.filter(
-            guid=str(id), organization_id=org_pk, deleted_at__isnull=True
-        ).first()
+        row = Brief.objects.filter(guid=str(id), organization_id=org_pk, deleted_at__isnull=True).first()
         return brief_to_type(row) if row is not None else None
 
     @strawberry.field
@@ -225,6 +223,38 @@ class AgentsQuery:
         return agent_task_to_type(row) if row is not None else None
 
     @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def agent_environment_specs(self, info: Info, org_id: strawberry.ID) -> list[AgentEnvironmentSpecType]:
+        """The org's AgentEnvironmentSpecs, ordered by slug.
+
+        Org-scoped: ``org_id`` must match the caller's active tenant
+        (superusers excepted) — the spec carries secret *references* the
+        dispatcher resolves at launch, so it must never leak across orgs.
+        """
+        org_pk = _caller_org_id(info, org_id)
+        qs = AgentEnvironmentSpec.objects.filter(organization_id=org_pk, deleted_at__isnull=True).order_by(
+            "slug"
+        )[:200]
+        return [agent_env_spec_to_type(s) for s in qs]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def agent_environment_spec(self, info: Info, slug: str) -> AgentEnvironmentSpecType | None:
+        """One AgentEnvironmentSpec by slug, scoped to the caller's org.
+
+        A spec in another org resolves to null (not an error) so the
+        surface doesn't leak existence across tenants.
+        """
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        row = AgentEnvironmentSpec.objects.filter(
+            slug=slug, organization_id=org_pk, deleted_at__isnull=True
+        ).first()
+        return agent_env_spec_to_type(row) if row is not None else None
+
+    @strawberry.field
     def agent_runtimes(self, info: Info) -> list[AgentRuntimeType]:
         # Platform-level reference data: the public runtime catalog is
         # install-wide (not per-tenant) — the same 12 published images are
@@ -252,8 +282,5 @@ class AgentsQuery:
             raise GraphQLError("authentication required")
         if not (getattr(user, "is_staff", False) or getattr(user, "is_superuser", False)):
             raise GraphQLError("staff access required")
-        qs = (
-            DispatcherInstance.objects.filter(deleted_at__isnull=True)
-            .order_by("slug")[:200]
-        )
+        qs = DispatcherInstance.objects.filter(deleted_at__isnull=True).order_by("slug")[:200]
         return [dispatcher_to_type(d) for d in qs]

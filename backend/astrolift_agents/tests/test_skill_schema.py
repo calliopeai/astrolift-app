@@ -65,7 +65,9 @@ def with_tenant_org():
 
 
 def _grant_all(resolver):
-    for p in (Permission.SKILL_READ, Permission.SKILL_WRITE, Permission.SKILL_IMPORT):
+    # The live resolvers gate the skill read surface on APP_READ and the
+    # repo importer on SKILL_IMPORT (astrolift_agents/schema/*.py).
+    for p in (Permission.APP_READ, Permission.SKILL_IMPORT):
         resolver.grant(p)
 
 
@@ -93,7 +95,7 @@ def test_skills_lists_org_and_global(permission_resolver, info, org, other_org, 
     _mk_skill(other_org, "their-skill")
 
     with with_tenant_org(org):
-        rows = AgentsQuery().skills(info())
+        rows = AgentsQuery().skills(info(), org_id=str(org.guid))
 
     slugs = {r.slug for r in rows}
     assert "my-skill" in slugs
@@ -102,92 +104,62 @@ def test_skills_lists_org_and_global(permission_resolver, info, org, other_org, 
     assert "their-skill" not in slugs
 
 
-def test_skills_can_exclude_global(permission_resolver, info, org, with_tenant_org):
+def test_skills_global_only_narrows_to_global(permission_resolver, info, org, with_tenant_org):
     _grant_all(permission_resolver)
     _mk_skill(org, "my-skill")
     _mk_skill(None, "global-skill", is_global=True, organization_set=False)
 
     with with_tenant_org(org):
-        rows = AgentsQuery().skills(info(), include_global=False)
+        rows = AgentsQuery().skills(info(), org_id=str(org.guid), is_global=True)
 
     slugs = {r.slug for r in rows}
-    assert slugs == {"my-skill"}
+    assert slugs == {"global-skill"}
 
 
-def test_skills_filters_by_agent_type(permission_resolver, info, org, with_tenant_org):
+def test_skill_detail_returns_org_skill(permission_resolver, info, org, with_tenant_org):
     _grant_all(permission_resolver)
-    _mk_skill(org, "claude-skill", agent_type="claude")
-    _mk_skill(org, "codex-skill", agent_type="codex")
-    _mk_skill(org, "any-skill", agent_type="any")
+    org_row = _mk_skill(org, "my-skill")
 
     with with_tenant_org(org):
-        rows = AgentsQuery().skills(info(), agent_type="claude")
-
-    slugs = {r.slug for r in rows}
-    # Specific match + the runtime-agnostic "any" skill, never codex.
-    assert slugs == {"claude-skill", "any-skill"}
-
-
-def test_skills_filters_by_scaffolding_tag(permission_resolver, info, org, with_tenant_org):
-    _grant_all(permission_resolver)
-    _mk_skill(org, "review-skill", tags=["code-review"])
-    _mk_skill(org, "infra-skill", tags=["infra-ops"])
-
-    with with_tenant_org(org):
-        rows = AgentsQuery().skills(info(), scaffolding_tag="code-review")
-
-    assert {r.slug for r in rows} == {"review-skill"}
-
-
-def test_skills_excludes_inactive(permission_resolver, info, org, with_tenant_org):
-    _grant_all(permission_resolver)
-    active = _mk_skill(org, "active-skill")
-    inactive = _mk_skill(org, "inactive-skill")
-    inactive.is_active = False
-    inactive.save()
-
-    with with_tenant_org(org):
-        rows = AgentsQuery().skills(info())
-
-    assert {r.slug for r in rows} == {active.slug}
-
-
-def test_skill_detail_prefers_org_over_global(permission_resolver, info, org, with_tenant_org):
-    _grant_all(permission_resolver)
-    _mk_skill(None, "shared", is_global=True, organization_set=False)
-    org_row = _mk_skill(org, "shared")  # same slug, org-owned
-
-    with with_tenant_org(org):
-        result = AgentsQuery().skill(info(), slug="shared")
+        result = AgentsQuery().skill(info(), id=str(org_row.guid))
 
     assert result is not None
     assert result.is_global is False
     assert str(result.id) == str(org_row.guid)
 
 
-def test_skill_detail_cross_tenant_returns_null(
-    permission_resolver, info, org, other_org, with_tenant_org
-):
+def test_skill_detail_resolves_global(permission_resolver, info, org, with_tenant_org):
     _grant_all(permission_resolver)
-    _mk_skill(org, "secret-skill")
+    glob = _mk_skill(None, "shared", is_global=True, organization_set=False)
+
+    with with_tenant_org(org):
+        result = AgentsQuery().skill(info(), id=str(glob.guid))
+
+    assert result is not None
+    assert result.is_global is True
+    assert str(result.id) == str(glob.guid)
+
+
+def test_skill_detail_cross_tenant_returns_null(permission_resolver, info, org, other_org, with_tenant_org):
+    _grant_all(permission_resolver)
+    secret = _mk_skill(org, "secret-skill")
 
     with with_tenant_org(other_org):
-        result = AgentsQuery().skill(info(), slug="secret-skill")
+        result = AgentsQuery().skill(info(), id=str(secret.guid))
 
     assert result is None
 
 
-def test_skill_detail_exposes_tool_defs(permission_resolver, info, org, with_tenant_org):
+def test_tool_defs_for_skill(permission_resolver, info, org, with_tenant_org):
     _grant_all(permission_resolver)
     skill = _mk_skill(org, "with-tools")
-    ToolDef.objects.create(skill=skill, name="cat", slug="cat", commands=["cat"], capability_group="dev")
+    ToolDef.objects.create(skill=skill, name="cat", slug="cat", adapter="python_fn", handler_ref="tools.cat")
 
     with with_tenant_org(org):
-        result = AgentsQuery().skill(info(), slug="with-tools")
+        rows = AgentsQuery().tool_defs(info(), skill_id=str(skill.guid))
 
-    assert result is not None
-    assert [t.slug for t in result.tool_defs] == ["cat"]
-    assert result.tool_defs[0].commands == ["cat"]
+    assert [t.slug for t in rows] == ["cat"]
+    assert rows[0].adapter == "python_fn"
 
 
 # ---------------------------------------------------------------------------
@@ -195,11 +167,11 @@ def test_skill_detail_exposes_tool_defs(permission_resolver, info, org, with_ten
 # ---------------------------------------------------------------------------
 
 
-def test_skills_requires_skill_read(info, org, with_tenant_org):
+def test_skills_requires_app_read(info, org, with_tenant_org):
     with with_tenant_org(org):
         with pytest.raises(PermissionDenied) as exc_info:
-            AgentsQuery().skills(info())
-    assert exc_info.value.permission.value == "skill.read"
+            AgentsQuery().skills(info(), org_id=str(org.guid))
+    assert exc_info.value.permission.value == "app.read"
 
 
 # ---------------------------------------------------------------------------
@@ -279,9 +251,7 @@ def test_import_mutation_defaults_branch_to_main(
     assert captured["url"].endswith("/repos/acme/agent-config/zipball/main")
 
 
-def test_import_mutation_rejects_non_github_url(
-    permission_resolver, info, org, with_tenant_org, monkeypatch
-):
+def test_import_mutation_rejects_non_github_url(permission_resolver, info, org, with_tenant_org, monkeypatch):
     _grant_all(permission_resolver)
     # Fetch must never run for an invalid URL.
     monkeypatch.setattr(
@@ -308,9 +278,7 @@ def test_import_mutation_surfaces_github_error_as_precondition(
     _patch_get(monkeypatch, _FakeResponse(b"", status_ok=False))
 
     with with_tenant_org(org):
-        result = AgentsMutation().import_skills_from_repo(
-            info(), repo_url="https://github.com/acme/missing"
-        )
+        result = AgentsMutation().import_skills_from_repo(info(), repo_url="https://github.com/acme/missing")
 
     assert result.ok is False
     assert result.errors[0].code == "PRECONDITION"

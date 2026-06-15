@@ -20,10 +20,19 @@ import strawberry
 from django.db import transaction
 from strawberry.types import Info
 
-from astrolift_agents.models import AgentTask, Brief, BriefSkillRef, Skill, ToolDef
+from astrolift_agents.models import (
+    AgentEnvironmentSpec,
+    AgentTask,
+    Brief,
+    BriefSkillRef,
+    Skill,
+    ToolDef,
+)
 from astrolift_agents.schema.types import (
+    AgentEnvironmentSpecType,
     SkillType,
     ToolDefType,
+    agent_env_spec_to_type,
     skill_to_type,
     tool_def_to_type,
 )
@@ -68,6 +77,45 @@ class ToolDefInput:
     handler_ref: str
     # See SkillInput.dependencies — None default, resolver coerces to {}.
     implementation_config: JSON | None = None
+
+
+@strawberry.input
+class CreateAgentEnvironmentSpecInput:
+    name: str
+    slug: str
+    agent_type: str
+    # When set, the explicit image ref wins over ``runtime``; leave blank
+    # to resolve the image from the runtime catalog instead.
+    image_tag: str = ""
+    runtime: str = ""
+    tool_preset: str = ""
+    allow_install: bool = False
+    vnc_enabled: bool = False
+    config_repo: str = ""
+    config_branch: str = "main"
+    # Secret URIs only — never values. See SkillInput.dependencies for why
+    # these are None-defaulted JSON (the SDL printer can't render an empty
+    # collection literal); the resolver coerces None → []/{}.
+    secret_refs: JSON | None = None
+    env_vars: JSON | None = None
+
+
+@strawberry.input
+class UpdateAgentEnvironmentSpecInput:
+    # Every field optional: only supplied (non-None) fields are applied so
+    # the mutation is a partial update. ``slug`` is immutable (it's the
+    # lookup key) and intentionally absent.
+    name: str | None = None
+    agent_type: str | None = None
+    image_tag: str | None = None
+    runtime: str | None = None
+    tool_preset: str | None = None
+    allow_install: bool | None = None
+    vnc_enabled: bool | None = None
+    config_repo: str | None = None
+    config_branch: str | None = None
+    secret_refs: JSON | None = None
+    env_vars: JSON | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -161,14 +209,10 @@ class AgentsMutation:
     @mutation_audit(action="agents.skill.update")
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
-    def update_skill(
-        self, info: Info, id: strawberry.ID, input: SkillInput
-    ) -> MutationResultType[SkillType]:
+    def update_skill(self, info: Info, id: strawberry.ID, input: SkillInput) -> MutationResultType[SkillType]:
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
-        skill = Skill.objects.filter(
-            guid=str(id), organization_id=org_pk, deleted_at__isnull=True
-        ).first()
+        skill = Skill.objects.filter(guid=str(id), organization_id=org_pk, deleted_at__isnull=True).first()
         if skill is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "skill not found")
         if not input.name.strip():
@@ -193,9 +237,7 @@ class AgentsMutation:
     def delete_skill(self, info: Info, id: strawberry.ID) -> MutationResultType[SkillType]:
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
-        skill = Skill.objects.filter(
-            guid=str(id), organization_id=org_pk, deleted_at__isnull=True
-        ).first()
+        skill = Skill.objects.filter(guid=str(id), organization_id=org_pk, deleted_at__isnull=True).first()
         if skill is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "skill not found")
         skill.soft_delete()
@@ -295,6 +337,120 @@ class AgentsMutation:
         tool.soft_delete()
         return gql_success(tool_def_to_type(tool))
 
+    # ---- AgentEnvironmentSpec CRUD --------------------------------
+
+    @strawberry.field
+    @mutation_audit(action="agents.env_spec.create")
+    @require_permission(Permission.APP_CREATE)
+    @tenant_scoped()
+    def create_agent_environment_spec(
+        self, info: Info, input: CreateAgentEnvironmentSpecInput, org_id: strawberry.ID
+    ) -> MutationResultType[AgentEnvironmentSpecType]:
+        org, err = _resolve_org(org_id)
+        if err is not None:
+            return err
+        if not input.name.strip():
+            return gql_failure(ErrorCode.VALIDATION.value, "name is required", field="name")
+        if not input.slug.strip():
+            return gql_failure(ErrorCode.VALIDATION.value, "slug is required", field="slug")
+        if input.agent_type not in AgentEnvironmentSpec.AgentType.values:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"unknown agent type {input.agent_type!r}",
+                field="agentType",
+            )
+
+        slug = input.slug.strip()[:128]
+        if AgentEnvironmentSpec.objects.filter(organization=org, slug=slug, deleted_at__isnull=True).exists():
+            return gql_failure(
+                ErrorCode.CONFLICT.value,
+                f"an environment spec with slug {slug!r} already exists",
+                field="slug",
+            )
+
+        with transaction.atomic():
+            spec = AgentEnvironmentSpec.objects.create(
+                organization=org,
+                name=input.name.strip()[:255],
+                slug=slug,
+                agent_type=input.agent_type,
+                image_tag=(input.image_tag or "").strip()[:512],
+                runtime=(input.runtime or "").strip()[:64],
+                tool_preset=(input.tool_preset or "").strip()[:128],
+                allow_install=bool(input.allow_install),
+                vnc_enabled=bool(input.vnc_enabled),
+                config_repo=(input.config_repo or "").strip()[:512],
+                config_branch=(input.config_branch or "main").strip()[:128],
+                secret_refs=list(input.secret_refs or []),
+                env_vars=dict(input.env_vars or {}),
+            )
+        return gql_success(agent_env_spec_to_type(spec))
+
+    @strawberry.field
+    @mutation_audit(action="agents.env_spec.update")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def update_agent_environment_spec(
+        self, info: Info, slug: str, input: UpdateAgentEnvironmentSpecInput
+    ) -> MutationResultType[AgentEnvironmentSpecType]:
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        spec = AgentEnvironmentSpec.objects.filter(
+            slug=slug, organization_id=org_pk, deleted_at__isnull=True
+        ).first()
+        if spec is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "environment spec not found")
+
+        if input.agent_type is not None:
+            if input.agent_type not in AgentEnvironmentSpec.AgentType.values:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"unknown agent type {input.agent_type!r}",
+                    field="agentType",
+                )
+            spec.agent_type = input.agent_type
+        if input.name is not None:
+            if not input.name.strip():
+                return gql_failure(ErrorCode.VALIDATION.value, "name is required", field="name")
+            spec.name = input.name.strip()[:255]
+        if input.image_tag is not None:
+            spec.image_tag = input.image_tag.strip()[:512]
+        if input.runtime is not None:
+            spec.runtime = input.runtime.strip()[:64]
+        if input.tool_preset is not None:
+            spec.tool_preset = input.tool_preset.strip()[:128]
+        if input.allow_install is not None:
+            spec.allow_install = bool(input.allow_install)
+        if input.vnc_enabled is not None:
+            spec.vnc_enabled = bool(input.vnc_enabled)
+        if input.config_repo is not None:
+            spec.config_repo = input.config_repo.strip()[:512]
+        if input.config_branch is not None:
+            spec.config_branch = input.config_branch.strip()[:128]
+        if input.secret_refs is not None:
+            spec.secret_refs = list(input.secret_refs)
+        if input.env_vars is not None:
+            spec.env_vars = dict(input.env_vars)
+        spec.save()
+        return gql_success(agent_env_spec_to_type(spec))
+
+    @strawberry.field
+    @mutation_audit(action="agents.env_spec.delete")
+    @require_permission(Permission.APP_DELETE)
+    @tenant_scoped()
+    def delete_agent_environment_spec(
+        self, info: Info, slug: str
+    ) -> MutationResultType[AgentEnvironmentSpecType]:
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        spec = AgentEnvironmentSpec.objects.filter(
+            slug=slug, organization_id=org_pk, deleted_at__isnull=True
+        ).first()
+        if spec is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "environment spec not found")
+        spec.soft_delete()
+        return gql_success(agent_env_spec_to_type(spec))
+
     @strawberry.field
     @mutation_audit(action="agents.brief.assemble")
     @require_permission(Permission.APP_DEPLOY)
@@ -318,9 +474,7 @@ class AgentsMutation:
         if err is not None:
             return err
         if not skill_ids:
-            return gql_failure(
-                ErrorCode.VALIDATION.value, "at least one skill is required", field="skillIds"
-            )
+            return gql_failure(ErrorCode.VALIDATION.value, "at least one skill is required", field="skillIds")
 
         from django.db.models import Q
 
@@ -421,9 +575,7 @@ class AgentsMutation:
         """
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
-        task = AgentTask.objects.filter(
-            guid=str(id), organization_id=org_pk, deleted_at__isnull=True
-        ).first()
+        task = AgentTask.objects.filter(guid=str(id), organization_id=org_pk, deleted_at__isnull=True).first()
         if task is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "task not found")
         try:
@@ -446,6 +598,8 @@ class AgentsMutation:
         GitHub repository.  Idempotent — re-importing updates existing
         rows matched on ``(organization, slug)``; versions bump only when
         content changes."""
+        import requests
+
         from astrolift_agents.services.skill_importer import (
             InvalidRepoURLError,
             import_skills_from_repo,
@@ -463,11 +617,13 @@ class AgentsMutation:
             return gql_failure(ErrorCode.NOT_FOUND.value, "organization not found")
 
         try:
-            result = import_skills_from_repo(
-                organization=org, repo_url=repo_url, branch=branch
-            )
+            result = import_skills_from_repo(organization=org, repo_url=repo_url, branch=branch)
         except InvalidRepoURLError as exc:
             return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="repoUrl")
+        except requests.RequestException as exc:
+            # Upstream fetch failed (repo/branch missing, network, non-2xx).
+            # That's a client-fixable precondition, not a server INTERNAL.
+            return gql_failure(ErrorCode.PRECONDITION.value, f"could not fetch repo: {exc}")
         except Exception as exc:  # noqa: BLE001
             return gql_failure(ErrorCode.INTERNAL.value, str(exc))
 

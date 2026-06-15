@@ -156,6 +156,30 @@ type AstroliftActivityPage {
   nextCursor: String
 }
 
+type AstroliftAgentEnvironmentSpec {
+  id: GUID!
+  name: String!
+  slug: String!
+  imageTag: String!
+  runtime: String!
+  agentType: String!
+  toolPreset: String!
+  allowInstall: Boolean!
+  vncEnabled: Boolean!
+  secretRefs: JSON!
+  envVars: JSON!
+  configRepo: String!
+  configBranch: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type AstroliftAgentEnvironmentSpecMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAgentEnvironmentSpec
+}
+
 type AstroliftAgentRun {
   id: GUID!
   registeredAppSlug: String!
@@ -3315,6 +3339,21 @@ enum CostWindow {
   MTD
 }
 
+input CreateAgentEnvironmentSpecInput {
+  name: String!
+  slug: String!
+  agentType: String!
+  imageTag: String! = ""
+  runtime: String! = ""
+  toolPreset: String! = ""
+  allowInstall: Boolean! = false
+  vncEnabled: Boolean! = false
+  configRepo: String! = ""
+  configBranch: String! = "main"
+  secretRefs: JSON = null
+  envVars: JSON = null
+}
+
 input CreateAlertRuleInput {
   name: String!
   target: String!
@@ -4238,6 +4277,9 @@ type Mutation {
   createToolDef(skillId: ID!, input: ToolDefInput!): AstroliftToolDefMutationResult!
   updateToolDef(id: ID!, input: ToolDefInput!): AstroliftToolDefMutationResult!
   deleteToolDef(id: ID!): AstroliftToolDefMutationResult!
+  createAgentEnvironmentSpec(input: CreateAgentEnvironmentSpecInput!, orgId: ID!): AstroliftAgentEnvironmentSpecMutationResult!
+  updateAgentEnvironmentSpec(slug: String!, input: UpdateAgentEnvironmentSpecInput!): AstroliftAgentEnvironmentSpecMutationResult!
+  deleteAgentEnvironmentSpec(slug: String!): AstroliftAgentEnvironmentSpecMutationResult!
   assembleBrief(skillIds: [ID!]!, orgId: ID!, config: JSON = null): AstroliftAssembleBriefResultMutationResult!
   launchTask(briefId: ID!, orgId: ID!, callbackUrl: String = null): AstroliftLaunchTaskResultMutationResult!
   cancelTask(id: ID!): NoneTypeMutationResult!
@@ -4675,6 +4717,8 @@ type Query {
   agentTasks(orgId: ID!, status: String = null): [AstroliftAgentTask!]!
   agentGallery(orgId: ID!): [AstroliftAgentTask!]!
   agentTask(id: ID!): AstroliftAgentTask
+  agentEnvironmentSpecs(orgId: ID!): [AstroliftAgentEnvironmentSpec!]!
+  agentEnvironmentSpec(slug: String!): AstroliftAgentEnvironmentSpec
   agentRuntimes: [AstroliftAgentRuntime!]!
   dispatchers: [AstroliftDispatcherInstance!]!
 
@@ -5184,6 +5228,20 @@ input UnmuteAlertRuleInput {
 
 input UnregisterTenantClusterInput {
   id: GUID!
+}
+
+input UpdateAgentEnvironmentSpecInput {
+  name: String = null
+  agentType: String = null
+  imageTag: String = null
+  runtime: String = null
+  toolPreset: String = null
+  allowInstall: Boolean = null
+  vncEnabled: Boolean = null
+  configRepo: String = null
+  configBranch: String = null
+  secretRefs: JSON = null
+  envVars: JSON = null
 }
 
 input UpdateAlertRuleInput {
