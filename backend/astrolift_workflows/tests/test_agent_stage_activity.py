@@ -146,7 +146,7 @@ def test_create_agent_task_prefers_org_skill_over_global(org, monkeypatch):
 
     captured = {}
 
-    def _fake_assemble(*, organization, config_repo, config_branch, context, ttl_seconds):
+    def _fake_assemble(*, organization, config_repo, config_branch, context, ttl_seconds, manifest_path=""):
         captured["context"] = context
         return Brief.objects.create(
             organization=organization,
@@ -316,7 +316,7 @@ def test_load_outcome_returns_output_key_from_brief(org, monkeypatch):
         config_repo="acme/cfg",
     )
 
-    def _fake_assemble(*, organization, config_repo, config_branch, context, ttl_seconds):
+    def _fake_assemble(*, organization, config_repo, config_branch, context, ttl_seconds, manifest_path=""):
         return Brief.objects.create(
             organization=organization,
             content_hash="abc" + "0" * 61,

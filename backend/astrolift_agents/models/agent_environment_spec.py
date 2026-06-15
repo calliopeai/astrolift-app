@@ -52,6 +52,10 @@ class AgentEnvironmentSpec(BaseCoreModel):
     # "owner/repo" holding the astrolift.toml config for this environment.
     config_repo = models.CharField(max_length=512, blank=True, default="")
     config_branch = models.CharField(max_length=128, default="main")
+    # Repo-relative path to this agent's manifest (e.g. "agents/foo/astrolift.toml"
+    # or the directory "agents/foo"). Empty selects the root-most astrolift.toml,
+    # so a single repo can hold many agents.
+    config_manifest_path = models.CharField(max_length=512, blank=True, default="")
 
     class Meta:
         constraints = [

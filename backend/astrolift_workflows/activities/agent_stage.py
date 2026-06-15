@@ -195,6 +195,7 @@ def _create_agent_task_sync(params: dict[str, Any]) -> int:
             organization=organization,
             config_repo=env_spec.config_repo,
             config_branch=env_spec.config_branch or "main",
+            manifest_path=env_spec.config_manifest_path or "",
             context=task_context,
             ttl_seconds=timeout_seconds,
         )

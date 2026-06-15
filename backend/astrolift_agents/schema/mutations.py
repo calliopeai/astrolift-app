@@ -93,6 +93,7 @@ class CreateAgentEnvironmentSpecInput:
     vnc_enabled: bool = False
     config_repo: str = ""
     config_branch: str = "main"
+    config_manifest_path: str = ""
     # Secret URIs only — never values. See SkillInput.dependencies for why
     # these are None-defaulted JSON (the SDL printer can't render an empty
     # collection literal); the resolver coerces None → []/{}.
@@ -114,6 +115,7 @@ class UpdateAgentEnvironmentSpecInput:
     vnc_enabled: bool | None = None
     config_repo: str | None = None
     config_branch: str | None = None
+    config_manifest_path: str | None = None
     secret_refs: JSON | None = None
     env_vars: JSON | None = None
 
@@ -381,6 +383,7 @@ class AgentsMutation:
                 vnc_enabled=bool(input.vnc_enabled),
                 config_repo=(input.config_repo or "").strip()[:512],
                 config_branch=(input.config_branch or "main").strip()[:128],
+                config_manifest_path=(input.config_manifest_path or "").strip()[:512],
                 secret_refs=list(input.secret_refs or []),
                 env_vars=dict(input.env_vars or {}),
             )
@@ -427,6 +430,8 @@ class AgentsMutation:
             spec.config_repo = input.config_repo.strip()[:512]
         if input.config_branch is not None:
             spec.config_branch = input.config_branch.strip()[:128]
+        if input.config_manifest_path is not None:
+            spec.config_manifest_path = input.config_manifest_path.strip()[:512]
         if input.secret_refs is not None:
             spec.secret_refs = list(input.secret_refs)
         if input.env_vars is not None:
@@ -593,6 +598,7 @@ class AgentsMutation:
         info: Info,
         repo_url: str,
         branch: str = "main",
+        manifest_path: str = "",
     ) -> MutationResultType[ImportSkillsResult]:
         """Import Skills and ToolDefs from an ``astrolift.toml`` in a
         GitHub repository.  Idempotent — re-importing updates existing
@@ -617,7 +623,10 @@ class AgentsMutation:
             return gql_failure(ErrorCode.NOT_FOUND.value, "organization not found")
 
         try:
-            result = import_skills_from_repo(organization=org, repo_url=repo_url, branch=branch)
+            result = import_skills_from_repo(
+                organization=org, repo_url=repo_url, branch=branch,
+                manifest_path=manifest_path,
+            )
         except InvalidRepoURLError as exc:
             return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="repoUrl")
         except requests.RequestException as exc:

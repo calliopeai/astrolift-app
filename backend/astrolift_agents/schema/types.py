@@ -104,6 +104,7 @@ class AgentEnvironmentSpecType:
     env_vars: JSON
     config_repo: str
     config_branch: str
+    config_manifest_path: str
     created_at: dt.datetime
     updated_at: dt.datetime
 
@@ -248,6 +249,7 @@ def agent_env_spec_to_type(s) -> AgentEnvironmentSpecType:
         env_vars=s.env_vars or {},
         config_repo=s.config_repo or "",
         config_branch=s.config_branch or "main",
+        config_manifest_path=s.config_manifest_path or "",
         created_at=s.created_at,
         updated_at=s.updated_at,
     )

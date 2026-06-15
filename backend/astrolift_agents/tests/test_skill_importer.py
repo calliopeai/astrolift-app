@@ -305,3 +305,27 @@ def test_invalid_url_raises_before_any_fetch(monkeypatch, org):
     with pytest.raises(InvalidRepoURLError):
         import_skills_from_repo(organization=org, repo_url="https://gitlab.com/acme/cfg")
     assert called["n"] == 0
+
+
+# ---------------------------------------------------------------------------
+# manifest_path: import a library that isn't at the repo root
+# ---------------------------------------------------------------------------
+
+
+def _make_subdir_zipball(toml_bytes: bytes, *, top_dir: str = "owner-repo-abc123") -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr(f"{top_dir}/astrolift.toml", b'[skills.root]\ncontent = "root lib"\n')
+        zf.writestr(f"{top_dir}/libs/emr/astrolift.toml", toml_bytes)
+    return buf.getvalue()
+
+
+def test_import_uses_manifest_path_when_given(monkeypatch, org):
+    _patch_get(monkeypatch, _FakeResponse(_make_subdir_zipball(_TOML)))
+    result = import_skills_from_repo(
+        organization=org, repo_url="https://github.com/acme/cfg",
+        manifest_path="libs/emr/astrolift.toml",
+    )
+    # Pulled the subdir library (reviewer/builder), not the root one.
+    assert set(result.imported_skills) == {"reviewer", "builder"}
+    assert result.source_ref == "acme/cfg@main:libs/emr/astrolift.toml"

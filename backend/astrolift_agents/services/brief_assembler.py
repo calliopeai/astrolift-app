@@ -57,11 +57,16 @@ _REQUEST_TIMEOUT_SECONDS = 60
 _ENVIRONMENT_RESERVED_KEYS = frozenset({"tool_preset", "allow_install"})
 
 
+class ManifestNotFoundError(ValueError):
+    """Raised when an explicit ``manifest_path`` has no matching astrolift.toml."""
+
+
 def assemble_agent_brief(
     *,
     organization,
     config_repo: str,
     config_branch: str = "main",
+    manifest_path: str = "",
     context: dict | None = None,
     ttl_seconds: int = 3600,
     source_connection=None,
@@ -75,6 +80,11 @@ def assemble_agent_brief(
         config_repo: ``"owner/repo"`` of the repository holding the agent's
             ``astrolift.toml``.
         config_branch: the branch (or tag/ref) to fetch. Defaults to ``main``.
+        manifest_path: optional repo-relative path to the agent's manifest
+            (e.g. ``agents/foo/astrolift.toml`` or the directory ``agents/foo``),
+            so a single repo can hold many agents. Empty (default) selects the
+            root-most ``astrolift.toml``. Folded into the content hash so each
+            agent in a monorepo gets a distinct Brief.
         context: optional task context metadata (task id, actor, slugs). Stored
             verbatim on the Brief and folded into the content hash.
         ttl_seconds: how long the READY Brief stays valid before the agent
@@ -112,7 +122,12 @@ def assemble_agent_brief(
 
     # Content-address over the canonical payload, not the raw zip bytes, so the
     # globally-unique content_hash is org-correct (see module docstring).
-    content_hash = _content_hash(organization=organization, zip_digest=zip_digest, context=context)
+    content_hash = _content_hash(
+        organization=organization,
+        zip_digest=zip_digest,
+        context=context,
+        manifest_path=manifest_path,
+    )
 
     existing = Brief.objects.filter(content_hash=content_hash).first()
     if existing is not None and existing.status == Brief.Status.READY:
@@ -128,7 +143,7 @@ def assemble_agent_brief(
             )
             return existing
 
-    manifest, secrets_refs = _parse_manifest(zip_bytes)
+    manifest, secrets_refs = _parse_manifest(zip_bytes, manifest_path)
 
     storage_key = _store_bundle(organization=organization, content_hash=content_hash, zip_bytes=zip_bytes)
 
@@ -179,43 +194,80 @@ def _fetch_zipball(owner_repo: str, branch: str) -> bytes:
     return resp.content
 
 
-def _content_hash(*, organization, zip_digest: str, context: dict) -> str:
+def _content_hash(*, organization, zip_digest: str, context: dict,
+                  manifest_path: str = "") -> str:
     """SHA-256 of the canonical JSON payload identifying this Brief.
 
     The payload binds the org identity, the zipball digest, and the task
     context. ``sort_keys`` makes the encoding deterministic so two assemblies
     with the same inputs hash identically (the basis for dedup).
+
+    ``manifest_path`` is folded in only when set, so a monorepo's per-agent
+    Briefs are distinct while root-manifest hashes stay identical to those
+    assembled before manifest_path existed (no dedup churn / re-assembly).
     """
     payload = {
         "org": str(organization.guid),
         "zip_sha256": zip_digest,
         "context": context,
     }
+    if manifest_path:
+        payload["manifest_path"] = manifest_path
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def _parse_manifest(zip_bytes: bytes) -> tuple[dict[str, Any], list[dict[str, str]]]:
+def select_manifest_member(names: list[str], manifest_path: str = "") -> str | None:
+    """Pick the ``astrolift.toml`` member to read from a zipball's namelist.
+
+    GitHub zipballs nest everything under a single ``<owner>-<repo>-<sha>/``
+    top-level directory. Without ``manifest_path`` the root-most manifest (the
+    fewest path segments) is chosen — the historical behaviour. With
+    ``manifest_path`` (a repo-relative path like ``agents/foo/astrolift.toml``
+    or the directory ``agents/foo``), the member whose path *below the
+    top-level dir* matches it exactly is chosen, enabling many agents per repo.
+    Returns ``None`` when nothing matches.
+    """
+    candidates = [n for n in names if n.endswith("astrolift.toml")]
+    if not candidates:
+        return None
+    if not manifest_path:
+        # Fewest path separators == closest to the archive root.
+        return min(candidates, key=lambda n: n.count("/"))
+
+    target = manifest_path.strip().strip("/")
+    if not target.endswith("astrolift.toml"):
+        target = f"{target}/astrolift.toml" if target else "astrolift.toml"
+    for name in candidates:
+        # Strip the zipball's "<owner>-<repo>-<sha>/" top-level dir.
+        rel = name.split("/", 1)[1] if "/" in name else name
+        if rel == target:
+            return name
+    return None
+
+
+def _parse_manifest(zip_bytes: bytes,
+                    manifest_path: str = "") -> tuple[dict[str, Any], list[dict[str, str]]]:
     """Parse ``astrolift.toml`` from the zipball.
 
     Returns ``(manifest_snapshot, secrets_refs)``. When the archive contains no
-    ``astrolift.toml`` both are empty — the Brief is still assembled so the
-    caller can decide how to treat a config-less repo.
-
-    GitHub zipballs nest everything under a single
-    ``<owner>-<repo>-<sha>/`` top-level directory, so the root manifest is the
-    matching path with the fewest segments.
+    root ``astrolift.toml`` (and no ``manifest_path`` was requested) both are
+    empty — the Brief is still assembled so the caller can decide how to treat a
+    config-less repo. An explicit ``manifest_path`` that matches nothing raises
+    ``ManifestNotFoundError`` so a misconfigured agent fails loudly instead of
+    booting an empty Brief.
     """
     manifest: dict[str, Any] = {}
     secrets_refs: list[dict[str, str]] = []
 
     with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-        candidates = [n for n in zf.namelist() if n.endswith("astrolift.toml")]
-        if not candidates:
+        toml_path = select_manifest_member(zf.namelist(), manifest_path)
+        if toml_path is None:
+            if manifest_path:
+                raise ManifestNotFoundError(
+                    f"no astrolift.toml at {manifest_path!r} in the config repo"
+                )
             return manifest, secrets_refs
-
-        # Fewest path separators == closest to the archive root.
-        toml_path = min(candidates, key=lambda n: n.count("/"))
         with zf.open(toml_path) as fh:
             config = tomllib.load(fh)
 

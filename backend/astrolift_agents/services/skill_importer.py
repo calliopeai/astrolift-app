@@ -37,7 +37,7 @@ from urllib.parse import urlparse
 from django.db import transaction
 
 from astrolift_agents.models import Skill, ToolDef
-from astrolift_agents.services.brief_assembler import _fetch_zipball
+from astrolift_agents.services.brief_assembler import _fetch_zipball, select_manifest_member
 
 log = logging.getLogger(__name__)
 
@@ -96,18 +96,18 @@ def parse_repo_url(repo_url: str) -> str:
     return f"{owner}/{repo}"
 
 
-def _load_root_manifest(zip_bytes: bytes) -> dict[str, Any]:
-    """Parse the repo-root ``astrolift.toml`` out of a GitHub zipball.
+def _load_root_manifest(zip_bytes: bytes, manifest_path: str = "") -> dict[str, Any]:
+    """Parse the ``astrolift.toml`` library manifest out of a GitHub zipball.
 
-    Returns ``{}`` when the archive carries no manifest so the caller
-    can report zero imports rather than crash.
+    Without ``manifest_path`` the repo-root manifest is used. With it, the
+    manifest at that repo-relative path is used (so a monorepo can keep its
+    skills library somewhere other than the root). Returns ``{}`` when nothing
+    matches so the caller reports zero imports rather than crashing.
     """
     with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-        candidates = [n for n in zf.namelist() if n.endswith("astrolift.toml")]
-        if not candidates:
+        toml_path = select_manifest_member(zf.namelist(), manifest_path)
+        if toml_path is None:
             return {}
-        # Fewest path separators == closest to the archive root.
-        toml_path = min(candidates, key=lambda n: n.count("/"))
         with zf.open(toml_path) as fh:
             return tomllib.load(fh)
 
@@ -204,6 +204,7 @@ def import_skills_from_repo(
     organization,
     repo_url: str,
     branch: str = "main",
+    manifest_path: str = "",
 ) -> ImportResult:
     """Import every ``[skills.*]`` + ``[tools.*]`` table from ``repo_url``.
 
@@ -225,9 +226,11 @@ def import_skills_from_repo(
     """
     owner_repo = parse_repo_url(repo_url)
     source_ref = f"{owner_repo}@{branch}"
+    if manifest_path:
+        source_ref = f"{source_ref}:{manifest_path}"
 
     zip_bytes = _fetch_zipball(owner_repo, branch)
-    manifest = _load_root_manifest(zip_bytes)
+    manifest = _load_root_manifest(zip_bytes, manifest_path)
 
     result = ImportResult(source_ref=source_ref)
     skills_table = manifest.get("skills") or {}

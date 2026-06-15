@@ -170,6 +170,7 @@ type AstroliftAgentEnvironmentSpec {
   envVars: JSON!
   configRepo: String!
   configBranch: String!
+  configManifestPath: String!
   createdAt: DateTime!
   updatedAt: DateTime!
 }
@@ -3350,6 +3351,7 @@ input CreateAgentEnvironmentSpecInput {
   vncEnabled: Boolean! = false
   configRepo: String! = ""
   configBranch: String! = "main"
+  configManifestPath: String! = ""
   secretRefs: JSON = null
   envVars: JSON = null
 }
@@ -4283,7 +4285,7 @@ type Mutation {
   assembleBrief(skillIds: [ID!]!, orgId: ID!, config: JSON = null): AstroliftAssembleBriefResultMutationResult!
   launchTask(briefId: ID!, orgId: ID!, callbackUrl: String = null): AstroliftLaunchTaskResultMutationResult!
   cancelTask(id: ID!): NoneTypeMutationResult!
-  importSkillsFromRepo(repoUrl: String!, branch: String! = "main"): AstroliftImportSkillsResultMutationResult!
+  importSkillsFromRepo(repoUrl: String!, branch: String! = "main", manifestPath: String! = ""): AstroliftImportSkillsResultMutationResult!
 
   """Start a workflow for an object."""
   startWorkflow(workflowSlug: String!, modelLabel: String!, objectId: Int!): StartWorkflowResult!
@@ -5240,6 +5242,7 @@ input UpdateAgentEnvironmentSpecInput {
   vncEnabled: Boolean = null
   configRepo: String = null
   configBranch: String = null
+  configManifestPath: String = null
   secretRefs: JSON = null
   envVars: JSON = null
 }

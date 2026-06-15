@@ -186,6 +186,7 @@ export type AstroliftAgentEnvironmentSpec = {
   agentType: Scalars['String']['output'];
   allowInstall: Scalars['Boolean']['output'];
   configBranch: Scalars['String']['output'];
+  configManifestPath: Scalars['String']['output'];
   configRepo: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
   envVars: Scalars['JSON']['output'];
@@ -3365,6 +3366,7 @@ export type CreateAgentEnvironmentSpecInput = {
   agentType: Scalars['String']['input'];
   allowInstall: Scalars['Boolean']['input'];
   configBranch: Scalars['String']['input'];
+  configManifestPath: Scalars['String']['input'];
   configRepo: Scalars['String']['input'];
   envVars: InputMaybe<Scalars['JSON']['input']>;
   imageTag: Scalars['String']['input'];
@@ -4762,6 +4764,7 @@ export type MutationGrantTeamAccessToAppArgs = {
 
 export type MutationImportSkillsFromRepoArgs = {
   branch?: Scalars['String']['input'];
+  manifestPath?: Scalars['String']['input'];
   repoUrl: Scalars['String']['input'];
 };
 
@@ -7385,6 +7388,7 @@ export type UpdateAgentEnvironmentSpecInput = {
   agentType: InputMaybe<Scalars['String']['input']>;
   allowInstall: InputMaybe<Scalars['Boolean']['input']>;
   configBranch: InputMaybe<Scalars['String']['input']>;
+  configManifestPath: InputMaybe<Scalars['String']['input']>;
   configRepo: InputMaybe<Scalars['String']['input']>;
   envVars: InputMaybe<Scalars['JSON']['input']>;
   imageTag: InputMaybe<Scalars['String']['input']>;

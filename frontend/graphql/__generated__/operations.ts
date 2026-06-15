@@ -182,6 +182,31 @@ export type AstroliftActivityPage = {
   nextCursor?: Maybe<Scalars['String']['output']>;
 };
 
+export type AstroliftAgentEnvironmentSpec = {
+  agentType: Scalars['String']['output'];
+  allowInstall: Scalars['Boolean']['output'];
+  configBranch: Scalars['String']['output'];
+  configManifestPath: Scalars['String']['output'];
+  configRepo: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  envVars: Scalars['JSON']['output'];
+  id: Scalars['GUID']['output'];
+  imageTag: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  runtime: Scalars['String']['output'];
+  secretRefs: Scalars['JSON']['output'];
+  slug: Scalars['String']['output'];
+  toolPreset: Scalars['String']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+  vncEnabled: Scalars['Boolean']['output'];
+};
+
+export type AstroliftAgentEnvironmentSpecMutationResult = {
+  data?: Maybe<AstroliftAgentEnvironmentSpec>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftAgentRun = {
   createdAt: Scalars['DateTime']['output'];
   durationSeconds?: Maybe<Scalars['Int']['output']>;
@@ -3337,6 +3362,22 @@ export type CostWindow =
   | 'H24'
   | 'MTD';
 
+export type CreateAgentEnvironmentSpecInput = {
+  agentType: Scalars['String']['input'];
+  allowInstall: Scalars['Boolean']['input'];
+  configBranch: Scalars['String']['input'];
+  configManifestPath: Scalars['String']['input'];
+  configRepo: Scalars['String']['input'];
+  envVars: InputMaybe<Scalars['JSON']['input']>;
+  imageTag: Scalars['String']['input'];
+  name: Scalars['String']['input'];
+  runtime: Scalars['String']['input'];
+  secretRefs: InputMaybe<Scalars['JSON']['input']>;
+  slug: Scalars['String']['input'];
+  toolPreset: Scalars['String']['input'];
+  vncEnabled: Scalars['Boolean']['input'];
+};
+
 export type CreateAlertRuleInput = {
   isActive: InputMaybe<Scalars['Boolean']['input']>;
   managedServiceId: InputMaybe<Scalars['GUID']['input']>;
@@ -3967,6 +4008,7 @@ export type Mutation = {
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
   confirmPreSignedUrlImageUpload: ConfirmUploadResult;
   connectSource: AstroliftSourceConnectionMutationResult;
+  createAgentEnvironmentSpec: AstroliftAgentEnvironmentSpecMutationResult;
   createAlertRule: AstroliftAlertRuleMutationResult;
   createApiToken: AstroliftApiTokenPlaintextMutationResult;
   createDeployToken: DeployTokenSecretRevealMutationResult;
@@ -3994,6 +4036,7 @@ export type Mutation = {
   deelevateAdminSession: AstroliftDeelevatePayloadMutationResult;
   /** Delete an object by its global ID (soft-delete via delete_check). */
   delete: Scalars['Boolean']['output'];
+  deleteAgentEnvironmentSpec: AstroliftAgentEnvironmentSpecMutationResult;
   deleteAlertRule: AlertruledeletedpayloadMutationResult;
   deleteAppDnsRecord: AstroliftCapabilityDeprovisionPayloadMutationResult;
   deleteAppIdentityRole: AstroliftCapabilityDeprovisionPayloadMutationResult;
@@ -4185,6 +4228,7 @@ export type Mutation = {
   triggerPipelineRun: AstroliftPipelineRunMutationResult;
   unmuteAlertRule: AstroliftAlertRuleMutationResult;
   unregisterTenantCluster: SoftdeletepayloadMutationResult;
+  updateAgentEnvironmentSpec: AstroliftAgentEnvironmentSpecMutationResult;
   updateAlertRule: AstroliftAlertRuleMutationResult;
   updateApp: AstroliftRegisteredAppMutationResult;
   updateAstroliftSecurityPolicy: AstroliftRegisteredAppMutationResult;
@@ -4427,6 +4471,12 @@ export type MutationConnectSourceArgs = {
 };
 
 
+export type MutationCreateAgentEnvironmentSpecArgs = {
+  input: CreateAgentEnvironmentSpecInput;
+  orgId: Scalars['ID']['input'];
+};
+
+
 export type MutationCreateAlertRuleArgs = {
   input: CreateAlertRuleInput;
 };
@@ -4554,6 +4604,11 @@ export type MutationDecommissionClusterArgs = {
 
 export type MutationDeleteArgs = {
   gid: Scalars['ID']['input'];
+};
+
+
+export type MutationDeleteAgentEnvironmentSpecArgs = {
+  slug: Scalars['String']['input'];
 };
 
 
@@ -4709,6 +4764,7 @@ export type MutationGrantTeamAccessToAppArgs = {
 
 export type MutationImportSkillsFromRepoArgs = {
   branch?: Scalars['String']['input'];
+  manifestPath?: Scalars['String']['input'];
   repoUrl: Scalars['String']['input'];
 };
 
@@ -5388,6 +5444,12 @@ export type MutationUnregisterTenantClusterArgs = {
 };
 
 
+export type MutationUpdateAgentEnvironmentSpecArgs = {
+  input: UpdateAgentEnvironmentSpecInput;
+  slug: Scalars['String']['input'];
+};
+
+
 export type MutationUpdateAlertRuleArgs = {
   input: UpdateAlertRuleInput;
 };
@@ -5768,6 +5830,8 @@ export type PushManifestToRepoInput = {
 export type Query = {
   ObjectStoreMetrics: Array<Array<Scalars['String']['output']>>;
   PostgresMetrics: Array<Array<Scalars['String']['output']>>;
+  agentEnvironmentSpec?: Maybe<AstroliftAgentEnvironmentSpec>;
+  agentEnvironmentSpecs: Array<AstroliftAgentEnvironmentSpec>;
   agentGallery: Array<AstroliftAgentTask>;
   agentRuntimes: Array<AstroliftAgentRuntime>;
   agentTask?: Maybe<AstroliftAgentTask>;
@@ -5950,6 +6014,16 @@ export type Query = {
   workflowStageExecutions: Array<WorkflowStageExecutionType>;
   /** List stages for a workflow definition by slug. */
   workflowStages: Array<WorkflowStageType>;
+};
+
+
+export type QueryAgentEnvironmentSpecArgs = {
+  slug: Scalars['String']['input'];
+};
+
+
+export type QueryAgentEnvironmentSpecsArgs = {
+  orgId: Scalars['ID']['input'];
 };
 
 
@@ -7308,6 +7382,21 @@ export type UnmuteAlertRuleInput = {
 
 export type UnregisterTenantClusterInput = {
   id: Scalars['GUID']['input'];
+};
+
+export type UpdateAgentEnvironmentSpecInput = {
+  agentType: InputMaybe<Scalars['String']['input']>;
+  allowInstall: InputMaybe<Scalars['Boolean']['input']>;
+  configBranch: InputMaybe<Scalars['String']['input']>;
+  configManifestPath: InputMaybe<Scalars['String']['input']>;
+  configRepo: InputMaybe<Scalars['String']['input']>;
+  envVars: InputMaybe<Scalars['JSON']['input']>;
+  imageTag: InputMaybe<Scalars['String']['input']>;
+  name: InputMaybe<Scalars['String']['input']>;
+  runtime: InputMaybe<Scalars['String']['input']>;
+  secretRefs: InputMaybe<Scalars['JSON']['input']>;
+  toolPreset: InputMaybe<Scalars['String']['input']>;
+  vncEnabled: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 export type UpdateAlertRuleInput = {
