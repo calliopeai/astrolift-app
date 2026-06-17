@@ -168,7 +168,7 @@ def _resolve_base_image(workload, spec) -> str:
 
         if is_known_runtime(spec.runtime):
             return resolve_runtime_image(spec.runtime)
-    primary_container = workload.container_set.filter(is_primary=True).first() if workload else None
+    primary_container = workload.containers.filter(is_primary=True).first() if workload else None
     if primary_container and primary_container.image_ref:
         return primary_container.image_ref
     return "gcr.io/distroless/base"
@@ -176,7 +176,7 @@ def _resolve_base_image(workload, spec) -> str:
 
 def _render_agent_job(*, job_name: str, workload, namespace: str, task) -> dict:
     """Build a minimal batch/v1 Job manifest for an agent workload."""
-    primary_container = workload.container_set.filter(is_primary=True).first()
+    primary_container = workload.containers.filter(is_primary=True).first()
     port = primary_container.port if primary_container else 0
 
     spec = getattr(task, "environment_spec", None)
