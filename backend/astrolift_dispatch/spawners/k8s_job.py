@@ -37,7 +37,7 @@ class K8sJobSpawner(ContainerSpawner):
         """Create a K8s Job for the given AgentTask."""
         from astrolift_dispatch.brief_injector import inject_brief_into_job_spec
         from astrolift_dispatch.snapshot_injector import inject_snapshot_into_job_spec
-        from core.cluster_observability import get_dynamic_client
+        from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
         workload = task.agent_definition
         if workload is None:
@@ -60,9 +60,13 @@ class K8sJobSpawner(ContainerSpawner):
         job_manifest = inject_snapshot_into_job_spec(job_manifest, task)
 
         try:
-            client = get_dynamic_client(self._cluster)
-            job_api = client.resources.get(api_version="batch/v1", kind="Job")
-            job_api.create(body=job_manifest, namespace=self._namespace)
+            driver = _driver_for_cluster(self._cluster)
+            ctx = _context_for_cluster(self._cluster)
+            result = driver.apply_manifests(ctx.slug, self._namespace, [job_manifest])
+            if not getattr(result, "ok", False):
+                error = result.summary() if hasattr(result, "summary") else "apply failed"
+                logger.warning("k8s_job_spawner: apply failed for Job %s: %s", job_name, error)
+                return SpawnResult(external_id=job_name, ok=False, error=str(error))
             logger.info("k8s_job_spawner: created Job %s for task %s", job_name, task.guid)
             return SpawnResult(external_id=job_name)
         except Exception as exc:
@@ -71,21 +75,25 @@ class K8sJobSpawner(ContainerSpawner):
 
     def status(self, external_id: str) -> TaskStatus:
         """Poll the K8s Job status."""
-        from core.cluster_observability import get_dynamic_client
+        from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
         try:
-            client = get_dynamic_client(self._cluster)
-            job_api = client.resources.get(api_version="batch/v1", kind="Job")
-            job = job_api.get(name=external_id, namespace=self._namespace)
-            status = job.status or {}
-            conditions = status.get("conditions") or []
+            driver = _driver_for_cluster(self._cluster)
+            ctx = _context_for_cluster(self._cluster)
+            ws = driver.get_workload_status(ctx.slug, self._namespace, "Job", external_id)
+            conditions = ws.conditions or []
 
-            succeeded = any(c["type"] == "Complete" and c["status"] == "True" for c in conditions)
-            failed = any(c["type"] == "Failed" and c["status"] == "True" for c in conditions)
-            active = (status.get("active") or 0) > 0
+            succeeded = any(
+                str(c.get("type")) == "Complete" and str(c.get("status")) == "True"
+                for c in conditions
+            )
+            failed = any(
+                str(c.get("type")) == "Failed" and str(c.get("status")) == "True"
+                for c in conditions
+            )
 
             return TaskStatus(
-                running=active,
+                running=not succeeded and not failed,
                 succeeded=succeeded,
                 failed=failed,
             )
@@ -94,16 +102,17 @@ class K8sJobSpawner(ContainerSpawner):
 
     def stop(self, external_id: str) -> None:
         """Delete the K8s Job (and its pod) for a running task."""
-        from core.cluster_observability import get_dynamic_client
+        from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
+        job_ref = {
+            "apiVersion": "batch/v1",
+            "kind": "Job",
+            "metadata": {"name": external_id, "namespace": self._namespace},
+        }
         try:
-            client = get_dynamic_client(self._cluster)
-            job_api = client.resources.get(api_version="batch/v1", kind="Job")
-            job_api.delete(
-                name=external_id,
-                namespace=self._namespace,
-                body={"propagationPolicy": "Foreground"},
-            )
+            driver = _driver_for_cluster(self._cluster)
+            ctx = _context_for_cluster(self._cluster)
+            driver.delete_manifests(ctx.slug, self._namespace, [job_ref])
             logger.info("k8s_job_spawner: deleted Job %s", external_id)
         except Exception:  # noqa: BLE001
             logger.exception("k8s_job_spawner: failed to delete Job %s", external_id)
