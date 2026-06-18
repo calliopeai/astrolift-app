@@ -171,6 +171,31 @@ export const LIST_AGENT_LIVE_STATUS = gql`
   }
 `;
 
+// ---------------------------------------------------------------------------
+// Register-agent-repo wizard (PR-8) — repo discovery preview. `scanAgentManifests`
+// walks the repo (monorepo `agents/*/astrolift.toml` + a root `astrolift.toml`)
+// and returns each agent manifest as a preview row WITHOUT persisting anything.
+// `alreadyRegistered` is computed against the caller's org so the wizard can
+// render already-registered rows as disabled. Registration is confirmed via
+// `REGISTER_AGENT_REPO` (agents.mutations).
+// ---------------------------------------------------------------------------
+
+export const SCAN_AGENT_MANIFESTS = gql`
+  query ScanAgentManifests($orgId: ID!, $sourceRepo: String!, $sourceKind: String!, $ref: String!) {
+    scanAgentManifests(orgId: $orgId, sourceRepo: $sourceRepo, sourceKind: $sourceKind, ref: $ref) {
+      ok
+      error
+      agents {
+        manifestPath
+        name
+        slug
+        workloadKind
+        alreadyRegistered
+      }
+    }
+  }
+`;
+
 // The VNC theatre roster: RUNNING, watchable agent tasks (vnc-capable
 // with a published relay path). Gated on agent_task.watch server-side.
 // Each row carries vncUrl (the live RFB relay the theatre connects to)
@@ -187,4 +212,3 @@ export const AGENT_GALLERY = gql`
     }
   }
 `;
-
