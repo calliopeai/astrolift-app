@@ -1,4 +1,6 @@
 import type {
+  AstroliftAgentListItem as GeneratedAgentListItem,
+  AstroliftAgentLiveStatus as GeneratedAgentLiveStatus,
   AstroliftAgentTask as GeneratedAgentTask,
   AstroliftBrief as GeneratedBrief,
   AstroliftDispatcherInstance as GeneratedDispatcherInstance,
@@ -24,6 +26,42 @@ export type AstroliftBrief = Pick<
 export type AstroliftAgentTask = Pick<
   GeneratedAgentTask,
   "id" | "status" | "callbackUrl" | "result" | "createdAt" | "startedAt" | "finishedAt"
+>;
+
+// Registry list row (PR-7). The full row as returned by `agentWorkloads` /
+// `agentFleet` — every field is queried, so the facade is the whole type.
+export type AstroliftAgentListItem = Pick<
+  GeneratedAgentListItem,
+  | "id"
+  | "name"
+  | "slug"
+  | "appSlug"
+  | "projectSlug"
+  | "sourceRepo"
+  | "sourceUrl"
+  | "runFamily"
+  | "runMode"
+  | "runPaused"
+  | "runCronExpression"
+  | "lastRunStatus"
+  | "lastRunAt"
+  | "runningCount"
+>;
+
+// Volatile live-status companion (PR-7), merged into list rows by workloadId.
+export type AstroliftAgentLiveStatus = Pick<
+  GeneratedAgentLiveStatus,
+  | "workloadId"
+  | "workloadSlug"
+  | "appSlug"
+  | "runFamily"
+  | "runMode"
+  | "isPaused"
+  | "isIdle"
+  | "runningCount"
+  | "lastRunStatus"
+  | "lastRunAt"
+  | "nextScheduledAt"
 >;
 
 export type AstroliftDispatcherInstance = Pick<
