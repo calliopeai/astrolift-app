@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@apollo/client/react";
 import { ConnectedAccountsSection } from "@/components/ConnectedAccountsSection";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { SecuritySettingsClient } from "@/app/(app)/settings/security/security-settings-client";
+import { PairDeviceCard } from "@/app/(app)/settings/security/pair-device-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -13,7 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -59,6 +63,7 @@ export const NavUser = ({ ssrUser: _ssrUser }: { ssrUser: CurrentUser | null }) 
   });
   const [accountOpen, setAccountOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [securityOpen, setSecurityOpen] = useState(false);
 
   useEffect(() => {
     setSentryUser(user ?? null);
@@ -137,11 +142,9 @@ export const NavUser = ({ ssrUser: _ssrUser }: { ssrUser: CurrentUser | null }) 
                   <BellIcon />
                   {t("notifications")}
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/settings/security">
-                    <ShieldIcon />
-                    {t("security")}
-                  </Link>
+                <DropdownMenuItem onSelect={() => setSecurityOpen(true)}>
+                  <ShieldIcon />
+                  {t("security")}
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/tokens">
@@ -180,7 +183,7 @@ export const NavUser = ({ ssrUser: _ssrUser }: { ssrUser: CurrentUser | null }) 
       </Sheet>
 
       <Sheet open={accountOpen} onOpenChange={setAccountOpen}>
-        <SheetContent>
+        <SheetContent className="overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Account</SheetTitle>
           </SheetHeader>
@@ -236,6 +239,35 @@ export const NavUser = ({ ssrUser: _ssrUser }: { ssrUser: CurrentUser | null }) 
               <p className="text-muted-foreground text-sm">Loading…</p>
             )}
             <ConnectedAccountsSection />
+
+            <Separator />
+
+            <div className="flex flex-col gap-3">
+              <h3 className="text-sm font-medium">Appearance</h3>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground text-sm">Theme</span>
+                <ThemeToggle variant="select" />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground text-sm">Language</span>
+                <LanguageSwitcher variant="select" />
+              </div>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={securityOpen} onOpenChange={setSecurityOpen}>
+        <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
+          <SheetHeader>
+            <SheetTitle>{t("security")}</SheetTitle>
+            <SheetDescription>
+              Active sessions and bearer credentials issued for your account.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex flex-col gap-4 px-4 pb-6">
+            <SecuritySettingsClient />
+            <PairDeviceCard />
           </div>
         </SheetContent>
       </Sheet>

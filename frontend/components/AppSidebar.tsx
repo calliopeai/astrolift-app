@@ -5,13 +5,11 @@ import Link from "next/link";
 import * as React from "react";
 
 import { AstroliftNav } from "@/components/AstroliftNav";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { NavTree } from "@/components/NavTree";
 import { NavUser } from "@/components/NavUser";
 import { OrgSwitcher } from "@/components/OrgSwitcher";
 import { RegisterAppButton } from "@/components/RegisterAppButton";
 import { StatusPageLink } from "@/components/StatusPageLink";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   Sidebar,
   SidebarContent,
@@ -84,8 +82,6 @@ export function AppSidebar({ ssrUser, ...props }: AppSidebarProps) {
           </SidebarMenuItem>
         </SidebarMenu>
         <SidebarSeparator />
-        <LanguageSwitcher />
-        <ThemeToggle />
         <StatusPageLink />
         <SidebarSeparator />
         <NavUser ssrUser={ssrUser} />

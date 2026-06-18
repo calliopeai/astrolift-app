@@ -1,14 +1,11 @@
 "use client";
 
 import {
-  BellIcon,
   BuildingIcon,
   GitBranchIcon,
   KeyRoundIcon,
   ScaleIcon,
   ShieldCheckIcon,
-  ShieldIcon,
-  UserCircleIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -28,9 +25,6 @@ const LINKS: SubnavLink[] = [
   { href: "/settings/source-providers", label: "Source providers", icon: <GitBranchIcon className="size-4" /> },
   { href: "/settings/policies", label: "Policies", icon: <ScaleIcon className="size-4" /> },
   { href: "/settings/permissions", label: "Permissions", icon: <ShieldCheckIcon className="size-4" /> },
-  { href: "/settings/profile", label: "Profile", icon: <UserCircleIcon className="size-4" /> },
-  { href: "/settings/security", label: "Security", icon: <ShieldIcon className="size-4" /> },
-  { href: "/settings/notifications", label: "Notifications", icon: <BellIcon className="size-4" /> },
 ];
 
 export function SettingsSubnav() {
