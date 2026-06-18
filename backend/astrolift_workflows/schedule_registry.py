@@ -72,6 +72,16 @@ class ScheduleKind(StrEnum):
     trigger_mode='cron' and fires a deploy for each whose
     cron_expression matches the current minute (#296)."""
 
+    AGENT_CRON_TICK = "agent_cron_tick"
+    """Every 1 min — re-reads agent Workload rows with
+    run_family='task', run_mode='schedule' and dispatches an AgentTask
+    (through the runAstroliftAgent dispatch path, NOT an app deploy)
+    for each whose run_cron_expression matches the current minute and
+    that is not run_paused (spec 33, PR-4). Kept distinct from
+    CRON_DEPLOY_TICK so agent dispatches and app deploys have separate
+    run history + a separate selector that can never double-fire one as
+    the other."""
+
     SECRET_BUNDLE_REFRESH = "secret_bundle_refresh"
     """Every 1 hr — re-applies every actively-referenced
     ``SecretBundle`` from the SecretsBackend to its bound clusters
@@ -214,6 +224,15 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.CRON_DEPLOY_TICK,
         ),
         description="Cron-triggered deploy dispatcher tick (#296)",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.AGENT_CRON_TICK,
+        workflow_name="AgentCronTickWorkflow",
+        interval_seconds=60,
+        schedule_id=schedule_id_for(
+            kind=ScheduleKind.AGENT_CRON_TICK,
+        ),
+        description="Cron-triggered agent Task dispatcher tick (spec 33 PR-4)",
     ),
     ScheduleDefinition(
         kind=ScheduleKind.SECRET_BUNDLE_REFRESH,

@@ -9,6 +9,7 @@ the no-op activity implementations until provider plugins ship. The
 sequence is the contract — bodies fill in.
 """
 
+from astrolift_workflows.workflows.agent_cron_tick import AgentCronTickWorkflow
 from astrolift_workflows.workflows.bring_cluster_into_management import (
     BringClusterIntoManagementWorkflow,
 )
@@ -65,6 +66,7 @@ from astrolift_workflows.workflows.workflow_definition_run import (
 )
 
 __all__ = [
+    "AgentCronTickWorkflow",
     "BringClusterIntoManagementWorkflow",
     "BuildPreviewWorkflow",
     "CapturePlatformCostSnapshotWorkflow",

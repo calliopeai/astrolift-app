@@ -72,7 +72,10 @@ from astrolift_workflows.activities.cluster_management import (
     teardown_cluster_infra,
     verify_reachability,
 )
-from astrolift_workflows.activities.cron_deploy import dispatch_cron_deploys
+from astrolift_workflows.activities.cron_deploy import (
+    dispatch_agent_crons,
+    dispatch_cron_deploys,
+)
 from astrolift_workflows.activities.custom_domain import (
     ensure_platform_managed_records,
     issue_custom_domain_certificate,
@@ -168,6 +171,7 @@ __all__ = [
     "deprovision_app_registry_repo",
     "deprovision_managed_service",
     "detect_drift",
+    "dispatch_agent_crons",
     "dispatch_agent_for_stage",
     "dispatch_cron_deploys",
     "drain_source_cluster",
