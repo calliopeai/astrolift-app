@@ -26,6 +26,7 @@ from astrolift_workflows.workflows.dev_environment import (
     CreateDevEnvironmentWorkflow,
     SyncDevEnvironmentFilesWorkflow,
 )
+from astrolift_workflows.workflows.dispatch_agent_task import DispatchAgentTaskWorkflow
 from astrolift_workflows.workflows.install_cluster_prereqs import (
     InstallClusterPrereqsWorkflow,
 )
@@ -74,6 +75,7 @@ __all__ = [
     "DeployAppWorkflow",
     "DeprovisionManagedServiceWorkflow",
     "DeregisterAppWorkflow",
+    "DispatchAgentTaskWorkflow",
     "DriftDetectionWorkflow",
     "ExpirePendingApprovalDeploymentsWorkflow",
     "InstallClusterPrereqsWorkflow",

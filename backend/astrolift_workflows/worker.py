@@ -107,6 +107,7 @@ from astrolift_workflows.activities import (
 )
 from astrolift_workflows.activities.agent_stage import (
     cancel_agent_stage,
+    dispatch_agent_task,
     execute_agent_stage,
 )
 from astrolift_workflows.workflows import (
@@ -120,6 +121,7 @@ from astrolift_workflows.workflows import (
     DeployAppWorkflow,
     DeprovisionManagedServiceWorkflow,
     DeregisterAppWorkflow,
+    DispatchAgentTaskWorkflow,
     DriftDetectionWorkflow,
     ExpirePendingApprovalDeploymentsWorkflow,
     InstallClusterPrereqsWorkflow,
@@ -156,6 +158,7 @@ WORKFLOWS = (
     DeployAppWorkflow,
     DeprovisionManagedServiceWorkflow,
     DeregisterAppWorkflow,
+    DispatchAgentTaskWorkflow,
     DriftDetectionWorkflow,
     ExpirePendingApprovalDeploymentsWorkflow,
     InstallClusterPrereqsWorkflow,
@@ -206,6 +209,7 @@ ACTIVITIES = (
     deprovision_managed_service,
     detect_drift,
     dispatch_agent_for_stage,
+    dispatch_agent_task,
     dispatch_cron_deploys,
     drain_source_cluster,
     ensure_cluster_drained,

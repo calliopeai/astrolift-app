@@ -219,6 +219,12 @@ type AstroliftAgentTask {
   snapshotUrl: String
 }
 
+type AstroliftAgentTaskMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAgentTask
+}
+
 type AstroliftAggregatedEvent {
   representative: AstroliftEvent!
   count: Int!
@@ -4285,6 +4291,7 @@ type Mutation {
   assembleBrief(skillIds: [ID!]!, orgId: ID!, config: JSON = null): AstroliftAssembleBriefResultMutationResult!
   launchTask(briefId: ID!, orgId: ID!, callbackUrl: String = null): AstroliftLaunchTaskResultMutationResult!
   cancelTask(id: ID!): NoneTypeMutationResult!
+  runAstroliftAgent(input: RunAstroliftAgentInput!): AstroliftAgentTaskMutationResult!
   importSkillsFromRepo(repoUrl: String!, branch: String! = "main", manifestPath: String! = ""): AstroliftImportSkillsResultMutationResult!
 
   """Start a workflow for an object."""
@@ -4719,6 +4726,7 @@ type Query {
   agentTasks(orgId: ID!, status: String = null): [AstroliftAgentTask!]!
   agentGallery(orgId: ID!): [AstroliftAgentTask!]!
   agentTask(id: ID!): AstroliftAgentTask
+  agentTaskLogs(id: ID!, tail: Int! = 200): [String!]!
   agentEnvironmentSpecs(orgId: ID!): [AstroliftAgentEnvironmentSpec!]!
   agentEnvironmentSpec(slug: String!): AstroliftAgentEnvironmentSpec
   agentRuntimes: [AstroliftAgentRuntime!]!
@@ -4999,6 +5007,13 @@ input RotateSecretBundleInput {
 
 input RotateWebhookSecretInput {
   connectionId: GUID!
+}
+
+input RunAstroliftAgentInput {
+  agentSlug: String!
+  environmentSpecId: GUID = null
+  triggerPayload: JSON = null
+  timeoutSeconds: Int = null
 }
 
 input RunJobOnceInput {

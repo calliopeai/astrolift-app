@@ -132,6 +132,15 @@ class Permission(enum.StrEnum):
     # comprehensions over the full enum.
     AGENT_TASK_WATCH = "agent_task.watch"
 
+    # --- Agent dispatch (spec 33, PR-1) ---------------------------
+    # Dispatch a run of a registered agent ``Workload(kind=agent)`` —
+    # the ``runAstroliftAgent`` mutation (Once-mode in PR-1; later modes
+    # gate on the same grant). Distinct from ``app.deploy`` so an org can
+    # let a role run agents without granting full app-deploy rights;
+    # granted alongside the deploy ops on the same roles for now (see
+    # ``astrolift_identity.system_roles._DEPLOY_OPS``).
+    AGENT_DISPATCH = "agent.dispatch"
+
     # --- Pipelines (#86) ------------------------------------------
     PIPELINE_READ = "pipeline.read"
     PIPELINE_CREATE = "pipeline.create"

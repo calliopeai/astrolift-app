@@ -53,6 +53,12 @@ _DEPLOY_OPS = (
     Permission.SECRET_READ,
     Permission.SECRET_WRITE,
     Permission.SECRET_LIST,
+    # Agent dispatch (spec 33, PR-1): a role that can deploy apps can
+    # also dispatch a registered agent Workload (runAstroliftAgent).
+    # Bundled with the deploy ops so the agents surface inherits the
+    # same operator/developer reach as app deploys; org owner/admin
+    # already get it via the full-enum comprehension.
+    Permission.AGENT_DISPATCH,
 )
 
 # (slug, scope_level, name, description, permissions)
