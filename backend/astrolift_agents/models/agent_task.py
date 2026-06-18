@@ -126,11 +126,40 @@ class AgentTask(BaseCoreModel):
     # for non-VNC tasks. The gallery resolves this to a presigned GET URL.
     snapshot_key = models.CharField(max_length=512, blank=True, default="")
 
+    # Statuses that mean the task has settled — no further work happens and
+    # it no longer counts as "in flight". The complement (NON_TERMINAL_*)
+    # is what the PR-6 Loop controller counts toward an agent's concurrency
+    # cap. Kept in sync with the terminal nodes of ``_TRANSITIONS`` (the
+    # states whose allowed-transition set is empty) and with the dispatch
+    # activity's own terminal set (``agent_stage._TERMINAL_STATUSES``).
+    TERMINAL_STATUSES: frozenset[str] = frozenset(
+        {
+            Status.COMPLETED,
+            Status.FAILED,
+            Status.TIMED_OUT,
+            Status.CANCELLED,
+        }
+    )
+    NON_TERMINAL_STATUSES: frozenset[str] = frozenset(
+        {
+            Status.DRAFT,
+            Status.QUEUED,
+            Status.PROVISIONING,
+            Status.RUNNING,
+        }
+    )
+
     class Meta:
         indexes = [
             models.Index(
                 fields=["organization", "status"],
                 name="agent_task_org_status_idx",
+            ),
+            # PR-6: the Loop controller counts non-terminal tasks per agent;
+            # index (agent_definition, status) so that count is cheap.
+            models.Index(
+                fields=["agent_definition", "status"],
+                name="agent_task_agentdef_status_idx",
             ),
         ]
 

@@ -74,6 +74,7 @@ from astrolift_workflows.activities.cluster_management import (
 )
 from astrolift_workflows.activities.cron_deploy import (
     dispatch_agent_crons,
+    dispatch_agent_loops,
     dispatch_cron_deploys,
     dispatch_scale_ticks,
 )
@@ -174,6 +175,7 @@ __all__ = [
     "detect_drift",
     "dispatch_agent_crons",
     "dispatch_agent_for_stage",
+    "dispatch_agent_loops",
     "dispatch_cron_deploys",
     "dispatch_scale_ticks",
     "drain_source_cluster",

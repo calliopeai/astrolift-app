@@ -54,6 +54,24 @@ class AgentCronDispatchSummary:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class LoopDispatchSummary:
+    """Per-tick summary for the Loop-dispatch tick (spec 33, PR-6).
+
+    ``fired_workload_slugs`` are the Loop agents we dispatched at least one
+    Task for this tick; ``fired_task_guids`` are every AgentTask row created
+    (possibly several per agent when the cap headroom is > 1) so tests can
+    assert the dispatch path ran and that the per-agent count never exceeds
+    the cap. ``candidates_count`` counts every selected Loop agent, including
+    those at/over cap that dispatched nothing.
+    """
+
+    candidates_count: int
+    fired_count: int
+    fired_workload_slugs: tuple[str, ...]
+    fired_task_guids: tuple[str, ...]
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class ScaleTickSummary:
     """Per-tick summary for the scheduled-scaling tick (spec 33, PR-5).
 
@@ -428,6 +446,235 @@ def _dispatch_agent_crons_sync() -> AgentCronDispatchSummary:
         fired_workload_slugs=tuple(fired_slugs),
         fired_task_guids=tuple(fired_task_guids),
     )
+
+
+# ---------------------------------------------------------------------------
+# Loop-dispatch tick (spec 33, PR-6)
+# ---------------------------------------------------------------------------
+#
+# The continuous-re-dispatch sibling of the agent-cron tick. It selects agent
+# ``Workload`` rows whose run-spec is ``run_family='task', run_mode='loop'``
+# and, per agent, tops the number of IN-FLIGHT (non-terminal) AgentTasks back
+# up to the concurrency cap by dispatching fresh Tasks — through the SAME PR-1
+# dispatch path the ``runAstroliftAgent`` mutation + the cron tick use (create
+# AgentTask QUEUED with ``agent_definition`` set, start DispatchAgentTaskWorkflow).
+# As runs finish, a later tick re-dispatches; the loop is the every-minute
+# reconcile, not a long-running child workflow (mirrors the three sibling ticks
+# — same durability + single-flight + separate run-history properties, with no
+# per-agent workflow to lifecycle on pause/unregister).
+#
+# Cap enforcement + the race (acceptance (1): "never exceeds the cap, even
+# under concurrent ticks"):
+#   The cap is enforced by counting in-flight tasks and dispatching only the
+#   headroom (cap - in_flight). The obvious race is two concurrent ticks both
+#   reading in_flight=k and both dispatching (cap-k), landing at 2*cap-k. We
+#   close it by doing the count-then-dispatch for each agent INSIDE one
+#   transaction that first takes a ``select_for_update`` row lock on the agent
+#   Workload — a per-agent mutex. A second concurrent tick blocks on that lock
+#   until the first commits, then re-counts and sees the first tick's freshly
+#   created QUEUED rows, so its headroom is already 0. Different agents lock
+#   different rows, so agents still reconcile in parallel. (The tick workflow's
+#   single-flight id + 55s timeout already make truly-concurrent ticks rare;
+#   the lock is the hard guarantee on top.)
+#   Residual window: a Task that reaches a terminal state is no longer counted,
+#   so the NEXT tick re-dispatches to refill — that is the intended loop, not a
+#   cap violation. The cap bounds CONCURRENT in-flight runs, never the total
+#   number of runs over time.
+#
+# Mutually exclusive from the deploy / agent-cron / scale selectors by the
+# ``run_family``/``run_mode`` axes (see the cron_deploy policy module note):
+# this tick reads ONLY ``run_family='task' AND run_mode='loop'`` agent
+# Workloads — a Schedule agent, a Service agent, and a plain app are all
+# invisible to it.
+
+
+@activity.defn(name="astrolift.agent.loop_dispatch_tick")
+async def dispatch_agent_loops() -> LoopDispatchSummary:
+    """One tick of the Loop dispatcher. Lazily imports Django models so the
+    workflow sandbox stays clean."""
+    from asgiref.sync import sync_to_async
+
+    return await sync_to_async(_dispatch_agent_loops_sync, thread_sensitive=False)()
+
+
+def _dispatch_agent_loops_sync() -> LoopDispatchSummary:
+    from django.db import transaction
+    from django.utils import timezone
+
+    from astrolift_agents.models import AgentTask
+    from astrolift_registry.models import Workload
+    from astrolift_workflows import client as wf_client
+    from astrolift_workflows.cron_deploy import (
+        LoopDispatchCandidate,
+        select_loop_dispatches,
+    )
+    from astrolift_workflows.inputs import Actor, DispatchAgentTaskInput
+
+    now = timezone.now()
+
+    # Select Loop agents. ``run_family='task'`` + ``run_mode='loop'`` is the
+    # discriminator that keeps this disjoint from the cron tick (schedule),
+    # the scale tick (service), and the deploy tick (apps). Soft-deleted
+    # workloads/apps are excluded so a torn-down agent stops looping. We pull
+    # only the ids here; the per-agent critical section re-reads each row
+    # under a lock so the in-flight count + dispatch are atomic.
+    workload_ids = list(
+        Workload.objects.filter(
+            kind=Workload.Kind.AGENT.value,
+            run_family=Workload.RunFamily.TASK.value,
+            run_mode=Workload.RunMode.LOOP.value,
+            deleted_at__isnull=True,
+            registered_app__deleted_at__isnull=True,
+        ).values_list("id", flat=True)
+    )
+
+    candidates_count = 0
+    fired_slugs: list[str] = []
+    fired_task_guids: list[str] = []
+
+    for workload_id in workload_ids:
+        # Per-agent critical section: lock the Workload row, re-read the
+        # run-spec (it may have changed since selection), COUNT in-flight
+        # tasks, decide headroom, and create the QUEUED rows — all atomic, so
+        # a concurrent tick blocks here and re-counts after we commit (the
+        # cap-enforcement guarantee). The workflow-start calls happen AFTER
+        # the transaction commits so a slow Temporal RPC doesn't hold the lock.
+        to_start: list[tuple[int, str]] = []  # (task_pk, task_guid)
+        slug = ""
+        with transaction.atomic():
+            workload = (
+                Workload.objects.select_for_update()
+                .select_related("registered_app")
+                .filter(
+                    pk=workload_id,
+                    deleted_at__isnull=True,
+                    registered_app__deleted_at__isnull=True,
+                )
+                .first()
+            )
+            if workload is None:
+                # Raced with a soft-delete between selection and lock — skip.
+                continue
+            # Defend the selector predicate under the lock: the run-spec could
+            # have flipped (e.g. loop→schedule) after selection. Only a Loop
+            # Task agent dispatches here.
+            if (
+                workload.kind != Workload.Kind.AGENT
+                or workload.run_family != Workload.RunFamily.TASK
+                or workload.run_mode != Workload.RunMode.LOOP
+            ):
+                continue
+
+            candidates_count += 1
+            slug = workload.slug
+            app = workload.registered_app
+
+            in_flight = AgentTask.objects.filter(
+                agent_definition_id=workload.id,
+                status__in=AgentTask.NON_TERMINAL_STATUSES,
+                deleted_at__isnull=True,
+            ).count()
+
+            actions = select_loop_dispatches(
+                candidates=[
+                    LoopDispatchCandidate(
+                        workload_id=workload.id,
+                        workload_slug=workload.slug,
+                        workload_guid=str(workload.guid),
+                        organization_id=app.organization_id,
+                        run_paused=bool(workload.run_paused),
+                        run_max_parallel=workload.run_max_parallel,
+                        in_flight=in_flight,
+                    )
+                ]
+            )
+            if not actions:
+                # Paused, or already at/over cap — nothing to dispatch. The
+                # agent stays a candidate; it just refills on a later tick.
+                continue
+            to_dispatch = actions[0].to_dispatch
+
+            # Create the QUEUED Tasks exactly the way the cron tick + the
+            # mutation do: ``agent_definition`` set (the K8s Job spawner needs
+            # it to render the pod image), DRAFT→QUEUED via ``transition_to``.
+            # Loop dispatch is unattended (no env spec / VNC), like the cron tick.
+            for _ in range(to_dispatch):
+                task = AgentTask.objects.create(
+                    organization_id=app.organization_id,
+                    agent_definition=workload,
+                    status=AgentTask.Status.DRAFT,
+                    timeout_seconds=int(workload.tool_timeout_seconds or 300),
+                )
+                task.transition_to(AgentTask.Status.QUEUED)
+                to_start.append((task.pk, str(task.guid)))
+
+        # ---- post-commit: enqueue each created task's dispatch workflow ----
+        # Outside the lock so a slow Temporal RPC never serializes other
+        # agents' ticks. A start failure fails just that orphan task (mirrors
+        # the cron tick); the cap accounting already happened under the lock.
+        actor = Actor(kind="system", display="agent-loop")
+        for task_pk, task_guid in to_start:
+            try:
+                wf_client.start_workflow(
+                    "DispatchAgentTaskWorkflow",
+                    args=[DispatchAgentTaskInput(agent_task_id=task_pk, actor=actor)],
+                    workflow_id=f"DispatchAgentTaskWorkflow-{task_guid}",
+                )
+            except Exception:
+                log.warning(
+                    "agent-loop start_workflow failed for task %s",
+                    task_guid,
+                    exc_info=True,
+                )
+                _fail_orphan_loop_task(task_pk)
+                continue
+
+            try:
+                from core.pubsub import publish_sync
+
+                publish_sync(
+                    f"agent.loop.dispatched.{app.organization_id}",
+                    {
+                        "task_guid": task_guid,
+                        "workload_slug": slug,
+                        "source": "loop",
+                        "occurred_at": now.isoformat(),
+                    },
+                )
+            except Exception:
+                log.warning("agent.loop.dispatched publish failed", exc_info=True)
+
+            fired_task_guids.append(task_guid)
+
+        if to_start:
+            fired_slugs.append(slug)
+
+    return LoopDispatchSummary(
+        candidates_count=candidates_count,
+        fired_count=len(fired_slugs),
+        fired_workload_slugs=tuple(fired_slugs),
+        fired_task_guids=tuple(fired_task_guids),
+    )
+
+
+def _fail_orphan_loop_task(task_pk: int) -> None:
+    """Mark a loop-dispatched Task FAILED when its workflow-start failed.
+
+    Mirrors the cron tick's orphan handling: the task was created + QUEUED
+    under the lock but its durable dispatch never enqueued, so fail it rather
+    than leave a phantom QUEUED row that the in-flight count would forever
+    treat as occupying a cap slot."""
+    from astrolift_agents.models import AgentTask
+
+    task = AgentTask.objects.filter(pk=task_pk).first()
+    if task is None:
+        return
+    task.failure = {"message": "agent-loop dispatch start failed"}
+    task.save(update_fields=["failure", "updated_at", "version"])
+    try:
+        task.transition_to(AgentTask.Status.FAILED)
+    except ValueError:
+        pass
 
 
 # ---------------------------------------------------------------------------

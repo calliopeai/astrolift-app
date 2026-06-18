@@ -202,6 +202,132 @@ def select_agent_matches(
 
 
 # ---------------------------------------------------------------------------
+# Loop dispatch (spec 33, PR-6)
+# ---------------------------------------------------------------------------
+#
+# The continuous-re-dispatch sibling of the cron selector. A Loop agent
+# (``run_family='task' AND run_mode='loop'``) should always have up to
+# ``run_max_parallel`` Tasks in flight: as each run finishes (terminal), the
+# next reconcile tick tops the agent back up to the cap. This selector is the
+# pure-policy half — it computes, per agent, HOW MANY new Tasks to dispatch
+# this tick from the cap + the current in-flight count. The activity layer
+# supplies the in-flight count (a DB COUNT) and performs the dispatch + the
+# per-agent row lock that makes the count-then-dispatch atomic.
+#
+# Default cap (``run_max_parallel is None``): Loop must NOT be truly
+# unbounded — an uncapped continuous re-dispatch would spawn runs without
+# limit. So a null cap means "use the platform default loop cap"
+# (``DEFAULT_LOOP_MAX_PARALLEL``), not infinity. An explicit cap of 0 means
+# "dispatch nothing" (a soft pause that keeps the agent in Loop mode).
+#
+# Mutually exclusive from the other three selectors by the same axes:
+#   * cron-deploy   reads ``RegisteredApp.trigger_mode='cron'``;
+#   * agent-cron    reads agent Workloads ``run_family='task', run_mode='schedule'``;
+#   * scale-tick    reads agent Workloads ``run_family='service'``;
+#   * THIS selector reads agent Workloads ``run_family='task', run_mode='loop'``.
+# ``run_mode`` (loop vs schedule) makes the two Task selectors disjoint; an
+# agent is in exactly one run_mode at a time.
+
+# Platform default Loop concurrency cap when ``run_max_parallel is None``.
+# Chosen conservatively: a Loop with no explicit cap keeps a single run in
+# flight at a time (serial re-dispatch) rather than fanning out unbounded.
+# Operators raise it explicitly via the run-spec ``run_max_parallel`` field.
+DEFAULT_LOOP_MAX_PARALLEL = 1
+
+
+def effective_loop_cap(run_max_parallel: int | None) -> int:
+    """Resolve the concurrency cap for a Loop agent.
+
+    ``None`` (the field's "uncapped" sentinel) maps to the platform default
+    cap, NOT infinity — a Loop is never truly unbounded (see module note).
+    An explicit value (including 0) is honoured verbatim.
+    """
+    if run_max_parallel is None:
+        return DEFAULT_LOOP_MAX_PARALLEL
+    return int(run_max_parallel)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class LoopDispatchCandidate:
+    """One ``run_family='task', run_mode='loop'`` agent ``Workload`` row the
+    loop tick should consider (spec 33, PR-6).
+
+    Carries the run-spec cap (``run_max_parallel``; None = default cap) and
+    the agent's current in-flight (non-terminal) Task count — supplied by the
+    activity from a DB COUNT taken under the per-agent row lock — so the pure
+    policy can decide how many fresh Tasks to dispatch without exceeding the
+    cap.
+    """
+
+    workload_id: int
+    workload_slug: str
+    workload_guid: str
+    organization_id: int
+    run_paused: bool
+    run_max_parallel: int | None
+    in_flight: int
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class LoopDispatchAction:
+    """A decided loop dispatch for one agent this tick (spec 33, PR-6).
+
+    ``to_dispatch`` is how many fresh Tasks the activity should create +
+    enqueue for this agent — always ``>= 1`` (candidates that resolve to 0
+    are dropped, so the activity never iterates a no-op) and never more than
+    the headroom under the (resolved) cap.
+    """
+
+    workload_id: int
+    workload_slug: str
+    workload_guid: str
+    organization_id: int
+    to_dispatch: int
+
+
+def select_loop_dispatches(
+    *,
+    candidates: list[LoopDispatchCandidate],
+) -> list[LoopDispatchAction]:
+    """Decide how many Tasks to dispatch per Loop agent.
+
+    For each candidate:
+      * a paused agent (``run_paused=True``) dispatches nothing — the
+        operator kill-switch halts the loop (acceptance (3));
+      * otherwise the headroom is ``effective_loop_cap(run_max_parallel) -
+        in_flight``; clamped at 0 so an over-cap agent (more in-flight than
+        the cap, e.g. just after the cap was lowered) dispatches nothing and
+        drains naturally;
+      * an agent with positive headroom yields an action to dispatch exactly
+        that many — so the in-flight count after dispatch equals the cap and
+        NEVER exceeds it (acceptance (1)).
+
+    No clock here — Loop is not cron-gated; it reconciles to the cap every
+    tick. The activity is responsible for taking the in-flight count under a
+    per-agent lock so two concurrent ticks can't both see the same headroom
+    and double-dispatch (the cap-enforcement race; see the activity).
+    """
+    out: list[LoopDispatchAction] = []
+    for c in candidates:
+        if c.run_paused:
+            continue
+        cap = effective_loop_cap(c.run_max_parallel)
+        headroom = cap - int(c.in_flight)
+        if headroom <= 0:
+            continue
+        out.append(
+            LoopDispatchAction(
+                workload_id=c.workload_id,
+                workload_slug=c.workload_slug,
+                workload_guid=c.workload_guid,
+                organization_id=c.organization_id,
+                to_dispatch=headroom,
+            )
+        )
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Scheduled scaling (spec 33, PR-5)
 # ---------------------------------------------------------------------------
 #

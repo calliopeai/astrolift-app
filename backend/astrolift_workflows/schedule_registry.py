@@ -93,6 +93,21 @@ class ScheduleKind(StrEnum):
     it only ever touches ``run_family='service'`` agent Workloads and
     issues a replica patch, never a dispatch or a deploy."""
 
+    LOOP_TICK = "loop_tick"
+    """Every 1 min — re-reads agent Workload rows with
+    run_family='task', run_mode='loop' and tops the number of in-flight
+    (non-terminal) AgentTasks per agent back up to the concurrency cap
+    (``run_max_parallel``; null = a default cap of 1, never unbounded),
+    dispatching fresh Tasks through the same runAstroliftAgent path as the
+    cron tick (spec 33, PR-6). As runs finish, a later tick re-dispatches —
+    the loop is the every-minute reconcile, not a long-running workflow.
+    Kept distinct from AGENT_CRON_TICK (schedule mode), SCALE_TICK (service
+    family), and CRON_DEPLOY_TICK (apps) so its selector is mutually
+    exclusive from all three — it only ever touches ``run_family='task',
+    run_mode='loop'`` agent Workloads. The activity caps each agent's
+    dispatch under a per-agent row lock so the cap holds even under
+    concurrent ticks."""
+
     SECRET_BUNDLE_REFRESH = "secret_bundle_refresh"
     """Every 1 hr — re-applies every actively-referenced
     ``SecretBundle`` from the SecretsBackend to its bound clusters
@@ -253,6 +268,15 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.SCALE_TICK,
         ),
         description="Scheduled-scaling tick: cron-driven Service replica patch X/0 (spec 33 PR-5)",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.LOOP_TICK,
+        workflow_name="AgentLoopTickWorkflow",
+        interval_seconds=60,
+        schedule_id=schedule_id_for(
+            kind=ScheduleKind.LOOP_TICK,
+        ),
+        description="Loop-dispatch tick: refill Task agent to concurrency cap (spec 33 PR-6)",
     ),
     ScheduleDefinition(
         kind=ScheduleKind.SECRET_BUNDLE_REFRESH,
