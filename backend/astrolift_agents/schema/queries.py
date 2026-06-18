@@ -227,7 +227,7 @@ class AgentsQuery:
     @strawberry.field
     @require_permission(Permission.APP_READ_LOGS)
     @tenant_scoped()
-    async def agent_task_logs(self, info: Info, id: strawberry.ID, tail: int = 200) -> list[str]:
+    def agent_task_logs(self, info: Info, id: strawberry.ID, tail: int = 200) -> list[str]:
         """Recent stdout/stderr lines from an AgentTask's pod.
 
         Resolves the AgentTask by GUID, tenant-scoped exactly like
@@ -257,7 +257,7 @@ class AgentsQuery:
         on ``AgentTask.pod_name``; wiring a task-id label selector into
         the driver SDK is the follow-up that makes live discovery exact.
         """
-        from asgiref.sync import sync_to_async
+        from asgiref.sync import async_to_sync
 
         from core.cluster_observability import fetch_task_pod_logs
 
@@ -291,12 +291,15 @@ class AgentsQuery:
             namespace = f"astrolift-agents-{org_slug}"
             return cluster, namespace, str(row.guid), (row.pod_name or "")
 
-        resolved = await sync_to_async(_resolve)()
+        resolved = _resolve()
         if resolved is None:
             return []
         cluster, namespace, task_guid, pod_name_hint = resolved
 
-        return await fetch_task_pod_logs(
+        # The /app/gql GraphQL view runs sync (threadpool, no event loop), so
+        # bridge the async pod-log fetch with async_to_sync rather than making
+        # the resolver async (which the sync view can't drive).
+        return async_to_sync(fetch_task_pod_logs)(
             cluster=cluster,
             namespace=namespace,
             task_guid=task_guid,
