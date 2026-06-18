@@ -97,9 +97,10 @@ def test_default_schedules_complete():
     """Spec 06 §5 listed 7 schedules; #296 added the cron-deploy
     dispatcher tick; #365 added the secret-bundle refresh sweep;
     #498 added the stale-session prune; #779 added the pending-approval
-    expiry sweep; spec 33 PR-4 added the agent-cron dispatcher tick.
+    expiry sweep; spec 33 PR-4 added the agent-cron dispatcher tick;
+    spec 33 PR-5 added the scheduled-scaling tick.
     Lock the count so future additions stay visible in a diff."""
-    assert len(DEFAULT_SCHEDULES) == 12
+    assert len(DEFAULT_SCHEDULES) == 13
 
 
 def test_default_schedules_include_all_kinds():
