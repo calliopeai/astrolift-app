@@ -53,6 +53,23 @@ class AgentCronDispatchSummary:
     fired_task_guids: tuple[str, ...]
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class ScaleTickSummary:
+    """Per-tick summary for the scheduled-scaling tick (spec 33, PR-5).
+
+    ``scaled_workload_slugs`` are the Service agents whose Deployment we
+    patched this tick; ``scaled_to`` is the parallel replica count we
+    patched each to (so tests can assert which workload went to X vs 0).
+    Candidates already at target (idempotent skip) and those whose cron
+    didn't match are counted in ``candidates_count`` but not ``scaled``.
+    """
+
+    candidates_count: int
+    scaled_count: int
+    scaled_workload_slugs: tuple[str, ...]
+    scaled_to: tuple[int, ...]
+
+
 @activity.defn(name="astrolift.cron.dispatch_tick")
 async def dispatch_cron_deploys() -> CronDispatchSummary:
     """One tick of the cron dispatcher. Lazily imports Django models
@@ -410,4 +427,169 @@ def _dispatch_agent_crons_sync() -> AgentCronDispatchSummary:
         fired_count=len(fired_slugs),
         fired_workload_slugs=tuple(fired_slugs),
         fired_task_guids=tuple(fired_task_guids),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Scheduled-scaling tick (spec 33, PR-5)
+# ---------------------------------------------------------------------------
+#
+# The replica-patch sibling of the two ticks above. It selects
+# ``run_family='service'`` agent ``Workload`` rows carrying a scale-up
+# and/or scale-down cron and, at each cron match, patches the Service's
+# Deployment replicas via the existing ``scale_workload`` service
+# (bounds-checked) — to ``scheduled_scale_to`` (X) on the up-cron, to 0
+# on the down-cron. NO dispatch, NO app Deployment row: a Service agent's
+# pods already exist (it deployed through the app-deploy path); this only
+# changes how many of them run.
+#
+# Mutually exclusive from the dispatch + deploy ticks by the same
+# ``run_family`` axis the agent-cron selector uses: this tick reads ONLY
+# ``run_family='service'`` agents, so a Task-family agent (acceptance (4))
+# and a plain app are both invisible to it.
+#
+# ``scale_workload`` enforces the env max bound (raising VALIDATION when
+# out of range) but does NOT no-op at target — so the selector clamps the
+# up-target to the env ceiling and skips the patch when already at target
+# (idempotency, acceptance (3)). A successful scale also writes the new
+# count back onto ``Workload.replicas`` (the field the manifest renderer
+# reads) so the next tick's idempotency check is accurate and a later
+# redeploy doesn't silently revert the scheduled scale.
+
+
+@activity.defn(name="astrolift.agent.scale_tick")
+async def dispatch_scale_ticks() -> ScaleTickSummary:
+    """One tick of the scheduled-scaling loop. Lazily imports Django
+    models so the workflow sandbox stays clean."""
+    from asgiref.sync import sync_to_async
+
+    return await sync_to_async(_dispatch_scale_ticks_sync, thread_sensitive=False)()
+
+
+def _dispatch_scale_ticks_sync() -> ScaleTickSummary:
+    from django.db import models as dj_models
+    from django.utils import timezone
+
+    from astrolift_lifecycle.services.k8s_ops import (
+        K8sOpError,
+        _primary_environment_for_workload,
+        resolve_replica_bounds,
+        scale_workload,
+    )
+    from astrolift_registry.models import Workload
+    from astrolift_workflows.cron_deploy import (
+        ScaleTickCandidate,
+        select_scale_matches,
+    )
+
+    now = timezone.now()
+
+    # Select Service-family agent Workloads that carry at least one scale
+    # cron. ``run_family='service'`` is the explicit guard so a Task-family
+    # agent is never scaled here (acceptance (4)); ``run_mode`` is
+    # irrelevant for a Service (it's always-on, not dispatched). Soft-deleted
+    # workloads and apps are excluded so a torn-down agent stops scaling.
+    workloads = (
+        Workload.objects.filter(
+            kind=Workload.Kind.AGENT.value,
+            run_family=Workload.RunFamily.SERVICE.value,
+            deleted_at__isnull=True,
+            registered_app__deleted_at__isnull=True,
+        )
+        # At least one scale cron set (mirrors the deploy tick's
+        # ``.exclude(cron_expression="")`` but for the OR of the pair).
+        .filter(dj_models.Q(scale_up_cron__gt="") | dj_models.Q(scale_down_cron__gt=""))
+        .select_related("registered_app")
+        .only(
+            "id",
+            "guid",
+            "slug",
+            "replicas",
+            "scheduled_scale_to",
+            "scale_up_cron",
+            "scale_down_cron",
+            "registered_app__organization_id",
+        )
+    )
+
+    candidates: list[ScaleTickCandidate] = []
+    workload_by_id: dict[int, Workload] = {w.id: w for w in workloads}
+    for w in workloads:
+        # Resolve the env ceiling the same way ``scale_workload`` will, so
+        # the selector clamps to the identical bound (and the idempotency
+        # comparison is against the clamped target). No active env → the
+        # platform default ceiling, and the scale_workload call below will
+        # surface PRECONDITION if the env/cluster truly can't be resolved.
+        env = _primary_environment_for_workload(w)
+        _lower, upper = resolve_replica_bounds(env)
+        candidates.append(
+            ScaleTickCandidate(
+                workload_id=w.id,
+                workload_slug=w.slug,
+                workload_guid=str(w.guid),
+                organization_id=w.registered_app.organization_id,
+                scheduled_scale_to=w.scheduled_scale_to,
+                scale_up_cron=w.scale_up_cron or "",
+                scale_down_cron=w.scale_down_cron or "",
+                current_replicas=int(w.replicas),
+                max_replicas=int(upper),
+            )
+        )
+
+    actions = select_scale_matches(candidates=candidates, now=now)
+
+    scaled_slugs: list[str] = []
+    scaled_to: list[int] = []
+    for action in actions:
+        workload = workload_by_id[action.workload_id]
+        app = workload.registered_app
+        try:
+            scale_workload(workload, action.target_replicas)
+        except K8sOpError:
+            # Cluster not resolvable / Deployment not found / driver error.
+            # Log and move on; a later tick retries (the cron still matches
+            # the next minute for ``*`` schedules, and the idempotency skip
+            # means a recovered cluster converges).
+            log.warning(
+                "scale-tick scale_workload failed for workload %s (target=%d)",
+                workload.slug,
+                action.target_replicas,
+                exc_info=True,
+            )
+            continue
+
+        # Persist the new desired count on the workload so the next tick's
+        # idempotency check is accurate and a subsequent manifest redeploy
+        # renders the scheduled count rather than reverting it.
+        workload.replicas = action.target_replicas
+        workload.save(update_fields=["replicas", "updated_at", "version"])
+
+        # Publish a scale event so the agent surface can show the scheduled
+        # scale reason. Wrapped so a broker error never breaks the tick
+        # (mirrors the deploy + dispatch ticks' publish guard).
+        try:
+            from core.pubsub import publish_sync
+
+            publish_sync(
+                f"agent.scale.scheduled.{app.organization_id}",
+                {
+                    "workload_slug": workload.slug,
+                    "workload_guid": str(workload.guid),
+                    "direction": action.direction,
+                    "target_replicas": action.target_replicas,
+                    "source": "scale_cron",
+                    "occurred_at": now.isoformat(),
+                },
+            )
+        except Exception:
+            log.warning("agent.scale.scheduled publish failed", exc_info=True)
+
+        scaled_slugs.append(workload.slug)
+        scaled_to.append(action.target_replicas)
+
+    return ScaleTickSummary(
+        candidates_count=len(candidates),
+        scaled_count=len(scaled_slugs),
+        scaled_workload_slugs=tuple(scaled_slugs),
+        scaled_to=tuple(scaled_to),
     )

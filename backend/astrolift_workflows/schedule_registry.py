@@ -82,6 +82,17 @@ class ScheduleKind(StrEnum):
     run history + a separate selector that can never double-fire one as
     the other."""
 
+    SCALE_TICK = "scale_tick"
+    """Every 1 min — re-reads agent Workload rows with
+    run_family='service' that carry a scale-up and/or scale-down cron
+    and patches the Service's Deployment replicas: to ``scheduled_scale_to``
+    at a scale-up-cron match, to 0 at a scale-down-cron match
+    (business-hours-up / off-hours-zero, spec 33 PR-5). Kept distinct from
+    AGENT_CRON_TICK (which dispatches Tasks) and CRON_DEPLOY_TICK (which
+    fires app deploys) so its selector is mutually exclusive from both —
+    it only ever touches ``run_family='service'`` agent Workloads and
+    issues a replica patch, never a dispatch or a deploy."""
+
     SECRET_BUNDLE_REFRESH = "secret_bundle_refresh"
     """Every 1 hr — re-applies every actively-referenced
     ``SecretBundle`` from the SecretsBackend to its bound clusters
@@ -233,6 +244,15 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.AGENT_CRON_TICK,
         ),
         description="Cron-triggered agent Task dispatcher tick (spec 33 PR-4)",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.SCALE_TICK,
+        workflow_name="AgentScaleTickWorkflow",
+        interval_seconds=60,
+        schedule_id=schedule_id_for(
+            kind=ScheduleKind.SCALE_TICK,
+        ),
+        description="Scheduled-scaling tick: cron-driven Service replica patch X/0 (spec 33 PR-5)",
     ),
     ScheduleDefinition(
         kind=ScheduleKind.SECRET_BUNDLE_REFRESH,

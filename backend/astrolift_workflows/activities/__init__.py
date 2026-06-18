@@ -75,6 +75,7 @@ from astrolift_workflows.activities.cluster_management import (
 from astrolift_workflows.activities.cron_deploy import (
     dispatch_agent_crons,
     dispatch_cron_deploys,
+    dispatch_scale_ticks,
 )
 from astrolift_workflows.activities.custom_domain import (
     ensure_platform_managed_records,
@@ -174,6 +175,7 @@ __all__ = [
     "dispatch_agent_crons",
     "dispatch_agent_for_stage",
     "dispatch_cron_deploys",
+    "dispatch_scale_ticks",
     "drain_source_cluster",
     "ensure_cluster_drained",
     "ensure_platform_managed_records",

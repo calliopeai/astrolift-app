@@ -199,3 +199,133 @@ def select_agent_matches(
             continue
         out.append(c)
     return out
+
+
+# ---------------------------------------------------------------------------
+# Scheduled scaling (spec 33, PR-5)
+# ---------------------------------------------------------------------------
+#
+# The third selector in this module, parallel to :func:`select_matches`
+# (app deploys) and :func:`select_agent_matches` (agent Task dispatch).
+# This one selects ``run_family='service'`` agent Workloads and decides a
+# replica-patch action per tick: scale UP to ``scheduled_scale_to`` at a
+# scale-up-cron match, or scale DOWN to 0 at a scale-down-cron match.
+#
+# Mutually exclusive from the other two selectors by construction:
+#   * the deploy selector reads ``RegisteredApp.trigger_mode='cron'`` and
+#     fires ``DeployAppWorkflow``;
+#   * the agent-dispatch selector reads agent Workloads with
+#     ``run_family='task' AND run_mode='schedule'`` and fires
+#     ``DispatchAgentTaskWorkflow``;
+#   * this selector reads agent Workloads with ``run_family='service'``
+#     and issues a ``scale_workload`` replica patch — no dispatch, no
+#     deploy.
+# The ``run_family`` axis (task vs service) makes the two agent selectors
+# disjoint: a Task agent is never scaled, a Service agent is never
+# dispatched-as-task. An app has no ``run_family`` at all.
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ScaleTickCandidate:
+    """One ``run_family='service'`` agent ``Workload`` row the scaling
+    tick should consider (spec 33, PR-5).
+
+    Carries the cron pair + the up-cron target (``scheduled_scale_to``)
+    and the workload's current desired replica count + the env-resolved
+    upper bound so the pure-policy :func:`select_scale_matches` can both
+    clamp the target to the env max AND skip a redundant patch when the
+    workload is already at the (clamped) target — keeping the activity
+    layer a thin DB+driver shim.
+    """
+
+    workload_id: int
+    workload_slug: str
+    workload_guid: str
+    organization_id: int
+    scheduled_scale_to: int | None
+    scale_up_cron: str
+    scale_down_cron: str
+    current_replicas: int
+    max_replicas: int
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ScaleAction:
+    """A decided replica-patch for one workload this tick.
+
+    ``direction`` is ``'up'`` | ``'down'`` for logging / events;
+    ``target_replicas`` is the already-clamped count to patch to (the
+    activity passes it straight to ``scale_workload``)."""
+
+    workload_id: int
+    workload_slug: str
+    workload_guid: str
+    organization_id: int
+    direction: str
+    target_replicas: int
+
+
+def select_scale_matches(
+    *,
+    candidates: list[ScaleTickCandidate],
+    now: datetime,
+) -> list[ScaleAction]:
+    """Decide replica-patch actions for ``candidates`` at ``now``.
+
+    For each Service agent:
+      * if the **scale-down** cron matches ``now`` → action to 0;
+      * else if the **scale-up** cron matches ``now`` → action to
+        ``min(scheduled_scale_to, max_replicas)`` (clamped to the env
+        ceiling so a misconfigured target never raises VALIDATION in
+        the activity — acceptance (2));
+      * else no action.
+
+    Tie-break (acceptance: up-cron and down-cron match the SAME tick,
+    e.g. both ``0 0 * * *``): **scale-DOWN wins** — it's the safer,
+    cheaper outcome (never accidentally scale a fleet UP because two
+    crons collided), and it's deterministic regardless of field order.
+    We evaluate down first and ``continue`` so up can't override.
+
+    Idempotency (acceptance (3)): an action is emitted only when the
+    (clamped) target differs from ``current_replicas`` — so a workload
+    already at target produces no action and the activity issues no
+    redundant ``scale_workload`` patch.
+
+    An up-cron candidate with no ``scheduled_scale_to`` set is skipped
+    (there is no target to scale to); the down-cron path is unaffected
+    (its target is always 0).
+    """
+    if now.tzinfo is None:
+        raise ValueError("now must be timezone-aware")
+    out: list[ScaleAction] = []
+    for c in candidates:
+        # Scale-down wins a same-tick collision: evaluate it first.
+        if c.scale_down_cron and cron_matches(c.scale_down_cron, now=now):
+            if c.current_replicas != 0:
+                out.append(
+                    ScaleAction(
+                        workload_id=c.workload_id,
+                        workload_slug=c.workload_slug,
+                        workload_guid=c.workload_guid,
+                        organization_id=c.organization_id,
+                        direction="down",
+                        target_replicas=0,
+                    )
+                )
+            continue
+        if c.scale_up_cron and cron_matches(c.scale_up_cron, now=now):
+            if c.scheduled_scale_to is None:
+                continue
+            target = min(int(c.scheduled_scale_to), int(c.max_replicas))
+            if c.current_replicas != target:
+                out.append(
+                    ScaleAction(
+                        workload_id=c.workload_id,
+                        workload_slug=c.workload_slug,
+                        workload_guid=c.workload_guid,
+                        organization_id=c.organization_id,
+                        direction="up",
+                        target_replicas=target,
+                    )
+                )
+    return out
