@@ -22,6 +22,7 @@ from astrolift_lifecycle.models import (
     TaskRun,
 )
 from astrolift_lifecycle.schema.types import (
+    AgentRunType,
     AppCertificateType,
     AppDnsRecordType,
     AppDomainType,
@@ -43,8 +44,10 @@ from astrolift_lifecycle.schema.types import (
     PreviewEnvironmentType,
     ReleaseNotesType,
     ScheduledJobRunType,
+    TaskRunType,
     WorkloadPodStatusBucketType,
     WorkloadPodSummaryType,
+    agent_run_to_type,
     app_domain_to_type,
     app_env_to_type,
     certificate_info_to_type,
@@ -55,9 +58,6 @@ from astrolift_lifecycle.schema.types import (
     dns_record_to_type,
     identity_binding_to_type,
     pod_info_to_type,
-    AgentRunType,
-    TaskRunType,
-    agent_run_to_type,
     preview_to_type,
     release_notes_to_type,
     scheduled_job_run_to_type,
@@ -1351,24 +1351,42 @@ class LifecycleQuery:
         info: Info,
         app_slug: str | None = None,
         workload_slug: str | None = None,
+        project_slug: str | None = None,
         status: str | None = None,
         limit: int = 100,
     ) -> list[AgentRunType]:
         """AI agent dispatch executions, most-recent-first.
 
-        Filtered by app, workload, and/or status. ``status="running"``
-        is the Active tab query; omitting status gives the full History.
+        Filtered by app, workload, project, and/or status.
+        ``status="running"`` is the Active tab query; omitting status
+        gives the full History. ``project_slug`` (spec 33 PR-2) narrows
+        to runs whose agent workload belongs to that project — the
+        per-project Agents detail surface uses it.
+
+        Org-scoped: AgentRun has no organization FK of its own (it hangs
+        off ``workload → registered_app``), so the queryset is filtered
+        to the caller's active tenant via ``registered_app__organization``.
+        Without it the ``app_slug`` / ``project_slug`` filters would leak
+        across orgs — both slugs are only unique *within* a tenant, so a
+        caller could read another org's runs by passing a known slug
+        (``@tenant_scoped`` asserts a tenant exists but does not filter).
         """
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         qs = AgentRun.objects.select_related(
             "workload",
             "workload__registered_app",
             "app_environment",
             "triggered_by_user",
         ).order_by("-created_at")
+        if org_id is not None:
+            qs = qs.filter(workload__registered_app__organization_id=org_id)
         if app_slug:
             qs = qs.filter(workload__registered_app__slug=app_slug)
         if workload_slug:
             qs = qs.filter(workload__slug=workload_slug)
+        if project_slug:
+            qs = qs.filter(workload__registered_app__project__slug=project_slug)
         if status:
             qs = qs.filter(status=status)
         return [agent_run_to_type(r) for r in qs[: max(1, min(limit, 500))]]

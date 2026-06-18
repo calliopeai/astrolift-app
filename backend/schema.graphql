@@ -181,6 +181,37 @@ type AstroliftAgentEnvironmentSpecMutationResult {
   data: AstroliftAgentEnvironmentSpec
 }
 
+type AstroliftAgentListItem {
+  id: GUID!
+  name: String!
+  slug: String!
+  appSlug: String!
+  projectSlug: String!
+  sourceRepo: String!
+  sourceUrl: String!
+  runFamily: String!
+  runMode: String!
+  runPaused: Boolean!
+  runCronExpression: String!
+  lastRunStatus: String
+  lastRunAt: DateTime
+  runningCount: Int!
+}
+
+type AstroliftAgentLiveStatus {
+  workloadId: GUID!
+  workloadSlug: String!
+  appSlug: String!
+  runFamily: String!
+  runMode: String!
+  isPaused: Boolean!
+  isIdle: Boolean!
+  runningCount: Int!
+  lastRunStatus: String
+  lastRunAt: DateTime
+  nextScheduledAt: DateTime
+}
+
 type AstroliftAgentRun {
   id: GUID!
   registeredAppSlug: String!
@@ -4648,7 +4679,7 @@ type Query {
   previewAstroliftDeregister(appSlug: String!): AstroliftDeregisterPreview
   previewAstroliftForceRedeploy(appSlug: String!, environmentName: String = null): AstroliftForceRedeployPreview
   astroliftTaskRuns(appSlug: String = null, workloadSlug: String = null, status: String = null, limit: Int! = 100): [AstroliftTaskRun!]!
-  astroliftAgentRuns(appSlug: String = null, workloadSlug: String = null, status: String = null, limit: Int! = 100): [AstroliftAgentRun!]!
+  astroliftAgentRuns(appSlug: String = null, workloadSlug: String = null, projectSlug: String = null, status: String = null, limit: Int! = 100): [AstroliftAgentRun!]!
   astroliftClusters: [AstroliftTenantCluster!]!
   astroliftClusterCount: Int!
   astroliftManagedDomains: [AstroliftManagedDomain!]!
@@ -4723,12 +4754,15 @@ type Query {
   toolDefs(skillId: ID!): [AstroliftToolDef!]!
   orgToolDefs(orgId: ID!): [AstroliftToolDef!]!
   brief(id: ID!): AstroliftBrief
-  agentTasks(orgId: ID!, status: String = null): [AstroliftAgentTask!]!
+  agentTasks(orgId: ID!, status: String = null, workloadId: ID = null): [AstroliftAgentTask!]!
   agentGallery(orgId: ID!): [AstroliftAgentTask!]!
   agentTask(id: ID!): AstroliftAgentTask
   agentTaskLogs(id: ID!, tail: Int! = 200): [String!]!
   agentEnvironmentSpecs(orgId: ID!): [AstroliftAgentEnvironmentSpec!]!
   agentEnvironmentSpec(slug: String!): AstroliftAgentEnvironmentSpec
+  agentWorkloads(orgId: ID!, projectSlug: String = null): [AstroliftAgentListItem!]!
+  agentFleet(orgId: ID!): [AstroliftAgentListItem!]!
+  agentLiveStatus(orgId: ID!, projectSlug: String = null, workloadId: ID = null): [AstroliftAgentLiveStatus!]!
   agentRuntimes: [AstroliftAgentRuntime!]!
   dispatchers: [AstroliftDispatcherInstance!]!
 
