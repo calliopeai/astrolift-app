@@ -961,6 +961,29 @@ _REPROVISION_REASONS = {
 }
 
 
+def _app_builds_an_image(app) -> bool:
+    """Whether the platform ever needs an ECR repo + push role for this app.
+
+    An app produces an image — and therefore needs a container registry
+    repo to push to — unless it points at a pre-built image. Two model
+    states mean "pre-built, no build step": ``build_mode == none`` (the
+    operator supplies a published tag and nothing builds) and
+    ``source_kind == direct_upload`` (a Calliope App Builder promote with
+    no source repo — the platform bakes the file tree into an image out of
+    band). Both ``ci_pushed`` and ``platform_build`` produce images, so
+    they still need the registry coordinates.
+    """
+    from astrolift_registry.models import RegisteredApp
+
+    build_mode = (getattr(app, "build_mode", "") or "").strip()
+    source_kind = (getattr(app, "source_kind", "") or "").strip()
+    if build_mode == RegisteredApp.BuildMode.NONE.value:
+        return False
+    if source_kind == RegisteredApp.SourceKind.DIRECT_UPLOAD.value:
+        return False
+    return True
+
+
 def build_reprovision_state(app) -> AppReprovisionStateType:
     """Derive the reprovision-callout payload for one app (#407 A).
 
@@ -975,7 +998,11 @@ def build_reprovision_state(app) -> AppReprovisionStateType:
     ready gap where ``provisioning_status == 'ready'`` but
     ``registry_repo_uri`` is empty — that combination means the
     bring-up loop landed the manifest + DNS but lost the ECR setup,
-    and a deploy will silently no-op until reprovisioned.
+    and a deploy will silently no-op until reprovisioned. This gap only
+    matters for apps that actually build an image; a pre-built-image app
+    (``build_mode == none`` or ``source_kind == direct_upload``) never
+    pushes to ECR, so a missing registry URI is the normal steady state
+    for it and must NOT raise the callout.
     """
 
     status = (app.provisioning_status or "").strip()
@@ -985,7 +1012,7 @@ def build_reprovision_state(app) -> AppReprovisionStateType:
         elapsed = max(0, int((dt.datetime.now(dt.UTC) - updated_at).total_seconds()))
 
     if status == "ready":
-        if not (app.registry_repo_uri or "").strip():
+        if _app_builds_an_image(app) and not (app.registry_repo_uri or "").strip():
             return AppReprovisionStateType(
                 needs_reprovision=True,
                 state=_REPROVISION_STATE_READY_MISSING_REGISTRY,

@@ -48,6 +48,8 @@ Then dispatch the seeded workflow::
 
 from __future__ import annotations
 
+import json
+
 from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
@@ -70,6 +72,19 @@ _MINIMAL_STATES = [
 # free-form; matching the run mutation's WorkflowInstance content type keeps
 # the row self-consistent.
 _MODEL_LABEL = "workflows.workflowdefinition"
+
+# Default container command for the flow-test agent. The point of the
+# flow-test is to prove the dispatch chain end-to-end (workflow → stage
+# executor → dispatcher → spawned Job → terminal status), NOT to run a
+# real agent. This command exits 0 immediately with a marker line so the
+# Job reaches ``Complete`` without needing an API key, a Brief, or any
+# agent runtime wiring. The agent-claude base image ships ``/bin/sh``, so
+# this runs on the published runtime as well as on a bespoke image.
+_DEFAULT_COMMAND = [
+    "/bin/sh",
+    "-c",
+    "echo 'flow-test reached the agent runtime'; exit 0",
+]
 
 
 def _resolve_org(value: str) -> Organization:
@@ -117,6 +132,18 @@ class Command(BaseCommand):
             required=True,
             help="Agent container image ref (the Job's primary container image).",
         )
+        parser.add_argument(
+            "--command",
+            default=json.dumps(_DEFAULT_COMMAND),
+            help=(
+                "Primary container command as a JSON list string (parsed with "
+                "json.loads), set as Container.command so the spawned Job runs "
+                "it instead of the image entrypoint. Defaults to a shell command "
+                "that prints a marker line and exits 0, so the flow-test Job "
+                "completes cleanly without an API key or Brief. Pass '[]' to fall "
+                "back to the image entrypoint."
+            ),
+        )
         parser.add_argument("--app-slug", default="flow-test", help="RegisteredApp slug.")
         parser.add_argument(
             "--workflow-slug",
@@ -137,6 +164,15 @@ class Command(BaseCommand):
         image = options["image"].strip()
         if not image:
             raise CommandError("--image must not be empty")
+
+        # Parse --command as a JSON list. A non-list (e.g. a bare string or
+        # an object) is a usage error — the container command must be argv.
+        try:
+            command = json.loads(options["command"])
+        except json.JSONDecodeError as exc:
+            raise CommandError(f"--command is not valid JSON: {exc}") from exc
+        if not isinstance(command, list) or not all(isinstance(part, str) for part in command):
+            raise CommandError("--command must be a JSON list of strings, e.g. '[\"/bin/sh\",\"-c\",\"...\"]'")
 
         app_slug = options["app_slug"]
         workflow_slug = options["workflow_slug"]
@@ -201,6 +237,10 @@ class Command(BaseCommand):
             defaults={
                 "is_primary": True,
                 "image_ref": image,
+                # The spawner sets the Job container's ``command`` only when
+                # this is non-empty (else the image entrypoint runs). The
+                # default exits 0 cleanly so the flow-test Job completes.
+                "command": command,
                 "deleted_at": None,
                 "deleted_by": None,
             },
@@ -279,8 +319,8 @@ class Command(BaseCommand):
         )
         self.stdout.write(
             f"  container         {container.name} (pk={container.pk}, "
-            f"is_primary={container.is_primary}, image_ref={container.image_ref}) "
-            f"[{_verb(container_created)}]"
+            f"is_primary={container.is_primary}, image_ref={container.image_ref}, "
+            f"command={container.command}) [{_verb(container_created)}]"
         )
         self.stdout.write(
             f"  workflow_def      {workflow.slug} (pk={workflow.pk}, "

@@ -37,7 +37,7 @@ class _FakeContainer:
 
 class _FakeWorkload:
     def __init__(self, image_ref: str, port: int):
-        self.container_set = _FakeQS(_FakeContainer(image_ref, port))
+        self.containers = _FakeQS(_FakeContainer(image_ref, port))
 
 
 class _FakeSpec:

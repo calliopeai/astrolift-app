@@ -13,6 +13,8 @@ active tenant (a non-superuser may not read another org's rows).
 
 from __future__ import annotations
 
+from typing import Any
+
 import strawberry
 from graphql import GraphQLError
 from strawberry.types import Info
@@ -221,6 +223,86 @@ class AgentsQuery:
             .first()
         )
         return agent_task_to_type(row) if row is not None else None
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ_LOGS)
+    @tenant_scoped()
+    async def agent_task_logs(self, info: Info, id: strawberry.ID, tail: int = 200) -> list[str]:
+        """Recent stdout/stderr lines from an AgentTask's pod.
+
+        Resolves the AgentTask by GUID, tenant-scoped exactly like
+        :meth:`agent_task` (the task must belong to the caller's active
+        org; a foreign-org id resolves to ``[]``, not an error, so the
+        surface doesn't leak task existence across tenants). Reads the
+        pod's logs through the same driver plumbing the app-log surface
+        uses — :func:`core.cluster_observability.fetch_task_pod_logs`,
+        which discovers the pod via ``list_app_pods`` and reads it with
+        ``stream_app_logs(follow=False)`` — and returns up to ``tail``
+        of the most recent message lines.
+
+        Gated on ``app.read_logs`` (the log-specific permission, same as
+        the live-tail subscription) rather than plain ``app.read``.
+
+        Returns ``[]`` — never a 500 — for every empty case: the task
+        doesn't exist for the tenant, the task's dispatcher has no
+        ``tenant_cluster`` bound, the cluster can't be turned into a
+        usable driver, or the pod has produced no logs yet.
+
+        Note on pod discovery: the K8s Job spawner labels each agent pod
+        ``astrolift.dev/task-id=<task.guid>`` and the agent namespace is
+        ``astrolift-agents-<org-slug>`` (see
+        ``astrolift_workflows.activities.agent_stage``). The default live
+        pod backend selects on the ``astrolift.dev/app`` label, so on a
+        real cluster the discovery falls through to the recorded Job name
+        on ``AgentTask.pod_name``; wiring a task-id label selector into
+        the driver SDK is the follow-up that makes live discovery exact.
+        """
+        from asgiref.sync import sync_to_async
+
+        from core.cluster_observability import fetch_task_pod_logs
+
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        if org_pk is None:
+            return []
+
+        # Resolve the task + its dispatcher's cluster off the event loop
+        # (Django ORM is sync). Returns the data the async log fetch
+        # needs, or None when there is no readable pod to target.
+        def _resolve() -> tuple[Any, str, str, str] | None:
+            row = (
+                AgentTask.objects.filter(
+                    guid=str(id), organization_id=org_pk, deleted_at__isnull=True
+                )
+                .select_related("organization", "dispatcher", "dispatcher__tenant_cluster")
+                .first()
+            )
+            if row is None:
+                return None
+            dispatcher = row.dispatcher
+            cluster = dispatcher.tenant_cluster if dispatcher is not None else None
+            if cluster is None or not getattr(cluster, "is_active", True):
+                return None
+            org_slug = (getattr(row.organization, "slug", "") or "").strip()
+            if not org_slug:
+                return None
+            # The spawner runs agent Jobs in the per-org agent namespace
+            # (astrolift_workflows.activities.agent_stage._agent_namespace).
+            namespace = f"astrolift-agents-{org_slug}"
+            return cluster, namespace, str(row.guid), (row.pod_name or "")
+
+        resolved = await sync_to_async(_resolve)()
+        if resolved is None:
+            return []
+        cluster, namespace, task_guid, pod_name_hint = resolved
+
+        return await fetch_task_pod_logs(
+            cluster=cluster,
+            namespace=namespace,
+            task_guid=task_guid,
+            pod_name_hint=pod_name_hint,
+            tail=tail,
+        )
 
     @strawberry.field
     @require_permission(Permission.APP_READ)

@@ -202,6 +202,15 @@ def _render_agent_job(*, job_name: str, workload, namespace: str, task) -> dict:
         ports = [p for p in ports if p["containerPort"] != VNC_PORT]
         ports.append({"containerPort": VNC_PORT})
 
+    # Honour the primary container's command/args overrides. Both are
+    # JSONField(default=list); only set the corresponding Job keys when
+    # non-empty so an unconfigured container preserves the image's own
+    # ENTRYPOINT/CMD (omitting the keys is not the same as setting them
+    # to []). ``command`` maps to the pod's ``command`` (ENTRYPOINT) and
+    # ``args`` to ``args`` (CMD).
+    command = list(primary_container.command or []) if primary_container else []
+    args = list(primary_container.args or []) if primary_container else []
+
     return {
         "apiVersion": "batch/v1",
         "kind": "Job",
@@ -230,6 +239,8 @@ def _render_agent_job(*, job_name: str, workload, namespace: str, task) -> dict:
                             "name": "agent",
                             "image": image,
                             "env": [],
+                            **({"command": command} if command else {}),
+                            **({"args": args} if args else {}),
                             **({"ports": ports} if ports else {}),
                         }
                     ],

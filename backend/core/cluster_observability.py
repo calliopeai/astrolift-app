@@ -387,6 +387,106 @@ def stream_app_logs(
     )
 
 
+async def fetch_task_pod_logs(
+    *,
+    cluster: TenantCluster,
+    namespace: str,
+    task_guid: str,
+    pod_name_hint: str = "",
+    tail: int = 200,
+) -> list[str]:
+    """Operator-facing one-shot log read for an agent-task pod.
+
+    Resolves the task's pod in ``namespace`` and returns up to ``tail``
+    of its most recent log message lines (no timestamps, no follow).
+    Built on the same driver plumbing the app-log surface uses —
+    :func:`list_app_pods` for discovery and :func:`stream_app_logs`
+    (``follow=False``) for the byte stream — so it inherits the
+    test-injectable pod/log backends.
+
+    Pod discovery order:
+
+    1. ``list_app_pods`` keyed on ``task_guid``. The K8s Job spawner
+       labels each agent pod ``astrolift.dev/task-id=<task.guid>``; a
+       discovery backend that selects on that label resolves the live
+       pod here. (The default live pod backend currently selects on the
+       ``astrolift.dev/app`` label, so on a real cluster this returns
+       nothing for an agent pod — see the resolver note — and we fall
+       through to the hint.)
+    2. ``pod_name_hint`` — the dispatcher records the spawned Job name
+       on ``AgentTask.pod_name``; passed through as a last-resort pod
+       name so a single-pod Job whose pod name equals the Job name (or
+       a future exact pod name) still streams.
+
+    Returns ``[]`` — never raises — when the cluster can't be turned
+    into a usable driver, no pod is found, or the stream yields nothing
+    yet. The resolver layer surfaces the empty list as "no logs yet"
+    rather than a 500.
+    """
+    from asgiref.sync import sync_to_async
+
+    tail = max(0, int(tail))
+    if tail == 0:
+        return []
+
+    def _discover() -> str:
+        try:
+            pods = list_app_pods(cluster=cluster, namespace=namespace, app_slug=task_guid)
+        except ClusterObservabilityError:
+            return ""
+        except Exception:
+            logger.exception("fetch_task_pod_logs: pod discovery failed for task %s", task_guid)
+            return ""
+        for pod in pods:
+            name = getattr(pod, "name", "") or ""
+            if name:
+                return name
+        return ""
+
+    pod_name = await sync_to_async(_discover)()
+    if not pod_name:
+        pod_name = (pod_name_hint or "").strip()
+    if not pod_name:
+        return []
+
+    try:
+        inner = stream_app_logs(
+            cluster=cluster,
+            namespace=namespace,
+            pod_name=pod_name,
+            container=None,
+            tail_lines=tail,
+            follow=False,
+        )
+    except ClusterObservabilityError:
+        return []
+    except Exception:
+        logger.exception("fetch_task_pod_logs: failed to open log stream for pod %s", pod_name)
+        return []
+
+    lines: list[str] = []
+    try:
+        async for line in inner:
+            message = getattr(line, "message", "")
+            lines.append(message if isinstance(message, str) else str(message))
+            if len(lines) >= tail:
+                break
+    except Exception:
+        # A mid-stream failure still returns whatever we collected —
+        # partial logs beat a hard error on an operator-facing read.
+        logger.exception("fetch_task_pod_logs: stream raised for pod %s", pod_name)
+    finally:
+        # Explicit aclose so the kubelet socket releases even when we
+        # break out early after hitting the tail cap — async for does
+        # not aclose its iterator on a break.
+        try:
+            await inner.aclose()
+        except Exception:
+            logger.exception("fetch_task_pod_logs: aclose failed for pod %s", pod_name)
+
+    return lines
+
+
 # ---- Multi-pod fan-out (#482) ------------------------------------
 #
 # Fan N per-pod streams into one merged async generator. Each line

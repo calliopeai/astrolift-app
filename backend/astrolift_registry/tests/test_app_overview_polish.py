@@ -166,6 +166,69 @@ def test_reprovision_state_ready_missing_registry_surfaces_callout():
     assert state.elapsed_seconds is not None and state.elapsed_seconds >= 0
 
 
+def test_reprovision_state_ready_no_registry_quiet_for_build_mode_none():
+    """A pre-built-image app (``build_mode=none``) never pushes to ECR, so
+    an empty ``registry_repo_uri`` is its normal steady state — it must NOT
+    raise the ready-missing-registry callout."""
+    org, team, project, _ = _scaffold(suffix="-bm-none")
+    app = _app(
+        org,
+        team,
+        project,
+        slug="prebuilt-app",
+        registry_repo_uri="",
+        build_mode=RegisteredApp.BuildMode.NONE,
+    )
+
+    state = build_reprovision_state(app)
+
+    assert state.needs_reprovision is False
+    assert state.state == ""
+    assert state.reason == ""
+    assert state.elapsed_seconds is None
+
+
+def test_reprovision_state_ready_no_registry_quiet_for_direct_upload():
+    """A DIRECT_UPLOAD app (App Builder promote, no source repo) has its
+    image baked out of band — no ECR repo/push role needed, so an empty
+    registry URI must stay quiet even though it would flag for a normal
+    GitHub-sourced app."""
+    org, team, project, _ = _scaffold(suffix="-direct-upload")
+    app = _app(
+        org,
+        team,
+        project,
+        slug="upload-app",
+        registry_repo_uri="",
+        source_kind=RegisteredApp.SourceKind.DIRECT_UPLOAD,
+    )
+
+    state = build_reprovision_state(app)
+
+    assert state.needs_reprovision is False
+    assert state.state == ""
+
+
+def test_reprovision_state_ready_no_registry_still_flags_platform_build():
+    """``platform_build`` DOES produce an image (the platform builds + pushes
+    it), so a ready app missing its registry coords is still broken and must
+    raise the callout — the non-building exemption is narrow."""
+    org, team, project, _ = _scaffold(suffix="-platform-build")
+    app = _app(
+        org,
+        team,
+        project,
+        slug="platform-build-app",
+        registry_repo_uri="",
+        build_mode=RegisteredApp.BuildMode.PLATFORM_BUILD,
+    )
+
+    state = build_reprovision_state(app)
+
+    assert state.needs_reprovision is True
+    assert state.state == "ready_missing_registry"
+
+
 def test_reprovision_state_failed():
     org, team, project, _ = _scaffold(suffix="-failed")
     app = _app(
