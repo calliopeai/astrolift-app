@@ -1389,6 +1389,14 @@ type AstroliftDisconnectUserSourceProviderPayloadMutationResult {
   data: AstroliftDisconnectUserSourceProviderPayload
 }
 
+type AstroliftDiscoveredAgentManifest {
+  manifestPath: String!
+  name: String!
+  slug: String!
+  workloadKind: String!
+  alreadyRegistered: Boolean!
+}
+
 type AstroliftDispatcherInstance {
   id: GUID!
   serviceUrl: String!
@@ -2289,6 +2297,24 @@ type AstroliftQuotaIncreaseRequestMutationResult {
   data: AstroliftQuotaIncreaseRequest
 }
 
+type AstroliftRegisterAgentRepoResult {
+  agents: [AstroliftRegisteredAgent!]!
+}
+
+type AstroliftRegisterAgentRepoResultMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftRegisterAgentRepoResult
+}
+
+type AstroliftRegisteredAgent {
+  manifestPath: String!
+  slug: String!
+  appId: GUID!
+  workloadSlug: String!
+  created: Boolean!
+}
+
 type AstroliftRegisteredApp {
   id: GUID!
   slug: String!
@@ -2524,6 +2550,12 @@ type AstroliftRunJobOncePayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftRunJobOncePayload
+}
+
+type AstroliftScanAgentManifestsResult {
+  ok: Boolean!
+  agents: [AstroliftDiscoveredAgentManifest!]!
+  error: String
 }
 
 type AstroliftScheduledJobRun {
@@ -4152,6 +4184,7 @@ type Mutation {
   attestSession(input: AttestSessionInput!): AstroliftAttestationResultMutationResult!
   assertSession(input: AssertSessionInput!): AstroliftAttestationResultMutationResult!
   registerApp(input: RegisterAppInput!): AstroliftRegisteredAppMutationResult!
+  registerAgentRepo(input: RegisterAgentRepoInput!): AstroliftRegisterAgentRepoResultMutationResult!
   updateApp(input: UpdateAppInput!): AstroliftRegisteredAppMutationResult!
   setAppSubdomain(input: SetAppSubdomainInput!): AstroliftRegisteredAppMutationResult!
   softDeleteApp(input: SoftDeleteAppInput!): SoftdeletepayloadMutationResult!
@@ -4762,6 +4795,7 @@ type Query {
   agentEnvironmentSpec(slug: String!): AstroliftAgentEnvironmentSpec
   agentWorkloads(orgId: ID!, projectSlug: String = null): [AstroliftAgentListItem!]!
   agentFleet(orgId: ID!): [AstroliftAgentListItem!]!
+  scanAgentManifests(orgId: ID!, sourceRepo: String!, sourceKind: String! = "github", ref: String! = "main"): AstroliftScanAgentManifestsResult!
   agentLiveStatus(orgId: ID!, projectSlug: String = null, workloadId: ID = null): [AstroliftAgentLiveStatus!]!
   agentRuntimes: [AstroliftAgentRuntime!]!
   dispatchers: [AstroliftDispatcherInstance!]!
@@ -4821,6 +4855,16 @@ input RecordClusterBootstrapRunInput {
 input RefreshClusterManagementInputType {
   clusterId: GUID!
   forcePreflight: Boolean! = false
+}
+
+input RegisterAgentRepoInput {
+  projectId: GUID!
+  sourceRepo: String!
+  sourceKind: String! = "github"
+  sourceUrl: String = null
+  ref: String! = "main"
+  defaultBranch: String = null
+  deployBranch: String = null
 }
 
 input RegisterAppInput {

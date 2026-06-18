@@ -40,6 +40,7 @@ from collections.abc import Callable
 from django.db import transaction
 from django.utils import timezone
 
+from astrolift_manifest.discover import DiscoveredAgentManifest, scan_agent_manifests
 from astrolift_manifest.normalize import NormalizationDefaults, manifest_hash, normalize
 from astrolift_manifest.parser import ManifestError, parse_raw
 from astrolift_manifest.persist import persist_manifest
@@ -554,3 +555,418 @@ def summarize_changes(changes: ResyncChanges) -> str:
     if summary:
         summary = summary[0].upper() + summary[1:]
     return summary + "."
+
+
+# ---------------------------------------------------------------------------
+# Monorepo agent discovery (spec 33, PR-3)
+# ---------------------------------------------------------------------------
+#
+# Point at a repo and register each agent manifest it carries as its own
+# agent ``Workload`` (under its own ``RegisteredApp`` keyed by
+# ``(source_repo, manifest_path)``). Two layouts:
+#
+#   * monorepo — ``agents/<slug>/astrolift.toml`` (N agents, N apps);
+#   * single   — a root ``astrolift.toml`` (1 agent).
+#
+# The scan + parse live in ``astrolift_manifest.discover.scan_agent_manifests``
+# (pure, fixture-testable); the repo tree comes from the SCM dispatcher's
+# zipball (``astrolift_scm.providers.repo_tree.fetch_repo_tree``), reusing the
+# existing ``fetch_zipball`` rather than adding a new git client. Both the
+# tree fetch and the per-manifest persist mirror ``register_app`` /
+# ``resync_app_manifest_from_repo`` so there is one registration contract.
+#
+# Idempotency + re-scan: every app is keyed by ``(source_repo, manifest_path)``
+# (the existing partial-unique constraint — no migration). Re-running the
+# scan registers only manifests not already registered for the repo; existing
+# agents are left untouched. A manifest that *disappeared* from the repo
+# leaves its app + workload in place (we never hard-delete, and an operator
+# may still want to dispatch or audit a removed agent); the per-manifest
+# resync reconciles the bodies of agents that are still present.
+
+# The tree fetcher returns ``{repo_relative_path: text}``; injectable so the
+# discovery service can be exercised against a fixture repo tree without
+# touching the SCM provider / network (mirrors ``_FetchFn`` above).
+_TreeFn = Callable[[SourceConnection, str, str], "dict[str, str]"]
+
+
+def _default_tree_fetch(
+    connection: SourceConnection,
+    repo_full_name: str,
+    ref: str,
+) -> dict[str, str]:
+    """Production tree fetch: thin wrapper over the SCM provider's
+    zipball-backed tree unpacker so the call site can be monkeypatched in
+    tests without poking the import-time symbol on the provider package."""
+    from astrolift_scm.providers.repo_tree import fetch_repo_tree
+
+    return fetch_repo_tree(connection, repo_full_name=repo_full_name, ref=ref)
+
+
+@dataclasses.dataclass(slots=True)
+class DiscoveredAgent:
+    """One agent manifest discovered in a repo, as a preview row.
+
+    Carries the parsed identity the FE wizard's discovery step renders
+    before the operator confirms registration, plus ``already_registered``
+    so the wizard can disable / annotate manifests that point at an app
+    already registered for this repo (the re-scan idempotency surfaced to
+    the UI). ``manifest_path`` is the key that becomes
+    ``RegisteredApp.manifest_path``.
+    """
+
+    manifest_path: str
+    name: str
+    slug: str
+    workload_kind: str
+    already_registered: bool
+
+
+@dataclasses.dataclass(slots=True)
+class DiscoverAgentsResult:
+    """Return shape from :func:`discover_agent_manifests`.
+
+    ``status`` is one of:
+
+    - ``ok``           — the scan ran; ``agents`` lists every agent manifest
+                          found (possibly empty when the repo has none).
+    - ``fetch_failed`` — no usable source connection, or the SCM fetch
+                          raised; ``error`` carries the host-side message.
+    """
+
+    status: str
+    agents: list[DiscoveredAgent] = dataclasses.field(default_factory=list)
+    error: str | None = None
+
+
+@dataclasses.dataclass(slots=True)
+class RegisteredAgent:
+    """One agent app the register call created or matched.
+
+    ``created`` is False when an app already existed for
+    ``(source_repo, manifest_path)`` (idempotent re-run) — the workload is
+    not re-persisted in that case beyond the body reconcile.
+    """
+
+    manifest_path: str
+    slug: str
+    app_guid: str
+    workload_slug: str
+    created: bool
+
+
+@dataclasses.dataclass(slots=True)
+class RegisterAgentRepoResult:
+    """Return shape from :func:`register_agent_repo`.
+
+    ``status`` is one of ``ok`` / ``fetch_failed`` / ``no_agents`` /
+    ``error``. ``agents`` lists what was created or matched (only on
+    ``ok``); ``error`` carries the message on the failure statuses.
+    """
+
+    status: str
+    agents: list[RegisteredAgent] = dataclasses.field(default_factory=list)
+    error: str | None = None
+
+
+def _scan_repo_for_agents(
+    *,
+    source_kind: str,
+    source_repo: str,
+    ref: str,
+    organization_id: int,
+    tree: _TreeFn | None,
+) -> tuple[list[DiscoveredAgentManifest] | None, str | None]:
+    """Fetch ``source_repo`` at ``ref`` and run the agent-manifest scan.
+
+    Resolves a usable ``SourceConnection`` for ``(organization_id,
+    source_kind)`` (same selection as the per-app resync), fetches the repo
+    tree, and returns ``(discovered, None)`` on success or
+    ``(None, error_message)`` when there is no connection / the fetch fails.
+    """
+    from astrolift_scm.providers import ProviderError
+
+    tree_fn: _TreeFn = tree if tree is not None else _default_tree_fetch
+
+    # Reuse the per-app connection picker by constructing a throwaway
+    # RegisteredApp-shaped lookup: the picker only reads ``organization_id``
+    # + ``source_kind``, so a lightweight unsaved instance is enough and
+    # avoids duplicating the preference-ranking logic.
+    probe = RegisteredApp(organization_id=organization_id, source_kind=source_kind)
+    connection = _pick_source_connection(probe)
+    if connection is None:
+        return None, (
+            "no active source connection found for this organization — "
+            "reconnect the source host under Settings -> Source connections"
+        )
+
+    try:
+        files = tree_fn(connection, source_repo, ref)
+    except ProviderError as exc:
+        return None, f"{exc.code}: {exc.message}"
+    except Exception as exc:  # noqa: BLE001 — surface anything as fetch_failed
+        log.exception("agent-repo scan fetch crashed (repo=%s)", source_repo)
+        return None, str(exc) or exc.__class__.__name__
+
+    return scan_agent_manifests(files), None
+
+
+def discover_agent_manifests(
+    *,
+    organization_id: int,
+    source_kind: str,
+    source_repo: str,
+    ref: str,
+    tree: _TreeFn | None = None,
+) -> DiscoverAgentsResult:
+    """Scan ``source_repo`` for agent manifests and return a preview.
+
+    Does NOT persist anything — backs the FE wizard's discovery step. Each
+    returned row carries the parsed name/slug/kind plus
+    ``already_registered`` (True when an app for that
+    ``(source_repo, manifest_path)`` already exists, soft-deleted excluded),
+    so the wizard can show which agents are new vs already onboarded.
+    """
+    discovered, error = _scan_repo_for_agents(
+        source_kind=source_kind,
+        source_repo=source_repo,
+        ref=ref,
+        organization_id=organization_id,
+        tree=tree,
+    )
+    if discovered is None:
+        return DiscoverAgentsResult(status="fetch_failed", error=error)
+
+    existing_paths = set(
+        RegisteredApp.objects.filter(
+            source_repo=source_repo,
+            deleted_at__isnull=True,
+        ).values_list("manifest_path", flat=True)
+    )
+
+    rows = [
+        DiscoveredAgent(
+            manifest_path=d.manifest_path,
+            name=d.name,
+            slug=d.slug,
+            workload_kind=d.workload_kind,
+            already_registered=d.manifest_path in existing_paths,
+        )
+        for d in discovered
+    ]
+    return DiscoverAgentsResult(status="ok", agents=rows)
+
+
+def _register_one_agent(
+    *,
+    project,
+    discovered: DiscoveredAgentManifest,
+    source_kind: str,
+    source_repo: str,
+    source_url: str,
+    default_branch: str,
+    deploy_branch: str,
+    default_cluster,
+) -> RegisteredAgent:
+    """Create (or match) one agent app + workload for a discovered manifest.
+
+    Idempotent on ``(source_repo, manifest_path)``: when an app already
+    exists for the pair the existing app is reused (and its agent workload's
+    body reconciled from the repo via ``persist_manifest``), so a re-scan
+    adds only genuinely-new agents. Mirrors ``register_app``'s field
+    defaults; binds ``default_tenant_cluster`` best-effort (agents are
+    dispatched on demand — the dispatch path enforces the managed-cluster
+    requirement, so registration does not reject when none exists yet).
+    """
+    org = project.organization
+    manifest = _normalize_text(discovered.raw_text)
+
+    app = RegisteredApp.objects.filter(
+        source_repo=source_repo,
+        manifest_path=discovered.manifest_path,
+        deleted_at__isnull=True,
+    ).first()
+    created = app is None
+    if app is None:
+        # Slug must be unique per org; an agent's manifest name can repeat
+        # across repos, so qualify with the manifest path's agent segment
+        # when it isn't the root manifest. ``_agent_app_slug`` resolves a
+        # collision deterministically.
+        app_slug = _agent_app_slug(org, discovered)
+        app = RegisteredApp.objects.create(
+            organization=org,
+            team=project.team,
+            project=project,
+            name=discovered.name,
+            slug=app_slug,
+            source_kind=source_kind,
+            source_repo=source_repo,
+            source_url=source_url,
+            manifest_path=discovered.manifest_path,
+            manifest_raw=discovered.raw_text,
+            default_branch=default_branch,
+            deploy_branch=deploy_branch,
+            k8s_namespace=f"{org.slug}-{app_slug}",
+            subdomain=app_slug,
+            default_tenant_cluster=default_cluster,
+        )
+
+    # Reconcile the agent workload (+ container) rows from the manifest.
+    # On a fresh app this creates them; on a re-matched app it updates only
+    # what changed (and leaves the row otherwise — never hard-deleted).
+    persist_manifest(app, manifest, raw_text=discovered.raw_text)
+
+    return RegisteredAgent(
+        manifest_path=discovered.manifest_path,
+        slug=discovered.slug,
+        app_guid=str(app.guid),
+        workload_slug=discovered.slug,
+        created=created,
+    )
+
+
+def _agent_app_slug(org, discovered: DiscoveredAgentManifest) -> str:
+    """Pick a unique-per-org app slug for a discovered agent.
+
+    Prefers the agent's own slug (the workload name); when an active app in
+    the org already holds it, falls back to ``<agent-slug>-<dir>`` using the
+    manifest's parent directory (e.g. ``agents/triage/astrolift.toml`` →
+    ``triage``), then appends a numeric suffix as a last resort. Keeps slugs
+    stable across re-scans because the same manifest path yields the same
+    candidate sequence.
+    """
+    base = discovered.slug
+    if not _slug_taken(org, base):
+        return base
+
+    # Directory-qualified candidate from the manifest path.
+    segments = discovered.manifest_path.split("/")
+    if len(segments) == 3:  # agents/<dir>/astrolift.toml
+        qualified = f"{base}-{segments[1]}" if segments[1] != base else base
+        if qualified != base and not _slug_taken(org, qualified):
+            return qualified
+
+    # Numeric suffix fallback.
+    i = 2
+    while _slug_taken(org, f"{base}-{i}"):
+        i += 1
+    return f"{base}-{i}"
+
+
+def _slug_taken(org, slug: str) -> bool:
+    return RegisteredApp.objects.filter(
+        organization=org,
+        slug=slug,
+        deleted_at__isnull=True,
+    ).exists()
+
+
+def register_agent_repo(
+    *,
+    project,
+    source_kind: str,
+    source_repo: str,
+    ref: str,
+    source_url: str = "",
+    default_branch: str = "main",
+    deploy_branch: str = "",
+    default_cluster=None,
+    tree: _TreeFn | None = None,
+) -> RegisterAgentRepoResult:
+    """Register every agent manifest in ``source_repo`` under ``project``.
+
+    Scans the repo (monorepo ``agents/*/astrolift.toml`` + root manifest),
+    and for each agent manifest creates an agent ``Workload`` under its own
+    ``RegisteredApp``. Idempotent on ``(source_repo, manifest_path)`` so a
+    re-run adds only manifests not already registered. Every row is created
+    under ``project`` (its organization is the tenancy boundary).
+
+    Returns ``no_agents`` when the repo has no agent manifests,
+    ``fetch_failed`` when the repo can't be fetched, ``error`` on an
+    unexpected persist failure, else ``ok`` with the per-manifest outcome.
+    """
+    discovered, error = _scan_repo_for_agents(
+        source_kind=source_kind,
+        source_repo=source_repo,
+        ref=ref,
+        organization_id=project.organization_id,
+        tree=tree,
+    )
+    if discovered is None:
+        return RegisterAgentRepoResult(status="fetch_failed", error=error)
+    if not discovered:
+        return RegisterAgentRepoResult(status="no_agents")
+
+    eff_deploy_branch = deploy_branch or default_branch or "main"
+
+    try:
+        with transaction.atomic():
+            agents = [
+                _register_one_agent(
+                    project=project,
+                    discovered=d,
+                    source_kind=source_kind,
+                    source_repo=source_repo,
+                    source_url=source_url,
+                    default_branch=default_branch or "main",
+                    deploy_branch=eff_deploy_branch,
+                    default_cluster=default_cluster,
+                )
+                for d in discovered
+            ]
+    except Exception as exc:  # noqa: BLE001 — surface as a clean envelope
+        log.exception("agent-repo registration failed (repo=%s)", source_repo)
+        return RegisterAgentRepoResult(status="error", error=str(exc) or exc.__class__.__name__)
+
+    return RegisterAgentRepoResult(status="ok", agents=agents)
+
+
+def resync_agent_repo_manifests(
+    *,
+    project,
+    source_repo: str,
+    source_kind: str = "",
+    ref: str = "",
+    default_cluster=None,
+    tree: _TreeFn | None = None,
+) -> RegisterAgentRepoResult:
+    """Re-scan ``source_repo`` and add agents that appeared since last scan.
+
+    The keep-the-list-in-sync counterpart of :func:`register_agent_repo`:
+    pointed at a repo whose agents were already registered, it picks up
+    newly-added ``agents/<slug>/astrolift.toml`` manifests and registers
+    them WITHOUT duplicating the existing agents (idempotent on
+    ``(source_repo, manifest_path)``), and reconciles the bodies of agents
+    that are still present.
+
+    Disappeared manifests: an agent whose manifest was *removed* from the
+    repo is intentionally LEFT in place (app + workload not deleted). We
+    never hard-delete onboarding data — a removed agent may still need to be
+    dispatched or audited, and a soft-delete-on-disappear policy is a
+    deliberate, separately-scoped decision (it would also race a transient
+    fetch that returned a partial tree). This function only ever ADDS /
+    UPDATES; pruning is out of scope by design.
+
+    ``source_kind`` / ``ref`` default to the values on an existing app for
+    the repo when omitted, so a caller that only has the repo handle still
+    resolves the right connection + branch.
+    """
+    anchor = (
+        RegisteredApp.objects.filter(source_repo=source_repo, deleted_at__isnull=True).order_by("pk").first()
+    )
+    eff_source_kind = source_kind or (anchor.source_kind if anchor else "github")
+    eff_ref = ref or (anchor.deploy_branch or anchor.default_branch if anchor else "") or "main"
+    eff_source_url = anchor.source_url if anchor else ""
+    eff_default_branch = (anchor.default_branch if anchor else "main") or "main"
+    eff_deploy_branch = (anchor.deploy_branch if anchor else "") or eff_default_branch
+
+    return register_agent_repo(
+        project=project,
+        source_kind=eff_source_kind,
+        source_repo=source_repo,
+        ref=eff_ref,
+        source_url=eff_source_url,
+        default_branch=eff_default_branch,
+        deploy_branch=eff_deploy_branch,
+        default_cluster=default_cluster,
+        tree=tree,
+    )
