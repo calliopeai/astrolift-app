@@ -375,6 +375,25 @@ class WorkflowDefinitionRunInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class DispatchAgentTaskInput:
+    """Input for ``DispatchAgentTaskWorkflow`` (spec 33, PR-1).
+
+    The Once-dispatch wrapper for a registered agent ``Workload(kind=agent)``.
+    The ``runAstroliftAgent`` mutation creates the ``AgentTask`` (in QUEUED,
+    with its ``agent_definition`` Workload set) and passes its pk here; the
+    workflow drives that single task through the existing spawn -> poll ->
+    terminal pipeline via the ``dispatch_agent_task`` activity.
+
+    Workflow id is ``DispatchAgentTaskWorkflow-<task-guid>`` (the mutation
+    constructs it that way) so a duplicate fire joins the in-flight run
+    instead of spawning a parallel dispatch of the same task.
+    """
+
+    agent_task_id: int
+    actor: Actor
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class WorkflowResult:
     ok: bool
     message: str = ""

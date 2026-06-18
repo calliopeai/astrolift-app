@@ -140,6 +140,70 @@ class Workload(NamedBaseCoreModel):
         default="",
     )
 
+    # ---- Run spec (spec 33, PR-1) ------------------------------------
+    # How an ``agent`` workload runs. Only meaningful when
+    # ``kind == AGENT``; every other kind carries the defaults and
+    # ignores them (the defaults — task / once — are a no-op for an
+    # existing deployment/job/cronjob row, so the migration is additive
+    # and non-breaking). PR-1 wires only Once dispatch end-to-end; the
+    # other modes (Loop/Schedule/Trigger) + Service replicas + scheduled
+    # scaling hang off these same fields in later PRs so the schema is
+    # stable and no further agent run-spec migration is needed.
+
+    class RunFamily(models.TextChoices):
+        # The platform's native Job-vs-Deployment split for agents:
+        #   task    → runs to completion (backed by a k8s Job — the
+        #             existing dispatch pipeline / ``execute_agent_stage``).
+        #   service → always-on (backed by a k8s Deployment — the app-
+        #             deploy path pointed at the agent image), scaled by
+        #             ``replicas`` (reuses the shared field above).
+        TASK = "task"
+        SERVICE = "service"
+
+    class RunMode(models.TextChoices):
+        # The Task-family trigger mode (ignored when family == service).
+        #   once     → manual ``Dispatch now`` (the only mode wired in PR-1).
+        #   loop     → continuous re-dispatch with a concurrency cap (PR-6).
+        #   schedule → cron-driven (PR-4, reads ``run_cron_expression``).
+        #   trigger  → bound to a webhook / event / condition (PR-6).
+        ONCE = "once"
+        LOOP = "loop"
+        SCHEDULE = "schedule"
+        TRIGGER = "trigger"
+
+    run_family = models.CharField(
+        max_length=16,
+        choices=RunFamily.choices,
+        default=RunFamily.TASK,
+    )
+    run_mode = models.CharField(
+        max_length=16,
+        choices=RunMode.choices,
+        default=RunMode.ONCE,
+    )
+    # 5-field cron for ``run_mode == SCHEDULE`` (PR-4). Validated against
+    # the platform cron parser at the mutation boundary; stored verbatim.
+    run_cron_expression = models.CharField(max_length=128, blank=True, default="")
+    # Operator kill-switch: pauses scheduled / loop / trigger dispatch
+    # without unregistering the agent (PR-4/PR-6 honour it). Once dispatch
+    # is manual and ignores it.
+    run_paused = models.BooleanField(default=False)
+    # Task concurrency cap — the max number of in-flight runs for this
+    # agent (consumed by the PR-6 Loop controller). Null means uncapped.
+    # Distinct from ``concurrency_policy`` above, which is the CronJob
+    # overlap policy (forbid/queue/replace) and only applies to ``cronjob``.
+    run_max_parallel = models.PositiveSmallIntegerField(null=True, blank=True)
+
+    # ---- Scheduled scaling placeholders (spec 33, PR-5) --------------
+    # Declared null here so PR-5 (cron → replicas X/0 for a Service-family
+    # agent) needs no further migration. PR-1 does NOT read or write these
+    # — they are inert until the scheduled-scaling tick + editor land.
+    # ``scheduled_scale_to`` is the replica count the up-cron scales to;
+    # the down-cron always scales to 0 (business-hours-up / off-hours-zero).
+    scheduled_scale_to = models.PositiveIntegerField(null=True, blank=True)
+    scale_up_cron = models.CharField(max_length=128, blank=True, default="")
+    scale_down_cron = models.CharField(max_length=128, blank=True, default="")
+
     class Meta:
         constraints = [
             models.UniqueConstraint(

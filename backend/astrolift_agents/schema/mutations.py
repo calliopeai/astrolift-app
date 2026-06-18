@@ -9,7 +9,9 @@ each resolver applies its own org filter / org binding explicitly.
 Permissions reuse the app-tier grants (Skills/Briefs/ToolDefs are
 agent-workload building blocks): ``APP_READ`` is implied by the read
 surface, writes gate on ``APP_CREATE`` / ``APP_UPDATE`` / ``APP_DELETE``,
-and dispatch (assemble/launch/cancel) gates on ``APP_DEPLOY``.
+and Brief assemble/launch/cancel gate on ``APP_DEPLOY``. The user-facing
+agent dispatch (``run_astrolift_agent``, spec 33 PR-1) gates on the
+dedicated ``AGENT_DISPATCH`` grant instead.
 """
 
 from __future__ import annotations
@@ -30,9 +32,11 @@ from astrolift_agents.models import (
 )
 from astrolift_agents.schema.types import (
     AgentEnvironmentSpecType,
+    AgentTaskType,
     SkillType,
     ToolDefType,
     agent_env_spec_to_type,
+    agent_task_to_type,
     skill_to_type,
     tool_def_to_type,
 )
@@ -40,6 +44,7 @@ from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Organization
+from astrolift_registry.models import Workload
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -120,6 +125,29 @@ class UpdateAgentEnvironmentSpecInput:
     env_vars: JSON | None = None
 
 
+@strawberry.input
+class RunAstroliftAgentInput:
+    """Ad-hoc Once dispatch of a registered agent (spec 33, PR-1).
+
+    ``agent_slug`` is the ``Workload(kind=agent)`` slug under one of the
+    caller's apps; the workload is resolved org-scoped (a foreign-org slug
+    is not resolvable). ``environment_spec_id`` optionally pins the
+    container-environment recipe to launch into (else the workload's own
+    image/runtime is used). ``trigger_payload`` is opaque per-dispatch
+    context (e.g. an inline prompt or input map) folded into the task's
+    brief context; ``None`` is the no-payload manual case. ``timeout_seconds``
+    bounds the run (defaults to the AgentTask model default).
+    """
+
+    agent_slug: str
+    environment_spec_id: GUID | None = None
+    # See SkillInput.dependencies for why this is None-defaulted JSON (the
+    # SDL printer can't render an empty-collection literal); the resolver
+    # coerces None -> {}.
+    trigger_payload: JSON | None = None
+    timeout_seconds: int | None = None
+
+
 # ---------------------------------------------------------------------------
 # Result payloads
 # ---------------------------------------------------------------------------
@@ -163,6 +191,26 @@ def _resolve_org(org_id: strawberry.ID) -> tuple[Organization | None, object | N
         # org by passing its GUID.
         return None, gql_failure(ErrorCode.PERMISSION_DENIED.value, "organization mismatch", field="orgId")
     return org, None
+
+
+def _dispatch_actor(info: Info):
+    """Build a workflow ``Actor`` for the dispatching caller.
+
+    Mirrors ``astrolift_lifecycle.schema.mutations._actor_from_request``:
+    prefer the authenticated request user, fall back to the tenant
+    context's actor, then to a ``system`` actor. Imported lazily so the
+    schema module doesn't pull the workflow package at import time.
+    """
+    from astrolift_workflows.inputs import Actor
+
+    request = getattr(info.context, "request", None)
+    user = getattr(request, "user", None) if request else None
+    if user is not None and getattr(user, "is_authenticated", False):
+        return Actor(kind="user", user_id=user.pk, display=getattr(user, "username", "") or "")
+    tenant = get_current_tenant()
+    if tenant and tenant.actor_user_id:
+        return Actor(kind="user", user_id=tenant.actor_user_id, display="")
+    return Actor(kind="system", display="system")
 
 
 # ---------------------------------------------------------------------------
@@ -588,6 +636,120 @@ class AgentsMutation:
         except ValueError as exc:
             return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
         return gql_success(None)
+
+    @strawberry.field
+    @mutation_audit(
+        action="agents.agent.dispatch",
+        target=lambda self, info, input: ("workload", input.agent_slug),
+    )
+    @require_permission(Permission.AGENT_DISPATCH)
+    @tenant_scoped()
+    def run_astrolift_agent(
+        self, info: Info, input: RunAstroliftAgentInput
+    ) -> MutationResultType[AgentTaskType]:
+        """Dispatch a Once run of a registered agent ``Workload(kind=agent)``.
+
+        Spec 33, PR-1 — the user-facing seam that bridges a registered agent
+        Workload to the existing Temporal dispatch pipeline. Unlike
+        ``launch_task`` (Brief-based, never sets ``agent_definition`` and
+        dead-ends at QUEUED with no pickup), this resolver:
+
+          1. resolves the agent Workload by slug, org-scoped to the caller's
+             active tenant (a foreign-org slug is not resolvable -> NOT_FOUND);
+          2. creates an ``AgentTask`` with ``agent_definition`` set to that
+             Workload (the K8s Job spawner requires it to render the pod image)
+             plus the optional ``environment_spec``, in DRAFT then advanced to
+             QUEUED via the model's sanctioned ``transition_to``;
+          3. enqueues ``DispatchAgentTaskWorkflow`` for the task, which runs it
+             through spawn -> poll -> terminal via the ``dispatch_agent_task``
+             activity (reusing ``execute_agent_stage``'s sync helpers).
+
+        Returns the created task (id + status) so the FE can poll it to a
+        terminal state. Only the run-spec ``once`` mode is wired in PR-1; the
+        Workload's run-spec fields carry the other modes for later PRs.
+        """
+        from astrolift_workflows.client import start_workflow
+        from astrolift_workflows.inputs import DispatchAgentTaskInput
+
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        if org_pk is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+
+        slug = (input.agent_slug or "").strip()
+        if not slug:
+            return gql_failure(ErrorCode.VALIDATION.value, "agentSlug is required", field="agentSlug")
+
+        # Resolve the agent Workload org-scoped: the workload lives under a
+        # RegisteredApp whose organization must be the caller's active tenant.
+        # A foreign-org (or non-agent) slug is not resolvable so the surface
+        # never dispatches another tenant's agent or a non-agent workload.
+        workload = (
+            Workload.objects.filter(
+                slug=slug,
+                registered_app__organization_id=org_pk,
+                registered_app__deleted_at__isnull=True,
+                deleted_at__isnull=True,
+            )
+            .select_related("registered_app")
+            .first()
+        )
+        if workload is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "agent not found", field="agentSlug")
+        if workload.kind != Workload.Kind.AGENT:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"workload {slug!r} is not an agent (kind={workload.kind})",
+                field="agentSlug",
+            )
+
+        org = Organization.objects.filter(pk=org_pk, deleted_at__isnull=True).first()
+        if org is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "organization not found")
+
+        # Optional environment spec, org-scoped. A foreign-org spec id is
+        # NOT_FOUND for the same non-leak reason as the workload lookup.
+        env_spec = None
+        if input.environment_spec_id is not None:
+            env_spec = AgentEnvironmentSpec.objects.filter(
+                guid=str(input.environment_spec_id),
+                organization_id=org_pk,
+                deleted_at__isnull=True,
+            ).first()
+            if env_spec is None:
+                return gql_failure(
+                    ErrorCode.NOT_FOUND.value,
+                    "environment spec not found",
+                    field="environmentSpecId",
+                )
+
+        timeout_seconds = input.timeout_seconds if input.timeout_seconds and input.timeout_seconds > 0 else 300
+
+        with transaction.atomic():
+            task = AgentTask.objects.create(
+                organization=org,
+                agent_definition=workload,
+                environment_spec=env_spec,
+                status=AgentTask.Status.DRAFT,
+                timeout_seconds=timeout_seconds,
+                # Freeze VNC eligibility from the spec so the task stays
+                # self-describing if the spec is later edited or deleted
+                # (mirrors execute_agent_stage._create_agent_task_sync).
+                vnc_enabled=bool(env_spec and env_spec.vnc_enabled),
+            )
+            task.transition_to(AgentTask.Status.QUEUED)
+
+        # Enqueue the durable dispatch. Workflow id is keyed to the task guid
+        # so a duplicate fire joins the in-flight run. When Temporal is
+        # disabled (dev/CI) this is a logged no-op and the task stays QUEUED
+        # until a worker picks it up — the FE still gets a pollable task.
+        start_workflow(
+            "DispatchAgentTaskWorkflow",
+            args=[DispatchAgentTaskInput(agent_task_id=task.pk, actor=_dispatch_actor(info))],
+            workflow_id=f"DispatchAgentTaskWorkflow-{task.guid}",
+        )
+
+        return gql_success(agent_task_to_type(task))
 
     @strawberry.field
     @mutation_audit(action="agents.skill.import_from_repo")

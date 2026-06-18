@@ -506,3 +506,43 @@ async def cancel_agent_stage(task_guid: str) -> None:
 
     activity.heartbeat()
     await sync_to_async(_cancel_agent_task_sync)(task_guid)
+
+
+@activity.defn(name="astrolift.agent.dispatch_task")
+async def dispatch_agent_task(task_pk: int) -> dict[str, Any]:
+    """Run one *already-created* AgentTask end-to-end (spec 33, PR-1).
+
+    This is the Once-dispatch counterpart to :func:`execute_agent_stage`. The
+    ``runAstroliftAgent`` mutation has already created the AgentTask in QUEUED
+    with its ``agent_definition`` Workload set (the K8s Job spawner requires
+    ``agent_definition`` to render the pod image — see
+    ``astrolift_dispatch.spawners.k8s_job``), so this activity does NOT create
+    a task; it reuses the same spawn -> poll -> terminal pipeline on the
+    existing pk:
+
+      ``_spawn_agent_task_sync`` (QUEUED -> PROVISIONING + ``get_spawner``)
+      then ``_poll_agent_task_sync`` until terminal, heartbeating each cycle.
+
+    Returns the task's terminal outcome payload (same shape as
+    :func:`execute_agent_stage`). On Temporal cancellation the in-flight task
+    is torn down best-effort before the CancelledError propagates.
+    """
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    try:
+        spawn = await sync_to_async(_spawn_agent_task_sync)(task_pk)
+
+        if spawn["ok"]:
+            while True:
+                activity.heartbeat()
+                poll = await sync_to_async(_poll_agent_task_sync)(task_pk)
+                if poll["terminal"]:
+                    break
+                await asyncio.sleep(_POLL_INTERVAL_SECONDS)
+    except asyncio.CancelledError:
+        outcome = await sync_to_async(_load_task_outcome_sync)(task_pk)
+        await sync_to_async(_cancel_agent_task_sync)(outcome["task_guid"])
+        raise
+
+    return await sync_to_async(_load_task_outcome_sync)(task_pk)
