@@ -200,10 +200,70 @@ def test_ssa_returns_created_when_pre_get_404() -> None:
     assert outcome == "created"
     _, kwargs = fake_resource.server_side_apply.call_args
     assert kwargs["field_manager"] == "astrolift"
-    assert kwargs["force_conflicts"] is False
+    assert kwargs["force_conflicts"] is True
     assert kwargs["namespace"] == "ns"
     assert "dry_run" not in kwargs
     assert token_provider.call_count >= 2
+
+
+def test_ssa_forces_conflicts_by_default() -> None:
+    """Regression for the agent-deploy 409 ``FieldManagerConflict``.
+
+    ``build_agent_manifests`` applies the ``astrolift-system`` Namespace
+    with ``astrolift.io/managed-by: platform`` through the cluster
+    drivers' ``apply_manifests`` → this helper. That label key is already
+    owned by other field managers (legacy ``OpenAPI-Generator`` and the
+    bootstrap's ``astrolift-control-plane``), so a non-forcing apply was
+    rejected with a 409 and agent dispatch failed. The platform is the
+    authoritative manager for the resources it applies, so the helper
+    must force conflicts by default.
+    """
+    with patch(
+        "kubernetes.dynamic.exceptions.NotFoundError",
+        _FakeDynNotFoundError,
+    ):
+        client, fake_resource, _tok = _ssa_test_setup(
+            pre_get_payload={"metadata": {"name": "astrolift-system", "generation": 1}},
+            post_apply_payload={"metadata": {"name": "astrolift-system", "generation": 1}},
+        )
+        client.server_side_apply(
+            namespace=None,
+            manifest={
+                "apiVersion": "v1",
+                "kind": "Namespace",
+                "metadata": {
+                    "name": "astrolift-system",
+                    "labels": {"astrolift.io/managed-by": "platform"},
+                },
+            },
+            dry_run=False,
+        )
+    _, kwargs = fake_resource.server_side_apply.call_args
+    assert kwargs["force_conflicts"] is True
+
+
+def test_ssa_respects_explicit_force_conflicts_override() -> None:
+    """An explicit ``force_conflicts=False`` still defers to the owner."""
+    with patch(
+        "kubernetes.dynamic.exceptions.NotFoundError",
+        _FakeDynNotFoundError,
+    ):
+        client, fake_resource, _tok = _ssa_test_setup(
+            pre_get_payload={"metadata": {"name": "x", "generation": 1}},
+            post_apply_payload={"metadata": {"name": "x", "generation": 1}},
+        )
+        client.server_side_apply(
+            namespace="ns",
+            manifest={
+                "apiVersion": "apps/v1",
+                "kind": "Deployment",
+                "metadata": {"name": "x"},
+            },
+            dry_run=False,
+            force_conflicts=False,
+        )
+    _, kwargs = fake_resource.server_side_apply.call_args
+    assert kwargs["force_conflicts"] is False
 
 
 def test_ssa_returns_updated_when_generation_bumps() -> None:
