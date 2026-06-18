@@ -29,6 +29,8 @@ from astrolift_agents.models import (
 )
 from astrolift_agents.schema.types import (
     AgentEnvironmentSpecType,
+    AgentListItemType,
+    AgentLiveStatusType,
     AgentRuntimeType,
     AgentTaskType,
     BriefType,
@@ -42,6 +44,7 @@ from astrolift_agents.schema.types import (
     skill_to_type,
     tool_def_to_type,
 )
+from astrolift_graphql import GUID
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
@@ -72,6 +75,138 @@ def _caller_org_id(info: Info, org_id: strawberry.ID) -> int:
     if requested.pk != org and not is_super:
         raise GraphQLError("organization mismatch")
     return requested.pk
+
+
+# ---------------------------------------------------------------------------
+# Agent list + live-status helpers (spec 33 PR-2)
+# ---------------------------------------------------------------------------
+#
+# The Agents list and the per-agent detail header read ``kind: agent``
+# Workload rows plus a rollup of their AgentRun execution state. These
+# helpers keep the rollup to a bounded number of queries (no per-agent
+# N+1) and compute the next scheduled firing off the platform's existing
+# cron evaluator — no new dependency.
+
+# Cap the agent list / live-status rollup so a tenant with a large fleet
+# can't issue an unbounded scan. Mirrors the 200-row soft cap the sibling
+# agent resolvers (agent_tasks, skills, ...) already use.
+_AGENT_LIST_CAP = 200
+
+# How far ahead ``_next_cron_fire`` scans for the next firing. A valid
+# 5-field cron with a day-of-month + month constraint can be up to ~13
+# months out (e.g. ``0 0 29 2 *`` on a non-leap year), so a 400-day window
+# covers every expression the registry's validator accepts. The scan is
+# minute-granular and pure-Python; the cap bounds the worst case rather
+# than being expected to bite (most schedules fire within a day).
+_NEXT_CRON_LOOKAHEAD_MINUTES = 400 * 24 * 60
+
+
+def _next_cron_fire(expression: str, *, after):
+    """Next UTC firing of ``expression`` strictly after ``after``.
+
+    Reuses the platform's existing cron evaluator
+    (:func:`astrolift_workflows.cron_deploy.cron_matches`) — the same
+    5-field grammar the registry validates at the mutation boundary — by
+    scanning forward minute-by-minute. Returns a tz-aware ``datetime``
+    truncated to the minute, or ``None`` when the expression is empty /
+    invalid or no firing falls within :data:`_NEXT_CRON_LOOKAHEAD_MINUTES`.
+
+    Scanning (rather than pulling in ``croniter``) keeps the dependency
+    surface flat per the build plan; the look-ahead cap bounds the cost.
+    """
+    from datetime import timedelta
+
+    from astrolift_workflows.cron_deploy import cron_matches
+
+    if not (expression or "").strip():
+        return None
+    # Start at the top of the minute *after* ``after`` so a cron that
+    # matches the current minute reports the *next* occurrence, not now.
+    cursor = after.replace(second=0, microsecond=0) + timedelta(minutes=1)
+    for _ in range(_NEXT_CRON_LOOKAHEAD_MINUTES):
+        try:
+            if cron_matches(expression, now=cursor):
+                return cursor
+        except ValueError:
+            # cron_matches rejects naive datetimes; ``after`` is always
+            # tz-aware here (timezone.now()), so this can't fire — but
+            # refuse to loop forever on a bad expression just in case.
+            return None
+        cursor += timedelta(minutes=1)
+    return None
+
+
+def _agent_run_rollup(workload_pks: list[int]) -> dict[int, dict]:
+    """Bulk last-run + running-count per agent workload.
+
+    Returns ``{workload_pk: {"last_status", "last_at", "running"}}`` for
+    every pk in ``workload_pks`` (missing keys mean "no runs yet"). Two
+    queries total regardless of fleet size — one ordered scan that keeps
+    the first (newest) row per workload off the ``(workload, -created_at)``
+    index, and one grouped count of RUNNING rows — so the list resolvers
+    never spawn a per-agent query.
+    """
+    from django.db.models import Count
+
+    from astrolift_lifecycle.models import AgentRun
+
+    if not workload_pks:
+        return {}
+
+    rollup: dict[int, dict] = {}
+
+    # Newest run per workload. The index is (workload, -created_at), so the
+    # first row seen per workload_id in this ordering is its latest run.
+    latest_seen: set[int] = set()
+    for run in (
+        AgentRun.objects.filter(workload_id__in=workload_pks)
+        .order_by("workload_id", "-created_at")
+        .values_list("workload_id", "status", "created_at", "started_at")
+    ):
+        wl_id, status, created_at, started_at = run
+        if wl_id in latest_seen:
+            continue
+        latest_seen.add(wl_id)
+        rollup.setdefault(wl_id, {})
+        rollup[wl_id]["last_status"] = status
+        # Prefer the actual start; fall back to created for pending rows
+        # that never started so the "last ran" chip still has a timestamp.
+        rollup[wl_id]["last_at"] = started_at or created_at
+
+    # Running count per workload — one grouped aggregate.
+    for row in (
+        AgentRun.objects.filter(
+            workload_id__in=workload_pks,
+            status=AgentRun.Status.RUNNING,
+        )
+        .values("workload_id")
+        .annotate(n=Count("pk"))
+    ):
+        rollup.setdefault(row["workload_id"], {})
+        rollup[row["workload_id"]]["running"] = int(row["n"])
+
+    return rollup
+
+
+def _agent_workload_qs(org_pk: int, *, project_slug: str | None = None):
+    """Base queryset of the caller-org's ``kind: agent`` workloads.
+
+    Scoped to ``org_pk`` via the workload's app organization (Workload
+    has no org FK of its own). ``project_slug`` further narrows to one
+    project. Soft-deleted workloads (and rows under a soft-deleted app)
+    are excluded; ordered newest-first for a stable list.
+    """
+    from astrolift_registry.models import Workload
+
+    qs = Workload.objects.filter(
+        kind=Workload.Kind.AGENT,
+        registered_app__organization_id=org_pk,
+        registered_app__deleted_at__isnull=True,
+        deleted_at__isnull=True,
+    ).select_related("registered_app", "registered_app__project")
+    if project_slug:
+        qs = qs.filter(registered_app__project__slug=project_slug)
+    return qs.order_by("-created_at")
 
 
 @strawberry.type
@@ -166,15 +301,46 @@ class AgentsQuery:
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
     def agent_tasks(
-        self, info: Info, org_id: strawberry.ID, status: str | None = None
+        self,
+        info: Info,
+        org_id: strawberry.ID,
+        status: str | None = None,
+        workload_id: strawberry.ID | None = None,
     ) -> list[AgentTaskType]:
         """The org's AgentTasks, newest first, optionally filtered by
-        status. An unknown status string yields an empty list rather
-        than an error."""
+        status and/or agent workload.
+
+        ``workload_id`` (spec 33 PR-2) narrows to tasks dispatched from
+        one ``kind: agent`` Workload — the per-agent detail surface uses
+        it to show a single agent's task history. The GUID is resolved
+        within the caller's org first; a workload GUID that belongs to
+        another org (or doesn't exist) yields an empty list rather than
+        leaking another tenant's tasks. An unknown status string also
+        yields an empty list rather than an error.
+        """
         org_pk = _caller_org_id(info, org_id)
         qs = AgentTask.objects.filter(organization_id=org_pk, deleted_at__isnull=True)
         if status:
             qs = qs.filter(status=status)
+        if workload_id:
+            # Resolve the workload inside the caller's org (its app's
+            # organization must match) so a foreign-org GUID can't be
+            # used to filter — and so a no-match returns [] instead of
+            # the org's entire task list (an unfiltered filter).
+            from astrolift_registry.models import Workload
+
+            wl = (
+                Workload.objects.filter(
+                    guid=str(workload_id),
+                    registered_app__organization_id=org_pk,
+                    deleted_at__isnull=True,
+                )
+                .values_list("pk", flat=True)
+                .first()
+            )
+            if wl is None:
+                return []
+            qs = qs.filter(agent_definition_id=wl)
         # select_related the org so snapshot_url presigning (per RUNNING vnc
         # row) doesn't fire a query per task — the org is the only related
         # object agent_task_to_type touches.
@@ -338,6 +504,139 @@ class AgentsQuery:
             slug=slug, organization_id=org_pk, deleted_at__isnull=True
         ).first()
         return agent_env_spec_to_type(row) if row is not None else None
+
+    # ----------------------------------------------------------------
+    # Agent list + live status (spec 33 PR-2)
+    # ----------------------------------------------------------------
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def agent_workloads(
+        self, info: Info, org_id: strawberry.ID, project_slug: str | None = None
+    ) -> list[AgentListItemType]:
+        """The org's ``kind: agent`` workloads as list rows, newest first.
+
+        ``project_slug`` narrows to one project's agents (the
+        project-scoped Agents list); omitting it returns every agent in
+        the org's fleet (the fleet/org-wide variant). Each row carries
+        the run-spec fields (PR-1) plus a compact last-run summary +
+        running count rolled up in bulk so the list stays a single
+        round-trip with no per-agent query.
+
+        Org-scoped: ``org_id`` must match the caller's active tenant
+        (superusers excepted, via ``_caller_org_id``); the workload
+        queryset is filtered to that org through the app's organization.
+        """
+        org_pk = _caller_org_id(info, org_id)
+        workloads = list(_agent_workload_qs(org_pk, project_slug=project_slug)[:_AGENT_LIST_CAP])
+        rollup = _agent_run_rollup([w.pk for w in workloads])
+        rows: list[AgentListItemType] = []
+        for w in workloads:
+            stats = rollup.get(w.pk, {})
+            app = w.registered_app
+            rows.append(
+                AgentListItemType(
+                    id=GUID(str(w.guid)),
+                    name=w.name,
+                    slug=w.slug,
+                    app_slug=app.slug,
+                    project_slug=(app.project.slug if app.project_id else ""),
+                    source_repo=app.source_repo or "",
+                    source_url=app.source_url or "",
+                    run_family=w.run_family,
+                    run_mode=w.run_mode,
+                    run_paused=w.run_paused,
+                    run_cron_expression=w.run_cron_expression or "",
+                    last_run_status=stats.get("last_status"),
+                    last_run_at=stats.get("last_at"),
+                    running_count=stats.get("running", 0),
+                )
+            )
+        return rows
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def agent_fleet(self, info: Info, org_id: strawberry.ID) -> list[AgentListItemType]:
+        """Org-wide agent fleet — every ``kind: agent`` workload across
+        all projects in the caller's org.
+
+        Convenience alias for :meth:`agent_workloads` with no project
+        filter, exposed as its own field so the fleet/global Agents page
+        doesn't have to special-case a null ``project_slug`` argument.
+        """
+        return self.agent_workloads(info, org_id=org_id, project_slug=None)
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def agent_live_status(
+        self,
+        info: Info,
+        org_id: strawberry.ID,
+        project_slug: str | None = None,
+        workload_id: strawberry.ID | None = None,
+    ) -> list[AgentLiveStatusType]:
+        """Per-agent live status for the caller's org, one row per agent.
+
+        Drives the live badges on the Agents list (poll the whole
+        project/fleet) and the detail header (pass ``workload_id`` to get
+        just that agent). For each agent it rolls up the in-flight run
+        count, the last-run status/time, the paused + idle flags, and —
+        for a ``run_mode == schedule`` unpaused agent — the next cron
+        firing (computed from ``run_cron_expression`` via the platform
+        cron evaluator; null for non-schedule / paused agents or when no
+        firing falls in the look-ahead window).
+
+        Org-scoped exactly like :meth:`agent_workloads`. ``project_slug``
+        narrows to one project; ``workload_id`` narrows to one agent
+        (resolved within the org — a foreign-org or unknown GUID yields
+        an empty list, never another tenant's status).
+        """
+        from django.utils import timezone
+
+        from astrolift_registry.models import Workload
+
+        org_pk = _caller_org_id(info, org_id)
+        qs = _agent_workload_qs(org_pk, project_slug=project_slug)
+        if workload_id:
+            qs = qs.filter(guid=str(workload_id))
+        workloads = list(qs[:_AGENT_LIST_CAP])
+        rollup = _agent_run_rollup([w.pk for w in workloads])
+        now = timezone.now()
+
+        rows: list[AgentLiveStatusType] = []
+        for w in workloads:
+            stats = rollup.get(w.pk, {})
+            running = stats.get("running", 0)
+            # Next-scheduled only for an unpaused, schedule-mode agent —
+            # the only run mode whose firing is computable from the cron
+            # expression. Loop/trigger/once have no clock-derived next
+            # time, so they report null (the FE renders "—" / on-demand).
+            next_scheduled = None
+            if (
+                w.run_mode == Workload.RunMode.SCHEDULE
+                and not w.run_paused
+                and (w.run_cron_expression or "").strip()
+            ):
+                next_scheduled = _next_cron_fire(w.run_cron_expression, after=now)
+            rows.append(
+                AgentLiveStatusType(
+                    workload_id=GUID(str(w.guid)),
+                    workload_slug=w.slug,
+                    app_slug=w.registered_app.slug,
+                    run_family=w.run_family,
+                    run_mode=w.run_mode,
+                    is_paused=w.run_paused,
+                    is_idle=running == 0,
+                    running_count=running,
+                    last_run_status=stats.get("last_status"),
+                    last_run_at=stats.get("last_at"),
+                    next_scheduled_at=next_scheduled,
+                )
+            )
+        return rows
 
     @strawberry.field
     def agent_runtimes(self, info: Info) -> list[AgentRuntimeType]:

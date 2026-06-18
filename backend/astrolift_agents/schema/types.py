@@ -234,6 +234,73 @@ def dispatcher_to_type(d) -> DispatcherInstanceType:
     )
 
 
+@strawberry.type(name="AstroliftAgentListItem")
+class AgentListItemType:
+    """One row on the Agents list (spec 33 PR-2).
+
+    Projects a ``kind: agent`` :class:`Workload` plus the source-repo
+    coordinates from its :class:`RegisteredApp` and the run-spec fields
+    (PR-1) the list needs to render a row, alongside a compact last-run
+    summary so the list doesn't need a second round-trip per agent.
+
+    The run-spec fields (``run_family`` / ``run_mode`` / ``run_paused`` /
+    ``run_cron_expression``) drive the schedule/idle badges; the
+    ``last_run_*`` fields render the "last ran 5m ago — succeeded" chip;
+    ``running_count`` powers the live "N running" pill. ``last_run_*`` and
+    ``running_count`` are computed in bulk by the resolver, not per row.
+    """
+
+    id: GUID
+    name: str
+    slug: str
+    app_slug: str
+    project_slug: str
+    source_repo: str
+    source_url: str
+    run_family: str
+    run_mode: str
+    run_paused: bool
+    run_cron_expression: str
+    # Compact last-run summary (most recent AgentRun for this workload).
+    last_run_status: str | None
+    last_run_at: dt.datetime | None
+    # Number of currently-running AgentRuns for this workload.
+    running_count: int
+
+
+@strawberry.type(name="AstroliftAgentLiveStatus")
+class AgentLiveStatusType:
+    """Live operational status for one agent workload (spec 33 PR-2).
+
+    A per-agent rollup the Agents list + detail header poll: how many
+    runs are in flight, when the agent last ran and how it ended,
+    whether it's paused, whether it's idle (nothing running), and — for
+    a ``run_mode == schedule`` agent — when it is next due to fire.
+
+    ``next_scheduled_at`` is non-null only when the agent is on the
+    ``schedule`` run mode, has a valid ``run_cron_expression``, and is
+    not paused. It is computed from the cron expression using the
+    platform's existing cron evaluator (``cron_matches``), scanning
+    forward minute-by-minute; null when the agent isn't schedule-driven,
+    is paused, or no firing falls inside the look-ahead window.
+    """
+
+    workload_id: GUID
+    workload_slug: str
+    app_slug: str
+    run_family: str
+    run_mode: str
+    is_paused: bool
+    # True when no AgentRun is currently RUNNING for this agent.
+    is_idle: bool
+    running_count: int
+    last_run_status: str | None
+    last_run_at: dt.datetime | None
+    # Next cron firing (UTC) for a schedule-mode, unpaused agent; null
+    # otherwise. See the class docstring for the exact non-null contract.
+    next_scheduled_at: dt.datetime | None
+
+
 def agent_env_spec_to_type(s) -> AgentEnvironmentSpecType:
     return AgentEnvironmentSpecType(
         id=GUID(str(s.guid)),
