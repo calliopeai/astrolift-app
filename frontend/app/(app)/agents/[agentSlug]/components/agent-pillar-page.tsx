@@ -2,10 +2,10 @@
 
 import { AgentDetailShell } from "./agent-detail-shell";
 import { BuildContent } from "./build-content";
+import { ControlContent } from "./control-content";
 import { ObserveContent } from "./observe-content";
 import { RunContent } from "./run-content";
 import { SecureContent } from "./secure-content";
-import { TabStub } from "./tab-stub";
 
 export type AgentPillar = "build" | "run" | "observe" | "control" | "secure";
 
@@ -13,16 +13,11 @@ export type AgentPillar = "build" | "run" | "observe" | "control" | "secure";
  * Single client entry for every `/agents/[agentSlug]/<pillar>` route. The
  * server `page.tsx` resolves the slug and names its pillar; this renders the
  * shared `AgentDetailShell` (header + `AgentTabs`) and slots the matching
- * content. Build + Observe + Run are real; Control is the PR-11/12 stub,
- * Secure the Zentinelle gate.
+ * content. Build + Observe + Run + Control are real; Control is the run-spec
+ * editor (Once/Schedule/Service in PR-11; Loop/Trigger/scaled-scaling in
+ * PR-12). Secure is the Zentinelle gate.
  */
-export function AgentPillarPage({
-  agentSlug,
-  pillar,
-}: {
-  agentSlug: string;
-  pillar: AgentPillar;
-}) {
+export function AgentPillarPage({ agentSlug, pillar }: { agentSlug: string; pillar: AgentPillar }) {
   return (
     <AgentDetailShell agentSlug={agentSlug}>
       {({ agent, orgId }) => {
@@ -36,12 +31,7 @@ export function AgentPillarPage({
           case "run":
             return <RunContent agent={agent} orgId={orgId} />;
           case "control":
-            return (
-              <TabStub
-                title="Control — coming in PR-11"
-                description="The run-spec editor (Once / Schedule / Service, then Loop / Trigger / scaled-scaling) lands in a later PR. You'll edit how and when this agent runs here."
-              />
-            );
+            return <ControlContent agent={agent} />;
           default:
             return null;
         }

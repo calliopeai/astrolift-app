@@ -1,6 +1,10 @@
 import type {
+  AgentRunFamily as GeneratedAgentRunFamily,
+  AgentRunMode as GeneratedAgentRunMode,
+  AgentRunSpecInput as GeneratedAgentRunSpecInput,
   AstroliftAgentListItem as GeneratedAgentListItem,
   AstroliftAgentLiveStatus as GeneratedAgentLiveStatus,
+  AstroliftAgentRunSpec as GeneratedAgentRunSpec,
   AstroliftAgentTask as GeneratedAgentTask,
   AstroliftBrief as GeneratedBrief,
   AstroliftDiscoveredAgentManifest as GeneratedDiscoveredAgentManifest,
@@ -120,3 +124,32 @@ export type AstroliftRegisterAgentRepoResult = Omit<GeneratedRegisterAgentRepoRe
 };
 
 export type RegisterAgentRepoInput = GeneratedRegisterAgentRepoInput;
+
+// Run-spec editor (spec 33 PR-11/PR-12). The write surface for
+// `updateAgentRunSpec`. The input enums are the UPPERCASE wire form
+// (TASK|SERVICE, ONCE|LOOP|SCHEDULE|TRIGGER); note the read side
+// (`AstroliftAgentListItem.runFamily/runMode` and the persisted spec below)
+// returns the LOWERCASE stored value — the editor maps between the two.
+export type AgentRunFamily = GeneratedAgentRunFamily;
+export type AgentRunMode = GeneratedAgentRunMode;
+export type AgentRunSpecInput = GeneratedAgentRunSpecInput;
+
+// The persisted run-spec returned by `updateAgentRunSpec` (read-back after a
+// write). Carries `replicas` (the Service baseline) — which the list-row
+// (`AstroliftAgentListItem`) does NOT — so it is the only existing surface that
+// exposes the stored replica count to the Service editor.
+export type AstroliftAgentRunSpec = Pick<
+  GeneratedAgentRunSpec,
+  | "id"
+  | "slug"
+  | "kind"
+  | "runFamily"
+  | "runMode"
+  | "runCronExpression"
+  | "runPaused"
+  | "runMaxParallel"
+  | "replicas"
+  | "scheduledScaleTo"
+  | "scaleUpCron"
+  | "scaleDownCron"
+>;
