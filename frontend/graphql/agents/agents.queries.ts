@@ -78,9 +78,13 @@ export const GET_BRIEF = gql`
   }
 `;
 
+// Agent runs/executions. `workloadId` (PR-2) scopes the list to a single
+// agent Workload — the per-agent Executions list (spec 33 PR-10) passes it;
+// the org-wide fleet surfaces (Active / History tabs, Observe) leave it null
+// and get every agent's tasks. `status` narrows by run state when set.
 export const LIST_AGENT_TASKS = gql`
-  query ListAgentTasks($orgId: ID!, $status: String) {
-    agentTasks(orgId: $orgId, status: $status) {
+  query ListAgentTasks($orgId: ID!, $status: String, $workloadId: ID) {
+    agentTasks(orgId: $orgId, status: $status, workloadId: $workloadId) {
       id
       status
       callbackUrl
