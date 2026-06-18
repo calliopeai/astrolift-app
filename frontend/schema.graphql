@@ -37,6 +37,30 @@ input AddWildcardDomainInput {
   sniCertRef: String! = ""
 }
 
+enum AgentRunFamily {
+  TASK
+  SERVICE
+}
+
+enum AgentRunMode {
+  ONCE
+  LOOP
+  SCHEDULE
+  TRIGGER
+}
+
+input AgentRunSpecInput {
+  runFamily: AgentRunFamily = null
+  runMode: AgentRunMode = null
+  runCronExpression: String = null
+  runPaused: Boolean = null
+  runMaxParallel: Int = null
+  replicas: Int = null
+  scheduledScaleTo: Int = null
+  scaleUpCron: String = null
+  scaleDownCron: String = null
+}
+
 type Alertruledeletedpayload {
   id: GUID!
   deleted: Boolean!
@@ -230,6 +254,27 @@ type AstroliftAgentRun {
   k8sPodName: String!
   resultTtlHours: Int!
   createdAt: DateTime!
+}
+
+type AstroliftAgentRunSpec {
+  id: GUID!
+  slug: String!
+  kind: String!
+  runFamily: String!
+  runMode: String!
+  runCronExpression: String!
+  runPaused: Boolean!
+  runMaxParallel: Int
+  replicas: Int!
+  scheduledScaleTo: Int
+  scaleUpCron: String!
+  scaleDownCron: String!
+}
+
+type AstroliftAgentRunSpecMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAgentRunSpec
 }
 
 type AstroliftAgentRuntime {
@@ -4356,6 +4401,7 @@ type Mutation {
   launchTask(briefId: ID!, orgId: ID!, callbackUrl: String = null): AstroliftLaunchTaskResultMutationResult!
   cancelTask(id: ID!): NoneTypeMutationResult!
   runAstroliftAgent(input: RunAstroliftAgentInput!): AstroliftAgentTaskMutationResult!
+  updateAgentRunSpec(agentSlug: String!, input: AgentRunSpecInput!): AstroliftAgentRunSpecMutationResult!
   importSkillsFromRepo(repoUrl: String!, branch: String! = "main", manifestPath: String! = ""): AstroliftImportSkillsResultMutationResult!
 
   """Start a workflow for an object."""

@@ -32,10 +32,14 @@ from astrolift_agents.models import (
 )
 from astrolift_agents.schema.types import (
     AgentEnvironmentSpecType,
+    AgentRunFamily,
+    AgentRunMode,
+    AgentRunSpecType,
     AgentTaskType,
     SkillType,
     ToolDefType,
     agent_env_spec_to_type,
+    agent_run_spec_to_type,
     agent_task_to_type,
     skill_to_type,
     tool_def_to_type,
@@ -44,6 +48,7 @@ from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Organization
+from astrolift_registry.cron import CronValidationError, validate_cron_expression
 from astrolift_registry.models import Workload
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
@@ -146,6 +151,45 @@ class RunAstroliftAgentInput:
     # coerces None -> {}.
     trigger_payload: JSON | None = None
     timeout_seconds: int | None = None
+
+
+@strawberry.input
+class AgentRunSpecInput:
+    """Partial write of an agent ``Workload(kind=agent)`` run-spec (spec 33).
+
+    Serves BOTH run-spec editors in one mutation:
+
+    - Task family — ``run_mode`` (once/loop/schedule/trigger),
+      ``run_cron_expression`` (schedule), ``run_max_parallel`` (loop cap),
+      ``run_paused``.
+    - Service family — ``replicas`` (baseline desired count),
+      ``scheduled_scale_to`` (scale-up target), ``scale_up_cron`` /
+      ``scale_down_cron``.
+
+    Every field is optional: only fields the caller actually supplies
+    (non-``None``) are written; an omitted / ``None`` field leaves the
+    stored value unchanged (partial update, mirrors
+    ``UpdateAgentEnvironmentSpecInput``). ``run_family`` / ``run_mode``
+    use the typed enums so the editor can't submit an unknown value;
+    ``run_max_parallel`` / ``replicas`` / ``scheduled_scale_to`` are
+    null-defaulted ints (``None`` = leave unchanged — distinct from an
+    explicit value, including 0 for ``run_max_parallel`` which is a Loop
+    soft-pause).
+    """
+
+    run_family: AgentRunFamily | None = None
+    run_mode: AgentRunMode | None = None
+    run_cron_expression: str | None = None
+    run_paused: bool | None = None
+    run_max_parallel: int | None = None
+    # Service baseline replica count the Deployment renderer reads
+    # (``spawners.k8s_job._render_agent`` → ``spec.replicas``). Service-only,
+    # >= 1; ``None`` leaves it unchanged. See ``update_agent_run_spec`` for the
+    # family gate.
+    replicas: int | None = None
+    scheduled_scale_to: int | None = None
+    scale_up_cron: str | None = None
+    scale_down_cron: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -750,6 +794,228 @@ class AgentsMutation:
         )
 
         return gql_success(agent_task_to_type(task))
+
+    @strawberry.field
+    @mutation_audit(
+        action="agents.agent.configure_run_spec",
+        target=lambda self, info, agent_slug, input: ("workload", agent_slug),
+    )
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def update_agent_run_spec(
+        self, info: Info, agent_slug: str, input: AgentRunSpecInput
+    ) -> MutationResultType[AgentRunSpecType]:
+        """Write the run-spec of a registered agent ``Workload(kind=agent)``.
+
+        Spec 33 — the backend write surface the run-spec editors target:
+        the Once/Schedule/Service editor (PR-11) and the Loop/Trigger +
+        scaling editor (PR-12) both POST here. A partial update: only the
+        fields the caller supplies are written (an omitted / ``None`` field
+        is left unchanged), so an editor can save a single toggle without
+        round-tripping the whole spec.
+
+        Org-scoped exactly like ``run_astrolift_agent``: the workload is
+        resolved through its ``RegisteredApp`` whose organization must be
+        the caller's active tenant, so a foreign-org (or non-agent) slug is
+        not resolvable. Gates on ``APP_UPDATE`` — configuring an agent
+        workload's static run-spec is an app-config write, the same grant
+        the Skill / ToolDef / AgentEnvironmentSpec writes in this module use
+        (distinct from ``AGENT_DISPATCH``, which authorizes *running* an
+        agent, not configuring it).
+
+        Validation returns a structured field error (never a 500):
+
+          * each cron field is shape-checked via the platform cron parser
+            when supplied non-empty (and stored normalized); an empty string
+            clears it;
+          * ``run_mode == schedule`` (Task family) requires a non-empty
+            ``run_cron_expression`` — either already stored or in this input;
+          * the Service-family fields (``replicas`` / ``scheduled_scale_to``
+            / ``scale_*_cron``) are Service-family only — setting any on a
+            Task agent is rejected; ``run_max_parallel`` (the Loop cap) is
+            Task-family only — setting it on a Service agent is rejected;
+          * ``replicas`` (the Service baseline desired count) and
+            ``scheduled_scale_to`` must each be a positive int (the env-max
+            clamp is deferred to the deploy/scaling tick, which resolves the
+            per-env ceiling live via ``resolve_replica_bounds`` + clamps);
+          * ``run_max_parallel`` must be >= 0 (0 = Loop soft-pause; null =
+            leave unchanged, which the tick reads as the platform default).
+
+        Coherence is judged against the EFFECTIVE family/mode (the supplied
+        value, else the stored one) so a partial save validates against the
+        spec the row will actually have. Returns the updated run-spec so the
+        editor reads back the persisted state in one round-trip.
+        """
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        if org_pk is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+
+        slug = (agent_slug or "").strip()
+        if not slug:
+            return gql_failure(ErrorCode.VALIDATION.value, "agentSlug is required", field="agentSlug")
+
+        # Resolve the agent Workload org-scoped through its RegisteredApp —
+        # the same non-leaking lookup run_astrolift_agent uses. A foreign-org
+        # slug is not resolvable, so the surface never edits another tenant's
+        # agent (the @tenant_scoped decorator only asserts a tenant exists; it
+        # does NOT filter — this query is what enforces isolation).
+        workload = (
+            Workload.objects.filter(
+                slug=slug,
+                registered_app__organization_id=org_pk,
+                registered_app__deleted_at__isnull=True,
+                deleted_at__isnull=True,
+            )
+            .select_related("registered_app")
+            .first()
+        )
+        if workload is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "agent not found", field="agentSlug")
+        if workload.kind != Workload.Kind.AGENT:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"workload {slug!r} is not an agent (kind={workload.kind})",
+                field="agentSlug",
+            )
+
+        # ---- Effective family/mode (supplied value, else stored) ---------
+        eff_family = input.run_family.value if input.run_family is not None else workload.run_family
+        eff_mode = input.run_mode.value if input.run_mode is not None else workload.run_mode
+
+        # ---- Cron shape validation (normalize on success) ---------------
+        # Validate every supplied non-empty cron; an explicit "" clears the
+        # field (allowed). Track the normalized value to persist.
+        normalized: dict[str, str] = {}
+        for field_name, gql_field in (
+            ("run_cron_expression", "runCronExpression"),
+            ("scale_up_cron", "scaleUpCron"),
+            ("scale_down_cron", "scaleDownCron"),
+        ):
+            raw = getattr(input, field_name)
+            if raw is None:
+                continue
+            if not raw.strip():
+                normalized[field_name] = ""
+                continue
+            try:
+                normalized[field_name] = validate_cron_expression(raw)
+            except CronValidationError as exc:
+                return gql_failure(ErrorCode.VALIDATION.value, str(exc), field=gql_field)
+
+        # ---- Family/mode coherence (reject incoherent combos) -----------
+        # Scaling fields are Service-only. Reject SETTING a meaningful scaling
+        # value (a non-empty cron / a scale target) on a Task-family agent;
+        # clearing them ("" / leaving them None) is always fine.
+        sets_scale_up = "scale_up_cron" in normalized and normalized["scale_up_cron"] != ""
+        sets_scale_down = "scale_down_cron" in normalized and normalized["scale_down_cron"] != ""
+        sets_scale_to = input.scheduled_scale_to is not None
+        sets_replicas = input.replicas is not None
+        if eff_family == Workload.RunFamily.TASK.value:
+            if sets_scale_up:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "scaleUpCron applies to service-family agents only",
+                    field="scaleUpCron",
+                )
+            if sets_scale_down:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "scaleDownCron applies to service-family agents only",
+                    field="scaleDownCron",
+                )
+            if sets_scale_to:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "scheduledScaleTo applies to service-family agents only",
+                    field="scheduledScaleTo",
+                )
+            if sets_replicas:
+                # replicas is the Service Deployment's baseline count; a Task
+                # agent runs as a Job and has no replica count to set.
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "replicas applies to service-family agents only",
+                    field="replicas",
+                )
+
+        # The Loop concurrency cap is a Task-family concern; a Service agent
+        # scales via ``replicas``, not a per-task cap. Reject setting it on a
+        # Service agent.
+        if input.run_max_parallel is not None and eff_family == Workload.RunFamily.SERVICE.value:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "runMaxParallel applies to task-family agents only",
+                field="runMaxParallel",
+            )
+
+        # Schedule mode (a Task concern) needs a cron to fire on. Check the
+        # effective cron: the one supplied in this input, else the stored one.
+        if eff_family == Workload.RunFamily.TASK.value and eff_mode == Workload.RunMode.SCHEDULE.value:
+            eff_cron = normalized.get("run_cron_expression", workload.run_cron_expression or "")
+            if not eff_cron.strip():
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "schedule run_mode requires a run_cron_expression",
+                    field="runCronExpression",
+                )
+
+        # ---- Numeric sanity --------------------------------------------
+        if input.replicas is not None and input.replicas < 1:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "replicas must be a positive integer",
+                field="replicas",
+            )
+        if input.scheduled_scale_to is not None and input.scheduled_scale_to < 1:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "scheduledScaleTo must be a positive integer",
+                field="scheduledScaleTo",
+            )
+        if input.run_max_parallel is not None and input.run_max_parallel < 0:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "runMaxParallel must be zero or a positive integer",
+                field="runMaxParallel",
+            )
+
+        # ---- Apply (only supplied fields) -------------------------------
+        update_fields: list[str] = []
+        if input.run_family is not None:
+            workload.run_family = input.run_family.value
+            update_fields.append("run_family")
+        if input.run_mode is not None:
+            workload.run_mode = input.run_mode.value
+            update_fields.append("run_mode")
+        if "run_cron_expression" in normalized:
+            workload.run_cron_expression = normalized["run_cron_expression"]
+            update_fields.append("run_cron_expression")
+        if input.run_paused is not None:
+            workload.run_paused = bool(input.run_paused)
+            update_fields.append("run_paused")
+        if input.run_max_parallel is not None:
+            workload.run_max_parallel = int(input.run_max_parallel)
+            update_fields.append("run_max_parallel")
+        if input.replicas is not None:
+            workload.replicas = int(input.replicas)
+            update_fields.append("replicas")
+        if input.scheduled_scale_to is not None:
+            workload.scheduled_scale_to = int(input.scheduled_scale_to)
+            update_fields.append("scheduled_scale_to")
+        if "scale_up_cron" in normalized:
+            workload.scale_up_cron = normalized["scale_up_cron"]
+            update_fields.append("scale_up_cron")
+        if "scale_down_cron" in normalized:
+            workload.scale_down_cron = normalized["scale_down_cron"]
+            update_fields.append("scale_down_cron")
+
+        if update_fields:
+            # Bump the optimistic-concurrency version + updated_at alongside
+            # the run-spec columns (NamedBaseCoreModel.save tracks them).
+            workload.save(update_fields=[*update_fields, "updated_at", "version"])
+
+        return gql_success(agent_run_spec_to_type(workload))
 
     @strawberry.field
     @mutation_audit(action="agents.skill.import_from_repo")
