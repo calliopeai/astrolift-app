@@ -387,7 +387,7 @@ const sections: NavSection[] = [
             // precise `me.isStaff` (Django is_staff) field and switch this
             // gate to it so non-staff org admins don't see the Django admin.
             label: "Admin",
-            href: "/admin",
+            href: "/app/admin",
             icon: <ShieldCheckIcon />,
             permission: "cluster.register",
             external: true,
