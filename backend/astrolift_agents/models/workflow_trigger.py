@@ -25,10 +25,25 @@ workflow triggers in addition to the core deploy path.
                    scan. Nullable for backward compat: rows created
                    before this column are org-agnostic and match any
                    org's SCM events when scm_repo is blank.
+
+Agent trigger binding (spec 33, PR-6):
+WorkflowWebhook gains an optional ``agent_definition`` FK so the SAME
+webhook row + SCM fan-out can bind to an agent ``Workload(kind=agent)``
+instead of a ``WorkflowDefinition``. A bound webhook firing dispatches a
+Task through the PR-1 ``runAstroliftAgent`` path with ``input_mapping``
+applied to the incoming payload, rather than launching a WorkflowInstance.
+Exactly one target is set per row (enforced by ``clean`` + a DB
+``CheckConstraint``): ``workflow_definition`` XOR ``agent_definition``.
+``workflow_definition`` is therefore nullable now (it was required); this
+is a widening AlterField — existing rows keep their value and the XOR holds
+for them (definition set, agent null). Condition triggers are explicitly
+out of scope (spec §PR-6): there is no condition backing in the platform,
+so only webhook/event bindings exist — a condition binding has no column.
 """
 
 from __future__ import annotations
 
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -108,12 +123,42 @@ class WorkflowWebhook(models.Model):
     up matching webhooks in O(rows per org) rather than scanning the
     full table.  Legacy rows without an org are excluded from SCM
     routing automatically.
+
+    Agent binding (spec 33, PR-6)
+    -----------------------------
+    A webhook targets EITHER a ``workflow_definition`` (launch a
+    WorkflowInstance) OR an ``agent_definition`` Workload (dispatch an
+    AgentTask through the ``runAstroliftAgent`` path) — never both, never
+    neither. The XOR is enforced by :meth:`clean` and the
+    ``wfwebhook_exactly_one_target`` DB CheckConstraint. Both FKs are
+    nullable so the column shape can represent either binding; the
+    constraint keeps a row coherent.
     """
 
+    # Nullable since PR-6: a webhook may instead target an agent (see
+    # ``agent_definition``). The XOR constraint below guarantees exactly
+    # one of the two is set, so a definition-bound row is unchanged.
     workflow_definition = models.ForeignKey(
         "workflows.WorkflowDefinition",
         on_delete=models.CASCADE,
         related_name="webhooks",
+        null=True,
+        blank=True,
+    )
+    # Agent-trigger binding (spec 33, PR-6). When set (and
+    # ``workflow_definition`` is null), a firing of this webhook dispatches
+    # an AgentTask for this agent ``Workload(kind=agent)`` via the PR-1
+    # dispatch path, with ``input_mapping`` applied to the incoming payload.
+    agent_definition = models.ForeignKey(
+        "astrolift_registry.Workload",
+        on_delete=models.CASCADE,
+        related_name="agent_webhooks",
+        null=True,
+        blank=True,
+        help_text=(
+            "Agent Workload this webhook dispatches a Task for when it fires "
+            "(spec 33, PR-6). Mutually exclusive with workflow_definition."
+        ),
     )
     # Source-host (SCM) webhooks scope to a RegisteredApp so the SCM
     # ingest receiver can find "which workflows fire for this app's
@@ -140,7 +185,11 @@ class WorkflowWebhook(models.Model):
         default=dict,
         blank=True,
         help_text=(
-            "JSONPath / key-mapping spec that maps incoming payload fields " "to the workflow's input schema."
+            "Key-mapping spec applied to the incoming payload. For a "
+            "workflow_definition target it maps payload fields to the "
+            "workflow's input schema; for an agent_definition target "
+            "(PR-6) it shapes the dispatch payload handed to the agent "
+            "Task (see services.workflow_triggers.apply_input_mapping)."
         ),
     )
     enabled = models.BooleanField(default=True, db_index=True)
@@ -190,8 +239,47 @@ class WorkflowWebhook(models.Model):
                 fields=["registered_app", "enabled"],
                 name="wfwebhook_app_enabled_idx",
             ),
+            # PR-6: cheap lookup of "agent webhooks bound to this agent".
+            models.Index(
+                fields=["agent_definition", "enabled"],
+                name="wfwebhook_agent_enabled_idx",
+            ),
         ]
+        constraints = [
+            # PR-6: exactly one target — a row binds to a workflow definition
+            # XOR an agent. Encoded as "exactly one of the two FK columns is
+            # non-null". Legacy rows (definition set, agent null) satisfy it.
+            models.CheckConstraint(
+                name="wfwebhook_exactly_one_target",
+                condition=(
+                    models.Q(workflow_definition__isnull=False, agent_definition__isnull=True)
+                    | models.Q(workflow_definition__isnull=True, agent_definition__isnull=False)
+                ),
+            ),
+        ]
+
+    def clean(self) -> None:
+        """Enforce the workflow-vs-agent XOR at the application layer too.
+
+        The DB CheckConstraint is the hard guarantee; this surfaces a clear
+        ValidationError on ``full_clean`` (used by admin / forms) instead of
+        an IntegrityError. ``condition`` triggers are out of scope (spec
+        §PR-6) — there is no third target column, so binding to neither is
+        rejected here as well.
+        """
+        has_def = self.workflow_definition_id is not None
+        has_agent = self.agent_definition_id is not None
+        if has_def == has_agent:
+            raise ValidationError(
+                "WorkflowWebhook must target exactly one of "
+                "workflow_definition or agent_definition (not both, not neither)."
+            )
 
     def __str__(self) -> str:
         state = "enabled" if self.enabled else "disabled"
-        return f"WorkflowWebhook(slug={self.slug!r}, def={self.workflow_definition_id}, {state})"
+        target = (
+            f"agent={self.agent_definition_id}"
+            if self.agent_definition_id is not None
+            else f"def={self.workflow_definition_id}"
+        )
+        return f"WorkflowWebhook(slug={self.slug!r}, {target}, {state})"

@@ -33,6 +33,7 @@ from astrolift_workflows.activities import (
     detect_drift,
     dispatch_agent_crons,
     dispatch_agent_for_stage,
+    dispatch_agent_loops,
     dispatch_cron_deploys,
     dispatch_scale_ticks,
     drain_source_cluster,
@@ -114,6 +115,7 @@ from astrolift_workflows.activities.agent_stage import (
 )
 from astrolift_workflows.workflows import (
     AgentCronTickWorkflow,
+    AgentLoopTickWorkflow,
     AgentScaleTickWorkflow,
     BringClusterIntoManagementWorkflow,
     BuildPreviewWorkflow,
@@ -153,6 +155,7 @@ from astrolift_workflows.workflows import (
 
 WORKFLOWS = (
     AgentCronTickWorkflow,
+    AgentLoopTickWorkflow,
     AgentScaleTickWorkflow,
     BringClusterIntoManagementWorkflow,
     BuildPreviewWorkflow,
@@ -216,6 +219,7 @@ ACTIVITIES = (
     detect_drift,
     dispatch_agent_crons,
     dispatch_agent_for_stage,
+    dispatch_agent_loops,
     dispatch_agent_task,
     dispatch_cron_deploys,
     dispatch_scale_ticks,

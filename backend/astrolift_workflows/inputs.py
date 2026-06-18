@@ -387,10 +387,20 @@ class DispatchAgentTaskInput:
     Workflow id is ``DispatchAgentTaskWorkflow-<task-guid>`` (the mutation
     constructs it that way) so a duplicate fire joins the in-flight run
     instead of spawning a parallel dispatch of the same task.
+
+    ``trigger_payload`` (spec 33, PR-6) carries the per-dispatch input for a
+    webhook/event-triggered run — the incoming payload shaped by the
+    binding's ``input_mapping`` (see
+    ``astrolift_agents.services.workflow_triggers.apply_input_mapping``).
+    ``None`` for manual / cron / loop dispatch, which carry no ad-hoc input
+    (matching PR-1's ``runAstroliftAgent``, which does not thread a payload).
+    The dispatch activity reads from the AgentTask itself, so this rides along
+    as the durable record of what input the trigger fired with.
     """
 
     agent_task_id: int
     actor: Actor
+    trigger_payload: dict[str, Any] | None = None
 
 
 @dataclasses.dataclass(slots=True, frozen=True)

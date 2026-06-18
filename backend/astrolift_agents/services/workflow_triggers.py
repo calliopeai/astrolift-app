@@ -84,6 +84,126 @@ def trigger_workflow_instance(
     return instance
 
 
+# ── Agent trigger binding (spec 33, PR-6) ────────────────────────────────────
+
+
+def apply_input_mapping(payload: dict | None, input_mapping: dict | None) -> dict:
+    """Shape an incoming webhook ``payload`` into an agent dispatch payload.
+
+    The contract, kept deliberately small (spec 33, PR-6):
+
+      * **Empty / falsy ``input_mapping``** → pass the whole ``payload``
+        through verbatim (mirrors the workflow-definition path, where the
+        definition's own input schema projects the raw payload downstream).
+      * **Non-empty mapping** → it is a ``{out_key: source_path}`` spec. Each
+        ``source_path`` is a dotted lookup into ``payload``
+        (``"pull_request.number"`` walks ``payload["pull_request"]["number"]``);
+        a missing path yields ``None`` for that key rather than raising, so a
+        partial payload still dispatches. The result is exactly the mapped
+        keys — nothing else from the payload leaks through.
+
+    Returns a plain ``dict`` suitable as the agent Task's trigger payload.
+    """
+    payload = payload or {}
+    if not input_mapping:
+        return dict(payload)
+    out: dict = {}
+    for out_key, source_path in input_mapping.items():
+        # Only string source paths are walked; a non-string mapping value is
+        # treated as a literal (lets a mapping inject a constant if desired).
+        if not isinstance(source_path, str):
+            out[out_key] = source_path
+            continue
+        cursor: object = payload
+        for segment in source_path.split("."):
+            if isinstance(cursor, dict) and segment in cursor:
+                cursor = cursor[segment]
+            else:
+                cursor = None
+                break
+        out[out_key] = cursor
+    return out
+
+
+def dispatch_agent_task_from_webhook(webhook, payload: dict | None) -> object | None:
+    """Dispatch an AgentTask for an agent-bound ``WorkflowWebhook`` firing.
+
+    The agent counterpart of :func:`trigger_workflow_instance`: the SCM
+    fan-out (and the app-scoped ingest path) call this when a fired webhook
+    targets an ``agent_definition`` Workload instead of a WorkflowDefinition.
+
+    It MIRRORS the PR-1 ``runAstroliftAgent`` dispatch path exactly — creates
+    an ``AgentTask`` with ``agent_definition`` set, advances DRAFT→QUEUED via
+    the sanctioned ``transition_to``, then enqueues ``DispatchAgentTaskWorkflow``
+    keyed to the task guid — rather than reinventing dispatch. The incoming
+    payload shaped by the binding's ``input_mapping`` (``apply_input_mapping``)
+    rides on the dispatch input's ``trigger_payload`` so the run carries the
+    mapped input (PR-1 manual/cron/loop dispatch leaves it ``None``).
+
+    Honors ``run_paused`` (acceptance (3)): a paused agent's bound webhook is a
+    no-op (returns None) — the kill-switch halts trigger dispatch the same way
+    it halts the loop + cron ticks.
+
+    Returns the created ``AgentTask`` (so callers can count / observe), or
+    ``None`` when nothing was dispatched (no agent target, paused, or the
+    agent/app was soft-deleted out from under the binding).
+
+    Condition triggers are explicitly out of scope (spec §PR-6): a webhook can
+    only bind to an agent for webhook/event delivery — there is no condition
+    backing in the platform, so no condition path exists here.
+    """
+    from django.db import transaction
+
+    from astrolift_agents.models import AgentTask
+    from astrolift_registry.models import Workload
+    from astrolift_workflows.client import start_workflow
+    from astrolift_workflows.inputs import Actor, DispatchAgentTaskInput
+
+    workload = getattr(webhook, "agent_definition", None)
+    if workload is None:
+        return None
+    # Re-validate the binding target at fire time: the agent must still be a
+    # live agent Workload under a live app (the FK is CASCADE, but a soft
+    # delete leaves the row — honour soft-delete here so a torn-down agent
+    # stops dispatching, matching the loop/cron selectors).
+    if (
+        workload.kind != Workload.Kind.AGENT
+        or workload.deleted_at is not None
+        or getattr(workload, "registered_app", None) is None
+        or workload.registered_app.deleted_at is not None
+    ):
+        return None
+    if workload.run_paused:
+        # Operator kill-switch — a paused agent's trigger does not dispatch.
+        return None
+
+    mapped = apply_input_mapping(payload, getattr(webhook, "input_mapping", None))
+
+    org_id = workload.registered_app.organization_id
+    with transaction.atomic():
+        task = AgentTask.objects.create(
+            organization_id=org_id,
+            agent_definition=workload,
+            status=AgentTask.Status.DRAFT,
+            timeout_seconds=int(workload.tool_timeout_seconds or 300),
+        )
+        task.transition_to(AgentTask.Status.QUEUED)
+
+    actor = Actor(kind="system", display="agent-trigger")
+    start_workflow(
+        "DispatchAgentTaskWorkflow",
+        args=[
+            DispatchAgentTaskInput(
+                agent_task_id=task.pk,
+                actor=actor,
+                trigger_payload=mapped,
+            )
+        ],
+        workflow_id=f"DispatchAgentTaskWorkflow-{task.guid}",
+    )
+    return task
+
+
 def create_scheduled_workflow_trigger(
     definition: WorkflowDefinition,
     cron_expression: str,
@@ -219,14 +339,22 @@ def route_scm_push_to_workflow_webhooks(event: ScmEvent) -> list[WorkflowInstanc
     * ``branch_pattern`` — ``fnmatch`` glob against ``event.branch``;
       blank means "match any branch".
 
-    For each matching webhook ``trigger_workflow_instance`` is called
-    with ``trigger_kind="scm_<event_kind>"`` and the normalised SCM
-    payload merged into the trigger input.  The ``last_triggered_at``
-    timestamp is updated in a single bulk UPDATE after all instances
-    are created so the loop stays O(1) DB round-trips per webhook.
+    For each matching webhook, the target decides the dispatch
+    (spec 33, PR-6):
+      * a ``workflow_definition``-bound webhook calls
+        ``trigger_workflow_instance`` (launch a WorkflowInstance), as before;
+      * an ``agent_definition``-bound webhook calls
+        ``dispatch_agent_task_from_webhook`` (dispatch an AgentTask through
+        the PR-1 path, with ``input_mapping`` applied to the SCM payload).
+    Both honour ``trigger_kind="scm_<event_kind>"`` semantics and the
+    per-webhook failure isolation. The ``last_triggered_at`` timestamp is
+    updated in a single bulk UPDATE after all dispatches so the loop stays
+    O(1) DB round-trips per webhook.
 
-    Returns the list of created ``WorkflowInstance`` objects (may be
-    empty when no webhooks match).
+    Returns the list of created ``WorkflowInstance`` objects (may be empty
+    when no webhooks match or when every match was agent-bound — agent Tasks
+    are not WorkflowInstances). Agent dispatches still update
+    ``last_triggered_at`` and are isolated from each other.
     """
     from astrolift_agents.models.workflow_trigger import WorkflowWebhook
 
@@ -234,7 +362,7 @@ def route_scm_push_to_workflow_webhooks(event: ScmEvent) -> list[WorkflowInstanc
         WorkflowWebhook.objects.filter(
             organization_id=event.organization_id,
             enabled=True,
-        ).select_related("workflow_definition")
+        ).select_related("workflow_definition", "agent_definition__registered_app")
     )
 
     instances: list[WorkflowInstance] = []
@@ -250,6 +378,23 @@ def route_scm_push_to_workflow_webhooks(event: ScmEvent) -> list[WorkflowInstanc
             "event_kind": event.event_kind,
             **event.raw_payload,
         }
+        # Agent-bound webhook (PR-6): dispatch a Task, not a WorkflowInstance.
+        if hook.agent_definition_id is not None:
+            try:
+                task = dispatch_agent_task_from_webhook(hook, input_data)
+            except Exception:
+                log.exception(
+                    "route_scm_push_to_workflow_webhooks: failed to dispatch "
+                    "agent task for webhook %s (agent=%s)",
+                    hook.pk,
+                    hook.agent_definition_id,
+                )
+                continue
+            # A paused / torn-down agent returns None — not a fire, so don't
+            # stamp last_triggered_at for it.
+            if task is not None:
+                fired_ids.append(hook.pk)
+            continue
         try:
             instance = trigger_workflow_instance(
                 hook.workflow_definition,

@@ -222,23 +222,39 @@ def _dispatch_workflow_webhooks(event_kind: str, app, payload: dict) -> int:
     host retry the delivery. We return the count of webhooks we attempted
     to dispatch so the caller can surface it in the ack body for
     observability.
+
+    Agent-bound webhooks (spec 33, PR-6): when a fired webhook targets an
+    ``agent_definition`` Workload instead of a WorkflowDefinition, it
+    dispatches an AgentTask through the PR-1 path (with ``input_mapping``
+    applied) rather than launching a WorkflowInstance. A paused / torn-down
+    agent is a no-op and is not counted as dispatched.
     """
     from astrolift_agents.models import WorkflowWebhook
-    from astrolift_agents.services.workflow_triggers import trigger_workflow_instance
+    from astrolift_agents.services.workflow_triggers import (
+        dispatch_agent_task_from_webhook,
+        trigger_workflow_instance,
+    )
 
     webhooks = WorkflowWebhook.objects.filter(
         registered_app=app,
         enabled=True,
-    ).select_related("workflow_definition")
+    ).select_related("workflow_definition", "agent_definition__registered_app")
 
     dispatched = 0
     for wh in webhooks:
         try:
-            trigger_workflow_instance(
-                wh.workflow_definition,
-                payload,
-                trigger_kind=f"scm_{event_kind}",
-            )
+            if wh.agent_definition_id is not None:
+                # Agent-bound: dispatch a Task, not a WorkflowInstance.
+                task = dispatch_agent_task_from_webhook(wh, payload)
+                if task is None:
+                    # Paused / torn-down agent — not a fire; don't count it.
+                    continue
+            else:
+                trigger_workflow_instance(
+                    wh.workflow_definition,
+                    payload,
+                    trigger_kind=f"scm_{event_kind}",
+                )
         except Exception:
             # Never let one bad workflow trigger break SCM ingest, and
             # never let it stop the sibling webhooks from firing.
