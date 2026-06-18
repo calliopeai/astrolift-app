@@ -400,6 +400,7 @@
     },
     "tabs": {
       "ariaLabel": "Secciones de la aplicación",
+      "pillarAriaLabel": "App pillars",
       "overview": "Resumen",
       "deployments": "Implementaciones",
       "workloads": "Cargas de trabajo",
@@ -410,7 +411,22 @@
       "secrets": "Secretos",
       "security": "Seguridad",
       "members": "Miembros",
-      "settings": "Ajustes"
+      "settings": "Ajustes",
+      "config": "Config",
+      "manifest": "Manifest",
+      "webhooks": "Webhooks",
+      "environments": "Environments",
+      "jobs": "Jobs",
+      "commands": "Commands",
+      "managedServices": "Managed Services",
+      "tokens": "Tokens",
+      "pillars": {
+        "build": "Build",
+        "run": "Run",
+        "observe": "Observe",
+        "control": "Control",
+        "secure": "Secure"
+      }
     },
     "workloadDetail": {
       "resourceUsage": {

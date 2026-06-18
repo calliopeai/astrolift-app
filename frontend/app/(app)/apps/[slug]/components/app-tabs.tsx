@@ -6,6 +6,12 @@ import { useTranslations } from "next-intl";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * Public override key. Callers pass `active` as one of these legacy tab
+ * keys; we resolve each to its owning pillar + sub-tab so existing pages
+ * keep working without edits. Inferring from the pathname is preferred —
+ * `active` is only an explicit fallback when a page knows its own section.
+ */
 type TabKey =
   | "overview"
   | "deployments"
@@ -20,126 +26,260 @@ type TabKey =
   | "members"
   | "settings";
 
-interface TabSpec {
-  key: TabKey;
+type PillarKey = "build" | "run" | "observe" | "control" | "secure";
+
+/** A leaf sub-tab → a real flat route at `/apps/[slug]/<sub>`. */
+interface SubTab {
+  /** i18n key under `apps.tabs.*`. */
+  label: string;
   href: (slug: string) => string;
-  /** Sub-paths that should still highlight this tab when matched. */
+  /** True when this sub-tab owns the current pathname. */
   match: (pathname: string, slug: string) => boolean;
+  /** Legacy `active` keys that should resolve to this sub-tab. */
+  legacy: TabKey[];
 }
 
-const TABS: TabSpec[] = [
+interface Pillar {
+  key: PillarKey;
+  /** i18n key under `apps.tabs.pillars.*`. */
+  label: string;
+  subs: SubTab[];
+}
+
+const at = (slug: string, sub: string) => `/apps/${slug}/${sub}`;
+const under = (sub: string) => (p: string, s: string) =>
+  p === at(s, sub) || p.startsWith(`${at(s, sub)}/`);
+
+/**
+ * The App detail's twelve+ flat routes folded into the five BROCS pillars
+ * (Build · Run · Observe · Control · Secure). Routes stay flat at
+ * `/apps/[slug]/<sub>`; this only adds a two-level tab identity over them.
+ * Every existing sub-route lands in exactly one pillar.
+ */
+const PILLARS: Pillar[] = [
   {
-    key: "overview",
-    href: (s) => `/apps/${s}`,
-    match: (p, s) => p === `/apps/${s}`,
+    key: "build",
+    label: "build",
+    subs: [
+      { label: "config", href: (s) => at(s, "config"), match: under("config"), legacy: [] },
+      { label: "manifest", href: (s) => at(s, "manifest"), match: under("manifest"), legacy: [] },
+      { label: "webhooks", href: (s) => at(s, "webhooks"), match: under("webhooks"), legacy: [] },
+    ],
   },
   {
-    key: "deployments",
-    href: (s) => `/apps/${s}/deployments`,
-    match: (p, s) =>
-      p === `/apps/${s}/deployments` ||
-      p.startsWith(`/apps/${s}/deployments/`) ||
-      p.startsWith(`/apps/${s}/environments`) ||
-      p.startsWith(`/apps/${s}/jobs`) ||
-      p.startsWith(`/apps/${s}/commands`),
+    key: "run",
+    label: "run",
+    subs: [
+      {
+        label: "overview",
+        href: (s) => `/apps/${s}`,
+        match: (p, s) => p === `/apps/${s}`,
+        legacy: ["overview"],
+      },
+      {
+        label: "deployments",
+        href: (s) => at(s, "deployments"),
+        match: under("deployments"),
+        legacy: ["deployments"],
+      },
+      {
+        label: "environments",
+        href: (s) => at(s, "environments"),
+        match: under("environments"),
+        legacy: [],
+      },
+      { label: "jobs", href: (s) => at(s, "jobs"), match: under("jobs"), legacy: [] },
+      { label: "commands", href: (s) => at(s, "commands"), match: under("commands"), legacy: [] },
+      {
+        label: "workloads",
+        href: (s) => at(s, "workloads"),
+        match: under("workloads"),
+        legacy: ["workloads"],
+      },
+      {
+        label: "topology",
+        href: (s) => at(s, "topology"),
+        match: under("topology"),
+        legacy: ["topology"],
+      },
+      {
+        label: "previews",
+        href: (s) => at(s, "previews"),
+        match: under("previews"),
+        legacy: ["previews"],
+      },
+    ],
   },
   {
-    key: "workloads",
-    href: (s) => `/apps/${s}/workloads`,
-    match: (p, s) => p.startsWith(`/apps/${s}/workloads`),
+    key: "observe",
+    label: "observe",
+    subs: [
+      {
+        label: "observability",
+        href: (s) => at(s, "observability"),
+        match: under("observability"),
+        legacy: ["observability"],
+      },
+      {
+        label: "console",
+        href: (s) => at(s, "console"),
+        match: under("console"),
+        legacy: ["console"],
+      },
+    ],
   },
   {
-    key: "topology",
-    href: (s) => `/apps/${s}/topology`,
-    match: (p, s) => p.startsWith(`/apps/${s}/topology`),
+    key: "control",
+    label: "control",
+    subs: [
+      {
+        label: "domains",
+        href: (s) => at(s, "domains"),
+        match: under("domains"),
+        legacy: ["domains"],
+      },
+      {
+        label: "managedServices",
+        href: (s) => at(s, "managed-services"),
+        match: under("managed-services"),
+        legacy: [],
+      },
+      {
+        label: "settings",
+        href: (s) => at(s, "settings"),
+        match: under("settings"),
+        legacy: ["settings"],
+      },
+      {
+        label: "members",
+        href: (s) => at(s, "members"),
+        match: under("members"),
+        legacy: ["members"],
+      },
+    ],
   },
   {
-    key: "observability",
-    href: (s) => `/apps/${s}/observability`,
-    match: (p, s) => p.startsWith(`/apps/${s}/observability`),
-  },
-  {
-    key: "console",
-    href: (s) => `/apps/${s}/console`,
-    match: (p, s) => p.startsWith(`/apps/${s}/console`),
-  },
-  {
-    key: "previews",
-    href: (s) => `/apps/${s}/previews`,
-    match: (p, s) => p.startsWith(`/apps/${s}/previews`),
-  },
-  {
-    key: "domains",
-    href: (s) => `/apps/${s}/domains`,
-    match: (p, s) => p.startsWith(`/apps/${s}/domains`),
-  },
-  {
-    key: "secrets",
-    href: (s) => `/apps/${s}/secrets`,
-    match: (p, s) => p.startsWith(`/apps/${s}/secrets`) || p.startsWith(`/apps/${s}/tokens`),
-  },
-  {
-    key: "security",
-    href: (s) => `/apps/${s}/security`,
-    match: (p, s) => p.startsWith(`/apps/${s}/security`),
-  },
-  {
-    key: "members",
-    href: (s) => `/apps/${s}/members`,
-    match: (p, s) => p.startsWith(`/apps/${s}/members`),
-  },
-  {
-    key: "settings",
-    href: (s) => `/apps/${s}/settings`,
-    match: (p, s) =>
-      p.startsWith(`/apps/${s}/settings`) ||
-      p.startsWith(`/apps/${s}/config`) ||
-      p.startsWith(`/apps/${s}/manifest`) ||
-      p.startsWith(`/apps/${s}/webhooks`) ||
-      p.startsWith(`/apps/${s}/managed-services`),
+    key: "secure",
+    label: "secure",
+    subs: [
+      {
+        label: "security",
+        href: (s) => at(s, "security"),
+        match: under("security"),
+        legacy: ["security"],
+      },
+      {
+        label: "secrets",
+        href: (s) => at(s, "secrets"),
+        match: under("secrets"),
+        legacy: ["secrets"],
+      },
+      { label: "tokens", href: (s) => at(s, "tokens"), match: under("tokens"), legacy: [] },
+    ],
   },
 ];
 
+/** Resolve the active pillar + sub-tab from the pathname, falling back to
+ * an explicit `active` key, and finally to Run › Overview (the default
+ * landing for `/apps/[slug]`). */
+function resolveActive(
+  pathname: string,
+  slug: string,
+  active?: TabKey
+): { pillar: PillarKey; sub: string } {
+  // 1. Pathname is the source of truth — keeps deep links correct.
+  for (const pillar of PILLARS) {
+    for (const sub of pillar.subs) {
+      if (sub.match(pathname, slug)) return { pillar: pillar.key, sub: sub.label };
+    }
+  }
+  // 2. Explicit override from a page that knows its own section.
+  if (active) {
+    for (const pillar of PILLARS) {
+      for (const sub of pillar.subs) {
+        if (sub.legacy.includes(active)) return { pillar: pillar.key, sub: sub.label };
+      }
+    }
+  }
+  // 3. Default landing.
+  return { pillar: "run", sub: "overview" };
+}
+
 interface AppTabsProps {
   slug: string;
-  /** Explicit override for the active tab; otherwise inferred from pathname. */
+  /** Explicit override for the active section; otherwise inferred from pathname. */
   active?: TabKey;
 }
 
 /**
- * Link-based tab nav for `/apps/[slug]`. Each tab is a real route — the
- * existing sibling subroutes (`environments/`, `domains/`, etc.) still own
- * their pages; this just gives the page a tabbed top-level identity.
+ * Two-level link nav for `/apps/[slug]`: a primary BROCS pillar bar and a
+ * secondary sub-tab row scoped to the active pillar. Each sub-tab is a real
+ * flat route — the sibling subroutes (`environments/`, `domains/`, …) still
+ * own their pages; this only gives the page a tabbed top-level identity.
  */
 export function AppTabs({ slug, active }: AppTabsProps) {
   const t = useTranslations("apps.tabs");
   const pathname = usePathname() ?? "";
-  const activeKey: TabKey = active ?? TABS.find((t) => t.match(pathname, slug))?.key ?? "overview";
+  const { pillar: activePillar, sub: activeSub } = resolveActive(pathname, slug, active);
+
+  const current = PILLARS.find((p) => p.key === activePillar) ?? PILLARS[1];
 
   return (
-    <nav
-      aria-label={t("ariaLabel")}
-      className="border-border -mx-6 flex gap-1 overflow-x-auto border-b px-6 scrollbar-none [mask-image:linear-gradient(to_right,transparent_0,black_1.5rem,black_calc(100%-3rem),transparent_100%)]"
-    >
-      {TABS.map((tab) => {
-        const isActive = activeKey === tab.key;
-        return (
-          <Link
-            key={tab.key}
-            href={tab.href(slug)}
-            aria-current={isActive ? "page" : undefined}
-            className={cn(
-              "relative shrink-0 px-3 py-2.5 text-sm font-medium transition-colors",
-              isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {t(tab.key)}
-            {isActive && (
-              <span className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-[var(--brand-primary)]" />
-            )}
-          </Link>
-        );
-      })}
-    </nav>
+    <div className="-mx-6">
+      {/* Primary: BROCS pillar bar. */}
+      <nav
+        aria-label={t("pillarAriaLabel")}
+        className="border-border flex gap-1 overflow-x-auto border-b px-6 scrollbar-none [mask-image:linear-gradient(to_right,transparent_0,black_1.5rem,black_calc(100%-3rem),transparent_100%)]"
+      >
+        {PILLARS.map((pillar) => {
+          const isActive = pillar.key === activePillar;
+          // Land on the pillar's first sub-tab; Run leads with Overview.
+          const href = pillar.subs[0].href(slug);
+          return (
+            <Link
+              key={pillar.key}
+              href={href}
+              aria-current={isActive ? "page" : undefined}
+              className={cn(
+                "relative shrink-0 px-3 py-2.5 text-sm font-medium transition-colors",
+                isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {t(`pillars.${pillar.label}`)}
+              {isActive && (
+                <span className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-[var(--brand-primary)]" />
+              )}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Secondary: sub-tabs for the active pillar. Always rendered, even
+          when a pillar has a single sub-route. */}
+      <nav
+        aria-label={t("ariaLabel")}
+        className="border-border bg-muted/30 flex gap-1 overflow-x-auto border-b px-6 scrollbar-none [mask-image:linear-gradient(to_right,transparent_0,black_1.5rem,black_calc(100%-3rem),transparent_100%)]"
+      >
+        {current.subs.map((sub) => {
+          const isActive = sub.label === activeSub;
+          return (
+            <Link
+              key={sub.label}
+              href={sub.href(slug)}
+              aria-current={isActive ? "page" : undefined}
+              className={cn(
+                "relative shrink-0 px-3 py-2 text-xs font-medium transition-colors",
+                isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {t(sub.label)}
+              {isActive && (
+                <span className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-[var(--brand-primary)]" />
+              )}
+            </Link>
+          );
+        })}
+      </nav>
+    </div>
   );
 }
