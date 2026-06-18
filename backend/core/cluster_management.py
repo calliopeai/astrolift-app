@@ -386,10 +386,13 @@ AGENT_SECRET_NAME = "astrolift-agent"
 
 # Container image for the keep-alive agent. Override via env so a
 # private-registry mirror or a pinned digest can be swapped in without a
-# code change; defaults to the public GHCR latest tag.
+# code change. Defaults to the public Docker Hub image published by the
+# astrolift-agents fleet (calliopeai/astrolift-agent-keepalive) — public so
+# any tenant cluster, on any cloud, pulls it without a pull secret. The old
+# ghcr `astrolift-agent` name was never built (ImagePullBackOff).
 AGENT_IMAGE = os.environ.get(
     "ASTROLIFT_AGENT_IMAGE",
-    "ghcr.io/calliopeai/astrolift-agent:latest",
+    "docker.io/calliopeai/astrolift-agent-keepalive:latest",
 )
 
 
