@@ -286,3 +286,135 @@ def infer_manifest_from_signals(
         confidence=confidence,
         hints=hints,
     )
+
+
+# ---- agent-manifest scan (spec 33, PR-3) -------------------------------
+#
+# Distinct concern from ``infer_manifest_from_signals`` above (which drafts
+# a manifest from Dockerfile / ecosystem heuristics). This walks a fetched
+# repo tree looking for *committed* ``astrolift.toml`` files that declare an
+# agent workload, in one of two layouts:
+#
+#   * monorepo — ``agents/<slug>/astrolift.toml`` (one manifest per agent,
+#     each in its own directory directly under ``agents/``);
+#   * single   — a root ``astrolift.toml``.
+#
+# Each candidate is parsed with the real manifest parser and kept only when
+# it declares exactly an agent (its sole workload's ``kind == "agent"``).
+# Non-agent manifests (a web app's root ``astrolift.toml``, a worker, …) are
+# silently ignored so pointing the scanner at a mixed repo registers only
+# the agents. Unparseable / malformed manifests are skipped too — discovery
+# is best-effort and never raises on one bad file.
+
+# Directory under which monorepo agent manifests live. A manifest must sit
+# *directly* in a child directory of this prefix (``agents/<slug>/…``);
+# deeper nesting (``agents/<slug>/sub/astrolift.toml``) is not an agent root
+# and is ignored so a vendored fixture or example dir doesn't register.
+_AGENTS_DIR = "agents"
+_MANIFEST_BASENAME = "astrolift.toml"
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class DiscoveredAgentManifest:
+    """One agent manifest found by :func:`scan_agent_manifests`.
+
+    ``manifest_path`` is the repo-relative path (the value that lands on
+    ``RegisteredApp.manifest_path`` and participates in the
+    ``(source_repo, manifest_path)`` uniqueness, so re-scans dedupe on it).
+    ``name`` / ``slug`` / ``workload_kind`` come from parsing the manifest:
+    ``name`` is the manifest's top-level name; ``slug`` is the agent
+    workload's name (the value that becomes the ``Workload.slug``);
+    ``workload_kind`` is always ``"agent"`` for a kept entry (carried
+    explicitly so the preview type is self-describing).
+    """
+
+    manifest_path: str
+    name: str
+    slug: str
+    workload_kind: str
+    raw_text: str
+
+
+def _candidate_manifest_paths(files: Mapping[str, Any]) -> list[str]:
+    """Repo-relative paths that *could* be agent manifests, sorted.
+
+    Returns the root ``astrolift.toml`` (when present) plus every
+    ``agents/<slug>/astrolift.toml``. Deeper paths under ``agents/`` and
+    ``astrolift.toml`` files nested elsewhere are excluded — only the two
+    sanctioned layouts. Sorted for deterministic registration order so a
+    re-scan creates rows in a stable sequence.
+    """
+    out: list[str] = []
+    if _MANIFEST_BASENAME in files:
+        out.append(_MANIFEST_BASENAME)
+    prefix = f"{_AGENTS_DIR}/"
+    for path in files:
+        if not path.startswith(prefix) or not path.endswith(f"/{_MANIFEST_BASENAME}"):
+            continue
+        # Exactly ``agents/<slug>/astrolift.toml`` — three segments. A
+        # deeper path (``agents/<slug>/nested/astrolift.toml``) has more
+        # and is not an agent root.
+        if len(path.split("/")) != 3:
+            continue
+        out.append(path)
+    return sorted(set(out))
+
+
+def _parse_agent_manifest(text: str | None) -> tuple[str, str, str] | None:
+    """Parse one manifest body and return ``(name, slug, kind)`` when it is
+    an agent manifest, else ``None``.
+
+    A manifest qualifies as an agent when it has exactly one workload and
+    that workload's ``kind == "agent"``. We deliberately require a *single*
+    agent workload: an ``agents/<slug>/astrolift.toml`` describes one agent,
+    and a root manifest with mixed workloads is an app (handled by the app
+    registration path), not an agent. Parse / validation errors return
+    ``None`` so the scan skips the file rather than failing the whole walk.
+    """
+    if not isinstance(text, str) or not text.strip():
+        return None
+    # Local import keeps ``discover`` free of a hard parser dependency at
+    # module import time (the heuristic half above has no such need).
+    from astrolift_manifest.parser import ManifestError, parse_raw
+
+    try:
+        manifest = parse_raw(text)
+    except ManifestError:
+        return None
+    agent_workloads = [w for w in manifest.workloads if w.kind == "agent"]
+    if len(agent_workloads) != 1 or len(manifest.workloads) != 1:
+        return None
+    workload = agent_workloads[0]
+    return manifest.name, workload.name, workload.kind
+
+
+def scan_agent_manifests(files: Mapping[str, Any]) -> list[DiscoveredAgentManifest]:
+    """Find every agent manifest in a fetched repo tree.
+
+    ``files`` is a ``{repo_relative_path: contents}`` map — the same shape
+    :func:`infer_manifest_from_signals` consumes and the SCM provider's
+    zipball unpacker produces. Paths must map to ``str`` contents to be
+    parsed; a ``None`` value (present-but-not-fetched) is skipped, so a
+    caller that wants discovery must fetch the bodies of the manifest
+    candidates.
+
+    Returns the kept agent manifests in deterministic path order. A repo
+    with no agent manifests returns ``[]`` (not an error) — the caller
+    surfaces "no agents found" to the operator.
+    """
+    found: list[DiscoveredAgentManifest] = []
+    for path in _candidate_manifest_paths(files):
+        parsed = _parse_agent_manifest(files.get(path) if isinstance(files.get(path), str) else None)
+        if parsed is None:
+            continue
+        name, slug, kind = parsed
+        found.append(
+            DiscoveredAgentManifest(
+                manifest_path=path,
+                name=name,
+                slug=slug,
+                workload_kind=kind,
+                raw_text=files[path],
+            )
+        )
+    return found

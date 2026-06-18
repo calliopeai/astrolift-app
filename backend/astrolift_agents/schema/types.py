@@ -301,6 +301,47 @@ class AgentLiveStatusType:
     next_scheduled_at: dt.datetime | None
 
 
+@strawberry.type(name="AstroliftDiscoveredAgentManifest")
+class DiscoveredAgentManifestType:
+    """One agent manifest found by scanning a repo (spec 33 PR-3).
+
+    Backs the monorepo-discovery step of the agent onboarding wizard: the
+    operator points at a repo, the scan walks ``agents/*/astrolift.toml`` +
+    a root ``astrolift.toml``, and each agent manifest comes back as one of
+    these preview rows WITHOUT anything being persisted. The operator then
+    confirms registration via ``registerAgentRepo``.
+
+    ``manifest_path`` is the repo-relative path (the value that becomes
+    ``RegisteredApp.manifest_path`` and is the key registration dedupes on).
+    ``name`` is the manifest's top-level name; ``slug`` is the agent
+    workload's name; ``workload_kind`` is always ``"agent"``.
+    ``already_registered`` is True when an app for that repo + manifest path
+    already exists, so the wizard can mark agents that are already onboarded
+    rather than offering to register them twice.
+    """
+
+    manifest_path: str
+    name: str
+    slug: str
+    workload_kind: str
+    already_registered: bool
+
+
+@strawberry.type(name="AstroliftScanAgentManifestsResult")
+class ScanAgentManifestsResultType:
+    """Outcome of a repo agent-manifest scan (spec 33 PR-3).
+
+    ``ok`` is True when the scan ran (``agents`` may still be empty when the
+    repo has no agent manifests); False when the repo couldn't be fetched
+    (no source connection / SCM error), in which case ``error`` carries the
+    operator-facing message and ``agents`` is empty.
+    """
+
+    ok: bool
+    agents: list[DiscoveredAgentManifestType]
+    error: str | None = None
+
+
 def agent_env_spec_to_type(s) -> AgentEnvironmentSpecType:
     return AgentEnvironmentSpecType(
         id=GUID(str(s.guid)),

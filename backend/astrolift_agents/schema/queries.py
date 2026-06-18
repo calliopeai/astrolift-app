@@ -34,7 +34,9 @@ from astrolift_agents.schema.types import (
     AgentRuntimeType,
     AgentTaskType,
     BriefType,
+    DiscoveredAgentManifestType,
     DispatcherInstanceType,
+    ScanAgentManifestsResultType,
     SkillType,
     ToolDefType,
     agent_env_spec_to_type,
@@ -567,6 +569,56 @@ class AgentsQuery:
         doesn't have to special-case a null ``project_slug`` argument.
         """
         return self.agent_workloads(info, org_id=org_id, project_slug=None)
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def scan_agent_manifests(
+        self,
+        info: Info,
+        org_id: strawberry.ID,
+        source_repo: str,
+        source_kind: str = "github",
+        ref: str = "main",
+    ) -> ScanAgentManifestsResultType:
+        """Scan a repo for agent manifests and return a preview (spec 33 PR-3).
+
+        Backs the monorepo-discovery step of the agent onboarding wizard:
+        given a repo handle (``source_repo`` = ``owner/name``), walks
+        ``agents/*/astrolift.toml`` + a root ``astrolift.toml`` and returns
+        each agent manifest as a preview row WITHOUT persisting anything.
+        The operator then confirms registration via ``registerAgentRepo``.
+
+        Read-only and org-scoped exactly like :meth:`agent_workloads`:
+        ``org_id`` must match the caller's active tenant (superusers
+        excepted, via ``_caller_org_id``), and the repo is fetched through
+        the org's own source connection — a caller can neither scan with
+        another tenant's credentials nor see another tenant's registered
+        agents (``already_registered`` is computed against this org's apps).
+        """
+        from astrolift_registry.services.manifest_sync import discover_agent_manifests
+
+        org_pk = _caller_org_id(info, org_id)
+        result = discover_agent_manifests(
+            organization_id=org_pk,
+            source_kind=source_kind or "github",
+            source_repo=source_repo,
+            ref=ref or "main",
+        )
+        return ScanAgentManifestsResultType(
+            ok=result.status == "ok",
+            agents=[
+                DiscoveredAgentManifestType(
+                    manifest_path=a.manifest_path,
+                    name=a.name,
+                    slug=a.slug,
+                    workload_kind=a.workload_kind,
+                    already_registered=a.already_registered,
+                )
+                for a in result.agents
+            ],
+            error=result.error,
+        )
 
     @strawberry.field
     @require_permission(Permission.APP_READ)

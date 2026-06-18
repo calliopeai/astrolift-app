@@ -85,6 +85,60 @@ class RegisterAppInput:
 
 
 @strawberry.input
+class RegisterAgentRepoInput:
+    """Register every agent manifest in a repo as an agent Workload (spec 33 PR-3).
+
+    Points the platform at ``source_repo`` (``owner/name``) and registers
+    each ``agents/<slug>/astrolift.toml`` (monorepo) plus a root
+    ``astrolift.toml`` (single) that declares an agent, as its own agent
+    ``Workload`` under its own ``RegisteredApp``. All rows land under
+    ``project_id`` (its organization is the tenancy boundary).
+
+    Idempotent on ``(source_repo, manifest_path)``: re-running registers
+    only manifests not already registered for the repo, so this same input
+    drives both first-time registration and a re-scan that picks up newly
+    added agents. ``ref`` is the branch/sha to read the tree at (defaults to
+    the repo's default branch handle); ``default_branch`` / ``deploy_branch``
+    seed the created apps' branch fields.
+    """
+
+    project_id: GUID
+    source_repo: str
+    source_kind: str = "github"
+    source_url: str | None = None
+    ref: str = "main"
+    default_branch: str | None = None
+    deploy_branch: str | None = None
+
+
+@strawberry.type(name="AstroliftRegisteredAgent")
+class RegisteredAgentType:
+    """One agent app registered (or matched) by ``registerAgentRepo``.
+
+    ``created`` is False when an app already existed for the repo + manifest
+    path (idempotent re-run / re-scan), True when this call created it.
+    """
+
+    manifest_path: str
+    slug: str
+    app_id: GUID
+    workload_slug: str
+    created: bool
+
+
+@strawberry.type(name="AstroliftRegisterAgentRepoResult")
+class RegisterAgentRepoResultType:
+    """Payload of ``registerAgentRepo``.
+
+    ``agents`` lists the per-manifest outcome (created or matched). The
+    mutation envelope (ok / error) wraps this; ``agents`` is empty when the
+    repo carried no agent manifests.
+    """
+
+    agents: list[RegisteredAgentType]
+
+
+@strawberry.input
 class UpdateAppInput:
     id: GUID
     name: str | None = None
@@ -1010,6 +1064,113 @@ class RegistryMutation:
         if approval["user_ids"] is not None:
             app.approver_users.set(approval["user_ids"])
         return gql_success(app_to_type(app))
+
+    @strawberry.field
+    @mutation_audit(
+        action="app.register_agent_repo",
+        target=lambda self, info, input: ("repo", input.source_repo),
+    )
+    @require_permission(Permission.APP_CREATE)
+    @tenant_scoped()
+    def register_agent_repo(
+        self, info: Info, input: RegisterAgentRepoInput
+    ) -> MutationResultType[RegisterAgentRepoResultType]:
+        """Register every agent manifest in a repo as an agent Workload (spec 33 PR-3).
+
+        Scans ``source_repo`` for agent manifests (monorepo
+        ``agents/*/astrolift.toml`` + root ``astrolift.toml``) and registers
+        each as an agent ``Workload`` under its own ``RegisteredApp``,
+        reusing the same per-manifest persist path as ``register_app`` and
+        the PR-1 run-spec defaults (a fresh agent ``Workload`` carries
+        ``run_family=task`` / ``run_mode=once``). Idempotent on
+        ``(source_repo, manifest_path)`` so re-running picks up only
+        newly-added agents without duplicating the existing ones.
+
+        Org-scoped exactly like ``register_app``: the target project is
+        resolved by GUID and must belong to the caller's active tenant
+        (``@tenant_scoped`` establishes the context; the project's
+        organization is the boundary). The repo is fetched through the
+        org's own source connection, so a caller can neither register into a
+        foreign org nor scan with another tenant's credentials.
+        """
+        from astrolift_registry.services.manifest_sync import register_agent_repo as _register_agent_repo
+
+        tenant = get_current_tenant()
+        active_org_id = tenant.organization_id if tenant else None
+        if active_org_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+
+        project = (
+            Project.objects.select_related("organization", "team")
+            .filter(guid=str(input.project_id), deleted_at__isnull=True)
+            .first()
+        )
+        if project is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "project not found", field="projectId")
+        # The project's org must be the caller's active tenant — otherwise a
+        # caller could register agents into another org by passing its
+        # project GUID (the decorator only asserts a context exists).
+        if project.organization_id != active_org_id:
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                "project belongs to another organization",
+                field="projectId",
+            )
+
+        if not (input.source_repo or "").strip():
+            return gql_failure(ErrorCode.VALIDATION.value, "sourceRepo is required", field="sourceRepo")
+
+        # Bind the org's first managed cluster best-effort (agents are
+        # dispatched on demand; the dispatch path enforces the managed-
+        # cluster requirement, so registration does not reject when none
+        # exists yet — unlike register_app which is a deploy target).
+        default_cluster = (
+            TenantCluster.objects.filter(
+                Q(organization=project.organization) | Q(organization__isnull=True),
+                deleted_at__isnull=True,
+                is_active=True,
+                lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+            )
+            .order_by("pk")
+            .first()
+        )
+
+        result = _register_agent_repo(
+            project=project,
+            source_kind=input.source_kind or "github",
+            source_repo=input.source_repo,
+            ref=input.ref or "main",
+            source_url=input.source_url or "",
+            default_branch=input.default_branch or "main",
+            deploy_branch=input.deploy_branch or "",
+            default_cluster=default_cluster,
+        )
+
+        if result.status == "fetch_failed":
+            return gql_failure(ErrorCode.PRECONDITION.value, result.error or "repo fetch failed")
+        if result.status == "no_agents":
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "no agent manifests found in this repo (looked for agents/*/astrolift.toml and a root astrolift.toml)",
+                field="sourceRepo",
+            )
+        if result.status != "ok":
+            return gql_failure(ErrorCode.INTERNAL.value, result.error or "registration failed")
+
+        return gql_success(
+            RegisterAgentRepoResultType(
+                agents=[
+                    RegisteredAgentType(
+                        manifest_path=a.manifest_path,
+                        slug=a.slug,
+                        app_id=GUID(str(a.app_guid)),
+                        workload_slug=a.workload_slug,
+                        created=a.created,
+                    )
+                    for a in result.agents
+                ]
+            )
+        )
 
     @strawberry.field
     @mutation_audit(action="app.update")
