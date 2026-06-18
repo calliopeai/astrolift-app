@@ -20,6 +20,19 @@ interface PaletteEntry {
   keywords?: string[];
 }
 
+// IA restructure (spec 31, step 1) — keep the palette in lockstep with
+// the sidebar nav in components/AstroliftNav.tsx. Routes whose nav entry
+// is flagged OFF there (the BUILD / OBSERVE pillars and the old flat RUN
+// extras: Deployments, Environments, Workflows, Jobs, Previews, Events,
+// Metrics) are pulled out of PAGES below so Cmd-K can't jump to a surface
+// the nav has hidden. The pages still EXIST — re-add the entry here when
+// the matching NAV_FLAGS flag flips back on.
+//
+// `SHOW_RECENT_DEPLOYS` mirrors that gate for the dynamic "Recent deploys"
+// group (deployments are off-nav in step 1). Flip to `true` alongside the
+// nav's runExtras/observe flag to bring the deploy quick-jumps back.
+const SHOW_RECENT_DEPLOYS = false;
+
 // Quick Actions are imperative shortcuts the operator reaches for
 // constantly — they live at the top of the palette regardless of
 // query so they're always one Cmd-K away.
@@ -42,7 +55,7 @@ const QUICK_ACTIONS: PaletteEntry[] = [
   },
   {
     label: "Manage tokens",
-    href: "/tokens",
+    href: "/administration/tokens",
     group: "Quick Actions",
     hint: "API tokens",
     permission: "api_token.create",
@@ -56,38 +69,34 @@ const QUICK_ACTIONS: PaletteEntry[] = [
 // palette is searched by free-text rather than the hierarchical nav
 // structure, so a flat list is the right shape.
 const PAGES: PaletteEntry[] = [
-  { label: "Overview", href: "/dashboard", group: "Pages" },
+  // Run & Observe (live primitives) + Dashboard.
+  { label: "Dashboard", href: "/dashboard", group: "Pages", keywords: ["overview", "home"] },
   { label: "Apps", href: "/apps", group: "Pages", permission: "app.read" },
-  { label: "Projects", href: "/projects", group: "Pages" },
-  { label: "Teams", href: "/teams", group: "Pages", permission: "team.read" },
+  { label: "Agents", href: "/agents", group: "Pages", permission: "app.read" },
 
-  { label: "Deployments", href: "/deployments", group: "Pages", permission: "app.read" },
-  { label: "Environments", href: "/environments", group: "Pages", permission: "app.read" },
-  { label: "Workflows", href: "/workflows", group: "Pages", permission: "app.read" },
-  { label: "Jobs", href: "/jobs", group: "Pages", permission: "app.read_logs", keywords: ["scheduled", "command", "cron"] },
-  { label: "Previews", href: "/previews", group: "Pages", permission: "app.read", keywords: ["pr", "pull request", "ephemeral"] },
-  { label: "Events", href: "/events", group: "Pages", permission: "audit_log.read" },
-  { label: "Audit log", href: "/audit", group: "Pages", permission: "audit_log.read" },
-
+  // Control — Infra.
   { label: "Clusters", href: "/clusters", group: "Pages", permission: "cluster.update" },
   { label: "Domains", href: "/domains", group: "Pages" },
   { label: "Providers", href: "/providers", group: "Pages", permission: "cluster.update" },
   { label: "Webhooks", href: "/webhooks", group: "Pages" },
+
+  // Control — Settings (org config + RBAC/governance). Destinations match
+  // the sidebar's Settings group; deep settings pages stay reachable here.
+  { label: "Members", href: "/administration/members", group: "Pages", permission: "org.manage_members" },
+  { label: "Teams", href: "/administration/teams", group: "Pages", permission: "team.read" },
+  { label: "Projects", href: "/administration/projects", group: "Pages", permission: "project.read" },
+  { label: "Tokens", href: "/administration/tokens", group: "Pages", permission: "api_token.create" },
+  { label: "Cost", href: "/administration/cost", group: "Pages", permission: "billing.read" },
+  { label: "Quotas", href: "/administration/quotas", group: "Pages", permission: "org.manage_members" },
+  { label: "Audit log", href: "/audit", group: "Pages", permission: "audit_log.read" },
+  { label: "Policies", href: "/settings/policies", group: "Pages" },
+  { label: "Permissions diagnostics", href: "/settings/permissions", group: "Pages", keywords: ["why", "denied", "rbac", "role"] },
   { label: "Source providers", href: "/settings/source-providers", group: "Pages", keywords: ["github", "scm", "git"] },
-
-  { label: "Members", href: "/members", group: "Pages", permission: "org.manage_members" },
-  { label: "Tokens", href: "/tokens", group: "Pages", permission: "api_token.create" },
-  { label: "Cost", href: "/cost", group: "Pages", permission: "billing.read" },
-  { label: "Quotas", href: "/quotas", group: "Pages", permission: "billing.read" },
-  { label: "Metrics", href: "/metrics", group: "Pages" },
-
+  { label: "Identity provider", href: "/settings/identity-provider", group: "Pages", keywords: ["sso", "oidc", "saml", "idp"] },
+  { label: "Organization", href: "/settings/organization", group: "Pages", permission: "org.update" },
   { label: "Profile", href: "/settings/profile", group: "Pages" },
   { label: "Notifications", href: "/settings/notifications", group: "Pages" },
   { label: "Security", href: "/settings/security", group: "Pages" },
-  { label: "Policies", href: "/settings/policies", group: "Pages" },
-  { label: "Permissions diagnostics", href: "/settings/permissions", group: "Pages", keywords: ["why", "denied", "rbac", "role"] },
-  { label: "Identity provider", href: "/settings/identity-provider", group: "Pages", keywords: ["sso", "oidc", "saml", "idp"] },
-  { label: "Organization", href: "/settings/organization", group: "Pages", permission: "org.update" },
 ];
 
 // Section ordering for display — Quick Actions on top, then Apps
@@ -129,10 +138,12 @@ export function CommandPalette() {
   const apps = useQuery<AppsResp>(LIST_APPS, { skip: !open });
   // #700 — fetch the 25 most recent deployments lazily so the palette
   // can match by commit SHA / message / image tag / app slug. Same
-  // lazy pattern as apps — only fires when the palette is open.
+  // lazy pattern as apps — only fires when the palette is open. Gated by
+  // SHOW_RECENT_DEPLOYS for the step-1 IA (deployments are off-nav), so
+  // we don't even issue the query while the group is hidden.
   const deployments = useQuery<DeploymentsResp>(LIST_DEPLOYMENTS, {
     variables: { limit: 25 },
-    skip: !open,
+    skip: !open || !SHOW_RECENT_DEPLOYS,
   });
 
   // Cmd-K / Ctrl-K toggles the palette. Esc closes via the dialog

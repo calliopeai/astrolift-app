@@ -15,7 +15,6 @@ import {
   HammerIcon,
   ChevronRightIcon,
   CreditCardIcon,
-  FingerprintIcon,
   FolderIcon,
   GitBranchIcon,
   GitPullRequestIcon,
@@ -27,7 +26,6 @@ import {
   LockIcon,
   RocketIcon,
   ScrollTextIcon,
-  ServerIcon,
   Settings2Icon,
   ShieldCheckIcon,
   ShieldIcon,
@@ -72,6 +70,19 @@ interface NavItem {
    * are invisible to the tour.
    */
   tourTarget?: string;
+  /**
+   * Coming-soon items: rendered muted with a "Soon" lock affordance
+   * and made non-interactive (no <Link>, `aria-disabled`). The route
+   * may exist but isn't ready for general navigation. Used for the
+   * deferred Run & Observe primitives (Workloads, Workflows).
+   */
+  disabled?: boolean;
+  /**
+   * External destination rendered with a plain <a> in the same tab
+   * (e.g. the Django admin at /admin, which is server-rendered outside
+   * the Next app). Next's <Link> would try to client-route and 404.
+   */
+  external?: boolean;
 }
 
 interface NavSubGroup {
@@ -89,6 +100,32 @@ interface NavSection {
   subGroups?: NavSubGroup[];
 }
 
+// ---------------------------------------------------------------------------
+// IA restructure (spec 31, step 1) — feature flags
+// ---------------------------------------------------------------------------
+// The nav is being collapsed from the five BROCS pillars (Build / Run /
+// Observe / Control / Secure) down to three groups: a flat Dashboard, a
+// "Run & Observe" group, and a "Control" group. This is REVERSIBLE and
+// nav-level only — no routes or pages were deleted, and the deferred
+// section/item definitions below are kept verbatim.
+//
+// Everything that is not part of the step-1 surface is gated OFF through
+// the single `NAV_FLAGS` map. Each section reads its flag in the
+// `sections` array (a falsy flag => the section is omitted from render).
+// Re-enabling any deferred pillar is a one-line flip from `false` -> `true`.
+//
+// Currently live (true): the Run & Observe primitives that ship today
+// (Apps, Agents) and the Control group (Infra + Settings + Admin).
+// Deferred (false): the BUILD pillar, the OBSERVE pillar, the old flat RUN
+// extras (Deployments / Approvals / Skills / Tools / Jobs / Tasks /
+// Functions as top-level entries), and SECURE/Zentinelle.
+const NAV_FLAGS = {
+  build: false, // BUILD pillar: Build / Pipelines / Workflow Definitions
+  runExtras: false, // old flat RUN extras now off-nav (see runExtrasSection)
+  observe: false, // OBSERVE pillar: ops dashboard dupe + per-primitive signals
+  secure: false, // SECURE pillar: Zentinelle GRC handoff
+} as const;
+
 // Required-permission annotations mirror the @require_permission
 // decorators on the corresponding GraphQL resolvers. When a viewer
 // can't read a resource, surfacing the link would just lead to a
@@ -98,167 +135,151 @@ interface NavSection {
 // rendered by `NavTree` above this flat nav. The "Apps" link used to
 // live in this Platform section but is reachable via the tree's
 // leaves now; "Teams" and "Projects" remain as the flat management
-// list pages and have been folded into Administration.
+// list pages and have been folded into Settings.
+
+// --- Deferred section definitions (flagged OFF, kept for re-enable) ---
+// These are preserved verbatim from the BROCS layout. They are NOT part
+// of the step-1 nav; each is included in `sections` only when its
+// NAV_FLAGS entry is true.
+
+// BUILD — CI pipelines, image builder, artifact management.
+const buildSection: NavSection = {
+  label: "Build",
+  items: [
+    { label: "Build", href: "/build", icon: <HammerIcon />, permission: "cluster.register" },
+    { label: "Pipelines", href: "/pipelines", icon: <GitBranchIcon />, permission: "pipeline.read" },
+    {
+      label: "Workflow Definitions",
+      href: "/workflows",
+      icon: <WorkflowIcon />,
+      permission: "app.read",
+    },
+  ],
+};
+
+// Old flat RUN extras — Deployments / Approvals / Skills / Tools / Jobs /
+// Tasks / Functions. In the new IA these are no longer top-level nav
+// entries (Deployments/Jobs/etc. move under app + primitive surfaces).
+const runExtrasSection: NavSection = {
+  label: "Run",
+  items: [
+    { label: "Deployments", href: "/deployments", icon: <RocketIcon />, permission: "app.read" },
+    {
+      label: "Approvals",
+      href: "/approvals",
+      icon: <CheckCircle2Icon />,
+      permission: "app.approve_deploy",
+    },
+    { label: "Skills", href: "/agents/skills", icon: <BookOpenIcon />, permission: "app.read" },
+    { label: "Tools", href: "/agents/tools", icon: <WrenchIcon />, permission: "app.read" },
+    { label: "Jobs", href: "/jobs", icon: <CalendarClockIcon />, permission: "app.read_logs" },
+    { label: "Tasks", href: "/tasks", icon: <ClipboardListIcon />, permission: "app.read" },
+    { label: "Functions", href: "/functions", icon: <BoltIcon />, permission: "app.read" },
+  ],
+};
+
+// OBSERVE — passive visibility across the signal pyramid. The "Dashboard"
+// here is the /ops dupe; the flat Dashboard at the top of the new nav
+// supersedes it.
+const observeSection: NavSection = {
+  label: "Observe",
+  items: [
+    { label: "Dashboard", href: "/ops", icon: <LayoutDashboardIcon />, permission: "org.read" },
+    {
+      label: "Deployments",
+      href: "/observe/deployments",
+      icon: <RocketIcon />,
+      permission: "app.read",
+    },
+    { label: "Agents", href: "/observe/agents", icon: <BoxIcon />, permission: "app.read" },
+    {
+      label: "Jobs",
+      href: "/observe/jobs",
+      icon: <CalendarClockIcon />,
+      permission: "app.read_logs",
+    },
+    { label: "Tasks", href: "/observe/tasks", icon: <ClipboardListIcon />, permission: "app.read" },
+    {
+      label: "Functions",
+      href: "/observe/functions",
+      icon: <BoltIcon />,
+      permission: "app.read",
+    },
+    { label: "Events", href: "/events", icon: <ActivityIcon />, permission: "audit_log.read" },
+    { label: "Alerts", href: "/alerts", icon: <BellIcon />, permission: "org.read" },
+    {
+      label: "Platform Activity",
+      href: "/platform-activity",
+      icon: <ActivityIcon />,
+      permission: "cluster.register",
+    },
+  ],
+};
+
+// SECURE — the Zentinelle integration gateway (GRC/security plane handoff).
+const secureSection: NavSection = {
+  label: "Secure",
+  items: [{ label: "Zentinelle", href: "/secure/zentinelle", icon: <ShieldCheckIcon /> }],
+};
+
+// --- Step-1 nav: three groups ---
+//   Dashboard (flat, top)
+//   Run & Observe — live primitives (Apps, Agents) + disabled placeholders
+//                   (Workloads, Workflows) for primitives not yet shipped.
+//   Control — Infra sub-group, Settings (org + RBAC/governance), Admin.
+//
+// Deferred pillars are spliced in via the NAV_FLAGS guards below: each is a
+// one-line `false` -> `true` flip away from rendering again.
 const sections: NavSection[] = [
   {
-    // Build — CI pipelines, image builder, artifact management.
-    // This pillar is on the product roadmap; the page is an enable/
-    // onboarding gateway following the same pattern as Zentinelle.
-    // Gated on cluster.register so only platform admins see it.
-    label: "Build",
-    items: [
-      {
-        label: "Build",
-        href: "/build",
-        icon: <HammerIcon />,
-        permission: "cluster.register",
-      },
-      {
-        label: "Pipelines",
-        href: "/pipelines",
-        icon: <GitBranchIcon />,
-        permission: "pipeline.read",
-      },
-      {
-        label: "Workflow Definitions",
-        href: "/workflows",
-        icon: <WorkflowIcon />,
-        permission: "app.read",
-      },
-    ],
-  },
-  {
-    // Run — the three runtime primitives Astrolift manages:
-    //   Apps (Deployments + gate management)
-    //   Agents (agent dispatch and scheduling)
-    //   Workflows (automation workflow instances)
-    // Environments and Previews are app-scoped → app tab bar.
-    // Workflow definitions (authoring) live in BUILD.
-    label: "Run",
-    items: [
-      {
-        label: "Deployments",
-        href: "/deployments",
-        icon: <RocketIcon />,
-        permission: "app.read",
-      },
-      {
-        label: "Approvals",
-        href: "/approvals",
-        icon: <CheckCircle2Icon />,
-        permission: "app.approve_deploy",
-      },
-      {
-        label: "Agents",
-        href: "/agents",
-        icon: <BoxIcon />,
-        permission: "app.read",
-      },
-      {
-        label: "Skills",
-        href: "/agents/skills",
-        icon: <BookOpenIcon />,
-        permission: "app.read",
-      },
-      {
-        label: "Tools",
-        href: "/agents/tools",
-        icon: <WrenchIcon />,
-        permission: "app.read",
-      },
-      {
-        label: "Jobs",
-        href: "/jobs",
-        icon: <CalendarClockIcon />,
-        permission: "app.read_logs",
-      },
-      {
-        label: "Tasks",
-        href: "/tasks",
-        icon: <ClipboardListIcon />,
-        permission: "app.read",
-      },
-      {
-        label: "Functions",
-        href: "/functions",
-        icon: <BoltIcon />,
-        permission: "app.read",
-      },
-    ],
-  },
-  {
-    // Observe — passive visibility across the signal pyramid:
-    // Observe — organised by runtime primitive so each workload type
-    // gets a tailored signal surface (Deployments see rollout health +
-    // request latency; Agents see token usage + reasoning traces; etc.).
-    // Global signals (Events, Alerts, Platform Activity) stay flat at
-    // the bottom — they cross all primitive boundaries.
-    label: "Observe",
+    // Dashboard — flat, no section chrome (empty label => no collapsible
+    // wrapper). The single org-wide landing surface.
+    label: "",
     items: [
       {
         label: "Dashboard",
-        href: "/ops",
+        href: "/dashboard",
         icon: <LayoutDashboardIcon />,
         permission: "org.read",
-      },
-      {
-        label: "Deployments",
-        href: "/observe/deployments",
-        icon: <RocketIcon />,
-        permission: "app.read",
-      },
-      {
-        label: "Agents",
-        href: "/observe/agents",
-        icon: <BoxIcon />,
-        permission: "app.read",
-      },
-      {
-        label: "Jobs",
-        href: "/observe/jobs",
-        icon: <CalendarClockIcon />,
-        permission: "app.read_logs",
-      },
-      {
-        label: "Tasks",
-        href: "/observe/tasks",
-        icon: <ClipboardListIcon />,
-        permission: "app.read",
-      },
-      {
-        label: "Functions",
-        href: "/observe/functions",
-        icon: <BoltIcon />,
-        permission: "app.read",
-      },
-      {
-        label: "Events",
-        href: "/events",
-        icon: <ActivityIcon />,
-        permission: "audit_log.read",
-      },
-      {
-        label: "Alerts",
-        href: "/alerts",
-        icon: <BellIcon />,
-        permission: "org.read",
-      },
-      {
-        label: "Platform Activity",
-        href: "/platform-activity",
-        icon: <ActivityIcon />,
-        permission: "cluster.register",
+        tourTarget: "dashboard-nav",
       },
     ],
   },
+  ...(NAV_FLAGS.build ? [buildSection] : []),
   {
-    // Control — platform governance split into three concerns:
-    // Infrastructure (runtime plane setup), Org Governance (identity,
-    // access, compliance), and Org Config (integrations + domain config).
+    // Run & Observe — the runtime primitives operators work with daily.
+    // Apps + Agents are live; Workloads + Workflows are disabled
+    // placeholders (route work pending) rendered with a "Soon" affordance.
+    label: "Run & Observe",
+    items: [
+      { label: "Apps", href: "/apps", icon: <RocketIcon />, permission: "app.read" },
+      { label: "Agents", href: "/agents", icon: <BoxIcon />, permission: "app.read" },
+      {
+        label: "Workloads",
+        href: "/workloads",
+        icon: <LayersIcon />,
+        permission: "app.read",
+        disabled: true,
+      },
+      {
+        label: "Workflows",
+        href: "/workflows",
+        icon: <WorkflowIcon />,
+        permission: "app.read",
+        disabled: true,
+      },
+    ],
+  },
+  ...(NAV_FLAGS.runExtras ? [runExtrasSection] : []),
+  ...(NAV_FLAGS.observe ? [observeSection] : []),
+  {
+    // Control — platform governance. Infra (runtime plane setup) is its own
+    // sub-group; Settings owns org config + RBAC/governance (each item
+    // keeps its existing destination); Admin links out to the Django admin.
     label: "Control",
     subGroups: [
       {
-        label: "Infrastructure",
+        label: "Infra",
         items: [
           {
             label: "Clusters",
@@ -288,7 +309,10 @@ const sections: NavSection[] = [
         ],
       },
       {
-        label: "Org Governance",
+        // Settings — org settings + RBAC/governance. Destinations are kept
+        // as-is from the prior Org Governance / Org Config groups (Members
+        // and friends still point at /administration/*, /settings/*, etc.).
+        label: "Settings",
         items: [
           {
             label: "Members",
@@ -347,51 +371,39 @@ const sections: NavSection[] = [
         ],
       },
       {
-        label: "Org Config",
+        label: "Platform",
         items: [
           {
-            label: "Identity Provider",
-            href: "/settings/identity-provider",
-            icon: <FingerprintIcon />,
-            permission: "org.manage_members",
-          },
-          {
-            label: "Source Providers",
-            href: "/settings/source-providers",
-            icon: <GitBranchIcon />,
-            permission: "org.manage_members",
-          },
-          {
-            label: "Managed Domains",
-            href: "/settings/managed-domains",
-            icon: <ServerIcon />,
-            permission: "provider_plugin.configure",
+            // Admin — the Django admin lives outside the Next app and is
+            // server-rendered, so it opens via a plain <a> in the same tab.
+            //
+            // Gate: there is no `is_staff`/`isSuperuser` field on the
+            // current viewer surface today — `useMyPermissions` exposes
+            // only granted-permission slugs, and the `me` query does not
+            // select `isSuperuser` (it exists on the schema's
+            // PermissionDiagnosis type, not on Me). We therefore gate on
+            // the existing platform-admin proxy `cluster.register` (the
+            // same proxy BUILD / Platform Activity used). FOLLOW-UP: add a
+            // precise `me.isStaff` (Django is_staff) field and switch this
+            // gate to it so non-staff org admins don't see the Django admin.
+            label: "Admin",
+            href: "/admin",
+            icon: <ShieldCheckIcon />,
+            permission: "cluster.register",
+            external: true,
           },
         ],
       },
     ],
   },
-  {
-    // Secure — the Zentinelle integration gateway. Zentinelle is the
-    // Control + Observe + Secure pillar in the BROCS stack. This entry
-    // is the handoff from Astrolift (Run) into the GRC/security plane.
-    label: "Secure",
-    items: [
-      {
-        label: "Zentinelle",
-        href: "/secure/zentinelle",
-        icon: <ShieldCheckIcon />,
-      },
-    ],
-  },
+  ...(NAV_FLAGS.secure ? [secureSection] : []),
 ];
 
-// Sections that start collapsed so BUILD + RUN + top of OBSERVE fit
-// in one viewport without scrolling (#811).
+// Control starts collapsed so the daily-driver Run & Observe group sits
+// at the top of the viewport without scrolling (#811). Run & Observe stays
+// open by default.
 const DEFAULT_COLLAPSED: Record<string, boolean> = {
-  Observe: true,
   Control: true,
-  Secure: true,
 };
 
 function loadCollapsedState(): Record<string, boolean> {
@@ -464,16 +476,55 @@ export function AstroliftNav() {
                 !item.permission || loading || can(item.permission)
             )
             .map((item) => {
+              // Disabled (coming-soon) items: muted, non-interactive, no
+              // navigation. Rendered as a <span> rather than a <Link> so
+              // there's no href to follow, and marked `aria-disabled` for
+              // assistive tech. A small "Soon" pill stands in for the lock.
+              if (item.disabled) {
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      asChild
+                      tooltip={`${item.label} — coming soon`}
+                    >
+                      <span
+                        aria-disabled="true"
+                        className="text-muted-foreground/60 pointer-events-none cursor-default"
+                      >
+                        {item.icon}
+                        <span>{item.label}</span>
+                        <span className="border-border text-muted-foreground/70 ml-auto rounded-sm border px-1 text-[9px] font-semibold uppercase tracking-wider">
+                          Soon
+                        </span>
+                      </span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              }
+
               const active =
                 pathname === item.href ||
                 (item.href !== "/" && pathname.startsWith(item.href + "/"));
+
+              // External destinations (e.g. the Django admin) live outside
+              // the Next app, so a plain <a> in the same tab is correct —
+              // <Link> would attempt to client-route and 404.
+              const linkEl = item.external ? (
+                <a href={item.href} data-onboarding-tour={item.tourTarget}>
+                  {item.icon}
+                  <span>{item.label}</span>
+                </a>
+              ) : (
+                <Link href={item.href} data-onboarding-tour={item.tourTarget}>
+                  {item.icon}
+                  <span>{item.label}</span>
+                </Link>
+              );
+
               return (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
-                    <Link href={item.href} data-onboarding-tour={item.tourTarget}>
-                      {item.icon}
-                      <span>{item.label}</span>
-                    </Link>
+                    {linkEl}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               );
