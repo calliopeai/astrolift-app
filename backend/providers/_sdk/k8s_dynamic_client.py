@@ -329,19 +329,36 @@ class KubernetesDynamicClient:
         namespace: str | None,
         manifest: dict[str, Any],
         dry_run: bool,
+        force_conflicts: bool = True,
     ) -> str:
         """Server-side apply via the dynamic client.
 
         Returns one of ``"created"`` / ``"updated"`` / ``"unchanged"``.
         Strategy:
           1. GET the target object first — a 404 means we're creating.
-          2. Apply with ``field_manager="astrolift"``,
-             ``force_conflicts=False``.
+          2. Apply with ``field_manager="astrolift"`` and
+             ``force_conflicts=True`` (the default).
           3. If the pre-apply GET found nothing → ``"created"``.
              Otherwise compare ``metadata.generation`` against the
              pre-apply snapshot — same generation means SSA accepted
              our intent without changing the resource spec
              (``"unchanged"``); a bump means ``"updated"``.
+
+        ``force_conflicts`` defaults to ``True`` because the only
+        non-test callers of this helper are the cluster drivers'
+        ``apply_manifests``, i.e. the platform reconciling resources it
+        owns. The platform is the authoritative field manager for those
+        resources: a conflict means another manager (a legacy
+        ``OpenAPI-Generator`` apply, or the bootstrap's
+        ``astrolift-control-plane`` manager touching a shared label like
+        ``astrolift.io/managed-by`` on the ``astrolift-system``
+        namespace) has claimed a platform-owned field, and the platform
+        must win rather than abort with a 409 ``FieldManagerConflict``.
+        This mirrors the bootstrap path in
+        :mod:`providers.k8s_native.management`, which already applies its
+        platform-owned manifests with ``force_conflicts=True``. Callers
+        that genuinely want to defer to an existing owner can pass
+        ``force_conflicts=False``.
 
         ``dry_run`` is the bool the SDK callers pass; the kubernetes
         wire takes the literal string ``"All"`` for dry-run.
@@ -375,7 +392,7 @@ class KubernetesDynamicClient:
             "body": manifest,
             "namespace": namespace,
             "field_manager": "astrolift",
-            "force_conflicts": False,
+            "force_conflicts": force_conflicts,
         }
         if dry_run:
             apply_kwargs["dry_run"] = "All"
