@@ -145,3 +145,57 @@ def select_matches(
             continue
         out.append(c)
     return out
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class AgentCronDispatchCandidate:
+    """One agent ``Workload`` row the agent-cron tick should consider
+    this tick (spec 33, PR-4).
+
+    The Task-family / Schedule-mode counterpart to
+    :class:`CronDispatchCandidate`. The agent-cron tick selects agent
+    Workloads — not ``RegisteredApp`` rows — so this carries the
+    workload identity instead of an app/env pair. An agent dispatches
+    to the org's managed cluster (the ``dispatch_agent_task`` activity
+    resolves it), so there is no per-app ``primary_environment_name``
+    gate here; that's the one field the app selector needs and this one
+    doesn't.
+    """
+
+    workload_id: int
+    workload_slug: str
+    workload_guid: str
+    organization_id: int
+    run_cron_expression: str
+    run_paused: bool
+
+
+def select_agent_matches(
+    *,
+    candidates: list[AgentCronDispatchCandidate],
+    now: datetime,
+) -> list[AgentCronDispatchCandidate]:
+    """Filter agent ``candidates`` to those whose cron fires at ``now``.
+
+    Parallel to :func:`select_matches` and reuses :func:`cron_matches`
+    verbatim for the minute-grained evaluation. Skips:
+      * rows with ``run_paused=True`` (operator kill-switch — a paused
+        schedule agent must not dispatch)
+      * rows whose ``run_cron_expression`` doesn't match the current
+        minute (and malformed expressions, which ``cron_matches``
+        defensively refuses)
+
+    Deliberately has no environment gate: agent Tasks run on the org's
+    managed cluster, resolved at dispatch time, not against an
+    ``AppEnvironment`` the way an app deploy does.
+    """
+    if now.tzinfo is None:
+        raise ValueError("now must be timezone-aware")
+    out: list[AgentCronDispatchCandidate] = []
+    for c in candidates:
+        if c.run_paused:
+            continue
+        if not cron_matches(c.run_cron_expression, now=now):
+            continue
+        out.append(c)
+    return out

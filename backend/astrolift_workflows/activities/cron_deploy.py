@@ -37,6 +37,22 @@ class CronDispatchSummary:
     fired_app_slugs: tuple[str, ...]
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class AgentCronDispatchSummary:
+    """Per-tick summary for the agent-cron tick (spec 33, PR-4).
+
+    The Task-dispatch counterpart to :class:`CronDispatchSummary`.
+    ``fired_workload_slugs`` are the agent Workloads we dispatched a
+    Task for this tick; ``fired_task_guids`` are the AgentTask rows
+    created (one per fired workload) so tests can assert the dispatch
+    path ran, not an app deploy."""
+
+    candidates_count: int
+    fired_count: int
+    fired_workload_slugs: tuple[str, ...]
+    fired_task_guids: tuple[str, ...]
+
+
 @activity.defn(name="astrolift.cron.dispatch_tick")
 async def dispatch_cron_deploys() -> CronDispatchSummary:
     """One tick of the cron dispatcher. Lazily imports Django models
@@ -218,4 +234,180 @@ def _dispatch_cron_deploys_sync() -> CronDispatchSummary:
         candidates_count=len(candidates),
         fired_count=len(fired),
         fired_app_slugs=tuple(fired),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Agent-cron tick (spec 33, PR-4)
+# ---------------------------------------------------------------------------
+#
+# The Task-dispatch sibling of the app-deploy tick above. It selects agent
+# ``Workload`` rows whose run-spec says "schedule" and dispatches an AgentTask
+# at each cron match — by going THROUGH the same PR-1 dispatch path the
+# ``runAstroliftAgent`` mutation uses (create AgentTask in QUEUED with
+# ``agent_definition`` set, then start ``DispatchAgentTaskWorkflow``), NOT by
+# reinventing dispatch and NOT by minting an app Deployment.
+#
+# The two selectors are mutually exclusive by construction:
+#   * the deploy tick iterates ``RegisteredApp`` rows on ``trigger_mode='cron'``
+#     (an app-level field) and fires ``DeployAppWorkflow``;
+#   * this tick iterates ``Workload`` rows on
+#     ``kind='agent' AND run_family='task' AND run_mode='schedule'``
+#     (workload-level run-spec fields) and fires ``DispatchAgentTaskWorkflow``.
+# An app has no ``run_mode``; a Workload has no ``trigger_mode``. A
+# ``run_family='service'`` agent is excluded here (it deploys through the app
+# Deployment path instead), so a schedule agent is never deployed-as-app and an
+# app is never dispatched-as-task.
+
+
+@activity.defn(name="astrolift.agent.cron_dispatch_tick")
+async def dispatch_agent_crons() -> AgentCronDispatchSummary:
+    """One tick of the agent-cron dispatcher. Lazily imports Django
+    models so the workflow sandbox stays clean."""
+    from asgiref.sync import sync_to_async
+
+    return await sync_to_async(_dispatch_agent_crons_sync, thread_sensitive=False)()
+
+
+def _dispatch_agent_crons_sync() -> AgentCronDispatchSummary:
+    from django.db import transaction
+    from django.utils import timezone
+
+    from astrolift_agents.models import AgentTask
+    from astrolift_registry.models import Workload
+    from astrolift_workflows import client as wf_client
+    from astrolift_workflows.cron_deploy import (
+        AgentCronDispatchCandidate,
+        select_agent_matches,
+    )
+    from astrolift_workflows.inputs import Actor, DispatchAgentTaskInput
+
+    now = timezone.now()
+
+    # Select agent Workloads in Schedule mode. ``run_family='task'`` is the
+    # explicit guard so a Service-family agent (which deploys through the app
+    # Deployment path) can never be dispatched as a Task here, even if its
+    # run_mode were left at 'schedule'. Soft-deleted workloads and apps are
+    # excluded so a torn-down agent stops dispatching.
+    workloads = (
+        Workload.objects.filter(
+            kind=Workload.Kind.AGENT.value,
+            run_family=Workload.RunFamily.TASK.value,
+            run_mode=Workload.RunMode.SCHEDULE.value,
+            deleted_at__isnull=True,
+            registered_app__deleted_at__isnull=True,
+        )
+        .exclude(run_cron_expression="")
+        .select_related("registered_app")
+        .only(
+            "id",
+            "guid",
+            "slug",
+            "run_cron_expression",
+            "run_paused",
+            "registered_app__organization_id",
+        )
+    )
+
+    candidates: list[AgentCronDispatchCandidate] = []
+    workload_by_id: dict[int, Workload] = {w.id: w for w in workloads}
+    for w in workloads:
+        candidates.append(
+            AgentCronDispatchCandidate(
+                workload_id=w.id,
+                workload_slug=w.slug,
+                workload_guid=str(w.guid),
+                organization_id=w.registered_app.organization_id,
+                run_cron_expression=w.run_cron_expression or "",
+                run_paused=bool(w.run_paused),
+            )
+        )
+
+    matches = select_agent_matches(candidates=candidates, now=now)
+
+    fired_slugs: list[str] = []
+    fired_task_guids: list[str] = []
+    for match in matches:
+        workload = workload_by_id[match.workload_id]
+        app = workload.registered_app
+
+        # Create the AgentTask exactly the way ``run_astrolift_agent`` does:
+        # ``agent_definition`` set (the K8s Job spawner requires it to render
+        # the pod image), DRAFT then advanced to QUEUED via the sanctioned
+        # ``transition_to`` so ``queued_at`` is stamped. The scheduled tick
+        # supplies no environment spec (cron dispatch is unattended), so VNC
+        # is off and the task launches from the workload's own image/runtime.
+        try:
+            with transaction.atomic():
+                task = AgentTask.objects.create(
+                    organization_id=app.organization_id,
+                    agent_definition=workload,
+                    status=AgentTask.Status.DRAFT,
+                    timeout_seconds=int(workload.tool_timeout_seconds or 300),
+                )
+                task.transition_to(AgentTask.Status.QUEUED)
+        except Exception:
+            log.warning(
+                "agent-cron create-task failed for workload %s",
+                workload.slug,
+                exc_info=True,
+            )
+            continue
+
+        # Enqueue the durable dispatch through the PR-1 path. Workflow id is
+        # keyed to the task guid so a duplicate fire of THIS task joins the
+        # in-flight run; a fresh tick mints a new task (new guid) so back-to-
+        # back cron matches each get their own dispatch. When Temporal is
+        # disabled (dev/CI) this is a logged no-op and the task stays QUEUED.
+        actor = Actor(kind="system", display="agent-cron")
+        try:
+            wf_client.start_workflow(
+                "DispatchAgentTaskWorkflow",
+                args=[DispatchAgentTaskInput(agent_task_id=task.pk, actor=actor)],
+                workflow_id=f"DispatchAgentTaskWorkflow-{task.guid}",
+            )
+        except Exception:
+            # A start failure leaves the task QUEUED; a later tick won't
+            # re-dispatch THIS task (it mints a new one), so fail the orphan
+            # so it doesn't dangle as a phantom queued run.
+            log.warning(
+                "agent-cron start_workflow failed for task %s",
+                task.guid,
+                exc_info=True,
+            )
+            task.failure = {"message": "agent-cron dispatch start failed"}
+            task.save(update_fields=["failure", "updated_at", "version"])
+            try:
+                task.transition_to(AgentTask.Status.FAILED)
+            except ValueError:
+                pass
+            continue
+
+        # Publish an agent-dispatch event so the agent executions surface can
+        # show the cron trigger reason. Wrapped so a broker error never breaks
+        # dispatch (mirrors the deploy tick's publish guard).
+        try:
+            from core.pubsub import publish_sync
+
+            publish_sync(
+                f"agent.cron.dispatched.{app.organization_id}",
+                {
+                    "task_guid": str(task.guid),
+                    "workload_slug": workload.slug,
+                    "source": "cron",
+                    "run_cron_expression": workload.run_cron_expression or "",
+                    "occurred_at": now.isoformat(),
+                },
+            )
+        except Exception:
+            log.warning("agent.cron.dispatched publish failed", exc_info=True)
+
+        fired_slugs.append(workload.slug)
+        fired_task_guids.append(str(task.guid))
+
+    return AgentCronDispatchSummary(
+        candidates_count=len(candidates),
+        fired_count=len(fired_slugs),
+        fired_workload_slugs=tuple(fired_slugs),
+        fired_task_guids=tuple(fired_task_guids),
     )
