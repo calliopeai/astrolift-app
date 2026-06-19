@@ -140,6 +140,19 @@ class Workload(NamedBaseCoreModel):
         default="",
     )
 
+    # Definitional Brief for an ``agent`` workload (spec 38, Phase 2).
+    # The assembled, content-hashed package the agent fetches at boot;
+    # set at registration in Phase 3. SET_NULL so revoking/deleting a
+    # Brief leaves the workload registered (it can be re-assembled).
+    # Only meaningful when ``kind == AGENT``.
+    brief = models.ForeignKey(
+        "astrolift_agents.Brief",
+        related_name="agent_workloads",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+
     # ---- Run spec (spec 33, PR-1) ------------------------------------
     # How an ``agent`` workload runs. Only meaningful when
     # ``kind == AGENT``; every other kind carries the defaults and
