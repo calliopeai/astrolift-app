@@ -2029,6 +2029,7 @@ export type AstroliftMarkOnboardingCompletePayloadMutationResult = {
 
 export type AstroliftMe = {
   id: Scalars['String']['output'];
+  modules: Array<AstroliftModuleEntitlement>;
   profile?: Maybe<AstroliftUserProfile>;
 };
 
@@ -2044,6 +2045,14 @@ export type AstroliftMember = {
   scopeId: Scalars['String']['output'];
   scopeKind: Scalars['String']['output'];
   user: AstroliftUser;
+};
+
+export type AstroliftModuleEntitlement = {
+  canCreate: Scalars['Boolean']['output'];
+  canManage: Scalars['Boolean']['output'];
+  canRun: Scalars['Boolean']['output'];
+  canView: Scalars['Boolean']['output'];
+  key: Scalars['String']['output'];
 };
 
 export type AstroliftMyConnectedAccount = {
@@ -7965,6 +7974,14 @@ export type RegisterAgentRepoMutationVariables = Exact<{
 
 
 export type RegisterAgentRepoMutation = { registerAgentRepo: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { agents: Array<{ manifestPath: string, slug: string, appId: string, workloadSlug: string, created: boolean }> } | null } };
+
+export type UpdateAgentRunSpecMutationVariables = Exact<{
+  agentSlug: Scalars['String']['input'];
+  input: AgentRunSpecInput;
+}>;
+
+
+export type UpdateAgentRunSpecMutation = { updateAgentRunSpec: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, slug: string, kind: string, runFamily: string, runMode: string, runCronExpression: string, runPaused: boolean, runMaxParallel?: number | null, replicas: number, scheduledScaleTo?: number | null, scaleUpCron: string, scaleDownCron: string } | null } };
 
 export type ImportSkillsFromRepoMutationVariables = Exact<{
   repoUrl: Scalars['String']['input'];

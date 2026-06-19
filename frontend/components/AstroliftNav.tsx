@@ -2,13 +2,11 @@
 
 import {
   ActivityIcon,
-  BarChart3Icon,
   BellIcon,
   BoltIcon,
   BoxIcon,
   ClipboardListIcon,
   LayoutDashboardIcon,
-  ScrollIcon,
   BookOpenIcon,
   CalendarClockIcon,
   CheckCircle2Icon,
@@ -17,16 +15,13 @@ import {
   CreditCardIcon,
   FolderIcon,
   GitBranchIcon,
-  GitPullRequestIcon,
   CloudIcon,
-  DownloadIcon,
   GlobeIcon,
   KeyRoundIcon,
   LayersIcon,
   LockIcon,
   RocketIcon,
   ScrollTextIcon,
-  Settings2Icon,
   ShieldCheckIcon,
   ShieldIcon,
   SlidersHorizontalIcon,
@@ -48,6 +43,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { type ModuleKey, useModules } from "@/graphql/user/user.hooks";
 import { type PermissionCheck, useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 const COLLAPSED_KEY = "astrolift.nav.collapsed.v1";
@@ -60,6 +56,14 @@ interface NavItem {
    * Permission(s) required to see this item. Items with no
    * `permission` are visible to every authenticated user (e.g.
    * Settings, which itself routes deeper into per-section guards).
+   *
+   * NOTE (spec 36 §1.3): top-level *module* visibility no longer uses
+   * this field — modules are gated by the server-authoritative
+   * `me.modules.canView` (see `moduleKey` below). This field survives
+   * only for the **Admin module's internal sub-nav**, which §1.2 keeps
+   * "exactly as today" (its per-item reorg is Phase 2). The frontend
+   * carries no permission *logic* for the switcher itself — it renders
+   * the server's answer.
    */
   permission?: PermissionCheck;
   /**
@@ -70,13 +74,6 @@ interface NavItem {
    * are invisible to the tour.
    */
   tourTarget?: string;
-  /**
-   * Coming-soon items: rendered muted with a "Soon" lock affordance
-   * and made non-interactive (no <Link>, `aria-disabled`). The route
-   * may exist but isn't ready for general navigation. Used for the
-   * deferred Run & Observe primitives (Workloads, Workflows).
-   */
-  disabled?: boolean;
   /**
    * External destination rendered with a plain <a> in the same tab
    * (e.g. the Django admin at /admin, which is server-rendered outside
@@ -91,34 +88,55 @@ interface NavSubGroup {
   items: NavItem[];
 }
 
-interface NavSection {
+interface ModuleEntry {
+  /** Top-level label rendered in the switcher (e.g. "Apps", "Admin"). */
   label: string;
-  /** Flat item list — used when no sub-grouping is needed. */
-  items?: NavItem[];
-  /** Labeled sub-groups within the section — used for Control where
-   * Infrastructure / Org Governance / Org Config are distinct concerns. */
+  /**
+   * Server `me.modules` key gating this module's top-level visibility
+   * (spec 36 §1.2). `undefined` => always rendered (Dashboard only —
+   * it has no `me.modules` entry; `org.read` is implicit).
+   */
+  moduleKey?: ModuleKey;
+  icon: React.ReactNode;
+  /** Landing route for a flat module entry (Dashboard, Apps, Agents, Workflows). */
+  href?: string;
+  tourTarget?: string;
+  /**
+   * Labeled sub-groups for a module rendered as a collapsible section
+   * (Admin). Mutually exclusive with `href` — a module is either a flat
+   * landing link or a collapsible container of sub-nav.
+   */
   subGroups?: NavSubGroup[];
 }
 
 // ---------------------------------------------------------------------------
-// IA restructure (spec 31, step 1) — feature flags
+// Entity-module switcher (spec 34 re-shell, spec 36 Phase 1)
 // ---------------------------------------------------------------------------
-// The nav is being collapsed from the five BROCS pillars (Build / Run /
-// Observe / Control / Secure) down to three groups: a flat Dashboard, a
-// "Run & Observe" group, and a "Control" group. This is REVERSIBLE and
-// nav-level only — no routes or pages were deleted, and the deferred
-// section/item definitions below are kept verbatim.
+// The top-level nav is the FIVE entity modules, gated by the
+// server-authoritative `me.modules.canView` (NOT client-side permission
+// strings). This replaces the prior BROCS/`NAV_FLAGS` three-group layout:
 //
-// Everything that is not part of the step-1 surface is gated OFF through
-// the single `NAV_FLAGS` map. Each section reads its flag in the
-// `sections` array (a falsy flag => the section is omitted from render).
-// Re-enabling any deferred pillar is a one-line flip from `false` -> `true`.
+//   Dashboard  — always rendered (no `me.modules` key).
+//   Apps       — iff `modules.apps.canView`.
+//   Agents     — iff `modules.agents.canView`.
+//   Workflows  — iff `modules.workflows.canView`.
+//   Admin      — iff `modules.admin.canView`. Absorbs the former `Control`
+//                group's Infra + Settings + Platform sub-groups VERBATIM as
+//                its internal sub-nav (their per-item reorg is Phase 2).
 //
-// Currently live (true): the Run & Observe primitives that ship today
-// (Apps, Agents) and the Control group (Infra + Settings + Admin).
-// Deferred (false): the BUILD pillar, the OBSERVE pillar, the old flat RUN
-// extras (Deployments / Approvals / Skills / Tools / Jobs / Tasks /
-// Functions as top-level entries), and SECURE/Zentinelle.
+// The former `NAV_FLAGS`-gated Build / Observe / Secure / runExtras sections
+// and the Run & Observe "Workloads" placeholder are dropped FROM THE SWITCHER
+// (their routes are not deleted — cuts are Phase 5). The deferred section
+// definitions below are preserved verbatim for re-enable / route reference.
+
+// ---------------------------------------------------------------------------
+// Deferred section definitions (NOT in the switcher — kept for reference /
+// re-enable; their routes remain reachable, deletions are Phase 5).
+// ---------------------------------------------------------------------------
+// These BROCS pillars are off-nav under the module switcher but their flags
+// and definitions are preserved verbatim (spec 36 §1.2 — "they stay flag-off;
+// their routes remain reachable, not deleted"). Re-enabling any of them is a
+// later-phase decision, not a one-line flip into this switcher.
 const NAV_FLAGS = {
   build: false, // BUILD pillar: Build / Pipelines / Workflow Definitions
   runExtras: false, // old flat RUN extras now off-nav (see runExtrasSection)
@@ -126,24 +144,8 @@ const NAV_FLAGS = {
   secure: false, // SECURE pillar: Zentinelle GRC handoff
 } as const;
 
-// Required-permission annotations mirror the @require_permission
-// decorators on the corresponding GraphQL resolvers. When a viewer
-// can't read a resource, surfacing the link would just lead to a
-// permission-denied empty state, so we hide it entirely.
-//
-// Note: the tenant hierarchy (Org -> Team -> Project -> App) is
-// rendered by `NavTree` above this flat nav. The "Apps" link used to
-// live in this Platform section but is reachable via the tree's
-// leaves now; "Teams" and "Projects" remain as the flat management
-// list pages and have been folded into Settings.
-
-// --- Deferred section definitions (flagged OFF, kept for re-enable) ---
-// These are preserved verbatim from the BROCS layout. They are NOT part
-// of the step-1 nav; each is included in `sections` only when its
-// NAV_FLAGS entry is true.
-
 // BUILD — CI pipelines, image builder, artifact management.
-const buildSection: NavSection = {
+const buildSection: { label: string; items: NavItem[] } = {
   label: "Build",
   items: [
     { label: "Build", href: "/build", icon: <HammerIcon />, permission: "cluster.register" },
@@ -158,9 +160,8 @@ const buildSection: NavSection = {
 };
 
 // Old flat RUN extras — Deployments / Approvals / Skills / Tools / Jobs /
-// Tasks / Functions. In the new IA these are no longer top-level nav
-// entries (Deployments/Jobs/etc. move under app + primitive surfaces).
-const runExtrasSection: NavSection = {
+// Tasks / Functions. In the new IA these are no longer top-level nav entries.
+const runExtrasSection: { label: string; items: NavItem[] } = {
   label: "Run",
   items: [
     { label: "Deployments", href: "/deployments", icon: <RocketIcon />, permission: "app.read" },
@@ -178,10 +179,8 @@ const runExtrasSection: NavSection = {
   ],
 };
 
-// OBSERVE — passive visibility across the signal pyramid. The "Dashboard"
-// here is the /ops dupe; the flat Dashboard at the top of the new nav
-// supersedes it.
-const observeSection: NavSection = {
+// OBSERVE — passive visibility across the signal pyramid.
+const observeSection: { label: string; items: NavItem[] } = {
   label: "Observe",
   items: [
     { label: "Dashboard", href: "/ops", icon: <LayoutDashboardIcon />, permission: "org.read" },
@@ -217,66 +216,63 @@ const observeSection: NavSection = {
 };
 
 // SECURE — the Zentinelle integration gateway (GRC/security plane handoff).
-const secureSection: NavSection = {
+const secureSection: { label: string; items: NavItem[] } = {
   label: "Secure",
   items: [{ label: "Zentinelle", href: "/secure/zentinelle", icon: <ShieldCheckIcon /> }],
 };
 
-// --- Step-1 nav: three groups ---
-//   Dashboard (flat, top)
-//   Run & Observe — live primitives (Apps, Agents) + disabled placeholders
-//                   (Workloads, Workflows) for primitives not yet shipped.
-//   Control — Infra sub-group, Settings (org + RBAC/governance), Admin.
-//
-// Deferred pillars are spliced in via the NAV_FLAGS guards below: each is a
-// one-line `false` -> `true` flip away from rendering again.
-const sections: NavSection[] = [
-  {
-    // Dashboard — flat, no section chrome (empty label => no collapsible
-    // wrapper). The single org-wide landing surface.
-    label: "",
-    items: [
-      {
-        label: "Dashboard",
-        href: "/dashboard",
-        icon: <LayoutDashboardIcon />,
-        permission: "org.read",
-        tourTarget: "dashboard-nav",
-      },
-    ],
-  },
+// Retention anchor: keeps the flags + deferred definitions live for
+// re-enable / Phase-5 cut planning without tripping no-unused-vars. The
+// flags are all `false`, so this resolves to an empty list — the deferred
+// sections are intentionally NOT rendered by the module switcher.
+const DEFERRED_SECTIONS = [
   ...(NAV_FLAGS.build ? [buildSection] : []),
-  {
-    // Run & Observe — the runtime primitives operators work with daily.
-    // Apps + Agents are live; Workloads + Workflows are disabled
-    // placeholders (route work pending) rendered with a "Soon" affordance.
-    label: "Run & Observe",
-    items: [
-      { label: "Apps", href: "/apps", icon: <RocketIcon />, permission: "app.read" },
-      { label: "Agents", href: "/agents", icon: <BoxIcon />, permission: "app.read" },
-      {
-        label: "Workloads",
-        href: "/workloads",
-        icon: <LayersIcon />,
-        permission: "app.read",
-        disabled: true,
-      },
-      {
-        label: "Workflows",
-        href: "/workflows",
-        icon: <WorkflowIcon />,
-        permission: "app.read",
-        disabled: true,
-      },
-    ],
-  },
   ...(NAV_FLAGS.runExtras ? [runExtrasSection] : []),
   ...(NAV_FLAGS.observe ? [observeSection] : []),
+  ...(NAV_FLAGS.secure ? [secureSection] : []),
+];
+void DEFERRED_SECTIONS;
+
+// ---------------------------------------------------------------------------
+// The five modules.
+// ---------------------------------------------------------------------------
+// Dashboard / Apps / Agents / Workflows are flat landing links. Admin is a
+// collapsible container whose sub-groups are the former Control group's
+// Infra / Settings / Platform items, kept exactly as today (§1.2).
+const modules: ModuleEntry[] = [
   {
-    // Control — platform governance. Infra (runtime plane setup) is its own
-    // sub-group; Settings owns org config + RBAC/governance (each item
-    // keeps its existing destination); Admin links out to the Django admin.
-    label: "Control",
+    // Dashboard — always rendered (no `me.modules` key; `org.read` implicit).
+    label: "Dashboard",
+    icon: <LayoutDashboardIcon />,
+    href: "/dashboard",
+    tourTarget: "dashboard-nav",
+  },
+  {
+    label: "Apps",
+    moduleKey: "apps",
+    icon: <RocketIcon />,
+    href: "/apps",
+  },
+  {
+    label: "Agents",
+    moduleKey: "agents",
+    icon: <BoxIcon />,
+    href: "/agents",
+  },
+  {
+    label: "Workflows",
+    moduleKey: "workflows",
+    icon: <WorkflowIcon />,
+    href: "/workflows",
+  },
+  {
+    // Admin — absorbs the former top-level `Control` group's three
+    // sub-groups VERBATIM (Phase 2 reorganises their contents). Top-level
+    // visibility is `modules.admin.canView`; the sub-items keep their own
+    // `permission` filtering exactly as today.
+    label: "Admin",
+    moduleKey: "admin",
+    icon: <ShieldCheckIcon />,
     subGroups: [
       {
         label: "Infra",
@@ -309,9 +305,9 @@ const sections: NavSection[] = [
         ],
       },
       {
-        // Settings — org settings + RBAC/governance. Destinations are kept
-        // as-is from the prior Org Governance / Org Config groups (Members
-        // and friends still point at /administration/*, /settings/*, etc.).
+        // Settings — org settings + RBAC/governance. Destinations kept
+        // as-is (Members and friends still point at /administration/*,
+        // /settings/*, etc.).
         label: "Settings",
         items: [
           {
@@ -376,16 +372,8 @@ const sections: NavSection[] = [
           {
             // Admin — the Django admin lives outside the Next app and is
             // server-rendered, so it opens via a plain <a> in the same tab.
-            //
-            // Gate: there is no `is_staff`/`isSuperuser` field on the
-            // current viewer surface today — `useMyPermissions` exposes
-            // only granted-permission slugs, and the `me` query does not
-            // select `isSuperuser` (it exists on the schema's
-            // PermissionDiagnosis type, not on Me). We therefore gate on
-            // the existing platform-admin proxy `cluster.register` (the
-            // same proxy BUILD / Platform Activity used). FOLLOW-UP: add a
-            // precise `me.isStaff` (Django is_staff) field and switch this
-            // gate to it so non-staff org admins don't see the Django admin.
+            // Gate kept as the existing platform-admin proxy `cluster.register`
+            // (there is no `me.isStaff` field yet). FOLLOW-UP unchanged.
             label: "Admin",
             href: "/app/admin",
             icon: <ShieldCheckIcon />,
@@ -396,14 +384,12 @@ const sections: NavSection[] = [
       },
     ],
   },
-  ...(NAV_FLAGS.secure ? [secureSection] : []),
 ];
 
-// Control starts collapsed so the daily-driver Run & Observe group sits
-// at the top of the viewport without scrolling (#811). Run & Observe stays
-// open by default.
+// Admin starts collapsed so the daily-driver modules sit at the top of the
+// viewport without scrolling (#811).
 const DEFAULT_COLLAPSED: Record<string, boolean> = {
-  Control: true,
+  Admin: true,
 };
 
 function loadCollapsedState(): Record<string, boolean> {
@@ -430,10 +416,15 @@ function saveCollapsedState(state: Record<string, boolean>) {
 
 export function AstroliftNav() {
   const pathname = usePathname();
-  const { can, loading } = useMyPermissions();
+  // Top-level module visibility comes from the server-authoritative
+  // `me.modules` (spec 36 §1.3). The Admin module's internal sub-nav keeps
+  // its own per-item permission filtering (§1.2 — "exactly as today"), so we
+  // still read the granted-permission set for that.
+  const { canView, loading: modulesLoading } = useModules();
+  const { can, loading: permsLoading } = useMyPermissions();
 
-  // Collapsed sections persist in localStorage so refreshes keep
-  // the layout the operator chose. Default: every section open.
+  // Collapsed sections persist in localStorage so refreshes keep the layout
+  // the operator chose.
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>(DEFAULT_COLLAPSED);
   React.useEffect(() => {
     setCollapsed(loadCollapsedState());
@@ -447,134 +438,110 @@ export function AstroliftNav() {
     });
   }
 
+  // Render a list of sub-nav items as sidebar menu entries. Sub-items keep
+  // their per-item permission filtering (Admin internal nav, §1.2). While the
+  // permission set is loading we show every item so the sidebar doesn't
+  // shrink-and-grow on refresh; once warm, the filter takes effect.
+  const renderItems = (items: NavItem[]) =>
+    items
+      .filter((item) => !item.permission || permsLoading || can(item.permission))
+      .map((item) => {
+        const active =
+          pathname === item.href ||
+          (item.href !== "/" && pathname.startsWith(item.href + "/"));
+
+        // External destinations (e.g. the Django admin) live outside the
+        // Next app, so a plain <a> in the same tab is correct — <Link> would
+        // attempt to client-route and 404.
+        const linkEl = item.external ? (
+          <a href={item.href} data-onboarding-tour={item.tourTarget}>
+            {item.icon}
+            <span>{item.label}</span>
+          </a>
+        ) : (
+          <Link href={item.href} data-onboarding-tour={item.tourTarget}>
+            {item.icon}
+            <span>{item.label}</span>
+          </Link>
+        );
+
+        return (
+          <SidebarMenuItem key={item.href}>
+            <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
+              {linkEl}
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        );
+      });
+
   return (
     // overflow-x-hidden prevents horizontal wobble when sidebar items are
     // wider than the sidebar's collapsed/expanded width during transitions.
     <div className="min-w-0 overflow-x-hidden">
-      {sections.map((section) => {
-        // Sections use either flat `items` or structured `subGroups`.
-        const allItems: NavItem[] = section.subGroups
-          ? section.subGroups.flatMap((g) => g.items)
-          : (section.items ?? []);
+      {modules.map((mod) => {
+        // Top-level gate: Dashboard (no key) always shows; every other module
+        // shows iff the server says `canView`. While `me.modules` is loading
+        // we render so the sidebar doesn't shrink-and-grow on refresh.
+        const visible =
+          mod.moduleKey === undefined || modulesLoading || canView(mod.moduleKey);
+        if (!visible) return null;
 
-        const visibleItems = allItems.filter(
-          (item) =>
-            !item.permission ||
-            // While permissions are loading, show every item so the
-            // sidebar doesn't visibly shrink-and-grow on every refresh.
-            // Once the cache is warm, the filter takes effect.
-            loading ||
-            can(item.permission)
-        );
-        if (visibleItems.length === 0) return null;
-
-        // Helper to render a list of items as sidebar menu entries.
-        const renderItems = (items: NavItem[]) =>
-          items
-            .filter(
-              (item) =>
-                !item.permission || loading || can(item.permission)
-            )
-            .map((item) => {
-              // Disabled (coming-soon) items: muted, non-interactive, no
-              // navigation. Rendered as a <span> rather than a <Link> so
-              // there's no href to follow, and marked `aria-disabled` for
-              // assistive tech. A small "Soon" pill stands in for the lock.
-              if (item.disabled) {
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      asChild
-                      tooltip={`${item.label} — coming soon`}
-                    >
-                      <span
-                        aria-disabled="true"
-                        className="text-muted-foreground/60 pointer-events-none cursor-default"
-                      >
-                        {item.icon}
-                        <span>{item.label}</span>
-                        <span className="border-border text-muted-foreground/70 ml-auto rounded-sm border px-1 text-[9px] font-semibold uppercase tracking-wider">
-                          Soon
-                        </span>
-                      </span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              }
-
-              const active =
-                pathname === item.href ||
-                (item.href !== "/" && pathname.startsWith(item.href + "/"));
-
-              // External destinations (e.g. the Django admin) live outside
-              // the Next app, so a plain <a> in the same tab is correct —
-              // <Link> would attempt to client-route and 404.
-              const linkEl = item.external ? (
-                <a href={item.href} data-onboarding-tour={item.tourTarget}>
-                  {item.icon}
-                  <span>{item.label}</span>
-                </a>
-              ) : (
-                <Link href={item.href} data-onboarding-tour={item.tourTarget}>
-                  {item.icon}
-                  <span>{item.label}</span>
-                </Link>
-              );
-
-              return (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
-                    {linkEl}
+        // Flat module (Dashboard / Apps / Agents / Workflows) — a single
+        // landing link, no section chrome.
+        if (mod.href) {
+          const active =
+            pathname === mod.href || pathname.startsWith(mod.href + "/");
+          return (
+            <SidebarGroup key={mod.label}>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={active} tooltip={mod.label}>
+                    <Link href={mod.href} data-onboarding-tour={mod.tourTarget}>
+                      {mod.icon}
+                      <span>{mod.label}</span>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              );
-            });
-
-        // Trust the operator's explicit toggle. Default is open.
-        // Unlabeled sections are always visible — no collapsible wrapper.
-        if (!section.label) {
-          return (
-            <SidebarGroup key="__top__">
-              <SidebarMenu>{renderItems(section.items ?? [])}</SidebarMenu>
+              </SidebarMenu>
             </SidebarGroup>
           );
         }
 
-        const isOpen = !collapsed[section.label];
+        // Collapsible module (Admin) — labeled sub-groups of internal nav.
+        const subGroups = mod.subGroups ?? [];
+        const renderedGroups = subGroups
+          .map((group) => ({ group, items: renderItems(group.items) }))
+          .filter(({ items }) => items.length > 0);
+        // If the viewer can see the module but none of its sub-items pass
+        // their own permission filter, omit the empty shell.
+        if (renderedGroups.length === 0) return null;
 
-        // Content — either flat items or labeled sub-groups.
-        const content = section.subGroups ? (
-          section.subGroups.map((group) => {
-            const groupItems = renderItems(group.items);
-            if (!groupItems.length) return null;
-            return (
-              <div key={group.label}>
-                <p className="text-muted-foreground/60 px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest">
-                  {group.label}
-                </p>
-                <SidebarMenu>{groupItems}</SidebarMenu>
-              </div>
-            );
-          })
-        ) : (
-          <SidebarMenu>{renderItems(section.items ?? [])}</SidebarMenu>
-        );
+        const isOpen = !collapsed[mod.label];
 
         return (
           <Collapsible
-            key={section.label}
+            key={mod.label}
             open={isOpen}
-            onOpenChange={() => toggleSection(section.label)}
+            onOpenChange={() => toggleSection(mod.label)}
             asChild
           >
             <SidebarGroup>
               <SidebarGroupLabel asChild>
                 <CollapsibleTrigger className="group/section hover:text-sidebar-foreground flex w-full items-center justify-between">
-                  <span className="text-[12px] font-bold uppercase tracking-widest">{section.label}</span>
+                  <span className="text-[12px] font-bold uppercase tracking-widest">{mod.label}</span>
                   <ChevronRightIcon className="size-3 transition-transform group-data-[state=open]/section:rotate-90" />
                 </CollapsibleTrigger>
               </SidebarGroupLabel>
-              <CollapsibleContent>{content}</CollapsibleContent>
+              <CollapsibleContent>
+                {renderedGroups.map(({ group, items }) => (
+                  <div key={group.label}>
+                    <p className="text-muted-foreground/60 px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest">
+                      {group.label}
+                    </p>
+                    <SidebarMenu>{items}</SidebarMenu>
+                  </div>
+                ))}
+              </CollapsibleContent>
             </SidebarGroup>
           </Collapsible>
         );

@@ -2029,6 +2029,7 @@ export type AstroliftMarkOnboardingCompletePayloadMutationResult = {
 
 export type AstroliftMe = {
   id: Scalars['String']['output'];
+  modules: Array<AstroliftModuleEntitlement>;
   profile?: Maybe<AstroliftUserProfile>;
 };
 
@@ -2044,6 +2045,14 @@ export type AstroliftMember = {
   scopeId: Scalars['String']['output'];
   scopeKind: Scalars['String']['output'];
   user: AstroliftUser;
+};
+
+export type AstroliftModuleEntitlement = {
+  canCreate: Scalars['Boolean']['output'];
+  canManage: Scalars['Boolean']['output'];
+  canRun: Scalars['Boolean']['output'];
+  canView: Scalars['Boolean']['output'];
+  key: Scalars['String']['output'];
 };
 
 export type AstroliftMyConnectedAccount = {
