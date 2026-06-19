@@ -141,6 +141,30 @@ class Permission(enum.StrEnum):
     # ``astrolift_identity.system_roles._DEPLOY_OPS``).
     AGENT_DISPATCH = "agent.dispatch"
 
+    # --- Agents module (spec 34/36 Phase 0) -----------------------
+    # Standalone CRUD verbs for the Agents entity module so an org can
+    # grant the Agents surface mix-and-match, independent of ``app.*``.
+    # The agent-instance (workload/run) read resolvers re-gate from
+    # ``app.read``/``app.read_logs`` to ``AGENT_READ``; ``registerAgentRepo``
+    # re-gates from ``app.create`` to ``AGENT_CREATE``. Dispatch stays on
+    # the dedicated ``AGENT_DISPATCH`` grant above.
+    AGENT_READ = "agent.read"
+    AGENT_CREATE = "agent.create"
+    AGENT_UPDATE = "agent.update"
+    AGENT_DELETE = "agent.delete"
+
+    # --- Workflows module (spec 34/36 Phase 0) --------------------
+    # Standalone verbs for the Workflows entity module. Phase 0 ships
+    # the perms + role grants + the ``workflows`` entry in ``me.modules``
+    # only; the workflow resolvers are consolidated + RBAC-gated in
+    # Phase 3 (the definition CRUD currently lives staff-gated in the
+    # un-prefixed ``workflows`` app).
+    WORKFLOW_READ = "workflow.read"
+    WORKFLOW_CREATE = "workflow.create"
+    WORKFLOW_UPDATE = "workflow.update"
+    WORKFLOW_DELETE = "workflow.delete"
+    WORKFLOW_TRIGGER = "workflow.trigger"
+
     # --- Pipelines (#86) ------------------------------------------
     PIPELINE_READ = "pipeline.read"
     PIPELINE_CREATE = "pipeline.create"
@@ -152,6 +176,118 @@ class Permission(enum.StrEnum):
 
     # --- Admin elevation ------------------------------------------
     ADMIN_ELEVATE = "admin.elevate"
+
+
+@dataclass(frozen=True, slots=True)
+class ModuleEntitlement:
+    """One row of the ``me.modules`` capability manifest (spec 34/36 §0.3).
+
+    A coarse, server-computed view of what the viewer can do with an
+    entity *module* (apps / agents / workflows / admin), derived from
+    the fine-grained permission slugs. The frontend shell reads these to
+    decide which top-level modules to show and which in-module actions to
+    surface — it never re-derives capability from raw slugs.
+
+    ``dashboard`` is intentionally NOT a module here: the shell always
+    renders it, so it carries no entitlement row.
+    """
+
+    key: str
+    can_view: bool
+    can_create: bool
+    can_manage: bool
+    can_run: bool
+
+
+# Permission slugs the ``admin`` module's view/manage capability keys off
+# (spec 34/36 §0.3). Any one of these (or is_staff / superuser) lights up
+# the Admin module. Kept as a module-level constant so the mapping has a
+# single, greppable source.
+_ADMIN_VIEW_SLUGS = (
+    "cluster.register",
+    "cluster.manage",
+    "org.manage_members",
+    "billing.read",
+    "audit_log.read",
+)
+
+
+def module_entitlements(
+    perms: Iterable[str],
+    *,
+    is_superuser: bool = False,
+    is_staff: bool = False,
+) -> list[ModuleEntitlement]:
+    """The single source-of-truth mapping from permission slugs to the
+    ``me.modules`` capability manifest (spec 34/36 §0.3).
+
+    ``perms`` is the viewer's effective permission slug set for the
+    active tenant (typically the result of
+    :func:`astrolift_identity.permission_resolver.resolve_effective_permissions`).
+    Returns one :class:`ModuleEntitlement` per entity module in a stable
+    order: ``apps``, ``agents``, ``workflows``, ``admin``.
+
+    The mapping table is fixed (do not re-derive capability anywhere
+    else):
+
+    ===========  ===============  =================  ============================  ================
+    key          can_view         can_create         can_manage                    can_run
+    ===========  ===============  =================  ============================  ================
+    ``apps``     app.read         app.create         app.update | app.delete       app.deploy
+    ``agents``   agent.read       agent.create       agent.update | agent.delete   agent.dispatch
+    ``workflows``workflow.read    workflow.create    workflow.update|.delete       workflow.trigger
+    ``admin``    any admin slug   cluster.register   same as can_view              (always false)
+                 OR staff/super   | org.manage_members
+    ===========  ===============  =================  ============================  ================
+
+    ``dashboard`` is always visible and is **not** returned here.
+
+    Superuser short-circuits to every capability ``true`` on every
+    module, matching the bootstrap-admin bypass elsewhere in this module.
+    The ``admin`` module additionally lights its view/manage capability
+    for staff (``is_staff``) even without an explicit admin slug.
+    """
+    held = set(perms)
+
+    if is_superuser:
+        return [
+            ModuleEntitlement(key=key, can_view=True, can_create=True, can_manage=True, can_run=True)
+            for key in ("apps", "agents", "workflows", "admin")
+        ]
+
+    def has(slug: str) -> bool:
+        return slug in held
+
+    apps = ModuleEntitlement(
+        key="apps",
+        can_view=has("app.read"),
+        can_create=has("app.create"),
+        can_manage=has("app.update") or has("app.delete"),
+        can_run=has("app.deploy"),
+    )
+    agents = ModuleEntitlement(
+        key="agents",
+        can_view=has("agent.read"),
+        can_create=has("agent.create"),
+        can_manage=has("agent.update") or has("agent.delete"),
+        can_run=has("agent.dispatch"),
+    )
+    workflows = ModuleEntitlement(
+        key="workflows",
+        can_view=has("workflow.read"),
+        can_create=has("workflow.create"),
+        can_manage=has("workflow.update") or has("workflow.delete"),
+        can_run=has("workflow.trigger"),
+    )
+    admin_view = is_staff or any(has(slug) for slug in _ADMIN_VIEW_SLUGS)
+    admin = ModuleEntitlement(
+        key="admin",
+        can_view=admin_view,
+        can_create=has("cluster.register") or has("org.manage_members"),
+        can_manage=admin_view,
+        can_run=False,
+    )
+    return [apps, agents, workflows, admin]
 
 
 class ScopeKind(enum.StrEnum):

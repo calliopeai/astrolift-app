@@ -1070,7 +1070,7 @@ class RegistryMutation:
         action="app.register_agent_repo",
         target=lambda self, info, input: ("repo", input.source_repo),
     )
-    @require_permission(Permission.APP_CREATE)
+    @require_permission(Permission.AGENT_CREATE)
     @tenant_scoped()
     def register_agent_repo(
         self, info: Info, input: RegisterAgentRepoInput

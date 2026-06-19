@@ -68,7 +68,7 @@ from astrolift_identity.schema.types import (
     team_to_type,
 )
 from core.decorators import tenant_scoped
-from core.permissions import Permission, require_permission
+from core.permissions import Permission, module_entitlements, require_permission
 
 
 @strawberry.type(name="AstroliftUserProfile")
@@ -77,10 +77,65 @@ class UserProfileType:
     username: str | None
 
 
+@strawberry.type(name="AstroliftModuleEntitlement")
+class ModuleEntitlementType:
+    """Coarse, server-computed capability for one entity module
+    (spec 34/36 §0.3). The shell reads ``me.modules`` to decide which
+    top-level modules to render and which in-module actions to surface;
+    it never re-derives capability from raw permission slugs.
+    """
+
+    key: str
+    can_view: bool
+    can_create: bool
+    can_manage: bool
+    can_run: bool
+
+
 @strawberry.type(name="AstroliftMe")
 class MeType:
     id: str
     profile: UserProfileType | None
+
+    @strawberry.field
+    def modules(self, info: Info) -> list[ModuleEntitlementType]:
+        """Capability manifest for the active tenant (spec 34/36 §0.3).
+
+        Computed from the viewer's effective permission slugs for the
+        active tenant via the single source-of-truth mapping
+        (:func:`core.permissions.module_entitlements`), which reuses
+        :func:`~astrolift_identity.permission_resolver.resolve_effective_permissions`
+        so the manifest and the ``@require_permission`` gates stay in
+        lockstep.
+
+        Anonymous / no-tenant returns ``[]`` (no slug catalog leak — the
+        shell renders only Dashboard). Superuser → every capability true.
+        ``dashboard`` is never listed; the shell always renders it.
+        """
+        from astrolift_identity.permission_resolver import resolve_effective_permissions
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        if tenant is None or tenant.actor_user_id is None:
+            return []
+
+        request = getattr(info.context, "request", None)
+        user = getattr(request, "user", None) if request else None
+        is_superuser = bool(getattr(user, "is_superuser", False) and getattr(user, "is_active", True))
+        is_staff = bool(getattr(user, "is_staff", False) and getattr(user, "is_active", True))
+
+        perms = resolve_effective_permissions(tenant)
+        rows = module_entitlements(perms, is_superuser=is_superuser, is_staff=is_staff)
+        return [
+            ModuleEntitlementType(
+                key=r.key,
+                can_view=r.can_view,
+                can_create=r.can_create,
+                can_manage=r.can_manage,
+                can_run=r.can_run,
+            )
+            for r in rows
+        ]
 
 
 @strawberry.type

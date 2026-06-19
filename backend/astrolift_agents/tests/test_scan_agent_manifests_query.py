@@ -9,7 +9,8 @@ real database:
   * ``already_registered`` reflects whether an app for that repo + manifest
     path already exists in the caller's org;
   * the query is org-scoped — a foreign ``org_id`` is rejected;
-  * the read gate is ``app.read``;
+  * the read gate is ``agent.read`` (re-gated from ``app.read`` in the
+    entity-module re-shell, spec 36 §0.4);
   * nothing is persisted by the preview.
 
 The SCM tree fetch is patched at the service's ``_default_tree_fetch`` so the
@@ -75,7 +76,7 @@ def _patch_tree(monkeypatch, files):
 
 def test_scan_returns_preview_rows(monkeypatch, info, org, permission_resolver):
     _connect(org)
-    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.AGENT_READ)
     _patch_tree(
         monkeypatch,
         {
@@ -102,7 +103,7 @@ def test_scan_returns_preview_rows(monkeypatch, info, org, permission_resolver):
 
 def test_scan_flags_already_registered(monkeypatch, info, org, permission_resolver):
     _connect(org)
-    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.AGENT_READ)
     team = Team.objects.create(organization=org, name="Eng", slug="eng")
     project = Project.objects.create(organization=org, team=team, name="Demo", slug="demo")
     # Pre-register one agent app at the same repo + manifest path.
@@ -136,7 +137,7 @@ def test_scan_flags_already_registered(monkeypatch, info, org, permission_resolv
 
 def test_scan_fetch_failed_without_connection(info, org, permission_resolver):
     # No source connection → ok=False with an operator-facing error.
-    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.AGENT_READ)
     with tenant_context(TenantContext(organization_id=org.id)):
         result = AgentsQuery().scan_agent_manifests(
             info, org_id=GUID(str(org.guid)), source_repo="acme/agents"
@@ -149,7 +150,7 @@ def test_scan_fetch_failed_without_connection(info, org, permission_resolver):
 def test_scan_rejects_foreign_org(monkeypatch, info, org, permission_resolver):
     other = Organization.objects.create(name="Globex", slug="globex")
     _connect(org)
-    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.AGENT_READ)
     _patch_tree(monkeypatch, {"agents/a/astrolift.toml": _agent_toml("a")})
 
     # Active tenant is ``org`` but the query asks for ``other``'s GUID.
