@@ -61,6 +61,7 @@ import type {
 import { LIST_PROJECTS } from "@/graphql/identity/identity.queries";
 import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
+import { useModules } from "@/graphql/user/user.hooks";
 import { formatRelativeAge } from "@/lib/format";
 import { getActiveOrgGuid } from "@/lib/identity/active-org";
 import { useListControls, type SortState } from "@/hooks/use-list-controls";
@@ -595,6 +596,11 @@ function RegistryTab({ orgId }: RegistryTabProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  // The "Register an agent repo" create affordance is gated on the Agents
+  // module's server-authoritative `canCreate` (spec 36 §1.3).
+  const { canCreate } = useModules();
+  const canCreateAgent = canCreate("agents");
+
   // Project scoping is URL-synced via ?project= (mirrors the Apps list).
   // Empty string === the fleet view (all agents in the org).
   const projectSlug = searchParams.get("project") ?? "";
@@ -710,8 +716,8 @@ function RegistryTab({ orgId }: RegistryTabProps) {
                 ? "Register an agent repo to scan it for agent manifests and add each one as an agent here. Agents share the same image build and deployment pipeline as your apps."
                 : "This project has no registered agents yet. Register an agent repo or switch the scope to view agents across the whole fleet."
             }
-            actionHref="/agents/new"
-            actionLabel="Register an agent repo"
+            actionHref={canCreateAgent ? "/agents/new" : undefined}
+            actionLabel={canCreateAgent ? "Register an agent repo" : undefined}
             learnMoreHref="https://github.com/calliopeai/astrolift-docs/blob/main/reference/agents.md"
           />
         </CardContent>

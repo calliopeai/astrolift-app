@@ -8,9 +8,23 @@ export type UserProfile = {
   username: string | null;
 };
 
+// Server-authoritative module capability manifest (spec 34 §3.2.3,
+// spec 36 §1.1). One entry per entitled module; the backend computes
+// each flag from the viewer's effective permissions for the active
+// tenant. Anonymous / no-tenant viewers get an empty list — never a
+// partial or client-derived set.
+export type ModuleEntitlement = {
+  key: string;
+  canView: boolean;
+  canCreate: boolean;
+  canManage: boolean;
+  canRun: boolean;
+};
+
 export type CurrentUser = {
   id: string;
   profile: UserProfile | null;
+  modules: ModuleEntitlement[];
 };
 
 // --- Query types ---

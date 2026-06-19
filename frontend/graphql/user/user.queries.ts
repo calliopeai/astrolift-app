@@ -8,6 +8,13 @@ export const GET_ME = gql`
         id
         username
       }
+      modules {
+        key
+        canView
+        canCreate
+        canManage
+        canRun
+      }
     }
   }
 `;

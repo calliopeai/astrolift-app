@@ -22,20 +22,12 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import type { CurrentUser } from "@/graphql/user/user.types";
-import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   ssrUser: CurrentUser | null;
 };
 
 export function AppSidebar({ ssrUser, ...props }: AppSidebarProps) {
-  // Audience split: platform admins (any permission granted) see the full
-  // BROCS nav. End users with no platform permissions see only the workspace
-  // tree + Register App CTA — a clean onboarding surface, not a broken
-  // admin view. The Register App button is always visible to both audiences.
-  const { hasAnyAccess, loading } = useMyPermissions();
-  const isAdmin = hasAnyAccess;
-
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -45,19 +37,17 @@ export function AppSidebar({ ssrUser, ...props }: AppSidebarProps) {
         {/* Tenant workspace tree — visible to all authenticated users. */}
         <NavTree />
 
-        {/* Register App CTA — always visible, primary onboarding action. */}
+        {/* Register App CTA — gated on the Apps module's `canCreate`
+            (spec 36 §1.3). The component reads `me.modules` itself and
+            renders nothing when the viewer can't create apps. */}
         <RegisterAppButton />
 
-        {/* BROCS platform nav — admin-only. End users with no platform
-            permissions see only the workspace tree + CTA above. While
-            permissions are loading we render the nav to avoid layout
-            shift; items filter themselves via their own permission checks. */}
-        {(loading || isAdmin) && (
-          <>
-            <SidebarSeparator />
-            <AstroliftNav />
-          </>
-        )}
+        {/* Module switcher (spec 36 §1.2). Each module self-gates on the
+            server-authoritative `me.modules.canView`; Dashboard always
+            renders, so the nav is shown for every authenticated viewer and
+            simply omits the modules they can't view. */}
+        <SidebarSeparator />
+        <AstroliftNav />
       </SidebarContent>
       <SidebarFooter>
         {/* Utility row — Docs and Downloads at the bottom of every sidebar.
