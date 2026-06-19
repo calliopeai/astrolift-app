@@ -645,6 +645,13 @@ class RegisteredAgent:
     ``created`` is False when an app already existed for
     ``(source_repo, manifest_path)`` (idempotent re-run) — the workload is
     not re-persisted in that case beyond the body reconcile.
+
+    ``skill_notes`` carries any **non-fatal** brief/skill-resolution warnings
+    for this agent (a missing local skill path, a name absent from the
+    built-in catalogue, an unavailable catalogue). The agent still registers
+    when these are present — resolution failures degrade an agent's tooling,
+    they do not block onboarding (spec 38 Phase 3 safety contract). Empty when
+    everything resolved.
     """
 
     manifest_path: str
@@ -652,6 +659,7 @@ class RegisteredAgent:
     app_guid: str
     workload_slug: str
     created: bool
+    skill_notes: list[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass(slots=True)
@@ -675,13 +683,16 @@ def _scan_repo_for_agents(
     ref: str,
     organization_id: int,
     tree: _TreeFn | None,
-) -> tuple[list[DiscoveredAgentManifest] | None, str | None]:
+) -> tuple[list[DiscoveredAgentManifest] | None, dict[str, str], str | None]:
     """Fetch ``source_repo`` at ``ref`` and run the agent-manifest scan.
 
     Resolves a usable ``SourceConnection`` for ``(organization_id,
     source_kind)`` (same selection as the per-app resync), fetches the repo
-    tree, and returns ``(discovered, None)`` on success or
-    ``(None, error_message)`` when there is no connection / the fetch fails.
+    tree, and returns ``(discovered, files, None)`` on success or
+    ``(None, {}, error_message)`` when there is no connection / the fetch
+    fails. ``files`` is the fetched ``{path: contents}`` repo tree — returned
+    so registration can resolve local skill / brief folders out of it (spec 38
+    Phase 3) without re-fetching.
     """
     from astrolift_scm.providers import ProviderError
 
@@ -694,20 +705,24 @@ def _scan_repo_for_agents(
     probe = RegisteredApp(organization_id=organization_id, source_kind=source_kind)
     connection = _pick_source_connection(probe)
     if connection is None:
-        return None, (
-            "no active source connection found for this organization — "
-            "reconnect the source host under Settings -> Source connections"
+        return (
+            None,
+            {},
+            (
+                "no active source connection found for this organization — "
+                "reconnect the source host under Settings -> Source connections"
+            ),
         )
 
     try:
         files = tree_fn(connection, source_repo, ref)
     except ProviderError as exc:
-        return None, f"{exc.code}: {exc.message}"
+        return None, {}, f"{exc.code}: {exc.message}"
     except Exception as exc:  # noqa: BLE001 — surface anything as fetch_failed
         log.exception("agent-repo scan fetch crashed (repo=%s)", source_repo)
-        return None, str(exc) or exc.__class__.__name__
+        return None, {}, str(exc) or exc.__class__.__name__
 
-    return scan_agent_manifests(files), None
+    return scan_agent_manifests(files), files, None
 
 
 def discover_agent_manifests(
@@ -726,7 +741,7 @@ def discover_agent_manifests(
     ``(source_repo, manifest_path)`` already exists, soft-deleted excluded),
     so the wizard can show which agents are new vs already onboarded.
     """
-    discovered, error = _scan_repo_for_agents(
+    discovered, _files, error = _scan_repo_for_agents(
         source_kind=source_kind,
         source_repo=source_repo,
         ref=ref,
@@ -766,6 +781,8 @@ def _register_one_agent(
     default_branch: str,
     deploy_branch: str,
     default_cluster,
+    agent_repo_tree: dict[str, str],
+    catalogue_tree: dict[str, str] | None,
 ) -> RegisteredAgent:
     """Create (or match) one agent app + workload for a discovered manifest.
 
@@ -776,8 +793,18 @@ def _register_one_agent(
     defaults; binds ``default_tenant_cluster`` best-effort (agents are
     dispatched on demand — the dispatch path enforces the managed-cluster
     requirement, so registration does not reject when none exists yet).
+
+    After the workload is persisted, the manifest's ``brief`` / ``skills``
+    pointers (spec 38) are resolved + stored: each skill is upserted as an
+    org-scoped ``Skill``, the workload's ``AgentSkillRef`` set is reconciled,
+    and (when a brief is declared) a ``Brief`` is assembled and linked via
+    ``Workload.brief``. Resolution failures are non-fatal — they are returned
+    as ``skill_notes`` on the result, not raised, so one bad skill path or a
+    catalogue outage degrades an agent's tooling rather than aborting the
+    whole registration pass.
     """
     org = project.organization
+    raw_manifest = parse_raw(discovered.raw_text)
     manifest = _normalize_text(discovered.raw_text)
 
     app = RegisteredApp.objects.filter(
@@ -815,13 +842,83 @@ def _register_one_agent(
     # what changed (and leaves the row otherwise — never hard-deleted).
     persist_manifest(app, manifest, raw_text=discovered.raw_text)
 
+    # Resolve + store the agent's brief + skills (spec 38 Phase 3). The
+    # discovered slug is the agent workload's name == its slug; fetch the
+    # persisted Workload row to attach the AgentSkillRef / Brief to.
+    skill_notes = _resolve_agent_brief_and_skills(
+        app=app,
+        workload_slug=discovered.slug,
+        raw_manifest=raw_manifest,
+        manifest_path=discovered.manifest_path,
+        agent_repo_tree=agent_repo_tree,
+        catalogue_tree=catalogue_tree,
+    )
+
     return RegisteredAgent(
         manifest_path=discovered.manifest_path,
         slug=discovered.slug,
         app_guid=str(app.guid),
         workload_slug=discovered.slug,
         created=created,
+        skill_notes=skill_notes,
     )
+
+
+def _resolve_agent_brief_and_skills(
+    *,
+    app: RegisteredApp,
+    workload_slug: str,
+    raw_manifest,
+    manifest_path: str,
+    agent_repo_tree: dict[str, str],
+    catalogue_tree: dict[str, str] | None,
+) -> list[str]:
+    """Resolve + persist the agent workload's brief + skills; return notes.
+
+    Skips cleanly (empty notes) when the manifest declares neither a brief nor
+    skills — the common case for an agent that carries only a container. Never
+    raises on a resolution failure: the per-skill / per-brief notes are
+    returned for the caller to surface, and any unexpected error is caught and
+    logged so a resolution bug can't abort the whole registration transaction
+    (the agent workload is already persisted at this point).
+    """
+    if raw_manifest.brief is None and not raw_manifest.skills:
+        return []
+
+    from astrolift_agents.services.agent_skill_registration import (
+        resolve_and_store_agent_skills,
+    )
+
+    workload = app.workloads.filter(
+        slug=workload_slug,
+        kind="agent",
+        deleted_at__isnull=True,
+    ).first()
+    if workload is None:
+        # persist_manifest just created/updated it, so this is unexpected —
+        # log + a note rather than raise (registration stays non-fatal).
+        log.warning(
+            "agent workload %r not found after persist for app %s; skipping skill resolution",
+            workload_slug,
+            app.guid,
+        )
+        return [f"workload {workload_slug!r}: not found after persist; skills/brief not resolved"]
+
+    try:
+        return resolve_and_store_agent_skills(
+            workload=workload,
+            manifest=raw_manifest,
+            manifest_path=manifest_path,
+            agent_repo_tree=agent_repo_tree,
+            catalogue_tree=catalogue_tree,
+        )
+    except Exception as exc:  # noqa: BLE001 — resolution must never abort registration
+        log.exception(
+            "agent skill/brief resolution crashed for workload %r (app %s)",
+            workload_slug,
+            app.guid,
+        )
+        return [f"skill/brief resolution error: {exc or exc.__class__.__name__}"]
 
 
 def _agent_app_slug(org, discovered: DiscoveredAgentManifest) -> str:
@@ -884,7 +981,7 @@ def register_agent_repo(
     ``fetch_failed`` when the repo can't be fetched, ``error`` on an
     unexpected persist failure, else ``ok`` with the per-manifest outcome.
     """
-    discovered, error = _scan_repo_for_agents(
+    discovered, files, error = _scan_repo_for_agents(
         source_kind=source_kind,
         source_repo=source_repo,
         ref=ref,
@@ -898,6 +995,14 @@ def register_agent_repo(
 
     eff_deploy_branch = deploy_branch or default_branch or "main"
 
+    # Fetch the built-in skills catalogue ONCE for this registration pass and
+    # thread it into every agent's resolution (spec 39c). Done only when some
+    # discovered manifest actually references a named (non-local) skill — a
+    # repo of purely-local-skill agents never touches the network. A fetch
+    # failure is non-fatal: ``catalogue_tree`` stays None and every named
+    # skill records a note while local skills + the agents still register.
+    catalogue_tree = _load_catalogue_if_needed(discovered)
+
     try:
         with transaction.atomic():
             agents = [
@@ -910,6 +1015,8 @@ def register_agent_repo(
                     default_branch=default_branch or "main",
                     deploy_branch=eff_deploy_branch,
                     default_cluster=default_cluster,
+                    agent_repo_tree=files,
+                    catalogue_tree=catalogue_tree,
                 )
                 for d in discovered
             ]
@@ -918,6 +1025,46 @@ def register_agent_repo(
         return RegisterAgentRepoResult(status="error", error=str(exc) or exc.__class__.__name__)
 
     return RegisterAgentRepoResult(status="ok", agents=agents)
+
+
+def _load_catalogue_if_needed(
+    discovered: list[DiscoveredAgentManifest],
+) -> dict[str, str] | None:
+    """Fetch the built-in catalogue tree iff some manifest uses a named skill.
+
+    A *named* skill (a bare string in ``skills``) resolves from the catalogue;
+    a *local* skill (a ``{name = "path"}`` table) does not. Parse each
+    discovered manifest's skills and fetch the catalogue once only when at
+    least one named skill is present, so a repo of purely-local-skill agents
+    never hits the network. Returns the ``{path: text}`` catalogue map, or
+    ``None`` when no named skill is referenced OR the fetch failed (a failed
+    fetch is non-fatal — every named skill then records a note downstream).
+    """
+    needs_catalogue = False
+    for d in discovered:
+        try:
+            rm = parse_raw(d.raw_text)
+        except ManifestError:
+            # A manifest that no longer parses was already skipped by the
+            # scanner for registration; ignore it for catalogue need too.
+            continue
+        if any(not s.is_local for s in rm.skills):
+            needs_catalogue = True
+            break
+    if not needs_catalogue:
+        return None
+
+    from astrolift_agents.services.skill_resolver import (
+        CatalogueFetchError,
+        load_catalogue_tree,
+    )
+
+    try:
+        return load_catalogue_tree()
+    except CatalogueFetchError:
+        # Already logged once in load_catalogue_tree; downstream records a
+        # per-skill note for every named skill so the operator sees it.
+        return None
 
 
 def resync_agent_repo_manifests(

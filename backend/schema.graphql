@@ -2367,6 +2367,7 @@ type AstroliftRegisteredAgent {
   appId: GUID!
   workloadSlug: String!
   created: Boolean!
+  skillNotes: [String!]!
 }
 
 type AstroliftRegisteredApp {
