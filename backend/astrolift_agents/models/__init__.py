@@ -2,6 +2,7 @@ from astrolift_agents.models.agent_environment_spec import AgentEnvironmentSpec
 from astrolift_agents.models.agent_task import AgentTask
 from astrolift_agents.models.brief import Brief
 from astrolift_agents.models.dispatcher_instance import DispatcherInstance
+from astrolift_agents.models.org_skill_repo import OrgSkillRepo
 from astrolift_agents.models.skill import (
     AgentSkillRef,
     BriefSkillRef,
@@ -21,6 +22,7 @@ __all__ = [
     "Brief",
     "BriefSkillRef",
     "DispatcherInstance",
+    "OrgSkillRepo",
     "Skill",
     "TaskMeteringRecord",
     "TaskToken",

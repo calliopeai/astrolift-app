@@ -20,6 +20,7 @@ from astrolift_agents.services.skill_resolver import (
     catalogue_ref,
     catalogue_repo,
     load_catalogue_tree,
+    resolve_org_repo_skill,
     resolve_skill,
 )
 from astrolift_manifest.skills import SkillError
@@ -42,7 +43,7 @@ def _catalogue_tree() -> dict[str, str]:
 
 
 def test_resolve_local_skill_loads_from_agent_repo():
-    ref = SkillRef(name="reviewer", path="skills/reviewer", is_local=True)
+    ref = SkillRef(name="reviewer", path="skills/reviewer", kind="local")
     loaded = resolve_skill(ref, agent_repo_tree=_agent_tree(), catalogue_tree={})
     assert loaded.name == "Reviewer"
     assert loaded.description == "reviews code"
@@ -50,30 +51,30 @@ def test_resolve_local_skill_loads_from_agent_repo():
 
 
 def test_resolve_local_skill_missing_path_raises():
-    ref = SkillRef(name="ghost", path="skills/ghost", is_local=True)
+    ref = SkillRef(name="ghost", path="skills/ghost", kind="local")
     with pytest.raises(SkillError):  # subclass of SkillResolutionError's base ManifestError
         resolve_skill(ref, agent_repo_tree=_agent_tree(), catalogue_tree={})
 
 
 def test_resolve_local_skill_without_path_raises_resolution_error():
     # Defensive branch: a local ref with no path can't be located.
-    ref = SkillRef(name="reviewer", path=None, is_local=True)
+    ref = SkillRef(name="reviewer", path=None, kind="local")
     with pytest.raises(SkillResolutionError):
         resolve_skill(ref, agent_repo_tree=_agent_tree(), catalogue_tree={})
 
 
-# ---- resolve_skill: named (catalogue) ---------------------------------
+# ---- resolve_skill: catalogue -----------------------------------------
 
 
 def test_resolve_named_skill_loads_from_catalogue():
-    ref = SkillRef(name="pr-review", path=None, is_local=False)
+    ref = SkillRef(name="pr-review", path=None, kind="catalogue")
     loaded = resolve_skill(ref, agent_repo_tree={}, catalogue_tree=_catalogue_tree())
     assert loaded.name == "PR Review"
     assert loaded.description == "reviews PRs"
 
 
 def test_resolve_named_skill_absent_from_catalogue_raises():
-    ref = SkillRef(name="does-not-exist", path=None, is_local=False)
+    ref = SkillRef(name="does-not-exist", path=None, kind="catalogue")
     with pytest.raises(SkillResolutionError) as exc:
         resolve_skill(ref, agent_repo_tree={}, catalogue_tree=_catalogue_tree())
     assert "does-not-exist" in str(exc.value)
@@ -83,11 +84,128 @@ def test_resolve_named_skill_absent_from_catalogue_raises():
 def test_resolve_named_skill_does_not_fall_back_to_agent_repo():
     """A bare name resolves only against the catalogue, never the agent repo
     (the agent repo's matching folder is a *local* skill, declared as a table
-    entry — a bare name is unambiguously a catalogue/org ref)."""
-    ref = SkillRef(name="reviewer", path=None, is_local=False)
+    entry — a bare name is unambiguously a catalogue ref)."""
+    ref = SkillRef(name="reviewer", path=None, kind="catalogue")
     # 'reviewer' exists in the agent tree but NOT the catalogue → miss.
     with pytest.raises(SkillResolutionError):
         resolve_skill(ref, agent_repo_tree=_agent_tree(), catalogue_tree=_catalogue_tree())
+
+
+# ---- resolve_skill: org-repo guard ------------------------------------
+
+
+def test_resolve_skill_rejects_org_repo_ref():
+    """An org-repo ref must be resolved by the registration flow
+    (resolve_org_repo_skill), not resolve_skill — passing one here is a
+    caller bug surfaced loudly rather than mis-resolved against the catalogue."""
+    ref = SkillRef(
+        name="pr-review",
+        kind="org_repo",
+        repo_alias="acme",
+        skill_subpath="dev-skills/pr-review",
+    )
+    with pytest.raises(SkillResolutionError):
+        resolve_skill(ref, agent_repo_tree={}, catalogue_tree=_catalogue_tree())
+
+
+# ---- resolve_org_repo_skill: spec 39d ---------------------------------
+
+
+def _org_ref(subpath: str, *, ref: str = "v2") -> SkillRef:
+    return SkillRef(
+        name=subpath.rsplit("/", 1)[-1],
+        kind="org_repo",
+        repo_alias="acme",
+        skill_subpath=subpath,
+        ref=ref,
+    )
+
+
+def test_resolve_org_repo_skill_finds_under_skills_dir():
+    """Preferred layout: ``skills/<subpath>/SKILL.md`` in the org repo."""
+    tree = {"skills/dev-skills/pr-review/SKILL.md": _skill_md("PR Review", "org skill")}
+    loaded = resolve_org_repo_skill(_org_ref("dev-skills/pr-review"), repo_tree=tree)
+    assert loaded.name == "PR Review"
+    assert loaded.description == "org skill"
+
+
+def test_resolve_org_repo_skill_falls_back_to_bare_subpath():
+    """Fallback layout: ``<subpath>/SKILL.md`` (repo not nested under skills/)."""
+    tree = {"dev-skills/pr-review/SKILL.md": _skill_md("PR Review", "flat layout")}
+    loaded = resolve_org_repo_skill(_org_ref("dev-skills/pr-review"), repo_tree=tree)
+    assert loaded.name == "PR Review"
+    assert loaded.description == "flat layout"
+
+
+def test_resolve_org_repo_skill_missing_raises_resolution_error():
+    tree = {"skills/other/SKILL.md": _skill_md("Other", "x")}
+    with pytest.raises(SkillResolutionError) as exc:
+        resolve_org_repo_skill(_org_ref("dev-skills/pr-review"), repo_tree=tree)
+    assert "pr-review" in str(exc.value)
+
+
+def test_resolve_org_repo_skill_rejects_non_org_repo_ref():
+    ref = SkillRef(name="pr-review", path=None, kind="catalogue")
+    with pytest.raises(SkillResolutionError):
+        resolve_org_repo_skill(ref, repo_tree={})
+
+
+# ---- fetch_org_repo_tree: public vs private routing -------------------
+
+
+class _StubRepo:
+    """Minimal OrgSkillRepo stand-in — fetch_org_repo_tree only reads
+    ``source_connection`` + ``repo_full_name``."""
+
+    def __init__(self, repo_full_name: str, source_connection=None):
+        self.repo_full_name = repo_full_name
+        self.source_connection = source_connection
+
+
+def test_fetch_org_repo_tree_public_uses_anonymous_fetch(monkeypatch):
+    from astrolift_agents.services import skill_resolver
+
+    captured = {}
+
+    def _fake_public(*, repo_full_name, ref):
+        captured["repo"] = repo_full_name
+        captured["ref"] = ref
+        return {"skills/foo/SKILL.md": _skill_md("Foo", "x")}
+
+    def _fail_private(*a, **k):  # must NOT be called for a public repo
+        raise AssertionError("private fetch must not run for a public repo")
+
+    monkeypatch.setattr("astrolift_scm.providers.repo_tree.fetch_public_repo_tree", _fake_public)
+    monkeypatch.setattr("astrolift_scm.providers.repo_tree.fetch_repo_tree", _fail_private)
+
+    tree = skill_resolver.fetch_org_repo_tree(_StubRepo("acme/dev-skills"), ref="v3")
+    assert "skills/foo/SKILL.md" in tree
+    assert captured == {"repo": "acme/dev-skills", "ref": "v3"}
+
+
+def test_fetch_org_repo_tree_private_uses_connection_fetch(monkeypatch):
+    from astrolift_agents.services import skill_resolver
+
+    captured = {}
+    sentinel_conn = object()
+
+    def _fake_private(conn, *, repo_full_name, ref):
+        captured["conn"] = conn
+        captured["repo"] = repo_full_name
+        captured["ref"] = ref
+        return {"skills/bar/SKILL.md": _skill_md("Bar", "y")}
+
+    def _fail_public(*a, **k):  # must NOT be called for a private repo
+        raise AssertionError("public fetch must not run for a private repo")
+
+    monkeypatch.setattr("astrolift_scm.providers.repo_tree.fetch_repo_tree", _fake_private)
+    monkeypatch.setattr("astrolift_scm.providers.repo_tree.fetch_public_repo_tree", _fail_public)
+
+    repo = _StubRepo("acme/private-skills", source_connection=sentinel_conn)
+    tree = skill_resolver.fetch_org_repo_tree(repo, ref="main")
+    assert "skills/bar/SKILL.md" in tree
+    assert captured["conn"] is sentinel_conn
+    assert captured["repo"] == "acme/private-skills"
 
 
 # ---- catalogue settings + fetch ---------------------------------------

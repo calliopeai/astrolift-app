@@ -147,22 +147,29 @@ def _parse_brief(value: Any, path: str) -> BriefRef | None:
 
 
 def _parse_skills(raw_list: Any, path: str) -> tuple[SkillRef, ...]:
-    """Parse the optional top-level ``skills`` list (spec 38).
+    """Parse the optional top-level ``skills`` list (spec 38 + spec 39).
 
-    Each entry is *either*:
+    Each entry is one of spec 39's three reference forms:
 
     * a single-key inline table ``{ name = "relative/path" }`` → a **local**
-      skill (a folder in this repo), or
-    * a bare string ``"skill-name"`` → a **named-global** skill (resolved
-      from the global skills source later).
+      skill (an agentskills.io folder in this agent's own repo); or
+    * a bare string **with no ``/``** (``"pr-review"`` / ``"pr-review@1.2.0"``)
+      → a **catalogue** skill (resolved from the built-in catalogue repo); or
+    * a bare string **containing a ``/``** (``"<alias>/<skill-path>@<ref>"``,
+      e.g. ``"acme/dev-skills/pr-review@v2"``) → an **org-repo** skill
+      (resolved from one of the org's registered skill repos — spec 39 §2).
 
-    The spec's heterogeneous-array surface parses cleanly in ``tomllib``
-    (verified — dicts and strings intermix in one list), so we keep the
-    spec's shape verbatim rather than a ``[skills.<name>]`` table form.
+    The ``@ref`` pin (a tag/branch/sha) is optional on catalogue + org-repo
+    refs and is split off into :attr:`SkillRef.ref`; :attr:`SkillRef.name`
+    always holds the bare skill name (so catalogue/org-repo folder lookup
+    keys on a clean name, not the pinned string). The spec's heterogeneous
+    array (dicts + strings intermixed) parses cleanly in ``tomllib``.
 
     Malformed entries raise :class:`ManifestError` with an indexed path
     (``skills[1]``) so the UI can point at the offending row — a skill that
     can't be resolved would silently drop the agent's tooling otherwise.
+    Validated: a stray/empty ``@`` pin, an empty alias or skill path on an
+    org-repo ref, an empty local path, and duplicate skill names.
     """
     if not isinstance(raw_list, list):
         raise ManifestError("skills must be a list", path=path)
@@ -172,32 +179,13 @@ def _parse_skills(raw_list: Any, path: str) -> tuple[SkillRef, ...]:
     for i, entry in enumerate(raw_list):
         entry_path = f"{path}[{i}]"
         if isinstance(entry, str):
-            name = entry.strip()
-            if not name:
-                raise ManifestError("named skill entry must be a non-empty string", path=entry_path)
-            ref = SkillRef(name=name, path=None, is_local=False)
+            ref = _parse_skill_string(entry, entry_path)
         elif isinstance(entry, dict):
-            if len(entry) != 1:
-                raise ManifestError(
-                    "local skill entry must be a single-key table "
-                    '{ name = "relative/path" }, got '
-                    f"{len(entry)} keys",
-                    path=entry_path,
-                )
-            ((name, raw_path),) = entry.items()
-            name = str(name).strip()
-            if not name:
-                raise ManifestError("local skill entry name must be non-empty", path=entry_path)
-            if not isinstance(raw_path, str) or not raw_path.strip():
-                raise ManifestError(
-                    f"local skill {name!r} must map to a non-empty path string",
-                    path=entry_path,
-                )
-            ref = SkillRef(name=name, path=raw_path, is_local=True)
+            ref = _parse_local_skill_table(entry, entry_path)
         else:
             raise ManifestError(
-                "skill entry must be a string (named) or a single-key table "
-                f"(local), got {type(entry).__name__}",
+                "skill entry must be a string (catalogue / org-repo) or a "
+                f"single-key table (local), got {type(entry).__name__}",
                 path=entry_path,
             )
         if ref.name in seen_names:
@@ -205,6 +193,111 @@ def _parse_skills(raw_list: Any, path: str) -> tuple[SkillRef, ...]:
         seen_names.add(ref.name)
         out.append(ref)
     return tuple(out)
+
+
+def _split_ref_pin(value: str, entry_path: str) -> tuple[str, str]:
+    """Split a ``"<body>@<ref>"`` skill string into ``(body, ref)``.
+
+    ``ref`` is ``""`` when there is no ``@``. Rejects a trailing/empty pin
+    (``"foo@"``) and more than one ``@`` (``"a@b@c"``) — both are operator
+    paste-errors that would otherwise resolve to a nonsense ref silently.
+    Local ``./path`` refs never reach here (a leading ``./`` is detected
+    first), so an ``@`` in a path is not mis-split.
+    """
+    if "@" not in value:
+        return value, ""
+    parts = value.split("@")
+    if len(parts) != 2:
+        raise ManifestError(
+            f"skill ref {value!r} has more than one '@' — expected at most one pin",
+            path=entry_path,
+        )
+    body, ref = parts[0], parts[1]
+    if not ref.strip():
+        raise ManifestError(
+            f"skill ref {value!r} has an empty '@' pin",
+            path=entry_path,
+        )
+    return body, ref.strip()
+
+
+def _parse_skill_string(entry: str, entry_path: str) -> SkillRef:
+    """Parse a bare-string skill entry into a local / catalogue / org-repo ref.
+
+    Discrimination (spec 39 §Reference grammar):
+      * a leading ``./`` or ``../`` → **local** (a path in the agent's repo);
+      * else a string containing a ``/`` → **org-repo**
+        (``<alias>/<skill-path>``); the first segment is the repo alias, the
+        remainder is the skill folder path within that repo;
+      * else (no ``/``) → **catalogue**.
+    """
+    raw = entry.strip()
+    if not raw:
+        raise ManifestError("skill entry must be a non-empty string", path=entry_path)
+
+    # Local "./path" form (spec 39: a path in the agent's own repo). Detected
+    # before pin-splitting so an '@' inside a path isn't treated as a pin.
+    if raw.startswith(("./", "../")):
+        name = raw.rstrip("/").rsplit("/", 1)[-1]
+        if not name:
+            raise ManifestError(f"local skill path {raw!r} has no folder name", path=entry_path)
+        return SkillRef(name=name, path=raw, kind="local")
+
+    body, ref = _split_ref_pin(raw, entry_path)
+    body = body.strip()
+    if not body:
+        raise ManifestError(f"skill ref {entry!r} has no name before the '@' pin", path=entry_path)
+
+    if "/" not in body:
+        # Catalogue: a bare name, optional @pin.
+        return SkillRef(name=body, path=None, kind="catalogue", ref=ref)
+
+    # Org-repo: "<alias>/<skill-subpath>". Alias is the first segment; the
+    # rest is the skill folder path within the registered repo.
+    alias, _, subpath = body.partition("/")
+    alias = alias.strip()
+    subpath = subpath.strip().strip("/")
+    if not alias:
+        raise ManifestError(
+            f"org-repo skill ref {entry!r} has an empty repo alias",
+            path=entry_path,
+        )
+    if not subpath:
+        raise ManifestError(
+            f"org-repo skill ref {entry!r} has an empty skill path after the alias",
+            path=entry_path,
+        )
+    # Skill name = the last path segment (the agentskills.io folder name).
+    name = subpath.rsplit("/", 1)[-1]
+    return SkillRef(
+        name=name,
+        path=None,
+        kind="org_repo",
+        repo_alias=alias,
+        skill_subpath=subpath,
+        ref=ref,
+    )
+
+
+def _parse_local_skill_table(entry: dict, entry_path: str) -> SkillRef:
+    """Parse a ``{ name = "relative/path" }`` single-key table → a local ref."""
+    if len(entry) != 1:
+        raise ManifestError(
+            "local skill entry must be a single-key table "
+            '{ name = "relative/path" }, got '
+            f"{len(entry)} keys",
+            path=entry_path,
+        )
+    ((name, raw_path),) = entry.items()
+    name = str(name).strip()
+    if not name:
+        raise ManifestError("local skill entry name must be non-empty", path=entry_path)
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        raise ManifestError(
+            f"local skill {name!r} must map to a non-empty path string",
+            path=entry_path,
+        )
+    return SkillRef(name=name, path=raw_path, kind="local")
 
 
 def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:

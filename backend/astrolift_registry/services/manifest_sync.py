@@ -783,6 +783,7 @@ def _register_one_agent(
     default_cluster,
     agent_repo_tree: dict[str, str],
     catalogue_tree: dict[str, str] | None,
+    org_repo_tree_cache: dict[str, dict[str, str] | None],
 ) -> RegisteredAgent:
     """Create (or match) one agent app + workload for a discovered manifest.
 
@@ -852,6 +853,7 @@ def _register_one_agent(
         manifest_path=discovered.manifest_path,
         agent_repo_tree=agent_repo_tree,
         catalogue_tree=catalogue_tree,
+        org_repo_tree_cache=org_repo_tree_cache,
     )
 
     return RegisteredAgent(
@@ -872,6 +874,7 @@ def _resolve_agent_brief_and_skills(
     manifest_path: str,
     agent_repo_tree: dict[str, str],
     catalogue_tree: dict[str, str] | None,
+    org_repo_tree_cache: dict[str, dict[str, str] | None],
 ) -> list[str]:
     """Resolve + persist the agent workload's brief + skills; return notes.
 
@@ -911,6 +914,7 @@ def _resolve_agent_brief_and_skills(
             manifest_path=manifest_path,
             agent_repo_tree=agent_repo_tree,
             catalogue_tree=catalogue_tree,
+            org_repo_tree_cache=org_repo_tree_cache,
         )
     except Exception as exc:  # noqa: BLE001 — resolution must never abort registration
         log.exception(
@@ -1003,6 +1007,13 @@ def register_agent_repo(
     # skill records a note while local skills + the agents still register.
     catalogue_tree = _load_catalogue_if_needed(discovered)
 
+    # Per-pass cache of fetched org skill-repo trees (spec 39d), keyed by
+    # ``"<alias>@<ref>"`` so a repo referenced by many agents / skills across
+    # this registration pass is fetched once. Threaded into every agent's
+    # resolution. A cached ``None`` records a fetch failure for that alias@ref
+    # so it isn't re-tried this pass.
+    org_repo_tree_cache: dict[str, dict[str, str] | None] = {}
+
     try:
         with transaction.atomic():
             agents = [
@@ -1017,6 +1028,7 @@ def register_agent_repo(
                     default_cluster=default_cluster,
                     agent_repo_tree=files,
                     catalogue_tree=catalogue_tree,
+                    org_repo_tree_cache=org_repo_tree_cache,
                 )
                 for d in discovered
             ]
@@ -1030,15 +1042,17 @@ def register_agent_repo(
 def _load_catalogue_if_needed(
     discovered: list[DiscoveredAgentManifest],
 ) -> dict[str, str] | None:
-    """Fetch the built-in catalogue tree iff some manifest uses a named skill.
+    """Fetch the built-in catalogue tree iff some manifest uses a catalogue skill.
 
-    A *named* skill (a bare string in ``skills``) resolves from the catalogue;
-    a *local* skill (a ``{name = "path"}`` table) does not. Parse each
-    discovered manifest's skills and fetch the catalogue once only when at
-    least one named skill is present, so a repo of purely-local-skill agents
-    never hits the network. Returns the ``{path: text}`` catalogue map, or
-    ``None`` when no named skill is referenced OR the fetch failed (a failed
-    fetch is non-fatal — every named skill then records a note downstream).
+    A *catalogue* skill (a bare string with no ``/``) resolves from the
+    built-in catalogue; *local* skills (``{name = "path"}`` tables / ``./``
+    strings) and *org-repo* skills (``<alias>/<path>@<ref>`` strings, spec
+    39d) do not. Parse each discovered manifest's skills and fetch the
+    catalogue once only when at least one catalogue skill is present, so a
+    repo of purely-local / org-repo agents never hits the catalogue. Returns
+    the ``{path: text}`` catalogue map, or ``None`` when no catalogue skill is
+    referenced OR the fetch failed (a failed fetch is non-fatal — every
+    catalogue skill then records a note downstream).
     """
     needs_catalogue = False
     for d in discovered:
@@ -1048,7 +1062,10 @@ def _load_catalogue_if_needed(
             # A manifest that no longer parses was already skipped by the
             # scanner for registration; ignore it for catalogue need too.
             continue
-        if any(not s.is_local for s in rm.skills):
+        # Only a *catalogue* ref needs the built-in catalogue tree. Local
+        # skills read from the agent repo; org-repo skills (spec 39d) fetch
+        # their own registered repo — neither touches the catalogue.
+        if any(s.kind == "catalogue" for s in rm.skills):
             needs_catalogue = True
             break
     if not needs_catalogue:

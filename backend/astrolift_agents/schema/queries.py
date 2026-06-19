@@ -24,6 +24,7 @@ from astrolift_agents.models import (
     AgentTask,
     Brief,
     DispatcherInstance,
+    OrgSkillRepo,
     Skill,
     ToolDef,
 )
@@ -37,6 +38,7 @@ from astrolift_agents.schema.types import (
     BriefType,
     DiscoveredAgentManifestType,
     DispatcherInstanceType,
+    OrgSkillRepoType,
     ScanAgentManifestsResultType,
     SkillType,
     ToolDefType,
@@ -45,6 +47,7 @@ from astrolift_agents.schema.types import (
     agent_task_to_type,
     brief_to_type,
     dispatcher_to_type,
+    org_skill_repo_to_type,
     skill_to_type,
     tool_def_to_type,
 )
@@ -300,6 +303,27 @@ class AgentsQuery:
         org_pk = tenant.organization_id if tenant else None
         row = Brief.objects.filter(guid=str(id), organization_id=org_pk, deleted_at__isnull=True).first()
         return brief_to_type(row) if row is not None else None
+
+    @strawberry.field
+    @require_permission(Permission.SCM_READ)
+    @tenant_scoped()
+    def org_skill_repos(self, info: Info, org_id: strawberry.ID) -> list[OrgSkillRepoType]:
+        """The org's registered skill repos (spec 39d), ordered by alias.
+
+        Org-scoped: ``org_id`` must match the caller's active tenant
+        (superusers excepted, via ``_caller_org_id``); the queryset is filtered
+        to that org. Gated on ``scm.read`` — the same read grant the source
+        connections list uses, since a skill repo is a source reference. The
+        linked credential is never surfaced (only ``sourceConnectionId`` + the
+        ``isPrivate`` derivation).
+        """
+        org_pk = _caller_org_id(info, org_id)
+        qs = (
+            OrgSkillRepo.objects.filter(organization_id=org_pk, deleted_at__isnull=True)
+            .select_related("source_connection")
+            .order_by("alias")[:200]
+        )
+        return [org_skill_repo_to_type(r) for r in qs]
 
     @strawberry.field
     @require_permission(Permission.AGENT_READ)

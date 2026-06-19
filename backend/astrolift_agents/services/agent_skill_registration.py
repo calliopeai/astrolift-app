@@ -243,6 +243,7 @@ def resolve_and_store_agent_skills(
     manifest_path: str,
     agent_repo_tree: dict[str, str],
     catalogue_tree: dict[str, str] | None,
+    org_repo_tree_cache: dict[str, dict[str, str] | None] | None = None,
 ) -> list[str]:
     """Resolve + persist the manifest's brief + skills for ``workload``.
 
@@ -250,17 +251,26 @@ def resolve_and_store_agent_skills(
     new, repositioning, removing dropped), and assembles/links the Brief +
     sets ``Workload.brief``. Returns a list of human-readable notes for any
     **non-fatal** resolution failures (a missing local skill, a name not in the
-    catalogue, an unavailable catalogue) — an empty list means everything
-    resolved cleanly. Never raises on a resolution failure; the caller records
-    the notes and the agent stays registered.
+    catalogue, an unavailable catalogue, an unknown org-repo alias, an org-repo
+    fetch failure) — an empty list means everything resolved cleanly. Never
+    raises on a resolution failure; the caller records the notes and the agent
+    stays registered.
 
     ``catalogue_tree`` is the already-fetched built-in catalogue map (threaded
     in once per registration pass). ``None`` means the catalogue fetch failed
-    upstream — every *named* skill then records a note and is skipped, while
-    *local* skills still resolve.
+    upstream — every *catalogue* skill then records a note and is skipped,
+    while *local* + *org-repo* skills still resolve.
+
+    ``org_repo_tree_cache`` is a per-pass cache of fetched org-repo trees keyed
+    by ``"<alias>@<ref>"`` so a repo referenced by many agents (or many skills)
+    is fetched once. A cached value of ``None`` records a prior fetch failure
+    (don't re-try the same alias@ref this pass). Defaults to a fresh dict when
+    omitted (a single-agent caller).
     """
     notes: list[str] = []
     organization = workload.registered_app.organization
+    if org_repo_tree_cache is None:
+        org_repo_tree_cache = {}
 
     resolved: list[Skill] = []
     for ref in manifest.skills:
@@ -269,6 +279,7 @@ def resolve_and_store_agent_skills(
             organization=organization,
             agent_repo_tree=agent_repo_tree,
             catalogue_tree=catalogue_tree,
+            org_repo_tree_cache=org_repo_tree_cache,
             notes=notes,
         )
         if skill is not None:
@@ -301,12 +312,25 @@ def _resolve_one_skill(
     organization,
     agent_repo_tree: dict[str, str],
     catalogue_tree: dict[str, str] | None,
+    org_repo_tree_cache: dict[str, dict[str, str] | None],
     notes: list[str],
 ) -> Skill | None:
     """Resolve + upsert one skill ref; append a note + return None on failure."""
-    if not ref.is_local and catalogue_tree is None:
-        # Catalogue unavailable upstream — every named skill is skipped with a
-        # note (the catalogue-fetch error itself was already logged once).
+    # Org-repo (spec 39d) resolves through a per-org registered repo, not the
+    # catalogue / agent repo — handled separately (DB lookup + own fetch).
+    if ref.kind == "org_repo":
+        loaded = _resolve_org_repo_skill(
+            ref=ref,
+            organization=organization,
+            org_repo_tree_cache=org_repo_tree_cache,
+            notes=notes,
+        )
+        return _upsert_skill(organization=organization, loaded=loaded) if loaded is not None else None
+
+    if ref.kind == "catalogue" and catalogue_tree is None:
+        # Catalogue unavailable upstream — every catalogue skill is skipped
+        # with a note (the catalogue-fetch error itself was already logged
+        # once).
         notes.append(f"skill {ref.name!r}: built-in catalogue unavailable; skill not attached")
         return None
     try:
@@ -322,6 +346,89 @@ def _resolve_one_skill(
         log.warning("agent skill %r failed to resolve for org %s: %s", ref.name, organization.id, exc)
         return None
     return _upsert_skill(organization=organization, loaded=loaded)
+
+
+def _resolve_org_repo_skill(
+    *,
+    ref: SkillRef,
+    organization,
+    org_repo_tree_cache: dict[str, dict[str, str] | None],
+    notes: list[str],
+) -> LoadedSkill | None:
+    """Resolve one org-repo skill ref against the org's registered repos.
+
+    Looks the ref's ``repo_alias`` up among the org's active
+    :class:`~astrolift_agents.models.org_skill_repo.OrgSkillRepo` rows, fetches
+    that repo's tree at the effective ref (``ref.ref`` else the repo's
+    ``default_ref``) — caching the fetched tree per ``"<alias>@<ref>"`` so a
+    repo referenced by many skills/agents is fetched once — and locates the
+    skill folder via :func:`resolve_org_repo_skill`. Every failure (unknown
+    alias, fetch error, skill-not-in-repo) is **non-fatal**: a note is
+    appended and ``None`` returned so the agent still registers.
+    """
+    from astrolift_agents.models import OrgSkillRepo
+    from astrolift_agents.services.skill_resolver import (
+        fetch_org_repo_tree,
+        resolve_org_repo_skill,
+    )
+
+    repo = OrgSkillRepo.objects.filter(
+        organization=organization,
+        alias=ref.repo_alias,
+        is_active=True,
+        deleted_at__isnull=True,
+    ).first()
+    if repo is None:
+        notes.append(
+            f"skill {ref.repo_alias}/{ref.skill_subpath!r}: no skill repo registered "
+            f"for alias {ref.repo_alias!r} in this org; skill not attached"
+        )
+        return None
+
+    eff_ref = (ref.ref or repo.default_ref or "main").strip()
+    cache_key = f"{repo.alias}@{eff_ref}"
+    if cache_key in org_repo_tree_cache:
+        tree = org_repo_tree_cache[cache_key]
+        if tree is None:
+            # A prior fetch of this alias@ref already failed this pass — record
+            # a per-skill note without re-fetching.
+            notes.append(
+                f"skill {ref.repo_alias}/{ref.skill_subpath!r}: skill repo "
+                f"{repo.repo_full_name}@{eff_ref} could not be fetched; skill not attached"
+            )
+            return None
+    else:
+        try:
+            tree = fetch_org_repo_tree(repo, ref=eff_ref)
+        except Exception as exc:  # noqa: BLE001 — any fetch failure is one non-fatal note
+            org_repo_tree_cache[cache_key] = None
+            notes.append(
+                f"skill {ref.repo_alias}/{ref.skill_subpath!r}: skill repo "
+                f"{repo.repo_full_name}@{eff_ref} fetch failed: {exc or exc.__class__.__name__}; "
+                "skill not attached"
+            )
+            log.warning(
+                "org skill repo %r (alias %r) fetch failed for org %s: %s",
+                repo.repo_full_name,
+                repo.alias,
+                organization.id,
+                exc,
+            )
+            return None
+        org_repo_tree_cache[cache_key] = tree
+
+    try:
+        return resolve_org_repo_skill(ref, repo_tree=tree)
+    except (SkillResolutionError, ManifestError) as exc:
+        notes.append(f"skill {ref.repo_alias}/{ref.skill_subpath!r}: {exc}")
+        log.warning(
+            "org-repo skill %r/%r failed to resolve for org %s: %s",
+            ref.repo_alias,
+            ref.skill_subpath,
+            organization.id,
+            exc,
+        )
+        return None
 
 
 def _resolve_brief(

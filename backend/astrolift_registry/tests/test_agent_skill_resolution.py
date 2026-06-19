@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import pytest
 
-from astrolift_agents.models import AgentSkillRef, Brief, BriefSkillRef, Skill
+from astrolift_agents.models import AgentSkillRef, Brief, BriefSkillRef, OrgSkillRepo, Skill
 from astrolift_identity.models import Organization, Project, Team
 from astrolift_registry.models import Workload
 from astrolift_registry.services.manifest_sync import register_agent_repo, resync_agent_repo_manifests
@@ -431,3 +431,242 @@ def test_agent_without_brief_or_skills_is_noop(org, with_connection, mock_catalo
     workload = Workload.objects.get(kind=Workload.Kind.AGENT, registered_app__organization=org)
     assert workload.brief_id is None
     assert AgentSkillRef.objects.filter(workload=workload).count() == 0
+
+
+# ---------------------------------------------------------------------------
+# spec 39d — per-org skill repo refs ("<alias>/<skill-path>@<ref>")
+# ---------------------------------------------------------------------------
+
+
+def _agent_toml_with_org_repo_skill() -> str:
+    """An agent manifest referencing a skill from a registered org repo."""
+    return (
+        'name = "triage"\n'
+        "skills = [\n"
+        '  { reviewer = "skills/reviewer" },\n'  # local
+        '  "acme/dev-skills/security-review@v2",\n'  # org-repo
+        "]\n"
+        "[[workloads]]\n"
+        'name = "triage"\n'
+        'kind = "agent"\n'
+        "[[workloads.containers]]\n"
+        'name = "triage"\n'
+        "is_primary = true\n"
+        'image_ref = "ecr.example/agent:latest"\n'
+    )
+
+
+def _org_repo_tree() -> dict[str, str]:
+    """A registered org skill repo's file tree carrying security-review."""
+    return {
+        "skills/dev-skills/security-review/SKILL.md": _skill_md(
+            "Security Review",
+            "Audit a change for security issues.",
+            "Look for injection, authz, and secret-handling bugs.",
+        ),
+        "skills/dev-skills/security-review/scripts/scan.sh": "echo scan",
+        "README.md": "org skills",
+    }
+
+
+@pytest.fixture
+def mock_org_repo_fetch(monkeypatch):
+    """Patch the org-repo tree fetch (no network).
+
+    ``agent_skill_registration._resolve_org_repo_skill`` lazily imports
+    ``fetch_org_repo_tree`` from the resolver module, so patching the resolver
+    symbol exercises the real alias-lookup + caching path. Returns a ``calls``
+    list recording each ``(repo_full_name, ref, is_private)`` fetch so a test
+    can assert the per-pass cache fetched a repo exactly once."""
+
+    def _install(tree, *, fail: bool = False):
+        calls: list[tuple[str, str, bool]] = []
+
+        def _fetch(repo, *, ref):
+            calls.append((repo.repo_full_name, ref, repo.source_connection_id is not None))
+            if fail:
+                import requests
+
+                raise requests.ConnectionError("org repo unreachable in test")
+            return dict(tree)
+
+        from astrolift_agents.services import skill_resolver
+
+        monkeypatch.setattr(skill_resolver, "fetch_org_repo_tree", _fetch)
+        return calls
+
+    return _install
+
+
+def test_org_repo_skill_resolves_via_registered_public_repo(
+    org, with_connection, mock_catalogue, mock_org_repo_fetch
+):
+    with_connection(org)
+    project = _project(org)
+    mock_catalogue(_catalogue_tree())  # present but unused (no catalogue ref)
+    calls = mock_org_repo_fetch(_org_repo_tree())
+
+    # Register the org skill repo under alias "acme" (public — no connection).
+    OrgSkillRepo.objects.create(
+        organization=org, alias="acme", repo_full_name="acme/dev-skills", default_ref="main"
+    )
+
+    result = _register(project, files=_agent_repo_tree(toml_text=_agent_toml_with_org_repo_skill()))
+    assert result.status == "ok"
+    [agent] = result.agents
+    assert agent.skill_notes == []  # both skills resolved cleanly
+
+    # Local + org-repo skill both upserted in the org.
+    skills = {s.slug: s for s in Skill.objects.filter(organization=org, deleted_at__isnull=True)}
+    assert set(skills) == {"reviewer", "security-review"}
+    assert skills["security-review"].name == "Security Review"
+    assert skills["security-review"].content == "Look for injection, authz, and secret-handling bugs."
+
+    # AgentSkillRef positions reflect manifest order (local first, org-repo second).
+    workload = Workload.objects.get(kind=Workload.Kind.AGENT, registered_app__organization=org)
+    refs = {
+        r.skill.slug: r.position
+        for r in AgentSkillRef.objects.filter(workload=workload, deleted_at__isnull=True)
+    }
+    assert refs == {"reviewer": 0, "security-review": 1}
+
+    # Fetched once, at the manifest's @v2 pin, anonymously (public repo).
+    assert calls == [("acme/dev-skills", "v2", False)]
+
+
+def test_org_repo_skill_resolves_via_private_repo_connection(
+    org, with_connection, mock_org_repo_fetch
+):
+    with_connection(org)
+    project = _project(org)
+    calls = mock_org_repo_fetch(_org_repo_tree())
+
+    # A private repo: link the org's SourceConnection.
+    conn = SourceConnection.objects.create(
+        organization=org,
+        kind=SourceConnection.Kind.GITHUB_PAT,
+        display_name="skills PAT",
+        account_login="acme-skills",
+    )
+    OrgSkillRepo.objects.create(
+        organization=org,
+        alias="acme",
+        repo_full_name="acme/private-skills",
+        default_ref="main",
+        source_connection=conn,
+    )
+
+    # Manifest ref without a pin → the repo's default_ref ("main") is used.
+    toml_no_pin = _agent_toml_with_org_repo_skill().replace(
+        "acme/dev-skills/security-review@v2", "acme/dev-skills/security-review"
+    )
+    result = _register(project, files=_agent_repo_tree(toml_text=toml_no_pin))
+    assert result.status == "ok"
+    [agent] = result.agents
+    assert agent.skill_notes == []
+
+    assert Skill.objects.filter(organization=org, slug="security-review", deleted_at__isnull=True).exists()
+    # Fetched at the repo default_ref, via the linked connection (private=True).
+    assert calls == [("acme/private-skills", "main", True)]
+
+
+def test_org_repo_unknown_alias_is_non_fatal(org, with_connection, mock_org_repo_fetch):
+    with_connection(org)
+    project = _project(org)
+    calls = mock_org_repo_fetch(_org_repo_tree())
+    # NO OrgSkillRepo registered for alias "acme".
+
+    result = _register(project, files=_agent_repo_tree(toml_text=_agent_toml_with_org_repo_skill()))
+    assert result.status == "ok"  # agent still registers
+    [agent] = result.agents
+    # The org-repo skill recorded a note; no fetch was attempted (alias missing).
+    assert any("acme" in n and "no skill repo registered" in n for n in agent.skill_notes)
+    assert calls == []
+
+    # Only the local skill landed.
+    assert {s.slug for s in Skill.objects.filter(organization=org, deleted_at__isnull=True)} == {"reviewer"}
+    workload = Workload.objects.get(kind=Workload.Kind.AGENT, registered_app__organization=org)
+    assert {
+        r.skill.slug for r in AgentSkillRef.objects.filter(workload=workload, deleted_at__isnull=True)
+    } == {"reviewer"}
+
+
+def test_org_repo_fetch_failure_is_non_fatal(org, with_connection, mock_org_repo_fetch):
+    with_connection(org)
+    project = _project(org)
+    calls = mock_org_repo_fetch(_org_repo_tree(), fail=True)  # fetch raises
+    OrgSkillRepo.objects.create(
+        organization=org, alias="acme", repo_full_name="acme/dev-skills", default_ref="main"
+    )
+
+    result = _register(project, files=_agent_repo_tree(toml_text=_agent_toml_with_org_repo_skill()))
+    assert result.status == "ok"  # agent still registers despite the outage
+    [agent] = result.agents
+    assert any("fetch failed" in n for n in agent.skill_notes)
+    # The fetch was attempted once (then cached as failed for the pass).
+    assert calls == [("acme/dev-skills", "v2", False)]
+
+    # Local skill still resolved.
+    assert {s.slug for s in Skill.objects.filter(organization=org, deleted_at__isnull=True)} == {"reviewer"}
+
+
+def test_org_repo_skill_not_in_repo_is_non_fatal(org, with_connection, mock_org_repo_fetch):
+    with_connection(org)
+    project = _project(org)
+    # Repo tree present but WITHOUT the requested skill folder.
+    calls = mock_org_repo_fetch({"skills/dev-skills/other/SKILL.md": _skill_md("Other", "x", "x")})
+    OrgSkillRepo.objects.create(
+        organization=org, alias="acme", repo_full_name="acme/dev-skills", default_ref="main"
+    )
+
+    result = _register(project, files=_agent_repo_tree(toml_text=_agent_toml_with_org_repo_skill()))
+    assert result.status == "ok"
+    [agent] = result.agents
+    assert any("security-review" in n and "not found in repo" in n for n in agent.skill_notes)
+    assert calls == [("acme/dev-skills", "v2", False)]
+    assert {s.slug for s in Skill.objects.filter(organization=org, deleted_at__isnull=True)} == {"reviewer"}
+
+
+def test_org_repo_tree_cached_across_agents_in_one_pass(org, with_connection, mock_org_repo_fetch):
+    """Two agents referencing the same org repo fetch it ONCE per pass."""
+    with_connection(org)
+    project = _project(org)
+    calls = mock_org_repo_fetch(_org_repo_tree())
+    OrgSkillRepo.objects.create(
+        organization=org, alias="acme", repo_full_name="acme/dev-skills", default_ref="main"
+    )
+
+    agent_toml = _agent_toml_with_org_repo_skill()
+    files = {
+        "agents/triage/astrolift.toml": agent_toml,
+        "agents/triage2/astrolift.toml": agent_toml.replace('name = "triage"', 'name = "triage2"'),
+        "skills/reviewer/SKILL.md": _skill_md("Reviewer", "Reviews code.", "Read the diff."),
+    }
+    result = _register(project, files=files)
+    assert result.status == "ok"
+    assert len(result.agents) == 2
+    assert all(a.skill_notes == [] for a in result.agents)
+    # Same alias@v2 across both agents → exactly one fetch (per-pass cache).
+    assert calls == [("acme/dev-skills", "v2", False)]
+
+
+def test_org_repo_skill_is_org_scoped(org, other_org, with_connection, mock_org_repo_fetch):
+    """A repo registered in org A is invisible to org B: B's agent gets a note,
+    not A's repo."""
+    with_connection(org)
+    with_connection(other_org)
+    project_b = _project(other_org, slug="team-b")
+    calls = mock_org_repo_fetch(_org_repo_tree())
+    # Register the alias in org A only.
+    OrgSkillRepo.objects.create(
+        organization=org, alias="acme", repo_full_name="acme/dev-skills", default_ref="main"
+    )
+
+    # Org B registers an agent referencing alias "acme" — unknown in B.
+    res = _register(project_b, files=_agent_repo_tree(toml_text=_agent_toml_with_org_repo_skill()), repo="b/agents")
+    assert res.status == "ok"
+    [agent] = res.agents
+    assert any("no skill repo registered" in n for n in agent.skill_notes)
+    assert calls == []  # B's alias lookup missed → no fetch
+    # No org-repo skill leaked into B.
+    assert not Skill.objects.filter(organization=other_org, slug="security-review").exists()

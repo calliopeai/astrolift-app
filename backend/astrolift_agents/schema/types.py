@@ -149,6 +149,30 @@ class AgentEnvironmentSpecType:
     updated_at: dt.datetime
 
 
+@strawberry.type(name="AstroliftOrgSkillRepo")
+class OrgSkillRepoType:
+    """A per-org registered skill repo (spec 39d).
+
+    An org registers skill repos under short aliases; a manifest references a
+    skill in one as ``"<alias>/<skill-path>@<ref>"``. ``sourceConnectionId``
+    is the GUID of the linked :class:`SourceConnection` for a PRIVATE repo, or
+    null for a PUBLIC repo fetched anonymously — the credential itself is never
+    surfaced. ``isPrivate`` is the convenience derivation the UI renders.
+    """
+
+    id: GUID
+    alias: str
+    repo_full_name: str
+    source_kind: str
+    default_ref: str
+    display_name: str
+    is_active: bool
+    is_private: bool
+    source_connection_id: GUID | None
+    created_at: dt.datetime
+    updated_at: dt.datetime
+
+
 @strawberry.type(name="AstroliftAgentRuntime")
 class AgentRuntimeType:
     """A selectable agent runtime from the public runtime catalog.
@@ -566,6 +590,22 @@ def agent_detail_to_type(w) -> AgentDetailType:
         dockerfile_path=(container.dockerfile_path or "") if container is not None else "",
         brief=brief_to_type(w.brief) if w.brief_id else None,
         skills=skills,
+    )
+
+
+def org_skill_repo_to_type(r) -> OrgSkillRepoType:
+    return OrgSkillRepoType(
+        id=GUID(str(r.guid)),
+        alias=r.alias,
+        repo_full_name=r.repo_full_name,
+        source_kind=r.source_kind,
+        default_ref=r.default_ref or "main",
+        display_name=r.display_name or "",
+        is_active=r.is_active,
+        is_private=r.is_private,
+        source_connection_id=(GUID(str(r.source_connection.guid)) if r.source_connection_id else None),
+        created_at=r.created_at,
+        updated_at=r.updated_at,
     )
 
 
