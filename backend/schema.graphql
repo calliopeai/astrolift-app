@@ -180,6 +180,22 @@ type AstroliftActivityPage {
   nextCursor: String
 }
 
+type AstroliftAgentDetail {
+  id: GUID!
+  name: String!
+  slug: String!
+  appSlug: String!
+  sourceRepo: String!
+  runFamily: String!
+  runMode: String!
+  runPaused: Boolean!
+  runCronExpression: String!
+  imageRef: String!
+  dockerfilePath: String!
+  brief: AstroliftBrief
+  skills: [AstroliftAgentSkill!]!
+}
+
 type AstroliftAgentEnvironmentSpec {
   id: GUID!
   name: String!
@@ -280,6 +296,12 @@ type AstroliftAgentRunSpecMutationResult {
 type AstroliftAgentRuntime {
   name: String!
   image: String!
+}
+
+type AstroliftAgentSkill {
+  position: Int!
+  skill: AstroliftSkill!
+  toolDefs: [AstroliftToolDef!]!
 }
 
 type AstroliftAgentTask {
@@ -4851,6 +4873,7 @@ type Query {
   agentEnvironmentSpec(slug: String!): AstroliftAgentEnvironmentSpec
   agentWorkloads(orgId: ID!, projectSlug: String = null): [AstroliftAgentListItem!]!
   agentFleet(orgId: ID!): [AstroliftAgentListItem!]!
+  agent(orgId: ID!, slug: String!): AstroliftAgentDetail
   scanAgentManifests(orgId: ID!, sourceRepo: String!, sourceKind: String! = "github", ref: String! = "main"): AstroliftScanAgentManifestsResult!
   agentLiveStatus(orgId: ID!, projectSlug: String = null, workloadId: ID = null): [AstroliftAgentLiveStatus!]!
   agentRuntimes: [AstroliftAgentRuntime!]!
