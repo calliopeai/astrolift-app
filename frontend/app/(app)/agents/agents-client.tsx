@@ -9,6 +9,7 @@ import {
   MonitorPlayIcon,
   ZapIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 
@@ -745,7 +746,12 @@ function RegistryTab({ orgId }: RegistryTabProps) {
               {ctrl.rows.map((a) => (
                 <TableRow key={a.id}>
                   <TableCell>
-                    <div className="font-medium">{a.name}</div>
+                    <Link
+                      href={`/agents/${encodeURIComponent(a.slug)}/build`}
+                      className="font-medium hover:text-[var(--brand-primary)] hover:underline"
+                    >
+                      {a.name}
+                    </Link>
                     <div className="text-muted-foreground font-mono text-xs">
                       {a.projectSlug}/{a.appSlug}/{a.slug}
                     </div>

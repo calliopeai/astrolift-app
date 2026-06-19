@@ -64,7 +64,7 @@ function elapsedLabel(startedAt: string | null): string {
  * GET every {@link POLL_MS}). Clicking a tile opens a fullscreen theatre
  * modal that connects the live noVNC session at the task's ``vncUrl`` via
  * the existing {@link VncViewer}. Each tile also offers a pop-out into
- * ``/agents/<task>/vnc`` for a dedicated tab.
+ * ``/agents/runs/<task>/vnc`` for a dedicated tab.
  */
 export function AgentTheatre() {
   const orgId = getActiveOrgGuid() ?? "";
@@ -178,7 +178,7 @@ export function AgentTheatre() {
               <span>{watching?.id}</span>
               {watching && (
                 <a
-                  href={`/agents/${watching.id}/vnc`}
+                  href={`/agents/runs/${watching.id}/vnc`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"

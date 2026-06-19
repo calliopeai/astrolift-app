@@ -112,6 +112,18 @@ export const GET_AGENT_TASK = gql`
   }
 `;
 
+// Per-run log lines for a single agent task, newest `tail` lines. Keyed by
+// the AGENT TASK id (not workloadId) — the agent-detail Observe tab reads
+// these for the most-recent run. NOTE: `agentTaskLogs` returns an empty list
+// on real clusters today (#891 — the log relay isn't wired through); the
+// Observe surface renders that gracefully rather than treating empty as an
+// error.
+export const AGENT_TASK_LOGS = gql`
+  query AgentTaskLogs($id: ID!, $tail: Int) {
+    agentTaskLogs(id: $id, tail: $tail)
+  }
+`;
+
 // ---------------------------------------------------------------------------
 // Registry list (PR-7) — registered AGENTS (not runs), project-scoped or
 // fleet-wide. `agentWorkloads` is the per-project list; `agentFleet` is the
