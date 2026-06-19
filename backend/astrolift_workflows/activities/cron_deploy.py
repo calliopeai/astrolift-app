@@ -72,6 +72,31 @@ class LoopDispatchSummary:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class AgentReconcileSummary:
+    """Per-tick summary for the keep-alive agent reconcile tick (#808).
+
+    ``reconciled_count`` is the number of eligible clusters whose agent
+    manifests were re-applied successfully this tick;
+    ``reconciled_cluster_slugs`` names them. ``skipped_count`` counts
+    clusters that were selected-out as ineligible *before* an apply was
+    attempted (this tick's query already excludes those, so it is the
+    count of rows the eligibility predicate filtered — surfaced for
+    observability, not a per-cluster list). ``failed_count`` /
+    ``failed_cluster_slugs`` are clusters whose apply raised a
+    ``ClusterManagementError`` (driver unbuildable / no apply_manifests)
+    or returned a non-ok ``ApplyResult``; each failure is isolated to its
+    cluster and recorded to ``last_management_error`` — it never aborts
+    the tick.
+    """
+
+    reconciled_count: int
+    skipped_count: int
+    failed_count: int
+    reconciled_cluster_slugs: tuple[str, ...]
+    failed_cluster_slugs: tuple[str, ...]
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class ScaleTickSummary:
     """Per-tick summary for the scheduled-scaling tick (spec 33, PR-5).
 
@@ -839,4 +864,131 @@ def _dispatch_scale_ticks_sync() -> ScaleTickSummary:
         scaled_count=len(scaled_slugs),
         scaled_workload_slugs=tuple(scaled_slugs),
         scaled_to=tuple(scaled_to),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Keep-alive agent reconcile tick (#808)
+# ---------------------------------------------------------------------------
+#
+# The self-heal sibling of the ticks above. It re-applies the keep-alive agent
+# manifests (Namespace + Deployment) to every eligible managed cluster by going
+# THROUGH the same idempotent server-side-apply path the ``deployClusterAgent``
+# mutation uses (``core.cluster_management.deploy_agent_dispatch``) — NOT by
+# reinventing the apply and NOT by dispatching a Task or minting an app Deployment.
+#
+# Why this exists: the keep-alive Deployment is only ever (re)applied by the
+# manual ``deployClusterAgent`` mutation. When ``AGENT_IMAGE`` changed, existing
+# clusters kept the old image (ImagePullBackOff) until an operator re-applied by
+# hand. A server-side apply converges the live Deployment to the rendered spec
+# (the new image), so re-applying on a cadence makes the fleet self-correct.
+#
+# Eligibility (mirrors the mutation's gates, minus the per-call NOT_FOUND lookup):
+#   * ``is_active=True`` — the mutation refuses an inactive cluster (PRECONDITION);
+#   * ``deleted_at__isnull=True`` — a torn-down cluster is not a deploy target
+#     (the SoftDeleteManager already hides these; the predicate is an explicit
+#     safety belt that mirrors the mutation lookup);
+#   * ``agent_key_hash`` non-empty — the mutation refuses to deploy without an
+#     issued agent key (PRECONDITION): no key means the ``astrolift-agent``
+#     Secret was never provisioned, so the Deployment's secretKeyRefs would fail.
+#     Re-applying would only manufacture a CreateContainerConfigError, so skip.
+#
+# Per-cluster error isolation: one cluster's failure must NEVER abort the tick.
+# Each apply is wrapped; a ``ClusterManagementError`` (driver unbuildable / no
+# ``apply_manifests``), a non-ok ``ApplyResult``, or any unexpected exception
+# (e.g. a metadata-only cluster that can't resolve a runtime) is caught, recorded
+# to ``cluster.last_management_error`` — the SAME field + message shape the
+# ``deployClusterAgent`` mutation persists — counted as failed, and the loop
+# moves on. A successful apply clears ``last_management_error`` (mirrors the
+# mutation's success path) so a recovered cluster stops showing the stale error.
+#
+# Mutually exclusive from the dispatch + deploy + scale ticks by construction:
+# those iterate ``RegisteredApp`` / ``Workload`` rows and fire deploys, Task
+# dispatches, or replica patches; this tick iterates ``TenantCluster`` rows and
+# re-applies the platform's own agent manifests. A cluster has no run-spec; a
+# workload/app is never a reconcile candidate.
+
+
+@activity.defn(name="astrolift.agent.reconcile_tick")
+async def reconcile_agent_deployments() -> AgentReconcileSummary:
+    """One tick of the keep-alive agent reconcile loop. Lazily imports
+    Django models so the workflow sandbox stays clean."""
+    from asgiref.sync import sync_to_async
+
+    return await sync_to_async(_reconcile_agent_deployments_sync, thread_sensitive=False)()
+
+
+def _reconcile_agent_deployments_sync() -> AgentReconcileSummary:
+    from astrolift_clusters.models import TenantCluster
+    from core.cluster_management import ClusterManagementError, deploy_agent_dispatch
+
+    # Active, non-deleted clusters. ``agent_key_hash`` decides eligibility:
+    # an empty hash means no agent Secret was ever provisioned, so re-applying
+    # the Deployment would only fail on its secretKeyRefs — skip it (counted in
+    # ``skipped_count`` for observability). The SoftDeleteManager already hides
+    # soft-deleted rows; ``deleted_at__isnull=True`` is an explicit belt that
+    # mirrors the mutation's lookup.
+    active = TenantCluster.objects.filter(is_active=True, deleted_at__isnull=True)
+    eligible = list(active.exclude(agent_key_hash=""))
+    skipped_count = active.filter(agent_key_hash="").count()
+
+    reconciled_slugs: list[str] = []
+    failed_slugs: list[str] = []
+
+    for cluster in eligible:
+        # Re-apply through the SAME idempotent SSA path the mutation uses.
+        # Two structured failure shapes are persisted to last_management_error
+        # and counted as failed (mirroring the deployClusterAgent mutation):
+        # the driver couldn't be built / lacks apply_manifests
+        # (ClusterManagementError), or the apply reported per-manifest errors
+        # (ApplyResult.ok is False). Any other unexpected error is treated the
+        # same way so a single bad cluster never aborts the tick.
+        try:
+            result = deploy_agent_dispatch(cluster=cluster)
+        except ClusterManagementError as exc:
+            cluster.last_management_error = str(exc)
+            cluster.save(update_fields=["last_management_error", "updated_at", "version"])
+            log.warning(
+                "agent-reconcile dispatch failed for cluster %s",
+                cluster.slug,
+                exc_info=True,
+            )
+            failed_slugs.append(cluster.slug)
+            continue
+        except Exception as exc:  # noqa: BLE001 — isolate any per-cluster failure
+            # A cluster with no resolvable managed runtime (or any other
+            # unexpected driver error) must skip gracefully, not error the
+            # whole tick. Record it like the structured failures so the
+            # settings card surfaces a reason, and move on.
+            cluster.last_management_error = f"agent reconcile failed: {exc}"
+            cluster.save(update_fields=["last_management_error", "updated_at", "version"])
+            log.warning(
+                "agent-reconcile unexpected error for cluster %s",
+                cluster.slug,
+                exc_info=True,
+            )
+            failed_slugs.append(cluster.slug)
+            continue
+
+        if not result.ok:
+            message = "agent deploy failed: " + "; ".join(str(e) for e in result.errors)
+            cluster.last_management_error = message
+            cluster.save(update_fields=["last_management_error", "updated_at", "version"])
+            log.warning("agent-reconcile apply not ok for cluster %s: %s", cluster.slug, message)
+            failed_slugs.append(cluster.slug)
+            continue
+
+        # Success — clear any stale error the way the mutation does so a
+        # recovered cluster stops surfacing the previous failure.
+        if cluster.last_management_error:
+            cluster.last_management_error = ""
+            cluster.save(update_fields=["last_management_error", "updated_at", "version"])
+        reconciled_slugs.append(cluster.slug)
+
+    return AgentReconcileSummary(
+        reconciled_count=len(reconciled_slugs),
+        skipped_count=skipped_count,
+        failed_count=len(failed_slugs),
+        reconciled_cluster_slugs=tuple(reconciled_slugs),
+        failed_cluster_slugs=tuple(failed_slugs),
     )

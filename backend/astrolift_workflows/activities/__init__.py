@@ -77,6 +77,7 @@ from astrolift_workflows.activities.cron_deploy import (
     dispatch_agent_loops,
     dispatch_cron_deploys,
     dispatch_scale_ticks,
+    reconcile_agent_deployments,
 )
 from astrolift_workflows.activities.custom_domain import (
     ensure_platform_managed_records,
@@ -230,6 +231,7 @@ __all__ = [
     "provision_secrets_backend",
     "prune_audit_log",
     "prune_stale_sessions",
+    "reconcile_agent_deployments",
     "reconcile_cluster_capabilities",
     "record_human_gate_decision",
     "refresh_secret_bundle_in_cluster",

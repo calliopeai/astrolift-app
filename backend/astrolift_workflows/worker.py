@@ -83,6 +83,7 @@ from astrolift_workflows.activities import (
     provision_secrets_backend,
     prune_audit_log,
     prune_stale_sessions,
+    reconcile_agent_deployments,
     reconcile_cluster_capabilities,
     record_cluster_bootstrap_run,
     record_human_gate_decision,
@@ -116,6 +117,7 @@ from astrolift_workflows.activities.agent_stage import (
 from astrolift_workflows.workflows import (
     AgentCronTickWorkflow,
     AgentLoopTickWorkflow,
+    AgentReconcileTickWorkflow,
     AgentScaleTickWorkflow,
     BringClusterIntoManagementWorkflow,
     BuildPreviewWorkflow,
@@ -156,6 +158,7 @@ from astrolift_workflows.workflows import (
 WORKFLOWS = (
     AgentCronTickWorkflow,
     AgentLoopTickWorkflow,
+    AgentReconcileTickWorkflow,
     AgentScaleTickWorkflow,
     BringClusterIntoManagementWorkflow,
     BuildPreviewWorkflow,
@@ -272,6 +275,7 @@ ACTIVITIES = (
     provision_secrets_backend,
     prune_audit_log,
     prune_stale_sessions,
+    reconcile_agent_deployments,
     reconcile_cluster_capabilities,
     record_human_gate_decision,
     refresh_secret_bundle_in_cluster,
