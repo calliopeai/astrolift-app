@@ -23,7 +23,7 @@ export function AgentPillarPage({ agentSlug, pillar }: { agentSlug: string; pill
       {({ agent, orgId }) => {
         switch (pillar) {
           case "build":
-            return <BuildContent agent={agent} />;
+            return <BuildContent agent={agent} orgId={orgId} />;
           case "observe":
             return <ObserveContent orgId={orgId} />;
           case "secure":

@@ -169,6 +169,64 @@ export const LIST_AGENT_FLEET = gql`
   }
 `;
 
+// Per-agent detail join (spec 38 Phase 4). `agent(orgId, slug)` resolves a
+// single registered agent and bundles the read-side joins the fleet list can't:
+// the assembled `brief`, the ordered `skills` (each with its nested `toolDefs`),
+// plus the build coordinates (`imageRef`/`dockerfilePath`). The agent-detail
+// Build tab reads this to render brief + skills + tools (it was a "backend join
+// pending" placeholder before the resolver landed). `brief` is nullable — an
+// agent may have no assembled brief yet — and `skills` is ordered by `position`.
+export const GET_AGENT_DETAIL = gql`
+  query GetAgentDetail($orgId: ID!, $slug: String!) {
+    agent(orgId: $orgId, slug: $slug) {
+      id
+      name
+      slug
+      appSlug
+      sourceRepo
+      runFamily
+      runMode
+      runPaused
+      runCronExpression
+      imageRef
+      dockerfilePath
+      brief {
+        id
+        contentHash
+        storageKey
+        config
+        createdAt
+      }
+      skills {
+        position
+        skill {
+          id
+          name
+          slug
+          description
+          content
+          skillVersion
+          isGlobal
+          isActive
+          createdAt
+          updatedAt
+        }
+        toolDefs {
+          id
+          name
+          slug
+          description
+          adapter
+          inputSchema
+          outputSchema
+          handlerRef
+          createdAt
+        }
+      }
+    }
+  }
+`;
+
 export const LIST_AGENT_LIVE_STATUS = gql`
   query ListAgentLiveStatus($orgId: ID!, $projectSlug: String, $workloadId: ID) {
     agentLiveStatus(orgId: $orgId, projectSlug: $projectSlug, workloadId: $workloadId) {
