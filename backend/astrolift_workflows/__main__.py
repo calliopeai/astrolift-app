@@ -58,6 +58,15 @@ async def _run() -> None:
     log.info("connecting to temporal address=%s namespace=%s", address, namespace)
     client = await Client.connect(address, namespace=namespace)
 
+    # Register the platform's scheduled workflows (spec 37). Non-fatal: a
+    # registration failure must NOT crash the worker — log and keep serving.
+    from astrolift_workflows.schedule_boot import register_schedules
+
+    try:
+        await register_schedules(client)
+    except Exception:  # noqa: BLE001 — registrar must never take down the worker
+        log.exception("schedule registrar failed; worker continuing without schedule sync")
+
     queues = (
         TASK_QUEUE_DEPLOY,
         TASK_QUEUE_PROVISION,
