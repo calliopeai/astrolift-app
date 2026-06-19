@@ -144,6 +144,42 @@ class BriefSkillRef(BaseCoreModel):
         return f"BriefSkillRef brief={self.brief_id} skill={self.skill_id}"
 
 
+class AgentSkillRef(BaseCoreModel):
+    """Join: which Skills are attached to an agent Workload's definition.
+
+    The definitional counterpart to :class:`BriefSkillRef`. Where a
+    ``BriefSkillRef`` snapshots a Skill into an already-assembled Brief,
+    an ``AgentSkillRef`` records the Skills an ``agent`` Workload carries
+    at the definition level (set at registration in Phase 3); the
+    assembly service reads these to build the agent's Brief.
+    """
+
+    workload = models.ForeignKey(
+        "astrolift_registry.Workload",
+        related_name="agent_skill_refs",
+        on_delete=models.CASCADE,
+    )
+    skill = models.ForeignKey(
+        Skill,
+        related_name="agent_refs",
+        on_delete=models.PROTECT,
+    )
+    # Ordering within the agent's skill set (ascending). Skills with the
+    # same position fall back to insertion order.
+    position = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["workload", "skill"],
+                name="agentskillref_unique_per_workload",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"AgentSkillRef workload={self.workload_id} skill={self.skill_id}"
+
+
 class WorkloadToolDef(BaseCoreModel):
     """Join: which ToolDefs a Workload exposes for cross-workload invocation."""
 
