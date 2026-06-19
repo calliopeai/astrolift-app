@@ -16,14 +16,31 @@ output JSON is what every other subsystem reads.
 See ``specs/05-manifest-schema.md``.
 """
 
+from astrolift_manifest.brief import BriefError, load_brief
 from astrolift_manifest.normalize import normalize
 from astrolift_manifest.parser import ManifestError, parse_raw
-from astrolift_manifest.types import NormalizedManifest, RawManifest
+from astrolift_manifest.skills import SkillError, load_skill
+from astrolift_manifest.types import (
+    BriefRef,
+    LoadedBrief,
+    LoadedSkill,
+    NormalizedManifest,
+    RawManifest,
+    SkillRef,
+)
 
 __all__ = [
+    "BriefError",
+    "BriefRef",
+    "LoadedBrief",
+    "LoadedSkill",
     "ManifestError",
     "NormalizedManifest",
     "RawManifest",
+    "SkillError",
+    "SkillRef",
+    "load_brief",
+    "load_skill",
     "normalize",
     "parse_raw",
 ]

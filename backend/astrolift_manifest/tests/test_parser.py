@@ -598,6 +598,145 @@ task_queue = "approvals"
     assert w.max_concurrent_workflows == 10
 
 
+# ---- agent brief + skills (spec 38, Phase 1) --------------------------
+
+
+def test_parse_brief_and_skills_local_and_named():
+    """The spec's heterogeneous ``skills`` array — single-key inline tables
+    (local) mixed with bare strings (named-global) — parses into typed
+    ``SkillRef``s, and ``brief`` into a ``BriefRef``."""
+    toml = """
+name = "triage-agent"
+brief = "brief/README.md"
+skills = [
+  { reviewer = "skills/reviewer" },
+  { linter = "skills/linter" },
+  "global-summarizer",
+]
+
+[[workloads]]
+name = "triage-agent"
+kind = "agent"
+
+  [[workloads.containers]]
+  name = "agent"
+  is_primary = true
+  command = ["python", "-m", "agent"]
+"""
+    raw = parse_raw(toml)
+    assert raw.brief is not None
+    assert raw.brief.path == "brief/README.md"
+    assert len(raw.skills) == 3
+    # Order is preserved from the array.
+    reviewer, linter, summarizer = raw.skills
+    assert (reviewer.name, reviewer.path, reviewer.is_local) == ("reviewer", "skills/reviewer", True)
+    assert (linter.name, linter.path, linter.is_local) == ("linter", "skills/linter", True)
+    assert (summarizer.name, summarizer.path, summarizer.is_local) == ("global-summarizer", None, False)
+
+
+def test_parse_brief_and_skills_default_when_absent():
+    """A manifest with neither key parses to ``brief=None`` / ``skills=()``,
+    so non-agent manifests round-trip unchanged."""
+    toml = """
+name = "web"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+
+  [[workloads.containers]]
+  name = "app"
+  is_primary = true
+  port = 8080
+"""
+    raw = parse_raw(toml)
+    assert raw.brief is None
+    assert raw.skills == ()
+
+
+def test_parse_brief_must_be_string():
+    toml = """
+name = "agent"
+brief = 42
+"""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(toml)
+    assert exc.value.path == "brief"
+    assert "brief" in str(exc.value).lower()
+
+
+def test_parse_skills_must_be_list():
+    toml = """
+name = "agent"
+skills = "not-a-list"
+"""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(toml)
+    assert exc.value.path == "skills"
+
+
+def test_parse_skill_entry_int_rejected():
+    """A non-string / non-table entry is a malformed skill and surfaces an
+    indexed path pointing at the offending row."""
+    toml = """
+name = "agent"
+skills = [ 42 ]
+"""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(toml)
+    assert exc.value.path == "skills[0]"
+
+
+def test_parse_skill_local_entry_multikey_rejected():
+    """A local skill table must have exactly one key (name = path); a
+    two-key table is ambiguous and rejected with a good path."""
+    toml = """
+name = "agent"
+skills = [ { reviewer = "a", linter = "b" } ]
+"""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(toml)
+    assert exc.value.path == "skills[0]"
+    assert "single-key" in str(exc.value)
+
+
+def test_parse_skill_local_entry_empty_path_rejected():
+    toml = """
+name = "agent"
+skills = [ { reviewer = "" } ]
+"""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(toml)
+    assert exc.value.path == "skills[0]"
+    assert "path" in str(exc.value).lower()
+
+
+def test_parse_skill_named_entry_empty_rejected():
+    toml = """
+name = "agent"
+skills = [ "" ]
+"""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(toml)
+    assert exc.value.path == "skills[0]"
+
+
+def test_parse_skill_duplicate_name_rejected():
+    """Two skill entries resolving to the same name would upsert onto one
+    Skill row at registration — reject the ambiguity at parse time."""
+    toml = """
+name = "agent"
+skills = [
+  { reviewer = "skills/reviewer" },
+  "reviewer",
+]
+"""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(toml)
+    assert exc.value.path == "skills[1]"
+    assert "duplicate" in str(exc.value)
+
+
 def test_parse_workflow_worker_optional_fields_round_trip():
     """The optional caps + namespace are read when present."""
     toml = """

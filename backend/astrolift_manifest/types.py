@@ -103,11 +103,106 @@ class ManagedServiceManifest:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class BriefRef:
+    """A pointer to a brief folder, declared by the manifest's top-level
+    ``brief`` key (spec 38).
+
+    ``path`` is the repo-relative path to the brief's entry ``README.md``
+    (e.g. ``"brief/README.md"``). The brief *folder* is that file's parent
+    directory; sibling files it references are loaded as context later by
+    :func:`astrolift_manifest.brief.load_brief`. Parsing only records the
+    pointer — it does not read the repo tree.
+    """
+
+    path: str
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
+class SkillRef:
+    """A pointer to one skill, declared in the manifest's ``skills`` list
+    (spec 38).
+
+    Two flavours, distinguished by :attr:`is_local`:
+
+    * **local** — ``{ name = "relative/path" }`` in the TOML. ``name`` is
+      the skill name, ``path`` is the repo-relative folder (agentskills.io
+      layout) read from the fetched repo tree at resolution time.
+      ``is_local`` is ``True`` and ``path`` is non-``None``.
+    * **named-global** — a bare string in the TOML. ``name`` is the skill
+      name, resolved from the global skills source later. ``is_local`` is
+      ``False`` and ``path`` is ``None``.
+
+    Parsing only records the pointer; it does not fetch or load the skill
+    folder. The skill folder itself is parsed by
+    :func:`astrolift_manifest.skills.load_skill`.
+    """
+
+    name: str
+    path: str | None = None
+    is_local: bool = False
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class RawManifest:
     name: str
     workloads: tuple[WorkloadManifest, ...] = ()
     managed_services: tuple[ManagedServiceManifest, ...] = ()
+    # Agent brief + skills (spec 38). ``brief`` is an optional pointer to a
+    # brief folder's entry README; ``skills`` is the ordered list of skill
+    # pointers (local-path or named-global). Both stay thin pointers — the
+    # substance lives in packaged folders loaded at registration. Empty /
+    # ``None`` for non-agent manifests that declare neither.
+    brief: BriefRef | None = None
+    skills: tuple[SkillRef, ...] = ()
     raw: dict[str, Any] = dataclasses.field(default_factory=dict)
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
+class LoadedSkill:
+    """A parsed agentskills.io skill folder (spec 38, §Formats).
+
+    Produced by :func:`astrolift_manifest.skills.load_skill` from a skill
+    folder's ``SKILL.md`` (YAML frontmatter + markdown body) and the folder
+    listing. Maps onto the future ``Skill`` record (name/description/
+    instructions) + its bundled ``scripts/`` → ``ToolDef`` rows; ``Skill``
+    persistence is Phase 2 and not part of this dataclass.
+
+    * ``name`` / ``description`` — required SKILL.md frontmatter.
+    * ``instructions`` — the markdown body after the frontmatter (stripped).
+    * ``scripts`` / ``references`` / ``assets`` — repo-relative paths to the
+      files under the skill folder's ``scripts/`` / ``references/`` /
+      ``assets/`` subdirectories, sorted. Empty when the subdir is absent.
+    * ``frontmatter`` — the full parsed frontmatter mapping (so optional
+      agentskills.io keys beyond name/description pass through to Phase 2
+      without this loader having to enumerate them).
+    """
+
+    name: str
+    description: str
+    instructions: str
+    scripts: tuple[str, ...] = ()
+    references: tuple[str, ...] = ()
+    assets: tuple[str, ...] = ()
+    frontmatter: dict[str, Any] = dataclasses.field(default_factory=dict)
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
+class LoadedBrief:
+    """A parsed brief folder (spec 38, §Formats).
+
+    Produced by :func:`astrolift_manifest.brief.load_brief` from a brief
+    folder's entry ``README.md``. Maps onto the future ``Brief`` record;
+    ``Brief`` persistence is Phase 2 and not part of this dataclass.
+
+    * ``readme_text`` — the raw README markdown.
+    * ``referenced_paths`` — repo-relative paths to sibling files the README
+      links to that resolve *within* the brief folder, sorted. These are the
+      additional context files loaded for the agent at dispatch. Links that
+      escape the folder (``../``), absolute URLs, and anchors are ignored.
+    """
+
+    readme_text: str
+    referenced_paths: tuple[str, ...] = ()
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
