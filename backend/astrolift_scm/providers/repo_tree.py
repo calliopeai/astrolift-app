@@ -24,15 +24,29 @@ the scanner skips any path whose contents aren't ``str`` anyway.
 from __future__ import annotations
 
 import io
+import logging
 import zipfile
 from collections.abc import Callable
 
+import requests
+
 from astrolift_scm.models import SourceConnection
+
+log = logging.getLogger(__name__)
 
 # Cap per-file size kept in the tree map. Manifests are a few KB; anything
 # larger is not a manifest and would only bloat memory. Files over the cap
 # are dropped from the map entirely (discovery never needs them).
 _MAX_FILE_BYTES = 256 * 1024
+
+# Unauthenticated GitHub archive endpoint for a PUBLIC repo. Unlike the
+# provider-dispatched ``fetch_zipball`` (which needs a per-org
+# ``SourceConnection`` credential), this streams a public repo's archive with
+# no auth — the right fit for the built-in skills catalogue, which every
+# install must be able to read without first registering an SCM connection.
+# The archive nests under a single ``<repo>-<ref>/`` top-level dir, the same
+# shape :func:`repo_tree_from_zipball_bytes` already strips.
+_GITHUB_ARCHIVE_TIMEOUT_SECONDS = 60
 
 # Cap the total number of entries so a pathological archive (hundreds of
 # thousands of tiny files) can't exhaust memory during a scan. Far above any
@@ -106,3 +120,29 @@ def fetch_repo_tree(
         fetch = fetch_zipball
     data = fetch(connection, repo_full_name=repo_full_name, ref=ref)
     return repo_tree_from_zipball_bytes(data)
+
+
+def fetch_public_repo_tree(*, repo_full_name: str, ref: str) -> dict[str, str]:
+    """Fetch a PUBLIC GitHub repo's file tree map with NO authentication.
+
+    Used for the built-in skills catalogue (``calliopeai/astrolift-skills``):
+    a public repo every install must read without first registering an SCM
+    ``SourceConnection``. Streams ``https://github.com/<repo>/archive/<ref>.zip``
+    (anonymous, no token) and reuses :func:`repo_tree_from_zipball_bytes` to
+    unpack into the ``{repo_relative_path: text}`` map the skill loader
+    consumes.
+
+    Raises ``requests.HTTPError`` on a non-2xx response and
+    ``requests.RequestException`` on a network failure — the caller (the skill
+    resolver) catches these and degrades to a clear, non-fatal resolution
+    error so a catalogue outage never aborts agent registration.
+    """
+    owner_repo = repo_full_name.strip("/")
+    archive_url = f"https://github.com/{owner_repo}/archive/{ref}.zip"
+    resp = requests.get(
+        archive_url,
+        timeout=_GITHUB_ARCHIVE_TIMEOUT_SECONDS,
+        allow_redirects=True,
+    )
+    resp.raise_for_status()
+    return repo_tree_from_zipball_bytes(resp.content)

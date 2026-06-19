@@ -124,6 +124,11 @@ class RegisteredAgentType:
     app_id: GUID
     workload_slug: str
     created: bool
+    # Non-fatal brief/skill-resolution warnings for this agent (spec 38
+    # Phase 3): a missing local skill path, a name absent from the built-in
+    # catalogue, or an unavailable catalogue. The agent still registers when
+    # present — empty when everything resolved.
+    skill_notes: list[str]
 
 
 @strawberry.type(name="AstroliftRegisterAgentRepoResult")
@@ -1166,6 +1171,7 @@ class RegistryMutation:
                         app_id=GUID(str(a.app_guid)),
                         workload_slug=a.workload_slug,
                         created=a.created,
+                        skill_notes=list(a.skill_notes),
                     )
                     for a in result.agents
                 ]
