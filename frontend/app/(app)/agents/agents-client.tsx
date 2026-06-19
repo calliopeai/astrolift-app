@@ -4,6 +4,7 @@ import { useQuery } from "@apollo/client/react";
 import {
   BotIcon,
   ClockIcon,
+  GitBranchIcon,
   Loader2Icon,
   MonitorPlayIcon,
   ZapIcon,
@@ -12,7 +13,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
+import { ListControls, SortableHeader } from "@/components/ListControls";
 import { PageShell } from "@/components/PageShell";
+import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,10 +45,22 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { VncViewer } from "@/components/observability/VncViewer";
-import { LIST_AGENT_TASKS } from "@/graphql/agents/agents.queries";
+import {
+  LIST_AGENT_FLEET,
+  LIST_AGENT_LIVE_STATUS,
+  LIST_AGENT_TASKS,
+  LIST_AGENT_WORKLOADS,
+} from "@/graphql/agents/agents.queries";
+import type {
+  AstroliftAgentListItem,
+  AstroliftAgentLiveStatus,
+} from "@/graphql/agents/agents.types";
+import { LIST_PROJECTS } from "@/graphql/identity/identity.queries";
 import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
+import { formatRelativeAge } from "@/lib/format";
 import { getActiveOrgGuid } from "@/lib/identity/active-org";
+import { useListControls, type SortState } from "@/hooks/use-list-controls";
 
 type AgentTask = {
   id: string;
@@ -372,19 +387,297 @@ function HistoryTab({ orgId }: { orgId: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Registry tab — agent-kind workloads across all apps
+// Registry tab — registered AGENTS (kind=agent Workloads), project-scoped
+// with a fleet/all-agents toggle. (spec 33 §3 / PR-7)
+//
+// This is the *registered-agents* surface, not the runs surface — runs
+// live in the Active / History tabs and become the Executions view in a
+// later PR. The base list (agentWorkloads / agentFleet) is fetched once;
+// the volatile live-status (running count, next-scheduled, paused/idle)
+// is a separate 15s-polled query merged into rows by workloadId, matching
+// how /jobs polls its run signal.
 // ---------------------------------------------------------------------------
 
-interface RegistryTabProps {
-  agentWorkloads: AstroliftWorkload[];
-  workloadsLoading: boolean;
+// Render runFamily + runMode as a human-readable cell, e.g. "Task · Schedule"
+// or "Service". Both are free `String!` fields on the schema; normalize
+// case-insensitively and title-case any value we don't recognize so a new
+// backend mode degrades gracefully rather than rendering a raw token.
+const RUN_FAMILY_LABELS: Record<string, string> = {
+  task: "Task",
+  service: "Service",
+};
+const RUN_MODE_LABELS: Record<string, string> = {
+  once: "Once",
+  loop: "Loop",
+  schedule: "Schedule",
+  trigger: "Trigger",
+  service: "Service",
+};
+
+function titleCase(value: string): string {
+  if (!value) return "";
+  return value
+    .replace(/[_-]+/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
 }
 
-function RegistryTab({ agentWorkloads, workloadsLoading }: RegistryTabProps) {
-  if (workloadsLoading) {
+function formatRunMode(runFamily: string, runMode: string): string {
+  const family = RUN_FAMILY_LABELS[runFamily.toLowerCase()] ?? titleCase(runFamily);
+  const mode = RUN_MODE_LABELS[runMode.toLowerCase()] ?? titleCase(runMode);
+  // Service is single-axis (the family *is* the mode); Task carries a
+  // sub-mode (Once/Loop/Schedule/Trigger) so we show "Family · Mode".
+  if (!mode || mode === family) return family || "—";
+  return `${family} · ${mode}`;
+}
+
+// Last-run status → {dot, badge-variant}. Agent run vocabulary (spec 33 §6):
+// running / queued / completed / failed / timed_out / cancelled. Mirrors the
+// dot+badge convention the platform uses elsewhere (RunStatusBadge) but with
+// the agent-run vocabulary, which differs from ScheduledJobRun ("completed"
+// not "succeeded").
+type Dot = "ok" | "warn" | "error" | "muted" | "pending";
+const RUN_STATUS_DOT: Record<string, Dot> = {
+  running: "pending",
+  queued: "warn",
+  completed: "ok",
+  succeeded: "ok",
+  failed: "error",
+  timed_out: "error",
+  cancelled: "muted",
+  canceled: "muted",
+};
+
+function LastRunCell({
+  status,
+  at,
+}: {
+  status: string | null | undefined;
+  at: string | null | undefined;
+}) {
+  if (!status && !at) {
+    return <span className="text-muted-foreground text-sm">Never run</span>;
+  }
+  const key = (status ?? "").toLowerCase();
+  const dot = RUN_STATUS_DOT[key] ?? "muted";
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {status && (
+        <>
+          <StatusDot status={dot} />
+          <Badge
+            variant={dot === "error" ? "destructive" : "secondary"}
+            className="capitalize"
+          >
+            {titleCase(status)}
+          </Badge>
+        </>
+      )}
+      {at && (
+        <span className="text-muted-foreground text-xs" title={at}>
+          {formatRelativeAge(at)}
+        </span>
+      )}
+    </span>
+  );
+}
+
+// Live-status cell: running count + a running / scheduled / paused / idle
+// badge. Derived from the polled agentLiveStatus row (falls back to the
+// list row's own runningCount/runPaused when live data hasn't arrived yet).
+function LiveStatusCell({
+  live,
+  fallback,
+}: {
+  live: AstroliftAgentLiveStatus | undefined;
+  fallback: Pick<AstroliftAgentListItem, "runningCount" | "runPaused">;
+}) {
+  const runningCount = live?.runningCount ?? fallback.runningCount;
+  const isPaused = live?.isPaused ?? fallback.runPaused;
+  const isIdle = live?.isIdle ?? runningCount === 0;
+  const nextScheduledAt = live?.nextScheduledAt ?? null;
+
+  if (runningCount > 0) {
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <StatusDot status="pending" />
+        <Badge variant="default">
+          {runningCount} running
+        </Badge>
+      </span>
+    );
+  }
+  if (isPaused) {
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <StatusDot status="muted" />
+        <Badge variant="outline">Paused</Badge>
+      </span>
+    );
+  }
+  if (nextScheduledAt) {
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <StatusDot status="warn" />
+        <Badge variant="secondary" title={nextScheduledAt}>
+          Next {formatRelativeAge(nextScheduledAt)}
+        </Badge>
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <StatusDot status="muted" />
+      <Badge variant="outline">{isIdle ? "Idle" : "—"}</Badge>
+    </span>
+  );
+}
+
+function agentSortFn(
+  a: AstroliftAgentListItem,
+  b: AstroliftAgentListItem,
+  sort: SortState
+): number {
+  const dir = sort.dir === "asc" ? 1 : -1;
+  switch (sort.key) {
+    case "name":
+      return dir * a.name.localeCompare(b.name);
+    case "repo":
+      return dir * a.sourceRepo.localeCompare(b.sourceRepo);
+    case "runMode":
+      return (
+        dir *
+        formatRunMode(a.runFamily, a.runMode).localeCompare(
+          formatRunMode(b.runFamily, b.runMode)
+        )
+      );
+    case "lastRun":
+      return dir * ((a.lastRunAt ?? "").localeCompare(b.lastRunAt ?? ""));
+    default:
+      return 0;
+  }
+}
+
+interface AgentListResp {
+  agentWorkloads: AstroliftAgentListItem[];
+}
+interface AgentFleetResp {
+  agentFleet: AstroliftAgentListItem[];
+}
+interface AgentLiveStatusResp {
+  agentLiveStatus: AstroliftAgentLiveStatus[];
+}
+
+interface ProjectsResp {
+  astroliftProjects: Array<{ id: string; slug: string; name: string }>;
+}
+
+interface RegistryTabProps {
+  orgId: string;
+}
+
+function RegistryTab({ orgId }: RegistryTabProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Project scoping is URL-synced via ?project= (mirrors the Apps list).
+  // Empty string === the fleet view (all agents in the org).
+  const projectSlug = searchParams.get("project") ?? "";
+  const fleet = projectSlug === "";
+
+  const setProjectScope = React.useCallback(
+    (next: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (!next) params.delete("project");
+      else params.set("project", next);
+      const qs = params.toString();
+      router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
+
+  // Projects populate the scope picker. Cheap query; cached across the app.
+  const { data: projectsData } = useQuery<ProjectsResp>(LIST_PROJECTS);
+  const projects = projectsData?.astroliftProjects ?? [];
+
+  // Base list: fleet vs project-scoped. We run one query and skip the other
+  // so we never over-fetch. cache-and-network keeps the list fresh on
+  // re-entry without flashing the skeleton.
+  const projectQuery = useQuery<AgentListResp>(LIST_AGENT_WORKLOADS, {
+    variables: { orgId, projectSlug },
+    skip: !orgId || fleet,
+    fetchPolicy: "cache-and-network",
+  });
+  const fleetQuery = useQuery<AgentFleetResp>(LIST_AGENT_FLEET, {
+    variables: { orgId },
+    skip: !orgId || !fleet,
+    fetchPolicy: "cache-and-network",
+  });
+
+  const rawAgents: AstroliftAgentListItem[] = React.useMemo(
+    () =>
+      fleet
+        ? fleetQuery.data?.agentFleet ?? []
+        : projectQuery.data?.agentWorkloads ?? [],
+    [fleet, fleetQuery.data?.agentFleet, projectQuery.data?.agentWorkloads]
+  );
+  const listLoading = fleet ? fleetQuery.loading : projectQuery.loading;
+
+  // Volatile live-status, polled every 15s (matching /jobs). Scoped the same
+  // way as the list; merged into rows by workloadId. No workloadId arg ⇒ the
+  // whole scope rolls up in one request.
+  const { data: liveData } = useQuery<AgentLiveStatusResp>(LIST_AGENT_LIVE_STATUS, {
+    variables: { orgId, projectSlug: fleet ? null : projectSlug, workloadId: null },
+    skip: !orgId,
+    pollInterval: 15000,
+    fetchPolicy: "cache-and-network",
+  });
+  const liveByWorkloadId = React.useMemo(() => {
+    const map = new Map<string, AstroliftAgentLiveStatus>();
+    for (const row of liveData?.agentLiveStatus ?? []) {
+      map.set(row.workloadId, row);
+    }
+    return map;
+  }, [liveData?.agentLiveStatus]);
+
+  const ctrl = useListControls({
+    data: rawAgents,
+    searchFn: (a) =>
+      [a.name, a.slug, a.appSlug, a.projectSlug, a.sourceRepo, a.runFamily, a.runMode].join(" "),
+    initialPageSize: 25,
+    initialSort: { key: "name", dir: "asc" },
+    sortFn: agentSortFn,
+  });
+
+  const scopePicker = (
+    <div className="flex flex-wrap items-center gap-2">
+      <Label htmlFor="agent-scope" className="text-muted-foreground text-xs">
+        Scope
+      </Label>
+      <Select value={fleet ? "__fleet__" : projectSlug} onValueChange={(v) => setProjectScope(v === "__fleet__" ? "" : v)}>
+        <SelectTrigger id="agent-scope" className="h-8 w-56 text-sm">
+          <SelectValue placeholder="Select project…" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__fleet__">All agents (fleet)</SelectItem>
+          {projects.map((p) => (
+            <SelectItem key={p.id} value={p.slug}>
+              {p.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  if (listLoading && rawAgents.length === 0) {
     return (
       <Card>
-        <CardContent className="space-y-2 p-6">
+        <CardContent className="space-y-3 p-6">
+          {scopePicker}
           <Skeleton className="h-12 w-full" />
           <Skeleton className="h-12 w-full" />
         </CardContent>
@@ -392,14 +685,22 @@ function RegistryTab({ agentWorkloads, workloadsLoading }: RegistryTabProps) {
     );
   }
 
-  if (agentWorkloads.length === 0) {
+  if (rawAgents.length === 0) {
     return (
       <Card>
-        <CardContent className="p-6">
+        <CardContent className="space-y-4 p-6">
+          {scopePicker}
           <EmptyState
             icon={<BotIcon className="size-5" />}
-            title="No agent workloads registered"
-            description="Declare a workload with kind: agent in your app manifest to register it here. Agents share the same image build and deployment pipeline as other workloads."
+            title={fleet ? "No agents registered" : "No agents in this project"}
+            description={
+              fleet
+                ? "Register an agent repo to scan it for agent manifests and add each one as an agent here. Agents share the same image build and deployment pipeline as your apps."
+                : "This project has no registered agents yet. Register an agent repo or switch the scope to view agents across the whole fleet."
+            }
+            actionHref="/agents/new"
+            actionLabel="Register an agent repo"
+            learnMoreHref="https://github.com/calliopeai/astrolift-docs/blob/main/reference/agents.md"
           />
         </CardContent>
       </Card>
@@ -408,35 +709,86 @@ function RegistryTab({ agentWorkloads, workloadsLoading }: RegistryTabProps) {
 
   return (
     <Card>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>App</TableHead>
-              <TableHead>Slug</TableHead>
-              <TableHead>CPU</TableHead>
-              <TableHead>Memory</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {agentWorkloads.map((w) => (
-              <TableRow key={w.id}>
-                <TableCell className="font-medium">{w.name}</TableCell>
-                <TableCell>
-                  <Badge variant="outline">{w.registeredAppSlug}</Badge>
-                </TableCell>
-                <TableCell className="font-mono text-xs">{w.slug}</TableCell>
-                <TableCell className="text-muted-foreground text-sm">
-                  {w.cpuRequest || "—"} / {w.cpuLimit || "—"}
-                </TableCell>
-                <TableCell className="text-muted-foreground text-sm">
-                  {w.memoryRequest || "—"} / {w.memoryLimit || "—"}
-                </TableCell>
+      <CardContent className="space-y-3 p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {scopePicker}
+          <ListControls controls={ctrl} searchPlaceholder="Filter agents…" />
+        </div>
+        <div className="overflow-x-auto rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>
+                  <SortableHeader sortKey="name" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                    Name
+                  </SortableHeader>
+                </TableHead>
+                <TableHead>
+                  <SortableHeader sortKey="repo" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                    Repo
+                  </SortableHeader>
+                </TableHead>
+                <TableHead>
+                  <SortableHeader sortKey="runMode" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                    Run mode
+                  </SortableHeader>
+                </TableHead>
+                <TableHead>Live status</TableHead>
+                <TableHead>
+                  <SortableHeader sortKey="lastRun" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                    Last run
+                  </SortableHeader>
+                </TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {ctrl.rows.map((a) => (
+                <TableRow key={a.id}>
+                  <TableCell>
+                    <div className="font-medium">{a.name}</div>
+                    <div className="text-muted-foreground font-mono text-xs">
+                      {a.projectSlug}/{a.appSlug}/{a.slug}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {a.sourceRepo ? (
+                      a.sourceUrl ? (
+                        <a
+                          href={a.sourceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
+                        >
+                          <GitBranchIcon className="size-3.5" />
+                          {a.sourceRepo}
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground inline-flex items-center gap-1 text-sm">
+                          <GitBranchIcon className="size-3.5" />
+                          {a.sourceRepo}
+                        </span>
+                      )
+                    ) : (
+                      <span className="text-muted-foreground text-sm">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{formatRunMode(a.runFamily, a.runMode)}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <LiveStatusCell
+                      live={liveByWorkloadId.get(a.id)}
+                      fallback={{ runningCount: a.runningCount, runPaused: a.runPaused }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <LastRunCell status={a.lastRunStatus} at={a.lastRunAt} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </CardContent>
     </Card>
   );
@@ -467,8 +819,8 @@ export function AgentsClient() {
 
   const orgId = getActiveOrgGuid() ?? "";
 
-  // Workloads are loaded here so both the Dispatch and Registry tabs
-  // can share the single query result.
+  // Workloads are loaded here for the Dispatch tab's workload picker.
+  // (The Registry tab has its own project-scoped agent queries — PR-7.)
   const { data: workloadsData, loading: workloadsLoading } = useQuery<WorkloadResp>(
     LIST_WORKLOADS,
     { variables: {} }
@@ -508,17 +860,6 @@ export function AgentsClient() {
               }
             >
               {TAB_LABELS[tabKey]}
-              {/* Registry count badge — shows how many agent workloads are registered */}
-              {tabKey === "registry" && !workloadsLoading && agentWorkloads.length > 0 && (
-                <span
-                  className={
-                    "inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs tabular-nums " +
-                    (active ? "bg-muted text-foreground" : "bg-muted/70 text-muted-foreground")
-                  }
-                >
-                  {agentWorkloads.length}
-                </span>
-              )}
             </button>
           );
         })}
@@ -529,9 +870,7 @@ export function AgentsClient() {
         <DispatchTab agentWorkloads={agentWorkloads} workloadsLoading={workloadsLoading} />
       )}
       {tab === "history" && <HistoryTab orgId={orgId} />}
-      {tab === "registry" && (
-        <RegistryTab agentWorkloads={agentWorkloads} workloadsLoading={workloadsLoading} />
-      )}
+      {tab === "registry" && <RegistryTab orgId={orgId} />}
     </PageShell>
   );
 }

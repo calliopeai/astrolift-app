@@ -207,6 +207,37 @@ export type AstroliftAgentEnvironmentSpecMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftAgentListItem = {
+  appSlug: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  lastRunAt?: Maybe<Scalars['DateTime']['output']>;
+  lastRunStatus?: Maybe<Scalars['String']['output']>;
+  name: Scalars['String']['output'];
+  projectSlug: Scalars['String']['output'];
+  runCronExpression: Scalars['String']['output'];
+  runFamily: Scalars['String']['output'];
+  runMode: Scalars['String']['output'];
+  runPaused: Scalars['Boolean']['output'];
+  runningCount: Scalars['Int']['output'];
+  slug: Scalars['String']['output'];
+  sourceRepo: Scalars['String']['output'];
+  sourceUrl: Scalars['String']['output'];
+};
+
+export type AstroliftAgentLiveStatus = {
+  appSlug: Scalars['String']['output'];
+  isIdle: Scalars['Boolean']['output'];
+  isPaused: Scalars['Boolean']['output'];
+  lastRunAt?: Maybe<Scalars['DateTime']['output']>;
+  lastRunStatus?: Maybe<Scalars['String']['output']>;
+  nextScheduledAt?: Maybe<Scalars['DateTime']['output']>;
+  runFamily: Scalars['String']['output'];
+  runMode: Scalars['String']['output'];
+  runningCount: Scalars['Int']['output'];
+  workloadId: Scalars['GUID']['output'];
+  workloadSlug: Scalars['String']['output'];
+};
+
 export type AstroliftAgentRun = {
   createdAt: Scalars['DateTime']['output'];
   durationSeconds?: Maybe<Scalars['Int']['output']>;
@@ -243,6 +274,12 @@ export type AstroliftAgentTask = {
   status: Scalars['String']['output'];
   vncEnabled: Scalars['Boolean']['output'];
   vncUrl: Scalars['String']['output'];
+};
+
+export type AstroliftAgentTaskMutationResult = {
+  data?: Maybe<AstroliftAgentTask>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AstroliftAggregatedEvent = {
@@ -1375,6 +1412,14 @@ export type AstroliftDisconnectUserSourceProviderPayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftDiscoveredAgentManifest = {
+  alreadyRegistered: Scalars['Boolean']['output'];
+  manifestPath: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
+  workloadKind: Scalars['String']['output'];
+};
+
 export type AstroliftDispatcherInstance = {
   capabilities: Scalars['JSON']['output'];
   id: Scalars['GUID']['output'];
@@ -2275,6 +2320,24 @@ export type AstroliftQuotaIncreaseRequestMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftRegisterAgentRepoResult = {
+  agents: Array<AstroliftRegisteredAgent>;
+};
+
+export type AstroliftRegisterAgentRepoResultMutationResult = {
+  data?: Maybe<AstroliftRegisterAgentRepoResult>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftRegisteredAgent = {
+  appId: Scalars['GUID']['output'];
+  created: Scalars['Boolean']['output'];
+  manifestPath: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
+  workloadSlug: Scalars['String']['output'];
+};
+
 export type AstroliftRegisteredApp = {
   activePreviewCount: Scalars['Int']['output'];
   approverTeamId?: Maybe<Scalars['GUID']['output']>;
@@ -2509,6 +2572,12 @@ export type AstroliftRunJobOncePayload = {
 export type AstroliftRunJobOncePayloadMutationResult = {
   data?: Maybe<AstroliftRunJobOncePayload>;
   errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftScanAgentManifestsResult = {
+  agents: Array<AstroliftDiscoveredAgentManifest>;
+  error?: Maybe<Scalars['String']['output']>;
   ok: Scalars['Boolean']['output'];
 };
 
@@ -4142,6 +4211,7 @@ export type Mutation = {
   recordClusterBootstrapRun: BootstraprunrecordedpayloadMutationResult;
   redeployApp: AstroliftDeploymentMutationResult;
   refreshClusterManagement: AstroliftTenantClusterMutationResult;
+  registerAgentRepo: AstroliftRegisterAgentRepoResultMutationResult;
   registerApp: AstroliftRegisteredAppMutationResult;
   registerMobileDevice: AstroliftDeviceRegistrationMutationResult;
   registerTenantCluster: AstroliftTenantClusterMutationResult;
@@ -4178,6 +4248,7 @@ export type Mutation = {
   rotateOutboundWebhookSecret: WebhookSecretRevealMutationResult;
   rotateSecretBundle: AstroliftSecretBundleMutationResult;
   rotateWebhookSecret: AstroliftScmWebhookSecretRevealMutationResult;
+  runAstroliftAgent: AstroliftAgentTaskMutationResult;
   runAstroliftJobOnce: AstroliftRunJobOncePayloadMutationResult;
   runTask: AstroliftTaskRunPayloadMutationResult;
   /** Run an agent WorkflowDefinition's stages durably via Temporal (WorkflowDefinitionRunWorkflow). Creates the WorkflowInstance + WorkflowRun mirror rows and enqueues the stage executor. */
@@ -5035,6 +5106,11 @@ export type MutationRefreshClusterManagementArgs = {
 };
 
 
+export type MutationRegisterAgentRepoArgs = {
+  input: RegisterAgentRepoInput;
+};
+
+
 export type MutationRegisterAppArgs = {
   input: RegisterAppInput;
 };
@@ -5214,6 +5290,11 @@ export type MutationRotateSecretBundleArgs = {
 
 export type MutationRotateWebhookSecretArgs = {
   input: RotateWebhookSecretInput;
+};
+
+
+export type MutationRunAstroliftAgentArgs = {
+  input: RunAstroliftAgentInput;
 };
 
 
@@ -5832,10 +5913,14 @@ export type Query = {
   PostgresMetrics: Array<Array<Scalars['String']['output']>>;
   agentEnvironmentSpec?: Maybe<AstroliftAgentEnvironmentSpec>;
   agentEnvironmentSpecs: Array<AstroliftAgentEnvironmentSpec>;
+  agentFleet: Array<AstroliftAgentListItem>;
   agentGallery: Array<AstroliftAgentTask>;
+  agentLiveStatus: Array<AstroliftAgentLiveStatus>;
   agentRuntimes: Array<AstroliftAgentRuntime>;
   agentTask?: Maybe<AstroliftAgentTask>;
+  agentTaskLogs: Array<Scalars['String']['output']>;
   agentTasks: Array<AstroliftAgentTask>;
+  agentWorkloads: Array<AstroliftAgentListItem>;
   assignableAstroliftProjects: Array<AstroliftProject>;
   astroliftActiveIdentityProvider?: Maybe<AstroliftIdentityProvider>;
   astroliftActiveSessions: Array<AstroliftActiveSession>;
@@ -5999,6 +6084,7 @@ export type Query = {
   permissionDiagnose?: Maybe<PermissionDiagnosis>;
   previewAstroliftDeregister?: Maybe<AstroliftDeregisterPreview>;
   previewAstroliftForceRedeploy?: Maybe<AstroliftForceRedeployPreview>;
+  scanAgentManifests: AstroliftScanAgentManifestsResult;
   skill?: Maybe<AstroliftSkill>;
   skills: Array<AstroliftSkill>;
   toolDefs: Array<AstroliftToolDef>;
@@ -6027,8 +6113,20 @@ export type QueryAgentEnvironmentSpecsArgs = {
 };
 
 
+export type QueryAgentFleetArgs = {
+  orgId: Scalars['ID']['input'];
+};
+
+
 export type QueryAgentGalleryArgs = {
   orgId: Scalars['ID']['input'];
+};
+
+
+export type QueryAgentLiveStatusArgs = {
+  orgId: Scalars['ID']['input'];
+  projectSlug?: InputMaybe<Scalars['String']['input']>;
+  workloadId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 
@@ -6037,15 +6135,29 @@ export type QueryAgentTaskArgs = {
 };
 
 
+export type QueryAgentTaskLogsArgs = {
+  id: Scalars['ID']['input'];
+  tail?: Scalars['Int']['input'];
+};
+
+
 export type QueryAgentTasksArgs = {
   orgId: Scalars['ID']['input'];
   status?: InputMaybe<Scalars['String']['input']>;
+  workloadId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+
+export type QueryAgentWorkloadsArgs = {
+  orgId: Scalars['ID']['input'];
+  projectSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 
 export type QueryAstroliftAgentRunsArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
+  projectSlug?: InputMaybe<Scalars['String']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
   workloadSlug?: InputMaybe<Scalars['String']['input']>;
 };
@@ -6820,6 +6932,14 @@ export type QueryPreviewAstroliftForceRedeployArgs = {
 };
 
 
+export type QueryScanAgentManifestsArgs = {
+  orgId: Scalars['ID']['input'];
+  ref?: Scalars['String']['input'];
+  sourceKind?: Scalars['String']['input'];
+  sourceRepo: Scalars['String']['input'];
+};
+
+
 export type QuerySkillArgs = {
   id: Scalars['ID']['input'];
 };
@@ -6903,6 +7023,16 @@ export type RecordClusterBootstrapRunInput = {
 export type RefreshClusterManagementInputType = {
   clusterId: Scalars['GUID']['input'];
   forcePreflight: Scalars['Boolean']['input'];
+};
+
+export type RegisterAgentRepoInput = {
+  defaultBranch: InputMaybe<Scalars['String']['input']>;
+  deployBranch: InputMaybe<Scalars['String']['input']>;
+  projectId: Scalars['GUID']['input'];
+  ref: Scalars['String']['input'];
+  sourceKind: Scalars['String']['input'];
+  sourceRepo: Scalars['String']['input'];
+  sourceUrl: InputMaybe<Scalars['String']['input']>;
 };
 
 export type RegisterAppInput = {
@@ -7123,6 +7253,13 @@ export type RotateSecretBundleInput = {
 
 export type RotateWebhookSecretInput = {
   connectionId: Scalars['GUID']['input'];
+};
+
+export type RunAstroliftAgentInput = {
+  agentSlug: Scalars['String']['input'];
+  environmentSpecId: InputMaybe<Scalars['GUID']['input']>;
+  timeoutSeconds: InputMaybe<Scalars['Int']['input']>;
+  triggerPayload: InputMaybe<Scalars['JSON']['input']>;
 };
 
 export type RunJobOnceInput = {

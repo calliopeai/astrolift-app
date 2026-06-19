@@ -112,6 +112,65 @@ export const GET_AGENT_TASK = gql`
   }
 `;
 
+// ---------------------------------------------------------------------------
+// Registry list (PR-7) — registered AGENTS (not runs), project-scoped or
+// fleet-wide. `agentWorkloads` is the per-project list; `agentFleet` is the
+// org-wide roll-up. Both return the same `AstroliftAgentListItem` row shape.
+// `agentLiveStatus` is the volatile companion signal (running count,
+// next-scheduled, paused/idle) merged into rows by workloadId.
+// ---------------------------------------------------------------------------
+
+const AGENT_LIST_ITEM_FIELDS = `
+  id
+  name
+  slug
+  appSlug
+  projectSlug
+  sourceRepo
+  sourceUrl
+  runFamily
+  runMode
+  runPaused
+  runCronExpression
+  lastRunStatus
+  lastRunAt
+  runningCount
+`;
+
+export const LIST_AGENT_WORKLOADS = gql`
+  query ListAgentWorkloads($orgId: ID!, $projectSlug: String) {
+    agentWorkloads(orgId: $orgId, projectSlug: $projectSlug) {
+      ${AGENT_LIST_ITEM_FIELDS}
+    }
+  }
+`;
+
+export const LIST_AGENT_FLEET = gql`
+  query ListAgentFleet($orgId: ID!) {
+    agentFleet(orgId: $orgId) {
+      ${AGENT_LIST_ITEM_FIELDS}
+    }
+  }
+`;
+
+export const LIST_AGENT_LIVE_STATUS = gql`
+  query ListAgentLiveStatus($orgId: ID!, $projectSlug: String, $workloadId: ID) {
+    agentLiveStatus(orgId: $orgId, projectSlug: $projectSlug, workloadId: $workloadId) {
+      workloadId
+      workloadSlug
+      appSlug
+      runFamily
+      runMode
+      isPaused
+      isIdle
+      runningCount
+      lastRunStatus
+      lastRunAt
+      nextScheduledAt
+    }
+  }
+`;
+
 // The VNC theatre roster: RUNNING, watchable agent tasks (vnc-capable
 // with a published relay path). Gated on agent_task.watch server-side.
 // Each row carries vncUrl (the live RFB relay the theatre connects to)
