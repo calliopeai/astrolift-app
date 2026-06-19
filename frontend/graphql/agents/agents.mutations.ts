@@ -207,6 +207,44 @@ export const REGISTER_AGENT_REPO = gql`
   }
 `;
 
+// Write the run-spec of a registered agent Workload(kind=agent) (spec 33
+// PR-11/PR-12). One partial-update mutation backs both editors: only the
+// fields the caller supplies are written, an omitted/null field is left
+// unchanged — so an editor can save a single toggle without round-tripping the
+// whole spec. PR-11 owns runFamily / runMode / runCronExpression / runPaused /
+// replicas; the Loop/Trigger/scaled-scaling fields (runMaxParallel,
+// scaleUpCron, scaleDownCron, scheduledScaleTo) are PR-12's and left unset by
+// the Once/Schedule/Service editor. Returns the persisted run-spec so the
+// editor reads back the stored state in one round-trip. Gates on `app.update`
+// server-side (configuring an agent is an app-config write, distinct from
+// `agent.dispatch`, which authorizes *running* it).
+export const UPDATE_AGENT_RUN_SPEC = gql`
+  mutation UpdateAgentRunSpec($agentSlug: String!, $input: AgentRunSpecInput!) {
+    updateAgentRunSpec(agentSlug: $agentSlug, input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        kind
+        runFamily
+        runMode
+        runCronExpression
+        runPaused
+        runMaxParallel
+        replicas
+        scheduledScaleTo
+        scaleUpCron
+        scaleDownCron
+      }
+    }
+  }
+`;
+
 export const IMPORT_SKILLS_FROM_REPO = gql`
   mutation ImportSkillsFromRepo($repoUrl: String!, $branch: String) {
     importSkillsFromRepo(repoUrl: $repoUrl, branch: $branch) {

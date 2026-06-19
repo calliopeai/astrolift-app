@@ -64,6 +64,28 @@ export type AddWildcardDomainInput = {
   validationMethod: Scalars['String']['input'];
 };
 
+export type AgentRunFamily =
+  | 'SERVICE'
+  | 'TASK';
+
+export type AgentRunMode =
+  | 'LOOP'
+  | 'ONCE'
+  | 'SCHEDULE'
+  | 'TRIGGER';
+
+export type AgentRunSpecInput = {
+  replicas: InputMaybe<Scalars['Int']['input']>;
+  runCronExpression: InputMaybe<Scalars['String']['input']>;
+  runFamily: InputMaybe<AgentRunFamily>;
+  runMaxParallel: InputMaybe<Scalars['Int']['input']>;
+  runMode: InputMaybe<AgentRunMode>;
+  runPaused: InputMaybe<Scalars['Boolean']['input']>;
+  scaleDownCron: InputMaybe<Scalars['String']['input']>;
+  scaleUpCron: InputMaybe<Scalars['String']['input']>;
+  scheduledScaleTo: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type Alertruledeletedpayload = {
   deleted: Scalars['Boolean']['output'];
   id: Scalars['GUID']['output'];
@@ -256,6 +278,27 @@ export type AstroliftAgentRun = {
   triggerKind: Scalars['String']['output'];
   triggeredByUsername?: Maybe<Scalars['String']['output']>;
   workloadSlug: Scalars['String']['output'];
+};
+
+export type AstroliftAgentRunSpec = {
+  id: Scalars['GUID']['output'];
+  kind: Scalars['String']['output'];
+  replicas: Scalars['Int']['output'];
+  runCronExpression: Scalars['String']['output'];
+  runFamily: Scalars['String']['output'];
+  runMaxParallel?: Maybe<Scalars['Int']['output']>;
+  runMode: Scalars['String']['output'];
+  runPaused: Scalars['Boolean']['output'];
+  scaleDownCron: Scalars['String']['output'];
+  scaleUpCron: Scalars['String']['output'];
+  scheduledScaleTo?: Maybe<Scalars['Int']['output']>;
+  slug: Scalars['String']['output'];
+};
+
+export type AstroliftAgentRunSpecMutationResult = {
+  data?: Maybe<AstroliftAgentRunSpec>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AstroliftAgentRuntime = {
@@ -4300,6 +4343,7 @@ export type Mutation = {
   unmuteAlertRule: AstroliftAlertRuleMutationResult;
   unregisterTenantCluster: SoftdeletepayloadMutationResult;
   updateAgentEnvironmentSpec: AstroliftAgentEnvironmentSpecMutationResult;
+  updateAgentRunSpec: AstroliftAgentRunSpecMutationResult;
   updateAlertRule: AstroliftAlertRuleMutationResult;
   updateApp: AstroliftRegisteredAppMutationResult;
   updateAstroliftSecurityPolicy: AstroliftRegisteredAppMutationResult;
@@ -5528,6 +5572,12 @@ export type MutationUnregisterTenantClusterArgs = {
 export type MutationUpdateAgentEnvironmentSpecArgs = {
   input: UpdateAgentEnvironmentSpecInput;
   slug: Scalars['String']['input'];
+};
+
+
+export type MutationUpdateAgentRunSpecArgs = {
+  agentSlug: Scalars['String']['input'];
+  input: AgentRunSpecInput;
 };
 
 
