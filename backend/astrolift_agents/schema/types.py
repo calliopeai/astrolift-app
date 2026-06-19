@@ -8,12 +8,52 @@ intentionally NOT exposed — the read surface is operator-facing only.
 from __future__ import annotations
 
 import datetime as dt
+import enum
 
 import strawberry
 
 from astrolift_graphql import GUID
 
 JSON = strawberry.scalars.JSON
+
+
+@strawberry.enum
+class AgentRunFamily(enum.Enum):
+    """The agent's native Job-vs-Deployment split (spec 33).
+
+    Mirrors :class:`astrolift_registry.models.Workload.RunFamily`:
+
+    - ``TASK``    — runs to completion (a k8s Job; the dispatch pipeline).
+                    Carries ``run_mode`` (once/loop/schedule) + the loop
+                    concurrency cap (``run_max_parallel``).
+    - ``SERVICE`` — always-on (a k8s Deployment); carries ``replicas`` and
+                    the scheduled-scaling cron pair.
+
+    The wire form is the uppercase member name (``TASK`` / ``SERVICE``);
+    the resolver maps ``.value`` to the lowercase model string.
+    """
+
+    TASK = "task"
+    SERVICE = "service"
+
+
+@strawberry.enum
+class AgentRunMode(enum.Enum):
+    """The Task-family trigger mode (spec 33).
+
+    Mirrors :class:`astrolift_registry.models.Workload.RunMode`; ignored
+    when ``run_family == SERVICE`` (a Service is always-on, not dispatched):
+
+    - ``ONCE``     — manual Dispatch-now (PR-1).
+    - ``LOOP``     — continuous re-dispatch with a concurrency cap (PR-6).
+    - ``SCHEDULE`` — cron-driven, reads ``run_cron_expression`` (PR-4).
+    - ``TRIGGER``  — bound to a webhook / event / condition (PR-6).
+    """
+
+    ONCE = "once"
+    LOOP = "loop"
+    SCHEDULE = "schedule"
+    TRIGGER = "trigger"
 
 
 @strawberry.type(name="AstroliftSkill")
@@ -301,6 +341,48 @@ class AgentLiveStatusType:
     next_scheduled_at: dt.datetime | None
 
 
+@strawberry.type(name="AstroliftAgentRunSpec")
+class AgentRunSpecType:
+    """The full run-spec of one ``kind=agent`` :class:`Workload` (spec 33).
+
+    The write surface for ``updateAgentRunSpec`` returns this so the
+    Run/Schedule/Service editor (PR-11) and the Loop/Trigger/scaling
+    editor (PR-12) read back exactly what they wrote in one round-trip.
+
+    Carries BOTH families' fields:
+
+    - Task family: ``run_mode`` (once/loop/schedule/trigger),
+      ``run_cron_expression`` (schedule mode), ``run_max_parallel``
+      (loop cap; null = platform default), ``run_paused``.
+    - Service family: ``replicas`` (current desired count),
+      ``scheduled_scale_to`` (scale-up target), ``scale_up_cron`` /
+      ``scale_down_cron``.
+
+    ``run_family`` / ``run_mode`` are surfaced as lowercase strings to
+    match the read surface (:class:`AgentListItemType` /
+    :class:`AgentLiveStatusType`), not the uppercase input enums.
+    """
+
+    id: GUID
+    slug: str
+    kind: str
+    run_family: str
+    run_mode: str
+    run_cron_expression: str
+    run_paused: bool
+    # Null means "no explicit loop cap" — the Loop tick falls back to the
+    # platform default (DEFAULT_LOOP_MAX_PARALLEL), NOT unbounded.
+    run_max_parallel: int | None
+    # Service replica count the manifest renderer reads (the scaling tick
+    # writes the scheduled count back onto it).
+    replicas: int
+    # Service scheduled-scaling: the up-cron scales to ``scheduled_scale_to``
+    # (clamped to the env ceiling by the tick), the down-cron scales to 0.
+    scheduled_scale_to: int | None
+    scale_up_cron: str
+    scale_down_cron: str
+
+
 @strawberry.type(name="AstroliftDiscoveredAgentManifest")
 class DiscoveredAgentManifestType:
     """One agent manifest found by scanning a repo (spec 33 PR-3).
@@ -340,6 +422,24 @@ class ScanAgentManifestsResultType:
     ok: bool
     agents: list[DiscoveredAgentManifestType]
     error: str | None = None
+
+
+def agent_run_spec_to_type(w) -> AgentRunSpecType:
+    """Project a ``kind=agent`` :class:`Workload` to its run-spec type."""
+    return AgentRunSpecType(
+        id=GUID(str(w.guid)),
+        slug=w.slug,
+        kind=w.kind,
+        run_family=w.run_family,
+        run_mode=w.run_mode,
+        run_cron_expression=w.run_cron_expression or "",
+        run_paused=w.run_paused,
+        run_max_parallel=w.run_max_parallel,
+        replicas=w.replicas,
+        scheduled_scale_to=w.scheduled_scale_to,
+        scale_up_cron=w.scale_up_cron or "",
+        scale_down_cron=w.scale_down_cron or "",
+    )
 
 
 def agent_env_spec_to_type(s) -> AgentEnvironmentSpecType:
