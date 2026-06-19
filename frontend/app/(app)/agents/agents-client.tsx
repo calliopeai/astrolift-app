@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import {
   BotIcon,
   ClockIcon,
@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
+import { toast } from "sonner";
 
 import { EmptyState } from "@/components/EmptyState";
 import { ListControls, SortableHeader } from "@/components/ListControls";
@@ -46,6 +47,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { VncViewer } from "@/components/observability/VncViewer";
+import { RUN_AGENT } from "@/graphql/agents/agents.mutations";
 import {
   LIST_AGENT_FLEET,
   LIST_AGENT_LIVE_STATUS,
@@ -77,6 +79,14 @@ type AgentTask = {
 
 type AgentTasksData = {
   agentTasks: AgentTask[];
+};
+
+type RunAgentData = {
+  runAstroliftAgent: {
+    ok: boolean;
+    errors: { code: string; message: string; field: string | null }[];
+    data: { id: string; status: string; createdAt: string } | null;
+  };
 };
 
 type AgentTab = "active" | "dispatch" | "history" | "registry";
@@ -201,7 +211,12 @@ function DispatchTab({ agentWorkloads, workloadsLoading }: DispatchTabProps) {
   const [selectedWorkload, setSelectedWorkload] = React.useState<string>("");
   const [inputJson, setInputJson] = React.useState<string>("");
   const [jsonError, setJsonError] = React.useState<string | null>(null);
-  const [dispatching, setDispatching] = React.useState(false);
+
+  // Refetch the fleet runs list on success so the new run shows on the Active
+  // tab without a reload (the per-agent Run tab does its own scoped refetch).
+  const [runAgent, { loading: dispatching }] = useMutation<RunAgentData>(RUN_AGENT, {
+    refetchQueries: [LIST_AGENT_TASKS],
+  });
 
   function validateJson(value: string): boolean {
     if (!value.trim()) {
@@ -222,28 +237,25 @@ function DispatchTab({ agentWorkloads, workloadsLoading }: DispatchTabProps) {
     if (!selectedWorkload) return;
     if (!validateJson(inputJson)) return;
 
-    setDispatching(true);
+    const selectedName =
+      agentWorkloads.find((w) => w.slug === selectedWorkload)?.name ?? selectedWorkload;
     try {
-      // TODO(#798): Call runAstroliftAgent mutation once it exists.
-      // const { data } = await runAgent({
-      //   variables: {
-      //     input: {
-      //       workloadSlug: selectedWorkload,
-      //       input: inputJson.trim() ? JSON.parse(inputJson) : null,
-      //     },
-      //   },
-      // });
-      // if (!data?.runAstroliftAgent.ok) {
-      //   throw new Error(data?.runAstroliftAgent.errors[0]?.message ?? "Dispatch failed");
-      // }
-      // toast.success("Agent run dispatched");
-      throw new Error("runAstroliftAgent mutation not yet implemented — see #798");
+      const { data } = await runAgent({
+        variables: {
+          input: {
+            agentSlug: selectedWorkload,
+            triggerPayload: inputJson.trim() ? JSON.parse(inputJson) : null,
+          },
+        },
+      });
+      const result = data?.runAstroliftAgent;
+      if (!result?.ok) {
+        throw new Error(result?.errors?.[0]?.message ?? "Dispatch failed");
+      }
+      toast.success(`Dispatched ${selectedName}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      // eslint-disable-next-line no-console
-      console.error("dispatch error:", message);
-    } finally {
-      setDispatching(false);
+      toast.error(`Couldn't dispatch ${selectedName}`, { description: message });
     }
   }
 
@@ -305,9 +317,8 @@ function DispatchTab({ agentWorkloads, workloadsLoading }: DispatchTabProps) {
             Dispatch run
           </Button>
           <p className="text-muted-foreground mt-2 text-xs">
-            Dispatch is a stub — the{" "}
-            <span className="font-mono">runAstroliftAgent</span> mutation will be wired in a
-            follow-up (#798).
+            Dispatches the agent for a single run. Track it on the Active tab, or open the
+            agent&rsquo;s Run tab for its full execution history.
           </p>
         </div>
       </CardContent>

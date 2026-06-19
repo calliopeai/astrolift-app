@@ -149,6 +149,32 @@ export const CANCEL_TASK = gql`
   }
 `;
 
+// Dispatch a registered agent for a single Once run (spec 33 PR-1/PR-10). This
+// is the user-facing "Dispatch now" action — distinct from LAUNCH_TASK, which
+// is Brief-based and never sets `agent_definition` or enqueues a workflow.
+// `runAstroliftAgent` resolves the agentSlug to its Workload(kind=agent),
+// creates an AgentTask wired to the Temporal dispatch pipeline, and returns it
+// (id + status) so the caller can refetch the executions list and watch the
+// new run appear with a live "running now" badge. Requires `agent.dispatch`.
+// Closes #896 (the silent Dispatch no-op).
+export const RUN_AGENT = gql`
+  mutation RunAgent($input: RunAstroliftAgentInput!) {
+    runAstroliftAgent(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        status
+        createdAt
+      }
+    }
+  }
+`;
+
 // ---------------------------------------------------------------------------
 // Register-agent-repo wizard (PR-8). `registerAgentRepo` registers EVERY agent
 // manifest discovered in the repo as an agent Workload under its own

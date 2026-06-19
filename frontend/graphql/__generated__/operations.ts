@@ -7902,6 +7902,20 @@ export type CancelTaskMutationVariables = Exact<{
 
 export type CancelTaskMutation = { cancelTask: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }> } };
 
+export type RunAgentMutationVariables = Exact<{
+  input: RunAstroliftAgentInput;
+}>;
+
+
+export type RunAgentMutation = { runAstroliftAgent: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, status: string, createdAt: string } | null } };
+
+export type RegisterAgentRepoMutationVariables = Exact<{
+  input: RegisterAgentRepoInput;
+}>;
+
+
+export type RegisterAgentRepoMutation = { registerAgentRepo: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { agents: Array<{ manifestPath: string, slug: string, appId: string, workloadSlug: string, created: boolean }> } | null } };
+
 export type ImportSkillsFromRepoMutationVariables = Exact<{
   repoUrl: Scalars['String']['input'];
   branch?: InputMaybe<Scalars['String']['input']>;
@@ -7909,64 +7923,6 @@ export type ImportSkillsFromRepoMutationVariables = Exact<{
 
 
 export type ImportSkillsFromRepoMutation = { importSkillsFromRepo: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { importedSkills: Array<string>, importedTools: Array<string>, sourceRef: string } | null } };
-
-export type ListSkillsQueryVariables = Exact<{
-  orgId: Scalars['ID']['input'];
-  isGlobal?: InputMaybe<Scalars['Boolean']['input']>;
-}>;
-
-
-export type ListSkillsQuery = { skills: Array<{ id: string, name: string, slug: string, description: string, content: string, skillVersion: number, isGlobal: boolean, isActive: boolean, createdAt: string, updatedAt: string }> };
-
-export type GetSkillQueryVariables = Exact<{
-  id: Scalars['ID']['input'];
-}>;
-
-
-export type GetSkillQuery = { skill?: { id: string, name: string, slug: string, description: string, content: string, skillVersion: number, isGlobal: boolean, isActive: boolean, createdAt: string, updatedAt: string } | null };
-
-export type ListToolDefsQueryVariables = Exact<{
-  skillId: Scalars['ID']['input'];
-}>;
-
-
-export type ListToolDefsQuery = { toolDefs: Array<{ id: string, name: string, slug: string, description: string, adapter: string, inputSchema: Record<string, unknown>, outputSchema: Record<string, unknown>, handlerRef: string, createdAt: string }> };
-
-export type ListOrgToolDefsQueryVariables = Exact<{
-  orgId: Scalars['ID']['input'];
-}>;
-
-
-export type ListOrgToolDefsQuery = { orgToolDefs: Array<{ id: string, name: string, slug: string, description: string, adapter: string, inputSchema: Record<string, unknown>, outputSchema: Record<string, unknown>, handlerRef: string, createdAt: string }> };
-
-export type GetBriefQueryVariables = Exact<{
-  id: Scalars['ID']['input'];
-}>;
-
-
-export type GetBriefQuery = { brief?: { id: string, contentHash: string, storageKey: string, config: Record<string, unknown>, createdAt: string } | null };
-
-export type ListAgentTasksQueryVariables = Exact<{
-  orgId: Scalars['ID']['input'];
-  status?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-
-export type ListAgentTasksQuery = { agentTasks: Array<{ id: string, status: string, callbackUrl: string, result?: Record<string, unknown> | null, createdAt: string, startedAt?: string | null, finishedAt?: string | null, vncEnabled: boolean, vncUrl: string, snapshotUrl?: string | null }> };
-
-export type GetAgentTaskQueryVariables = Exact<{
-  id: Scalars['ID']['input'];
-}>;
-
-
-export type GetAgentTaskQuery = { agentTask?: { id: string, status: string, callbackUrl: string, result?: Record<string, unknown> | null, createdAt: string, startedAt?: string | null, finishedAt?: string | null, vncEnabled: boolean, vncUrl: string, snapshotUrl?: string | null } | null };
-
-export type AgentGalleryQueryVariables = Exact<{
-  orgId: Scalars['ID']['input'];
-}>;
-
-
-export type AgentGalleryQuery = { agentGallery: Array<{ id: string, status: string, startedAt?: string | null, vncEnabled: boolean, vncUrl: string, snapshotUrl?: string | null }> };
 
 export type ListQuotasQueryVariables = Exact<{ [key: string]: never; }>;
 

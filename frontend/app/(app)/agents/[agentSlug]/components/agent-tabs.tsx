@@ -55,7 +55,7 @@ function isActive(pathname: string, agentSlug: string, segment: string): boolean
 }
 
 /** Resolve the active pillar from the pathname, defaulting to Build (the
- * landing tab — Run is a stub until PR-10). */
+ * landing tab). */
 function resolveActivePillar(pathname: string, agentSlug: string): PillarKey {
   for (const pillar of PILLARS) {
     if (isActive(pathname, agentSlug, pillar.segment)) return pillar.key;
