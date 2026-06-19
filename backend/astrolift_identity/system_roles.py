@@ -39,6 +39,15 @@ _READ_ALL = (
     # (plus the platform-global skills). Write/import live on the
     # admin/developer roles below so auditors can't mutate the catalog.
     Permission.SKILL_READ,
+    # Agents + Workflows modules (spec 34/36 Phase 0): the read-all /
+    # auditor set sees the agent fleet + workflow surface. The agent
+    # workload/run readers re-gate to ``agent.read``, so without this an
+    # auditor who could see agents via the old ``app.read`` gate would
+    # lose that visibility. Workflow CRUD is still staff-gated until
+    # Phase 3, but the perm is granted now so the parallel-read promise
+    # holds the moment those resolvers re-gate.
+    Permission.AGENT_READ,
+    Permission.WORKFLOW_READ,
 )
 
 _DEPLOY_OPS = (
@@ -59,6 +68,45 @@ _DEPLOY_OPS = (
     # same operator/developer reach as app deploys; org owner/admin
     # already get it via the full-enum comprehension.
     Permission.AGENT_DISPATCH,
+)
+
+# Agents + Workflows module verbs (spec 34/36 Phase 0). Standalone from
+# ``app.*`` so the modules are grantable mix-and-match, but seeded onto
+# the existing roles to mirror each role's current app-perm level so
+# **no existing user loses access**: a role that could see / create /
+# run agents or workflows via ``app.*`` now also holds the parallel
+# entity perm.
+
+# Full management of both modules — for the admin-grade roles
+# (team/project/app admins) that already hold full ``app.*`` CRUD.
+_AGENT_FULL = (
+    Permission.AGENT_READ,
+    Permission.AGENT_CREATE,
+    Permission.AGENT_UPDATE,
+    Permission.AGENT_DELETE,
+)
+_WORKFLOW_FULL = (
+    Permission.WORKFLOW_READ,
+    Permission.WORKFLOW_CREATE,
+    Permission.WORKFLOW_UPDATE,
+    Permission.WORKFLOW_DELETE,
+)
+
+# Developer level — view+create+run, NOT manage (no update/delete).
+# Mirrors the developer roles' app baseline, where developers hold deploy
+# ops but not ``app.update``/``app.delete``: they can build + run, but
+# editing/tearing down existing resources is admin-tier (spec 36 §0.2,
+# consistent with §0.6.2). Keeps ``agents.canManage``/``workflows.canManage``
+# false for a developer.
+_AGENT_DEVELOPER = (
+    Permission.AGENT_READ,
+    Permission.AGENT_CREATE,
+    Permission.AGENT_DISPATCH,
+)
+_WORKFLOW_DEVELOPER = (
+    Permission.WORKFLOW_READ,
+    Permission.WORKFLOW_CREATE,
+    Permission.WORKFLOW_TRIGGER,
 )
 
 # (slug, scope_level, name, description, permissions)
@@ -129,6 +177,10 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             Permission.SKILL_READ,
             Permission.SKILL_WRITE,
             Permission.SKILL_IMPORT,
+            # Agents + Workflows modules (Phase 0): full management,
+            # mirroring the full app CRUD a team owner holds.
+            *_AGENT_FULL,
+            *_WORKFLOW_FULL,
         ),
     ),
     (
@@ -151,6 +203,9 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             Permission.SKILL_READ,
             Permission.SKILL_WRITE,
             Permission.SKILL_IMPORT,
+            # Agents + Workflows modules (Phase 0): full management.
+            *_AGENT_FULL,
+            *_WORKFLOW_FULL,
         ),
     ),
     (
@@ -171,6 +226,11 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             # stay on the admin roles.
             Permission.SKILL_READ,
             Permission.SKILL_IMPORT,
+            # Agents + Workflows modules (Phase 0): view+create+run, NOT
+            # manage — mirrors the developer's app baseline (deploy ops but
+            # no app.update/delete); canManage stays false.
+            *_AGENT_DEVELOPER,
+            *_WORKFLOW_DEVELOPER,
         ),
     ),
     (
@@ -189,6 +249,10 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             # they have no write access to anything else.
             Permission.FORM_READ,
             Permission.FORM_SUBMIT,
+            # Agents + Workflows modules (Phase 0): read-only, mirroring
+            # the viewer's app.read.
+            Permission.AGENT_READ,
+            Permission.WORKFLOW_READ,
         ),
     ),
     (
@@ -204,6 +268,9 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             Permission.APP_UPDATE,
             Permission.APP_DELETE,
             *_DEPLOY_OPS,
+            # Agents + Workflows modules (Phase 0): full management.
+            *_AGENT_FULL,
+            *_WORKFLOW_FULL,
         ),
     ),
     (
@@ -211,7 +278,16 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
         "PROJECT",
         "Project Developer",
         "Deploy/rollback + secrets on project apps.",
-        (Permission.PROJECT_READ, Permission.APP_READ, *_DEPLOY_OPS),
+        (
+            Permission.PROJECT_READ,
+            Permission.APP_READ,
+            *_DEPLOY_OPS,
+            # Agents + Workflows modules (Phase 0): view+create+run, NOT
+            # manage — mirrors the developer's app baseline (deploy ops but
+            # no app.update/delete); canManage stays false.
+            *_AGENT_DEVELOPER,
+            *_WORKFLOW_DEVELOPER,
+        ),
     ),
     (
         "project_viewer",
@@ -223,6 +299,9 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             Permission.APP_READ,
             Permission.APP_READ_LOGS,
             Permission.APP_READ_METRICS,
+            # Agents + Workflows modules (Phase 0): read-only.
+            Permission.AGENT_READ,
+            Permission.WORKFLOW_READ,
         ),
     ),
     (
@@ -235,6 +314,9 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             Permission.APP_UPDATE,
             Permission.APP_DELETE,
             *_DEPLOY_OPS,
+            # Agents + Workflows modules (Phase 0): full management.
+            *_AGENT_FULL,
+            *_WORKFLOW_FULL,
         ),
     ),
     (
@@ -242,7 +324,18 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
         "APP",
         "App Deployer",
         "Deploy + rollback only.",
-        (Permission.APP_READ, Permission.APP_DEPLOY, Permission.APP_ROLLBACK),
+        (
+            Permission.APP_READ,
+            Permission.APP_DEPLOY,
+            Permission.APP_ROLLBACK,
+            # Agents + Workflows modules (Phase 0): run-only — a deployer
+            # can dispatch agents + trigger workflows, mirroring its
+            # app-deploy reach, but not create or delete them.
+            Permission.AGENT_READ,
+            Permission.AGENT_DISPATCH,
+            Permission.WORKFLOW_READ,
+            Permission.WORKFLOW_TRIGGER,
+        ),
     ),
     (
         "app_developer",
@@ -264,7 +357,14 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
         "APP",
         "App Viewer",
         "Read-only access to a single app.",
-        (Permission.APP_READ, Permission.APP_READ_LOGS, Permission.APP_READ_METRICS),
+        (
+            Permission.APP_READ,
+            Permission.APP_READ_LOGS,
+            Permission.APP_READ_METRICS,
+            # Agents + Workflows modules (Phase 0): read-only.
+            Permission.AGENT_READ,
+            Permission.WORKFLOW_READ,
+        ),
     ),
     (
         "app_approver",

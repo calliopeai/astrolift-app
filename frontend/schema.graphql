@@ -1964,6 +1964,7 @@ type AstroliftMarkOnboardingCompletePayloadMutationResult {
 type AstroliftMe {
   id: String!
   profile: AstroliftUserProfile
+  modules: [AstroliftModuleEntitlement!]!
 }
 
 type AstroliftMember {
@@ -1978,6 +1979,14 @@ type AstroliftMember {
   lastActiveAt: DateTime
   createdAt: DateTime!
   deletedAt: DateTime
+}
+
+type AstroliftModuleEntitlement {
+  key: String!
+  canView: Boolean!
+  canCreate: Boolean!
+  canManage: Boolean!
+  canRun: Boolean!
 }
 
 type AstroliftMyConnectedAccount {

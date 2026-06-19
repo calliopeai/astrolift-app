@@ -109,7 +109,7 @@ def test_agent_workloads_lists_only_agents_in_project(permission_resolver, info,
     org = _org("acme")
     project, team = _project(org, "demo")
     app = _app(org, project, team, "hello")
-    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.AGENT_READ)
 
     agent = _agent_workload(app, "triage-bot")
     # A non-agent workload on the same app must NOT appear.
@@ -132,7 +132,7 @@ def test_agent_workloads_carries_source_and_run_spec(permission_resolver, info, 
     org = _org("acme")
     project, team = _project(org, "demo")
     app = _app(org, project, team, "hello", source_repo="acme/agents", source_url="https://github.com/acme/agents")
-    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.AGENT_READ)
     _agent_workload(
         app,
         "cron-bot",
@@ -158,7 +158,7 @@ def test_agent_workloads_project_filter_excludes_other_projects(permission_resol
     proj_b, team_b = _project(org, "beta")
     app_a = _app(org, proj_a, team_a, "app-a")
     app_b = _app(org, proj_b, team_b, "app-b")
-    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.AGENT_READ)
     _agent_workload(app_a, "agent-a")
     _agent_workload(app_b, "agent-b")
 
@@ -174,7 +174,7 @@ def test_agent_fleet_spans_all_projects(permission_resolver, info, with_tenant_o
     proj_b, team_b = _project(org, "beta")
     app_a = _app(org, proj_a, team_a, "app-a")
     app_b = _app(org, proj_b, team_b, "app-b")
-    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.AGENT_READ)
     _agent_workload(app_a, "agent-a")
     _agent_workload(app_b, "agent-b")
 
@@ -188,7 +188,7 @@ def test_agent_workloads_last_run_summary(permission_resolver, info, with_tenant
     org = _org("acme")
     project, team = _project(org, "demo")
     app = _app(org, project, team, "hello")
-    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.AGENT_READ)
     agent = _agent_workload(app, "triage-bot")
 
     now = timezone.now()
@@ -217,7 +217,7 @@ def test_agent_workloads_no_runs_yet(permission_resolver, info, with_tenant_org)
     org = _org("acme")
     project, team = _project(org, "demo")
     app = _app(org, project, team, "hello")
-    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.AGENT_READ)
     _agent_workload(app, "fresh-bot")
 
     with with_tenant_org(org):
@@ -238,7 +238,7 @@ def test_agent_workloads_cross_tenant_isolation(permission_resolver, info, with_
     proj_b, team_b = _project(org_b, "shared-slug")
     app_a = _app(org_a, proj_a, team_a, "shared-app")
     app_b = _app(org_b, proj_b, team_b, "shared-app")
-    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.AGENT_READ)
     _agent_workload(app_a, "agent-a")
     _agent_workload(app_b, "agent-b")
 
@@ -253,18 +253,21 @@ def test_agent_workloads_rejects_foreign_org_id(permission_resolver, info, with_
 
     org_a = _org("org-a")
     org_b = _org("org-b")
-    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.AGENT_READ)
     with with_tenant_org(org_a):
         with pytest.raises(GraphQLError):
             AgentsQuery().agent_workloads(info(), org_id=str(org_b.guid))
 
 
-def test_agent_workloads_requires_app_read(info, with_tenant_org):
+def test_agent_workloads_requires_agent_read(info, with_tenant_org):
+    # Re-gated APP_READ → AGENT_READ in the entity-module re-shell
+    # (spec 36 §0.4): the agent workload/run readers now demand the
+    # standalone agent.read perm, not app.read.
     org = _org("acme")
     with with_tenant_org(org):
         with pytest.raises(PermissionDenied) as exc_info:
             AgentsQuery().agent_workloads(info(), org_id=str(org.guid))
-    assert exc_info.value.permission.value == "app.read"
+    assert exc_info.value.permission.value == "agent.read"
 
 
 # ---------------------------------------------------------------------------
@@ -276,7 +279,7 @@ def test_live_status_running_and_idle(permission_resolver, info, with_tenant_org
     org = _org("acme")
     project, team = _project(org, "demo")
     app = _app(org, project, team, "hello")
-    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.AGENT_READ)
     busy = _agent_workload(app, "busy-bot")
     idle = _agent_workload(app, "idle-bot")
     _run(busy, status=AgentRun.Status.RUNNING)
@@ -297,7 +300,7 @@ def test_live_status_next_scheduled_for_schedule_mode(permission_resolver, info,
     org = _org("acme")
     project, team = _project(org, "demo")
     app = _app(org, project, team, "hello")
-    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.AGENT_READ)
     _agent_workload(
         app,
         "cron-bot",
@@ -320,7 +323,7 @@ def test_live_status_no_next_scheduled_when_paused(permission_resolver, info, wi
     org = _org("acme")
     project, team = _project(org, "demo")
     app = _app(org, project, team, "hello")
-    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.AGENT_READ)
     _agent_workload(
         app,
         "paused-cron",
@@ -340,7 +343,7 @@ def test_live_status_no_next_scheduled_for_once_mode(permission_resolver, info, 
     org = _org("acme")
     project, team = _project(org, "demo")
     app = _app(org, project, team, "hello")
-    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.AGENT_READ)
     # ONCE mode (the default) is on-demand — no clock-derived next time.
     _agent_workload(app, "manual-bot", run_cron_expression="*/5 * * * *")
 
@@ -355,7 +358,7 @@ def test_live_status_workload_id_narrows_to_one_agent(permission_resolver, info,
     org = _org("acme")
     project, team = _project(org, "demo")
     app = _app(org, project, team, "hello")
-    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.AGENT_READ)
     target = _agent_workload(app, "target-bot")
     _agent_workload(app, "other-bot")
 
@@ -376,7 +379,7 @@ def test_live_status_foreign_workload_id_returns_empty(permission_resolver, info
     proj_b, team_b = _project(org_b, "demo")
     app_b = _app(org_b, proj_b, team_b, "hello")
     foreign = _agent_workload(app_b, "foreign-bot")
-    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.AGENT_READ)
 
     with with_tenant_org(org_a):
         rows = AgentsQuery().agent_live_status(
@@ -395,7 +398,7 @@ def test_agent_tasks_filtered_by_workload(permission_resolver, info, with_tenant
     org = _org("acme")
     project, team = _project(org, "demo")
     app = _app(org, project, team, "hello")
-    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.AGENT_READ)
     agent_a = _agent_workload(app, "agent-a")
     agent_b = _agent_workload(app, "agent-b")
     task_a = AgentTask.objects.create(organization=org, agent_definition=agent_a, status="queued")
@@ -417,7 +420,7 @@ def test_agent_tasks_foreign_workload_returns_empty(permission_resolver, info, w
     proj_b, team_b = _project(org_b, "demo")
     app_b = _app(org_b, proj_b, team_b, "hello")
     foreign = _agent_workload(app_b, "foreign-bot")
-    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.AGENT_READ)
     # org-a has its own task — it must NOT be returned for a foreign filter.
     AgentTask.objects.create(organization=org_a, status="queued")
 
@@ -431,7 +434,7 @@ def test_agent_tasks_workload_and_status_compose(permission_resolver, info, with
     org = _org("acme")
     project, team = _project(org, "demo")
     app = _app(org, project, team, "hello")
-    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.AGENT_READ)
     agent = _agent_workload(app, "agent-a")
     AgentTask.objects.create(organization=org, agent_definition=agent, status="queued")
     running = AgentTask.objects.create(organization=org, agent_definition=agent, status="running")

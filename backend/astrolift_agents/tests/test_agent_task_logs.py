@@ -17,7 +17,9 @@ Covered cases:
 * unknown task id resolves to ``[]``
 * dispatcher with no ``tenant_cluster`` resolves to ``[]``
 * an inactive cluster resolves to ``[]``
-* ``app.read_logs`` is required (denial raises)
+* ``agent.read`` is required (denial raises) — re-gated from
+  ``app.read_logs`` in the entity-module re-shell (spec 36 §0.4); the
+  agents module has no separate read-logs perm
 * a driver error degrades to ``[]`` (no 500)
 * ``tail`` caps the returned line count
 """
@@ -169,7 +171,7 @@ async def test_agent_task_logs_happy_path(permission_resolver):
     dispatcher = await asyncio.to_thread(_dispatcher, org, cluster, slug="logs-dispatcher")
     task = await asyncio.to_thread(_task, org, dispatcher)
 
-    permission_resolver.grant(Permission.APP_READ_LOGS)
+    permission_resolver.grant(Permission.AGENT_READ)
     pod_backend = _FixedPodBackend([_fake_pod("agent-task-abc-xyz12")])
     log_backend = _ScriptedLogBackend(["line one", "line two", "line three"])
     set_pod_backend_for_tests(pod_backend)
@@ -200,7 +202,7 @@ async def test_agent_task_logs_tail_caps_line_count(permission_resolver):
     dispatcher = await asyncio.to_thread(_dispatcher, org, cluster, slug="tail-dispatcher")
     task = await asyncio.to_thread(_task, org, dispatcher)
 
-    permission_resolver.grant(Permission.APP_READ_LOGS)
+    permission_resolver.grant(Permission.AGENT_READ)
     set_pod_backend_for_tests(_FixedPodBackend([_fake_pod("pod-1")]))
     set_log_backend_for_tests(_ScriptedLogBackend([f"line {i}" for i in range(50)]))
     try:
@@ -226,7 +228,7 @@ async def test_agent_task_logs_falls_back_to_pod_name_hint(permission_resolver):
     dispatcher = await asyncio.to_thread(_dispatcher, org, cluster, slug="hint-dispatcher")
     task = await asyncio.to_thread(_task, org, dispatcher, pod_name="agent-task-deadbeef")
 
-    permission_resolver.grant(Permission.APP_READ_LOGS)
+    permission_resolver.grant(Permission.AGENT_READ)
     set_pod_backend_for_tests(_FixedPodBackend([]))  # discovery finds nothing
     log_backend = _ScriptedLogBackend(["hi"])
     set_log_backend_for_tests(log_backend)
@@ -254,7 +256,7 @@ async def test_agent_task_logs_foreign_org_returns_empty(permission_resolver):
     dispatcher = await asyncio.to_thread(_dispatcher, other, cluster, slug="their-dispatcher")
     foreign_task = await asyncio.to_thread(_task, other, dispatcher)
 
-    permission_resolver.grant(Permission.APP_READ_LOGS)
+    permission_resolver.grant(Permission.AGENT_READ)
     # Backends would yield lines if ever reached — they must not be.
     set_pod_backend_for_tests(_FixedPodBackend([_fake_pod("pod-1")]))
     set_log_backend_for_tests(_ScriptedLogBackend(["should not appear"]))
@@ -276,7 +278,7 @@ async def test_agent_task_logs_unknown_id_returns_empty(permission_resolver):
 
     org = await asyncio.to_thread(Organization.objects.create, name="Empty", slug="empty-org")
 
-    permission_resolver.grant(Permission.APP_READ_LOGS)
+    permission_resolver.grant(Permission.AGENT_READ)
     set_pod_backend_for_tests(_FixedPodBackend([_fake_pod("pod-1")]))
     set_log_backend_for_tests(_ScriptedLogBackend(["x"]))
     try:
@@ -310,7 +312,7 @@ async def test_agent_task_logs_no_cluster_returns_empty(permission_resolver):
     )
     task = await asyncio.to_thread(_task, org, dispatcher)
 
-    permission_resolver.grant(Permission.APP_READ_LOGS)
+    permission_resolver.grant(Permission.AGENT_READ)
     try:
         with _tenant(org):
             lines = await AgentsQuery().agent_task_logs(info=_info(), id=str(task.guid))
@@ -330,7 +332,7 @@ async def test_agent_task_logs_inactive_cluster_returns_empty(permission_resolve
     dispatcher = await asyncio.to_thread(_dispatcher, org, cluster, slug="inact-dispatcher")
     task = await asyncio.to_thread(_task, org, dispatcher)
 
-    permission_resolver.grant(Permission.APP_READ_LOGS)
+    permission_resolver.grant(Permission.AGENT_READ)
     set_pod_backend_for_tests(_FixedPodBackend([_fake_pod("pod-1")]))
     set_log_backend_for_tests(_ScriptedLogBackend(["x"]))
     try:
@@ -346,8 +348,9 @@ async def test_agent_task_logs_inactive_cluster_returns_empty(permission_resolve
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 async def test_agent_task_logs_requires_read_logs_permission():
-    """Without ``app.read_logs`` the resolver-entry gate raises before any
-    task lookup (queries surface permission failures via raise)."""
+    """Without the read gate (``agent.read`` after the §0.4 re-gate) the
+    resolver-entry gate raises before any task lookup (queries surface
+    permission failures via raise)."""
     import asyncio
 
     org = await asyncio.to_thread(Organization.objects.create, name="Deny", slug="deny-org")
@@ -376,7 +379,7 @@ async def test_agent_task_logs_driver_error_degrades_to_empty(permission_resolve
         def list_pods(self, *, auth, namespace, app_slug):
             raise ClusterObservabilityError("cluster unreachable")
 
-    permission_resolver.grant(Permission.APP_READ_LOGS)
+    permission_resolver.grant(Permission.AGENT_READ)
     set_pod_backend_for_tests(_ExplodingPodBackend())
     set_log_backend_for_tests(_ScriptedLogBackend(["x"]))
     try:

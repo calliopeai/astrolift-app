@@ -300,7 +300,7 @@ class AgentsQuery:
         return brief_to_type(row) if row is not None else None
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.AGENT_READ)
     @tenant_scoped()
     def agent_tasks(
         self,
@@ -393,7 +393,7 @@ class AgentsQuery:
         return agent_task_to_type(row) if row is not None else None
 
     @strawberry.field
-    @require_permission(Permission.APP_READ_LOGS)
+    @require_permission(Permission.AGENT_READ)
     @tenant_scoped()
     def agent_task_logs(self, info: Info, id: strawberry.ID, tail: int = 200) -> list[str]:
         """Recent stdout/stderr lines from an AgentTask's pod.
@@ -512,7 +512,7 @@ class AgentsQuery:
     # ----------------------------------------------------------------
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.AGENT_READ)
     @tenant_scoped()
     def agent_workloads(
         self, info: Info, org_id: strawberry.ID, project_slug: str | None = None
@@ -558,7 +558,7 @@ class AgentsQuery:
         return rows
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.AGENT_READ)
     @tenant_scoped()
     def agent_fleet(self, info: Info, org_id: strawberry.ID) -> list[AgentListItemType]:
         """Org-wide agent fleet — every ``kind: agent`` workload across
@@ -571,7 +571,7 @@ class AgentsQuery:
         return self.agent_workloads(info, org_id=org_id, project_slug=None)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.AGENT_READ)
     @tenant_scoped()
     def scan_agent_manifests(
         self,
@@ -621,7 +621,7 @@ class AgentsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.AGENT_READ)
     @tenant_scoped()
     def agent_live_status(
         self,

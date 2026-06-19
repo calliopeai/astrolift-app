@@ -463,7 +463,9 @@ def _enter(org):
 def test_register_agent_repo_mutation_happy_path(monkeypatch, org, with_connection, permission_resolver):
     with_connection(org)
     project = _project(org)
-    permission_resolver.grant(Permission.APP_CREATE)
+    # Re-gated APP_CREATE → AGENT_CREATE in the entity-module re-shell
+    # (spec 36 §0.4).
+    permission_resolver.grant(Permission.AGENT_CREATE)
 
     # Patch the service's tree fetch so the mutation runs end-to-end with no
     # network. The resolver calls register_agent_repo (no tree arg), which
@@ -505,7 +507,10 @@ def test_register_agent_repo_mutation_rejects_foreign_org_project(
     permission granted — the active tenant is the boundary."""
     with_connection(other_org)
     foreign_project = _project(other_org, slug="foreign")
-    permission_resolver.grant(Permission.APP_CREATE)
+    # Grant the real gate (AGENT_CREATE after the §0.4 re-gate) so the
+    # rejection that this test asserts is the foreign-org boundary, not
+    # the permission gate firing first.
+    permission_resolver.grant(Permission.AGENT_CREATE)
 
     import astrolift_registry.services.manifest_sync as ms
 
@@ -549,7 +554,9 @@ def test_register_agent_repo_mutation_no_agents_envelope(
 ):
     with_connection(org)
     project = _project(org)
-    permission_resolver.grant(Permission.APP_CREATE)
+    # Re-gated APP_CREATE → AGENT_CREATE in the entity-module re-shell
+    # (spec 36 §0.4).
+    permission_resolver.grant(Permission.AGENT_CREATE)
 
     import astrolift_registry.services.manifest_sync as ms
 

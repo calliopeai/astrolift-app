@@ -33,6 +33,16 @@ EXEMPT: dict[str, str] = {
     # set of memberships they belong to. The org filter is the user
     # itself; tenant context is the *output*, not the input.
     "IdentityQuery.me": "self-service: returns the caller's profile",
+    "MeType.modules": (
+        "self-service (spec 34/36 §0.3): the ``me.modules`` capability "
+        "manifest computes the caller's OWN module entitlements for the "
+        "active tenant via resolve_effective_permissions — same category "
+        "as astrolift_my_permissions. Cannot be @tenant_scoped: the spec "
+        "requires anonymous / no-tenant to return ``[]`` (the shell still "
+        "renders Dashboard), whereas @tenant_scoped would RAISE "
+        "TenantRequired. The viewer's own effective permissions ARE the "
+        "gate; no other tenant's data is reachable."
+    ),
     "IdentityQuery.astrolift_my_profile": "self-service: editable profile fields",
     "IdentityQuery.my_memberships": (
         "self-service: enumerates orgs the caller belongs to — needed before any tenant context can be picked"
