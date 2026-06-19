@@ -28,6 +28,7 @@ from astrolift_agents.models import (
     ToolDef,
 )
 from astrolift_agents.schema.types import (
+    AgentDetailType,
     AgentEnvironmentSpecType,
     AgentListItemType,
     AgentLiveStatusType,
@@ -39,6 +40,7 @@ from astrolift_agents.schema.types import (
     ScanAgentManifestsResultType,
     SkillType,
     ToolDefType,
+    agent_detail_to_type,
     agent_env_spec_to_type,
     agent_task_to_type,
     brief_to_type,
@@ -569,6 +571,45 @@ class AgentsQuery:
         doesn't have to special-case a null ``project_slug`` argument.
         """
         return self.agent_workloads(info, org_id=org_id, project_slug=None)
+
+    @strawberry.field
+    @require_permission(Permission.AGENT_READ)
+    @tenant_scoped()
+    def agent(self, info: Info, org_id: strawberry.ID, slug: str) -> AgentDetailType | None:
+        """One agent's full read bundle by slug (spec 38 Phase 4).
+
+        Backs the per-agent Build tab: resolves the ``kind: agent``
+        :class:`Workload` whose slug is ``slug`` within the caller's org
+        and returns its identity + run-spec basics, primary-container
+        image, definitional Brief (nullable), and attached Skills (ordered
+        by :class:`AgentSkillRef` position) with each skill's ToolDefs
+        nested.
+
+        Org-scoped exactly like :meth:`agent_workloads`: ``org_id`` must
+        match the caller's active tenant (superusers excepted, via
+        ``_caller_org_id``), and the workload is filtered to that org
+        through the app's organization. A slug that belongs to another
+        org — or doesn't exist — resolves to ``null`` (not an error and
+        not another tenant's agent) so the surface doesn't leak existence
+        across tenants. The slug is unique only *within* an org, so the
+        org filter is what makes the lookup unambiguous.
+
+        No N+1: the workload is loaded with ``select_related('brief',
+        'registered_app')`` and ``prefetch_related(
+        'agent_skill_refs__skill__tool_defs', 'containers')`` so the
+        Brief, image, every skill, and every tool come back in a bounded
+        number of queries regardless of how many skills/tools the agent
+        carries.
+        """
+        org_pk = _caller_org_id(info, org_id)
+        w = (
+            _agent_workload_qs(org_pk)
+            .filter(slug=slug)
+            .select_related("brief", "registered_app")
+            .prefetch_related("agent_skill_refs__skill__tool_defs", "containers")
+            .first()
+        )
+        return agent_detail_to_type(w) if w is not None else None
 
     @strawberry.field
     @require_permission(Permission.AGENT_READ)

@@ -308,6 +308,65 @@ class AgentListItemType:
     running_count: int
 
 
+@strawberry.type(name="AstroliftAgentSkill")
+class AgentSkillType:
+    """One Skill attached to an agent, with its ToolDefs nested (spec 38
+    Phase 4).
+
+    Wraps the shared :class:`SkillType` rather than adding a ``tool_defs``
+    field to it directly — the bare ``SkillType`` is reused by the Skill
+    Registry surface where the per-skill tools are fetched separately, so
+    nesting them here keeps that surface unchanged while letting the agent
+    detail bundle a skill and its tools in one shape.
+
+    ``position`` is the skill's ordinal within the agent's skill set (the
+    :class:`AgentSkillRef` ordering); ``tool_defs`` is every ToolDef on the
+    skill, ordered by slug, and is empty when the skill exposes no tools.
+    """
+
+    position: int
+    skill: SkillType
+    tool_defs: list[ToolDefType]
+
+
+@strawberry.type(name="AstroliftAgentDetail")
+class AgentDetailType:
+    """Full read bundle for one ``kind: agent`` :class:`Workload` (spec
+    38 Phase 4) — the Build tab's content.
+
+    Composes the agent identity + run-spec basics (the same fields the
+    list row carries, so the detail header reads back consistently), the
+    primary container image coordinates, the definitional Brief (nullable
+    — an agent may be registered before a Brief is assembled), and the
+    agent's Skills ordered by :class:`AgentSkillRef` position with each
+    skill's ToolDefs nested.
+
+    ``image_ref`` / ``dockerfile_path`` come from the workload's primary
+    :class:`Container` (the one with ``is_primary=True``, falling back to
+    the first container); both are empty strings when the agent has no
+    container row yet. ``brief`` is null until Phase-3 registration (or a
+    later re-assembly) populates ``Workload.brief``. ``skills`` is empty
+    for an agent with no :class:`AgentSkillRef` rows.
+    """
+
+    id: GUID
+    name: str
+    slug: str
+    app_slug: str
+    source_repo: str
+    run_family: str
+    run_mode: str
+    run_paused: bool
+    run_cron_expression: str
+    # Primary container image coordinates (empty when no container yet).
+    image_ref: str
+    dockerfile_path: str
+    # Definitional Brief (Workload.brief); null until assembled.
+    brief: BriefType | None
+    # Attached Skills, ordered by AgentSkillRef.position, tools nested.
+    skills: list[AgentSkillType]
+
+
 @strawberry.type(name="AstroliftAgentLiveStatus")
 class AgentLiveStatusType:
     """Live operational status for one agent workload (spec 33 PR-2).
@@ -439,6 +498,74 @@ def agent_run_spec_to_type(w) -> AgentRunSpecType:
         scheduled_scale_to=w.scheduled_scale_to,
         scale_up_cron=w.scale_up_cron or "",
         scale_down_cron=w.scale_down_cron or "",
+    )
+
+
+def _primary_container(w):
+    """The workload's primary container, or the first one, or None.
+
+    Reads from the prefetched ``containers`` set (the agent-detail
+    resolver prefetches it) so no per-call query fires. Prefers the row
+    flagged ``is_primary`` — the manifest guarantees exactly one — and
+    falls back to the first container when none is flagged (an older row),
+    or ``None`` when the workload has no container.
+    """
+    containers = list(w.containers.all())
+    if not containers:
+        return None
+    for c in containers:
+        if c.is_primary:
+            return c
+    return containers[0]
+
+
+def agent_detail_to_type(w) -> AgentDetailType:
+    """Project a ``kind=agent`` :class:`Workload` to its full detail
+    bundle (spec 38 Phase 4).
+
+    Reads the run-spec basics off the workload, the image coordinates off
+    its primary container, the Brief off ``w.brief`` (nullable), and the
+    Skills off the ``agent_skill_refs`` join ordered by ``position`` with
+    each skill's ToolDefs nested. Every relation it touches
+    (``registered_app``, ``brief``, ``agent_skill_refs__skill__tool_defs``,
+    ``containers``) is select_/prefetch_related by the resolver so this
+    builder issues no further queries regardless of skill/tool count.
+    """
+    app = w.registered_app
+    container = _primary_container(w)
+    skills: list[AgentSkillType] = []
+    # ``agent_skill_refs`` is prefetched; sort in Python (the prefetch
+    # can't carry an ORDER BY through the reverse accessor reliably for
+    # all Django versions) by (position, pk) so equal positions fall back
+    # to insertion order, matching AgentSkillRef's documented contract.
+    for ref in sorted(w.agent_skill_refs.all(), key=lambda r: (r.position, r.pk)):
+        skill = ref.skill
+        tool_defs = [
+            tool_def_to_type(t)
+            for t in sorted(skill.tool_defs.all(), key=lambda t: t.slug)
+            if t.deleted_at is None
+        ]
+        skills.append(
+            AgentSkillType(
+                position=ref.position,
+                skill=skill_to_type(skill),
+                tool_defs=tool_defs,
+            )
+        )
+    return AgentDetailType(
+        id=GUID(str(w.guid)),
+        name=w.name,
+        slug=w.slug,
+        app_slug=app.slug,
+        source_repo=app.source_repo or "",
+        run_family=w.run_family,
+        run_mode=w.run_mode,
+        run_paused=w.run_paused,
+        run_cron_expression=w.run_cron_expression or "",
+        image_ref=(container.image_ref or "") if container is not None else "",
+        dockerfile_path=(container.dockerfile_path or "") if container is not None else "",
+        brief=brief_to_type(w.brief) if w.brief_id else None,
+        skills=skills,
     )
 
 
