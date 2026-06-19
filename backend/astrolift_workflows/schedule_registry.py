@@ -132,6 +132,22 @@ class ScheduleKind(StrEnum):
     (#779, spec §06 §4.6). Prevents deployments from dangling
     in pending_approval forever after the approval window closes."""
 
+    AGENT_RECONCILE_TICK = "agent_reconcile_tick"
+    """Every 5 min — re-applies the keep-alive agent manifests
+    (Namespace + Deployment) to every eligible managed cluster via
+    the idempotent server-side-apply path the ``deployClusterAgent``
+    mutation uses (``deploy_agent_dispatch``). Self-heals a stale or
+    failed agent image (e.g. after ``AGENT_IMAGE`` changes, existing
+    clusters keep the old image in ImagePullBackOff until re-applied)
+    and any agent-manifest drift, with no manual re-apply (#808).
+    Kept distinct from the dispatch ticks (AGENT_CRON_TICK / LOOP_TICK
+    dispatch Tasks, SCALE_TICK patches Service replicas, CRON_DEPLOY_TICK
+    fires app deploys): this tick neither dispatches nor deploys an app —
+    it reconciles the platform's own in-cluster agent Deployment. The
+    cadence is 5 min rather than 60 s because re-applying to every cluster
+    each minute is needless load; 5 min is well inside the self-heal
+    window for an image/manifest drift."""
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ScheduleDefinition:
@@ -304,6 +320,15 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.EXPIRE_PENDING_APPROVAL_DEPLOYMENTS,
         ),
         description="Auto-fail pending_approval deployments past magic-link expiry (#779)",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.AGENT_RECONCILE_TICK,
+        workflow_name="AgentReconcileTickWorkflow",
+        interval_seconds=5 * 60,
+        schedule_id=schedule_id_for(
+            kind=ScheduleKind.AGENT_RECONCILE_TICK,
+        ),
+        description="Re-apply keep-alive agent manifests to managed clusters (self-heal, #808)",
     ),
 )
 
