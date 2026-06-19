@@ -2,9 +2,11 @@ import type {
   AgentRunFamily as GeneratedAgentRunFamily,
   AgentRunMode as GeneratedAgentRunMode,
   AgentRunSpecInput as GeneratedAgentRunSpecInput,
+  AstroliftAgentDetail as GeneratedAgentDetail,
   AstroliftAgentListItem as GeneratedAgentListItem,
   AstroliftAgentLiveStatus as GeneratedAgentLiveStatus,
   AstroliftAgentRunSpec as GeneratedAgentRunSpec,
+  AstroliftAgentSkill as GeneratedAgentSkill,
   AstroliftAgentTask as GeneratedAgentTask,
   AstroliftBrief as GeneratedBrief,
   AstroliftDiscoveredAgentManifest as GeneratedDiscoveredAgentManifest,
@@ -48,6 +50,39 @@ export type AstroliftBrief = Pick<
   GeneratedBrief,
   "id" | "contentHash" | "storageKey" | "config" | "createdAt"
 >;
+
+// One ordered skill binding on an agent (spec 38 Phase 4), as returned by the
+// `agent(slug)` detail join. Reuses the registry `AstroliftSkill` /
+// `AstroliftToolDef` facades — `skill` is the bound skill, `toolDefs` are the
+// tool definitions resolved for it on this agent. `position` is the ordering
+// key the Build tab sorts by.
+export type AstroliftAgentSkill = Pick<GeneratedAgentSkill, "position"> & {
+  skill: AstroliftSkill;
+  toolDefs: AstroliftToolDef[];
+};
+
+// Per-agent detail (spec 38 Phase 4) — the `agent(orgId, slug)` join the Build
+// tab reads to compose brief + skills + tools alongside the build coordinates
+// (`imageRef`/`dockerfilePath`). `brief` is nullable; `skills` is ordered by
+// each binding's `position`. Distinct from `AstroliftAgentListItem` (the fleet
+// list row) — this is the single-agent read with the joins attached.
+export type AstroliftAgentDetail = Pick<
+  GeneratedAgentDetail,
+  | "id"
+  | "name"
+  | "slug"
+  | "appSlug"
+  | "sourceRepo"
+  | "runFamily"
+  | "runMode"
+  | "runPaused"
+  | "runCronExpression"
+  | "imageRef"
+  | "dockerfilePath"
+> & {
+  brief: AstroliftBrief | null;
+  skills: AstroliftAgentSkill[];
+};
 
 export type AstroliftAgentTask = Pick<
   GeneratedAgentTask,

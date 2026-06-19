@@ -204,6 +204,22 @@ export type AstroliftActivityPage = {
   nextCursor?: Maybe<Scalars['String']['output']>;
 };
 
+export type AstroliftAgentDetail = {
+  appSlug: Scalars['String']['output'];
+  brief?: Maybe<AstroliftBrief>;
+  dockerfilePath: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  imageRef: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  runCronExpression: Scalars['String']['output'];
+  runFamily: Scalars['String']['output'];
+  runMode: Scalars['String']['output'];
+  runPaused: Scalars['Boolean']['output'];
+  skills: Array<AstroliftAgentSkill>;
+  slug: Scalars['String']['output'];
+  sourceRepo: Scalars['String']['output'];
+};
+
 export type AstroliftAgentEnvironmentSpec = {
   agentType: Scalars['String']['output'];
   allowInstall: Scalars['Boolean']['output'];
@@ -304,6 +320,12 @@ export type AstroliftAgentRunSpecMutationResult = {
 export type AstroliftAgentRuntime = {
   image: Scalars['String']['output'];
   name: Scalars['String']['output'];
+};
+
+export type AstroliftAgentSkill = {
+  position: Scalars['Int']['output'];
+  skill: AstroliftSkill;
+  toolDefs: Array<AstroliftToolDef>;
 };
 
 export type AstroliftAgentTask = {
@@ -5970,6 +5992,7 @@ export type PushManifestToRepoInput = {
 export type Query = {
   ObjectStoreMetrics: Array<Array<Scalars['String']['output']>>;
   PostgresMetrics: Array<Array<Scalars['String']['output']>>;
+  agent?: Maybe<AstroliftAgentDetail>;
   agentEnvironmentSpec?: Maybe<AstroliftAgentEnvironmentSpec>;
   agentEnvironmentSpecs: Array<AstroliftAgentEnvironmentSpec>;
   agentFleet: Array<AstroliftAgentListItem>;
@@ -6159,6 +6182,12 @@ export type Query = {
   workflowStageExecutions: Array<WorkflowStageExecutionType>;
   /** List stages for a workflow definition by slug. */
   workflowStages: Array<WorkflowStageType>;
+};
+
+
+export type QueryAgentArgs = {
+  orgId: Scalars['ID']['input'];
+  slug: Scalars['String']['input'];
 };
 
 

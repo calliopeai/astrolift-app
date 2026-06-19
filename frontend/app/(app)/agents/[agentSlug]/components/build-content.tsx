@@ -6,24 +6,51 @@ import {
   BoxIcon,
   FileCodeIcon,
   GitBranchIcon,
-  InfoIcon,
   PackageIcon,
   WrenchIcon,
 } from "lucide-react";
 import Link from "next/link";
 
+import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { AstroliftAgentListItem } from "@/graphql/agents/agents.types";
+import { GET_AGENT_DETAIL } from "@/graphql/agents/agents.queries";
+import type {
+  AstroliftAgentDetail,
+  AstroliftAgentListItem,
+  AstroliftAgentSkill,
+  AstroliftToolDef,
+} from "@/graphql/agents/agents.types";
 import { GET_WORKLOAD, LIST_CONTAINERS } from "@/graphql/registry/registry.queries";
 import type { AstroliftContainer, AstroliftWorkload } from "@/graphql/registry/registry.types";
+import { formatRelativeAge } from "@/lib/format";
 
 interface WorkloadResp {
   astroliftWorkload: AstroliftWorkload | null;
 }
 interface ContainersResp {
   astroliftContainers: AstroliftContainer[];
+}
+interface AgentDetailResp {
+  agent: AstroliftAgentDetail | null;
+}
+
+// Tool-adapter display labels, kept in sync with the skill/tool registry
+// surfaces (`/agents/tools`, `/agents/skills/[id]`). Free `String!` on the
+// schema, so unknown adapters fall through to the raw value.
+const ADAPTER_LABELS: Record<string, string> = {
+  python_fn: "Python function",
+  http_endpoint: "HTTP endpoint",
+  mcp_server: "MCP server",
+};
+
+function prettyJson(v: unknown): string {
+  try {
+    return JSON.stringify(v, null, 2);
+  } catch {
+    return "{}";
+  }
 }
 
 function Field({
@@ -44,20 +71,28 @@ function Field({
 }
 
 /**
- * Build tab content for an agent (spec 33 PR-9).
+ * Build tab content for an agent (spec 33 PR-9 / spec 38 Phase 4).
  *
- * Composed from existing queries:
- *   - repo / source       ← the resolved fleet row (`sourceRepo`/`sourceUrl`)
+ * Composed from two reads:
  *   - container image      ← `GET_WORKLOAD` + `LIST_CONTAINERS` (`imageRef`)
  *   - manifest preview     ← link into the app's workload manifest route
+ *   - source / repo        ← the resolved fleet row (`sourceRepo`/`sourceUrl`)
+ *   - brief / skills / tools ← `GET_AGENT_DETAIL` (the `agent(orgId, slug)` join)
  *
- * The brief / attached skills / tools are NOT resolvable from existing
- * queries — there is no agent→brief or agent→skill join, and `LIST_SKILLS` /
- * `LIST_TOOL_DEFS` are org/skill-scoped, not agent-scoped. Rather than fake an
- * association, those sections render an explicit "backend join pending" notice
- * pointing at the deferred `agent(slug)` resolver (spec 33 PR-9 net-new).
+ * The brief, the agent's ordered skill bindings, and each skill's tool
+ * definitions now come from `agent(slug)` — the read-side join that bundles
+ * them onto a single agent. The brief is nullable (an agent may not have an
+ * assembled brief yet) and the skill list may be empty; both render calm
+ * empty states rather than an error. (Before the resolver landed these were
+ * "backend join pending" placeholders — that gap is closed.)
  */
-export function BuildContent({ agent }: { agent: AstroliftAgentListItem }) {
+export function BuildContent({
+  agent,
+  orgId,
+}: {
+  agent: AstroliftAgentListItem;
+  orgId: string;
+}) {
   const { data: wlData, loading: wlLoading } = useQuery<WorkloadResp>(GET_WORKLOAD, {
     variables: { appSlug: agent.appSlug, slug: agent.slug },
     fetchPolicy: "cache-and-network",
@@ -66,10 +101,24 @@ export function BuildContent({ agent }: { agent: AstroliftAgentListItem }) {
     variables: { workloadSlug: agent.slug },
     fetchPolicy: "cache-and-network",
   });
+  const {
+    data: adData,
+    loading: adLoading,
+    error: adError,
+  } = useQuery<AgentDetailResp>(GET_AGENT_DETAIL, {
+    variables: { orgId, slug: agent.slug },
+    skip: !orgId,
+    fetchPolicy: "cache-and-network",
+  });
 
   const workload = wlData?.astroliftWorkload ?? null;
   const containers = cData?.astroliftContainers ?? [];
   const primary = containers.find((c) => c.isPrimary) ?? containers[0] ?? null;
+
+  const detail = adData?.agent ?? null;
+  const detailPending = adLoading && !detail;
+  const brief = detail?.brief ?? null;
+  const skills = [...(detail?.skills ?? [])].sort((a, b) => a.position - b.position);
 
   return (
     <div className="space-y-5">
@@ -183,72 +232,183 @@ export function BuildContent({ agent }: { agent: AstroliftAgentListItem }) {
         </CardContent>
       </Card>
 
-      {/* Brief / Skills / Tools — backend join gap (spec 33 PR-9). These have
-          no agent-scoped read query; surfaced as a pending notice, not faked. */}
-      <BackendJoinPending
-        icon={<BookOpenIcon className="size-4" />}
-        title="Brief"
-        body="The assembled brief for this agent (system prompt + skill bindings) isn't reachable yet — there's no agent→brief join in the API. It lands with the agent(slug) resolver."
-      />
-      <BackendJoinPending
-        icon={<WrenchIcon className="size-4" />}
-        title="Skills & tools"
-        body="The skills attached to this agent and their tool definitions aren't reachable per-agent yet (the skill and tool registries are org-scoped, not agent-scoped). Browse the org-wide registries below until the agent(slug) join ships."
-        links={[
-          { href: "/agents/skills", label: "Skill registry" },
-          { href: "/agents/tools", label: "Tool registry" },
-        ]}
-      />
+      {/* Brief — the assembled brief for this agent, from `agent(slug)`. */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <BookOpenIcon className="size-4" />
+            Brief
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {detailPending ? (
+            <Skeleton className="h-24 w-full" />
+          ) : adError ? (
+            <p className="text-muted-foreground text-sm">
+              The brief could not be loaded right now.
+            </p>
+          ) : brief ? (
+            <div className="space-y-3">
+              <dl className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
+                <Field label="Content hash" mono value={brief.contentHash || "—"} />
+                <Field
+                  label="Assembled"
+                  value={
+                    brief.createdAt ? (
+                      <span title={brief.createdAt}>{formatRelativeAge(brief.createdAt)}</span>
+                    ) : (
+                      "—"
+                    )
+                  }
+                />
+              </dl>
+              <div>
+                <p className="text-muted-foreground mb-1 text-xs tracking-wide uppercase">
+                  Configuration
+                </p>
+                <pre className="bg-muted text-muted-foreground max-h-80 overflow-auto rounded-md p-3 font-mono text-xs">
+                  {prettyJson(brief.config)}
+                </pre>
+              </div>
+            </div>
+          ) : (
+            <EmptyState
+              icon={<BookOpenIcon className="size-5" />}
+              title="No brief defined"
+              description="This agent has no assembled brief yet. A brief is composed when the agent's skills are bound and its system prompt is generated."
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Skills & tools — the agent's ordered skill bindings and each skill's
+          tool definitions, from `agent(slug)`. */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <WrenchIcon className="size-4" />
+            Skills &amp; tools
+            {skills.length > 0 && (
+              <Badge variant="outline" className="text-muted-foreground ml-1 text-xs">
+                {skills.length}
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {detailPending ? (
+            <Skeleton className="h-24 w-full" />
+          ) : adError ? (
+            <p className="text-muted-foreground text-sm">
+              Skills could not be loaded right now.
+            </p>
+          ) : skills.length > 0 ? (
+            <div className="flex flex-col gap-4">
+              {skills.map((binding) => (
+                <SkillBlock key={binding.skill.id} binding={binding} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              icon={<WrenchIcon className="size-5" />}
+              title="No skills attached"
+              description="This agent has no skills bound to it yet. Skills and their tool definitions are managed in the org-wide registries."
+              secondary={
+                <div className="flex flex-wrap justify-center gap-3">
+                  <Link
+                    href="/agents/skills"
+                    className="inline-flex items-center gap-1 text-sm text-[var(--brand-primary)] hover:underline"
+                  >
+                    Skill registry
+                  </Link>
+                  <Link
+                    href="/agents/tools"
+                    className="inline-flex items-center gap-1 text-sm text-[var(--brand-primary)] hover:underline"
+                  >
+                    Tool registry
+                  </Link>
+                </div>
+              }
+            />
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
 /**
- * A neutral "this section needs a backend join we don't have yet" card. Used
- * for the agent Build tab's brief/skills/tools, which can't be agent-scoped
- * from existing queries (spec 33 PR-9 flags `agent(slug)` as net-new backend
- * work). Deliberately not an error state — the agent is fine, the read path
- * just isn't wired.
+ * One bound skill on the agent: its identity (name · slug · version, with
+ * Global/Inactive badges) plus its nested tool definitions. Mirrors the
+ * skill-detail / tool-registry presentation so a skill reads the same wherever
+ * it appears.
  */
-function BackendJoinPending({
-  icon,
-  title,
-  body,
-  links,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  body: string;
-  links?: Array<{ href: string; label: string }>;
-}) {
+function SkillBlock({ binding }: { binding: AstroliftAgentSkill }) {
+  const { skill, toolDefs } = binding;
   return (
-    <Card className="border-dashed">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          {icon}
-          {title}
-          <Badge variant="outline" className="text-muted-foreground ml-1 gap-1 text-[10px]">
-            <InfoIcon className="size-3" />
-            Backend join pending
+    <div className="rounded-lg border">
+      <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
+        <Link
+          href={`/agents/skills/${skill.id}`}
+          className="font-medium hover:underline"
+        >
+          {skill.name}
+        </Link>
+        <span className="text-muted-foreground font-mono text-xs">{skill.slug}</span>
+        <span className="text-muted-foreground text-xs">v{skill.skillVersion}</span>
+        {skill.isGlobal && (
+          <Badge variant="outline" className="text-xs">
+            Global
           </Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <p className="text-muted-foreground text-sm leading-relaxed">{body}</p>
-        {links && links.length > 0 && (
-          <div className="flex flex-wrap gap-3">
-            {links.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className="inline-flex items-center gap-1 text-sm text-[var(--brand-primary)] hover:underline"
-              >
-                {l.label}
-              </Link>
+        )}
+        {!skill.isActive && (
+          <Badge variant="secondary" className="text-xs">
+            Inactive
+          </Badge>
+        )}
+      </div>
+      {skill.description && (
+        <p className="text-muted-foreground px-4 pt-3 text-sm leading-relaxed">
+          {skill.description}
+        </p>
+      )}
+      <div className="px-4 py-3">
+        {toolDefs.length > 0 ? (
+          <div className="flex flex-col gap-2">
+            {toolDefs.map((tool) => (
+              <ToolRow key={tool.id} tool={tool} />
             ))}
           </div>
+        ) : (
+          <p className="text-muted-foreground text-xs">No tools registered for this skill.</p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A single tool definition row under a skill — name + description, adapter
+ * badge, and handler ref. Matches the tool-registry row shape.
+ */
+function ToolRow({ tool }: { tool: AstroliftToolDef }) {
+  return (
+    <div className="flex items-center gap-4 rounded-md border px-3 py-2 text-sm">
+      <WrenchIcon className="text-muted-foreground size-4 shrink-0" />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="font-medium">{tool.name}</span>
+        {tool.description && (
+          <span className="text-muted-foreground truncate text-xs">{tool.description}</span>
+        )}
+      </div>
+      <Badge variant="secondary" className="shrink-0 text-xs">
+        {ADAPTER_LABELS[tool.adapter] ?? tool.adapter}
+      </Badge>
+      {tool.handlerRef && (
+        <span className="text-muted-foreground hidden max-w-[180px] shrink-0 truncate font-mono text-xs sm:inline">
+          {tool.handlerRef}
+        </span>
+      )}
+    </div>
   );
 }
