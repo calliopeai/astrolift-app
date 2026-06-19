@@ -13,9 +13,11 @@ from typing import Any
 
 from astrolift_manifest.security_volumes import parse_volume
 from astrolift_manifest.types import (
+    BriefRef,
     ContainerManifest,
     ManagedServiceManifest,
     RawManifest,
+    SkillRef,
     WorkloadManifest,
 )
 
@@ -106,6 +108,12 @@ def parse_raw(toml_text: str) -> RawManifest:
         for i, item in enumerate(data.get("managed_services", []))
     )
 
+    # Agent brief + skills (spec 38). Both keys are optional and only
+    # meaningful for agent manifests; a manifest that omits them parses to
+    # ``brief=None`` / ``skills=()`` and round-trips unchanged.
+    brief = _parse_brief(data.get("brief"), "brief")
+    skills = _parse_skills(data.get("skills", []), "skills")
+
     if workloads:
         public_count = sum(1 for w in workloads if w.is_public)
         if public_count > 1:
@@ -113,7 +121,90 @@ def parse_raw(toml_text: str) -> RawManifest:
             # template. Validation here is tolerant — caller decides.
             pass
 
-    return RawManifest(name=name, workloads=workloads, managed_services=managed, raw=data)
+    return RawManifest(
+        name=name,
+        workloads=workloads,
+        managed_services=managed,
+        brief=brief,
+        skills=skills,
+        raw=data,
+    )
+
+
+def _parse_brief(value: Any, path: str) -> BriefRef | None:
+    """Parse the optional top-level ``brief`` key (spec 38).
+
+    ``brief`` is a single string path to a brief folder's entry README.
+    Absent → ``None``. Present-but-not-a-non-empty-string → ``ManifestError``
+    (a brief that can't be located is a footgun, same posture as the rest
+    of the parser).
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise ManifestError("brief must be a non-empty string path to a brief README", path=path)
+    return BriefRef(path=value)
+
+
+def _parse_skills(raw_list: Any, path: str) -> tuple[SkillRef, ...]:
+    """Parse the optional top-level ``skills`` list (spec 38).
+
+    Each entry is *either*:
+
+    * a single-key inline table ``{ name = "relative/path" }`` → a **local**
+      skill (a folder in this repo), or
+    * a bare string ``"skill-name"`` → a **named-global** skill (resolved
+      from the global skills source later).
+
+    The spec's heterogeneous-array surface parses cleanly in ``tomllib``
+    (verified — dicts and strings intermix in one list), so we keep the
+    spec's shape verbatim rather than a ``[skills.<name>]`` table form.
+
+    Malformed entries raise :class:`ManifestError` with an indexed path
+    (``skills[1]``) so the UI can point at the offending row — a skill that
+    can't be resolved would silently drop the agent's tooling otherwise.
+    """
+    if not isinstance(raw_list, list):
+        raise ManifestError("skills must be a list", path=path)
+
+    out: list[SkillRef] = []
+    seen_names: set[str] = set()
+    for i, entry in enumerate(raw_list):
+        entry_path = f"{path}[{i}]"
+        if isinstance(entry, str):
+            name = entry.strip()
+            if not name:
+                raise ManifestError("named skill entry must be a non-empty string", path=entry_path)
+            ref = SkillRef(name=name, path=None, is_local=False)
+        elif isinstance(entry, dict):
+            if len(entry) != 1:
+                raise ManifestError(
+                    "local skill entry must be a single-key table "
+                    '{ name = "relative/path" }, got '
+                    f"{len(entry)} keys",
+                    path=entry_path,
+                )
+            ((name, raw_path),) = entry.items()
+            name = str(name).strip()
+            if not name:
+                raise ManifestError("local skill entry name must be non-empty", path=entry_path)
+            if not isinstance(raw_path, str) or not raw_path.strip():
+                raise ManifestError(
+                    f"local skill {name!r} must map to a non-empty path string",
+                    path=entry_path,
+                )
+            ref = SkillRef(name=name, path=raw_path, is_local=True)
+        else:
+            raise ManifestError(
+                "skill entry must be a string (named) or a single-key table "
+                f"(local), got {type(entry).__name__}",
+                path=entry_path,
+            )
+        if ref.name in seen_names:
+            raise ManifestError(f"duplicate skill name {ref.name!r}", path=entry_path)
+        seen_names.add(ref.name)
+        out.append(ref)
+    return tuple(out)
 
 
 def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
