@@ -120,17 +120,30 @@ class BriefRef:
 @dataclasses.dataclass(slots=True, frozen=True)
 class SkillRef:
     """A pointer to one skill, declared in the manifest's ``skills`` list
-    (spec 38).
+    (spec 38 + spec 39's three-source model).
 
-    Two flavours, distinguished by :attr:`is_local`:
+    Three flavours, discriminated by :attr:`kind` (a ``str`` so the parsed
+    shape stays JSON-friendly and frozen-dataclass-cheap — no enum import):
 
-    * **local** — ``{ name = "relative/path" }`` in the TOML. ``name`` is
-      the skill name, ``path`` is the repo-relative folder (agentskills.io
-      layout) read from the fetched repo tree at resolution time.
-      ``is_local`` is ``True`` and ``path`` is non-``None``.
-    * **named-global** — a bare string in the TOML. ``name`` is the skill
-      name, resolved from the global skills source later. ``is_local`` is
-      ``False`` and ``path`` is ``None``.
+    * ``"local"`` — ``{ name = "relative/path" }`` in the TOML, or a bare
+      ``"./path"`` string. ``name`` is the skill name, ``path`` is the
+      repo-relative folder (agentskills.io layout) read from the fetched
+      agent repo tree at resolution time. ``path`` is non-``None``.
+    * ``"catalogue"`` — a bare string with no ``/`` (``"pr-review"`` /
+      ``"pr-review@1.2.0"``). Resolved from the built-in catalogue repo.
+      ``path`` is ``None``; ``ref`` carries the optional ``@`` pin.
+    * ``"org_repo"`` — a string containing a ``/`` (spec 39 §2,
+      ``"<alias>/<skill-path>@<ref>"``, e.g. ``"acme/dev-skills/pr-review@v2"``
+      → alias ``acme``, subpath ``dev-skills/pr-review``). Resolved from one
+      of the org's registered skill repos (``astrolift_agents.OrgSkillRepo``).
+      ``repo_alias`` + ``skill_subpath`` are set; ``ref`` is the optional
+      ``@`` pin (else the repo's ``default_ref`` at resolution time). ``path``
+      is ``None`` (the subpath is repo-relative *within the org repo*, not the
+      agent's own repo).
+
+    :attr:`is_local` is derived from ``kind`` (``kind == "local"``) so the
+    Phase-3 resolver + registration call sites that branch on ``ref.is_local``
+    keep working unchanged.
 
     Parsing only records the pointer; it does not fetch or load the skill
     folder. The skill folder itself is parsed by
@@ -139,7 +152,22 @@ class SkillRef:
 
     name: str
     path: str | None = None
-    is_local: bool = False
+    # ``"local"`` | ``"catalogue"`` | ``"org_repo"`` — the source discriminator.
+    kind: str = "catalogue"
+    # org_repo only: the registered repo alias + the skill folder's path
+    # *within that repo* (the part after the first ``/``). ``ref`` is the
+    # optional ``@`` pin on catalogue + org_repo refs (a tag/branch/sha);
+    # empty string means "no pin — use the catalogue/repo default ref".
+    repo_alias: str = ""
+    skill_subpath: str = ""
+    ref: str = ""
+
+    @property
+    def is_local(self) -> bool:
+        """``True`` for a local (agent-repo) skill. Derived from :attr:`kind`
+        so existing ``ref.is_local`` call sites (skill_resolver,
+        agent_skill_registration, manifest_sync) need no change."""
+        return self.kind == "local"
 
 
 @dataclasses.dataclass(slots=True, frozen=True)

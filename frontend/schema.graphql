@@ -2131,6 +2131,26 @@ type AstroliftNotificationPreferenceMutationResult {
   data: AstroliftNotificationPreference
 }
 
+type AstroliftOrgSkillRepo {
+  id: GUID!
+  alias: String!
+  repoFullName: String!
+  sourceKind: String!
+  defaultRef: String!
+  displayName: String!
+  isActive: Boolean!
+  isPrivate: Boolean!
+  sourceConnectionId: GUID
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type AstroliftOrgSkillRepoMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftOrgSkillRepo
+}
+
 type AstroliftOrganization {
   id: GUID!
   slug: String!
@@ -2389,6 +2409,7 @@ type AstroliftRegisteredAgent {
   appId: GUID!
   workloadSlug: String!
   created: Boolean!
+  skillNotes: [String!]!
 }
 
 type AstroliftRegisteredApp {
@@ -4434,6 +4455,9 @@ type Mutation {
   runAstroliftAgent(input: RunAstroliftAgentInput!): AstroliftAgentTaskMutationResult!
   updateAgentRunSpec(agentSlug: String!, input: AgentRunSpecInput!): AstroliftAgentRunSpecMutationResult!
   importSkillsFromRepo(repoUrl: String!, branch: String! = "main", manifestPath: String! = ""): AstroliftImportSkillsResultMutationResult!
+  registerOrgSkillRepo(input: RegisterOrgSkillRepoInput!, orgId: ID!): AstroliftOrgSkillRepoMutationResult!
+  updateOrgSkillRepo(input: UpdateOrgSkillRepoInput!): AstroliftOrgSkillRepoMutationResult!
+  removeOrgSkillRepo(input: RemoveOrgSkillRepoInput!): AstroliftOrgSkillRepoMutationResult!
 
   """Start a workflow for an object."""
   startWorkflow(workflowSlug: String!, modelLabel: String!, objectId: Int!): StartWorkflowResult!
@@ -4864,6 +4888,7 @@ type Query {
   toolDefs(skillId: ID!): [AstroliftToolDef!]!
   orgToolDefs(orgId: ID!): [AstroliftToolDef!]!
   brief(id: ID!): AstroliftBrief
+  orgSkillRepos(orgId: ID!): [AstroliftOrgSkillRepo!]!
   agentTasks(orgId: ID!, status: String = null, workloadId: ID = null): [AstroliftAgentTask!]!
   agentGallery(orgId: ID!): [AstroliftAgentTask!]!
   agentTask(id: ID!): AstroliftAgentTask
@@ -4976,6 +5001,15 @@ input RegisterMobileDeviceInput {
   label: String = null
 }
 
+input RegisterOrgSkillRepoInput {
+  alias: String!
+  repoFullName: String!
+  sourceKind: String! = "github"
+  defaultRef: String! = "main"
+  displayName: String = null
+  sourceConnectionId: GUID = null
+}
+
 input RegisterTenantClusterInput {
   slug: String!
   name: String!
@@ -5019,6 +5053,10 @@ input RemoveAppDomainInput {
 input RemoveEmailSuppressionEntryInput {
   managedServiceId: GUID!
   address: String!
+}
+
+input RemoveOrgSkillRepoInput {
+  id: GUID!
 }
 
 input RemoveOrganizationAllowlistDomainInput {
@@ -5495,6 +5533,17 @@ input UpdateMyProfileInput {
   lastName: String = null
   email: String = null
   timezone: String = null
+}
+
+input UpdateOrgSkillRepoInput {
+  id: GUID!
+  repoFullName: String = null
+  sourceKind: String = null
+  defaultRef: String = null
+  displayName: String = null
+  isActive: Boolean = null
+  sourceConnectionId: GUID = null
+  detachSourceConnection: Boolean! = false
 }
 
 input UpdateOrganizationInput {

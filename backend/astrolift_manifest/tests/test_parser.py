@@ -603,8 +603,9 @@ task_queue = "approvals"
 
 def test_parse_brief_and_skills_local_and_named():
     """The spec's heterogeneous ``skills`` array — single-key inline tables
-    (local) mixed with bare strings (named-global) — parses into typed
-    ``SkillRef``s, and ``brief`` into a ``BriefRef``."""
+    (local) mixed with bare strings (catalogue) — parses into typed
+    ``SkillRef``s, and ``brief`` into a ``BriefRef``. ``is_local`` stays a
+    valid (derived) view of ``kind`` for the Phase-3 callers."""
     toml = """
 name = "triage-agent"
 brief = "brief/README.md"
@@ -629,9 +630,24 @@ kind = "agent"
     assert len(raw.skills) == 3
     # Order is preserved from the array.
     reviewer, linter, summarizer = raw.skills
-    assert (reviewer.name, reviewer.path, reviewer.is_local) == ("reviewer", "skills/reviewer", True)
-    assert (linter.name, linter.path, linter.is_local) == ("linter", "skills/linter", True)
-    assert (summarizer.name, summarizer.path, summarizer.is_local) == ("global-summarizer", None, False)
+    assert (reviewer.name, reviewer.path, reviewer.kind, reviewer.is_local) == (
+        "reviewer",
+        "skills/reviewer",
+        "local",
+        True,
+    )
+    assert (linter.name, linter.path, linter.kind, linter.is_local) == (
+        "linter",
+        "skills/linter",
+        "local",
+        True,
+    )
+    assert (summarizer.name, summarizer.path, summarizer.kind, summarizer.is_local) == (
+        "global-summarizer",
+        None,
+        "catalogue",
+        False,
+    )
 
 
 def test_parse_brief_and_skills_default_when_absent():
@@ -801,3 +817,133 @@ workflow_type = "ApprovalWorkflow"
     with pytest.raises(ManifestError) as exc:
         parse_raw(toml)
     assert "task_queue" in str(exc.value)
+
+
+# ---------------------------------------------------------------------------
+# spec 39d — org-repo skill refs ("<alias>/<skill-path>@<ref>")
+# ---------------------------------------------------------------------------
+
+
+def _agent_with_skills(*entries: str) -> str:
+    body = ",\n  ".join(entries)
+    return f"""
+name = "triage-agent"
+skills = [
+  {body}
+]
+
+[[workloads]]
+name = "triage-agent"
+kind = "agent"
+
+  [[workloads.containers]]
+  name = "agent"
+  is_primary = true
+"""
+
+
+def test_parse_skill_org_repo_ref_with_pin():
+    """A bare string containing a ``/`` is an org-repo ref; the first segment
+    is the alias, the rest is the skill path, and ``@ref`` is the pin."""
+    raw = parse_raw(_agent_with_skills('"acme/dev-skills/pr-review@v2"'))
+    (s,) = raw.skills
+    assert s.kind == "org_repo"
+    assert s.is_local is False
+    assert s.repo_alias == "acme"
+    assert s.skill_subpath == "dev-skills/pr-review"
+    assert s.ref == "v2"
+    # Skill name = the last path segment (the agentskills.io folder name).
+    assert s.name == "pr-review"
+
+
+def test_parse_skill_org_repo_ref_without_pin():
+    """``@ref`` is optional on an org-repo ref — ``ref`` is empty (the repo's
+    default_ref is used at resolution time)."""
+    raw = parse_raw(_agent_with_skills('"acme/pr-review"'))
+    (s,) = raw.skills
+    assert s.kind == "org_repo"
+    assert s.repo_alias == "acme"
+    assert s.skill_subpath == "pr-review"
+    assert s.ref == ""
+    assert s.name == "pr-review"
+
+
+def test_parse_skill_catalogue_ref_splits_pin_off_name():
+    """A bare name with no ``/`` is a catalogue ref; an ``@`` pin is split off
+    into ``ref`` so ``name`` stays the clean catalogue folder name."""
+    raw = parse_raw(_agent_with_skills('"pr-review@1.2.0"'))
+    (s,) = raw.skills
+    assert s.kind == "catalogue"
+    assert s.name == "pr-review"
+    assert s.ref == "1.2.0"
+
+
+def test_parse_skill_bare_catalogue_ref_no_pin():
+    raw = parse_raw(_agent_with_skills('"pr-review"'))
+    (s,) = raw.skills
+    assert s.kind == "catalogue"
+    assert s.name == "pr-review"
+    assert s.ref == ""
+
+
+def test_parse_skill_local_dot_slash_string():
+    """A leading ``./`` string is a LOCAL ref (a path in the agent's repo),
+    not an org-repo ref — even though it contains a ``/``."""
+    raw = parse_raw(_agent_with_skills('"./skills/custom-review"'))
+    (s,) = raw.skills
+    assert s.kind == "local"
+    assert s.is_local is True
+    assert s.path == "./skills/custom-review"
+    assert s.name == "custom-review"
+
+
+def test_parse_skill_local_table_still_local():
+    """The table form stays local (regression: kind discriminator)."""
+    raw = parse_raw(_agent_with_skills('{ reviewer = "skills/reviewer" }'))
+    (s,) = raw.skills
+    assert s.kind == "local"
+    assert s.is_local is True
+    assert s.path == "skills/reviewer"
+
+
+def test_parse_skill_org_repo_empty_pin_rejected():
+    """A trailing ``@`` (empty pin) is an operator paste-error → ManifestError."""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(_agent_with_skills('"acme/pr-review@"'))
+    assert exc.value.path == "skills[0]"
+    assert "empty" in str(exc.value).lower()
+
+
+def test_parse_skill_double_pin_rejected():
+    """More than one ``@`` is ambiguous → ManifestError."""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(_agent_with_skills('"acme/pr-review@a@b"'))
+    assert exc.value.path == "skills[0]"
+    assert "@" in str(exc.value)
+
+
+def test_parse_skill_org_repo_empty_alias_rejected():
+    """A leading ``/`` means an empty alias → ManifestError."""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(_agent_with_skills('"/pr-review"'))
+    assert exc.value.path == "skills[0]"
+    assert "alias" in str(exc.value).lower()
+
+
+def test_parse_skill_org_repo_empty_path_rejected():
+    """A trailing ``/`` (alias with no skill path) → ManifestError."""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(_agent_with_skills('"acme/"'))
+    assert exc.value.path == "skills[0]"
+    assert "path" in str(exc.value).lower()
+
+
+def test_parse_skill_org_repo_deep_subpath():
+    """A multi-segment skill path keeps the full subpath; name = last segment."""
+    raw = parse_raw(_agent_with_skills('"acme/team/skills/pr-review@main"'))
+    (s,) = raw.skills
+    assert s.kind == "org_repo"
+    assert s.repo_alias == "acme"
+    assert s.skill_subpath == "team/skills/pr-review"
+    assert s.name == "pr-review"
+    assert s.ref == "main"

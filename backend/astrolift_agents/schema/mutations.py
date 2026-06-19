@@ -27,6 +27,7 @@ from astrolift_agents.models import (
     AgentTask,
     Brief,
     BriefSkillRef,
+    OrgSkillRepo,
     Skill,
     ToolDef,
 )
@@ -36,11 +37,13 @@ from astrolift_agents.schema.types import (
     AgentRunMode,
     AgentRunSpecType,
     AgentTaskType,
+    OrgSkillRepoType,
     SkillType,
     ToolDefType,
     agent_env_spec_to_type,
     agent_run_spec_to_type,
     agent_task_to_type,
+    org_skill_repo_to_type,
     skill_to_type,
     tool_def_to_type,
 )
@@ -154,6 +157,53 @@ class RunAstroliftAgentInput:
 
 
 @strawberry.input
+class RegisterOrgSkillRepoInput:
+    """Register a per-org skill repo under an alias (spec 39d).
+
+    ``alias`` is the short handle a manifest references as
+    ``"<alias>/<skill-path>@<ref>"`` (unique per org). ``repo_full_name`` is
+    ``owner/repo`` on the source host. ``source_connection_id`` links a
+    :class:`SourceConnection` for a PRIVATE repo; omit it (null) for a PUBLIC
+    repo fetched anonymously. ``default_ref`` is the branch/tag/sha fetched
+    when a manifest ref carries no ``@`` pin.
+    """
+
+    alias: str
+    repo_full_name: str
+    source_kind: str = "github"
+    default_ref: str = "main"
+    display_name: str | None = None
+    source_connection_id: GUID | None = None
+
+
+@strawberry.input
+class UpdateOrgSkillRepoInput:
+    """Partial update of a registered org skill repo. Only supplied
+    (non-``None``) fields are applied; ``alias`` is the immutable lookup key
+    and is intentionally absent.
+
+    Connection link control: pass ``source_connection_id`` (an org-owned
+    connection GUID) to attach/re-point it for a PRIVATE repo, or set
+    ``detach_source_connection = true`` to drop the link (the repo becomes
+    PUBLIC). Setting both is rejected. Omitting both leaves the link
+    unchanged."""
+
+    id: GUID
+    repo_full_name: str | None = None
+    source_kind: str | None = None
+    default_ref: str | None = None
+    display_name: str | None = None
+    is_active: bool | None = None
+    source_connection_id: GUID | None = None
+    detach_source_connection: bool = False
+
+
+@strawberry.input
+class RemoveOrgSkillRepoInput:
+    id: GUID
+
+
+@strawberry.input
 class AgentRunSpecInput:
     """Partial write of an agent ``Workload(kind=agent)`` run-spec (spec 33).
 
@@ -235,6 +285,39 @@ def _resolve_org(org_id: strawberry.ID) -> tuple[Organization | None, object | N
         # org by passing its GUID.
         return None, gql_failure(ErrorCode.PERMISSION_DENIED.value, "organization mismatch", field="orgId")
     return org, None
+
+
+# Valid OrgSkillRepo source hosts — the host-prefix half of every
+# ``SourceConnection.Kind`` ("github_pat" → "github", etc.). Derived so the
+# set stays in lockstep with the connection kinds the platform supports.
+def _skill_repo_source_kinds() -> frozenset[str]:
+    from astrolift_scm.models import SourceConnection
+
+    return frozenset(k.value.split("_", 1)[0] for k in SourceConnection.Kind)
+
+
+_SKILL_REPO_SOURCE_KINDS = _skill_repo_source_kinds()
+
+
+def _resolve_org_skill_repo_connection(org, connection_id: strawberry.ID):
+    """Resolve a ``SourceConnection`` for an OrgSkillRepo link, org-scoped.
+
+    Returns ``(connection, None)`` on success or ``(None, failure_envelope)``
+    when the id doesn't resolve to a live connection in ``org`` — so a caller
+    can't attach another tenant's credential to its skill repo (the foreign id
+    is NOT_FOUND for the same non-leak reason as the sibling resolvers)."""
+    from astrolift_scm.models import SourceConnection
+
+    conn = SourceConnection.objects.filter(
+        guid=str(connection_id), organization=org, deleted_at__isnull=True
+    ).first()
+    if conn is None:
+        return None, gql_failure(
+            ErrorCode.NOT_FOUND.value,
+            "source connection not found",
+            field="sourceConnectionId",
+        )
+    return conn, None
 
 
 def _dispatch_actor(info: Info):
@@ -1071,6 +1154,150 @@ class AgentsMutation:
                 source_ref=result.source_ref,
             )
         )
+
+    # ---- OrgSkillRepo CRUD (spec 39d) -----------------------------
+    #
+    # An org registers one or more skill repos under aliases; a manifest
+    # references a skill in one as ``"<alias>/<skill-path>@<ref>"`` and the
+    # resolver fetches it alongside the built-in catalogue + local skills.
+    # Mechanism mirrors source-connection registration: gated on the SAME
+    # ``scm.connect`` grant source registration uses (registering a skill
+    # repo is the same trust decision as connecting a source host), and
+    # tenancy-scoped to the caller's active org exactly like ``ScmMutation``.
+
+    @strawberry.field
+    @mutation_audit(action="agents.org_skill_repo.register")
+    @require_permission(Permission.SCM_CONNECT)
+    @tenant_scoped()
+    def register_org_skill_repo(
+        self, info: Info, input: RegisterOrgSkillRepoInput, org_id: strawberry.ID
+    ) -> MutationResultType[OrgSkillRepoType]:
+        org, err = _resolve_org(org_id)
+        if err is not None:
+            return err
+
+        alias = (input.alias or "").strip()
+        if not alias:
+            return gql_failure(ErrorCode.VALIDATION.value, "alias is required", field="alias")
+        if "/" in alias or "@" in alias:
+            # The alias is the first segment of "<alias>/<path>@<ref>"; a '/'
+            # or '@' in it would make every manifest ref ambiguous.
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "alias must not contain '/' or '@'",
+                field="alias",
+            )
+        repo_full_name = (input.repo_full_name or "").strip().strip("/")
+        if not repo_full_name:
+            return gql_failure(
+                ErrorCode.VALIDATION.value, "repoFullName is required", field="repoFullName"
+            )
+        source_kind = (input.source_kind or "github").strip()
+        if source_kind not in _SKILL_REPO_SOURCE_KINDS:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"unknown source_kind {source_kind!r}",
+                field="sourceKind",
+            )
+
+        if OrgSkillRepo.objects.filter(organization=org, alias=alias, deleted_at__isnull=True).exists():
+            return gql_failure(
+                ErrorCode.CONFLICT.value,
+                f"a skill repo with alias {alias!r} already exists",
+                field="alias",
+            )
+
+        conn = None
+        if input.source_connection_id is not None:
+            conn, conn_err = _resolve_org_skill_repo_connection(org, input.source_connection_id)
+            if conn_err is not None:
+                return conn_err
+
+        with transaction.atomic():
+            repo = OrgSkillRepo.objects.create(
+                organization=org,
+                alias=alias[:128],
+                repo_full_name=repo_full_name[:512],
+                source_kind=source_kind[:32],
+                default_ref=(input.default_ref or "main").strip()[:255] or "main",
+                display_name=(input.display_name or "").strip()[:200],
+                source_connection=conn,
+                is_active=True,
+            )
+        return gql_success(org_skill_repo_to_type(repo))
+
+    @strawberry.field
+    @mutation_audit(action="agents.org_skill_repo.update")
+    @require_permission(Permission.SCM_CONNECT)
+    @tenant_scoped()
+    def update_org_skill_repo(
+        self, info: Info, input: UpdateOrgSkillRepoInput
+    ) -> MutationResultType[OrgSkillRepoType]:
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        repo = OrgSkillRepo.objects.filter(
+            guid=str(input.id), organization_id=org_pk, deleted_at__isnull=True
+        ).first()
+        if repo is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "skill repo not found")
+
+        if input.source_connection_id is not None and input.detach_source_connection:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "pass either sourceConnectionId (attach) or detachSourceConnection (drop), not both",
+                field="sourceConnectionId",
+            )
+
+        if input.repo_full_name is not None:
+            new_repo = input.repo_full_name.strip().strip("/")
+            if not new_repo:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value, "repoFullName must be non-empty", field="repoFullName"
+                )
+            repo.repo_full_name = new_repo[:512]
+        if input.source_kind is not None:
+            sk = input.source_kind.strip()
+            if sk not in _SKILL_REPO_SOURCE_KINDS:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value, f"unknown source_kind {sk!r}", field="sourceKind"
+                )
+            repo.source_kind = sk[:32]
+        if input.default_ref is not None:
+            repo.default_ref = (input.default_ref.strip()[:255]) or "main"
+        if input.display_name is not None:
+            repo.display_name = input.display_name.strip()[:200]
+        if input.is_active is not None:
+            repo.is_active = bool(input.is_active)
+        if input.detach_source_connection:
+            repo.source_connection = None
+        elif input.source_connection_id is not None:
+            org = Organization.objects.filter(pk=org_pk, deleted_at__isnull=True).first()
+            if org is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "organization not found")
+            conn, conn_err = _resolve_org_skill_repo_connection(org, input.source_connection_id)
+            if conn_err is not None:
+                return conn_err
+            repo.source_connection = conn
+
+        repo.save()
+        return gql_success(org_skill_repo_to_type(repo))
+
+    @strawberry.field
+    @mutation_audit(action="agents.org_skill_repo.remove")
+    @require_permission(Permission.SCM_CONNECT)
+    @tenant_scoped()
+    def remove_org_skill_repo(
+        self, info: Info, input: RemoveOrgSkillRepoInput
+    ) -> MutationResultType[OrgSkillRepoType]:
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        repo = OrgSkillRepo.objects.filter(
+            guid=str(input.id), organization_id=org_pk, deleted_at__isnull=True
+        ).first()
+        if repo is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "skill repo not found")
+        repo.soft_delete()
+        return gql_success(org_skill_repo_to_type(repo))
 
 
 def json_canonical(payload: dict) -> str:
