@@ -28,3 +28,23 @@ def test_teardown_transitions_are_allowed():
         assert PS.TEARING_DOWN in t[src], f"{src} must allow → TEARING_DOWN"
     # And tearing-down completes to deregistered.
     assert PS.DEREGISTERED in t[PS.TEARING_DOWN]
+
+
+def test_transition_to_current_state_is_idempotent_noop():
+    """Re-firing deregister on an app already TEARING_DOWN must NOT raise
+    (mark_tearing_down → tearing_down). Otherwise a teardown that failed
+    after the first step leaves the app permanently unrecoverable (#1006)."""
+    app = RegisteredApp(provisioning_status=PS.TEARING_DOWN.value)
+    # Same-state transition returns early (before the save), so it neither
+    # raises nor needs a persisted row — the recovery re-fire can proceed.
+    app.transition_provisioning(PS.TEARING_DOWN)
+    assert app.provisioning_status == PS.TEARING_DOWN.value
+
+
+def test_invalid_transition_still_rejected():
+    """The idempotent no-op must not weaken genuine guards."""
+    import pytest
+
+    app = RegisteredApp(provisioning_status=PS.READY.value)
+    with pytest.raises(ValueError, match="cannot transition"):
+        app.transition_provisioning(PS.DEREGISTERED)  # READY can't jump straight to deregistered

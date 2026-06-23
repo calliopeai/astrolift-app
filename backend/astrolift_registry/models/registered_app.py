@@ -368,6 +368,13 @@ class RegisteredApp(NamedBaseCoreModel):
 
     def transition_provisioning(self, new_status: RegisteredApp.ProvisioningStatus) -> None:
         current = RegisteredApp.ProvisioningStatus(self.provisioning_status)
+        # Idempotent: re-marking the current state is a no-op, not an error.
+        # Without this, a deregister re-fired to recover an app stuck at
+        # TEARING_DOWN (after a failed/terminated teardown) dies at
+        # mark_tearing_down on tearing_down → tearing_down, leaving the app
+        # permanently unrecoverable (#1006). Same principle as #998.
+        if new_status is current:
+            return
         allowed = self._PROVISIONING_TRANSITIONS.get(current, set())
         if new_status not in allowed:
             raise ValueError(
