@@ -162,8 +162,12 @@ class IRSADriver(WorkloadIdentityDriver):
                     PolicyArn=entry["PolicyArn"],
                 )
             self._iam.delete_role(RoleName=role)
-        except self._iam.exceptions.NoSuchEntityException as exc:
-            raise NotFoundError(f"role {role} not found") from exc
+        except self._iam.exceptions.NoSuchEntityException:
+            # Idempotent delete: the role is already absent, which is the
+            # desired end state. Treat as success so teardown completes (and
+            # re-runs are safe) instead of halting on a missing role — e.g. a
+            # role that was never created, or already deleted (#998).
+            return
         except Exception as exc:
             raise map_client_error(exc) from exc
 

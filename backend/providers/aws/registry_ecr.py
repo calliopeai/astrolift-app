@@ -110,8 +110,11 @@ class ECRDriver(ImageRegistryDriver):
             return
         try:
             self._client.delete_repository(repositoryName=name, force=True)
-        except self._client.exceptions.RepositoryNotFoundException as exc:
-            raise NotFoundError(f"repository {name} not found") from exc
+        except self._client.exceptions.RepositoryNotFoundException:
+            # Idempotent delete: the repo is already absent, which is the
+            # desired end state. Treat as success so teardown completes (and
+            # re-runs are safe) instead of halting on a missing repo (#998).
+            return
         except Exception as exc:
             raise map_client_error(exc) from exc
 
