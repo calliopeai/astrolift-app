@@ -723,6 +723,82 @@ def test_statefulset_with_storage_emits_volume_claim_template():
     assert vct[0]["spec"]["accessModes"] == ["ReadWriteOnce"]
 
 
+def test_statefulset_mounts_volume_claim_template():
+    # Regression for #989: the per-pod volumeClaimTemplate must be MOUNTED into
+    # the primary container at its declared mount_path, else the app's writes
+    # land on the pod's ephemeral FS and don't survive a restart.
+    w = WorkloadManifest(
+        name="store",
+        kind="statefulset",
+        replicas=1,
+        storage_size="1Gi",
+        volumes=(
+            {"name": "data", "kind": "pvc", "mount_path": "/var/lib/store", "size": "1Gi"},
+        ),
+        containers=(_container("app", port=8080),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="ns",
+        image_tag="v1",
+        image_repository="ghcr.io/acme/store",
+        environment_name="prod",
+    )
+    sts = next(r for r in out if r["kind"] == "StatefulSet")
+    assert sts["spec"]["volumeClaimTemplates"][0]["metadata"]["name"] == "store-data"
+    mounts = sts["spec"]["template"]["spec"]["containers"][0]["volumeMounts"]
+    assert {"name": "store-data", "mountPath": "/var/lib/store"} in mounts
+
+
+def test_statefulset_storage_size_defaults_mount_path():
+    # storage_size with no explicit volumes mount_path still mounts (at /data),
+    # so the claim is never orphaned.
+    w = WorkloadManifest(
+        name="db",
+        kind="statefulset",
+        replicas=1,
+        storage_size="2Gi",
+        containers=(_container("app", port=0),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="ns",
+        image_tag="v1",
+        image_repository="ghcr.io/acme/db",
+        environment_name="prod",
+    )
+    sts = next(r for r in out if r["kind"] == "StatefulSet")
+    mounts = sts["spec"]["template"]["spec"]["containers"][0]["volumeMounts"]
+    assert mounts == [{"name": "db-data", "mountPath": "/data"}]
+
+
+def test_function_renders_knative_service():
+    # Regression for #988: kind=function previously raised NameError
+    # (_resource_spec undefined) at render time.
+    w = WorkloadManifest(
+        name="fn",
+        kind="function",
+        min_scale=0,
+        max_scale=5,
+        function_concurrency=10,
+        function_timeout_seconds=60,
+        containers=(_container("fn", port=8080),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="ns",
+        image_tag="v1",
+        image_repository="ghcr.io/acme/fn",
+        environment_name="prod",
+    )
+    ksvc = next(
+        r for r in out if str(r.get("apiVersion", "")).startswith("serving.knative")
+    )
+    assert ksvc["kind"] == "Service"
+    container = ksvc["spec"]["template"]["spec"]["containers"][0]
+    assert "resources" in container  # the field whose helper used to crash
+
+
 def test_statefulset_no_port_omits_headless_ports():
     w = WorkloadManifest(
         name="etcd",

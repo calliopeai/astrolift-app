@@ -704,7 +704,7 @@ def _render_function(
     )
     container_spec: dict[str, Any] = {
         "image": image,
-        "resources": _resource_spec(w),
+        "resources": _render_resources(w),
     }
     if primary.port > 0:
         container_spec["ports"] = [{"containerPort": primary.port, "name": "http1"}]
@@ -788,9 +788,10 @@ def _render_statefulset(
 
     volume_claim_templates: list[dict[str, Any]] = []
     if w.storage_size:
+        claim_name = f"{w.name}-data"
         volume_claim_templates.append(
             {
-                "metadata": {"name": f"{w.name}-data"},
+                "metadata": {"name": claim_name},
                 "spec": {
                     "accessModes": ["ReadWriteOnce"],
                     "resources": {"requests": {"storage": w.storage_size}},
@@ -798,6 +799,25 @@ def _render_statefulset(
                 },
             }
         )
+        # Mount the per-pod claim into the primary container. Without this the
+        # volumeClaimTemplate is provisioned but never mounted, so the app's
+        # writes land on the pod's ephemeral FS and don't survive a restart
+        # (#989). Mount path comes from the workload's pvc volume declaration
+        # ([[workloads.volumes]] mount_path), defaulting to /data.
+        mount_path = next(
+            (
+                v.get("mount_path")
+                for v in w.volumes
+                if v.get("kind", "pvc") == "pvc" and v.get("mount_path")
+            ),
+            "/data",
+        )
+        primary = _primary_container(w)
+        for container in pod_spec.get("containers", []):
+            if primary is not None and container["name"] == primary.name:
+                container.setdefault("volumeMounts", []).append(
+                    {"name": claim_name, "mountPath": mount_path}
+                )
 
     sts: dict[str, Any] = {
         "apiVersion": "apps/v1",
