@@ -88,7 +88,15 @@ def test_register_app_accepts_when_org_has_active_cluster(permission_resolver, s
         )
 
     assert result.ok, result.errors
-    assert RegisteredApp.objects.filter(slug="with-cluster").exists()
+    app = RegisteredApp.objects.get(slug="with-cluster")
+    assert app is not None
+    # register_app bootstraps the default environment straight from
+    # registration (no resync / repo fetch required) so the app can deploy.
+    from astrolift_lifecycle.models import AppEnvironment
+
+    assert AppEnvironment.objects.filter(
+        registered_app=app, name="production", deleted_at__isnull=True
+    ).exists()
 
 
 def test_register_app_rejects_when_only_soft_deleted_clusters(permission_resolver, seed_cluster):

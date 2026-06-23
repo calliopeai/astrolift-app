@@ -1075,6 +1075,18 @@ class RegistryMutation:
         )
         if approval["user_ids"] is not None:
             app.approver_users.set(approval["user_ids"])
+
+        # Bootstrap the default environment + kick off OnboardAppWorkflow
+        # straight from registration. Previously the env + onboard were only
+        # created by a later resync/scan, which re-fetches the repo — so an
+        # app registered with an inline ``manifest_raw`` (a repo the platform
+        # can't fetch) never onboarded, and resync would wipe the inline
+        # manifest on the failed fetch. ``_bootstrap_app_environments`` is
+        # fetch-free (creates AppEnvironment + starts the idempotent
+        # OnboardAppWorkflow), never touches ``manifest_raw``, and no-ops when
+        # no managed cluster is bound. The manifest declares no environments,
+        # so pass ``[]`` — ``_bootstrap`` defaults to a ``production`` env.
+        _bootstrap_app_environments(app, [])
         return gql_success(app_to_type(app))
 
     @strawberry.field
