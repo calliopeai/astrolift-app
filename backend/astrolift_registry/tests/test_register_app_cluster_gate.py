@@ -139,3 +139,27 @@ def test_register_app_rejects_when_only_inactive_clusters(permission_resolver, s
     assert not result.ok
     assert result.errors[0].code == "PRECONDITION"
     assert not RegisteredApp.objects.filter(slug="only-inactive").exists()
+
+
+def test_register_app_accepts_shared_null_org_cluster(permission_resolver, seed_cluster):
+    """A managed cluster with ``organization=None`` is shared (available to
+    all orgs). register_app must accept it — mirroring the deploy-time cluster
+    picker — so an org whose only managed cluster is shared isn't wrongly told
+    "no managed cluster connected" when deploy would happily use it."""
+    org, project = _scaffold_org()
+    seed_cluster(None, slug="gate-shared")  # organization=None -> shared
+    permission_resolver.grant(Permission.APP_CREATE)
+
+    with _ctx(org):
+        result = RegistryMutation().register_app(
+            _info(),
+            input=RegisterAppInput(
+                project_id=str(project.guid),
+                name="App",
+                slug="with-shared-cluster",
+                source_repo="acme/with-shared-cluster",
+            ),
+        )
+
+    assert result.ok, result.errors
+    assert RegisteredApp.objects.filter(slug="with-shared-cluster").exists()

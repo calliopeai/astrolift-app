@@ -936,8 +936,15 @@ class RegistryMutation:
         # not-yet-managed clusters don't count: only ``lifecycle =
         # "managed"`` rows (#316) have platform RBAC + a passing
         # preflight and can actually accept a deploy.
+        #
+        # TenantCluster.organization is nullable: null means shared
+        # (available to all orgs). Mirror the deploy-time cluster picker
+        # (``_resolve_app_cluster`` below + builder_views) and accept an
+        # org-scoped cluster OR a shared one — otherwise an org whose only
+        # managed cluster is shared is wrongly told "no managed cluster"
+        # even though deploy would happily use it.
         cluster_count = TenantCluster.objects.filter(
-            organization=project.organization,
+            Q(organization=project.organization) | Q(organization__isnull=True),
             deleted_at__isnull=True,
             is_active=True,
             lifecycle=TenantCluster.Lifecycle.MANAGED.value,
