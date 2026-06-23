@@ -48,7 +48,7 @@ def _deprovision_sync(
 ) -> dict[str, Any]:
     from astrolift_drivers.registry import DriverNotFound, plugins
     from astrolift_services.models import ManagedService
-    from core.cluster_observability import _config_for  # type: ignore[attr-defined]
+    from core.cluster_observability import managed_config_for
 
     svc = ManagedService.all_objects.select_related(
         "app_environment__tenant_cluster__provider_plugin",
@@ -75,7 +75,7 @@ def _deprovision_sync(
                 f"for kind={svc.kind!r} variant={variant!r}",
             ) from exc
 
-    cfg = _config_for(plugin_slug, cluster)
+    cfg = managed_config_for(plugin_slug, cluster, kind=svc.kind, variant=variant)
     driver = driver_cls(config=cfg)
 
     from _sdk.managed_service import DeprovisionSpec
@@ -181,7 +181,7 @@ async def mark_managed_service_provisioning(
 def _provision_sync(managed_service_id: int) -> dict[str, Any]:
     from astrolift_drivers.registry import DriverNotFound, plugins
     from astrolift_services.models import ManagedService
-    from core.cluster_observability import _config_for  # type: ignore[attr-defined]
+    from core.cluster_observability import managed_config_for
 
     svc = ManagedService.all_objects.select_related(
         "registered_app__organization",
@@ -208,7 +208,7 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
                 f"for kind={svc.kind!r} variant={variant!r}",
             ) from exc
 
-    cfg = _config_for(plugin_slug, cluster)
+    cfg = managed_config_for(plugin_slug, cluster, kind=svc.kind, variant=variant)
     driver = driver_cls(config=cfg)
 
     from _sdk.managed_service import ProvisionSpec

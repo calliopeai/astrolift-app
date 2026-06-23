@@ -305,6 +305,107 @@ def _config_for(plugin_slug: str, cluster: TenantCluster) -> Any:
     )
 
 
+def managed_config_for(
+    plugin_slug: str,
+    cluster: TenantCluster,
+    *,
+    kind: str,
+    variant: str = "",
+) -> Any:
+    """Build a managed-service DRIVER config from the cluster's install
+    settings (#1002).
+
+    Distinct from :func:`_config_for`, which builds the *cluster* driver
+    config (EKSConfig …). Managed-service drivers (RDS, ElastiCache, S3)
+    take their own ``*Config`` dataclass. Every field is read from the
+    cluster's ``provider_config`` (the install-time settings bundle) with
+    the driver default as the fallback, so an operator can pin anything
+    (sizing, engine, retention, encryption, prefixes) for a locked-down
+    install. VPC-bound kinds (RDS/Redis) resolve their subnet group + SG
+    from ``provider_config`` if pinned, else the platform discovers the
+    cluster VPC and creates them itself — never out-of-band terraform.
+    """
+    pc = cluster.provider_config or {}
+    ac = cluster.auth_config or {}
+    region = str(pc.get("region", ac.get("region", cluster.region or "")))
+
+    if plugin_slug != "aws":
+        raise ClusterObservabilityError(
+            f"cluster {cluster.slug}: managed-service config not wired for "
+            f"plugin {plugin_slug!r} (kind={kind!r})",
+        )
+
+    if kind == "object_store":
+        from aws.managed.object_store_s3 import S3Config
+
+        return S3Config(
+            region=region,
+            bucket_name_prefix=str(pc.get("bucket_name_prefix", "astrolift")),
+            versioning_enabled=bool(pc.get("versioning_enabled", True)),
+            public_access_blocked=bool(pc.get("public_access_blocked", True)),
+        )
+
+    if kind in ("postgres", "mysql"):
+        from aws.managed._networking import ensure_db_networking
+
+        port = 3306 if kind == "mysql" else 5432
+        subnet_group, sg_ids = ensure_db_networking(
+            cluster, region=region, port=port, service="rds",
+        )
+        if kind == "mysql":
+            from aws.managed.mysql_rds import RDSMySQLConfig
+
+            return RDSMySQLConfig(
+                region=region,
+                db_subnet_group=subnet_group,
+                security_group_ids=sg_ids,
+                instance_name_prefix=str(pc.get("instance_name_prefix", "astrolift")),
+                engine_version=str(pc.get("mysql_engine_version", "8.0")),
+                backup_retention_days=int(pc.get("backup_retention_days", 7)),
+                multi_az_default=bool(pc.get("multi_az_default", False)),
+                deletion_protection_default=bool(
+                    pc.get("deletion_protection_default", True),
+                ),
+            )
+        from aws.managed.postgres_rds import RDSConfig
+
+        return RDSConfig(
+            region=region,
+            db_subnet_group=subnet_group,
+            security_group_ids=sg_ids,
+            instance_name_prefix=str(pc.get("instance_name_prefix", "astrolift")),
+            engine_version=str(pc.get("postgres_engine_version", "16.4")),
+            backup_retention_days=int(pc.get("backup_retention_days", 7)),
+            multi_az_default=bool(pc.get("multi_az_default", False)),
+            deletion_protection_default=bool(
+                pc.get("deletion_protection_default", True),
+            ),
+        )
+
+    if kind == "redis":
+        from aws.managed._networking import ensure_db_networking
+        from aws.managed.redis_elasticache import ElastiCacheConfig
+
+        subnet_group, sg_ids = ensure_db_networking(
+            cluster, region=region, port=6379, service="elasticache",
+        )
+        return ElastiCacheConfig(
+            region=region,
+            cache_subnet_group=subnet_group,
+            security_group_ids=sg_ids,
+            replication_group_prefix=str(pc.get("instance_name_prefix", "astrolift")),
+            engine_version=str(pc.get("redis_engine_version", "7.1")),
+            transit_encryption_default=bool(pc.get("transit_encryption_default", True)),
+            at_rest_encryption_default=bool(pc.get("at_rest_encryption_default", True)),
+            snapshot_retention_days=int(pc.get("snapshot_retention_days", 7)),
+        )
+
+    raise ClusterObservabilityError(
+        f"cluster {cluster.slug}: no managed-service config builder for "
+        f"kind={kind!r} (plugin={plugin_slug!r})",
+    )
+
+
 def list_app_pods(
     *,
     cluster: TenantCluster,
