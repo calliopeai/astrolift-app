@@ -106,7 +106,14 @@ class ECRDriver(ImageRegistryDriver):
         force-deletes (must use ``force=True`` to delete repos with images).
         """
         if archive:
-            self._block_push(name=name)
+            try:
+                self._block_push(name=name)
+            except NotFoundError:
+                # Repo already absent — block-push (archive) is a no-op; the
+                # desired end state (no pushable repo) is met. Idempotent so a
+                # re-fired teardown completes instead of halting on a missing
+                # repo (#1007, extends #998's idempotency to the archive path).
+                return
             return
         try:
             self._client.delete_repository(repositoryName=name, force=True)

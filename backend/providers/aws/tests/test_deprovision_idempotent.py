@@ -45,6 +45,9 @@ def _mock_ecr():
         raise _RepoNotFound("repository does not exist")
 
     ecr.delete_repository = _raise
+    # The archive path (_block_push) calls set_repository_policy; a missing
+    # repo raises RepositoryNotFoundException there.
+    ecr.set_repository_policy = _raise
     return ecr
 
 
@@ -63,3 +66,14 @@ def test_delete_repo_idempotent_when_repo_missing():
         client=_mock_ecr(),
     )
     drv.delete_repo("astrolift-acme-missing", archive=False)
+
+
+def test_archive_repo_idempotent_when_repo_missing():
+    # The deregister workflow archives (archive=True) the repo; if it's
+    # already gone, block-push must no-op rather than raise NotFoundError
+    # (which gated soft-delete and wedged apps at tearing_down) — #1007.
+    drv = ECRDriver(
+        config=ECRConfig(region="us-west-2", account_id="1"),
+        client=_mock_ecr(),
+    )
+    drv.delete_repo("astrolift-acme-missing", archive=True)
