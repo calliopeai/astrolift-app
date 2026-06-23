@@ -59,6 +59,11 @@ class ManagedService(BaseCoreModel):
     status = models.CharField(max_length=32, choices=Status.choices, default=Status.PENDING)
     status_error = models.TextField(blank=True, default="")
     connection_secret_ref = models.CharField(max_length=512, blank=True, default="")
+    # Provider-side resource handle (e.g. "rds/<instance-id>",
+    # "object_store/<bucket>") returned by the driver's provision() and
+    # threaded back into deprovision() so teardown targets the exact
+    # cloud resource. Empty until provisioning finalizes (#1002).
+    backend_ref = models.CharField(max_length=512, blank=True, default="")
     # Per-service quick-action audit surface (#401). Captures the
     # most-recent operator-fired action against this service so the
     # Settings landing summary can render "tested 3m ago" / "revealed

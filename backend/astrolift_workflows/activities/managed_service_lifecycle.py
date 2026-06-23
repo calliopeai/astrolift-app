@@ -62,6 +62,15 @@ def _deprovision_sync(
             "message": "managed service has no bound cluster — nothing to delete",
             "handle": svc.backend_ref or "",
         }
+    if not svc.backend_ref:
+        # No provider-side resource was ever created (provision failed or
+        # never finalized) — nothing to delete. Soft-success so teardown
+        # completes instead of stalling on a non-existent resource.
+        return {
+            "ok": True,
+            "message": "managed service has no backend resource — nothing to delete",
+            "handle": "",
+        }
     plugin_slug = cluster.provider_plugin.slug
     variant = getattr(svc, "variant", "") or ""
     try:
