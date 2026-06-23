@@ -123,9 +123,20 @@ def _config_for_capability(plugin_slug: str, cluster: TenantCluster, capability:
                 cluster_oidc_issuer=str(ac.get("cluster_oidc_issuer", "")),
                 role_path=str(pc.get("irsa_role_path", "/astrolift/")),
             )
+        if capability == "secrets":
+            from aws.secrets import SecretsConfig
+
+            return SecretsConfig(
+                region=region,
+                kms_key_id=(pc.get("kms_key_id") or None),
+                secrets_manager_prefix=str(
+                    pc.get("secrets_manager_prefix", "astrolift"),
+                ),
+                ssm_prefix=str(pc.get("ssm_prefix", "/astrolift")),
+            )
 
     # Fallback: cluster-level config (EKSConfig / GKEConfig / AKSConfig) for
-    # secrets, dns, tls, and any capability without a dedicated entry above.
+    # dns, tls, and any capability without a dedicated entry above.
     return _config_for(plugin_slug, cluster)
 
 
