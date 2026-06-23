@@ -66,6 +66,14 @@ class RegisteredApp(NamedBaseCoreModel):
         PROVISIONING = "provisioning"
         READY = "ready"
         FAILED = "failed"
+        # Teardown lifecycle (#993): the deregister workflow flips an app to
+        # TEARING_DOWN while it deprovisions, then DEREGISTERED once cleanup
+        # completes. Both values are written by app_teardown's mark_* activities
+        # via ``transition_provisioning(ProvisioningStatus(...))`` — they MUST be
+        # enum members or that coercion raises ValueError and teardown crashes
+        # (leaving orphaned cloud resources, never converging).
+        TEARING_DOWN = "tearing_down"
+        DEREGISTERED = "deregistered"
 
     organization = models.ForeignKey(
         "astrolift_identity.Organization",
@@ -308,10 +316,31 @@ class RegisteredApp(NamedBaseCoreModel):
         ]
 
     _PROVISIONING_TRANSITIONS = {
-        ProvisioningStatus.PENDING: {ProvisioningStatus.PROVISIONING, ProvisioningStatus.FAILED},
-        ProvisioningStatus.PROVISIONING: {ProvisioningStatus.READY, ProvisioningStatus.FAILED},
-        ProvisioningStatus.READY: {ProvisioningStatus.PROVISIONING, ProvisioningStatus.FAILED},
-        ProvisioningStatus.FAILED: {ProvisioningStatus.PROVISIONING},
+        ProvisioningStatus.PENDING: {
+            ProvisioningStatus.PROVISIONING,
+            ProvisioningStatus.FAILED,
+            ProvisioningStatus.TEARING_DOWN,
+        },
+        ProvisioningStatus.PROVISIONING: {
+            ProvisioningStatus.READY,
+            ProvisioningStatus.FAILED,
+            ProvisioningStatus.TEARING_DOWN,
+        },
+        ProvisioningStatus.READY: {
+            ProvisioningStatus.PROVISIONING,
+            ProvisioningStatus.FAILED,
+            ProvisioningStatus.TEARING_DOWN,
+        },
+        ProvisioningStatus.FAILED: {
+            ProvisioningStatus.PROVISIONING,
+            ProvisioningStatus.TEARING_DOWN,
+        },
+        # Teardown is reachable from any live state; once tearing down it
+        # completes to DEREGISTERED (or back to FAILED if cleanup errors).
+        ProvisioningStatus.TEARING_DOWN: {
+            ProvisioningStatus.DEREGISTERED,
+            ProvisioningStatus.FAILED,
+        },
     }
 
     @property

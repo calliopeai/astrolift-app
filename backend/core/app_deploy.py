@@ -234,7 +234,7 @@ def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, An
     if managed_domain is not None and cluster is not None:
         ingress_resources = _render_managed_subdomain_ingress(
             deployment, manifest, namespace, managed_domain, cluster
-        )
+        ) or []
         _ingress_count = len(ingress_resources)
         if ingress_resources:
             resources = sorted(
@@ -390,6 +390,12 @@ def _render_managed_subdomain_ingress(
                         "nginx.ingress.kubernetes.io/server-snippet"
                     ] = 'return 503 "Astrolift: app is paused";'
                 out.append(rendered)
+
+    # Return the rendered Ingress set. Without this the function fell through
+    # to an implicit ``return None``, and the caller's ``if ingress_resources:``
+    # (None → falsy) silently dropped the managed Ingress — so is_public apps
+    # deployed with no ALB/DNS while the deploy still reported success (#992).
+    return out
 
 
 def workloads_from_resources(
