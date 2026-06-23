@@ -312,6 +312,27 @@ def _render_managed_subdomain_ingress(
                 return int(primary.port)
         return 80
 
+    # ALB target-group health-check path per workload. The default was a
+    # hardcoded ``/healthz`` (ALBConfig), but apps declare their own probe
+    # path (``[healthcheck] value`` in the manifest, e.g. ``/health``). A
+    # mismatch makes the ALB health check 404 → targets unhealthy → with an
+    # ``EvaluateTargetHealth`` alias the Route53 record returns NO answer, so
+    # the app never resolves (#997). Use the manifest's http probe path,
+    # falling back to ``/`` (not ``/healthz``).
+    def _healthcheck_path(workload_slug: str) -> str:
+        for w in manifest.workloads:
+            if w.name != workload_slug:
+                continue
+            primary = next(
+                (c for c in w.containers if getattr(c, "is_primary", False)),
+                w.containers[0] if w.containers else None,
+            )
+            if primary is not None and getattr(primary, "healthcheck_kind", "none") == "http":
+                val = getattr(primary, "healthcheck_value", "") or ""
+                if val:
+                    return val
+        return "/"
+
     if getattr(cluster, "ingress_class", None) == "alb":
         from providers.aws.ingress_alb import ALBConfig, ALBIngressDriver, CognitoAuthConfig
 
@@ -331,6 +352,7 @@ def _render_managed_subdomain_ingress(
                 region=cluster.region or "us-east-1",
                 certificate_arn=cert_arn,
                 cognito_auth=cognito_auth,
+                healthcheck_path=_healthcheck_path(computed[0].workload_slug) if computed else "/",
             )
         )
         tls_strategy = "acm_dns_validated" if cert_arn else "letsencrypt"

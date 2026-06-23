@@ -69,3 +69,8 @@ def test_managed_subdomain_ingress_returns_ingress_for_alb():
     # find the port and never provisions a load balancer.
     backend = ing["spec"]["rules"][0]["http"]["paths"][0]["backend"]["service"]["port"]["number"]
     assert backend == 8080, f"backend must use the workload port, got {backend}"
+    # #997: the ALB health-check path must come from the manifest probe
+    # (/health here), not a hardcoded /healthz — else targets go unhealthy and
+    # the EvaluateTargetHealth DNS alias returns nothing.
+    hc = ing["metadata"]["annotations"]["alb.ingress.kubernetes.io/healthcheck-path"]
+    assert hc == "/health", f"ALB healthcheck-path must follow the manifest probe, got {hc}"
