@@ -226,6 +226,30 @@ def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, An
         )
     manifest = normalize(parse_raw(app.manifest_raw), defaults=NormalizationDefaults())
     namespace = namespace_for_app(app)
+
+    # envFrom: operator secret bundles + the platform-synthesized
+    # managed-service bindings Secret (astrolift-bindings-<slug>, created by
+    # update_secrets). apply_manifests renders via THIS function, so the
+    # env only reaches workloads if it's wired here — the render_manifests
+    # Temporal activity computes the same env_from but its output isn't what
+    # gets applied (#1003). update_secrets creates the bindings Secret
+    # between apply_manifests and poll_rollout, so it exists before rollout.
+    from astrolift_services.models import AppSecretBundleRef, ManagedService
+
+    env_from = sorted(
+        AppSecretBundleRef.objects.filter(
+            registered_app=app,
+            app_environment=env,
+            deleted_at__isnull=True,
+        ).values_list("secret_bundle__slug", flat=True),
+    )
+    if ManagedService.objects.filter(
+        registered_app=app,
+        app_environment=env,
+        deleted_at__isnull=True,
+    ).exists():
+        env_from.append(f"astrolift-bindings-{app.slug}")
+
     resources = _render(
         manifest,
         app_slug=app.slug,
@@ -233,6 +257,7 @@ def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, An
         image_tag=deployment.image_tag or "latest",
         image_repository=app.registry_repo_uri or app.slug,
         environment_name=env.name,
+        env_from_secret_refs=env_from,
     )
 
     # Fold in the managed-subdomain Ingress if the environment has a

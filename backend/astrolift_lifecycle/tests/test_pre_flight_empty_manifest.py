@@ -70,3 +70,51 @@ def test_pre_flight_accepts_manifest_with_workloads(app, env):
 
     # Must not raise.
     _pre_flight_sync(deployment.pk)
+
+
+def test_render_includes_bindings_envfrom_when_managed_service_exists(app, env):
+    """Regression for #1003: render_resources_for_deployment (what
+    apply_manifests actually applies) must wire the managed-service
+    bindings Secret into the workload's envFrom. Before the fix it
+    re-rendered without env_from, so the bindings Secret (created by
+    update_secrets) was never mounted and apps saw no connection env."""
+    from astrolift_services.models import ManagedService
+    from core.app_deploy import render_resources_for_deployment
+
+    app.manifest_raw = _MANIFEST_WITH_WORKLOAD
+    app.save(update_fields=["manifest_raw"])
+    ManagedService.objects.create(
+        registered_app=app,
+        app_environment=env,
+        kind="object_store",
+        name="archive",
+        variant="s3",
+        status=ManagedService.Status.ACTIVE,
+    )
+    deployment = _make_deployment(app, env)
+
+    resources = render_resources_for_deployment(deployment)
+    deploy_res = [r for r in resources if r.get("kind") == "Deployment"]
+    assert deploy_res, "expected a Deployment resource"
+    bindings = f"astrolift-bindings-{app.slug}"
+    found = False
+    for d in deploy_res:
+        for c in d["spec"]["template"]["spec"]["containers"]:
+            refs = [e.get("secretRef", {}).get("name") for e in c.get("envFrom", [])]
+            if bindings in refs:
+                found = True
+    assert found, f"{bindings} not mounted via envFrom in any container"
+
+
+def test_render_no_bindings_envfrom_without_managed_service(app, env):
+    """No managed service → no bindings Secret mounted (clean default)."""
+    from core.app_deploy import render_resources_for_deployment
+
+    app.manifest_raw = _MANIFEST_WITH_WORKLOAD
+    app.save(update_fields=["manifest_raw"])
+    deployment = _make_deployment(app, env)
+    resources = render_resources_for_deployment(deployment)
+    for d in [r for r in resources if r.get("kind") == "Deployment"]:
+        for c in d["spec"]["template"]["spec"]["containers"]:
+            refs = [e.get("secretRef", {}).get("name") for e in c.get("envFrom", [])]
+            assert f"astrolift-bindings-{app.slug}" not in refs
