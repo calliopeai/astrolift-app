@@ -33,6 +33,7 @@ Deprovision implements the SDK's four-corner matrix:
 
 from __future__ import annotations
 
+import contextlib
 import secrets
 import string
 from dataclasses import dataclass, field
@@ -324,6 +325,7 @@ class RDSPostgresDriver(ManagedServiceDriver):
         existing = self._describe(instance_id)
         if existing is None:
             self._delete_master_password_secret(instance_id)
+            self._delete_url_secret(instance_id)
             return DeprovisionResult(
                 ok=True, handle=spec.handle,
                 message=f"db instance {instance_id} already gone",
@@ -379,6 +381,7 @@ class RDSPostgresDriver(ManagedServiceDriver):
         # from final-snapshot still has the original credentials.
         if delete_data:
             self._delete_master_password_secret(instance_id)
+            self._delete_url_secret(instance_id)
 
         return DeprovisionResult(
             ok=True, handle=spec.handle,
@@ -421,6 +424,20 @@ class RDSPostgresDriver(ManagedServiceDriver):
         db_name = existing.get("DBName", "")
         username = existing.get("MasterUsername", "astrolift")
         secret_name = self._secret_name_for(instance_id=instance_id)
+
+        # Ensure the DATABASE_URL secret exists. The master-password secret is
+        # created at provision, but the URL needs the endpoint host, which only
+        # exists once the instance is available (binding() runs post-available
+        # per #1009). Without this the DATABASE_URL secret_ref is unresolvable
+        # and the whole bindings Secret fails to build → CreateContainerConfigError.
+        self._ensure_url_secret(
+            instance_id=instance_id,
+            host=host,
+            port=port,
+            db_name=db_name,
+            username=username,
+            password_secret=secret_name,
+        )
 
         return Binding(
             # Canonical postgres envelope (astrolift_manifest.env_injection
@@ -608,6 +625,54 @@ class RDSPostgresDriver(ManagedServiceDriver):
             raise ManagedServiceError(
                 f"create_secret for {name}: {exc}",
             ) from exc
+
+    def _ensure_url_secret(
+        self,
+        *,
+        instance_id: str,
+        host: str,
+        port: str,
+        db_name: str,
+        username: str,
+        password_secret: str,
+    ) -> None:
+        """Create/update the DATABASE_URL secret (full postgres:// DSN). Built
+        from the live endpoint host + the stored master password. Idempotent."""
+        from urllib.parse import quote
+
+        if not host:
+            return  # endpoint not ready; binding() re-runs once available
+        try:
+            pw = self._sm.get_secret_value(
+                SecretId=password_secret,
+            ).get("SecretString", "")
+        except Exception:
+            return
+        url = (
+            f"postgresql://{username}:{quote(pw, safe='')}@{host}:{port}/"
+            f"{db_name}?sslmode=require"
+        )
+        name = self._secret_name_for_url(instance_id=instance_id)
+        try:
+            self._sm.create_secret(
+                Name=name,
+                Description=f"Connection URL for RDS Postgres {instance_id}",
+                SecretString=url,
+            )
+        except Exception as exc:
+            if "ResourceExistsException" in type(exc).__name__:
+                self._sm.put_secret_value(SecretId=name, SecretString=url)
+            else:
+                raise ManagedServiceError(
+                    f"create_secret for {name}: {exc}",
+                ) from exc
+
+    def _delete_url_secret(self, instance_id: str) -> None:
+        name = self._secret_name_for_url(instance_id=instance_id)
+        with contextlib.suppress(Exception):
+            self._sm.delete_secret(
+                SecretId=name, ForceDeleteWithoutRecovery=True,
+            )
 
     def _delete_master_password_secret(self, instance_id: str) -> None:
         name = self._secret_name_for(instance_id=instance_id)

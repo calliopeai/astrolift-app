@@ -41,10 +41,12 @@ def test_postgres_binding_emits_canonical_postgres_envelope():
             "MasterUsername": "astrolift",
         }],
     }
+    sm = MagicMock()
+    sm.get_secret_value.return_value = {"SecretString": "s3cr3t/p@ss"}
     drv = RDSPostgresDriver(
         config=RDSConfig(region="us-west-2", db_subnet_group="g", security_group_ids=["sg-1"]),
         rds_client=rds,
-        secrets_client=MagicMock(),
+        secrets_client=sm,
     )
     binding = drv.binding(ServiceHandle(handle="rds/astrolift-acme-prod-records"))
     keys = set(binding.env_vars)
@@ -53,6 +55,14 @@ def test_postgres_binding_emits_canonical_postgres_envelope():
     assert canonical <= keys, keys
     assert binding.env_vars["POSTGRES_PASSWORD"].secret_ref  # password is a secret ref
     assert binding.env_vars["POSTGRES_HOST"].literal == "db.example.rds.amazonaws.com"
+    # binding() must materialize the DATABASE_URL secret it references (#1009
+    # followup) — otherwise the secret-ref is unresolvable and the bindings
+    # Secret fails to build. URL must be a real postgres DSN with the password
+    # URL-encoded (the / in the password becomes %2F).
+    sm.create_secret.assert_called_once()
+    url = sm.create_secret.call_args.kwargs["SecretString"]
+    assert url.startswith("postgresql://astrolift:s3cr3t%2Fp%40ss@db.example.rds.amazonaws.com:5432/")
+    assert "sslmode=require" in url
 
 
 def test_redis_binding_emits_canonical_redis_envelope():
