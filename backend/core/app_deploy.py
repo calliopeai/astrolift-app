@@ -230,16 +230,30 @@ def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, An
     # the full resource set regardless of which code path produced it.
     managed_domain = getattr(env, "managed_domain", None)
     cluster = getattr(env, "tenant_cluster", None)
+    _ingress_count = 0
     if managed_domain is not None and cluster is not None:
         ingress_resources = _render_managed_subdomain_ingress(
             deployment, manifest, namespace, managed_domain, cluster
         )
+        _ingress_count = len(ingress_resources)
         if ingress_resources:
             resources = sorted(
                 [*resources, *ingress_resources],
                 key=lambda r: (r.get("kind", ""), r["metadata"]["name"]),
             )
 
+    log.info(
+        "render_resources_for_deployment: app=%s env=%s md_id=%s cluster_id=%s "
+        "base+ingress=%d ingress=%d kinds=%s",
+        app.slug,
+        getattr(env, "name", None),
+        getattr(env, "managed_domain_id", None),
+        getattr(env, "tenant_cluster_id", None),
+        len(resources),
+        _ingress_count,
+        [r.get("kind") for r in resources],
+        extra={"deployment_id": getattr(deployment, "pk", None)},
+    )
     return resources
 
 
