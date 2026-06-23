@@ -86,7 +86,7 @@ class ElastiCacheConfig:
     group ids must be ``[a-zA-Z][a-zA-Z0-9-]{0,39}`` so we sanitize
     the constructed name aggressively."""
 
-    engine_version: str = "7.1"
+    engine_version: str = ""
 
     transit_encryption_default: bool = True
     """Default. Operators can opt out via spec.config but the
@@ -216,6 +216,8 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
         if cfg.get("parameter_group"):
             create_kwargs["CacheParameterGroupName"] = cfg["parameter_group"]
 
+        if not engine_version:
+            create_kwargs.pop("EngineVersion", None)
         try:
             self._ec.create_replication_group(**create_kwargs)
         except Exception as exc:

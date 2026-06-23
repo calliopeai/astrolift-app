@@ -102,7 +102,7 @@ class RDSMySQLConfig:
     """Prefix on the DB instance identifier. Lets operators filter in
     the AWS console + apply tag-based budgets."""
 
-    engine_version: str = "8.0"
+    engine_version: str = ""
     """MySQL major.minor. Operators can override per-spec via
     ``spec.config.engine_version``. RDS will resolve to the latest
     patch release within the major.minor family."""
@@ -226,6 +226,8 @@ class RDSMySQLDriver(ManagedServiceDriver):
         if cfg.get("parameter_group"):
             create_kwargs["DBParameterGroupName"] = cfg["parameter_group"]
 
+        if not engine_version:
+            create_kwargs.pop("EngineVersion", None)
         try:
             self._rds.create_db_instance(**create_kwargs)
         except Exception as exc:

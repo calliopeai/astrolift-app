@@ -360,7 +360,7 @@ def managed_config_for(
                 db_subnet_group=subnet_group,
                 security_group_ids=sg_ids,
                 instance_name_prefix=str(pc.get("instance_name_prefix", "astrolift")),
-                engine_version=str(pc.get("mysql_engine_version", "8.0")),
+                engine_version=str(pc.get("mysql_engine_version", "")),
                 backup_retention_days=int(pc.get("backup_retention_days", 7)),
                 multi_az_default=bool(pc.get("multi_az_default", False)),
                 deletion_protection_default=bool(
@@ -374,7 +374,7 @@ def managed_config_for(
             db_subnet_group=subnet_group,
             security_group_ids=sg_ids,
             instance_name_prefix=str(pc.get("instance_name_prefix", "astrolift")),
-            engine_version=str(pc.get("postgres_engine_version", "16.4")),
+            engine_version=str(pc.get("postgres_engine_version", "")),
             backup_retention_days=int(pc.get("backup_retention_days", 7)),
             multi_az_default=bool(pc.get("multi_az_default", False)),
             deletion_protection_default=bool(
@@ -394,7 +394,7 @@ def managed_config_for(
             cache_subnet_group=subnet_group,
             security_group_ids=sg_ids,
             replication_group_prefix=str(pc.get("instance_name_prefix", "astrolift")),
-            engine_version=str(pc.get("redis_engine_version", "7.1")),
+            engine_version=str(pc.get("redis_engine_version", "")),
             transit_encryption_default=bool(pc.get("transit_encryption_default", True)),
             at_rest_encryption_default=bool(pc.get("at_rest_encryption_default", True)),
             snapshot_retention_days=int(pc.get("snapshot_retention_days", 7)),

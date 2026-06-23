@@ -104,8 +104,10 @@ class RDSConfig:
     """Prefix on the DB instance identifier. Lets operators filter in
     the AWS console + apply tag-based budgets."""
 
-    engine_version: str = "16.4"
-    """Postgres major.minor. Operators can override per-spec via
+    engine_version: str = ""
+    """Postgres major.minor. Empty (default) omits EngineVersion so RDS
+    picks its current default for the engine — pinning a specific minor
+    rots (AWS retires old versions). Operators can override per-spec via
     ``spec.config.engine_version``."""
 
     backup_retention_days: int = 7
@@ -232,6 +234,8 @@ class RDSPostgresDriver(ManagedServiceDriver):
         if cfg.get("parameter_group"):
             create_kwargs["DBParameterGroupName"] = cfg["parameter_group"]
 
+        if not engine_version:
+            create_kwargs.pop("EngineVersion", None)
         try:
             self._rds.create_db_instance(**create_kwargs)
         except Exception as exc:
