@@ -91,6 +91,7 @@ class ALBIngressDriver(IngressDriver):
         workload: str,
         hostnames: list[str],
         tls_strategy: str,
+        port: int = 80,
     ) -> list[Manifest]:
         """Render the Ingress + (optional) IngressClassParams.
 
@@ -121,7 +122,7 @@ class ALBIngressDriver(IngressDriver):
                                 "backend": {
                                     "service": {
                                         "name": workload,
-                                        "port": {"number": 80},
+                                        "port": {"number": port},
                                     },
                                 },
                             }

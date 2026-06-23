@@ -295,6 +295,23 @@ def _render_managed_subdomain_ingress(
     ingress_state_label = "paused" if ingress_paused else "live"
     out: list[dict[str, Any]] = []
 
+    # Backend Service port per workload. The Service exposes the primary
+    # container's port (render._render_service), so the Ingress backend must
+    # reference that exact number — not a hardcoded 80, or the LB controller
+    # rejects the Ingress ("unable to find port 80 on service") and never
+    # provisions an ALB (#996).
+    def _backend_port(workload_slug: str) -> int:
+        for w in manifest.workloads:
+            if w.name != workload_slug:
+                continue
+            primary = next(
+                (c for c in w.containers if getattr(c, "is_primary", False)),
+                w.containers[0] if w.containers else None,
+            )
+            if primary is not None and getattr(primary, "port", 0):
+                return int(primary.port)
+        return 80
+
     if getattr(cluster, "ingress_class", None) == "alb":
         from providers.aws.ingress_alb import ALBConfig, ALBIngressDriver, CognitoAuthConfig
 
@@ -326,6 +343,7 @@ def _render_managed_subdomain_ingress(
                 workload=workload_slug,
                 hostnames=hostnames,
                 tls_strategy=tls_strategy,
+                port=_backend_port(workload_slug),
             ):
                 rendered.setdefault("metadata", {})["namespace"] = namespace
                 rendered["metadata"].setdefault("labels", {})[
@@ -379,6 +397,7 @@ def _render_managed_subdomain_ingress(
                 workload=workload_slug,
                 hostnames=hostnames,
                 tls_strategy=tls_strategy,
+                port=_backend_port(workload_slug),
             ):
                 rendered.setdefault("metadata", {})["namespace"] = namespace
                 rendered["metadata"].setdefault("labels", {})[

@@ -48,6 +48,7 @@ class AzureAppGatewayIngressDriver(IngressDriver):
         workload: str,
         hostnames: list[str],
         tls_strategy: str,
+        port: int = 80,
     ) -> list[Manifest]:
         if self._config.variant == "agic":
             return self._render_agic(
@@ -149,7 +150,7 @@ class AzureAppGatewayIngressDriver(IngressDriver):
                             "backend": {
                                 "service": {
                                     "name": workload,
-                                    "port": {"number": 80},
+                                    "port": {"number": port},
                                 },
                             },
                         }

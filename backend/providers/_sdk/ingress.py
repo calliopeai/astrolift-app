@@ -26,6 +26,7 @@ class IngressDriver(Protocol):
         workload: str,
         hostnames: list[str],
         tls_strategy: str,
+        port: int = 80,
     ) -> list[Manifest]: ...
 
     def update_ingress_host(

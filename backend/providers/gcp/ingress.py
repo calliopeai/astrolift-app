@@ -48,6 +48,7 @@ class GCPIngressDriver(IngressDriver):
         workload: str,
         hostnames: list[str],
         tls_strategy: str,
+        port: int = 80,
     ) -> list[Manifest]:
         if self._config.variant == "gce_ingress":
             return self._render_gce(
@@ -147,7 +148,7 @@ class GCPIngressDriver(IngressDriver):
                             "backend": {
                                 "service": {
                                     "name": workload,
-                                    "port": {"number": 80},
+                                    "port": {"number": port},
                                 },
                             },
                         }

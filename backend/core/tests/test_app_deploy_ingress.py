@@ -64,3 +64,8 @@ def test_managed_subdomain_ingress_returns_ingress_for_alb():
     assert ing["spec"]["ingressClassName"] == "alb"
     hosts = [r["host"] for r in ing["spec"]["rules"]]
     assert "hello-web.apps.example.net" in hosts
+    # #996: the Ingress backend must reference the workload's real Service
+    # port (8080 here), not a hardcoded 80 — else the ALB controller can't
+    # find the port and never provisions a load balancer.
+    backend = ing["spec"]["rules"][0]["http"]["paths"][0]["backend"]["service"]["port"]["number"]
+    assert backend == 8080, f"backend must use the workload port, got {backend}"

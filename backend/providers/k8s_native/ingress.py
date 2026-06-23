@@ -107,6 +107,7 @@ class K8sIngressDriver(IngressDriver):
         workload: str,
         hostnames: list[str],
         tls_strategy: str,
+        port: int = 80,
     ) -> list[Manifest]:
         if self._config.variant == "nginx_ingress":
             return self._render_nginx(
@@ -281,7 +282,7 @@ class K8sIngressDriver(IngressDriver):
                             "backend": {
                                 "service": {
                                     "name": workload,
-                                    "port": {"number": 80},
+                                    "port": {"number": port},
                                 },
                             },
                         }
@@ -410,7 +411,7 @@ class K8sIngressDriver(IngressDriver):
                             {
                                 "destination": {
                                     "host": workload,
-                                    "port": {"number": 80},
+                                    "port": {"number": port},
                                 },
                             }
                         ],
