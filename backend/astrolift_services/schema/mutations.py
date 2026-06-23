@@ -1548,6 +1548,36 @@ class ServicesMutation:
             config=dict(input.config or {}),
             status=ManagedService.Status.PENDING,
         )
+
+        # Fire the workflow that actually provisions the backend resource
+        # and transitions the row PENDING -> PROVISIONING -> ACTIVE (#1001).
+        # Before this, the row was created and nothing drove it — it sat
+        # PENDING forever. Deterministic id de-dups re-fires via Temporal.
+        from astrolift_workflows.client import start_workflow
+        from astrolift_workflows.inputs import (
+            Actor,
+        )
+        from astrolift_workflows.inputs import (
+            ProvisionManagedServiceInput as ProvisionInput,
+        )
+
+        request = info.context.request  # type: ignore[attr-defined]
+        user = getattr(request, "user", None)
+        actor = Actor(
+            kind="user",
+            user_id=getattr(user, "pk", None) if user is not None else None,
+            display=str(getattr(user, "email", "") or getattr(user, "username", "")),
+        )
+        start_workflow(
+            "ProvisionManagedServiceWorkflow",
+            args=[
+                ProvisionInput(
+                    managed_service_id=svc.pk,
+                    actor=actor,
+                ),
+            ],
+            workflow_id=f"ProvisionManagedServiceWorkflow-{svc.guid}",
+        )
         return gql_success(managed_service_to_type(svc))
 
     @strawberry.field

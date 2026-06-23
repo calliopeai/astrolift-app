@@ -97,7 +97,11 @@ from astrolift_workflows.activities.install_prereqs import (
 from astrolift_workflows.activities.managed_service_lifecycle import (
     deprovision_managed_service,
     finalize_managed_service_deletion,
+    finalize_managed_service_provision,
     mark_managed_service_deprovisioning,
+    mark_managed_service_failed,
+    mark_managed_service_provisioning,
+    provision_managed_service,
 )
 from astrolift_workflows.activities.migration import (
     apply_to_target_cluster,
@@ -185,6 +189,7 @@ __all__ = [
     "expire_pending_approval_deployments",
     "fetch_app_build_strategy",
     "finalize_managed_service_deletion",
+    "finalize_managed_service_provision",
     "gc_stale_previews",
     "get_workflow_stages",
     "health_check",
@@ -207,6 +212,8 @@ __all__ = [
     "mark_managed",
     "mark_managed_domain_active",
     "mark_managed_service_deprovisioning",
+    "mark_managed_service_failed",
+    "mark_managed_service_provisioning",
     "mark_managing",
     "mark_preview_building",
     "mark_preview_failed",
@@ -224,6 +231,7 @@ __all__ = [
     "probe_required_records",
     "provision_dev_environment",
     "provision_dns_zone",
+    "provision_managed_service",
     "provision_managed_services_initial",
     "provision_namespace",
     "provision_preview_namespace",

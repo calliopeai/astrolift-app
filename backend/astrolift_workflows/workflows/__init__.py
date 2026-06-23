@@ -40,6 +40,9 @@ from astrolift_workflows.workflows.promote_deployment import PromoteDeploymentWo
 from astrolift_workflows.workflows.provision_managed_domain import (
     ProvisionManagedDomainWorkflow,
 )
+from astrolift_workflows.workflows.provision_managed_service import (
+    ProvisionManagedServiceWorkflow,
+)
 from astrolift_workflows.workflows.provision_namespace import NamespaceProvisionWorkflow
 from astrolift_workflows.workflows.provision_registry import RegistryProvisionWorkflow
 from astrolift_workflows.workflows.rollback_deployment import RollbackDeploymentWorkflow
@@ -94,6 +97,7 @@ __all__ = [
     "PreviewGarbageCollectWorkflow",
     "PromoteDeploymentWorkflow",
     "ProvisionManagedDomainWorkflow",
+    "ProvisionManagedServiceWorkflow",
     "PruneAuditLogWorkflow",
     "PruneStaleSessionsWorkflow",
     "ReconcileClusterCapabilitiesWorkflow",

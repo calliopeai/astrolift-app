@@ -154,3 +154,173 @@ async def finalize_managed_service_deletion(
     from asgiref.sync import sync_to_async
 
     await sync_to_async(_finalize_sync)(managed_service_id)
+
+
+# ---- provision (#1001) ---------------------------------------------
+# The mirror of the deprovision path: the provision mutation creates
+# the row in PENDING and fires ProvisionManagedServiceWorkflow, which
+# drives these activities (mark_provisioning -> provision -> finalize).
+# Before #1001 the mutation started no workflow and the row sat PENDING
+# forever — provisioning never ran.
+
+
+@activity.defn(name="astrolift.managed_service.mark_provisioning")
+async def mark_managed_service_provisioning(
+    managed_service_id: int,
+) -> None:
+    from asgiref.sync import sync_to_async
+
+    from astrolift_services.models import ManagedService
+
+    await sync_to_async(_mark_status_sync)(
+        managed_service_id,
+        ManagedService.Status.PROVISIONING,
+    )
+
+
+def _provision_sync(managed_service_id: int) -> dict[str, Any]:
+    from astrolift_drivers.registry import DriverNotFound, plugins
+    from astrolift_services.models import ManagedService
+    from core.cluster_observability import _config_for  # type: ignore[attr-defined]
+
+    svc = ManagedService.all_objects.select_related(
+        "registered_app__organization",
+        "app_environment__tenant_cluster__provider_plugin",
+    ).get(pk=managed_service_id)
+    env = svc.app_environment
+    cluster = env.tenant_cluster
+    if cluster is None:
+        raise RuntimeError(
+            f"managed service {svc.pk} env has no tenant_cluster bound",
+        )
+    plugin_slug = cluster.provider_plugin.slug
+    variant = getattr(svc, "variant", "") or ""
+    try:
+        driver_cls = plugins.get(plugin_slug, f"managed:{svc.kind}:{variant}")
+    except DriverNotFound:
+        # Some plugins register the empty-variant default
+        # (``managed:postgres:`` rather than ``managed:postgres:rds``).
+        try:
+            driver_cls = plugins.get(plugin_slug, f"managed:{svc.kind}:")
+        except DriverNotFound as exc:
+            raise RuntimeError(
+                f"cluster {cluster.slug}: plugin {plugin_slug!r} has no managed-service driver "
+                f"for kind={svc.kind!r} variant={variant!r}",
+            ) from exc
+
+    cfg = _config_for(plugin_slug, cluster)
+    driver = driver_cls(config=cfg)
+
+    from _sdk.managed_service import ProvisionSpec
+
+    app = svc.registered_app
+    org = app.organization
+    svc_config = dict(svc.config or {})
+    spec = ProvisionSpec(
+        organization_id=str(getattr(org, "guid", "") or ""),
+        organization_slug=getattr(org, "slug", "") or "",
+        app_id=str(getattr(app, "guid", "") or ""),
+        app_slug=app.slug,
+        environment_id=str(getattr(env, "guid", "") or ""),
+        environment_name=env.name,
+        tenant_cluster_id=str(getattr(cluster, "guid", "") or ""),
+        service_handle_hint=svc.name or svc.kind,
+        size=str(svc_config.get("size", "small")),
+        config=svc_config,
+        managed_service_id=str(getattr(svc, "guid", "") or svc.pk),
+    )
+    result = driver.provision(spec)
+    return {
+        "ok": bool(getattr(result, "ok", False)),
+        "handle": str(getattr(result, "handle", "")),
+        "message": str(getattr(result, "message", "")),
+        "errors": list(getattr(result, "errors", []) or []),
+    }
+
+
+@activity.defn(name="astrolift.managed_service.provision")
+async def provision_managed_service(
+    managed_service_id: int,
+) -> dict[str, Any]:
+    """Resolve the ``managed:<kind>:<variant>`` driver and call
+    ``provision``. Idempotent — drivers probe for an existing resource
+    and return ``ok=True`` if it's already there, so retries are safe.
+    Raises on ``ok=False`` so Temporal honors the RetryPolicy.
+    """
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    result = await sync_to_async(_provision_sync)(managed_service_id)
+    log.info(
+        "provision_managed_service result=%s",
+        result,
+        extra={"managed_service_id": managed_service_id},
+    )
+    if not result["ok"]:
+        raise RuntimeError(
+            result["message"] or "driver.provision returned ok=False",
+        )
+    return result
+
+
+def _finalize_provision_sync(managed_service_id: int, handle: str) -> None:
+    from astrolift_services.models import ManagedService
+
+    svc = ManagedService.all_objects.get(pk=managed_service_id)
+    if handle:
+        svc.backend_ref = handle
+    svc.status = ManagedService.Status.ACTIVE
+    svc.status_error = ""
+    svc.save(
+        update_fields=[
+            "backend_ref",
+            "status",
+            "status_error",
+            "updated_at",
+            "version",
+        ],
+    )
+
+
+@activity.defn(name="astrolift.managed_service.finalize_provision")
+async def finalize_managed_service_provision(
+    managed_service_id: int,
+    handle: str,
+) -> None:
+    """Persist the driver's backend handle and flip the row to ACTIVE.
+
+    Decoupled from the provision call so a DB hiccup persisting the
+    handle can be retried without re-issuing the (idempotent) cloud
+    provision.
+    """
+    from asgiref.sync import sync_to_async
+
+    await sync_to_async(_finalize_provision_sync)(managed_service_id, handle)
+
+
+def _mark_failed_sync(managed_service_id: int, error: str) -> None:
+    from astrolift_services.models import ManagedService
+
+    svc = ManagedService.all_objects.get(pk=managed_service_id)
+    svc.status = ManagedService.Status.FAILED
+    svc.status_error = error[:4000]
+    svc.save(
+        update_fields=[
+            "status",
+            "status_error",
+            "updated_at",
+            "version",
+        ],
+    )
+
+
+@activity.defn(name="astrolift.managed_service.mark_failed")
+async def mark_managed_service_failed(
+    managed_service_id: int,
+    error: str,
+) -> None:
+    """Flip the row to FAILED with the error surfaced on ``status_error``
+    so the operator sees why provisioning didn't complete."""
+    from asgiref.sync import sync_to_async
+
+    await sync_to_async(_mark_failed_sync)(managed_service_id, error)

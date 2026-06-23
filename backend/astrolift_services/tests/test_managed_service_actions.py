@@ -21,6 +21,7 @@ from astrolift_operations.email_infra import (
 from astrolift_registry.models import RegisteredApp
 from astrolift_services.models import ManagedService
 from astrolift_services.schema.mutations import (
+    ProvisionManagedServiceInput,
     RevealManagedServiceConnectionInput,
     SendManagedServiceTestEmailInput,
     ServicesMutation,
@@ -107,6 +108,67 @@ def _scaffold():
 
 def _ctx(org):
     return tenant_context(TenantContext(organization_id=org.id))
+
+
+# ---- provisionManagedService (#1001) ----------------------------------
+
+
+def test_provision_creates_pending_row_and_starts_workflow(permission_resolver):
+    """Regression for #1001: the mutation must both create the PENDING
+    row AND fire ProvisionManagedServiceWorkflow. Before the fix it only
+    created the row, so provisioning never ran (row stuck PENDING)."""
+    from unittest.mock import patch
+
+    org, app, env = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with _ctx(org), patch(
+        "astrolift_workflows.client.start_workflow",
+    ) as start_wf:
+        result = ServicesMutation().provision_managed_service(
+            _info(user=_make_user()),
+            input=ProvisionManagedServiceInput(
+                app_slug=app.slug,
+                environment_name=env.name,
+                kind="postgres",
+                name="records",
+                variant="rds",
+            ),
+        )
+
+    assert result.ok, result.errors
+    svc = ManagedService.objects.get(registered_app=app, kind="postgres", name="records")
+    assert svc.status == ManagedService.Status.PENDING
+
+    # The workflow MUST be started — this is the #1001 fix.
+    start_wf.assert_called_once()
+    call = start_wf.call_args
+    assert call.args[0] == "ProvisionManagedServiceWorkflow"
+    wf_input = call.kwargs["args"][0]
+    assert wf_input.managed_service_id == svc.pk
+    assert call.kwargs["workflow_id"] == f"ProvisionManagedServiceWorkflow-{svc.guid}"
+
+
+def test_provision_rejects_unknown_kind(permission_resolver):
+    org, app, env = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    from unittest.mock import patch
+
+    with _ctx(org), patch("astrolift_workflows.client.start_workflow") as start_wf:
+        result = ServicesMutation().provision_managed_service(
+            _info(user=_make_user()),
+            input=ProvisionManagedServiceInput(
+                app_slug=app.slug,
+                environment_name=env.name,
+                kind="not-a-real-kind",
+                name="x",
+                variant="",
+            ),
+        )
+    assert not result.ok
+    # No row, no workflow on a validation failure.
+    assert not ManagedService.objects.filter(registered_app=app, name="x").exists()
+    start_wf.assert_not_called()
 
 
 # ---- revealManagedServiceConnection -----------------------------------
