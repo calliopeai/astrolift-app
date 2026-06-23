@@ -1082,6 +1082,18 @@ class EKSClusterDriver(ClusterDriver):
                 ),
                 helm_values={
                     "provider": "aws",
+                    # policy=sync (the chart defaults to upsert-only) so that
+                    # when an app's Ingress/Service is deleted on teardown,
+                    # external-dns reaps the A + owner-TXT records it created.
+                    # Under upsert-only it never deletes, orphaning Route53
+                    # records on every deregister and breaking verify-clean.
+                    "policy": "sync",
+                    # Scope sync deletes to records THIS cluster owns. Required
+                    # whenever installs can share one hosted zone (the N-installs
+                    # topology): without a unique owner id, one cluster's
+                    # external-dns would treat another's records as orphans and
+                    # delete them. txt registry is on by chart default.
+                    "txtOwnerId": eks_cluster_name,
                     "sources": ["service", "ingress"],
                     "serviceAccount": _sa_with_irsa("external-dns"),
                 },

@@ -465,6 +465,27 @@ def _alb_values(components: list) -> dict:
     raise AssertionError("aws-load-balancer-controller component not found")
 
 
+def _component_values(components: list, key: str) -> dict:
+    for c in components:
+        if c.key == key:
+            return c.helm_values
+    raise AssertionError(f"{key} component not found")
+
+
+def test_bootstrap_external_dns_sync_policy_scoped_to_cluster(fake_k8s_client) -> None:
+    """external-dns must run with policy=sync (the chart defaults to
+    upsert-only, which never deletes → orphaned Route53 records on every
+    app teardown) and a per-cluster txtOwnerId so sync deletes are scoped
+    to records this cluster owns when installs share a hosted zone."""
+    with _bootstrap_driver(fake_k8s_client) as (driver, _):
+        ctx = ClusterContext(slug="aws-prod", auth_method="exec_plugin")
+
+        values = _component_values(driver.bootstrap_components(ctx), "external-dns")
+
+        assert values["policy"] == "sync"
+        assert values["txtOwnerId"] == _CLUSTER
+
+
 def test_bootstrap_sets_backend_sg_to_node_shared_sg(fake_k8s_client) -> None:
     """The LB controller's backendSecurityGroup resolves to the
     ``*-node-*`` shared SG, not the ``eks-cluster-sg-*`` group — the
