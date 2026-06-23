@@ -118,7 +118,17 @@ class AWSSecretsBackend(SecretsBackend):
     # ---- Secrets Manager backend ----------------------------------
 
     def _sm_name(self, path: str) -> str:
-        return f"{self._config.secrets_manager_prefix}/{path.lstrip('/')}"
+        # Resolve to a Secrets Manager name. Relative refs (app secret
+        # bundles) get the backend prefix prepended; absolute refs that
+        # already carry the prefix (e.g. a managed-service driver stored a
+        # secret at "astrolift/rds/<inst>/url" and the binding references it
+        # verbatim) are used as-is — otherwise we'd double-prefix to
+        # "astrolift/astrolift/rds/..." and the lookup 404s.
+        prefix = self._config.secrets_manager_prefix
+        p = path.lstrip("/")
+        if p == prefix or p.startswith(f"{prefix}/"):
+            return p
+        return f"{prefix}/{p}"
 
     def _sm_get(self, path: str) -> dict[str, str] | None:
         try:

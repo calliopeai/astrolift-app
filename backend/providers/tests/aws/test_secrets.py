@@ -150,3 +150,25 @@ def test_sm_and_ssm_dont_collide(
 
     assert sm_backend.get("my-app/v") == {"in": "sm"}
     assert sm_backend.get("ssm:my-app/v") == {"in": "ssm"}
+
+
+def test_sm_name_no_double_prefix():
+    """Absolute refs that already carry the backend prefix (e.g. a managed-
+    service driver stored at 'astrolift/rds/<inst>/url' and the binding
+    references it verbatim) must NOT be re-prefixed to
+    'astrolift/astrolift/...' — that 404s and breaks binding resolution."""
+    from unittest.mock import MagicMock
+
+    from aws.secrets import AWSSecretsBackend, SecretsConfig
+
+    b = AWSSecretsBackend(
+        config=SecretsConfig(region="us-east-1"),  # prefix defaults to "astrolift"
+        sm_client=MagicMock(),
+        ssm_client=MagicMock(),
+    )
+    # relative ref → prefixed
+    assert b._sm_name("acme/app/prod/db") == "astrolift/acme/app/prod/db"
+    # absolute ref already carrying the prefix → used verbatim
+    assert b._sm_name("astrolift/rds/inst/url") == "astrolift/rds/inst/url"
+    assert b._sm_name("/astrolift/rds/inst/url") == "astrolift/rds/inst/url"
+    assert b._sm_name("astrolift") == "astrolift"
