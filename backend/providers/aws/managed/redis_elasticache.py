@@ -396,16 +396,20 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
         )
         auth_secret_name = self._auth_secret_name_for(rg_id=rg_id)
 
+        # Canonical redis envelope (env_injection._ENVELOPES["redis"]) —
+        # the contract apps read. REDIS_USER is the ACL username; Redis
+        # defaults to "default" unless ACLs carve out per-app users.
         env_vars: dict[str, ValueRef] = {
             "REDIS_HOST": ValueRef(literal=host),
             "REDIS_PORT": ValueRef(literal=port),
+            "REDIS_USER": ValueRef(literal="default"),
             "REDIS_TLS": ValueRef(
                 literal="1" if transit_encryption else "0",
             ),
         }
         iam_grants: list[Grant] = []
         if transit_encryption:
-            env_vars["REDIS_AUTH_TOKEN"] = ValueRef(
+            env_vars["REDIS_PASSWORD"] = ValueRef(
                 secret_ref=auth_secret_name,
             )
             env_vars["REDIS_URL"] = ValueRef(

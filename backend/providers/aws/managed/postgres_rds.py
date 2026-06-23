@@ -423,12 +423,17 @@ class RDSPostgresDriver(ManagedServiceDriver):
         secret_name = self._secret_name_for(instance_id=instance_id)
 
         return Binding(
+            # Canonical postgres envelope (astrolift_manifest.env_injection
+            # ._ENVELOPES["postgres"]) — the contract apps read. Keep these
+            # keys in lockstep with that envelope, not a driver-local naming.
             env_vars={
-                "DATABASE_HOST": ValueRef(literal=host),
-                "DATABASE_PORT": ValueRef(literal=port),
-                "DATABASE_NAME": ValueRef(literal=db_name),
-                "DATABASE_USER": ValueRef(literal=username),
-                "DATABASE_PASSWORD": ValueRef(secret_ref=secret_name),
+                "POSTGRES_HOST": ValueRef(literal=host),
+                "POSTGRES_PORT": ValueRef(literal=port),
+                "POSTGRES_DB": ValueRef(literal=db_name),
+                "POSTGRES_USER": ValueRef(literal=username),
+                "POSTGRES_PASSWORD": ValueRef(secret_ref=secret_name),
+                # RDS storage is encrypted; require TLS client-side by default.
+                "POSTGRES_SSL_MODE": ValueRef(literal="require"),
                 "DATABASE_URL": ValueRef(
                     secret_ref=self._secret_name_for_url(
                         instance_id=instance_id,

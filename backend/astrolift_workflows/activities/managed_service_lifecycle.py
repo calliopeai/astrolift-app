@@ -289,6 +289,57 @@ def _finalize_provision_sync(managed_service_id: int, handle: str) -> None:
             "version",
         ],
     )
+    # Materialize the connection-envelope binding rows (#1003). The deploy
+    # render builds the per-app ``astrolift-bindings-<slug>`` Secret from
+    # these rows (resolving secret refs via the cluster secrets backend) and
+    # mounts it via envFrom — without them a provisioned service injects no
+    # env and the app can't consume it.
+    _sync_binding_rows(svc)
+
+
+def _sync_binding_rows(svc: Any) -> None:
+    """(Re)create ``ManagedServiceBinding`` rows from the driver's connection
+    envelope. Idempotent: clears existing rows for the service first so a
+    finalize retry doesn't duplicate them."""
+    from astrolift_drivers.registry import DriverNotFound, plugins
+    from astrolift_services.models import ManagedServiceBinding
+    from core.cluster_observability import managed_config_for
+
+    if not svc.backend_ref:
+        return
+    cluster = svc.app_environment.tenant_cluster
+    if cluster is None:
+        return
+    plugin_slug = cluster.provider_plugin.slug
+    variant = getattr(svc, "variant", "") or ""
+    try:
+        driver_cls = plugins.get(plugin_slug, f"managed:{svc.kind}:{variant}")
+    except DriverNotFound:
+        try:
+            driver_cls = plugins.get(plugin_slug, f"managed:{svc.kind}:")
+        except DriverNotFound:
+            return
+    cfg = managed_config_for(plugin_slug, cluster, kind=svc.kind, variant=variant)
+    driver = driver_cls(config=cfg)
+
+    binding_method = getattr(driver, "binding", None)
+    if not callable(binding_method):
+        return
+    from _sdk.managed_service import ServiceHandle
+
+    binding = binding_method(ServiceHandle(handle=svc.backend_ref))
+    env_vars = getattr(binding, "env_vars", {}) or {}
+
+    ManagedServiceBinding.objects.filter(managed_service=svc).delete()
+    for env_key, value_ref in env_vars.items():
+        secret_ref = getattr(value_ref, "secret_ref", None)
+        literal = getattr(value_ref, "literal", None)
+        ManagedServiceBinding.objects.create(
+            managed_service=svc,
+            env_key=env_key,
+            env_value_ref=secret_ref if secret_ref else (literal or ""),
+            is_secret=bool(secret_ref),
+        )
 
 
 @activity.defn(name="astrolift.managed_service.finalize_provision")

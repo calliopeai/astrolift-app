@@ -310,10 +310,17 @@ class S3Driver(ManagedServiceDriver):
         _, bucket_name = parse_handle(handle.handle)
         bucket_arn = f"arn:aws:s3:::{bucket_name}"
         return Binding(
+            # Canonical object_store envelope (env_injection._ENVELOPES
+            # ["object_store"]) — the contract apps read. S3_BUCKET_ARN is
+            # kept as an extra for IAM-aware callers.
             env_vars={
-                "S3_BUCKET_NAME": ValueRef(literal=bucket_name),
+                "BUCKET_NAME": ValueRef(literal=bucket_name),
+                "BUCKET_REGION": ValueRef(literal=self._config.region),
+                "BUCKET_ENDPOINT": ValueRef(
+                    literal=f"https://s3.{self._config.region}.amazonaws.com",
+                ),
+                "BUCKET_PREFIX": ValueRef(literal=""),
                 "S3_BUCKET_ARN": ValueRef(literal=bucket_arn),
-                "AWS_REGION": ValueRef(literal=self._config.region),
             },
             iam_grants=[
                 Grant(
