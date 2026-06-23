@@ -272,6 +272,53 @@ async def provision_managed_service(
     return result
 
 
+def _check_ready_sync(managed_service_id: int, handle: str) -> str:
+    """Return the driver-reported readiness state for the backend resource
+    (provisioning | available | updating | error | deprovisioned ...)."""
+    from astrolift_drivers.registry import DriverNotFound, plugins
+    from astrolift_services.models import ManagedService
+    from core.cluster_observability import managed_config_for
+
+    svc = ManagedService.all_objects.select_related(
+        "app_environment__tenant_cluster__provider_plugin",
+    ).get(pk=managed_service_id)
+    cluster = svc.app_environment.tenant_cluster
+    if cluster is None:
+        return "available"  # nothing to wait on
+    plugin_slug = cluster.provider_plugin.slug
+    variant = getattr(svc, "variant", "") or ""
+    try:
+        driver_cls = plugins.get(plugin_slug, f"managed:{svc.kind}:{variant}")
+    except DriverNotFound:
+        try:
+            driver_cls = plugins.get(plugin_slug, f"managed:{svc.kind}:")
+        except DriverNotFound:
+            return "available"
+    cfg = managed_config_for(plugin_slug, cluster, kind=svc.kind, variant=variant)
+    driver = driver_cls(config=cfg)
+    status_method = getattr(driver, "status", None)
+    if not callable(status_method):
+        return "available"
+    from _sdk.managed_service import ServiceHandle
+
+    return str(getattr(status_method(ServiceHandle(handle=handle)), "state", "available"))
+
+
+@activity.defn(name="astrolift.managed_service.check_ready")
+async def check_managed_service_ready(
+    managed_service_id: int,
+    handle: str,
+) -> str:
+    """One readiness probe of the backing resource. The workflow polls this
+    (with a timer between calls) until ``available`` so finalize materializes
+    bindings against a real endpoint — RDS/ElastiCache report ``provisioning``
+    until the instance is up; S3 is ``available`` immediately (#1009)."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    return await sync_to_async(_check_ready_sync)(managed_service_id, handle)
+
+
 def _finalize_provision_sync(managed_service_id: int, handle: str) -> None:
     from astrolift_services.models import ManagedService
 

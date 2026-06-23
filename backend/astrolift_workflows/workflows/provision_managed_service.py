@@ -39,6 +39,7 @@ from astrolift_workflows.inputs import ProvisionManagedServiceInput, WorkflowRes
 
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities import (
+        check_managed_service_ready,
         finalize_managed_service_provision,
         mark_managed_service_failed,
         mark_managed_service_provisioning,
@@ -103,6 +104,34 @@ class ProvisionManagedServiceWorkflow:
             return WorkflowResult(ok=False, message=message)
 
         handle = result.get("handle", "") if isinstance(result, dict) else ""
+
+        # Wait until the backing resource is actually ready before finalize
+        # materializes the connection bindings — RDS/ElastiCache report
+        # `provisioning` until the endpoint exists, so binding() at finalize
+        # would otherwise capture an empty host (#1009). S3 is `available`
+        # immediately, so this is a no-op for it. Bounded (~20 min) timer poll
+        # rather than a long blocking activity (avoids the #1004 trap).
+        if handle:
+            for _ in range(60):
+                state = await workflow.execute_activity(
+                    check_managed_service_ready,
+                    args=[svc_id, handle],
+                    start_to_close_timeout=_QUICK_TIMEOUT,
+                    retry_policy=_STATUS_RETRY,
+                )
+                if state == "available":
+                    break
+                if state in ("error", "deprovisioned"):
+                    msg = f"managed service backend not ready: state={state}"
+                    await workflow.execute_activity(
+                        mark_managed_service_failed,
+                        args=[svc_id, msg],
+                        start_to_close_timeout=_QUICK_TIMEOUT,
+                        retry_policy=_STATUS_RETRY,
+                    )
+                    return WorkflowResult(ok=False, message=msg)
+                await workflow.sleep(timedelta(seconds=20))
+
         await workflow.execute_activity(
             finalize_managed_service_provision,
             args=[svc_id, handle],

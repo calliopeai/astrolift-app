@@ -95,6 +95,7 @@ from astrolift_workflows.activities.install_prereqs import (
     record_cluster_bootstrap_run,
 )
 from astrolift_workflows.activities.managed_service_lifecycle import (
+    check_managed_service_ready,
     deprovision_managed_service,
     finalize_managed_service_deletion,
     finalize_managed_service_provision,
@@ -176,6 +177,7 @@ __all__ = [
     "deprovision_app_identity_role",
     "deprovision_app_ingress",
     "deprovision_app_registry_repo",
+    "check_managed_service_ready",
     "deprovision_managed_service",
     "detect_drift",
     "dispatch_agent_crons",
