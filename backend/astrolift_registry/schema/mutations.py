@@ -1086,6 +1086,34 @@ class RegistryMutation:
         # OnboardAppWorkflow), never touches ``manifest_raw``, and no-ops when
         # no managed cluster is bound. The manifest declares no environments,
         # so pass ``[]`` — ``_bootstrap`` defaults to a ``production`` env.
+        # Materialize the manifest's Workload + Container rows (#1014) so a
+        # manifest-declared workload — notably a ``kind=agent`` — is
+        # MANAGEABLE (run-spec, scale, live status, the agent fleet all key
+        # on Workload rows), not merely deployable (the renderer reads
+        # manifest_raw directly). Reuses the same persist path the SCM /
+        # registerAgentRepo flow already uses, so direct-upload apps reach
+        # parity. Best-effort + idempotent: a malformed manifest does not fail
+        # registration (the raw is stored and validated again at deploy time).
+        if (input.manifest_raw or "").strip():
+            try:
+                from astrolift_manifest.normalize import (
+                    NormalizationDefaults,
+                    normalize,
+                )
+                from astrolift_manifest.parser import parse_raw
+                from astrolift_manifest.persist import persist_manifest
+
+                _manifest = normalize(
+                    parse_raw(input.manifest_raw),
+                    defaults=NormalizationDefaults(),
+                )
+                persist_manifest(app, _manifest, raw_text=input.manifest_raw)
+            except Exception:
+                logging.getLogger(__name__).exception(
+                    "register_app: manifest workload persist failed for %s",
+                    app.slug,
+                )
+
         _bootstrap_app_environments(app, [])
         return gql_success(app_to_type(app))
 
