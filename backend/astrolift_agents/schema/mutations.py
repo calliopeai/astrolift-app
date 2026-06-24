@@ -259,6 +259,18 @@ class LaunchTaskResult:
     task_id: GUID | None = None
 
 
+@strawberry.type(name="AstroliftAgentTriggerResult")
+class AgentTriggerResult:
+    """Result of creating an agent trigger webhook (#983). ``signing_secret``
+    is the plaintext secret — shown ONCE here, stored only as a hash."""
+
+    ok: bool
+    message: str = ""
+    slug: str | None = None
+    endpoint: str | None = None
+    signing_secret: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -877,6 +889,54 @@ class AgentsMutation:
         )
 
         return gql_success(agent_task_to_type(task))
+
+    @strawberry.field
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def create_agent_trigger(
+        self, info: Info, agent_slug: str
+    ) -> AgentTriggerResult:
+        """Create an inbound trigger webhook bound to an agent ``Workload``
+        (spec 33, PR-6 / #983).
+
+        The dispatch side (``dispatch_agent_task_from_webhook``) + the model's
+        ``agent_definition`` FK already exist; this is the creation seam. Returns
+        the endpoint + plaintext signing secret (shown once). Fire it with
+        ``POST <endpoint>`` and header ``X-Astrolift-Signature: <secret>``.
+        """
+        from astrolift_agents.services.workflow_triggers import (
+            create_agent_webhook_trigger,
+        )
+
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        if org_pk is None:
+            return AgentTriggerResult(ok=False, message="no active organization")
+
+        slug = (agent_slug or "").strip()
+        if not slug:
+            return AgentTriggerResult(ok=False, message="agentSlug is required")
+
+        workload = (
+            Workload.objects.filter(
+                slug=slug,
+                registered_app__organization_id=org_pk,
+                registered_app__deleted_at__isnull=True,
+                deleted_at__isnull=True,
+            )
+            .select_related("registered_app", "registered_app__organization")
+            .first()
+        )
+        if workload is None or workload.kind != Workload.Kind.AGENT:
+            return AgentTriggerResult(ok=False, message="agent not found")
+
+        result = create_agent_webhook_trigger(workload)
+        return AgentTriggerResult(
+            ok=True,
+            slug=result["slug"],
+            endpoint=result["endpoint"],
+            signing_secret=result["signing_secret"],
+        )
 
     @strawberry.field
     @mutation_audit(

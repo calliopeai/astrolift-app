@@ -311,6 +311,50 @@ def create_webhook_workflow_trigger(
     }
 
 
+def create_agent_webhook_trigger(
+    workload,
+    webhook_slug: str | None = None,
+    *,
+    input_mapping: dict | None = None,
+) -> dict:
+    """Register a ``WorkflowWebhook`` that dispatches *workload* (an agent
+    Workload) on inbound POST to ``/api/webhooks/workflow/<org>/<slug>``.
+
+    The agent-bound sibling of ``create_webhook_workflow_trigger`` — the
+    inbound dispatch side (``dispatch_agent_task_from_webhook``) and the
+    model's ``agent_definition`` FK already exist (spec 33, PR-6); this is
+    the missing creation seam (#983). Same secret contract: stored as
+    SHA-256(plaintext), plaintext returned once. The webhook is org-scoped
+    (resolved by ``<org>/<slug>``) and carries no SCM app binding.
+    """
+    from astrolift_agents.models.workflow_trigger import WorkflowWebhook
+
+    org = workload.registered_app.organization
+    slug = webhook_slug or _random_slug()
+    plaintext_secret = secrets.token_urlsafe(32)
+    secret_hash = hashlib.sha256(plaintext_secret.encode()).hexdigest()
+
+    with transaction.atomic():
+        hook = WorkflowWebhook.objects.create(
+            agent_definition=workload,
+            organization=org,
+            slug=slug,
+            secret_hash=secret_hash,
+            input_mapping=input_mapping or {},
+            enabled=True,
+        )
+
+    endpoint = f"/api/webhooks/workflow/{org.slug}/{slug}"
+    log.info("created agent webhook %s → workload %s", slug, workload.pk)
+
+    return {
+        "slug": slug,
+        "endpoint": endpoint,
+        "signing_secret": plaintext_secret,
+        "webhook_id": hook.pk,
+    }
+
+
 # ── SCM routing (#863) ───────────────────────────────────────────────────────
 
 

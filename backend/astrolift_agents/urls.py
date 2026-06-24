@@ -24,6 +24,7 @@ from __future__ import annotations
 from django.urls import path
 
 from astrolift_agents.views.skill_ai_assist import skill_ai_assist
+from astrolift_agents.views.workflow_webhook import workflow_webhook
 
 app_name = "astrolift_agents"
 
@@ -35,5 +36,12 @@ urlpatterns = [
         "api/agents/v1/skills/ai-assist/",
         skill_ai_assist,
         name="skill-ai-assist",
+    ),
+    # Generic inbound workflow/agent trigger (#983). Org-level webhook the
+    # WorkflowWebhook model documents; secret-authenticated, csrf-exempt.
+    path(
+        "api/webhooks/workflow/<str:org_slug>/<slug:slug>",
+        workflow_webhook,
+        name="workflow-webhook",
     ),
 ]
