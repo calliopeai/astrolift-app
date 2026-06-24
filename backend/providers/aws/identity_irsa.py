@@ -109,7 +109,31 @@ class IRSADriver(WorkloadIdentityDriver):
                 ],
             )
         except self._iam.exceptions.EntityAlreadyExistsException:
-            # Idempotent — return the existing ARN
+            # Idempotent + self-healing: the role exists, but its trust or
+            # inline policy may be stale — e.g. the OIDC issuer was empty on
+            # the first create (producing a broken oidc-provider/ principal),
+            # or the service's grants changed. Re-assert both against the
+            # current (correct) trust + permissions. bind_service_account
+            # runs next and re-adds the (namespace, sa) subject, so resetting
+            # to the subject-less base trust here is safe.
+            try:
+                self._iam.update_assume_role_policy(
+                    RoleName=name,
+                    PolicyDocument=json.dumps(trust_policy),
+                )
+                if permissions:
+                    self._iam.put_role_policy(
+                        RoleName=name,
+                        PolicyName="astrolift-workload-policy",
+                        PolicyDocument=json.dumps(
+                            {
+                                "Version": "2012-10-17",
+                                "Statement": permissions,
+                            }
+                        ),
+                    )
+            except Exception as exc:
+                raise map_client_error(exc) from exc
             return self._role_arn(name)
         except Exception as exc:
             raise map_client_error(exc) from exc
@@ -314,6 +338,27 @@ class IRSADriver(WorkloadIdentityDriver):
             )
         except Exception as exc:
             raise map_client_error(exc) from exc
+
+
+def discover_oidc_issuer(region: str, cluster_name: str) -> str:
+    """Return the EKS cluster's OIDC issuer (host + path, no ``https://``),
+    or ``""`` if it can't be read.
+
+    IRSA's trust policy binds to this issuer; Astrolift is BYOC, so rather
+    than require it to be populated out-of-band the platform discovers it
+    from ``eks:DescribeCluster`` and caches it on the cluster row. The IAM
+    ``oidc-provider/<issuer>`` ARN + the ``<issuer>:sub`` trust condition are
+    built from this, so an empty value yields a broken trust — callers
+    should treat ``""`` as "cannot bind workload identity yet"."""
+    import boto3
+
+    eks = boto3.client("eks", region_name=region)
+    try:
+        cluster = eks.describe_cluster(name=cluster_name)["cluster"]
+    except Exception:
+        return ""
+    issuer = (((cluster.get("identity") or {}).get("oidc") or {}).get("issuer")) or ""
+    return issuer.removeprefix("https://")
 
 
 def _summarize_trust(trust_doc: dict[str, Any], oidc_issuer: str) -> str:

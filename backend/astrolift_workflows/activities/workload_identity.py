@@ -59,6 +59,33 @@ def _permissions_from_bindings(bindings: list[Any]) -> list[dict[str, Any]]:
     return permissions
 
 
+def _ensure_cluster_oidc_issuer(cluster: Any) -> None:
+    """Ensure ``cluster.auth_config['cluster_oidc_issuer']`` is populated.
+
+    IRSA's trust policy is built from the cluster's OIDC issuer. Rather than
+    require it to be set out-of-band, discover it from EKS and cache it on
+    the cluster row (mirrors the on-demand discovery managed-service
+    networking does). No-op when already set or when the provider isn't AWS.
+    """
+    ac = cluster.auth_config or {}
+    if ac.get("cluster_oidc_issuer"):
+        return
+    if getattr(getattr(cluster, "provider_plugin", None), "slug", "") != "aws":
+        return
+    from aws.identity_irsa import discover_oidc_issuer
+
+    pc = cluster.provider_config or {}
+    region = str(pc.get("region", ac.get("region", cluster.region or "")))
+    cluster_name = str(pc.get("cluster_name", ac.get("cluster_name", cluster.slug)))
+    issuer = discover_oidc_issuer(region, cluster_name)
+    if not issuer:
+        return
+    new_ac = dict(ac)
+    new_ac["cluster_oidc_issuer"] = issuer
+    cluster.auth_config = new_ac
+    cluster.save(update_fields=["auth_config"])
+
+
 def _ensure_workload_identity_sync(
     registered_app_id: int,
     app_environment_id: int,
@@ -111,6 +138,12 @@ def _ensure_workload_identity_sync(
             "reason": "no tenant cluster bound to environment",
             "registered_app_id": registered_app_id,
         }
+
+    # Self-sufficient: the IRSA trust policy needs the cluster's OIDC issuer.
+    # Discover it from EKS + cache on the cluster row when absent, so the
+    # trust isn't malformed by an empty issuer (which yields a broken
+    # oidc-provider/ principal + bare :sub condition).
+    _ensure_cluster_oidc_issuer(cluster)
 
     identity_driver = _resolve_capability_driver(cluster, "identity")
     role_name = workload_identity_role_name(app)

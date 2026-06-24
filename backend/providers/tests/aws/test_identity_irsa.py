@@ -45,6 +45,60 @@ def test_create_role_idempotent(driver: IRSADriver) -> None:
     assert a == b
 
 
+def test_create_role_reconciles_stale_trust_and_policy(iam_client) -> None:
+    """Re-create self-heals a role whose trust was built with an empty/wrong
+    issuer and whose grants have since changed (#1011).
+
+    First create uses an empty issuer (the bug: yields a broken
+    ``oidc-provider/`` principal). Second create — once the issuer is
+    discovered — must rewrite the trust principal to the real issuer and
+    replace the inline policy with the new grants, not silently no-op.
+    """
+    broken = IRSADriver(
+        config=IRSAConfig(
+            region="us-east-1", account_id="123456789012", cluster_oidc_issuer="",
+        ),
+        iam_client=iam_client,
+    )
+    broken.create_identity_role(
+        name="acme-api",
+        permissions=[{"Effect": "Allow", "Action": "s3:GetObject", "Resource": "arn:aws:s3:::old/*"}],
+    )
+
+    healed = IRSADriver(
+        config=IRSAConfig(
+            region="us-east-1",
+            account_id="123456789012",
+            cluster_oidc_issuer="oidc.eks.us-east-1.amazonaws.com/id/REAL",
+        ),
+        iam_client=iam_client,
+    )
+    healed.create_identity_role(
+        name="acme-api",
+        permissions=[{"Effect": "Allow", "Action": "s3:PutObject", "Resource": "arn:aws:s3:::new/*"}],
+    )
+
+    role = iam_client.get_role(RoleName="acme-api")["Role"]
+    trust = role["AssumeRolePolicyDocument"]
+    if isinstance(trust, str):
+        from urllib.parse import unquote
+
+        trust = json.loads(unquote(trust))
+    principal = trust["Statement"][0]["Principal"]["Federated"]
+    assert principal.endswith("oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/REAL")
+
+    policy = iam_client.get_role_policy(
+        RoleName="acme-api", PolicyName="astrolift-workload-policy",
+    )["PolicyDocument"]
+    if isinstance(policy, str):
+        from urllib.parse import unquote
+
+        policy = json.loads(unquote(policy))
+    assert policy["Statement"] == [
+        {"Effect": "Allow", "Action": "s3:PutObject", "Resource": "arn:aws:s3:::new/*"},
+    ]
+
+
 def test_create_role_oidc_trust(driver: IRSADriver, iam_client) -> None:
     """Trust policy must reference the OIDC provider + audience."""
     driver.create_identity_role(name="acme-api", permissions=[])
