@@ -86,7 +86,7 @@ def test_inject_sets_service_account_on_deployment_and_emits_sa():
     out = _inject_workload_identity(
         resources,
         sa_name="astrolift-org-app",
-        role_arn="arn:aws:iam::123456789012:role/astrolift/astrolift-org-app",
+        role_arn="arn:aws:iam::123456789012:role/astrolift-org-app",
         namespace="org-app",
     )
 
@@ -98,7 +98,7 @@ def test_inject_sets_service_account_on_deployment_and_emits_sa():
     assert sa["metadata"]["namespace"] == "org-app"
     assert (
         sa["metadata"]["annotations"]["eks.amazonaws.com/role-arn"]
-        == "arn:aws:iam::123456789012:role/astrolift/astrolift-org-app"
+        == "arn:aws:iam::123456789012:role/astrolift-org-app"
     )
     assert deploys[0]["spec"]["template"]["spec"]["serviceAccountName"] == "astrolift-org-app"
 

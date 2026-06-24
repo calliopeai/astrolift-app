@@ -189,7 +189,7 @@ def _config_for_capability(plugin_slug: str, cluster: TenantCluster, capability:
                 region=region,
                 account_id=str(pc.get("account_id", "")),
                 cluster_oidc_issuer=str(ac.get("cluster_oidc_issuer", "")),
-                role_path=str(pc.get("irsa_role_path", "/astrolift/")),
+                role_path=str(pc.get("irsa_role_path", "/")),
             )
         if capability == "secrets":
             from aws.secrets import SecretsConfig
@@ -360,7 +360,7 @@ def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, An
         account_id = str(pc.get("account_id", ""))
         plugin_slug = getattr(getattr(cluster, "provider_plugin", None), "slug", "")
         if plugin_slug == "aws" and account_id:
-            role_path = str(pc.get("irsa_role_path", "/astrolift/")).strip("/")
+            role_path = str(pc.get("irsa_role_path", "/")).strip("/")
             seg = f"{role_path}/" if role_path else ""
             sa_name = workload_identity_role_name(app)
             role_arn = f"arn:aws:iam::{account_id}:role/{seg}{sa_name}"

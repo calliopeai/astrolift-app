@@ -44,9 +44,16 @@ class IRSAConfig:
     e.g. ``oidc.eks.us-east-1.amazonaws.com/id/ABC123...``.
     Fetched from EKS DescribeCluster + cached on the cluster row."""
 
-    role_path: str = "/astrolift/"
-    """IAM path for platform-managed roles. Lets operators filter
-    in the AWS console + apply tag-based budgets."""
+    role_path: str = "/"
+    """IAM path for platform-managed roles. Defaults to root (``/``) so
+    the role ARN is ``role/astrolift-<...>`` — matching the name-prefix
+    (``astrolift-*``) the control-plane task role is scoped to grant
+    iam:CreateRole on. A non-root path (e.g. ``/astrolift/``) would put
+    the role at ``role/astrolift/astrolift-<...>``, which that prefix
+    does NOT match, so CreateRole would be denied. Roles are still
+    scoped/filterable via the ``astrolift-`` name prefix + the
+    ``astrolift.io/managed-by`` tag. Override per-install only if the
+    task-role policy is broadened to cover the chosen path."""
 
 
 class IRSADriver(WorkloadIdentityDriver):
