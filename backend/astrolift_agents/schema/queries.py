@@ -534,22 +534,17 @@ class AgentsQuery:
             )
             if row is None:
                 return None
-            # Resolve the cluster the SAME way the spawner does
-            # (_resolve_managed_cluster on the org) rather than via
-            # ``row.dispatcher`` — nothing sets AgentTask.dispatcher at dispatch
-            # time, so keying off it made this bail to [] before ever reading a
-            # pod (#1013). Honour an explicit dispatcher cluster when present.
+            # NOTE (#1013): the cluster *should* resolve via the spawner's
+            # _resolve_managed_cluster(org) (nothing sets AgentTask.dispatcher
+            # at dispatch). That change is correct + lands the resolver in
+            # list_app_pods/stream_app_logs — BUT the one-shot log read then
+            # HANGS (async_to_sync(fetch_task_pod_logs) + stream_app_logs in the
+            # sync GraphQL view; the app-log surface uses an async subscription
+            # instead). A hanging resolver is worse than a fast empty, so this
+            # keeps the dispatcher-only bail (fast []) until the read-path hang
+            # is fixed. See #1013 for the full 3-layer diagnosis.
             dispatcher = row.dispatcher
             cluster = dispatcher.tenant_cluster if dispatcher is not None else None
-            if cluster is None:
-                from astrolift_workflows.activities.agent_stage import (
-                    _resolve_managed_cluster,
-                )
-
-                try:
-                    cluster = _resolve_managed_cluster(row.organization)
-                except Exception:
-                    cluster = None
             if cluster is None or not getattr(cluster, "is_active", True):
                 return None
             org_slug = (getattr(row.organization, "slug", "") or "").strip()
