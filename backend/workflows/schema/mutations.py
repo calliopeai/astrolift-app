@@ -122,39 +122,34 @@ class Mutation:
                 ],
             )
 
-        payload = dict(trigger_payload or {})
-
         # Imports kept local so this engine app's schema module doesn't pull
         # the Temporal client + operations models at import time (the app is
         # feature-gated).
-        from django.utils import timezone
-
-        from astrolift_operations.models import WorkflowRun
-        from astrolift_workflows.client import start_workflow
-        from astrolift_workflows.inputs import Actor, WorkflowDefinitionRunInput
+        from astrolift_workflows.inputs import Actor
         from core.tenancy import get_current_tenant
+        from workflows.run_service import start_workflow_definition_run
 
         tenant = get_current_tenant()
         organization_id = getattr(tenant, "organization_id", None) if tenant else None
 
-        # The WorkflowRun mirror is the executor's source of truth; create
-        # it first so the workflow id can key off its pk, then enqueue, then
-        # backfill the Temporal run_id.
-        run = WorkflowRun.objects.create(
-            workflow_kind="WorkflowDefinitionRunWorkflow",
-            workflow_id="",  # filled in below once the id is known
-            run_id="",
-            status=WorkflowRun.Status.RUNNING,
-            started_at=timezone.now(),
+        # Start the stage executor via the shared helper (the same path the
+        # inbound webhook uses, so both actually run the stages — #1020).
+        run, workflow_id = start_workflow_definition_run(
+            workflow,
+            trigger_payload=trigger_payload,
             organization_id=organization_id,
-            trigger_actor_user_id=user.pk if getattr(user, "pk", None) else None,
+            actor=Actor(
+                kind="user",
+                user_id=user.pk if getattr(user, "pk", None) else None,
+                display=getattr(user, "username", "") or "",
+            ),
         )
 
-        # A WorkflowInstance keeps the existing instance surface populated.
-        # Agent stage workflows don't use the state-machine ``states`` array,
-        # so we point the instance at the definition itself and set a plain
-        # ``running`` state rather than going through ``WorkflowInstance.start``
-        # (which requires an initial state the stage model doesn't declare).
+        # Keep the existing instance surface populated (UI mirror). Agent stage
+        # workflows don't use the state-machine ``states`` array, so point the
+        # instance at the definition with a plain ``running`` state rather than
+        # ``WorkflowInstance.start`` (which requires an initial state the stage
+        # model doesn't declare).
         instance = WorkflowInstance.objects.create(
             workflow=workflow,
             content_type=ContentType.objects.get_for_model(WorkflowDefinition),
@@ -163,32 +158,6 @@ class Mutation:
             created_by=user,
             updated_by=user,
         )
-
-        workflow_id = f"WorkflowDefinitionRunWorkflow-{run.pk}"
-        run.workflow_id = workflow_id
-        run.save(update_fields=["workflow_id", "updated_at", "version"])
-
-        handle = start_workflow(
-            "WorkflowDefinitionRunWorkflow",
-            args=[
-                WorkflowDefinitionRunInput(
-                    workflow_definition_slug=workflow.slug,
-                    workflow_run_id=str(run.pk),
-                    trigger_payload=payload,
-                    actor=Actor(
-                        kind="user",
-                        user_id=user.pk if getattr(user, "pk", None) else None,
-                        display=getattr(user, "username", "") or "",
-                    ),
-                )
-            ],
-            workflow_id=workflow_id,
-        )
-
-        if handle.enqueued and handle.run_id:
-            run.run_id = handle.run_id
-            run.save(update_fields=["run_id", "updated_at", "version"])
-
         instance.temporal_workflow_id = workflow_id
         instance.save(update_fields=["temporal_workflow_id"])
 

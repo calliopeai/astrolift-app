@@ -37,6 +37,7 @@ def workflow_webhook(request: HttpRequest, org_slug: str, slug: str) -> JsonResp
         dispatch_agent_task_from_webhook,
         trigger_workflow_instance,
     )
+    from workflows.run_service import start_workflow_definition_run
 
     webhook = (
         WorkflowWebhook.objects.filter(slug=slug, enabled=True)
@@ -70,9 +71,21 @@ def workflow_webhook(request: HttpRequest, org_slug: str, slug: str) -> JsonResp
             dispatched = True
             task_id = str(task.guid)
     elif webhook.workflow_definition_id is not None:
-        trigger_workflow_instance(
-            webhook.workflow_definition, payload, trigger_kind="webhook"
-        )
+        definition = webhook.workflow_definition
+        # A stage-based (agent-orchestration) definition runs through the
+        # WorkflowDefinitionRunWorkflow executor — the same path
+        # runWorkflowDefinition uses — so the webhook actually executes its
+        # stages (#1020). Definitions without stages fall back to the legacy
+        # state-machine WorkflowInstance path.
+        if definition.stages.filter(deleted_at__isnull=True).exists():
+            run, _wid = start_workflow_definition_run(
+                definition,
+                trigger_payload=payload,
+                organization_id=webhook.organization_id,
+            )
+            task_id = str(run.workflow_id)
+        else:
+            trigger_workflow_instance(definition, payload, trigger_kind="webhook")
         dispatched = True
 
     webhook.last_triggered_at = timezone.now()
