@@ -422,6 +422,37 @@ class LiveLogBackend:
 
         resp = await loop.run_in_executor(None, _open)
 
+        # One-shot tail (follow=False): the response body is finite, so
+        # read it whole in a single bounded call and yield split lines.
+        # The line-at-a-time loop below is only correct for a live
+        # (follow=True) stream — driving a finite response through it
+        # spins forever, because urllib3's ``read_chunked`` returns a
+        # generator (never the empty-bytes EOF the loop waits for). See
+        # #1013.
+        if not follow:
+            try:
+                raw = await loop.run_in_executor(None, resp.read)
+            finally:
+                with contextlib.suppress(Exception):
+                    resp.release_conn()
+            text = (
+                raw.decode("utf-8", errors="replace")
+                if isinstance(raw, (bytes, bytearray))
+                else str(raw or "")
+            )
+            for line in text.splitlines():
+                if not line:
+                    continue
+                ts, message = _split_timestamp(line)
+                yield PodLogLine(
+                    pod_name=pod_name,
+                    container=container or "",
+                    timestamp=ts,
+                    message=message,
+                    stream="stdout",
+                )
+            return
+
         try:
             while True:
                 chunk = await loop.run_in_executor(
@@ -432,13 +463,6 @@ class LiveLogBackend:
                 if chunk is None:
                     break
                 if not chunk:
-                    if not follow:
-                        # One-shot tail (follow=False): an empty read
-                        # means the response body is fully drained
-                        # (EOF). No more data is coming on a non-follow
-                        # request, so stop — spinning here would hang
-                        # the reader forever (see #1013).
-                        break
                     # follow=True: stream still open but idle — yield to
                     # the loop so other subscribers + the disconnect
                     # signal can progress, then retry.

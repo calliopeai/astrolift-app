@@ -286,14 +286,18 @@ class _FakeLogResp:
     """Stands in for the urllib3 HTTPResponse returned by
     ``read_namespaced_pod_log(_preload_content=False)``.
 
-    Yields a fixed set of lines via ``readline()`` then returns ``b""``
-    forever — the EOF signal a non-follow (one-shot) request gets once
-    the body is drained. Has no ``read_chunked`` so ``_read_line_safe``
-    falls back to ``readline`` (the AttributeError path)."""
+    ``read()`` returns the whole (finite) body at once — the path the
+    follow=False one-shot tail takes. ``readline()`` drains line-by-line
+    then returns ``b""`` forever — the follow=True idle signal. Has no
+    ``read_chunked`` so ``_read_line_safe`` falls back to ``readline``
+    (the AttributeError path)."""
 
     def __init__(self, lines: list[bytes]):
         self._lines = list(lines)
         self.released = False
+
+    def read(self) -> bytes:
+        return b"".join(self._lines)
 
     def readline(self) -> bytes:
         if self._lines:
