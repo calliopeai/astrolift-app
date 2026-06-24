@@ -745,3 +745,57 @@ def test_my_apps_page_include_archived_opt_in():
 
     assert archived.slug not in {a.slug for a in hidden.items}
     assert archived.slug in {a.slug for a in revealed.items}
+
+
+# ---------- apps / agents separation -----------------------------------
+
+
+def test_agent_host_apps_excluded_from_apps_list():
+    """Apps and Agents are separate entity-modules: a RegisteredApp that hosts
+    an agent (has a kind=agent Workload) must NOT appear in the Apps list (it
+    shows in the Agents list instead). Regular apps are unaffected."""
+    from astrolift_registry.models import Workload
+
+    scaffold = _scaffold("-agentsep")
+    user = _superuser("agentsep-user")
+
+    agent_host = scaffold.apps["ok-a"]
+    Workload.objects.create(
+        registered_app=agent_host,
+        name="Agent",
+        slug="agent-wl-agentsep",
+        kind=Workload.Kind.AGENT,
+    )
+
+    result = _run_in_tenant(
+        {"organization_id": scaffold.org.id, "actor_user_id": user.id},
+        lambda: RegistryQuery().astrolift_apps(_info()),
+    )
+    slugs = {a.slug for a in result}
+    assert agent_host.slug not in slugs, "agent-host app must not appear in the Apps list"
+    # Regular apps (no agent workload) still appear.
+    assert scaffold.apps["ok-b"].slug in slugs
+    assert scaffold.apps["failed-a"].slug in slugs
+
+
+def test_agent_host_apps_excluded_from_apps_page_count():
+    """The cursor page's totalCount also excludes agent-host apps (the
+    exclusion lives in the shared filter helper)."""
+    from astrolift_registry.models import Workload
+
+    scaffold = _scaffold("-agentsep-pg")
+    user = _superuser("agentsep-pg-user")
+    Workload.objects.create(
+        registered_app=scaffold.apps["ok-a"],
+        name="Agent",
+        slug="agent-wl-agentsep-pg",
+        kind=Workload.Kind.AGENT,
+    )
+    page = _run_in_tenant(
+        {"organization_id": scaffold.org.id, "actor_user_id": user.id},
+        lambda: RegistryQuery().astrolift_apps_page(_info(), limit=50),
+    )
+    slugs = {row.slug for row in page.items}
+    assert scaffold.apps["ok-a"].slug not in slugs
+    # 5 scaffold apps minus the 1 agent host = 4.
+    assert page.total_count == 4

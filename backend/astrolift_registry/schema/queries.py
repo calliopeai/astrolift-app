@@ -125,6 +125,19 @@ def _apply_apps_list_filters(
         qs = qs.filter(project__slug=project_slug)
     if source_kind and source_kind is not AstroliftAppSourceKindFilter.ALL:
         qs = qs.filter(source_kind=source_kind.value)
+    # Apps and Agents are separate entity-modules (specs 34-36). An app that
+    # exists to host an agent (has a kind=agent Workload) belongs in the Agents
+    # list — exclude such agent-host apps here so they don't bleed into the
+    # Apps list (a regular app has no agent workloads and is unaffected). Both
+    # app-list resolvers + the page totalCount route through this helper, so
+    # the separation holds uniformly.
+    from astrolift_registry.models import Workload
+
+    agent_host_app_ids = Workload.objects.filter(
+        kind=Workload.Kind.AGENT,
+        deleted_at__isnull=True,
+    ).values("registered_app_id")
+    qs = qs.exclude(pk__in=agent_host_app_ids)
     return qs
 
 
