@@ -1161,6 +1161,32 @@ async def mark_running(deployment_id: int) -> None:
     await sync_to_async(_mark_running_sync)(deployment_id)
 
 
+def _mark_failed_sync(deployment_id: int, reason: str) -> None:
+    from astrolift_lifecycle.models import Deployment
+
+    d = Deployment.all_objects.get(pk=deployment_id)
+    # Idempotent: a deployment already in a terminal state (e.g. aborted
+    # then failed) shouldn't raise on a redundant transition.
+    if d.status == Deployment.Status.FAILED:
+        return
+    log.warning("deploy %s marked failed: %s", deployment_id, (reason or "")[:500])
+    d.transition_to(Deployment.Status.FAILED)
+
+
+@activity.defn(name="astrolift.deploy.mark_failed")
+async def mark_failed(deployment_id: int, reason: str = "") -> None:
+    """Terminal-failure transition for a deploy that can't complete
+    (rollout timed out / failed, or an activity exhausted its retries).
+
+    Lets ``DeployAppWorkflow`` exit cleanly instead of looping a poll
+    forever — the leak + worker-saturation source in #1004.
+    """
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    await sync_to_async(_mark_failed_sync)(deployment_id, reason)
+
+
 # ---- Preview lifecycle (build + teardown) -------------------------
 
 
