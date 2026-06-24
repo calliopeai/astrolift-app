@@ -56,6 +56,74 @@ def namespace_for_app(app: RegisteredApp) -> str:
     return f"{app.organization.slug}-{app.slug}"
 
 
+def workload_identity_role_name(app: RegisteredApp) -> str:
+    """Canonical IAM/identity role + ServiceAccount name the platform
+    issues per app for workload identity (IRSA / GKE WI / AKS federated).
+
+    Single source of truth so provision (``ensure_workload_identity``),
+    deprovision (``deprovision_app_identity_role``) and the deploy render
+    (which emits the annotated ServiceAccount) all agree on the name —
+    otherwise teardown would leak the role and the SA annotation would
+    point at a role that was never created. ``astrolift-<org>-<app>`` (or
+    ``astrolift-<app>`` when the app has no org) fits IAM's 64-char limit
+    for any reasonable slug.
+    """
+    org_slug = getattr(getattr(app, "organization", None), "slug", "") or ""
+    if org_slug:
+        return f"astrolift-{org_slug}-{app.slug}"
+    return f"astrolift-{app.slug}"
+
+
+# Kinds whose pod template gets the workload-identity ServiceAccount.
+_POD_TEMPLATE_KINDS = {"Deployment", "StatefulSet", "ReplicaSet", "DaemonSet", "Job"}
+
+
+def _inject_workload_identity(
+    resources: list[dict[str, Any]],
+    *,
+    sa_name: str,
+    role_arn: str,
+    namespace: str,
+) -> list[dict[str, Any]]:
+    """Set ``serviceAccountName`` on every pod template in ``resources`` and
+    append a ServiceAccount annotated with the IRSA role ARN (#1011).
+
+    The EKS pod-identity webhook reads ``eks.amazonaws.com/role-arn`` off the
+    SA and injects STS credentials into pods that use it — so IAM-authed
+    managed services (S3) work without static keys. The caller gates this on
+    the app actually having managed services + a resolvable AWS account.
+    """
+    for r in resources:
+        kind = r.get("kind", "")
+        if kind == "CronJob":
+            pod_spec = (
+                r.setdefault("spec", {})
+                .setdefault("jobTemplate", {})
+                .setdefault("spec", {})
+                .setdefault("template", {})
+                .setdefault("spec", {})
+            )
+            pod_spec["serviceAccountName"] = sa_name
+        elif kind in _POD_TEMPLATE_KINDS:
+            pod_spec = r.setdefault("spec", {}).setdefault("template", {}).setdefault("spec", {})
+            pod_spec["serviceAccountName"] = sa_name
+
+    service_account = {
+        "apiVersion": "v1",
+        "kind": "ServiceAccount",
+        "metadata": {
+            "name": sa_name,
+            "namespace": namespace,
+            "labels": {"astrolift.io/managed-by": "platform"},
+            "annotations": {"eks.amazonaws.com/role-arn": role_arn},
+        },
+    }
+    return sorted(
+        [*resources, service_account],
+        key=lambda r: (r.get("kind", ""), r["metadata"]["name"]),
+    )
+
+
 def cluster_for_deployment(deployment: Deployment) -> TenantCluster:
     """Resolve the TenantCluster the deployment lands on.
 
@@ -243,11 +311,12 @@ def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, An
             deleted_at__isnull=True,
         ).values_list("secret_bundle__slug", flat=True),
     )
-    if ManagedService.objects.filter(
+    has_managed = ManagedService.objects.filter(
         registered_app=app,
         app_environment=env,
         deleted_at__isnull=True,
-    ).exists():
+    ).exists()
+    if has_managed:
         env_from.append(f"astrolift-bindings-{app.slug}")
 
     resources = _render(
@@ -276,6 +345,30 @@ def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, An
             resources = sorted(
                 [*resources, *ingress_resources],
                 key=lambda r: (r.get("kind", ""), r["metadata"]["name"]),
+            )
+
+    # Workload identity (#1011): apps with managed services get a
+    # ServiceAccount annotated with their IRSA role ARN so IAM-authed
+    # services (S3) get STS credentials without static keys. The role +
+    # OIDC trust are created by the ensure_workload_identity activity,
+    # which uses the same name (workload_identity_role_name) and the same
+    # account_id/role_path config, so this ARN matches IRSADriver._role_arn.
+    # Only AWS clusters with a known account_id can form the ARN; others
+    # skip (postgres/redis bind via password env and don't need IRSA).
+    if has_managed and cluster is not None:
+        pc = getattr(cluster, "provider_config", None) or {}
+        account_id = str(pc.get("account_id", ""))
+        plugin_slug = getattr(getattr(cluster, "provider_plugin", None), "slug", "")
+        if plugin_slug == "aws" and account_id:
+            role_path = str(pc.get("irsa_role_path", "/astrolift/")).strip("/")
+            seg = f"{role_path}/" if role_path else ""
+            sa_name = workload_identity_role_name(app)
+            role_arn = f"arn:aws:iam::{account_id}:role/{seg}{sa_name}"
+            resources = _inject_workload_identity(
+                resources,
+                sa_name=sa_name,
+                role_arn=role_arn,
+                namespace=namespace,
             )
 
     log.info(
@@ -507,6 +600,7 @@ __all__ = [
     "driver_for_deployment",
     "driver_for_target_cluster",
     "namespace_for_app",
+    "workload_identity_role_name",
     "render_resources_for_deployment",
     "workloads_from_resources",
 ]

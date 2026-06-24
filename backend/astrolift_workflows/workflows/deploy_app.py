@@ -18,6 +18,7 @@ from astrolift_workflows.inputs import DeployAppInput, WorkflowResult
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities import (
         apply_manifests,
+        ensure_workload_identity,
         health_check,
         mark_deploying,
         mark_running,
@@ -90,6 +91,15 @@ class DeployAppWorkflow:
         # exists when apply_manifests creates Services/Secrets in it.
         await workflow.execute_activity(
             provision_namespace,
+            args=[input.registered_app_id, input.app_environment_id],
+            start_to_close_timeout=_TIMEOUT,
+        )
+        # Workload identity (#1011): create/update the app's IRSA role + bind
+        # it to the ServiceAccount before render+apply, so the annotated SA
+        # the render emits points at a role that already exists with the
+        # right OIDC trust. No-op for apps with no IAM-authed managed service.
+        await workflow.execute_activity(
+            ensure_workload_identity,
             args=[input.registered_app_id, input.app_environment_id],
             start_to_close_timeout=_TIMEOUT,
         )

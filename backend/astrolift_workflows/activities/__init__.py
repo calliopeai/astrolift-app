@@ -51,6 +51,9 @@ from astrolift_workflows.activities.capability_deprovision import (
     deprovision_app_ingress,
     deprovision_app_registry_repo,
 )
+from astrolift_workflows.activities.workload_identity import (
+    ensure_workload_identity,
+)
 from astrolift_workflows.activities.cluster_decommission_cleanup import (
     cleanup_cluster_acm_certs,
     cleanup_cluster_dns_records,
@@ -175,6 +178,7 @@ __all__ = [
     "deprovision_app_certificate",
     "deprovision_app_dns_record",
     "deprovision_app_identity_role",
+    "ensure_workload_identity",
     "deprovision_app_ingress",
     "deprovision_app_registry_repo",
     "check_managed_service_ready",

@@ -344,19 +344,23 @@ def _finalize_provision_sync(managed_service_id: int, handle: str) -> None:
     _sync_binding_rows(svc)
 
 
-def _sync_binding_rows(svc: Any) -> None:
-    """(Re)create ``ManagedServiceBinding`` rows from the driver's connection
-    envelope. Idempotent: clears existing rows for the service first so a
-    finalize retry doesn't duplicate them."""
+def _managed_binding_for(svc: Any) -> Any:
+    """Resolve ``svc``'s managed-service driver and return its connection
+    ``Binding`` (``env_vars`` + ``iam_grants``), or ``None`` when the service
+    has no backend handle / cluster / registered driver.
+
+    Shared by ``_sync_binding_rows`` (reads ``env_vars``) and the workload-
+    identity activity (reads ``iam_grants``) so both resolve the driver the
+    same way.
+    """
     from astrolift_drivers.registry import DriverNotFound, plugins
-    from astrolift_services.models import ManagedServiceBinding
     from core.cluster_observability import managed_config_for
 
     if not svc.backend_ref:
-        return
+        return None
     cluster = svc.app_environment.tenant_cluster
     if cluster is None:
-        return
+        return None
     plugin_slug = cluster.provider_plugin.slug
     variant = getattr(svc, "variant", "") or ""
     try:
@@ -365,16 +369,27 @@ def _sync_binding_rows(svc: Any) -> None:
         try:
             driver_cls = plugins.get(plugin_slug, f"managed:{svc.kind}:")
         except DriverNotFound:
-            return
+            return None
     cfg = managed_config_for(plugin_slug, cluster, kind=svc.kind, variant=variant)
     driver = driver_cls(config=cfg)
 
     binding_method = getattr(driver, "binding", None)
     if not callable(binding_method):
-        return
+        return None
     from _sdk.managed_service import ServiceHandle
 
-    binding = binding_method(ServiceHandle(handle=svc.backend_ref))
+    return binding_method(ServiceHandle(handle=svc.backend_ref))
+
+
+def _sync_binding_rows(svc: Any) -> None:
+    """(Re)create ``ManagedServiceBinding`` rows from the driver's connection
+    envelope. Idempotent: clears existing rows for the service first so a
+    finalize retry doesn't duplicate them."""
+    from astrolift_services.models import ManagedServiceBinding
+
+    binding = _managed_binding_for(svc)
+    if binding is None:
+        return
     env_vars = getattr(binding, "env_vars", {}) or {}
 
     ManagedServiceBinding.objects.filter(managed_service=svc).delete()

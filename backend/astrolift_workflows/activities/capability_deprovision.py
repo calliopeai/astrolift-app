@@ -241,14 +241,14 @@ async def deprovision_app_certificate(custom_domain_id: int) -> dict[str, Any]:
 def _identity_role_name_for(app) -> str:
     """Canonical IAM/identity role name the platform issues per app.
 
-    Mirrors the convention IRSA / GKE Workload Identity / AKS
-    federated creds use: ``astrolift-<org-slug>-<app-slug>``. Kept in
-    one place so deprovision and provision use the same string.
+    Delegates to ``core.app_deploy.workload_identity_role_name`` — the single
+    source of truth shared by provision (``ensure_workload_identity``), the
+    deploy render (annotated ServiceAccount) and this deprovision path, so all
+    three operate on the same role/SA name.
     """
-    org_slug = getattr(getattr(app, "organization", None), "slug", "") or ""
-    if org_slug:
-        return f"astrolift-{org_slug}-{app.slug}"
-    return f"astrolift-{app.slug}"
+    from core.app_deploy import workload_identity_role_name
+
+    return workload_identity_role_name(app)
 
 
 def _deprovision_identity_role_sync(*, registered_app_id: int) -> dict[str, Any]:
