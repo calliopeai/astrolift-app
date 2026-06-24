@@ -231,6 +231,19 @@ def test_get_namespace_missing_returns_none(
     assert driver.get_namespace("aws-prod", "missing") is None
 
 
+def test_get_namespace_none_response_returns_none(
+    driver: EKSClusterDriver,
+    fake_k8s_client,
+) -> None:
+    """Some client backends return None (not raise NotFound) when the
+    namespace is gone — e.g. finished Terminating mid-teardown. get_namespace
+    must treat None as "gone", not crash on ns["metadata"] (#1015 teardown
+    wedge: the crash failed delete_namespace's wait loop, gating the final
+    soft-delete and leaving the app stuck at tearing_down)."""
+    fake_k8s_client.get_namespace.return_value = None
+    assert driver.get_namespace("aws-prod", "terminating") is None
+
+
 def test_ensure_namespace_calls_apply(
     driver: EKSClusterDriver,
     fake_k8s_client,

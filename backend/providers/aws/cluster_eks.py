@@ -419,6 +419,13 @@ class EKSClusterDriver(ClusterDriver):
             return None
         except Exception as exc:
             raise RuntimeError(f"get_namespace {name}: {exc}") from exc
+        # Some client backends return None (rather than raising NotFound) when
+        # the namespace is absent — e.g. it finished Terminating between a
+        # delete call and this confirm-read. Treat None as "gone" so callers
+        # (delete_namespace's wait loop, teardown) see it as deleted instead of
+        # crashing on ns["metadata"] and wedging the app at tearing_down (#1015).
+        if ns is None:
+            return None
         return NamespaceState(
             name=ns["metadata"]["name"],
             labels=ns["metadata"].get("labels", {}) or {},
