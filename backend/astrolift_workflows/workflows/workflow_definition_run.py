@@ -372,7 +372,14 @@ class WorkflowDefinitionRunWorkflow:
             decision = decide_after_agent_run(run_status, on_failure, attempt)
 
             if decision.proceed:
-                output = {"agent_run_status": run_status, "attempt": attempt}
+                # Include execution_id so a FAN_OUT parent can collect each
+                # child's stage execution (it reads final_output["execution_id"])
+                # — without it, fan-out always aggregated 0 children (#1017).
+                output = {
+                    "agent_run_status": run_status,
+                    "attempt": attempt,
+                    "execution_id": execution_id,
+                }
                 await workflow.execute_activity(
                     update_stage_execution,
                     args=[execution_id, decision.terminal_status, output, None],
