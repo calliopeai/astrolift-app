@@ -62,6 +62,18 @@ class K8sJobSpawner(ContainerSpawner):
         try:
             driver = _driver_for_cluster(self._cluster)
             ctx = _context_for_cluster(self._cluster)
+            # Ensure the per-org agent namespace exists before creating the
+            # Job — unlike the app deploy path there's no separate
+            # provision_namespace step, so a first-ever agent dispatch would
+            # otherwise 404 on the Job POST (namespace not found). Idempotent.
+            ensure_ns = getattr(driver, "ensure_namespace", None)
+            if callable(ensure_ns):
+                ensure_ns(
+                    ctx.slug,
+                    self._namespace,
+                    {"astrolift.io/managed-by": "platform", "astrolift.io/component": "agents"},
+                    {},
+                )
             result = driver.apply_manifests(ctx.slug, self._namespace, [job_manifest])
             if not getattr(result, "ok", False):
                 error = result.summary() if hasattr(result, "summary") else "apply failed"
