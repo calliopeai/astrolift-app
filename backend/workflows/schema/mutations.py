@@ -244,9 +244,21 @@ class Mutation:
         transitions: strawberry.scalars.JSON,
         description: Optional[str] = None,
         is_enabled: bool = False,
+        pattern_kind: Optional[str] = None,
     ) -> MutationResult:
         user = info.context.user
         _require_staff(user)
+
+        # pattern_kind drives the executor's composition (single / chained /
+        # fan_out / ...). It existed on the model but had no creation arg, so
+        # every API-created definition was stuck on the default "single" —
+        # fan-out workflows were undefinable via the platform.
+        valid_patterns = {c[0] for c in WorkflowDefinition.PatternKind.choices}
+        if pattern_kind is not None and pattern_kind not in valid_patterns:
+            return MutationResult(
+                ok=False,
+                errors=[GQLValidationError(field='pattern_kind', messages=[f'Invalid pattern_kind "{pattern_kind}"'])],
+            )
 
         workflow = WorkflowDefinition(
             name=name,
@@ -256,6 +268,7 @@ class Mutation:
             transitions=transitions,
             description=description or '',
             is_enabled=is_enabled,
+            pattern_kind=pattern_kind or WorkflowDefinition.PatternKind.SINGLE,
             created_by=user,
             updated_by=user,
         )
@@ -287,6 +300,7 @@ class Mutation:
         states: Optional[strawberry.scalars.JSON] = None,
         transitions: Optional[strawberry.scalars.JSON] = None,
         is_enabled: Optional[bool] = None,
+        pattern_kind: Optional[str] = None,
     ) -> MutationResult:
         user = info.context.user
         _require_staff(user)
@@ -294,6 +308,15 @@ class Mutation:
         workflow = WorkflowDefinition.objects.filter(slug=slug).first()
         if not workflow:
             raise GraphQLError(f'Workflow definition "{slug}" not found')
+
+        if pattern_kind is not None:
+            valid_patterns = {c[0] for c in WorkflowDefinition.PatternKind.choices}
+            if pattern_kind not in valid_patterns:
+                return MutationResult(
+                    ok=False,
+                    errors=[GQLValidationError(field='pattern_kind', messages=[f'Invalid pattern_kind "{pattern_kind}"'])],
+                )
+            workflow.pattern_kind = pattern_kind
 
         if name is not None:
             workflow.name = name
@@ -401,6 +424,11 @@ class Mutation:
 
         stage = WorkflowStage(
             definition=workflow,
+            # Stage slug is unique (BaseCoreModel) but the mutation never set
+            # it, so every stage defaulted to "none" and the 2nd stage created
+            # anywhere collided — making multi-stage workflows impossible via
+            # the API. Derive a unique, readable slug from (workflow, order).
+            slug=f"{workflow.slug}-stage-{order}",
             order=order,
             kind=kind,
             on_failure=on_failure,
