@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { LIST_SKILLS } from "@/graphql/agents/agents.queries";
-import { getActiveOrgGuid } from "@/lib/identity/active-org";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,7 +28,10 @@ type SkillsData = {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SkillsPage() {
-  const orgId = getActiveOrgGuid() ?? "";
+  // Reactive org id (#agents-empty): a synchronous cookie read races the
+  // post-render effect that sets it, leaving orgId "" and the query skipped.
+  const { org } = useActiveOrg();
+  const orgId = org?.id ?? "";
 
   const { data, loading, error } = useQuery<SkillsData>(LIST_SKILLS, {
     variables: { orgId },

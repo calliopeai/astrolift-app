@@ -61,9 +61,9 @@ import type {
 import { LIST_PROJECTS } from "@/graphql/identity/identity.queries";
 import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import { useModules } from "@/graphql/user/user.hooks";
 import { formatRelativeAge } from "@/lib/format";
-import { getActiveOrgGuid } from "@/lib/identity/active-org";
 import { useListControls, type SortState } from "@/hooks/use-list-controls";
 
 type AgentTask = {
@@ -840,7 +840,14 @@ export function AgentsClient() {
     router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
   }
 
-  const orgId = getActiveOrgGuid() ?? "";
+  // Resolve the active org reactively (not a one-shot cookie read): the
+  // cookie is set by useActiveOrg's post-render effect after the org query
+  // resolves, so reading it synchronously at first render races and returns
+  // "" on a fresh load — leaving every tab's query skipped (skip: !orgId)
+  // and the page empty with no re-render to recover. useActiveOrg re-renders
+  // when the org loads, so orgId becomes populated and the queries fire.
+  const { org } = useActiveOrg();
+  const orgId = org?.id ?? "";
 
   // Workloads are loaded here for the Dispatch tab's workload picker.
   // (The Registry tab has its own project-scoped agent queries — PR-7.)
