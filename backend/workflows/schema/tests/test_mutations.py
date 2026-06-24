@@ -74,3 +74,44 @@ class WorkflowCreateMutationTest(TestCase):
         )
         self.assertEqual(len(slugs), 2, f"stages must have distinct slugs, got {slugs}")
         self.assertNotIn("none", slugs)
+
+
+class WorkflowTriggerMutationTest(TestCase):
+    def setUp(self):
+        from astrolift_identity.models import Organization
+        self.user = User.objects.create_superuser(
+            username="wf_trig_test", email="wf_trig@test.com", password="pw",
+        )
+        # WorkflowWebhook.organization is an astrolift_identity.Organization,
+        # resolved from the tenant context (not the profile's org model).
+        self.org = Organization.objects.create(name="Trig Org", slug="trig-org")
+        self.m = Mutation()
+        self.m.create_workflow_definition(
+            _info(self.user), name="Trig Def", slug="trig-def",
+            model_label="workflows.workflowdefinition",
+            states=[{"name": "pending", "label": "Pending", "is_initial": True, "is_final": False}],
+            transitions=[],
+        )
+
+    def _ctx(self):
+        from core.tenancy import TenantContext, tenant_context
+        return tenant_context(TenantContext(organization_id=self.org.id))
+
+    def test_create_workflow_trigger_owns_webhook_by_caller_org(self):
+        from astrolift_agents.models import WorkflowWebhook
+        with self._ctx():
+            res = self.m.create_workflow_trigger(_info(self.user), workflow_slug="trig-def")
+        assert res.ok, res.errors
+        assert res.endpoint == f"/api/webhooks/workflow/trig-org/{res.slug}"
+        assert res.signing_secret
+        hook = WorkflowWebhook.objects.get(slug=res.slug)
+        # Owned by the CALLER's org (WorkflowDefinition has no org FK).
+        assert hook.organization_id == self.org.id
+        assert hook.workflow_definition.slug == "trig-def"
+        assert hook.agent_definition_id is None
+        assert hook.enabled is True
+
+    def test_create_workflow_trigger_unknown_workflow(self):
+        with self._ctx():
+            res = self.m.create_workflow_trigger(_info(self.user), workflow_slug="nope")
+        assert not res.ok

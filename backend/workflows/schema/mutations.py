@@ -33,6 +33,16 @@ class CreateWorkflowStageResult(MutationResult):
     stage: Optional[WorkflowStageType] = None
 
 
+@strawberry.type
+class CreateWorkflowTriggerResult(MutationResult):
+    """Inbound webhook trigger for a workflow definition (#1019).
+    ``signing_secret`` is the plaintext — shown ONCE, stored only as a hash."""
+
+    slug: Optional[str] = None
+    endpoint: Optional[str] = None
+    signing_secret: Optional[str] = None
+
+
 def _require_staff(user):
     """Raise GraphQLError if user is not authenticated staff/superuser."""
     if not user or not user.is_authenticated:
@@ -446,3 +456,53 @@ class Mutation:
             raise GraphQLError(f'Failed to create workflow stage: {e}')
 
         return CreateWorkflowStageResult(ok=True, stage=stage)
+
+    @strawberry.mutation(description="Create an inbound webhook trigger for a workflow definition (staff only).")
+    def create_workflow_trigger(self, info: Info, workflow_slug: str) -> CreateWorkflowTriggerResult:
+        """Register a ``WorkflowWebhook`` that fires *workflow_slug* on inbound
+        POST (#1019). The webhook is owned by the CALLER's active org — a
+        WorkflowDefinition carries no org FK, and the org-level endpoint
+        (``/api/webhooks/workflow/<org>/<slug>``) resolves + verifies by org —
+        so the creator's org is the natural, secure owner. Returns the endpoint
+        + plaintext signing secret (shown once). Fire with
+        ``POST <endpoint>`` + header ``X-Astrolift-Signature: <secret>``.
+        """
+        from astrolift_agents.services.workflow_triggers import (
+            create_webhook_workflow_trigger,
+        )
+
+        from astrolift_identity.models import Organization
+        from core.tenancy import get_current_tenant
+
+        user = info.context.user
+        _require_staff(user)
+
+        workflow = WorkflowDefinition.objects.filter(
+            slug=workflow_slug, deleted_at__isnull=True
+        ).first()
+        if not workflow:
+            return CreateWorkflowTriggerResult(
+                ok=False,
+                errors=[GQLValidationError(field='workflow_slug', messages=[f'Workflow "{workflow_slug}" not found'])],
+            )
+
+        # The webhook is owned by the caller's org. WorkflowWebhook.organization
+        # is an astrolift_identity.Organization (NOT the profile's
+        # organization.Organization — distinct models), so resolve it from the
+        # tenant context the same way the agent/managed-service mutations do.
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        org = Organization.objects.filter(pk=org_pk, deleted_at__isnull=True).first() if org_pk else None
+        if org is None:
+            return CreateWorkflowTriggerResult(
+                ok=False,
+                errors=[GQLValidationError(field='organization', messages=['no active organization in context'])],
+            )
+
+        result = create_webhook_workflow_trigger(workflow, organization=org)
+        return CreateWorkflowTriggerResult(
+            ok=True,
+            slug=result["slug"],
+            endpoint=result["endpoint"],
+            signing_secret=result["signing_secret"],
+        )

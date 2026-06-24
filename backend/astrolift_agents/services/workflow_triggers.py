@@ -262,6 +262,7 @@ def create_webhook_workflow_trigger(
     definition: WorkflowDefinition,
     webhook_slug: str | None = None,
     *,
+    organization=None,
     input_mapping: dict | None = None,
 ) -> dict:
     """Register a WorkflowWebhook that fires *definition* on inbound POST.
@@ -276,9 +277,12 @@ def create_webhook_workflow_trigger(
             "signing_secret": "<plaintext, shown once>",
         }
 
-    The signing secret is stored hashed (SHA-256). The plaintext is
-    returned here and must be shown to the operator immediately — it
-    cannot be recovered afterward.
+    ``organization`` scopes the webhook (and the endpoint path). The webhook
+    is owned by whoever creates it — the caller's org — because
+    WorkflowDefinition carries no org FK; the org-level endpoint resolves the
+    webhook by ``<org>/<slug>`` and verifies the org matches, so an org is
+    required for the endpoint to be reachable. The signing secret is stored
+    hashed (SHA-256); the plaintext is returned once and not recoverable.
     """
     from astrolift_agents.models.workflow_trigger import WorkflowWebhook
 
@@ -286,14 +290,18 @@ def create_webhook_workflow_trigger(
     plaintext_secret = secrets.token_urlsafe(32)
     secret_hash = hashlib.sha256(plaintext_secret.encode()).hexdigest()
 
-    try:
-        org_slug = _resolve_org_slug(definition)
-    except Exception:
-        org_slug = "default"
+    if organization is not None:
+        org_slug = organization.slug
+    else:
+        try:
+            org_slug = _resolve_org_slug(definition)
+        except Exception:
+            org_slug = "default"
 
     with transaction.atomic():
         hook = WorkflowWebhook.objects.create(
             workflow_definition=definition,
+            organization=organization,
             slug=slug,
             secret_hash=secret_hash,
             input_mapping=input_mapping or {},
