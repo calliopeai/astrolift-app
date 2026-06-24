@@ -260,9 +260,13 @@ class ECRDriver(ImageRegistryDriver):
             self._iam = boto3.client("iam", region_name=self._config.region)
 
         account_id = self._config.account_id
-        # IAM role names cap at 64 chars; truncate from the head if our
-        # full naming convention overflows (rare — repo names are slugs).
-        role_name = f"astrolift-{repo}-ecr-push"[:64]
+        # ``repo`` is the ECR repo name ``<org>/<app>`` — the literal '/' is
+        # illegal in an IAM RoleName (and a naive [:64] slice never fixed the
+        # charset, only the length). iam_role_name sanitizes '/' → '-' and
+        # length-bounds with a stable hash suffix (#994).
+        from providers.aws._naming import iam_role_name
+
+        role_name = iam_role_name("astrolift", repo, "ecr-push")
         oidc_arn = f"arn:aws:iam::{account_id}:oidc-provider/{_GITHUB_OIDC_PROVIDER_HOST}"
         repo_arn = f"arn:aws:ecr:{self._config.region}:{account_id}:repository/{repo}"
 

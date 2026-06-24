@@ -68,10 +68,16 @@ def workload_identity_role_name(app: RegisteredApp) -> str:
     ``astrolift-<app>`` when the app has no org) fits IAM's 64-char limit
     for any reasonable slug.
     """
+    from providers.aws._naming import iam_role_name
+
     org_slug = getattr(getattr(app, "organization", None), "slug", "") or ""
+    # Sanitized + length-bounded (#994): this name is the IAM role name AND
+    # the workload-identity ServiceAccount name, so it must satisfy both IAM
+    # (≤64) and the K8s DNS-label limit (≤63). iam_role_name is deterministic,
+    # so create / SA annotation / deprovision keep agreeing.
     if org_slug:
-        return f"astrolift-{org_slug}-{app.slug}"
-    return f"astrolift-{app.slug}"
+        return iam_role_name("astrolift", org_slug, app.slug)
+    return iam_role_name("astrolift", app.slug)
 
 
 # Kinds whose pod template gets the workload-identity ServiceAccount.
