@@ -488,6 +488,12 @@ def stream_app_logs(
     )
 
 
+# Upper bound on a one-shot agent-task log read. Generous enough to drain a
+# real tail over a slow link, short enough that a stuck stream can never wedge
+# the GraphQL worker (#1013).
+_TASK_LOG_READ_TIMEOUT_SECONDS = 15.0
+
+
 async def fetch_task_pod_logs(
     *,
     cluster: TenantCluster,
@@ -566,12 +572,26 @@ async def fetch_task_pod_logs(
         return []
 
     lines: list[str] = []
-    try:
+
+    async def _collect() -> None:
         async for line in inner:
             message = getattr(line, "message", "")
             lines.append(message if isinstance(message, str) else str(message))
             if len(lines) >= tail:
                 break
+
+    try:
+        # Hard bound: a one-shot operator log read must never block the
+        # GraphQL worker, regardless of driver behaviour (see #1013). The
+        # follow=False path now terminates on EOF, but the timeout is the
+        # backstop for any future driver that doesn't.
+        await asyncio.wait_for(_collect(), timeout=_TASK_LOG_READ_TIMEOUT_SECONDS)
+    except (asyncio.TimeoutError, TimeoutError):
+        logger.warning(
+            "fetch_task_pod_logs: read exceeded %ss for pod %s; returning partial tail",
+            _TASK_LOG_READ_TIMEOUT_SECONDS,
+            pod_name,
+        )
     except Exception:
         # A mid-stream failure still returns whatever we collected —
         # partial logs beat a hard error on an operator-facing read.

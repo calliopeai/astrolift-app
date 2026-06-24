@@ -29,6 +29,7 @@ from _sdk.cluster import (
 from k8s_native.cluster import K8sNativeClusterDriver, K8sNativeConfig
 from k8s_native.observability import (
     ClusterAuthError,
+    LiveLogBackend,
     LivePodBackend,
     build_api_client,
 )
@@ -276,3 +277,110 @@ async def test_driver_stream_logs_propagates_cancellation() -> None:
     assert first.message == "tick"
     await gen.aclose()
     assert backend.cancelled is True
+
+
+# ---- LiveLogBackend: follow=False EOF termination (#1013) ---------
+
+
+class _FakeLogResp:
+    """Stands in for the urllib3 HTTPResponse returned by
+    ``read_namespaced_pod_log(_preload_content=False)``.
+
+    Yields a fixed set of lines via ``readline()`` then returns ``b""``
+    forever — the EOF signal a non-follow (one-shot) request gets once
+    the body is drained. Has no ``read_chunked`` so ``_read_line_safe``
+    falls back to ``readline`` (the AttributeError path)."""
+
+    def __init__(self, lines: list[bytes]):
+        self._lines = list(lines)
+        self.released = False
+
+    def readline(self) -> bytes:
+        if self._lines:
+            return self._lines.pop(0)
+        return b""  # EOF — and every subsequent call.
+
+    def release_conn(self) -> None:
+        self.released = True
+
+
+def _patch_live_backend(monkeypatch: Any, resp: _FakeLogResp) -> None:
+    """Wire LiveLogBackend.stream onto a fake k8s client whose
+    ``read_namespaced_pod_log`` returns ``resp``."""
+    pytest.importorskip("kubernetes")
+    import k8s_native.observability as obs
+
+    monkeypatch.setattr(obs, "build_api_client", lambda auth: object())
+
+    class _FakeCoreV1:
+        def __init__(self, _api_client: Any) -> None:
+            pass
+
+        def read_namespaced_pod_log(self, **_kw: Any) -> _FakeLogResp:
+            return resp
+
+    from kubernetes import client as k8s_client
+
+    monkeypatch.setattr(k8s_client, "CoreV1Api", _FakeCoreV1)
+
+
+@pytest.mark.asyncio
+async def test_live_backend_follow_false_terminates_on_eof(
+    monkeypatch: Any,
+) -> None:
+    """#1013: a one-shot tail must stop once the body drains. Before the
+    fix the empty-read branch slept-and-retried forever, hanging the
+    GraphQL worker; now ``follow=False`` breaks on the first empty read."""
+    resp = _FakeLogResp(
+        [
+            b"2024-01-01T00:00:00Z line 0\n",
+            b"2024-01-01T00:00:01Z line 1\n",
+        ]
+    )
+    _patch_live_backend(monkeypatch, resp)
+
+    out: list[str] = []
+
+    async def _drain() -> None:
+        async for line in LiveLogBackend().stream(
+            auth=_auth(),
+            namespace="astrolift-agents-acme",
+            pod_name="agent-task-1",
+            container=None,
+            tail_lines=100,
+            follow=False,
+        ):
+            out.append(line.message)
+
+    # Generous bound: pre-fix this never completes and trips the timeout.
+    await asyncio.wait_for(_drain(), timeout=2.0)
+    assert out == ["line 0", "line 1"]
+    assert resp.released is True
+
+
+@pytest.mark.asyncio
+async def test_live_backend_follow_true_keeps_waiting_on_idle(
+    monkeypatch: Any,
+) -> None:
+    """The follow=True (subscription) path must NOT treat an idle empty
+    read as EOF — it keeps the stream open for new lines. Verifies the
+    fix is scoped to the one-shot path and doesn't regress live tail."""
+    resp = _FakeLogResp([])  # always empty: open but idle
+    _patch_live_backend(monkeypatch, resp)
+
+    async def _drain_first() -> str:
+        async for line in LiveLogBackend().stream(
+            auth=_auth(),
+            namespace="astrolift-agents-acme",
+            pod_name="web-1",
+            container=None,
+            tail_lines=100,
+            follow=True,
+        ):
+            return line.message
+        return "ENDED"
+
+    # follow=True over an idle stream should block, not end — so the
+    # wait_for must time out rather than return "ENDED".
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(_drain_first(), timeout=0.4)

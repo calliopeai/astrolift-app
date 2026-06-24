@@ -432,9 +432,16 @@ class LiveLogBackend:
                 if chunk is None:
                     break
                 if not chunk:
-                    # No bytes yet but stream open — yield to the
-                    # loop so other subscribers + the disconnect
-                    # signal can progress.
+                    if not follow:
+                        # One-shot tail (follow=False): an empty read
+                        # means the response body is fully drained
+                        # (EOF). No more data is coming on a non-follow
+                        # request, so stop — spinning here would hang
+                        # the reader forever (see #1013).
+                        break
+                    # follow=True: stream still open but idle — yield to
+                    # the loop so other subscribers + the disconnect
+                    # signal can progress, then retry.
                     await asyncio.sleep(0.05)
                     continue
                 try:
