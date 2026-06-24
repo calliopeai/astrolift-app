@@ -232,6 +232,12 @@ def _render_agent_job(*, job_name: str, workload, namespace: str, task) -> dict:
             "labels": {
                 "astrolift.dev/workload-kind": "agent",
                 "astrolift.dev/task-id": str(task.guid),
+                # The platform log surface (list_pods) selects on
+                # astrolift.dev/app; key it to the task guid so an operator can
+                # read an agent task's pod logs (agentTaskLogs / workflow stage
+                # logs) without a task-id-specific selector in every driver
+                # (#1013). Discovery passes the task guid as the app_slug.
+                "astrolift.dev/app": str(task.guid),
             },
         },
         "spec": {
@@ -242,6 +248,7 @@ def _render_agent_job(*, job_name: str, workload, namespace: str, task) -> dict:
                     "labels": {
                         "astrolift.dev/task-id": str(task.guid),
                         "astrolift.dev/workload-kind": "agent",
+                        "astrolift.dev/app": str(task.guid),
                     }
                 },
                 "spec": {

@@ -104,3 +104,18 @@ def test_command_args_are_copied_not_aliased():
     rendered["args"].append("MUTATED")
     assert container.command == ["a"]
     assert container.args == ["b"]
+
+
+def test_agent_pod_labeled_with_app_equal_task_guid():
+    """#1013: the pod template carries astrolift.dev/app=<task guid> so the
+    platform log surface (list_pods selects astrolift.dev/app) can discover an
+    agent task's pod — without it, agentTaskLogs returned []."""
+    job = _render_agent_job(
+        job_name="agent-task-t1",
+        workload=_FakeWorkload(_FakeContainer(image_ref="busybox:latest")),
+        namespace="astrolift-agents-acme",
+        task=_FakeTask(guid="abc-123"),
+    )
+    pod_labels = job["spec"]["template"]["metadata"]["labels"]
+    assert pod_labels["astrolift.dev/app"] == "abc-123"
+    assert pod_labels["astrolift.dev/task-id"] == "abc-123"
