@@ -224,6 +224,39 @@ def test_spawn_without_managed_cluster_raises(org, env_spec, patch_spawner):
         agent_stage._spawn_agent_task_sync(task_pk)
 
 
+def _shared_managed_cluster(provider_plugin):
+    """A platform-shared managed cluster (organization is NULL) — how installs
+    register the EKS the org's apps deploy onto via AppEnvironment.tenant_cluster."""
+    from astrolift_clusters.models import TenantCluster
+
+    return TenantCluster.objects.create(
+        organization=None,
+        name="shared-platform",
+        slug="shared-platform",
+        provider_plugin=provider_plugin,
+        provider_config={},
+        endpoint="https://shared.cluster.invalid",
+        auth_method=TenantCluster.AuthMethod.KUBECONFIG,
+        auth_config={},
+        lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+    )
+
+
+def test_resolve_cluster_falls_back_to_shared_platform_cluster(org, provider_plugin):
+    """The org owns no cluster, but a shared (org=NULL) managed cluster exists —
+    agent dispatch must resolve onto it (the real prod situation that left Once
+    tasks stuck in QUEUED). Regression for the org-equality-only filter."""
+    shared = _shared_managed_cluster(provider_plugin)
+    assert agent_stage._resolve_managed_cluster(org).pk == shared.pk
+
+
+def test_resolve_cluster_prefers_org_owned_over_shared(org, provider_plugin, cluster):
+    """When the org owns a managed cluster AND a shared one exists, the org-owned
+    one wins (it isn't shadowed by the shared platform cluster)."""
+    _shared_managed_cluster(provider_plugin)
+    assert agent_stage._resolve_managed_cluster(org).pk == cluster.pk
+
+
 def test_poll_running_then_success_walks_to_completed(org, env_spec, cluster, patch_spawner):
     """A PROVISIONING task observed running transitions to RUNNING; a later
     succeeded status walks it to COMPLETED and records the result."""

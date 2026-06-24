@@ -216,6 +216,44 @@ def _agent_workload_qs(org_pk: int, *, project_slug: str | None = None):
     return qs.order_by("-created_at")
 
 
+def _agent_list_rows(
+    info: Info, org_id: strawberry.ID, project_slug: str | None
+) -> list[AgentListItemType]:
+    """Build the agent list rows for an org (+ optional project filter).
+
+    Module-level so both ``agent_workloads`` and ``agent_fleet`` can call it.
+    The fleet resolver previously did ``self.agent_workloads(...)``, but
+    Strawberry passes the root value (``None``) as ``self`` on a field
+    resolver, so that raised ``'NoneType' has no attribute 'agent_workloads'``.
+    """
+    org_pk = _caller_org_id(info, org_id)
+    workloads = list(_agent_workload_qs(org_pk, project_slug=project_slug)[:_AGENT_LIST_CAP])
+    rollup = _agent_run_rollup([w.pk for w in workloads])
+    rows: list[AgentListItemType] = []
+    for w in workloads:
+        stats = rollup.get(w.pk, {})
+        app = w.registered_app
+        rows.append(
+            AgentListItemType(
+                id=GUID(str(w.guid)),
+                name=w.name,
+                slug=w.slug,
+                app_slug=app.slug,
+                project_slug=(app.project.slug if app.project_id else ""),
+                source_repo=app.source_repo or "",
+                source_url=app.source_url or "",
+                run_family=w.run_family,
+                run_mode=w.run_mode,
+                run_paused=w.run_paused,
+                run_cron_expression=w.run_cron_expression or "",
+                last_run_status=stats.get("last_status"),
+                last_run_at=stats.get("last_at"),
+                running_count=stats.get("running", 0),
+            )
+        )
+    return rows
+
+
 @strawberry.type
 class AgentsQuery:
     @strawberry.field
@@ -556,32 +594,7 @@ class AgentsQuery:
         (superusers excepted, via ``_caller_org_id``); the workload
         queryset is filtered to that org through the app's organization.
         """
-        org_pk = _caller_org_id(info, org_id)
-        workloads = list(_agent_workload_qs(org_pk, project_slug=project_slug)[:_AGENT_LIST_CAP])
-        rollup = _agent_run_rollup([w.pk for w in workloads])
-        rows: list[AgentListItemType] = []
-        for w in workloads:
-            stats = rollup.get(w.pk, {})
-            app = w.registered_app
-            rows.append(
-                AgentListItemType(
-                    id=GUID(str(w.guid)),
-                    name=w.name,
-                    slug=w.slug,
-                    app_slug=app.slug,
-                    project_slug=(app.project.slug if app.project_id else ""),
-                    source_repo=app.source_repo or "",
-                    source_url=app.source_url or "",
-                    run_family=w.run_family,
-                    run_mode=w.run_mode,
-                    run_paused=w.run_paused,
-                    run_cron_expression=w.run_cron_expression or "",
-                    last_run_status=stats.get("last_status"),
-                    last_run_at=stats.get("last_at"),
-                    running_count=stats.get("running", 0),
-                )
-            )
-        return rows
+        return _agent_list_rows(info, org_id, project_slug)
 
     @strawberry.field
     @require_permission(Permission.AGENT_READ)
@@ -594,7 +607,7 @@ class AgentsQuery:
         filter, exposed as its own field so the fleet/global Agents page
         doesn't have to special-case a null ``project_slug`` argument.
         """
-        return self.agent_workloads(info, org_id=org_id, project_slug=None)
+        return _agent_list_rows(info, org_id, project_slug=None)
 
     @strawberry.field
     @require_permission(Permission.AGENT_READ)

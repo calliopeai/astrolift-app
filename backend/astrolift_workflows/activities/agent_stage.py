@@ -78,22 +78,30 @@ def _skill_org_or_global_q(organization: Any):
 
 
 def _resolve_managed_cluster(organization: Any) -> Any:
-    """Return the org's oldest ``managed`` TenantCluster, or raise.
+    """Return the org's ``managed`` TenantCluster (preferring an org-owned one,
+    falling back to a shared platform cluster), or raise.
 
     Agent stages are org-scoped (not app-scoped), so they run on the org's
-    default managed cluster — the first cluster the operator brought into
-    management. ``registered``/``error``/``decommissioned`` rows are not
-    deploy targets and are skipped.
+    default managed cluster. A cluster may be org-owned (``organization`` set)
+    or a shared platform cluster the install registered with ``organization``
+    NULL — the same EKS the org's apps already deploy onto via
+    ``AppEnvironment.tenant_cluster``. We match both (mirroring the
+    org-or-global skill lookup) and prefer the org-owned row so an org with
+    its own cluster isn't shadowed by a shared one.
+    ``registered``/``error``/``decommissioned`` rows are not deploy targets
+    and are skipped.
     """
+    from django.db.models import F, Q
+
     from astrolift_clusters.models import TenantCluster
 
     cluster = (
         TenantCluster.objects.filter(
-            organization=organization,
+            Q(organization=organization) | Q(organization__isnull=True),
             deleted_at__isnull=True,
             lifecycle=TenantCluster.Lifecycle.MANAGED.value,
         )
-        .order_by("created_at")
+        .order_by(F("organization_id").asc(nulls_last=True), "created_at")
         .first()
     )
     if cluster is None:
