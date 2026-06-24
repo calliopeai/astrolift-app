@@ -16,6 +16,7 @@ from astrolift_operations.models import WorkflowRun
 from astrolift_workflows.activities.workflow_stage_activities import (
     _aggregate_fan_out_sync,
     _create_stage_execution_sync,
+    _parent_run_pk,
     _dispatch_agent_for_stage_sync,
     _get_workflow_stages_sync,
     _mark_workflow_run_sync,
@@ -492,3 +493,11 @@ def test_dispatch_agent_rejects_stage_without_agent_definition(run, definition):
     execution_id = _create_stage_execution_sync(str(run.pk), str(gate.pk), 1)
     with pytest.raises(RuntimeError, match="no agent_definition"):
         _dispatch_agent_for_stage_sync(str(gate.pk), execution_id, {})
+
+
+def test_parent_run_pk_plain_and_fanout_child():
+    """#1017: fan-out children run under '<parent>:fanout:<order>:<idx>' —
+    their activities must resolve to the parent run pk, not ValueError on int()."""
+    assert _parent_run_pk("38") == 38
+    assert _parent_run_pk("38:fanout:0:0") == 38
+    assert _parent_run_pk("38:fanout:0:2") == 38

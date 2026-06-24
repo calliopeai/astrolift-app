@@ -59,6 +59,18 @@ def _unique_slug(prefix: str) -> str:
     return f"{prefix}-{uuid.uuid4().hex[:12]}"
 
 
+def _parent_run_pk(workflow_run_id: str) -> int:
+    """Resolve the WorkflowRun pk from a (possibly composite) run id.
+
+    Fan-out children run under ``<parent_run_pk>:fanout:<order>:<idx>`` (see
+    _run_fan_out); their activities still operate on the PARENT WorkflowRun.
+    A plain run id ("38") has no colon and round-trips unchanged. Without this
+    every fan-out child raised ``ValueError: invalid literal for int()`` and
+    the aggregation saw 0 children (#1017).
+    """
+    return int(str(workflow_run_id).split(":", 1)[0])
+
+
 # ---------------------------------------------------------------------------
 # Sync helpers (Django-touching — called via sync_to_async)
 # ---------------------------------------------------------------------------
@@ -120,7 +132,7 @@ def _create_stage_execution_sync(
     from astrolift_operations.models import WorkflowRun
     from workflows.models import WorkflowStage, WorkflowStageExecution
 
-    run = WorkflowRun.objects.get(pk=int(workflow_run_id))
+    run = WorkflowRun.objects.get(pk=_parent_run_pk(workflow_run_id))
     stage = WorkflowStage.objects.get(pk=int(stage_id))
 
     attempt = max(1, int(attempt_number))
@@ -454,7 +466,7 @@ def _snapshot_checkpoint_sync(
     from astrolift_operations.models import WorkflowRun
     from workflows.models import WorkflowStage, WorkflowStageExecution
 
-    run = WorkflowRun.objects.get(pk=int(workflow_run_id))
+    run = WorkflowRun.objects.get(pk=_parent_run_pk(workflow_run_id))
     stage = WorkflowStage.objects.get(pk=int(stage_id))
     now = timezone.now()
     execution = WorkflowStageExecution.objects.create(
@@ -488,7 +500,7 @@ def _aggregate_fan_out_sync(
     from astrolift_operations.models import WorkflowRun
     from workflows.models import WorkflowStage, WorkflowStageExecution
 
-    run = WorkflowRun.objects.get(pk=int(workflow_run_id))
+    run = WorkflowRun.objects.get(pk=_parent_run_pk(workflow_run_id))
     stage = WorkflowStage.objects.get(pk=int(stage_id))
     sources = list(
         WorkflowStageExecution.objects.filter(
@@ -550,7 +562,7 @@ def _mark_workflow_run_sync(
     if status not in valid:
         raise ValueError(f"invalid workflow run status {status!r}")
 
-    run = WorkflowRun.objects.get(pk=int(workflow_run_id))
+    run = WorkflowRun.objects.get(pk=_parent_run_pk(workflow_run_id))
     run.status = status
     if result is not None:
         run.result = result
