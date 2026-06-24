@@ -196,6 +196,7 @@ def test_plan_preserves_binding_order():
         "AppDomain",
         "PreviewEnvironment",
         "AppEnvironment",
+        "Workload",
     ],
 )
 def test_business_records_soft_deleted(kind):

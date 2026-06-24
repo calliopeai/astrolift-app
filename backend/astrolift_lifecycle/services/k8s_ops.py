@@ -69,6 +69,19 @@ class ScaleResult:
     error: str | None = None
 
 
+@dataclasses.dataclass(slots=True)
+class WorkloadStatusResult:
+    """Live Deployment status for a Service-family agent. ``deployed`` is
+    False (with null replica counts) when the Deployment doesn't exist yet,
+    so the caller can say "deploy the agent first" instead of erroring."""
+
+    ok: bool
+    deployed: bool
+    desired_replicas: int | None = None
+    ready_replicas: int | None = None
+    error: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # Public helpers
 # ---------------------------------------------------------------------------
@@ -282,6 +295,40 @@ def scale_workload(
         ready,
     )
     return ScaleResult(ok=True, current_replicas=current, ready_replicas=ready, error=None)
+
+
+def read_workload_status(workload: Workload) -> WorkloadStatusResult:
+    """Read the live Deployment status (desired/ready replicas) for a
+    Service-family agent ``workload``.
+
+    The Deployment IS the run for a Service agent (#1012), so its live
+    replica counts are the run's status. Returns ``deployed=False`` when the
+    Deployment isn't there yet (NOT_FOUND from the driver), letting the
+    observe surface distinguish "not deployed" from "deployed, 0 ready".
+    """
+    driver, namespace, cluster_slug = _resolve_driver_and_namespace(workload)
+    get_status = getattr(driver, "get_workload_status", None)
+    if not callable(get_status):
+        raise K8sOpError(
+            "PRECONDITION",
+            f"cluster {cluster_slug!r} driver has no get_workload_status; cannot read status",
+        )
+    try:
+        status = get_status(cluster_slug, namespace, "Deployment", workload.slug)
+    except Exception as exc:  # noqa: BLE001
+        msg = str(exc) or exc.__class__.__name__
+        lower = msg.lower()
+        if "not found" in lower or "404" in lower or "notfound" in lower:
+            return WorkloadStatusResult(ok=True, deployed=False)
+        raise K8sOpError("INTERNAL", f"get_workload_status failed: {msg}") from exc
+    desired = int(getattr(status, "desired_replicas", 0) or 0)
+    ready = int(getattr(status, "ready_replicas", 0) or 0)
+    return WorkloadStatusResult(
+        ok=True,
+        deployed=True,
+        desired_replicas=desired,
+        ready_replicas=ready,
+    )
 
 
 # ---------------------------------------------------------------------------

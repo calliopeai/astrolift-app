@@ -389,6 +389,13 @@ class AgentDetailType:
     brief: BriefType | None
     # Attached Skills, ordered by AgentSkillRef.position, tools nested.
     skills: list[AgentSkillType]
+    # Service-family scale config read parity (#1012) — the write surface
+    # already exists in updateAgentRunSpec; these expose it back. Defaults
+    # keep Task-family detail construction unchanged.
+    replicas: int = 1
+    scheduled_scale_to: int | None = None
+    scale_up_cron: str = ""
+    scale_down_cron: str = ""
 
 
 @strawberry.type(name="AstroliftAgentLiveStatus")
@@ -422,6 +429,15 @@ class AgentLiveStatusType:
     # Next cron firing (UTC) for a schedule-mode, unpaused agent; null
     # otherwise. See the class docstring for the exact non-null contract.
     next_scheduled_at: dt.datetime | None
+    # Service-family (run_family=service) live Deployment status (#1012):
+    # the Deployment IS the run, so these are its replica counts read live
+    # from the cluster. Null for Task-family agents (which use the
+    # running_count / last_run_* fields above). ``deployment_ready`` is
+    # True when ready==desired and desired>0; False when deployed but not
+    # ready; null when the agent isn't a Service agent or isn't deployed.
+    desired_replicas: int | None = None
+    ready_replicas: int | None = None
+    deployment_ready: bool | None = None
 
 
 @strawberry.type(name="AstroliftAgentRunSpec")
@@ -590,6 +606,10 @@ def agent_detail_to_type(w) -> AgentDetailType:
         dockerfile_path=(container.dockerfile_path or "") if container is not None else "",
         brief=brief_to_type(w.brief) if w.brief_id else None,
         skills=skills,
+        replicas=int(getattr(w, "replicas", 1) or 1),
+        scheduled_scale_to=getattr(w, "scheduled_scale_to", None),
+        scale_up_cron=getattr(w, "scale_up_cron", "") or "",
+        scale_down_cron=getattr(w, "scale_down_cron", "") or "",
     )
 
 

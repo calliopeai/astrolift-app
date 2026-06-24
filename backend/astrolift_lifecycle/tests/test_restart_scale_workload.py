@@ -78,10 +78,24 @@ class _RecordingDriver:
     call and returns a stubbed Deployment-status dict the service
     layer reads back. Behaviour switches are set per-test."""
 
-    def __init__(self, *, response: dict[str, Any] | None = None, raises: Exception | None = None):
+    def __init__(
+        self,
+        *,
+        response: dict[str, Any] | None = None,
+        raises: Exception | None = None,
+        status: Any | None = None,
+        status_raises: Exception | None = None,
+    ):
         self.calls: list[_PatchCall] = []
         self._response = response or {}
         self._raises = raises
+        self._status = status
+        self._status_raises = status_raises
+
+    def get_workload_status(self, cluster_slug, namespace, kind, name):  # noqa: ARG002
+        if self._status_raises is not None:
+            raise self._status_raises
+        return self._status
 
     def patch_workload(
         self,
@@ -177,6 +191,36 @@ def test_rollout_restart_without_environment_raises_precondition(
         rollout_restart_workload(workload)
     assert excinfo.value.code == "PRECONDITION"
     assert "no active environment" in excinfo.value.message
+
+
+# ---------------------------------------------------------------------------
+# Service layer — read_workload_status (#1012)
+# ---------------------------------------------------------------------------
+
+
+def test_read_workload_status_returns_live_replicas(workload, env, install_driver):
+    """A deployed Service agent reports the driver's live desired/ready."""
+    from astrolift_lifecycle.services.k8s_ops import read_workload_status
+
+    install_driver(
+        _RecordingDriver(status=SimpleNamespace(desired_replicas=3, ready_replicas=2)),
+    )
+    res = read_workload_status(workload)
+    assert res.ok and res.deployed
+    assert res.desired_replicas == 3
+    assert res.ready_replicas == 2
+
+
+def test_read_workload_status_not_deployed_when_driver_404s(workload, env, install_driver):
+    """A NOT_FOUND from the driver -> deployed=False (not an error), so the
+    observe surface can say 'deploy first' instead of breaking."""
+    from astrolift_lifecycle.services.k8s_ops import read_workload_status
+
+    install_driver(_RecordingDriver(status_raises=Exception("Deployment not found (404)")))
+    res = read_workload_status(workload)
+    assert res.ok is True
+    assert res.deployed is False
+    assert res.desired_replicas is None
 
 
 # ---------------------------------------------------------------------------

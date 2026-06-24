@@ -431,6 +431,27 @@ def test_workflow_happy_path_soft_deletes_app(app):
     assert teardown["platform_rows"]["ok"] is True
 
 
+def test_soft_delete_records_soft_deletes_workloads(app):
+    """#1012: the final soft-delete pass must also soft-delete the app's
+    Workloads (incl. agent Workloads) so the business record doesn't outlive
+    the RegisteredApp and a torn-down agent stops being dispatch-selectable."""
+    from astrolift_registry.models import Workload
+    from astrolift_workflows.activities.app_teardown import (
+        _soft_delete_app_records_sync,
+    )
+
+    agent = Workload.objects.create(
+        registered_app=app, name="agent", slug="dereg-agent", kind=Workload.Kind.AGENT
+    )
+    summary = _soft_delete_app_records_sync(app.pk)
+
+    agent.refresh_from_db()
+    app.refresh_from_db()
+    assert agent.deleted_at is not None
+    assert summary.get("workloads", 0) >= 1
+    assert app.deleted_at is not None
+
+
 def test_workflow_partial_failure_keeps_app_live(app):
     """A managed-service deprovision failure marks ``managed_services``
     still live and gates the platform-row soft-delete so the app row

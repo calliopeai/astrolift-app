@@ -271,6 +271,17 @@ class AgentTriggerResult:
     signing_secret: str | None = None
 
 
+@strawberry.type(name="AstroliftAgentScaleResult")
+class AgentScaleResult:
+    """Result of an on-demand Service-agent scale (#1012). ``desired`` echoes
+    the (clamped) target; ``ready`` is the driver's read-back when surfaced."""
+
+    ok: bool
+    message: str = ""
+    desired_replicas: int | None = None
+    ready_replicas: int | None = None
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -936,6 +947,68 @@ class AgentsMutation:
             slug=result["slug"],
             endpoint=result["endpoint"],
             signing_secret=result["signing_secret"],
+        )
+
+    @strawberry.field
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def scale_service_agent(
+        self, info: Info, agent_slug: str, target_replicas: int
+    ) -> AgentScaleResult:
+        """On-demand scale of a Service-family agent's Deployment (#1012).
+
+        The manual override alongside the scheduled scale ticks. Clamps to the
+        env replica bounds, patches the live Deployment, and persists
+        ``Workload.replicas`` so a later redeploy / scale tick doesn't revert
+        the operator's intent. ``target_replicas=0`` is the pause (the scale
+        tick + dispatch already honour a 0/scaled-down Service agent). Errors
+        if the agent isn't Service-family or hasn't been deployed yet.
+        """
+        from astrolift_lifecycle.services.k8s_ops import K8sOpError, scale_workload
+
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        if org_pk is None:
+            return AgentScaleResult(ok=False, message="no active organization")
+        if target_replicas < 0:
+            return AgentScaleResult(ok=False, message="target_replicas must be >= 0")
+
+        slug = (agent_slug or "").strip()
+        workload = (
+            Workload.objects.filter(
+                slug=slug,
+                registered_app__organization_id=org_pk,
+                registered_app__deleted_at__isnull=True,
+                deleted_at__isnull=True,
+            )
+            .select_related("registered_app")
+            .first()
+        )
+        if workload is None or workload.kind != Workload.Kind.AGENT:
+            return AgentScaleResult(ok=False, message="agent not found")
+        if workload.run_family != Workload.RunFamily.SERVICE:
+            return AgentScaleResult(
+                ok=False,
+                message=f"agent {slug!r} is not a service-family agent (run_family={workload.run_family})",
+            )
+
+        try:
+            res = scale_workload(workload, int(target_replicas))
+        except K8sOpError as exc:
+            msg = exc.message
+            if exc.code == "NOT_FOUND":
+                msg = f"{msg} — deploy the agent before scaling"
+            return AgentScaleResult(ok=False, message=msg)
+
+        # Persist intent so a redeploy / scale tick doesn't revert it (mirrors
+        # the scale-tick's own write-back of Workload.replicas).
+        workload.replicas = int(target_replicas)
+        workload.save(update_fields=["replicas", "updated_at"])
+
+        return AgentScaleResult(
+            ok=True,
+            desired_replicas=res.current_replicas,
+            ready_replicas=res.ready_replicas,
         )
 
     @strawberry.field

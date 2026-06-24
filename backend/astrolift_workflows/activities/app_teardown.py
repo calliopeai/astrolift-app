@@ -218,7 +218,7 @@ def _soft_delete_app_records_sync(registered_app_id: int) -> dict[str, int]:
     from datetime import UTC, datetime
 
     from astrolift_lifecycle.models import AppEnvironment, Deployment
-    from astrolift_registry.models import RegisteredApp
+    from astrolift_registry.models import RegisteredApp, Workload
     from astrolift_services.models import AppSecretBundleRef
 
     now = datetime.now(UTC)
@@ -255,6 +255,18 @@ def _soft_delete_app_records_sync(registered_app_id: int) -> dict[str, int]:
             deleted_at__isnull=True,
         ),
         "app_environments",
+    )
+    # Workloads (incl. agent Workloads) — #1012: these were NOT soft-deleted,
+    # so an agent's business record outlived its RegisteredApp (the K8s
+    # cascade removed the runtime objects, but the row survived). Soft-delete
+    # so the audit invariant "business record must not outlive the platform
+    # row" holds and stale agents stop being dispatch-selectable.
+    _soft_delete_queryset(
+        Workload.objects.filter(
+            registered_app_id=registered_app_id,
+            deleted_at__isnull=True,
+        ),
+        "workloads",
     )
 
     # Finally the app row itself.

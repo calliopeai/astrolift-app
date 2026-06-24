@@ -143,6 +143,29 @@ def _next_cron_fire(expression: str, *, after):
     return None
 
 
+def _service_replica_status(workload) -> tuple[int | None, int | None, bool | None]:
+    """Live ``(desired, ready, deployment_ready)`` for a Service-family agent.
+
+    The Deployment IS the run (#1012). Best-effort: any resolution/read error
+    (no cluster bound, driver missing, transient) degrades to ``(None, None,
+    None)`` so the agent list never fails on one unreachable Deployment.
+    ``deployment_ready`` is True when ready==desired and desired>0, False when
+    deployed but not yet converged, None when not deployed.
+    """
+    from astrolift_lifecycle.services.k8s_ops import read_workload_status
+
+    try:
+        status = read_workload_status(workload)
+    except Exception:  # noqa: BLE001 — observe surface must not raise
+        return None, None, None
+    if not status.deployed:
+        return None, None, None
+    desired = status.desired_replicas
+    ready = status.ready_replicas
+    ready_flag = (ready == desired and (desired or 0) > 0)
+    return desired, ready, ready_flag
+
+
 def _agent_run_rollup(workload_pks: list[int]) -> dict[int, dict]:
     """Bulk last-run + running-count per agent workload.
 
@@ -751,6 +774,12 @@ class AgentsQuery:
                 and (w.run_cron_expression or "").strip()
             ):
                 next_scheduled = _next_cron_fire(w.run_cron_expression, after=now)
+            # Service-family (#1012): the Deployment IS the run — read its
+            # live replica status. Best-effort + per-agent guarded so one
+            # unreachable Deployment never fails the whole list.
+            desired_replicas = ready_replicas = deployment_ready = None
+            if w.run_family == Workload.RunFamily.SERVICE:
+                desired_replicas, ready_replicas, deployment_ready = _service_replica_status(w)
             rows.append(
                 AgentLiveStatusType(
                     workload_id=GUID(str(w.guid)),
@@ -764,6 +793,9 @@ class AgentsQuery:
                     last_run_status=stats.get("last_status"),
                     last_run_at=stats.get("last_at"),
                     next_scheduled_at=next_scheduled,
+                    desired_replicas=desired_replicas,
+                    ready_replicas=ready_replicas,
+                    deployment_ready=deployment_ready,
                 )
             )
         return rows
