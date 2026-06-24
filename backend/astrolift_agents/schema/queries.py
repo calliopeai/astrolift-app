@@ -534,8 +534,22 @@ class AgentsQuery:
             )
             if row is None:
                 return None
+            # Resolve the cluster the SAME way the spawner does
+            # (_resolve_managed_cluster on the org) rather than via
+            # ``row.dispatcher`` — nothing sets AgentTask.dispatcher at dispatch
+            # time, so keying off it made this bail to [] before ever reading a
+            # pod (#1013). Honour an explicit dispatcher cluster when present.
             dispatcher = row.dispatcher
             cluster = dispatcher.tenant_cluster if dispatcher is not None else None
+            if cluster is None:
+                from astrolift_workflows.activities.agent_stage import (
+                    _resolve_managed_cluster,
+                )
+
+                try:
+                    cluster = _resolve_managed_cluster(row.organization)
+                except Exception:
+                    cluster = None
             if cluster is None or not getattr(cluster, "is_active", True):
                 return None
             org_slug = (getattr(row.organization, "slug", "") or "").strip()
