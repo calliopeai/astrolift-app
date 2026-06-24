@@ -53,6 +53,16 @@ class WorkflowStageExecutionType:
     created_at: datetime
 
     @strawberry_django.field
+    def execution_id(self) -> str:
+        """The stage-execution pk as a string — the id a ``human_gate_decision``
+        / ``escalation_cleared`` signal must target (the executor keys
+        ``_gate_decisions`` on this value from ``create_stage_execution``).
+        Exposed so an operator can approve a gate via ``signalWorkflowInstance``
+        without a DB lookup — without it the approve path wasn't reachable
+        through the platform (#1018)."""
+        return str(self.pk)
+
+    @strawberry_django.field
     def stage_guid(self) -> str:
         return str(self.stage.guid)
 
