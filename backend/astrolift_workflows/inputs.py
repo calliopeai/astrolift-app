@@ -37,6 +37,11 @@ class DeployAppInput:
     image_tags: dict[str, str]
     trigger_kind: str
     actor: Actor
+    # Git commit SHA the build step checks out + builds from (#865, #978).
+    # Empty on manual/UI deploys with no commit context — the build falls
+    # back to the app's default branch. Carried here so the
+    # platform-build path has the SHA without re-reading the Deployment row.
+    commit_sha: str = ""
 
 
 @dataclasses.dataclass(slots=True, frozen=True)

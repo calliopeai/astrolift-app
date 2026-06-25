@@ -239,6 +239,7 @@ def _dispatch_cron_deploys_sync() -> CronDispatchSummary:
                         image_tags={"app": image_tag},
                         trigger_kind=Deployment.TriggerKind.SCHEDULED.value,
                         actor=actor,
+                        commit_sha=deployment.commit_sha,
                     )
                 ],
                 workflow_id=wf_id,

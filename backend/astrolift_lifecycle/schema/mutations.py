@@ -863,6 +863,7 @@ def _record_approval_vote_and_maybe_start(
                 image_tags={"app": deployment.image_tag},
                 trigger_kind=deployment.trigger_kind,
                 actor=actor,
+                commit_sha=deployment.commit_sha,
             )
         ],
         workflow_id=wf_id,

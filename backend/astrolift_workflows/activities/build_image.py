@@ -1,25 +1,32 @@
 """
-BuildImageActivity — build a container image from source (#865, #867).
+BuildImageActivity — build a container image from source (#865, #867, #978).
 
 Invoked by ``DeployAppWorkflow`` when ``RegisteredApp.build_strategy`` is not
-``"off"``. The activity locates the app's source connection, constructs a
-``BuildSpec``, and dispatches through the cluster's registered
-``BuildDriver`` plugin.
+``"off"``. The activity resolves the deployment's app + cluster, ensures the
+app's registry repo + a registry-push identity role exist, then dispatches
+the build through the cluster's ``BuildDriver`` (kaniko, in-cluster).
 
-Until a real cluster-bound BuildDriver plugin lands, the activity falls
-back to a no-op stub that logs the request and returns the caller-supplied
-``image_tag`` unchanged. The stub signals its intent via the returned dict
-so callers can detect whether a real build was performed:
+The build pushes to ``<registry_repo_uri>:<image_tag>`` — exactly the ref
+``render_resources_for_deployment`` deploys (``{image_repository}:{image_tag}``)
+— so a successful build flows straight into the rollout with no rewrite. The
+pushed digest is read back from the registry and recorded on the Deployment
+row (``image_digest``), which is the ``stub:false`` signal callers check.
+
+When the app's cluster can't run a real build (no driver wired, non-AWS
+provider whose registry-push identity isn't supported yet, or missing AWS
+account id), the activity falls back to a no-op stub that returns the
+caller-supplied ``image_tag`` unchanged — keeping the workflow runnable in
+environments where build infrastructure isn't provisioned:
 
     {"ok": True, "image_ref": "<image_tag>", "stub": True}
 
-A real driver sets ``"stub": False`` and populates ``"digest"``.
+A real build sets ``"stub": False`` and populates ``"digest"``.
 
-Heartbeat contract: the activity heartbeats on entry and once per driver
-poll cycle. Temporal's default heartbeat timeout is not set here — callers
-set ``heartbeat_timeout`` on the ``execute_activity`` call to match the
-expected build duration (build times vary widely by strategy and repo size;
-dockerfile builds on a cold runner can take 10+ minutes).
+Heartbeat contract: the activity heartbeats on entry; the kaniko driver
+heartbeats once per poll cycle while the build Job runs (via
+``maybe_heartbeat``). Callers set ``heartbeat_timeout`` on the
+``execute_activity`` call to match the expected build duration (dockerfile
+builds on a cold runner can take 10+ minutes).
 """
 
 from __future__ import annotations
@@ -31,122 +38,320 @@ from temporalio import activity
 
 log = logging.getLogger("astrolift_workflows.activities.build_image")
 
+# Where the kaniko build Job runs — the platform namespace present on every
+# managed cluster. Imported lazily inside the sync path to keep the providers
+# tree out of the Temporal workflow-sandbox import graph.
+_BUILD_NAMESPACE = "astrolift-system"
+
 
 @dataclasses.dataclass(slots=True, frozen=True)
 class BuildImageInput:
     """Payload for ``build_image``.
 
-    ``app_guid`` — the RegisteredApp's GUID (string form of UUID).
-    ``image_tag`` — the desired output image tag (e.g. ``registry/repo:sha``).
-    ``commit_sha`` — the git commit SHA to check out and build from.
+    ``deployment_id`` — the Deployment PK the build is for. The activity
+    resolves the app, cluster, registry repo, and writes the pushed digest
+    back onto this row.
+    ``image_tag`` — the desired output image tag (the build pushes
+    ``<registry_repo_uri>:<image_tag>``).
+    ``commit_sha`` — the git commit SHA to check out and build from; empty
+    falls back to the app's default branch.
     """
 
-    app_guid: str
+    deployment_id: int
     image_tag: str
     commit_sha: str
 
 
-def _build_image_sync(inp: BuildImageInput) -> dict:
-    """Resolve the app, attempt a build via the registered BuildDriver.
+@dataclasses.dataclass(slots=True, frozen=True)
+class _PreparedBuild:
+    """Everything the activity needs to run + finalize one kaniko build."""
 
-    Falls back to a no-op stub when no BuildDriver plugin is wired to
-    the app's cluster — this keeps the workflow runnable in environments
-    where the build infrastructure is not yet provisioned.
+    driver: object
+    registry_driver: object
+    repo_name: str
+    repo_uri: str
+
+
+def _stub(image_tag: str) -> dict:
+    return {"ok": True, "image_ref": image_tag, "stub": True}
+
+
+def _build_image_sync(inp: BuildImageInput) -> dict:
+    """Resolve the deployment, attempt a real build via the BuildDriver.
+
+    Falls back to a no-op stub when the cluster can't run a build — this
+    keeps the workflow runnable where build infrastructure isn't yet
+    provisioned.
     """
-    from astrolift_registry.models import RegisteredApp
+    from astrolift_lifecycle.models import Deployment
 
     try:
-        app = RegisteredApp.objects.select_related(
-            "organization",
-            "default_tenant_cluster",
-        ).get(guid=inp.app_guid, deleted_at__isnull=True)
-    except RegisteredApp.DoesNotExist:
-        raise RuntimeError(f"RegisteredApp with guid={inp.app_guid!r} not found")
+        deployment = Deployment.objects.select_related(
+            "registered_app__organization",
+            "app_environment__tenant_cluster__provider_plugin",
+        ).get(pk=inp.deployment_id)
+    except Deployment.DoesNotExist:
+        raise RuntimeError(f"Deployment with pk={inp.deployment_id!r} not found") from None
 
+    app = deployment.registered_app
     build_strategy = app.build_strategy or "off"
     if build_strategy == "off":
         # Caller should not reach here when build_strategy is "off", but be
         # defensive and return early rather than erroring.
         log.warning(
-            "build_image called for app %s with build_strategy='off' — skipping",
-            inp.app_guid,
+            "build_image called for deployment %s (app=%s) with build_strategy='off' — skipping",
+            inp.deployment_id,
+            app.slug,
         )
-        return {"ok": True, "image_ref": inp.image_tag, "stub": True}
+        return _stub(inp.image_tag)
 
-    cluster = app.default_tenant_cluster
-    build_driver = _resolve_build_driver(cluster)
+    from core.app_deploy import AppDeployError, cluster_for_deployment
 
-    if build_driver is None:
+    try:
+        cluster = cluster_for_deployment(deployment)
+    except AppDeployError as exc:
+        log.info("build_image: no cluster for deployment %s (%s) — using stub", inp.deployment_id, exc)
+        return _stub(inp.image_tag)
+
+    prepared = _prepare_build(app, cluster, deployment.pk, inp.image_tag, inp.commit_sha)
+    if prepared is None:
         log.info(
-            "no BuildDriver registered for cluster %s (app=%s build_strategy=%s) — using stub",
+            "no BuildDriver available for cluster %s (app=%s build_strategy=%s) — using stub",
             getattr(cluster, "slug", "none"),
-            inp.app_guid,
+            app.slug,
             build_strategy,
         )
-        return {"ok": True, "image_ref": inp.image_tag, "stub": True}
+        return _stub(inp.image_tag)
 
     source_url = _resolve_source_url(app, inp.commit_sha)
+    from providers._sdk.build import BuildSpec  # noqa: PLC0415
+
+    spec = BuildSpec(
+        source_uri=source_url,
+        dockerfile_path=app.dockerfile_path or "Dockerfile",
+        context_path=app.build_context or ".",
+        build_args={str(k): str(v) for k, v in (app.build_args or {}).items()},
+    )
     log.info(
-        "build_image start app=%s build_strategy=%s source_url=%s image_tag=%s",
-        inp.app_guid,
+        "build_image start deployment=%s app=%s strategy=%s source=%s dest=%s:%s",
+        inp.deployment_id,
+        app.slug,
         build_strategy,
         source_url,
+        prepared.repo_uri,
         inp.image_tag,
     )
 
     try:
-        import asyncio
-
-        image_ref = asyncio.get_event_loop().run_until_complete(
-            build_driver.build(
-                source_url=source_url,
-                context_path=".",
-                dockerfile_path="Dockerfile",
-                image_tag=inp.image_tag,
-            )
-        )
+        result = prepared.driver.build(spec, prepared.repo_uri, inp.image_tag)
     except Exception as exc:
-        log.error(
-            "build_image failed app=%s: %s",
-            inp.app_guid,
-            exc,
-        )
+        log.error("build_image failed deployment=%s: %s", inp.deployment_id, exc)
         raise RuntimeError(f"BuildDriver.build failed: {exc}") from exc
 
-    log.info("build_image success app=%s image_ref=%s", inp.app_guid, image_ref)
-    return {"ok": True, "image_ref": image_ref or inp.image_tag, "stub": False}
+    if not getattr(result, "success", False):
+        errors = "; ".join(getattr(result, "errors", []) or []) or "unknown build failure"
+        raise RuntimeError(f"image build failed: {errors}")
+
+    digest = result.digest or _read_pushed_digest(prepared.registry_driver, prepared.repo_name, inp.image_tag)
+    _record_build_outcome(deployment, image_tag=inp.image_tag, digest=digest)
+
+    log.info(
+        "build_image success deployment=%s image=%s digest=%s",
+        inp.deployment_id,
+        result.image_uri,
+        digest or "(unavailable)",
+    )
+    return {"ok": True, "image_ref": result.image_uri, "digest": digest, "stub": False}
 
 
-def _resolve_build_driver(cluster):
-    """Look up the BuildDriver for the given TenantCluster.
+# ECR push needs an auth token (account-wide; not resource-scopable) plus the
+# layer push + image put actions scoped to the one repo, and the read actions
+# kaniko uses to pull cache layers / a base image from the same repo.
+_ECR_PUSH_ACTIONS = [
+    "ecr:BatchCheckLayerAvailability",
+    "ecr:GetDownloadUrlForLayer",
+    "ecr:BatchGetImage",
+    "ecr:InitiateLayerUpload",
+    "ecr:UploadLayerPart",
+    "ecr:CompleteLayerUpload",
+    "ecr:PutImage",
+]
 
-    Returns ``None`` when no plugin or no BuildDriver capability is wired.
+
+def _prepare_build(app, cluster, deployment_pk: int, image_tag: str, commit_sha: str):
+    """Provision the registry repo + push identity, return a ``_PreparedBuild``.
+
+    Returns ``None`` (→ stub) when the cluster can't run a real build:
+    a non-AWS provider whose in-cluster registry-push identity isn't wired
+    yet, or a missing AWS account id. The kaniko driver itself is
+    cloud-agnostic; the registry-push role minted here is the AWS/IRSA path
+    (mirrors the workload-identity provisioning the deploy does for S3).
     """
-    if cluster is None:
+    from core.app_deploy import AppDeployError, driver_for_capability
+    from core.cluster_management import (
+        ClusterManagementError,
+        _context_for_cluster,
+        _driver_for_cluster,
+    )
+
+    plugin_slug = getattr(getattr(cluster, "provider_plugin", None), "slug", "")
+    if plugin_slug != "aws":
+        # Only the AWS/EKS registry-push identity path is wired today.
         return None
+
+    pc = cluster.provider_config or {}
+    account_id = str(pc.get("account_id", ""))
+    region = str(pc.get("region", (cluster.auth_config or {}).get("region", cluster.region or "")))
+    if not account_id:
+        return None
+
+    # Registry repo (idempotent) — same canonical name onboarding uses.
+    try:
+        registry_driver = driver_for_capability(cluster, "registry")
+    except AppDeployError:
+        return None
+    repo_name = (
+        app.registry_repo_uri.split("/", 1)[1]
+        if "/" in (app.registry_repo_uri or "")
+        else (f"{app.organization.slug}/{app.slug}")
+    )
+    repo = registry_driver.ensure_repo(repo_name)
+    repo_uri = repo.uri
+    if not (app.registry_repo_uri or "").strip():
+        app.registry_repo_uri = repo_uri
+        app.save(update_fields=["registry_repo_uri", "updated_at", "version"])
+
+    # The cluster's OIDC issuer must be populated for the IRSA trust policy.
+    _ensure_cluster_oidc_issuer(cluster)
+
+    # Mint (or refresh) a net-new, build-scoped IRSA role and bind it to the
+    # build ServiceAccount in the platform namespace. Distinct from the app's
+    # runtime workload-identity role: this one grants ECR push to the app's
+    # repo, not the runtime managed-service grants.
+    identity_driver = driver_for_capability(cluster, "identity")
+    sa_name = _build_identity_name(app)
+    repo_arn = f"arn:aws:ecr:{region}:{account_id}:repository/{repo_name}"
+    permissions = [
+        {"Effect": "Allow", "Action": "ecr:GetAuthorizationToken", "Resource": "*"},
+        {"Effect": "Allow", "Action": list(_ECR_PUSH_ACTIONS), "Resource": repo_arn},
+    ]
+    identity_driver.create_identity_role(sa_name, permissions)
+    annotation = identity_driver.bind_service_account(cluster.slug, _BUILD_NAMESPACE, sa_name, sa_name)
+    role_arn = annotation.get("eks.amazonaws.com/role-arn", "")
 
     try:
-        from astrolift_drivers.registry import plugins
-        from core.cluster_observability import _config_for  # type: ignore[attr-defined]
-
-        plugin = plugins.get(getattr(cluster, "provider_plugin_id", None))
-        if plugin is None:
-            return None
-        if not hasattr(plugin, "build_driver"):
-            return None
-        config = _config_for(cluster)
-        return plugin.build_driver(config)
-    except Exception as exc:  # noqa: BLE001
-        log.debug("_resolve_build_driver: could not load driver: %s", exc)
+        cluster_driver = _driver_for_cluster(cluster)
+    except ClusterManagementError:
         return None
+    ctx = _context_for_cluster(cluster)
+
+    from providers.k8s_native.build_kaniko import KanikoBuildDriver  # noqa: PLC0415
+
+    driver = KanikoBuildDriver(
+        cluster_driver=cluster_driver,
+        cluster_slug=ctx.slug,
+        service_account=sa_name,
+        service_account_role_arn=role_arn,
+        namespace=_BUILD_NAMESPACE,
+        build_id=f"{deployment_pk}-{(commit_sha or image_tag)}",
+    )
+    return _PreparedBuild(
+        driver=driver,
+        registry_driver=registry_driver,
+        repo_name=repo_name,
+        repo_uri=repo_uri,
+    )
+
+
+def _build_identity_name(app) -> str:
+    """Name of the build-scoped IRSA role + ServiceAccount for an app.
+
+    Deterministic + charset/length-safe for both IAM (≤64) and the K8s SA it
+    doubles as (DNS label ≤63). Distinct prefix from the runtime
+    workload-identity role so the two never collide.
+    """
+    from providers.aws._naming import iam_role_name
+
+    org_slug = getattr(getattr(app, "organization", None), "slug", "") or ""
+    if org_slug:
+        return iam_role_name("astrolift-build", org_slug, app.slug)
+    return iam_role_name("astrolift-build", app.slug)
+
+
+def _ensure_cluster_oidc_issuer(cluster) -> None:
+    """Populate ``cluster.auth_config['cluster_oidc_issuer']`` if absent.
+
+    Mirrors the workload-identity path: rather than require the issuer to be
+    set out-of-band, discover it from EKS and cache it on the row, so the
+    IRSA trust policy isn't malformed by an empty issuer. No-op when already
+    set or when the provider isn't AWS.
+    """
+    ac = cluster.auth_config or {}
+    if ac.get("cluster_oidc_issuer"):
+        return
+    if getattr(getattr(cluster, "provider_plugin", None), "slug", "") != "aws":
+        return
+    from aws.identity_irsa import discover_oidc_issuer  # noqa: PLC0415
+
+    pc = cluster.provider_config or {}
+    region = str(pc.get("region", ac.get("region", cluster.region or "")))
+    cluster_name = str(pc.get("cluster_name", ac.get("cluster_name", cluster.slug)))
+    issuer = discover_oidc_issuer(region, cluster_name)
+    if not issuer:
+        return
+    new_ac = dict(ac)
+    new_ac["cluster_oidc_issuer"] = issuer
+    cluster.auth_config = new_ac
+    cluster.save(update_fields=["auth_config"])
+
+
+def _read_pushed_digest(registry_driver, repo_name: str, image_tag: str) -> str:
+    """Return the ``sha256:...`` digest the build pushed for ``image_tag``.
+
+    Reads it from the registry (``list_tags``) — the driver doesn't query
+    the registry itself, so this is the authoritative source. Best-effort:
+    a read failure leaves the digest empty rather than failing a build that
+    actually succeeded.
+    """
+    try:
+        for tag in registry_driver.list_tags(repo_name):
+            if getattr(tag, "name", "") == image_tag and getattr(tag, "digest", ""):
+                return tag.digest
+    except Exception as exc:  # noqa: BLE001
+        log.warning("could not read pushed digest for %s:%s — %s", repo_name, image_tag, exc)
+    return ""
+
+
+def _record_build_outcome(deployment, *, image_tag: str, digest: str) -> None:
+    """Persist the built image's tag + digest on the Deployment row.
+
+    ``image_tag`` already drives the render (``deployment.image_tag``); the
+    digest is the content-addressable record the UI surfaces as ``stub:false``
+    proof and rollback pins to."""
+    fields: list[str] = []
+    if deployment.image_tag != image_tag:
+        deployment.image_tag = image_tag
+        fields.append("image_tag")
+    if digest and deployment.image_digest != digest:
+        deployment.image_digest = digest
+        fields.append("image_digest")
+    if fields:
+        fields += ["updated_at", "version"]
+        deployment.save(update_fields=fields)
 
 
 def _resolve_source_url(app, commit_sha: str) -> str:
-    """Build a best-effort source URL for the BuildDriver.
+    """Build a git source URL (``git+https://host/path#<ref>``) for the build.
 
-    Prefers a git+https form from the SCM SourceConnection when available;
-    falls back to the raw ``source_repo`` + commit SHA.
+    Prefers a clone URL from the SCM SourceConnection; falls back to
+    ``source_repo`` on GitHub. The ref is the commit SHA when known, else the
+    app's default branch (as a ``refs/heads/...`` ref kaniko can fetch).
     """
+    ref = commit_sha.strip() if commit_sha else ""
+    if not ref:
+        branch = (getattr(app, "default_branch", "") or "main").strip()
+        ref = f"refs/heads/{branch}"
+
     try:
         from astrolift_scm.models import SourceConnection
 
@@ -159,18 +364,14 @@ def _resolve_source_url(app, commit_sha: str) -> str:
             .order_by("-created_at")
             .first()
         )
-        if conn is not None and hasattr(conn, "clone_url"):
-            url = conn.clone_url or ""
-            if url:
-                return f"git+{url}#{commit_sha}" if commit_sha else f"git+{url}"
+        if conn is not None and getattr(conn, "clone_url", ""):
+            return f"git+{conn.clone_url}#{ref}"
     except Exception:  # noqa: BLE001
         pass
 
     repo = (app.source_repo or "").strip()
-    if repo and commit_sha:
-        return f"git+https://github.com/{repo}#{commit_sha}"
     if repo:
-        return f"git+https://github.com/{repo}"
+        return f"git+https://github.com/{repo}#{ref}"
     return ""
 
 
@@ -202,8 +403,8 @@ async def fetch_app_build_strategy(registered_app_id: int) -> str:
 async def build_image(inp: BuildImageInput) -> dict:
     """Build a container image from source via the registered BuildDriver.
 
-    Returns ``{"ok": bool, "image_ref": str, "stub": bool}``.
-    ``stub=True`` means no real build was performed (driver not wired or
+    Returns ``{"ok": bool, "image_ref": str, "stub": bool, "digest"?: str}``.
+    ``stub=True`` means no real build was performed (no driver available or
     ``build_strategy`` is "off"). ``image_ref`` is always the usable image
     reference — callers can treat it as the image to deploy regardless of
     whether a real build ran.

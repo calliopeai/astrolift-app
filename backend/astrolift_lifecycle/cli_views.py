@@ -309,6 +309,7 @@ def ci_deploy(request: HttpRequest, app_slug: str) -> JsonResponse:
                     image_tags=ci_req.image_tags,
                     trigger_kind=ci_req.trigger_kind.value,
                     actor=actor,
+                    commit_sha=deployment.commit_sha,
                 )
             ],
             workflow_id=wf_id,

@@ -42,6 +42,11 @@ with workflow.unsafe.imports_passed_through():
 # Fargate cold-starts + image-pull can exceed 15m on first rollout (#359).
 _TIMEOUT = timedelta(minutes=20)
 
+# Platform builds (kaniko from source) dominate deploy wall-clock — a cold
+# dockerfile build clones, runs every layer, and pushes to the registry.
+# Give the build step its own wider window (#978).
+_BUILD_TIMEOUT = timedelta(minutes=30)
+
 # Bounded retries so no deploy activity loops forever (#1004). Before this,
 # activities ran under Temporal's default (unlimited) retry policy: a
 # rollout that timed out — a crashlooping container, or an app deregistered
@@ -103,16 +108,20 @@ class DeployAppWorkflow:
             if build_strategy != "off":
                 _image_tags: dict = input.image_tags or {}
                 _image_tag = next(iter(_image_tags.values()), "")
-                _commit_sha = ""  # TODO: thread commit_sha through DeployAppInput (#865)
                 await workflow.execute_activity(
                     build_image,
                     args=[BuildImageInput(
-                        app_guid=str(input.registered_app_id),
+                        deployment_id=input.deployment_id,
                         image_tag=_image_tag,
-                        commit_sha=_commit_sha,
+                        commit_sha=input.commit_sha,
                     )],
-                    start_to_close_timeout=_TIMEOUT,
-                    retry_policy=_STANDARD_RETRY,
+                    # Builds are the longest step — a cold dockerfile build
+                    # can run 10+ minutes. Give it a wide window and a
+                    # heartbeat timeout (the kaniko driver heartbeats per
+                    # poll) so a slow build isn't mistaken for a stuck one.
+                    start_to_close_timeout=_BUILD_TIMEOUT,
+                    heartbeat_timeout=timedelta(minutes=2),
+                    retry_policy=_ROLLOUT_RETRY,
                 )
 
             # provision_namespace runs *before* render so the namespace

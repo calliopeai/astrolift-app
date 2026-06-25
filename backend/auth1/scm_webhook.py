@@ -206,6 +206,7 @@ def _fire_deploy(app: RegisteredApp, branch: str, head_sha: str) -> Deployment |
                     image_tags={"app": deployment.image_tag},
                     trigger_kind=Deployment.TriggerKind.PUSH.value,
                     actor=actor,
+                    commit_sha=deployment.commit_sha,
                 )
             ],
             workflow_id=f"DeployAppWorkflow-{app.guid}-{env.guid}",
