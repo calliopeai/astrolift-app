@@ -210,3 +210,60 @@ def test_unknown_repo_error_typed(driver: ECRDriver) -> None:
     """Errors must propagate as typed ProviderError, not raw ClientError."""
     with pytest.raises(ProviderError):
         driver.list_tags("nonexistent/repo")
+
+
+# ---- ensure_ci_push_role: IAM charset (#1026) --------------------
+
+
+class _RecordingIam:
+    """Minimal IAM stand-in that records the create_role call.
+
+    moto doesn't enforce IAM's role-Description charset, so a real
+    regression guard has to inspect what the driver *sends* to CreateRole.
+    """
+
+    class exceptions:  # noqa: N801 — mirrors boto3's lowercase ``client.exceptions``
+        class EntityAlreadyExistsException(Exception):  # noqa: N818 — boto3 name
+            pass
+
+        class NoSuchEntityException(Exception):  # noqa: N818 — boto3 name
+            pass
+
+    def __init__(self) -> None:
+        self.created: dict = {}
+
+    def create_role(self, **kwargs):
+        self.created = kwargs
+        return {"Role": {"Arn": f"arn:aws:iam::123456789012:role/{kwargs['RoleName']}"}}
+
+    def put_role_policy(self, **kwargs):
+        return {}
+
+    def update_assume_role_policy(self, **kwargs):
+        return {}
+
+    def get_role(self, **kwargs):
+        return {"Role": {"Arn": f"arn:aws:iam::123456789012:role/{kwargs['RoleName']}"}}
+
+
+def test_ensure_ci_push_role_description_is_ascii() -> None:
+    """IAM rejects a role Description outside [ASCII + Latin-1], so the
+    description must never carry a unicode arrow/dash — a "→" failed
+    CreateRole on every onboard (#1026).
+
+    Uses a recording IAM stand-in (not moto): ``ensure_ci_push_role`` only
+    touches the IAM client, so no ECR client is exercised."""
+    iam = _RecordingIam()
+    driver = ECRDriver(
+        config=ECRConfig(region="us-east-1", account_id="123456789012"),
+        client=object(),
+        iam_client=iam,
+    )
+    driver.ensure_ci_push_role(
+        repo="steadymd/web",
+        scm_provider="github",
+        scm_repo_full_name="calliopeai/astrolift-sample-web",
+    )
+    desc = iam.created.get("Description", "")
+    assert desc, "create_role was not called with a Description"
+    assert desc.isascii(), f"IAM role Description must be ASCII (#1026): {desc!r}"

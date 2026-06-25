@@ -315,7 +315,10 @@ class ECRDriver(ImageRegistryDriver):
             response = self._iam.create_role(
                 RoleName=role_name,
                 AssumeRolePolicyDocument=json.dumps(trust_policy),
-                Description=f"Astrolift ECR push role for {scm_repo_full_name} → {repo}",
+                # ASCII-only: IAM rejects an AssumeRolePolicy/role Description
+                # outside [\\u0009\\u000A\\u000D\\u0020-\\u007E\\u00A1-\\u00FF], so
+                # no unicode arrows/dashes here (a "→" failed CreateRole, #1026).
+                Description=f"Astrolift ECR push role for {scm_repo_full_name} -> {repo}",
             )
             role_arn = response["Role"]["Arn"]
         except self._iam.exceptions.EntityAlreadyExistsException:
