@@ -319,6 +319,9 @@ class ECRDriver(ImageRegistryDriver):
                 # outside [\\u0009\\u000A\\u000D\\u0020-\\u007E\\u00A1-\\u00FF], so
                 # no unicode arrows/dashes here (a "→" failed CreateRole, #1026).
                 Description=f"Astrolift ECR push role for {scm_repo_full_name} -> {repo}",
+                # Tag like every other platform-minted role so the orphan scan
+                # (#995) can reap it as a backstop if teardown is interrupted.
+                Tags=[{"Key": "astrolift.io/managed-by", "Value": "platform"}],
             )
             role_arn = response["Role"]["Arn"]
         except self._iam.exceptions.EntityAlreadyExistsException:

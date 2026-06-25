@@ -302,10 +302,10 @@ def test_delete_app_identity_role_happy_path(
         )
     assert result.ok is True, result.errors
     assert result.data.cluster_slug == cluster.slug
-    # Deletes BOTH per-app roles: the runtime workload-identity role
-    # (``astrolift-<org>-<app>``) and the platform-build role
-    # (``astrolift-build-<org>-<app>``, #978) — otherwise the build role
-    # orphans on teardown.
+    # Deletes EVERY per-app IAM role: runtime workload-identity
+    # (``astrolift-<org>-<app>``), platform-build (``astrolift-build-…``, #978),
+    # and GitHub-OIDC CI push (``astrolift-<org>/<app>-ecr-push`` → sanitized,
+    # #994/#1026) — otherwise they orphan on teardown.
     assert rec.calls == [
         (
             "delete_identity_role",
@@ -315,6 +315,11 @@ def test_delete_app_identity_role_happy_path(
         (
             "delete_identity_role",
             (f"astrolift-build-{org.slug}-{app_with_cluster.slug}",),
+            {},
+        ),
+        (
+            "delete_identity_role",
+            (f"astrolift-{org.slug}-{app_with_cluster.slug}-ecr-push",),
             {},
         ),
     ]

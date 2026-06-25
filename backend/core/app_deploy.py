@@ -101,6 +101,22 @@ def build_identity_role_name(app: RegisteredApp) -> str:
     return iam_role_name("astrolift-build", app.slug)
 
 
+def ci_push_role_name(app: RegisteredApp) -> str:
+    """IAM role name of the GitHub-OIDC CI push role for an app (#994/#1026).
+
+    Mirrors ``ECRDriver.ensure_ci_push_role`` (``astrolift-<repo>-ecr-push``,
+    where ``repo`` is the ECR repo name ``<org>/<app>``). SSOT so the
+    deregister/teardown path can delete it by the same name the registry
+    provision created — otherwise the CI push role orphans (it isn't tagged
+    for the #995 scan either, so nothing else would reap it).
+    """
+    from providers.aws._naming import iam_role_name
+
+    org_slug = getattr(getattr(app, "organization", None), "slug", "") or ""
+    repo = f"{org_slug}/{app.slug}" if org_slug else app.slug
+    return iam_role_name("astrolift", repo, "ecr-push")
+
+
 # Kinds whose pod template gets the workload-identity ServiceAccount.
 _POD_TEMPLATE_KINDS = {"Deployment", "StatefulSet", "ReplicaSet", "DaemonSet", "Job"}
 
