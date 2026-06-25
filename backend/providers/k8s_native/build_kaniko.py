@@ -46,6 +46,16 @@ KANIKO_IMAGE = "gcr.io/kaniko-project/executor:v1.23.2"
 # control-plane ClusterRole already grants jobs + serviceaccounts there.
 BUILD_NAMESPACE = "astrolift-system"
 
+# kaniko in-process push retries (exponential backoff). Sized to span the
+# IRSA trust-policy propagation window for a freshly-minted build role —
+# the push re-resolves the AssumeRoleWithWebIdentity credential each attempt.
+_PUSH_RETRY = 6
+
+# Pod-level backstop: a fresh pod re-runs the whole web-identity chain. Small
+# — push-retry handles the common propagation case in-process; this only
+# matters if the entire pod's projected token needs a clean re-assume.
+_BACKOFF_LIMIT = 2
+
 # Modest resource floor so the kaniko pod schedules without starving the
 # node; the limit gives a real build headroom without being unbounded.
 _BUILD_RESOURCES = {
@@ -113,16 +123,24 @@ def render_kaniko_job(
 ) -> dict[str, Any]:
     """Render the one-shot kaniko build Job.
 
-    ``--single-snapshot`` keeps the layer count down for a faster push;
-    ``--context-sub-path`` scopes the build into a monorepo subdir (omitted
-    for a root context). ``backoffLimit: 0`` — a failed build is terminal;
-    the workflow surfaces it rather than silently retrying inside k8s.
+    ``--single-snapshot`` keeps the layer count down for a faster push.
+    ``--push-retry`` re-attempts the registry push with backoff, re-resolving
+    the cloud credential each time — this is what absorbs the IRSA
+    eventual-consistency window: a brand-new app's build SA + push role are
+    minted seconds before this pod runs, and the first
+    ``AssumeRoleWithWebIdentity`` can 401 until the role's OIDC trust
+    propagates (~tens of seconds); push-retry keeps re-resolving until it
+    sticks instead of failing the whole build. ``--context-sub-path`` scopes
+    the build into a monorepo subdir (omitted for a root context).
+    ``backoffLimit`` gives a pod-level backstop (a fresh pod re-runs the full
+    credential chain) for the rare case the in-process retry isn't enough.
     """
     args = [
         f"--context={context}",
         f"--dockerfile={dockerfile}",
         f"--destination={destination}",
         "--single-snapshot",
+        f"--push-retry={_PUSH_RETRY}",
     ]
     if context_sub_path and context_sub_path != ".":
         args.append(f"--context-sub-path={context_sub_path}")
@@ -142,7 +160,7 @@ def render_kaniko_job(
             },
         },
         "spec": {
-            "backoffLimit": 0,
+            "backoffLimit": _BACKOFF_LIMIT,
             "completions": 1,
             "ttlSecondsAfterFinished": 3600,
             "template": {

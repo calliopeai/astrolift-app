@@ -18,10 +18,7 @@ from k8s_native.build_kaniko import (
 
 
 def test_kaniko_context_rewrites_scheme_and_keeps_ref():
-    assert (
-        kaniko_context("git+https://github.com/acme/app#deadbeef")
-        == "git://github.com/acme/app.git#deadbeef"
-    )
+    assert kaniko_context("git+https://github.com/acme/app#deadbeef") == "git://github.com/acme/app.git#deadbeef"
 
 
 def test_kaniko_context_branch_ref_and_existing_dot_git():
@@ -63,21 +60,33 @@ def test_kaniko_job_renders_expected_args():
     assert "--context=git://github.com/acme/app.git#abc" in args
     assert "--dockerfile=Dockerfile" in args
     assert "--destination=123.dkr.ecr.us-west-2.amazonaws.com/acme/web:sha-abc" in args
+    # push-retry absorbs the IRSA trust-propagation window on a first build.
+    assert any(a.startswith("--push-retry=") for a in args)
     # build args are sorted + rendered as --build-arg=K=V
     assert args.index("--build-arg=ARCH=amd64") < args.index("--build-arg=VERSION=1")
     assert spec["template"]["spec"]["serviceAccountName"] == "sa-x"
-    assert spec["backoffLimit"] == 0
+    assert spec["backoffLimit"] >= 1
     assert spec["template"]["spec"]["restartPolicy"] == "Never"
 
 
 def test_kaniko_job_context_sub_path_only_when_non_root():
     root = render_kaniko_job(
-        job_name="j", namespace="ns", service_account="sa", context="c", dockerfile="Dockerfile",
-        destination="r:t", context_sub_path=".",
+        job_name="j",
+        namespace="ns",
+        service_account="sa",
+        context="c",
+        dockerfile="Dockerfile",
+        destination="r:t",
+        context_sub_path=".",
     )
     sub = render_kaniko_job(
-        job_name="j", namespace="ns", service_account="sa", context="c", dockerfile="Dockerfile",
-        destination="r:t", context_sub_path="services/api",
+        job_name="j",
+        namespace="ns",
+        service_account="sa",
+        context="c",
+        dockerfile="Dockerfile",
+        destination="r:t",
+        context_sub_path="services/api",
     )
     root_args = root["spec"]["template"]["spec"]["containers"][0]["args"]
     sub_args = sub["spec"]["template"]["spec"]["containers"][0]["args"]
@@ -105,8 +114,12 @@ def _ok_apply():
 
 def _status(conditions):
     return WorkloadStatus(
-        kind="Job", name="x", namespace="astrolift-system",
-        ready_replicas=0, desired_replicas=1, conditions=conditions,
+        kind="Job",
+        name="x",
+        namespace="astrolift-system",
+        ready_replicas=0,
+        desired_replicas=1,
+        conditions=conditions,
     )
 
 
@@ -147,10 +160,12 @@ _SPEC = BuildSpec(source_uri="git+https://github.com/acme/web#abc", dockerfile_p
 
 
 def test_build_success_applies_sa_and_job_and_polls_complete():
-    cluster = FakeClusterDriver(statuses=[
-        _status([{"type": "Complete", "status": "False"}]),
-        _status([{"type": "Complete", "status": "True"}]),
-    ])
+    cluster = FakeClusterDriver(
+        statuses=[
+            _status([{"type": "Complete", "status": "False"}]),
+            _status([{"type": "Complete", "status": "True"}]),
+        ]
+    )
     result = _driver(cluster).build(_SPEC, "123.dkr.ecr.us-west-2.amazonaws.com/acme/web", "sha-abc")
 
     assert result.success is True
@@ -162,9 +177,11 @@ def test_build_success_applies_sa_and_job_and_polls_complete():
 
 
 def test_build_failure_surfaces_condition_message():
-    cluster = FakeClusterDriver(statuses=[
-        _status([{"type": "Failed", "status": "True", "message": "BackoffLimitExceeded"}]),
-    ])
+    cluster = FakeClusterDriver(
+        statuses=[
+            _status([{"type": "Failed", "status": "True", "message": "BackoffLimitExceeded"}]),
+        ]
+    )
     result = _driver(cluster).build(_SPEC, "repo", "t")
     assert result.success is False
     assert any("BackoffLimitExceeded" in e for e in result.errors)
