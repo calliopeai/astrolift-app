@@ -75,3 +75,19 @@ class WorkloadIdentityDriver(Protocol):
         raise UnsupportedOperationError(
             f"identity.describe_identity({app_slug=}) not supported on this driver",
         )
+
+    def list_owned_roles(self) -> list[str]:
+        """Enumerate the identity-role names this driver owns on behalf of
+        the platform (tagged ``astrolift.io/managed-by=platform``), for the
+        orphan-detection scan (#995).
+
+        Returns role *names* (not ARNs) so the reaper can diff them against
+        the forward mapping ``{workload_identity_role_name(app)}`` for live
+        apps — a role with no live owner is an orphan. Default raises
+        :class:`UnsupportedOperationError` so non-implementing clouds report
+        a "not supported" section rather than crashing the whole scan."""
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            "identity.list_owned_roles not supported on this driver",
+        )

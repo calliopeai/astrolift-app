@@ -332,7 +332,50 @@ def _compute_manifest_diff(
 
 
 @strawberry.type
+class CloudOrphanType:
+    """A platform-owned cloud resource with no live owning DB row (#995)."""
+
+    kind: str
+    identifier: str
+    classification: str
+
+
+@strawberry.type
+class CloudOrphanReportType:
+    orphans: list[CloudOrphanType]
+    scanned_kinds: list[str]
+    # Kinds that couldn't be fully enumerated (unsupported driver / list
+    # error). When non-empty the scan is partial — do NOT read it as clean.
+    incomplete_kinds: list[str]
+    complete: bool
+
+
+@strawberry.type
 class LifecycleQuery:
+    @strawberry.field
+    @require_permission(Permission.APP_DELETE)
+    def scan_cloud_orphans(self, info: Info) -> CloudOrphanReportType:
+        """Read-only orphan-detection scan (#995): platform-owned cloud
+        resources with no live owner row. Install-wide (not tenant-scoped) —
+        an operator capability gated on APP_DELETE. Reaping is a separate,
+        guarded follow-up; this never deletes."""
+        from astrolift_operations.services.orphan_reaper import scan_orphans
+
+        report = scan_orphans()
+        return CloudOrphanReportType(
+            orphans=[
+                CloudOrphanType(
+                    kind=o.kind,
+                    identifier=o.identifier,
+                    classification=o.classification,
+                )
+                for o in report.orphans
+            ],
+            scanned_kinds=report.scanned_kinds,
+            incomplete_kinds=report.incomplete_kinds,
+            complete=report.complete,
+        )
+
     @strawberry.field
     @require_permission(Permission.APP_READ)
     @tenant_scoped()

@@ -259,6 +259,43 @@ class IRSADriver(WorkloadIdentityDriver):
             last_used_at=last_used_iso,
         )
 
+    def list_owned_roles(self) -> list[str]:
+        """Enumerate IAM role names the platform owns (#995).
+
+        Paginates ``list_roles`` under the configured ``role_path``, keeps
+        only ``astrolift-``-prefixed roles (cheap filter), then confirms the
+        ``astrolift.io/managed-by=platform`` tag before including each — we
+        never treat a role as platform-owned on name alone, so a same-named
+        role created out-of-band is not a reap candidate. Raises
+        ``map_client_error`` on a list failure so the scan marks itself
+        incomplete rather than implying a clean (empty) result.
+        """
+        owned: list[str] = []
+        try:
+            paginator = self._iam.get_paginator("list_roles")
+            for page in paginator.paginate(PathPrefix=self._config.role_path):
+                for role in page.get("Roles", []):
+                    name = role.get("RoleName", "")
+                    if not name.startswith("astrolift-"):
+                        continue
+                    if self._role_is_platform_owned(name):
+                        owned.append(name)
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+        return owned
+
+    def _role_is_platform_owned(self, role_name: str) -> bool:
+        try:
+            tags = self._iam.list_role_tags(RoleName=role_name).get("Tags", [])
+        except self._iam.exceptions.NoSuchEntityException:
+            return False
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+        return any(
+            t.get("Key") == "astrolift.io/managed-by" and t.get("Value") == "platform"
+            for t in tags
+        )
+
     # ---- internals ------------------------------------------------
 
     def _role_arn(self, role_name: str) -> str:
