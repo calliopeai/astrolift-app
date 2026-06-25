@@ -18,7 +18,7 @@ import type { AstroliftProject } from "@/graphql/identity/identity.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import type { SourceKind } from "@/graphql/registry/registry.types";
 import type { ScmConnectionKind } from "@/graphql/scm/scm.types";
-import { getActiveOrgGuid } from "@/lib/identity/active-org";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 
 import { WizardShell, type WizardStep } from "./components/WizardShell";
 import { DiscoveryStep } from "./steps/DiscoveryStep";
@@ -114,7 +114,10 @@ interface ProjectsResp {
  */
 export function WizardClient() {
   const router = useRouter();
-  const orgId = getActiveOrgGuid() ?? "";
+  // Reactive org id (#1022): the synchronous cookie read races the
+  // post-render effect that sets it, leaving orgId "" on cold load.
+  const { org } = useActiveOrg();
+  const orgId = org?.id ?? "";
   const [state, setState] = React.useState<WizardState>(initialWizardState);
   const [stepValid, setStepValid] = React.useState<Record<StepNumber, boolean>>({
     1: false,

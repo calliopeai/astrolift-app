@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SCAN_AGENT_MANIFESTS } from "@/graphql/agents/agents.queries";
 import type { AstroliftScanAgentManifestsResult } from "@/graphql/agents/agents.types";
-import { getActiveOrgGuid } from "@/lib/identity/active-org";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import { cn } from "@/lib/utils";
 
 import type { WizardState } from "../wizard-client";
@@ -45,7 +45,10 @@ interface Props {
  * least one not-yet-registered agent has been discovered.
  */
 export function DiscoveryStep({ state, setState, setValid }: Props) {
-  const orgId = getActiveOrgGuid() ?? "";
+  // Reactive org id (#1022): the synchronous cookie read races the
+  // post-render effect that sets it, leaving orgId "" on cold load.
+  const { org } = useActiveOrg();
+  const orgId = org?.id ?? "";
   const [fetchState, setFetchState] = React.useState<FetchState>("idle");
   const [fetchError, setFetchError] = React.useState<string>("");
   const [scan] = useLazyQuery<ScanResp>(SCAN_AGENT_MANIFESTS, {

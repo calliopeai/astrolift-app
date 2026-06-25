@@ -13,7 +13,7 @@ import { PageShell } from "@/components/PageShell";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { CREATE_SKILL } from "@/graphql/agents/agents.mutations";
-import { getActiveOrgGuid } from "@/lib/identity/active-org";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,7 +29,10 @@ type CreateSkillData = {
 
 export default function NewAgentSkillPage() {
   const router = useRouter();
-  const orgId = getActiveOrgGuid() ?? "";
+  // Reactive org id (#1022): the synchronous cookie read races the
+  // post-render effect that sets it, leaving orgId "" on cold load.
+  const { org } = useActiveOrg();
+  const orgId = org?.id ?? "";
 
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");

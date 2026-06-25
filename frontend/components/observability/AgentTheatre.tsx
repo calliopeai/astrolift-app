@@ -18,7 +18,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { VncViewer } from "@/components/observability/VncViewer";
 import { AGENT_GALLERY } from "@/graphql/agents/agents.queries";
-import { getActiveOrgGuid } from "@/lib/identity/active-org";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 
 // Roster refresh cadence. Doubles as the snapshot-frame cadence: each poll
 // re-mints the presigned snapshot GET URL, so a fresh (signed) URL string
@@ -67,7 +67,10 @@ function elapsedLabel(startedAt: string | null): string {
  * ``/agents/runs/<task>/vnc`` for a dedicated tab.
  */
 export function AgentTheatre() {
-  const orgId = getActiveOrgGuid() ?? "";
+  // Reactive org id (#1022): the synchronous cookie read races the
+  // post-render effect that sets it, leaving orgId "" on cold load.
+  const { org } = useActiveOrg();
+  const orgId = org?.id ?? "";
   const { data, loading, error, refetch } = useQuery<AgentGalleryData>(AGENT_GALLERY, {
     variables: { orgId },
     fetchPolicy: "cache-and-network",

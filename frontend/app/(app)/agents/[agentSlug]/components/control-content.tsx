@@ -28,7 +28,7 @@ import type {
   AstroliftAgentRunSpec,
 } from "@/graphql/agents/agents.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
-import { getActiveOrgGuid } from "@/lib/identity/active-org";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -317,7 +317,10 @@ export function ControlContent({ agent }: { agent: AstroliftAgentListItem }) {
   // the list-row cache; without this refetch the header badge (run mode /
   // paused) would show stale values until the fleet query reloaded on its own.
   // Scoped to the same `orgId` `useAgent` resolves against.
-  const orgId = getActiveOrgGuid() ?? "";
+  // Reactive org id (#1022): the synchronous cookie read races the
+  // post-render effect that sets it, leaving orgId "" on cold load.
+  const { org } = useActiveOrg();
+  const orgId = org?.id ?? "";
   const [save, { loading: saving }] = useMutation<UpdateResp>(UPDATE_AGENT_RUN_SPEC, {
     refetchQueries: orgId ? [{ query: LIST_AGENT_FLEET, variables: { orgId } }] : [],
   });

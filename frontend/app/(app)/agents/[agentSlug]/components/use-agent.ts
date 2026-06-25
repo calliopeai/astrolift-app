@@ -5,7 +5,7 @@ import * as React from "react";
 
 import { LIST_AGENT_FLEET } from "@/graphql/agents/agents.queries";
 import type { AstroliftAgentListItem } from "@/graphql/agents/agents.types";
-import { getActiveOrgGuid } from "@/lib/identity/active-org";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 
 interface AgentFleetResp {
   agentFleet: AstroliftAgentListItem[];
@@ -36,7 +36,10 @@ export interface UseAgentResult {
  * backend gap the Build tab surfaces explicitly rather than faking.
  */
 export function useAgent(agentSlug: string): UseAgentResult {
-  const orgId = getActiveOrgGuid() ?? "";
+  // Reactive org id (#1022): the synchronous cookie read races the
+  // post-render effect that sets it, leaving orgId "" on cold load.
+  const { org } = useActiveOrg();
+  const orgId = org?.id ?? "";
   const { data, loading } = useQuery<AgentFleetResp>(LIST_AGENT_FLEET, {
     variables: { orgId },
     skip: !orgId,

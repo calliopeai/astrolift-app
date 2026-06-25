@@ -23,7 +23,7 @@ import {
   DELETE_TOOL_DEF,
   UPDATE_TOOL_DEF,
 } from "@/graphql/agents/agents.mutations";
-import { getActiveOrgGuid } from "@/lib/identity/active-org";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 
 // ─── GraphQL ─────────────────────────────────────────────────────────────────
 
@@ -106,7 +106,10 @@ export default function ToolDetailPage() {
   // The dynamic segment is named [slug] but we use it as the tool GUID.
   const { slug: id } = useParams<{ slug: string }>();
   const router = useRouter();
-  const orgId = (getActiveOrgGuid() ?? "");
+  // Reactive org id (#1022): the synchronous cookie read races the
+  // post-render effect that sets it, leaving orgId "" on cold load.
+  const { org } = useActiveOrg();
+  const orgId = org?.id ?? "";
 
   // ── form state ──────────────────────────────────────────────────────────────
   const [name, setName] = useState("");

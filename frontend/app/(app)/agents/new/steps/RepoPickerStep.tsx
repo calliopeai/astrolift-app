@@ -37,7 +37,7 @@ import { LIST_AGENT_FLEET } from "@/graphql/agents/agents.queries";
 import type { AstroliftAgentListItem } from "@/graphql/agents/agents.types";
 import { LIST_AVAILABLE_REPOS, LIST_SOURCE_CONNECTIONS } from "@/graphql/scm/scm.queries";
 import { cn } from "@/lib/utils";
-import { getActiveOrgGuid } from "@/lib/identity/active-org";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import type {
   AstroliftRemoteRepoList,
   AstroliftSourceConnection,
@@ -82,7 +82,10 @@ interface Props {
 }
 
 export function RepoPickerStep({ state, setState, setValid }: Props) {
-  const orgId = getActiveOrgGuid() ?? "";
+  // Reactive org id (#1022): the synchronous cookie read races the
+  // post-render effect that sets it, leaving orgId "" on cold load.
+  const { org } = useActiveOrg();
+  const orgId = org?.id ?? "";
 
   // Existing fleet — surfaces a "N agents already registered" badge on repo
   // rows that already host registered agents (a re-scan only adds NEW agents).
