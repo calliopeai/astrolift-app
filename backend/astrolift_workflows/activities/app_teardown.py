@@ -163,6 +163,59 @@ async def delete_app_namespaces(registered_app_id: int) -> list[str]:
     return deleted
 
 
+def _abort_in_flight_deploys_sync(registered_app_id: int) -> list[str]:
+    from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_registry.models import RegisteredApp
+    from astrolift_workflows.client import signal_workflow
+
+    app = RegisteredApp.all_objects.get(pk=registered_app_id)
+    envs = list(
+        AppEnvironment.objects.filter(
+            registered_app=app,
+            deleted_at__isnull=True,
+        ),
+    )
+    signalled: list[str] = []
+    for env in envs:
+        # Workflow id is deterministic from app.guid/env.guid — the same id
+        # the deploy mutation/CLI/cron all use.
+        wf_id = f"DeployAppWorkflow-{app.guid}-{env.guid}"
+        try:
+            # Graceful abort: DeployAppWorkflow checks _abort_requested before
+            # poll_rollout and returns ok=False. signal_workflow returns False
+            # when the workflow isn't running (or Temporal is disabled), so a
+            # False just means "no in-flight deploy here" — we don't terminate
+            # a speculative id. A deploy ALREADY inside poll_rollout won't see
+            # the flag mid-activity; the #1004 bounded retry + the namespace
+            # delete that follows are the backstop for that case.
+            if signal_workflow(wf_id, "abort"):
+                signalled.append(wf_id)
+        except Exception:  # noqa: BLE001 — best-effort; teardown proceeds
+            log.warning(
+                "abort_in_flight_deploys: abort failed for %s", wf_id, exc_info=True
+            )
+    return signalled
+
+
+@activity.defn(name="astrolift.app.abort_in_flight_deploys")
+async def abort_in_flight_deploys(registered_app_id: int) -> list[str]:
+    """Abort any in-flight DeployAppWorkflow for the app's environments
+    BEFORE the namespace cascade — so a running deploy sees the abort flag
+    and exits cleanly instead of polling a deleted namespace until timeout
+    (#1004). Best-effort per env; returns the workflow ids actually signalled.
+    """
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    signalled = await sync_to_async(_abort_in_flight_deploys_sync)(registered_app_id)
+    log.info(
+        "abort_in_flight_deploys signalled %d in-flight deploy(s)",
+        len(signalled),
+        extra={"registered_app_id": registered_app_id},
+    )
+    return signalled
+
+
 def _revoke_app_deploy_tokens_sync(registered_app_id: int) -> int:
     """Soft-delete active deploy tokens for the app.
 

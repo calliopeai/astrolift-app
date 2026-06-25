@@ -47,6 +47,7 @@ from astrolift_workflows.inputs import (
 
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities import (
+        abort_in_flight_deploys,
         delete_app_namespaces,
         list_app_managed_service_ids,
         mark_app_deregistered,
@@ -100,6 +101,21 @@ class TearDownAppWorkflow:
             start_to_close_timeout=_QUICK_TIMEOUT,
             retry_policy=_STANDARD_RETRY,
         )
+
+        # Step 1 — abort any in-flight deploy before the namespace cascade, so
+        # a running DeployAppWorkflow exits on its abort flag instead of
+        # polling a deleted namespace until timeout (#1004). Best-effort.
+        try:
+            await workflow.execute_activity(
+                abort_in_flight_deploys,
+                app_id,
+                start_to_close_timeout=_QUICK_TIMEOUT,
+                retry_policy=_STANDARD_RETRY,
+            )
+        except Exception as exc:  # noqa: BLE001 — best-effort; teardown proceeds
+            workflow.logger.warning(
+                "abort_in_flight_deploys raised: %s — continuing", exc,
+            )
 
         # Step 2 — namespace delete cascades runtime resources.
         namespaces_deleted: list[str] = []

@@ -69,6 +69,7 @@ from astrolift_workflows.inputs import DeregisterAppInput, WorkflowResult
 
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities import (
+        abort_in_flight_deploys,
         delete_app_namespaces,
         delete_app_source_webhook,
         delete_secret_from_cluster,
@@ -196,9 +197,32 @@ class DeregisterAppWorkflow:
         teardown: dict[str, dict[str, Any]] = {}
         still_live: list[str] = []
 
-        # 1. Drain in-flight deployments — namespace delete cascades
-        #    the runtime resources Deployments/ReplicaSets/Pods so
-        #    nothing new comes up while subsequent steps run.
+        # 0. Abort any in-flight deploy BEFORE the namespace cascade. Deleting
+        #    the k8s namespace does NOT touch the Temporal workflow, so a
+        #    running DeployAppWorkflow would otherwise keep polling a vanished
+        #    namespace for its full timeout, stranding a worker (#1004). The
+        #    signal makes it observe its abort flag and exit cleanly first.
+        try:
+            aborted = await workflow.execute_activity(
+                abort_in_flight_deploys,
+                app_id,
+                start_to_close_timeout=_QUICK_TIMEOUT,
+                retry_policy=_STANDARD_RETRY,
+            )
+            teardown["in_flight_deploys_aborted"] = _step_result(
+                ok=True,
+                detail=f"signalled {len(aborted)} in-flight deploy(s)",
+                data=aborted,
+            )
+        except Exception as exc:  # noqa: BLE001 — best-effort; teardown proceeds
+            teardown["in_flight_deploys_aborted"] = _step_result(
+                ok=False,
+                detail=str(exc),
+            )
+
+        # 1. Delete the app's namespaces — cascades the runtime resources
+        #    (Deployments/ReplicaSets/Pods/Services/Ingresses) so nothing new
+        #    comes up while subsequent steps run.
         try:
             namespaces_deleted = await workflow.execute_activity(
                 delete_app_namespaces,

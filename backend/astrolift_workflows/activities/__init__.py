@@ -38,6 +38,7 @@ from astrolift_workflows.activities.app_lifecycle import (
     wait_dns,
 )
 from astrolift_workflows.activities.app_teardown import (
+    abort_in_flight_deploys,
     delete_app_namespaces,
     list_app_managed_service_ids,
     mark_app_deregistered,
@@ -158,6 +159,7 @@ from astrolift_workflows.activities.workflow_stage_activities import (
 )
 
 __all__ = [
+    "abort_in_flight_deploys",
     "aggregate_fan_out",
     "apply_manifests",
     "build_image",
