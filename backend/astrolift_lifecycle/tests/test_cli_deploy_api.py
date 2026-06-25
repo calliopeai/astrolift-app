@@ -157,6 +157,10 @@ def test_ci_deploy_happy_path_returns_201_and_starts_workflow(
     assert body["deployment_id"]
     assert body["polling_url"] == f"/api/cli/v1/deployments/{body['deployment_id']}/status/"
     assert body["workflow_run_id"].startswith("run-")
+    # #977: the 201 body exposes the canonical single-flight id — the SAME one
+    # the GraphQL startDeployment resolver uses, so CI + UI deploys to one
+    # (app, env) collide on a single DeployAppWorkflow.
+    assert body["workflow_id"] == f"DeployAppWorkflow-{app_with_manifest.guid}-{env.guid}"
 
     # Deployment row persisted with CI provenance + token attribution.
     deployment = Deployment.objects.get(guid=body["deployment_id"])

@@ -30,6 +30,7 @@ Wire protocol
   201 on success:
     {
       "deployment_id":   "<guid>",
+      "workflow_id":     "DeployAppWorkflow-<app-guid>-<env-guid>",  # CLI logs this
       "workflow_run_id": "<temporal-run-id>",   # or "" if already in-flight
       "polling_url":     "/api/cli/v1/deployments/<guid>/status/",
       "status":          "pending"
@@ -37,15 +38,22 @@ Wire protocol
   400 for validation errors (CiDeployError), 401 for bad/missing token,
   403 for token/app mismatch or scope error.
 
+  ``workflow_id`` is the SAME single-flight id the GraphQL ``startDeployment``
+  resolver uses (``DeployAppWorkflow-<app-guid>-<env-guid>``), so a CI deploy
+  and a UI deploy to the same (app, env) collide on one DeployAppWorkflow.
+
 ``GET /api/cli/v1/deployments/<guid>/status/``
-  201/200 with:
+  200 with:
     {
       "deployment_id": "<guid>",
-      "status":        "running",         # pending | deploying | running | failed | aborted
-      "message":       "...",
-      "image_tags":    {"web": "abc1234"},
+      "state":         "running",         # CLI-facing; polled for terminal detection
+      "status":        "running",         # platform-native (pending|deploying|running|failed|aborted)
+      "image_tag":     "abc1234",
+      "commit_sha":    "<sha>",
+      "branch":        "main",
       "created_at":    "2026-01-01T00:00:00Z",
-      "updated_at":    "2026-01-01T00:05:00Z"
+      "updated_at":    "2026-01-01T00:05:00Z",
+      "environment":   "production"
     }
   404 if not found or token/app mismatch.
 """
