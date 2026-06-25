@@ -33,6 +33,7 @@ from _sdk.cluster import (
     ManagementReport,
     Namespace,
     NamespaceState,
+    StorageClassInfo,
     PodInfo,
     PodLogLine,
     PodPhaseSummary,
@@ -279,6 +280,23 @@ class K8sNativeClusterDriver(ClusterDriver):
         raise TimeoutError(
             f"namespace {name} did not delete within 10m",
         )
+
+    @driver_op(cloud="k8s_native", driver="cluster")
+    def list_storage_classes(self, cluster: str) -> list[StorageClassInfo]:
+        client = self._k8s(cluster)
+        out: list[StorageClassInfo] = []
+        for sc in client.list(kind="storage.k8s.io/v1/StorageClass"):
+            meta = sc.get("metadata", {}) or {}
+            ann = meta.get("annotations", {}) or {}
+            out.append(
+                StorageClassInfo(
+                    name=meta.get("name", ""),
+                    is_default=(
+                        ann.get("storageclass.kubernetes.io/is-default-class") == "true"
+                    ),
+                )
+            )
+        return out
 
     # ---- workload status ------------------------------------------
 

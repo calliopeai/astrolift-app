@@ -162,6 +162,12 @@ class NamespaceState:
 
 
 @dataclass(frozen=True)
+class StorageClassInfo:
+    name: str
+    is_default: bool
+
+
+@dataclass(frozen=True)
 class Namespace:
     name: str
     labels: dict[str, str]
@@ -736,6 +742,17 @@ class ClusterDriver(Protocol):
     ) -> Namespace: ...
 
     def delete_namespace(self, cluster: str, name: str, *, wait: bool = True) -> None: ...
+
+    def list_storage_classes(self, cluster: str) -> list[StorageClassInfo]:
+        """Return the cluster's StorageClasses (name + whether default).
+
+        Used to stamp a ``storageClassName`` on a StatefulSet's
+        volumeClaimTemplate when the manifest omits ``storage_class`` and the
+        cluster has no default-annotated SC (#1023), so stateful apps bind
+        their PVCs without the operator knowing the cluster's SC name.
+        Default returns ``[]`` — a driver that can't enumerate leaves the
+        claim's storageClassName unset (same as before)."""
+        return []
 
     def get_workload_status(
         self,

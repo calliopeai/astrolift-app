@@ -446,6 +446,22 @@ class KubernetesDynamicClient:
             return None
         return self._to_dict(obj)
 
+    def list(
+        self,
+        *,
+        kind: str,
+        namespace: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List resources of ``kind`` (cluster- or namespace-scoped).
+
+        Returns the ``items`` as dicts (empty list when none). Raises on
+        auth / reachability failure like the other reads."""
+        self._refresh_token()
+        api_version, resolved_kind = split_kind(kind)
+        resource = self._resource_for(api_version, resolved_kind)
+        obj = resource.get(namespace=namespace)
+        return self._to_dict(obj).get("items", []) or []
+
     def delete(
         self,
         *,

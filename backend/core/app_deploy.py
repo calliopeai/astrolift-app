@@ -274,6 +274,50 @@ def driver_for_target_cluster(
     return driver, ctx, namespace
 
 
+def _stamp_storage_class_for_claims(
+    deployment: Deployment, resources: list[dict[str, Any]]
+) -> None:
+    """Stamp a ``storageClassName`` on StatefulSet volumeClaimTemplates that
+    omit one, by discovering the cluster's StorageClass (#1023).
+
+    A claim with no ``storageClassName`` only binds when the cluster has a
+    default-annotated SC; astrolift-eks ships ``gp2`` un-defaulted, so the
+    PVC would hang Pending forever. Prefer the default SC, else the sole SC;
+    if several exist with none default we can't safely guess, so we leave it
+    unset (and log) rather than risk the wrong tier. Best-effort: a list
+    failure leaves claims as-is (same as before).
+    """
+    pending = [
+        vct
+        for r in resources
+        if r.get("kind") == "StatefulSet"
+        for vct in (r.get("spec", {}) or {}).get("volumeClaimTemplates", []) or []
+        if not ((vct.get("spec", {}) or {}).get("storageClassName"))
+    ]
+    if not pending:
+        return
+    try:
+        driver, ctx, _ns = driver_for_deployment(deployment)
+        scs = driver.list_storage_classes(ctx.slug)
+    except Exception:
+        log.warning("storage-class autostamp: list failed; leaving claims unset", exc_info=True)
+        return
+    if not scs:
+        return
+    chosen = next((s.name for s in scs if s.is_default), None)
+    if chosen is None and len(scs) == 1:
+        chosen = scs[0].name
+    if chosen is None:
+        log.warning(
+            "storage-class autostamp: %d StorageClasses, none default — "
+            "leaving claim unset (set storage_class in the manifest)",
+            len(scs),
+        )
+        return
+    for vct in pending:
+        vct.setdefault("spec", {})["storageClassName"] = chosen
+
+
 def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, Any]]:
     """Re-render the deployment's manifests against the stored TOML.
 
@@ -352,6 +396,12 @@ def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, An
                 [*resources, *ingress_resources],
                 key=lambda r: (r.get("kind", ""), r["metadata"]["name"]),
             )
+
+    # StatefulSet PVC binding (#1023): if a volumeClaimTemplate omits
+    # storageClassName and the cluster has no default-annotated SC, the PVC
+    # never binds → the pod hangs Pending. Discover the cluster's SC and stamp
+    # it so stateful apps bind without the operator knowing the SC name.
+    _stamp_storage_class_for_claims(deployment, resources)
 
     # Workload identity (#1011): apps with managed services get a
     # ServiceAccount annotated with their IRSA role ARN so IAM-authed
