@@ -80,6 +80,27 @@ def workload_identity_role_name(app: RegisteredApp) -> str:
     return iam_role_name("astrolift", app.slug)
 
 
+def build_identity_role_name(app: RegisteredApp) -> str:
+    """Canonical IAM role + ServiceAccount name for an app's platform build
+    (#978).
+
+    Distinct from ``workload_identity_role_name``: the build role grants ECR
+    *push* to the app's repo and is bound to the kaniko build SA in the
+    platform namespace, whereas the workload-identity role grants the app's
+    *runtime* managed-service access. Single source of truth so the build
+    activity (which mints + binds it) and the deregister/teardown path (which
+    deletes it) agree on the name — otherwise teardown leaks the build role.
+    ``astrolift-build-<org>-<app>`` (or ``astrolift-build-<app>``) stays under
+    IAM's 64-char limit and the K8s DNS-label limit it doubles as.
+    """
+    from providers.aws._naming import iam_role_name
+
+    org_slug = getattr(getattr(app, "organization", None), "slug", "") or ""
+    if org_slug:
+        return iam_role_name("astrolift-build", org_slug, app.slug)
+    return iam_role_name("astrolift-build", app.slug)
+
+
 # Kinds whose pod template gets the workload-identity ServiceAccount.
 _POD_TEMPLATE_KINDS = {"Deployment", "StatefulSet", "ReplicaSet", "DaemonSet", "Job"}
 
@@ -274,9 +295,7 @@ def driver_for_target_cluster(
     return driver, ctx, namespace
 
 
-def _stamp_storage_class_for_claims(
-    deployment: Deployment, resources: list[dict[str, Any]]
-) -> None:
+def _stamp_storage_class_for_claims(deployment: Deployment, resources: list[dict[str, Any]]) -> None:
     """Stamp a ``storageClassName`` on StatefulSet volumeClaimTemplates that
     omit one, by discovering the cluster's StorageClass (#1023).
 
@@ -387,9 +406,9 @@ def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, An
     cluster = getattr(env, "tenant_cluster", None)
     _ingress_count = 0
     if managed_domain is not None and cluster is not None:
-        ingress_resources = _render_managed_subdomain_ingress(
-            deployment, manifest, namespace, managed_domain, cluster
-        ) or []
+        ingress_resources = (
+            _render_managed_subdomain_ingress(deployment, manifest, namespace, managed_domain, cluster) or []
+        )
         _ingress_count = len(ingress_resources)
         if ingress_resources:
             resources = sorted(
@@ -457,7 +476,9 @@ def _render_managed_subdomain_ingress(
 
     log.info(
         "render_managed_subdomain_ingress: app=%s org_slug=%s managed_domain=%s ingress_class=%s",
-        app.slug, org_slug, getattr(managed_domain, "zone", None),
+        app.slug,
+        org_slug,
+        getattr(managed_domain, "zone", None),
         getattr(cluster, "ingress_class", None),
     )
 
@@ -553,9 +574,7 @@ def _render_managed_subdomain_ingress(
                 port=_backend_port(workload_slug),
             ):
                 rendered.setdefault("metadata", {})["namespace"] = namespace
-                rendered["metadata"].setdefault("labels", {})[
-                    "astrolift.dev/managed-subdomain"
-                ] = "true"
+                rendered["metadata"].setdefault("labels", {})["astrolift.dev/managed-subdomain"] = "true"
                 rendered["metadata"]["labels"]["astrolift.dev/ingress-state"] = ingress_state_label
                 out.append(rendered)
     else:
@@ -607,9 +626,7 @@ def _render_managed_subdomain_ingress(
                 port=_backend_port(workload_slug),
             ):
                 rendered.setdefault("metadata", {})["namespace"] = namespace
-                rendered["metadata"].setdefault("labels", {})[
-                    "astrolift.dev/managed-subdomain"
-                ] = "true"
+                rendered["metadata"].setdefault("labels", {})["astrolift.dev/managed-subdomain"] = "true"
                 rendered["metadata"]["labels"]["astrolift.dev/ingress-state"] = ingress_state_label
                 if ingress_paused:
                     rendered["metadata"].setdefault("annotations", {})[

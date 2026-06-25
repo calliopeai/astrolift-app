@@ -302,11 +302,19 @@ def test_delete_app_identity_role_happy_path(
         )
     assert result.ok is True, result.errors
     assert result.data.cluster_slug == cluster.slug
-    # Canonical role name: ``astrolift-<org-slug>-<app-slug>``.
+    # Deletes BOTH per-app roles: the runtime workload-identity role
+    # (``astrolift-<org>-<app>``) and the platform-build role
+    # (``astrolift-build-<org>-<app>``, #978) — otherwise the build role
+    # orphans on teardown.
     assert rec.calls == [
         (
             "delete_identity_role",
             (f"astrolift-{org.slug}-{app_with_cluster.slug}",),
+            {},
+        ),
+        (
+            "delete_identity_role",
+            (f"astrolift-build-{org.slug}-{app_with_cluster.slug}",),
             {},
         ),
     ]

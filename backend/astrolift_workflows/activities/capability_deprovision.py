@@ -267,9 +267,20 @@ def _deprovision_identity_role_sync(*, registered_app_id: int) -> dict[str, Any]
         raise CapabilityDeprovisionError(
             f"identity driver for cluster {cluster.slug!r} does not support delete_identity_role",
         )
+    from core.app_deploy import build_identity_role_name
+
+    # Delete both per-app IAM roles: the runtime workload-identity role AND
+    # the platform-build role (#978). delete_identity_role is idempotent
+    # (swallows NoSuchEntity per #998), so deleting the build role for an app
+    # that never ran a platform build is a safe no-op — otherwise that role
+    # orphans on teardown (only the orphan scan #995 would later catch it).
     role = _identity_role_name_for(app)
+    build_role = build_identity_role_name(app)
+    deleted: list[str] = []
     try:
-        delete_role(role)
+        for name in (role, build_role):
+            delete_role(name)
+            deleted.append(name)
     except NotImplementedError as exc:
         raise CapabilityDeprovisionError(
             f"identity driver delete_identity_role not implemented for cluster {cluster.slug!r}: {exc}",
@@ -278,6 +289,7 @@ def _deprovision_identity_role_sync(*, registered_app_id: int) -> dict[str, Any]
         "cluster_slug": cluster.slug,
         "registered_app_id": registered_app_id,
         "role": role,
+        "roles_deleted": deleted,
     }
 
 

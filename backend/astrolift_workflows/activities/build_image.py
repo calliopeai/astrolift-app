@@ -187,7 +187,11 @@ def _prepare_build(app, cluster, deployment_pk: int, image_tag: str, commit_sha:
     cloud-agnostic; the registry-push role minted here is the AWS/IRSA path
     (mirrors the workload-identity provisioning the deploy does for S3).
     """
-    from core.app_deploy import AppDeployError, driver_for_capability
+    from core.app_deploy import (
+        AppDeployError,
+        build_identity_role_name,
+        driver_for_capability,
+    )
     from core.cluster_management import (
         ClusterManagementError,
         _context_for_cluster,
@@ -229,7 +233,7 @@ def _prepare_build(app, cluster, deployment_pk: int, image_tag: str, commit_sha:
     # runtime workload-identity role: this one grants ECR push to the app's
     # repo, not the runtime managed-service grants.
     identity_driver = driver_for_capability(cluster, "identity")
-    sa_name = _build_identity_name(app)
+    sa_name = build_identity_role_name(app)
     repo_arn = f"arn:aws:ecr:{region}:{account_id}:repository/{repo_name}"
     permissions = [
         {"Effect": "Allow", "Action": "ecr:GetAuthorizationToken", "Resource": "*"},
@@ -261,21 +265,6 @@ def _prepare_build(app, cluster, deployment_pk: int, image_tag: str, commit_sha:
         repo_name=repo_name,
         repo_uri=repo_uri,
     )
-
-
-def _build_identity_name(app) -> str:
-    """Name of the build-scoped IRSA role + ServiceAccount for an app.
-
-    Deterministic + charset/length-safe for both IAM (≤64) and the K8s SA it
-    doubles as (DNS label ≤63). Distinct prefix from the runtime
-    workload-identity role so the two never collide.
-    """
-    from providers.aws._naming import iam_role_name
-
-    org_slug = getattr(getattr(app, "organization", None), "slug", "") or ""
-    if org_slug:
-        return iam_role_name("astrolift-build", org_slug, app.slug)
-    return iam_role_name("astrolift-build", app.slug)
 
 
 def _ensure_cluster_oidc_issuer(cluster) -> None:
