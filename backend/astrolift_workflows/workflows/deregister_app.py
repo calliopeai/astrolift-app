@@ -1,4 +1,4 @@
-"""DeregisterAppWorkflow (#392) — danger-zone hard deregister.
+"""DeregisterAppWorkflow (#392) — full app teardown (keep-vs-wipe opt-in).
 
 Tears down every per-app resource class in strict dependency order
 and ONLY soft-deletes the platform rows once every prior step has
@@ -18,16 +18,20 @@ subsequent cancel signals are no-ops.
 Resource teardown order (each step records its result on
 ``WorkflowResult.data["teardown"][<resource>]``):
 
-  1. ``deployments_cancelled`` — drain in-flight deploys by clearing
-     the app's runtime via ``delete_app_namespaces`` (the namespace
-     delete cascades Deployments / ReplicaSets / Pods on every
-     cluster the app is bound to). Done first so subsequent steps
-     don't race with a workflow rolling new pods.
+  0. ``in_flight_deploys_aborted`` — signal-abort any running
+     ``DeployAppWorkflow`` for the app's envs BEFORE the namespace
+     cascade, so a deploy exits on its abort flag instead of polling a
+     vanished namespace until timeout (#1004).
+  1. ``deployments_cancelled`` — clear the app's runtime via
+     ``delete_app_namespaces`` (the namespace delete cascades
+     Deployments / ReplicaSets / Pods on every cluster the app is
+     bound to) so subsequent steps don't race with new pods.
   2. ``managed_services`` — fan out ``deprovision_managed_service``
-     for every active ``ManagedService`` row with
-     ``delete_data=True, force_destroy=True`` (the danger-zone four-
-     corner). Driver-level errors propagate so we can mark the
-     resource as still-live on partial-failure resume.
+     for every active ``ManagedService`` row with the operator's
+     ``delete_data`` / ``force_destroy`` choice (default False/False —
+     RDS final snapshot + S3 contents retained; #1000). Driver-level
+     errors propagate so we can mark the resource as still-live on
+     partial-failure resume.
   3. ``namespaces`` — re-run ``delete_app_namespaces`` after the
      managed-service deprovision to catch anything the deprovision
      of a stateful service re-emitted (Helm-managed PVCs etc.).

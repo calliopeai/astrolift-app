@@ -3882,8 +3882,9 @@ class LifecycleMutation:
                 _DeregisterInput(
                     registered_app_id=app.pk,
                     actor=actor,
-                    delete_data=True,
-                    force_destroy=True,
+                    # Operator opt-in (#1000); defaults keep + snapshot.
+                    delete_data=bool(input.delete_data),
+                    force_destroy=bool(input.force_destroy),
                 ),
             ],
             workflow_id=workflow_id,
@@ -4597,13 +4598,18 @@ class DeregisterAppInput:
     the typed-name field to this argument so the destructive button
     stays disabled until the operator types the exact name.
 
-    Hard-deregister always fires with the danger-zone four-corner:
-    ``delete_data=True`` + ``force_destroy=True`` on the child
-    managed-service deprovisions. Operators who want a recoverable
-    delete use the soft-delete mutation on the overview tab instead."""
+    Keep-vs-wipe is an explicit operator choice, defaulting to the SAFE
+    corner (#1000): with both flags False (the default) the child
+    managed-service deprovisions take an RDS final snapshot and retain
+    S3 contents — recoverable. ``delete_data=True`` + ``force_destroy=True``
+    is the danger-zone four-corner that irreversibly wipes persistent
+    state. ``force_destroy`` without ``delete_data`` is a no-op per the
+    driver matrix."""
 
     app_slug: str
     confirm_name: str
+    delete_data: bool = False
+    force_destroy: bool = False
 
 
 @strawberry.type(name="AstroliftDeregisterAppPayload")

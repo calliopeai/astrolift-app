@@ -189,8 +189,12 @@ class DeregisterAppInput:
     before soft-deleting the platform rows. ``delete_data`` +
     ``force_destroy`` propagate to the child
     ``DeprovisionManagedServiceWorkflow`` per the SDK's four-corner
-    safety matrix — danger-zone fires with both True so persistent
-    state is irreversibly removed.
+    safety matrix. Both default to ``False`` (the SAFE corner, matching
+    ``TearDownAppInput`` / ``DeprovisionManagedServiceInput``): a default
+    deregister takes an RDS final snapshot, retains S3 contents, and
+    archives the registry repo — fully recoverable. An operator must
+    explicitly opt in (``delete_data=True`` + ``force_destroy=True``) to
+    irreversibly wipe persistent state (#1000).
 
     Idempotent on resume: the workflow id is
     ``DeregisterAppWorkflow-<app-guid>`` so re-firing the mutation
@@ -202,8 +206,8 @@ class DeregisterAppInput:
 
     registered_app_id: int
     actor: Actor
-    delete_data: bool = True
-    force_destroy: bool = True
+    delete_data: bool = False
+    force_destroy: bool = False
 
 
 @dataclasses.dataclass(slots=True, frozen=True)

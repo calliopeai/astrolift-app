@@ -101,7 +101,36 @@ def test_deregister_mutation_happy_path_starts_workflow(
     assert wf_id == f"DeregisterAppWorkflow-{app.guid}"
     assert isinstance(args[0], DeregisterWfInput)
     assert args[0].registered_app_id == app.pk
-    # Hard-deregister always fires with the danger-zone four-corner.
+    # #1000: with no opt-in fields, deregister defaults to the SAFE corner
+    # (RDS final snapshot + S3 contents retained) — NOT an unconditional wipe.
+    assert args[0].delete_data is False
+    assert args[0].force_destroy is False
+
+
+def test_deregister_mutation_wipe_opt_in_passes_through(
+    app,
+    fake_info,
+    org,
+    actor,
+    permission_resolver,
+    temporal_recorder,
+):
+    """#1000: an operator explicitly opting into the wipe corner threads both
+    flags through to the workflow input."""
+    _grant_delete(permission_resolver)
+    mutation = LifecycleMutation()
+    with _tenant_for(org, actor):
+        result = mutation.deregister_astrolift_app(
+            info=fake_info,
+            input=DeregisterAppInput(
+                app_slug=app.slug,
+                confirm_name=app.name,
+                delete_data=True,
+                force_destroy=True,
+            ),
+        )
+    assert result.ok is True, result.errors
+    _name, args, _wf_id = temporal_recorder.starts[0]
     assert args[0].delete_data is True
     assert args[0].force_destroy is True
 
