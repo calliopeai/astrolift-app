@@ -12,8 +12,9 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from aws.managed._networking import ensure_db_networking
 from core.cluster_observability import managed_config_for
+
+from aws.managed._networking import ensure_db_networking
 
 
 def _cluster(provider_config=None, *, slug="aws-prod", region="us-west-2"):
@@ -30,7 +31,9 @@ def _cluster(provider_config=None, *, slug="aws-prod", region="us-west-2"):
 
 def test_s3_config_defaults_and_overrides():
     cfg = managed_config_for(
-        "aws", _cluster(), kind="object_store",
+        "aws",
+        _cluster(),
+        kind="object_store",
     )
     assert cfg.region == "us-west-2"
     assert cfg.bucket_name_prefix == "astrolift"
@@ -43,6 +46,36 @@ def test_s3_config_defaults_and_overrides():
     )
     assert pinned.bucket_name_prefix == "acme"
     assert pinned.public_access_blocked is False
+
+
+# ---- managed_config_for: cdn (CloudFront, #1010) ----------------------
+
+
+def test_cdn_config_defaults_and_overrides():
+    from aws.managed.cdn_cloudfront import CloudFrontConfig
+
+    cfg = managed_config_for("aws", _cluster(), kind="cdn")
+    assert isinstance(cfg, CloudFrontConfig)
+    # CloudFront + its ACM certs are always us-east-1, regardless of cluster region.
+    assert cfg.region == "us-east-1"
+    assert cfg.comment_prefix == "astrolift"
+    assert cfg.price_class == "PriceClass_100"
+
+    pinned = managed_config_for(
+        "aws",
+        _cluster({"cdn_comment_prefix": "acme", "cloudfront_price_class": "PriceClass_All"}),
+        kind="cdn",
+    )
+    assert pinned.comment_prefix == "acme"
+    assert pinned.price_class == "PriceClass_All"
+
+
+def test_managed_service_kind_has_cdn():
+    # The cdn ManagedService row shape relies on the enum addition (#1010).
+    from astrolift_services.models import ManagedService
+
+    assert ManagedService.Kind.CDN == "cdn"
+    assert "cdn" in {choice for choice, _label in ManagedService.Kind.choices}
 
 
 # ---- managed_config_for: postgres with pinned networking --------------
@@ -73,7 +106,6 @@ def test_postgres_config_uses_pinned_networking_no_discovery():
 
 def test_unknown_kind_raises():
     import pytest
-
     from core.cluster_observability import ClusterObservabilityError
 
     with pytest.raises(ClusterObservabilityError):

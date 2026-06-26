@@ -101,6 +101,27 @@ def build_identity_role_name(app: RegisteredApp) -> str:
     return iam_role_name("astrolift-build", app.slug)
 
 
+def static_build_role_name(app: RegisteredApp) -> str:
+    """Canonical IAM role + ServiceAccount name for an app's in-cluster
+    static-asset build/sync Job (#1010).
+
+    Distinct from both the kaniko ``build_identity_role_name`` (ECR push) and
+    the runtime ``workload_identity_role_name``: this role grants S3
+    put/list/delete on the app's static origin bucket + cloudfront
+    CreateInvalidation, and is bound to the static-build SA in the platform
+    namespace. SSOT so the ``sync_static_assets`` activity (which mints +
+    binds it) and the deregister/teardown path (which deletes it) agree on
+    the name -- otherwise teardown leaks the role. ``astrolift-static-<org>-<app>``
+    (or ``astrolift-static-<app>``) stays under IAM's 64-char limit and the
+    K8s DNS-label limit it doubles as."""
+    from providers.aws._naming import iam_role_name
+
+    org_slug = getattr(getattr(app, "organization", None), "slug", "") or ""
+    if org_slug:
+        return iam_role_name("astrolift-static", org_slug, app.slug)
+    return iam_role_name("astrolift-static", app.slug)
+
+
 def ci_push_role_name(app: RegisteredApp) -> str:
     """IAM role name of the GitHub-OIDC CI push role for an app (#994/#1026).
 
@@ -510,6 +531,12 @@ def _render_managed_subdomain_ingress(
     if not computed:
         return []
 
+    # static_site workloads have no Service -> the ALB/nginx controller would
+    # reject an Ingress backend pointing at a non-existent Service. They are
+    # reached via a CNAME -> CloudFront written by the deploy flow, not an
+    # Ingress, so drop them from the hostname-to-backend maps below.
+    static_workloads = {w.name for w in manifest.workloads if w.kind == "static_site"}
+
     cert_arn: str | None = (
         managed_domain.dns_config.get("certificate_arn") if managed_domain.dns_config else None
     )
@@ -569,17 +596,28 @@ def _render_managed_subdomain_ingress(
                 user_pool_domain=alb_auth_cfg["user_pool_domain"],
             )
 
+        # The ALB health-check path is a single global ALBConfig field, so it
+        # must come from a REAL container workload -- never a container-less
+        # static_site (which has no probe and would force the "/" fallback
+        # onto the real workload's target group, re-triggering #997). Pick the
+        # first non-static computed entry.
+        hc_source = next(
+            (wh for wh in computed if wh.workload_slug not in static_workloads),
+            None,
+        )
         driver = ALBIngressDriver(
             config=ALBConfig(
                 region=cluster.region or "us-east-1",
                 certificate_arn=cert_arn,
                 cognito_auth=cognito_auth,
-                healthcheck_path=_healthcheck_path(computed[0].workload_slug) if computed else "/",
+                healthcheck_path=_healthcheck_path(hc_source.workload_slug) if hc_source else "/",
             )
         )
         tls_strategy = "acm_dns_validated" if cert_arn else "letsencrypt"
         by_workload: dict[str, list[str]] = {}
         for wh in computed:
+            if wh.workload_slug in static_workloads:
+                continue
             by_workload.setdefault(wh.workload_slug, []).append(wh.hostname)
         for workload_slug, hostnames in by_workload.items():
             for rendered in driver.render_ingress(
@@ -632,6 +670,8 @@ def _render_managed_subdomain_ingress(
         tls_strategy = "letsencrypt" if not cert_arn else "provided"
         by_workload: dict[str, list[str]] = {}
         for wh in computed:
+            if wh.workload_slug in static_workloads:
+                continue
             by_workload.setdefault(wh.workload_slug, []).append(wh.hostname)
         for workload_slug, hostnames in by_workload.items():
             for rendered in k8s_driver.render_ingress(

@@ -33,6 +33,7 @@ class ManagedService(BaseCoreModel):
         DOCUMENT_DB = "document_db"
         EMAIL = "email"
         MODEL_ENDPOINT = "model_endpoint"
+        CDN = "cdn"
 
     class Status(models.TextChoices):
         PENDING = "pending"

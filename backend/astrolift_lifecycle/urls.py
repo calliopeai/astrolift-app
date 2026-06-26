@@ -50,4 +50,11 @@ urlpatterns = [
         csrf_exempt(cli_views.deployment_status),
         name="cli-deployment-status",
     ),
+    # CI_PUSHED static-site asset upload (#1010): sync a prebuilt bundle to
+    # the workload's origin bucket + invalidate the CDN.
+    path(
+        "api/cli/v1/apps/<str:app_slug>/static/<str:workload>/upload/",
+        csrf_exempt(cli_views.ci_static_upload),
+        name="cli-static-upload",
+    ),
 ]

@@ -154,6 +154,15 @@ def test_object_store_envelope_includes_prefix():
     assert "BUCKET_PREFIX" in keys
 
 
+def test_cdn_envelope_carries_distribution_domain_and_invalidation_role():
+    """#1010 — a static_site's cdn managed service binds these three keys so a
+    co-resident container workload can invalidate the distribution at runtime."""
+    keys = envelope_keys_for("cdn")
+    assert "CDN_DISTRIBUTION_ID" in keys
+    assert "CDN_DOMAIN_NAME" in keys
+    assert "CDN_INVALIDATION_ROLE" in keys
+
+
 def test_email_and_sms_envelopes_split_provider_from_creds():
     email = envelope_keys_for("email")
     assert {"EMAIL_PROVIDER", "EMAIL_API_KEY", "EMAIL_DOMAIN", "EMAIL_FROM"} <= set(email)

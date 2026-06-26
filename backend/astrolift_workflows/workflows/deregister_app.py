@@ -36,6 +36,10 @@ Resource teardown order (each step records its result on
      managed-service deprovision to catch anything the deprovision
      of a stateful service re-emitted (Helm-managed PVCs etc.).
      Idempotent — already-gone namespaces are a clean no-op.
+  2b. ``static_dns`` — ``delete_static_dns_records`` removes the
+     platform-written ``CNAME host -> CloudFront`` record for every
+     public ``static_site`` workload (no Ingress owned it, so it must
+     be deleted explicitly). Idempotent; no-op for non-static apps.
   4. ``registry_repo`` — ``deprovision_app_registry_repo`` archives
      the app's image repo and clears the platform's stored URI.
   5. ``identity_role`` — ``deprovision_app_identity_role`` deletes
@@ -77,6 +81,7 @@ with workflow.unsafe.imports_passed_through():
         delete_app_namespaces,
         delete_app_source_webhook,
         delete_secret_from_cluster,
+        delete_static_dns_records,
         deprovision_app_identity_role,
         deprovision_app_registry_repo,
         deprovision_managed_service,
@@ -299,6 +304,30 @@ class DeregisterAppWorkflow:
         )
         if ms_failed:
             still_live.append("managed_services")
+
+        # 2b. Static-site DNS records (#1010). A static_site workload's CNAME
+        #     (host -> CloudFront domain) is written explicitly by the deploy
+        #     flow (no Ingress, so external-dns never owned it) — so it must be
+        #     removed explicitly here. Idempotent: a missing record is swallowed.
+        #     No-op when the app has no public static workload.
+        try:
+            dns_summary = await workflow.execute_activity(
+                delete_static_dns_records,
+                app_id,
+                start_to_close_timeout=_QUICK_TIMEOUT,
+                retry_policy=_CLEANUP_RETRY,
+            )
+            teardown["static_dns"] = _step_result(
+                ok=True,
+                detail=f"deleted {len(dns_summary.get('deleted', []))} static CNAME(s)",
+                data=dns_summary,
+            )
+        except Exception as exc:  # noqa: BLE001
+            teardown["static_dns"] = _step_result(
+                ok=False,
+                detail=str(exc),
+            )
+            still_live.append("static_dns")
 
         # 3. Second namespace pass — captures anything the managed-
         #    service deprovision re-emitted (Helm cleanup hooks etc.).

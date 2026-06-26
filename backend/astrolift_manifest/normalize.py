@@ -70,6 +70,12 @@ def _normalize_workload(
     defaults: NormalizationDefaults,
     applied: list[str],
 ) -> WorkloadManifest:
+    # Static-site (#1010) has no container/pod — applying cpu/mem/healthcheck
+    # defaults or fabricating an is_primary container would pollute the
+    # serialized hash for a container-less workload. Pass it through untouched.
+    if w.kind == "static_site":
+        return w
+
     cpu_request = w.cpu_request or _apply(applied, f"workload.{w.name}.cpu_request", defaults.cpu_request)
     cpu_limit = w.cpu_limit or _apply(applied, f"workload.{w.name}.cpu_limit", defaults.cpu_limit)
     memory_request = w.memory_request or _apply(
@@ -157,6 +163,14 @@ def _workload_dict(w: WorkloadManifest) -> dict[str, Any]:
         "temporal_namespace": w.temporal_namespace,
         "max_concurrent_activities": w.max_concurrent_activities,
         "max_concurrent_workflows": w.max_concurrent_workflows,
+        # Static-site config (#1010) participates in the manifest hash so a
+        # change to e.g. ``static_build_command`` is detected as a real change
+        # rather than collapsing to a silent no-op deploy. Only meaningful on
+        # ``kind == "static_site"`` workloads; defaults elsewhere.
+        "static_build_command": w.static_build_command,
+        "static_output_dir": w.static_output_dir,
+        "static_spa": w.static_spa,
+        "static_index": w.static_index,
         "containers": [_container_dict(c) for c in w.containers],
     }
 

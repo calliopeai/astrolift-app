@@ -37,6 +37,12 @@ with workflow.unsafe.imports_passed_through():
         build_image,
         fetch_app_build_strategy,
     )
+    from astrolift_workflows.activities.static_site import (
+        SyncStaticAssetsInput,
+        ensure_static_dns,
+        ensure_static_site_services,
+        sync_static_assets,
+    )
 
 
 # Fargate cold-starts + image-pull can exceed 15m on first rollout (#359).
@@ -132,6 +138,17 @@ class DeployAppWorkflow:
                 start_to_close_timeout=_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
+            # Static-site topology (#1010): a static_site workload implies an
+            # (object_store bucket, cdn distribution) pair of managed services.
+            # Ensure them — bucket first, then cdn — BEFORE ensure_workload_identity
+            # so their iam_grants fold into the app runtime role. No-op fast-return
+            # when the manifest has no static workload.
+            await workflow.execute_activity(
+                ensure_static_site_services,
+                deployment_id,
+                start_to_close_timeout=_TIMEOUT,
+                retry_policy=_STANDARD_RETRY,
+            )
             # Workload identity (#1011): create/update the app's IRSA role + bind
             # it to the ServiceAccount before render+apply, so the annotated SA
             # the render emits points at a role that already exists with the
@@ -151,6 +168,28 @@ class DeployAppWorkflow:
             await workflow.execute_activity(
                 update_secrets, deployment_id, start_to_close_timeout=_TIMEOUT, retry_policy=_STANDARD_RETRY
             )
+
+            # Static-site asset pipeline (#1010): PLATFORM_BUILD dispatches an
+            # in-cluster build/sync Job (terminal — it polls internally like
+            # build_image); CI_PUSHED is a no-op + best-effort cache invalidate.
+            # No-op fast-return when the manifest has no static workload.
+            await workflow.execute_activity(
+                sync_static_assets,
+                args=[SyncStaticAssetsInput(deployment_id=deployment_id, commit_sha=input.commit_sha)],
+                start_to_close_timeout=_BUILD_TIMEOUT,
+                heartbeat_timeout=timedelta(minutes=2),
+                retry_policy=_ROLLOUT_RETRY,
+            )
+            # Static sites have no Ingress, so external-dns never sees them.
+            # Write the CNAME host -> CloudFront domain explicitly per public
+            # static workload (idempotent UPSERT). No-op when none are static.
+            await workflow.execute_activity(
+                ensure_static_dns,
+                deployment_id,
+                start_to_close_timeout=_TIMEOUT,
+                retry_policy=_STANDARD_RETRY,
+            )
+
             await workflow.execute_activity(
                 wait_dns, deployment_id, start_to_close_timeout=_TIMEOUT, retry_policy=_STANDARD_RETRY
             )

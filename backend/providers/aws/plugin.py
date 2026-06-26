@@ -29,6 +29,7 @@ from aws.cluster_eks import EKSClusterDriver
 from aws.dns_route53 import Route53Driver
 from aws.identity_irsa import IRSADriver
 from aws.ingress_alb import ALBIngressDriver
+from aws.managed.cdn_cloudfront import CloudFrontDriver
 from aws.managed.email_ses import AmazonSESDriver
 from aws.managed.model_endpoint_bedrock import AmazonBedrockDriver
 from aws.managed.mysql_rds import RDSMySQLDriver
@@ -64,6 +65,7 @@ PLUGIN = ProviderPlugin(
         # bucket + relational DB + cache). Pending per backlog tickets:
         # postgres/aurora, nosql/dynamodb, pubsub/sns, filesystem/efs.
         ("object_store", "s3"): S3Driver,
+        ("cdn", "cloudfront"): CloudFrontDriver,
         ("queue", "sqs"): SQSDriver,
         ("postgres", "rds"): RDSPostgresDriver,
         ("mysql", "rds_mysql"): RDSMySQLDriver,

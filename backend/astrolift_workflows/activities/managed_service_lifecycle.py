@@ -89,7 +89,7 @@ def _deprovision_sync(
 
     from _sdk.managed_service import DeprovisionSpec
 
-    spec = DeprovisionSpec(handle=svc.backend_ref or "")
+    spec = DeprovisionSpec(handle=svc.backend_ref or "", config=dict(svc.config or {}))
     result = driver.deprovision(
         spec,
         delete_data=delete_data,

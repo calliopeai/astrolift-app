@@ -62,6 +62,11 @@ class UpdateResult:
 @dataclass(frozen=True)
 class DeprovisionSpec:
     handle: str
+    # The row's stored config, so a driver can recover origin/auxiliary
+    # resource refs (e.g. the CloudFront OAC's origin bucket) on the
+    # idempotent "already gone" path where the live resource that carried
+    # them no longer exists. Other drivers ignore it.
+    config: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

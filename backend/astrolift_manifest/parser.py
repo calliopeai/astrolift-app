@@ -47,7 +47,17 @@ class ManifestError(ValueError):
         self.column = column
 
 
-_VALID_WORKLOAD_KINDS = {"deployment", "statefulset", "job", "cronjob", "task", "agent", "workflow", "function"}
+_VALID_WORKLOAD_KINDS = {
+    "deployment",
+    "statefulset",
+    "job",
+    "cronjob",
+    "task",
+    "agent",
+    "workflow",
+    "function",
+    "static_site",
+}
 _VALID_HEALTHCHECK = {"none", "http", "tcp", "exec"}
 _VALID_CONCURRENCY_POLICY = {"forbid", "queue", "replace"}
 
@@ -327,6 +337,27 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
         _require_str(d, "workflow_type", f"{path}.workflow_type")
         _require_str(d, "task_queue", f"{path}.task_queue")
 
+    # Static-site (#1010). A static_site serves built assets from object
+    # storage + a CDN — it has no container/pod, so declaring containers is
+    # a mistake (they would be silently ignored). ``static_output_dir`` is
+    # only required when the platform builds in-cluster
+    # (``static_build_command`` set); a CI-pushed app may sync at the bucket
+    # root and leave both empty.
+    if kind == "static_site":
+        if d.get("containers"):
+            raise ManifestError(
+                "static_site workload must declare no containers",
+                path=f"{path}.containers",
+            )
+        # Mode select is keyed on a STRIPPED command (a whitespace-only value
+        # is CI-pushed, same as the runtime selector) -- strip here too so the
+        # output_dir requirement and the stored value agree at both sites.
+        if str(d.get("static_build_command", "")).strip() and not str(d.get("static_output_dir", "")):
+            raise ManifestError(
+                "static_build_command requires static_output_dir",
+                path=f"{path}.static_output_dir",
+            )
+
     containers = tuple(
         _parse_container(item, f"{path}.containers[{i}]") for i, item in enumerate(d.get("containers", []))
     )
@@ -372,6 +403,12 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
         max_scale=int(d.get("max_scale", 10)),
         function_concurrency=int(d.get("concurrency", 1)),
         function_timeout_seconds=int(d.get("timeout_seconds", 300)),
+        # ``kind == "static_site"`` (#1010). Read unconditionally — harmless
+        # defaults on other kinds, same posture as the agent/function fields.
+        static_build_command=str(d.get("static_build_command", "")).strip(),
+        static_output_dir=str(d.get("static_output_dir", "")),
+        static_spa=bool(d.get("static_spa", False)),
+        static_index=str(d.get("static_index", "index.html")),
     )
 
 

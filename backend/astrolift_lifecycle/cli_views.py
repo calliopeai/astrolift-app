@@ -353,6 +353,211 @@ def ci_deploy(request: HttpRequest, app_slug: str) -> JsonResponse:
     )
 
 
+# ── static-site asset upload (CI_PUSHED mode, #1010) ─────────────────────────
+
+
+class _BundleError(Exception):
+    """Malformed upload bundle -- surfaced as a 400."""
+
+
+def _s3_client(region: str):
+    """Control-plane S3 client. The control plane authenticates via its own
+    role (ECS task role) -- NOT the per-app IRSA build role (that one is
+    in-cluster only). Factored out so tests can inject a recording fake."""
+    import boto3
+
+    return boto3.client("s3", region_name=region or None)
+
+
+def _safe_join(root: str, member: str) -> str:
+    """Resolve an archive member path under ``root``, rejecting traversal
+    (zip-slip / tar ``..``)."""
+    import os
+
+    dest = os.path.realpath(os.path.join(root, member))
+    if dest != os.path.realpath(root) and not dest.startswith(os.path.realpath(root) + os.sep):
+        raise _BundleError(f"unsafe path in bundle: {member!r}")
+    return dest
+
+
+def _extract_bundle(request: HttpRequest) -> str:
+    """Extract the uploaded asset bundle to a fresh temp dir, return its path.
+
+    Accepts a multipart ``bundle`` file (``.tar.gz`` or ``.zip``) or a raw
+    gzipped-tar request body. Guards against path traversal."""
+    import io
+    import os
+    import shutil
+    import tarfile
+    import tempfile
+    import zipfile
+
+    upload = request.FILES.get("bundle")
+    if upload is not None:
+        raw = upload.read()
+        filename = upload.name or ""
+    else:
+        raw = bytes(request.body or b"")
+        filename = ""
+    if not raw:
+        raise _BundleError("empty bundle; send a 'bundle' file or a gzipped tar body")
+
+    dest = tempfile.mkdtemp(prefix="astrolift-static-")
+    bio = io.BytesIO(raw)
+    try:
+        if filename.endswith(".zip") or raw[:2] == b"PK":
+            with zipfile.ZipFile(bio) as zf:
+                for member in zf.namelist():
+                    target = _safe_join(dest, member)
+                    if member.endswith("/"):
+                        os.makedirs(target, exist_ok=True)
+                        continue
+                    os.makedirs(os.path.dirname(target), exist_ok=True)
+                    with zf.open(member) as src, open(target, "wb") as out:
+                        shutil.copyfileobj(src, out)
+            return dest
+        with tarfile.open(fileobj=bio, mode="r:*") as tf:
+            for member in tf.getmembers():
+                _safe_join(dest, member.name)  # reject absolute / .. names
+            # ``filter="data"`` (py3.12) rejects absolute paths, ``..`` escapes,
+            # AND symlink/hardlink members whose target leaves the dest -- the
+            # name-only check above cannot catch a symlink-then-write-through
+            # traversal, so the filter is the real guard.
+            tf.extractall(dest, filter="data")  # noqa: S202
+        return dest
+    except (zipfile.BadZipFile, tarfile.TarError) as exc:
+        shutil.rmtree(dest, ignore_errors=True)
+        raise _BundleError(f"malformed bundle (expected tar.gz or zip): {exc}") from exc
+
+
+def _sync_dir_to_s3(root: str, bucket: str, prefix: str, region: str) -> int:
+    """Upload every file under ``root`` to ``s3://bucket/prefix`` and delete
+    any object under that prefix not in the upload set (mirrors ``aws s3 sync
+    --delete``). Returns the number of objects uploaded."""
+    import mimetypes
+    import os
+
+    s3 = _s3_client(region)
+    base = prefix.strip("/")
+    uploaded: set[str] = set()
+    count = 0
+    for dirpath, _dirs, files in os.walk(root):
+        for fn in files:
+            full = os.path.join(dirpath, fn)
+            rel = os.path.relpath(full, root).replace(os.sep, "/")
+            key = f"{base}/{rel}" if base else rel
+            ctype = mimetypes.guess_type(fn)[0] or "application/octet-stream"
+            with open(full, "rb") as fh:
+                s3.put_object(Bucket=bucket, Key=key, Body=fh.read(), ContentType=ctype)
+            uploaded.add(key)
+            count += 1
+
+    # Delete extras under the prefix so a removed file disappears from the site.
+    paginator = s3.get_paginator("list_objects_v2")
+    stale: list[dict[str, str]] = []
+    for page in paginator.paginate(Bucket=bucket, Prefix=base):
+        for obj in page.get("Contents", []) or []:
+            if obj["Key"] not in uploaded:
+                stale.append({"Key": obj["Key"]})
+    for i in range(0, len(stale), 1000):
+        s3.delete_objects(Bucket=bucket, Delete={"Objects": stale[i : i + 1000]})
+    return count
+
+
+@require_http_methods(["POST"])
+def ci_static_upload(request: HttpRequest, app_slug: str, workload: str) -> JsonResponse:
+    """POST /api/cli/v1/apps/<app_slug>/static/<workload>/upload/
+
+    CI_PUSHED mode: sync a prebuilt static-asset bundle to the workload's
+    origin bucket and bust the CloudFront cache. The in-cluster
+    ``sync_static_assets`` activity stays a no-op for this workload so a
+    deploy doesn't clobber CI-pushed assets."""
+    from aws.managed._base import parse_handle
+
+    from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_services.models import ManagedService
+    from astrolift_workflows.activities.static_site import _service_names
+
+    token, err = _resolve_deploy_token(request, app_slug)
+    if err is not None:
+        return err
+
+    app = token.registered_app
+
+    # Static rows are env-scoped -- one bucket + distribution per (app, env) --
+    # so an upload must target a specific environment. Default to the app's
+    # sole env; require an ``environment`` field when the app has several so a
+    # CI push never silently lands on the wrong env's bucket.
+    env_name = (request.POST.get("environment") or request.GET.get("environment") or "").strip()
+    envs = list(AppEnvironment.objects.filter(registered_app=app, deleted_at__isnull=True))
+    if env_name:
+        env = next((e for e in envs if e.name == env_name), None)
+        if env is None:
+            return JsonResponse({"detail": f"environment {env_name!r} not found"}, status=404)
+    elif len(envs) == 1:
+        env = envs[0]
+    else:
+        return JsonResponse(
+            {"detail": "app has multiple environments; specify the 'environment' field"},
+            status=400,
+        )
+
+    assets_name, cdn_name = _service_names(workload, env)
+    assets = (
+        ManagedService.objects.filter(registered_app=app, kind="object_store", name=assets_name)
+        .select_related("app_environment__tenant_cluster__provider_plugin")
+        .first()
+    )
+    cdn = ManagedService.objects.filter(registered_app=app, kind="cdn", name=cdn_name).first()
+    active = ManagedService.Status.ACTIVE
+    if (
+        assets is None
+        or cdn is None
+        or assets.status != active
+        or cdn.status != active
+        or not assets.backend_ref
+        or not cdn.backend_ref
+    ):
+        return JsonResponse(
+            {"detail": "static services not provisioned; deploy once first"},
+            status=409,
+        )
+
+    bucket = parse_handle(assets.backend_ref)[1]
+    distribution_id = parse_handle(cdn.backend_ref)[1]
+    prefix = (request.POST.get("prefix", "") or "").strip()
+
+    try:
+        extracted = _extract_bundle(request)
+    except _BundleError as exc:
+        return JsonResponse({"detail": str(exc)}, status=400)
+
+    import shutil
+
+    from astrolift_workflows.activities.static_site import _cdn_driver, _region_account
+
+    cluster = assets.app_environment.tenant_cluster if assets.app_environment_id else None
+    region = _region_account(cluster)[0] if cluster is not None else ""
+    try:
+        objects = _sync_dir_to_s3(extracted, bucket, prefix, region)
+    finally:
+        shutil.rmtree(extracted, ignore_errors=True)
+
+    invalidation_id = ""
+    if cluster is not None:
+        try:
+            invalidation_id = (
+                _cdn_driver(cluster, cdn).invalidate(distribution_id, ["/*"]).get("invalidation_id", "")
+            )
+        except Exception as exc:  # noqa: BLE001 -- invalidation is best-effort
+            log.info("ci_static_upload: invalidate skipped for %s/%s (%s)", app_slug, workload, exc)
+
+    log.info("ci_static_upload: app=%s workload=%s bucket=%s objects=%d", app_slug, workload, bucket, objects)
+    return JsonResponse(
+        {"ok": True, "bucket": bucket, "objects": objects, "invalidation_id": invalidation_id}
+    )
+
+
 # Map Deployment.Status → CLI terminal state vocabulary.
 # The CLI polls for "state" and checks terminal set
 # {succeeded, completed, failed, cancelled, timed_out}.

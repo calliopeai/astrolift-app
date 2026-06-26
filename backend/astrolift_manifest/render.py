@@ -216,6 +216,10 @@ def render_manifests(
             svc = _render_service(w, namespace=namespace, labels=wl_labels)
             if svc is not None:
                 out.append(svc)
+        elif w.kind == "static_site":
+            # No K8s resource — reachability is the CNAME -> CloudFront written
+            # by the deploy flow; bucket+CDN are managed services.
+            continue
         # job lands in a follow-up render module.
 
     return sorted(out, key=lambda d: (d.get("kind", ""), d["metadata"]["name"]))

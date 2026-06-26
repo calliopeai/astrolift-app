@@ -57,3 +57,23 @@ def test_activity_names_are_unique():
     ]
     dupes = sorted({n for n in names if names.count(n) > 1})
     assert not dupes, f"duplicate activity registrations: {dupes}"
+
+
+def test_static_site_activities_are_registered():
+    """#1010 (P0b): the four static-site activities must be registered on the
+    worker, or the deploy/teardown workflows fail at runtime with an
+    'activity not registered' error the moment a static_site app deploys."""
+    import astrolift_workflows.worker as worker
+
+    registered = {
+        fn.__temporal_activity_definition.name
+        for fn in worker.ACTIVITIES
+        if getattr(fn, "__temporal_activity_definition", None) is not None
+    }
+    for name in (
+        "astrolift.deploy.ensure_static_site_services",
+        "astrolift.deploy.sync_static_assets",
+        "astrolift.deploy.ensure_static_dns",
+        "astrolift.deploy.delete_static_dns_records",
+    ):
+        assert name in registered, f"{name!r} is not registered in worker.ACTIVITIES"

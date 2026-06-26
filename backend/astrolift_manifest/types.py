@@ -77,6 +77,16 @@ class WorkloadManifest:
     function_concurrency: int = 1
     function_timeout_seconds: int = 300
 
+    # kind == "static_site" — built assets served from object storage + CDN,
+    # no container/pod. static_build_command non-empty => platform-build mode;
+    # empty => CI-pushed mode. static_output_dir is the build artifact dir to
+    # sync; static_spa adds the CDN 403/404 -> /index SPA rewrite; static_index
+    # is default_root_object.
+    static_build_command: str = ""
+    static_output_dir: str = ""
+    static_spa: bool = False
+    static_index: str = "index.html"
+
 
 @dataclasses.dataclass(slots=True, frozen=True)
 class ContainerManifest:

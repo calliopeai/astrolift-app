@@ -286,6 +286,19 @@ def _workload_body_changed(a: WorkloadManifest, b: WorkloadManifest) -> bool:
         return True
     if (a.storage_class, a.storage_size) != (b.storage_class, b.storage_size):
         return True
+    # Static-site config (#1010) — a static_* edit must trigger a resync.
+    if (
+        a.static_build_command,
+        a.static_output_dir,
+        a.static_spa,
+        a.static_index,
+    ) != (
+        b.static_build_command,
+        b.static_output_dir,
+        b.static_spa,
+        b.static_index,
+    ):
+        return True
 
     a_containers = {c.name: c for c in a.containers}
     b_containers = {c.name: c for c in b.containers}

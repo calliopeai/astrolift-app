@@ -139,6 +139,12 @@ from astrolift_workflows.activities.build_image import (
     build_image,
     fetch_app_build_strategy,
 )
+from astrolift_workflows.activities.static_site import (
+    delete_static_dns_records,
+    ensure_static_dns,
+    ensure_static_site_services,
+    sync_static_assets,
+)
 from astrolift_workflows.activities.secret_rotation import (
     bounce_workloads_consuming_bundle,
     delete_secret_from_cluster,
@@ -178,6 +184,7 @@ __all__ = [
     "delete_app_source_webhook",
     "delete_preview_namespace",
     "delete_secret_from_cluster",
+    "delete_static_dns_records",
     "deprovision_app_certificate",
     "deprovision_app_dns_record",
     "deprovision_app_identity_role",
@@ -195,6 +202,8 @@ __all__ = [
     "drain_source_cluster",
     "ensure_cluster_drained",
     "ensure_platform_managed_records",
+    "ensure_static_dns",
+    "ensure_static_site_services",
     "expire_pending_approval_deployments",
     "fetch_app_build_strategy",
     "finalize_managed_service_deletion",
@@ -266,6 +275,7 @@ __all__ = [
     "soft_delete_app_records",
     "switch_app_env_binding",
     "sync_dev_environment_files",
+    "sync_static_assets",
     "teardown_cluster_infra",
     "transition_domain_status",
     "update_secrets",

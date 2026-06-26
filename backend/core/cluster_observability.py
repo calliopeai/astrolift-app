@@ -345,6 +345,15 @@ def managed_config_for(
             public_access_blocked=bool(pc.get("public_access_blocked", True)),
         )
 
+    if kind == "cdn":
+        from aws.managed.cdn_cloudfront import CloudFrontConfig
+
+        return CloudFrontConfig(
+            region="us-east-1",
+            comment_prefix=str(pc.get("cdn_comment_prefix", "astrolift")),
+            price_class=str(pc.get("cloudfront_price_class", "PriceClass_100")),
+        )
+
     if kind in ("postgres", "mysql"):
         from aws.managed._networking import ensure_db_networking
 
@@ -586,7 +595,7 @@ async def fetch_task_pod_logs(
         # follow=False path now terminates on EOF, but the timeout is the
         # backstop for any future driver that doesn't.
         await asyncio.wait_for(_collect(), timeout=_TASK_LOG_READ_TIMEOUT_SECONDS)
-    except (asyncio.TimeoutError, TimeoutError):
+    except TimeoutError:
         logger.warning(
             "fetch_task_pod_logs: read exceeded %ss for pod %s; returning partial tail",
             _TASK_LOG_READ_TIMEOUT_SECONDS,
