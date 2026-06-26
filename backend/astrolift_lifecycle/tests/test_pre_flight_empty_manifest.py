@@ -39,6 +39,19 @@ _MANIFEST_NO_WORKLOADS = """
 name = "hello-app"
 """
 
+# A static_site-only manifest (#1010): renders to ZERO K8s resources (its
+# bucket + CDN are managed services), but is a valid deploy — pre_flight must
+# NOT treat it as the empty-manifest error.
+_MANIFEST_STATIC_ONLY = """
+name = "hello-app"
+
+[[workloads]]
+name = "site"
+kind = "static_site"
+is_public = true
+static_output_dir = "dist"
+"""
+
 
 def _make_deployment(app, env, image_tag: str = "v1") -> Deployment:
     return Deployment.objects.create(
@@ -69,6 +82,19 @@ def test_pre_flight_accepts_manifest_with_workloads(app, env):
     deployment = _make_deployment(app, env)
 
     # Must not raise.
+    _pre_flight_sync(deployment.pk)
+
+
+def test_pre_flight_accepts_static_only_manifest_rendering_zero_resources(app, env):
+    """#1010: a static_site-only app renders zero K8s resources (bucket + CDN
+    are managed services, not pods), so pre_flight must NOT reject it as an
+    empty manifest — the empty-render gate only fires when there's also no
+    static workload."""
+    app.manifest_raw = _MANIFEST_STATIC_ONLY
+    app.save(update_fields=["manifest_raw"])
+    deployment = _make_deployment(app, env)
+
+    # Must not raise even though render_resources_for_deployment returns [].
     _pre_flight_sync(deployment.pk)
 
 
