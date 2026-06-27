@@ -39,6 +39,7 @@ with workflow.unsafe.imports_passed_through():
     )
     from astrolift_workflows.activities.static_site import (
         SyncStaticAssetsInput,
+        ensure_cloudfront_cert,
         ensure_static_dns,
         ensure_static_site_services,
         sync_static_assets,
@@ -136,6 +137,19 @@ class DeployAppWorkflow:
                 provision_namespace,
                 args=[input.registered_app_id, input.app_environment_id],
                 start_to_close_timeout=_TIMEOUT,
+                retry_policy=_STANDARD_RETRY,
+            )
+            # Static-site custom-domain TLS (#1010): CloudFront aliases need a
+            # us-east-1 ACM cert (the regional ALB cert won't do). Ensure a
+            # us-east-1 wildcard cert for the env's managed domain BEFORE the
+            # cdn provisions, so the distribution comes up with the alias+cert.
+            # Idempotent + reused across static apps; no-op when none are
+            # public-static or there's no managed domain (serves on cloudfront.net).
+            await workflow.execute_activity(
+                ensure_cloudfront_cert,
+                deployment_id,
+                start_to_close_timeout=_BUILD_TIMEOUT,
+                heartbeat_timeout=timedelta(minutes=2),
                 retry_policy=_STANDARD_RETRY,
             )
             # Static-site topology (#1010): a static_site workload implies an

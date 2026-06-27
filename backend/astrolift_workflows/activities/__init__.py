@@ -141,6 +141,7 @@ from astrolift_workflows.activities.build_image import (
 )
 from astrolift_workflows.activities.static_site import (
     delete_static_dns_records,
+    ensure_cloudfront_cert,
     ensure_static_dns,
     ensure_static_site_services,
     sync_static_assets,
@@ -202,6 +203,7 @@ __all__ = [
     "drain_source_cluster",
     "ensure_cluster_drained",
     "ensure_platform_managed_records",
+    "ensure_cloudfront_cert",
     "ensure_static_dns",
     "ensure_static_site_services",
     "expire_pending_approval_deployments",

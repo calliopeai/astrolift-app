@@ -243,3 +243,99 @@ def test_delete_static_dns_records_swallows_notfound(monkeypatch, app, env, org)
     # completes instead of hard-failing.
     out = static_site._delete_static_dns_records_sync(app.pk)
     assert out["deleted"] == []
+
+
+# ---- ensure_cloudfront_cert (us-east-1 ACM for CloudFront aliases) --------
+
+
+class _FakeCertDns:
+    """Recording stand-in for the us-east-1 Route53Driver cert primitives."""
+
+    def __init__(self, *, statuses):
+        # statuses: list of poll_cert_status return values, popped in order.
+        self._statuses = list(statuses)
+        self.requested = 0
+        self.validation_written: list[tuple] = []
+
+    def request_wildcard_cert(self, zone, zone_id):
+        self.requested += 1
+        return {
+            "cert_id": "arn:aws:acm:us-east-1:1:certificate/new",
+            "validation_records": [
+                {"name": "_acme.apps.example.com.", "type": "CNAME", "value": "_x.acm-validations.aws."}
+            ],
+        }
+
+    def ensure_record(self, *, zone, name, type, value, ttl):  # noqa: A002 -- driver kwarg
+        self.validation_written.append((zone, name, type, value))
+
+    def poll_cert_status(self, zone, cert_id):
+        return self._statuses.pop(0) if self._statuses else {"status": "issued", "cert_arn": cert_id}
+
+
+def _domain_without_cert(org, env, *, dns_config):
+    from astrolift_clusters.models import ManagedDomain
+
+    md = ManagedDomain.objects.create(
+        zone="apps.example.com", organization=org, dns_driver="route53", dns_config=dns_config
+    )
+    env.managed_domain = md
+    env.save(update_fields=["managed_domain", "updated_at", "version"])
+    return md
+
+
+def test_cloudfront_cert_reuses_issued(monkeypatch, app, env, org):
+    """An already-ISSUED cert ARN on the managed domain is reused — no new
+    request."""
+    _attach(app, env, org)  # _managed_domain already has cloudfront_certificate_arn
+    fake = _FakeCertDns(statuses=[{"status": "issued", "cert_arn": "x"}])
+    monkeypatch.setattr(static_site, "_us_east_1_dns_driver", lambda: fake)
+    dep = _deployment(app, env)
+
+    out = static_site._ensure_cloudfront_cert_sync(dep.pk)
+
+    assert out["reused"] is True
+    assert fake.requested == 0  # reused, not re-minted
+
+
+def test_cloudfront_cert_requests_validates_and_stores(monkeypatch, app, env, org):
+    _attach(app, env, org, with_domain=False)
+    md = _domain_without_cert(org, env, dns_config={"zone_id": "Z123"})
+    fake = _FakeCertDns(statuses=[{"status": "pending", "cert_arn": None}, {"status": "issued", "cert_arn": "c"}])
+    monkeypatch.setattr(static_site, "_us_east_1_dns_driver", lambda: fake)
+    monkeypatch.setattr(static_site.time, "sleep", lambda _s: None)
+    dep = _deployment(app, env)
+
+    out = static_site._ensure_cloudfront_cert_sync(dep.pk)
+
+    assert out["reused"] is False
+    assert fake.requested == 1
+    assert fake.validation_written  # ACM DNS-validation CNAME written to Route53
+    md.refresh_from_db()
+    assert md.dns_config["cloudfront_certificate_arn"] == "arn:aws:acm:us-east-1:1:certificate/new"
+
+
+def test_cloudfront_cert_resumes_pending_without_reminting(monkeypatch, app, env, org):
+    """A prior timed-out attempt parked a pending cert ARN -> resume polling it,
+    don't mint a duplicate."""
+    _attach(app, env, org, with_domain=False)
+    md = _domain_without_cert(
+        org, env, dns_config={"zone_id": "Z1", "cloudfront_certificate_pending_arn": "arn:pending/p"}
+    )
+    fake = _FakeCertDns(statuses=[{"status": "issued", "cert_arn": "arn:pending/p"}])
+    monkeypatch.setattr(static_site, "_us_east_1_dns_driver", lambda: fake)
+    dep = _deployment(app, env)
+
+    static_site._ensure_cloudfront_cert_sync(dep.pk)
+
+    assert fake.requested == 0  # resumed the pending cert, not re-minted
+    md.refresh_from_db()
+    assert md.dns_config["cloudfront_certificate_arn"] == "arn:pending/p"
+
+
+def test_cloudfront_cert_stub_without_managed_domain(monkeypatch, app, env, org):
+    _attach(app, env, org, with_domain=False)  # no managed domain
+    monkeypatch.setattr(static_site, "_us_east_1_dns_driver", lambda: _FakeCertDns(statuses=[]))
+    dep = _deployment(app, env)
+
+    assert static_site._ensure_cloudfront_cert_sync(dep.pk) == {"stub": True}

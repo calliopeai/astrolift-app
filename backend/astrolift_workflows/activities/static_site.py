@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import time
 from typing import Any
 
 from temporalio import activity
@@ -210,6 +211,118 @@ def _distribution_id(row) -> str:
     if not row or not row.backend_ref:
         return ""
     return parse_handle(row.backend_ref)[1]
+
+
+# ---- ensure_cloudfront_cert ----------------------------------------------
+
+# Bounded DNS-validated issuance wait. In a platform-managed zone we write the
+# ACM validation CNAME immediately, so issuance is usually well under a minute;
+# this cap tolerates a slow ACM without wedging the deploy.
+_CERT_POLL_ATTEMPTS = 12
+_CERT_POLL_SLEEP_SECONDS = 30
+
+
+def _us_east_1_dns_driver():
+    """A Route53 driver whose ACM client is pinned to us-east-1.
+
+    CloudFront aliases require their ACM cert in us-east-1 (the regional ALB
+    cert won't do), independent of the cluster's region. ``Route53Config``
+    defaults to us-east-1, so an explicitly-constructed driver gives a
+    us-east-1 ACM client while record writes stay global. Mirrors the
+    ``core.dns_discovery`` pattern."""
+    from aws.dns_route53 import Route53Config, Route53Driver
+
+    return Route53Driver(config=Route53Config())
+
+
+def _ensure_cloudfront_cert_sync(deployment_id: int) -> dict[str, Any]:
+    """Idempotently ensure a us-east-1 wildcard ACM cert for the env's managed
+    domain, stored as ``managed_domain.dns_config['cloudfront_certificate_arn']``.
+
+    Domain-level + reused: one wildcard cert per managed domain serves every
+    static_site app/env under it. Reuses the managed-domain cert primitives
+    (request_wildcard_cert -> write validation CNAME -> poll_cert_status). The
+    issued ARN is stored only once ISSUED (CloudFront rejects a non-issued
+    cert); an in-flight request is parked under a pending key so a retry
+    reuses it instead of minting a duplicate cert. No-op when the deploy has
+    no public static workload or the env has no managed domain (the
+    distribution then serves on its default cloudfront.net domain)."""
+    from astrolift_lifecycle.models import Deployment
+
+    deployment = Deployment.objects.select_related(
+        "registered_app",
+        "app_environment__managed_domain",
+    ).get(pk=deployment_id)
+    app = deployment.registered_app
+    env = deployment.app_environment
+    statics = [w for w in _static_workloads(_normalized_manifest(app)) if w.is_public]
+    managed_domain = getattr(env, "managed_domain", None) if env else None
+    if not statics or managed_domain is None:
+        return {"stub": True}
+
+    dns_config = dict(managed_domain.dns_config or {})
+    zone = managed_domain.zone
+    zone_id = str(dns_config.get("zone_id", ""))
+    cf_dns = _us_east_1_dns_driver()
+
+    def _store(key: str, value: str) -> None:
+        latest = type(managed_domain).objects.get(pk=managed_domain.pk)
+        cfg = dict(latest.dns_config or {})
+        cfg[key] = value
+        latest.dns_config = cfg
+        latest.save(update_fields=["dns_config", "updated_at", "version"])
+
+    # Already issued earlier -> reuse (the common case after the first deploy).
+    issued = str(dns_config.get("cloudfront_certificate_arn", ""))
+    if issued and cf_dns.poll_cert_status(zone, issued).get("status") == "issued":
+        return {"stub": False, "cert_arn": issued, "reused": True}
+
+    # An in-flight request from a prior (timed-out) attempt -> resume polling it
+    # rather than minting a duplicate cert.
+    cert_id = str(dns_config.get("cloudfront_certificate_pending_arn", ""))
+    if not cert_id:
+        result = cf_dns.request_wildcard_cert(zone, zone_id)
+        cert_id = result["cert_id"]
+        _store("cloudfront_certificate_pending_arn", cert_id)
+        # Write the ACM DNS-validation CNAME(s) so issuance can proceed.
+        for rec in result.get("validation_records", []) or []:
+            cf_dns.ensure_record(
+                zone=zone,
+                name=str(rec["name"]).rstrip("."),
+                type=str(rec.get("type", "CNAME")),
+                value=str(rec["value"]),
+                ttl=300,
+            )
+
+    for _ in range(_CERT_POLL_ATTEMPTS):
+        if activity.in_activity():
+            activity.heartbeat()
+        status = cf_dns.poll_cert_status(zone, cert_id).get("status")
+        if status == "issued":
+            _store("cloudfront_certificate_arn", cert_id)
+            return {"stub": False, "cert_arn": cert_id, "reused": False}
+        if status == "failed":
+            raise RuntimeError(f"cloudfront cert {cert_id} for {zone} failed validation")
+        time.sleep(_CERT_POLL_SLEEP_SECONDS)
+
+    raise RuntimeError(
+        f"cloudfront cert {cert_id} for {zone} not ISSUED after "
+        f"{_CERT_POLL_ATTEMPTS * _CERT_POLL_SLEEP_SECONDS}s; deploy will retry "
+        "(the pending cert is reused, not re-minted)",
+    )
+
+
+@activity.defn(name="astrolift.deploy.ensure_cloudfront_cert")
+async def ensure_cloudfront_cert(deployment_id: int) -> dict:
+    """Ensure the env's managed domain has a us-east-1 wildcard ACM cert for
+    CloudFront aliases, before the static services provision (so the CDN picks
+    it up). No-op when no public static workload / no managed domain."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    result = await sync_to_async(_ensure_cloudfront_cert_sync)(deployment_id)
+    activity.heartbeat()
+    return result
 
 
 # ---- ensure_static_site_services -----------------------------------------
