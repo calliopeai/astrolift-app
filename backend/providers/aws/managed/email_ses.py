@@ -697,7 +697,14 @@ class AmazonSESDriver(ManagedServiceDriver):
         explicit = cfg.get("identity")
         if explicit:
             return str(explicit)
-        if not self._config.base_domain:
+        # Per-service ``config={base_domain: ...}`` overrides the install-
+        # level base_domain (#1038): a tenant provisioning email with its
+        # own sending domain passes it through the mutation config, which
+        # is threaded into ``spec.config``. Without this the driver only
+        # read the install bundle's base_domain and raised even when the
+        # caller supplied one.
+        base_domain = str(cfg.get("base_domain") or "").strip() or self._config.base_domain
+        if not base_domain:
             raise ManagedServiceError(
                 "ses driver requires either spec.config.identity or a "
                 "configured base_domain so it can derive a sending "
@@ -710,7 +717,7 @@ class AmazonSESDriver(ManagedServiceDriver):
             spec.environment_name,
         ]
         sub = "-".join(_safe(p) for p in parts if p)
-        return f"{sub}.{self._config.base_domain}".lower()
+        return f"{sub}.{base_domain}".lower()
 
     def _configuration_set_name_for(self, identity: str) -> str:
         return (

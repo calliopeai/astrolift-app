@@ -394,7 +394,25 @@ def _managed_binding_for(svc: Any) -> Any:
         return None
     from _sdk.managed_service import ServiceHandle
 
-    return binding_method(ServiceHandle(handle=svc.backend_ref))
+    handle = ServiceHandle(handle=svc.backend_ref)
+    # Thread the operator-supplied ``ManagedService.config`` into the
+    # binding so config-driven binding fields render (#1038): the SES
+    # driver folds ``from_name``/``reply_to``/``return_path``/
+    # ``env_senders`` into its env_vars from this dict. Pass it only to
+    # drivers whose ``binding`` signature accepts ``config`` — the
+    # majority take ``(self, handle)`` only, and an unconditional kwarg
+    # would TypeError those (the 7 working kinds). Defaults empty, so
+    # config-agnostic callers are unaffected.
+    import inspect
+
+    svc_config = dict(getattr(svc, "config", None) or {})
+    try:
+        accepts_config = "config" in inspect.signature(binding_method).parameters
+    except (TypeError, ValueError):
+        accepts_config = False
+    if accepts_config:
+        return binding_method(handle, config=svc_config)
+    return binding_method(handle)
 
 
 def _sync_binding_rows(svc: Any) -> None:
