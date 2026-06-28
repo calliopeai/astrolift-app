@@ -40,7 +40,6 @@ import fnmatch
 import hashlib
 import logging
 import secrets
-import uuid
 
 from django.db import transaction
 from django.utils import timezone
@@ -495,26 +494,33 @@ def _enqueue_temporal(
     *,
     trigger_kind: str,
 ) -> None:
-    """Submit the Temporal workflow start. Best-effort; never raises."""
-    try:
-        from astrolift_workflows.client import start_workflow
+    """Start the WorkflowDefinition stage executor for *instance*.
 
-        workflow_id = f"wf-def-{instance.pk}-{uuid.uuid4().hex[:8]}"
-        handle = start_workflow(
-            AGENT_WORKFLOW_TYPE,
-            args=[
-                {
-                    "workflow_instance_id": instance.pk,
-                    "input": input_data,
-                    "trigger_kind": trigger_kind,
-                }
-            ],
-            workflow_id=workflow_id,
+    Best-effort; never raises (the instance row is already committed, so a
+    Temporal failure is recoverable by re-triggering).
+
+    The executor (``WorkflowDefinitionRunWorkflow``) takes a
+    ``WorkflowDefinitionRunInput`` dataclass and keys its stage executions to
+    an ``astrolift_operations.WorkflowRun`` mirror-row pk — passing a plain
+    dict left the workflow's ``run`` unable to deserialize its argument and
+    the triggered run never started (#1030). Dispatch goes through the shared
+    ``start_workflow_definition_run`` entry point — the same one
+    ``runWorkflowDefinition`` and the inbound webhook use (#1020) — so the
+    mirror row exists and the dispatched argument matches the workflow's
+    ``run`` signature.
+    """
+    try:
+        from astrolift_workflows.inputs import Actor
+        from workflows.run_service import start_workflow_definition_run
+
+        _run, workflow_id = start_workflow_definition_run(
+            instance.workflow,
+            trigger_payload=input_data,
+            actor=Actor(kind="system", user_id=None, display=trigger_kind),
         )
         # Store the Temporal workflow_id on the instance for observability.
-        if handle.enqueued:
-            instance.temporal_workflow_id = handle.workflow_id
-            instance.save(update_fields=["temporal_workflow_id", "updated_at"])
+        instance.temporal_workflow_id = workflow_id
+        instance.save(update_fields=["temporal_workflow_id", "updated_at"])
     except Exception:
         log.exception("failed to enqueue Temporal workflow for instance %s", instance.pk)
 
