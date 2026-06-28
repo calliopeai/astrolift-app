@@ -453,6 +453,31 @@ class GKEClusterDriver(ClusterDriver):
         return self._pod_backend.list_pods(**kwargs)
 
     @driver_op(cloud="gcp", driver="cluster")
+    def interactive_exec(
+        self,
+        *,
+        auth: ClusterAuth,
+        namespace: str,
+        pod_name: str,
+        container: str,
+        command: list[str],
+        tty: bool = True,
+    ) -> Any:
+        """Open a streaming exec session on the GKE cluster (#1040).
+        Materializes exec_plugin auth into a bearer token (as list_pods)
+        before delegating to the shared k8s_native exec opener."""
+        from providers.k8s_native.observability import open_interactive_exec
+
+        return open_interactive_exec(
+            auth=self._materialize_gke_auth_auth(auth),
+            namespace=namespace,
+            pod_name=pod_name,
+            container=container,
+            command=command,
+            tty=tty,
+        )
+
+    @driver_op(cloud="gcp", driver="cluster")
     def stream_logs(
         self,
         *,

@@ -461,6 +461,31 @@ class K8sNativeClusterDriver(ClusterDriver):
         return self._pod_backend.list_pods(**kwargs)
 
     @driver_op(cloud="k8s_native", driver="cluster")
+    def interactive_exec(
+        self,
+        *,
+        auth: ClusterAuth,
+        namespace: str,
+        pod_name: str,
+        container: str,
+        command: list[str],
+        tty: bool = True,
+    ) -> Any:
+        """Open a streaming exec session into a pod (#1040). Delegates to
+        the shared exec opener; auth passes through unchanged (the base
+        k8s_native driver supports kubeconfig + service_account_token)."""
+        from providers.k8s_native.observability import open_interactive_exec
+
+        return open_interactive_exec(
+            auth=auth,
+            namespace=namespace,
+            pod_name=pod_name,
+            container=container,
+            command=command,
+            tty=tty,
+        )
+
+    @driver_op(cloud="k8s_native", driver="cluster")
     def stream_logs(
         self,
         *,

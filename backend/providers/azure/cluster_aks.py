@@ -452,6 +452,31 @@ class AKSClusterDriver(ClusterDriver):
         return self._pod_backend.list_pods(**kwargs)
 
     @driver_op(cloud="azure", driver="cluster")
+    def interactive_exec(
+        self,
+        *,
+        auth: ClusterAuth,
+        namespace: str,
+        pod_name: str,
+        container: str,
+        command: list[str],
+        tty: bool = True,
+    ) -> Any:
+        """Open a streaming exec session on the AKS cluster (#1040).
+        Materializes exec_plugin auth into a kubeconfig (as list_pods)
+        before delegating to the shared k8s_native exec opener."""
+        from providers.k8s_native.observability import open_interactive_exec
+
+        return open_interactive_exec(
+            auth=self._resolve_aks_auth(auth),
+            namespace=namespace,
+            pod_name=pod_name,
+            container=container,
+            command=command,
+            tty=tty,
+        )
+
+    @driver_op(cloud="azure", driver="cluster")
     def stream_logs(
         self,
         *,
