@@ -390,7 +390,7 @@ class _FakeWorkflowAPI:
         return fake
 
 
-def _run_workflow_with_fakes(app, fakes):
+def _run_workflow_with_fakes(app, fakes, *, delete_data=True, force_destroy=True):
     """Run ``DeregisterAppWorkflow.run`` against a fake workflow API.
 
     The grace-period cancel (#436 B) added a ``workflow.wait_condition``
@@ -408,8 +408,8 @@ def _run_workflow_with_fakes(app, fakes):
     input = DeregisterWfInput(
         registered_app_id=app.pk,
         actor=actor,
-        delete_data=True,
-        force_destroy=True,
+        delete_data=delete_data,
+        force_destroy=force_destroy,
     )
 
     async def _grace_window_timeout(*_a, **_k):
@@ -524,6 +524,62 @@ def test_workflow_partial_failure_keeps_app_live(app):
     # The app row is NOT soft-deleted.
     app.refresh_from_db()
     assert app.deleted_at is None
+
+
+def _clean_teardown_fakes():
+    """Fakes that let every teardown step succeed (clean happy path)."""
+    return {
+        "mark_app_tearing_down": lambda *_: None,
+        "abort_in_flight_deploys": lambda *_: [],
+        "delete_app_namespaces": lambda *_: [],
+        "list_app_managed_service_ids": lambda *_: [],
+        "delete_static_dns_records": lambda *_: {"deleted": []},
+        "deprovision_app_registry_repo": lambda *_: {"repo": "acme/hello"},
+        "deprovision_app_identity_role": lambda *_: {"role": "astrolift-acme-hello"},
+        "list_app_secret_targets": lambda *_: [],
+        "revoke_app_secret_bundle_refs": lambda *_: 0,
+        "delete_app_source_webhook": lambda *_: {
+            "status": "not_installed",
+            "detail": "",
+            "hook_id": "",
+        },
+        "revoke_app_deploy_tokens": lambda *_: 0,
+        "soft_delete_app_records": lambda *_: {"registered_app": 1},
+        "mark_app_deregistered": lambda *_: None,
+    }
+
+
+def _registry_archive_arg(fake_api):
+    """Extract the ``archive`` flag the registry deprovision was invoked with."""
+    repo_calls = [
+        call_args for name, call_args, _ in fake_api.calls if name == "deprovision_app_registry_repo"
+    ]
+    assert len(repo_calls) == 1, repo_calls
+    # args = [app_id, archive]
+    assert len(repo_calls[0]) == 2, repo_calls[0]
+    return repo_calls[0][1]
+
+
+def test_workflow_registry_archived_on_safe_teardown(app):
+    """#1000: a default (non-force_destroy) teardown archives the ECR repo
+    so the image history survives a re-register."""
+    fake_api, result = _run_workflow_with_fakes(
+        app, _clean_teardown_fakes(), delete_data=False, force_destroy=False
+    )
+    assert result.ok is True
+    assert _registry_archive_arg(fake_api) is True
+    assert result.data["teardown"]["registry_repo"]["detail"].startswith("archived")
+
+
+def test_workflow_registry_hard_deleted_on_force_destroy(app):
+    """#1000: the full-wipe corner (force_destroy=True) hard-deletes the ECR
+    repo rather than archiving it — archive must be False."""
+    fake_api, result = _run_workflow_with_fakes(
+        app, _clean_teardown_fakes(), delete_data=True, force_destroy=True
+    )
+    assert result.ok is True
+    assert _registry_archive_arg(fake_api) is False
+    assert result.data["teardown"]["registry_repo"]["detail"].startswith("deleted")
 
 
 # ---------------------------------------------------------------------------

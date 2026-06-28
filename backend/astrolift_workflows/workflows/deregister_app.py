@@ -41,7 +41,8 @@ Resource teardown order (each step records its result on
      public ``static_site`` workload (no Ingress owned it, so it must
      be deleted explicitly). Idempotent; no-op for non-static apps.
   4. ``registry_repo`` — ``deprovision_app_registry_repo`` archives
-     the app's image repo and clears the platform's stored URI.
+     the app's image repo (or hard-deletes it when ``force_destroy``)
+     and clears the platform's stored URI.
   5. ``identity_role`` — ``deprovision_app_identity_role`` deletes
      the IRSA / WI / FI role bound to the app's ServiceAccount.
   6. ``materialized_secrets`` — fan out ``delete_secret_from_cluster``
@@ -351,17 +352,22 @@ class DeregisterAppWorkflow:
             )
             still_live.append("namespaces")
 
-        # 4. Registry repo archive + URI clear.
+        # 4. Registry repo deprovision + URI clear. Archive on a safe teardown
+        #    so the image history survives a re-register; hard-delete only when
+        #    the operator opted into force_destroy (the full wipe corner; #1000).
+        archive_repo = not force_destroy
         try:
             repo_summary = await workflow.execute_activity(
                 deprovision_app_registry_repo,
-                args=[app_id, True],
+                args=[app_id, archive_repo],
                 start_to_close_timeout=_QUICK_TIMEOUT,
                 retry_policy=_CLEANUP_RETRY,
             )
             teardown["registry_repo"] = _step_result(
                 ok=True,
-                detail=f"archived repo {repo_summary.get('repo', '')!r}",
+                detail=(
+                    f"{'archived' if archive_repo else 'deleted'} repo " f"{repo_summary.get('repo', '')!r}"
+                ),
                 data=repo_summary,
             )
         except Exception as exc:  # noqa: BLE001
