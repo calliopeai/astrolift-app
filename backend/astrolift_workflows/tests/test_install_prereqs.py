@@ -126,7 +126,9 @@ def test_apply_semantic_options_filestore_persistent():
     from astrolift_workflows.activities.install_prereqs import _apply_semantic_options
 
     base = {"prometheus": {"prometheusSpec": {"storageSpec": {}}}}
-    out = _apply_semantic_options("kube-prometheus-stack", base, {"prometheus_storage": "filestore_persistent"})
+    out = _apply_semantic_options(
+        "kube-prometheus-stack", base, {"prometheus_storage": "filestore_persistent"}
+    )
     sc = out["prometheus"]["prometheusSpec"]["storageSpec"]["volumeClaimTemplate"]["spec"]["storageClassName"]
     assert sc == "filestore-prometheus"
 
@@ -136,7 +138,9 @@ def test_apply_semantic_options_azurefile_persistent():
     from astrolift_workflows.activities.install_prereqs import _apply_semantic_options
 
     base = {"prometheus": {"prometheusSpec": {"storageSpec": {}}}}
-    out = _apply_semantic_options("kube-prometheus-stack", base, {"prometheus_storage": "azurefile_persistent"})
+    out = _apply_semantic_options(
+        "kube-prometheus-stack", base, {"prometheus_storage": "azurefile_persistent"}
+    )
     sc = out["prometheus"]["prometheusSpec"]["storageSpec"]["volumeClaimTemplate"]["spec"]["storageClassName"]
     assert sc == "azurefile-prometheus"
 
@@ -205,3 +209,184 @@ def test_workflow_modules_import_clean():
     import astrolift_workflows.workflows.deprovision_managed_service  # noqa: F401
     import astrolift_workflows.workflows.install_cluster_prereqs  # noqa: F401
     import astrolift_workflows.workflows.tear_down_app  # noqa: F401
+
+
+# ---- _provision_ebs_csi_irsa_role (#1032) ------------------------------
+#
+# #1024 shipped IRSADriver.provision_ebs_csi_role but never called it, so the
+# EBS-CSI controller SA pointed at a role nothing created and PVCs hung. These
+# tests pin the wiring: the install flow mints the role (scoped to the
+# discovered OIDC issuer + the kube-system:ebs-csi-controller-sa subject) when
+# the component is enabled, is idempotent, and is a no-op when it's disabled.
+
+import json  # noqa: E402
+
+
+class _RecordingIam:
+    """Moto-free recording IAM double covering the provision path
+    (create_role + get/update trust + attach_role_policy). Mirrors the fake
+    in providers/tests/aws/test_identity_irsa.py so the assertions can reach
+    the real IRSADriver trust policy without moto installed."""
+
+    class exceptions:  # noqa: N801
+        class EntityAlreadyExistsException(Exception):  # noqa: N818
+            pass
+
+        class NoSuchEntityException(Exception):  # noqa: N818
+            pass
+
+    def __init__(self) -> None:
+        self.roles: dict[str, dict] = {}
+        self.attached: dict[str, list[str]] = {}
+
+    def create_role(self, **kwargs) -> dict:  # noqa: N803 (boto3 PascalCase kwargs)
+        name = kwargs["RoleName"]
+        if name in self.roles:
+            raise self.exceptions.EntityAlreadyExistsException(name)
+        arn = f"arn:aws:iam::123456789012:role/{name}"
+        self.roles[name] = {"trust": json.loads(kwargs["AssumeRolePolicyDocument"]), "arn": arn}
+        return {"Role": {"Arn": arn}}
+
+    def get_role(self, **kwargs) -> dict:
+        name = kwargs["RoleName"]
+        if name not in self.roles:
+            raise self.exceptions.NoSuchEntityException(name)
+        return {
+            "Role": {
+                "AssumeRolePolicyDocument": self.roles[name]["trust"],
+                "Arn": self.roles[name]["arn"],
+            }
+        }
+
+    def update_assume_role_policy(self, **kwargs) -> None:
+        self.roles[kwargs["RoleName"]]["trust"] = json.loads(kwargs["PolicyDocument"])
+
+    def put_role_policy(self, **kwargs) -> None:
+        pass
+
+    def attach_role_policy(self, **kwargs) -> None:
+        name = kwargs["RoleName"]
+        if name not in self.roles:
+            raise self.exceptions.NoSuchEntityException(name)
+        self.attached.setdefault(name, []).append(kwargs["PolicyArn"])
+
+
+class _FakeCluster:
+    """Minimal stand-in for a TenantCluster row — just the surface the
+    provision helper + _ensure_cluster_oidc_issuer touch."""
+
+    def __init__(self, auth_config: dict) -> None:
+        self.auth_config = auth_config
+        self.provider_config = {"account_id": "123456789012", "region": "us-west-2"}
+        self.provider_plugin = type("PP", (), {"slug": "aws"})()
+        self.region = "us-west-2"
+        self.slug = "astrolift-eks"
+        self.saved_fields: list[str] = []
+
+    def save(self, update_fields=None) -> None:  # noqa: ANN001
+        self.saved_fields = list(update_fields or [])
+
+
+_DISCOVERED_ISSUER = "oidc.eks.us-west-2.amazonaws.com/id/ABC"
+
+
+def _patch_driver_and_issuer(monkeypatch, iam: _RecordingIam) -> None:
+    """Wire discovery (returns a known issuer) and driver_for_capability
+    (builds a real IRSADriver from the cluster's *cached* issuer + the
+    recording IAM). Building from auth_config proves the helper discovered +
+    cached the issuer before resolving the driver."""
+    import aws.identity_irsa as irsa
+
+    import core.app_deploy as app_deploy
+
+    monkeypatch.setattr(irsa, "discover_oidc_issuer", lambda region, name: _DISCOVERED_ISSUER)
+
+    def _fake_driver(cluster, capability):  # noqa: ANN001
+        assert capability == "identity"
+        return irsa.IRSADriver(
+            config=irsa.IRSAConfig(
+                region="us-west-2",
+                account_id="123456789012",
+                cluster_oidc_issuer=cluster.auth_config["cluster_oidc_issuer"],
+            ),
+            iam_client=iam,
+        )
+
+    monkeypatch.setattr(app_deploy, "driver_for_capability", _fake_driver)
+
+
+def test_provision_ebs_csi_role_minted_when_enabled(monkeypatch):
+    """When the aws-ebs-csi-driver component is selected, the helper discovers
+    the OIDC issuer and mints the controller role bound to that issuer +
+    kube-system:ebs-csi-controller-sa, with AmazonEBSCSIDriverPolicy attached."""
+    from astrolift_workflows.activities.install_prereqs import _provision_ebs_csi_irsa_role
+
+    iam = _RecordingIam()
+    _patch_driver_and_issuer(monkeypatch, iam)
+    cluster = _FakeCluster({"cluster_name": "astrolift-eks"})
+
+    arn = _provision_ebs_csi_irsa_role(cluster, {"aws-ebs-csi-driver", "metrics-server"})
+
+    # Role name matches the SA annotation convention <cluster_name>-<key>.
+    role = "astrolift-eks-aws-ebs-csi-driver"
+    assert arn == f"arn:aws:iam::123456789012:role/{role}"
+    # Discovery ran + cached the issuer on the row before the driver was built.
+    assert cluster.auth_config["cluster_oidc_issuer"] == _DISCOVERED_ISSUER
+    assert cluster.saved_fields == ["auth_config"]
+    # Trust scoped to the discovered issuer + the chart's controller SA.
+    cond = iam.roles[role]["trust"]["Statement"][0]["Condition"]["StringEquals"]
+    assert cond[f"{_DISCOVERED_ISSUER}:sub"] == "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+    assert cond[f"{_DISCOVERED_ISSUER}:aud"] == "sts.amazonaws.com"
+    assert "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy" in iam.attached[role]
+
+
+def test_provision_ebs_csi_role_idempotent(monkeypatch):
+    """Re-running converges to a single trust subject (not a duplicated list)
+    and returns the same ARN — a second prereqs run must not error."""
+    from astrolift_workflows.activities.install_prereqs import _provision_ebs_csi_irsa_role
+
+    iam = _RecordingIam()
+    _patch_driver_and_issuer(monkeypatch, iam)
+    cluster = _FakeCluster({"cluster_name": "astrolift-eks"})
+
+    a = _provision_ebs_csi_irsa_role(cluster, {"aws-ebs-csi-driver"})
+    b = _provision_ebs_csi_irsa_role(cluster, {"aws-ebs-csi-driver"})
+
+    assert a == b
+    cond = iam.roles["astrolift-eks-aws-ebs-csi-driver"]["trust"]["Statement"][0]["Condition"]["StringEquals"]
+    assert cond[f"{_DISCOVERED_ISSUER}:sub"] == "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+
+
+def test_provision_ebs_csi_role_noop_when_disabled(monkeypatch):
+    """When the component is NOT selected the helper short-circuits — it must
+    never reach issuer discovery or the identity driver."""
+    import aws.identity_irsa as irsa
+
+    import core.app_deploy as app_deploy
+    from astrolift_workflows.activities.install_prereqs import _provision_ebs_csi_irsa_role
+
+    def _boom(*a, **k):  # noqa: ANN002, ANN003
+        raise AssertionError("must not be called when the component is disabled")
+
+    monkeypatch.setattr(irsa, "discover_oidc_issuer", _boom)
+    monkeypatch.setattr(app_deploy, "driver_for_capability", _boom)
+    cluster = _FakeCluster({"cluster_name": "astrolift-eks"})
+
+    assert _provision_ebs_csi_irsa_role(cluster, {"metrics-server", "external-dns"}) is None
+    assert cluster.auth_config == {"cluster_name": "astrolift-eks"}
+
+
+def test_provision_ebs_csi_role_noop_on_non_aws(monkeypatch):
+    """Other clouds use their own CSI path — the AWS EBS mint is gated on the
+    provider plugin slug, so a non-AWS cluster is a no-op."""
+    import core.app_deploy as app_deploy
+    from astrolift_workflows.activities.install_prereqs import _provision_ebs_csi_irsa_role
+
+    def _boom(*a, **k):  # noqa: ANN002, ANN003
+        raise AssertionError("must not mint an AWS role on a non-AWS cluster")
+
+    monkeypatch.setattr(app_deploy, "driver_for_capability", _boom)
+    cluster = _FakeCluster({"cluster_name": "gke-x"})
+    cluster.provider_plugin = type("PP", (), {"slug": "gcp"})()
+
+    assert _provision_ebs_csi_irsa_role(cluster, {"aws-ebs-csi-driver"}) is None

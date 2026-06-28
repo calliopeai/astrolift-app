@@ -186,6 +186,7 @@ def _assert_storage_class_preflight(
         return
     if not check(cluster_slug, required_sc):
         from core.app_deploy import AppDeployError
+
         raise AppDeployError(
             f"kube-prometheus-stack storage mode '{storage_mode}' requires "
             f"StorageClass '{required_sc}' on cluster '{cluster_slug}' but it "
@@ -268,11 +269,73 @@ def _ensure_flux_installed(driver, ctx_slug: str) -> None:
             from core.app_deploy import AppDeployError
 
             raise AppDeployError(
-                "Flux controller bootstrap failed: "
-                + "; ".join(str(e) for e in result.errors),
+                "Flux controller bootstrap failed: " + "; ".join(str(e) for e in result.errors),
             )
 
     log.info("Flux bootstrap applied — caller should let Temporal retry for CRD registration")
+
+
+# Bootstrap-component key for the AWS EBS CSI driver (mirrors the key
+# EKSCluster.bootstrap_components emits). The component's IRSA role must be
+# minted by the platform before its controller can provision EBS volumes.
+_EBS_CSI_COMPONENT_KEY = "aws-ebs-csi-driver"
+
+
+def _provision_ebs_csi_irsa_role(cluster: Any, selected_set: set[str]) -> str | None:
+    """Mint the EBS-CSI controller's IRSA role when the aws-ebs-csi-driver
+    component is enabled (#1032).
+
+    #1024 added ``IRSADriver.provision_ebs_csi_role`` + the in-cluster Helm
+    component + the default gp3 StorageClass, but nothing ever called the
+    mint — so the controller ServiceAccount was annotated with a role no one
+    created, the controller couldn't assume it, and PVCs hung ``Pending``
+    forever. This wires the call into the prereqs install: when the component
+    is selected on an AWS cluster, discover the cluster's OIDC issuer (cache
+    it on the row) and self-provision the role, scoping its trust to the
+    ``kube-system:ebs-csi-controller-sa`` subject the chart runs as.
+
+    The minted role name matches the ServiceAccount annotation
+    ``EKSCluster.bootstrap_components`` emits (``_irsa_arn``): an explicit
+    override ARN from ``auth_config['irsa_roles']`` if set, else the
+    convention ``<cluster_name>-aws-ebs-csi-driver``.
+
+    Idempotent — ``provision_ebs_csi_role`` reconciles the trust subject and
+    re-attaches the managed policy on re-run. No-op (returns ``None``) when
+    the component is disabled or the cluster isn't AWS (other clouds use their
+    own CSI path)."""
+    if _EBS_CSI_COMPONENT_KEY not in selected_set:
+        return None
+    if getattr(getattr(cluster, "provider_plugin", None), "slug", "") != "aws":
+        return None
+
+    from astrolift_workflows.activities.workload_identity import (
+        _ensure_cluster_oidc_issuer,
+    )
+    from core.app_deploy import driver_for_capability
+
+    # The IRSA trust binds to the cluster's OIDC issuer; discover + cache it
+    # before resolving the identity driver (whose IRSAConfig reads the issuer
+    # off the cluster row) so the minted trust isn't malformed by an empty
+    # issuer.
+    _ensure_cluster_oidc_issuer(cluster)
+
+    ac = cluster.auth_config or {}
+    pc = cluster.provider_config or {}
+    override = (ac.get("irsa_roles") or {}).get(_EBS_CSI_COMPONENT_KEY)
+    if override:
+        role_name = str(override).split("/")[-1]
+    else:
+        cluster_name = ac.get("cluster_name") or pc.get("cluster_name") or cluster.slug
+        role_name = f"{cluster_name}-{_EBS_CSI_COMPONENT_KEY}"
+
+    identity_driver = driver_for_capability(cluster, "identity")
+    role_arn = identity_driver.provision_ebs_csi_role(role_name)
+    log.info(
+        "install_cluster_prereqs: provisioned EBS-CSI IRSA role %s (%s)",
+        role_name,
+        role_arn,
+    )
+    return role_arn
 
 
 _LEGACY_HELM_RELEASE_NAMES: frozenset[str] = frozenset(
@@ -317,6 +380,11 @@ def _install_cluster_prereqs_sync(
     components = bootstrap_components_dispatch(cluster=cluster)
     selected_set = set(selected_keys)
     target_namespace = "astrolift-system"
+
+    # Self-provision the EBS-CSI controller's IRSA role before the HelmRelease
+    # lands, so the controller can assume it as soon as its pods start (#1032).
+    # No-op for non-AWS clusters or when the component is deselected.
+    _provision_ebs_csi_irsa_role(cluster, selected_set)
 
     resources: list[dict[str, Any]] = []
     applied: list[dict[str, str]] = []
