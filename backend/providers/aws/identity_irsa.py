@@ -34,6 +34,16 @@ from _sdk._telemetry import driver_op
 from _sdk.identity import IdentityBinding, WorkloadIdentityDriver
 from aws._errors import NotFoundError, map_client_error
 
+# The aws-ebs-csi-driver Helm chart runs its controller as the
+# ``ebs-csi-controller-sa`` ServiceAccount in ``kube-system`` (#1024). The
+# self-provisioned IRSA trust must bind that exact subject so the controller
+# can assume the role via the cluster's OIDC provider.
+EBS_CSI_NAMESPACE = "kube-system"
+EBS_CSI_CONTROLLER_SA = "ebs-csi-controller-sa"
+# AWS-managed policy granting the EBS CSI controller the EC2 volume
+# create/attach/detach/delete permissions it needs to provision PVs.
+AMAZON_EBS_CSI_DRIVER_POLICY_ARN = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+
 
 @dataclass(frozen=True)
 class IRSAConfig:
@@ -169,6 +179,28 @@ class IRSADriver(WorkloadIdentityDriver):
         except Exception as exc:
             raise map_client_error(exc) from exc
 
+    @driver_op(cloud="aws", driver="identity", audit=True, sensitive_kind="identity.provision_ebs_csi_role")
+    def provision_ebs_csi_role(self, role_name: str) -> str:
+        """Self-provision the IRSA role the aws-ebs-csi-driver controller assumes (#1024).
+
+        Astrolift installs the EBS CSI driver in-cluster via Helm and mints
+        its IAM role itself — no EKS managed addon, no out-of-band Terraform.
+        Creates the OIDC-trust role, scopes its trust to the
+        ``kube-system:ebs-csi-controller-sa`` subject, and attaches the
+        AWS-managed ``AmazonEBSCSIDriverPolicy``.
+
+        Idempotent: re-runs reconcile the trust subject + re-attach the
+        managed policy (both AWS ops are safe to repeat), mirroring
+        ``create_identity_role``'s self-healing. Returns the role ARN."""
+        role_arn = self.create_identity_role(role_name, permissions=[])
+        self._ensure_trust_includes(
+            role_name=role_name,
+            namespace=EBS_CSI_NAMESPACE,
+            sa_name=EBS_CSI_CONTROLLER_SA,
+        )
+        self.attach_policy(role_name, AMAZON_EBS_CSI_DRIVER_POLICY_ARN)
+        return role_arn
+
     @driver_op(cloud="aws", driver="identity", audit=True, sensitive_kind="identity.delete_role")
     def delete_identity_role(self, role: str) -> None:
         """Detach + delete in the right order. AWS rejects role
@@ -291,10 +323,7 @@ class IRSADriver(WorkloadIdentityDriver):
             return False
         except Exception as exc:
             raise map_client_error(exc) from exc
-        return any(
-            t.get("Key") == "astrolift.io/managed-by" and t.get("Value") == "platform"
-            for t in tags
-        )
+        return any(t.get("Key") == "astrolift.io/managed-by" and t.get("Value") == "platform" for t in tags)
 
     # ---- internals ------------------------------------------------
 
@@ -307,9 +336,7 @@ class IRSADriver(WorkloadIdentityDriver):
         """Trust policy template — initial form has no subject claim
         so create_identity_role doesn't need to know which (namespace,
         sa) to bind. bind_service_account adds the subject."""
-        oidc_provider_arn = (
-            f"arn:aws:iam::{self._config.account_id}:oidc-provider/" f"{self._config.cluster_oidc_issuer}"
-        )
+        oidc_provider_arn = f"arn:aws:iam::{self._config.account_id}:oidc-provider/{self._config.cluster_oidc_issuer}"
         return {
             "Version": "2012-10-17",
             "Statement": [

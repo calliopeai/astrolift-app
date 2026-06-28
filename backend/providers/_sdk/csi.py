@@ -38,6 +38,12 @@ class CsiDriverProfile:
     supports_volume_expansion: bool = True
     access_modes: tuple[str, ...] = ("ReadWriteOnce",)
 
+    default_volume_type: str = ""
+    """Volume-type the platform stamps into the StorageClass ``type``
+    parameter when it emits a default class for this profile (EBS
+    ``gp3``). Empty when the platform doesn't pin a volume type for the
+    provisioner."""
+
 
 # Canonical profiles per cloud's recommended CSI.
 PROFILES: tuple[CsiDriverProfile, ...] = (
@@ -49,6 +55,7 @@ PROFILES: tuple[CsiDriverProfile, ...] = (
         supports_snapshots=True,
         snapshot_class_driver="ebs.csi.aws.com",
         access_modes=("ReadWriteOnce",),
+        default_volume_type="gp3",
     ),
     CsiDriverProfile(
         plugin_id="aws",
@@ -123,13 +130,12 @@ PROFILES: tuple[CsiDriverProfile, ...] = (
 
 
 def profile_for(
-    *, plugin_id: str, csi_driver_name: str,
+    *,
+    plugin_id: str,
+    csi_driver_name: str,
 ) -> CsiDriverProfile | None:
     for p in PROFILES:
-        if (
-            p.plugin_id == plugin_id
-            and p.csi_driver_name == csi_driver_name
-        ):
+        if p.plugin_id == plugin_id and p.csi_driver_name == csi_driver_name:
             return p
     return None
 
@@ -141,30 +147,40 @@ def render_storage_class(
     encryption_key: str | None = None,
     parameters: dict[str, str] | None = None,
     reclaim_policy: str = "Retain",
+    make_default: bool = False,
 ) -> dict[str, Any]:
     """Build a StorageClass manifest with encryption + expansion
-    enabled per the profile."""
+    enabled per the profile.
+
+    ``make_default=True`` stamps the
+    ``storageclass.kubernetes.io/is-default-class`` annotation so the
+    StatefulSet PVC autostamp (#1023) picks this class for claims that
+    omit ``storageClassName`` — the cluster gets a working default
+    (e.g. EBS gp3) instead of leaving PVCs Pending."""
     params = dict(parameters or {})
-    if (
-        profile.supports_encryption
-        and encryption_key
-        and profile.encryption_parameter_key
-    ):
+    if profile.default_volume_type and "type" not in params:
+        params["type"] = profile.default_volume_type
+    if profile.supports_encryption and encryption_key and profile.encryption_parameter_key:
         params[profile.encryption_parameter_key] = encryption_key
     elif profile.supports_encryption and profile.encryption_parameter_key:
         # When the profile takes a 'true' / 'false' string for
         # encryption (e.g. EBS 'encrypted'), default to 'true'
         # so PVs encrypt-at-rest by default.
         params.setdefault(profile.encryption_parameter_key, "true")
+    metadata: dict[str, Any] = {
+        "name": name,
+        "labels": {
+            "astrolift.io/managed-by": "platform",
+        },
+    }
+    if make_default:
+        metadata["annotations"] = {
+            "storageclass.kubernetes.io/is-default-class": "true",
+        }
     return {
         "apiVersion": "storage.k8s.io/v1",
         "kind": "StorageClass",
-        "metadata": {
-            "name": name,
-            "labels": {
-                "astrolift.io/managed-by": "platform",
-            },
-        },
+        "metadata": metadata,
         "provisioner": profile.csi_driver_name,
         "parameters": params,
         "reclaimPolicy": reclaim_policy,

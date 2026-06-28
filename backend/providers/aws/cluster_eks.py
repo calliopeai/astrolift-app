@@ -523,9 +523,7 @@ class EKSClusterDriver(ClusterDriver):
             out.append(
                 StorageClassInfo(
                     name=meta.get("name", ""),
-                    is_default=(
-                        ann.get("storageclass.kubernetes.io/is-default-class") == "true"
-                    ),
+                    is_default=(ann.get("storageclass.kubernetes.io/is-default-class") == "true"),
                 )
             )
         return out
@@ -984,8 +982,9 @@ class EKSClusterDriver(ClusterDriver):
           - TLS: ACM via aws-load-balancer-controller annotations on
             Ingress/Service (cert-manager only if the operator needs
             internal mTLS or non-ALB cert flows).
-          - Storage: EBS CSI is an EKS managed addon (already provided
-            in the prd-eks-astrolift TF; not in the bootstrap recipe).
+          - Storage: aws-ebs-csi-driver installed in-cluster via Helm with
+            a platform-minted IRSA role (#1024) — self-sufficient, NOT an
+            EKS managed addon and not provisioned out-of-band in Terraform.
           - Ingress: aws-load-balancer-controller renders Ingress as ALB.
 
         IRSA wiring:
@@ -1004,8 +1003,10 @@ class EKSClusterDriver(ClusterDriver):
           - DaemonSets with ``hostNetwork:true`` don't schedule on
             Fargate pods; node-exporter is disabled so Pending pods
             don't pile up.
-          - PVCs backed by gp3 (EBS) work on Fargate when the EBS CSI
-            managed addon is installed (standard in the prd-eks TF).
+          - EBS volumes attach to EC2 nodegroup instances only; Fargate
+            pods have no EBS. The aws-ebs-csi-driver component unblocks
+            nodegroup-backed StatefulSet PVCs — Fargate-only workloads
+            need EFS (aws-efs-csi-driver) instead.
         """
         auth_cfg = cluster.auth_config or {}
         eks_cluster_name = auth_cfg.get("cluster_name") or self._config.cluster_name
@@ -1152,6 +1153,39 @@ class EKSClusterDriver(ClusterDriver):
                 chart_repo_url="https://kubernetes-sigs.github.io/metrics-server/",
                 chart_repo_type="default",
                 chart_version="3.12.2",
+            ),
+            BootstrapComponent(
+                key="aws-ebs-csi-driver",
+                title="AWS EBS CSI Driver (persistent volumes)",
+                default_enabled=True,
+                rationale=(
+                    "Provisions EBS-backed PersistentVolumes so StatefulSet "
+                    "PVCs bind. astrolift-eks ships without it, so claims hang "
+                    "Pending forever (#1024). Installed in-cluster via Helm "
+                    "with its own platform-minted IRSA role — self-sufficient, "
+                    "no EKS managed addon or out-of-band Terraform. EBS attaches "
+                    "to EC2 nodegroup instances only: this helps nodegroup-backed "
+                    "StatefulSets; Fargate-only workloads need EFS instead."
+                ),
+                # The controller SA is IRSA-bound so the driver can call the EC2
+                # volume APIs. Name pinned to the chart default (ebs-csi-controller-sa)
+                # so it matches the kube-system:ebs-csi-controller-sa subject the
+                # platform scopes the IRSA trust to (IRSADriver.provision_ebs_csi_role).
+                helm_values={
+                    "controller": {
+                        "serviceAccount": {
+                            **_sa_with_irsa("aws-ebs-csi-driver"),
+                            "name": "ebs-csi-controller-sa",
+                        },
+                    },
+                },
+                requires=["irsa:aws-ebs-csi-driver"],
+                options=[],
+                chart_name="aws-ebs-csi-driver",
+                chart_repo_url="https://kubernetes-sigs.github.io/aws-ebs-csi-driver",
+                chart_repo_type="default",
+                chart_version="2.35.1",
+                install_timeout="10m",
             ),
             BootstrapComponent(
                 key="kube-prometheus-stack",
@@ -1562,11 +1596,11 @@ class EKSClusterDriver(ClusterDriver):
             period=period,
         )
         return {
-            "rps":          request_rate(**kwargs),
-            "error_rate":   error_rate(**kwargs),
-            "latency_p50":  latency(**kwargs, stat="p50"),
-            "latency_p95":  latency(**kwargs, stat="p95"),
-            "latency_p99":  latency(**kwargs, stat="p99"),
+            "rps": request_rate(**kwargs),
+            "error_rate": error_rate(**kwargs),
+            "latency_p50": latency(**kwargs, stat="p50"),
+            "latency_p95": latency(**kwargs, stat="p95"),
+            "latency_p99": latency(**kwargs, stat="p99"),
         }
 
     # ---- region / Cognito discovery (#860 / #859) -----------------
@@ -1586,9 +1620,7 @@ class EKSClusterDriver(ClusterDriver):
         """
         try:
             resp = self._ec2.describe_regions()
-            slugs = sorted(
-                r["RegionName"] for r in resp.get("Regions", []) if r.get("RegionName")
-            )
+            slugs = sorted(r["RegionName"] for r in resp.get("Regions", []) if r.get("RegionName"))
             if not slugs:
                 raise ValueError("describe_regions returned no regions")
         except Exception as exc:

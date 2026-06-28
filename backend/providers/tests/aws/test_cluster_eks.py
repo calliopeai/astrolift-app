@@ -485,6 +485,51 @@ def _component_values(components: list, key: str) -> dict:
     raise AssertionError(f"{key} component not found")
 
 
+def _mock_bootstrap_driver(fake_k8s_client: Any) -> EKSClusterDriver:
+    """EKS driver wired with recording boto3 doubles (moto-free) for the
+    metadata calls bootstrap_components makes (STS account id, EKS
+    DescribeCluster vpc id, EC2 SG discovery)."""
+    sts = MagicMock()
+    sts.get_caller_identity.return_value = {"Account": "123456789012"}
+    eks = MagicMock()
+    eks.describe_cluster.return_value = {
+        "cluster": {"resourcesVpcConfig": {"vpcId": "vpc-123"}},
+    }
+    ec2 = MagicMock()
+    ec2.describe_security_groups.return_value = {"SecurityGroups": []}
+    return EKSClusterDriver(
+        config=EKSConfig(region="us-west-2", cluster_name=_CLUSTER),
+        eks_client=eks,
+        sts_client=sts,
+        ec2_client=ec2,
+        k8s_client_factory=lambda **kw: fake_k8s_client,
+    )
+
+
+def test_bootstrap_includes_ebs_csi_with_irsa_sa(fake_k8s_client) -> None:
+    """The EKS recipe ships aws-ebs-csi-driver (#1024) so StatefulSet PVCs
+    bind, and its controller SA carries the convention IRSA role
+    annotation (arn:...:role/<cluster>-aws-ebs-csi-driver)."""
+    driver = _mock_bootstrap_driver(fake_k8s_client)
+    ctx = ClusterContext(slug="aws-prod", auth_method="exec_plugin")
+
+    component = _component(driver.bootstrap_components(ctx), "aws-ebs-csi-driver")
+
+    assert component.chart_name == "aws-ebs-csi-driver"
+    sa = component.helm_values["controller"]["serviceAccount"]
+    assert sa["name"] == "ebs-csi-controller-sa"
+    assert sa["annotations"]["eks.amazonaws.com/role-arn"] == (
+        f"arn:aws:iam::123456789012:role/{_CLUSTER}-aws-ebs-csi-driver"
+    )
+
+
+def _component(components: list, key: str):
+    for c in components:
+        if c.key == key:
+            return c
+    raise AssertionError(f"{key} component not found")
+
+
 def test_bootstrap_external_dns_sync_policy_scoped_to_cluster(fake_k8s_client) -> None:
     """external-dns must run with policy=sync (the chart defaults to
     upsert-only, which never deletes → orphaned Route53 records on every
@@ -601,7 +646,9 @@ def test_list_certificates_returns_issued_acm_certs() -> None:
     arn = "arn:aws:acm:us-east-1:123456789012:certificate/abc"
     acm = _stub_acm(
         certs=[{"CertificateArn": arn, "DomainName": "api.acme.example", "Status": "ISSUED"}],
-        describe={arn: {"DomainName": "api.acme.example", "Status": "ISSUED", "SubjectAlternativeNames": ["api.acme.example"]}},
+        describe={
+            arn: {"DomainName": "api.acme.example", "Status": "ISSUED", "SubjectAlternativeNames": ["api.acme.example"]}
+        },
     )
     driver = _cert_driver(acm)
 
@@ -620,7 +667,13 @@ def test_list_certificates_multi_san_label() -> None:
     arn = "arn:aws:acm:us-east-1:123456789012:certificate/def"
     acm = _stub_acm(
         certs=[{"CertificateArn": arn, "DomainName": "acme.example", "Status": "ISSUED"}],
-        describe={arn: {"DomainName": "acme.example", "Status": "ISSUED", "SubjectAlternativeNames": ["acme.example", "*.acme.example"]}},
+        describe={
+            arn: {
+                "DomainName": "acme.example",
+                "Status": "ISSUED",
+                "SubjectAlternativeNames": ["acme.example", "*.acme.example"],
+            }
+        },
     )
     driver = _cert_driver(acm)
 
