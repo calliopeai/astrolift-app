@@ -726,6 +726,47 @@ def _record_workflow_run(
     )
 
 
+def _start_deploy_workflow_on_commit(
+    *,
+    deployment: Deployment,
+    workflow_kind: str,
+    workflow_id: str,
+    args: list,
+    organization_id: int | None,
+    registered_app_id: int | None,
+    app_environment_id: int | None,
+    actor: Actor,
+) -> None:
+    """Defer the Temporal workflow start until the surrounding transaction
+    commits (#1025).
+
+    Starting the workflow inside ``transaction.atomic()`` lets a worker pick
+    the run up and read the deployment row before that row is committed, so a
+    freshly-registered app's first deploy can sit ``pending`` forever (the
+    worker saw nothing to act on). Registering the start via ``on_commit``
+    guarantees the row is visible before the workflow runs. The deployment row
+    itself is written by the caller inside the atomic block; only the start and
+    the ``WorkflowRun`` mirror link happen post-commit.
+    """
+
+    def _start() -> None:
+        handle = start_workflow(workflow_kind, args=args, workflow_id=workflow_id)
+        if handle.enqueued:
+            run = _record_workflow_run(
+                kind=workflow_kind,
+                workflow_id=handle.workflow_id,
+                run_id=handle.run_id,
+                organization_id=organization_id,
+                registered_app_id=registered_app_id,
+                app_environment_id=app_environment_id,
+                actor=actor,
+            )
+            deployment.workflow_run = run
+            deployment.save(update_fields=["workflow_run", "updated_at", "version"])
+
+    transaction.on_commit(_start)
+
+
 def _resolve_app_env(app_slug: str, environment_name: str) -> tuple[RegisteredApp, AppEnvironment] | None:
     app = (
         RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
@@ -853,8 +894,10 @@ def _record_approval_vote_and_maybe_start(
     app = deployment.registered_app
     env = deployment.app_environment
     wf_id = _deploy_workflow_id(str(app.guid), str(env.guid))
-    handle = start_workflow(
-        "DeployAppWorkflow",
+    _start_deploy_workflow_on_commit(
+        deployment=deployment,
+        workflow_kind="DeployAppWorkflow",
+        workflow_id=wf_id,
         args=[
             DeployAppInput(
                 registered_app_id=app.pk,
@@ -866,20 +909,11 @@ def _record_approval_vote_and_maybe_start(
                 commit_sha=deployment.commit_sha,
             )
         ],
-        workflow_id=wf_id,
+        organization_id=organization_id,
+        registered_app_id=app.pk,
+        app_environment_id=env.pk,
+        actor=actor,
     )
-    if handle.enqueued:
-        run = _record_workflow_run(
-            kind="DeployAppWorkflow",
-            workflow_id=handle.workflow_id,
-            run_id=handle.run_id,
-            organization_id=organization_id,
-            registered_app_id=app.pk,
-            app_environment_id=env.pk,
-            actor=actor,
-        )
-        deployment.workflow_run = run
-        deployment.save(update_fields=["workflow_run", "updated_at", "version"])
 
 
 # ---------------------------------------------------------------------------
@@ -1319,8 +1353,10 @@ class LifecycleMutation:
 
             if initial_status is Deployment.Status.PENDING:
                 wf_id = _deploy_workflow_id(str(app.guid), str(env.guid))
-                handle = start_workflow(
-                    "DeployAppWorkflow",
+                _start_deploy_workflow_on_commit(
+                    deployment=deployment,
+                    workflow_kind="DeployAppWorkflow",
+                    workflow_id=wf_id,
                     args=[
                         DeployAppInput(
                             registered_app_id=app.pk,
@@ -1331,20 +1367,11 @@ class LifecycleMutation:
                             actor=actor,
                         )
                     ],
-                    workflow_id=wf_id,
+                    organization_id=tenant.organization_id if tenant else None,
+                    registered_app_id=app.pk,
+                    app_environment_id=env.pk,
+                    actor=actor,
                 )
-                if handle.enqueued:
-                    run = _record_workflow_run(
-                        kind="DeployAppWorkflow",
-                        workflow_id=handle.workflow_id,
-                        run_id=handle.run_id,
-                        organization_id=tenant.organization_id if tenant else None,
-                        registered_app_id=app.pk,
-                        app_environment_id=env.pk,
-                        actor=actor,
-                    )
-                    deployment.workflow_run = run
-                    deployment.save(update_fields=["workflow_run", "updated_at", "version"])
 
         return gql_success(deployment_to_type(deployment))
 
@@ -1851,28 +1878,21 @@ class LifecycleMutation:
                 approvals_received=0,
                 promoted_from=prior,
             )
-            handle = start_workflow(
-                "RollbackDeploymentWorkflow",
+            _start_deploy_workflow_on_commit(
+                deployment=new_deploy,
+                workflow_kind="RollbackDeploymentWorkflow",
+                workflow_id=_rollback_workflow_id(str(new_deploy.guid)),
                 args=[
                     RollbackInput(
                         deployment_id=new_deploy.pk,
                         actor=actor,
                     )
                 ],
-                workflow_id=_rollback_workflow_id(str(new_deploy.guid)),
+                organization_id=tenant.organization_id if tenant else None,
+                registered_app_id=new_deploy.registered_app_id,
+                app_environment_id=new_deploy.app_environment_id,
+                actor=actor,
             )
-            if handle.enqueued:
-                run = _record_workflow_run(
-                    kind="RollbackDeploymentWorkflow",
-                    workflow_id=handle.workflow_id,
-                    run_id=handle.run_id,
-                    organization_id=tenant.organization_id if tenant else None,
-                    registered_app_id=new_deploy.registered_app_id,
-                    app_environment_id=new_deploy.app_environment_id,
-                    actor=actor,
-                )
-                new_deploy.workflow_run = run
-                new_deploy.save(update_fields=["workflow_run", "updated_at", "version"])
 
         return gql_success(deployment_to_type(new_deploy))
 
@@ -1924,8 +1944,10 @@ class LifecycleMutation:
 
             if initial_status is Deployment.Status.PENDING:
                 wf_id = _deploy_workflow_id(str(source.registered_app.guid), str(env.guid))
-                handle = start_workflow(
-                    "DeployAppWorkflow",
+                _start_deploy_workflow_on_commit(
+                    deployment=new_deploy,
+                    workflow_kind="DeployAppWorkflow",
+                    workflow_id=wf_id,
                     args=[
                         DeployAppInput(
                             registered_app_id=source.registered_app_id,
@@ -1936,20 +1958,11 @@ class LifecycleMutation:
                             actor=actor,
                         )
                     ],
-                    workflow_id=wf_id,
+                    organization_id=tenant.organization_id if tenant else None,
+                    registered_app_id=source.registered_app_id,
+                    app_environment_id=source.app_environment_id,
+                    actor=actor,
                 )
-                if handle.enqueued:
-                    run = _record_workflow_run(
-                        kind="DeployAppWorkflow",
-                        workflow_id=handle.workflow_id,
-                        run_id=handle.run_id,
-                        organization_id=tenant.organization_id if tenant else None,
-                        registered_app_id=source.registered_app_id,
-                        app_environment_id=source.app_environment_id,
-                        actor=actor,
-                    )
-                    new_deploy.workflow_run = run
-                    new_deploy.save(update_fields=["workflow_run", "updated_at", "version"])
 
         return gql_success(deployment_to_type(new_deploy))
 

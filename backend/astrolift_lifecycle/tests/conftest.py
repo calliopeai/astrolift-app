@@ -24,6 +24,7 @@ from typing import Any
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.db import transaction
 
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization, Project, Team
@@ -193,4 +194,15 @@ def temporal_recorder(monkeypatch, settings):
     monkeypatch.setattr("astrolift_lifecycle.schema.mutations.start_workflow", _start)
     monkeypatch.setattr("astrolift_lifecycle.schema.mutations.signal_workflow", _signal)
     monkeypatch.setattr("astrolift_lifecycle.schema.mutations.terminate_workflow", _terminate)
+
+    # Deploy starts are now registered via ``transaction.on_commit`` so the
+    # worker never races an uncommitted deployment row (#1025). Under the
+    # ``django_db`` outer transaction those callbacks would otherwise never
+    # fire, so run them at registration time to model the production commit —
+    # this keeps the recorder observing exactly the starts a real commit would
+    # enqueue.
+    def _run_on_commit(func, using=None):
+        func()
+
+    monkeypatch.setattr(transaction, "on_commit", _run_on_commit)
     return rec

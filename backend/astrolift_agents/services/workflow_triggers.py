@@ -49,8 +49,12 @@ from workflows.models import WorkflowDefinition, WorkflowInstance
 
 log = logging.getLogger(__name__)
 
-# Temporal workflow type for agent workflow definitions.
-AGENT_WORKFLOW_TYPE = "AgentWorkflowDefinitionRun"
+# Temporal workflow type for agent workflow definitions. Must match the name
+# the worker registers (`@workflow.defn(name=...)` in
+# astrolift_workflows/workflows/workflow_definition_run.py); a name no worker
+# registers leaves the started run unclaimed and the workflow never executes
+# (#1025).
+AGENT_WORKFLOW_TYPE = "WorkflowDefinitionRunWorkflow"
 
 
 def trigger_workflow_instance(
