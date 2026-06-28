@@ -109,7 +109,11 @@ def _normalize_container(
     healthcheck_kind = c.healthcheck_kind
     healthcheck_value = c.healthcheck_value
     healthcheck_port = c.healthcheck_port
-    if healthcheck_kind == "none":
+    # Only default an http healthcheck onto a container that actually serves
+    # a port. A port-less worker (e.g. a background consumer / queue poller)
+    # has nothing to probe over http — defaulting one fabricates a port and
+    # CrashLoops the pod on a probe that can never succeed (#1033).
+    if healthcheck_kind == "none" and c.port > 0:
         healthcheck_kind = _apply(
             applied,
             f"workload.{workload_name}.containers[{c.name}].healthcheck.kind",

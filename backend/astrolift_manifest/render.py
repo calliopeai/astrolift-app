@@ -637,11 +637,16 @@ def _render_probe(c: ContainerManifest) -> dict[str, Any] | None:
     }
     port = c.healthcheck_port if c.healthcheck_port is not None else c.port
     if c.healthcheck_kind == "http":
+        # No http probe without a real port to hit. A port-less container
+        # would otherwise get an httpGet on a fabricated port and CrashLoop
+        # on a probe that can never succeed (#1033).
+        if not port:
+            return None
         return {
             **base,
             "httpGet": {
                 "path": c.healthcheck_value or "/health",
-                "port": int(port) if port else 80,
+                "port": int(port),
                 "scheme": "HTTP",
             },
         }

@@ -272,6 +272,24 @@ def test_no_probe_when_kind_is_none():
     assert "readinessProbe" not in container
 
 
+def test_no_http_probe_when_container_has_no_port():
+    # #1033: a port-less container with an http healthcheck must get NO
+    # probe — an httpGet on a fabricated port would CrashLoop the pod.
+    out = _render((_deployment_workload(containers=(_container(port=0, healthcheck_kind="http"),)),))
+    container = next(r for r in out if r["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
+    assert "livenessProbe" not in container
+    assert "readinessProbe" not in container
+
+
+def test_http_probe_still_rendered_when_container_has_port():
+    # Regression guard for #1033: a real port still gets its http probe
+    # (the guard is on port==0, not all http probes).
+    out = _render((_deployment_workload(containers=(_container(port=8080, healthcheck_kind="http"),)),))
+    container = next(r for r in out if r["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
+    assert container["livenessProbe"]["httpGet"]["port"] == 8080
+    assert container["readinessProbe"]["httpGet"]["port"] == 8080
+
+
 # ---- Env / command / args ---------------------------------------------
 
 

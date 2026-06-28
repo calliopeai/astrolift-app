@@ -303,6 +303,27 @@ command = ["/bin/run"]
     assert "collides" in str(exc.value)
 
 
+def test_parse_rejects_duplicate_workload_names():
+    """Two [[workloads]] sharing a name would render onto one Deployment
+    and the set-based dedup would silently drop one. Reject at parse time,
+    flagging the offending row (#1033)."""
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+"""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(toml)
+    assert "duplicate workload name" in str(exc.value)
+    assert exc.value.path == "workloads[1].name"
+
+
 def test_jobs_env_pairs_propagate():
     toml = """
 name = "hello"

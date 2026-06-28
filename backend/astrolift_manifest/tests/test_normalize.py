@@ -98,3 +98,45 @@ def test_manifest_hash_changes_with_content():
     h1 = manifest_hash(normalize(raw1).serialized)
     h2 = manifest_hash(normalize(raw2).serialized)
     assert h1 != h2
+
+
+def test_port_less_container_keeps_no_healthcheck():
+    # #1033: a container with no port must NOT get the default http
+    # healthcheck — there is nothing to probe over http, and a defaulted
+    # http probe would CrashLoop a port-less worker.
+    raw = RawManifest(
+        name="hello",
+        workloads=(
+            WorkloadManifest(
+                name="worker",
+                kind="deployment",
+                containers=(ContainerManifest(name="app", is_primary=True, port=0),),
+            ),
+        ),
+    )
+    n = normalize(raw)
+    c = n.workloads[0].containers[0]
+    assert c.healthcheck_kind == "none"
+    assert c.healthcheck_value == ""
+    assert c.healthcheck_port is None
+    assert "workload.worker.containers[app].healthcheck.kind" not in n.defaults_applied
+
+
+def test_ported_container_gets_default_http_healthcheck():
+    # Regression guard for #1033: a real port still receives the default
+    # http healthcheck (the fix is gated on port==0, not all containers).
+    raw = RawManifest(
+        name="hello",
+        workloads=(
+            WorkloadManifest(
+                name="web",
+                kind="deployment",
+                containers=(ContainerManifest(name="app", is_primary=True, port=8080),),
+            ),
+        ),
+    )
+    n = normalize(raw)
+    c = n.workloads[0].containers[0]
+    assert c.healthcheck_kind == "http"
+    assert c.healthcheck_value == "/health"
+    assert "workload.web.containers[app].healthcheck.kind" in n.defaults_applied

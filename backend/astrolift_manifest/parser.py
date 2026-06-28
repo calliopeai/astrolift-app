@@ -82,6 +82,19 @@ def parse_raw(toml_text: str) -> RawManifest:
         _parse_workload(item, f"workloads[{i}]") for i, item in enumerate(data.get("workloads", []))
     )
 
+    # Reject duplicate names within [[workloads]]. Two workloads sharing a
+    # name would render onto one Deployment/Service and the set-based dedup
+    # below would silently drop one — a footgun. Flag the offending row so
+    # the UI can point at it (#1033).
+    seen_workload_names: set[str] = set()
+    for i, w in enumerate(workloads):
+        if w.name in seen_workload_names:
+            raise ManifestError(
+                f"duplicate workload name {w.name!r}",
+                path=f"workloads[{i}].name",
+            )
+        seen_workload_names.add(w.name)
+
     # ``[[jobs]]`` is a shorthand for a single-container cronjob.
     # Desugar into the same WorkloadManifest shape so downstream
     # rendering / validation only ever sees one workload format.
@@ -346,7 +359,7 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
     run_family = str(d.get("run_family", "task")).lower()
     if kind == "agent" and run_family not in _VALID_AGENT_RUN_FAMILY:
         raise ManifestError(
-            "agent run_family must be one of " f"{sorted(_VALID_AGENT_RUN_FAMILY)}, got {run_family!r}",
+            f"agent run_family must be one of {sorted(_VALID_AGENT_RUN_FAMILY)}, got {run_family!r}",
             path=f"{path}.run_family",
         )
 
