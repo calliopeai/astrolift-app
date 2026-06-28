@@ -78,26 +78,24 @@ def _static_workloads(manifest) -> list[Any]:
 
 def _cdn_backed_public_workloads(manifest) -> list[Any]:
     """Public workloads whose external surface is a platform-written
-    ``CNAME -> CloudFront`` record + a us-east-1 ACM cert: ``static_site``,
-    and ``faas`` with a public Function URL fronted by CloudFront (#987).
+    ``CNAME -> CloudFront`` record + a us-east-1 ACM cert: ``static_site``.
 
-    Both topologies are container-less and own no Ingress, so external-dns
-    never writes their record -- the platform writes it explicitly. The cert
-    + DNS activities below cover both via this shared filter so the cert/DNS
-    logic isn't duplicated per topology. ``faas`` additionally requires
-    ``faas_public`` (the Function-URL+cdn switch); ``is_public`` alone (which
-    drives the hostname) would otherwise produce a CNAME pointing at a cdn row
-    that was never created."""
+    A static_site is container-less and owns no Ingress, so external-dns never
+    writes its record -- the platform writes it explicitly. The cert + DNS
+    activities below cover it via this shared filter.
+
+    Public ``faas`` workloads are NOT cdn-backed (#1035 pivot): their invoke
+    surface is an API Gateway HTTP API served over its ``execute-api`` URL,
+    not a CloudFront distribution, so they need no us-east-1 cert and no
+    ``CNAME -> CloudFront`` record. (A faas custom domain is a fast-follow via
+    apigatewayv2 domain names + a REGIONAL cert, not this CloudFront path.)"""
     if manifest is None:
         return []
     out: list[Any] = []
     for w in manifest.workloads:
         if not getattr(w, "is_public", False):
             continue
-        kind = getattr(w, "kind", "")
-        if kind == "static_site":
-            out.append(w)
-        elif kind == "faas" and getattr(w, "faas_public", False):
+        if getattr(w, "kind", "") == "static_site":
             out.append(w)
     return out
 
