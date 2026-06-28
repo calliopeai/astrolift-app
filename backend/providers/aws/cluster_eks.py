@@ -1169,7 +1169,7 @@ class EKSClusterDriver(ClusterDriver):
                 ),
                 # The controller SA is IRSA-bound so the driver can call the EC2
                 # volume APIs. Name pinned to the chart default (ebs-csi-controller-sa)
-                # so it matches the kube-system:ebs-csi-controller-sa subject the
+                # so it matches the astrolift-system:ebs-csi-controller-sa subject the
                 # platform scopes the IRSA trust to (IRSADriver.provision_ebs_csi_role).
                 helm_values={
                     "controller": {

@@ -35,10 +35,13 @@ from _sdk.identity import IdentityBinding, WorkloadIdentityDriver
 from aws._errors import NotFoundError, map_client_error
 
 # The aws-ebs-csi-driver Helm chart runs its controller as the
-# ``ebs-csi-controller-sa`` ServiceAccount in ``kube-system`` (#1024). The
-# self-provisioned IRSA trust must bind that exact subject so the controller
-# can assume the role via the cluster's OIDC provider.
-EBS_CSI_NAMESPACE = "kube-system"
+# ``ebs-csi-controller-sa`` ServiceAccount in the platform bootstrap
+# namespace ``astrolift-system`` (where install_cluster_prereqs deploys the
+# HelmRelease) — NOT kube-system (#1024). The self-provisioned IRSA trust
+# must bind that exact subject (system:serviceaccount:astrolift-system:
+# ebs-csi-controller-sa) or the controller's AssumeRoleWithWebIdentity 403s
+# and EBS CreateVolume fails, leaving StatefulSet PVCs Pending.
+EBS_CSI_NAMESPACE = "astrolift-system"
 EBS_CSI_CONTROLLER_SA = "ebs-csi-controller-sa"
 # AWS-managed policy granting the EBS CSI controller the EC2 volume
 # create/attach/detach/delete permissions it needs to provision PVs.

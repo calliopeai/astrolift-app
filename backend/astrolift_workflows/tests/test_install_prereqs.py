@@ -216,7 +216,7 @@ def test_workflow_modules_import_clean():
 # #1024 shipped IRSADriver.provision_ebs_csi_role but never called it, so the
 # EBS-CSI controller SA pointed at a role nothing created and PVCs hung. These
 # tests pin the wiring: the install flow mints the role (scoped to the
-# discovered OIDC issuer + the kube-system:ebs-csi-controller-sa subject) when
+# discovered OIDC issuer + the astrolift-system:ebs-csi-controller-sa subject) when
 # the component is enabled, is idempotent, and is a no-op when it's disabled.
 
 import json  # noqa: E402
@@ -318,7 +318,7 @@ def _patch_driver_and_issuer(monkeypatch, iam: _RecordingIam) -> None:
 def test_provision_ebs_csi_role_minted_when_enabled(monkeypatch):
     """When the aws-ebs-csi-driver component is selected, the helper discovers
     the OIDC issuer and mints the controller role bound to that issuer +
-    kube-system:ebs-csi-controller-sa, with AmazonEBSCSIDriverPolicy attached."""
+    astrolift-system:ebs-csi-controller-sa, with AmazonEBSCSIDriverPolicy attached."""
     from astrolift_workflows.activities.install_prereqs import _provision_ebs_csi_irsa_role
 
     iam = _RecordingIam()
@@ -335,7 +335,7 @@ def test_provision_ebs_csi_role_minted_when_enabled(monkeypatch):
     assert cluster.saved_fields == ["auth_config"]
     # Trust scoped to the discovered issuer + the chart's controller SA.
     cond = iam.roles[role]["trust"]["Statement"][0]["Condition"]["StringEquals"]
-    assert cond[f"{_DISCOVERED_ISSUER}:sub"] == "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+    assert cond[f"{_DISCOVERED_ISSUER}:sub"] == "system:serviceaccount:astrolift-system:ebs-csi-controller-sa"
     assert cond[f"{_DISCOVERED_ISSUER}:aud"] == "sts.amazonaws.com"
     assert "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy" in iam.attached[role]
 
@@ -354,7 +354,7 @@ def test_provision_ebs_csi_role_idempotent(monkeypatch):
 
     assert a == b
     cond = iam.roles["astrolift-eks-aws-ebs-csi-driver"]["trust"]["Statement"][0]["Condition"]["StringEquals"]
-    assert cond[f"{_DISCOVERED_ISSUER}:sub"] == "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+    assert cond[f"{_DISCOVERED_ISSUER}:sub"] == "system:serviceaccount:astrolift-system:ebs-csi-controller-sa"
 
 
 def test_provision_ebs_csi_role_noop_when_disabled(monkeypatch):

@@ -375,14 +375,14 @@ def _ebs_driver(iam: _RecordingIam) -> IRSADriver:
 
 def test_provision_ebs_csi_role_trust_and_managed_policy() -> None:
     """Self-provisions a role whose OIDC trust is scoped to
-    kube-system:ebs-csi-controller-sa and attaches AmazonEBSCSIDriverPolicy."""
+    astrolift-system:ebs-csi-controller-sa and attaches AmazonEBSCSIDriverPolicy."""
     iam = _RecordingIam()
     arn = _ebs_driver(iam).provision_ebs_csi_role(_EBS_CSI_ROLE)
 
     assert arn == f"arn:aws:iam::123456789012:role/{_EBS_CSI_ROLE}"
 
     cond = iam.roles[_EBS_CSI_ROLE]["trust"]["Statement"][0]["Condition"]["StringEquals"]
-    assert cond[f"{_ISSUER}:sub"] == "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+    assert cond[f"{_ISSUER}:sub"] == "system:serviceaccount:astrolift-system:ebs-csi-controller-sa"
     assert cond[f"{_ISSUER}:aud"] == "sts.amazonaws.com"
 
     assert "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy" in iam.attached[_EBS_CSI_ROLE]
@@ -398,4 +398,4 @@ def test_provision_ebs_csi_role_idempotent() -> None:
 
     assert a == b
     cond = iam.roles[_EBS_CSI_ROLE]["trust"]["Statement"][0]["Condition"]["StringEquals"]
-    assert cond[f"{_ISSUER}:sub"] == "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+    assert cond[f"{_ISSUER}:sub"] == "system:serviceaccount:astrolift-system:ebs-csi-controller-sa"
