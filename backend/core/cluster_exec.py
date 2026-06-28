@@ -182,8 +182,12 @@ class K8sExecBackend(ExecBackend):
         namespace = resolved["namespace"]
 
         try:
-            driver = _driver_for(cluster)
-            auth = _auth_for(cluster)
+            # Driver + auth resolution constructs config dataclasses and
+            # reads cluster rows (sync ORM), so it must not run on the event
+            # loop directly — wrap in sync_to_async or Django's async guard
+            # raises "cannot call this from an async context" (#1040).
+            driver = await sync_to_async(_driver_for)(cluster)
+            auth = await sync_to_async(_auth_for)(cluster)
         except Exception as exc:  # noqa: BLE001
             logger.exception("cluster_exec: driver resolution failed")
             await send_stderr(

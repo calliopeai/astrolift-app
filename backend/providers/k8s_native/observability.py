@@ -30,7 +30,11 @@ from __future__ import annotations
 import asyncio
 import base64
 import contextlib
+import json
+import logging
+import queue
 import tempfile
+import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Protocol
@@ -44,6 +48,8 @@ from _sdk.cluster import (
     PodInfo,
     PodLogLine,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ClusterAuthError(Exception):
@@ -544,3 +550,143 @@ def default_log_backend() -> LogBackend:
     except ImportError:
         return StubLogBackend()
     return LiveLogBackend()
+
+
+# ---- interactive exec (#1040) ---------------------------------------
+#
+# `kubectl exec -it` equivalent: a bidirectional streaming session over
+# the apiserver exec channel. The kubernetes WSClient is blocking, so a
+# daemon drain thread pumps stdout/stderr into thread-safe queues and the
+# async methods bridge back to the event loop via run_in_executor. This
+# is the leaf the exec WS relay drives (core.schema.exec_ws →
+# core.cluster_exec.K8sExecBackend); see that module for the frame protocol.
+
+# kubernetes exec channels: 0=stdin 1=stdout 2=stderr 3=error(status) 4=resize.
+_EXEC_ERROR_CHANNEL = 3
+_EXEC_RESIZE_CHANNEL = 4
+
+
+class InteractiveExecSession:
+    """Async-native handle over a blocking kubernetes ``WSClient`` exec
+    stream. Mirrors what ``core.cluster_exec._BackendSession`` consumes:
+    ``read_stdout`` / ``read_stderr`` raise ``StopAsyncIteration`` at EOF,
+    ``wait_exit`` resolves to the remote exit code, and ``write_stdin`` /
+    ``resize`` / ``close`` push control upstream."""
+
+    def __init__(self, resp: Any) -> None:
+        self._resp = resp
+        self._stdout_q: queue.Queue = queue.Queue()
+        self._stderr_q: queue.Queue = queue.Queue()
+        self._exit_q: queue.Queue = queue.Queue()
+        self._closed = threading.Event()
+        self._drain = threading.Thread(target=self._drain_loop, daemon=True)
+        self._drain.start()
+
+    def _drain_loop(self) -> None:
+        try:
+            while self._resp.is_open() and not self._closed.is_set():
+                self._resp.update(timeout=1)
+                if self._resp.peek_stdout():
+                    self._stdout_q.put(self._resp.read_stdout())
+                if self._resp.peek_stderr():
+                    self._stderr_q.put(self._resp.read_stderr())
+        except Exception:
+            logger.exception("interactive_exec: drain loop failed")
+        finally:
+            self._exit_q.put(self._exit_code())
+            # Sentinels unblock any reader parked on an empty queue.
+            self._stdout_q.put(None)
+            self._stderr_q.put(None)
+
+    def _exit_code(self) -> int:
+        try:
+            payload = self._resp.read_channel(_EXEC_ERROR_CHANNEL)
+        except Exception:
+            return 0
+        if not payload:
+            return 0
+        try:
+            parsed = json.loads(payload)
+        except (ValueError, TypeError):
+            return 0
+        if parsed.get("status") == "Success":
+            return 0
+        if parsed.get("status") == "Failure":
+            for cause in parsed.get("details", {}).get("causes", []) or []:
+                if cause.get("reason") == "ExitCode":
+                    try:
+                        return int(cause.get("message", "1"))
+                    except (ValueError, TypeError):
+                        return 1
+            return 1
+        return 0
+
+    async def _aget(self, q: queue.Queue) -> Any:
+        return await asyncio.get_running_loop().run_in_executor(None, q.get)
+
+    async def read_stdout(self) -> str:
+        data = await self._aget(self._stdout_q)
+        if data is None:
+            raise StopAsyncIteration
+        return data
+
+    async def read_stderr(self) -> str:
+        data = await self._aget(self._stderr_q)
+        if data is None:
+            raise StopAsyncIteration
+        return data
+
+    async def write_stdin(self, data: str) -> None:
+        await asyncio.get_running_loop().run_in_executor(
+            None, self._resp.write_stdin, data
+        )
+
+    async def resize(self, *, rows: int, cols: int) -> None:
+        payload = json.dumps({"Height": int(rows), "Width": int(cols)})
+        await asyncio.get_running_loop().run_in_executor(
+            None, self._resp.write_channel, _EXEC_RESIZE_CHANNEL, payload
+        )
+
+    async def wait_exit(self) -> int:
+        return int(await self._aget(self._exit_q))
+
+    async def close(self) -> None:
+        self._closed.set()
+        with contextlib.suppress(Exception):
+            await asyncio.get_running_loop().run_in_executor(None, self._resp.close)
+
+
+def open_interactive_exec(
+    *,
+    auth: ClusterAuth,
+    namespace: str,
+    pod_name: str,
+    container: str,
+    command: list[str],
+    tty: bool = True,
+) -> InteractiveExecSession:
+    """Open a streaming exec session into ``pod_name`` and return an
+    :class:`InteractiveExecSession`. Cloud-neutral — ``build_api_client``
+    resolves the per-provider auth (EKS/AKS/GKE/native). Synchronous; the
+    caller invokes it via ``run_in_executor`` off the event loop."""
+    try:
+        from kubernetes import client as k8s_client
+        from kubernetes.stream import stream
+    except ImportError as exc:  # pragma: no cover
+        raise ClusterAuthError("kubernetes python client is not installed") from exc
+
+    api_client = build_api_client(auth)
+    core_v1 = k8s_client.CoreV1Api(api_client)
+    resp = stream(
+        core_v1.connect_get_namespaced_pod_exec,
+        pod_name,
+        namespace,
+        command=list(command) or ["sh"],
+        container=container or None,
+        stderr=True,
+        stdin=True,
+        stdout=True,
+        tty=tty,
+        _preload_content=False,
+    )
+    return InteractiveExecSession(resp)

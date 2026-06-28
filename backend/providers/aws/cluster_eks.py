@@ -55,10 +55,10 @@ from _sdk.cluster import (
     NamespaceState,
     PodInfo,
     PodLogLine,
-    StorageClassInfo,
     PortForwardSession,
     RegionInfo,
     RolloutResult,
+    StorageClassInfo,
     TeardownReport,
     WorkloadStatus,
     classify_apply_error,
@@ -735,6 +735,33 @@ class EKSClusterDriver(ClusterDriver):
         if task_id:
             kwargs["task_id"] = task_id
         return self._pod_backend.list_pods(**kwargs)
+
+    @driver_op(cloud="aws", driver="cluster")
+    def interactive_exec(
+        self,
+        *,
+        auth: ClusterAuth,
+        namespace: str,
+        pod_name: str,
+        container: str,
+        command: list[str],
+        tty: bool = True,
+    ) -> Any:
+        """Open a streaming exec session on the EKS cluster (#1040).
+
+        Materializes ``exec_plugin`` auth into a real bearer token (as
+        ``list_pods``) before delegating to the shared k8s_native exec
+        opener."""
+        from providers.k8s_native.observability import open_interactive_exec
+
+        return open_interactive_exec(
+            auth=self._resolve_eks_auth(auth),
+            namespace=namespace,
+            pod_name=pod_name,
+            container=container,
+            command=command,
+            tty=tty,
+        )
 
     @driver_op(cloud="aws", driver="cluster")
     def stream_logs(
@@ -1791,7 +1818,7 @@ class EKSClusterDriver(ClusterDriver):
         try:
             paginator = acm.get_paginator("list_certificates")
             pages = paginator.paginate(CertificateStatuses=["ISSUED"])
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning(
                 "list_certificates: ListCertificates failed region=%s: %s",
                 self._config.region,
@@ -1816,7 +1843,7 @@ class EKSClusterDriver(ClusterDriver):
                         label = f"{domain_name} (+{len(sans) - 1})"
                     else:
                         label = domain_name
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     log.warning(
                         "list_certificates: DescribeCertificate failed arn=%s: %s",
                         arn,
