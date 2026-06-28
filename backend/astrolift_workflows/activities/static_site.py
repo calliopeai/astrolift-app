@@ -294,9 +294,10 @@ def _ensure_cloudfront_cert_sync(deployment_id: int) -> dict[str, Any]:
                 ttl=300,
             )
 
+    # Self-bounded poll (≈6m) runs well under the activity's start_to_close,
+    # so no mid-loop heartbeat is needed — and calling activity.heartbeat()
+    # from this sync_to_async thread raises "no running event loop".
     for _ in range(_CERT_POLL_ATTEMPTS):
-        if activity.in_activity():
-            activity.heartbeat()
         status = cf_dns.poll_cert_status(zone, cert_id).get("status")
         if status == "issued":
             _store("cloudfront_certificate_arn", cert_id)

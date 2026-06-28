@@ -148,8 +148,9 @@ class DeployAppWorkflow:
             await workflow.execute_activity(
                 ensure_cloudfront_cert,
                 deployment_id,
+                # Self-bounded internal cert poll (~6m) < start_to_close; no
+                # heartbeat_timeout (the sync poll can't heartbeat from its thread).
                 start_to_close_timeout=_BUILD_TIMEOUT,
-                heartbeat_timeout=timedelta(minutes=2),
                 retry_policy=_STANDARD_RETRY,
             )
             # Static-site topology (#1010): a static_site workload implies an
