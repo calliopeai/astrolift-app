@@ -104,6 +104,132 @@ def test_postgres_config_uses_pinned_networking_no_discovery():
     assert cfg.multi_az_default is True
 
 
+# ---- managed_config_for: the non-VPC kinds wired in #1037 -------------
+#
+# plugin.py registers managed-service drivers for these (kind, variant)
+# pairs but managed_config_for had no branch, so provisioning died with
+# "no managed-service config builder for kind=<X>". One falsifiable guard
+# per kind: right Config type, region resolved, one override honored.
+
+
+def test_queue_config_defaults_and_overrides():
+    from aws.managed.queue_sqs import SQSConfig
+
+    cfg = managed_config_for("aws", _cluster(), kind="queue")
+    assert isinstance(cfg, SQSConfig)
+    assert cfg.region == "us-west-2"
+    assert cfg.queue_name_prefix == "astrolift"
+    assert cfg.fifo_default is False
+
+    pinned = managed_config_for(
+        "aws",
+        _cluster({"queue_name_prefix": "acme", "sqs_fifo_default": True}),
+        kind="queue",
+    )
+    assert pinned.queue_name_prefix == "acme"
+    assert pinned.fifo_default is True
+
+
+def test_search_config_defaults_and_overrides():
+    from aws.managed.search_opensearch import OpenSearchSearchConfig
+
+    cfg = managed_config_for("aws", _cluster(), kind="search")
+    assert isinstance(cfg, OpenSearchSearchConfig)
+    assert cfg.region == "us-west-2"
+    assert cfg.domain_name_prefix == "astrolift"
+    assert cfg.engine_version == "OpenSearch_2.11"
+
+    pinned = managed_config_for(
+        "aws",
+        _cluster({"search_domain_name_prefix": "acme", "opensearch_engine_version": "OpenSearch_2.13"}),
+        kind="search",
+    )
+    assert pinned.domain_name_prefix == "acme"
+    assert pinned.engine_version == "OpenSearch_2.13"
+
+
+def test_vector_index_config_is_distinct_from_search():
+    """search and vector_index resolve to SEPARATE Config types from
+    SEPARATE modules — not two variants of one class."""
+    from aws.managed.search_opensearch import OpenSearchSearchConfig
+    from aws.managed.vector_opensearch import OpenSearchVectorConfig
+
+    cfg = managed_config_for("aws", _cluster(), kind="vector_index")
+    assert isinstance(cfg, OpenSearchVectorConfig)
+    assert not isinstance(cfg, OpenSearchSearchConfig)
+    assert cfg.region == "us-west-2"
+    assert cfg.domain_name_prefix == "astrolift-vec"
+    assert cfg.instance_count_default == 1
+
+    pinned = managed_config_for(
+        "aws",
+        _cluster({"vector_domain_name_prefix": "acme-vec", "vector_instance_count_default": 3}),
+        kind="vector_index",
+    )
+    assert pinned.domain_name_prefix == "acme-vec"
+    assert pinned.instance_count_default == 3
+
+
+def test_email_config_defaults_and_overrides():
+    from aws.managed.email_ses import SESEmailConfig
+
+    cfg = managed_config_for("aws", _cluster(), kind="email")
+    assert isinstance(cfg, SESEmailConfig)
+    assert cfg.region == "us-west-2"
+    assert cfg.identity_prefix == "astrolift"
+    assert cfg.base_domain == ""
+
+    pinned = managed_config_for(
+        "aws",
+        _cluster({"ses_identity_prefix": "acme", "base_domain": "mail.acme.test"}),
+        kind="email",
+    )
+    assert pinned.identity_prefix == "acme"
+    assert pinned.base_domain == "mail.acme.test"
+
+
+def test_model_endpoint_config_defaults_and_overrides():
+    from aws.managed.model_endpoint_bedrock import AmazonBedrockConfig
+
+    cfg = managed_config_for("aws", _cluster(), kind="model_endpoint")
+    assert isinstance(cfg, AmazonBedrockConfig)
+    assert cfg.region == "us-west-2"
+    assert cfg.default_model_id == "anthropic.claude-3-haiku-20240307-v1:0"
+    assert cfg.invocation_log_retention_days == 30
+
+    pinned = managed_config_for(
+        "aws",
+        _cluster(
+            {
+                "bedrock_default_model_id": "anthropic.claude-3-5-sonnet-20240620-v1:0",
+                "bedrock_invocation_log_retention_days": 90,
+            },
+        ),
+        kind="model_endpoint",
+    )
+    assert pinned.default_model_id == "anthropic.claude-3-5-sonnet-20240620-v1:0"
+    assert pinned.invocation_log_retention_days == 90
+
+
+def test_time_series_config_defaults_and_overrides():
+    from aws.managed.timeseries_timestream import TimestreamConfig
+
+    cfg = managed_config_for("aws", _cluster(), kind="time_series")
+    assert isinstance(cfg, TimestreamConfig)
+    assert cfg.region == "us-west-2"
+    assert cfg.database_name_prefix == "astrolift"
+    assert cfg.table_name_default == "metrics"
+    assert cfg.kms_key_id == ""
+
+    pinned = managed_config_for(
+        "aws",
+        _cluster({"timestream_table_name_default": "events", "kms_key_id": "arn:aws:kms:::key/abc"}),
+        kind="time_series",
+    )
+    assert pinned.table_name_default == "events"
+    assert pinned.kms_key_id == "arn:aws:kms:::key/abc"
+
+
 def test_unknown_kind_raises():
     import pytest
     from core.cluster_observability import ClusterObservabilityError

@@ -437,6 +437,84 @@ def managed_config_for(
             snapshot_retention_days=int(pc.get("snapshot_retention_days", 7)),
         )
 
+    if kind == "queue":
+        from aws.managed.queue_sqs import SQSConfig
+
+        return SQSConfig(
+            region=region,
+            queue_name_prefix=str(pc.get("queue_name_prefix", "astrolift")),
+            default_visibility_timeout_seconds=int(
+                pc.get("sqs_default_visibility_timeout_seconds", 30),
+            ),
+            default_message_retention_seconds=int(
+                pc.get("sqs_default_message_retention_seconds", 4 * 86400),
+            ),
+            fifo_default=bool(pc.get("sqs_fifo_default", False)),
+        )
+
+    if kind == "search":
+        from aws.managed.search_opensearch import OpenSearchSearchConfig
+
+        return OpenSearchSearchConfig(
+            region=region,
+            domain_name_prefix=str(pc.get("search_domain_name_prefix", "astrolift")),
+            engine_version=str(pc.get("opensearch_engine_version", "OpenSearch_2.11")),
+            deletion_protection_default=bool(
+                pc.get("deletion_protection_default", True),
+            ),
+        )
+
+    if kind == "vector_index":
+        from aws.managed.vector_opensearch import OpenSearchVectorConfig
+
+        return OpenSearchVectorConfig(
+            region=region,
+            domain_name_prefix=str(pc.get("vector_domain_name_prefix", "astrolift-vec")),
+            engine_version=str(pc.get("opensearch_engine_version", "OpenSearch_2.11")),
+            instance_count_default=int(pc.get("vector_instance_count_default", 1)),
+            deletion_protection_default=bool(
+                pc.get("deletion_protection_default", True),
+            ),
+        )
+
+    if kind == "email":
+        from aws.managed.email_ses import SESEmailConfig
+
+        return SESEmailConfig(
+            region=region,
+            identity_prefix=str(pc.get("ses_identity_prefix", "astrolift")),
+            base_domain=str(pc.get("base_domain", "")),
+            deletion_protection_default=bool(
+                pc.get("deletion_protection_default", True),
+            ),
+        )
+
+    if kind == "model_endpoint":
+        from aws.managed.model_endpoint_bedrock import AmazonBedrockConfig
+
+        return AmazonBedrockConfig(
+            region=region,
+            default_model_id=str(
+                pc.get("bedrock_default_model_id", "anthropic.claude-3-haiku-20240307-v1:0"),
+            ),
+            invocation_log_retention_days=int(
+                pc.get("bedrock_invocation_log_retention_days", 30),
+            ),
+        )
+
+    if kind == "time_series":
+        from aws.managed.timeseries_timestream import TimestreamConfig
+
+        return TimestreamConfig(
+            region=region,
+            database_name_prefix=str(pc.get("database_name_prefix", "astrolift")),
+            table_name_default=str(pc.get("timestream_table_name_default", "metrics")),
+            deletion_protection_default=bool(
+                pc.get("deletion_protection_default", True),
+            ),
+            kms_key_id=str(pc.get("kms_key_id", "")),
+        )
+
     raise ClusterObservabilityError(
         f"cluster {cluster.slug}: no managed-service config builder for "
         f"kind={kind!r} (plugin={plugin_slug!r})",
