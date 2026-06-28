@@ -26,8 +26,11 @@ CORE_LOOP_MUTATIONS = [
     "runWorkflowDefinition",
     "cancelTask",
 ]
-# managedService (singular) is intentionally omitted: only the list field
-# managedServices is exposed on the assembled schema today.
+# astroliftManagedServices is the managed-services list root query (the
+# CLI-facing field). There is no by-id singular managed-service root query, so
+# only the list field is guarded. The bare token "managedServices" is NOT used
+# here: it also appears as a nested field on unrelated types, so it would match
+# even if the root query were dropped — exactly the regression this guards.
 CORE_LOOP_QUERIES = [
     "astroliftDeployment",
     "astroliftDeployments",
@@ -36,7 +39,7 @@ CORE_LOOP_QUERIES = [
     "agentTask",
     "agentTasks",
     "agentTaskLogs",
-    "managedServices",
+    "astroliftManagedServices",
 ]
 
 
