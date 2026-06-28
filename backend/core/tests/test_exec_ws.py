@@ -529,3 +529,17 @@ async def test_dispatcher_replays_buffered_lines(monkeypatch) -> None:
     # ring buffer holds every stdout chunk in order
     assert {"type": "stdout", "data": "line 1\n"} in lines
     assert {"type": "stdout", "data": "line 2\n"} in lines
+
+
+def test_bearer_from_scope_extracts_token() -> None:
+    """_bearer_from_scope pulls the plaintext token out of an ASGI scope's
+    Authorization header (CLI exec path) and ignores non-bearer schemes."""
+    from core.schema.ws_auth import _bearer_from_scope
+
+    scope = {"headers": [(b"authorization", b"Bearer alft_secrettoken")]}
+    assert _bearer_from_scope(scope) == "alft_secrettoken"
+    # Case-insensitive scheme, whitespace trimmed.
+    assert _bearer_from_scope({"headers": [(b"authorization", b"bearer  x ")]}) == "x"
+    # No header / wrong scheme → empty.
+    assert _bearer_from_scope({"headers": []}) == ""
+    assert _bearer_from_scope({"headers": [(b"authorization", b"Basic abc")]}) == ""

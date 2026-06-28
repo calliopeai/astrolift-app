@@ -96,6 +96,62 @@ def _resolve_user_from_sessionid(session_key: str):
         return AnonymousUser(), {}
 
 
+def _bearer_from_scope(scope_or_request: Any) -> str:
+    """Pull a plaintext ``Authorization: Bearer <token>`` value out of an
+    ASGI scope or Starlette request. Empty string when absent.
+
+    CLI clients (``astro exec``) authenticate the WS handshake with the
+    same ``alft_`` API token they use for GraphQL rather than a browser
+    session cookie, so the exec/VNC relays accept either credential."""
+    raw = ""
+    if hasattr(scope_or_request, "headers"):
+        try:
+            raw = scope_or_request.headers.get("authorization") or ""
+        except Exception:
+            raw = ""
+    elif isinstance(scope_or_request, dict):
+        for name, value in scope_or_request.get("headers", []):
+            if name.lower() == b"authorization":
+                raw = value.decode("latin-1")
+                break
+    if raw[:7].lower() == "bearer ":
+        return raw[7:].strip()
+    return ""
+
+
+@sync_to_async
+def _resolve_user_and_tenant_from_bearer(token: str):
+    """Resolve ``(user, TenantContext)`` from an ``alft_`` API token.
+
+    Mirrors ``ApiTokenMiddleware`` for the WS path: the token's user +
+    organization become the authenticated, tenant-scoped identity.
+    Returns ``(AnonymousUser, None)`` for a missing/invalid/revoked
+    token so the relay closes with the right code."""
+    if not token:
+        return AnonymousUser(), None
+    try:
+        from astrolift_identity.api_tokens import touch_token, verify_token
+        from core.tenancy import TenantContext
+
+        row = verify_token(token)
+        if row is None:
+            return AnonymousUser(), None
+        user = row.user
+        if user is None or not getattr(user, "is_active", True):
+            return AnonymousUser(), None
+        try:
+            touch_token(row)
+        except Exception:  # noqa: BLE001
+            pass
+        return user, TenantContext(
+            organization_id=row.organization_id,
+            actor_user_id=user.pk,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("ws bearer resolution failed")
+        return AnonymousUser(), None
+
+
 @sync_to_async
 def _resolve_tenant_for_user(user, session_data: dict) -> Any:
     """Mirror what TenantContextMiddleware does, but synchronously

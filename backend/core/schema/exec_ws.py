@@ -280,19 +280,31 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
     app_slug, workload_slug = target
 
     from core.schema.ws_auth import (
+        _bearer_from_scope,
         _parse_cookies,
         _resolve_tenant_for_user,
+        _resolve_user_and_tenant_from_bearer,
         _resolve_user_from_sessionid,
     )
 
-    cookies = _parse_cookies(scope)
-    session_key = cookies.get("sessionid", "")
-    user, session_data = await _resolve_user_from_sessionid(session_key)
+    # CLI (`astro exec`) presents an ``alft_`` API token on the handshake;
+    # the browser presents a sessionid cookie. Try the bearer first, fall
+    # back to the cookie so both surfaces share one relay.
+    bearer = _bearer_from_scope(scope)
+    tenant = None
+    if bearer:
+        user, tenant = await _resolve_user_and_tenant_from_bearer(bearer)
+    else:
+        cookies = _parse_cookies(scope)
+        session_key = cookies.get("sessionid", "")
+        user, session_data = await _resolve_user_from_sessionid(session_key)
+        if getattr(user, "is_authenticated", False):
+            tenant = await _resolve_tenant_for_user(user, session_data)
+
     if not getattr(user, "is_authenticated", False):
         await send({"type": "websocket.close", "code": 4401})
         return
 
-    tenant = await _resolve_tenant_for_user(user, session_data)
     org_id = getattr(tenant, "organization_id", None) if tenant else None
     actor_user_id = getattr(tenant, "actor_user_id", None) if tenant else None
     if not await _check_app_in_tenant(
