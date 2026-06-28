@@ -154,6 +154,11 @@ def _workload_dict(w: WorkloadManifest) -> dict[str, Any]:
         "max_retries": w.max_retries,
         "tool_timeout_seconds": w.tool_timeout_seconds,
         "result_ttl_hours": w.result_ttl_hours,
+        # Agent run family (#1027) participates in the manifest hash so a
+        # task<->service flip (which changes whether a Deployment renders at
+        # all) is detected as a real change, not a silent no-op deploy. Only
+        # meaningful on ``kind == "agent"`` workloads; defaults elsewhere.
+        "run_family": w.run_family,
         # Temporal worker config (#796) participates in the manifest hash
         # so a change to e.g. ``task_queue`` is detected as a real change
         # rather than collapsing to a silent no-op deploy. Only set on
