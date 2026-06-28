@@ -376,6 +376,11 @@ def managed_config_for(
             log_retention_days=int(pc.get("faas_log_retention_days", 14)),
         )
 
+    if kind == "api_gateway":
+        from aws.managed.api_gateway_http import ApiGatewayHttpConfig
+
+        return ApiGatewayHttpConfig(region=region)
+
     if kind in ("postgres", "mysql"):
         from aws.managed._networking import ensure_db_networking
 

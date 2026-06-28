@@ -29,6 +29,7 @@ from aws.cluster_eks import EKSClusterDriver
 from aws.dns_route53 import Route53Driver
 from aws.identity_irsa import IRSADriver
 from aws.ingress_alb import ALBIngressDriver
+from aws.managed.api_gateway_http import ApiGatewayHttpDriver
 from aws.managed.cdn_cloudfront import CloudFrontDriver
 from aws.managed.dynamodb import DynamoDBDriver
 from aws.managed.email_ses import AmazonSESDriver
@@ -70,6 +71,7 @@ PLUGIN = ProviderPlugin(
         ("kv_store", "dynamodb"): DynamoDBDriver,
         ("cdn", "cloudfront"): CloudFrontDriver,
         ("faas", "lambda"): LambdaDriver,
+        ("api_gateway", "http_api"): ApiGatewayHttpDriver,
         ("queue", "sqs"): SQSDriver,
         ("postgres", "rds"): RDSPostgresDriver,
         ("mysql", "rds_mysql"): RDSMySQLDriver,
