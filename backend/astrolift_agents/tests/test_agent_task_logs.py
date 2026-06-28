@@ -398,22 +398,23 @@ async def test_agent_task_logs_driver_error_degrades_to_empty(permission_resolve
 
 
 @pytest.mark.django_db(transaction=True)
-@pytest.mark.asyncio
-async def test_agent_task_logs_reads_stamped_namespace(permission_resolver):
+def test_agent_task_logs_reads_stamped_namespace(permission_resolver):
     """The resolver reads ``AgentTask.namespace`` (the namespace the spawn
     actually used) rather than recomputing it from the org slug (#891).
 
     Stage-dispatched agents can land in a namespace that doesn't match the
     recomputed ``astrolift-agents-<org>`` guess; reading the stamped value
     is what makes agentTaskLogs return lines on a real cluster.
-    """
-    import asyncio
 
-    org = await asyncio.to_thread(Organization.objects.create, name="Stamp", slug="stamp-org")
-    cluster = await asyncio.to_thread(_cluster, org, slug="stamp-cluster")
-    dispatcher = await asyncio.to_thread(_dispatcher, org, cluster, slug="stamp-dispatcher")
+    ``agent_task_logs`` is a sync resolver (it bridges the async log fetch
+    with ``async_to_sync`` itself), so it is exercised here from a sync test
+    rather than awaited.
+    """
+    org = Organization.objects.create(name="Stamp", slug="stamp-org")
+    cluster = _cluster(org, slug="stamp-cluster")
+    dispatcher = _dispatcher(org, cluster, slug="stamp-dispatcher")
     # Stamp a namespace that is NOT the recomputed astrolift-agents-stamp-org.
-    task = await asyncio.to_thread(_task, org, dispatcher, namespace="agents-elsewhere")
+    task = _task(org, dispatcher, namespace="agents-elsewhere")
 
     permission_resolver.grant(Permission.AGENT_READ)
     pod_backend = _FixedPodBackend([_fake_pod("agent-task-stamped")])
@@ -422,7 +423,7 @@ async def test_agent_task_logs_reads_stamped_namespace(permission_resolver):
     set_log_backend_for_tests(log_backend)
     try:
         with _tenant(org):
-            lines = await AgentsQuery().agent_task_logs(info=_info(), id=str(task.guid))
+            lines = AgentsQuery().agent_task_logs(info=_info(), id=str(task.guid))
     finally:
         reset_pod_backend_for_tests()
         reset_log_backend_for_tests()
