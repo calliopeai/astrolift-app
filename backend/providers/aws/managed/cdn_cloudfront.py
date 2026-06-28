@@ -185,6 +185,7 @@ class CloudFrontDriver(ManagedServiceDriver):
                     acm_cert_arn=acm_cert_arn,
                     spa=spa,
                     index=index,
+                    oac_id=oac_id,
                 )
             except Exception as exc:
                 return ProvisionResult(
@@ -698,6 +699,7 @@ class CloudFrontDriver(ManagedServiceDriver):
         acm_cert_arn: str,
         spa: bool,
         index: str,
+        oac_id: str = "",
     ) -> tuple[str, str]:
         distribution_id = self._find_distribution_by_comment(comment)
         current = self._cf.get_distribution(Id=distribution_id)
@@ -707,6 +709,14 @@ class CloudFrontDriver(ManagedServiceDriver):
         config = dist["DistributionConfig"]
 
         config["DefaultRootObject"] = index
+        # Attach the OAC to the origin. A distribution created before #1035
+        # (or any pre-OAC reconcile) has an OAC-less origin; without this,
+        # CloudFront sends unsigned requests to an AWS_IAM Lambda Function URL
+        # and gets 403. Idempotent for S3 origins (same id already set).
+        if oac_id:
+            items = config.get("Origins", {}).get("Items") or []
+            if items:
+                items[0]["OriginAccessControlId"] = oac_id
         if acm_cert_arn and aliases:
             config["Aliases"] = {"Quantity": len(aliases), "Items": aliases}
             config["ViewerCertificate"] = {
