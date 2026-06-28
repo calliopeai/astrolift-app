@@ -145,6 +145,7 @@ class AmazonSESDriver(ManagedServiceDriver):
         config: SESEmailConfig,
         ses_client: Any | None = None,
         secrets_client: Any | None = None,
+        route53: Any | None = None,
     ) -> None:
         self._config = config
         if ses_client is not None:
@@ -161,6 +162,13 @@ class AmazonSESDriver(ManagedServiceDriver):
             self._sm = boto3.client(
                 "secretsmanager", region_name=config.region,
             )
+        # Lazily constructed Route53 driver used to publish the SES
+        # domain-verification + Easy-DKIM records so a domain identity
+        # converges to Verified with no manual operator DNS step.
+        # Injected directly in tests; ``None`` means "construct on first
+        # use" (and best-effort: a construction or API failure leaves the
+        # identity pending rather than failing the provision).
+        self._route53 = route53
 
     # ---- lifecycle ----------------------------------------------------
 
@@ -182,17 +190,29 @@ class AmazonSESDriver(ManagedServiceDriver):
         cfg = spec.config or {}
         is_domain = "@" not in identity
 
-        if self._identity_verified_state(identity) is not None:
+        existing_state = self._identity_verified_state(identity)
+        if existing_state is not None:
+            # Re-entrant provision: the identity is already registered.
+            # Re-run the best-effort ancillary steps (idempotent) so a
+            # previously-stuck partial provision can self-heal -- including
+            # re-publishing the verification DNS for an identity that's
+            # still pending.
             self._ensure_configuration_set(spec=spec, identity=identity)
-            self._ensure_smtp_credentials(spec=spec, identity=identity)
+            smtp_ok = self._ensure_smtp_credentials(
+                spec=spec, identity=identity,
+            )
+            if is_domain:
+                self._publish_verification_dns(identity=identity)
+            message = (
+                f"ses identity {identity} already registered "
+                f"(state={existing_state})"
+            )
+            if not smtp_ok:
+                message += "; smtp placeholder secrets not stored"
             return ProvisionResult(
                 ok=True,
                 handle=handle_for(kind=KIND, resource_id=identity),
-                message=(
-                    f"ses identity {identity} already registered "
-                    f"(state="
-                    f"{self._identity_verified_state(identity)})"
-                ),
+                message=message,
             )
 
         try:
@@ -207,6 +227,14 @@ class AmazonSESDriver(ManagedServiceDriver):
                 errors=[str(exc)],
             )
 
+        # The verification request above is the load-bearing step -- the
+        # identity is now registered with SES. Everything below is
+        # best-effort: a freshly-requested-but-unverified SES identity is
+        # the normal, expected state and must NOT hard-fail the provision.
+        # Ancillary failures (configuration set, DNS publish, SMTP
+        # placeholder secrets, deletion-protection marker) are surfaced in
+        # the result message, never raised.
+
         # Best-effort: register a configuration set scoped to this
         # identity. Configuration sets carry event destinations
         # (CloudWatch, SNS, Kinesis); operators wire those out-of-band.
@@ -214,13 +242,23 @@ class AmazonSESDriver(ManagedServiceDriver):
             spec=spec, identity=identity,
         )
 
+        # Best-effort: publish the domain-verification TXT + Easy-DKIM
+        # CNAMEs into the operator's Route53 zone so the identity
+        # converges to Verified with no manual DNS step. When the zone
+        # isn't in Route53 (or the platform role lacks access) the
+        # identity stays pending -- the operator publishes the records
+        # surfaced via the obs/status surface; provision still succeeds.
+        dns_published = False
+        if is_domain:
+            dns_published = self._publish_verification_dns(identity=identity)
+
         # Persist a generated SMTP secret pair so the binding has
         # stable refs. Real SES SMTP credentials must be derived
         # from an IAM access-key-id via the SES-specific SMTP
         # password algorithm; that is an out-of-band operator
         # rotation step. The driver stores placeholders the
         # operator overwrites once the IAM access key is created.
-        self._ensure_smtp_credentials(spec=spec, identity=identity)
+        smtp_ok = self._ensure_smtp_credentials(spec=spec, identity=identity)
 
         deletion_protection = bool(
             cfg.get(
@@ -232,13 +270,23 @@ class AmazonSESDriver(ManagedServiceDriver):
             identity=identity, enabled=deletion_protection,
         )
 
+        message = (
+            f"ses identity {identity} verification requested "
+            f"(configuration set={cset_name})"
+        )
+        if is_domain:
+            message += (
+                "; dns records published"
+                if dns_published
+                else "; pending dns verification (publish records manually)"
+            )
+        if not smtp_ok:
+            message += "; smtp placeholder secrets not stored"
+
         return ProvisionResult(
             ok=True,
             handle=handle_for(kind=KIND, resource_id=identity),
-            message=(
-                f"ses identity {identity} verification requested "
-                f"(configuration set={cset_name})"
-            ),
+            message=message,
         )
 
     @driver_op(cloud="aws", driver="email_ses")
@@ -782,7 +830,13 @@ class AmazonSESDriver(ManagedServiceDriver):
 
     def _ensure_smtp_credentials(
         self, *, spec: ProvisionSpec, identity: str,
-    ) -> None:
+    ) -> bool:
+        """Store the placeholder SMTP secret pair. Returns ``True`` when
+        both refs exist (created now or already present), ``False`` when a
+        write failed. Best-effort: these are operator-overwritten
+        placeholders, so a write failure (e.g. the platform role lacks
+        ``secretsmanager:CreateSecret`` on this prefix) must NOT fail the
+        provision of the load-bearing SES identity."""
         access_key_name = self._smtp_access_key_secret_name(
             identity=identity,
         )
@@ -794,29 +848,112 @@ class AmazonSESDriver(ManagedServiceDriver):
         # key via the SES SMTP password algorithm; that is an
         # out-of-band operator step. The driver keeps stable secret
         # refs so consumers don't need to re-bind after rotation.
-        self._put_secret_if_missing(
+        ok_access = self._put_secret_if_missing(
             name=access_key_name,
             value=self._config.smtp_username,
         )
-        self._put_secret_if_missing(
+        ok_secret = self._put_secret_if_missing(
             name=secret_key_name,
             value=_generate_smtp_password(),
         )
+        return ok_access and ok_secret
 
-    def _put_secret_if_missing(self, *, name: str, value: str) -> None:
+    def _put_secret_if_missing(self, *, name: str, value: str) -> bool:
+        """Create a secret if absent. Returns ``True`` when the secret
+        exists afterwards (created or pre-existing), ``False`` when the
+        write failed. Never raises: SMTP placeholder secrets are not the
+        load-bearing resource, so a failure here is surfaced to the caller
+        as a soft warning rather than aborting the provision."""
         try:
             self._sm.create_secret(
                 Name=name, SecretString=value,
             )
+            return True
         except Exception as exc:
-            if "ResourceExistsException" in type(exc).__name__:
-                return
-            # Soft state: log via raised ManagedServiceError so the
-            # caller can decide. SES identity is the load-bearing
-            # bit -- a missing secret means binding will be unusable.
-            raise ManagedServiceError(
-                f"create_secret for {name}: {exc}",
-            ) from exc
+            # Already-present is success; any other failure is a soft miss.
+            return "ResourceExistsException" in type(exc).__name__
+
+    def _dns_driver(self) -> Any | None:
+        """Return the Route53 driver used to publish verification records,
+        constructing it lazily. Best-effort: returns ``None`` (rather than
+        raising) when boto3 / the driver can't be constructed so the DNS
+        publish degrades to "operator publishes manually"."""
+        if self._route53 is not None:
+            return self._route53
+        try:
+            from aws.dns_route53 import Route53Driver
+
+            self._route53 = Route53Driver()
+        except Exception:
+            return None
+        return self._route53
+
+    def _publish_verification_dns(self, *, identity: str) -> bool:
+        """Publish the SES domain-verification TXT + Easy-DKIM CNAMEs into
+        the operator's Route53 zone so the domain identity converges to
+        Verified without a manual DNS step. Returns ``True`` when at least
+        one record was written.
+
+        Entirely best-effort -- returns ``False`` (never raises) when no
+        ``base_domain`` is configured, the identity lives outside that
+        zone, SES doesn't yield tokens, the zone isn't in Route53, or the
+        platform role lacks Route53 access. In every such case the
+        identity simply stays pending verification, which is a normal,
+        non-failing state."""
+        base_domain = (self._config.base_domain or "").strip().rstrip(".")
+        if not base_domain:
+            return False
+        # Only publish when the identity lives inside the operator's zone;
+        # otherwise we'd write records into the wrong hosted zone.
+        if identity != base_domain and not identity.endswith(
+            "." + base_domain,
+        ):
+            return False
+
+        try:
+            dkim = self._ses.verify_domain_dkim(Domain=identity)
+            tokens = [t for t in (dkim.get("DkimTokens") or []) if t]
+        except Exception:
+            tokens = []
+        verification_token = ""
+        try:
+            resp = self._ses.get_identity_verification_attributes(
+                Identities=[identity],
+            )
+            attrs = resp.get("VerificationAttributes") or {}
+            verification_token = str(
+                (attrs.get(identity) or {}).get("VerificationToken") or "",
+            )
+        except Exception:
+            verification_token = ""
+        if not tokens and not verification_token:
+            return False
+
+        dns = self._dns_driver()
+        if dns is None:
+            return False
+
+        wrote = False
+        try:
+            if verification_token:
+                dns.ensure_record(
+                    zone=base_domain,
+                    name=f"_amazonses.{identity}",
+                    type="TXT",
+                    value=f'"{verification_token}"',
+                )
+                wrote = True
+            for token in tokens:
+                dns.ensure_record(
+                    zone=base_domain,
+                    name=f"{token}._domainkey.{identity}",
+                    type="CNAME",
+                    value=f"{token}.dkim.amazonses.com",
+                )
+                wrote = True
+        except Exception:
+            return wrote
+        return wrote
 
     def _delete_smtp_credentials(self, *, identity: str) -> None:
         for name in (
