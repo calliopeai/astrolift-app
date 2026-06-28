@@ -40,7 +40,12 @@ from collections.abc import Callable
 from django.db import transaction
 from django.utils import timezone
 
-from astrolift_manifest.discover import DiscoveredAgentManifest, scan_agent_manifests
+from astrolift_manifest.discover import (
+    DiscoveredAgentManifest,
+    DiscoveredAppManifest,
+    scan_agent_manifests,
+    scan_app_manifests,
+)
 from astrolift_manifest.normalize import NormalizationDefaults, manifest_hash, normalize
 from astrolift_manifest.parser import ManifestError, parse_raw
 from astrolift_manifest.persist import persist_manifest
@@ -414,7 +419,7 @@ def resync_app_manifest_from_repo(
         return ResyncResult(
             status="fetch_failed",
             changes=ResyncChanges(),
-            error=(f"{manifest_path!r} not found on {deploy_branch!r} of " f"{app.source_repo!r}"),
+            error=(f"{manifest_path!r} not found on {deploy_branch!r} of {app.source_repo!r}"),
         )
 
     # Parse the repo content first. A repo with broken TOML is a
@@ -545,7 +550,7 @@ def summarize_changes(changes: ResyncChanges) -> str:
         parts.append(", ".join(bits))
     if changes.env_keys_changed:
         parts.append(
-            f"{changes.env_keys_changed} env " f"{'keys' if changes.env_keys_changed != 1 else 'key'} changed"
+            f"{changes.env_keys_changed} env {'keys' if changes.env_keys_changed != 1 else 'key'} changed"
         )
     else:
         parts.append("env unchanged")
@@ -560,7 +565,7 @@ def summarize_changes(changes: ResyncChanges) -> str:
         parts.append(", ".join(bits))
     if changes.schedules_changed:
         parts.append(
-            f"{changes.schedules_changed} schedule" f"{'s' if changes.schedules_changed != 1 else ''} changed"
+            f"{changes.schedules_changed} schedule{'s' if changes.schedules_changed != 1 else ''} changed"
         )
 
     # Capitalize the first segment; period at the end.
@@ -1147,3 +1152,327 @@ def resync_agent_repo_manifests(
         default_cluster=default_cluster,
         tree=tree,
     )
+
+
+# ---------------------------------------------------------------------------
+# Monorepo / multi-service app discovery (#979)
+# ---------------------------------------------------------------------------
+#
+# The app-side mirror of the agent monorepo path above: point at a repo and
+# register each *app* manifest it carries (one ``apps/<slug>/astrolift.toml``
+# per service, plus a root ``astrolift.toml``) as its own ``RegisteredApp``
+# keyed by ``(source_repo, manifest_path)``. The scan + the app/agent split
+# live in ``astrolift_manifest.discover.scan_app_manifests`` (pure,
+# fixture-testable); the repo tree comes from the same SCM zipball fetch the
+# agent path uses (``_scan_repo_for_apps`` reuses ``_default_tree_fetch``).
+#
+# Each created app's ``build_context`` is set to the manifest's own directory
+# (``apps/<slug>``) so each service builds from its own subdir — the build
+# activity reads ``RegisteredApp.build_context`` (build_image.py is UNCHANGED).
+#
+# Idempotency + re-scan mirror the agent path: every app is keyed by
+# ``(source_repo, manifest_path)`` (the existing partial-unique constraint — no
+# migration). Re-running registers only manifests not already registered for
+# the repo; an app whose manifest disappeared is left in place (never
+# hard-deleted), and the per-manifest body is reconciled via ``persist_manifest``.
+
+
+@dataclasses.dataclass(slots=True)
+class DiscoveredAppPreview:
+    """One app manifest discovered in a repo, as a preview row.
+
+    Carries the parsed identity the FE wizard's discovery step renders before
+    the operator confirms registration, plus ``already_registered`` so the
+    wizard can disable / annotate manifests that point at an app already
+    registered for this repo. ``manifest_path`` is the key that becomes
+    ``RegisteredApp.manifest_path``; ``build_context`` is the per-service
+    subdir the app builds from.
+    """
+
+    manifest_path: str
+    name: str
+    build_context: str
+    workload_count: int
+    already_registered: bool
+
+
+@dataclasses.dataclass(slots=True)
+class DiscoverAppsResult:
+    """Return shape from :func:`discover_app_manifests`.
+
+    ``status`` is ``ok`` (the scan ran; ``apps`` lists every app manifest
+    found, possibly empty) or ``fetch_failed`` (no usable source connection /
+    the SCM fetch raised; ``error`` carries the host-side message).
+    """
+
+    status: str
+    apps: list[DiscoveredAppPreview] = dataclasses.field(default_factory=list)
+    error: str | None = None
+
+
+@dataclasses.dataclass(slots=True)
+class RegisteredAppEntry:
+    """One app the register call created or matched.
+
+    ``created`` is False when an app already existed for
+    ``(source_repo, manifest_path)`` (idempotent re-run) — the workloads are
+    reconciled from the manifest body but the app row is reused.
+    """
+
+    manifest_path: str
+    slug: str
+    app_guid: str
+    build_context: str
+    created: bool
+
+
+@dataclasses.dataclass(slots=True)
+class RegisterAppRepoResult:
+    """Return shape from :func:`register_app_repo`.
+
+    ``status`` is one of ``ok`` / ``fetch_failed`` / ``no_apps`` / ``error``.
+    ``apps`` lists what was created or matched (only on ``ok``); ``error``
+    carries the message on the failure statuses.
+    """
+
+    status: str
+    apps: list[RegisteredAppEntry] = dataclasses.field(default_factory=list)
+    error: str | None = None
+
+
+def _scan_repo_for_apps(
+    *,
+    source_kind: str,
+    source_repo: str,
+    ref: str,
+    organization_id: int,
+    tree: _TreeFn | None,
+) -> tuple[list[DiscoveredAppManifest] | None, str | None]:
+    """Fetch ``source_repo`` at ``ref`` and run the app-manifest scan.
+
+    Resolves a usable ``SourceConnection`` for ``(organization_id,
+    source_kind)`` (same selection as the per-app resync), fetches the repo
+    tree, and returns ``(discovered, None)`` on success or
+    ``(None, error_message)`` when there is no connection / the fetch fails.
+    """
+    from astrolift_scm.providers import ProviderError
+
+    tree_fn: _TreeFn = tree if tree is not None else _default_tree_fetch
+
+    probe = RegisteredApp(organization_id=organization_id, source_kind=source_kind)
+    connection = _pick_source_connection(probe)
+    if connection is None:
+        return (
+            None,
+            (
+                "no active source connection found for this organization — "
+                "reconnect the source host under Settings -> Source connections"
+            ),
+        )
+
+    try:
+        files = tree_fn(connection, source_repo, ref)
+    except ProviderError as exc:
+        return None, f"{exc.code}: {exc.message}"
+    except Exception as exc:  # noqa: BLE001 — surface anything as fetch_failed
+        log.exception("app-repo scan fetch crashed (repo=%s)", source_repo)
+        return None, str(exc) or exc.__class__.__name__
+
+    return scan_app_manifests(files), None
+
+
+def discover_app_manifests(
+    *,
+    organization_id: int,
+    source_kind: str,
+    source_repo: str,
+    ref: str,
+    tree: _TreeFn | None = None,
+) -> DiscoverAppsResult:
+    """Scan ``source_repo`` for app manifests and return a preview.
+
+    Does NOT persist anything — backs the FE wizard's discovery step. Each
+    returned row carries the parsed name / build_context / workload_count plus
+    ``already_registered`` (True when an app for that
+    ``(source_repo, manifest_path)`` already exists, soft-deleted excluded).
+    """
+    discovered, error = _scan_repo_for_apps(
+        source_kind=source_kind,
+        source_repo=source_repo,
+        ref=ref,
+        organization_id=organization_id,
+        tree=tree,
+    )
+    if discovered is None:
+        return DiscoverAppsResult(status="fetch_failed", error=error)
+
+    existing_paths = set(
+        RegisteredApp.objects.filter(
+            source_repo=source_repo,
+            deleted_at__isnull=True,
+        ).values_list("manifest_path", flat=True)
+    )
+
+    rows = [
+        DiscoveredAppPreview(
+            manifest_path=d.manifest_path,
+            name=d.name,
+            build_context=d.build_context,
+            workload_count=d.workload_count,
+            already_registered=d.manifest_path in existing_paths,
+        )
+        for d in discovered
+    ]
+    return DiscoverAppsResult(status="ok", apps=rows)
+
+
+def _app_repo_slug(org, discovered: DiscoveredAppManifest) -> str:
+    """Pick a unique-per-org app slug for a discovered app manifest.
+
+    Prefers the manifest's own directory segment for a monorepo service
+    (``apps/web/astrolift.toml`` → ``web``) and the slugified manifest name for
+    a root manifest. On a collision with an active app in the org, appends a
+    numeric suffix. Keeps slugs stable across re-scans because the same
+    manifest path yields the same candidate sequence.
+    """
+    from django.utils.text import slugify
+
+    segments = discovered.manifest_path.split("/")
+    if len(segments) == 3:  # apps/<dir>/astrolift.toml
+        base = slugify(segments[1])
+    else:
+        base = slugify(discovered.name)
+    if not base:
+        base = "app"
+    if not _slug_taken(org, base):
+        return base
+
+    i = 2
+    while _slug_taken(org, f"{base}-{i}"):
+        i += 1
+    return f"{base}-{i}"
+
+
+def _register_one_app(
+    *,
+    project,
+    discovered: DiscoveredAppManifest,
+    source_kind: str,
+    source_repo: str,
+    source_url: str,
+    default_branch: str,
+    deploy_branch: str,
+    default_cluster,
+) -> RegisteredAppEntry:
+    """Create (or match) one ``RegisteredApp`` + its workloads for a manifest.
+
+    Idempotent on ``(source_repo, manifest_path)``: when an app already exists
+    for the pair the existing app is reused (and its workloads reconciled from
+    the repo via ``persist_manifest``), so a re-scan adds only genuinely-new
+    apps. Mirrors ``register_app``'s field defaults and sets ``build_context``
+    to the manifest's own subdir so each service builds from its own folder.
+    """
+    org = project.organization
+    manifest = _normalize_text(discovered.raw_text)
+
+    app = RegisteredApp.objects.filter(
+        source_repo=source_repo,
+        manifest_path=discovered.manifest_path,
+        deleted_at__isnull=True,
+    ).first()
+    created = app is None
+    if app is None:
+        app_slug = _app_repo_slug(org, discovered)
+        app = RegisteredApp.objects.create(
+            organization=org,
+            team=project.team,
+            project=project,
+            name=discovered.name,
+            slug=app_slug,
+            source_kind=source_kind,
+            source_repo=source_repo,
+            source_url=source_url,
+            manifest_path=discovered.manifest_path,
+            manifest_raw=discovered.raw_text,
+            default_branch=default_branch,
+            deploy_branch=deploy_branch,
+            # Each service builds from its own subdir (build_image.py reads
+            # RegisteredApp.build_context as the context path in the source tree).
+            build_context=discovered.build_context,
+            k8s_namespace=f"{org.slug}-{app_slug}",
+            subdomain=app_slug,
+            default_tenant_cluster=default_cluster,
+        )
+
+    # Reconcile the workload (+ container) rows from the manifest. On a fresh
+    # app this creates them; on a re-matched app it updates only what changed.
+    persist_manifest(app, manifest, raw_text=discovered.raw_text)
+
+    return RegisteredAppEntry(
+        manifest_path=discovered.manifest_path,
+        slug=app.slug,
+        app_guid=str(app.guid),
+        build_context=app.build_context,
+        created=created,
+    )
+
+
+def register_app_repo(
+    *,
+    project,
+    source_kind: str,
+    source_repo: str,
+    ref: str,
+    source_url: str = "",
+    default_branch: str = "main",
+    deploy_branch: str = "",
+    default_cluster=None,
+    tree: _TreeFn | None = None,
+) -> RegisterAppRepoResult:
+    """Register every app manifest in ``source_repo`` under ``project``.
+
+    Scans the repo (monorepo ``apps/*/astrolift.toml`` + root
+    ``astrolift.toml``) and creates one ``RegisteredApp`` (with its workloads)
+    per discovered service, each building from its own subdir. Idempotent on
+    ``(source_repo, manifest_path)`` so a re-run adds only manifests not
+    already registered. Every row is created under ``project`` (its
+    organization is the tenancy boundary).
+
+    Returns ``no_apps`` when the repo has no app manifests, ``fetch_failed``
+    when the repo can't be fetched, ``error`` on an unexpected persist
+    failure, else ``ok`` with the per-manifest outcome.
+    """
+    discovered, error = _scan_repo_for_apps(
+        source_kind=source_kind,
+        source_repo=source_repo,
+        ref=ref,
+        organization_id=project.organization_id,
+        tree=tree,
+    )
+    if discovered is None:
+        return RegisterAppRepoResult(status="fetch_failed", error=error)
+    if not discovered:
+        return RegisterAppRepoResult(status="no_apps")
+
+    eff_deploy_branch = deploy_branch or default_branch or "main"
+
+    try:
+        with transaction.atomic():
+            apps = [
+                _register_one_app(
+                    project=project,
+                    discovered=d,
+                    source_kind=source_kind,
+                    source_repo=source_repo,
+                    source_url=source_url,
+                    default_branch=default_branch or "main",
+                    deploy_branch=eff_deploy_branch,
+                    default_cluster=default_cluster,
+                )
+                for d in discovered
+            ]
+    except Exception as exc:  # noqa: BLE001 — surface as a clean envelope
+        log.exception("app-repo registration failed (repo=%s)", source_repo)
+        return RegisterAppRepoResult(status="error", error=str(exc) or exc.__class__.__name__)
+
+    return RegisterAppRepoResult(status="ok", apps=apps)

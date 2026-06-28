@@ -144,6 +144,60 @@ class RegisterAgentRepoResultType:
 
 
 @strawberry.input
+class RegisterAppRepoInput:
+    """Register every app manifest in a repo as its own app (#979).
+
+    Points the platform at ``source_repo`` (``owner/name``) and registers each
+    ``apps/<slug>/astrolift.toml`` (monorepo / multi-service) plus a root
+    ``astrolift.toml`` that declares a deployable (non-agent) app, as its own
+    ``RegisteredApp``. Each service builds from its own subdir. All rows land
+    under ``project_id`` (its organization is the tenancy boundary).
+
+    Idempotent on ``(source_repo, manifest_path)``: re-running registers only
+    manifests not already registered for the repo, so the same input drives
+    both first-time registration and a re-scan that picks up newly-added
+    services. ``ref`` is the branch/sha to read the tree at; ``default_branch``
+    / ``deploy_branch`` seed the created apps' branch fields.
+    """
+
+    project_id: GUID
+    source_repo: str
+    source_kind: str = "github"
+    source_url: str | None = None
+    ref: str = "main"
+    default_branch: str | None = None
+    deploy_branch: str | None = None
+
+
+@strawberry.type(name="AstroliftRegisteredAppEntry")
+class RegisteredAppEntryType:
+    """One app registered (or matched) by ``registerAppRepo``.
+
+    ``created`` is False when an app already existed for the repo + manifest
+    path (idempotent re-run / re-scan), True when this call created it.
+    ``build_context`` is the per-service subdir the app builds from.
+    """
+
+    manifest_path: str
+    slug: str
+    app_id: GUID
+    build_context: str
+    created: bool
+
+
+@strawberry.type(name="AstroliftRegisterAppRepoResult")
+class RegisterAppRepoResultType:
+    """Payload of ``registerAppRepo``.
+
+    ``apps`` lists the per-manifest outcome (created or matched). The mutation
+    envelope (ok / error) wraps this; ``apps`` is empty when the repo carried
+    no app manifests.
+    """
+
+    apps: list[RegisteredAppEntryType]
+
+
+@strawberry.input
 class UpdateAppInput:
     id: GUID
     name: str | None = None
@@ -855,9 +909,7 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
     created_any = False
     effective_env_names = list(env_names) if env_names else []
     if not effective_env_names:
-        has_any = AppEnvironment.objects.filter(
-            registered_app=app, deleted_at__isnull=True
-        ).exists()
+        has_any = AppEnvironment.objects.filter(registered_app=app, deleted_at__isnull=True).exists()
         if not has_any:
             effective_env_names = ["production"]
     for env_name in effective_env_names:
@@ -1221,6 +1273,132 @@ class RegistryMutation:
                         skill_notes=list(a.skill_notes),
                     )
                     for a in result.agents
+                ]
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(
+        action="app.register_app_repo",
+        target=lambda self, info, input: ("repo", input.source_repo),
+    )
+    @require_permission(Permission.APP_CREATE)
+    @tenant_scoped()
+    def register_app_repo(
+        self, info: Info, input: RegisterAppRepoInput
+    ) -> MutationResultType[RegisterAppRepoResultType]:
+        """Register every app manifest in a repo as its own app (#979).
+
+        Scans ``source_repo`` for app manifests (monorepo
+        ``apps/*/astrolift.toml`` + root ``astrolift.toml``) and registers each
+        deployable (non-agent) manifest as its own ``RegisteredApp`` building
+        from its own subdir, reusing the same per-manifest persist path as
+        ``register_app``. Idempotent on ``(source_repo, manifest_path)`` so
+        re-running picks up only newly-added services.
+
+        Org-scoped exactly like ``register_app``: the target project is
+        resolved by GUID and must belong to the caller's active tenant. Apps
+        are deploy targets, so a managed cluster is required up front (mirrors
+        ``register_app``); each created app is bound to it and bootstrapped
+        (default environment + OnboardAppWorkflow) so it is deployable.
+        """
+        from astrolift_registry.services.manifest_sync import register_app_repo as _register_app_repo
+
+        tenant = get_current_tenant()
+        active_org_id = tenant.organization_id if tenant else None
+        if active_org_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+
+        project = (
+            Project.objects.select_related("organization", "team")
+            .filter(guid=str(input.project_id), deleted_at__isnull=True)
+            .first()
+        )
+        if project is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "project not found", field="projectId")
+        if project.organization_id != active_org_id:
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                "project belongs to another organization",
+                field="projectId",
+            )
+
+        if not (input.source_repo or "").strip():
+            return gql_failure(ErrorCode.VALIDATION.value, "sourceRepo is required", field="sourceRepo")
+
+        # Apps are deploy targets — require a managed cluster up front (mirror
+        # register_app). organization is nullable on TenantCluster: null =
+        # shared (available to all orgs).
+        managed_cluster = (
+            TenantCluster.objects.filter(
+                Q(organization=project.organization) | Q(organization__isnull=True),
+                deleted_at__isnull=True,
+                is_active=True,
+                lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+            )
+            .order_by("pk")
+            .first()
+        )
+        if managed_cluster is None:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "No managed cluster connected. Visit /clusters and finish bringing a cluster into management before adding apps.",
+                field=None,
+            )
+
+        result = _register_app_repo(
+            project=project,
+            source_kind=input.source_kind or "github",
+            source_repo=input.source_repo,
+            ref=input.ref or "main",
+            source_url=input.source_url or "",
+            default_branch=input.default_branch or "main",
+            deploy_branch=input.deploy_branch or "",
+            default_cluster=managed_cluster,
+        )
+
+        if result.status == "fetch_failed":
+            return gql_failure(ErrorCode.PRECONDITION.value, result.error or "repo fetch failed")
+        if result.status == "no_apps":
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "no app manifests found in this repo (looked for apps/*/astrolift.toml and a root astrolift.toml)",
+                field="sourceRepo",
+            )
+        if result.status != "ok":
+            return gql_failure(ErrorCode.INTERNAL.value, result.error or "registration failed")
+
+        # Bootstrap each newly-created app (default environment +
+        # OnboardAppWorkflow) so it is deployable, at parity with register_app.
+        # Best-effort + per-app: one app's bootstrap failure does not unwind
+        # the registration of the rest.
+        for entry in result.apps:
+            if not entry.created:
+                continue
+            app = RegisteredApp.objects.filter(guid=str(entry.app_guid)).first()
+            if app is None:
+                continue
+            try:
+                _bootstrap_app_environments(app, [])
+            except Exception:  # noqa: BLE001 — one app's bootstrap must not unwind the rest
+                import logging
+
+                logging.getLogger(__name__).exception(
+                    "register_app_repo: environment bootstrap failed for %s",
+                    app.slug,
+                )
+
+        return gql_success(
+            RegisterAppRepoResultType(
+                apps=[
+                    RegisteredAppEntryType(
+                        manifest_path=a.manifest_path,
+                        slug=a.slug,
+                        app_id=GUID(str(a.app_guid)),
+                        build_context=a.build_context,
+                        created=a.created,
+                    )
+                    for a in result.apps
                 ]
             )
         )

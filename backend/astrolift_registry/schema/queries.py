@@ -623,6 +623,47 @@ def _freshness_for_apps(apps: Iterable[RegisteredApp]) -> dict[int, AppFreshness
     return freshness_by_app
 
 
+@strawberry.type(name="AstroliftDiscoveredAppManifest")
+class DiscoveredAppManifestType:
+    """One app manifest found by scanning a repo (#979).
+
+    Backs the monorepo / multi-service discovery step of the app onboarding
+    wizard: the operator points at a repo, the scan walks
+    ``apps/*/astrolift.toml`` + a root ``astrolift.toml``, and each app
+    manifest comes back as one of these preview rows WITHOUT anything being
+    persisted. The operator then confirms registration via ``registerAppRepo``.
+
+    ``manifest_path`` is the repo-relative path (the value that becomes
+    ``RegisteredApp.manifest_path`` and the key registration dedupes on).
+    ``build_context`` is the per-service subdir the app builds from
+    (``apps/<slug>`` for a monorepo service, ``"."`` for a root manifest).
+    ``name`` is the manifest's top-level name; ``workload_count`` is how many
+    workloads it declares. ``already_registered`` is True when an app for that
+    repo + manifest path already exists.
+    """
+
+    manifest_path: str
+    name: str
+    build_context: str
+    workload_count: int
+    already_registered: bool
+
+
+@strawberry.type(name="AstroliftScanAppManifestsResult")
+class ScanAppManifestsResultType:
+    """Outcome of a repo app-manifest scan (#979).
+
+    ``ok`` is True when the scan ran (``apps`` may still be empty when the repo
+    has no app manifests); False when the repo couldn't be fetched (no source
+    connection / SCM error), in which case ``error`` carries the operator-facing
+    message and ``apps`` is empty.
+    """
+
+    ok: bool
+    apps: list[DiscoveredAppManifestType]
+    error: str | None = None
+
+
 @strawberry.type
 class RegistryQuery:
     @strawberry.field
@@ -1495,3 +1536,55 @@ class RegistryQuery:
 
         qs = base_qs.filter(scope_filter).order_by("team__name", "name")[:500]
         return [project_to_type(p) for p in qs]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def scan_app_manifests(
+        self,
+        info: Info,
+        source_repo: str,
+        source_kind: str = "github",
+        ref: str = "main",
+    ) -> ScanAppManifestsResultType:
+        """Scan a repo for app manifests and return a preview (#979).
+
+        Backs the monorepo / multi-service discovery step of the app onboarding
+        wizard: given a repo handle (``source_repo`` = ``owner/name``), walks
+        ``apps/*/astrolift.toml`` + a root ``astrolift.toml`` and returns each
+        app manifest as a preview row WITHOUT persisting anything. The operator
+        then confirms registration via ``registerAppRepo``.
+
+        Read-only and org-scoped: the active tenant (established by
+        ``@tenant_scoped``) is the organization boundary — the repo is fetched
+        through that org's own source connection, and ``already_registered`` is
+        computed against that org's apps, so a caller can neither scan with
+        another tenant's credentials nor register the same repo twice.
+        """
+        from astrolift_registry.services.manifest_sync import discover_app_manifests
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return ScanAppManifestsResultType(ok=False, apps=[], error="no active organization")
+
+        result = discover_app_manifests(
+            organization_id=org_id,
+            source_kind=source_kind or "github",
+            source_repo=source_repo,
+            ref=ref or "main",
+        )
+        return ScanAppManifestsResultType(
+            ok=result.status == "ok",
+            apps=[
+                DiscoveredAppManifestType(
+                    manifest_path=a.manifest_path,
+                    name=a.name,
+                    build_context=a.build_context,
+                    workload_count=a.workload_count,
+                    already_registered=a.already_registered,
+                )
+                for a in result.apps
+            ],
+            error=result.error,
+        )

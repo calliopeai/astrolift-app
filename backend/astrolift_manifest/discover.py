@@ -418,3 +418,136 @@ def scan_agent_manifests(files: Mapping[str, Any]) -> list[DiscoveredAgentManife
             )
         )
     return found
+
+
+# ---- app-manifest scan (#979) -----------------------------------------
+#
+# Monorepo / multi-service *app* discovery — the app-side mirror of the agent
+# scan above (and deliberately the same shape, so there is one discovery
+# contract). Walks a fetched repo tree for *committed* ``astrolift.toml``
+# files that declare a deployable app, in one of two layouts:
+#
+#   * monorepo — ``apps/<slug>/astrolift.toml`` (one manifest per service,
+#     each in its own directory directly under ``apps/``);
+#   * single   — a root ``astrolift.toml``.
+#
+# Each candidate is parsed with the real manifest parser and kept only when it
+# declares at least one *non-agent* workload (a deployment / cronjob / worker /
+# static_site / function / …). A pure single-agent manifest is owned by the
+# agent-registration path (``scan_agent_manifests``) and is silently ignored
+# here, so pointing both scanners at one mixed repo registers each manifest
+# once, in the right place. A manifest with an agent workload *plus* a
+# non-agent workload is an app (it has a deployable surface) and is kept.
+# Unparseable / malformed manifests are skipped — discovery is best-effort and
+# never raises on one bad file.
+#
+# ``build_context`` on each kept manifest is the manifest's own directory
+# (``apps/<slug>`` for a monorepo service, ``"."`` for a root manifest) so each
+# service builds from its own subdir — the build activity reads
+# ``RegisteredApp.build_context`` as the context path within the source tree.
+_APPS_DIR = "apps"
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class DiscoveredAppManifest:
+    """One app manifest found by :func:`scan_app_manifests`.
+
+    ``manifest_path`` is the repo-relative path (the value that lands on
+    ``RegisteredApp.manifest_path`` and participates in the
+    ``(source_repo, manifest_path)`` uniqueness, so re-scans dedupe on it).
+    ``build_context`` is the manifest's own directory — the subdir the service
+    builds from (``"."`` for a root manifest) — so each service in a monorepo
+    builds from its own folder. ``name`` is the manifest's top-level name;
+    ``workload_count`` is how many workloads the manifest declares (a
+    self-describing preview hint).
+    """
+
+    manifest_path: str
+    name: str
+    build_context: str
+    workload_count: int
+    raw_text: str
+
+
+def _candidate_app_manifest_paths(files: Mapping[str, Any]) -> list[str]:
+    """Repo-relative paths that *could* be app manifests, sorted.
+
+    Returns the root ``astrolift.toml`` (when present) plus every
+    ``apps/<slug>/astrolift.toml``. Deeper paths under ``apps/`` and
+    ``astrolift.toml`` files nested elsewhere are excluded — only the two
+    sanctioned layouts. Sorted for deterministic registration order so a
+    re-scan creates rows in a stable sequence.
+    """
+    out: list[str] = []
+    if _MANIFEST_BASENAME in files:
+        out.append(_MANIFEST_BASENAME)
+    prefix = f"{_APPS_DIR}/"
+    for path in files:
+        if not path.startswith(prefix) or not path.endswith(f"/{_MANIFEST_BASENAME}"):
+            continue
+        # Exactly ``apps/<slug>/astrolift.toml`` — three segments. A deeper
+        # path (``apps/<slug>/nested/astrolift.toml``) has more and is not an
+        # app root.
+        if len(path.split("/")) != 3:
+            continue
+        out.append(path)
+    return sorted(set(out))
+
+
+def _parse_app_manifest(text: str | None) -> tuple[str, int] | None:
+    """Parse one manifest body and return ``(name, workload_count)`` when it is
+    an app manifest, else ``None``.
+
+    A manifest qualifies as an app when it declares at least one *non-agent*
+    workload. A pure single-agent manifest (its sole workload is
+    ``kind == "agent"``) is owned by the agent-registration path and returns
+    ``None`` so a mixed repo registers agents and apps from their respective
+    scanners without overlap. Parse / validation errors return ``None`` so the
+    scan skips the file rather than failing the whole walk.
+    """
+    if not isinstance(text, str) or not text.strip():
+        return None
+    # Local import keeps ``discover`` free of a hard parser dependency at
+    # module import time (mirrors ``_parse_agent_manifest`` above).
+    from astrolift_manifest.parser import ManifestError, parse_raw
+
+    try:
+        manifest = parse_raw(text)
+    except ManifestError:
+        return None
+    if not manifest.workloads:
+        return None
+    if not any(w.kind != "agent" for w in manifest.workloads):
+        return None
+    return manifest.name, len(manifest.workloads)
+
+
+def scan_app_manifests(files: Mapping[str, Any]) -> list[DiscoveredAppManifest]:
+    """Find every app manifest in a fetched repo tree.
+
+    ``files`` is a ``{repo_relative_path: contents}`` map — the same shape
+    :func:`scan_agent_manifests` consumes and the SCM provider's zipball
+    unpacker produces. Paths must map to ``str`` contents to be parsed; a
+    ``None`` value (present-but-not-fetched) is skipped, so a caller that wants
+    discovery must fetch the bodies of the manifest candidates.
+
+    Returns the kept app manifests in deterministic path order. A repo with no
+    app manifests returns ``[]`` (not an error).
+    """
+    found: list[DiscoveredAppManifest] = []
+    for path in _candidate_app_manifest_paths(files):
+        parsed = _parse_app_manifest(files.get(path) if isinstance(files.get(path), str) else None)
+        if parsed is None:
+            continue
+        name, workload_count = parsed
+        build_context = path.rsplit("/", 1)[0] if "/" in path else "."
+        found.append(
+            DiscoveredAppManifest(
+                manifest_path=path,
+                name=name,
+                build_context=build_context,
+                workload_count=workload_count,
+                raw_text=files[path],
+            )
+        )
+    return found
