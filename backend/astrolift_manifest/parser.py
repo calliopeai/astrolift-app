@@ -57,6 +57,7 @@ _VALID_WORKLOAD_KINDS = {
     "workflow",
     "function",
     "static_site",
+    "faas",
 }
 _VALID_HEALTHCHECK = {"none", "http", "tcp", "exec"}
 _VALID_CONCURRENCY_POLICY = {"forbid", "queue", "replace"}
@@ -370,6 +371,49 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
                 path=f"{path}.static_output_dir",
             )
 
+    # Provider-managed FaaS (#987). The cloud runs the function — there is no
+    # container/pod, so declaring containers is a mistake (silently ignored).
+    # ``faas_package_type`` selects ``image`` (PackageType=Image from the
+    # per-app ECR repo, the default) or ``zip`` (a built artifact). Image mode
+    # bundles its own runtime + entrypoint, so ``faas_handler``/``faas_runtime``
+    # are zip-only and rejected on an image function; zip mode requires the
+    # runtime + handler + the built ``faas_output_dir`` to package.
+    if kind == "faas":
+        if d.get("containers"):
+            raise ManifestError(
+                "faas workload must declare no containers",
+                path=f"{path}.containers",
+            )
+        package_type = str(d.get("faas_package_type", "image")).strip().lower()
+        if package_type not in ("image", "zip"):
+            raise ManifestError(
+                f"faas_package_type must be one of ['image', 'zip'], got {package_type!r}",
+                path=f"{path}.faas_package_type",
+            )
+        if package_type == "image":
+            if str(d.get("faas_handler", "")).strip() or str(d.get("faas_runtime", "")).strip():
+                raise ManifestError(
+                    "image-package faas workload must not set faas_handler/faas_runtime "
+                    "(the container image bundles its own runtime and entrypoint)",
+                    path=f"{path}.faas_handler",
+                )
+        else:
+            if not str(d.get("faas_handler", "")).strip():
+                raise ManifestError(
+                    "zip-package faas workload requires faas_handler",
+                    path=f"{path}.faas_handler",
+                )
+            if not str(d.get("faas_runtime", "")).strip():
+                raise ManifestError(
+                    "zip-package faas workload requires faas_runtime",
+                    path=f"{path}.faas_runtime",
+                )
+            if not str(d.get("faas_output_dir", "")).strip():
+                raise ManifestError(
+                    "zip-package faas workload requires faas_output_dir",
+                    path=f"{path}.faas_output_dir",
+                )
+
     containers = tuple(
         _parse_container(item, f"{path}.containers[{i}]") for i, item in enumerate(d.get("containers", []))
     )
@@ -422,6 +466,17 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
         static_output_dir=str(d.get("static_output_dir", "")),
         static_spa=bool(d.get("static_spa", False)),
         static_index=str(d.get("static_index", "index.html")),
+        # ``kind == "faas"`` (#987). Read unconditionally — harmless defaults on
+        # other kinds, same posture as the static_site/function fields.
+        faas_package_type=str(d.get("faas_package_type", "image")).strip().lower(),
+        faas_runtime=str(d.get("faas_runtime", "")).strip(),
+        faas_handler=str(d.get("faas_handler", "")).strip(),
+        faas_memory_mb=int(d.get("faas_memory_mb", 512)),
+        faas_timeout_seconds=int(d.get("faas_timeout_seconds", 30)),
+        faas_architecture=str(d.get("faas_architecture", "arm64")),
+        faas_public=bool(d.get("faas_public", False)),
+        faas_build_command=str(d.get("faas_build_command", "")).strip(),
+        faas_output_dir=str(d.get("faas_output_dir", "")),
     )
 
 

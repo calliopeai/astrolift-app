@@ -288,13 +288,17 @@ async def provision_managed_services_initial(
     return ids
 
 
-def _has_static_site_workload(app) -> bool:
-    """True when the app's manifest declares a ``static_site`` workload (#1010).
+_PODLESS_WORKLOAD_KINDS = {"static_site", "faas"}
 
-    A static-site workload renders to zero K8s resources (its bucket + CDN are
-    managed services, not pods), so the pre-flight zero-resources gate must not
-    treat it as an empty manifest. Best-effort: a manifest that won't parse
-    falls through to the normal gate."""
+
+def _has_podless_workload(app) -> bool:
+    """True when the app's manifest declares a pod-less workload (#1010, #987).
+
+    A pod-less workload (``static_site`` → S3 + CDN, ``faas`` → cloud-run
+    Lambda) renders to zero K8s resources — its backing resources are managed
+    services, not pods — so the pre-flight zero-resources gate must not treat
+    it as an empty manifest. Best-effort: a manifest that won't parse falls
+    through to the normal gate."""
     try:
         from astrolift_manifest.normalize import NormalizationDefaults, normalize
         from astrolift_manifest.parser import parse_raw
@@ -302,7 +306,7 @@ def _has_static_site_workload(app) -> bool:
         manifest = normalize(parse_raw(app.manifest_raw or ""), defaults=NormalizationDefaults())
     except Exception:  # noqa: BLE001 — unparseable manifest: defer to the normal gate
         return False
-    return any(getattr(w, "kind", "") == "static_site" for w in manifest.workloads)
+    return any(getattr(w, "kind", "") in _PODLESS_WORKLOAD_KINDS for w in manifest.workloads)
 
 
 def _pre_flight_sync(deployment_id: int) -> None:
@@ -333,13 +337,13 @@ def _pre_flight_sync(deployment_id: int) -> None:
         )
     # Catch the empty-[[workloads]] case here so operators see a clear
     # pre-deploy error rather than an opaque apply failure later (#359).
-    # Exception: a static_site-only app (#1010) legitimately renders zero K8s
-    # resources — its "resources" are the managed S3 bucket + CloudFront
-    # distribution, provisioned by the static-site deploy activities, not pods.
-    # Only a manifest with NO static workload AND zero rendered resources is an
-    # error (the truly-empty [[workloads]] case).
+    # Exception: a pod-less-only app (static_site #1010 → S3 + CloudFront,
+    # faas #987 → cloud-run Lambda) legitimately renders zero K8s resources —
+    # its "resources" are managed services provisioned by the topology's deploy
+    # activities, not pods. Only a manifest with NO pod-less workload AND zero
+    # rendered resources is an error (the truly-empty [[workloads]] case).
     resources = render_resources_for_deployment(d)
-    if not resources and not _has_static_site_workload(app):
+    if not resources and not _has_podless_workload(app):
         raise AppDeployError(
             "manifest renders to zero Kubernetes resources — declare at least one workload in [[workloads]]",
         )

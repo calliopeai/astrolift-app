@@ -304,6 +304,29 @@ def _workload_body_changed(a: WorkloadManifest, b: WorkloadManifest) -> bool:
         b.static_index,
     ):
         return True
+    # FaaS config (#987) — a faas_* edit must trigger a resync.
+    if (
+        a.faas_package_type,
+        a.faas_runtime,
+        a.faas_handler,
+        a.faas_memory_mb,
+        a.faas_timeout_seconds,
+        a.faas_architecture,
+        a.faas_public,
+        a.faas_build_command,
+        a.faas_output_dir,
+    ) != (
+        b.faas_package_type,
+        b.faas_runtime,
+        b.faas_handler,
+        b.faas_memory_mb,
+        b.faas_timeout_seconds,
+        b.faas_architecture,
+        b.faas_public,
+        b.faas_build_command,
+        b.faas_output_dir,
+    ):
+        return True
 
     a_containers = {c.name: c for c in a.containers}
     b_containers = {c.name: c for c in b.containers}

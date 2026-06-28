@@ -93,6 +93,22 @@ class WorkloadManifest:
     static_spa: bool = False
     static_index: str = "index.html"
 
+    # kind == "faas" — provider-managed FaaS (#987, AWS Lambda v1). No
+    # container/pod: the cloud runs the function. faas_package_type selects
+    # ``image`` (PackageType=Image from the per-app ECR repo built by kaniko)
+    # vs ``zip`` (a built artifact uploaded to staging S3). Image mode bundles
+    # its own runtime + entrypoint, so faas_runtime/faas_handler are zip-only.
+    # faas_public drives the Function-URL + CloudFront (cdn) + DNS surface.
+    faas_package_type: str = "image"
+    faas_runtime: str = ""
+    faas_handler: str = ""
+    faas_memory_mb: int = 512
+    faas_timeout_seconds: int = 30
+    faas_architecture: str = "arm64"
+    faas_public: bool = False
+    faas_build_command: str = ""
+    faas_output_dir: str = ""
+
 
 @dataclasses.dataclass(slots=True, frozen=True)
 class ContainerManifest:

@@ -34,6 +34,7 @@ class ManagedService(BaseCoreModel):
         EMAIL = "email"
         MODEL_ENDPOINT = "model_endpoint"
         CDN = "cdn"
+        FAAS = "faas"
 
     class Status(models.TextChoices):
         PENDING = "pending"

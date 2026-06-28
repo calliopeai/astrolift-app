@@ -52,6 +52,18 @@ is_public = true
 static_output_dir = "dist"
 """
 
+# A faas-only manifest (#987): renders to ZERO K8s resources (the cloud runs the
+# function; its Lambda + Function URL + CloudFront are managed services), but is
+# a valid deploy — pre_flight must NOT treat it as the empty-manifest error.
+_MANIFEST_FAAS_ONLY = """
+name = "hello-app"
+
+[[workloads]]
+name = "api"
+kind = "faas"
+faas_public = true
+"""
+
 
 def _make_deployment(app, env, image_tag: str = "v1") -> Deployment:
     return Deployment.objects.create(
@@ -91,6 +103,19 @@ def test_pre_flight_accepts_static_only_manifest_rendering_zero_resources(app, e
     empty manifest — the empty-render gate only fires when there's also no
     static workload."""
     app.manifest_raw = _MANIFEST_STATIC_ONLY
+    app.save(update_fields=["manifest_raw"])
+    deployment = _make_deployment(app, env)
+
+    # Must not raise even though render_resources_for_deployment returns [].
+    _pre_flight_sync(deployment.pk)
+
+
+def test_pre_flight_accepts_faas_only_manifest_rendering_zero_resources(app, env):
+    """#987: a faas-only app renders zero K8s resources (the cloud runs the
+    function; its Lambda + Function URL + CloudFront are managed services, not
+    pods), so pre_flight must NOT reject it as an empty manifest — the
+    empty-render gate only fires when there's also no pod-less workload."""
+    app.manifest_raw = _MANIFEST_FAAS_ONLY
     app.save(update_fields=["manifest_raw"])
     deployment = _make_deployment(app, env)
 

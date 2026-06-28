@@ -70,10 +70,11 @@ def _normalize_workload(
     defaults: NormalizationDefaults,
     applied: list[str],
 ) -> WorkloadManifest:
-    # Static-site (#1010) has no container/pod — applying cpu/mem/healthcheck
-    # defaults or fabricating an is_primary container would pollute the
-    # serialized hash for a container-less workload. Pass it through untouched.
-    if w.kind == "static_site":
+    # Static-site (#1010) and faas (#987) have no container/pod — applying
+    # cpu/mem/healthcheck defaults or fabricating an is_primary container would
+    # pollute the serialized hash for a container-less workload. Pass them
+    # through untouched.
+    if w.kind in ("static_site", "faas"):
         return w
 
     cpu_request = w.cpu_request or _apply(applied, f"workload.{w.name}.cpu_request", defaults.cpu_request)
@@ -176,6 +177,19 @@ def _workload_dict(w: WorkloadManifest) -> dict[str, Any]:
         "static_output_dir": w.static_output_dir,
         "static_spa": w.static_spa,
         "static_index": w.static_index,
+        # FaaS config (#987) participates in the manifest hash so a change to
+        # e.g. ``faas_memory_mb`` or ``faas_public`` is detected as a real
+        # change rather than collapsing to a silent no-op deploy. Only
+        # meaningful on ``kind == "faas"`` workloads; defaults elsewhere.
+        "faas_package_type": w.faas_package_type,
+        "faas_runtime": w.faas_runtime,
+        "faas_handler": w.faas_handler,
+        "faas_memory_mb": w.faas_memory_mb,
+        "faas_timeout_seconds": w.faas_timeout_seconds,
+        "faas_architecture": w.faas_architecture,
+        "faas_public": w.faas_public,
+        "faas_build_command": w.faas_build_command,
+        "faas_output_dir": w.faas_output_dir,
         "containers": [_container_dict(c) for c in w.containers],
     }
 

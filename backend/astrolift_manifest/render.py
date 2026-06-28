@@ -227,6 +227,11 @@ def render_manifests(
             # No K8s resource — reachability is the CNAME -> CloudFront written
             # by the deploy flow; bucket+CDN are managed services.
             continue
+        elif w.kind == "faas":
+            # No K8s resource — the cloud runs the function (#987). The Lambda,
+            # its Function URL, and the fronting CloudFront (cdn) are managed
+            # services provisioned by the faas deploy activities, not pods.
+            continue
         # job lands in a follow-up render module.
 
     return sorted(out, key=lambda d: (d.get("kind", ""), d["metadata"]["name"]))
