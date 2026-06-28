@@ -626,8 +626,11 @@ def test_cdn_custom_origin_renders_lambda_oac_custom_origin():
     assert origin["OriginAccessControlId"] == "oac-lambda-1"
     # A custom origin must NOT carry the S3 origin config.
     assert "S3OriginConfig" not in origin
-    # Query strings forwarded to the function; no default root object.
-    assert config["DefaultCacheBehavior"]["ForwardedValues"]["QueryString"] is True
+    # OAC sigv4 to Lambda needs managed cache/origin-request policies, not
+    # legacy ForwardedValues (#1035); no default root object.
+    assert config["DefaultCacheBehavior"]["CachePolicyId"] == "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
+    assert config["DefaultCacheBehavior"]["OriginRequestPolicyId"] == "b689b0a8-53d0-40ab-baf2-68738e2966ac"
+    assert "ForwardedValues" not in config["DefaultCacheBehavior"]
     assert config["DefaultRootObject"] == ""
 
 
