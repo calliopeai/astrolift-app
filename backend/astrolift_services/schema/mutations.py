@@ -1684,6 +1684,39 @@ class ServicesMutation:
             )
         svc.status = ManagedService.Status.PENDING
         svc.save(update_fields=["status", "updated_at", "version"])
+
+        # Re-fire ProvisionManagedServiceWorkflow so a row that is failed/
+        # pending/active actually re-runs (#1038). Before this the mutation
+        # only flipped status to PENDING and returned ok=true — but nothing
+        # drove the row, so it sat PENDING forever (live finding: reprovision
+        # on a failed row never re-ran). Deterministic id + TERMINATE_IF_RUNNING
+        # single-flights re-fires: a still-running run is superseded, a dead
+        # run is replaced with a fresh one. Mirrors provision_managed_service.
+        from astrolift_workflows.client import start_workflow
+        from astrolift_workflows.inputs import (
+            Actor,
+        )
+        from astrolift_workflows.inputs import (
+            ProvisionManagedServiceInput as ProvisionInput,
+        )
+
+        request = info.context.request  # type: ignore[attr-defined]
+        user = getattr(request, "user", None)
+        actor = Actor(
+            kind="user",
+            user_id=getattr(user, "pk", None) if user is not None else None,
+            display=str(getattr(user, "email", "") or getattr(user, "username", "")),
+        )
+        start_workflow(
+            "ProvisionManagedServiceWorkflow",
+            args=[
+                ProvisionInput(
+                    managed_service_id=svc.pk,
+                    actor=actor,
+                ),
+            ],
+            workflow_id=f"ProvisionManagedServiceWorkflow-{svc.guid}",
+        )
         return gql_success(managed_service_to_type(svc))
 
     @strawberry.field

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -97,7 +98,7 @@ def test_reprovision_transitions_active_to_pending(permission_resolver):
         name="primary",
         status=ManagedService.Status.ACTIVE,
     )
-    with _ctx(org):
+    with _ctx(org), patch("astrolift_workflows.client.start_workflow"):
         result = ServicesMutation().reprovision_managed_service(
             _info(user=_make_user()),
             input=ReprovisionManagedServiceInput(
@@ -120,7 +121,7 @@ def test_reprovision_transitions_failed_to_pending(permission_resolver):
         name="cache",
         status=ManagedService.Status.FAILED,
     )
-    with _ctx(org):
+    with _ctx(org), patch("astrolift_workflows.client.start_workflow"):
         result = ServicesMutation().reprovision_managed_service(
             _info(user=_make_user()),
             input=ReprovisionManagedServiceInput(
@@ -130,6 +131,37 @@ def test_reprovision_transitions_failed_to_pending(permission_resolver):
     assert result.ok, result.errors
     svc.refresh_from_db()
     assert svc.status == ManagedService.Status.PENDING
+
+
+def test_reprovision_failed_row_starts_provision_workflow(permission_resolver):
+    """Regression for #1038: reprovision on a failed row must (re)start
+    ProvisionManagedServiceWorkflow, not just flip status to PENDING.
+    Before the fix the row sat PENDING forever — nothing drove it. Revert
+    the start_workflow call in reprovision_managed_service and this fails."""
+    org, app, env = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    svc = ManagedService.objects.create(
+        registered_app=app,
+        app_environment=env,
+        kind=ManagedService.Kind.POSTGRES,
+        name="primary",
+        status=ManagedService.Status.FAILED,
+    )
+    with _ctx(org), patch("astrolift_workflows.client.start_workflow") as start_wf:
+        result = ServicesMutation().reprovision_managed_service(
+            _info(user=_make_user()),
+            input=ReprovisionManagedServiceInput(
+                managed_service_id=GUID(str(svc.guid)),
+            ),
+        )
+    assert result.ok, result.errors
+    svc.refresh_from_db()
+    assert svc.status == ManagedService.Status.PENDING
+    start_wf.assert_called_once()
+    call = start_wf.call_args
+    assert call.args[0] == "ProvisionManagedServiceWorkflow"
+    assert call.kwargs["args"][0].managed_service_id == svc.pk
+    assert call.kwargs["workflow_id"] == f"ProvisionManagedServiceWorkflow-{svc.guid}"
 
 
 def test_reprovision_blocked_while_deprovisioning(permission_resolver):

@@ -241,6 +241,41 @@ def test_deregister_mutation_resume_uses_same_workflow_id(
     assert {wf_id for _, _, wf_id in temporal_recorder.starts} == {f"DeregisterAppWorkflow-{app.guid}"}
 
 
+def test_deregister_mutation_resurrects_dead_teardown(
+    app,
+    fake_info,
+    org,
+    actor,
+    permission_resolver,
+    temporal_recorder,
+):
+    """Regression for #1038: an app already at TEARING_DOWN (its prior
+    teardown workflow died) must still (re)start DeregisterAppWorkflow when
+    the operator re-fires the mutation — otherwise the app stays stranded at
+    tearing_down forever (live finding: staticsite stuck for days). The
+    mutation has no status guard; start is deterministic + single-flighted
+    via the workflow id, so the dead run is resurrected, not skipped."""
+    from astrolift_registry.models import RegisteredApp
+
+    app.provisioning_status = RegisteredApp.ProvisioningStatus.TEARING_DOWN.value
+    app.save(update_fields=["provisioning_status", "updated_at", "version"])
+
+    _grant_delete(permission_resolver)
+    mutation = LifecycleMutation()
+    with _tenant_for(org, actor):
+        result = mutation.deregister_astrolift_app(
+            info=fake_info,
+            input=DeregisterAppInput(app_slug=app.slug, confirm_name=app.name),
+        )
+    assert result.ok is True, result.errors
+    # The teardown is resurrected — start is NOT skipped for a tearing_down app.
+    assert len(temporal_recorder.starts) == 1
+    name, args, wf_id = temporal_recorder.starts[0]
+    assert name == "DeregisterAppWorkflow"
+    assert wf_id == f"DeregisterAppWorkflow-{app.guid}"
+    assert args[0].registered_app_id == app.pk
+
+
 # ---------------------------------------------------------------------------
 # Source-webhook activity
 # ---------------------------------------------------------------------------
