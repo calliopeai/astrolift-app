@@ -334,6 +334,67 @@ def test_provision_idempotent_reconcile(cf, s3) -> None:
     assert cf._dists["EOLD123"]["config"]["DefaultRootObject"] == "index.html"
 
 
+# ---- #1035 faas custom origin: Lambda OAC ----------------------------
+
+
+def _custom_spec(**overrides) -> ProvisionSpec:
+    cfg = {
+        "custom_origin_domain": "api-prod-fn.lambda-url.us-east-1.on.aws",
+        "origin_region": "us-west-2",
+        "aliases": [],
+        "acm_cert_arn": "",
+    }
+    return _spec(config=cfg, **overrides)
+
+
+def test_provision_lambda_custom_origin_creates_lambda_oac(driver, cf, s3) -> None:
+    # #1035: a Lambda Function URL origin gets a Lambda OAC (sigv4/always) and
+    # the distribution origin carries its id -- the secure proxy model. No
+    # bucket policy is written (the invoke grant lives Lambda-side).
+    result = driver.provision(_custom_spec())
+    assert result.ok is True
+    oac_cfg = cf.calls[0][1]
+    assert oac_cfg["OriginAccessControlOriginType"] == "lambda"
+    assert oac_cfg["SigningProtocol"] == "sigv4"
+    assert oac_cfg["SigningBehavior"] == "always"
+    origin = cf._dists[parse_handle(result.handle)[1]]["config"]["Origins"]["Items"][0]
+    assert origin["OriginAccessControlId"] == "oac-1"
+    assert "CustomOriginConfig" in origin
+    assert "S3OriginConfig" not in origin
+    # Custom origin -> no S3 bucket policy written.
+    assert s3.policies == {}
+
+
+def test_provision_s3_oac_origin_type_unchanged(driver, cf) -> None:
+    # Non-regression guard (#1010): the S3 OAC path still creates an OAC with
+    # OriginType "s3". Falsifiable: a refactor that flips the S3 origin type to
+    # "lambda" fails here.
+    driver.provision(_spec())
+    oac_cfg = cf.calls[0][1]
+    assert oac_cfg["OriginAccessControlOriginType"] == "s3"
+
+
+def test_provision_lambda_oac_idempotent_reuses_existing(cf, s3) -> None:
+    driver = CloudFrontDriver(config=CloudFrontConfig(), client=cf, s3_client=s3)
+    name = driver._lambda_oac_name("api-prod-fn.lambda-url.us-east-1.on.aws")
+    cf._oacs["oac-existing"] = name
+    cf.raise_oac_already_exists = True
+    result = driver.provision(_custom_spec())
+    assert result.ok is True
+    origin = cf._dists[parse_handle(result.handle)[1]]["config"]["Origins"]["Items"][0]
+    assert origin["OriginAccessControlId"] == "oac-existing"
+
+
+def test_deprovision_lambda_custom_origin_reaps_oac(driver, cf, s3) -> None:
+    result = driver.provision(_custom_spec())
+    dist_id = parse_handle(result.handle)[1]
+    deprov = driver.deprovision(DeprovisionSpec(handle=result.handle, config=_custom_spec().config))
+    assert deprov.ok is True
+    assert dist_id not in cf._dists
+    # The Lambda OAC was reaped (resolved from the dist config's origin).
+    assert ("delete_oac", "oac-1") in cf.calls
+
+
 # ---- binding ---------------------------------------------------------
 
 

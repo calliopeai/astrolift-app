@@ -10,11 +10,16 @@ already builds and pushes; the image digest flows in via
 ``ProvisionSpec.config['image_uri']``. Zip packaging is parsed but its
 build pipeline is a follow-up.
 
-A *public* faas workload (``faas_public``) gets a Lambda Function URL
-(``AuthType=NONE``); the public HTTPS surface + custom domain are layered
-on by a separate ``cdn`` managed-service row whose origin is that Function
-URL (the CloudFront driver's custom-origin path), mirroring how a
-static_site implies an object_store + cdn pair.
+A *public* faas workload (``faas_public``) gets a Lambda Function URL with
+``AuthType=AWS_IAM`` (NOT public/``NONE`` — common org guardrails block
+public Function URLs, #1035). The function is reached only through a
+``cdn`` managed-service row whose CloudFront distribution fronts the
+Function URL via a Lambda Origin Access Control (sigv4-signed) — the secure
+proxy model. The Lambda grants ``lambda:InvokeFunctionUrl`` to the
+CloudFront service principal scoped to that one distribution's SourceArn
+(a post-cdn step: the distribution ARN doesn't exist until the cdn
+provisions). This mirrors how a static_site implies an object_store + cdn
+pair reached via an S3 OAC.
 
 The execution role is minted here with a **service trust**
 (``lambda.amazonaws.com``), not the OIDC web-identity trust IRSA uses for
@@ -65,8 +70,13 @@ KIND = "faas"
 # The inline policy name is deterministic so deprovision can delete it by
 # name (no ListRolePolicies grant required).
 _INLINE_POLICY_NAME = "astrolift-faas-policy"
-# Statement id for the public Function-URL invoke grant.
+# Statement id for the legacy public ("*") Function-URL invoke grant. No
+# longer added (#1035); kept only so a re-provision can REMOVE it from a
+# function created under the pre-#1035 public-NONE shape.
 _PUBLIC_URL_STATEMENT_ID = "AstroliftFunctionUrlPublic"
+# Statement id for the CloudFront-scoped Function-URL invoke grant (#1035):
+# only the fronting CloudFront distribution may invoke the AWS_IAM URL.
+_CLOUDFRONT_INVOKE_STATEMENT_ID = "AstroliftFunctionUrlCloudFront"
 
 # CreateFunction can race IAM trust propagation: a freshly-minted role is
 # not yet assumable by Lambda, surfacing as InvalidParameterValueException
@@ -332,7 +342,11 @@ class LambdaDriver(ManagedServiceDriver):
                 "environment": {"type": "object", "description": "Environment variables."},
                 "public": {
                     "type": "boolean",
-                    "description": "Create a public Function URL (AuthType=NONE), fronted by a cdn row.",
+                    "description": (
+                        "Create an AWS_IAM Function URL fronted by a cdn row "
+                        "(CloudFront Lambda OAC); the function is reachable only "
+                        "through the distribution, never publicly."
+                    ),
                 },
                 "grants": {
                     "type": "array",
@@ -552,22 +566,51 @@ class LambdaDriver(ManagedServiceDriver):
             return False
 
     def _ensure_function_url(self, function_name: str) -> str:
+        # AuthType=AWS_IAM (not NONE): public Function URLs are blocked by common
+        # org guardrails, and an IAM-auth URL fronted by CloudFront (Lambda OAC,
+        # sigv4) is the secure proxy model (#1035). The function is NOT public;
+        # the CloudFront-scoped invoke grant is added post-cdn via
+        # allow_cloudfront_invoke once the distribution ARN exists.
         try:
-            resp = self._lambda.create_function_url_config(FunctionName=function_name, AuthType="NONE")
+            resp = self._lambda.create_function_url_config(FunctionName=function_name, AuthType="AWS_IAM")
             url = resp.get("FunctionUrl", "")
         except self._lambda.exceptions.ResourceConflictException:
+            # Idempotent + self-healing: re-assert AWS_IAM in case a prior
+            # provision created the URL as AuthType=NONE (the pre-#1035 public
+            # shape) — this migrates the live function off the public URL.
+            self._lambda.update_function_url_config(FunctionName=function_name, AuthType="AWS_IAM")
             url = self._lambda.get_function_url_config(FunctionName=function_name).get("FunctionUrl", "")
-        # Public invoke: anyone may call the Function URL (CloudFront fronts
-        # it). ResourceConflictException == the grant already exists.
+        # Reap the legacy public ("*") invoke grant if a pre-#1035 provision left
+        # one — the function is now reachable only through CloudFront. Absent ==
+        # ResourceNotFoundException (nothing to remove).
+        with contextlib.suppress(self._lambda.exceptions.ResourceNotFoundException):
+            self._lambda.remove_permission(
+                FunctionName=function_name,
+                StatementId=_PUBLIC_URL_STATEMENT_ID,
+            )
+        return url
+
+    @driver_op(cloud="aws", driver="faas_lambda", audit=True)
+    def allow_cloudfront_invoke(self, function_name: str, distribution_arn: str) -> None:
+        """Grant ONLY the given CloudFront distribution permission to invoke the
+        function's (AWS_IAM) Function URL (#1035).
+
+        Post-cdn step: the distribution ARN doesn't exist until the cdn
+        provisions, so ``ensure_faas_services`` calls this after the cdn row is
+        ACTIVE. Idempotent — a re-grant under the same StatementId raises
+        ResourceConflictException, which is swallowed (the distribution id is
+        stable per app/env, so the SourceArn doesn't drift across redeploys)."""
+        if not distribution_arn:
+            return
         with contextlib.suppress(self._lambda.exceptions.ResourceConflictException):
             self._lambda.add_permission(
                 FunctionName=function_name,
-                StatementId=_PUBLIC_URL_STATEMENT_ID,
+                StatementId=_CLOUDFRONT_INVOKE_STATEMENT_ID,
                 Action="lambda:InvokeFunctionUrl",
-                Principal="*",
-                FunctionUrlAuthType="NONE",
+                Principal="cloudfront.amazonaws.com",
+                SourceArn=distribution_arn,
+                FunctionUrlAuthType="AWS_IAM",
             )
-        return url
 
     def _wait_active(self, function_name: str) -> None:
         self._lambda.get_waiter("function_active_v2").wait(FunctionName=function_name)

@@ -7,6 +7,13 @@ this CDN distribution in front of it. The bucket stays private; the
 distribution reaches it through an Origin Access Control (OAC) and a
 bucket policy scoped to the distribution's ARN.
 
+A public faas workload (#1035) instead points the distribution at a Lambda
+Function URL (a custom HTTPS origin) through a *Lambda* OAC: CloudFront
+sigv4-signs its requests to the AWS_IAM Function URL, and the function
+trusts only this distribution. Same OAC primitive as S3, ``OriginType``
+``lambda`` instead of ``s3``; the invoke grant is written Lambda-side
+(``LambdaDriver.allow_cloudfront_invoke``), not as a bucket policy here.
+
 CloudFront is a global service but boto3 routes its control-plane calls
 through us-east-1, and CloudFront aliases require their ACM certificate
 in us-east-1 (regional ALB certs do NOT work) -- both pinned below.
@@ -127,6 +134,18 @@ class CloudFrontDriver(ManagedServiceDriver):
                     message=f"origin-access-control: {exc}",
                     errors=[str(exc)],
                 )
+        elif custom_origin_domain:
+            # A Lambda Function URL origin gets a Lambda OAC so CloudFront
+            # sigv4-signs its requests; the URL is AWS_IAM, not public (#1035).
+            try:
+                oac_id = self._ensure_lambda_oac(custom_origin_domain)
+            except Exception as exc:
+                return ProvisionResult(
+                    ok=False,
+                    handle="",
+                    message=f"origin-access-control (lambda): {exc}",
+                    errors=[str(exc)],
+                )
 
         dist_config = self._build_distribution_config(
             spec=spec,
@@ -243,10 +262,18 @@ class CloudFrontDriver(ManagedServiceDriver):
             # The live config that carried the origin refs is gone, so recover
             # them from spec.config and reap the leftovers on this retry.
             origin_bucket = str((spec.config or {}).get("origin_bucket", ""))
+            custom_origin_domain = str((spec.config or {}).get("custom_origin_domain", ""))
             if origin_bucket:
                 self._cleanup_origin(
                     origin_bucket=origin_bucket,
                     oac_id=self._oac_id_by_name(origin_bucket),
+                )
+            elif custom_origin_domain:
+                # A faas (Lambda Function URL) origin has no bucket policy, but
+                # its deterministically-named Lambda OAC may be orphaned (#1035).
+                self._cleanup_origin(
+                    origin_bucket="",
+                    oac_id=self._lambda_oac_id_by_name(custom_origin_domain),
                 )
             return DeprovisionResult(
                 ok=True,
@@ -465,15 +492,35 @@ class CloudFrontDriver(ManagedServiceDriver):
         return f"{self._config.comment_prefix} {ident}"
 
     def _ensure_oac(self, origin_bucket: str) -> str:
-        name = f"{self._config.comment_prefix}-{origin_bucket}-oac"[:64]
+        return self._ensure_oac_named(
+            f"{self._config.comment_prefix}-{origin_bucket}-oac"[:64],
+            origin_type="s3",
+            description="astrolift static-site origin access control",
+        )
+
+    def _ensure_lambda_oac(self, custom_origin_domain: str) -> str:
+        return self._ensure_oac_named(
+            self._lambda_oac_name(custom_origin_domain),
+            origin_type="lambda",
+            description="astrolift faas (Lambda Function URL) origin access control",
+        )
+
+    def _lambda_oac_name(self, custom_origin_domain: str) -> str:
+        # Deterministic so the id is recoverable by name on the idempotent
+        # teardown path (mirrors the S3 OAC naming).
+        return f"{self._config.comment_prefix}-{custom_origin_domain}-oac"[:64]
+
+    def _ensure_oac_named(self, name: str, *, origin_type: str, description: str) -> str:
+        # Shared by the S3 (#1010) and Lambda (#1035) OAC paths — identical
+        # sigv4/always signing, differing only by OriginAccessControlOriginType.
         try:
             response = self._cf.create_origin_access_control(
                 OriginAccessControlConfig={
                     "Name": name,
-                    "Description": "astrolift static-site origin access control",
+                    "Description": description,
                     "SigningProtocol": "sigv4",
                     "SigningBehavior": "always",
-                    "OriginAccessControlOriginType": "s3",
+                    "OriginAccessControlOriginType": origin_type,
                 },
             )
             return response["OriginAccessControl"]["Id"]
@@ -537,14 +584,19 @@ class CloudFrontDriver(ManagedServiceDriver):
     def _custom_origin(
         self,
         custom_origin_domain: str,
+        oac_id: str,
     ) -> tuple[dict[str, Any], dict[str, Any], str]:
-        """Custom HTTPS origin: a Lambda Function URL host fronted directly
-        (no OAC, https-only) for a public faas workload (#987). Returns
-        (origin item, default cache behavior, default-root-object)."""
+        """Custom HTTPS origin: a Lambda Function URL host (https-only) fronted
+        through a Lambda OAC so CloudFront sigv4-signs requests to the AWS_IAM
+        Function URL (#1035) for a public faas workload. Returns (origin item,
+        default cache behavior, default-root-object)."""
         origin_id = "custom-origin"
         origin_item = {
             "Id": origin_id,
             "DomainName": custom_origin_domain,
+            # Lambda OAC: CloudFront signs (sigv4) requests to the AWS_IAM
+            # Function URL; the function trusts only this distribution (#1035).
+            "OriginAccessControlId": oac_id,
             "CustomOriginConfig": {
                 "HTTPPort": 80,
                 "HTTPSPort": 443,
@@ -590,7 +642,7 @@ class CloudFrontDriver(ManagedServiceDriver):
         comment: str,
     ) -> dict[str, Any]:
         if custom_origin_domain:
-            origin_item, default_behavior, default_root = self._custom_origin(custom_origin_domain)
+            origin_item, default_behavior, default_root = self._custom_origin(custom_origin_domain, oac_id)
             origin_ref = custom_origin_domain
         else:
             origin_item, default_behavior, default_root = self._s3_origin(origin_bucket, origin_region, oac_id, index)
@@ -766,6 +818,13 @@ class CloudFrontDriver(ManagedServiceDriver):
         name = f"{self._config.comment_prefix}-{origin_bucket}-oac"[:64]
         with contextlib.suppress(Exception):
             return self._find_oac_id(name)
+        return ""
+
+    def _lambda_oac_id_by_name(self, custom_origin_domain: str) -> str:
+        # Lambda OAC counterpart of _oac_id_by_name for the faas custom-origin
+        # idempotent teardown path. Absent -> "" (already reaped).
+        with contextlib.suppress(Exception):
+            return self._find_oac_id(self._lambda_oac_name(custom_origin_domain))
         return ""
 
     def _cleanup_origin(self, *, origin_bucket: str, oac_id: str) -> None:

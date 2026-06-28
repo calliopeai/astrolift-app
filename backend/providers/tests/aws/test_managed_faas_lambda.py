@@ -60,6 +60,8 @@ class FakeLambda:
         self.exceptions = _LambdaExceptions()
         self._functions: dict[str, dict] = {}
         self._urls: dict[str, str] = {}
+        self._url_auth: dict[str, str] = {}
+        self._permissions: set[tuple[str, str]] = set()
         self._conflict_on_create = conflict_on_create
 
     def _record(self, name: str, kwargs: dict) -> None:
@@ -74,7 +76,7 @@ class FakeLambda:
                 return kw
         raise AssertionError(f"{name} was not called")
 
-    def seed_function(self, function_name: str, *, url: str | None = None) -> None:
+    def seed_function(self, function_name: str, *, url: str | None = None, url_auth: str = "AWS_IAM") -> None:
         self._functions[function_name] = {
             "FunctionArn": f"arn:aws:lambda:us-east-1:123456789012:function:{function_name}",
             "State": "Active",
@@ -82,6 +84,10 @@ class FakeLambda:
         }
         if url:
             self._urls[function_name] = url
+            self._url_auth[function_name] = url_auth
+
+    def seed_permission(self, function_name: str, statement_id: str) -> None:
+        self._permissions.add((function_name, statement_id))
 
     # ---- lambda API surface ----
     def get_function(self, **kwargs):
@@ -114,16 +120,27 @@ class FakeLambda:
     def create_function_url_config(self, **kwargs):
         self._record("create_function_url_config", kwargs)
         name = kwargs["FunctionName"]
+        if name in self._urls:
+            # A url already exists -> conflict (drives the self-heal path).
+            raise _ResourceConflictException(name)
         url = f"https://{name}.lambda-url.us-east-1.on.aws/"
         self._urls[name] = url
+        self._url_auth[name] = kwargs.get("AuthType", "")
         return {"FunctionUrl": url}
+
+    def update_function_url_config(self, **kwargs):
+        self._record("update_function_url_config", kwargs)
+        name = kwargs["FunctionName"]
+        if "AuthType" in kwargs:
+            self._url_auth[name] = kwargs["AuthType"]
+        return {"FunctionUrl": self._urls.get(name, "")}
 
     def get_function_url_config(self, **kwargs):
         self._record("get_function_url_config", kwargs)
         name = kwargs["FunctionName"]
         if name not in self._urls:
             raise _ResourceNotFoundException(name)
-        return {"FunctionUrl": self._urls[name]}
+        return {"FunctionUrl": self._urls[name], "AuthType": self._url_auth.get(name, "")}
 
     def delete_function_url_config(self, **kwargs):
         self._record("delete_function_url_config", kwargs)
@@ -134,6 +151,17 @@ class FakeLambda:
 
     def add_permission(self, **kwargs):
         self._record("add_permission", kwargs)
+        key = (kwargs["FunctionName"], kwargs["StatementId"])
+        if key in self._permissions:
+            raise _ResourceConflictException(str(key))
+        self._permissions.add(key)
+
+    def remove_permission(self, **kwargs):
+        self._record("remove_permission", kwargs)
+        key = (kwargs["FunctionName"], kwargs["StatementId"])
+        if key not in self._permissions:
+            raise _ResourceNotFoundException(str(key))
+        self._permissions.discard(key)
 
     def delete_function(self, **kwargs):
         self._record("delete_function", kwargs)
@@ -360,22 +388,74 @@ def test_update_serializes_code_before_config_with_wait():
 # ---- public Function URL ---------------------------------------------
 
 
-def test_public_creates_function_url_and_public_permission():
+def test_public_creates_aws_iam_function_url_not_public():
+    # #1035: a public faas Function URL is AWS_IAM (NOT NONE), and provision
+    # must NOT add a public ("*") invoke permission -- the function is reachable
+    # only through the fronting CloudFront distribution (granted post-cdn).
+    # Falsifiable: reverting to AuthType=NONE + Principal "*" fails both asserts.
     drv, lam, _ = _driver()
     result = drv.provision(_spec({"image_uri": "repo@sha256:abc", "public": True}))
     assert result.ok is True
-    assert "create_function_url_config" in lam.names()
-    assert lam.kwargs_for("create_function_url_config")["AuthType"] == "NONE"
-    perm = lam.kwargs_for("add_permission")
-    assert perm["Action"] == "lambda:InvokeFunctionUrl"
-    assert perm["Principal"] == "*"
-    assert perm["FunctionUrlAuthType"] == "NONE"
+    assert lam.kwargs_for("create_function_url_config")["AuthType"] == "AWS_IAM"
+    # No public grant added during provision.
+    public_grants = [
+        kw for n, kw in lam.calls if n == "add_permission" and kw.get("Principal") == "*"
+    ]
+    assert public_grants == []
+
+
+def test_public_reasserts_aws_iam_on_preexisting_none_url():
+    # Self-heal/migration: a function created under the pre-#1035 public-NONE
+    # shape must be flipped to AWS_IAM on re-provision (and its legacy public
+    # grant reaped). The create raises conflict (url exists) -> update path.
+    lam = FakeLambda()
+    lam.seed_function(_FN, url=f"https://{_FN}.lambda-url.us-east-1.on.aws/", url_auth="NONE")
+    lam.seed_permission(_FN, "AstroliftFunctionUrlPublic")
+    drv, lam, _ = _driver(lam=lam)
+    result = drv.provision(_spec({"image_uri": "repo@sha256:abc", "public": True}))
+    assert result.ok is True
+    assert lam.kwargs_for("update_function_url_config")["AuthType"] == "AWS_IAM"
+    assert lam._url_auth[_FN] == "AWS_IAM"
+    # Legacy public grant removed; nothing else lingers as public.
+    assert ("remove_permission", {"FunctionName": _FN, "StatementId": "AstroliftFunctionUrlPublic"}) in lam.calls
+    assert (_FN, "AstroliftFunctionUrlPublic") not in lam._permissions
 
 
 def test_private_does_not_create_function_url():
     drv, lam, _ = _driver()
     drv.provision(_spec({"image_uri": "repo@sha256:abc"}))
     assert "create_function_url_config" not in lam.names()
+    assert "add_permission" not in lam.names()
+
+
+def test_allow_cloudfront_invoke_scopes_to_distribution():
+    # #1035: the only invoke grant on the AWS_IAM URL is the CloudFront service
+    # principal scoped to ONE distribution SourceArn. Falsifiable: a Principal
+    # "*" / missing SourceArn would fail these asserts.
+    dist_arn = "arn:aws:cloudfront::123456789012:distribution/E123"
+    drv, lam, _ = _driver()
+    drv.allow_cloudfront_invoke(_FN, dist_arn)
+    perm = lam.kwargs_for("add_permission")
+    assert perm["StatementId"] == "AstroliftFunctionUrlCloudFront"
+    assert perm["Action"] == "lambda:InvokeFunctionUrl"
+    assert perm["Principal"] == "cloudfront.amazonaws.com"
+    assert perm["SourceArn"] == dist_arn
+    assert perm["FunctionUrlAuthType"] == "AWS_IAM"
+
+
+def test_allow_cloudfront_invoke_is_idempotent():
+    dist_arn = "arn:aws:cloudfront::123456789012:distribution/E123"
+    drv, lam, _ = _driver()
+    drv.allow_cloudfront_invoke(_FN, dist_arn)
+    # A second grant under the same StatementId conflicts; it must be swallowed,
+    # not raised (re-provision must converge).
+    drv.allow_cloudfront_invoke(_FN, dist_arn)
+    assert (_FN, "AstroliftFunctionUrlCloudFront") in lam._permissions
+
+
+def test_allow_cloudfront_invoke_noop_without_arn():
+    drv, lam, _ = _driver()
+    drv.allow_cloudfront_invoke(_FN, "")
     assert "add_permission" not in lam.names()
 
 
@@ -523,14 +603,17 @@ def _cf_driver():
     return CloudFrontDriver(config=CloudFrontConfig(), client=object(), s3_client=object())
 
 
-def test_cdn_custom_origin_renders_https_custom_origin():
+def test_cdn_custom_origin_renders_lambda_oac_custom_origin():
+    # #1035: a custom (Lambda Function URL) origin now carries a Lambda OAC id so
+    # CloudFront sigv4-signs the AWS_IAM Function URL -- but stays a custom (not
+    # S3) origin. Falsifiable: dropping the OAC attach leaves OriginAccessControlId empty.
     drv = _cf_driver()
     config = drv._build_distribution_config(
         spec=_spec(),
         origin_bucket="",
         custom_origin_domain="abc.lambda-url.us-east-1.on.aws",
         origin_region="us-east-1",
-        oac_id="",
+        oac_id="oac-lambda-1",
         aliases=[],
         acm_cert_arn="",
         spa=False,
@@ -540,9 +623,9 @@ def test_cdn_custom_origin_renders_https_custom_origin():
     origin = config["Origins"]["Items"][0]
     assert origin["DomainName"] == "abc.lambda-url.us-east-1.on.aws"
     assert origin["CustomOriginConfig"]["OriginProtocolPolicy"] == "https-only"
-    # A custom origin must NOT carry S3/OAC fields.
+    assert origin["OriginAccessControlId"] == "oac-lambda-1"
+    # A custom origin must NOT carry the S3 origin config.
     assert "S3OriginConfig" not in origin
-    assert "OriginAccessControlId" not in origin
     # Query strings forwarded to the function; no default root object.
     assert config["DefaultCacheBehavior"]["ForwardedValues"]["QueryString"] is True
     assert config["DefaultRootObject"] == ""
