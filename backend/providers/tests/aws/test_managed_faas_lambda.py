@@ -246,9 +246,10 @@ def _spec(config: dict | None = None) -> ProvisionSpec:
     )
 
 
-# Function name is deterministic from org/app/env; the role appends "-fn".
-_FN = "astrolift-acme-api-prod"
-_ROLE = "astrolift-acme-api-prod-fn"
+# Function name is deterministic from org/app/env + the service_handle_hint
+# ("faas" here, per _spec); the role appends "-fn".
+_FN = "astrolift-acme-api-prod-faas"
+_ROLE = "astrolift-acme-api-prod-faas-fn"
 
 
 # ---- provision: idempotency ------------------------------------------
@@ -323,6 +324,19 @@ def test_provision_zip_mode_sets_runtime_handler():
     assert create["Code"] == {"S3Bucket": "astrolift-staging", "S3Key": "acme/api.zip"}
     assert create["Runtime"] == "python3.12"
     assert create["Handler"] == "app.handler"
+
+
+def test_two_faas_workloads_get_distinct_function_names():
+    # Two faas workloads in the SAME org/app/env must not collide onto one
+    # Lambda. The per-workload service_handle_hint scopes the name; dropping it
+    # from _function_name would make these equal (silent overwrite).
+    import dataclasses
+
+    drv, _, _ = _driver()
+    a = drv._function_name(_spec())  # hint defaults to "faas"
+    b = drv._function_name(dataclasses.replace(_spec(), service_handle_hint="worker-prod-fn"))
+    assert a != b
+    assert a.startswith("astrolift-") and b.startswith("astrolift-")
 
 
 # ---- update: code-then-config serialization --------------------------

@@ -355,12 +355,18 @@ class LambdaDriver(ManagedServiceDriver):
 
     def _function_name(self, spec: ProvisionSpec) -> str:
         # Deterministic, charset/length-safe, astrolift-* prefixed so it
-        # matches the control-plane function:astrolift-* grant.
+        # matches the control-plane function:astrolift-* grant. The
+        # service_handle_hint (the per-workload row name, e.g.
+        # ``<workload>-<env>-fn``) is folded in so two faas workloads in the
+        # same app/env get distinct functions instead of silently overwriting
+        # one another (matches object_store_s3._bucket_name_for, which scopes
+        # by the same hint).
         return iam_role_name(
             "astrolift",
             spec.organization_slug,
             spec.app_slug,
             spec.environment_name,
+            spec.service_handle_hint,
             max_len=64,
         )
 
