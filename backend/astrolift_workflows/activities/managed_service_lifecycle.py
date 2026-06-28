@@ -255,6 +255,9 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
     return {
         "ok": bool(getattr(result, "ok", False)),
         "handle": str(getattr(result, "handle", "")),
+        # Capability-only services (Bedrock on-demand) report ready=True so
+        # the workflow skips its status()-poll readiness wait (#1038).
+        "ready": bool(getattr(result, "ready", False)),
         "message": str(getattr(result, "message", "")),
         "errors": list(getattr(result, "errors", []) or []),
     }

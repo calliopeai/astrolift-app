@@ -104,6 +104,7 @@ class ProvisionManagedServiceWorkflow:
             return WorkflowResult(ok=False, message=message)
 
         handle = result.get("handle", "") if isinstance(result, dict) else ""
+        ready = bool(result.get("ready")) if isinstance(result, dict) else False
 
         # Wait until the backing resource is actually ready before finalize
         # materializes the connection bindings — RDS/ElastiCache report
@@ -111,7 +112,14 @@ class ProvisionManagedServiceWorkflow:
         # would otherwise capture an empty host (#1009). S3 is `available`
         # immediately, so this is a no-op for it. Bounded (~20 min) timer poll
         # rather than a long blocking activity (avoids the #1004 trap).
-        if handle:
+        #
+        # Capability-only services (Bedrock on-demand model access) provision
+        # no cloud resource and report `ready=True`; there is no backend
+        # `state` to poll, so skip the wait entirely. Polling status() for
+        # them false-failed with "backend not ready: state=deprovisioned"
+        # because the driver's record is per-instance and absent in the
+        # fresh check-activity driver (#1038).
+        if handle and not ready:
             for _ in range(60):
                 state = await workflow.execute_activity(
                     check_managed_service_ready,

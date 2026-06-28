@@ -42,6 +42,15 @@ class ProvisionResult:
     handle: str
     message: str
     errors: list[str] = field(default_factory=list)
+    ready: bool = False
+    """The backing resource is already active and needs no readiness
+    poll. Capability-only services (e.g. Bedrock on-demand model
+    access) provision no cloud resource, so they are ready the moment
+    ``provision`` returns. The provision workflow skips its
+    ``status``-poll wait loop when this is set. Drivers that create a
+    resource with a ``creating`` -> ``available`` transition (RDS,
+    ElastiCache, provisioned-throughput Bedrock) leave it ``False`` so
+    the workflow waits for the endpoint."""
 
 
 @dataclass(frozen=True)

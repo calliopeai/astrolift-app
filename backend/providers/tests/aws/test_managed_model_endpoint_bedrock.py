@@ -230,6 +230,39 @@ def test_provision_idempotent(
     assert logs_client.create_calls.count(log_group) >= 1
 
 
+def test_provision_on_demand_reports_ready(
+    driver: AmazonBedrockDriver,
+) -> None:
+    """On-demand model access creates no cloud resource, so provision is
+    ready immediately and the workflow skips its readiness wait (#1038)."""
+    result = driver.provision(_spec())
+    assert result.ok
+    assert result.ready is True
+
+
+def test_provision_idempotent_on_demand_reports_ready(
+    driver: AmazonBedrockDriver,
+) -> None:
+    """The already-exists fast path must also report ready for on-demand."""
+    driver.provision(_spec())
+    result = driver.provision(_spec())
+    assert "already exists" in result.message
+    assert result.ready is True
+
+
+def test_provision_with_throughput_not_ready(
+    driver: AmazonBedrockDriver,
+) -> None:
+    """A provisioned-throughput commitment is a real resource that
+    transitions creating -> InService, so provision is NOT ready and the
+    workflow must poll status() before finalize."""
+    result = driver.provision(
+        _spec(config={"provisioned_throughput": "OneMonth"}),
+    )
+    assert result.ok
+    assert result.ready is False
+
+
 def test_provision_attaches_provisioned_throughput(
     driver: AmazonBedrockDriver,
     bedrock_client: FakeBedrockClient,
@@ -445,11 +478,21 @@ def test_deprovision_surfaces_pt_delete_failure(
 # ---- status -----------------------------------------------------
 
 
-def test_status_for_missing_returns_deprovisioned(
+def test_status_without_record_is_available(
     driver: AmazonBedrockDriver,
 ) -> None:
-    state = driver.status(ServiceHandle(handle=f"{KIND}/missing"))
-    assert state.state == "deprovisioned"
+    """A capability-only handle with no in-memory record is available.
+
+    Each Temporal activity builds a fresh driver instance, so the
+    readiness-poll activity never shares the provision activity's
+    in-memory record. Treating its absence as ``deprovisioned`` (the
+    old behavior) false-failed the provision readiness gate with
+    "backend not ready: state=deprovisioned" (#1038). On-demand
+    foundation-model access has no cloud resource to be unavailable, so
+    a valid handle reads as available regardless of local record state.
+    """
+    state = driver.status(ServiceHandle(handle=f"{KIND}/never-seen"))
+    assert state.state == "available"
 
 
 def test_status_for_on_demand_record_is_available(
@@ -525,11 +568,58 @@ def test_binding_iam_grants_cover_invoke_model(
     assert "bedrock:InvokeModelWithResponseStream" in actions
 
 
-def test_binding_for_missing_raises(
+def test_binding_without_record_reconstructs_envelope(
+    bedrock_client: FakeBedrockClient,
+    logs_client: FakeLogsClient,
+) -> None:
+    """binding() on a fresh driver instance (no in-memory record) must
+    still emit the invoke env + grant.
+
+    This is the finalize path: the activity that materializes binding
+    rows builds a brand-new driver, so it never shares the provision
+    activity's record. Requiring the record there raised
+    ``ManagedServiceError`` and aborted provisioning (#1038). A
+    capability-only service reconstructs the envelope from the handle +
+    driver config alone.
+    """
+    provisioner = AmazonBedrockDriver(
+        config=AmazonBedrockConfig(region="us-east-1"),
+        bedrock_client=bedrock_client,
+        logs_client=logs_client,
+    )
+    provisioned = provisioner.provision(_spec())
+    # A separate driver instance with an empty record store, exactly like
+    # the finalize activity sees.
+    fresh = AmazonBedrockDriver(
+        config=AmazonBedrockConfig(region="us-east-1"),
+        bedrock_client=FakeBedrockClient(),
+        logs_client=FakeLogsClient(),
+    )
+    binding = fresh.binding(ServiceHandle(handle=provisioned.handle))
+    assert binding.env_vars["MODEL_ENDPOINT_PROVIDER"].literal == "bedrock"
+    assert binding.env_vars["BEDROCK_REGION"].literal == "us-east-1"
+    assert (
+        "bedrock-runtime"
+        in binding.env_vars["MODEL_ENDPOINT_URL"].literal
+    )
+    actions = {a for g in binding.iam_grants for a in g.actions}
+    assert "bedrock:InvokeModel" in actions
+
+
+def test_binding_without_record_honours_config_model_id(
     driver: AmazonBedrockDriver,
 ) -> None:
-    with pytest.raises(ManagedServiceError):
-        driver.binding(ServiceHandle(handle=f"{KIND}/missing"))
+    """When the durable record is absent, an operator config model_id is
+    honored over the driver default so the workload binds the model the
+    operator selected."""
+    binding = driver.binding(
+        ServiceHandle(handle=f"{KIND}/acme-api-prod-model"),
+        config={"model_id": "mistral.mistral-large-2402-v1:0"},
+    )
+    assert (
+        binding.env_vars["BEDROCK_MODEL_ID"].literal
+        == "mistral.mistral-large-2402-v1:0"
+    )
 
 
 def test_binding_notes_mention_irsa_tag(

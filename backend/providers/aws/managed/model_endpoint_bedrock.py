@@ -156,6 +156,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             return ProvisionResult(
                 ok=True,
                 handle=handle_for(kind=KIND, resource_id=record_id),
+                ready=not (existing.get("ProvisionedThroughputArn") or ""),
                 message=(
                     f"bedrock model endpoint {record_id} already exists "
                     f"(model_id={existing.get('ModelId')})"
@@ -209,6 +210,11 @@ class AmazonBedrockDriver(ManagedServiceDriver):
         return ProvisionResult(
             ok=True,
             handle=handle_for(kind=KIND, resource_id=record_id),
+            # On-demand foundation-model access creates no cloud resource
+            # -> ready immediately. A provisioned-throughput commitment is
+            # a real resource that transitions creating -> InService, so
+            # leave ready=False and let the workflow poll status().
+            ready=not provisioned_throughput_arn,
             message=(
                 f"bedrock model endpoint {record_id} provisioned "
                 f"(model_id={model_id}, "
@@ -344,13 +350,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
     @driver_op(cloud="aws", driver="model_endpoint_bedrock")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         _, record_id = parse_handle(handle.handle)
-        existing = self._describe(record_id)
-        if existing is None:
-            return ServiceStatus(
-                handle=handle.handle,
-                state="deprovisioned",
-                message=f"bedrock model endpoint {record_id} not found",
-            )
+        existing = self._describe(record_id) or {}
         pt_arn = existing.get("ProvisionedThroughputArn") or ""
         if pt_arn:
             try:
@@ -377,28 +377,51 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             except Exception:
                 # Best-effort -- fall through to available.
                 pass
+        # On-demand foundation-model access has no cloud resource that can
+        # be "unavailable": a syntactically valid handle is always
+        # available. The in-memory record is per-driver-instance and is
+        # absent across Temporal activity boundaries (each activity builds
+        # a fresh driver), so a missing record must NOT read as
+        # "deprovisioned" -- doing so false-failed the provision readiness
+        # gate with "backend not ready: state=deprovisioned".
+        model_id = existing.get("ModelId") or self._config.default_model_id
         return ServiceStatus(
             handle=handle.handle,
             state="available",
             message=(
                 f"bedrock model endpoint {record_id} available "
-                f"(model_id={existing.get('ModelId')})"
+                f"(model_id={model_id})"
             ),
         )
 
     @driver_op(cloud="aws", driver="model_endpoint_bedrock")
-    def binding(self, handle: ServiceHandle) -> Binding:
+    def binding(
+        self,
+        handle: ServiceHandle,
+        config: dict[str, Any] | None = None,
+    ) -> Binding:
         _, record_id = parse_handle(handle.handle)
-        existing = self._describe(record_id)
-        if existing is None:
-            raise ManagedServiceError(
-                f"binding requested for missing record {record_id}",
-            )
+        # Capability-only service: reconstruct the connection envelope from
+        # the handle + driver config alone. The in-memory record is absent
+        # in the fresh driver instance the finalize activity builds, so we
+        # must not require it (that raised and aborted provisioning). When
+        # present (same-instance) its ModelId wins; otherwise fall back to
+        # operator config then the driver default.
+        existing = self._describe(record_id) or {}
+        cfg = config or {}
         invoke_endpoint = (
             self._config.invoke_endpoint_override
             or f"https://bedrock-runtime.{self._config.region}.amazonaws.com"
         )
-        model_id = existing.get("ModelId") or self._config.default_model_id
+        model_id = (
+            existing.get("ModelId")
+            or cfg.get("model_id")
+            or _SIZE_TO_MODEL_ID.get(str(cfg.get("size", "")))
+            or self._config.default_model_id
+        )
+        log_group = existing.get("LogGroup") or self._log_group_for(
+            record_id=record_id,
+        )
         irsa_role_tag_value = (
             f"{self._config.irsa_role_tag_value_prefix}-{record_id}"
         )
@@ -431,7 +454,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
                 f"IRSA role lookup uses tag "
                 f"{self._config.irsa_role_tag_key}="
                 f"{irsa_role_tag_value}. CloudWatch invocation logs "
-                f"persist at {existing.get('LogGroup')} -- retention "
+                f"persist at {log_group} -- retention "
                 f"governed by deprovision delete_data flag."
             ),
         )
