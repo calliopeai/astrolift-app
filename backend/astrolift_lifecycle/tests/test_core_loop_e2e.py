@@ -20,13 +20,23 @@ import re
 CORE_LOOP_MUTATIONS = [
     "registerApp",
     "startDeployment",
+    "redeployApp",
     "deregisterAstroliftApp",
     "runAstroliftAgent",
     "runWorkflowDefinition",
+    "cancelTask",
 ]
+# managedService (singular) is intentionally omitted: only the list field
+# managedServices is exposed on the assembled schema today.
 CORE_LOOP_QUERIES = [
     "astroliftDeployment",
     "astroliftDeployments",
+    "astroliftApp",
+    "astroliftApps",
+    "agentTask",
+    "agentTasks",
+    "agentTaskLogs",
+    "managedServices",
 ]
 
 
