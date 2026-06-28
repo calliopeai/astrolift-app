@@ -63,7 +63,7 @@ def test_single_public_workload_uses_app_slug():
         HostnameInputs(app_slug="hello", org_slug="acme", base_zone="astrolift.dev"),
     )
     assert len(out) == 1
-    assert out[0].hostname == "hello.acme.astrolift.dev"
+    assert out[0].hostname == "hello.astrolift.dev"
 
 
 def test_subdomain_override_takes_precedence():
@@ -77,12 +77,12 @@ def test_subdomain_override_takes_precedence():
             subdomain_override="custom",
         ),
     )
-    assert out[0].hostname == "custom.acme.astrolift.dev"
+    assert out[0].hostname == "custom.astrolift.dev"
 
 
 def test_multi_public_workloads_get_flat_suffix():
     """Two public workloads → both get -<slug> suffix so a single
-    wildcard cert (*.acme.astrolift.dev) covers them."""
+    wildcard cert (*.astrolift.dev) covers them."""
     manifest = _normalized(
         _wl("web", is_public=True),
         _wl("api", is_public=True),
@@ -93,8 +93,8 @@ def test_multi_public_workloads_get_flat_suffix():
     )
     hosts = sorted(o.hostname for o in out)
     assert hosts == [
-        "hello-api.acme.astrolift.dev",
-        "hello-web.acme.astrolift.dev",
+        "hello-api.astrolift.dev",
+        "hello-web.astrolift.dev",
     ]
 
 
@@ -135,7 +135,7 @@ def test_uppercase_subdomain_normalized_to_lower():
         manifest,
         HostnameInputs(app_slug="HELLO", org_slug="acme", base_zone="astrolift.dev"),
     )
-    assert out[0].hostname == "hello.acme.astrolift.dev"
+    assert out[0].hostname == "hello.astrolift.dev"
 
 
 # ---- preview ----------------------------------------------------------
@@ -143,7 +143,7 @@ def test_uppercase_subdomain_normalized_to_lower():
 
 def test_preview_hostname_pattern():
     h = compute_preview_hostname(pr_number=42, app_slug="hello", org_slug="acme", base_zone="astrolift.dev")
-    assert h == "pr-42-hello.pr.acme.astrolift.dev"
+    assert h == "pr-42-hello.pr.astrolift.dev"
 
 
 def test_preview_hostname_rejects_non_positive_pr_number():

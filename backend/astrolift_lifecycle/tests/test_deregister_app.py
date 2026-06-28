@@ -437,8 +437,10 @@ def test_workflow_happy_path_soft_deletes_app(app):
     returns ok=True with an empty still-live list."""
     fakes = {
         "mark_app_tearing_down": lambda *_: None,
+        "abort_in_flight_deploys": lambda *_: [],
         "delete_app_namespaces": lambda *_: ["dev-cluster/acme-hello"],
         "list_app_managed_service_ids": lambda *_: [],
+        "delete_static_dns_records": lambda *_: {"deleted": []},
         "deprovision_app_registry_repo": lambda *_: {"repo": "acme/hello"},
         "deprovision_app_identity_role": lambda *_: {"role": "astrolift-acme-hello"},
         "list_app_secret_targets": lambda *_: [],
@@ -1140,8 +1142,10 @@ def test_workflow_grace_period_elapses_proceeds_with_teardown(app):
 
     fakes = {
         "mark_app_tearing_down": lambda *_: None,
+        "abort_in_flight_deploys": lambda *_: [],
         "delete_app_namespaces": lambda *_: ["dev-cluster/acme-hello"],
         "list_app_managed_service_ids": lambda *_: [],
+        "delete_static_dns_records": lambda *_: {"deleted": []},
         "deprovision_app_registry_repo": lambda *_: {"repo": "acme/hello"},
         "deprovision_app_identity_role": lambda *_: {"role": "astrolift-acme-hello"},
         "list_app_secret_targets": lambda *_: [],

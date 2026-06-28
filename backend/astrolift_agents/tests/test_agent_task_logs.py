@@ -161,16 +161,13 @@ class _ScriptedLogBackend:
 
 
 @pytest.mark.django_db(transaction=True)
-@pytest.mark.asyncio
-async def test_agent_task_logs_happy_path(permission_resolver):
+def test_agent_task_logs_happy_path(permission_resolver):
     """Pod discovered + lines streamed back as plain message strings,
     in the per-org agent namespace, with follow disabled."""
-    import asyncio
-
-    org = await asyncio.to_thread(Organization.objects.create, name="Logs Org", slug="logs-org")
-    cluster = await asyncio.to_thread(_cluster, org, slug="logs-cluster")
-    dispatcher = await asyncio.to_thread(_dispatcher, org, cluster, slug="logs-dispatcher")
-    task = await asyncio.to_thread(_task, org, dispatcher)
+    org = Organization.objects.create(name="Logs Org", slug="logs-org")
+    cluster = _cluster(org, slug="logs-cluster")
+    dispatcher = _dispatcher(org, cluster, slug="logs-dispatcher")
+    task = _task(org, dispatcher)
 
     permission_resolver.grant(Permission.AGENT_READ)
     pod_backend = _FixedPodBackend([_fake_pod("agent-task-abc-xyz12")])
@@ -179,7 +176,7 @@ async def test_agent_task_logs_happy_path(permission_resolver):
     set_log_backend_for_tests(log_backend)
     try:
         with _tenant(org):
-            lines = await AgentsQuery().agent_task_logs(info=_info(), id=str(task.guid), tail=200)
+            lines = AgentsQuery().agent_task_logs(info=_info(), id=str(task.guid), tail=200)
     finally:
         reset_pod_backend_for_tests()
         reset_log_backend_for_tests()
@@ -197,21 +194,18 @@ async def test_agent_task_logs_happy_path(permission_resolver):
 
 
 @pytest.mark.django_db(transaction=True)
-@pytest.mark.asyncio
-async def test_agent_task_logs_tail_caps_line_count(permission_resolver):
-    import asyncio
-
-    org = await asyncio.to_thread(Organization.objects.create, name="Tail Org", slug="tail-org")
-    cluster = await asyncio.to_thread(_cluster, org, slug="tail-cluster")
-    dispatcher = await asyncio.to_thread(_dispatcher, org, cluster, slug="tail-dispatcher")
-    task = await asyncio.to_thread(_task, org, dispatcher)
+def test_agent_task_logs_tail_caps_line_count(permission_resolver):
+    org = Organization.objects.create(name="Tail Org", slug="tail-org")
+    cluster = _cluster(org, slug="tail-cluster")
+    dispatcher = _dispatcher(org, cluster, slug="tail-dispatcher")
+    task = _task(org, dispatcher)
 
     permission_resolver.grant(Permission.AGENT_READ)
     set_pod_backend_for_tests(_FixedPodBackend([_fake_pod("pod-1")]))
     set_log_backend_for_tests(_ScriptedLogBackend([f"line {i}" for i in range(50)]))
     try:
         with _tenant(org):
-            lines = await AgentsQuery().agent_task_logs(info=_info(), id=str(task.guid), tail=5)
+            lines = AgentsQuery().agent_task_logs(info=_info(), id=str(task.guid), tail=5)
     finally:
         reset_pod_backend_for_tests()
         reset_log_backend_for_tests()
@@ -220,17 +214,14 @@ async def test_agent_task_logs_tail_caps_line_count(permission_resolver):
 
 
 @pytest.mark.django_db(transaction=True)
-@pytest.mark.asyncio
-async def test_agent_task_logs_falls_back_to_pod_name_hint(permission_resolver):
+def test_agent_task_logs_falls_back_to_pod_name_hint(permission_resolver):
     """When discovery returns no pods (the live backend can't select the
     agent's task-id label), the resolver falls back to the recorded Job
     name on ``AgentTask.pod_name``."""
-    import asyncio
-
-    org = await asyncio.to_thread(Organization.objects.create, name="Hint Org", slug="hint-org")
-    cluster = await asyncio.to_thread(_cluster, org, slug="hint-cluster")
-    dispatcher = await asyncio.to_thread(_dispatcher, org, cluster, slug="hint-dispatcher")
-    task = await asyncio.to_thread(_task, org, dispatcher, pod_name="agent-task-deadbeef")
+    org = Organization.objects.create(name="Hint Org", slug="hint-org")
+    cluster = _cluster(org, slug="hint-cluster")
+    dispatcher = _dispatcher(org, cluster, slug="hint-dispatcher")
+    task = _task(org, dispatcher, pod_name="agent-task-deadbeef")
 
     permission_resolver.grant(Permission.AGENT_READ)
     set_pod_backend_for_tests(_FixedPodBackend([]))  # discovery finds nothing
@@ -238,7 +229,7 @@ async def test_agent_task_logs_falls_back_to_pod_name_hint(permission_resolver):
     set_log_backend_for_tests(log_backend)
     try:
         with _tenant(org):
-            lines = await AgentsQuery().agent_task_logs(info=_info(), id=str(task.guid))
+            lines = AgentsQuery().agent_task_logs(info=_info(), id=str(task.guid))
     finally:
         reset_pod_backend_for_tests()
         reset_log_backend_for_tests()
@@ -248,17 +239,14 @@ async def test_agent_task_logs_falls_back_to_pod_name_hint(permission_resolver):
 
 
 @pytest.mark.django_db(transaction=True)
-@pytest.mark.asyncio
-async def test_agent_task_logs_foreign_org_returns_empty(permission_resolver):
+def test_agent_task_logs_foreign_org_returns_empty(permission_resolver):
     """A task owned by another org resolves to [] (not an error) so the
     surface doesn't leak task existence across tenants."""
-    import asyncio
-
-    org = await asyncio.to_thread(Organization.objects.create, name="Mine", slug="mine-org")
-    other = await asyncio.to_thread(Organization.objects.create, name="Theirs", slug="their-org")
-    cluster = await asyncio.to_thread(_cluster, other, slug="their-cluster")
-    dispatcher = await asyncio.to_thread(_dispatcher, other, cluster, slug="their-dispatcher")
-    foreign_task = await asyncio.to_thread(_task, other, dispatcher)
+    org = Organization.objects.create(name="Mine", slug="mine-org")
+    other = Organization.objects.create(name="Theirs", slug="their-org")
+    cluster = _cluster(other, slug="their-cluster")
+    dispatcher = _dispatcher(other, cluster, slug="their-dispatcher")
+    foreign_task = _task(other, dispatcher)
 
     permission_resolver.grant(Permission.AGENT_READ)
     # Backends would yield lines if ever reached — they must not be.
@@ -266,7 +254,7 @@ async def test_agent_task_logs_foreign_org_returns_empty(permission_resolver):
     set_log_backend_for_tests(_ScriptedLogBackend(["should not appear"]))
     try:
         with _tenant(org):
-            lines = await AgentsQuery().agent_task_logs(info=_info(), id=str(foreign_task.guid))
+            lines = AgentsQuery().agent_task_logs(info=_info(), id=str(foreign_task.guid))
     finally:
         reset_pod_backend_for_tests()
         reset_log_backend_for_tests()
@@ -275,19 +263,17 @@ async def test_agent_task_logs_foreign_org_returns_empty(permission_resolver):
 
 
 @pytest.mark.django_db(transaction=True)
-@pytest.mark.asyncio
-async def test_agent_task_logs_unknown_id_returns_empty(permission_resolver):
-    import asyncio
+def test_agent_task_logs_unknown_id_returns_empty(permission_resolver):
     import uuid
 
-    org = await asyncio.to_thread(Organization.objects.create, name="Empty", slug="empty-org")
+    org = Organization.objects.create(name="Empty", slug="empty-org")
 
     permission_resolver.grant(Permission.AGENT_READ)
     set_pod_backend_for_tests(_FixedPodBackend([_fake_pod("pod-1")]))
     set_log_backend_for_tests(_ScriptedLogBackend(["x"]))
     try:
         with _tenant(org):
-            lines = await AgentsQuery().agent_task_logs(info=_info(), id=str(uuid.uuid4()))
+            lines = AgentsQuery().agent_task_logs(info=_info(), id=str(uuid.uuid4()))
     finally:
         reset_pod_backend_for_tests()
         reset_log_backend_for_tests()
@@ -296,15 +282,11 @@ async def test_agent_task_logs_unknown_id_returns_empty(permission_resolver):
 
 
 @pytest.mark.django_db(transaction=True)
-@pytest.mark.asyncio
-async def test_agent_task_logs_no_cluster_returns_empty(permission_resolver):
+def test_agent_task_logs_no_cluster_returns_empty(permission_resolver):
     """A dispatcher without a tenant_cluster bound has no pod to read —
     the resolver returns [] rather than 500ing."""
-    import asyncio
-
-    org = await asyncio.to_thread(Organization.objects.create, name="NoClust", slug="noclust-org")
-    dispatcher = await asyncio.to_thread(
-        DispatcherInstance.objects.create,
+    org = Organization.objects.create(name="NoClust", slug="noclust-org")
+    dispatcher = DispatcherInstance.objects.create(
         organization=org,
         name="d",
         slug="noclust-dispatcher",
@@ -314,12 +296,12 @@ async def test_agent_task_logs_no_cluster_returns_empty(permission_resolver):
         status=DispatcherInstance.Status.ACTIVE,
         tenant_cluster=None,
     )
-    task = await asyncio.to_thread(_task, org, dispatcher)
+    task = _task(org, dispatcher)
 
     permission_resolver.grant(Permission.AGENT_READ)
     try:
         with _tenant(org):
-            lines = await AgentsQuery().agent_task_logs(info=_info(), id=str(task.guid))
+            lines = AgentsQuery().agent_task_logs(info=_info(), id=str(task.guid))
     finally:
         pass
 
@@ -327,21 +309,18 @@ async def test_agent_task_logs_no_cluster_returns_empty(permission_resolver):
 
 
 @pytest.mark.django_db(transaction=True)
-@pytest.mark.asyncio
-async def test_agent_task_logs_inactive_cluster_returns_empty(permission_resolver):
-    import asyncio
-
-    org = await asyncio.to_thread(Organization.objects.create, name="Inact", slug="inact-org")
-    cluster = await asyncio.to_thread(_cluster, org, slug="inact-cluster", is_active=False)
-    dispatcher = await asyncio.to_thread(_dispatcher, org, cluster, slug="inact-dispatcher")
-    task = await asyncio.to_thread(_task, org, dispatcher)
+def test_agent_task_logs_inactive_cluster_returns_empty(permission_resolver):
+    org = Organization.objects.create(name="Inact", slug="inact-org")
+    cluster = _cluster(org, slug="inact-cluster", is_active=False)
+    dispatcher = _dispatcher(org, cluster, slug="inact-dispatcher")
+    task = _task(org, dispatcher)
 
     permission_resolver.grant(Permission.AGENT_READ)
     set_pod_backend_for_tests(_FixedPodBackend([_fake_pod("pod-1")]))
     set_log_backend_for_tests(_ScriptedLogBackend(["x"]))
     try:
         with _tenant(org):
-            lines = await AgentsQuery().agent_task_logs(info=_info(), id=str(task.guid))
+            lines = AgentsQuery().agent_task_logs(info=_info(), id=str(task.guid))
     finally:
         reset_pod_backend_for_tests()
         reset_log_backend_for_tests()
@@ -350,34 +329,28 @@ async def test_agent_task_logs_inactive_cluster_returns_empty(permission_resolve
 
 
 @pytest.mark.django_db(transaction=True)
-@pytest.mark.asyncio
-async def test_agent_task_logs_requires_read_logs_permission():
+def test_agent_task_logs_requires_read_logs_permission():
     """Without the read gate (``agent.read`` after the §0.4 re-gate) the
     resolver-entry gate raises before any task lookup (queries surface
     permission failures via raise)."""
-    import asyncio
-
-    org = await asyncio.to_thread(Organization.objects.create, name="Deny", slug="deny-org")
-    cluster = await asyncio.to_thread(_cluster, org, slug="deny-cluster")
-    dispatcher = await asyncio.to_thread(_dispatcher, org, cluster, slug="deny-dispatcher")
-    task = await asyncio.to_thread(_task, org, dispatcher)
+    org = Organization.objects.create(name="Deny", slug="deny-org")
+    cluster = _cluster(org, slug="deny-cluster")
+    dispatcher = _dispatcher(org, cluster, slug="deny-dispatcher")
+    task = _task(org, dispatcher)
 
     # NOTE: no permission granted.
     with _tenant(org), pytest.raises(PermissionDenied):
-        await AgentsQuery().agent_task_logs(info=_info(), id=str(task.guid))
+        AgentsQuery().agent_task_logs(info=_info(), id=str(task.guid))
 
 
 @pytest.mark.django_db(transaction=True)
-@pytest.mark.asyncio
-async def test_agent_task_logs_driver_error_degrades_to_empty(permission_resolver):
+def test_agent_task_logs_driver_error_degrades_to_empty(permission_resolver):
     """A ClusterObservabilityError during discovery degrades to [] —
     the operator read never 500s on a cluster outage."""
-    import asyncio
-
-    org = await asyncio.to_thread(Organization.objects.create, name="Err", slug="err-org")
-    cluster = await asyncio.to_thread(_cluster, org, slug="err-cluster")
-    dispatcher = await asyncio.to_thread(_dispatcher, org, cluster, slug="err-dispatcher")
-    task = await asyncio.to_thread(_task, org, dispatcher, pod_name="")
+    org = Organization.objects.create(name="Err", slug="err-org")
+    cluster = _cluster(org, slug="err-cluster")
+    dispatcher = _dispatcher(org, cluster, slug="err-dispatcher")
+    task = _task(org, dispatcher, pod_name="")
 
     class _ExplodingPodBackend:
         def list_pods(self, *, auth, namespace, app_slug, task_id=""):
@@ -388,7 +361,7 @@ async def test_agent_task_logs_driver_error_degrades_to_empty(permission_resolve
     set_log_backend_for_tests(_ScriptedLogBackend(["x"]))
     try:
         with _tenant(org):
-            lines = await AgentsQuery().agent_task_logs(info=_info(), id=str(task.guid))
+            lines = AgentsQuery().agent_task_logs(info=_info(), id=str(task.guid))
     finally:
         reset_pod_backend_for_tests()
         reset_log_backend_for_tests()
