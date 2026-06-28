@@ -126,6 +126,7 @@ class _RecordingBackend(ExecBackend):
         self.stdin: list[str] = []
         self.resizes: list[tuple[int, int]] = []
         self.closes = 0
+        self.stdin_closes = 0
 
     async def open(self, **kw: Any) -> ExecSession:
         self.opens.append(
@@ -147,6 +148,9 @@ class _RecordingBackend(ExecBackend):
 
             async def close(self) -> None:
                 backend.closes += 1
+
+            async def close_stdin(self) -> None:
+                backend.stdin_closes += 1
 
         return _Sess()
 
@@ -229,6 +233,10 @@ async def test_dispatcher_routes_frames_to_backend(
         },
         {
             "type": "websocket.receive",
+            "text": json.dumps({"type": "stdin_eof"}),
+        },
+        {
+            "type": "websocket.receive",
             "text": json.dumps({"type": "close"}),
         },
     ]
@@ -260,6 +268,7 @@ async def test_dispatcher_routes_frames_to_backend(
     ]
     assert backend.stdin == ["more"]
     assert backend.resizes == [(24, 80)]
+    assert backend.stdin_closes == 1
     # Close runs from explicit 'close' frame + finally block.
     assert backend.closes >= 1
     assert sent[0] == {"type": "websocket.accept"}

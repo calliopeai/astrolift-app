@@ -332,6 +332,18 @@ class _BackendSession(ExecSession):
         except Exception:  # noqa: BLE001
             logger.exception("cluster_exec: resize failed")
 
+    async def close_stdin(self) -> None:
+        """Forward a stdin half-close to the SDK session (#1040 follow-up)
+        so a piped read-to-EOF command finishes. Best-effort — no-ops if
+        the SDK session has no close_stdin."""
+        if self._closed:
+            return
+        close_stdin = getattr(self._sdk, "close_stdin", None)
+        if close_stdin is None:
+            return
+        with contextlib.suppress(Exception):
+            await close_stdin()
+
     async def close(self) -> None:
         if self._closed:
             return

@@ -419,6 +419,14 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
                         rows=int(frame.get("rows", 0)),
                         cols=int(frame.get("cols", 0)),
                     )
+            elif kind == "stdin_eof":
+                # Half-close the remote stdin (the CLI sends this on its
+                # local stdin EOF) so a piped read-to-EOF command finishes,
+                # while keeping the session open for its output + exit code.
+                if session is not None:
+                    close_stdin = getattr(session, "close_stdin", None)
+                    if close_stdin is not None:
+                        await close_stdin()
             elif kind == "replay":
                 # Drain the ring buffer back to the client in order.
                 # Wrapped in its own frame type so the client can

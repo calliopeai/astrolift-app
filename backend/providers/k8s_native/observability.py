@@ -564,6 +564,8 @@ def default_log_backend() -> LogBackend:
 # kubernetes exec channels: 0=stdin 1=stdout 2=stderr 3=error(status) 4=resize.
 _EXEC_ERROR_CHANNEL = 3
 _EXEC_RESIZE_CHANNEL = 4
+_EXEC_CLOSE_CHANNEL = 255  # v5 remotecommand half-close signal
+_STDIN_CHANNEL = 0
 
 
 class InteractiveExecSession:
@@ -646,6 +648,20 @@ class InteractiveExecSession:
         await asyncio.get_running_loop().run_in_executor(
             None, self._resp.write_channel, _EXEC_RESIZE_CHANNEL, payload
         )
+
+    async def close_stdin(self) -> None:
+        """Best-effort half-close of the remote stdin via the v5 CLOSE
+        channel, so a piped read-to-EOF command (cat, psql < script)
+        sees EOF and finishes without tearing the whole session down.
+        No-op when the cluster negotiated only the v4 subprotocol."""
+
+        def _close() -> None:
+            with contextlib.suppress(Exception):
+                # v5 remotecommand: channel 255 = CLOSE; the payload is the
+                # stream number to half-close (0 = stdin).
+                self._resp.write_channel(_EXEC_CLOSE_CHANNEL, chr(_STDIN_CHANNEL))
+
+        await asyncio.get_running_loop().run_in_executor(None, _close)
 
     async def wait_exit(self) -> int:
         return int(await self._aget(self._exit_q))
