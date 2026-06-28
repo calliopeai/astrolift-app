@@ -53,6 +53,12 @@ class WorkloadManifest:
     max_retries: int = 5
     tool_timeout_seconds: int = 300
     result_ttl_hours: int = 72
+    # Agent run family (#1027). Mirrors astrolift_registry RunFamily: a
+    # ``task``-family agent is dispatched as a one-shot K8s Job by the agent
+    # dispatch path and emits NO standing K8s resource from the renderer; a
+    # ``service``-family agent is a long-running Deployment (+Service/HPA).
+    # Only meaningful when ``kind == "agent"``.
+    run_family: str = "task"
     # Temporal worker config (#796). Only meaningful when
     # ``kind == "workflow"`` — the renderer stamps a
     # ``astrolift.dev/workload-kind: workflow`` pod annotation and injects

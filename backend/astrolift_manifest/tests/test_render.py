@@ -402,6 +402,7 @@ def test_agent_renders_deployment_service_hpa_with_annotation_and_env():
     w = WorkloadManifest(
         name="data-pipeline-agent",
         kind="agent",
+        run_family="service",
         replicas=2,
         cpu_request="500m",
         memory_request="1Gi",
@@ -445,6 +446,67 @@ def test_agent_renders_deployment_service_hpa_with_annotation_and_env():
     # HPA targets the agent's Deployment by name.
     hpa = next(r for r in out if r["kind"] == "HorizontalPodAutoscaler")
     assert hpa["spec"]["scaleTargetRef"]["name"] == "data-pipeline-agent"
+
+
+def test_task_family_agent_emits_no_resources():
+    # A task-family agent is dispatched as a one-shot Job by the agent
+    # dispatch path; the renderer must emit NOTHING for it (#1027) — an
+    # always-on Deployment would CrashLoop a run-to-completion agent.
+    w = WorkloadManifest(
+        name="batch-agent",
+        kind="agent",
+        run_family="task",
+        replicas=2,
+        hpa_min=1,
+        hpa_max=5,
+        containers=(_container(name="agent", port=8080),),
+    )
+    out = _render((w,))
+    assert out == []
+
+
+def test_agent_defaults_to_task_family_emits_no_resources():
+    # The WorkloadManifest default run_family is "task", so an agent
+    # constructed without an explicit family also renders nothing.
+    w = WorkloadManifest(
+        name="batch-agent",
+        kind="agent",
+        hpa_min=1,
+        hpa_max=5,
+        containers=(_container(name="agent", port=8080),),
+    )
+    out = _render((w,))
+    assert out == []
+
+
+def test_service_family_agent_renders_deployment_service_hpa():
+    w = WorkloadManifest(
+        name="chat-agent",
+        kind="agent",
+        run_family="service",
+        replicas=3,
+        hpa_min=2,
+        hpa_max=6,
+        containers=(_container(name="agent", port=8080),),
+    )
+    out = _render((w,))
+    kinds = sorted(r["kind"] for r in out)
+    assert kinds == ["Deployment", "HorizontalPodAutoscaler", "Service"]
+    dep = next(r for r in out if r["kind"] == "Deployment")
+    assert dep["spec"]["replicas"] == 3
+    assert dep["spec"]["template"]["metadata"]["annotations"]["astrolift.dev/workload-kind"] == "agent"
+
+
+def test_service_family_agent_without_hpa_renders_deployment_and_service_only():
+    w = WorkloadManifest(
+        name="chat-agent",
+        kind="agent",
+        run_family="service",
+        containers=(_container(name="agent", port=8080),),
+    )
+    out = _render((w,))
+    kinds = sorted(r["kind"] for r in out)
+    assert kinds == ["Deployment", "Service"]
 
 
 # ---- envFrom injection (#353) ----------------------------------------
@@ -689,10 +751,7 @@ def test_statefulset_basic_renders_statefulset_and_headless_service():
     # No volumeClaimTemplates when storage_size is unset
     assert "volumeClaimTemplates" not in sts["spec"]
 
-    headless = next(
-        r for r in out
-        if r["kind"] == "Service" and r["metadata"]["name"] == "postgres-headless"
-    )
+    headless = next(r for r in out if r["kind"] == "Service" and r["metadata"]["name"] == "postgres-headless")
     assert headless["spec"]["clusterIP"] == "None"
     assert headless["spec"]["ports"][0]["port"] == 5432
 
@@ -732,9 +791,7 @@ def test_statefulset_mounts_volume_claim_template():
         kind="statefulset",
         replicas=1,
         storage_size="1Gi",
-        volumes=(
-            {"name": "data", "kind": "pvc", "mount_path": "/var/lib/store", "size": "1Gi"},
-        ),
+        volumes=({"name": "data", "kind": "pvc", "mount_path": "/var/lib/store", "size": "1Gi"},),
         containers=(_container("app", port=8080),),
     )
     out = render_manifests(
@@ -791,9 +848,7 @@ def test_function_renders_knative_service():
         image_repository="ghcr.io/acme/fn",
         environment_name="prod",
     )
-    ksvc = next(
-        r for r in out if str(r.get("apiVersion", "")).startswith("serving.knative")
-    )
+    ksvc = next(r for r in out if str(r.get("apiVersion", "")).startswith("serving.knative"))
     assert ksvc["kind"] == "Service"
     container = ksvc["spec"]["template"]["spec"]["containers"][0]
     assert "resources" in container  # the field whose helper used to crash
@@ -813,14 +868,8 @@ def test_statefulset_no_port_omits_headless_ports():
         image_repository="ghcr.io/acme/etcd",
         environment_name="prod",
     )
-    headless = next(
-        r for r in out
-        if r["kind"] == "Service" and r["metadata"]["name"] == "etcd-headless"
-    )
+    headless = next(r for r in out if r["kind"] == "Service" and r["metadata"]["name"] == "etcd-headless")
     assert headless["spec"]["ports"] == []
     # No regular Service for a port-less workload
-    non_headless = [
-        r for r in out
-        if r["kind"] == "Service" and r["metadata"]["name"] != "etcd-headless"
-    ]
+    non_headless = [r for r in out if r["kind"] == "Service" and r["metadata"]["name"] != "etcd-headless"]
     assert non_headless == []

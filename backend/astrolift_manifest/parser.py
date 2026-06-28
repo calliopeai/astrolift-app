@@ -60,6 +60,7 @@ _VALID_WORKLOAD_KINDS = {
 }
 _VALID_HEALTHCHECK = {"none", "http", "tcp", "exec"}
 _VALID_CONCURRENCY_POLICY = {"forbid", "queue", "replace"}
+_VALID_AGENT_RUN_FAMILY = {"task", "service"}
 
 
 _TOML_POS_RE = __import__("re").compile(r"line\s+(\d+),\s+column\s+(\d+)")
@@ -337,6 +338,17 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
         _require_str(d, "workflow_type", f"{path}.workflow_type")
         _require_str(d, "task_queue", f"{path}.task_queue")
 
+    # Agent run family (#1027). Defaults to ``task`` (one-shot Job dispatch,
+    # no standing K8s resource); only ``task`` / ``service`` are valid for an
+    # agent. A bad value would otherwise silently render an always-on
+    # Deployment and CrashLoop a task agent.
+    run_family = str(d.get("run_family", "task")).lower()
+    if kind == "agent" and run_family not in _VALID_AGENT_RUN_FAMILY:
+        raise ManifestError(
+            "agent run_family must be one of " f"{sorted(_VALID_AGENT_RUN_FAMILY)}, got {run_family!r}",
+            path=f"{path}.run_family",
+        )
+
     # Static-site (#1010). A static_site serves built assets from object
     # storage + a CDN — it has no container/pod, so declaring containers is
     # a mistake (they would be silently ignored). ``static_output_dir`` is
@@ -389,6 +401,7 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
         max_retries=int(d.get("max_retries", 5)),
         tool_timeout_seconds=int(d.get("tool_timeout_seconds", 300)),
         result_ttl_hours=int(d.get("result_ttl_hours", 72)),
+        run_family=run_family,
         # Temporal worker config (#796). Required pair validated above for
         # ``kind == "workflow"``; other kinds carry the empty/default
         # values and ignore them. Read unconditionally so a manifest that

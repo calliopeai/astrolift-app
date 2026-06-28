@@ -15,10 +15,12 @@ What this renderer covers today
   ``schedule``).
 * ``workload.kind = task`` → ``batch/v1 Job`` (one-shot, runs once;
   ``completions: 1`` / ``backoffLimit: 0`` / ``restartPolicy: Never``).
-* ``workload.kind = agent`` → ``apps/v1 Deployment`` (same shape as
-  ``deployment``) + a ``astrolift.dev/workload-kind: agent`` pod
-  annotation + injected ``ASTROLIFT_*`` dispatch env vars, plus the
-  matching Service and HPA.
+* ``workload.kind = agent`` with ``run_family = service`` → ``apps/v1
+  Deployment`` (same shape as ``deployment``) + a
+  ``astrolift.dev/workload-kind: agent`` pod annotation + injected
+  ``ASTROLIFT_*`` dispatch env vars, plus the matching Service and HPA.
+  A ``task``-family agent (the default) renders nothing — it is
+  dispatched as a one-shot K8s Job by the agent dispatch path.
 * HPA when ``hpa_min`` / ``hpa_max`` are set on a deployment workload
   → ``autoscaling/v2 HorizontalPodAutoscaler``.
 * Healthchecks (``http`` / ``tcp`` / ``exec``) → ``livenessProbe``
@@ -150,24 +152,29 @@ def render_manifests(
                 )
             )
         elif w.kind == "agent":
-            # Agents are deployments with platform annotations + injected
-            # dispatch env vars; they still get a Service + HPA.
-            out.append(
-                _render_agent(
-                    w,
-                    namespace=namespace,
-                    image_tag=image_tag,
-                    image_repository=image_repository,
-                    labels=wl_labels,
-                    env_from_secret_refs=env_from,
+            # Only a service-family agent is a standing Deployment (with
+            # platform annotations + injected dispatch env vars, plus its
+            # Service + HPA). A task-family agent is dispatched as a one-shot
+            # K8s Job by the agent dispatch path, so the renderer emits
+            # nothing for it — rendering an always-on Deployment would
+            # CrashLoop a run-to-completion agent (#1027).
+            if w.run_family == "service":
+                out.append(
+                    _render_agent(
+                        w,
+                        namespace=namespace,
+                        image_tag=image_tag,
+                        image_repository=image_repository,
+                        labels=wl_labels,
+                        env_from_secret_refs=env_from,
+                    )
                 )
-            )
-            svc = _render_service(w, namespace=namespace, labels=wl_labels)
-            if svc is not None:
-                out.append(svc)
-            hpa = _render_hpa(w, namespace=namespace, labels=wl_labels)
-            if hpa is not None:
-                out.append(hpa)
+                svc = _render_service(w, namespace=namespace, labels=wl_labels)
+                if svc is not None:
+                    out.append(svc)
+                hpa = _render_hpa(w, namespace=namespace, labels=wl_labels)
+                if hpa is not None:
+                    out.append(hpa)
         elif w.kind == "workflow":
             # Workflow workers are deployments with platform annotations +
             # injected Temporal env vars; they still get a Service + HPA.
@@ -701,11 +708,7 @@ def _render_function(
     if primary is None:
         raise ValueError(f"function workload {w.name!r} has no containers")
 
-    image = (
-        primary.image_ref
-        if primary.image_ref
-        else f"{image_repository}:{image_tag}"
-    )
+    image = primary.image_ref if primary.image_ref else f"{image_repository}:{image_tag}"
     container_spec: dict[str, Any] = {
         "image": image,
         "resources": _render_resources(w),
@@ -719,9 +722,7 @@ def _render_function(
 
     env = list(primary.env)
     if env_from_secret_refs:
-        container_spec["envFrom"] = [
-            {"secretRef": {"name": ref}} for ref in env_from_secret_refs
-        ]
+        container_spec["envFrom"] = [{"secretRef": {"name": ref}} for ref in env_from_secret_refs]
     if env:
         container_spec["env"] = [{"name": k, "value": v} for k, v in env]
 
@@ -809,19 +810,13 @@ def _render_statefulset(
         # (#989). Mount path comes from the workload's pvc volume declaration
         # ([[workloads.volumes]] mount_path), defaulting to /data.
         mount_path = next(
-            (
-                v.get("mount_path")
-                for v in w.volumes
-                if v.get("kind", "pvc") == "pvc" and v.get("mount_path")
-            ),
+            (v.get("mount_path") for v in w.volumes if v.get("kind", "pvc") == "pvc" and v.get("mount_path")),
             "/data",
         )
         primary = _primary_container(w)
         for container in pod_spec.get("containers", []):
             if primary is not None and container["name"] == primary.name:
-                container.setdefault("volumeMounts", []).append(
-                    {"name": claim_name, "mountPath": mount_path}
-                )
+                container.setdefault("volumeMounts", []).append({"name": claim_name, "mountPath": mount_path})
 
     sts: dict[str, Any] = {
         "apiVersion": "apps/v1",
@@ -862,8 +857,6 @@ def _render_statefulset(
     # Populate headless service ports from the primary container.
     primary = _primary_container(w)
     if primary and primary.port > 0:
-        headless["spec"]["ports"] = [
-            {"name": "app", "port": primary.port, "targetPort": primary.port}
-        ]
+        headless["spec"]["ports"] = [{"name": "app", "port": primary.port, "targetPort": primary.port}]
 
     return sts, headless

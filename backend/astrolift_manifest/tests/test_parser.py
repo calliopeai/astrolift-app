@@ -534,6 +534,61 @@ kind = "agent"
     assert w.result_ttl_hours == 72
 
 
+def test_agent_run_family_defaults_to_task():
+    """An agent that omits ``run_family`` defaults to ``task`` (#1027)."""
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "agent"
+kind = "agent"
+
+  [[workloads.containers]]
+  name = "agent"
+  is_primary = true
+  command = ["python", "-m", "myagent"]
+"""
+    w = parse_raw(toml).workloads[0]
+    assert w.run_family == "task"
+
+
+def test_agent_run_family_service_round_trips():
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "agent"
+kind = "agent"
+run_family = "service"
+
+  [[workloads.containers]]
+  name = "agent"
+  is_primary = true
+  command = ["python", "-m", "myagent"]
+"""
+    w = parse_raw(toml).workloads[0]
+    assert w.run_family == "service"
+
+
+def test_agent_run_family_invalid_rejected():
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "agent"
+kind = "agent"
+run_family = "daemon"
+
+  [[workloads.containers]]
+  name = "agent"
+  is_primary = true
+  command = ["python", "-m", "myagent"]
+"""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(toml)
+    assert exc.value.path == "workloads[0].run_family"
+
+
 def test_parse_missing_name_is_error():
     toml = """
 [[workloads]]
