@@ -96,12 +96,18 @@ class CloudFrontDriver(ManagedServiceDriver):
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         cfg = spec.config or {}
         origin_bucket = str(cfg.get("origin_bucket", "")).strip()
-        if not origin_bucket:
+        # A faas (Lambda Function URL) origin is a custom HTTPS origin -- no
+        # S3 bucket, no OAC. Exactly one origin kind is provided (#987).
+        custom_origin_domain = str(cfg.get("custom_origin_domain", "")).strip()
+        if not origin_bucket and not custom_origin_domain:
             return ProvisionResult(
                 ok=False,
                 handle="",
-                message="cdn provision requires config.origin_bucket",
-                errors=["origin_bucket_required"],
+                message=(
+                    "cdn provision requires config.origin_bucket (S3 origin) "
+                    "or config.custom_origin_domain (custom HTTPS origin)"
+                ),
+                errors=["origin_required"],
             )
         origin_region = str(cfg.get("origin_region") or self._config.region)
         aliases = [str(a) for a in (cfg.get("aliases") or []) if a]
@@ -110,19 +116,22 @@ class CloudFrontDriver(ManagedServiceDriver):
         index = str(cfg.get("index") or "index.html")
         comment = self._comment_for(spec)
 
-        try:
-            oac_id = self._ensure_oac(origin_bucket)
-        except Exception as exc:
-            return ProvisionResult(
-                ok=False,
-                handle="",
-                message=f"origin-access-control: {exc}",
-                errors=[str(exc)],
-            )
+        oac_id = ""
+        if origin_bucket:
+            try:
+                oac_id = self._ensure_oac(origin_bucket)
+            except Exception as exc:
+                return ProvisionResult(
+                    ok=False,
+                    handle="",
+                    message=f"origin-access-control: {exc}",
+                    errors=[str(exc)],
+                )
 
         dist_config = self._build_distribution_config(
             spec=spec,
             origin_bucket=origin_bucket,
+            custom_origin_domain=custom_origin_domain,
             origin_region=origin_region,
             oac_id=oac_id,
             aliases=aliases,
@@ -175,12 +184,14 @@ class CloudFrontDriver(ManagedServiceDriver):
 
         # OAC read path: let this distribution (and only this one) read
         # the private origin bucket. Separate s3 client; benign races
-        # (concurrent provision) are swallowed.
-        self._grant_bucket_read(
-            origin_bucket=origin_bucket,
-            origin_region=origin_region,
-            distribution_arn=distribution_arn,
-        )
+        # (concurrent provision) are swallowed. Custom (non-S3) origins
+        # have no bucket policy to write.
+        if origin_bucket:
+            self._grant_bucket_read(
+                origin_bucket=origin_bucket,
+                origin_region=origin_region,
+                distribution_arn=distribution_arn,
+            )
 
         return ProvisionResult(
             ok=True,
@@ -487,11 +498,89 @@ class CloudFrontDriver(ManagedServiceDriver):
             f"origin access control {name!r} reported existing but not found",
         )
 
+    def _s3_origin(
+        self,
+        origin_bucket: str,
+        origin_region: str,
+        oac_id: str,
+        index: str,
+    ) -> tuple[dict[str, Any], dict[str, Any], str]:
+        """Static-site origin: a private S3 bucket read via OAC. Returns
+        (origin item, default cache behavior, default-root-object)."""
+        origin_id = "s3-origin"
+        origin_item = {
+            "Id": origin_id,
+            "DomainName": f"{origin_bucket}.s3.{origin_region}.amazonaws.com",
+            "OriginAccessControlId": oac_id,
+            # OAC supersedes the legacy OAI; it must be empty.
+            "S3OriginConfig": {"OriginAccessIdentity": ""},
+        }
+        behavior = {
+            "TargetOriginId": origin_id,
+            "ViewerProtocolPolicy": "redirect-to-https",
+            "Compress": True,
+            "AllowedMethods": {
+                "Quantity": 2,
+                "Items": ["GET", "HEAD"],
+                "CachedMethods": {"Quantity": 2, "Items": ["GET", "HEAD"]},
+            },
+            "ForwardedValues": {
+                "QueryString": False,
+                "Cookies": {"Forward": "none"},
+            },
+            "MinTTL": 0,
+            "DefaultTTL": self._config.default_ttl,
+            "MaxTTL": 86400,
+        }
+        return origin_item, behavior, index
+
+    def _custom_origin(
+        self,
+        custom_origin_domain: str,
+    ) -> tuple[dict[str, Any], dict[str, Any], str]:
+        """Custom HTTPS origin: a Lambda Function URL host fronted directly
+        (no OAC, https-only) for a public faas workload (#987). Returns
+        (origin item, default cache behavior, default-root-object)."""
+        origin_id = "custom-origin"
+        origin_item = {
+            "Id": origin_id,
+            "DomainName": custom_origin_domain,
+            "CustomOriginConfig": {
+                "HTTPPort": 80,
+                "HTTPSPort": 443,
+                "OriginProtocolPolicy": "https-only",
+                "OriginSslProtocols": {"Quantity": 1, "Items": ["TLSv1.2"]},
+            },
+        }
+        behavior = {
+            "TargetOriginId": origin_id,
+            "ViewerProtocolPolicy": "redirect-to-https",
+            "Compress": True,
+            "AllowedMethods": {
+                "Quantity": 7,
+                "Items": ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"],
+                "CachedMethods": {"Quantity": 2, "Items": ["GET", "HEAD"]},
+            },
+            # Forward query strings to the function. Do NOT forward the viewer
+            # Host header -- a Lambda Function URL validates Host, so it must
+            # see the origin's own host. Caching off by default (dynamic).
+            "ForwardedValues": {
+                "QueryString": True,
+                "Cookies": {"Forward": "none"},
+            },
+            "MinTTL": 0,
+            "DefaultTTL": 0,
+            "MaxTTL": 0,
+        }
+        # A function URL serves every path; there is no default root object.
+        return origin_item, behavior, ""
+
     def _build_distribution_config(
         self,
         *,
         spec: ProvisionSpec,
         origin_bucket: str,
+        custom_origin_domain: str,
         origin_region: str,
         oac_id: str,
         aliases: list[str],
@@ -500,44 +589,21 @@ class CloudFrontDriver(ManagedServiceDriver):
         index: str,
         comment: str,
     ) -> dict[str, Any]:
-        origin_id = "s3-origin"
-        origin_domain = f"{origin_bucket}.s3.{origin_region}.amazonaws.com"
-        caller_ref = f"{self._config.comment_prefix}-{spec.managed_service_id or spec.app_slug}-{origin_bucket}"
+        if custom_origin_domain:
+            origin_item, default_behavior, default_root = self._custom_origin(custom_origin_domain)
+            origin_ref = custom_origin_domain
+        else:
+            origin_item, default_behavior, default_root = self._s3_origin(origin_bucket, origin_region, oac_id, index)
+            origin_ref = origin_bucket
+        caller_ref = f"{self._config.comment_prefix}-{spec.managed_service_id or spec.app_slug}-{origin_ref}"
         config: dict[str, Any] = {
             "CallerReference": caller_ref,
             "Comment": comment,
             "Enabled": True,
-            "DefaultRootObject": index,
+            "DefaultRootObject": default_root,
             "PriceClass": self._config.price_class,
-            "Origins": {
-                "Quantity": 1,
-                "Items": [
-                    {
-                        "Id": origin_id,
-                        "DomainName": origin_domain,
-                        "OriginAccessControlId": oac_id,
-                        # OAC supersedes the legacy OAI; it must be empty.
-                        "S3OriginConfig": {"OriginAccessIdentity": ""},
-                    },
-                ],
-            },
-            "DefaultCacheBehavior": {
-                "TargetOriginId": origin_id,
-                "ViewerProtocolPolicy": "redirect-to-https",
-                "Compress": True,
-                "AllowedMethods": {
-                    "Quantity": 2,
-                    "Items": ["GET", "HEAD"],
-                    "CachedMethods": {"Quantity": 2, "Items": ["GET", "HEAD"]},
-                },
-                "ForwardedValues": {
-                    "QueryString": False,
-                    "Cookies": {"Forward": "none"},
-                },
-                "MinTTL": 0,
-                "DefaultTTL": self._config.default_ttl,
-                "MaxTTL": 86400,
-            },
+            "Origins": {"Quantity": 1, "Items": [origin_item]},
+            "DefaultCacheBehavior": default_behavior,
         }
 
         if acm_cert_arn and aliases:

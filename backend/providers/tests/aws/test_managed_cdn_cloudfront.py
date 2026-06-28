@@ -239,10 +239,12 @@ def test_provision_creates_distribution(driver, cf, s3) -> None:
     assert origin["DomainName"] == ("astrolift-acme-site-prod-assets.s3.us-west-2.amazonaws.com")
 
 
-def test_provision_requires_origin_bucket(driver) -> None:
+def test_provision_requires_an_origin(driver) -> None:
+    # Neither an S3 origin_bucket nor a custom_origin_domain (#987) -> refuse.
     result = driver.provision(_spec(config={"origin_bucket": ""}))
     assert result.ok is False
-    assert "origin_bucket" in result.errors[0]
+    assert result.errors == ["origin_required"]
+    assert "origin_bucket" in result.message
 
 
 def test_provision_spa_error_responses(driver, cf) -> None:

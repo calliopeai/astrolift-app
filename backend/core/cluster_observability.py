@@ -355,6 +355,16 @@ def managed_config_for(
             price_class=str(pc.get("cloudfront_price_class", "PriceClass_100")),
         )
 
+    if kind == "faas":
+        from aws.managed.faas_lambda import LambdaConfig
+
+        return LambdaConfig(
+            region=region,
+            role_path_prefix=str(pc.get("faas_role_path_prefix", "/")),
+            default_architecture=str(pc.get("faas_default_architecture", "arm64")),
+            log_retention_days=int(pc.get("faas_log_retention_days", 14)),
+        )
+
     if kind in ("postgres", "mysql"):
         from aws.managed._networking import ensure_db_networking
 

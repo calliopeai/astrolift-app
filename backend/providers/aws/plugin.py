@@ -31,6 +31,7 @@ from aws.identity_irsa import IRSADriver
 from aws.ingress_alb import ALBIngressDriver
 from aws.managed.cdn_cloudfront import CloudFrontDriver
 from aws.managed.email_ses import AmazonSESDriver
+from aws.managed.faas_lambda import LambdaDriver
 from aws.managed.model_endpoint_bedrock import AmazonBedrockDriver
 from aws.managed.mysql_rds import RDSMySQLDriver
 from aws.managed.object_store_s3 import S3Driver
@@ -66,6 +67,7 @@ PLUGIN = ProviderPlugin(
         # postgres/aurora, nosql/dynamodb, pubsub/sns, filesystem/efs.
         ("object_store", "s3"): S3Driver,
         ("cdn", "cloudfront"): CloudFrontDriver,
+        ("faas", "lambda"): LambdaDriver,
         ("queue", "sqs"): SQSDriver,
         ("postgres", "rds"): RDSPostgresDriver,
         ("mysql", "rds_mysql"): RDSMySQLDriver,
