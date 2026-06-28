@@ -8,10 +8,13 @@ surface + DNS:
 
 * ``ensure_faas_services`` -- idempotently ensure the implied managed-
   service rows exist and are ACTIVE: the ``faas`` (lambda) row FIRST, then
-  -- when ``faas_public`` -- a ``cdn`` row whose origin is the Lambda
-  Function URL (origin-dependency order, exactly like static_site's bucket
-  -> cdn). Runs BEFORE ``ensure_workload_identity`` so any bound managed-
-  service grants fold into the execution role.
+  -- when ``faas_public`` -- a ``cdn`` row whose origin is the AWS_IAM
+  Lambda Function URL (origin-dependency order, exactly like static_site's
+  bucket -> cdn), and finally a POST-cdn step that grants the Lambda's
+  Function-URL invoke permission scoped to ONLY that distribution's
+  SourceArn (#1035 -- the distribution ARN doesn't exist until the cdn
+  provisions). Runs BEFORE ``ensure_workload_identity`` so any bound
+  managed-service grants fold into the execution role.
 
 The public custom-domain TLS cert and the ``CNAME host -> CloudFront``
 record are NOT owned here: the generalized ``ensure_cloudfront_cert`` /
@@ -50,6 +53,7 @@ from astrolift_workflows.activities.static_site import (
     _normalized_manifest,
     _provision_row,
     _region_account,
+    _resolve_account_id,
 )
 
 log = logging.getLogger("astrolift_workflows.activities.faas")
@@ -208,7 +212,7 @@ def _ensure_faas_services_sync(deployment_id: int) -> dict[str, Any]:
     if cluster is None:
         return {"stub": True, "reason": "no tenant_cluster bound", "ensured": []}
 
-    region, _account = _region_account(cluster)
+    region, account = _region_account(cluster)
     managed_domain = getattr(env, "managed_domain", None)
     org_slug = app.organization.slug if app.organization_id else "none"
 
@@ -289,8 +293,29 @@ def _ensure_faas_services_sync(deployment_id: int) -> dict[str, Any]:
                 cdn_row.save(update_fields=["config", "updated_at", "version"])
             _provision_row(cdn_row)
             cdn_row.refresh_from_db()
-            entry["distribution_id"] = _resource_id(cdn_row)
+            distribution_id = _resource_id(cdn_row)
+            entry["distribution_id"] = distribution_id
             entry["origin"] = origin
+
+            # 3. POST-cdn: scope the Lambda's Function-URL invoke permission to
+            #    ONLY this distribution (#1035). The Function URL is AWS_IAM and
+            #    CloudFront (Lambda OAC, sigv4) is the sole allowed caller; the
+            #    distribution ARN doesn't exist until the cdn provisions, so this
+            #    can't be done in the lambda provision. A missing/unscoped grant
+            #    is the exact 403 #1035 fixes, so fail loudly if the account id
+            #    (needed for the ARN) can't be resolved.
+            if distribution_id:
+                account_id = _resolve_account_id(cluster, account)
+                if not account_id:
+                    raise RuntimeError(
+                        f"faas {w.name}: cannot resolve AWS account id for the "
+                        "CloudFront invoke grant (provider_config.account_id "
+                        "empty and STS discovery failed)",
+                    )
+                distribution_arn = f"arn:aws:cloudfront::{account_id}:distribution/{distribution_id}"
+                _faas_driver(cluster, fn_row).allow_cloudfront_invoke(
+                    _resource_id(fn_row), distribution_arn
+                )
 
         ensured.append(entry)
 

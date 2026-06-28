@@ -49,6 +49,17 @@ name = "api"
 kind = "faas"
 """
 
+# faasprobe-shape (#1035 live): the operator sets ONLY faas_public, not
+# is_public. normalize must imply is_public so the alias + CNAME fire.
+_FAAS_PUBLIC_ONLY_TOML = """
+name = "hello"
+
+[[workloads]]
+name = "api"
+kind = "faas"
+faas_public = true
+"""
+
 _FAAS_ZIP_TOML = """
 name = "hello"
 
@@ -122,6 +133,24 @@ def _fake_provision(row) -> None:
         )
 
 
+def _patch_public_grant(monkeypatch, *, account: str = "123456789012") -> list[tuple[str, str]]:
+    """Patch the post-cdn CloudFront invoke grant (#1035) with recorders so the
+    public path runs without real AWS. Returns the list of
+    (function_name, distribution_arn) grants made."""
+    grants: list[tuple[str, str]] = []
+
+    class _Drv:
+        def __init__(self, *a, **k) -> None:
+            pass
+
+        def allow_cloudfront_invoke(self, function_name: str, distribution_arn: str) -> None:
+            grants.append((function_name, distribution_arn))
+
+    monkeypatch.setattr(faas, "_faas_driver", lambda cluster, row: _Drv())
+    monkeypatch.setattr(faas, "_resolve_account_id", lambda cluster, acct: account)
+    return grants
+
+
 class _FakeDns:
     def __init__(self, *, raise_notfound: bool = False):
         self.ensured: list[tuple] = []
@@ -179,6 +208,7 @@ def test_ensure_private_faas_provisions_lambda_only(monkeypatch, app, env, org):
 def test_ensure_public_faas_provisions_lambda_then_cdn(monkeypatch, app, env, org):
     _attach(app, env, org, toml=_FAAS_PUBLIC_TOML)
     monkeypatch.setattr(faas, "_provision_row", _fake_provision)
+    grants = _patch_public_grant(monkeypatch)
     dep = _deployment(app, env)
 
     out = faas._ensure_faas_services_sync(dep.pk)
@@ -199,6 +229,11 @@ def test_ensure_public_faas_provisions_lambda_then_cdn(monkeypatch, app, env, or
     assert cdn.config["aliases"] == ["hello-app.apps.example.com"]
     assert cdn.config["acm_cert_arn"].endswith("certificate/abc")
     assert out["ensured"][0]["origin"] == "api-prod-fn.lambda-url.us-east-1.on.aws"
+    # POST-cdn (#1035): the Lambda invoke is scoped to THIS distribution's ARN.
+    # Falsifiable: dropping the post-cdn grant (or building it before the cdn)
+    # leaves grants empty.
+    distribution_id = out["ensured"][0]["distribution_id"]
+    assert grants == [("api-prod-fn", f"arn:aws:cloudfront::123456789012:distribution/{distribution_id}")]
 
 
 def test_ensure_zip_mode_shapes_runtime_handler(monkeypatch, app, env, org):
@@ -219,6 +254,7 @@ def test_ensure_zip_mode_shapes_runtime_handler(monkeypatch, app, env, org):
 def test_ensure_is_idempotent_on_rerun(monkeypatch, app, env, org):
     _attach(app, env, org)
     monkeypatch.setattr(faas, "_provision_row", _fake_provision)
+    _patch_public_grant(monkeypatch)
     dep = _deployment(app, env)
 
     faas._ensure_faas_services_sync(dep.pk)
@@ -231,6 +267,7 @@ def test_ensure_is_idempotent_on_rerun(monkeypatch, app, env, org):
 def test_ensure_undeletes_soft_deleted_rows_on_redeploy(monkeypatch, app, env, org):
     _attach(app, env, org)
     monkeypatch.setattr(faas, "_provision_row", _fake_provision)
+    _patch_public_grant(monkeypatch)
     dep = _deployment(app, env)
 
     faas._ensure_faas_services_sync(dep.pk)
@@ -250,6 +287,7 @@ def test_ensure_undeletes_soft_deleted_rows_on_redeploy(monkeypatch, app, env, o
 def test_static_dns_writes_cname_for_public_faas(monkeypatch, app, env, org):
     _attach(app, env, org, toml=_FAAS_PUBLIC_TOML)
     monkeypatch.setattr(faas, "_provision_row", _fake_provision)
+    _patch_public_grant(monkeypatch)
     dep = _deployment(app, env)
     faas._ensure_faas_services_sync(dep.pk)
 
@@ -257,6 +295,36 @@ def test_static_dns_writes_cname_for_public_faas(monkeypatch, app, env, org):
     # does; the generalized ensure_static_dns resolves it via the shared
     # {workload}-{env}-cdn name.
     cdn = ManagedService.objects.get(registered_app=app, kind="cdn", name="api-prod-cdn")
+    ManagedServiceBinding.objects.create(
+        managed_service=cdn, env_key="CDN_DOMAIN_NAME", env_value_ref="d999.cloudfront.net"
+    )
+
+    fake_dns = _FakeDns()
+    monkeypatch.setattr("core.app_deploy.driver_for_capability", lambda cluster, cap: fake_dns)
+
+    out = static_site._ensure_static_dns_sync(dep.pk)
+
+    assert fake_dns.ensured == [
+        ("apps.example.com", "hello-app.apps.example.com", "CNAME", "d999.cloudfront.net", 300)
+    ]
+    assert out["records"] == [{"host": "hello-app.apps.example.com", "value": "d999.cloudfront.net"}]
+
+
+def test_faas_public_only_implies_is_public_and_writes_cname(monkeypatch, app, env, org):
+    # #1035 live root cause: faasprobe declared ONLY faas_public (no is_public),
+    # so the cdn was created but got no alias and no CNAME. normalize must imply
+    # is_public so the alias flows into the cdn AND ensure_static_dns writes the
+    # CNAME. Falsifiable: reverting the normalize implication leaves aliases
+    # empty and writes no record.
+    _attach(app, env, org, toml=_FAAS_PUBLIC_ONLY_TOML)
+    monkeypatch.setattr(faas, "_provision_row", _fake_provision)
+    _patch_public_grant(monkeypatch)
+    dep = _deployment(app, env)
+    faas._ensure_faas_services_sync(dep.pk)
+
+    cdn = ManagedService.objects.get(registered_app=app, kind="cdn", name="api-prod-cdn")
+    # The alias was applied (is_public implied) -> custom domain on the dist.
+    assert cdn.config["aliases"] == ["hello-app.apps.example.com"]
     ManagedServiceBinding.objects.create(
         managed_service=cdn, env_key="CDN_DOMAIN_NAME", env_value_ref="d999.cloudfront.net"
     )
@@ -283,11 +351,14 @@ def test_delete_static_dns_records_covers_public_faas(monkeypatch, app, env, org
     assert out["deleted"] == ["hello-app.apps.example.com"]
 
 
-def test_cdn_backed_filter_excludes_non_public_faas():
-    # A faas with is_public but NOT faas_public must be excluded -- otherwise
-    # the teardown/DNS would target a cdn row that ensure_faas_services never
-    # created (faas_public gates the cdn). Falsifiable: dropping the faas_public
-    # check would include it.
+def test_cdn_backed_filter_keys_on_faas_public():
+    # #1035: faas_public is the public switch -- normalize implies is_public from
+    # it, so a workload that declares ONLY faas_public ("faaspub") is included.
+    # A faas with is_public but NOT faas_public ("nopub") must still be excluded,
+    # otherwise the teardown/DNS would target a cdn row that ensure_faas_services
+    # never created (faas_public gates the cdn). Falsifiable both ways: dropping
+    # the normalize implication drops "faaspub"; dropping the faas_public check
+    # would wrongly include "nopub".
     from astrolift_manifest.normalize import normalize
     from astrolift_manifest.types import RawManifest, WorkloadManifest
 
@@ -295,14 +366,14 @@ def test_cdn_backed_filter_excludes_non_public_faas():
         RawManifest(
             name="hello",
             workloads=(
-                WorkloadManifest(name="pub", kind="faas", is_public=True, faas_public=True),
+                WorkloadManifest(name="both", kind="faas", is_public=True, faas_public=True),
                 WorkloadManifest(name="nopub", kind="faas", is_public=True, faas_public=False),
-                WorkloadManifest(name="private", kind="faas", is_public=False, faas_public=True),
+                WorkloadManifest(name="faaspub", kind="faas", is_public=False, faas_public=True),
             ),
         )
     )
     names = {w.name for w in static_site._cdn_backed_public_workloads(n)}
-    assert names == {"pub"}
+    assert names == {"both", "faaspub"}
 
 
 # ---- deploy wiring ordering ------------------------------------------------

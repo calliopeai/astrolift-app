@@ -140,3 +140,28 @@ def test_ported_container_gets_default_http_healthcheck():
     assert c.healthcheck_kind == "http"
     assert c.healthcheck_value == "/health"
     assert "workload.web.containers[app].healthcheck.kind" in n.defaults_applied
+
+
+def test_faas_public_implies_is_public():
+    # #1035: faas_public is the public switch for a faas workload -- normalize
+    # implies is_public from it so the hostname/alias/CNAME machinery (all keyed
+    # on is_public) fires. Falsifiable: dropping the implication leaves
+    # is_public False and the public surface never resolves.
+    raw = RawManifest(
+        name="hello",
+        workloads=(WorkloadManifest(name="api", kind="faas", faas_public=True),),
+    )
+    n = normalize(raw)
+    assert n.workloads[0].is_public is True
+    assert "workload.api.is_public" in n.defaults_applied
+
+
+def test_faas_without_public_stays_private():
+    # A private faas (no faas_public) must NOT be made public.
+    raw = RawManifest(
+        name="hello",
+        workloads=(WorkloadManifest(name="api", kind="faas", faas_public=False),),
+    )
+    n = normalize(raw)
+    assert n.workloads[0].is_public is False
+    assert "workload.api.is_public" not in n.defaults_applied

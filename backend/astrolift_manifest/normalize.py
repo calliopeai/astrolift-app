@@ -73,8 +73,20 @@ def _normalize_workload(
     # Static-site (#1010) and faas (#987) have no container/pod — applying
     # cpu/mem/healthcheck defaults or fabricating an is_primary container would
     # pollute the serialized hash for a container-less workload. Pass them
-    # through untouched.
-    if w.kind in ("static_site", "faas"):
+    # through untouched, except:
+    if w.kind == "static_site":
+        return w
+    if w.kind == "faas":
+        # faas_public is the public switch for a faas workload: it drives the
+        # Function-URL + CloudFront (cdn) + the public hostname/CNAME. The
+        # hostname / alias / DNS machinery all key on is_public, so a workload
+        # that declares only faas_public must be is_public too — otherwise the
+        # cdn is created but gets no alias and no CNAME (#1035, live: faasprobe
+        # set faas_public only and its custom host never resolved). Imply it
+        # here so the operator declares one switch, not two.
+        if w.faas_public and not w.is_public:
+            applied.append(f"workload.{w.name}.is_public")
+            return dataclasses.replace(w, is_public=True)
         return w
 
     cpu_request = w.cpu_request or _apply(applied, f"workload.{w.name}.cpu_request", defaults.cpu_request)

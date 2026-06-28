@@ -42,6 +42,33 @@ is_public = true
 static_output_dir = "dist"
 """
 
+# #1035: a public faas workload has no Service either (the cloud runs the
+# function; reachability is the CNAME -> CloudFront). It declares only
+# faas_public; normalize implies is_public, so it appears in `computed` and must
+# be filtered out of the Ingress set exactly like a static_site.
+_FAAS_HYBRID = """name = "shop"
+[[workloads]]
+name = "api"
+kind = "deployment"
+is_public = true
+  [[workloads.containers]]
+  name = "app"
+  is_primary = true
+  image_ref = "docker.io/acme/shop-api:main"
+  port = 8080
+[[workloads]]
+name = "fn"
+kind = "faas"
+faas_public = true
+"""
+
+_FAAS_ONLY = """name = "marketing"
+[[workloads]]
+name = "fn"
+kind = "faas"
+faas_public = true
+"""
+
 
 def _scenario(manifest_toml: str):
     manifest = normalize(parse_raw(manifest_toml), defaults=NormalizationDefaults())
@@ -85,3 +112,28 @@ def test_static_only_emits_no_ingress():
     # A public static_site has a hostname (so `computed` is non-empty) but no
     # Service -- the filter drops it, leaving no Ingress at all.
     assert out == [], f"a lone static_site must produce no Ingress, got {out!r}"
+
+
+def test_hybrid_faas_ingress_only_for_container_workload():
+    deployment, manifest, md, cluster = _scenario(_FAAS_HYBRID)
+    out = _render_managed_subdomain_ingress(
+        deployment, manifest, namespace="acme-shop", managed_domain=md, cluster=cluster
+    )
+    # The public faas workload must be filtered out (no Service); only the
+    # container workload gets an Ingress. Falsifiable: not skipping faas yields
+    # a second Ingress whose backend Service ("fn") does not exist.
+    assert len(out) == 1, f"public faas must be skipped from the ingress set, got {len(out)}"
+    hosts = [r["host"] for r in out[0]["spec"]["rules"]]
+    assert "shop-api.apps.example.net" in hosts
+    assert not any("fn" in h for h in hosts), f"faas host leaked into the Ingress: {hosts}"
+
+
+def test_faas_only_emits_no_ingress():
+    deployment, manifest, md, cluster = _scenario(_FAAS_ONLY)
+    deployment.registered_app.slug = "marketing"
+    out = _render_managed_subdomain_ingress(
+        deployment, manifest, namespace="acme-marketing", managed_domain=md, cluster=cluster
+    )
+    # A lone public faas (is_public implied from faas_public) has a hostname but
+    # no Service -- the filter drops it, leaving no Ingress (#1035).
+    assert out == [], f"a lone public faas must produce no Ingress, got {out!r}"

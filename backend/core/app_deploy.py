@@ -531,11 +531,14 @@ def _render_managed_subdomain_ingress(
     if not computed:
         return []
 
-    # static_site workloads have no Service -> the ALB/nginx controller would
-    # reject an Ingress backend pointing at a non-existent Service. They are
-    # reached via a CNAME -> CloudFront written by the deploy flow, not an
-    # Ingress, so drop them from the hostname-to-backend maps below.
-    static_workloads = {w.name for w in manifest.workloads if w.kind == "static_site"}
+    # static_site and faas workloads have no Service -> the ALB/nginx controller
+    # would reject an Ingress backend pointing at a non-existent Service. Both are
+    # reached via a CNAME -> CloudFront written by the deploy flow, not an Ingress
+    # (#1010 static_site, #1035 public faas), so drop them from the
+    # hostname-to-backend maps below.
+    serviceless_workloads = {
+        w.name for w in manifest.workloads if w.kind in ("static_site", "faas")
+    }
 
     cert_arn: str | None = (
         managed_domain.dns_config.get("certificate_arn") if managed_domain.dns_config else None
@@ -602,7 +605,7 @@ def _render_managed_subdomain_ingress(
         # onto the real workload's target group, re-triggering #997). Pick the
         # first non-static computed entry.
         hc_source = next(
-            (wh for wh in computed if wh.workload_slug not in static_workloads),
+            (wh for wh in computed if wh.workload_slug not in serviceless_workloads),
             None,
         )
         driver = ALBIngressDriver(
@@ -616,7 +619,7 @@ def _render_managed_subdomain_ingress(
         tls_strategy = "acm_dns_validated" if cert_arn else "letsencrypt"
         by_workload: dict[str, list[str]] = {}
         for wh in computed:
-            if wh.workload_slug in static_workloads:
+            if wh.workload_slug in serviceless_workloads:
                 continue
             by_workload.setdefault(wh.workload_slug, []).append(wh.hostname)
         for workload_slug, hostnames in by_workload.items():
@@ -670,7 +673,7 @@ def _render_managed_subdomain_ingress(
         tls_strategy = "letsencrypt" if not cert_arn else "provided"
         by_workload: dict[str, list[str]] = {}
         for wh in computed:
-            if wh.workload_slug in static_workloads:
+            if wh.workload_slug in serviceless_workloads:
                 continue
             by_workload.setdefault(wh.workload_slug, []).append(wh.hostname)
         for workload_slug, hostnames in by_workload.items():
