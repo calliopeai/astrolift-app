@@ -8,10 +8,10 @@ API ops. Tokens come from the local default GCP credentials
 
 from __future__ import annotations
 
+import contextlib
 import time
-from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from _sdk._telemetry import driver_op, maybe_heartbeat
 from _sdk.cluster import (
@@ -54,6 +54,9 @@ from k8s_native.observability import (
     PodBackend,
     default_log_backend,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Callable
 
 # ``_NotFound`` is aliased to the shared helper's ``NotFoundError`` at
 # the top-of-file imports so existing ``except _NotFound`` clauses keep
@@ -347,7 +350,6 @@ class GKEClusterDriver(ClusterDriver):
         if timeout <= 0:
             timeout = 600
         deadline = time.monotonic() + timeout
-        last_status = None
         while time.monotonic() < deadline:
             maybe_heartbeat(f"cluster.poll_rollout:{kind}/{name}")
             try:
@@ -366,7 +368,6 @@ class GKEClusterDriver(ClusterDriver):
                     message="workload not found",
                     timed_out=False,
                 )
-            last_status = status
             if on_tick:
                 on_tick(status)
             if status.ready_replicas == status.desired_replicas and status.desired_replicas > 0:
@@ -1006,14 +1007,12 @@ def _build_k8s_client(
         # is fresh. The refresh is a single HTTP request against the
         # metadata server (inside GCP) or stsservice.googleapis.com
         # (off-cluster), so it's cheap to over-refresh.
-        try:
+        # On a transient refresh failure, fall back to the existing cached
+        # token rather than failing the op. The kubernetes client will
+        # surface the 401 if the token is genuinely expired, which the
+        # resolver layer renders as an empty UI.
+        with contextlib.suppress(Exception):
             _refresh_credentials(creds)
-        except Exception:
-            # On a transient refresh failure, fall back to the existing
-            # cached token rather than failing the op. The kubernetes
-            # client will surface the 401 if the token is genuinely
-            # expired, which the resolver layer renders as an empty UI.
-            pass
         return str(getattr(creds, "token", "") or "")
 
     return _RealK8sClient(

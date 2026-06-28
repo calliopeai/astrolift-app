@@ -11,9 +11,8 @@ from __future__ import annotations
 
 import base64
 import time
-from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from _sdk._telemetry import driver_op, maybe_heartbeat
 from _sdk.cluster import (
@@ -56,6 +55,9 @@ from k8s_native.observability import (
     PodBackend,
     default_log_backend,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Callable
 
 # AKS admin kubeconfig TTL. The blob carries a long-lived client
 # certificate, but we re-fetch every ~50 min so a key-rotation event

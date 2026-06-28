@@ -14,9 +14,8 @@ shape, same operations, but no boto3. Production use requires the
 from __future__ import annotations
 
 import time
-from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from _sdk._telemetry import driver_op, maybe_heartbeat
 from _sdk.cluster import (
@@ -33,12 +32,12 @@ from _sdk.cluster import (
     ManagementReport,
     Namespace,
     NamespaceState,
-    StorageClassInfo,
     PodInfo,
     PodLogLine,
     PodPhaseSummary,
     PortForwardSession,
     RolloutResult,
+    StorageClassInfo,
     TeardownReport,
     WorkloadStatus,
     classify_apply_error,
@@ -57,6 +56,9 @@ from k8s_native.observability import (
     PodBackend,
     default_log_backend,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Callable
 
 
 class K8sNativeError(Exception):
