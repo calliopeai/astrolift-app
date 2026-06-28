@@ -17,6 +17,8 @@ from _sdk.managed_service import (
 )
 from aws.managed._base import parse_handle
 from aws.managed.cdn_cloudfront import (
+    _CACHE_POLICY_CACHING_DISABLED,
+    _ORIGIN_REQUEST_POLICY_ALL_VIEWER_EXCEPT_HOST,
     KIND,
     CloudFrontConfig,
     CloudFrontDriver,
@@ -393,6 +395,125 @@ def test_deprovision_lambda_custom_origin_reaps_oac(driver, cf, s3) -> None:
     assert dist_id not in cf._dists
     # The Lambda OAC was reaped (resolved from the dist config's origin).
     assert ("delete_oac", "oac-1") in cf.calls
+
+
+# ---- #1035 cache policy: OAC-safe behavior for the faas custom origin ----
+
+
+def test_provision_custom_origin_uses_caching_disabled_policies(driver, cf) -> None:
+    # #1035: OAC sigv4 signing to an AWS_IAM Lambda Function URL requires the
+    # managed CachingDisabled + AllViewerExceptHostHeader policies and forbids
+    # legacy ForwardedValues (the live 403 root cause). Falsifiable: reverting
+    # _custom_origin to ForwardedValues fails every assertion below.
+    result = driver.provision(_custom_spec())
+    behavior = cf._dists[parse_handle(result.handle)[1]]["config"]["DefaultCacheBehavior"]
+    assert behavior["CachePolicyId"] == _CACHE_POLICY_CACHING_DISABLED
+    assert behavior["OriginRequestPolicyId"] == _ORIGIN_REQUEST_POLICY_ALL_VIEWER_EXCEPT_HOST
+    # A behavior cannot carry both a CachePolicyId and legacy ForwardedValues/TTL.
+    assert "ForwardedValues" not in behavior
+    assert "MinTTL" not in behavior
+    assert "DefaultTTL" not in behavior
+    assert "MaxTTL" not in behavior
+
+
+def test_provision_s3_origin_behavior_byte_unchanged(driver, cf) -> None:
+    # Regression guard: the static-site (S3) default behavior must NOT pick up
+    # the faas cache-policy swap -- it keeps legacy ForwardedValues + TTLs and
+    # carries no CachePolicyId. Falsifiable: applying the policy swap to the S3
+    # origin (or dropping its ForwardedValues) fails this exact-match.
+    result = driver.provision(_spec())
+    behavior = cf._dists[parse_handle(result.handle)[1]]["config"]["DefaultCacheBehavior"]
+    assert behavior == {
+        "TargetOriginId": "s3-origin",
+        "ViewerProtocolPolicy": "redirect-to-https",
+        "Compress": True,
+        "AllowedMethods": {
+            "Quantity": 2,
+            "Items": ["GET", "HEAD"],
+            "CachedMethods": {"Quantity": 2, "Items": ["GET", "HEAD"]},
+        },
+        "ForwardedValues": {
+            "QueryString": False,
+            "Cookies": {"Forward": "none"},
+        },
+        "MinTTL": 0,
+        "DefaultTTL": 3600,
+        "MaxTTL": 86400,
+    }
+
+
+def test_reconcile_existing_custom_origin_sets_cache_policies(cf, s3) -> None:
+    # A faas distribution created before #1035 carries legacy ForwardedValues on
+    # its custom origin's default behavior, which 403s OAC signing. Reconcile
+    # (idempotent redeploy) must converge it onto the managed policies so the
+    # live faasprobe distribution self-heals. Falsifiable: dropping the
+    # reconcile-path swap leaves ForwardedValues in place.
+    driver = CloudFrontDriver(config=CloudFrontConfig(), client=cf, s3_client=s3)
+    cf._seed(
+        "EFAAS01",
+        {
+            "Comment": "astrolift ms-1",
+            "DefaultRootObject": "",
+            "Origins": {
+                "Items": [
+                    {
+                        "DomainName": "api-prod-fn.lambda-url.us-east-1.on.aws",
+                        "CustomOriginConfig": {"OriginProtocolPolicy": "https-only"},
+                    }
+                ]
+            },
+            "DefaultCacheBehavior": {
+                "TargetOriginId": "custom-origin",
+                "ForwardedValues": {"QueryString": True, "Cookies": {"Forward": "none"}},
+                "MinTTL": 0,
+                "DefaultTTL": 0,
+                "MaxTTL": 0,
+            },
+        },
+    )
+    cf.raise_create_already_exists = True
+    result = driver.provision(_custom_spec())
+    assert result.ok is True
+    assert parse_handle(result.handle)[1] == "EFAAS01"
+    behavior = cf._dists["EFAAS01"]["config"]["DefaultCacheBehavior"]
+    assert behavior["CachePolicyId"] == _CACHE_POLICY_CACHING_DISABLED
+    assert behavior["OriginRequestPolicyId"] == _ORIGIN_REQUEST_POLICY_ALL_VIEWER_EXCEPT_HOST
+    assert "ForwardedValues" not in behavior
+
+
+def test_reconcile_existing_s3_origin_behavior_untouched(cf, s3) -> None:
+    # Regression guard: reconciling a static-site (S3) distribution must NOT
+    # touch its default behavior -- no CachePolicyId, ForwardedValues intact.
+    driver = CloudFrontDriver(config=CloudFrontConfig(), client=cf, s3_client=s3)
+    s3_behavior = {
+        "TargetOriginId": "s3-origin",
+        "ForwardedValues": {"QueryString": False, "Cookies": {"Forward": "none"}},
+        "MinTTL": 0,
+        "DefaultTTL": 3600,
+        "MaxTTL": 86400,
+    }
+    cf._seed(
+        "ES3OLD1",
+        {
+            "Comment": "astrolift ms-1",
+            "DefaultRootObject": "old.html",
+            "Origins": {
+                "Items": [
+                    {
+                        "DomainName": "b.s3.us-west-2.amazonaws.com",
+                        "S3OriginConfig": {"OriginAccessIdentity": ""},
+                    }
+                ]
+            },
+            "DefaultCacheBehavior": dict(s3_behavior),
+        },
+    )
+    cf.raise_create_already_exists = True
+    result = driver.provision(_spec())
+    assert result.ok is True
+    behavior = cf._dists["ES3OLD1"]["config"]["DefaultCacheBehavior"]
+    assert "CachePolicyId" not in behavior
+    assert behavior == s3_behavior
 
 
 # ---- binding ---------------------------------------------------------

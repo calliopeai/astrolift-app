@@ -57,6 +57,16 @@ log = logging.getLogger("aws.managed.cdn_cloudfront")
 
 KIND = "cdn"
 
+# OAC sigv4 signing to an AWS_IAM Lambda Function URL only works when the
+# custom (faas) origin's cache behavior references AWS-managed policies rather
+# than legacy ForwardedValues (#1035): a behavior cannot carry both a
+# CachePolicyId and ForwardedValues, and ForwardedValues breaks OAC signing.
+# CachingDisabled keeps faas responses dynamic; AllViewerExceptHostHeader
+# forwards every query string/cookie/header *except* Host -- a Function URL
+# validates Host, so the origin must see its own host, not the viewer's.
+_CACHE_POLICY_CACHING_DISABLED = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
+_ORIGIN_REQUEST_POLICY_ALL_VIEWER_EXCEPT_HOST = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
+
 # Disabling a distribution flips Status to InProgress until the change
 # propagates to every edge; a distribution can only be deleted once it
 # reports Deployed. Bounded poll so a stuck propagation surfaces.
@@ -614,19 +624,22 @@ class CloudFrontDriver(ManagedServiceDriver):
                 "Items": ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"],
                 "CachedMethods": {"Quantity": 2, "Items": ["GET", "HEAD"]},
             },
-            # Forward query strings to the function. Do NOT forward the viewer
-            # Host header -- a Lambda Function URL validates Host, so it must
-            # see the origin's own host. Caching off by default (dynamic).
-            "ForwardedValues": {
-                "QueryString": True,
-                "Cookies": {"Forward": "none"},
-            },
-            "MinTTL": 0,
-            "DefaultTTL": 0,
-            "MaxTTL": 0,
         }
+        # OAC sigv4 signing needs the managed CachingDisabled +
+        # AllViewerExceptHostHeader policies, NOT legacy ForwardedValues (#1035).
+        self._apply_custom_cache_policies(behavior)
         # A function URL serves every path; there is no default root object.
         return origin_item, behavior, ""
+
+    def _apply_custom_cache_policies(self, behavior: dict[str, Any]) -> None:
+        """Make a custom (Lambda Function URL) origin's cache behavior OAC-safe:
+        reference the managed CachingDisabled + AllViewerExceptHostHeader
+        policies and drop the legacy ForwardedValues/TTL fields, which are
+        mutually exclusive with a CachePolicyId and break OAC signing (#1035)."""
+        behavior["CachePolicyId"] = _CACHE_POLICY_CACHING_DISABLED
+        behavior["OriginRequestPolicyId"] = _ORIGIN_REQUEST_POLICY_ALL_VIEWER_EXCEPT_HOST
+        for legacy in ("ForwardedValues", "MinTTL", "DefaultTTL", "MaxTTL"):
+            behavior.pop(legacy, None)
 
     def _build_distribution_config(
         self,
@@ -717,6 +730,13 @@ class CloudFrontDriver(ManagedServiceDriver):
             items = config.get("Origins", {}).get("Items") or []
             if items:
                 items[0]["OriginAccessControlId"] = oac_id
+                # Converge a custom (faas) origin's default behavior onto the
+                # OAC-safe managed policies: a distribution created before #1035
+                # carries legacy ForwardedValues, which breaks OAC signing and
+                # 403s the Lambda Function URL. S3 (static-site) origins keep
+                # their existing behavior (SPA error responses etc.) untouched.
+                if "CustomOriginConfig" in items[0] and config.get("DefaultCacheBehavior"):
+                    self._apply_custom_cache_policies(config["DefaultCacheBehavior"])
         if acm_cert_arn and aliases:
             config["Aliases"] = {"Quantity": len(aliases), "Items": aliases}
             config["ViewerCertificate"] = {
