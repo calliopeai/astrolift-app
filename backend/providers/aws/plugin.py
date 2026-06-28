@@ -30,6 +30,7 @@ from aws.dns_route53 import Route53Driver
 from aws.identity_irsa import IRSADriver
 from aws.ingress_alb import ALBIngressDriver
 from aws.managed.cdn_cloudfront import CloudFrontDriver
+from aws.managed.dynamodb import DynamoDBDriver
 from aws.managed.email_ses import AmazonSESDriver
 from aws.managed.faas_lambda import LambdaDriver
 from aws.managed.model_endpoint_bedrock import AmazonBedrockDriver
@@ -66,6 +67,7 @@ PLUGIN = ProviderPlugin(
         # bucket + relational DB + cache). Pending per backlog tickets:
         # postgres/aurora, nosql/dynamodb, pubsub/sns, filesystem/efs.
         ("object_store", "s3"): S3Driver,
+        ("kv_store", "dynamodb"): DynamoDBDriver,
         ("cdn", "cloudfront"): CloudFrontDriver,
         ("faas", "lambda"): LambdaDriver,
         ("queue", "sqs"): SQSDriver,

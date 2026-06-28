@@ -346,6 +346,17 @@ def managed_config_for(
             public_access_blocked=bool(pc.get("public_access_blocked", True)),
         )
 
+    if kind == "kv_store":
+        from aws.managed.dynamodb import DynamoDBConfig
+
+        return DynamoDBConfig(
+            region=region,
+            table_name_prefix=str(pc.get("table_name_prefix", "astrolift")),
+            billing_mode_default=str(pc.get("dynamodb_billing_mode", "PAY_PER_REQUEST")),
+            deletion_protection_default=bool(pc.get("deletion_protection_default", True)),
+            point_in_time_recovery_default=bool(pc.get("point_in_time_recovery_default", True)),
+        )
+
     if kind == "cdn":
         from aws.managed.cdn_cloudfront import CloudFrontConfig
 
@@ -370,7 +381,10 @@ def managed_config_for(
 
         port = 3306 if kind == "mysql" else 5432
         subnet_group, sg_ids = ensure_db_networking(
-            cluster, region=region, port=port, service="rds",
+            cluster,
+            region=region,
+            port=port,
+            service="rds",
         )
         if kind == "mysql":
             from aws.managed.mysql_rds import RDSMySQLConfig
@@ -407,7 +421,10 @@ def managed_config_for(
         from aws.managed.redis_elasticache import ElastiCacheConfig
 
         subnet_group, sg_ids = ensure_db_networking(
-            cluster, region=region, port=6379, service="elasticache",
+            cluster,
+            region=region,
+            port=6379,
+            service="elasticache",
         )
         return ElastiCacheConfig(
             region=region,

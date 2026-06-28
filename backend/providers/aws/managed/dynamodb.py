@@ -25,13 +25,14 @@ Four-corner deprovision matrix:
     skip backup, flip protection off, delete. The platform's
     --atomic teardown path.
 
-Binding envelope follows the IRSA pattern used by the SQS driver:
-the workload assumes an IRSA-backed role that the platform attaches
-``dynamodb:*Item`` + ``dynamodb:Query`` permissions to scoped at
-the table ARN. We bind ``DYNAMODB_TABLE_NAME`` / ``DYNAMODB_REGION``
-/ ``DYNAMODB_ENDPOINT`` + leave AWS_ACCESS_KEY_ID / SECRET refs
-empty (driver returns ``ValueRef(secret_ref=...)`` placeholders that
-the secrets backend populates when IRSA is unavailable).
+Binding envelope follows the IRSA pattern proven by object_store
+(#1011): the workload assumes an IRSA-backed role that the platform
+folds ``dynamodb:*Item`` + ``dynamodb:Query`` permissions into,
+scoped at the table ARN. We bind ``DYNAMODB_TABLE_NAME`` /
+``DYNAMODB_REGION`` / ``DYNAMODB_ENDPOINT`` as literals only — no
+static access-key refs, since the bindings-Secret render hard-fails
+on any secret_ref the backend can't resolve and the SDK resolves
+credentials from the projected service-account token.
 """
 
 from __future__ import annotations
@@ -462,10 +463,14 @@ class DynamoDBDriver(ManagedServiceDriver):
             )
         table_arn = existing.get("TableArn") or (f"arn:aws:dynamodb:{self._config.region}:UNKNOWN:table/{table_name}")
 
-        # IRSA pattern: the workload assumes a role we attach perms to.
-        # We bind the table coordinates as literals + leave the access
-        # key refs empty for the secrets backend to populate when an
-        # operator wants static creds instead of IRSA.
+        # IRSA pattern (mirrors object_store #1011): the workload assumes
+        # an IRSA-backed role we fold the iam_grants below into. We bind
+        # only the table coordinates as literals — no static access-key
+        # refs. Emitting empty secret refs here would be a deploy-time
+        # trap: the bindings-Secret render hard-fails on any secret_ref
+        # the backend can't resolve, and nothing mints per-table keys for
+        # an IRSA workload. SDK clients (boto3 etc.) pick up credentials
+        # from the projected service-account token automatically.
         return Binding(
             env_vars={
                 "DYNAMODB_TABLE_NAME": ValueRef(literal=table_name),
@@ -475,12 +480,6 @@ class DynamoDBDriver(ManagedServiceDriver):
                     literal=(f"https://dynamodb.{self._config.region}.amazonaws.com"),
                 ),
                 "AWS_REGION": ValueRef(literal=self._config.region),
-                "AWS_ACCESS_KEY_ID": ValueRef(
-                    secret_ref=f"astrolift/dynamodb/{table_name}/access_key_id",
-                ),
-                "AWS_SECRET_ACCESS_KEY": ValueRef(
-                    secret_ref=(f"astrolift/dynamodb/{table_name}/secret_access_key"),
-                ),
             },
             iam_grants=[
                 Grant(
@@ -499,11 +498,10 @@ class DynamoDBDriver(ManagedServiceDriver):
                 ),
             ],
             notes=(
-                "Prefer the IRSA role-binding path: the platform "
-                "attaches the dynamodb:* actions above to the "
-                "workload's service-account role. Static access keys "
-                "are only populated when IRSA is unavailable in the "
-                "tenant cluster."
+                "IRSA role-binding path: the platform attaches the "
+                "dynamodb item/query actions above to the workload's "
+                "service-account role; the SDK resolves credentials from "
+                "the projected token. No static access keys are injected."
             ),
         )
 
@@ -597,12 +595,6 @@ class DynamoDBDriver(ManagedServiceDriver):
                 "DYNAMODB_REGION": "Table's region",
                 "DYNAMODB_ENDPOINT": "DynamoDB HTTPS endpoint URL",
                 "AWS_REGION": "Same region as DYNAMODB_REGION",
-                "AWS_ACCESS_KEY_ID": (
-                    "Secrets Manager ref -- populated only when IRSA is unavailable in the tenant cluster"
-                ),
-                "AWS_SECRET_ACCESS_KEY": (
-                    "Secrets Manager ref -- populated only when IRSA is unavailable in the tenant cluster"
-                ),
             },
         )
 
