@@ -656,10 +656,16 @@ class InteractiveExecSession:
         No-op when the cluster negotiated only the v4 subprotocol."""
 
         def _close() -> None:
-            with contextlib.suppress(Exception):
-                # v5 remotecommand: channel 255 = CLOSE; the payload is the
-                # stream number to half-close (0 = stdin).
-                self._resp.write_channel(_EXEC_CLOSE_CHANNEL, chr(_STDIN_CHANNEL))
+            # v5 remotecommand CLOSE: a BINARY frame on channel 255 whose
+            # single payload byte is the stream to half-close (0 = stdin).
+            # Must be bytes (binary opcode) — a text frame isn't parsed as a
+            # close by the apiserver. Logged (not suppressed) so we can tell
+            # "v5 not negotiated" from "sent ok but ignored".
+            try:
+                self._resp.write_channel(_EXEC_CLOSE_CHANNEL, bytes([_STDIN_CHANNEL]))
+                logger.info("interactive_exec: sent v5 stdin CLOSE frame")
+            except Exception:
+                logger.exception("interactive_exec: stdin CLOSE write failed")
 
         await asyncio.get_running_loop().run_in_executor(None, _close)
 
