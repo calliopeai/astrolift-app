@@ -37,6 +37,7 @@ with workflow.unsafe.imports_passed_through():
         build_image,
         fetch_app_build_strategy,
     )
+    from astrolift_workflows.activities.faas import ensure_faas_services
     from astrolift_workflows.activities.static_site import (
         SyncStaticAssetsInput,
         ensure_cloudfront_cert,
@@ -160,6 +161,19 @@ class DeployAppWorkflow:
             # when the manifest has no static workload.
             await workflow.execute_activity(
                 ensure_static_site_services,
+                deployment_id,
+                start_to_close_timeout=_TIMEOUT,
+                retry_policy=_STANDARD_RETRY,
+            )
+            # FaaS topology (#987): a faas workload implies a (faas/lambda [, cdn])
+            # pair of managed services. Ensure them — lambda first, then (when
+            # public) the cdn fronting its Function URL — AFTER build_image (the
+            # container image must be in ECR) and the cert, BEFORE
+            # ensure_workload_identity so any bound grants fold into the exec role.
+            # No-op fast-return when the manifest has no faas workload. The public
+            # CNAME is written by the generalized ensure_static_dns below.
+            await workflow.execute_activity(
+                ensure_faas_services,
                 deployment_id,
                 start_to_close_timeout=_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,

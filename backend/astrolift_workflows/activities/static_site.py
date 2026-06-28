@@ -76,6 +76,32 @@ def _static_workloads(manifest) -> list[Any]:
     return [w for w in manifest.workloads if getattr(w, "kind", "") == "static_site"]
 
 
+def _cdn_backed_public_workloads(manifest) -> list[Any]:
+    """Public workloads whose external surface is a platform-written
+    ``CNAME -> CloudFront`` record + a us-east-1 ACM cert: ``static_site``,
+    and ``faas`` with a public Function URL fronted by CloudFront (#987).
+
+    Both topologies are container-less and own no Ingress, so external-dns
+    never writes their record -- the platform writes it explicitly. The cert
+    + DNS activities below cover both via this shared filter so the cert/DNS
+    logic isn't duplicated per topology. ``faas`` additionally requires
+    ``faas_public`` (the Function-URL+cdn switch); ``is_public`` alone (which
+    drives the hostname) would otherwise produce a CNAME pointing at a cdn row
+    that was never created."""
+    if manifest is None:
+        return []
+    out: list[Any] = []
+    for w in manifest.workloads:
+        if not getattr(w, "is_public", False):
+            continue
+        kind = getattr(w, "kind", "")
+        if kind == "static_site":
+            out.append(w)
+        elif kind == "faas" and getattr(w, "faas_public", False):
+            out.append(w)
+    return out
+
+
 def _region_account(cluster) -> tuple[str, str]:
     pc = cluster.provider_config or {}
     ac = cluster.auth_config or {}
@@ -255,9 +281,11 @@ def _ensure_cloudfront_cert_sync(deployment_id: int) -> dict[str, Any]:
     ).get(pk=deployment_id)
     app = deployment.registered_app
     env = deployment.app_environment
-    statics = [w for w in _static_workloads(_normalized_manifest(app)) if w.is_public]
+    # Generalized (#987): the us-east-1 ACM cert covers both static_site and
+    # public faas (Function-URL+CloudFront) custom domains.
+    targets = _cdn_backed_public_workloads(_normalized_manifest(app))
     managed_domain = getattr(env, "managed_domain", None) if env else None
-    if not statics or managed_domain is None:
+    if not targets or managed_domain is None:
         return {"stub": True}
 
     dns_config = dict(managed_domain.dns_config or {})
@@ -316,8 +344,9 @@ def _ensure_cloudfront_cert_sync(deployment_id: int) -> dict[str, Any]:
 @activity.defn(name="astrolift.deploy.ensure_cloudfront_cert")
 async def ensure_cloudfront_cert(deployment_id: int) -> dict:
     """Ensure the env's managed domain has a us-east-1 wildcard ACM cert for
-    CloudFront aliases, before the static services provision (so the CDN picks
-    it up). No-op when no public static workload / no managed domain."""
+    CloudFront aliases, before the static/faas services provision (so the CDN
+    picks it up). Covers both static_site and public faas workloads (#987).
+    No-op when no cdn-backed public workload / no managed domain."""
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
@@ -685,8 +714,11 @@ def _ensure_static_dns_sync(deployment_id: int) -> dict[str, Any]:
     app = deployment.registered_app
     env = deployment.app_environment
     manifest = _normalized_manifest(app)
-    statics = [w for w in _static_workloads(manifest) if w.is_public]
-    if not statics:
+    # Generalized (#987): write the CNAME for both static_site and public faas
+    # workloads -- the cdn row name is identical (``{workload}-{env}-cdn``) for
+    # both, so the lookup below resolves either topology's distribution.
+    targets = _cdn_backed_public_workloads(manifest)
+    if not targets:
         return {"stub": True, "records": []}
 
     cluster = env.tenant_cluster if env else None
@@ -710,7 +742,7 @@ def _ensure_static_dns_sync(deployment_id: int) -> dict[str, Any]:
     dns_driver = driver_for_capability(cluster, "dns")
 
     records: list[dict[str, str]] = []
-    for w in statics:
+    for w in targets:
         host = host_by_workload.get(w.name)
         if not host:
             continue
@@ -729,9 +761,10 @@ def _ensure_static_dns_sync(deployment_id: int) -> dict[str, Any]:
 
 @activity.defn(name="astrolift.deploy.ensure_static_dns")
 async def ensure_static_dns(deployment_id: int) -> dict:
-    """Write a ``CNAME host -> CloudFront domain`` for each public static_site
-    workload. A static site has no Ingress, so external-dns never sees it --
-    the platform writes the record explicitly (idempotent UPSERT)."""
+    """Write a ``CNAME host -> CloudFront domain`` for each cdn-backed public
+    workload (static_site, and public faas; #987). Neither has an Ingress, so
+    external-dns never sees it -- the platform writes the record explicitly
+    (idempotent UPSERT)."""
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
@@ -748,8 +781,10 @@ def _delete_static_dns_records_sync(registered_app_id: int) -> dict[str, Any]:
 
     app = RegisteredApp.all_objects.select_related("organization").get(pk=registered_app_id)
     manifest = _normalized_manifest(app)
-    statics = [w for w in _static_workloads(manifest) if w.is_public]
-    if not statics:
+    # Generalized (#987): remove the CNAME for both static_site and public faas
+    # workloads (teardown counterpart of ensure_static_dns).
+    targets = _cdn_backed_public_workloads(manifest)
+    if not targets:
         return {"deleted": []}
 
     from aws._errors import NotFoundError
@@ -779,7 +814,7 @@ def _delete_static_dns_records_sync(registered_app_id: int) -> dict[str, Any]:
                 HostnameInputs(app_slug=app.slug, org_slug=org_slug, base_zone=managed_domain.zone),
             )
         }
-        for w in statics:
+        for w in targets:
             host = host_by_workload.get(w.name)
             if not host:
                 continue
@@ -794,7 +829,8 @@ def _delete_static_dns_records_sync(registered_app_id: int) -> dict[str, Any]:
 
 @activity.defn(name="astrolift.deploy.delete_static_dns_records")
 async def delete_static_dns_records(registered_app_id: int) -> dict:
-    """Remove the platform-written static-site CNAMEs for an app (teardown).
+    """Remove the platform-written CNAMEs for an app (teardown) -- both
+    static_site and public faas workloads (#987).
 
     Best-effort + idempotent: a missing record is swallowed so re-runs and
     partial teardowns complete."""

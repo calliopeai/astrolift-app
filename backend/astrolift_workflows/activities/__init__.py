@@ -46,15 +46,16 @@ from astrolift_workflows.activities.app_teardown import (
     revoke_app_deploy_tokens,
     soft_delete_app_records,
 )
+from astrolift_workflows.activities.build_image import (
+    build_image,
+    fetch_app_build_strategy,
+)
 from astrolift_workflows.activities.capability_deprovision import (
     deprovision_app_certificate,
     deprovision_app_dns_record,
     deprovision_app_identity_role,
     deprovision_app_ingress,
     deprovision_app_registry_repo,
-)
-from astrolift_workflows.activities.workload_identity import (
-    ensure_workload_identity,
 )
 from astrolift_workflows.activities.cluster_decommission_cleanup import (
     cleanup_cluster_acm_certs,
@@ -94,6 +95,9 @@ from astrolift_workflows.activities.dev_environment import (
     mark_dev_environment_failed,
     provision_dev_environment,
     sync_dev_environment_files,
+)
+from astrolift_workflows.activities.faas import (
+    ensure_faas_services,
 )
 from astrolift_workflows.activities.install_prereqs import (
     install_cluster_prereqs,
@@ -135,9 +139,12 @@ from astrolift_workflows.activities.scheduled import (
     reconcile_cluster_capabilities,
     reheal_webhook_subscriptions,
 )
-from astrolift_workflows.activities.build_image import (
-    build_image,
-    fetch_app_build_strategy,
+from astrolift_workflows.activities.secret_rotation import (
+    bounce_workloads_consuming_bundle,
+    delete_secret_from_cluster,
+    list_active_secret_bundle_targets,
+    list_bundles_due_for_refresh,
+    refresh_secret_bundle_in_cluster,
 )
 from astrolift_workflows.activities.static_site import (
     delete_static_dns_records,
@@ -145,13 +152,6 @@ from astrolift_workflows.activities.static_site import (
     ensure_static_dns,
     ensure_static_site_services,
     sync_static_assets,
-)
-from astrolift_workflows.activities.secret_rotation import (
-    bounce_workloads_consuming_bundle,
-    delete_secret_from_cluster,
-    list_active_secret_bundle_targets,
-    list_bundles_due_for_refresh,
-    refresh_secret_bundle_in_cluster,
 )
 from astrolift_workflows.activities.workflow_stage_activities import (
     aggregate_fan_out,
@@ -163,6 +163,9 @@ from astrolift_workflows.activities.workflow_stage_activities import (
     record_human_gate_decision,
     snapshot_checkpoint,
     update_stage_execution,
+)
+from astrolift_workflows.activities.workload_identity import (
+    ensure_workload_identity,
 )
 
 __all__ = [
@@ -204,6 +207,7 @@ __all__ = [
     "ensure_cluster_drained",
     "ensure_platform_managed_records",
     "ensure_cloudfront_cert",
+    "ensure_faas_services",
     "ensure_static_dns",
     "ensure_static_site_services",
     "expire_pending_approval_deployments",
