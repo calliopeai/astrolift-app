@@ -40,15 +40,27 @@ def _mark_state_sync(registered_app_id: int, status: str) -> None:
     )
 
 
+def _mark_tearing_down_sync(registered_app_id: int) -> None:
+    from astrolift_registry.models import RegisteredApp
+
+    app = RegisteredApp.all_objects.get(pk=registered_app_id)
+    # A deregister re-fired to resume a teardown that already reached the
+    # terminal DEREGISTERED state (rows soft-deleted on the prior run) must
+    # be a clean no-op — DEREGISTERED → TEARING_DOWN is not a legal
+    # transition and would raise, blowing up an otherwise-idempotent resume
+    # at the very first step (#1034). tearing_down → tearing_down idempotency
+    # is already handled inside transition_provisioning (#1006).
+    if app.provisioning_status == RegisteredApp.ProvisioningStatus.DEREGISTERED:
+        return
+    app.transition_provisioning(RegisteredApp.ProvisioningStatus.TEARING_DOWN)
+
+
 @activity.defn(name="astrolift.app.mark_tearing_down")
 async def mark_app_tearing_down(registered_app_id: int) -> None:
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    await sync_to_async(_mark_state_sync)(
-        registered_app_id,
-        "tearing_down",
-    )
+    await sync_to_async(_mark_tearing_down_sync)(registered_app_id)
 
 
 @activity.defn(name="astrolift.app.mark_deregistered")
@@ -191,9 +203,7 @@ def _abort_in_flight_deploys_sync(registered_app_id: int) -> list[str]:
             if signal_workflow(wf_id, "abort"):
                 signalled.append(wf_id)
         except Exception:  # noqa: BLE001 — best-effort; teardown proceeds
-            log.warning(
-                "abort_in_flight_deploys: abort failed for %s", wf_id, exc_info=True
-            )
+            log.warning("abort_in_flight_deploys: abort failed for %s", wf_id, exc_info=True)
     return signalled
 
 

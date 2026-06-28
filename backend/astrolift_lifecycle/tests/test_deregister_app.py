@@ -526,6 +526,163 @@ def test_workflow_partial_failure_keeps_app_live(app):
     assert app.deleted_at is None
 
 
+# ---------------------------------------------------------------------------
+# #1034 — resumable / idempotent teardown finalization
+#
+# NOTE: the workflow-body harness (`_run_workflow_with_fakes`) drives the
+# workflow inside `asyncio.run`, where Django ORM resolves to a *separate*
+# connection that cannot see the test transaction's uncommitted rows. So the
+# fan-out wiring is asserted at the harness level with recording fakes (call
+# order, no DB), and the DB-level finalization the fakes stand in for is
+# asserted directly against the activity sync helpers (real Postgres).
+# ---------------------------------------------------------------------------
+
+
+def _finalizing_fan_out_fakes(ms_ids):
+    """Recording fakes (no DB) for a clean deregister run whose managed-service
+    fan-out covers ``ms_ids``; the cloud resource is already gone so each
+    deprovision reports ok (#998)."""
+    return {
+        "mark_app_tearing_down": lambda *_: None,
+        "abort_in_flight_deploys": lambda *_: [],
+        "delete_app_namespaces": lambda *_: [],
+        "list_app_managed_service_ids": lambda *_: list(ms_ids),
+        "deprovision_managed_service": lambda *_: {"ok": True, "message": "already gone"},
+        "finalize_managed_service_deletion": lambda *_: None,
+        "delete_static_dns_records": lambda *_: {"deleted": []},
+        "deprovision_app_registry_repo": lambda *_: {"repo": "acme/hello"},
+        "deprovision_app_identity_role": lambda *_: {"role": "astrolift-acme-hello"},
+        "list_app_secret_targets": lambda *_: [],
+        "revoke_app_secret_bundle_refs": lambda *_: 0,
+        "delete_app_source_webhook": lambda *_: {
+            "status": "not_installed",
+            "detail": "",
+            "hook_id": "",
+        },
+        "revoke_app_deploy_tokens": lambda *_: 0,
+        "soft_delete_app_records": lambda *_: {"registered_app": 1},
+        "mark_app_deregistered": lambda *_: None,
+    }
+
+
+def test_fan_out_finalizes_every_managed_service_before_app_soft_delete(app):
+    """#1034: the deregister fan-out deprovisions AND finalizes (soft-deletes)
+    EVERY managed-service row — each finalize after its own deprovision and
+    before the app-level soft-delete — so a torn-down service row can't outlive
+    its backend resource and strand the app at tearing_down forever."""
+    ms_ids = [101, 202, 303]
+    fake_api, result = _run_workflow_with_fakes(app, _finalizing_fan_out_fakes(ms_ids))
+
+    assert result.ok is True, result.data
+    assert result.data["still_live_resources"] == []
+
+    seq = [(name, call_args) for name, call_args, _ in fake_api.calls]
+
+    def _idx(name, ms_id=None):
+        for i, (n, call_args) in enumerate(seq):
+            if n == name and (ms_id is None or (call_args and call_args[0] == ms_id)):
+                return i
+        return -1
+
+    soft_idx = _idx("soft_delete_app_records")
+    assert soft_idx != -1
+    for ms_id in ms_ids:
+        deprov = _idx("deprovision_managed_service", ms_id)
+        final = _idx("finalize_managed_service_deletion", ms_id)
+        assert deprov != -1, ms_id
+        assert final != -1, ms_id
+        # deprovision the cloud resource, THEN finalize the row, THEN (only
+        # after the whole fan-out) soft-delete the app.
+        assert deprov < final < soft_idx, ms_id
+
+
+def test_fan_out_does_not_finalize_on_deprovision_failure(app):
+    """A managed-service deprovision that fails must NOT finalize (soft-delete)
+    the row — the row stays live for retry, and the app-level soft-delete is
+    gated on a clean pass (the row can't be silently dropped)."""
+    fakes = _finalizing_fan_out_fakes([777])
+    fakes["deprovision_managed_service"] = RuntimeError("rds final snapshot required")
+    fake_api, result = _run_workflow_with_fakes(app, fakes)
+
+    assert result.ok is False
+    assert "managed_services" in result.data["still_live_resources"]
+    names = [name for name, _, _ in fake_api.calls]
+    # A failed deprovision short-circuits before finalize, and the gated
+    # platform-row soft-delete never runs.
+    assert "finalize_managed_service_deletion" not in names
+    assert "soft_delete_app_records" not in names
+    assert result.data["teardown"]["platform_rows"]["ok"] is False
+
+
+@pytest.mark.parametrize(
+    "start_status",
+    ["pending", "active", "deprovisioning"],
+)
+def test_finalize_drives_stuck_managed_service_to_terminal(app, env, start_status):
+    """#1034: ``finalize_managed_service_deletion`` drives a row stuck in any
+    non-terminal status to terminal — flipped off pending/active and
+    soft-deleted — and a second call is a clean idempotent no-op (no re-write,
+    so a resumed teardown can re-run the fan-out safely)."""
+    from astrolift_services.models import ManagedService
+    from astrolift_workflows.activities.managed_service_lifecycle import (
+        _finalize_sync,
+    )
+
+    svc = ManagedService.objects.create(
+        registered_app=app,
+        app_environment=env,
+        kind="postgres",
+        name=f"db-{start_status}",
+        variant="rds",
+        backend_ref="rds/db",
+        status=ManagedService.Status(start_status),
+    )
+
+    _finalize_sync(svc.pk)
+    svc.refresh_from_db()
+    assert svc.deleted_at is not None
+    assert svc.status == ManagedService.Status.DEPROVISIONING
+    first_deleted_at = svc.deleted_at
+    first_version = svc.version
+
+    # Idempotent: a resumed run over the already-finalized row must not
+    # re-soft-delete (no new write — version + timestamp unchanged).
+    _finalize_sync(svc.pk)
+    svc.refresh_from_db()
+    assert svc.deleted_at == first_deleted_at
+    assert svc.version == first_version
+
+
+def test_mark_tearing_down_is_noop_on_already_deregistered_app(app):
+    """#1034: a deregister re-fired to resume a teardown that already reached
+    DEREGISTERED must NOT raise at the first step — DEREGISTERED →
+    TEARING_DOWN is an illegal transition that would otherwise blow up an
+    idempotent resume before it can re-run the fan-out."""
+    from astrolift_registry.models import RegisteredApp
+    from astrolift_workflows.activities.app_teardown import _mark_tearing_down_sync
+
+    app.provisioning_status = RegisteredApp.ProvisioningStatus.DEREGISTERED.value
+    app.save(update_fields=["provisioning_status", "updated_at", "version"])
+
+    _mark_tearing_down_sync(app.pk)  # must not raise
+
+    app.refresh_from_db()
+    assert app.provisioning_status == RegisteredApp.ProvisioningStatus.DEREGISTERED.value
+
+
+def test_mark_tearing_down_transitions_live_app(app):
+    """The guard for the deregistered case (above) must not break the normal
+    path: a live (ready) app still transitions to tearing_down."""
+    from astrolift_registry.models import RegisteredApp
+    from astrolift_workflows.activities.app_teardown import _mark_tearing_down_sync
+
+    # The ``app`` fixture starts at provisioning_status="ready".
+    _mark_tearing_down_sync(app.pk)
+
+    app.refresh_from_db()
+    assert app.provisioning_status == RegisteredApp.ProvisioningStatus.TEARING_DOWN.value
+
+
 def _clean_teardown_fakes():
     """Fakes that let every teardown step succeed (clean happy path)."""
     return {

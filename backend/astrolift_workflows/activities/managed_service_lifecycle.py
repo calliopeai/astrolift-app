@@ -145,8 +145,21 @@ def _finalize_sync(managed_service_id: int) -> None:
     from astrolift_services.models import ManagedService
 
     svc = ManagedService.all_objects.get(pk=managed_service_id)
-    if svc.deleted_at is None:
-        svc.soft_delete()
+    if svc.deleted_at is not None:
+        # Already finalized — a resumed/idempotent teardown re-running the
+        # fan-out over an already-soft-deleted row is a clean no-op (#1034).
+        return
+    # Drive the row off any transient status (pending / active /
+    # provisioning / deprovisioning) before soft-deleting it. Without this
+    # a teardown that deleted the backend resource could leave the platform
+    # row stuck at pending/active, outliving its cloud resource and
+    # stranding the app at tearing_down forever (#1034). There is no
+    # terminal DEPROVISIONED status; the soft-delete IS the terminal state,
+    # and DEPROVISIONING is the truthful last-known intent on the dead row.
+    if svc.status != ManagedService.Status.DEPROVISIONING:
+        svc.status = ManagedService.Status.DEPROVISIONING
+        svc.save(update_fields=["status", "updated_at", "version"])
+    svc.soft_delete()
 
 
 @activity.defn(name="astrolift.managed_service.finalize_deletion")

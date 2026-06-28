@@ -27,11 +27,15 @@ Resource teardown order (each step records its result on
      Deployments / ReplicaSets / Pods on every cluster the app is
      bound to) so subsequent steps don't race with new pods.
   2. ``managed_services`` — fan out ``deprovision_managed_service``
-     for every active ``ManagedService`` row with the operator's
+     for every ``ManagedService`` row with the operator's
      ``delete_data`` / ``force_destroy`` choice (default False/False —
-     RDS final snapshot + S3 contents retained; #1000). Driver-level
-     errors propagate so we can mark the resource as still-live on
-     partial-failure resume.
+     RDS final snapshot + S3 contents retained; #1000), then
+     ``finalize_managed_service_deletion`` to soft-delete the row so it
+     can't outlive its (now-deleted) backend resource (#1034). Every
+     non-soft-deleted row is re-deprovisioned regardless of its status,
+     so a row left stuck pending/active/deprovisioning by an interrupted
+     run is driven to terminal on resume. Driver-level errors propagate
+     so we can mark the resource as still-live on partial-failure resume.
   3. ``namespaces`` — re-run ``delete_app_namespaces`` after the
      managed-service deprovision to catch anything the deprovision
      of a stateful service re-emitted (Helm-managed PVCs etc.).
@@ -86,6 +90,7 @@ with workflow.unsafe.imports_passed_through():
         deprovision_app_identity_role,
         deprovision_app_registry_repo,
         deprovision_managed_service,
+        finalize_managed_service_deletion,
         list_app_managed_service_ids,
         list_app_secret_targets,
         mark_app_deregistered,
@@ -270,6 +275,13 @@ class DeregisterAppWorkflow:
             ms_results.append({"ok": False, "message": str(exc)})
 
         for ms_id in ms_ids:
+            # ``list_app_managed_service_ids`` returns EVERY non-soft-deleted
+            # row regardless of status — pending/active/deprovisioning all
+            # flow through here. We deliberately do NOT skip a row because it
+            # looks "in progress" (e.g. left at deprovisioning by an
+            # interrupted prior run); a stuck row is re-deprovisioned and
+            # driven to terminal, never assumed to be owned by another worker
+            # (#1034).
             try:
                 res = await workflow.execute_activity(
                     deprovision_managed_service,
@@ -277,15 +289,35 @@ class DeregisterAppWorkflow:
                     start_to_close_timeout=_DEPROVISION_TIMEOUT,
                     retry_policy=_CLEANUP_RETRY,
                 )
+                if not res.get("ok"):
+                    ms_results.append(
+                        {
+                            "ok": False,
+                            "managed_service_id": ms_id,
+                            "message": str(res.get("message", "")),
+                        },
+                    )
+                    ms_failed = True
+                    continue
+                # Finalize: soft-delete the platform row + flip it off its
+                # transient status now that the backend resource is gone.
+                # Without this the fan-out deleted the cloud resource but left
+                # the row stuck pending/active, so the app never finalized and
+                # sat at tearing_down forever (#1034). Idempotent — a resumed
+                # run over an already-finalized row no-ops.
+                await workflow.execute_activity(
+                    finalize_managed_service_deletion,
+                    ms_id,
+                    start_to_close_timeout=_QUICK_TIMEOUT,
+                    retry_policy=_STANDARD_RETRY,
+                )
                 ms_results.append(
                     {
-                        "ok": bool(res.get("ok")),
+                        "ok": True,
                         "managed_service_id": ms_id,
                         "message": str(res.get("message", "")),
                     },
                 )
-                if not res.get("ok"):
-                    ms_failed = True
             except Exception as exc:  # noqa: BLE001
                 ms_results.append(
                     {
@@ -299,7 +331,7 @@ class DeregisterAppWorkflow:
         teardown["managed_services"] = _step_result(
             ok=not ms_failed,
             detail=(
-                f"{sum(1 for r in ms_results if r.get('ok'))}/" f"{len(ms_results)} deprovision result(s) ok"
+                f"{sum(1 for r in ms_results if r.get('ok'))}/{len(ms_results)} deprovision result(s) ok"
             ),
             data=ms_results,
         )
@@ -365,9 +397,7 @@ class DeregisterAppWorkflow:
             )
             teardown["registry_repo"] = _step_result(
                 ok=True,
-                detail=(
-                    f"{'archived' if archive_repo else 'deleted'} repo " f"{repo_summary.get('repo', '')!r}"
-                ),
+                detail=(f"{'archived' if archive_repo else 'deleted'} repo {repo_summary.get('repo', '')!r}"),
                 data=repo_summary,
             )
         except Exception as exc:  # noqa: BLE001
@@ -557,12 +587,12 @@ class DeregisterAppWorkflow:
         else:
             teardown["platform_rows"] = _step_result(
                 ok=False,
-                detail=("skipped: prior steps still live — soft-delete is gated " "on a clean teardown pass"),
+                detail=("skipped: prior steps still live — soft-delete is gated on a clean teardown pass"),
             )
 
         ok = not still_live
         message_parts = [
-            f"{sum(1 for k, v in teardown.items() if v['ok'])}/" f"{len(teardown)} step(s) ok",
+            f"{sum(1 for k, v in teardown.items() if v['ok'])}/{len(teardown)} step(s) ok",
         ]
         if still_live:
             message_parts.append(f"still_live={still_live}")
