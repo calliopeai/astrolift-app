@@ -1178,6 +1178,25 @@ class EKSClusterDriver(ClusterDriver):
                             "name": "ebs-csi-controller-sa",
                         },
                     },
+                    # Default gp3 StorageClass so a StatefulSet PVC that omits
+                    # storage_class binds (#1024): the cluster ships with only
+                    # the in-tree gp2 (not marked default), so claims hang
+                    # Pending. is-default-class lets #1023's autostamp pick it.
+                    # The chart creates the SC as part of the HelmRelease the
+                    # install applies (render_storage_class isn't in the apply
+                    # set, which only applies HelmReleases).
+                    "storageClasses": [
+                        {
+                            "name": "gp3",
+                            "annotations": {
+                                "storageclass.kubernetes.io/is-default-class": "true",
+                            },
+                            "parameters": {"type": "gp3", "encrypted": "true"},
+                            "reclaimPolicy": "Delete",
+                            "volumeBindingMode": "WaitForFirstConsumer",
+                            "allowVolumeExpansion": True,
+                        },
+                    ],
                 },
                 requires=["irsa:aws-ebs-csi-driver"],
                 options=[],
