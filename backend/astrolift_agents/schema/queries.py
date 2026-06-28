@@ -504,13 +504,13 @@ class AgentsQuery:
         usable driver, or the pod has produced no logs yet.
 
         Note on pod discovery: the K8s Job spawner labels each agent pod
-        ``astrolift.dev/task-id=<task.guid>`` and the agent namespace is
-        ``astrolift-agents-<org-slug>`` (see
-        ``astrolift_workflows.activities.agent_stage``). The default live
-        pod backend selects on the ``astrolift.dev/app`` label, so on a
-        real cluster the discovery falls through to the recorded Job name
-        on ``AgentTask.pod_name``; wiring a task-id label selector into
-        the driver SDK is the follow-up that makes live discovery exact.
+        ``astrolift.dev/task-id=<task.guid>`` and the namespace the Job
+        actually landed in is frozen on ``AgentTask.namespace`` at spawn
+        (#891). Discovery passes the task guid as a ``task_id`` selector,
+        which the live pod backend turns into an
+        ``astrolift.dev/task-id=<guid>`` label query, so an agent pod is
+        found exactly on a real cluster; the recorded Job name on
+        ``AgentTask.pod_name`` remains the last-resort fallback.
         """
         from asgiref.sync import async_to_sync
 
@@ -554,12 +554,16 @@ class AgentsQuery:
                     return None
             if cluster is None or not getattr(cluster, "is_active", True):
                 return None
-            org_slug = (getattr(row.organization, "slug", "") or "").strip()
-            if not org_slug:
-                return None
-            # The spawner runs agent Jobs in the per-org agent namespace
-            # (astrolift_workflows.activities.agent_stage._agent_namespace).
-            namespace = f"astrolift-agents-{org_slug}"
+            # Read the namespace the dispatcher actually spawned into off the
+            # task (#891) — different dispatch paths land in different
+            # namespaces, so recomputing it can miss the pod. Fall back to the
+            # per-org agent namespace for pre-#891 rows that never stamped it.
+            namespace = (row.namespace or "").strip()
+            if not namespace:
+                org_slug = (getattr(row.organization, "slug", "") or "").strip()
+                if not org_slug:
+                    return None
+                namespace = f"astrolift-agents-{org_slug}"
             return cluster, namespace, str(row.guid), (row.pod_name or "")
 
         resolved = _resolve()

@@ -267,7 +267,8 @@ def _spawn_agent_task_sync(task_pk: int) -> dict[str, Any]:
 
     task.external_id = result.external_id
     task.pod_name = result.external_id
-    task.save(update_fields=["external_id", "pod_name", "updated_at", "version"])
+    task.namespace = namespace
+    task.save(update_fields=["external_id", "pod_name", "namespace", "updated_at", "version"])
     log.info(
         "execute_agent_stage: spawned job %s for task %s in namespace %s",
         result.external_id,

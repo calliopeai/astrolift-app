@@ -111,6 +111,12 @@ class AgentTask(BaseCoreModel):
     )
     # Pod/container name assigned by the dispatcher backend.
     pod_name = models.CharField(max_length=255, blank=True, default="")
+    # K8s namespace the dispatcher actually spawned the Job in, frozen at
+    # spawn. The log resolver reads this back rather than recomputing the
+    # namespace — different dispatch paths land in different namespaces, so
+    # a recomputed guess can miss the pod (#891). Blank on pre-#891 rows;
+    # the resolver falls back to the per-org agent namespace for those.
+    namespace = models.CharField(max_length=255, blank=True, default="")
     # "owner/repo@sha" frozen at dispatch so the run is reproducible.
     source_ref = models.CharField(max_length=512, blank=True, default="")
     # Frozen at spawn from the env spec's ``vnc_enabled`` so the task is

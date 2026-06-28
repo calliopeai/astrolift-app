@@ -296,10 +296,28 @@ def _dispatch_agent_for_stage_sync(
     task.transition_to(AgentTask.Status.PROVISIONING)
     task.dispatcher = dispatcher
 
-    spawner = get_spawner(dispatcher.backend, cluster=dispatcher.tenant_cluster)
+    # Spawn into the per-org agent namespace (the same one execute_agent_stage
+    # uses) and freeze it on the task. Previously this path took the spawner's
+    # "default" namespace while the log resolver read the per-org namespace, so
+    # agentTaskLogs always came back empty for stage-dispatched agents (#891).
+    from astrolift_workflows.activities.agent_stage import _agent_namespace
+
+    namespace = _agent_namespace(run.organization.slug)
+    spawner = get_spawner(dispatcher.backend, cluster=dispatcher.tenant_cluster, namespace=namespace)
     result = spawner.spawn(task)
     task.external_id = result.external_id
-    task.save(update_fields=["external_id", "dispatcher", "updated_at", "version"])
+    task.namespace = namespace
+    task.pod_name = result.external_id
+    task.save(
+        update_fields=[
+            "external_id",
+            "dispatcher",
+            "namespace",
+            "pod_name",
+            "updated_at",
+            "version",
+        ]
+    )
 
     if not result.ok:
         task.transition_to(AgentTask.Status.FAILED)

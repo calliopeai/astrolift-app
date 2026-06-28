@@ -446,15 +446,19 @@ class K8sNativeClusterDriver(ClusterDriver):
         auth: ClusterAuth,
         namespace: str,
         app_slug: str,
+        task_id: str = "",
     ) -> list[PodInfo]:
         """Delegate to the (pluggable) pod backend. Subclasses for
         managed-cloud variants (EKS/GKE/AKS) override only when the
-        auth path differs; the listing shape is cloud-neutral."""
-        return self._pod_backend.list_pods(
-            auth=auth,
-            namespace=namespace,
-            app_slug=app_slug,
-        )
+        auth path differs; the listing shape is cloud-neutral.
+
+        ``task_id`` (#891) selects an agent task pod by its
+        ``astrolift.dev/task-id`` label; forwarded only when set so
+        backends that predate the kwarg keep working."""
+        kwargs: dict[str, Any] = {"auth": auth, "namespace": namespace, "app_slug": app_slug}
+        if task_id:
+            kwargs["task_id"] = task_id
+        return self._pod_backend.list_pods(**kwargs)
 
     @driver_op(cloud="k8s_native", driver="cluster")
     def stream_logs(

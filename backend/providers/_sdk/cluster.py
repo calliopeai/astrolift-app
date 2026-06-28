@@ -804,6 +804,7 @@ class ClusterDriver(Protocol):
         auth: ClusterAuth,
         namespace: str,
         app_slug: str,
+        task_id: str = "",
     ) -> list[PodInfo]:
         """Return live pods in ``namespace`` filtered to ``app_slug``.
 
@@ -812,6 +813,10 @@ class ClusterDriver(Protocol):
         empty list when no pods match (a new app, scaled-to-zero
         deployment); raises on auth / network / cluster errors and
         lets the caller decide whether to surface or swallow.
+
+        ``task_id`` (#891), when set, selects an agent task pod by its
+        ``astrolift.dev/task-id`` label instead — the agent dispatch
+        path labels Job pods with the task guid, not an app slug.
         """
         ...
 

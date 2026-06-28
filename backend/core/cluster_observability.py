@@ -153,16 +153,17 @@ class _OverrideDriver:
         self._log_backend = log_backend
         self._events_backend = events_backend
 
-    def list_pods(self, *, auth: Any, namespace: str, app_slug: str) -> list[Any]:
+    def list_pods(self, *, auth: Any, namespace: str, app_slug: str, task_id: str = "") -> list[Any]:
         if self._pod_backend is None:
             raise ClusterObservabilityError(
                 "list_pods called without a pod backend override; set_pod_backend_for_tests was not called",
             )
-        return self._pod_backend.list_pods(
-            auth=auth,
-            namespace=namespace,
-            app_slug=app_slug,
-        )
+        kwargs: dict[str, Any] = {"auth": auth, "namespace": namespace, "app_slug": app_slug}
+        # Forward task_id only when set so app-path test backends (whose
+        # list_pods predates the kwarg) keep working unchanged (#891).
+        if task_id:
+            kwargs["task_id"] = task_id
+        return self._pod_backend.list_pods(**kwargs)
 
     def stream_logs(
         self,
@@ -420,13 +421,17 @@ def list_app_pods(
     cluster: TenantCluster,
     namespace: str,
     app_slug: str,
+    task_id: str = "",
 ) -> list[Any]:
     """Resolver-facing entry. Returns a list of ``PodInfo`` (from
     the provider SDK). Resolver layer is responsible for catching
-    :class:`ClusterObservabilityError` and rendering the empty UI."""
+    :class:`ClusterObservabilityError` and rendering the empty UI.
+
+    ``task_id`` (#891), when set, discovers an agent task pod by its
+    ``astrolift.dev/task-id`` label rather than the ``app_slug`` label."""
     driver = _driver_for_cluster(cluster)
     auth = _auth_for_cluster(cluster)
-    return driver.list_pods(auth=auth, namespace=namespace, app_slug=app_slug)
+    return driver.list_pods(auth=auth, namespace=namespace, app_slug=app_slug, task_id=task_id)
 
 
 def list_app_pod_warning_events(
@@ -522,13 +527,12 @@ async def fetch_task_pod_logs(
 
     Pod discovery order:
 
-    1. ``list_app_pods`` keyed on ``task_guid``. The K8s Job spawner
-       labels each agent pod ``astrolift.dev/task-id=<task.guid>``; a
-       discovery backend that selects on that label resolves the live
-       pod here. (The default live pod backend currently selects on the
-       ``astrolift.dev/app`` label, so on a real cluster this returns
-       nothing for an agent pod — see the resolver note — and we fall
-       through to the hint.)
+    1. ``list_app_pods`` keyed on ``task_guid`` as a ``task_id``
+       selector. The K8s Job spawner labels each agent pod
+       ``astrolift.dev/task-id=<task.guid>``, and the live pod backend
+       turns a non-empty ``task_id`` into an
+       ``astrolift.dev/task-id=<guid>`` label query, so the agent pod is
+       resolved exactly on a real cluster (#891).
     2. ``pod_name_hint`` — the dispatcher records the spawned Job name
        on ``AgentTask.pod_name``; passed through as a last-resort pod
        name so a single-pod Job whose pod name equals the Job name (or
@@ -547,7 +551,12 @@ async def fetch_task_pod_logs(
 
     def _discover() -> str:
         try:
-            pods = list_app_pods(cluster=cluster, namespace=namespace, app_slug=task_guid)
+            pods = list_app_pods(
+                cluster=cluster,
+                namespace=namespace,
+                app_slug=task_guid,
+                task_id=task_guid,
+            )
         except ClusterObservabilityError:
             return ""
         except Exception:

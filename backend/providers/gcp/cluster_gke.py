@@ -430,6 +430,7 @@ class GKEClusterDriver(ClusterDriver):
         auth: ClusterAuth,
         namespace: str,
         app_slug: str,
+        task_id: str = "",
     ) -> list[PodInfo]:
         """List pods on the GKE cluster.
 
@@ -437,12 +438,19 @@ class GKEClusterDriver(ClusterDriver):
         (Workload Identity ADC) before delegating to the shared
         k8s_native pod backend. ``kubeconfig`` /
         ``service_account_token`` pass through unchanged.
+
+        ``task_id`` (#891) selects an agent task pod by its
+        ``astrolift.dev/task-id`` label; forwarded only when set so
+        backends that predate the kwarg keep working.
         """
-        return self._pod_backend.list_pods(
-            auth=self._materialize_gke_auth_auth(auth),
-            namespace=namespace,
-            app_slug=app_slug,
-        )
+        kwargs: dict[str, Any] = {
+            "auth": self._materialize_gke_auth_auth(auth),
+            "namespace": namespace,
+            "app_slug": app_slug,
+        }
+        if task_id:
+            kwargs["task_id"] = task_id
+        return self._pod_backend.list_pods(**kwargs)
 
     @driver_op(cloud="gcp", driver="cluster")
     def stream_logs(

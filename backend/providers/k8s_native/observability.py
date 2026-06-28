@@ -178,6 +178,7 @@ class PodBackend(Protocol):
         auth: ClusterAuth,
         namespace: str,
         app_slug: str,
+        task_id: str = "",
     ) -> list[PodInfo]: ...
 
 
@@ -265,6 +266,19 @@ def _to_container_statuses(raw_statuses: Any) -> list[ContainerStatusInfo]:
     return out
 
 
+def _pod_label_selector(*, app_slug: str, task_id: str) -> str:
+    """Label selector for ``list_pods``.
+
+    Agent task pods carry ``astrolift.dev/task-id=<guid>`` (set by the
+    K8s Job spawner) but app workloads carry ``astrolift.dev/app=<slug>``.
+    A non-empty ``task_id`` selects the agent pod exactly (#891); otherwise
+    fall back to the app-slug selector the app-log surface relies on.
+    """
+    if task_id:
+        return f"astrolift.dev/task-id={task_id}"
+    return f"astrolift.dev/app={app_slug}"
+
+
 @dataclass(frozen=True)
 class LivePodBackend:
     """Default backend — talks to the live kubernetes apiserver."""
@@ -275,6 +289,7 @@ class LivePodBackend:
         auth: ClusterAuth,
         namespace: str,
         app_slug: str,
+        task_id: str = "",
     ) -> list[PodInfo]:
         try:
             from kubernetes import client as k8s_client
@@ -286,7 +301,7 @@ class LivePodBackend:
         api_client = build_api_client(auth)
         core_v1 = k8s_client.CoreV1Api(api_client)
 
-        label_selector = f"astrolift.dev/app={app_slug}"
+        label_selector = _pod_label_selector(app_slug=app_slug, task_id=task_id)
         resp = core_v1.list_namespaced_pod(
             namespace=namespace,
             label_selector=label_selector,

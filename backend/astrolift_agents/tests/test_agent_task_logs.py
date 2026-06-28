@@ -31,7 +31,7 @@ from datetime import UTC
 from types import SimpleNamespace
 
 import pytest
-from _sdk.cluster import PodInfo, PodLogLine
+from _sdk.cluster import ClusterAuth, PodInfo, PodLogLine
 
 from astrolift_agents.models import AgentTask, DispatcherInstance
 from astrolift_agents.schema.queries import AgentsQuery
@@ -102,12 +102,13 @@ def _dispatcher(org, cluster, *, slug: str) -> DispatcherInstance:
     )
 
 
-def _task(org, dispatcher, *, pod_name: str = "") -> AgentTask:
+def _task(org, dispatcher, *, pod_name: str = "", namespace: str = "") -> AgentTask:
     return AgentTask.objects.create(
         organization=org,
         dispatcher=dispatcher,
         status=AgentTask.Status.RUNNING,
         pod_name=pod_name,
+        namespace=namespace,
     )
 
 
@@ -130,8 +131,8 @@ class _FixedPodBackend:
         self._pods = list(pods)
         self.calls: list[dict] = []
 
-    def list_pods(self, *, auth, namespace, app_slug):
-        self.calls.append({"namespace": namespace, "app_slug": app_slug})
+    def list_pods(self, *, auth, namespace, app_slug, task_id=""):
+        self.calls.append({"namespace": namespace, "app_slug": app_slug, "task_id": task_id})
         return list(self._pods)
 
 
@@ -184,9 +185,12 @@ async def test_agent_task_logs_happy_path(permission_resolver):
         reset_log_backend_for_tests()
 
     assert lines == ["line one", "line two", "line three"]
-    # Discovery + stream both targeted the per-org agent namespace.
+    # Discovery + stream both targeted the per-org agent namespace (the
+    # fallback when the task never stamped a namespace).
     assert pod_backend.calls[0]["namespace"] == "astrolift-agents-logs-org"
     assert pod_backend.calls[0]["app_slug"] == str(task.guid)
+    # Discovery selects the agent pod by its task-id label (#891).
+    assert pod_backend.calls[0]["task_id"] == str(task.guid)
     assert log_backend.calls[0]["pod_name"] == "agent-task-abc-xyz12"
     # One-shot read — never a live follow.
     assert log_backend.calls[0]["follow"] is False
@@ -376,7 +380,7 @@ async def test_agent_task_logs_driver_error_degrades_to_empty(permission_resolve
     task = await asyncio.to_thread(_task, org, dispatcher, pod_name="")
 
     class _ExplodingPodBackend:
-        def list_pods(self, *, auth, namespace, app_slug):
+        def list_pods(self, *, auth, namespace, app_slug, task_id=""):
             raise ClusterObservabilityError("cluster unreachable")
 
     permission_resolver.grant(Permission.AGENT_READ)
@@ -391,3 +395,142 @@ async def test_agent_task_logs_driver_error_degrades_to_empty(permission_resolve
 
     # No pod found (discovery raised) and no pod_name hint -> [].
     assert lines == []
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_agent_task_logs_reads_stamped_namespace(permission_resolver):
+    """The resolver reads ``AgentTask.namespace`` (the namespace the spawn
+    actually used) rather than recomputing it from the org slug (#891).
+
+    Stage-dispatched agents can land in a namespace that doesn't match the
+    recomputed ``astrolift-agents-<org>`` guess; reading the stamped value
+    is what makes agentTaskLogs return lines on a real cluster.
+    """
+    import asyncio
+
+    org = await asyncio.to_thread(Organization.objects.create, name="Stamp", slug="stamp-org")
+    cluster = await asyncio.to_thread(_cluster, org, slug="stamp-cluster")
+    dispatcher = await asyncio.to_thread(_dispatcher, org, cluster, slug="stamp-dispatcher")
+    # Stamp a namespace that is NOT the recomputed astrolift-agents-stamp-org.
+    task = await asyncio.to_thread(_task, org, dispatcher, namespace="agents-elsewhere")
+
+    permission_resolver.grant(Permission.AGENT_READ)
+    pod_backend = _FixedPodBackend([_fake_pod("agent-task-stamped")])
+    log_backend = _ScriptedLogBackend(["only line"])
+    set_pod_backend_for_tests(pod_backend)
+    set_log_backend_for_tests(log_backend)
+    try:
+        with _tenant(org):
+            lines = await AgentsQuery().agent_task_logs(info=_info(), id=str(task.guid))
+    finally:
+        reset_pod_backend_for_tests()
+        reset_log_backend_for_tests()
+
+    assert lines == ["only line"]
+    # Both discovery and the stream read the stamped namespace, not the
+    # recomputed astrolift-agents-stamp-org guess.
+    assert pod_backend.calls[0]["namespace"] == "agents-elsewhere"
+    assert log_backend.calls[0]["namespace"] == "agents-elsewhere"
+    # And the pod is still discovered by the task-id selector.
+    assert pod_backend.calls[0]["task_id"] == str(task.guid)
+
+
+def test_pod_label_selector_prefers_task_id():
+    """The pod discovery selector keys on the task-id label when a task_id
+    is given and falls back to the app-slug label otherwise (#891)."""
+    from k8s_native.observability import _pod_label_selector
+
+    assert _pod_label_selector(app_slug="web", task_id="guid-1") == "astrolift.dev/task-id=guid-1"
+    assert _pod_label_selector(app_slug="web", task_id="") == "astrolift.dev/app=web"
+
+
+@pytest.mark.asyncio
+async def test_fetch_task_pod_logs_discovers_by_task_id():
+    """``fetch_task_pod_logs`` discovers the agent pod via the task-id
+    selector and reads it in the namespace it is handed — not a recomputed
+    one (#891). Exercises the discovery wiring end-to-end through the
+    driver-override layer without a live cluster or kubernetes SDK."""
+    from core.cluster_observability import fetch_task_pod_logs
+
+    cluster = SimpleNamespace(
+        slug="c",
+        auth_method="kubeconfig",
+        auth_config={"kubeconfig": "x"},
+        endpoint="https://k8s.invalid",
+        ca_cert="",
+        default_namespace_prefix="",
+        is_active=True,
+    )
+    pod_backend = _FixedPodBackend([_fake_pod("agent-task-xyz")])
+    log_backend = _ScriptedLogBackend(["a", "b"])
+    set_pod_backend_for_tests(pod_backend)
+    set_log_backend_for_tests(log_backend)
+    try:
+        lines = await fetch_task_pod_logs(
+            cluster=cluster,
+            namespace="agents-elsewhere",
+            task_guid="task-guid-9",
+            pod_name_hint="",
+            tail=200,
+        )
+    finally:
+        reset_pod_backend_for_tests()
+        reset_log_backend_for_tests()
+
+    assert lines == ["a", "b"]
+    # Discovery selected by the task-id label, in the supplied namespace.
+    assert pod_backend.calls[0]["task_id"] == "task-guid-9"
+    assert pod_backend.calls[0]["namespace"] == "agents-elsewhere"
+    # The stream read the discovered pod in that same namespace.
+    assert log_backend.calls[0]["namespace"] == "agents-elsewhere"
+    assert log_backend.calls[0]["pod_name"] == "agent-task-xyz"
+
+
+def test_live_pod_backend_uses_task_id_selector(monkeypatch):
+    """``LivePodBackend.list_pods`` selects agent pods by the task-id label
+    (``astrolift.dev/task-id=<guid>``) when ``task_id`` is set, and falls
+    back to the app-slug label otherwise (#891).
+
+    Recording fake: the kubernetes ``CoreV1Api`` is patched so the call
+    records the ``label_selector`` it would have sent to the apiserver.
+    """
+    pytest.importorskip("kubernetes")
+    import k8s_native.observability as obs
+
+    monkeypatch.setattr(obs, "build_api_client", lambda auth: object())
+
+    recorded: dict[str, str] = {}
+
+    class _FakeResp:
+        items: list = []
+
+    class _RecordingCoreV1:
+        def __init__(self, _api_client):
+            pass
+
+        def list_namespaced_pod(self, *, namespace, label_selector, timeout_seconds):
+            recorded["namespace"] = namespace
+            recorded["label_selector"] = label_selector
+            return _FakeResp()
+
+    from kubernetes import client as k8s_client
+
+    monkeypatch.setattr(k8s_client, "CoreV1Api", _RecordingCoreV1)
+
+    auth = ClusterAuth(slug="c", auth_method="kubeconfig", auth_config={"kubeconfig": "x"})
+
+    # task_id set -> task-id label selector, app_slug ignored.
+    pods = obs.LivePodBackend().list_pods(
+        auth=auth,
+        namespace="astrolift-agents-acme",
+        app_slug="ignored-app",
+        task_id="task-guid-123",
+    )
+    assert pods == []
+    assert recorded["namespace"] == "astrolift-agents-acme"
+    assert recorded["label_selector"] == "astrolift.dev/task-id=task-guid-123"
+
+    # No task_id -> falls back to the app-slug label (app-log surface).
+    obs.LivePodBackend().list_pods(auth=auth, namespace="acme-web", app_slug="web")
+    assert recorded["label_selector"] == "astrolift.dev/app=web"
