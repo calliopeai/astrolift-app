@@ -230,6 +230,30 @@ def test_time_series_config_defaults_and_overrides():
     assert pinned.kms_key_id == "arn:aws:kms:::key/abc"
 
 
+def test_every_registered_managed_service_driver_has_a_config_builder():
+    """Regression guard for #1037 / #982: every (kind, variant) the AWS
+    plugin registers a managed-service driver for MUST resolve through
+    ``managed_config_for``. The #982 live grid found 6 registered drivers
+    with no config branch, so ``provisionManagedService`` died with
+    'no managed-service config builder for kind=<X>'. Iterating the manifest
+    means a driver added to the plugin without a matching config builder
+    fails here instead of failing live."""
+    from aws.plugin import PLUGIN
+
+    # Pin DB networking for the VPC-bound kinds (postgres/mysql/redis) so
+    # config resolution short-circuits instead of reaching boto3.
+    cluster = _cluster(
+        {
+            "db_subnet_group": "subnets",
+            "cache_subnet_group": "subnets",
+            "db_security_group_ids": ["sg-1"],
+        },
+    )
+    for kind, variant in PLUGIN.managed_service_drivers:
+        cfg = managed_config_for("aws", cluster, kind=kind, variant=variant)
+        assert cfg is not None, f"no config builder for registered driver kind={kind!r} variant={variant!r}"
+
+
 def test_unknown_kind_raises():
     import pytest
     from core.cluster_observability import ClusterObservabilityError

@@ -49,6 +49,20 @@ from astrolift_services.schema.types import (
 )
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
+from core.tenancy import get_current_tenant
+
+
+def _caller_org_id() -> int | None:
+    """Current tenant's organization id, or None when there's no tenant
+    context. Read resolvers over org-owned rows MUST treat None as
+    deny-by-default ("no rows" / not-found), never as "all rows" (#1042).
+
+    ``@tenant_scoped()`` only asserts a tenant context exists; it does
+    NOT filter any queryset. Every resolver/helper that fetches by slug
+    or guid has to add the org constraint itself or it leaks cross-org.
+    """
+    tenant = get_current_tenant()
+    return tenant.organization_id if tenant is not None else None
 
 
 def _secret_id(*, source: str, key: str, env: str) -> str:
@@ -226,13 +240,23 @@ def _resolve_email_driver(managed_service_id):
     from astrolift_services.email_observability import driver_for_plugin_slug
     from astrolift_services.models import ManagedService
 
+    # Org-scope the fetch (#1042): a cross-org / no-tenant caller must
+    # not be able to resolve another tenant's email driver by guessing
+    # its managed-service guid. ManagedService has no direct org column,
+    # so scope through the owning app. org_id None → IS NULL → no match
+    # (RegisteredApp.organization is non-null) → deny-by-default.
+    org_id = _caller_org_id()
     svc = (
         ManagedService.objects.select_related(
             "app_environment",
             "app_environment__tenant_cluster",
             "app_environment__tenant_cluster__provider_plugin",
         )
-        .filter(guid=str(managed_service_id), deleted_at__isnull=True)
+        .filter(
+            guid=str(managed_service_id),
+            registered_app__organization_id=org_id,
+            deleted_at__isnull=True,
+        )
         .first()
     )
     if svc is None or svc.kind != ManagedService.Kind.EMAIL:
@@ -437,7 +461,12 @@ class ServicesQuery:
 
         ``environment_name`` filter narrows to one env; omitted
         returns the union across all envs."""
-        app = RegisteredApp.objects.select_related("updated_by").filter(slug=app_slug).first()
+        org_id = _caller_org_id()
+        app = (
+            RegisteredApp.objects.select_related("updated_by")
+            .filter(slug=app_slug, organization_id=org_id)
+            .first()
+        )
         if app is None:
             return []
         if environment_name:
@@ -477,7 +506,8 @@ class ServicesQuery:
         """
         from astrolift_operations.models import AuditEvent
 
-        app = RegisteredApp.objects.filter(slug=app_slug).only("id", "slug").first()
+        org_id = _caller_org_id()
+        app = RegisteredApp.objects.filter(slug=app_slug, organization_id=org_id).only("id", "slug").first()
         if app is None:
             return []
 
@@ -488,6 +518,11 @@ class ServicesQuery:
         # rows from a different (app, key) pair.
         target_id = f"{app.slug}:{key}"
 
+        # Scope the audit query by org too (#1042): target_id is
+        # "<slug>:<key>" and app slugs recur across orgs, so without the
+        # org filter a same-slug app in another tenant would surface that
+        # tenant's secret-history rows. AuditEvent.organization is stamped
+        # from the tenant context at write time, so org_id matches here.
         rows = list(
             AuditEvent.objects.filter(
                 action__in=(
@@ -497,6 +532,7 @@ class ServicesQuery:
                 ),
                 target_kind="AppSecret",
                 target_id=target_id,
+                organization_id=org_id,
             ).order_by("-occurred_at")[:50]
         )
 
@@ -560,9 +596,12 @@ class ServicesQuery:
         info: Info,
     ) -> list[SecretBundleType]:
         """All secret bundles in the calling tenant."""
+        org_id = _caller_org_id()
+        if org_id is None:
+            return []
         qs = (
             SecretBundle.objects.select_related("organization", "team")
-            .filter(deleted_at__isnull=True)
+            .filter(organization_id=org_id, deleted_at__isnull=True)
             .order_by("-created_at")[:200]
         )
         return [secret_bundle_to_type(b) for b in qs]
@@ -582,6 +621,9 @@ class ServicesQuery:
         (lowest-first). App-local literals always win on collision
         regardless of merge_order — this column is just a debugging
         aid for the operator to read precedence at a glance."""
+        org_id = _caller_org_id()
+        if org_id is None:
+            return []
         qs = (
             AppSecretBundleRef.objects.select_related(
                 "registered_app",
@@ -591,6 +633,7 @@ class ServicesQuery:
             )
             .filter(
                 registered_app__slug=app_slug,
+                registered_app__organization_id=org_id,
                 deleted_at__isnull=True,
             )
             .order_by("app_environment__name", "created_at")
@@ -621,8 +664,12 @@ class ServicesQuery:
         app_slug: str,
         environment_name: str | None = None,
     ) -> list[ManagedServiceType]:
+        org_id = _caller_org_id()
+        if org_id is None:
+            return []
         qs = ManagedService.objects.select_related("registered_app", "app_environment").filter(
             registered_app__slug=app_slug,
+            registered_app__organization_id=org_id,
             deleted_at__isnull=True,
         )
         if environment_name:
@@ -653,9 +700,14 @@ class ServicesQuery:
         if limit > 100:
             limit = 100
 
+        org_id = _caller_org_id()
         svc = (
             ManagedService.objects.select_related("app_environment", "registered_app")
-            .filter(guid=str(managed_service_id), deleted_at__isnull=True)
+            .filter(
+                guid=str(managed_service_id),
+                registered_app__organization_id=org_id,
+                deleted_at__isnull=True,
+            )
             .first()
         )
         if svc is None:
@@ -747,9 +799,14 @@ class ServicesQuery:
         cached values plus a `sampled_at` timestamp so operators can see
         how stale the reading is.
         """
+        org_id = _caller_org_id()
         svc = (
             ManagedService.objects.select_related("app_environment", "registered_app")
-            .filter(guid=str(managed_service_id), deleted_at__isnull=True)
+            .filter(
+                guid=str(managed_service_id),
+                registered_app__organization_id=org_id,
+                deleted_at__isnull=True,
+            )
             .first()
         )
         if svc is None:
@@ -813,6 +870,7 @@ class ServicesQuery:
         ``managed_service.update`` (the email-detail surface contains
         operator-actionable rows like the suppression list).
         """
+        org_id = _caller_org_id()
         svc = (
             ManagedService.objects.select_related(
                 "app_environment",
@@ -820,7 +878,11 @@ class ServicesQuery:
                 "app_environment__tenant_cluster__provider_plugin",
                 "registered_app",
             )
-            .filter(guid=str(managed_service_id), deleted_at__isnull=True)
+            .filter(
+                guid=str(managed_service_id),
+                registered_app__organization_id=org_id,
+                deleted_at__isnull=True,
+            )
             .first()
         )
         if svc is None:
@@ -992,9 +1054,11 @@ class ServicesQuery:
         if limit > 500:
             limit = 500
 
+        org_id = _caller_org_id()
         svc = (
             ManagedService.objects.filter(
                 guid=str(managed_service_id),
+                registered_app__organization_id=org_id,
                 deleted_at__isnull=True,
             )
             .only("id", "kind")
@@ -1058,9 +1122,11 @@ class ServicesQuery:
         if days > 365:
             days = 365
 
+        org_id = _caller_org_id()
         svc = (
             ManagedService.objects.filter(
                 guid=str(managed_service_id),
+                registered_app__organization_id=org_id,
                 deleted_at__isnull=True,
             )
             .only("id", "kind")
@@ -1126,13 +1192,16 @@ class ServicesQuery:
         caller can read; the global ``/approvals`` page consumes this
         to render the mixed queue alongside deployment approvals.
         """
+        org_id = _caller_org_id()
+        if org_id is None:
+            return []
         qs = (
             SecretChangeProposal.objects.select_related(
                 "registered_app",
                 "app_environment",
                 "proposer",
             )
-            .filter(deleted_at__isnull=True)
+            .filter(registered_app__organization_id=org_id, deleted_at__isnull=True)
             .order_by("-created_at")
         )
         if app_slug:
@@ -1153,13 +1222,18 @@ class ServicesQuery:
         id: GUID,
     ) -> SecretChangeProposalType | None:
         """Single proposal detail for the proposal-detail page."""
+        org_id = _caller_org_id()
         proposal = (
             SecretChangeProposal.objects.select_related(
                 "registered_app",
                 "app_environment",
                 "proposer",
             )
-            .filter(guid=str(id), deleted_at__isnull=True)
+            .filter(
+                guid=str(id),
+                registered_app__organization_id=org_id,
+                deleted_at__isnull=True,
+            )
             .first()
         )
         if proposal is None:
