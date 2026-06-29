@@ -41,7 +41,10 @@ const ALERT_KINDS: { value: string; label: string }[] = [
   { value: "preview_destroyed", label: "Preview destroyed" },
 ];
 
-const CHANNEL = "in_app";
+// The in-app/web notifications surface maps to the backend's "web" channel
+// (UserAlertSubscription.Channel = email | web | both). "in_app" is not a
+// valid value and the subscribe mutation rejects it (#886).
+const CHANNEL = "web";
 
 interface AppsResp {
   astroliftAppsPage: AstroliftRegisteredAppPage;

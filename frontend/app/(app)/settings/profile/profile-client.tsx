@@ -121,6 +121,11 @@ function TimezoneCard() {
   // "dirty" means the local picker differs from the persisted value.
   const dirty = picked !== (savedTz ?? "");
 
+  // Radix <SelectItem> forbids an empty-string value (#885). Use a
+  // non-empty sentinel for the "no override" option and map it to/from
+  // the empty string `picked` uses for "clear" so persistence is unchanged.
+  const NO_TZ_OVERRIDE = "__browser__";
+
   async function save() {
     if (!dirty) return;
     const { data: res } = await updateProfile({
@@ -154,14 +159,17 @@ function TimezoneCard() {
       <CardContent className="space-y-3 max-w-sm">
         <div className="space-y-2">
           <Label htmlFor="timezone">Timezone</Label>
-          <Select value={picked} onValueChange={setPicked}>
+          <Select
+            value={picked || NO_TZ_OVERRIDE}
+            onValueChange={(v) => setPicked(v === NO_TZ_OVERRIDE ? "" : v)}
+          >
             <SelectTrigger id="timezone">
               <SelectValue
                 placeholder={`${browserTz} (browser-detected)`}
               />
             </SelectTrigger>
             <SelectContent className="max-h-72">
-              <SelectItem value="">
+              <SelectItem value={NO_TZ_OVERRIDE}>
                 <span className="text-muted-foreground">
                   {browserTz} (browser-detected, no override)
                 </span>
