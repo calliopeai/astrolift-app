@@ -179,6 +179,12 @@ class DeregisterAppWorkflow:
         already_tearing_down = await workflow.execute_activity(
             mark_app_tearing_down,
             app_id,
+            # The activity returns a bool (resume flag). Pin the decode type
+            # so the temporalio payload converter round-trips it instead of
+            # rejecting the bool against a None-typed result — a mismatch
+            # between the activity's return annotation and the workflow's
+            # result hint fails activation on the real worker (#1034).
+            result_type=bool,
             start_to_close_timeout=_QUICK_TIMEOUT,
             retry_policy=_STANDARD_RETRY,
         )

@@ -213,14 +213,35 @@ def test_deprovision_delete_data(driver: S3Driver, s3_client) -> None:
 
 
 def test_deprovision_already_gone_idempotent(driver: S3Driver) -> None:
-    """Deprovisioning a bucket that's already deleted shouldn't error."""
+    """Deprovisioning a bucket that's already deleted is an idempotent
+    success — the empty step hits NoSuchBucket and treats it as already-gone
+    so teardown converges instead of stranding the row (#1034)."""
     fake_handle = "object_store/never-existed-bucket-xyz"
     deprov = driver.deprovision(
         DeprovisionSpec(handle=fake_handle), delete_data=True,
     )
-    # Bucket-not-found short-circuits via NoSuchBucket exception
-    # → caller sees ok=True (idempotent)
-    assert deprov.ok is True or "NoSuch" in str(deprov.errors)
+    assert deprov.ok is True
+    assert not deprov.errors
+
+
+def test_deprovision_delete_data_idempotent_on_second_run(
+    driver: S3Driver, s3_client,
+) -> None:
+    """Re-running delete_data deprovision after the bucket is already gone
+    must still report ok=True (re-trigger / partial-teardown convergence)."""
+    result = driver.provision(_spec())
+    s3_client.put_object(
+        Bucket=parse_handle(result.handle)[1], Key="x", Body=b"y",
+    )
+    first = driver.deprovision(
+        DeprovisionSpec(handle=result.handle), delete_data=True,
+    )
+    assert first.ok is True
+    second = driver.deprovision(
+        DeprovisionSpec(handle=result.handle), delete_data=True,
+    )
+    assert second.ok is True
+    assert not second.errors
 
 
 # ---- snapshot --------------------------------------------------

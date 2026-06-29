@@ -1452,3 +1452,53 @@ def test_preview_force_redeploy_requires_both_permissions(
                 info=fake_info,
                 app_slug=app.slug,
             )
+
+
+# ---------------------------------------------------------------------------
+# #1034 — bool result type plumbing for mark_app_tearing_down
+# ---------------------------------------------------------------------------
+#
+# REGRESSION GUARD for the prod activation failure: #1034 changed
+# ``mark_app_tearing_down`` to RETURN a bool (resume flag) so the workflow can
+# skip the grace window on a re-trigger. temporalio decodes an activity result
+# against the activity's registered return type (``defn.ret_type``); if that
+# annotation regresses to ``None`` while the body returns a bool, the real
+# worker raises ``TypeError: Expected None, got value of type <class 'bool'>``
+# in ``_apply_resolve_activity`` and ``DeregisterAppWorkflow`` can never
+# activate — teardown is dead on the live worker. The fake-Temporal workflow
+# tests above don't decode through the payload converter, so they miss it.
+# These two assert the load-bearing plumbing directly.
+
+
+def test_mark_app_tearing_down_registers_bool_return_type():
+    """temporalio resolves the activity result against ``defn.ret_type``; it
+    MUST be ``bool`` so the real worker round-trips the resume flag instead of
+    rejecting it against a None type hint (#1034)."""
+    import temporalio.activity as temporal_activity
+
+    from astrolift_workflows.activities.app_teardown import mark_app_tearing_down
+
+    defn = temporal_activity._Definition.must_from_callable(mark_app_tearing_down)
+    assert defn.ret_type is bool, (
+        "mark_app_tearing_down must register a bool return type — a None "
+        "annotation makes the real worker fail to decode the resume flag (#1034)"
+    )
+
+
+def test_deregister_workflow_pins_bool_result_type():
+    """The DeregisterAppWorkflow await must pin ``result_type=bool`` so the
+    expected-decode type is explicit at the call site and can't silently
+    diverge from the activity's bool return (#1034)."""
+    import inspect
+
+    from astrolift_workflows.workflows import deregister_app
+
+    src = inspect.getsource(deregister_app.DeregisterAppWorkflow.run)
+    # Isolate the mark_app_tearing_down execute_activity argument list: from
+    # the activity name up to the call's start_to_close_timeout kwarg.
+    marker = "mark_app_tearing_down,"
+    assert marker in src
+    call_args = src.split(marker, 1)[1].split("start_to_close_timeout", 1)[0]
+    assert "result_type=bool" in call_args, (
+        "execute_activity(mark_app_tearing_down, ...) must pass result_type=bool"
+    )

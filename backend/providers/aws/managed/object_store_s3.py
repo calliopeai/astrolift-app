@@ -439,7 +439,13 @@ class S3Driver(ManagedServiceDriver):
         return clean[:63]
 
     def _empty_bucket(self, *, bucket_name: str) -> None:
-        """Empties versioned buckets including delete markers."""
+        """Empties versioned buckets including delete markers.
+
+        Idempotent: a bucket that's already gone (NoSuchBucket / 404) is an
+        already-empty no-op, not an error — a teardown re-run over a
+        partially-deleted app must converge instead of stranding the row at
+        tearing_down forever (#1034).
+        """
         try:
             paginator = self._s3.get_paginator("list_object_versions")
             for page in paginator.paginate(Bucket=bucket_name):
@@ -454,5 +460,16 @@ class S3Driver(ManagedServiceDriver):
                         Bucket=bucket_name,
                         Delete={"Objects": objects},
                     )
+        except self._s3.exceptions.NoSuchBucket:
+            return
         except Exception as exc:
+            # boto3 doesn't always raise the typed NoSuchBucket via the
+            # paginator — a missing bucket can surface as a generic
+            # ClientError with code NoSuchBucket / HTTP 404. Treat both as
+            # already-gone (mirrors the not-found detection in status()).
+            response = getattr(exc, "response", None) or {}
+            metadata = response.get("ResponseMetadata", {}) or {}
+            error_code = response.get("Error", {}).get("Code", "")
+            if metadata.get("HTTPStatusCode") == 404 or error_code in ("404", "NoSuchBucket"):
+                return
             raise map_client_error(exc) from exc

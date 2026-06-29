@@ -18,6 +18,26 @@ from temporalio import activity
 
 log = logging.getLogger("astrolift_workflows.activities.managed_service")
 
+# Markers a driver error / failed-result carries when the backend resource is
+# already gone. Idempotent teardown (#1034): a re-run over a partially-torn-
+# down app must converge — "already deleted" is success, not a fatal error
+# that re-raises and strands the row (and the app) at deprovisioning forever.
+_ALREADY_GONE_MARKERS = (
+    "nosuchbucket",
+    "nosuchentity",
+    "nosuchhostedzone",
+    "resourcenotfound",
+    "notfound",
+    "not found",
+    "does not exist",
+    "already deleted",
+)
+
+
+def _signals_already_gone(*parts: object) -> bool:
+    blob = " ".join(str(p) for p in parts if p).lower()
+    return any(marker in blob for marker in _ALREADY_GONE_MARKERS)
+
 
 def _mark_status_sync(managed_service_id: int, status: str) -> None:
     from astrolift_services.models import ManagedService
@@ -90,15 +110,43 @@ def _deprovision_sync(
     from _sdk.managed_service import DeprovisionSpec
 
     spec = DeprovisionSpec(handle=svc.backend_ref or "", config=dict(svc.config or {}))
-    result = driver.deprovision(
-        spec,
-        delete_data=delete_data,
-        force_destroy=force_destroy,
-    )
+    try:
+        result = driver.deprovision(
+            spec,
+            delete_data=delete_data,
+            force_destroy=force_destroy,
+        )
+    except Exception as exc:
+        # A driver that RAISES because the backend resource is already gone
+        # (NotFoundError / NoSuchBucket / 404) is an idempotent no-op on
+        # teardown — return soft-success so the row finalizes (#1034). Any
+        # other exception propagates so Temporal honors the RetryPolicy.
+        if _signals_already_gone(type(exc).__name__, exc):
+            return {
+                "ok": True,
+                "message": f"already deprovisioned: {exc}",
+                "errors": [],
+                "handle": svc.backend_ref or "",
+            }
+        raise
+    ok = bool(getattr(result, "ok", False))
+    message = str(getattr(result, "message", ""))
+    errors = list(getattr(result, "errors", []) or [])
+    if not ok and _signals_already_gone(message, *errors):
+        # Driver REPORTED a not-found failure (e.g. S3 "empty failed:
+        # NoSuchBucket") — the resource is already gone, so deprovision is
+        # effectively complete. Coerce to success so the workflow finalizes
+        # the row instead of re-raising into a stuck teardown (#1034).
+        return {
+            "ok": True,
+            "message": f"already deprovisioned: {message}",
+            "errors": [],
+            "handle": str(getattr(result, "handle", "")),
+        }
     return {
-        "ok": bool(getattr(result, "ok", False)),
-        "message": str(getattr(result, "message", "")),
-        "errors": list(getattr(result, "errors", []) or []),
+        "ok": ok,
+        "message": message,
+        "errors": errors,
         "handle": str(getattr(result, "handle", "")),
     }
 
