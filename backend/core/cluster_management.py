@@ -419,6 +419,53 @@ def build_agent_manifests(cluster: TenantCluster) -> list[dict[str, Any]]:
                 "labels": {"astrolift.io/managed-by": "platform"},
             },
         },
+        # Read-only RBAC so the agent can collect the live telemetry snapshot
+        # (node/pod/service inventory + metrics-server usage) for the
+        # heartbeat payload (#112). Cluster-scoped get/list only — the agent
+        # never mutates anything.
+        {
+            "apiVersion": "v1",
+            "kind": "ServiceAccount",
+            "metadata": {
+                "name": "astrolift-agent",
+                "namespace": AGENT_NAMESPACE,
+                "labels": labels,
+            },
+        },
+        {
+            "apiVersion": "rbac.authorization.k8s.io/v1",
+            "kind": "ClusterRole",
+            "metadata": {"name": "astrolift-agent", "labels": labels},
+            "rules": [
+                {
+                    "apiGroups": [""],
+                    "resources": ["nodes", "pods", "services"],
+                    "verbs": ["get", "list"],
+                },
+                {
+                    "apiGroups": ["metrics.k8s.io"],
+                    "resources": ["nodes", "pods"],
+                    "verbs": ["get", "list"],
+                },
+            ],
+        },
+        {
+            "apiVersion": "rbac.authorization.k8s.io/v1",
+            "kind": "ClusterRoleBinding",
+            "metadata": {"name": "astrolift-agent", "labels": labels},
+            "roleRef": {
+                "apiGroup": "rbac.authorization.k8s.io",
+                "kind": "ClusterRole",
+                "name": "astrolift-agent",
+            },
+            "subjects": [
+                {
+                    "kind": "ServiceAccount",
+                    "name": "astrolift-agent",
+                    "namespace": AGENT_NAMESPACE,
+                }
+            ],
+        },
         {
             "apiVersion": "apps/v1",
             "kind": "Deployment",
@@ -433,6 +480,8 @@ def build_agent_manifests(cluster: TenantCluster) -> list[dict[str, Any]]:
                 "template": {
                     "metadata": {"labels": labels},
                     "spec": {
+                        "serviceAccountName": "astrolift-agent",
+                        "automountServiceAccountToken": True,
                         "containers": [
                             {
                                 "name": "agent",

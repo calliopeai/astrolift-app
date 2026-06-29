@@ -306,11 +306,13 @@ def test_heartbeat_persists_timestamp_and_payload(cluster):
 
     payload = {
         "node_count": 3,
+        "node_ready_count": 2,
         "pods_by_namespace": {"astrolift-system": 4, "acme-prod": 11},
+        "app_readiness": {"acme": {"ready": 2, "total": 3}},
         "cpu_utilization": 0.42,
         "memory_utilization": 0.61,
         "ingress_ips": ["203.0.113.10"],
-        "agent_version": "0.1.0",
+        "agent_version": "0.2.0",
     }
     client = Client()
     resp = client.post(
@@ -328,8 +330,11 @@ def test_heartbeat_persists_timestamp_and_payload(cluster):
     cluster.refresh_from_db()
     assert cluster.last_heartbeat_at is not None
     assert cluster.last_heartbeat_payload["node_count"] == 3
+    # #112 rich-telemetry keys round-trip through the allow-list.
+    assert cluster.last_heartbeat_payload["node_ready_count"] == 2
+    assert cluster.last_heartbeat_payload["app_readiness"]["acme"]["ready"] == 2
     assert cluster.last_heartbeat_payload["pods_by_namespace"]["acme-prod"] == 11
-    assert cluster.last_heartbeat_payload["agent_version"] == "0.1.0"
+    assert cluster.last_heartbeat_payload["agent_version"] == "0.2.0"
 
 
 def test_heartbeat_allow_lists_payload_keys(cluster):

@@ -410,10 +410,12 @@ def cluster_live_state_to_type(cluster):
         heartbeat_interval_seconds=cluster.heartbeat_interval_seconds,
         agent_provisioned=bool(cluster.agent_key_hash),
         node_count=payload.get("node_count"),
+        node_ready_count=payload.get("node_ready_count"),
         cpu_utilization=payload.get("cpu_utilization"),
         memory_utilization=payload.get("memory_utilization"),
         pod_total=pod_total,
         pods_by_namespace=pods_by_ns if isinstance(pods_by_ns, dict) else {},
+        app_readiness=payload.get("app_readiness") or {},
         ingress_ips=[str(ip) for ip in ingress_ips],
         agent_version=str(payload.get("agent_version") or ""),
     )
@@ -507,12 +509,17 @@ class ClusterLiveStateType:
     # Snapshot fields from the most recent heartbeat payload. All
     # nullable because an older agent version may not report them.
     node_count: int | None
+    node_ready_count: int | None
+    """Ready nodes (#112) — render 'N/M ready'. Null on older agents."""
     cpu_utilization: float | None
     memory_utilization: float | None
     pod_total: int | None
     """Sum of pod counts across all reported namespaces."""
 
     pods_by_namespace: JSON
+    app_readiness: JSON
+    """Per-app pod readiness (#112): {app_slug: {ready, total}}. Drives
+    the Workloads tab's live readiness when the cluster is online."""
     ingress_ips: list[str]
     agent_version: str
 

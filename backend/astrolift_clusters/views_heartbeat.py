@@ -68,7 +68,9 @@ def _bearer_token(request: HttpRequest) -> str | None:
 _ALLOWED_PAYLOAD_KEYS = frozenset(
     {
         "node_count",
+        "node_ready_count",
         "pods_by_namespace",
+        "app_readiness",
         "cpu_utilization",
         "memory_utilization",
         "ingress_ips",

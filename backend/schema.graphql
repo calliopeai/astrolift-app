@@ -194,6 +194,10 @@ type AstroliftAgentDetail {
   dockerfilePath: String!
   brief: AstroliftBrief
   skills: [AstroliftAgentSkill!]!
+  replicas: Int!
+  scheduledScaleTo: Int
+  scaleUpCron: String!
+  scaleDownCron: String!
 }
 
 type AstroliftAgentEnvironmentSpec {
@@ -250,6 +254,9 @@ type AstroliftAgentLiveStatus {
   lastRunStatus: String
   lastRunAt: DateTime
   nextScheduledAt: DateTime
+  desiredReplicas: Int
+  readyReplicas: Int
+  deploymentReady: Boolean
 }
 
 type AstroliftAgentRun {
@@ -298,6 +305,13 @@ type AstroliftAgentRuntime {
   image: String!
 }
 
+type AstroliftAgentScaleResult {
+  ok: Boolean!
+  message: String!
+  desiredReplicas: Int
+  readyReplicas: Int
+}
+
 type AstroliftAgentSkill {
   position: Int!
   skill: AstroliftSkill!
@@ -321,6 +335,14 @@ type AstroliftAgentTaskMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftAgentTask
+}
+
+type AstroliftAgentTriggerResult {
+  ok: Boolean!
+  message: String!
+  slug: String
+  endpoint: String
+  signingSecret: String
 }
 
 type AstroliftAggregatedEvent {
@@ -1046,10 +1068,12 @@ type AstroliftClusterLiveState {
   heartbeatIntervalSeconds: Int!
   agentProvisioned: Boolean!
   nodeCount: Int
+  nodeReadyCount: Int
   cpuUtilization: Float
   memoryUtilization: Float
   podTotal: Int
   podsByNamespace: JSON!
+  appReadiness: JSON!
   ingressIps: [String!]!
   agentVersion: String!
 }
@@ -1461,6 +1485,14 @@ type AstroliftDiscoveredAgentManifest {
   name: String!
   slug: String!
   workloadKind: String!
+  alreadyRegistered: Boolean!
+}
+
+type AstroliftDiscoveredAppManifest {
+  manifestPath: String!
+  name: String!
+  buildContext: String!
+  workloadCount: Int!
   alreadyRegistered: Boolean!
 }
 
@@ -2403,6 +2435,16 @@ type AstroliftRegisterAgentRepoResultMutationResult {
   data: AstroliftRegisterAgentRepoResult
 }
 
+type AstroliftRegisterAppRepoResult {
+  apps: [AstroliftRegisteredAppEntry!]!
+}
+
+type AstroliftRegisterAppRepoResultMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftRegisterAppRepoResult
+}
+
 type AstroliftRegisteredAgent {
   manifestPath: String!
   slug: String!
@@ -2486,6 +2528,14 @@ type AstroliftRegisteredApp {
   activePreviewCount: Int!
   retentionPolicies: [AstroliftRetentionPolicy!]!
   provisioningProgress: AstroliftProvisioningProgress
+}
+
+type AstroliftRegisteredAppEntry {
+  manifestPath: String!
+  slug: String!
+  appId: GUID!
+  buildContext: String!
+  created: Boolean!
 }
 
 type AstroliftRegisteredAppMutationResult {
@@ -2652,6 +2702,12 @@ type AstroliftRunJobOncePayloadMutationResult {
 type AstroliftScanAgentManifestsResult {
   ok: Boolean!
   agents: [AstroliftDiscoveredAgentManifest!]!
+  error: String
+}
+
+type AstroliftScanAppManifestsResult {
+  ok: Boolean!
+  apps: [AstroliftDiscoveredAppManifest!]!
   error: String
 }
 
@@ -3458,6 +3514,19 @@ input ClearEnvironmentSettingInput {
   key: String!
 }
 
+type CloudOrphanReportType {
+  orphans: [CloudOrphanType!]!
+  scannedKinds: [String!]!
+  incompleteKinds: [String!]!
+  complete: Boolean!
+}
+
+type CloudOrphanType {
+  kind: String!
+  identifier: String!
+  classification: String!
+}
+
 type Clusteragentkeyissuedpayload {
   clusterId: GUID!
   agentKey: String!
@@ -3655,6 +3724,14 @@ type CreateWorkflowStageResult {
   stage: WorkflowStageType
 }
 
+type CreateWorkflowTriggerResult {
+  ok: Boolean!
+  errors: [ValidationError!]!
+  slug: String
+  endpoint: String
+  signingSecret: String
+}
+
 type DataImportUploadResult {
   preSignedUrl: String
   publicUrl: String
@@ -3757,6 +3834,8 @@ input DeprovisionManagedServiceInput {
 input DeregisterAppInput {
   appSlug: String!
   confirmName: String!
+  deleteData: Boolean! = false
+  forceDestroy: Boolean! = false
 }
 
 input DetachSecretBundleInput {
@@ -4282,6 +4361,7 @@ type Mutation {
   assertSession(input: AssertSessionInput!): AstroliftAttestationResultMutationResult!
   registerApp(input: RegisterAppInput!): AstroliftRegisteredAppMutationResult!
   registerAgentRepo(input: RegisterAgentRepoInput!): AstroliftRegisterAgentRepoResultMutationResult!
+  registerAppRepo(input: RegisterAppRepoInput!): AstroliftRegisterAppRepoResultMutationResult!
   updateApp(input: UpdateAppInput!): AstroliftRegisteredAppMutationResult!
   setAppSubdomain(input: SetAppSubdomainInput!): AstroliftRegisteredAppMutationResult!
   softDeleteApp(input: SoftDeleteAppInput!): SoftdeletepayloadMutationResult!
@@ -4453,6 +4533,8 @@ type Mutation {
   launchTask(briefId: ID!, orgId: ID!, callbackUrl: String = null): AstroliftLaunchTaskResultMutationResult!
   cancelTask(id: ID!): NoneTypeMutationResult!
   runAstroliftAgent(input: RunAstroliftAgentInput!): AstroliftAgentTaskMutationResult!
+  createAgentTrigger(agentSlug: String!): AstroliftAgentTriggerResult!
+  scaleServiceAgent(agentSlug: String!, targetReplicas: Int!): AstroliftAgentScaleResult!
   updateAgentRunSpec(agentSlug: String!, input: AgentRunSpecInput!): AstroliftAgentRunSpecMutationResult!
   importSkillsFromRepo(repoUrl: String!, branch: String! = "main", manifestPath: String! = ""): AstroliftImportSkillsResultMutationResult!
   registerOrgSkillRepo(input: RegisterOrgSkillRepoInput!, orgId: ID!): AstroliftOrgSkillRepoMutationResult!
@@ -4474,16 +4556,21 @@ type Mutation {
   overrideWorkflowState(instanceId: ID!, toState: String!, note: String! = ""): MutationResult!
 
   """Create a new workflow definition (staff only)."""
-  createWorkflowDefinition(name: String!, slug: String!, modelLabel: String!, states: JSON!, transitions: JSON!, description: String = null, isEnabled: Boolean! = false): MutationResult!
+  createWorkflowDefinition(name: String!, slug: String!, modelLabel: String!, states: JSON!, transitions: JSON!, description: String = null, isEnabled: Boolean! = false, patternKind: String = null): MutationResult!
 
   """Update an existing workflow definition (staff only)."""
-  updateWorkflowDefinition(slug: String!, name: String = null, description: String = null, modelLabel: String = null, states: JSON = null, transitions: JSON = null, isEnabled: Boolean = null): MutationResult!
+  updateWorkflowDefinition(slug: String!, name: String = null, description: String = null, modelLabel: String = null, states: JSON = null, transitions: JSON = null, isEnabled: Boolean = null, patternKind: String = null): MutationResult!
 
   """Delete a workflow definition by slug (staff only)."""
   deleteWorkflowDefinition(slug: String!): MutationResult!
 
   """Add a stage to an agent workflow definition (staff only)."""
   createWorkflowStage(workflowSlug: String!, order: Int!, kind: String!, onFailure: String! = "fail", timeoutSeconds: Int! = 300, agentDefinitionGuid: String = null, skillRefs: JSON = null, fanOutCount: Int = null): CreateWorkflowStageResult!
+
+  """
+  Create an inbound webhook trigger for a workflow definition (staff only).
+  """
+  createWorkflowTrigger(workflowSlug: String!): CreateWorkflowTriggerResult!
   astroliftAnonymizeUser(input: AstroliftAnonymizeUserInput!): AstroliftAnonymizeUserPayloadMutationResult!
   astroliftConnectUserSourceProvider(input: ConnectUserSourceProviderInput!): AstroliftConnectUserSourceProviderPayloadMutationResult!
   astroliftDisconnectUserSourceProvider(input: DisconnectUserSourceProviderInput!): AstroliftDisconnectUserSourceProviderPayloadMutationResult!
@@ -4791,6 +4878,8 @@ type Query {
   astroliftRenderedManifest(appSlug: String!, environmentName: String = null, imageTag: String = null): AstroliftRenderedManifest
   astroliftWorkloadManifest(appSlug: String!, workloadSlug: String!, environmentName: String = null, imageTag: String = null): AstroliftWorkloadManifest
   assignableAstroliftProjects: [AstroliftProject!]!
+  scanAppManifests(sourceRepo: String!, sourceKind: String! = "github", ref: String! = "main"): AstroliftScanAppManifestsResult!
+  scanCloudOrphans: CloudOrphanReportType!
   astroliftEnvironments(appSlug: String = null): [AstroliftAppEnvironment!]!
   astroliftDeployments(appSlug: String = null, environmentName: String = null, limit: Int! = 50): [AstroliftDeployment!]!
   astroliftDeployment(id: String!): AstroliftDeployment
@@ -4993,6 +5082,16 @@ input RegisterAppInput {
   approverUserIds: [String!] = null
   minimumApprovals: Int = null
   manifestRaw: String = null
+}
+
+input RegisterAppRepoInput {
+  projectId: GUID!
+  sourceRepo: String!
+  sourceKind: String! = "github"
+  sourceUrl: String = null
+  ref: String! = "main"
+  defaultBranch: String = null
+  deployBranch: String = null
 }
 
 input RegisterMobileDeviceInput {
@@ -5745,6 +5844,7 @@ type WorkflowStageExecutionType {
   failure: JSON
   errorMessage: String!
   createdAt: DateTime!
+  executionId: String!
   stageGuid: String!
   stageKind: String!
   stageOrder: Int!
