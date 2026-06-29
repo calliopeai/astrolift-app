@@ -26,6 +26,12 @@ export interface ClusterHeartbeatFields {
   agentProvisioned: boolean;
 }
 
+/** Per-app pod readiness reported by the keep-alive agent (#112). */
+export interface AppReadiness {
+  ready: number;
+  total: number;
+}
+
 /** Full live-state snapshot returned by ``astroliftClusterLiveState``. */
 export interface ClusterLiveState {
   clusterId: string;
@@ -35,10 +41,12 @@ export interface ClusterLiveState {
   heartbeatIntervalSeconds: number;
   agentProvisioned: boolean;
   nodeCount: number | null;
+  nodeReadyCount: number | null;
   cpuUtilization: number | null;
   memoryUtilization: number | null;
   podTotal: number | null;
   podsByNamespace: Record<string, number>;
+  appReadiness: Record<string, AppReadiness>;
   ingressIps: string[];
   agentVersion: string;
 }

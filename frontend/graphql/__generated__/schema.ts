@@ -1062,6 +1062,7 @@ export type AstroliftClusterLifecycleAuditEntry = {
 export type AstroliftClusterLiveState = {
   agentProvisioned: Scalars['Boolean']['output'];
   agentVersion: Scalars['String']['output'];
+  appReadiness: Scalars['JSON']['output'];
   clusterId: Scalars['GUID']['output'];
   cpuUtilization?: Maybe<Scalars['Float']['output']>;
   heartbeatAgeSeconds?: Maybe<Scalars['Float']['output']>;
@@ -1070,6 +1071,7 @@ export type AstroliftClusterLiveState = {
   lastHeartbeatAt?: Maybe<Scalars['DateTime']['output']>;
   memoryUtilization?: Maybe<Scalars['Float']['output']>;
   nodeCount?: Maybe<Scalars['Int']['output']>;
+  nodeReadyCount?: Maybe<Scalars['Int']['output']>;
   podTotal?: Maybe<Scalars['Int']['output']>;
   podsByNamespace: Scalars['JSON']['output'];
   status: Scalars['String']['output'];

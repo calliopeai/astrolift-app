@@ -1062,6 +1062,7 @@ export type AstroliftClusterLifecycleAuditEntry = {
 export type AstroliftClusterLiveState = {
   agentProvisioned: Scalars['Boolean']['output'];
   agentVersion: Scalars['String']['output'];
+  appReadiness: Scalars['JSON']['output'];
   clusterId: Scalars['GUID']['output'];
   cpuUtilization?: Maybe<Scalars['Float']['output']>;
   heartbeatAgeSeconds?: Maybe<Scalars['Float']['output']>;
@@ -1070,6 +1071,7 @@ export type AstroliftClusterLiveState = {
   lastHeartbeatAt?: Maybe<Scalars['DateTime']['output']>;
   memoryUtilization?: Maybe<Scalars['Float']['output']>;
   nodeCount?: Maybe<Scalars['Int']['output']>;
+  nodeReadyCount?: Maybe<Scalars['Int']['output']>;
   podTotal?: Maybe<Scalars['Int']['output']>;
   podsByNamespace: Scalars['JSON']['output'];
   status: Scalars['String']['output'];
@@ -8173,7 +8175,7 @@ export type ClusterLiveStateQueryVariables = Exact<{
 }>;
 
 
-export type ClusterLiveStateQuery = { astroliftClusterLiveState?: { clusterId: string, status: string, lastHeartbeatAt?: string | null, heartbeatAgeSeconds?: number | null, heartbeatIntervalSeconds: number, agentProvisioned: boolean, nodeCount?: number | null, cpuUtilization?: number | null, memoryUtilization?: number | null, podTotal?: number | null, podsByNamespace: Record<string, unknown>, ingressIps: Array<string>, agentVersion: string } | null };
+export type ClusterLiveStateQuery = { astroliftClusterLiveState?: { clusterId: string, status: string, lastHeartbeatAt?: string | null, heartbeatAgeSeconds?: number | null, heartbeatIntervalSeconds: number, agentProvisioned: boolean, nodeCount?: number | null, nodeReadyCount?: number | null, appReadiness: Record<string, unknown>, cpuUtilization?: number | null, memoryUtilization?: number | null, podTotal?: number | null, podsByNamespace: Record<string, unknown>, ingressIps: Array<string>, agentVersion: string } | null };
 
 export type IssueClusterAgentKeyMutationVariables = Exact<{
   input: IssueClusterAgentKeyInput;

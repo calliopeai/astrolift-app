@@ -524,12 +524,23 @@ function LiveStateSection({ clusterId, slug }: { clusterId: string; slug: string
 }
 
 function LiveSnapshotGrid({ state, age }: { state: ClusterLiveState; age: string | null }) {
-  const tiles: { label: string; value: string }[] = [
+  // Node readiness — "N/M ready" when the agent reports the ready count
+  // (#112), falling back to the bare total for agents that predate it.
+  const nodeValue: React.ReactNode =
+    state.nodeReadyCount !== null && state.nodeCount !== null ? (
+      <>
+        {state.nodeReadyCount}/{state.nodeCount}
+        <span className="text-muted-foreground ml-1 text-xs font-normal">ready</span>
+      </>
+    ) : state.nodeCount !== null ? (
+      String(state.nodeCount)
+    ) : (
+      "—"
+    );
+
+  const tiles: { label: string; value: React.ReactNode }[] = [
     { label: "Last heartbeat", value: age ?? "—" },
-    {
-      label: "Nodes",
-      value: state.nodeCount !== null ? String(state.nodeCount) : "—",
-    },
+    { label: "Nodes", value: nodeValue },
     {
       label: "Pods",
       value: state.podTotal !== null ? String(state.podTotal) : "—",
@@ -544,6 +555,15 @@ function LiveSnapshotGrid({ state, age }: { state: ClusterLiveState; age: string
         state.memoryUtilization !== null ? `${(state.memoryUtilization * 100).toFixed(0)}%` : "—",
     },
   ];
+
+  // Per-app pod readiness from the heartbeat payload, keyed by app slug
+  // (#112). Only present here when the cluster is online — this grid is
+  // mounted only in the live branch of LiveStateSection, so it never
+  // shows stale readiness for an offline / never-seen cluster.
+  const appEntries = Object.entries(state.appReadiness ?? {}).sort(([a], [b]) =>
+    a.localeCompare(b)
+  );
+
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
@@ -556,6 +576,18 @@ function LiveSnapshotGrid({ state, age }: { state: ClusterLiveState; age: string
           </div>
         ))}
       </div>
+      {appEntries.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
+            App readiness
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {appEntries.map(([appSlug, r]) => (
+              <AppReadinessPill key={appSlug} appSlug={appSlug} ready={r.ready} total={r.total} />
+            ))}
+          </div>
+        </div>
+      )}
       {state.ingressIps.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
           <span className="text-muted-foreground">Ingress:</span>
@@ -570,6 +602,37 @@ function LiveSnapshotGrid({ state, age }: { state: ClusterLiveState; age: string
         <p className="text-muted-foreground text-[11px]">Agent {state.agentVersion}</p>
       )}
     </div>
+  );
+}
+
+// Per-app pod readiness pill (#112). Tone tracks the ready/total ratio —
+// green when fully ready, red when nothing is ready, amber in between.
+// Mirrors the PodPhasePill shape so the live cards read consistently.
+function AppReadinessPill({
+  appSlug,
+  ready,
+  total,
+}: {
+  appSlug: string;
+  ready: number;
+  total: number;
+}) {
+  const tone: Tone = total === 0 ? "neutral" : ready >= total ? "ok" : ready === 0 ? "bad" : "warn";
+  const classes: Record<Tone, string> = {
+    ok: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30 dark:text-emerald-400",
+    warn: "bg-amber-500/10 text-amber-700 border-amber-500/30 dark:text-amber-400",
+    bad: "bg-destructive/10 text-destructive border-destructive/30",
+    neutral: "bg-muted text-muted-foreground border-border",
+  };
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs ${classes[tone]}`}
+    >
+      <code className="font-mono font-medium">{appSlug}</code>
+      <span className="tabular-nums opacity-80">
+        {ready}/{total} ready
+      </span>
+    </span>
   );
 }
 

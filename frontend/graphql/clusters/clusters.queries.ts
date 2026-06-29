@@ -340,10 +340,12 @@ export const CLUSTER_LIVE_STATE = gql`
       heartbeatIntervalSeconds
       agentProvisioned
       nodeCount
+      nodeReadyCount
       cpuUtilization
       memoryUtilization
       podTotal
       podsByNamespace
+      appReadiness
       ingressIps
       agentVersion
     }
