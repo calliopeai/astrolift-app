@@ -701,7 +701,9 @@ def test_mark_tearing_down_is_noop_on_already_deregistered_app(app):
     app.provisioning_status = RegisteredApp.ProvisioningStatus.DEREGISTERED.value
     app.save(update_fields=["provisioning_status", "updated_at", "version"])
 
-    _mark_tearing_down_sync(app.pk)  # must not raise
+    # A fully-deregistered app is unambiguously a resume → returns True so the
+    # workflow skips the cancel grace window.
+    assert _mark_tearing_down_sync(app.pk) is True  # must not raise
 
     app.refresh_from_db()
     assert app.provisioning_status == RegisteredApp.ProvisioningStatus.DEREGISTERED.value
@@ -709,12 +711,29 @@ def test_mark_tearing_down_is_noop_on_already_deregistered_app(app):
 
 def test_mark_tearing_down_transitions_live_app(app):
     """The guard for the deregistered case (above) must not break the normal
-    path: a live (ready) app still transitions to tearing_down."""
+    path: a live (ready) app still transitions to tearing_down and reports
+    that this was a FIRST teardown (resume flag False → grace window applies)."""
     from astrolift_registry.models import RegisteredApp
     from astrolift_workflows.activities.app_teardown import _mark_tearing_down_sync
 
     # The ``app`` fixture starts at provisioning_status="ready".
-    _mark_tearing_down_sync(app.pk)
+    assert _mark_tearing_down_sync(app.pk) is False
+
+    app.refresh_from_db()
+    assert app.provisioning_status == RegisteredApp.ProvisioningStatus.TEARING_DOWN.value
+
+
+def test_mark_tearing_down_reports_resume_on_already_tearing_down(app):
+    """#1034: re-firing the teardown on an app ALREADY tearing_down is the
+    re-trigger / reconcile resume case — the activity reports True (skip the
+    grace window) and the idempotent self-transition does not raise."""
+    from astrolift_registry.models import RegisteredApp
+    from astrolift_workflows.activities.app_teardown import _mark_tearing_down_sync
+
+    app.provisioning_status = RegisteredApp.ProvisioningStatus.TEARING_DOWN.value
+    app.save(update_fields=["provisioning_status", "updated_at", "version"])
+
+    assert _mark_tearing_down_sync(app.pk) is True
 
     app.refresh_from_db()
     assert app.provisioning_status == RegisteredApp.ProvisioningStatus.TEARING_DOWN.value
@@ -1221,6 +1240,91 @@ def test_workflow_grace_period_elapses_proceeds_with_teardown(app):
     # ``cancelled`` flag absent (or False) → proceeded with teardown.
     assert result.data.get("cancelled") is not True
     # Soft-delete activity ran.
+    assert "soft_delete_app_records" in {name for name, _, _ in fake_api.calls}
+
+
+# ---------------------------------------------------------------------------
+# #1034 — resume (re-trigger) skips the grace window
+#
+# The within-workflow finalization (#1034, shipped) only heals a stuck
+# teardown if a NEW run actually reaches the fan-out. Re-firing the deregister
+# restarts the workflow (TERMINATE_IF_RUNNING), and the first thing the run
+# does is the grace-period wait_condition. Re-applying the full 5-minute
+# window on every re-trigger stalls finalization — back-to-back re-triggers
+# each reset the timer and the rows never finalize. A resume must therefore
+# SKIP the window and drive the idempotent fan-out straight away.
+# ---------------------------------------------------------------------------
+
+
+def _run_workflow_with_wait_recorder(app, fakes):
+    """Run the workflow capturing whether the grace ``wait_condition`` fired.
+
+    Returns ``(fake_api, wait_calls, result)`` where ``wait_calls`` is the
+    list of timeouts the workflow passed to ``wait_condition`` — empty when
+    the grace window was skipped (the resume path)."""
+    import asyncio
+
+    from astrolift_workflows.workflows.deregister_app import DeregisterAppWorkflow
+
+    fake_api = _FakeWorkflowAPI(fakes=fakes)
+    wait_calls: list[object] = []
+
+    async def _wait_condition(predicate, *, timeout=None):
+        wait_calls.append(timeout)
+        # No cancel signal → the window elapses → proceed to teardown.
+        raise TimeoutError("grace period elapsed")
+
+    input = DeregisterWfInput(
+        registered_app_id=app.pk,
+        actor=Actor(kind="user", user_id=None, display="tester"),
+        delete_data=False,
+        force_destroy=False,
+    )
+    with patch(
+        "astrolift_workflows.workflows.deregister_app.workflow",
+        SimpleNamespace(
+            execute_activity=fake_api.execute_activity,
+            wait_condition=_wait_condition,
+            logger=SimpleNamespace(
+                warning=lambda *a, **k: None,
+                info=lambda *a, **k: None,
+            ),
+        ),
+    ):
+        result = asyncio.run(DeregisterAppWorkflow().run(input))
+    return fake_api, wait_calls, result
+
+
+def test_resume_skips_grace_window_and_drives_finalization(app):
+    """#1034: when ``mark_app_tearing_down`` reports the app was ALREADY
+    tearing_down (a resume), the workflow does NOT enter the grace window and
+    runs the fan-out straight through to the app soft-delete."""
+    fakes = _clean_teardown_fakes()
+    # Resume signal: the app was already tearing_down when this run started.
+    fakes["mark_app_tearing_down"] = lambda *_: True
+
+    fake_api, wait_calls, result = _run_workflow_with_wait_recorder(app, fakes)
+
+    assert wait_calls == [], "resume must skip the grace-period wait_condition"
+    assert result.ok is True, result.data
+    assert result.data.get("cancelled") is not True
+    called = {name for name, _, _ in fake_api.calls}
+    assert "soft_delete_app_records" in called
+    assert "mark_app_deregistered" in called
+
+
+def test_first_teardown_still_applies_grace_window(app):
+    """The resume skip must not break a FIRST teardown: when
+    ``mark_app_tearing_down`` reports the app was not previously tearing_down,
+    the grace window is still entered before any destructive work."""
+    fakes = _clean_teardown_fakes()
+    # First teardown: app was 'ready' → resume flag False.
+    fakes["mark_app_tearing_down"] = lambda *_: False
+
+    fake_api, wait_calls, result = _run_workflow_with_wait_recorder(app, fakes)
+
+    assert len(wait_calls) == 1, "first teardown must enter the grace window"
+    assert result.ok is True, result.data
     assert "soft_delete_app_records" in {name for name, _, _ in fake_api.calls}
 
 

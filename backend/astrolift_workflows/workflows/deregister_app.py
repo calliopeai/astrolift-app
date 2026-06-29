@@ -13,7 +13,12 @@ a ``cancel_teardown`` signal before any destructive step runs. The
 arrives within the window the workflow returns ``ok=False`` with a
 ``cancelled=True`` marker and NO destructive work executes. After
 the window elapses the workflow proceeds with the teardown and
-subsequent cancel signals are no-ops.
+subsequent cancel signals are no-ops. The window is applied ONLY on a
+first teardown: a RESUME run (re-trigger / reconcile of an app already
+``tearing_down`` or ``deregistered``) skips it and drives the
+idempotent fan-out straight away, so a stuck teardown finalizes
+instead of re-waiting (and re-resetting) the window on every
+re-trigger (#1034).
 
 Resource teardown order (each step records its result on
 ``WorkflowResult.data["teardown"][<resource>]``):
@@ -167,8 +172,11 @@ class DeregisterAppWorkflow:
 
         # Provisioning-status flip is observable in the UI immediately
         # — re-runs against the same workflow id no-op (Temporal de-
-        # dupes), so this is safe to re-execute as a step header.
-        await workflow.execute_activity(
+        # dupes), so this is safe to re-execute as a step header. The
+        # activity reports whether the app was ALREADY tearing down (or
+        # already deregistered) when this run started — i.e. whether this
+        # is a resume rather than a first teardown (#1034).
+        already_tearing_down = await workflow.execute_activity(
             mark_app_tearing_down,
             app_id,
             start_to_close_timeout=_QUICK_TIMEOUT,
@@ -183,31 +191,42 @@ class DeregisterAppWorkflow:
         # predicate still false. We only honour cancellation at this
         # single boundary so the FE's "cancel within X" promise is
         # observable and the destructive work below is monotonic.
-        try:
-            await workflow.wait_condition(
-                lambda: self._cancel_requested,
-                timeout=GRACE_PERIOD,
-            )
-        except TimeoutError:
-            # Grace window elapsed without a cancel signal — proceed
-            # to the destructive steps. This is the happy path.
-            pass
-        if self._cancel_requested:
-            workflow.logger.info(
-                "deregister cancelled within grace window app=%s reason=%s",
-                app_id,
-                self._cancel_reason,
-            )
-            return WorkflowResult(
-                ok=False,
-                message="cancelled within grace window",
-                data={
-                    "cancelled": True,
-                    "cancel_reason": self._cancel_reason,
-                    "teardown": {},
-                    "still_live_resources": [],
-                },
-            )
+        #
+        # ONLY on a first teardown (#1034). When this run is a RESUME of an
+        # already-tearing-down (or terminated) teardown — a re-trigger or a
+        # reconcile of a stuck app — re-waiting the grace window stalls the
+        # very finalization the resume exists to drive: each re-trigger
+        # restarts the workflow (TERMINATE_IF_RUNNING), so re-applying the
+        # full window would let back-to-back re-triggers reset the timer
+        # forever and the stuck rows would never finalize. A resume has no
+        # accidental first click to undo, so it proceeds straight to the
+        # idempotent fan-out.
+        if not already_tearing_down:
+            try:
+                await workflow.wait_condition(
+                    lambda: self._cancel_requested,
+                    timeout=GRACE_PERIOD,
+                )
+            except TimeoutError:
+                # Grace window elapsed without a cancel signal — proceed
+                # to the destructive steps. This is the happy path.
+                pass
+            if self._cancel_requested:
+                workflow.logger.info(
+                    "deregister cancelled within grace window app=%s reason=%s",
+                    app_id,
+                    self._cancel_reason,
+                )
+                return WorkflowResult(
+                    ok=False,
+                    message="cancelled within grace window",
+                    data={
+                        "cancelled": True,
+                        "cancel_reason": self._cancel_reason,
+                        "teardown": {},
+                        "still_live_resources": [],
+                    },
+                )
 
         teardown: dict[str, dict[str, Any]] = {}
         still_live: list[str] = []

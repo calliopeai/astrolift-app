@@ -40,7 +40,19 @@ def _mark_state_sync(registered_app_id: int, status: str) -> None:
     )
 
 
-def _mark_tearing_down_sync(registered_app_id: int) -> None:
+def _mark_tearing_down_sync(registered_app_id: int) -> bool:
+    """Flip the app to TEARING_DOWN. Returns True when the app was ALREADY
+    in a teardown state (tearing_down, or the terminal deregistered) before
+    this call — i.e. this run is a RESUME / re-trigger, not an operator's
+    first destructive click.
+
+    The caller uses that flag to skip the operator-cancel grace window on a
+    resume (#1034): the window's sole purpose is to let an operator undo an
+    accidental FIRST teardown, and re-waiting it on every re-trigger stalls
+    finalization. Each re-trigger restarts the workflow (TERMINATE_IF_RUNNING),
+    so re-applying the full 5-minute window would let back-to-back re-triggers
+    reset the timer indefinitely and the stuck rows would never finalize.
+    """
     from astrolift_registry.models import RegisteredApp
 
     app = RegisteredApp.all_objects.get(pk=registered_app_id)
@@ -51,16 +63,18 @@ def _mark_tearing_down_sync(registered_app_id: int) -> None:
     # at the very first step (#1034). tearing_down → tearing_down idempotency
     # is already handled inside transition_provisioning (#1006).
     if app.provisioning_status == RegisteredApp.ProvisioningStatus.DEREGISTERED:
-        return
+        return True
+    already_tearing_down = app.provisioning_status == RegisteredApp.ProvisioningStatus.TEARING_DOWN
     app.transition_provisioning(RegisteredApp.ProvisioningStatus.TEARING_DOWN)
+    return already_tearing_down
 
 
 @activity.defn(name="astrolift.app.mark_tearing_down")
-async def mark_app_tearing_down(registered_app_id: int) -> None:
+async def mark_app_tearing_down(registered_app_id: int) -> bool:
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    await sync_to_async(_mark_tearing_down_sync)(registered_app_id)
+    return await sync_to_async(_mark_tearing_down_sync)(registered_app_id)
 
 
 @activity.defn(name="astrolift.app.mark_deregistered")
