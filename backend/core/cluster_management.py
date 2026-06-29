@@ -447,6 +447,11 @@ def build_agent_manifests(cluster: TenantCluster) -> list[dict[str, Any]]:
                     "resources": ["nodes", "pods"],
                     "verbs": ["get", "list"],
                 },
+                {
+                    "apiGroups": ["networking.k8s.io"],
+                    "resources": ["ingresses"],
+                    "verbs": ["get", "list"],
+                },
             ],
         },
         {
