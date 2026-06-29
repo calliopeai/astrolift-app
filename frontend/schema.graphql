@@ -4434,6 +4434,7 @@ type Mutation {
   deleteDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
   rollbackDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
   redeployApp(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
+  promoteDeployment(input: PromoteDeploymentInput!): AstroliftDeploymentMutationResult!
   pauseEnvironment(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
   resumeEnvironment(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
   pauseAppIngress(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
@@ -4731,6 +4732,12 @@ type ProfileType {
   hasPin: Boolean!
   avatar: UploadType
   signature: UploadType
+}
+
+input PromoteDeploymentInput {
+  appSlug: String!
+  sourceEnvironmentName: String!
+  targetEnvironmentName: String!
 }
 
 input ProposeSecretChangeInput {
