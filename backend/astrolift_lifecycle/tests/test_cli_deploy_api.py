@@ -513,8 +513,22 @@ def test_deployment_status_returns_current_state(app_with_manifest, env, deploy_
     assert body["environment"] == "prod"
     assert body["created_at"] is not None
     assert body["updated_at"] is not None
-    # ``message`` is empty since Deployment has no status_message column.
-    assert body["message"] == ""
+    # The status contract is {deployment_id, state, status, image_tag,
+    # commit_sha, branch, created_at, updated_at, environment} — no
+    # ``message`` key (Deployment has no status_message column; the
+    # CLI-facing vocabulary lives in ``state``). Pin the exact key set so a
+    # field drop/rename is caught.
+    assert set(body) == {
+        "deployment_id",
+        "state",
+        "status",
+        "image_tag",
+        "commit_sha",
+        "branch",
+        "created_at",
+        "updated_at",
+        "environment",
+    }
 
 
 def test_deployment_status_reflects_transitions(app_with_manifest, env, deploy_token):

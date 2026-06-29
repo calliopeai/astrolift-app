@@ -15,6 +15,19 @@ inline via ``deploy_tokens.verify_token``.
 The verification also checks that the token belongs to the app being
 deployed — a token for ``app-a`` cannot trigger a deploy on ``app-b``.
 
+Deployment prerequisite (edge SSO bypass)
+-----------------------------------------
+These endpoints authenticate with a **deploy-token bearer**, not an SSO
+session. For an external CI caller to reach this view, the install's edge
+(load balancer / ingress SSO authenticate action) MUST bypass its SSO
+challenge for the ``/api/cli/v1/*`` prefix when a bearer is presented —
+the same bypass the GraphQL API path (``/app/*``) already has. Without
+that rule the edge answers the request itself with a ``302`` redirect to
+the SSO login page and the bearer never reaches Django, so ``astro ci
+deploy`` cannot trigger a deploy regardless of how correct the token is.
+The sibling builder surface (``/api/builder/v1/*``) needs the same bypass.
+Verified end-to-end only once that edge rule is in place (#977).
+
 Wire protocol
 -------------
 ``POST /api/cli/v1/apps/<slug>/deploy/``
