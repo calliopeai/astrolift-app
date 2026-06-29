@@ -23,7 +23,6 @@ import { ListControls } from "@/components/ListControls";
 import { useListControls } from "@/hooks/use-list-controls";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
-import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -94,7 +93,7 @@ interface KeysResp {
   astroliftSshDeployKeys: AstroliftSshDeployKey[];
 }
 
-export function SourceProvidersClient() {
+export function SourceProvidersPanel() {
   const [openConnect, setOpenConnect] = React.useState(false);
   const [openConnectGithub, setOpenConnectGithub] = React.useState(false);
   const [openConnectGitlab, setOpenConnectGitlab] = React.useState(false);
@@ -195,10 +194,15 @@ export function SourceProvidersClient() {
   }
 
   return (
-    <PageShell
-      title="Source providers"
-      description="Connect Astrolift to a code-hosting service so it can clone your repos and watch for pushes. Use OAuth Apps / GitHub Apps for org-wide access, PATs for self-hosted GitLab or Gitea, and SSH deploy keys for direct git access to any host."
-    >
+    <div className="flex flex-col gap-6">
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight">Source providers</h2>
+        <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+          Connect Astrolift to a code-hosting service so it can clone your repos and
+          watch for pushes. Use OAuth Apps / GitHub Apps for org-wide access, PATs for
+          self-hosted GitLab or Gitea, and SSH deploy keys for direct git access to any host.
+        </p>
+      </div>
       {/* Connections */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -402,7 +406,7 @@ export function SourceProvidersClient() {
                           ) : (
                             <Button asChild size="sm" variant="outline">
                               <a
-                                href={`/app/auth1/scm/github/start?config_id=${encodeURIComponent(c.id)}&return_to=/settings/source-providers`}
+                                href={`/app/auth1/scm/github/start?config_id=${encodeURIComponent(c.id)}&return_to=/providers%23source`}
                               >
                                 Connect my GitHub
                               </a>
@@ -411,7 +415,7 @@ export function SourceProvidersClient() {
                         {c.kind === "gitlab_oauth_app" && c.isOauthAppConfig && (
                           <Button asChild size="sm" variant="outline">
                             <a
-                              href={`/app/auth1/scm/gitlab/start?config_id=${encodeURIComponent(c.id)}&return_to=/settings/source-providers`}
+                              href={`/app/auth1/scm/gitlab/start?config_id=${encodeURIComponent(c.id)}&return_to=/providers%23source`}
                             >
                               Connect my GitLab
                             </a>
@@ -621,7 +625,7 @@ export function SourceProvidersClient() {
           if (rotateSecretTarget) await handleRotateSecret(rotateSecretTarget);
         }}
       />
-    </PageShell>
+    </div>
   );
 }
 

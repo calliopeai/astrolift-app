@@ -50,7 +50,7 @@ export function ConnectGitHubDialog({ open, onOpenChange }: Props) {
     if (!looksValidOrg) return;
     const params = new URLSearchParams();
     if (orgSlug) params.set("org", orgSlug);
-    params.set("return_to", "/settings/source-providers");
+    params.set("return_to", "/providers#source");
     // Full-page navigation — the backend renders a self-submitting
     // HTML form that POSTs to github.com on load.
     window.location.href = `/app/auth1/scm/github/app-manifest/start?${params.toString()}`;

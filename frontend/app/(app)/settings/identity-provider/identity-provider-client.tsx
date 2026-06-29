@@ -16,7 +16,6 @@ import { toast } from "sonner";
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
-import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,7 +56,7 @@ const KIND_LABEL: Record<string, string> = {
   local: "Local accounts",
 };
 
-export function IdentityProviderClient() {
+export function IdentityProvidersPanel() {
   const [open, setOpen] = React.useState(false);
   const { can } = useMyPermissions();
   const canManageIdp = can("org.update");
@@ -117,11 +116,17 @@ export function IdentityProviderClient() {
   const list = data?.astroliftIdentityProviders ?? [];
 
   return (
-    <PageShell
-      title="Identity providers"
-      description="Sign-in methods configured for the organization. Auth0, generic OIDC, Cognito, Okta, Azure AD, Google, GitHub, SAML, or local accounts. Exactly one is active at a time."
-      actions={
-        <>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Identity providers</h2>
+          <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+            Sign-in methods configured for the organization. Auth0, generic OIDC,
+            Cognito, Okta, Azure AD, Google, GitHub, SAML, or local accounts. Exactly
+            one is active at a time.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           <Button asChild size="sm" variant="outline">
             <Link href={DOC_LINKS.identityProviders}>
               <BookOpenIcon className="size-4" />
@@ -134,9 +139,8 @@ export function IdentityProviderClient() {
               New provider
             </Button>
           </Can>
-        </>
-      }
-    >
+        </div>
+      </div>
       {error && (
         <Card className="border-destructive/40 bg-destructive/5">
           <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3">
@@ -290,6 +294,6 @@ export function IdentityProviderClient() {
           if (deleteTarget) await handleDelete(deleteTarget);
         }}
       />
-    </PageShell>
+    </div>
   );
 }

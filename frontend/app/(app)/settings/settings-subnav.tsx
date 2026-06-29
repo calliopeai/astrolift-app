@@ -2,8 +2,6 @@
 
 import {
   BuildingIcon,
-  GitBranchIcon,
-  KeyRoundIcon,
   ScaleIcon,
   ShieldCheckIcon,
 } from "lucide-react";
@@ -21,8 +19,6 @@ interface SubnavLink {
 
 const LINKS: SubnavLink[] = [
   { href: "/settings/organization", label: "Organization", icon: <BuildingIcon className="size-4" /> },
-  { href: "/settings/identity-provider", label: "Identity provider", icon: <KeyRoundIcon className="size-4" /> },
-  { href: "/settings/source-providers", label: "Source providers", icon: <GitBranchIcon className="size-4" /> },
   { href: "/settings/policies", label: "Policies", icon: <ScaleIcon className="size-4" /> },
   { href: "/settings/permissions", label: "Permissions", icon: <ShieldCheckIcon className="size-4" /> },
 ];

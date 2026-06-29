@@ -1,16 +1,15 @@
-import { LIST_IDENTITY_PROVIDERS } from "@/graphql/identity/identity.queries";
-import { PreloadQuery } from "@/lib/apollo";
-
-import { IdentityProviderClient } from "./identity-provider-client";
+import { redirect } from "next/navigation";
 
 export const metadata = {
-  title: "Identity provider · Settings · Astrolift",
+  title: "Identity providers · Astrolift",
 };
 
-export default function IdentityProviderSettingsPage() {
-  return (
-    <PreloadQuery query={LIST_IDENTITY_PROVIDERS}>
-      <IdentityProviderClient />
-    </PreloadQuery>
-  );
+/**
+ * Identity providers moved into the unified Providers page (#890). The
+ * IdP panel (`identity-provider-client.tsx`, exported as
+ * `IdentityProvidersPanel`) now renders under /providers' Identity tab;
+ * this server-side redirect keeps bookmarks and in-app links working.
+ */
+export default function IdentityProviderAliasPage() {
+  redirect("/providers#identity");
 }
