@@ -458,7 +458,7 @@ def route_scm_push_to_workflow_webhooks(event: ScmEvent) -> list[WorkflowInstanc
             )
         except Exception:
             log.exception(
-                "route_scm_push_to_workflow_webhooks: failed to trigger " "instance for webhook %s (def=%s)",
+                "route_scm_push_to_workflow_webhooks: failed to trigger instance for webhook %s (def=%s)",
                 hook.pk,
                 hook.workflow_definition_id,
             )
@@ -541,17 +541,38 @@ def _create_temporal_schedule(
     input_template: dict,
     enabled: bool,
 ) -> None:
-    """Create a Temporal schedule (sync wrapper)."""
+    """Create a Temporal schedule (sync wrapper).
+
+    The schedule fires ``WorkflowDefinitionRunWorkflow``, whose
+    ``run(self, input: WorkflowDefinitionRunInput)`` expects the dataclass —
+    passing a plain dict left ``input.workflow_run_id`` undefined and every
+    scheduled fire failed to start (#1036). We build the executor input the
+    same way the inline trigger path does (``build_workflow_definition_run_input``
+    creates the ``WorkflowRun`` mirror row + ``workflow_run_id`` the dataclass
+    needs) and carry that ``WorkflowDefinitionRunInput`` as the schedule
+    action's argument, so each fire deserializes correctly. The action's
+    workflow id mirrors the run pk (the executor's id convention), so a
+    re-fire joins the in-flight run rather than spawning a parallel one.
+    """
     from asgiref.sync import async_to_sync
+    from django.conf import settings
 
     from astrolift_workflows.client import _get_client_async
+    from astrolift_workflows.inputs import Actor
+    from workflows.run_service import build_workflow_definition_run_input
+
+    _run, run_input, run_workflow_id = build_workflow_definition_run_input(
+        definition,
+        trigger_payload=input_template,
+        actor=Actor(kind="system", user_id=None, display="scheduled"),
+    )
+    task_queue = getattr(settings, "TEMPORAL_TASK_QUEUE", "astrolift-main")
 
     @async_to_sync
     async def _create():
         from temporalio.client import (
             Schedule,
             ScheduleActionStartWorkflow,
-            ScheduleCronString,
             ScheduleSpec,
             ScheduleState,
         )
@@ -559,19 +580,14 @@ def _create_temporal_schedule(
         client = await _get_client_async()
         action = ScheduleActionStartWorkflow(
             AGENT_WORKFLOW_TYPE,
-            {
-                "workflow_definition_id": definition.pk,
-                "input": input_template,
-                "trigger_kind": "scheduled",
-            },
-            id=f"{schedule_id}-run",
-            task_queue=getattr(
-                __import__("django.conf", fromlist=["settings"]).settings,
-                "TEMPORAL_TASK_QUEUE",
-                "astrolift-main",
-            ),
+            run_input,
+            id=run_workflow_id,
+            task_queue=task_queue,
         )
-        spec = ScheduleSpec(cron_strings=[ScheduleCronString(cron_expression)])
+        spec = ScheduleSpec(
+            cron_expressions=[cron_expression],
+            time_zone_name=timezone_name,
+        )
         await client.create_schedule(
             schedule_id,
             Schedule(action=action, spec=spec, state=ScheduleState(paused=not enabled)),
