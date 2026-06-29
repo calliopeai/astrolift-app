@@ -290,6 +290,22 @@ def test_http_probe_still_rendered_when_container_has_port():
     assert container["readinessProbe"]["httpGet"]["port"] == 8080
 
 
+def test_explicit_exec_probe_honored_on_port_less_container():
+    # #1033: the port-less guard is http-specific. An explicitly authored
+    # exec probe needs no listening port, so a port-0 worker that defines one
+    # must still get it — the fix must not strip non-http probes.
+    out = _render(
+        (
+            _deployment_workload(
+                containers=(_container(port=0, healthcheck_kind="exec", healthcheck_value="/bin/true"),)
+            ),
+        )
+    )
+    container = next(r for r in out if r["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
+    assert container["livenessProbe"]["exec"]["command"] == ["/bin/true"]
+    assert container["readinessProbe"]["exec"]["command"] == ["/bin/true"]
+
+
 # ---- Env / command / args ---------------------------------------------
 
 
