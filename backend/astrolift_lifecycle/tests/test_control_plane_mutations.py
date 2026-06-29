@@ -19,14 +19,18 @@ from __future__ import annotations
 
 import pytest
 
-from astrolift_lifecycle.models import Deployment
+from astrolift_clusters.models import TenantCluster
+from astrolift_identity.models import Organization, Project, Team
+from astrolift_lifecycle.models import AppEnvironment, Deployment
 from astrolift_lifecycle.schema.mutations import (
     AbortDeploymentInput,
     DeploymentByIdInput,
     LifecycleMutation,
+    PromoteDeploymentInput,
     StartDeploymentInput,
 )
 from astrolift_operations.models import WorkflowRun
+from astrolift_registry.models import RegisteredApp
 from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
 
@@ -573,3 +577,201 @@ def test_redeploy_clones_image_and_starts_workflow(
     assert result.data.image_digest == "sha256:abc"
     assert result.data.status == Deployment.Status.PENDING.value
     assert WorkflowRun.objects.filter(workflow_kind="DeployAppWorkflow").exists()
+
+
+# ---------------------------------------------------------------------------
+# promote_deployment (#1041, astrolift-cli#40)
+# ---------------------------------------------------------------------------
+
+
+def _running_in(env, app, actor, *, image_tag="v1.0.0", image_digest="sha256:abc"):
+    return Deployment.objects.create(
+        registered_app=app,
+        app_environment=env,
+        triggered_by_user=actor,
+        trigger_kind="manual",
+        status=Deployment.Status.RUNNING.value,
+        image_tag=image_tag,
+        image_digest=image_digest,
+        config_snapshot={"replicas": 2},
+    )
+
+
+def test_promote_clones_running_image_and_starts_workflow(
+    org, app, env, env_requires_approval, actor, fake_info, permission_resolver, temporal_recorder
+):
+    """staging (source, running) → prod (target, no approvals): the target
+    gets a PROMOTION deployment carrying the source's exact image+config,
+    ``promoted_from`` lineage, and a DeployAppWorkflow keyed on the target."""
+    _grant_all(permission_resolver, org.id)
+    source = _running_in(env_requires_approval, app, actor)
+    mut = LifecycleMutation()
+
+    with _tenant_for(org, actor):
+        result = mut.promote_deployment(
+            fake_info,
+            input=PromoteDeploymentInput(
+                app_slug=app.slug,
+                source_environment_name=env_requires_approval.name,
+                target_environment_name=env.name,
+            ),
+        )
+
+    assert result.ok, result.errors
+    assert result.data.trigger_kind == "promotion"
+    assert result.data.image_tag == "v1.0.0"
+    assert result.data.image_digest == "sha256:abc"
+    assert result.data.status == Deployment.Status.PENDING.value
+
+    new_deploy = Deployment.objects.get(guid=str(result.data.id))
+    assert new_deploy.app_environment_id == env.id
+    assert new_deploy.promoted_from_id == source.id
+    assert new_deploy.config_snapshot == {"replicas": 2}
+
+    (name, _args, workflow_id) = temporal_recorder.starts[0]
+    assert name == "DeployAppWorkflow"
+    assert workflow_id == f"DeployAppWorkflow-{app.guid}-{env.guid}"
+
+
+def test_promote_into_approval_gated_target_waits_for_approval(
+    org, app, env, env_requires_approval, actor, fake_info, permission_resolver, temporal_recorder
+):
+    """prod (source) → staging (target, requires 1 approval): lands
+    pending_approval and does NOT enqueue the apply workflow."""
+    _grant_all(permission_resolver, org.id)
+    _running_in(env, app, actor)
+    mut = LifecycleMutation()
+
+    with _tenant_for(org, actor):
+        result = mut.promote_deployment(
+            fake_info,
+            input=PromoteDeploymentInput(
+                app_slug=app.slug,
+                source_environment_name=env.name,
+                target_environment_name=env_requires_approval.name,
+            ),
+        )
+
+    assert result.ok, result.errors
+    assert result.data.status == Deployment.Status.PENDING_APPROVAL.value
+    assert temporal_recorder.starts == []
+
+
+def test_promote_rejected_to_same_environment(
+    org, app, env, actor, fake_info, permission_resolver, no_temporal
+):
+    """validate_promotion guards the no-op misclick: source == target env."""
+    _grant_all(permission_resolver, org.id)
+    _running_in(env, app, actor)
+    mut = LifecycleMutation()
+
+    with _tenant_for(org, actor):
+        result = mut.promote_deployment(
+            fake_info,
+            input=PromoteDeploymentInput(
+                app_slug=app.slug,
+                source_environment_name=env.name,
+                target_environment_name=env.name,
+            ),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "VALIDATION"
+
+
+def test_promote_refuses_paused_target(
+    org, app, env, env_requires_approval, actor, fake_info, permission_resolver, no_temporal
+):
+    _grant_all(permission_resolver, org.id)
+    _running_in(env_requires_approval, app, actor)
+    env.deploys_paused = True
+    env.save(update_fields=["deploys_paused"])
+    mut = LifecycleMutation()
+
+    with _tenant_for(org, actor):
+        result = mut.promote_deployment(
+            fake_info,
+            input=PromoteDeploymentInput(
+                app_slug=app.slug,
+                source_environment_name=env_requires_approval.name,
+                target_environment_name=env.name,
+            ),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "PRECONDITION"
+
+
+def test_promote_refuses_when_source_has_no_running_deployment(
+    org, app, env, env_requires_approval, actor, fake_info, permission_resolver, no_temporal
+):
+    _grant_all(permission_resolver, org.id)
+    mut = LifecycleMutation()
+
+    with _tenant_for(org, actor):
+        result = mut.promote_deployment(
+            fake_info,
+            input=PromoteDeploymentInput(
+                app_slug=app.slug,
+                source_environment_name=env_requires_approval.name,
+                target_environment_name=env.name,
+            ),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "PRECONDITION"
+
+
+def test_promote_denies_cross_org(
+    org, app, env, actor, provider_plugin, fake_info, permission_resolver, no_temporal
+):
+    """Caller is in org A; the app + envs live in org B. Org-scoped
+    resolution must treat the cross-org slug as not-found — never promote
+    another tenant's app (#1042)."""
+    _grant_all(permission_resolver, org.id)
+
+    other_org = Organization.objects.create(name="Globex", slug="globex-test")
+    other_team = Team.objects.create(organization=other_org, name="Ops", slug="ops")
+    other_project = Project.objects.create(organization=other_org, team=other_team, name="P", slug="p")
+    other_cluster = TenantCluster.objects.create(
+        organization=other_org,
+        name="b-cluster",
+        slug="b-cluster",
+        provider_plugin=provider_plugin,
+        provider_config={},
+        endpoint="https://b.cluster.invalid",
+        auth_method=TenantCluster.AuthMethod.KUBECONFIG,
+        auth_config={},
+        lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+    )
+    other_app = RegisteredApp.objects.create(
+        organization=other_org,
+        project=other_project,
+        team=other_team,
+        name="Secret",
+        slug="secret-app",
+        provisioning_status="ready",
+    )
+    other_src = AppEnvironment.objects.create(
+        registered_app=other_app, tenant_cluster=other_cluster, name="stg", required_approvals=0
+    )
+    AppEnvironment.objects.create(
+        registered_app=other_app, tenant_cluster=other_cluster, name="prd", required_approvals=0
+    )
+    _running_in(other_src, other_app, actor)
+
+    mut = LifecycleMutation()
+    with _tenant_for(org, actor):
+        result = mut.promote_deployment(
+            fake_info,
+            input=PromoteDeploymentInput(
+                app_slug=other_app.slug,
+                source_environment_name="stg",
+                target_environment_name="prd",
+            ),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "NOT_FOUND"
+    # Nothing was created in the other org.
+    assert Deployment.objects.filter(app_environment__name="prd").count() == 0

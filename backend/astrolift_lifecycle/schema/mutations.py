@@ -48,6 +48,12 @@ from astrolift_lifecycle.models import (
     PreviewEnvironment,
     TaskRun,
 )
+from astrolift_lifecycle.promotion import (
+    DeploymentRef,
+    PromotionError,
+    PromotionTarget,
+    plan_promotion,
+)
 from astrolift_lifecycle.schema.types import (
     AppDomainType,
     AppEnvironmentType,
@@ -121,6 +127,13 @@ class StartDeploymentInput:
     # step decides this; manual deploys default to "rolling" (the
     # safest k8s default).  Accepted values mirror Deployment.Strategy.
     strategy: str | None = None
+
+
+@strawberry.input
+class PromoteDeploymentInput:
+    app_slug: str
+    source_environment_name: str
+    target_environment_name: str
 
 
 @strawberry.input
@@ -1762,9 +1775,7 @@ class LifecycleMutation:
     )
     @require_permission(Permission.APP_DEPLOY)
     @tenant_scoped()
-    def delete_deployment(
-        self, info: Info, input: DeploymentByIdInput
-    ) -> MutationResultType[DeploymentType]:
+    def delete_deployment(self, info: Info, input: DeploymentByIdInput) -> MutationResultType[DeploymentType]:
         """Dismiss / delete a deployment the operator is done with.
 
         Two shapes, both gated on ``app.deploy`` (same as abort):
@@ -1961,6 +1972,160 @@ class LifecycleMutation:
                     organization_id=tenant.organization_id if tenant else None,
                     registered_app_id=source.registered_app_id,
                     app_environment_id=source.app_environment_id,
+                    actor=actor,
+                )
+
+        return gql_success(deployment_to_type(new_deploy))
+
+    @strawberry.field
+    @mutation_audit(action="deployment.promote")
+    @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
+    def promote_deployment(
+        self, info: Info, input: PromoteDeploymentInput
+    ) -> MutationResultType[DeploymentType]:
+        """Promote the source env's current running deployment — its exact
+        image + config — into the target env (#1041, astrolift-cli#40).
+
+        Reuses the promotion policy in :mod:`astrolift_lifecycle.promotion`
+        (``plan_promotion`` / ``validate_promotion``) to gate the move and
+        stamps ``promoted_from`` for lineage (#63). The new row runs the
+        standard ``DeployAppWorkflow`` apply path — identical to the tail of
+        ``PromoteDeploymentWorkflow`` — honouring the target env's approval
+        gate the same way ``startDeployment`` / ``redeployApp`` do.
+        """
+        if _deploy_pipeline_disabled():
+            return gql_failure(ErrorCode.PRECONDITION.value, _DEPLOY_PIPELINE_DISABLED_MSG)
+
+        # Deny-by-default org scoping: resolve the app + envs against the
+        # caller's org so a cross-org slug can never be promoted (#1042).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, f"app {input.app_slug!r} not found")
+
+        app = (
+            RegisteredApp.objects.filter(
+                slug=input.app_slug,
+                organization_id=org_id,
+                deleted_at__isnull=True,
+            )
+            .select_related("approver_team")
+            .first()
+        )
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, f"app {input.app_slug!r} not found")
+
+        def _env(name: str) -> AppEnvironment | None:
+            return (
+                AppEnvironment.objects.filter(
+                    registered_app=app,
+                    name=name,
+                    deleted_at__isnull=True,
+                )
+                .select_related("registered_app", "tenant_cluster", "managed_domain")
+                .first()
+            )
+
+        source_env = _env(input.source_environment_name)
+        if source_env is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"source environment {input.source_environment_name!r} not found",
+                field="sourceEnvironmentName",
+            )
+        target_env = _env(input.target_environment_name)
+        if target_env is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"target environment {input.target_environment_name!r} not found",
+                field="targetEnvironmentName",
+            )
+
+        if target_env.deploys_paused:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"environment {target_env.name!r} has deploys paused",
+                field="targetEnvironmentName",
+            )
+
+        source = (
+            Deployment.objects.filter(
+                registered_app=app,
+                app_environment=source_env,
+                status=Deployment.Status.RUNNING.value,
+                deleted_at__isnull=True,
+            )
+            .order_by("-created_at")
+            .first()
+        )
+        if source is None:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"no running deployment in environment {source_env.name!r} to promote",
+                field="sourceEnvironmentName",
+            )
+
+        approvals_required = _required_approvals_for(app, target_env)
+        try:
+            plan = plan_promotion(
+                source=DeploymentRef(
+                    deployment_id=source.pk,
+                    app_id=app.pk,
+                    environment_id=source_env.pk,
+                    image_digest=source.image_digest,
+                    promoted_from_id=source.promoted_from_id,
+                ),
+                target=PromotionTarget(
+                    environment_id=target_env.pk,
+                    app_id=app.pk,
+                    requires_approval=approvals_required > 0,
+                ),
+            )
+        except PromotionError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc))
+
+        actor = _actor_from_request(info)
+        initial_status = (
+            Deployment.Status.PENDING_APPROVAL if plan.needs_approval else Deployment.Status.PENDING
+        )
+
+        with transaction.atomic():
+            new_deploy = Deployment.objects.create(
+                registered_app=app,
+                app_environment=target_env,
+                workload_id=source.workload_id,
+                triggered_by_user_id=actor.user_id,
+                trigger_kind=Deployment.TriggerKind.PROMOTION.value,
+                strategy=(source.strategy or "rolling"),
+                status=initial_status.value,
+                image_tag=source.image_tag,
+                image_digest=plan.image_digest,
+                config_snapshot=source.config_snapshot,
+                approvals_required=approvals_required,
+                approvals_received=0,
+                promoted_from_id=plan.promoted_from_id,
+            )
+
+            if initial_status is Deployment.Status.PENDING:
+                wf_id = _deploy_workflow_id(str(app.guid), str(target_env.guid))
+                _start_deploy_workflow_on_commit(
+                    deployment=new_deploy,
+                    workflow_kind="DeployAppWorkflow",
+                    workflow_id=wf_id,
+                    args=[
+                        DeployAppInput(
+                            registered_app_id=app.pk,
+                            app_environment_id=target_env.pk,
+                            deployment_id=new_deploy.pk,
+                            image_tags={"app": source.image_tag},
+                            trigger_kind=Deployment.TriggerKind.PROMOTION.value,
+                            actor=actor,
+                        )
+                    ],
+                    organization_id=org_id,
+                    registered_app_id=app.pk,
+                    app_environment_id=target_env.pk,
                     actor=actor,
                 )
 
@@ -4302,15 +4467,12 @@ class LifecycleMutation:
                 field="appSlug",
             )
 
-        workload = (
-            Workload.objects.filter(
-                slug=workload_slug,
-                registered_app=app,
-                kind="task",
-                deleted_at__isnull=True,
-            )
-            .first()
-        )
+        workload = Workload.objects.filter(
+            slug=workload_slug,
+            registered_app=app,
+            kind="task",
+            deleted_at__isnull=True,
+        ).first()
         if workload is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -4320,14 +4482,11 @@ class LifecycleMutation:
 
         env = None
         if (input.environment_name or "").strip():
-            env = (
-                AppEnvironment.objects.filter(
-                    registered_app=app,
-                    name=input.environment_name,
-                    deleted_at__isnull=True,
-                )
-                .first()
-            )
+            env = AppEnvironment.objects.filter(
+                registered_app=app,
+                name=input.environment_name,
+                deleted_at__isnull=True,
+            ).first()
             if env is None:
                 return gql_failure(
                     ErrorCode.NOT_FOUND.value,
