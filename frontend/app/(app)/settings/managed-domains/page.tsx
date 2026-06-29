@@ -1,16 +1,15 @@
-import { LIST_MANAGED_DOMAINS } from "@/graphql/clusters/managed-domains.queries";
-import { PreloadQuery } from "@/lib/apollo";
-
-import { ManagedDomainsClient } from "./managed-domains-client";
+import { redirect } from "next/navigation";
 
 export const metadata = {
-  title: "Managed domains · Settings · Astrolift",
+  title: "Managed domains · Astrolift",
 };
 
-export default function ManagedDomainsPage() {
-  return (
-    <PreloadQuery query={LIST_MANAGED_DOMAINS}>
-      <ManagedDomainsClient />
-    </PreloadQuery>
-  );
+/**
+ * /settings/managed-domains was a duplicate of the canonical
+ * Infrastructure → Domains page at /domains — same query, same data
+ * (#888). The org-config nav entry and the standalone client are gone;
+ * this server-side redirect keeps any bookmarks working.
+ */
+export default function ManagedDomainsAliasPage() {
+  redirect("/domains");
 }

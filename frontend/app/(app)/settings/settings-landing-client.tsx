@@ -25,8 +25,6 @@ import { SETTINGS_NAV_FLAT, type SettingsNavItem, type SettingsSectionKey } from
  */
 const ORG_SCOPED: ReadonlySet<SettingsSectionKey> = new Set([
   "organization",
-  "identityProvider",
-  "sourceProviders",
   "policies",
   "permissions",
 ]);

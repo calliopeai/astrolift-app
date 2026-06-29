@@ -2,10 +2,7 @@ import {
   BellIcon,
   BuildingIcon,
   FileBoxIcon,
-  GitBranchIcon,
-  GlobeIcon,
   KeyIcon,
-  KeyRoundIcon,
   ScaleIcon,
   ShieldCheckIcon,
   ShieldIcon,
@@ -34,9 +31,6 @@ export type SettingsSectionKey =
   | "members"
   | "teams"
   | "projects"
-  | "identityProvider"
-  | "sourceProviders"
-  | "managedDomains"
   | "policies"
   | "permissions"
   | "profile"
@@ -87,24 +81,6 @@ export const SETTINGS_NAV: SettingsNavGroup[] = [
         icon: FileBoxIcon,
         i18nKey: "projects",
         external: true,
-      },
-      {
-        key: "identityProvider",
-        href: "/settings/identity-provider",
-        icon: KeyRoundIcon,
-        i18nKey: "identityProvider",
-      },
-      {
-        key: "sourceProviders",
-        href: "/settings/source-providers",
-        icon: GitBranchIcon,
-        i18nKey: "sourceProviders",
-      },
-      {
-        key: "managedDomains",
-        href: "/settings/managed-domains",
-        icon: GlobeIcon,
-        i18nKey: "managedDomains",
       },
       {
         key: "policies",
