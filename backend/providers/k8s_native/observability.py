@@ -564,8 +564,6 @@ def default_log_backend() -> LogBackend:
 # kubernetes exec channels: 0=stdin 1=stdout 2=stderr 3=error(status) 4=resize.
 _EXEC_ERROR_CHANNEL = 3
 _EXEC_RESIZE_CHANNEL = 4
-_EXEC_CLOSE_CHANNEL = 255  # v5 remotecommand half-close signal
-_STDIN_CHANNEL = 0
 
 
 class InteractiveExecSession:
@@ -650,24 +648,14 @@ class InteractiveExecSession:
         )
 
     async def close_stdin(self) -> None:
-        """Best-effort half-close of the remote stdin via the v5 CLOSE
-        channel, so a piped read-to-EOF command (cat, psql < script)
-        sees EOF and finishes without tearing the whole session down.
-        No-op when the cluster negotiated only the v4 subprotocol."""
-
-        def _close() -> None:
-            # v5 remotecommand CLOSE: a BINARY frame on channel 255 whose
-            # single payload byte is the stream to half-close (0 = stdin).
-            # Must be bytes (binary opcode) — a text frame isn't parsed as a
-            # close by the apiserver. Logged (not suppressed) so we can tell
-            # "v5 not negotiated" from "sent ok but ignored".
-            try:
-                self._resp.write_channel(_EXEC_CLOSE_CHANNEL, bytes([_STDIN_CHANNEL]))
-                logger.info("interactive_exec: sent v5 stdin CLOSE frame")
-            except Exception:
-                logger.exception("interactive_exec: stdin CLOSE write failed")
-
-        await asyncio.get_running_loop().run_in_executor(None, _close)
+        """No-op. The kubernetes python client's exec WSClient exposes no
+        working stdin half-close for the negotiated subprotocol — a v5
+        CLOSE-channel (255) write raises and corrupts the stream — so a
+        piped read-to-EOF command (``cat``, ``psql < script``) can't be
+        signalled stdin EOF over the relay. Interactive (TTY) sessions get
+        EOF from Ctrl-D; non-stdin commands finish on their own. Kept as a
+        hook for when upstream client support lands (#1040 follow-up)."""
+        return None
 
     async def wait_exit(self) -> int:
         return int(await self._aget(self._exit_q))

@@ -86,6 +86,7 @@ class ExecBackend:
         send_stderr: Any,
         send_exit: Any,
         send_error: Any,
+        tty: bool = True,
     ) -> ExecSession:
         raise NotImplementedError
 
@@ -135,6 +136,7 @@ class _StubExecBackend(ExecBackend):
         send_stderr: Any,
         send_exit: Any,
         send_error: Any,
+        tty: bool = True,
     ) -> ExecSession:
         await send_stderr(
             "exec backend not wired in this build — connect a real "
@@ -383,6 +385,11 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
                     continue
                 container = str(frame.get("container", "main"))
                 command = list(frame.get("command", []) or [])
+                # TTY allocation is the client's call: interactive consoles
+                # ask for a PTY (raw mode, resize); piped/non-interactive
+                # callers ask for a plain pipe so stdout isn't echo-doubled
+                # or CRLF-mangled. Default True for older clients.
+                tty = bool(frame.get("tty", True))
                 session = await backend.open(
                     app_slug=app_slug,
                     workload_slug=workload_slug,
@@ -392,6 +399,7 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
                     send_stderr=_send_stderr,
                     send_exit=_send_exit,
                     send_error=_send_error,
+                    tty=tty,
                 )
                 await _audit_exec_open(
                     app_slug=app_slug,

@@ -164,6 +164,7 @@ class K8sExecBackend(ExecBackend):
         send_stderr,
         send_exit,
         send_error,
+        tty: bool = True,
     ) -> ExecSession:
         resolved = await _resolve_target(
             app_slug=app_slug,
@@ -214,7 +215,7 @@ class K8sExecBackend(ExecBackend):
                     pod_name=workload_slug,
                     container=container,
                     command=command or ["sh"],
-                    tty=True,
+                    tty=tty,
                 ),
             )
         except Exception as exc:  # noqa: BLE001
