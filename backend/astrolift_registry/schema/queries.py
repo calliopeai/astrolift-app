@@ -664,6 +664,14 @@ class ScanAppManifestsResultType:
     error: str | None = None
 
 
+def _caller_org_id() -> int | None:
+    """Current tenant's organization id, or None when there's no tenant
+    context. Read resolvers over org-owned rows MUST treat None as
+    deny-by-default ("no rows" / not-found), never as "all rows" (#1042)."""
+    tenant = get_current_tenant()
+    return tenant.organization_id if tenant is not None else None
+
+
 @strawberry.type
 class RegistryQuery:
     @strawberry.field
@@ -726,7 +734,11 @@ class RegistryQuery:
         ``includeArchived: true``.
         """
         status = _coerce_apps_status(status)
+        org_id = _caller_org_id()
+        if org_id is None:
+            return []
         qs = RegisteredApp.objects.select_related("organization", "team", "project").filter(
+            organization_id=org_id,
             deleted_at__isnull=True,
             archived_at__isnull=True,
         )
@@ -815,9 +827,12 @@ class RegistryQuery:
         "Archived apps" admin page flips this flag on.
         """
         status = _coerce_apps_status(status)
+        org_id = _caller_org_id()
         qs = RegisteredApp.objects.select_related("organization", "team", "project").filter(
-            deleted_at__isnull=True
+            deleted_at__isnull=True,
         )
+        # Deny-by-default: no tenant context → no rows (#1042).
+        qs = qs.filter(organization_id=org_id) if org_id is not None else qs.none()
         if not include_archived:
             qs = qs.filter(archived_at__isnull=True)
         qs = _apply_apps_list_filters(
@@ -991,8 +1006,11 @@ class RegistryQuery:
         False so the cheap header query stays cheap. The app overview
         passes True; sidebar / breadcrumb queries pass False.
         """
+        org_id = _caller_org_id()
         app = (
-            RegisteredApp.objects.select_related("organization", "team", "project").filter(slug=slug).first()
+            RegisteredApp.objects.select_related("organization", "team", "project")
+            .filter(slug=slug, organization_id=org_id)
+            .first()
         )
         if app is None:
             return None
@@ -1020,9 +1038,10 @@ class RegistryQuery:
         team at ``OWNER``) until the operator grants more teams.
         """
 
+        org_id = _caller_org_id()
         app = (
             RegisteredApp.objects.select_related("team")
-            .filter(slug=app_slug, deleted_at__isnull=True)
+            .filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
             .first()
         )
         if app is None:
@@ -1038,7 +1057,12 @@ class RegistryQuery:
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_workloads(self, info: Info, app_slug: str | None = None) -> list[WorkloadType]:
-        qs = Workload.objects.select_related("registered_app")
+        org_id = _caller_org_id()
+        if org_id is None:
+            return []
+        qs = Workload.objects.select_related("registered_app").filter(
+            registered_app__organization_id=org_id
+        )
         if app_slug:
             qs = qs.filter(registered_app__slug=app_slug)
         return [workload_to_type(w) for w in qs[:200]]
@@ -1053,9 +1077,10 @@ class RegistryQuery:
         workload slug can recur across orgs without colliding because
         the app+slug compound is unique within tenant.
         """
+        org_id = _caller_org_id()
         w = (
             Workload.objects.select_related("registered_app")
-            .filter(registered_app__slug=app_slug, slug=slug)
+            .filter(registered_app__slug=app_slug, registered_app__organization_id=org_id, slug=slug)
             .first()
         )
         return workload_to_type(w) if w else None
@@ -1095,9 +1120,11 @@ class RegistryQuery:
         """
         from astrolift_lifecycle.services.k8s_ops import resolve_replica_bounds
 
+        org_id = _caller_org_id()
         workload = (
             Workload.objects.filter(
                 registered_app__slug=app_slug,
+                registered_app__organization_id=org_id,
                 slug=workload_slug,
                 deleted_at__isnull=True,
             )
@@ -1155,7 +1182,12 @@ class RegistryQuery:
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_containers(self, info: Info, workload_slug: str | None = None) -> list[ContainerType]:
-        qs = Container.objects.select_related("workload")
+        org_id = _caller_org_id()
+        if org_id is None:
+            return []
+        qs = Container.objects.select_related("workload").filter(
+            workload__registered_app__organization_id=org_id
+        )
         if workload_slug:
             qs = qs.filter(workload__slug=workload_slug)
         return [container_to_type(c) for c in qs[:500]]
@@ -1190,7 +1222,12 @@ class RegistryQuery:
         from astrolift_manifest.parser import ManifestError, parse_raw
         from astrolift_manifest.render import render_manifests
 
-        app = RegisteredApp.objects.select_related("organization").filter(slug=app_slug).first()
+        org_id = _caller_org_id()
+        app = (
+            RegisteredApp.objects.select_related("organization")
+            .filter(slug=app_slug, organization_id=org_id)
+            .first()
+        )
         if app is None:
             return None
 
@@ -1335,7 +1372,12 @@ class RegistryQuery:
         from astrolift_manifest.parser import ManifestError, parse_raw
         from astrolift_manifest.render import render_manifests
 
-        app = RegisteredApp.objects.select_related("organization").filter(slug=app_slug).first()
+        org_id = _caller_org_id()
+        app = (
+            RegisteredApp.objects.select_related("organization")
+            .filter(slug=app_slug, organization_id=org_id)
+            .first()
+        )
         if app is None:
             return None
 
