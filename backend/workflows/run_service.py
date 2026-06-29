@@ -12,25 +12,26 @@ from __future__ import annotations
 from typing import Any
 
 
-def start_workflow_definition_run(
+def build_workflow_definition_run_input(
     definition,
     *,
     trigger_payload: dict | None = None,
     organization_id: int | None = None,
     actor: Any = None,
 ):
-    """Create the ``WorkflowRun`` mirror and start the stage executor.
+    """Create the ``WorkflowRun`` mirror row and build the executor input.
 
-    Returns ``(workflow_run, workflow_id)``. The ``WorkflowRun`` is the
+    Returns ``(workflow_run, run_input, workflow_id)``. Factored out of
+    ``start_workflow_definition_run`` so a caller that hands the input to a
+    Temporal *schedule* action (rather than starting the run inline) builds it
+    the same way — a ``WorkflowDefinitionRunInput`` the executor's ``run``
+    deserializes, never a plain dict (#1036). The ``WorkflowRun`` is the
     executor's source of truth (stage executions key on its pk); the Temporal
-    workflow id is derived from that pk. ``actor`` is an
-    ``astrolift_workflows.inputs.Actor`` (caller for the mutation, a synthetic
-    ``system`` actor for a webhook).
+    workflow id is derived from that pk.
     """
     from django.utils import timezone
 
     from astrolift_operations.models import WorkflowRun
-    from astrolift_workflows.client import start_workflow
     from astrolift_workflows.inputs import Actor, WorkflowDefinitionRunInput
 
     payload = dict(trigger_payload or {})
@@ -50,16 +51,42 @@ def start_workflow_definition_run(
     run.workflow_id = workflow_id
     run.save(update_fields=["workflow_id", "updated_at", "version"])
 
+    run_input = WorkflowDefinitionRunInput(
+        workflow_definition_slug=definition.slug,
+        workflow_run_id=str(run.pk),
+        trigger_payload=payload,
+        actor=actor,
+    )
+    return run, run_input, workflow_id
+
+
+def start_workflow_definition_run(
+    definition,
+    *,
+    trigger_payload: dict | None = None,
+    organization_id: int | None = None,
+    actor: Any = None,
+):
+    """Create the ``WorkflowRun`` mirror and start the stage executor.
+
+    Returns ``(workflow_run, workflow_id)``. The ``WorkflowRun`` is the
+    executor's source of truth (stage executions key on its pk); the Temporal
+    workflow id is derived from that pk. ``actor`` is an
+    ``astrolift_workflows.inputs.Actor`` (caller for the mutation, a synthetic
+    ``system`` actor for a webhook).
+    """
+    from astrolift_workflows.client import start_workflow
+
+    run, run_input, workflow_id = build_workflow_definition_run_input(
+        definition,
+        trigger_payload=trigger_payload,
+        organization_id=organization_id,
+        actor=actor,
+    )
+
     handle = start_workflow(
         "WorkflowDefinitionRunWorkflow",
-        args=[
-            WorkflowDefinitionRunInput(
-                workflow_definition_slug=definition.slug,
-                workflow_run_id=str(run.pk),
-                trigger_payload=payload,
-                actor=actor,
-            )
-        ],
+        args=[run_input],
         workflow_id=workflow_id,
     )
     if handle.enqueued and handle.run_id:

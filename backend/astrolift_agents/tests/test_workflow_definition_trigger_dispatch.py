@@ -125,3 +125,69 @@ def test_dispatched_arg_type_matches_workflow_run_annotation(captured_start):
     assert len(captured_start) == 1
     arg = captured_start[0]["args"][0]
     assert isinstance(arg, annotated_input_type)
+
+
+@pytest.fixture
+def captured_schedule(monkeypatch):
+    """Replace the Temporal client so ``_create_temporal_schedule`` records the
+    ``Schedule`` it would create instead of talking to a real server."""
+    captured: dict = {}
+
+    class _FakeClient:
+        async def create_schedule(self, schedule_id, schedule):
+            captured["schedule_id"] = schedule_id
+            captured["schedule"] = schedule
+
+    async def _fake_get_client_async():
+        return _FakeClient()
+
+    monkeypatch.setattr("astrolift_workflows.client._get_client_async", _fake_get_client_async)
+    return captured
+
+
+def test_scheduled_path_dispatches_workflow_definition_run_input(captured_schedule):
+    """The Temporal schedule action carries a ``WorkflowDefinitionRunInput`` (#1036).
+
+    Regression guarded: ``_create_temporal_schedule`` previously baked a plain
+    ``dict`` (``{"workflow_definition_id", "input", "trigger_kind"}``) into the
+    schedule action; the fired ``WorkflowDefinitionRunWorkflow`` could not
+    deserialize it into its ``WorkflowDefinitionRunInput`` argument, so every
+    scheduled run failed to start. Assert the action's argument is the concrete
+    dataclass with its fields threaded and a real ``WorkflowRun`` mirror row.
+    """
+    from astrolift_agents.services.workflow_triggers import _create_temporal_schedule
+
+    definition = _definition("sched-def")
+    template = {"window": "nightly"}
+
+    _create_temporal_schedule(
+        schedule_id="astrolift-sched-sched-def-deadbeef",
+        definition=definition,
+        cron_expression="0 3 * * *",
+        timezone_name="UTC",
+        input_template=template,
+        enabled=True,
+    )
+
+    schedule = captured_schedule["schedule"]
+    action = schedule.action
+    assert action.workflow == "WorkflowDefinitionRunWorkflow"
+    assert len(action.args) == 1
+
+    arg = action.args[0]
+    # The bug: a plain dict was baked in. Assert the concrete dataclass type.
+    assert isinstance(arg, WorkflowDefinitionRunInput)
+    assert not isinstance(arg, dict)
+
+    assert arg.workflow_definition_slug == definition.slug
+    assert arg.trigger_payload == template
+    assert arg.actor.kind == "system"
+    assert arg.actor.display == "scheduled"
+
+    # workflow_run_id must be a real WorkflowRun pk (the executor activities do
+    # ``WorkflowRun.objects.get(pk=int(workflow_run_id))``) and the action's
+    # workflow id mirrors that pk (the executor's id convention).
+    assert arg.workflow_run_id.isdigit()
+    run = WorkflowRun.objects.get(pk=int(arg.workflow_run_id))
+    assert run.workflow_kind == "WorkflowDefinitionRunWorkflow"
+    assert action.id == f"WorkflowDefinitionRunWorkflow-{run.pk}"
