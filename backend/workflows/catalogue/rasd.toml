@@ -1,0 +1,24 @@
+# Platform catalogue definition (spec 40 §4.1). Null-org, read-only.
+[workflow]
+slug        = "rasd"
+name        = "Review-Assess-Score-Decide"
+pattern     = "review_loop"
+description = "Assess, score, gate on a human reviewer, then decide."
+
+[[stage]]
+kind = "agent_dispatch"
+role = "assessor"
+
+[[stage]]
+kind = "agent_dispatch"
+role = "scorer"
+
+[[stage]]
+kind      = "human_gate"
+prompt    = "Approve the assessment and score before deciding?"
+approvers = ["team:reviewers"]
+timeout   = 86400
+
+[[stage]]
+kind = "agent_dispatch"
+role = "decider"

@@ -1,0 +1,26 @@
+# Platform catalogue definition (spec 40 §4.1). Null-org, read-only.
+# web-research is a Tier-2/3 catalogue skill (later); http-request is in the
+# §39 v0.1 nine.
+[workflow]
+slug        = "research"
+name        = "Research"
+pattern     = "fan_out"
+description = "Fan out a search, fetch sources, aggregate, then synthesize."
+
+[[stage]]
+kind    = "agent_dispatch"
+role    = "searcher"
+skills  = ["web-research"]
+fan_out = "dynamic"
+
+[[stage]]
+kind   = "agent_dispatch"
+role   = "fetcher"
+skills = ["http-request"]
+
+[[stage]]
+kind = "aggregation"
+
+[[stage]]
+kind = "agent_dispatch"
+role = "synthesizer"

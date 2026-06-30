@@ -68,8 +68,8 @@ class WorkflowStageSpec:
     ``fan_out`` mirrors the manifest's tri-state: ``0`` (none), a positive
     ``int`` (static count), or the string ``"dynamic"`` (derive from the
     prior stage's output). ``prompt``/``approvers`` are human-gate fields
-    carried for round-trip fidelity (the #966 model does not persist them
-    yet, so :func:`definition_to_manifest` leaves them empty).
+    persisted on ``WorkflowStage`` (#969), so :func:`definition_to_manifest`
+    emits them and a model-backed export round-trips losslessly.
     """
 
     order: int
@@ -297,11 +297,11 @@ def definition_to_manifest(definition: WorkflowDefinition) -> ParsedWorkflowMani
     """Build the structured form from a persisted ``WorkflowDefinition``.
 
     Reads the definition's ordered stages so ``emit_workflow_manifest`` can
-    render the export TOML. ``fan_out_count`` maps back to the manifest
-    tri-state: a positive count is static fan-out; ``None`` renders as none
-    (the #966 model cannot distinguish "no fan-out" from "dynamic", so the
-    declarative ``"dynamic"`` form only survives a structured round-trip,
-    not a model one).
+    render the export TOML. The fan-out tri-state maps back from the two
+    columns (#969): ``fan_out_dynamic`` → ``"dynamic"``, a positive
+    ``fan_out_count`` → that static count, otherwise ``0`` (none). The
+    ``prompt``/``approvers`` columns emit verbatim, so a model-backed export
+    is now lossless (closes the #973 gap).
     """
     def_spec = WorkflowDefSpec(
         slug=definition.slug or "",
@@ -314,7 +314,12 @@ def definition_to_manifest(definition: WorkflowDefinition) -> ParsedWorkflowMani
     rows = definition.stages.order_by("order").select_related("agent_definition")
     for stage in rows:
         agent_slug = stage.agent_definition.slug if stage.agent_definition else None
-        fan_out: int | str = stage.fan_out_count if stage.fan_out_count else 0
+        if stage.fan_out_dynamic:
+            fan_out: int | str = "dynamic"
+        elif stage.fan_out_count:
+            fan_out = stage.fan_out_count
+        else:
+            fan_out = 0
         stages.append(
             WorkflowStageSpec(
                 order=stage.order,
@@ -325,6 +330,8 @@ def definition_to_manifest(definition: WorkflowDefinition) -> ParsedWorkflowMani
                 on_failure=stage.on_failure,
                 timeout=stage.timeout_seconds,
                 fan_out=fan_out,
+                prompt=stage.prompt or None,
+                approvers=list(stage.approvers or []),
             )
         )
 

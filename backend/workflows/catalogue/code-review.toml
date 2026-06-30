@@ -1,0 +1,13 @@
+# Platform catalogue definition (spec 40 §4.1). Null-org, read-only.
+# pr-review is a Tier-2/3 catalogue skill (later); the slug resolves once
+# that skill is added (§39).
+[workflow]
+slug        = "code-review"
+name        = "Code Review"
+pattern     = "single"
+description = "A single reviewer agent: diff, findings, summary."
+
+[[stage]]
+kind   = "agent_dispatch"
+role   = "reviewer"
+skills = ["pr-review"]

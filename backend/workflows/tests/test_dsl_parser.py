@@ -16,9 +16,13 @@ from workflows.services.dsl_parser import (
 # parse_workflows_dsl — structural parsing
 # ---------------------------------------------------------------------------
 
+# NOTE: "code-review" is now a reserved platform-catalogue global slug
+# (spec 40 §4.1, #969). The legacy DSL sync still creates org=None
+# definitions, which collide with the catalogue under the (organization,
+# slug) constraint, so this dormant-path fixture uses a DSL-specific slug.
 MINIMAL_YAML = """\
 workflows:
-  - slug: "code-review"
+  - slug: "legacy-code-review"
     name: "Code Review"
     pattern_kind: "chained"
     stages:
@@ -73,7 +77,7 @@ def test_parse_minimal_yaml_produces_correct_structure():
 
     assert len(results) == 1
     wf = results[0]
-    assert wf["slug"] == "code-review"
+    assert wf["slug"] == "legacy-code-review"
     assert wf["name"] == "Code Review"
     assert wf["pattern_kind"] == "chained"
     assert wf["model_label"] == ""
@@ -243,7 +247,7 @@ def test_sync_creates_definition_and_stages_on_first_run():
     assert result["updated"] == 0
     assert result["errors"] == []
 
-    defn = WorkflowDefinition.objects.get(slug="code-review")
+    defn = WorkflowDefinition.objects.get(slug="legacy-code-review")
     assert defn.name == "Code Review"
     assert defn.pattern_kind == "chained"
 
@@ -271,7 +275,7 @@ def test_sync_updates_definition_and_replaces_stages_on_second_run():
     # Second run with an updated YAML — one stage removed, name changed.
     updated_yaml = """\
 workflows:
-  - slug: "code-review"
+  - slug: "legacy-code-review"
     name: "Code Review v2"
     pattern_kind: "chained"
     stages:
@@ -287,7 +291,7 @@ workflows:
     assert result["updated"] == 1
     assert result["errors"] == []
 
-    defn = WorkflowDefinition.objects.get(slug="code-review")
+    defn = WorkflowDefinition.objects.get(slug="legacy-code-review")
     assert defn.name == "Code Review v2"
 
     stages = list(WorkflowStage.objects.filter(definition=defn).order_by("order"))

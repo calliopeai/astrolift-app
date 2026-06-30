@@ -1,0 +1,24 @@
+# Platform catalogue definition (spec 40 §4.1). Null-org, read-only.
+[workflow]
+slug        = "moderate"
+name        = "Moderate"
+pattern     = "review_loop"
+description = "Classify, decide, gate edge cases on a human, then act."
+
+[[stage]]
+kind = "agent_dispatch"
+role = "classifier"
+
+[[stage]]
+kind = "agent_dispatch"
+role = "decider"
+
+[[stage]]
+kind      = "human_gate"
+prompt    = "Review the edge cases flagged by the classifier?"
+approvers = ["team:moderators"]
+timeout   = 86400
+
+[[stage]]
+kind = "agent_dispatch"
+role = "actor"

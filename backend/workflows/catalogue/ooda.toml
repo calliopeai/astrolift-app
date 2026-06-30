@@ -1,0 +1,22 @@
+# Platform catalogue definition (spec 40 §4.1). Null-org, read-only.
+[workflow]
+slug        = "ooda"
+name        = "OODA Loop"
+pattern     = "chained"
+description = "Observe, Orient, Decide, Act — a chained decision loop."
+
+[[stage]]
+kind = "agent_dispatch"
+role = "observer"
+
+[[stage]]
+kind = "agent_dispatch"
+role = "orienter"
+
+[[stage]]
+kind = "agent_dispatch"
+role = "decider"
+
+[[stage]]
+kind = "agent_dispatch"
+role = "actor"

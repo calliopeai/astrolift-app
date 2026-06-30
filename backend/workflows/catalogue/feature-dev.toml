@@ -1,0 +1,28 @@
+# Platform catalogue definition (spec 40 §4.1). Null-org, read-only.
+[workflow]
+slug        = "feature-dev"
+name        = "Feature Dev"
+pattern     = "chained"
+description = "Spec, implement, test, review, and open a PR for a feature."
+
+[[stage]]
+kind = "agent_dispatch"
+role = "specifier"
+
+[[stage]]
+kind = "agent_dispatch"
+role = "implementer"
+
+[[stage]]
+kind   = "agent_dispatch"
+role   = "tester"
+skills = ["write-tests"]
+
+[[stage]]
+kind = "agent_dispatch"
+role = "reviewer"
+
+[[stage]]
+kind   = "agent_dispatch"
+role   = "committer"
+skills = ["commit-pr"]

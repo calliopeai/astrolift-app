@@ -1,0 +1,18 @@
+# Platform catalogue definition (spec 40 §4.1). Null-org, read-only.
+[workflow]
+slug        = "supervisor-worker"
+name        = "Supervisor-Worker"
+pattern     = "supervisor_worker"
+description = "Decompose a task, dispatch N parallel workers, aggregate."
+
+[[stage]]
+kind = "agent_dispatch"
+role = "supervisor"
+
+[[stage]]
+kind    = "agent_dispatch"
+role    = "worker"
+fan_out = 3
+
+[[stage]]
+kind = "aggregation"

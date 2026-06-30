@@ -1,0 +1,31 @@
+# Platform catalogue definition (spec 40 §4.1). Null-org, read-only.
+# incident-triage / fix-tests are Tier-2/3 catalogue skills (later); the
+# stage carries the slug now and resolves once the skill is added (§39).
+[workflow]
+slug        = "bug-fix"
+name        = "Bug Fix"
+pattern     = "chained"
+description = "Triage, reproduce, fix, test, and open a PR for a bug."
+
+[[stage]]
+kind   = "agent_dispatch"
+role   = "triager"
+skills = ["incident-triage"]
+
+[[stage]]
+kind = "agent_dispatch"
+role = "reproducer"
+
+[[stage]]
+kind = "agent_dispatch"
+role = "fixer"
+
+[[stage]]
+kind   = "agent_dispatch"
+role   = "tester"
+skills = ["fix-tests"]
+
+[[stage]]
+kind   = "agent_dispatch"
+role   = "committer"
+skills = ["commit-pr"]

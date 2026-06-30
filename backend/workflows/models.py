@@ -461,12 +461,20 @@ class WorkflowStage(BaseCoreModel):
         blank=True,
         help_text="Ordered list of Skill slugs injected at dispatch.",
     )
-    # For FAN_OUT pattern: max parallel tasks to spawn. Null means derive
-    # the count dynamically from the prior stage's output list length.
+    # Fan-out as a clean tri-state (spec 40 §5.4 manifest ``fan_out``
+    # "0"/N/"dynamic"):
+    #   none    → fan_out_count is NULL and fan_out_dynamic is False
+    #   static  → fan_out_count = N (>0) and fan_out_dynamic is False
+    #   dynamic → fan_out_count is NULL and fan_out_dynamic is True
+    # (derive the spawn count from the prior stage's output list at run time).
     fan_out_count = models.IntegerField(
         null=True,
         blank=True,
-        help_text="Max parallel tasks for fan_out stages. Null → dynamic from prior output.",
+        help_text="Static parallel-task count for fan_out stages. Null → none (or dynamic, see fan_out_dynamic).",
+    )
+    fan_out_dynamic = models.BooleanField(
+        default=False,
+        help_text="When true, spawn count is derived dynamically from the prior stage's output.",
     )
     on_failure = models.CharField(
         max_length=16,
@@ -482,6 +490,15 @@ class WorkflowStage(BaseCoreModel):
     # the builder/binding UI when ``agent_definition`` is null (globals).
     # Optional for org definitions. (spec 40 §2.4)
     role = models.CharField(max_length=64, blank=True, default="")
+    # Human-gate / escalation fields (spec 40 §5.4 manifest ``prompt`` /
+    # ``approvers``). Empty for non-gate stages; carried on the model so a
+    # model-backed manifest export round-trips losslessly (#973 gap).
+    prompt = models.TextField(blank=True, default="")
+    approvers = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Approver references for human_gate/escalation stages (e.g. team or role slugs).",
+    )
 
     class Meta:
         ordering = ["definition", "order"]
