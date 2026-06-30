@@ -79,6 +79,7 @@ if is_enabled(Feature.WORKFLOWS):
     import workflows.schema as WorkflowsSchema
 
     _query_bases.append(WorkflowsSchema.Query)
+    _query_bases.append(AstroliftTemporalWorkflowsSchema.WorkflowManifestQuery)
     _mutation_bases.append(WorkflowsSchema.Mutation)
 
 
