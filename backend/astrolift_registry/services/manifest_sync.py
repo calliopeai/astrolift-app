@@ -708,8 +708,10 @@ class RegisterAgentRepoResult:
     """Return shape from :func:`register_agent_repo`.
 
     ``status`` is one of ``ok`` / ``fetch_failed`` / ``no_agents`` /
-    ``error``. ``agents`` lists what was created or matched (only on
-    ``ok``); ``error`` carries the message on the failure statuses.
+    ``no_match`` / ``error``. ``no_match`` means a ``manifest_paths`` filter
+    was supplied but none of the requested paths matched a discovered agent
+    manifest. ``agents`` lists what was created or matched (only on ``ok``);
+    ``error`` carries the message on the failure statuses.
     """
 
     status: str
@@ -1012,6 +1014,7 @@ def register_agent_repo(
     default_branch: str = "main",
     deploy_branch: str = "",
     default_cluster=None,
+    manifest_paths: list[str] | None = None,
     tree: _TreeFn | None = None,
 ) -> RegisterAgentRepoResult:
     """Register every agent manifest in ``source_repo`` under ``project``.
@@ -1022,7 +1025,14 @@ def register_agent_repo(
     re-run adds only manifests not already registered. Every row is created
     under ``project`` (its organization is the tenancy boundary).
 
-    Returns ``no_agents`` when the repo has no agent manifests,
+    ``manifest_paths`` optionally restricts the pass to a subset of the
+    discovered manifests (#933): when given, only manifests at those paths
+    are registered (the wizard's checked agents); requested paths that don't
+    match a discovered manifest are ignored. When omitted/empty, every
+    discovered agent manifest is registered.
+
+    Returns ``no_agents`` when the repo has no agent manifests, ``no_match``
+    when a ``manifest_paths`` filter excluded every discovered manifest,
     ``fetch_failed`` when the repo can't be fetched, ``error`` on an
     unexpected persist failure, else ``ok`` with the per-manifest outcome.
     """
@@ -1037,6 +1047,24 @@ def register_agent_repo(
         return RegisterAgentRepoResult(status="fetch_failed", error=error)
     if not discovered:
         return RegisterAgentRepoResult(status="no_agents")
+
+    # Subset registration (#933): keep only the requested manifests. Unknown
+    # paths are silently dropped (a stale wizard selection shouldn't fail the
+    # whole pass); when the filter leaves nothing, surface a clear no_match so
+    # the caller knows their selection matched no discovered agent.
+    if manifest_paths:
+        requested = set(manifest_paths)
+        selected = [d for d in discovered if d.manifest_path in requested]
+        if not selected:
+            available = ", ".join(sorted(d.manifest_path for d in discovered))
+            return RegisterAgentRepoResult(
+                status="no_match",
+                error=(
+                    "none of the requested manifestPaths matched a discovered "
+                    f"agent manifest (available: {available})"
+                ),
+            )
+        discovered = selected
 
     eff_deploy_branch = deploy_branch or default_branch or "main"
 

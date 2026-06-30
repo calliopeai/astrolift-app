@@ -5064,6 +5064,7 @@ input RegisterAgentRepoInput {
   ref: String! = "main"
   defaultBranch: String = null
   deployBranch: String = null
+  manifestPaths: [String!] = null
 }
 
 input RegisterAppInput {
