@@ -16,10 +16,10 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
-
 from _sdk.cluster import (
     ClusterAuth,
     ContainerStatusInfo,
@@ -31,6 +31,8 @@ from k8s_native.observability import (
     ClusterAuthError,
     LiveLogBackend,
     LivePodBackend,
+    _resolve_primary_name,
+    _to_container_statuses,
     build_api_client,
 )
 
@@ -147,6 +149,123 @@ def test_driver_uses_live_pod_backend_by_default() -> None:
     driver = K8sNativeClusterDriver(config=K8sNativeConfig())
     # The default is the live backend, not the stub.
     assert isinstance(driver._pod_backend, LivePodBackend)
+
+
+# ---- enriched container status (#429 / #1062) ---------------------
+#
+# astrolift-local ships no kubernetes client + no fake apiserver, so we
+# can't drive ``LivePodBackend.list_pods`` end-to-end here. Instead we
+# exercise the pure mapping leaf (``_to_container_statuses``) with
+# recording-double k8s objects (SimpleNamespace mirrors the V1*
+# attribute shape the client exposes). Live-cluster validation of the
+# full read path is a follow-up. See #1034 for the double pattern.
+
+
+def _spec_container(name: str, *, requests: dict | None = None, limits: dict | None = None) -> Any:
+    return SimpleNamespace(
+        name=name,
+        resources=SimpleNamespace(requests=requests or {}, limits=limits or {}),
+    )
+
+
+def _running_status(name: str, *, ready: bool = True, image: str = "x", restart_count: int = 0) -> Any:
+    return SimpleNamespace(
+        name=name,
+        ready=ready,
+        restart_count=restart_count,
+        image=image,
+        state=SimpleNamespace(running=object(), waiting=None, terminated=None),
+        last_state=None,
+    )
+
+
+def test_to_container_statuses_populates_kind_resources_and_restart_history() -> None:
+    """A primary container with resource requests/limits + a restart
+    history (lastState terminated + a current bad waiting reason) maps
+    to ``kind`` / ``resources`` / ``last_restart_reasons`` /
+    ``last_restart_at``. The sidecar's budget stays separate, and the
+    init container is classified ``init``."""
+    finished = datetime.now(UTC)
+
+    # Primary: running now, but flapped — lastState.terminated=OOMKilled
+    # and currently waiting CrashLoopBackOff between restarts.
+    web_cs = SimpleNamespace(
+        name="web",
+        ready=False,
+        restart_count=7,
+        image="ghcr.io/acme/web:v1",
+        state=SimpleNamespace(
+            running=None,
+            waiting=SimpleNamespace(reason="CrashLoopBackOff"),
+            terminated=None,
+        ),
+        last_state=SimpleNamespace(
+            terminated=SimpleNamespace(reason="OOMKilled", finished_at=finished),
+        ),
+    )
+    sidecar_cs = _running_status("istio-proxy")
+    init_cs = SimpleNamespace(
+        name="migrate",
+        ready=True,
+        restart_count=0,
+        image="ghcr.io/acme/migrate:v1",
+        state=SimpleNamespace(
+            running=None,
+            waiting=None,
+            terminated=SimpleNamespace(reason="Completed"),
+        ),
+        last_state=None,
+    )
+
+    spec_main = [
+        _spec_container(
+            "web",
+            requests={"cpu": "200m", "memory": "256Mi"},
+            limits={"cpu": "500m", "memory": "512Mi"},
+        ),
+        _spec_container("istio-proxy", requests={"cpu": "100m", "memory": "128Mi"}),
+    ]
+    spec_init = [_spec_container("migrate", requests={"cpu": "50m", "memory": "64Mi"})]
+    primary_name = _resolve_primary_name(spec_main, workload_slug="web", app_slug="app")
+    assert primary_name == "web"
+
+    main = _to_container_statuses(
+        [web_cs, sidecar_cs],
+        is_init=False,
+        spec_lookup={c.name: c for c in spec_main},
+        primary_name=primary_name,
+    )
+    init = _to_container_statuses(
+        [init_cs],
+        is_init=True,
+        spec_lookup={c.name: c for c in spec_init},
+        primary_name=primary_name,
+    )
+    by_name = {c.name: c for c in (*init, *main)}
+
+    assert by_name["migrate"].kind == "init"
+    assert by_name["web"].kind == "primary"
+    assert by_name["istio-proxy"].kind == "sidecar"
+
+    web = by_name["web"]
+    # Restart history: lastState reason first, then the current waiting
+    # reason — most-actionable first.
+    assert web.last_restart_reasons == ["OOMKilled", "CrashLoopBackOff"]
+    assert web.last_restart_at == finished
+    assert web.resources.cpu_request == "200m"
+    assert web.resources.cpu_limit == "500m"
+    assert web.resources.memory_request == "256Mi"
+    assert web.resources.memory_limit == "512Mi"
+
+    # Sidecar resources are reported separately so its budget doesn't
+    # blur into the primary container's accounting.
+    sidecar = by_name["istio-proxy"]
+    assert sidecar.resources.cpu_request == "100m"
+    assert sidecar.resources.memory_request == "128Mi"
+    # A steady-state container (no restarts, no lastState) carries no
+    # restart history.
+    assert sidecar.last_restart_reasons == []
+    assert sidecar.last_restart_at is None
 
 
 # ---- build_api_client errors --------------------------------------
