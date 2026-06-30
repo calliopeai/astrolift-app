@@ -1097,7 +1097,10 @@ class EKSClusterDriver(ClusterDriver):
             # Fargate doesn't expose EC2 IMDS; supply these explicitly so
             # the controller never falls back to instance metadata.
             "awsRegion": self._config.region,
-            "serviceAccount": _sa_with_irsa("aws-load-balancer-controller"),
+            # Pin the SA name (chart default) so the IRSA trust subject the
+            # platform mints (astrolift-system:aws-load-balancer-controller) is
+            # deterministic and doesn't drift with the Flux release name (#1044).
+            "serviceAccount": {**_sa_with_irsa("aws-load-balancer-controller"), "name": "aws-load-balancer-controller"},
         }
         if vpc_id:
             alb_values["vpcId"] = vpc_id
@@ -1156,7 +1159,10 @@ class EKSClusterDriver(ClusterDriver):
                     # delete them. txt registry is on by chart default.
                     "txtOwnerId": eks_cluster_name,
                     "sources": ["service", "ingress"],
-                    "serviceAccount": _sa_with_irsa("external-dns"),
+                    # Pin the SA name (chart default) so the IRSA trust subject
+                    # the platform mints (astrolift-system:external-dns) is
+                    # deterministic, not coupled to the Flux release name (#1044).
+                    "serviceAccount": {**_sa_with_irsa("external-dns"), "name": "external-dns"},
                 },
                 requires=["irsa:external-dns", "route53_zone_id"],
                 options=[],

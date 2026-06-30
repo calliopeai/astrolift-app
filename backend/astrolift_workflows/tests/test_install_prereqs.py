@@ -390,3 +390,139 @@ def test_provision_ebs_csi_role_noop_on_non_aws(monkeypatch):
     cluster.provider_plugin = type("PP", (), {"slug": "gcp"})()
 
     assert _provision_ebs_csi_irsa_role(cluster, {"aws-ebs-csi-driver"}) is None
+
+
+# ---- _provision_aws_controller_irsa_role (#1044) -----------------------
+#
+# The aws-load-balancer-controller + external-dns components had no mint call
+# site at all (worse than EBS-CSI's missing call: the driver had no mint fn
+# either). These pin the generalized wiring: mint when selected on AWS, scope
+# the trust to the chart's pinned SA subject, idempotent, no-op otherwise.
+
+
+def test_provision_alb_controller_role_minted_when_enabled(monkeypatch):
+    """When aws-load-balancer-controller is selected, the helper discovers the
+    OIDC issuer and mints <cluster_name>-aws-load-balancer-controller bound to
+    astrolift-system:aws-load-balancer-controller."""
+    from astrolift_workflows.activities.install_prereqs import _provision_aws_controller_irsa_role
+
+    iam = _RecordingIam()
+    _patch_driver_and_issuer(monkeypatch, iam)
+    cluster = _FakeCluster({"cluster_name": "astrolift-eks"})
+
+    arn = _provision_aws_controller_irsa_role(
+        cluster,
+        {"aws-load-balancer-controller", "external-dns"},
+        component_key="aws-load-balancer-controller",
+        mint_method="provision_alb_controller_role",
+    )
+
+    role = "astrolift-eks-aws-load-balancer-controller"
+    assert arn == f"arn:aws:iam::123456789012:role/{role}"
+    assert cluster.auth_config["cluster_oidc_issuer"] == _DISCOVERED_ISSUER
+    assert cluster.saved_fields == ["auth_config"]
+    cond = iam.roles[role]["trust"]["Statement"][0]["Condition"]["StringEquals"]
+    assert (
+        cond[f"{_DISCOVERED_ISSUER}:sub"]
+        == "system:serviceaccount:astrolift-system:aws-load-balancer-controller"
+    )
+
+
+def test_provision_external_dns_role_minted_when_enabled(monkeypatch):
+    """external-dns selected → mint <cluster_name>-external-dns bound to
+    astrolift-system:external-dns."""
+    from astrolift_workflows.activities.install_prereqs import _provision_aws_controller_irsa_role
+
+    iam = _RecordingIam()
+    _patch_driver_and_issuer(monkeypatch, iam)
+    cluster = _FakeCluster({"cluster_name": "astrolift-eks"})
+
+    arn = _provision_aws_controller_irsa_role(
+        cluster,
+        {"external-dns"},
+        component_key="external-dns",
+        mint_method="provision_external_dns_role",
+    )
+
+    role = "astrolift-eks-external-dns"
+    assert arn == f"arn:aws:iam::123456789012:role/{role}"
+    cond = iam.roles[role]["trust"]["Statement"][0]["Condition"]["StringEquals"]
+    assert cond[f"{_DISCOVERED_ISSUER}:sub"] == "system:serviceaccount:astrolift-system:external-dns"
+
+
+def test_provision_aws_controller_role_idempotent(monkeypatch):
+    """Re-running converges to a single trust subject + the same ARN."""
+    from astrolift_workflows.activities.install_prereqs import _provision_aws_controller_irsa_role
+
+    iam = _RecordingIam()
+    _patch_driver_and_issuer(monkeypatch, iam)
+    cluster = _FakeCluster({"cluster_name": "astrolift-eks"})
+
+    a = _provision_aws_controller_irsa_role(
+        cluster,
+        {"aws-load-balancer-controller"},
+        component_key="aws-load-balancer-controller",
+        mint_method="provision_alb_controller_role",
+    )
+    b = _provision_aws_controller_irsa_role(
+        cluster,
+        {"aws-load-balancer-controller"},
+        component_key="aws-load-balancer-controller",
+        mint_method="provision_alb_controller_role",
+    )
+
+    assert a == b
+    cond = iam.roles["astrolift-eks-aws-load-balancer-controller"]["trust"]["Statement"][0]["Condition"][
+        "StringEquals"
+    ]
+    assert (
+        cond[f"{_DISCOVERED_ISSUER}:sub"]
+        == "system:serviceaccount:astrolift-system:aws-load-balancer-controller"
+    )
+
+
+def test_provision_aws_controller_role_noop_when_disabled(monkeypatch):
+    """Component not selected → short-circuit before discovery / driver."""
+    import aws.identity_irsa as irsa
+
+    import core.app_deploy as app_deploy
+    from astrolift_workflows.activities.install_prereqs import _provision_aws_controller_irsa_role
+
+    def _boom(*a, **k):  # noqa: ANN002, ANN003
+        raise AssertionError("must not be called when the component is disabled")
+
+    monkeypatch.setattr(irsa, "discover_oidc_issuer", _boom)
+    monkeypatch.setattr(app_deploy, "driver_for_capability", _boom)
+    cluster = _FakeCluster({"cluster_name": "astrolift-eks"})
+
+    result = _provision_aws_controller_irsa_role(
+        cluster,
+        {"metrics-server", "aws-ebs-csi-driver"},
+        component_key="external-dns",
+        mint_method="provision_external_dns_role",
+    )
+    assert result is None
+    assert cluster.auth_config == {"cluster_name": "astrolift-eks"}
+
+
+def test_provision_aws_controller_role_noop_on_non_aws(monkeypatch):
+    """Non-AWS cluster → no AWS role minted even when the key is selected."""
+    import core.app_deploy as app_deploy
+    from astrolift_workflows.activities.install_prereqs import _provision_aws_controller_irsa_role
+
+    def _boom(*a, **k):  # noqa: ANN002, ANN003
+        raise AssertionError("must not mint an AWS role on a non-AWS cluster")
+
+    monkeypatch.setattr(app_deploy, "driver_for_capability", _boom)
+    cluster = _FakeCluster({"cluster_name": "gke-x"})
+    cluster.provider_plugin = type("PP", (), {"slug": "gcp"})()
+
+    assert (
+        _provision_aws_controller_irsa_role(
+            cluster,
+            {"aws-load-balancer-controller"},
+            component_key="aws-load-balancer-controller",
+            mint_method="provision_alb_controller_role",
+        )
+        is None
+    )
