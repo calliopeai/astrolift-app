@@ -244,6 +244,15 @@ EXEMPT: dict[str, str] = {
     # construction the resolver runs unauthenticated, hash-at-rest in
     # the DB row is the source of truth. Bot/email integrations
     # cannot supply tenant context.
+    "LifecycleQuery.scan_cloud_orphans": (
+        "install-wide operator capability (#995): orphan detection enumerates "
+        "platform-owned cloud resources whose owning DB row no longer exists. "
+        "An orphan has no live owner, so by construction there is no tenant to "
+        "scope on — scan_orphans() unions every managed cluster + every live "
+        "app across ALL orgs and diffs against dangling cloud resources. Same "
+        "category as the Temporal admin resolvers that span tenants; gated on "
+        "APP_DELETE. Read-only — never deletes."
+    ),
     "LifecycleMutation.approve_deployment_by_token": (
         "public: approval magic-link token IS the auth proof; no tenant context at the point of click"
     ),

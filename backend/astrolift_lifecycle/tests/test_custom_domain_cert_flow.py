@@ -220,6 +220,10 @@ def _make_manifest(port: int = 8080):
                 name="web",
                 kind="deployment",
                 replicas=1,
+                # The managed-subdomain hostname machinery keys on
+                # ``is_public`` (compute_hostnames filters to public
+                # workloads), so a public worker must declare it.
+                is_public=True,
                 containers=(
                     ContainerManifest(
                         name="web",
@@ -672,9 +676,10 @@ def test_render_managed_subdomain_alb_emits_ingress(deployment_alb):
     assert ing["metadata"]["namespace"] == "test-ns"
     # Platform-label present so operators can distinguish managed vs custom
     assert ing["metadata"]["labels"]["astrolift.dev/managed-subdomain"] == "true"
-    # Hostname: {app}.{org}.{zone} → hello-app.acme-test.apps.example.com
+    # Hostname: {app}.{base-zone} → hello-app.apps.example.com. compute_hostnames
+    # keeps the org slug out of the public URL for clean short hostnames.
     rule_hosts = [r["host"] for r in ing["spec"]["rules"]]
-    assert "hello-app.acme-test.apps.example.com" in rule_hosts
+    assert "hello-app.apps.example.com" in rule_hosts
     # ACM cert ARN must appear in the LBC annotation
     annotations = ing["metadata"]["annotations"]
     assert annotations.get("alb.ingress.kubernetes.io/certificate-arn") == (
@@ -746,9 +751,9 @@ def test_render_managed_subdomain_nginx(app, cluster, managed_domain_no_cert):
     assert ing["metadata"]["labels"]["astrolift.dev/managed-subdomain"] == "true"
     # No cert ARN → cert-manager handles issuance
     assert ing["metadata"]["annotations"].get("cert-manager.io/cluster-issuer") == "letsencrypt-prod"
-    # Hostname in rules
+    # Hostname in rules: {app}.{base-zone} (org slug excluded)
     rule_hosts = [r["host"] for r in ing["spec"]["rules"]]
-    assert "hello-app.acme-test.apps.example.com" in rule_hosts
+    assert "hello-app.apps.example.com" in rule_hosts
 
 
 @pytest.mark.django_db

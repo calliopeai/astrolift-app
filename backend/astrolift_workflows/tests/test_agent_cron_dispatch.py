@@ -443,6 +443,7 @@ def test_service_agent_renders_deployment_service_hpa_with_replicas():
     w = WorkloadManifest(
         name="always-on-agent",
         kind="agent",
+        run_family="service",
         replicas=3,
         hpa_min=2,
         hpa_max=6,

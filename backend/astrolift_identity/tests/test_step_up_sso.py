@@ -31,6 +31,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 import pytest
+from constance.test import override_config
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 from django.utils import timezone
@@ -188,6 +189,7 @@ def test_elevate_admin_session_with_sso_method_returns_denied():
 # ---- supported_methods plumbing on the deny envelope ------------------
 
 
+@override_config(REQUIRE_STEP_UP_AUTH=True)
 def test_sso_session_step_up_deny_carries_supported_methods_sso(permission_resolver):
     """The prod bug (#526): SSO user → sensitive mutation → modal had
     no actionable button because the deny envelope didn't tell the FE
@@ -223,6 +225,7 @@ def test_sso_session_step_up_deny_carries_supported_methods_sso(permission_resol
     assert result.errors[0].supported_methods == [METHOD_SSO]
 
 
+@override_config(REQUIRE_STEP_UP_AUTH=True)
 def test_password_session_step_up_deny_carries_supported_methods_password(permission_resolver):
     """No-regression: a password-minted session still gets the
     ``["password"]`` envelope so the existing prompt UI keeps working."""
@@ -255,6 +258,7 @@ def test_password_session_step_up_deny_carries_supported_methods_password(permis
     assert result.errors[0].supported_methods == [METHOD_PASSWORD]
 
 
+@override_config(REQUIRE_STEP_UP_AUTH=True)
 def test_unset_login_method_falls_back_to_password_envelope(permission_resolver):
     """Pre-#526 sessions don't carry the key; the deny envelope must
     still default to ``["password"]`` so legacy operators see the form
@@ -527,6 +531,7 @@ def test_callback_missing_auth_time_rejected(rf, audit_capture):
     assert "auth.elevate_admin.sso.missing_auth_time" in actions
 
 
+@override_config(REQUIRE_STEP_UP_AUTH=True)
 def test_callback_after_elevation_expiry_reprompts_with_sso_envelope(permission_resolver):
     """An SSO elevation that lapsed at the time of the next mutation
     gets the same STEP_UP_REQUIRED envelope, still carrying

@@ -2039,6 +2039,10 @@ class IdentityMutation:
             prefs = UserPreferences.for_user(viewer)
             prefs.timezone = tz_val
             prefs.save(update_fields=["timezone"])
+            # ``for_user`` returns a fresh row via get_or_create; keep the
+            # reverse one-to-one cache on ``viewer`` in sync so the payload
+            # below reflects this write instead of a stale cached row.
+            viewer.preferences = prefs
 
         return gql_success(_my_profile_payload(viewer, org, locked))
 

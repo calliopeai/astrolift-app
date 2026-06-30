@@ -59,6 +59,7 @@ input AgentRunSpecInput {
   scheduledScaleTo: Int = null
   scaleUpCron: String = null
   scaleDownCron: String = null
+  clearScheduledScaling: Boolean! = false
 }
 
 type Alertruledeletedpayload {
@@ -240,6 +241,11 @@ type AstroliftAgentListItem {
   lastRunStatus: String
   lastRunAt: DateTime
   runningCount: Int!
+  runMaxParallel: Int
+  replicas: Int!
+  scheduledScaleTo: Int
+  scaleUpCron: String!
+  scaleDownCron: String!
 }
 
 type AstroliftAgentLiveStatus {
@@ -335,6 +341,17 @@ type AstroliftAgentTaskMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftAgentTask
+}
+
+type AstroliftAgentTrigger {
+  slug: String!
+  endpoint: String!
+  scmRepo: String!
+  branchPattern: String!
+  inputMapping: JSON!
+  enabled: Boolean!
+  lastTriggeredAt: DateTime
+  createdAt: DateTime!
 }
 
 type AstroliftAgentTriggerResult {
@@ -4541,7 +4558,8 @@ type Mutation {
   launchTask(briefId: ID!, orgId: ID!, callbackUrl: String = null): AstroliftLaunchTaskResultMutationResult!
   cancelTask(id: ID!): NoneTypeMutationResult!
   runAstroliftAgent(input: RunAstroliftAgentInput!): AstroliftAgentTaskMutationResult!
-  createAgentTrigger(agentSlug: String!): AstroliftAgentTriggerResult!
+  createAgentTrigger(agentSlug: String!, scmRepo: String! = "", branchPattern: String! = "", inputMapping: JSON = null): AstroliftAgentTriggerResult!
+  unbindAgentTrigger(slug: String!): AstroliftAgentTriggerResult!
   scaleServiceAgent(agentSlug: String!, targetReplicas: Int!): AstroliftAgentScaleResult!
   updateAgentRunSpec(agentSlug: String!, input: AgentRunSpecInput!): AstroliftAgentRunSpecMutationResult!
   importSkillsFromRepo(repoUrl: String!, branch: String! = "main", manifestPath: String! = ""): AstroliftImportSkillsResultMutationResult!
@@ -5006,6 +5024,7 @@ type Query {
   agentWorkloads(orgId: ID!, projectSlug: String = null): [AstroliftAgentListItem!]!
   agentFleet(orgId: ID!): [AstroliftAgentListItem!]!
   agent(orgId: ID!, slug: String!): AstroliftAgentDetail
+  agentTriggers(orgId: ID!, agentSlug: String!): [AstroliftAgentTrigger!]!
   scanAgentManifests(orgId: ID!, sourceRepo: String!, sourceKind: String! = "github", ref: String! = "main"): AstroliftScanAgentManifestsResult!
   agentLiveStatus(orgId: ID!, projectSlug: String = null, workloadId: ID = null): [AstroliftAgentLiveStatus!]!
   agentRuntimes: [AstroliftAgentRuntime!]!
@@ -5080,6 +5099,7 @@ input RegisterAgentRepoInput {
   ref: String! = "main"
   defaultBranch: String = null
   deployBranch: String = null
+  manifestPaths: [String!] = null
 }
 
 input RegisterAppInput {

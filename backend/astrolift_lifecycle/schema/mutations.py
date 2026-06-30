@@ -2443,8 +2443,12 @@ class LifecycleMutation:
         from astrolift_clusters.models import resolve_managed_domain
 
         _managed_domain = resolve_managed_domain(app.organization, for_preview=True)
-        base_zone = getattr(_managed_domain, "zone", None) or org_slug
-        hostname = f"preview-{branch_slug}.{app.slug}.{org_slug}.{base_zone}".lower()
+        # ``preview-<branch>.<app>.<org>`` plus the install's managed zone
+        # when one exists; without a zone, stop at the org slug rather than
+        # repeating it (the old ``... or org_slug`` fallback doubled it).
+        _base = f"preview-{branch_slug}.{app.slug}.{org_slug}"
+        _zone = getattr(_managed_domain, "zone", None)
+        hostname = (f"{_base}.{_zone}" if _zone else _base).lower()
 
         with transaction.atomic():
             env = AppEnvironment.objects.create(

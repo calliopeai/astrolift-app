@@ -28,12 +28,20 @@ The receiver tolerates noise:
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
+import re
+import urllib.parse
 import urllib.request
 from datetime import UTC, datetime
+from functools import lru_cache
 from typing import Any
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
+from cryptography.x509 import load_pem_x509_certificate
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -42,6 +50,38 @@ from django.views.decorators.http import require_POST
 from astrolift_services.models import EmailEvent, EmailEventKind, ManagedService
 
 logger = logging.getLogger(__name__)
+
+# SNS signs each message with an AWS-issued RSA cert published at
+# ``SigningCertURL``. The URL MUST resolve to an AWS SNS host or we
+# refuse to fetch it — otherwise an attacker controls the cert (and the
+# fetch target, an SSRF vector). Host shape per the SNS HTTPS spec:
+# ``sns.<region>.amazonaws.com`` (and the GovCloud / China partitions).
+_SIGNING_CERT_HOST_RE = re.compile(r"^sns\.[a-z0-9-]+\.amazonaws\.com(\.cn)?$")
+
+# Fields that go into the canonical signing string, in order, per SNS
+# message type. Only keys actually present on the message are included
+# (Subject is optional on Notifications).
+_SIGNED_KEYS: dict[str, tuple[str, ...]] = {
+    "Notification": ("Message", "MessageId", "Subject", "Timestamp", "TopicArn", "Type"),
+    "SubscriptionConfirmation": (
+        "Message",
+        "MessageId",
+        "SubscribeURL",
+        "Timestamp",
+        "Token",
+        "TopicArn",
+        "Type",
+    ),
+    "UnsubscribeConfirmation": (
+        "Message",
+        "MessageId",
+        "SubscribeURL",
+        "Timestamp",
+        "Token",
+        "TopicArn",
+        "Type",
+    ),
+}
 
 # SNS message types (per the SNS HTTPS subscription spec).
 _SUBSCRIPTION_CONFIRMATION = "SubscriptionConfirmation"
@@ -69,21 +109,137 @@ _KIND_MAP: dict[str, str] = {
 _CONFIGURATION_SET_PREFIX = "astrolift-"
 
 
+@lru_cache(maxsize=16)
+def _load_signing_cert_public_key(cert_url: str) -> rsa.RSAPublicKey | None:
+    """Fetch and cache the RSA public key from an SNS ``SigningCertURL``.
+
+    The URL host is validated by the caller against ``_SIGNING_CERT_HOST_RE``
+    before we get here, so the fetch target is always an AWS SNS host
+    (never attacker-controlled). Returns None on any fetch / parse
+    failure so verification fails closed.
+    """
+    try:
+        # nosec — the URL host is allowlisted to ``sns.*.amazonaws.com``
+        # by ``verify_signature`` before this is called, so S310's
+        # attacker-controlled-URL concern doesn't apply.
+        with urllib.request.urlopen(cert_url, timeout=10) as resp:  # noqa: S310
+            pem = resp.read()
+        cert = load_pem_x509_certificate(pem)
+        public_key = cert.public_key()
+    except Exception as exc:  # noqa: BLE001 -- fail closed on any error
+        logger.warning("ses-events-webhook: signing cert fetch/parse failed: %s", exc)
+        return None
+    if not isinstance(public_key, rsa.RSAPublicKey):
+        return None
+    return public_key
+
+
+def _canonical_message(body: dict[str, Any], msg_type: str) -> bytes | None:
+    """Build the SNS canonical signing string for ``body``.
+
+    Returns the ``key\\nvalue\\n`` byte string AWS signed, or None when
+    the message type is unknown or a required signed field is missing."""
+    keys = _SIGNED_KEYS.get(msg_type)
+    if keys is None:
+        return None
+    parts: list[str] = []
+    for key in keys:
+        if key not in body:
+            # Subject is optional and simply omitted when absent; every
+            # other key in the list is required for that message type.
+            if key == "Subject":
+                continue
+            return None
+        value = body[key]
+        if not isinstance(value, str):
+            return None
+        parts.append(key)
+        parts.append(value)
+    return ("".join(f"{p}\n" for p in parts)).encode("utf-8")
+
+
+def verify_signature(body: dict[str, Any]) -> bool:
+    """Verify an inbound SNS message's RSA signature (#1060).
+
+    SNS doesn't carry a per-request shared secret — instead every
+    message is signed with an AWS-issued RSA cert. We:
+
+    1. Require ``SignatureVersion`` 1 (SHA1) or 2 (SHA256).
+    2. Require ``SigningCertURL`` to be an HTTPS AWS SNS host — refusing
+       any other host closes both the attacker-controlled-cert hole and
+       the SSRF the fetch would otherwise open.
+    3. Rebuild the canonical signing string and RSA-verify the base64
+       ``Signature`` against the cert's public key.
+
+    Returns True only on a valid signature; False for any failure mode
+    (missing fields, bad host, fetch error, mismatch) so the caller
+    turns False into a single generic 403 before touching the payload.
+
+    Named ``verify_signature`` so the ``test_webhook_signature_guard``
+    CI guard (#529) recognizes it as the auth boundary on
+    ``ses_events_webhook``.
+    """
+    msg_type = body.get("Type")
+    if not isinstance(msg_type, str):
+        return False
+
+    version = body.get("SignatureVersion")
+    if version == "1":
+        algorithm: hashes.HashAlgorithm = hashes.SHA1()
+    elif version == "2":
+        algorithm = hashes.SHA256()
+    else:
+        return False
+
+    signature_b64 = body.get("Signature")
+    cert_url = body.get("SigningCertURL")
+    if not isinstance(signature_b64, str) or not isinstance(cert_url, str):
+        return False
+
+    parsed = urllib.parse.urlparse(cert_url)
+    if parsed.scheme != "https" or not _SIGNING_CERT_HOST_RE.match(parsed.hostname or ""):
+        logger.warning(
+            "ses-events-webhook: refusing non-SNS SigningCertURL host: %r",
+            (parsed.hostname or "")[:120],
+        )
+        return False
+
+    canonical = _canonical_message(body, msg_type)
+    if canonical is None:
+        return False
+
+    try:
+        signature = base64.b64decode(signature_b64)
+    except (ValueError, TypeError):
+        return False
+
+    public_key = _load_signing_cert_public_key(cert_url)
+    if public_key is None:
+        return False
+
+    try:
+        public_key.verify(signature, canonical, padding.PKCS1v15(), algorithm)
+    except InvalidSignature:
+        return False
+    return True
+
+
 @csrf_exempt
 @require_POST
 def ses_events_webhook(request: HttpRequest) -> HttpResponse:
     """Receive SES event notifications delivered via SNS.
 
-    The endpoint is unauthenticated because SNS POSTs over plain HTTP(S)
-    without per-request auth — the trust model is that the platform
-    only subscribes its own SNS topic to this URL, the topic is
-    locked down to the SES account, and we don't expose admin
-    affordances here (the only effect is appending an ``EmailEvent``
-    row).
+    Every SNS message is RSA-signed with an AWS-issued cert. We verify
+    that signature (``verify_signature``) before touching the payload —
+    SNS exposes no per-request shared secret, so the message signature
+    IS the trust boundary. An unsigned / forged POST is rejected with
+    403 before any side effect (including the SubscribeURL fetch, which
+    would otherwise be an SSRF lever).
 
-    Returns 200 on any well-formed body (including unrecognized kinds)
-    so SNS doesn't park the message on its retry queue. Returns 400
-    only on parse failure of the outer envelope.
+    Returns 200 on any well-formed, *verified* body (including
+    unrecognized kinds) so SNS doesn't park the message on its retry
+    queue. Returns 400 on parse failure of the outer envelope, 403 on a
+    missing / invalid signature.
     """
     try:
         body = json.loads(request.body.decode("utf-8"))
@@ -92,6 +248,9 @@ def ses_events_webhook(request: HttpRequest) -> HttpResponse:
 
     if not isinstance(body, dict):
         return HttpResponse(status=400)
+
+    if not verify_signature(body):
+        return HttpResponse(status=403)
 
     # SNS puts the message type in the ``Type`` header AND the JSON
     # body. We trust the body (the header can be omitted on some SDK
