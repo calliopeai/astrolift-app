@@ -4509,6 +4509,67 @@ class LifecycleMutation:
         )
         return gql_success(task_run_to_payload(run))
 
+    @strawberry.field
+    @mutation_audit(
+        action="orphan.reap",
+        target=lambda root, info, input: ("orphan", input.reap_key),
+    )
+    @require_permission(Permission.CLUSTER_MANAGE)
+    def reap_cloud_orphan(
+        self, info: Info, input: ReapCloudOrphanInput
+    ) -> MutationResultType[ReapCloudOrphanPayload]:
+        """Reap one detected cloud orphan THROUGH the provider drivers (#995).
+
+        Install-wide operator action (orphans have no org owner) — gated on
+        ``CLUSTER_MANAGE`` and deliberately NOT ``@tenant_scoped``. The reaper
+        re-checks ownership and refuses anything that still has a live owner;
+        only detection-proven orphans are reapable. Idempotent: an already-gone
+        resource returns success so a re-run converges. ``force_destroy``
+        carries through to the driver for deletion-protected resources.
+
+        Reaping never issues a raw cloud API delete — it reuses the same
+        idempotent driver deprovision path teardown uses (#1034).
+        """
+        from astrolift_operations.services.orphan_reaper import ALL_KINDS, reap_orphan
+
+        kind = (input.kind or "").strip()
+        reap_key = (input.reap_key or "").strip()
+        if kind not in ALL_KINDS:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"unknown orphan kind {kind!r}",
+                field="kind",
+            )
+        if not reap_key:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "reap_key is required",
+                field="reapKey",
+            )
+
+        result = reap_orphan(
+            kind=kind,
+            reap_key=reap_key,
+            cluster_slug=(input.cluster_slug or "").strip(),
+            force_destroy=bool(input.force_destroy),
+        )
+        if not result.ok:
+            # A refusal (live owner) is a precondition failure, not a crash.
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                result.message,
+                field="reapKey",
+            )
+        return gql_success(
+            ReapCloudOrphanPayload(
+                kind=result.kind,
+                identifier=result.identifier,
+                reaped=not result.already_gone,
+                already_gone=result.already_gone,
+                message=result.message,
+            )
+        )
+
 
 # ---------------------------------------------------------------------------
 # #389 input / payload types — force-redeploy recovery. Defined at
@@ -4917,3 +4978,44 @@ class RunTaskInput:
     workload_slug: str
     environment_name: str | None = None
     command: list[str] = strawberry.field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# #995 input / payload types — orphan reaper. Defined at module scope so
+# Strawberry discovers them before the mutation method's forward-reference
+# string resolves them; appended at the tail per the file convention.
+# ---------------------------------------------------------------------------
+
+
+@strawberry.input
+class ReapCloudOrphanInput:
+    """Input for ``reapCloudOrphan`` (#995).
+
+    ``kind`` + ``reap_key`` come straight off a ``scanCloudOrphans`` result
+    row (``CloudOrphanType.kind`` / ``.reap_key``). ``cluster_slug`` is the
+    optional hint of which managed cluster's driver should reap a
+    cloud-enumerated resource (IAM role); the reaper falls back to any
+    capable managed cluster when omitted. ``force_destroy`` removes
+    deletion-protection where a resource has it.
+    """
+
+    kind: str
+    reap_key: str
+    cluster_slug: str | None = None
+    force_destroy: bool = False
+
+
+@strawberry.type
+class ReapCloudOrphanPayload:
+    """Read-back for a reaped orphan (#995).
+
+    ``reaped`` is True when the driver actually deprovisioned the resource;
+    ``already_gone`` is True when the resource was found to be already absent
+    (an idempotent no-op) — both are successful outcomes.
+    """
+
+    kind: str
+    identifier: str
+    reaped: bool
+    already_gone: bool
+    message: str
