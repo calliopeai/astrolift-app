@@ -47,6 +47,233 @@ EBS_CSI_CONTROLLER_SA = "ebs-csi-controller-sa"
 # create/attach/detach/delete permissions it needs to provision PVs.
 AMAZON_EBS_CSI_DRIVER_POLICY_ARN = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
 
+# The aws-load-balancer-controller + external-dns Helm charts run their
+# controllers in the platform bootstrap namespace ``astrolift-system`` (where
+# install_cluster_prereqs deploys every HelmRelease). The chart values pin the
+# ServiceAccount names (``aws-load-balancer-controller`` / ``external-dns``,
+# the chart defaults) so the IRSA trust subject is deterministic and doesn't
+# drift with the Flux release name (#1044). The self-provisioned trust must
+# bind these exact subjects or AssumeRoleWithWebIdentity 403s and ingress /
+# DNS reconciliation never works.
+ALB_CONTROLLER_NAMESPACE = "astrolift-system"
+ALB_CONTROLLER_SA = "aws-load-balancer-controller"
+EXTERNAL_DNS_NAMESPACE = "astrolift-system"
+EXTERNAL_DNS_SA = "external-dns"
+
+# Inline IAM policy statements for the AWS Load Balancer Controller. This is
+# the canonical ``AWSLoadBalancerControllerIAMPolicy`` permission set (the
+# upstream policy published alongside the v2.x controller): EC2/ELBv2 describe
+# + create/modify, tag management scoped to the controller's cluster tag,
+# WAFv2/WAF-regional/Shield association, ACM + IAM server-cert describe, and
+# cognito-idp describe for OIDC-protected listeners. There is no AWS-managed
+# policy for this controller, so it's attached as an inline policy.
+ALB_CONTROLLER_POLICY_STATEMENTS: list[dict[str, Any]] = [
+    {
+        "Effect": "Allow",
+        "Action": ["iam:CreateServiceLinkedRole"],
+        "Resource": "*",
+        "Condition": {"StringEquals": {"iam:AWSServiceName": "elasticloadbalancing.amazonaws.com"}},
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "ec2:DescribeAccountAttributes",
+            "ec2:DescribeAddresses",
+            "ec2:DescribeAvailabilityZones",
+            "ec2:DescribeInternetGateways",
+            "ec2:DescribeVpcs",
+            "ec2:DescribeVpcPeeringConnections",
+            "ec2:DescribeSubnets",
+            "ec2:DescribeSecurityGroups",
+            "ec2:DescribeInstances",
+            "ec2:DescribeNetworkInterfaces",
+            "ec2:DescribeTags",
+            "ec2:GetCoipPoolUsage",
+            "ec2:DescribeCoipPools",
+            "elasticloadbalancing:DescribeLoadBalancers",
+            "elasticloadbalancing:DescribeLoadBalancerAttributes",
+            "elasticloadbalancing:DescribeListeners",
+            "elasticloadbalancing:DescribeListenerCertificates",
+            "elasticloadbalancing:DescribeSSLPolicies",
+            "elasticloadbalancing:DescribeRules",
+            "elasticloadbalancing:DescribeTargetGroups",
+            "elasticloadbalancing:DescribeTargetGroupAttributes",
+            "elasticloadbalancing:DescribeTargetHealth",
+            "elasticloadbalancing:DescribeTags",
+            "elasticloadbalancing:DescribeTrustStores",
+        ],
+        "Resource": "*",
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "cognito-idp:DescribeUserPoolClient",
+            "acm:ListCertificates",
+            "acm:DescribeCertificate",
+            "iam:ListServerCertificates",
+            "iam:GetServerCertificate",
+            "waf-regional:GetWebACL",
+            "waf-regional:GetWebACLForResource",
+            "waf-regional:AssociateWebACL",
+            "waf-regional:DisassociateWebACL",
+            "wafv2:GetWebACL",
+            "wafv2:GetWebACLForResource",
+            "wafv2:AssociateWebACL",
+            "wafv2:DisassociateWebACL",
+            "shield:GetSubscriptionState",
+            "shield:DescribeProtection",
+            "shield:CreateProtection",
+            "shield:DeleteProtection",
+        ],
+        "Resource": "*",
+    },
+    {
+        "Effect": "Allow",
+        "Action": ["ec2:AuthorizeSecurityGroupIngress", "ec2:RevokeSecurityGroupIngress"],
+        "Resource": "*",
+    },
+    {
+        "Effect": "Allow",
+        "Action": ["ec2:CreateSecurityGroup"],
+        "Resource": "*",
+    },
+    {
+        "Effect": "Allow",
+        "Action": ["ec2:CreateTags"],
+        "Resource": "arn:aws:ec2:*:*:security-group/*",
+        "Condition": {
+            "StringEquals": {"ec2:CreateAction": "CreateSecurityGroup"},
+            "Null": {"aws:RequestTag/elbv2.k8s.aws/cluster": "false"},
+        },
+    },
+    {
+        "Effect": "Allow",
+        "Action": ["ec2:CreateTags", "ec2:DeleteTags"],
+        "Resource": "arn:aws:ec2:*:*:security-group/*",
+        "Condition": {
+            "Null": {
+                "aws:RequestTag/elbv2.k8s.aws/cluster": "true",
+                "aws:ResourceTag/elbv2.k8s.aws/cluster": "false",
+            }
+        },
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "ec2:AuthorizeSecurityGroupIngress",
+            "ec2:RevokeSecurityGroupIngress",
+            "ec2:DeleteSecurityGroup",
+        ],
+        "Resource": "*",
+        "Condition": {"Null": {"aws:ResourceTag/elbv2.k8s.aws/cluster": "false"}},
+    },
+    {
+        "Effect": "Allow",
+        "Action": ["elasticloadbalancing:CreateLoadBalancer", "elasticloadbalancing:CreateTargetGroup"],
+        "Resource": "*",
+        "Condition": {"Null": {"aws:RequestTag/elbv2.k8s.aws/cluster": "false"}},
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "elasticloadbalancing:CreateListener",
+            "elasticloadbalancing:DeleteListener",
+            "elasticloadbalancing:CreateRule",
+            "elasticloadbalancing:DeleteRule",
+        ],
+        "Resource": "*",
+    },
+    {
+        "Effect": "Allow",
+        "Action": ["elasticloadbalancing:AddTags", "elasticloadbalancing:RemoveTags"],
+        "Resource": [
+            "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",
+            "arn:aws:elasticloadbalancing:*:*:loadbalancer/net/*/*",
+            "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*",
+        ],
+        "Condition": {
+            "Null": {
+                "aws:RequestTag/elbv2.k8s.aws/cluster": "true",
+                "aws:ResourceTag/elbv2.k8s.aws/cluster": "false",
+            }
+        },
+    },
+    {
+        "Effect": "Allow",
+        "Action": ["elasticloadbalancing:AddTags", "elasticloadbalancing:RemoveTags"],
+        "Resource": [
+            "arn:aws:elasticloadbalancing:*:*:listener/net/*/*/*",
+            "arn:aws:elasticloadbalancing:*:*:listener/app/*/*/*",
+            "arn:aws:elasticloadbalancing:*:*:listener-rule/net/*/*/*",
+            "arn:aws:elasticloadbalancing:*:*:listener-rule/app/*/*/*",
+        ],
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "elasticloadbalancing:ModifyLoadBalancerAttributes",
+            "elasticloadbalancing:SetIpAddressType",
+            "elasticloadbalancing:SetSecurityGroups",
+            "elasticloadbalancing:SetSubnets",
+            "elasticloadbalancing:DeleteLoadBalancer",
+            "elasticloadbalancing:ModifyTargetGroup",
+            "elasticloadbalancing:ModifyTargetGroupAttributes",
+            "elasticloadbalancing:DeleteTargetGroup",
+        ],
+        "Resource": "*",
+        "Condition": {"Null": {"aws:ResourceTag/elbv2.k8s.aws/cluster": "false"}},
+    },
+    {
+        "Effect": "Allow",
+        "Action": ["elasticloadbalancing:AddTags"],
+        "Resource": [
+            "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",
+            "arn:aws:elasticloadbalancing:*:*:loadbalancer/net/*/*",
+            "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*",
+        ],
+        "Condition": {
+            "StringEquals": {"elasticloadbalancing:CreateAction": ["CreateTargetGroup", "CreateLoadBalancer"]},
+            "Null": {"aws:RequestTag/elbv2.k8s.aws/cluster": "false"},
+        },
+    },
+    {
+        "Effect": "Allow",
+        "Action": ["elasticloadbalancing:RegisterTargets", "elasticloadbalancing:DeregisterTargets"],
+        "Resource": "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "elasticloadbalancing:SetWebAcl",
+            "elasticloadbalancing:ModifyListener",
+            "elasticloadbalancing:AddListenerCertificates",
+            "elasticloadbalancing:RemoveListenerCertificates",
+            "elasticloadbalancing:ModifyRule",
+        ],
+        "Resource": "*",
+    },
+]
+
+# Inline IAM policy statements for external-dns. ``ChangeResourceRecordSets``
+# is scoped to hosted zones (record CRUD); the list actions need ``*`` because
+# external-dns enumerates zones + record sets to discover what it manages.
+EXTERNAL_DNS_POLICY_STATEMENTS: list[dict[str, Any]] = [
+    {
+        "Effect": "Allow",
+        "Action": ["route53:ChangeResourceRecordSets"],
+        "Resource": ["arn:aws:route53:::hostedzone/*"],
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "route53:ListHostedZones",
+            "route53:ListResourceRecordSets",
+            "route53:ListTagsForResource",
+        ],
+        "Resource": ["*"],
+    },
+]
+
 
 @dataclass(frozen=True)
 class IRSAConfig:
@@ -202,6 +429,49 @@ class IRSADriver(WorkloadIdentityDriver):
             sa_name=EBS_CSI_CONTROLLER_SA,
         )
         self.attach_policy(role_name, AMAZON_EBS_CSI_DRIVER_POLICY_ARN)
+        return role_arn
+
+    @driver_op(cloud="aws", driver="identity", audit=True, sensitive_kind="identity.provision_alb_controller_role")
+    def provision_alb_controller_role(self, role_name: str) -> str:
+        """Self-provision the IRSA role the aws-load-balancer-controller assumes (#1044).
+
+        The controller renders Kubernetes Ingress as ALBs / Service
+        type=LoadBalancer as NLBs and needs the canonical
+        ``AWSLoadBalancerControllerIAMPolicy`` permission set. There is no
+        AWS-managed policy for it, so the permissions are attached inline.
+        Creates the OIDC-trust role, scopes its trust to the
+        ``astrolift-system:aws-load-balancer-controller`` subject, and (via
+        ``create_identity_role``) writes the inline policy.
+
+        Idempotent: re-runs reconcile the trust subject + re-write the inline
+        policy. Returns the role ARN."""
+        role_arn = self.create_identity_role(role_name, permissions=ALB_CONTROLLER_POLICY_STATEMENTS)
+        self._ensure_trust_includes(
+            role_name=role_name,
+            namespace=ALB_CONTROLLER_NAMESPACE,
+            sa_name=ALB_CONTROLLER_SA,
+        )
+        return role_arn
+
+    @driver_op(cloud="aws", driver="identity", audit=True, sensitive_kind="identity.provision_external_dns_role")
+    def provision_external_dns_role(self, role_name: str) -> str:
+        """Self-provision the IRSA role external-dns assumes (#1044).
+
+        external-dns syncs Route53 records from Ingress / Service annotations;
+        it needs ``route53:ChangeResourceRecordSets`` on hosted zones plus the
+        list actions to discover zones + record sets. Attached inline (no
+        AWS-managed policy fits). Creates the OIDC-trust role, scopes its trust
+        to the ``astrolift-system:external-dns`` subject, and writes the inline
+        policy.
+
+        Idempotent: re-runs reconcile the trust subject + re-write the inline
+        policy. Returns the role ARN."""
+        role_arn = self.create_identity_role(role_name, permissions=EXTERNAL_DNS_POLICY_STATEMENTS)
+        self._ensure_trust_includes(
+            role_name=role_name,
+            namespace=EXTERNAL_DNS_NAMESPACE,
+            sa_name=EXTERNAL_DNS_SA,
+        )
         return role_arn
 
     @driver_op(cloud="aws", driver="identity", audit=True, sensitive_kind="identity.delete_role")

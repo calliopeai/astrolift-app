@@ -338,6 +338,72 @@ def _provision_ebs_csi_irsa_role(cluster: Any, selected_set: set[str]) -> str | 
     return role_arn
 
 
+# Bootstrap-component keys for the AWS controllers whose IRSA roles the
+# platform mints (mirrors the keys EKSCluster.bootstrap_components emits). Each
+# maps to a mint method on the AWS IRSADriver.
+_ALB_CONTROLLER_COMPONENT_KEY = "aws-load-balancer-controller"
+_EXTERNAL_DNS_COMPONENT_KEY = "external-dns"
+
+
+def _provision_aws_controller_irsa_role(
+    cluster: Any,
+    selected_set: set[str],
+    *,
+    component_key: str,
+    mint_method: str,
+) -> str | None:
+    """Mint the IRSA role for an AWS in-cluster controller when its component
+    is enabled (#1044).
+
+    Generalizes the EBS-CSI wiring (#1032) to the aws-load-balancer-controller
+    and external-dns components: before #1044 neither had a mint function on
+    the identity driver *or* a call site, so their controller ServiceAccounts
+    were annotated with role ARNs that nothing created — AssumeRoleWithWebIdentity
+    403'd and ingress / Route53 sync silently never worked. When the component
+    is selected on an AWS cluster, discover + cache the cluster's OIDC issuer,
+    then call the named mint method (``provision_alb_controller_role`` /
+    ``provision_external_dns_role``), which scopes the trust to the chart's
+    pinned ServiceAccount subject and writes the inline policy.
+
+    Role name matches the SA annotation ``EKSCluster.bootstrap_components``
+    emits (``_irsa_arn``): an explicit override ARN from
+    ``auth_config['irsa_roles']`` if set, else ``<cluster_name>-<component_key>``.
+
+    Idempotent — the mint method reconciles the trust subject + re-writes the
+    inline policy on re-run. No-op (returns ``None``) when the component is
+    deselected or the cluster isn't AWS."""
+    if component_key not in selected_set:
+        return None
+    if getattr(getattr(cluster, "provider_plugin", None), "slug", "") != "aws":
+        return None
+
+    from astrolift_workflows.activities.workload_identity import (
+        _ensure_cluster_oidc_issuer,
+    )
+    from core.app_deploy import driver_for_capability
+
+    _ensure_cluster_oidc_issuer(cluster)
+
+    ac = cluster.auth_config or {}
+    pc = cluster.provider_config or {}
+    override = (ac.get("irsa_roles") or {}).get(component_key)
+    if override:
+        role_name = str(override).split("/")[-1]
+    else:
+        cluster_name = ac.get("cluster_name") or pc.get("cluster_name") or cluster.slug
+        role_name = f"{cluster_name}-{component_key}"
+
+    identity_driver = driver_for_capability(cluster, "identity")
+    role_arn = getattr(identity_driver, mint_method)(role_name)
+    log.info(
+        "install_cluster_prereqs: provisioned %s IRSA role %s (%s)",
+        component_key,
+        role_name,
+        role_arn,
+    )
+    return role_arn
+
+
 _LEGACY_HELM_RELEASE_NAMES: frozenset[str] = frozenset(
     [
         # tls_issuer was renamed to cert-manager across all cloud drivers.
@@ -381,10 +447,23 @@ def _install_cluster_prereqs_sync(
     selected_set = set(selected_keys)
     target_namespace = "astrolift-system"
 
-    # Self-provision the EBS-CSI controller's IRSA role before the HelmRelease
-    # lands, so the controller can assume it as soon as its pods start (#1032).
-    # No-op for non-AWS clusters or when the component is deselected.
+    # Self-provision the AWS controllers' IRSA roles before their HelmReleases
+    # land, so each controller can assume its role as soon as its pods start
+    # (#1032 EBS-CSI, #1044 ALB controller + external-dns). No-op for non-AWS
+    # clusters or when the component is deselected.
     _provision_ebs_csi_irsa_role(cluster, selected_set)
+    _provision_aws_controller_irsa_role(
+        cluster,
+        selected_set,
+        component_key=_ALB_CONTROLLER_COMPONENT_KEY,
+        mint_method="provision_alb_controller_role",
+    )
+    _provision_aws_controller_irsa_role(
+        cluster,
+        selected_set,
+        component_key=_EXTERNAL_DNS_COMPONENT_KEY,
+        mint_method="provision_external_dns_role",
+    )
 
     resources: list[dict[str, Any]] = []
     applied: list[dict[str, str]] = []
