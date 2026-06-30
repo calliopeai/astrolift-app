@@ -100,6 +100,12 @@ class RegisterAgentRepoInput:
     added agents. ``ref`` is the branch/sha to read the tree at (defaults to
     the repo's default branch handle); ``default_branch`` / ``deploy_branch``
     seed the created apps' branch fields.
+
+    ``manifest_paths`` optionally restricts registration to a subset of the
+    discovered manifests (spec 33 PR-8 / #933): when given, only manifests at
+    those paths are registered — the wizard's checked agents. Paths that
+    aren't among the discovered manifests are ignored. When omitted/empty,
+    every discovered agent manifest is registered (unchanged behaviour).
     """
 
     project_id: GUID
@@ -109,6 +115,7 @@ class RegisterAgentRepoInput:
     ref: str = "main"
     default_branch: str | None = None
     deploy_branch: str | None = None
+    manifest_paths: list[str] | None = None
 
 
 @strawberry.type(name="AstroliftRegisteredAgent")
@@ -1248,10 +1255,17 @@ class RegistryMutation:
             default_branch=input.default_branch or "main",
             deploy_branch=input.deploy_branch or "",
             default_cluster=default_cluster,
+            manifest_paths=input.manifest_paths or None,
         )
 
         if result.status == "fetch_failed":
             return gql_failure(ErrorCode.PRECONDITION.value, result.error or "repo fetch failed")
+        if result.status == "no_match":
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                result.error or "none of the requested manifestPaths matched a discovered agent manifest",
+                field="manifestPaths",
+            )
         if result.status == "no_agents":
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,

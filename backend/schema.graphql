@@ -59,6 +59,7 @@ input AgentRunSpecInput {
   scheduledScaleTo: Int = null
   scaleUpCron: String = null
   scaleDownCron: String = null
+  clearScheduledScaling: Boolean! = false
 }
 
 type Alertruledeletedpayload {
@@ -240,6 +241,11 @@ type AstroliftAgentListItem {
   lastRunStatus: String
   lastRunAt: DateTime
   runningCount: Int!
+  runMaxParallel: Int
+  replicas: Int!
+  scheduledScaleTo: Int
+  scaleUpCron: String!
+  scaleDownCron: String!
 }
 
 type AstroliftAgentLiveStatus {
@@ -5077,6 +5083,7 @@ input RegisterAgentRepoInput {
   ref: String! = "main"
   defaultBranch: String = null
   deployBranch: String = null
+  manifestPaths: [String!] = null
 }
 
 input RegisterAppInput {

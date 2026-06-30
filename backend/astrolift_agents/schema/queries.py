@@ -272,6 +272,11 @@ def _agent_list_rows(info: Info, org_id: strawberry.ID, project_slug: str | None
                 last_run_status=stats.get("last_status"),
                 last_run_at=stats.get("last_at"),
                 running_count=stats.get("running", 0),
+                run_max_parallel=w.run_max_parallel,
+                replicas=w.replicas,
+                scheduled_scale_to=w.scheduled_scale_to,
+                scale_up_cron=w.scale_up_cron or "",
+                scale_down_cron=w.scale_down_cron or "",
             )
         )
     return rows
