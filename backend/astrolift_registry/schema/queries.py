@@ -339,17 +339,22 @@ def _build_apps_page(
     # a per-row M2M query that explodes the count on a list query. Prefetch
     # it once for the page so the cost stays bounded.
     qs = qs.prefetch_related("approver_users")
+    # Fold the managed-domain inputs into the row fetch so the per-row
+    # hostname compute (``_compute_managed_hostname``) doesn't N+1 (#1043).
+    qs = _annotate_managed_domain(qs)
 
     if not _status_filter_active(status):
         items, next_cursor, total_count = _paginate_apps(qs, cursor=cursor, limit=page_size, sort_by=sort_by)
         freshness_by_app = _freshness_for_apps(items) if effective_freshness else {}
         preview_counts = _active_preview_counts(items)
+        managed_hostnames = _managed_hostnames_for_apps(items)
         return RegisteredAppPageType(
             items=[
                 app_to_type(
                     a,
                     freshness=freshness_by_app.get(a.pk) if include_freshness else None,
                     active_preview_count=preview_counts.get(a.pk, 0),
+                    managed_hostname=managed_hostnames.get(a.pk, ""),
                 )
                 for a in items
             ],
@@ -380,12 +385,14 @@ def _build_apps_page(
     else:
         next_cursor = None
     preview_counts = _active_preview_counts(items)
+    managed_hostnames = _managed_hostnames_for_apps(items)
     return RegisteredAppPageType(
         items=[
             app_to_type(
                 a,
                 freshness=freshness_by_app.get(a.pk) if include_freshness else None,
                 active_preview_count=preview_counts.get(a.pk, 0),
+                managed_hostname=managed_hostnames.get(a.pk, ""),
             )
             for a in items
         ],
@@ -418,6 +425,69 @@ def _active_preview_counts(apps: Iterable[RegisteredApp]) -> dict[int, int]:
         .annotate(count=models.Count("pk"))
     )
     return {row["registered_app_id"]: int(row["count"]) for row in rows}
+
+
+def _annotate_managed_domain(qs):
+    """Fold both managed-domain resolution inputs into the row fetch (#1043).
+
+    ``_compute_managed_hostname`` calls ``resolve_managed_domain`` per
+    row: it reads ``organization.default_managed_domain`` (an FK) and,
+    when that's unset, falls back to an unconditional platform-level
+    (``organization IS NULL``) ``ManagedDomain`` lookup. On a list that
+    fallback fires once *per row* — the N+1 this ticket fixes.
+
+    Both inputs depend only on the app's organization, so we load them
+    with the page SELECT instead of per row: ``select_related`` pulls the
+    org-default FK into the existing join, and an uncorrelated
+    ``Subquery`` annotates the platform-level zone (a single global row)
+    onto each row. Neither adds a query — the cost stays O(1) regardless
+    of row count. ``_managed_hostnames_for_apps`` then reads both off the
+    materialised rows with no further DB hits.
+    """
+    from astrolift_clusters.models import ManagedDomain
+
+    platform_zone_sq = (
+        ManagedDomain.objects.filter(
+            organization__isnull=True,
+            default_for__in=[ManagedDomain.DefaultFor.TENANT_APPS, ManagedDomain.DefaultFor.BOTH],
+            deleted_at__isnull=True,
+        )
+        .order_by("pk")
+        .values("zone")[:1]
+    )
+    return qs.select_related("organization__default_managed_domain").annotate(
+        _platform_zone=Subquery(platform_zone_sq)
+    )
+
+
+def _managed_hostnames_for_apps(apps: Iterable[RegisteredApp]) -> dict[int, str]:
+    """Map each app to its platform-managed hostname (#1043).
+
+    Reads the managed-domain inputs that :func:`_annotate_managed_domain`
+    pre-loaded onto the rows — the ``organization.default_managed_domain``
+    FK (select_related cache) and the ``_platform_zone`` annotation —
+    so it issues no queries of its own. Resolution mirrors
+    ``resolve_managed_domain``: a non-deleted org-default wins, else the
+    platform-level zone. ``app_to_type`` reads this map via the
+    ``managed_hostname=`` kwarg.
+    """
+    app_list = list(apps)
+    if not app_list:
+        return {}
+
+    out: dict[int, str] = {}
+    for app in app_list:
+        org = app.organization if app.organization_id else None
+        domain = getattr(org, "default_managed_domain", None) if org is not None else None
+        if domain is not None and getattr(domain, "deleted_at", None) is not None:
+            domain = None
+        zone = domain.zone if domain is not None else getattr(app, "_platform_zone", None)
+        if not zone:
+            out[app.pk] = ""
+            continue
+        subdomain = (app.subdomain or app.slug or "").strip()
+        out[app.pk] = f"{subdomain}.{zone}" if subdomain else ""
+    return out
 
 
 def _viewer_scope_filter() -> Q | None:
@@ -756,18 +826,27 @@ class RegistryQuery:
 
         # Soft cap kept at 200 to mirror the legacy shape — the page
         # variant is the right surface when callers need more than that.
-        apps = list(qs.order_by("-created_at")[:200])
+        apps = list(_annotate_managed_domain(qs).order_by("-created_at")[:200])
         freshness_by_app = _freshness_for_apps(apps) if effective_freshness else {}
         if _status_filter_active(status):
             apps = _filter_apps_by_status(apps, freshness_by_app, status)
         preview_counts = _active_preview_counts(apps)
+        managed_hostnames = _managed_hostnames_for_apps(apps)
         if not include_freshness:
-            return [app_to_type(a, active_preview_count=preview_counts.get(a.pk, 0)) for a in apps]
+            return [
+                app_to_type(
+                    a,
+                    active_preview_count=preview_counts.get(a.pk, 0),
+                    managed_hostname=managed_hostnames.get(a.pk, ""),
+                )
+                for a in apps
+            ]
         return [
             app_to_type(
                 a,
                 freshness=freshness_by_app.get(a.pk),
                 active_preview_count=preview_counts.get(a.pk, 0),
+                managed_hostname=managed_hostnames.get(a.pk, ""),
             )
             for a in apps
         ]
@@ -915,18 +994,27 @@ class RegistryQuery:
         # Legacy ordering preserved (``slug``) so existing callers see
         # the same row order they did before #481. The page variant
         # uses the createdAt seek key for cursor stability.
-        scoped_apps = list(qs.order_by("slug")[:200])
+        scoped_apps = list(_annotate_managed_domain(qs).order_by("slug")[:200])
         freshness_by_app = _freshness_for_apps(scoped_apps) if effective_freshness else {}
         if _status_filter_active(status):
             scoped_apps = _filter_apps_by_status(scoped_apps, freshness_by_app, status)
         preview_counts = _active_preview_counts(scoped_apps)
+        managed_hostnames = _managed_hostnames_for_apps(scoped_apps)
         if not include_freshness:
-            return [app_to_type(a, active_preview_count=preview_counts.get(a.pk, 0)) for a in scoped_apps]
+            return [
+                app_to_type(
+                    a,
+                    active_preview_count=preview_counts.get(a.pk, 0),
+                    managed_hostname=managed_hostnames.get(a.pk, ""),
+                )
+                for a in scoped_apps
+            ]
         return [
             app_to_type(
                 a,
                 freshness=freshness_by_app.get(a.pk),
                 active_preview_count=preview_counts.get(a.pk, 0),
+                managed_hostname=managed_hostnames.get(a.pk, ""),
             )
             for a in scoped_apps
         ]
