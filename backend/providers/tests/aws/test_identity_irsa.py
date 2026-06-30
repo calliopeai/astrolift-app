@@ -399,3 +399,114 @@ def test_provision_ebs_csi_role_idempotent() -> None:
     assert a == b
     cond = iam.roles[_EBS_CSI_ROLE]["trust"]["Statement"][0]["Condition"]["StringEquals"]
     assert cond[f"{_ISSUER}:sub"] == "system:serviceaccount:astrolift-system:ebs-csi-controller-sa"
+
+
+# ---- provision_alb_controller_role + provision_external_dns_role (#1044) ----
+#
+# Same recording-IAM approach, but these controllers attach an *inline* policy
+# (no AWS-managed ARN fits) so the double records put_role_policy to let the
+# assertions reach the policy document.
+
+
+class _InlineRecordingIam(_RecordingIam):
+    """Adds inline-policy recording to the EBS-CSI double so the ALB /
+    external-dns mint paths (which write an inline policy via
+    create_identity_role) can be asserted without moto."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.inline: dict[str, dict] = {}  # role -> {policy_name: doc}
+
+    def put_role_policy(self, **kwargs) -> None:
+        self.inline.setdefault(kwargs["RoleName"], {})[kwargs["PolicyName"]] = json.loads(kwargs["PolicyDocument"])
+
+
+_ALB_ROLE = "astrolift-eks-aws-load-balancer-controller"
+_EXTERNAL_DNS_ROLE = "astrolift-eks-external-dns"
+
+
+def _inline_driver(iam: _InlineRecordingIam) -> IRSADriver:
+    return IRSADriver(
+        config=IRSAConfig(
+            region="us-west-2",
+            account_id="123456789012",
+            cluster_oidc_issuer=_ISSUER,
+        ),
+        iam_client=iam,
+    )
+
+
+def _flatten_actions(statements: list[dict]) -> set[str]:
+    actions: set[str] = set()
+    for stmt in statements:
+        act = stmt.get("Action", [])
+        actions.update([act] if isinstance(act, str) else act)
+    return actions
+
+
+def test_provision_alb_controller_role_trust_and_inline_policy() -> None:
+    """Scopes the OIDC trust to astrolift-system:aws-load-balancer-controller
+    and writes the canonical LB-controller permission set inline."""
+    iam = _InlineRecordingIam()
+    arn = _inline_driver(iam).provision_alb_controller_role(_ALB_ROLE)
+
+    assert arn == f"arn:aws:iam::123456789012:role/{_ALB_ROLE}"
+
+    cond = iam.roles[_ALB_ROLE]["trust"]["Statement"][0]["Condition"]["StringEquals"]
+    assert cond[f"{_ISSUER}:sub"] == "system:serviceaccount:astrolift-system:aws-load-balancer-controller"
+    assert cond[f"{_ISSUER}:aud"] == "sts.amazonaws.com"
+
+    doc = iam.inline[_ALB_ROLE]["astrolift-workload-policy"]
+    actions = _flatten_actions(doc["Statement"])
+    # Spot-check the load-bearing permissions across the policy's families.
+    assert "elasticloadbalancing:CreateLoadBalancer" in actions
+    assert "ec2:CreateSecurityGroup" in actions
+    assert "wafv2:AssociateWebACL" in actions
+    assert "acm:DescribeCertificate" in actions
+    assert "cognito-idp:DescribeUserPoolClient" in actions
+
+
+def test_provision_alb_controller_role_idempotent() -> None:
+    """Re-running converges to a single trust subject + the same ARN."""
+    iam = _InlineRecordingIam()
+    driver = _inline_driver(iam)
+    a = driver.provision_alb_controller_role(_ALB_ROLE)
+    b = driver.provision_alb_controller_role(_ALB_ROLE)
+
+    assert a == b
+    cond = iam.roles[_ALB_ROLE]["trust"]["Statement"][0]["Condition"]["StringEquals"]
+    assert cond[f"{_ISSUER}:sub"] == "system:serviceaccount:astrolift-system:aws-load-balancer-controller"
+
+
+def test_provision_external_dns_role_trust_and_inline_policy() -> None:
+    """Scopes the OIDC trust to astrolift-system:external-dns and writes the
+    Route53 change/list permissions inline."""
+    iam = _InlineRecordingIam()
+    arn = _inline_driver(iam).provision_external_dns_role(_EXTERNAL_DNS_ROLE)
+
+    assert arn == f"arn:aws:iam::123456789012:role/{_EXTERNAL_DNS_ROLE}"
+
+    cond = iam.roles[_EXTERNAL_DNS_ROLE]["trust"]["Statement"][0]["Condition"]["StringEquals"]
+    assert cond[f"{_ISSUER}:sub"] == "system:serviceaccount:astrolift-system:external-dns"
+    assert cond[f"{_ISSUER}:aud"] == "sts.amazonaws.com"
+
+    doc = iam.inline[_EXTERNAL_DNS_ROLE]["astrolift-workload-policy"]
+    actions = _flatten_actions(doc["Statement"])
+    assert "route53:ChangeResourceRecordSets" in actions
+    assert "route53:ListHostedZones" in actions
+    assert "route53:ListResourceRecordSets" in actions
+    # ChangeResourceRecordSets is scoped to hosted zones, not "*".
+    change_stmt = next(s for s in doc["Statement"] if "route53:ChangeResourceRecordSets" in s["Action"])
+    assert change_stmt["Resource"] == ["arn:aws:route53:::hostedzone/*"]
+
+
+def test_provision_external_dns_role_idempotent() -> None:
+    """Re-running converges to a single trust subject + the same ARN."""
+    iam = _InlineRecordingIam()
+    driver = _inline_driver(iam)
+    a = driver.provision_external_dns_role(_EXTERNAL_DNS_ROLE)
+    b = driver.provision_external_dns_role(_EXTERNAL_DNS_ROLE)
+
+    assert a == b
+    cond = iam.roles[_EXTERNAL_DNS_ROLE]["trust"]["Statement"][0]["Condition"]["StringEquals"]
+    assert cond[f"{_ISSUER}:sub"] == "system:serviceaccount:astrolift-system:external-dns"

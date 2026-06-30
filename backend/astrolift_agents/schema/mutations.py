@@ -875,6 +875,10 @@ class AgentsMutation:
 
         timeout_seconds = input.timeout_seconds if input.timeout_seconds and input.timeout_seconds > 0 else 300
 
+        # Ad-hoc input frozen on the task so the spawner surfaces it to the
+        # pod as ASTROLIFT_TRIGGER_PAYLOAD (#930). None/empty -> no env var.
+        dispatch_input = input.trigger_payload or None
+
         with transaction.atomic():
             task = AgentTask.objects.create(
                 organization=org,
@@ -882,6 +886,7 @@ class AgentsMutation:
                 environment_spec=env_spec,
                 status=AgentTask.Status.DRAFT,
                 timeout_seconds=timeout_seconds,
+                dispatch_input=dispatch_input,
                 # Freeze VNC eligibility from the spec so the task stays
                 # self-describing if the spec is later edited or deleted
                 # (mirrors execute_agent_stage._create_agent_task_sync).

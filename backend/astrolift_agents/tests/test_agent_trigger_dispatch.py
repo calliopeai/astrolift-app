@@ -191,6 +191,9 @@ def test_dispatch_from_webhook_creates_task_with_mapped_input(agent, temporal_re
     assert args[0].actor.kind == "system"
     # The input mapping was applied — only the mapped key, projected value.
     assert args[0].trigger_payload == {"pr": 99}
+    # ...and the mapped payload is ALSO frozen on the task itself so the
+    # spawner surfaces it to the pod as ASTROLIFT_TRIGGER_PAYLOAD (#930).
+    assert task.dispatch_input == {"pr": 99}
 
 
 def test_dispatch_from_webhook_empty_mapping_passes_whole_payload(agent, temporal_recorder):

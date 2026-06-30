@@ -800,6 +800,7 @@ def app_to_type(
     settings_last_modified: AppSettingsLastModifiedType | None = None,
     viewer_permissions: Iterable[str] | None = None,
     active_preview_count: int | None = None,
+    managed_hostname: str | None = None,
     include_retention_policies: bool = False,
 ) -> RegisteredAppType:
     from astrolift_manifest.sync_state import (
@@ -849,7 +850,9 @@ def app_to_type(
         provider_plugin_slug=_provider_plugin_slug(app),
         k8s_namespace=app.k8s_namespace,
         subdomain=app.subdomain,
-        managed_hostname=_compute_managed_hostname(app),
+        managed_hostname=(
+            managed_hostname if managed_hostname is not None else _compute_managed_hostname(app)
+        ),
         is_active=app.is_active,
         provisioning_status=app.provisioning_status,
         provisioning_error=app.provisioning_error,
