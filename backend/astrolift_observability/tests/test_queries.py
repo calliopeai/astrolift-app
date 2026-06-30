@@ -231,16 +231,24 @@ def test_memory_saturation_uses_working_set_bytes(permission_resolver):
 
 
 def test_signal_promql_disclosure_includes_app_label(permission_resolver):
-    """The dev-mode disclosure text must include the app label so an
-    operator can copy-paste the query into Grafana and see it scope
-    to their app."""
+    """The dev-mode disclosure text must scope every signal to the app so
+    an operator can copy-paste the query into Grafana. App-instrumentation
+    signals carry the ``app="<slug>"`` matcher; the saturation pair reads
+    cAdvisor / kube-state-metrics series that only carry namespace/pod/
+    container labels, so those scope by ``namespace="<ns>"`` instead."""
     org, app = _scaffold(prometheus_endpoint="http://prom:9090")
     permission_resolver.grant(Permission.APP_READ)
 
     with patch.object(prom_client, "query_range_series", return_value=[]):
         with _tenant(org):
             result = GoldenSignalsQuery().astrolift_app_golden_signals(_info(), app_slug=app.slug)
-    assert all(f'app="{app.slug}"' in row.promql for row in result)
+    namespace_scoped = {GoldenSignalKind.SATURATION_CPU, GoldenSignalKind.SATURATION_MEMORY}
+    for row in result:
+        if row.name in namespace_scoped:
+            assert f'namespace="{app.k8s_namespace}"' in row.promql, row.promql
+            assert f'app="{app.slug}"' not in row.promql, row.promql
+        else:
+            assert f'app="{app.slug}"' in row.promql, row.promql
 
 
 def test_prometheus_error_returns_empty_list(permission_resolver):
@@ -369,9 +377,12 @@ def test_status_code_breakdown_returns_none_on_prometheus_error(permission_resol
 
 
 def test_golden_signals_workload_slug_threads_into_promql(permission_resolver):
-    """The ``workload_slug`` resolver arg lands as a
-    ``workload="<slug>"`` matcher in every emitted PromQL expression
-    so Prometheus narrows the metric stream to one workload."""
+    """The ``workload_slug`` resolver arg lands as a ``workload="<slug>"``
+    matcher in every app-instrumentation signal so Prometheus narrows the
+    metric stream to one workload. The saturation pair reads cAdvisor /
+    kube-state-metrics series that carry no ``workload`` label, so those
+    stay namespace-scoped (the workload matcher is intentionally dropped
+    rather than producing a query that matches nothing)."""
     org, app = _scaffold(prometheus_endpoint="http://prom:9090")
     permission_resolver.grant(Permission.APP_READ)
 
@@ -386,8 +397,13 @@ def test_golden_signals_workload_slug_threads_into_promql(permission_resolver):
             )
 
     assert result, "expected one row per signal kind even when samples are empty"
+    namespace_scoped = {GoldenSignalKind.SATURATION_CPU, GoldenSignalKind.SATURATION_MEMORY}
     for row in result:
-        assert 'workload="api"' in row.promql, row.promql
+        if row.name in namespace_scoped:
+            assert 'workload="api"' not in row.promql, row.promql
+            assert f'namespace="{app.k8s_namespace}"' in row.promql, row.promql
+        else:
+            assert 'workload="api"' in row.promql, row.promql
 
 
 def test_golden_signals_without_workload_slug_omits_label(permission_resolver):

@@ -131,7 +131,10 @@ def _patch_target(monkeypatch, cluster: Any | None) -> None:
             return None
         return {"cluster": cluster, "namespace": "acme-web"}
 
-    async def _auth_for(_cluster):
+    # ``_auth_for`` is sync — the backend wraps it in ``sync_to_async``
+    # (#1040, to keep sync ORM/config reads off the event loop), so the
+    # stub must be a plain function or ``sync_to_async`` rejects it.
+    def _auth_for(_cluster):
         return object()
 
     monkeypatch.setattr(mod, "_resolve_target", _resolve)

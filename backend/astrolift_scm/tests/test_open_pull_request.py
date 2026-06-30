@@ -319,18 +319,20 @@ def test_gitlab_open_merge_request_already_exists(monkeypatch):
 
 
 def test_open_pull_request_unsupported_kind_raises(monkeypatch):
-    """A kind the dispatcher doesn't know about (e.g. bitbucket) maps
-    to a UNSUPPORTED ProviderError rather than crashing — the
-    mutation layer translates this into a user-friendly envelope."""
+    """A kind the dispatcher doesn't know about maps to a UNSUPPORTED
+    ProviderError rather than crashing — the mutation layer translates
+    this into a user-friendly envelope."""
     encrypted = encrypt_at_rest(b"unused")
     org = Organization.objects.create(name="Bb", slug="bb")
-    # Bitbucket is in SourceConnection.Kind but not in the SCM
-    # provider dispatcher's _BITBUCKET_KINDS set — perfect canary
-    # for the unsupported-host path.
+    # GitHub/GitLab/Bitbucket/Gitea are all supported now, so the only
+    # way to reach the unsupported-host path is a kind string the
+    # dispatcher's host sets don't cover. ``kind`` is a CharField whose
+    # choices aren't DB-enforced, so a synthetic value exercises the
+    # final ``UNSUPPORTED`` fallthrough directly.
     conn = SourceConnection.objects.create(
         organization=org,
-        kind=SourceConnection.Kind.BITBUCKET_PAT,
-        display_name="Bitbucket",
+        kind="mercurial_pat",
+        display_name="Mercurial",
         account_login="alice",
         secret_backend_kind=encrypted.backend_kind,
         secret_ciphertext=encrypted.backend_ref,

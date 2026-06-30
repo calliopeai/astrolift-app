@@ -179,8 +179,13 @@ def _ensure_preview_environment(app, pr_ctx: github_pr_dispatch.PrEventContext):
     from astrolift_clusters.models import resolve_managed_domain
 
     _managed_domain = resolve_managed_domain(org, for_preview=True)
-    base_zone = getattr(_managed_domain, "zone", None) or org_slug
-    hostname = f"pr-{pr_ctx.pr_number}.{app_slug}.{org_slug}.{base_zone}".lower()
+    # Stable per-PR label: ``pr-<n>.<app>.<org>``. When the install has a
+    # managed DNS zone we append it to form the full FQDN; without one we
+    # stop at the org slug rather than repeating it (the old fallback
+    # ``base_zone = ... or org_slug`` produced ``…<org>.<org>``).
+    base = f"pr-{pr_ctx.pr_number}.{app_slug}.{org_slug}"
+    zone = getattr(_managed_domain, "zone", None)
+    hostname = (f"{base}.{zone}" if zone else base).lower()
     env_name = env_slug_for_preview(pr_number=pr_ctx.pr_number)
 
     with transaction.atomic():
