@@ -348,6 +348,127 @@ def test_repo_with_no_agents_returns_no_agents(org, with_connection):
 
 
 # ---------------------------------------------------------------------------
+# #933: manifestPaths subset registration
+# ---------------------------------------------------------------------------
+
+
+def test_manifest_paths_registers_only_the_requested_subset(org, with_connection):
+    """With manifest_paths given, only the listed manifests register; the
+    others are left untouched."""
+    with_connection(org)
+    project = _project(org)
+    tree = _tree_of(
+        {
+            "agents/triage/astrolift.toml": _agent_toml("triage"),
+            "agents/summarize/astrolift.toml": _agent_toml("summarize"),
+            "agents/report/astrolift.toml": _agent_toml("report"),
+        }
+    )
+
+    result = register_agent_repo(
+        project=project,
+        source_kind="github",
+        source_repo="acme/agents",
+        ref="main",
+        manifest_paths=["agents/triage/astrolift.toml", "agents/report/astrolift.toml"],
+        tree=tree,
+    )
+
+    assert result.status == "ok"
+    assert {a.manifest_path for a in result.agents} == {
+        "agents/triage/astrolift.toml",
+        "agents/report/astrolift.toml",
+    }
+    # Only the two requested agents landed — summarize was excluded.
+    apps = RegisteredApp.objects.filter(organization=org, deleted_at__isnull=True)
+    assert {a.manifest_path for a in apps} == {
+        "agents/triage/astrolift.toml",
+        "agents/report/astrolift.toml",
+    }
+    assert (
+        Workload.objects.filter(
+            kind=Workload.Kind.AGENT, registered_app__organization=org, deleted_at__isnull=True
+        ).count()
+        == 2
+    )
+
+
+def test_manifest_paths_omitted_registers_all(org, with_connection):
+    """Omitting manifest_paths preserves the register-everything behaviour."""
+    with_connection(org)
+    project = _project(org)
+    tree = _tree_of(
+        {
+            "agents/triage/astrolift.toml": _agent_toml("triage"),
+            "agents/summarize/astrolift.toml": _agent_toml("summarize"),
+        }
+    )
+
+    result = register_agent_repo(
+        project=project,
+        source_kind="github",
+        source_repo="acme/agents",
+        ref="main",
+        manifest_paths=None,
+        tree=tree,
+    )
+
+    assert result.status == "ok"
+    assert {a.manifest_path for a in result.agents} == {
+        "agents/triage/astrolift.toml",
+        "agents/summarize/astrolift.toml",
+    }
+
+
+def test_manifest_paths_ignores_unknown_path_in_mixed_request(org, with_connection):
+    """A request that mixes a known and an unknown path registers the known
+    one and silently drops the unknown — a stale selection never fails the
+    whole pass."""
+    with_connection(org)
+    project = _project(org)
+    tree = _tree_of(
+        {
+            "agents/triage/astrolift.toml": _agent_toml("triage"),
+            "agents/summarize/astrolift.toml": _agent_toml("summarize"),
+        }
+    )
+
+    result = register_agent_repo(
+        project=project,
+        source_kind="github",
+        source_repo="acme/agents",
+        ref="main",
+        manifest_paths=["agents/triage/astrolift.toml", "agents/ghost/astrolift.toml"],
+        tree=tree,
+    )
+
+    assert result.status == "ok"
+    assert {a.manifest_path for a in result.agents} == {"agents/triage/astrolift.toml"}
+    assert RegisteredApp.objects.filter(organization=org, deleted_at__isnull=True).count() == 1
+
+
+def test_manifest_paths_all_unknown_is_no_match(org, with_connection):
+    """When every requested path is unknown, nothing registers and the result
+    is a clear no_match (not a misleading no_agents)."""
+    with_connection(org)
+    project = _project(org)
+    tree = _tree_of({"agents/triage/astrolift.toml": _agent_toml("triage")})
+
+    result = register_agent_repo(
+        project=project,
+        source_kind="github",
+        source_repo="acme/agents",
+        ref="main",
+        manifest_paths=["agents/nope/astrolift.toml"],
+        tree=tree,
+    )
+
+    assert result.status == "no_match"
+    assert "agents/triage/astrolift.toml" in (result.error or "")
+    assert RegisteredApp.objects.filter(organization=org, deleted_at__isnull=True).count() == 0
+
+
+# ---------------------------------------------------------------------------
 # Acceptance 5: tenancy — rows scoped to the project's org
 # ---------------------------------------------------------------------------
 
@@ -571,3 +692,43 @@ def test_register_agent_repo_mutation_no_agents_envelope(
         )
     assert result.ok is False
     assert result.errors[0].code == ErrorCode.NOT_FOUND.value
+
+
+def test_register_agent_repo_mutation_manifest_paths_subset(
+    monkeypatch, org, with_connection, permission_resolver
+):
+    """The mutation threads manifestPaths into the service so only the checked
+    agents register (#933)."""
+    with_connection(org)
+    project = _project(org)
+    permission_resolver.grant(Permission.AGENT_CREATE)
+
+    import astrolift_registry.services.manifest_sync as ms
+
+    monkeypatch.setattr(
+        ms,
+        "_default_tree_fetch",
+        lambda connection, repo, ref: {
+            "agents/triage/astrolift.toml": _agent_toml("triage"),
+            "agents/summarize/astrolift.toml": _agent_toml("summarize"),
+        },
+    )
+
+    with _enter(org):
+        result = RegistryMutation().register_agent_repo(
+            _info(),
+            input=RegisterAgentRepoInput(
+                project_id=str(project.guid),
+                source_repo="acme/agents",
+                manifest_paths=["agents/summarize/astrolift.toml"],
+            ),
+        )
+
+    assert result.ok is True
+    assert {a.manifest_path for a in result.data.agents} == {"agents/summarize/astrolift.toml"}
+    assert (
+        Workload.objects.filter(
+            kind=Workload.Kind.AGENT, registered_app__organization=org, deleted_at__isnull=True
+        ).count()
+        == 1
+    )

@@ -330,6 +330,8 @@ def create_agent_webhook_trigger(
     webhook_slug: str | None = None,
     *,
     input_mapping: dict | None = None,
+    scm_repo: str = "",
+    branch_pattern: str = "",
 ) -> dict:
     """Register a ``WorkflowWebhook`` that dispatches *workload* (an agent
     Workload) on inbound POST to ``/api/webhooks/workflow/<org>/<slug>``.
@@ -339,7 +341,12 @@ def create_agent_webhook_trigger(
     model's ``agent_definition`` FK already exist (spec 33, PR-6); this is
     the missing creation seam (#983). Same secret contract: stored as
     SHA-256(plaintext), plaintext returned once. The webhook is org-scoped
-    (resolved by ``<org>/<slug>``) and carries no SCM app binding.
+    (resolved by ``<org>/<slug>``).
+
+    ``scm_repo`` / ``branch_pattern`` are the SCM fan-out filters (#863): set
+    them and the binding ALSO fires automatically on matching push/PR events
+    routed to the org (``route_scm_push_to_workflow_webhooks``), not only on a
+    direct POST to the endpoint. Both blank = direct-POST only / match-any.
     """
     from astrolift_agents.models.workflow_trigger import WorkflowWebhook
 
@@ -355,6 +362,8 @@ def create_agent_webhook_trigger(
             slug=slug,
             secret_hash=secret_hash,
             input_mapping=input_mapping or {},
+            scm_repo=scm_repo or "",
+            branch_pattern=branch_pattern or "",
             enabled=True,
         )
 

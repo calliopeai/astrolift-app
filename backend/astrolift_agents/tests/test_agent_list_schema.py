@@ -152,6 +152,58 @@ def test_agent_workloads_carries_source_and_run_spec(permission_resolver, info, 
     assert row.run_paused is True
 
 
+def test_agent_workloads_carries_full_run_spec_write_fields(permission_resolver, info, with_tenant_org):
+    """The list row carries the run-spec write fields (#952) — the loop cap,
+    Service baseline replicas, and the scheduled-scaling target + crons — so
+    the run-spec editors seed from the persisted values on first load instead
+    of from defaults."""
+    org = _org("acme")
+    project, team = _project(org, "demo")
+    app = _app(org, project, team, "hello")
+    permission_resolver.grant(Permission.AGENT_READ)
+    _agent_workload(
+        app,
+        "scaler-bot",
+        run_family=Workload.RunFamily.SERVICE,
+        replicas=4,
+        scheduled_scale_to=7,
+        scale_up_cron="0 8 * * 1-5",
+        scale_down_cron="0 18 * * 1-5",
+    )
+
+    with with_tenant_org(org):
+        rows = AgentsQuery().agent_workloads(info(), org_id=str(org.guid))
+
+    row = rows[0]
+    assert row.replicas == 4
+    assert row.scheduled_scale_to == 7
+    assert row.scale_up_cron == "0 8 * * 1-5"
+    assert row.scale_down_cron == "0 18 * * 1-5"
+
+
+def test_agent_workloads_run_max_parallel_surfaced(permission_resolver, info, with_tenant_org):
+    """The Task-family Loop cap (``run_max_parallel``) is surfaced on the row;
+    null on an agent with no explicit cap (platform default)."""
+    org = _org("acme")
+    project, team = _project(org, "demo")
+    app = _app(org, project, team, "hello")
+    permission_resolver.grant(Permission.AGENT_READ)
+    _agent_workload(app, "capped-bot", run_mode=Workload.RunMode.LOOP, run_max_parallel=3)
+    _agent_workload(app, "uncapped-bot", run_mode=Workload.RunMode.LOOP)
+
+    with with_tenant_org(org):
+        rows = AgentsQuery().agent_workloads(info(), org_id=str(org.guid))
+
+    by_slug = {r.slug: r for r in rows}
+    assert by_slug["capped-bot"].run_max_parallel == 3
+    assert by_slug["uncapped-bot"].run_max_parallel is None
+    # Task-family agent defaults: baseline replicas 1, no scaling schedule.
+    assert by_slug["capped-bot"].replicas == 1
+    assert by_slug["capped-bot"].scheduled_scale_to is None
+    assert by_slug["capped-bot"].scale_up_cron == ""
+    assert by_slug["capped-bot"].scale_down_cron == ""
+
+
 def test_agent_workloads_project_filter_excludes_other_projects(permission_resolver, info, with_tenant_org):
     org = _org("acme")
     proj_a, team_a = _project(org, "alpha")
