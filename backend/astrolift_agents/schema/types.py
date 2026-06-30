@@ -330,6 +330,19 @@ class AgentListItemType:
     last_run_at: dt.datetime | None
     # Number of currently-running AgentRuns for this workload.
     running_count: int
+    # Run-spec write-field read parity (#952). The run-spec editors (PR-11
+    # #949 / PR-12 #950) read the current spec off this row — the only agent
+    # read path the detail page has — so they seed from the persisted values
+    # on first load instead of defaults. Mirrors the same fields on
+    # :class:`AgentRunSpecType`: ``run_max_parallel`` (Task Loop cap; null =
+    # platform default), ``replicas`` (Service baseline), the Service
+    # scheduled-scaling target + crons. Defaults keep construction backward
+    # compatible.
+    run_max_parallel: int | None = None
+    replicas: int = 1
+    scheduled_scale_to: int | None = None
+    scale_up_cron: str = ""
+    scale_down_cron: str = ""
 
 
 @strawberry.type(name="AstroliftAgentSkill")

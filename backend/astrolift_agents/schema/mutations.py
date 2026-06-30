@@ -240,6 +240,16 @@ class AgentRunSpecInput:
     scheduled_scale_to: int | None = None
     scale_up_cron: str | None = None
     scale_down_cron: str | None = None
+    # Turn scheduled scaling back OFF (#952). A normal update can't express
+    # "remove the schedule": ``scheduled_scale_to`` is a null-defaulted int
+    # where ``None`` means "leave unchanged", so there's no value that resets
+    # it to NULL. This flag clears the whole scheduled-scaling triple in one
+    # call — ``scale_up_cron`` / ``scale_down_cron`` to "" and
+    # ``scheduled_scale_to`` to NULL — so unchecking "Scheduled scaling" and
+    # saving actually persists the off state. ``replicas`` (the Service
+    # baseline) is deliberately untouched. Combining it with an explicit
+    # scaling value in the same call is rejected (contradictory intent).
+    clear_scheduled_scaling: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -1062,6 +1072,13 @@ class AgentsMutation:
           * ``run_max_parallel`` must be >= 0 (0 = Loop soft-pause; null =
             leave unchanged, which the tick reads as the platform default).
 
+        ``clear_scheduled_scaling`` (#952) is the dedicated "remove the
+        schedule" seam: a normal partial update can't NULL
+        ``scheduled_scale_to`` (``None`` means leave-unchanged), so setting
+        the flag clears the whole triple — both scale crons to "" and the
+        scale target to NULL (``replicas`` is left untouched). It's rejected
+        when combined with an explicit scaling value in the same call.
+
         Coherence is judged against the EFFECTIVE family/mode (the supplied
         value, else the stored one) so a partial save validates against the
         spec the row will actually have. Returns the updated run-spec so the
@@ -1132,6 +1149,16 @@ class AgentsMutation:
         sets_scale_down = "scale_down_cron" in normalized and normalized["scale_down_cron"] != ""
         sets_scale_to = input.scheduled_scale_to is not None
         sets_replicas = input.replicas is not None
+
+        # ``clearScheduledScaling`` turns the whole scheduled-scaling triple
+        # off; supplying it alongside a meaningful scaling value is
+        # contradictory intent (set vs clear in one call) — reject it.
+        if input.clear_scheduled_scaling and (sets_scale_up or sets_scale_down or sets_scale_to):
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "pass either clearScheduledScaling or the scaling fields, not both",
+                field="clearScheduledScaling",
+            )
         if eff_family == Workload.RunFamily.TASK.value:
             if sets_scale_up:
                 return gql_failure(
@@ -1230,6 +1257,17 @@ class AgentsMutation:
         if "scale_down_cron" in normalized:
             workload.scale_down_cron = normalized["scale_down_cron"]
             update_fields.append("scale_down_cron")
+        if input.clear_scheduled_scaling:
+            # Reset the scheduled-scaling triple to its "off" state. NULLs the
+            # scale target (the one value a normal update can't reach) and
+            # blanks both crons; ``replicas`` (the Service baseline) is left
+            # as-is. Dedup against any "" cron the caller also supplied.
+            workload.scale_up_cron = ""
+            workload.scale_down_cron = ""
+            workload.scheduled_scale_to = None
+            for _f in ("scale_up_cron", "scale_down_cron", "scheduled_scale_to"):
+                if _f not in update_fields:
+                    update_fields.append(_f)
 
         if update_fields:
             # Bump the optimistic-concurrency version + updated_at alongside
