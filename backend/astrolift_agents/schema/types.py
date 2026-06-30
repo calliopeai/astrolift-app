@@ -198,6 +198,41 @@ class DispatcherInstanceType:
     registered_at: dt.datetime
 
 
+@strawberry.type(name="AstroliftAgentTrigger")
+class AgentTriggerType:
+    """A WorkflowWebhook bound to an agent ``Workload`` (spec 33, PR-6 / #951).
+
+    The read surface for the run-spec editor's Trigger card: shows the bound
+    inbound webhook (slug + endpoint), its SCM fan-out filters, the
+    ``input_mapping`` applied to the firing payload, and the enabled flag
+    (``unbind`` flips it off). The signing secret is NEVER surfaced here — it
+    is shown once at creation only.
+    """
+
+    slug: str
+    endpoint: str
+    scm_repo: str
+    branch_pattern: str
+    input_mapping: JSON
+    enabled: bool
+    last_triggered_at: dt.datetime | None
+    created_at: dt.datetime
+
+
+def agent_trigger_to_type(hook) -> AgentTriggerType:
+    org_slug = hook.organization.slug if hook.organization_id else "default"
+    return AgentTriggerType(
+        slug=hook.slug,
+        endpoint=f"/api/webhooks/workflow/{org_slug}/{hook.slug}",
+        scm_repo=hook.scm_repo or "",
+        branch_pattern=hook.branch_pattern or "",
+        input_mapping=hook.input_mapping or {},
+        enabled=hook.enabled,
+        last_triggered_at=hook.last_triggered_at,
+        created_at=hook.created_at,
+    )
+
+
 def skill_to_type(s) -> SkillType:
     return SkillType(
         id=GUID(str(s.guid)),

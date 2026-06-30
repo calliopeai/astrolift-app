@@ -873,7 +873,9 @@ class AgentsMutation:
                     field="environmentSpecId",
                 )
 
-        timeout_seconds = input.timeout_seconds if input.timeout_seconds and input.timeout_seconds > 0 else 300
+        timeout_seconds = (
+            input.timeout_seconds if input.timeout_seconds and input.timeout_seconds > 0 else 300
+        )
 
         # Ad-hoc input frozen on the task so the spawner surfaces it to the
         # pod as ASTROLIFT_TRIGGER_PAYLOAD (#930). None/empty -> no env var.
@@ -910,15 +912,28 @@ class AgentsMutation:
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def create_agent_trigger(
-        self, info: Info, agent_slug: str
+        self,
+        info: Info,
+        agent_slug: str,
+        scm_repo: str = "",
+        branch_pattern: str = "",
+        input_mapping: JSON | None = None,
     ) -> AgentTriggerResult:
-        """Create an inbound trigger webhook bound to an agent ``Workload``
-        (spec 33, PR-6 / #983).
+        """Create / bind an inbound trigger webhook to an agent ``Workload``
+        (spec 33, PR-6 / #951).
 
         The dispatch side (``dispatch_agent_task_from_webhook``) + the model's
-        ``agent_definition`` FK already exist; this is the creation seam. Returns
+        ``agent_definition`` FK already exist; this is the binding seam. Returns
         the endpoint + plaintext signing secret (shown once). Fire it with
         ``POST <endpoint>`` and header ``X-Astrolift-Signature: <secret>``.
+
+        ``scmRepo`` / ``branchPattern`` are optional SCM fan-out filters: set
+        them and the binding ALSO fires on matching push/PR events routed to the
+        org, not only on a direct POST. ``inputMapping`` is the
+        ``{out_key: dotted.source.path}`` spec applied to the firing payload
+        before it reaches the dispatched agent Task (the dispatch fan-out reads
+        it via ``apply_input_mapping``); omit / ``null`` passes the payload
+        through verbatim.
         """
         from astrolift_agents.services.workflow_triggers import (
             create_agent_webhook_trigger,
@@ -933,6 +948,9 @@ class AgentsMutation:
         if not slug:
             return AgentTriggerResult(ok=False, message="agentSlug is required")
 
+        if input_mapping is not None and not isinstance(input_mapping, dict):
+            return AgentTriggerResult(ok=False, message="inputMapping must be an object")
+
         workload = (
             Workload.objects.filter(
                 slug=slug,
@@ -946,7 +964,12 @@ class AgentsMutation:
         if workload is None or workload.kind != Workload.Kind.AGENT:
             return AgentTriggerResult(ok=False, message="agent not found")
 
-        result = create_agent_webhook_trigger(workload)
+        result = create_agent_webhook_trigger(
+            workload,
+            input_mapping=input_mapping or None,
+            scm_repo=(scm_repo or "").strip(),
+            branch_pattern=(branch_pattern or "").strip(),
+        )
         return AgentTriggerResult(
             ok=True,
             slug=result["slug"],
@@ -957,9 +980,44 @@ class AgentsMutation:
     @strawberry.field
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
-    def scale_service_agent(
-        self, info: Info, agent_slug: str, target_replicas: int
-    ) -> AgentScaleResult:
+    def unbind_agent_trigger(self, info: Info, slug: str) -> AgentTriggerResult:
+        """Remove an agent trigger binding by webhook ``slug`` (#951).
+
+        Disables the bound ``WorkflowWebhook`` (``enabled=False``) rather than
+        deleting it — webhook slugs are deliberately never recycled (an old URL
+        could still be POSTed to), so a disabled row is the documented removal
+        semantics (see ``WorkflowWebhook`` model). Org-scoped: a caller can only
+        unbind a webhook owned by their active org bound to one of their agents;
+        a foreign / unknown slug is a non-leaking "not found".
+        """
+        from astrolift_agents.models.workflow_trigger import WorkflowWebhook
+
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        if org_pk is None:
+            return AgentTriggerResult(ok=False, message="no active organization")
+
+        hook_slug = (slug or "").strip()
+        if not hook_slug:
+            return AgentTriggerResult(ok=False, message="slug is required")
+
+        hook = WorkflowWebhook.objects.filter(
+            slug=hook_slug,
+            organization_id=org_pk,
+            agent_definition__isnull=False,
+        ).first()
+        if hook is None:
+            return AgentTriggerResult(ok=False, message="trigger not found")
+
+        if hook.enabled:
+            hook.enabled = False
+            hook.save(update_fields=["enabled", "updated_at"])
+        return AgentTriggerResult(ok=True, slug=hook.slug)
+
+    @strawberry.field
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def scale_service_agent(self, info: Info, agent_slug: str, target_replicas: int) -> AgentScaleResult:
         """On-demand scale of a Service-family agent's Deployment (#1012).
 
         The manual override alongside the scheduled scale ticks. Clamps to the
@@ -1273,7 +1331,9 @@ class AgentsMutation:
 
         try:
             result = import_skills_from_repo(
-                organization=org, repo_url=repo_url, branch=branch,
+                organization=org,
+                repo_url=repo_url,
+                branch=branch,
                 manifest_path=manifest_path,
             )
         except InvalidRepoURLError as exc:
@@ -1327,9 +1387,7 @@ class AgentsMutation:
             )
         repo_full_name = (input.repo_full_name or "").strip().strip("/")
         if not repo_full_name:
-            return gql_failure(
-                ErrorCode.VALIDATION.value, "repoFullName is required", field="repoFullName"
-            )
+            return gql_failure(ErrorCode.VALIDATION.value, "repoFullName is required", field="repoFullName")
         source_kind = (input.source_kind or "github").strip()
         if source_kind not in _SKILL_REPO_SOURCE_KINDS:
             return gql_failure(

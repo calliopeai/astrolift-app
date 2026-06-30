@@ -35,6 +35,7 @@ from astrolift_agents.schema.types import (
     AgentLiveStatusType,
     AgentRuntimeType,
     AgentTaskType,
+    AgentTriggerType,
     BriefType,
     DiscoveredAgentManifestType,
     DispatcherInstanceType,
@@ -45,6 +46,7 @@ from astrolift_agents.schema.types import (
     agent_detail_to_type,
     agent_env_spec_to_type,
     agent_task_to_type,
+    agent_trigger_to_type,
     brief_to_type,
     dispatcher_to_type,
     org_skill_repo_to_type,
@@ -162,7 +164,7 @@ def _service_replica_status(workload) -> tuple[int | None, int | None, bool | No
         return None, None, None
     desired = status.desired_replicas
     ready = status.ready_replicas
-    ready_flag = (ready == desired and (desired or 0) > 0)
+    ready_flag = ready == desired and (desired or 0) > 0
     return desired, ready, ready_flag
 
 
@@ -239,9 +241,7 @@ def _agent_workload_qs(org_pk: int, *, project_slug: str | None = None):
     return qs.order_by("-created_at")
 
 
-def _agent_list_rows(
-    info: Info, org_id: strawberry.ID, project_slug: str | None
-) -> list[AgentListItemType]:
+def _agent_list_rows(info: Info, org_id: strawberry.ID, project_slug: str | None) -> list[AgentListItemType]:
     """Build the agent list rows for an org (+ optional project filter).
 
     Module-level so both ``agent_workloads`` and ``agent_fleet`` can call it.
@@ -526,9 +526,7 @@ class AgentsQuery:
         # needs, or None when there is no readable pod to target.
         def _resolve() -> tuple[Any, str, str, str] | None:
             row = (
-                AgentTask.objects.filter(
-                    guid=str(id), organization_id=org_pk, deleted_at__isnull=True
-                )
+                AgentTask.objects.filter(guid=str(id), organization_id=org_pk, deleted_at__isnull=True)
                 .select_related("organization", "dispatcher", "dispatcher__tenant_cluster")
                 .first()
             )
@@ -690,6 +688,36 @@ class AgentsQuery:
             .first()
         )
         return agent_detail_to_type(w) if w is not None else None
+
+    @strawberry.field
+    @require_permission(Permission.AGENT_READ)
+    @tenant_scoped()
+    def agent_triggers(self, info: Info, org_id: strawberry.ID, agent_slug: str) -> list[AgentTriggerType]:
+        """Inbound trigger webhooks bound to one agent (spec 33, PR-6 / #951).
+
+        Backs the run-spec editor's Trigger card: every ``WorkflowWebhook``
+        bound to the ``kind: agent`` Workload ``agent_slug`` in the caller's
+        org, newest first. Includes disabled (unbound) rows so the editor can
+        reflect a binding's enabled state; the signing secret is never
+        surfaced. Org-scoped through ``_caller_org_id`` + the agent's org, so a
+        foreign / unknown slug yields an empty list rather than another
+        tenant's bindings.
+        """
+        from astrolift_agents.models.workflow_trigger import WorkflowWebhook
+
+        org_pk = _caller_org_id(info, org_id)
+        workload = _agent_workload_qs(org_pk).filter(slug=agent_slug).first()
+        if workload is None:
+            return []
+        hooks = (
+            WorkflowWebhook.objects.filter(
+                agent_definition=workload,
+                organization_id=org_pk,
+            )
+            .select_related("organization")
+            .order_by("-created_at")
+        )
+        return [agent_trigger_to_type(h) for h in hooks]
 
     @strawberry.field
     @require_permission(Permission.AGENT_READ)
