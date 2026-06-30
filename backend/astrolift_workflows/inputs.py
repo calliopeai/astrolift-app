@@ -373,6 +373,15 @@ class WorkflowDefinitionRunInput:
     a FAN_OUT parent spawns: each child executes exactly the one stage at
     ``only_stage_order`` and never re-fans-out. Top-level runs leave both
     unset and execute every stage in order.
+
+    ``stage_bindings`` carries the tier-2 ``Workflow``'s per-stage concrete
+    bindings (spec 40 §2.2/§3) — ``{stage_order: {agent_workload_id,
+    skill_refs, params}}`` — so a run started from a configured Workflow
+    records which agent each stage resolved to. The executor resolves agents
+    from the definition's stages today; full per-stage binding→pod injection
+    arrives with #930. The field rides along as the durable record of the
+    run mapping regardless. Empty for definition-level runs (the legacy
+    ``runWorkflowDefinition`` / webhook paths).
     """
 
     workflow_definition_slug: str
@@ -381,6 +390,7 @@ class WorkflowDefinitionRunInput:
     actor: Actor
     only_stage_order: int | None = None
     fan_out_index: int | None = None
+    stage_bindings: dict[str, Any] | None = None
 
 
 @dataclasses.dataclass(slots=True, frozen=True)

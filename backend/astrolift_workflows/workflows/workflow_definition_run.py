@@ -194,11 +194,7 @@ def is_fan_out_stage(pattern_kind: str, stage: dict, already_fanned: bool) -> bo
     Only the FAN_OUT pattern fans out, only AGENT_DISPATCH stages, and only
     the first such stage (``already_fanned`` guards re-entry).
     """
-    return (
-        pattern_kind == PATTERN_FAN_OUT
-        and stage["kind"] == KIND_AGENT_DISPATCH
-        and not already_fanned
-    )
+    return pattern_kind == PATTERN_FAN_OUT and stage["kind"] == KIND_AGENT_DISPATCH and not already_fanned
 
 
 # ---------------------------------------------------------------------------
@@ -255,9 +251,7 @@ class WorkflowDefinitionRunWorkflow:
             await self._finalize(run_id, RUN_FAILED, None, {"message": abort.message})
             return WorkflowResult(ok=False, message=abort.message, data=abort.data)
         except Exception as exc:  # noqa: BLE001 — record then re-raise for Temporal
-            await self._finalize(
-                run_id, RUN_FAILED, None, {"message": f"unhandled: {exc}"}
-            )
+            await self._finalize(run_id, RUN_FAILED, None, {"message": f"unhandled: {exc}"})
             raise
 
         await self._finalize(run_id, RUN_COMPLETED, result, None)
@@ -296,9 +290,7 @@ class WorkflowDefinitionRunWorkflow:
             kind = stage["kind"]
 
             if is_fan_out_stage(pattern_kind, stage, already_fanned):
-                last_fan_out_executions = await self._run_fan_out(
-                    input, stage, previous_output
-                )
+                last_fan_out_executions = await self._run_fan_out(input, stage, previous_output)
                 already_fanned = True
                 previous_output = {
                     "fan_out_execution_ids": last_fan_out_executions,
@@ -308,19 +300,13 @@ class WorkflowDefinitionRunWorkflow:
                 continue
 
             if kind == KIND_AGENT_DISPATCH:
-                previous_output = await self._run_agent_stage(
-                    input, stage, previous_output
-                )
+                previous_output = await self._run_agent_stage(input, stage, previous_output)
             elif kind == KIND_HUMAN_GATE:
                 previous_output = await self._run_human_gate(stage)
             elif kind == KIND_CHECKPOINT:
-                previous_output = await self._run_checkpoint(
-                    input, stage, previous_output
-                )
+                previous_output = await self._run_checkpoint(input, stage, previous_output)
             elif kind == KIND_AGGREGATION:
-                previous_output = await self._run_aggregation(
-                    input, stage, last_fan_out_executions
-                )
+                previous_output = await self._run_aggregation(input, stage, last_fan_out_executions)
                 last_fan_out_executions = []
             else:
                 raise _WorkflowAbort(f"unknown stage kind {kind!r}")
@@ -362,9 +348,7 @@ class WorkflowDefinitionRunWorkflow:
                     start_to_close_timeout=_DB_TIMEOUT,
                     retry_policy=_DB_RETRY,
                 )
-                run_status = await self._poll_agent_to_terminal(
-                    agent_run_id, timeout_seconds
-                )
+                run_status = await self._poll_agent_to_terminal(agent_run_id, timeout_seconds)
             except ActivityError:
                 # The dispatch activity itself failed (e.g. spawn error).
                 run_status = "failed"
@@ -553,6 +537,7 @@ class WorkflowDefinitionRunWorkflow:
                     actor=input.actor,
                     only_stage_order=stage["order"],
                     fan_out_index=idx,
+                    stage_bindings=input.stage_bindings,
                 ),
                 id=f"WorkflowDefinitionRunWorkflow-{child_run_id}",
                 task_timeout=timedelta(seconds=max(1, int(stage["timeout_seconds"]))),
@@ -574,9 +559,7 @@ class WorkflowDefinitionRunWorkflow:
 
     # ---- signal waits -----------------------------------------------------
 
-    async def _wait_gate_decision(
-        self, execution_id: str, timeout_seconds: int
-    ) -> dict | None:
+    async def _wait_gate_decision(self, execution_id: str, timeout_seconds: int) -> dict | None:
         """Block until the gate's decision signal arrives or the timeout
         elapses. Returns the decision payload, or None on timeout."""
         deadline = workflow.now() + timedelta(seconds=timeout_seconds)
@@ -594,9 +577,7 @@ class WorkflowDefinitionRunWorkflow:
                     return None
         return self._gate_decisions.get(execution_id)
 
-    async def _wait_escalation_cleared(
-        self, execution_id: str, timeout_seconds: int
-    ) -> bool:
+    async def _wait_escalation_cleared(self, execution_id: str, timeout_seconds: int) -> bool:
         """Block until the escalation is cleared or the timeout elapses."""
         deadline = workflow.now() + timedelta(seconds=timeout_seconds)
         while execution_id not in self._escalation_cleared:

@@ -18,6 +18,7 @@ def build_workflow_definition_run_input(
     trigger_payload: dict | None = None,
     organization_id: int | None = None,
     actor: Any = None,
+    stage_bindings: dict | None = None,
 ):
     """Create the ``WorkflowRun`` mirror row and build the executor input.
 
@@ -56,6 +57,7 @@ def build_workflow_definition_run_input(
         workflow_run_id=str(run.pk),
         trigger_payload=payload,
         actor=actor,
+        stage_bindings=dict(stage_bindings) if stage_bindings else None,
     )
     return run, run_input, workflow_id
 
@@ -66,6 +68,7 @@ def start_workflow_definition_run(
     trigger_payload: dict | None = None,
     organization_id: int | None = None,
     actor: Any = None,
+    stage_bindings: dict | None = None,
 ):
     """Create the ``WorkflowRun`` mirror and start the stage executor.
 
@@ -82,6 +85,7 @@ def start_workflow_definition_run(
         trigger_payload=trigger_payload,
         organization_id=organization_id,
         actor=actor,
+        stage_bindings=stage_bindings,
     )
 
     handle = start_workflow(

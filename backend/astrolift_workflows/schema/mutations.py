@@ -1,4 +1,5 @@
-"""Admin mutations for the Temporal workflow viewer (#437).
+"""Admin mutations for the Temporal workflow viewer (#437) + the
+configured-Workflow write surface (spec 40 §3/§6, #967/#968).
 
 Cancel / terminate / signal are admin-gated because they can wedge
 real production workflows (mid-deploy, mid-migration). The viewer's
@@ -17,14 +18,60 @@ from astrolift_workflows.client import (
     signal_workflow,
     terminate_workflow,
 )
+from astrolift_workflows.schema.workflow_config_types import (
+    ConfiguredWorkflowType,
+    workflow_to_type,
+)
+from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.schema.common import MutationResult, ValidationError
+from core.tenancy import get_current_tenant
 
 JSON = strawberry.scalars.JSON
 
 
 def _failure(field: str, msg: str) -> MutationResult:
     return MutationResult(ok=False, errors=[ValidationError(field=field, messages=[msg])])
+
+
+def _caller_org_pk() -> int | None:
+    tenant = get_current_tenant()
+    return tenant.organization_id if tenant else None
+
+
+def _resolve_caller_org(org_id: str | None):
+    """Resolve the caller's active org and confirm an ``org_id`` arg (guid)
+    refers to it. Returns ``(organization, None)`` or ``(None, failure)``.
+    Deny-by-default real org scoping per #1042 — the decorator only asserts
+    a context exists."""
+    from astrolift_identity.models import Organization
+
+    caller = _caller_org_pk()
+    if caller is None:
+        return None, _failure("organization", "no active organization in context")
+    org = Organization.objects.filter(pk=caller, deleted_at__isnull=True).first()
+    if org is None:
+        return None, _failure("organization", "active organization not found")
+    if org_id is not None and str(org.guid) != str(org_id):
+        return None, _failure("orgId", "PERMISSION_DENIED: organization mismatch")
+    return org, None
+
+
+@strawberry.type
+class CreateWorkflowResult(MutationResult):
+    workflow: ConfiguredWorkflowType | None = None
+
+
+@strawberry.type
+class RunWorkflowResult(MutationResult):
+    """Result of starting a configured Workflow's run (spec 40 §3)."""
+
+    # The Temporal workflow id of the started run (the run id callers track).
+    run_id: str | None = None
+    # The astrolift_operations.WorkflowRun mirror pk (stage executions key on it).
+    workflow_run_id: str | None = None
+    # The tier-3 WorkflowInstance guid.
+    instance_id: str | None = None
 
 
 @strawberry.type
@@ -97,3 +144,430 @@ class TemporalWorkflowsMutation:
         if not delivered:
             return _failure("signal_name", "signal could not be delivered")
         return MutationResult.success()
+
+
+@strawberry.type
+class WorkflowsMutation:
+    """Configured-Workflow write surface (spec 40 §3/§6). Every resolver is
+    ``WORKFLOW_*``-gated + ``@tenant_scoped`` and applies a real caller-org
+    filter in the body (#1042). Definition + stage CREATE / clone + the
+    forms paths stay on the #966 ``workflows.schema`` surface (reused); this
+    class owns tier-2 Workflows, the run mapping, and the stage
+    update/delete/reorder #966 did not build."""
+
+    # ── tier-2 Workflow CRUD ────────────────────────────────────────────
+
+    @strawberry.mutation(description="Create a configured Workflow from a visible definition (spec 40 §2.2).")
+    @require_permission(Permission.WORKFLOW_CREATE)
+    @tenant_scoped()
+    def create_workflow(
+        self,
+        info: Info,
+        name: str,
+        definition_slug: str,
+        slug: str | None = None,
+        description: str | None = None,
+        stage_bindings: JSON | None = None,
+        inputs: JSON | None = None,
+        trigger_kind: str = "manual",
+        schedule_cron: str | None = None,
+        org_id: strawberry.ID | None = None,
+    ) -> CreateWorkflowResult:
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        from workflows.models import Workflow, WorkflowDefinition
+
+        org, err = _resolve_caller_org(org_id)
+        if err is not None:
+            return CreateWorkflowResult(ok=err.ok, errors=err.errors)
+
+        valid_triggers = {c[0] for c in Workflow.TriggerKind.choices}
+        if trigger_kind not in valid_triggers:
+            return CreateWorkflowResult(
+                ok=False,
+                errors=[
+                    ValidationError(field="trigger_kind", messages=[f'Invalid trigger_kind "{trigger_kind}"'])
+                ],
+            )
+
+        # Definition must be visible to the org (its own UNION global) — §2.1.
+        definition = (
+            WorkflowDefinition.visible_to_org(org.pk)
+            .filter(slug=definition_slug, deleted_at__isnull=True)
+            .first()
+        )
+        if definition is None:
+            return CreateWorkflowResult(
+                ok=False,
+                errors=[
+                    ValidationError(
+                        field="definition_slug",
+                        messages=[f'Workflow definition "{definition_slug}" not visible'],
+                    )
+                ],
+            )
+
+        user = info.context.user
+        wf = Workflow(
+            organization=org,
+            definition=definition,
+            name=name,
+            slug=slug or "",
+            description=description or "",
+            stage_bindings=stage_bindings or {},
+            inputs=inputs or {},
+            trigger_kind=trigger_kind,
+            schedule_cron=(schedule_cron or None),
+            created_by=user,
+            updated_by=user,
+        )
+        try:
+            # Model.save validates bindings (every agent_dispatch stage resolves).
+            wf.save()
+        except DjangoValidationError as e:
+            return CreateWorkflowResult(
+                ok=False,
+                errors=[ValidationError(field="stage_bindings", messages=list(e.messages))],
+            )
+        except Exception as e:  # noqa: BLE001 — IntegrityError on (org, slug), etc.
+            return CreateWorkflowResult(ok=False, errors=[ValidationError(field="slug", messages=[str(e)])])
+
+        _sync_schedule(wf)
+        return CreateWorkflowResult(ok=True, workflow=workflow_to_type(wf, with_runs=True))
+
+    @strawberry.mutation(description="Update a configured Workflow (bindings / inputs / trigger / enabled).")
+    @require_permission(Permission.WORKFLOW_UPDATE)
+    @tenant_scoped()
+    def update_workflow(
+        self,
+        info: Info,
+        slug: str,
+        name: str | None = None,
+        description: str | None = None,
+        stage_bindings: JSON | None = None,
+        inputs: JSON | None = None,
+        trigger_kind: str | None = None,
+        schedule_cron: str | None = None,
+        is_enabled: bool | None = None,
+        org_id: strawberry.ID | None = None,
+    ) -> CreateWorkflowResult:
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        from workflows.models import Workflow
+
+        org, err = _resolve_caller_org(org_id)
+        if err is not None:
+            return CreateWorkflowResult(ok=err.ok, errors=err.errors)
+
+        wf = (
+            Workflow.objects.filter(organization=org, slug=slug, deleted_at__isnull=True)
+            .select_related("definition")
+            .first()
+        )
+        if wf is None:
+            return CreateWorkflowResult(
+                ok=False, errors=[ValidationError(field="slug", messages=[f'Workflow "{slug}" not found'])]
+            )
+
+        if trigger_kind is not None:
+            valid_triggers = {c[0] for c in Workflow.TriggerKind.choices}
+            if trigger_kind not in valid_triggers:
+                return CreateWorkflowResult(
+                    ok=False,
+                    errors=[
+                        ValidationError(
+                            field="trigger_kind", messages=[f'Invalid trigger_kind "{trigger_kind}"']
+                        )
+                    ],
+                )
+            wf.trigger_kind = trigger_kind
+        if name is not None:
+            wf.name = name
+        if description is not None:
+            wf.description = description
+        if stage_bindings is not None:
+            wf.stage_bindings = stage_bindings
+        if inputs is not None:
+            wf.inputs = inputs
+        if schedule_cron is not None:
+            wf.schedule_cron = schedule_cron or None
+        if is_enabled is not None:
+            wf.is_enabled = is_enabled
+        wf.updated_by = info.context.user
+
+        try:
+            wf.save()
+        except DjangoValidationError as e:
+            return CreateWorkflowResult(
+                ok=False, errors=[ValidationError(field="stage_bindings", messages=list(e.messages))]
+            )
+
+        _sync_schedule(wf)
+        return CreateWorkflowResult(ok=True, workflow=workflow_to_type(wf, with_runs=True))
+
+    @strawberry.mutation(description="Soft-delete a configured Workflow and tear down its schedule.")
+    @require_permission(Permission.WORKFLOW_DELETE)
+    @tenant_scoped()
+    def delete_workflow(self, info: Info, slug: str, org_id: strawberry.ID | None = None) -> MutationResult:
+        from django.utils import timezone
+
+        from workflows.models import Workflow
+
+        org, err = _resolve_caller_org(org_id)
+        if err is not None:
+            return err
+
+        wf = Workflow.objects.filter(organization=org, slug=slug, deleted_at__isnull=True).first()
+        if wf is None:
+            return _failure("slug", f'Workflow "{slug}" not found')
+
+        wf.deleted_at = timezone.now()
+        wf.deleted_by = info.context.user
+        wf.save(
+            update_fields=["deleted_at", "deleted_by", "updated_at", "version"], skip_binding_validation=True
+        )
+        _delete_schedule(wf)
+        return MutationResult.success()
+
+    # ── run mapping (spec 40 §3) ────────────────────────────────────────
+
+    @strawberry.mutation(description="Run a configured Workflow now via Temporal (spec 40 §3).")
+    @require_permission(Permission.WORKFLOW_TRIGGER)
+    @tenant_scoped()
+    def run_workflow(
+        self,
+        info: Info,
+        workflow_id: strawberry.ID,
+        inputs: JSON | None = None,
+        org_id: strawberry.ID | None = None,
+    ) -> RunWorkflowResult:
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        from astrolift_workflows.inputs import Actor
+        from workflows.models import Workflow, WorkflowInstance
+        from workflows.run_service import start_workflow_definition_run
+
+        org, err = _resolve_caller_org(org_id)
+        if err is not None:
+            return RunWorkflowResult(ok=err.ok, errors=err.errors)
+
+        wf = (
+            Workflow.objects.filter(guid=str(workflow_id), organization=org, deleted_at__isnull=True)
+            .select_related("definition")
+            .first()
+        )
+        if wf is None:
+            return RunWorkflowResult(
+                ok=False, errors=[ValidationError(field="workflow_id", messages=["Workflow not found"])]
+            )
+        if not wf.is_enabled:
+            return RunWorkflowResult(
+                ok=False, errors=[ValidationError(field="workflow_id", messages=["Workflow is disabled"])]
+            )
+        if not wf.definition.is_enabled:
+            return RunWorkflowResult(
+                ok=False,
+                errors=[ValidationError(field="definition", messages=["Workflow definition is disabled"])],
+            )
+        if not wf.definition.stages.filter(deleted_at__isnull=True).exists():
+            return RunWorkflowResult(
+                ok=False,
+                errors=[ValidationError(field="definition", messages=["Workflow definition has no stages"])],
+            )
+
+        # Validate bindings: every agent_dispatch stage resolves (§2.2).
+        try:
+            wf.validate_bindings()
+        except DjangoValidationError as e:
+            return RunWorkflowResult(
+                ok=False, errors=[ValidationError(field="stage_bindings", messages=list(e.messages))]
+            )
+
+        # Merge workflow-level inputs ⊕ call inputs (call wins).
+        merged_inputs = {**(wf.inputs or {}), **(inputs or {})}
+        user = info.context.user
+
+        run, temporal_workflow_id = start_workflow_definition_run(
+            wf.definition,
+            trigger_payload=merged_inputs,
+            organization_id=org.pk,
+            actor=Actor(
+                kind="user",
+                user_id=user.pk if getattr(user, "pk", None) else None,
+                display=getattr(user, "username", "") or "",
+            ),
+            stage_bindings=wf.stage_bindings,
+        )
+
+        # Tier-3 run record linked to the Workflow (denormalized org, §2.3).
+        instance = WorkflowInstance.start(
+            configured_workflow=wf,
+            user=user,
+            temporal_workflow_id=temporal_workflow_id,
+        )
+
+        return RunWorkflowResult(
+            ok=True,
+            run_id=temporal_workflow_id,
+            workflow_run_id=str(run.pk),
+            instance_id=str(instance.pk),
+        )
+
+    # ── stage update / delete / reorder (spec 40 §6; #966 built create) ──
+
+    @strawberry.mutation(description="Update a stage's fields on a writable definition (spec 40 §6).")
+    @require_permission(Permission.WORKFLOW_UPDATE)
+    @tenant_scoped()
+    def update_workflow_stage(
+        self,
+        info: Info,
+        stage_guid: strawberry.ID,
+        kind: str | None = None,
+        role: str | None = None,
+        on_failure: str | None = None,
+        timeout_seconds: int | None = None,
+        agent_definition_guid: str | None = None,
+        skill_refs: JSON | None = None,
+        fan_out_count: int | None = None,
+    ) -> MutationResult:
+        from workflows.models import WorkflowStage
+        from workflows.schema.mutations import _definition_write_error
+
+        stage = (
+            WorkflowStage.objects.filter(guid=str(stage_guid), deleted_at__isnull=True)
+            .select_related("definition")
+            .first()
+        )
+        if stage is None:
+            return _failure("stage_guid", "Stage not found")
+
+        write_err = _definition_write_error(info.context.user, stage.definition)
+        if write_err is not None:
+            return _failure(write_err[0], write_err[1])
+
+        if kind is not None:
+            if kind not in {c[0] for c in WorkflowStage.StageKind.choices}:
+                return _failure("kind", f'Invalid stage kind "{kind}"')
+            stage.kind = kind
+        if on_failure is not None:
+            if on_failure not in {c[0] for c in WorkflowStage.OnFailure.choices}:
+                return _failure("on_failure", f'Invalid on_failure "{on_failure}"')
+            stage.on_failure = on_failure
+        if role is not None:
+            stage.role = role
+        if timeout_seconds is not None:
+            stage.timeout_seconds = timeout_seconds
+        if skill_refs is not None:
+            stage.skill_refs = skill_refs
+        if fan_out_count is not None:
+            stage.fan_out_count = fan_out_count
+        if agent_definition_guid is not None:
+            from astrolift_registry.models import Workload
+
+            workload = (
+                Workload.objects.filter(guid=agent_definition_guid).first() if agent_definition_guid else None
+            )
+            if agent_definition_guid and workload is None:
+                return _failure("agent_definition_guid", "Workload not found")
+            stage.agent_definition = workload
+        stage.updated_by = info.context.user
+        stage.save()
+        return MutationResult.success()
+
+    @strawberry.mutation(description="Soft-delete a stage from a writable definition (spec 40 §6).")
+    @require_permission(Permission.WORKFLOW_UPDATE)
+    @tenant_scoped()
+    def delete_workflow_stage(self, info: Info, stage_guid: strawberry.ID) -> MutationResult:
+        from django.utils import timezone
+
+        from workflows.models import WorkflowStage
+        from workflows.schema.mutations import _definition_write_error
+
+        stage = (
+            WorkflowStage.objects.filter(guid=str(stage_guid), deleted_at__isnull=True)
+            .select_related("definition")
+            .first()
+        )
+        if stage is None:
+            return _failure("stage_guid", "Stage not found")
+
+        write_err = _definition_write_error(info.context.user, stage.definition)
+        if write_err is not None:
+            return _failure(write_err[0], write_err[1])
+
+        stage.deleted_at = timezone.now()
+        stage.deleted_by = info.context.user
+        stage.save(update_fields=["deleted_at", "deleted_by", "updated_at", "version"])
+        return MutationResult.success()
+
+    @strawberry.mutation(
+        description="Reorder a definition's stages (spec 40 §6). Pass stage guids in the new order."
+    )
+    @require_permission(Permission.WORKFLOW_UPDATE)
+    @tenant_scoped()
+    def reorder_workflow_stages(
+        self, info: Info, definition_slug: str, stage_guids: list[strawberry.ID]
+    ) -> MutationResult:
+        from django.db import transaction
+
+        from workflows.models import WorkflowDefinition
+        from workflows.schema.mutations import _definition_write_error
+
+        org = _caller_org_pk()
+        definition = (
+            WorkflowDefinition.visible_to_org(org)
+            .filter(slug=definition_slug, deleted_at__isnull=True)
+            .first()
+        )
+        if definition is None:
+            return _failure("definition_slug", f'Workflow definition "{definition_slug}" not visible')
+
+        write_err = _definition_write_error(info.context.user, definition)
+        if write_err is not None:
+            return _failure(write_err[0], write_err[1])
+
+        stages = {str(s.guid): s for s in definition.stages.filter(deleted_at__isnull=True)}
+        requested = [str(g) for g in stage_guids]
+        if set(requested) != set(stages):
+            return _failure("stage_guids", "stage_guids must list exactly the definition's stages")
+
+        # Two-phase to dodge the (definition, order) unique constraint: park
+        # stages at negative orders, then assign final positions.
+        with transaction.atomic():
+            for offset, guid in enumerate(requested):
+                s = stages[guid]
+                s.order = -(offset + 1)
+                s.save(update_fields=["order", "updated_at", "version"])
+            for new_order, guid in enumerate(requested):
+                s = stages[guid]
+                s.order = new_order
+                s.updated_by = info.context.user
+                s.save(update_fields=["order", "updated_by", "updated_at", "version"])
+        return MutationResult.success()
+
+
+def _sync_schedule(workflow) -> None:
+    """Best-effort Temporal schedule sync for a saved Workflow (spec 40 §3)."""
+    try:
+        from workflows.schedule_sync import sync_workflow_schedule
+
+        sync_workflow_schedule(workflow)
+    except Exception:  # noqa: BLE001 — schedule sync never blocks the save
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "create/update_workflow: schedule sync failed for workflow %s", workflow.pk
+        )
+
+
+def _delete_schedule(workflow) -> None:
+    try:
+        from workflows.schedule_sync import delete_workflow_schedule
+
+        delete_workflow_schedule(workflow)
+    except Exception:  # noqa: BLE001
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "delete_workflow: schedule delete failed for workflow %s", workflow.pk
+        )
