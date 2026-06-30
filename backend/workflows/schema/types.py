@@ -94,6 +94,13 @@ class WorkflowDefinitionType:
     created_at: datetime
 
     @strawberry_django.field
+    def organization_guid(self) -> Optional[str]:
+        """Owning org's guid, or null for a platform-global template (spec 40 §2.1)."""
+        if self.organization_id is None:
+            return None
+        return str(self.organization.guid)
+
+    @strawberry_django.field
     def instance_count(self) -> int:
         return self.instances.count()
 
@@ -128,7 +135,7 @@ class WorkflowInstanceType:
     current_state: str
     started_at: datetime
     completed_at: Optional[datetime]
-    object_id: int
+    object_id: Optional[int]
 
     @strawberry_django.field
     def workflow_name(self) -> str:

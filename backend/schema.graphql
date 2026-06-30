@@ -3514,6 +3514,13 @@ input ClearEnvironmentSettingInput {
   key: String!
 }
 
+type CloneWorkflowDefinitionResult {
+  ok: Boolean!
+  errors: [ValidationError!]!
+  slug: String
+  definition: WorkflowDefinitionType
+}
+
 type CloudOrphanReportType {
   orphans: [CloudOrphanType!]!
   scannedKinds: [String!]!
@@ -4572,6 +4579,11 @@ type Mutation {
   Create an inbound webhook trigger for a workflow definition (staff only).
   """
   createWorkflowTrigger(workflowSlug: String!): CreateWorkflowTriggerResult!
+
+  """
+  Deep-copy a visible workflow definition + its stages into the caller's org as a new editable definition (spec 40 §2.1). New slug on collision; global stages copy with agent_definition cleared.
+  """
+  cloneWorkflowDefinition(slug: String!, orgId: ID!): CloneWorkflowDefinitionResult!
   astroliftAnonymizeUser(input: AstroliftAnonymizeUserInput!): AstroliftAnonymizeUserPayloadMutationResult!
   astroliftConnectUserSourceProvider(input: ConnectUserSourceProviderInput!): AstroliftConnectUserSourceProviderPayloadMutationResult!
   astroliftDisconnectUserSourceProvider(input: DisconnectUserSourceProviderInput!): AstroliftDisconnectUserSourceProviderPayloadMutationResult!
@@ -4999,10 +5011,14 @@ type Query {
   agentRuntimes: [AstroliftAgentRuntime!]!
   dispatchers: [AstroliftDispatcherInstance!]!
 
-  """List all workflow definitions."""
+  """
+  List workflow definitions visible to the caller: their org's UNION all platform-global (spec 40 §2.1).
+  """
   workflowDefinitions(modelLabel: String = null, includeDisabled: Boolean! = true): [WorkflowDefinitionType!]!
 
-  """Get a workflow definition by slug."""
+  """
+  Get a visible workflow definition by slug (prefers the caller's org over a global).
+  """
   workflowDefinition(slug: String!): WorkflowDefinitionType
 
   """Get a workflow instance by ID."""
@@ -5823,6 +5839,7 @@ type WorkflowDefinitionType {
   transitions: JSON!
   isEnabled: Boolean!
   createdAt: DateTime!
+  organizationGuid: String
   instanceCount: Int!
   activeInstanceCount: Int!
   workflowStages: [WorkflowStageType!]!
@@ -5832,7 +5849,7 @@ type WorkflowInstanceType {
   currentState: String!
   startedAt: DateTime!
   completedAt: DateTime
-  objectId: Int!
+  objectId: Int
   workflowName: String!
   workflowSlug: String!
   isCompleted: Boolean!

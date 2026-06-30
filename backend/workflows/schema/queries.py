@@ -17,20 +17,39 @@ from workflows.schema.types import (
 @strawberry.type
 class Query:
 
-    @strawberry.field(description="List all workflow definitions.")
+    @strawberry.field(
+        description="List workflow definitions visible to the caller: their org's UNION all platform-global (spec 40 §2.1).",
+    )
     def workflow_definitions(
         self, info: Info, model_label: Optional[str] = None, include_disabled: bool = True,
     ) -> list[WorkflowDefinitionType]:
-        qs = WorkflowDefinition.objects.all()
+        user = info.context.user
+        if getattr(user, "is_superuser", False):
+            qs = WorkflowDefinition.objects.all()
+        else:
+            from core.tenancy import get_current_tenant
+
+            tenant = get_current_tenant()
+            org_pk = tenant.organization_id if tenant else None
+            qs = WorkflowDefinition.visible_to_org(org_pk)
         if not include_disabled:
             qs = qs.filter(is_enabled=True)
         if model_label:
             qs = qs.filter(model_label=model_label)
         return qs
 
-    @strawberry.field(description="Get a workflow definition by slug.")
+    @strawberry.field(description="Get a visible workflow definition by slug (prefers the caller's org over a global).")
     def workflow_definition(self, info: Info, slug: str) -> Optional[WorkflowDefinitionType]:
-        return WorkflowDefinition.objects.filter(slug=slug).first()
+        user = info.context.user
+        if getattr(user, "is_superuser", False):
+            return WorkflowDefinition.objects.filter(slug=slug).first()
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        visible = WorkflowDefinition.visible_to_org(org_pk).filter(slug=slug)
+        # Prefer an org-owned definition over a global with the same slug.
+        return visible.filter(organization_id=org_pk).first() or visible.first()
 
     @strawberry.field(description="Get a workflow instance by ID.")
     def workflow_instance(self, info: Info, id: strawberry.ID) -> Optional[WorkflowInstanceType]:

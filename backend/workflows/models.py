@@ -73,10 +73,38 @@ class WorkflowDefinition(BaseCoreModel):
     )
     is_enabled = models.BooleanField(default=True)
 
+    # Tier-1 org scope (spec 40 §2.1). NULL → platform-global template,
+    # read-only to tenants (write mutations reject; superuser/staff may seed).
+    # Set → org-authored, editable by that org.
+    organization = models.ForeignKey(
+        "astrolift_identity.Organization",
+        related_name="workflow_definitions",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+    )
+    # Drop the global field-level slug uniqueness inherited from the legacy
+    # BaseCoreModel: a slug is unique *per org* now (and a platform-global may
+    # share a slug with an org's clone), enforced by (organization, slug).
+    slug = models.SlugField(max_length=100, null=True, blank=True, db_index=True)
+
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['slug', 'model_label'], name='unique_workflow_per_model'),
+            models.UniqueConstraint(
+                fields=["organization", "slug"],
+                name="workflowdefinition_org_slug_unique",
+            ),
         ]
+
+    @classmethod
+    def visible_to_org(cls, organization_id):
+        """Read scope (spec 40 §2.1): the org's own definitions UNION all
+        platform-global (null-org) definitions."""
+        from django.db.models import Q
+
+        return cls.objects.filter(
+            Q(organization_id=organization_id) | Q(organization__isnull=True)
+        )
 
     def get_initial_state(self) -> Optional[str]:
         for state in self.states:
@@ -130,13 +158,34 @@ class WorkflowInstance(Tracking):
 
     Uses GenericForeignKey to attach to any Django model.
     """
+    # Legacy tier (forms state-machine): now nullable — agent runs use
+    # ``configured_workflow`` instead and stop faking the GFK (spec 40 §2.3).
     workflow = models.ForeignKey(
         WorkflowDefinition,
         on_delete=models.PROTECT,
         related_name='instances',
+        null=True,
+        blank=True,
     )
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.PositiveIntegerField()
+    # Tier-2 link: the configured Workflow this run belongs to (spec 40 §2.3).
+    configured_workflow = models.ForeignKey(
+        "Workflow",
+        on_delete=models.PROTECT,
+        related_name="runs",
+        null=True,
+        blank=True,
+    )
+    # Denormalized from the Workflow on start() so the tenancy guardrail +
+    # indexes work without a 2-level join (spec 40 §2.3).
+    organization = models.ForeignKey(
+        "astrolift_identity.Organization",
+        on_delete=models.CASCADE,
+        related_name="workflow_instances",
+        null=True,
+        blank=True,
+    )
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
+    object_id = models.PositiveIntegerField(null=True, blank=True)
     content_object = GenericForeignKey('content_type', 'object_id')
 
     current_state = models.CharField(max_length=100, db_index=True)
@@ -150,11 +199,39 @@ class WorkflowInstance(Tracking):
         indexes = [
             models.Index(fields=['content_type', 'object_id']),
             models.Index(fields=['workflow', 'current_state']),
+            models.Index(fields=["organization", "current_state"]),
         ]
 
     @classmethod
-    def start(cls, workflow: WorkflowDefinition, obj, user=None) -> 'WorkflowInstance':
-        """Start a new workflow instance for an object."""
+    def start(
+        cls,
+        workflow: WorkflowDefinition | None = None,
+        obj=None,
+        user=None,
+        *,
+        configured_workflow: "Workflow | None" = None,
+        temporal_workflow_id: str | None = None,
+    ) -> 'WorkflowInstance':
+        """Start a new workflow instance.
+
+        ``configured_workflow``-first path (spec 40 §2.3): agent runs start
+        from a tier-2 Workflow; the org is denormalized off it and the legacy
+        GFK is left null. The legacy forms state-machine path (positional
+        ``workflow`` + ``obj``) is unchanged.
+        """
+        if configured_workflow is not None:
+            return cls.objects.create(
+                configured_workflow=configured_workflow,
+                organization_id=configured_workflow.organization_id,
+                # Keep the legacy mirror FK pointed at the shape for back-compat
+                # (UI reads instance.workflow.name / .slug).
+                workflow=configured_workflow.definition,
+                current_state="running",
+                temporal_workflow_id=temporal_workflow_id,
+                created_by=user,
+                updated_by=user,
+            )
+
         initial_state = workflow.get_initial_state()
         if not initial_state:
             raise ValidationError('Workflow has no initial state')
@@ -350,6 +427,11 @@ class WorkflowStage(BaseCoreModel):
         SKIP = "skip"
         ESCALATE = "escalate"
 
+    # Slug is identified by (definition, order); drop the legacy global
+    # field-level uniqueness so an org clone + the global it came from can
+    # both carry a "<slug>-stage-0" stage slug.
+    slug = models.SlugField(max_length=100, null=True, blank=True, db_index=True)
+
     definition = models.ForeignKey(
         WorkflowDefinition,
         related_name="stages",
@@ -396,6 +478,10 @@ class WorkflowStage(BaseCoreModel):
         default=300,
         help_text="Maximum wall-clock time for this stage before it times out.",
     )
+    # Human-readable label for the agent that belongs at this stage; used by
+    # the builder/binding UI when ``agent_definition`` is null (globals).
+    # Optional for org definitions. (spec 40 §2.4)
+    role = models.CharField(max_length=64, blank=True, default="")
 
     class Meta:
         ordering = ["definition", "order"]
@@ -411,6 +497,98 @@ class WorkflowStage(BaseCoreModel):
 
     def __str__(self) -> str:
         return f"{self.definition.name} stage {self.order} ({self.kind})"
+
+
+class Workflow(BaseCoreModel):
+    """Tier-2 configured, runnable workflow (spec 40 §2.2).
+
+    A tenant's named application of a ``WorkflowDefinition`` to a concrete
+    config: per-stage agent bindings + default inputs + a trigger. This is
+    the entity the Workflows module entitlement gates (``me.modules.workflows``).
+    """
+
+    class TriggerKind(models.TextChoices):
+        MANUAL = "manual"
+        SCHEDULE = "schedule"
+        EVENT = "event"
+
+    organization = models.ForeignKey(
+        "astrolift_identity.Organization",
+        related_name="workflows",
+        on_delete=models.CASCADE,
+    )
+    definition = models.ForeignKey(
+        WorkflowDefinition,
+        related_name="workflows",
+        on_delete=models.PROTECT,
+    )
+    # Per-stage concrete bindings keyed by stage order:
+    # {stage_order: {"agent_workload_id": guid, "skill_refs": [...], "params": {...}}}
+    stage_bindings = models.JSONField(default=dict, blank=True)
+    # Workflow-level default inputs, merged with per-trigger inputs at run time.
+    inputs = models.JSONField(default=dict, blank=True)
+    trigger_kind = models.CharField(
+        max_length=16,
+        choices=TriggerKind.choices,
+        default=TriggerKind.MANUAL,
+    )
+    schedule_cron = models.CharField(max_length=128, null=True, blank=True)
+    trigger_ref = models.CharField(max_length=200, null=True, blank=True)
+    is_enabled = models.BooleanField(default=True)
+
+    # Slug is unique per org (not globally) — drop the legacy field-level
+    # uniqueness inherited from BaseCoreModel.
+    slug = models.SlugField(max_length=100, null=True, blank=True, db_index=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "slug"],
+                name="workflow_org_slug_unique",
+            ),
+        ]
+
+    def unbound_agent_stages(self) -> list[tuple[int, str]]:
+        """Return ``[(order, role)]`` for every ``agent_dispatch`` stage that
+        resolves to no concrete agent — neither a
+        ``stage_bindings[order].agent_workload_id`` nor the stage's own
+        ``agent_definition`` (spec 40 §2.2)."""
+        unbound: list[tuple[int, str]] = []
+        bindings = self.stage_bindings or {}
+        stages = self.definition.stages.filter(
+            deleted_at__isnull=True,
+            kind=WorkflowStage.StageKind.AGENT_DISPATCH,
+        ).order_by("order")
+        for stage in stages:
+            binding = bindings.get(str(stage.order))
+            if binding is None:
+                binding = bindings.get(stage.order)
+            bound = bool(binding and binding.get("agent_workload_id"))
+            if not bound and stage.agent_definition_id is None:
+                unbound.append((stage.order, stage.role or ""))
+        return unbound
+
+    def validate_bindings(self) -> None:
+        """Raise ``ValidationError`` naming unbound ``agent_dispatch`` stages
+        (spec 40 §2.2: validation on save/run)."""
+        unbound = self.unbound_agent_stages()
+        if unbound:
+            labels = ", ".join(
+                f"stage {order}" + (f" ({role})" if role else "")
+                for order, role in unbound
+            )
+            raise ValidationError(f"Unbound agent_dispatch stage(s): {labels}")
+
+    def save(self, *args, **kwargs):
+        skip_binding_validation = kwargs.pop("skip_binding_validation", False)
+        if self.organization_id is None:
+            raise ValidationError("Workflow requires an organization")
+        if not skip_binding_validation and self.definition_id is not None:
+            self.validate_bindings()
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"{self.name} (org={self.organization_id})"
 
 
 class WorkflowStageExecution(BaseCoreModel):

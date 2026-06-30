@@ -6,13 +6,18 @@ import strawberry
 from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.db.models import Q
 from graphql import GraphQLError
 from strawberry.types import Info
 
+from core.decorators import tenant_scoped
+from core.permissions import Permission, require_permission
 from core.schema.common import MutationResult
 from core.schema.common import ValidationError as GQLValidationError
+from core.tenancy import get_current_tenant
 from workflows.models import WorkflowDefinition, WorkflowInstance, WorkflowStage
-from workflows.schema.types import WorkflowStageType
+from workflows.schema.types import WorkflowDefinitionType, WorkflowStageType
 
 
 @strawberry.type
@@ -34,6 +39,14 @@ class CreateWorkflowStageResult(MutationResult):
 
 
 @strawberry.type
+class CloneWorkflowDefinitionResult(MutationResult):
+    """Result of deep-copying a definition into the caller's org (spec 40 §2.1)."""
+
+    slug: Optional[str] = None
+    definition: Optional[WorkflowDefinitionType] = None
+
+
+@strawberry.type
 class CreateWorkflowTriggerResult(MutationResult):
     """Inbound webhook trigger for a workflow definition (#1019).
     ``signing_secret`` is the plaintext — shown ONCE, stored only as a hash."""
@@ -49,6 +62,64 @@ def _require_staff(user):
         raise GraphQLError('Authentication required')
     if not (user.is_staff or user.is_superuser):
         raise GraphQLError('Staff or superuser access required')
+
+
+def _caller_org_pk():
+    tenant = get_current_tenant()
+    return tenant.organization_id if tenant else None
+
+
+def _definition_write_error(user, definition):
+    """Deny-by-default write gate for a WorkflowDefinition (spec 40 §2.1).
+
+    Returns ``(field, message)`` describing why ``user`` may not write
+    ``definition``, or ``None`` if allowed. Platform-global (null-org)
+    templates are read-only to tenants — superuser/staff exempt (the seeding
+    path). Org-authored definitions are writable only by their owning org
+    (superuser/staff bypass). The org match is the actual scoping (#1042 —
+    ``@tenant_scoped`` only asserts a context exists)."""
+    if user is None or not getattr(user, "is_authenticated", False):
+        return ("permission", "Authentication required")
+    if user.is_superuser or user.is_staff:
+        return None
+    if definition.organization_id is None:
+        return ("permission", "PERMISSION_DENIED: platform template — clone to edit")
+    if definition.organization_id != _caller_org_pk():
+        return ("permission", "PERMISSION_DENIED: not your organization's workflow")
+    return None
+
+
+def _resolve_clone_org(org_id):
+    """Resolve ``org_id`` (Organization guid) to an Organization, asserting it
+    matches the caller's active tenant. Returns ``(org, None)`` on success or
+    ``(None, failure_result)``. Real org scoping per #1042."""
+    from astrolift_identity.models import Organization
+
+    user_org = _caller_org_pk()
+    org = Organization.objects.filter(guid=str(org_id), deleted_at__isnull=True).first()
+    if org is None:
+        return None, CloneWorkflowDefinitionResult(
+            ok=False,
+            errors=[GQLValidationError(field="orgId", messages=["organization not found"])],
+        )
+    if user_org is not None and org.pk != user_org:
+        return None, CloneWorkflowDefinitionResult(
+            ok=False,
+            errors=[GQLValidationError(field="orgId", messages=["PERMISSION_DENIED: organization mismatch"])],
+        )
+    return org, None
+
+
+def _unique_clone_slug(base_slug, org):
+    """First free slug for ``org`` derived from ``base_slug`` (spec 40 §9 Q2)."""
+    candidate = base_slug
+    suffix = 0
+    while WorkflowDefinition.objects.filter(
+        organization=org, slug=candidate, deleted_at__isnull=True
+    ).exists():
+        suffix += 1
+        candidate = f"{base_slug}-copy" if suffix == 1 else f"{base_slug}-copy-{suffix}"
+    return candidate
 
 
 @strawberry.type
@@ -282,11 +353,17 @@ class Mutation:
         pattern_kind: Optional[str] = None,
     ) -> MutationResult:
         user = info.context.user
-        _require_staff(user)
 
-        workflow = WorkflowDefinition.objects.filter(slug=slug).first()
+        workflow = WorkflowDefinition.objects.filter(slug=slug, deleted_at__isnull=True).first()
         if not workflow:
             raise GraphQLError(f'Workflow definition "{slug}" not found')
+
+        write_err = _definition_write_error(user, workflow)
+        if write_err is not None:
+            return MutationResult(
+                ok=False,
+                errors=[GQLValidationError(field=write_err[0], messages=[write_err[1]])],
+            )
 
         if pattern_kind is not None:
             valid_patterns = {c[0] for c in WorkflowDefinition.PatternKind.choices}
@@ -332,11 +409,17 @@ class Mutation:
         slug: str,
     ) -> MutationResult:
         user = info.context.user
-        _require_staff(user)
 
-        workflow = WorkflowDefinition.objects.filter(slug=slug).first()
+        workflow = WorkflowDefinition.objects.filter(slug=slug, deleted_at__isnull=True).first()
         if not workflow:
             raise GraphQLError(f'Workflow definition "{slug}" not found')
+
+        write_err = _definition_write_error(user, workflow)
+        if write_err is not None:
+            return MutationResult(
+                ok=False,
+                errors=[GQLValidationError(field=write_err[0], messages=[write_err[1]])],
+            )
 
         if workflow.instances.exists():
             raise GraphQLError(
@@ -365,13 +448,19 @@ class Mutation:
         fan_out_count: Optional[int] = None,
     ) -> CreateWorkflowStageResult:
         user = info.context.user
-        _require_staff(user)
 
-        workflow = WorkflowDefinition.objects.filter(slug=workflow_slug).first()
+        workflow = WorkflowDefinition.objects.filter(slug=workflow_slug, deleted_at__isnull=True).first()
         if not workflow:
             return CreateWorkflowStageResult(
                 ok=False,
                 errors=[GQLValidationError(field='workflow_slug', messages=[f'Workflow "{workflow_slug}" not found'])],
+            )
+
+        write_err = _definition_write_error(user, workflow)
+        if write_err is not None:
+            return CreateWorkflowStageResult(
+                ok=False,
+                errors=[GQLValidationError(field=write_err[0], messages=[write_err[1]])],
             )
 
         # Validate kind
@@ -475,3 +564,67 @@ class Mutation:
             endpoint=result["endpoint"],
             signing_secret=result["signing_secret"],
         )
+
+    @strawberry.mutation(
+        description=(
+            "Deep-copy a visible workflow definition + its stages into the "
+            "caller's org as a new editable definition (spec 40 §2.1). New slug "
+            "on collision; global stages copy with agent_definition cleared."
+        )
+    )
+    @require_permission(Permission.WORKFLOW_CREATE)
+    @tenant_scoped()
+    def clone_workflow_definition(
+        self, info: Info, slug: str, org_id: strawberry.ID,
+    ) -> CloneWorkflowDefinitionResult:
+        user = info.context.user
+        org, err = _resolve_clone_org(org_id)
+        if err is not None:
+            return err
+
+        # Visible scope = caller's org UNION all platform-global definitions.
+        source = (
+            WorkflowDefinition.objects.filter(slug=slug, deleted_at__isnull=True)
+            .filter(Q(organization_id=org.pk) | Q(organization__isnull=True))
+            .first()
+        )
+        if source is None:
+            return CloneWorkflowDefinitionResult(
+                ok=False,
+                errors=[GQLValidationError(field="slug", messages=[f'Workflow definition "{slug}" not visible'])],
+            )
+
+        new_slug = _unique_clone_slug(source.slug, org)
+        same_org = source.organization_id == org.pk
+        with transaction.atomic():
+            clone = WorkflowDefinition.objects.create(
+                organization=org,
+                name=source.name,
+                slug=new_slug,
+                description=source.description or "",
+                model_label=source.model_label,
+                pattern_kind=source.pattern_kind,
+                states=source.states,
+                transitions=source.transitions,
+                is_enabled=source.is_enabled,
+                created_by=user,
+                updated_by=user,
+            )
+            for stage in source.stages.filter(deleted_at__isnull=True).order_by("order"):
+                WorkflowStage.objects.create(
+                    definition=clone,
+                    slug=f"{new_slug}-stage-{stage.order}",
+                    order=stage.order,
+                    kind=stage.kind,
+                    role=stage.role,
+                    # Globals carry no org agent — clear unless cloning within
+                    # the same org (spec 40 §2.1/§2.4).
+                    agent_definition=(stage.agent_definition if same_org else None),
+                    skill_refs=list(stage.skill_refs or []),
+                    fan_out_count=stage.fan_out_count,
+                    on_failure=stage.on_failure,
+                    timeout_seconds=stage.timeout_seconds,
+                    created_by=user,
+                    updated_by=user,
+                )
+        return CloneWorkflowDefinitionResult(ok=True, slug=new_slug, definition=clone)
