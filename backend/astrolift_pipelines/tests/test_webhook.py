@@ -23,6 +23,7 @@ import pytest
 from django.test import RequestFactory
 
 from astrolift_identity.models import Organization
+from astrolift_pipelines.gitlab_webhook_views import pipeline_gitlab_webhook
 from astrolift_pipelines.models import Pipeline, PipelineRun, Trigger
 from astrolift_pipelines.webhook_views import pipeline_github_webhook
 
@@ -247,3 +248,77 @@ def test_pull_request_event_matches_pr_trigger(factory, org, pipeline):
     run = PipelineRun.objects.get(pipeline=pipeline)
     assert run.trigger_kind == "pull_request"
     assert run.trigger_ref == "fix/bug-42"
+
+
+# ---------------------------------------------------------------------------
+# GitLab receiver — token auth boundary (#1060). GitLab doesn't HMAC the
+# body; it presents a shared ``X-Gitlab-Token`` we compare in constant time
+# against the per-org secret. A wrong / missing token must be rejected
+# (403) before any PipelineRun is created.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def gitlab_org(org, monkeypatch):
+    """Reuse the github ``org`` but also patch the gitlab module's secret
+    seam (it has its own ``_get_org_pipeline_secret`` copy)."""
+    from astrolift_pipelines import gitlab_webhook_views
+
+    monkeypatch.setattr(
+        gitlab_webhook_views,
+        "_get_org_pipeline_secret",
+        lambda o: "gitlab-secret-123" if o.slug == org.slug else None,
+    )
+    return org
+
+
+def _gitlab_push_payload(http_url: str = "https://gitlab.com/acme/myapp") -> dict:
+    return {
+        "object_kind": "push",
+        "ref": "refs/heads/main",
+        "user_username": "octocat",
+        "project": {"git_ssh_url": f"{http_url}.git", "http_url": http_url},
+    }
+
+
+def test_gitlab_valid_token_dispatches(factory, gitlab_org, pipeline, push_trigger):
+    pipeline.repo_url = "https://gitlab.com/acme/myapp"
+    pipeline.save(update_fields=["repo_url"])
+    body = json.dumps(_gitlab_push_payload()).encode()
+    request = factory.post(
+        f"/webhooks/pipelines/gitlab/{gitlab_org.slug}/",
+        data=body,
+        content_type="application/json",
+        HTTP_X_GITLAB_EVENT="Push Hook",
+        HTTP_X_GITLAB_TOKEN="gitlab-secret-123",
+    )
+    response = pipeline_gitlab_webhook(request, gitlab_org.slug)
+    assert response.status_code == 200
+    assert PipelineRun.objects.count() == 1
+
+
+def test_gitlab_bad_token_returns_403(factory, gitlab_org, pipeline, push_trigger):
+    body = json.dumps(_gitlab_push_payload()).encode()
+    request = factory.post(
+        f"/webhooks/pipelines/gitlab/{gitlab_org.slug}/",
+        data=body,
+        content_type="application/json",
+        HTTP_X_GITLAB_EVENT="Push Hook",
+        HTTP_X_GITLAB_TOKEN="wrong-token",
+    )
+    response = pipeline_gitlab_webhook(request, gitlab_org.slug)
+    assert response.status_code == 403
+    assert PipelineRun.objects.count() == 0
+
+
+def test_gitlab_missing_token_returns_403(factory, gitlab_org, pipeline, push_trigger):
+    body = json.dumps(_gitlab_push_payload()).encode()
+    request = factory.post(
+        f"/webhooks/pipelines/gitlab/{gitlab_org.slug}/",
+        data=body,
+        content_type="application/json",
+        HTTP_X_GITLAB_EVENT="Push Hook",
+    )
+    response = pipeline_gitlab_webhook(request, gitlab_org.slug)
+    assert response.status_code == 403
+    assert PipelineRun.objects.count() == 0

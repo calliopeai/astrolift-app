@@ -23,12 +23,15 @@ mocks, per the project's testing posture.
 
 from __future__ import annotations
 
+import base64
 import json
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from django.contrib.auth import get_user_model
 from django.test import Client
 
@@ -37,6 +40,7 @@ from astrolift_graphql import GUID
 from astrolift_identity.models import Organization, Project, Team
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_registry.models import RegisteredApp
+from astrolift_services import views as ses_views
 from astrolift_services.models import EmailEvent, EmailEventKind, ManagedService
 from astrolift_services.schema.queries import ServicesQuery
 from core.permissions import Permission, PermissionDenied
@@ -128,6 +132,44 @@ def _ctx(org):
     return tenant_context(TenantContext(organization_id=org.id))
 
 
+# ---- SNS signing infra (#1060) --------------------------------------
+#
+# Every inbound SNS message is RSA-signed with an AWS-issued cert; the
+# receiver now verifies that signature before doing any work. The tests
+# stand in their own keypair, sign the canonical string the receiver
+# rebuilds, and patch the cert loader to hand back the matching public
+# key — so the receiver runs its real verification path against a valid
+# signature instead of being bypassed.
+
+_TEST_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+_TEST_PUBLIC_KEY = _TEST_KEY.public_key()
+_TEST_CERT_URL = "https://sns.us-east-1.amazonaws.com/SimpleNotificationService-test.pem"
+
+
+@pytest.fixture(autouse=True)
+def _sns_cert(monkeypatch):
+    """Hand the receiver our test public key for every SNS verify."""
+    ses_views._load_signing_cert_public_key.cache_clear()
+    monkeypatch.setattr(
+        ses_views,
+        "_load_signing_cert_public_key",
+        lambda url: _TEST_PUBLIC_KEY,
+    )
+    yield
+
+
+def _sign_envelope(body: dict) -> None:
+    """Sign ``body`` in place exactly as the receiver verifies it: build
+    the canonical string with the receiver's own ``_canonical_message``,
+    RSA-SHA256 sign it, and attach the v2 signature fields."""
+    canonical = ses_views._canonical_message(body, body["Type"])
+    assert canonical is not None, "envelope missing a required signed field"
+    signature = _TEST_KEY.sign(canonical, padding.PKCS1v15(), hashes.SHA256())
+    body["SignatureVersion"] = "2"
+    body["SigningCertURL"] = _TEST_CERT_URL
+    body["Signature"] = base64.b64encode(signature).decode()
+
+
 # ---- SNS envelope helpers -------------------------------------------
 
 
@@ -136,12 +178,25 @@ def _sns_envelope(
     msg_type: str = "Notification",
     message: dict | None = None,
     subscribe_url: str = "",
+    signed: bool = True,
 ) -> bytes:
-    body = {"Type": msg_type}
-    if subscribe_url:
+    body: dict = {
+        "Type": msg_type,
+        "MessageId": "11111111-2222-3333-4444-555555555555",
+        "Timestamp": "2026-06-30T00:00:00.000Z",
+        "TopicArn": "arn:aws:sns:us-east-1:123456789012:ses-events",
+    }
+    if msg_type in ("SubscriptionConfirmation", "UnsubscribeConfirmation"):
+        # SubscribeURL + Token are required signed fields for these types.
+        body["SubscribeURL"] = subscribe_url or "https://sns.us-east-1.amazonaws.com/?Action=Confirm"
+        body["Token"] = "confirm-token"
+        body["Message"] = "You have chosen to subscribe to the topic."
+    elif subscribe_url:
         body["SubscribeURL"] = subscribe_url
     if message is not None:
         body["Message"] = json.dumps(message)
+    if signed:
+        _sign_envelope(body)
     return json.dumps(body).encode()
 
 
@@ -318,6 +373,66 @@ def test_malformed_outer_envelope_rejected():
         content_type="application/json",
     )
     assert resp.status_code == 400
+    assert EmailEvent.objects.count() == 0
+
+
+# ---- SNS signature auth boundary (#1060) ----------------------------
+
+
+def test_unsigned_notification_rejected_403():
+    """A well-formed SNS body with no signature fields is rejected before
+    any EmailEvent is inserted — anyone with the URL must not be able to
+    forge events."""
+    body = _sns_envelope(
+        message=_ses_delivery(message_id="forged-1", recipients=["x@example.com"]),
+        signed=False,
+    )
+    resp = Client().post(
+        "/app/webhooks/ses-events/",
+        data=body,
+        content_type="application/json",
+    )
+    assert resp.status_code == 403
+    assert EmailEvent.objects.count() == 0
+
+
+def test_tampered_payload_rejected_403():
+    """A valid signature over one payload doesn't carry to a mutated one:
+    flipping the Message after signing invalidates the signature."""
+    raw = _sns_envelope(
+        message=_ses_delivery(message_id="orig-1", recipients=["a@example.com"]),
+        signed=True,
+    )
+    body = json.loads(raw)
+    # Swap in a different SES message; the signature no longer matches.
+    body["Message"] = json.dumps(_ses_delivery(message_id="tampered-1", recipients=["attacker@example.com"]))
+    resp = Client().post(
+        "/app/webhooks/ses-events/",
+        data=json.dumps(body).encode(),
+        content_type="application/json",
+    )
+    assert resp.status_code == 403
+    assert EmailEvent.objects.count() == 0
+
+
+def test_non_sns_signing_cert_url_rejected_403():
+    """A signed body whose SigningCertURL points off-AWS is rejected — the
+    host allowlist closes both the attacker-cert and the SSRF-fetch holes.
+    The cert loader must never be consulted for a disallowed host."""
+    raw = _sns_envelope(
+        message=_ses_delivery(message_id="evil-cert-1", recipients=["a@example.com"]),
+        signed=True,
+    )
+    body = json.loads(raw)
+    body["SigningCertURL"] = "https://evil.example.com/cert.pem"
+    with patch.object(ses_views, "_load_signing_cert_public_key") as mock_loader:
+        resp = Client().post(
+            "/app/webhooks/ses-events/",
+            data=json.dumps(body).encode(),
+            content_type="application/json",
+        )
+    assert resp.status_code == 403
+    assert not mock_loader.called
     assert EmailEvent.objects.count() == 0
 
 
