@@ -3574,6 +3574,25 @@ input ConfigureProviderPluginInput {
   organizationScoped: Boolean! = true
 }
 
+type ConfiguredWorkflow {
+  guid: String!
+  name: String!
+  slug: String!
+  description: String!
+  triggerKind: String!
+  scheduleCron: String
+  isEnabled: Boolean!
+  inputs: JSON!
+  stageBindings: JSON!
+  organizationGuid: String
+  definitionSlug: String!
+  definitionName: String!
+  patternKind: String!
+  runCount: Int!
+  createdAt: DateTime!
+  runs: [WorkflowRun!]!
+}
+
 type ConfirmUploadResult {
   ack: Boolean!
 }
@@ -3743,6 +3762,12 @@ input CreateWebhookSubscriptionInput {
   teamSlug: String = null
   appSlug: String = null
   format: String = null
+}
+
+type CreateWorkflowResult {
+  ok: Boolean!
+  errors: [ValidationError!]!
+  workflow: ConfiguredWorkflow
 }
 
 type CreateWorkflowStageResult {
@@ -4606,6 +4631,29 @@ type Mutation {
   Deep-copy a visible workflow definition + its stages into the caller's org as a new editable definition (spec 40 §2.1). New slug on collision; global stages copy with agent_definition cleared.
   """
   cloneWorkflowDefinition(slug: String!, orgId: ID!): CloneWorkflowDefinitionResult!
+
+  """Create a configured Workflow from a visible definition (spec 40 §2.2)."""
+  createWorkflow(name: String!, definitionSlug: String!, slug: String = null, description: String = null, stageBindings: JSON = null, inputs: JSON = null, triggerKind: String! = "manual", scheduleCron: String = null, orgId: ID = null): CreateWorkflowResult!
+
+  """Update a configured Workflow (bindings / inputs / trigger / enabled)."""
+  updateWorkflow(slug: String!, name: String = null, description: String = null, stageBindings: JSON = null, inputs: JSON = null, triggerKind: String = null, scheduleCron: String = null, isEnabled: Boolean = null, orgId: ID = null): CreateWorkflowResult!
+
+  """Soft-delete a configured Workflow and tear down its schedule."""
+  deleteWorkflow(slug: String!, orgId: ID = null): MutationResult!
+
+  """Run a configured Workflow now via Temporal (spec 40 §3)."""
+  runWorkflow(workflowId: ID!, inputs: JSON = null, orgId: ID = null): RunWorkflowResult!
+
+  """Update a stage's fields on a writable definition (spec 40 §6)."""
+  updateWorkflowStage(stageGuid: ID!, kind: String = null, role: String = null, onFailure: String = null, timeoutSeconds: Int = null, agentDefinitionGuid: String = null, skillRefs: JSON = null, fanOutCount: Int = null): MutationResult!
+
+  """Soft-delete a stage from a writable definition (spec 40 §6)."""
+  deleteWorkflowStage(stageGuid: ID!): MutationResult!
+
+  """
+  Reorder a definition's stages (spec 40 §6). Pass stage guids in the new order.
+  """
+  reorderWorkflowStages(definitionSlug: String!, stageGuids: [ID!]!): MutationResult!
   astroliftAnonymizeUser(input: AstroliftAnonymizeUserInput!): AstroliftAnonymizeUserPayloadMutationResult!
   astroliftConnectUserSourceProvider(input: ConnectUserSourceProviderInput!): AstroliftConnectUserSourceProviderPayloadMutationResult!
   astroliftDisconnectUserSourceProvider(input: DisconnectUserSourceProviderInput!): AstroliftDisconnectUserSourceProviderPayloadMutationResult!
@@ -5034,16 +5082,6 @@ type Query {
   agentRuntimes: [AstroliftAgentRuntime!]!
   dispatchers: [AstroliftDispatcherInstance!]!
 
-  """
-  List workflow definitions visible to the caller: their org's UNION all platform-global (spec 40 §2.1).
-  """
-  workflowDefinitions(modelLabel: String = null, includeDisabled: Boolean! = true): [WorkflowDefinitionType!]!
-
-  """
-  Get a visible workflow definition by slug (prefers the caller's org over a global).
-  """
-  workflowDefinition(slug: String!): WorkflowDefinitionType
-
   """Get a workflow instance by ID."""
   workflowInstance(id: ID!): WorkflowInstanceType
 
@@ -5055,6 +5093,27 @@ type Query {
 
   """List stage executions for a WorkflowRun (by workflow_id + run_id)."""
   workflowStageExecutions(workflowId: String!, runId: String!): [WorkflowStageExecutionType!]!
+  previewWorkflowManifest(toml: String!): WorkflowManifestPreviewType!
+  exportWorkflowManifest(definitionSlug: String!): WorkflowManifestExportType!
+
+  """List the org's configured Workflows (tier 2)."""
+  workflows(orgId: ID = null): [ConfiguredWorkflow!]!
+
+  """One configured Workflow by slug, with its recent runs."""
+  workflow(slug: String!, orgId: ID = null): ConfiguredWorkflow
+
+  """
+  Workflow definitions visible to the caller: their org's UNION all platform-global (spec 40 §2.1).
+  """
+  workflowDefinitions(orgId: ID = null): [WorkflowDefinitionSummary!]!
+
+  """
+  One visible workflow definition by slug (prefers the org's over a global).
+  """
+  workflowDefinition(slug: String!, orgId: ID = null): WorkflowDefinitionSummary
+
+  """Runs (tier 3) of one configured Workflow, newest first."""
+  workflowRuns(workflowId: ID!, orgId: ID = null): [WorkflowRun!]!
   astroliftMyConnectedAccounts: [AstroliftMyConnectedAccount!]!
 }
 
@@ -5395,6 +5454,14 @@ type RunWorkflowDefinitionResult {
   errors: [ValidationError!]!
   workflowRunId: ID
   temporalWorkflowId: String
+}
+
+type RunWorkflowResult {
+  ok: Boolean!
+  errors: [ValidationError!]!
+  runId: String
+  workflowRunId: String
+  instanceId: String
 }
 
 input ScaleWorkloadInput {
@@ -5874,6 +5941,19 @@ input WithdrawSecretChangeInput {
   proposalId: GUID!
 }
 
+type WorkflowDefinitionSummary {
+  guid: String!
+  name: String!
+  slug: String!
+  description: String!
+  patternKind: String!
+  isEnabled: Boolean!
+  isGlobal: Boolean!
+  organizationGuid: String
+  stageCount: Int!
+  createdAt: DateTime!
+}
+
 type WorkflowDefinitionType {
   name: String!
   slug: String!
@@ -5901,6 +5981,51 @@ type WorkflowInstanceType {
   stateLabel: String!
   availableTransitions: [AvailableTransition!]!
   history: [TransitionLogEntry!]!
+}
+
+type WorkflowManifestDefinitionType {
+  slug: String!
+  name: String!
+  pattern: String!
+  description: String!
+}
+
+type WorkflowManifestExportType {
+  ok: Boolean!
+  toml: String
+  error: String
+}
+
+type WorkflowManifestPreviewType {
+  ok: Boolean!
+  error: String
+  errorPath: String
+  errorLine: Int
+  errorColumn: Int
+  definition: WorkflowManifestDefinitionType
+  stages: [WorkflowManifestStageType!]!
+}
+
+type WorkflowManifestStageType {
+  order: Int!
+  kind: String!
+  role: String!
+  agent: String
+  skills: [String!]!
+  onFailure: String!
+  timeout: Int!
+  fanOut: String!
+  prompt: String
+  approvers: [String!]!
+}
+
+type WorkflowRun {
+  guid: String!
+  currentState: String!
+  temporalWorkflowId: String
+  startedAt: DateTime!
+  completedAt: DateTime
+  isCompleted: Boolean!
 }
 
 type WorkflowStageExecutionType {

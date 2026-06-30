@@ -79,7 +79,14 @@ if is_enabled(Feature.WORKFLOWS):
     import workflows.schema as WorkflowsSchema
 
     _query_bases.append(WorkflowsSchema.Query)
+    _query_bases.append(AstroliftTemporalWorkflowsSchema.WorkflowManifestQuery)
     _mutation_bases.append(WorkflowsSchema.Mutation)
+
+    # Configured-Workflow surface (spec 40 §6, #968) — lives under
+    # astrolift_workflows for the #164 tenancy guardrail but needs the
+    # workflows app's models, so it's wired alongside the legacy surface.
+    _query_bases.append(AstroliftTemporalWorkflowsSchema.WorkflowsQuery)
+    _mutation_bases.append(AstroliftTemporalWorkflowsSchema.WorkflowsMutation)
 
 
 # ---------------------------------------------------------------------------

@@ -1,4 +1,5 @@
-"""Read queries for the Temporal workflow viewer (#437)."""
+"""Read queries for the Temporal workflow viewer (#437) + the configured-
+Workflow surface (spec 40 §6, #968)."""
 
 from __future__ import annotations
 
@@ -18,8 +19,40 @@ from astrolift_workflows.schema.types import (
     history_event_to_type,
     instance_to_type,
 )
+from astrolift_workflows.schema.workflow_config_types import (
+    ConfiguredWorkflowType,
+    WorkflowDefinitionSummaryType,
+    WorkflowRunType,
+    definition_summary,
+    run_to_type,
+    workflow_to_type,
+)
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
+from core.tenancy import get_current_tenant
+
+
+def _caller_org_pk() -> int | None:
+    tenant = get_current_tenant()
+    return tenant.organization_id if tenant else None
+
+
+def _org_pk_matches(org_id: str | None) -> tuple[int | None, bool]:
+    """Resolve the caller's org and confirm an ``org_id`` argument (a guid)
+    refers to it. Returns ``(caller_org_pk, ok)``. Deny-by-default (#1042):
+    a mismatch is a hard ``ok=False`` so a resolver returns nothing rather
+    than another org's rows. ``org_id=None`` defers to the tenant context."""
+    caller = _caller_org_pk()
+    if caller is None:
+        return None, False
+    if org_id is None:
+        return caller, True
+    from astrolift_identity.models import Organization
+
+    org = Organization.objects.filter(guid=str(org_id), deleted_at__isnull=True).first()
+    if org is None or org.pk != caller:
+        return caller, False
+    return caller, True
 
 
 def _triggered_by_for(workflow_id: str) -> str:
@@ -126,3 +159,110 @@ class TemporalWorkflowsQuery:
         if row is None:
             return None
         return instance_to_type(row, _triggered_by_for(workflow_id))
+
+
+@strawberry.type
+class WorkflowsQuery:
+    """Configured-Workflow read surface (spec 40 §6). Every resolver is
+    ``WORKFLOW_READ``-gated + ``@tenant_scoped`` and applies the caller's
+    org filter in the body (#1042 — the decorator only asserts a context
+    exists; the org match is the actual scoping)."""
+
+    @strawberry.field(description="List the org's configured Workflows (tier 2).")
+    @require_permission(Permission.WORKFLOW_READ)
+    @tenant_scoped()
+    def workflows(self, info: Info, org_id: strawberry.ID | None = None) -> list[ConfiguredWorkflowType]:
+        caller, ok = _org_pk_matches(org_id)
+        if not ok:
+            return []
+        from workflows.models import Workflow
+
+        qs = (
+            Workflow.objects.filter(organization_id=caller, deleted_at__isnull=True)
+            .select_related("definition", "organization")
+            .order_by("-created_at")
+        )
+        return [workflow_to_type(w) for w in qs]
+
+    @strawberry.field(description="One configured Workflow by slug, with its recent runs.")
+    @require_permission(Permission.WORKFLOW_READ)
+    @tenant_scoped()
+    def workflow(
+        self, info: Info, slug: str, org_id: strawberry.ID | None = None
+    ) -> ConfiguredWorkflowType | None:
+        caller, ok = _org_pk_matches(org_id)
+        if not ok:
+            return None
+        from workflows.models import Workflow
+
+        wf = (
+            Workflow.objects.filter(organization_id=caller, slug=slug, deleted_at__isnull=True)
+            .select_related("definition", "organization")
+            .first()
+        )
+        if wf is None:
+            return None
+        return workflow_to_type(wf, with_runs=True)
+
+    @strawberry.field(
+        description="Workflow definitions visible to the caller: their org's UNION all platform-global (spec 40 §2.1)."
+    )
+    @require_permission(Permission.WORKFLOW_READ)
+    @tenant_scoped()
+    def workflow_definitions(
+        self, info: Info, org_id: strawberry.ID | None = None
+    ) -> list[WorkflowDefinitionSummaryType]:
+        caller, ok = _org_pk_matches(org_id)
+        if not ok:
+            return []
+        from workflows.models import WorkflowDefinition
+
+        qs = (
+            WorkflowDefinition.visible_to_org(caller)
+            .filter(deleted_at__isnull=True)
+            .select_related("organization")
+            .order_by("organization_id", "name")
+        )
+        return [definition_summary(d) for d in qs]
+
+    @strawberry.field(
+        description="One visible workflow definition by slug (prefers the org's over a global)."
+    )
+    @require_permission(Permission.WORKFLOW_READ)
+    @tenant_scoped()
+    def workflow_definition(
+        self, info: Info, slug: str, org_id: strawberry.ID | None = None
+    ) -> WorkflowDefinitionSummaryType | None:
+        caller, ok = _org_pk_matches(org_id)
+        if not ok:
+            return None
+        from workflows.models import WorkflowDefinition
+
+        visible = (
+            WorkflowDefinition.visible_to_org(caller)
+            .filter(slug=slug, deleted_at__isnull=True)
+            .select_related("organization")
+        )
+        d = visible.filter(organization_id=caller).first() or visible.first()
+        return definition_summary(d) if d else None
+
+    @strawberry.field(description="Runs (tier 3) of one configured Workflow, newest first.")
+    @require_permission(Permission.WORKFLOW_READ)
+    @tenant_scoped()
+    def workflow_runs(
+        self, info: Info, workflow_id: strawberry.ID, org_id: strawberry.ID | None = None
+    ) -> list[WorkflowRunType]:
+        caller, ok = _org_pk_matches(org_id)
+        if not ok:
+            return []
+        from workflows.models import Workflow, WorkflowInstance
+
+        wf = Workflow.objects.filter(
+            guid=str(workflow_id), organization_id=caller, deleted_at__isnull=True
+        ).first()
+        if wf is None:
+            return []
+        runs = WorkflowInstance.objects.filter(
+            configured_workflow=wf, organization_id=caller, deleted_at__isnull=True
+        ).order_by("-started_at")[:100]
+        return [run_to_type(r) for r in runs]
