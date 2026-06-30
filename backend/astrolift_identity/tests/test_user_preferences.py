@@ -20,7 +20,6 @@ from django.contrib.auth import get_user_model
 
 from astrolift_identity.models import Organization, UserPreferences
 from astrolift_identity.schema.mutations import IdentityMutation, UpdateMyProfileInput
-from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
 
 pytestmark = pytest.mark.django_db
@@ -86,7 +85,6 @@ def test_for_user_persists_to_database(user):
 def test_update_my_profile_saves_valid_timezone(user, org, permission_resolver):
     """A valid IANA timezone name must be persisted to UserPreferences
     and returned in the mutation payload."""
-    permission_resolver.grant(Permission.ORG_MEMBER)
     with tenant_context(TenantContext(organization_id=org.id)):
         result = IdentityMutation().update_my_profile(
             _info(user),
@@ -101,7 +99,6 @@ def test_update_my_profile_saves_valid_timezone(user, org, permission_resolver):
 def test_update_my_profile_rejects_invalid_timezone(user, org, permission_resolver):
     """An unrecognised IANA timezone name must return ok=False with a
     VALIDATION error and must not touch the database."""
-    permission_resolver.grant(Permission.ORG_MEMBER)
     with tenant_context(TenantContext(organization_id=org.id)):
         result = IdentityMutation().update_my_profile(
             _info(user),
@@ -117,7 +114,6 @@ def test_update_my_profile_clears_timezone_on_empty_string(user, org, permission
     the user to browser-detected zone behavior."""
     UserPreferences.objects.create(user=user, timezone="Europe/London")
 
-    permission_resolver.grant(Permission.ORG_MEMBER)
     with tenant_context(TenantContext(organization_id=org.id)):
         result = IdentityMutation().update_my_profile(
             _info(user),
@@ -133,7 +129,6 @@ def test_update_my_profile_timezone_none_leaves_value_unchanged(user, org, permi
     (None means 'I didn't touch this field')."""
     UserPreferences.objects.create(user=user, timezone="Asia/Tokyo")
 
-    permission_resolver.grant(Permission.ORG_MEMBER)
     with tenant_context(TenantContext(organization_id=org.id)):
         result = IdentityMutation().update_my_profile(
             _info(user),
@@ -150,7 +145,6 @@ def test_my_profile_query_returns_timezone(user, org, permission_resolver):
     from astrolift_identity.schema.queries import IdentityQuery
 
     UserPreferences.objects.create(user=user, timezone="Pacific/Auckland")
-    permission_resolver.grant(Permission.ORG_MEMBER)
     with tenant_context(TenantContext(organization_id=org.id)):
         profile = IdentityQuery().astrolift_my_profile(_info(user))
     assert profile is not None
@@ -162,7 +156,6 @@ def test_my_profile_query_returns_none_timezone_when_no_prefs(user, org, permiss
     preference), the query must return timezone=None, not raise."""
     from astrolift_identity.schema.queries import IdentityQuery
 
-    permission_resolver.grant(Permission.ORG_MEMBER)
     with tenant_context(TenantContext(organization_id=org.id)):
         profile = IdentityQuery().astrolift_my_profile(_info(user))
     assert profile is not None

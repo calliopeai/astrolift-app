@@ -33,6 +33,11 @@ class _FakeContainer:
     def __init__(self, image_ref: str, port: int):
         self.image_ref = image_ref
         self.port = port
+        self.is_primary = True
+        # command/args are JSONField(default=list) on the real Container;
+        # _render_agent_job reads both.
+        self.command: list = []
+        self.args: list = []
 
 
 class _FakeWorkload:

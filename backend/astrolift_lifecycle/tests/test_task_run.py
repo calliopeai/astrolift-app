@@ -59,10 +59,14 @@ def user(org):
 
 @pytest.fixture
 def app(org):
+    from astrolift_identity.models import Team
     from astrolift_registry.models import RegisteredApp
 
+    # team is NOT NULL on RegisteredApp.
+    team = Team.objects.create(organization=org, name="task-team", slug="task-team")
     return RegisteredApp.objects.create(
         organization=org,
+        team=team,
         name="task-app",
         slug="task-app",
         manifest_raw=_MANIFEST_TOML,
@@ -73,19 +77,18 @@ def app(org):
 def cluster(org):
     from astrolift_clusters.models import ProviderPlugin, TenantCluster
 
-    plugin = ProviderPlugin.objects.create(
-        organization=org,
-        name="test-k8s",
-        slug="test-k8s",
-        kind="k8s_native",
-        config={},
-    )
+    # bulk_create to bypass the model's save() — ProviderPlugin shadows the
+    # base integer ``version`` with a CharField, so the concurrency-counter
+    # increment in save() raises (pre-existing). Mirrors test_provider_pickers.
+    [plugin] = ProviderPlugin.objects.bulk_create([ProviderPlugin(name="test-k8s", slug="test-k8s")])
     return TenantCluster.objects.create(
         organization=org,
         name="test-cluster",
         slug="test-cluster",
         provider_plugin=plugin,
-        config={},
+        provider_config={},
+        auth_method=TenantCluster.AuthMethod.KUBECONFIG,
+        auth_config={"kubeconfig": "fake"},
     )
 
 
@@ -120,14 +123,13 @@ def deployment_workload(app):
 
 
 def _info(user, permission):
-    """Minimal request info object for mutation calls."""
+    """Minimal request info object for mutation calls.
+
+    ``permission`` is retained for call-site readability; the actual
+    gate is driven by the ``permission_resolver`` fixture.
+    """
     from types import SimpleNamespace
 
-    from core.permissions import Permission
-
-    perms = {p: True for p in Permission}
-    if permission != "all":
-        perms = {p: (p == permission) for p in Permission}
     return SimpleNamespace(
         context=SimpleNamespace(
             request=SimpleNamespace(
@@ -228,10 +230,11 @@ def test_task_run_to_type_no_user(task_workload):
 # ---------------------------------------------------------------------------
 
 
-def test_run_task_creates_record(app, task_workload, env, user, org):
+def test_run_task_creates_record(app, task_workload, env, user, org, permission_resolver):
     mutation = LifecycleMutation()
     info = _admin_info(user)
-    with tenant_context(TenantContext(organization_id=org.id, user_id=user.id)):
+    permission_resolver.grant(Permission.APP_UPDATE)
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
         result = mutation.run_task(
             info,
             input=RunTaskInput(
@@ -254,41 +257,44 @@ def test_run_task_creates_record(app, task_workload, env, user, org):
     assert run.triggered_by_user == user
 
 
-def test_run_task_unknown_app(task_workload, user, org):
+def test_run_task_unknown_app(task_workload, user, org, permission_resolver):
     mutation = LifecycleMutation()
     info = _admin_info(user)
-    with tenant_context(TenantContext(organization_id=org.id, user_id=user.id)):
+    permission_resolver.grant(Permission.APP_UPDATE)
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
         result = mutation.run_task(
             info,
             input=RunTaskInput(app_slug="no-such-app", workload_slug="db-migrate"),
         )
     assert not result.ok
-    assert any(e.code == "not_found" for e in result.errors)
+    assert any(e.code == "NOT_FOUND" for e in result.errors)
 
 
-def test_run_task_unknown_workload(app, user, org):
+def test_run_task_unknown_workload(app, user, org, permission_resolver):
     mutation = LifecycleMutation()
     info = _admin_info(user)
-    with tenant_context(TenantContext(organization_id=org.id, user_id=user.id)):
+    permission_resolver.grant(Permission.APP_UPDATE)
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
         result = mutation.run_task(
             info,
             input=RunTaskInput(app_slug="task-app", workload_slug="non-existent"),
         )
     assert not result.ok
-    assert any(e.code == "not_found" for e in result.errors)
+    assert any(e.code == "NOT_FOUND" for e in result.errors)
 
 
-def test_run_task_wrong_kind_rejected(app, deployment_workload, user, org):
+def test_run_task_wrong_kind_rejected(app, deployment_workload, user, org, permission_resolver):
     """A deployment workload is not executable as a task."""
     mutation = LifecycleMutation()
     info = _admin_info(user)
-    with tenant_context(TenantContext(organization_id=org.id, user_id=user.id)):
+    permission_resolver.grant(Permission.APP_UPDATE)
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
         result = mutation.run_task(
             info,
             input=RunTaskInput(app_slug="task-app", workload_slug="web"),
         )
     assert not result.ok
-    assert any(e.code == "not_found" for e in result.errors)
+    assert any(e.code == "NOT_FOUND" for e in result.errors)
 
 
 # ---------------------------------------------------------------------------
@@ -296,14 +302,17 @@ def test_run_task_wrong_kind_rejected(app, deployment_workload, user, org):
 # ---------------------------------------------------------------------------
 
 
-def test_task_runs_tenant_isolated(task_workload, org, user):
+def test_task_runs_tenant_isolated(task_workload, org, user, permission_resolver):
     """Runs belonging to another org must not appear in the query results."""
-    from astrolift_identity.models import Organization
+    permission_resolver.grant(Permission.APP_READ_LOGS)
+    from astrolift_identity.models import Organization, Team
     from astrolift_registry.models import RegisteredApp
 
     other_org = Organization.objects.create(name="Other", slug="other-org-tr")
+    other_team = Team.objects.create(organization=other_org, name="other-team", slug="other-team-tr")
     other_app = RegisteredApp.objects.create(
         organization=other_org,
+        team=other_team,
         name="other-app",
         slug="other-app",
         manifest_raw="name = 'other-app'\n",
@@ -320,12 +329,10 @@ def test_task_runs_tenant_isolated(task_workload, org, user):
     TaskRun.objects.create(workload=task_workload, status=TaskRun.Status.SUCCEEDED)
 
     query = LifecycleQuery()
-    with tenant_context(TenantContext(organization_id=org.id, user_id=user.id)):
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
         from types import SimpleNamespace
 
-        info = SimpleNamespace(
-            context=SimpleNamespace(request=SimpleNamespace(user=user, auth=None))
-        )
+        info = SimpleNamespace(context=SimpleNamespace(request=SimpleNamespace(user=user, auth=None)))
         runs = query.astrolift_task_runs(info, limit=100)
 
     slugs = {r.registered_app_slug for r in runs}
@@ -333,7 +340,8 @@ def test_task_runs_tenant_isolated(task_workload, org, user):
     assert "other-app" not in slugs, "cross-tenant leak: other org's task run returned"
 
 
-def test_task_runs_status_filter(task_workload, org, user):
+def test_task_runs_status_filter(task_workload, org, user, permission_resolver):
+    permission_resolver.grant(Permission.APP_READ_LOGS)
     TaskRun.objects.create(workload=task_workload, status=TaskRun.Status.PENDING)
     TaskRun.objects.create(workload=task_workload, status=TaskRun.Status.SUCCEEDED)
     TaskRun.objects.create(workload=task_workload, status=TaskRun.Status.FAILED)
@@ -341,10 +349,8 @@ def test_task_runs_status_filter(task_workload, org, user):
     query = LifecycleQuery()
     from types import SimpleNamespace
 
-    info = SimpleNamespace(
-        context=SimpleNamespace(request=SimpleNamespace(user=user, auth=None))
-    )
-    with tenant_context(TenantContext(organization_id=org.id, user_id=user.id)):
+    info = SimpleNamespace(context=SimpleNamespace(request=SimpleNamespace(user=user, auth=None)))
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
         succeeded = query.astrolift_task_runs(info, status="succeeded", limit=100)
         pending = query.astrolift_task_runs(info, status="pending", limit=100)
         all_runs = query.astrolift_task_runs(info, limit=100)

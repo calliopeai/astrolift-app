@@ -66,12 +66,22 @@ def _make_pr_payload(clone_url: str, branch: str = "feature/foo") -> dict:
 
 
 @pytest.fixture
-def org(db):
-    return Organization.objects.create(
-        name="Acme",
-        slug="acme-test-pipes",
-        extra_data={"pipeline_webhook_secret": "test-secret-123"},
+def org(db, monkeypatch):
+    org = Organization.objects.create(name="Acme", slug="acme-test-pipes")
+    # ``Organization.extra_data`` was dropped, taking the dev/test
+    # plaintext-secret fallback with it (and the prod path —
+    # ``astrolift_lifecycle.services.secrets.read_org_secret`` — is still
+    # an unimplemented stub). Patch the resolver seam so these tests
+    # exercise the HMAC + dispatch receiver logic (#72) with a known
+    # secret; secret *storage* is a separate WIP surface.
+    from astrolift_pipelines import webhook_views
+
+    monkeypatch.setattr(
+        webhook_views,
+        "_get_org_pipeline_secret",
+        lambda o: b"test-secret-123" if o.slug == "acme-test-pipes" else None,
     )
+    return org
 
 
 @pytest.fixture
@@ -82,7 +92,6 @@ def pipeline(org):
         repo_url="https://github.com/acme/myapp.git",
         default_branch="main",
         toml_path=".astrolift/pipelines/ci.toml",
-        status="active",
     )
 
 
@@ -138,7 +147,7 @@ def test_valid_push_triggers_pipeline_run(factory, org, pipeline, push_trigger):
 
 def test_run_number_increments_monotonically(factory, org, pipeline, push_trigger):
     payload = _make_push_payload("https://github.com/acme/myapp.git")
-    for i in range(3):
+    for _ in range(3):
         request = _post(factory, org.slug, payload)
         pipeline_github_webhook(request, org.slug)
 

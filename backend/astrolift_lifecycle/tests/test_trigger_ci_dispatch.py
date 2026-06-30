@@ -404,4 +404,4 @@ def test_trigger_gitlab_raises_not_implemented_clean(
 
     assert not result.ok
     assert result.errors[0].code == "PRECONDITION"
-    assert "github" in result.errors[0].message.lower()
+    assert "gitlab" in result.errors[0].message.lower()

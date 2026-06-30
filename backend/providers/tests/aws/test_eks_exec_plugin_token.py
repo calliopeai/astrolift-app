@@ -10,8 +10,10 @@ pattern. These tests pin the driver's resolution of that auth blob:
 2. The bearer token is minted via ``mint_eks_token`` and the result
    is cached for ``exec_plugin_token_ttl_seconds`` against the
    driver's monotonic-clock injection point.
-3. The synthesized auth payload is a real kubeconfig blob the
-   shared ``build_api_client`` ``kubeconfig`` branch can consume.
+3. The synthesized auth payload is a ``service_account_token`` row
+   (``{token, ca_cert}`` + endpoint) the shared ``build_api_client``
+   consumes directly — inline-``token`` kubeconfigs drop the
+   Authorization header against EKS, so the kubeconfig shape was dropped.
 4. DescribeCluster failure surfaces as a typed ProviderError so the
    resolver can swallow + log instead of leaking the boto3 stack.
 
@@ -26,7 +28,6 @@ from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
-import yaml
 from botocore.exceptions import ClientError
 
 from _sdk.cluster import ClusterAuth, ClusterContext
@@ -136,8 +137,12 @@ def _exec_plugin_context(slug: str = "prod-eks-row") -> ClusterContext:
 
 
 def test_synthesizes_kubeconfig_from_describe_cluster() -> None:
-    """First exec_plugin call materializes a kubeconfig YAML blob
-    that carries endpoint, base64 CA, and the freshly-minted token."""
+    """First exec_plugin call materializes a ``service_account_token``
+    ClusterAuth carrying endpoint, base64 CA, and the freshly-minted
+    token. The kubeconfig shape was dropped — inline-``token`` kubeconfigs
+    drop the Authorization header against EKS (401); the driver now emits
+    the direct ``{token, ca_cert}`` + endpoint shape ``build_api_client``
+    consumes."""
     eks = _eks_client_mock(endpoint="https://abc.eks.amazonaws.com", ca="Y2EtZGF0YQ==")
     minter = _RecordingMinter()
     clock = _Clock()
@@ -145,40 +150,28 @@ def test_synthesizes_kubeconfig_from_describe_cluster() -> None:
 
     resolved = driver._resolve_eks_auth(_exec_plugin_auth())
 
-    assert resolved.auth_method == "kubeconfig"
-    blob = resolved.auth_config["kubeconfig"]
-    parsed = yaml.safe_load(blob)
-    assert parsed["apiVersion"] == "v1"
-    assert parsed["kind"] == "Config"
-    [cluster_entry] = parsed["clusters"]
-    assert cluster_entry["name"] == "prod-eks"
-    assert cluster_entry["cluster"]["server"] == "https://abc.eks.amazonaws.com"
+    assert resolved.auth_method == "service_account_token"
+    assert resolved.endpoint == "https://abc.eks.amazonaws.com"
+    assert resolved.auth_config["token"].startswith("k8s-aws-v1.")
     # CA stays base64 — kubernetes client decodes downstream.
-    assert cluster_entry["cluster"]["certificate-authority-data"] == "Y2EtZGF0YQ=="
-    [user_entry] = parsed["users"]
-    assert user_entry["user"]["token"].startswith("k8s-aws-v1.")
-    [context_entry] = parsed["contexts"]
-    assert context_entry["context"]["cluster"] == "prod-eks"
-    assert context_entry["context"]["user"] == user_entry["name"]
-    assert parsed["current-context"] == "prod-eks-row"
+    assert resolved.auth_config["ca_cert"] == "Y2EtZGF0YQ=="
     assert eks.describe_cluster.call_count == 1
     assert minter.calls == [("prod-eks", "us-east-1")]
 
 
 def test_materialize_context_uses_same_synthesis() -> None:
-    """ClusterContext path returns a kubeconfig blob too — bring/probe
-    workflows need it on the same shape as the resolver path."""
-    eks = _eks_client_mock()
+    """ClusterContext path returns the same ``service_account_token``
+    shape — bring/probe workflows need it identical to the resolver
+    path."""
+    eks = _eks_client_mock(endpoint="https://abc.eks.amazonaws.com")
     minter = _RecordingMinter()
     driver = _driver(eks_client=eks, minter=minter, clock=_Clock())
 
     resolved = driver._resolve_eks_auth_context(_exec_plugin_context())
 
-    assert resolved.auth_method == "kubeconfig"
-    parsed = yaml.safe_load(resolved.auth_config["kubeconfig"])
-    # The cluster row's slug is the context name so the kubernetes
-    # client picks the right context on load.
-    assert parsed["current-context"] == "prod-eks-row"
+    assert resolved.auth_method == "service_account_token"
+    assert resolved.endpoint == "https://abc.eks.amazonaws.com"
+    assert resolved.auth_config["token"].startswith("k8s-aws-v1.")
 
 
 def test_non_exec_plugin_auth_passes_through_untouched() -> None:
@@ -223,8 +216,8 @@ def test_token_cached_within_ttl_window() -> None:
     clock.advance(60.0)  # 1 minute later — well inside TTL
     second = driver._resolve_eks_auth(_exec_plugin_auth())
 
-    first_token = yaml.safe_load(first.auth_config["kubeconfig"])["users"][0]["user"]["token"]
-    second_token = yaml.safe_load(second.auth_config["kubeconfig"])["users"][0]["user"]["token"]
+    first_token = first.auth_config["token"]
+    second_token = second.auth_config["token"]
 
     assert first_token == second_token
     assert len(minter.calls) == 1
@@ -245,8 +238,8 @@ def test_token_re_minted_after_ttl_expiry() -> None:
     clock.advance(13 * 60 + 1.0)
     second = driver._resolve_eks_auth(_exec_plugin_auth())
 
-    first_token = yaml.safe_load(first.auth_config["kubeconfig"])["users"][0]["user"]["token"]
-    second_token = yaml.safe_load(second.auth_config["kubeconfig"])["users"][0]["user"]["token"]
+    first_token = first.auth_config["token"]
+    second_token = second.auth_config["token"]
 
     assert first_token != second_token
     assert len(minter.calls) == 2
@@ -371,9 +364,8 @@ def test_invalidate_describe_cache_forces_redescribe() -> None:
     driver.invalidate_describe_cache("prod-eks")
     resolved = driver._resolve_eks_auth(_exec_plugin_auth())
 
-    parsed = yaml.safe_load(resolved.auth_config["kubeconfig"])
-    assert parsed["clusters"][0]["cluster"]["server"] == "https://new.example"
-    assert parsed["clusters"][0]["cluster"]["certificate-authority-data"] == "bmV3LWNh"
+    assert resolved.endpoint == "https://new.example"
+    assert resolved.auth_config["ca_cert"] == "bmV3LWNh"
     assert eks.describe_cluster.call_count == 2
     # Token came from the still-valid cache: minter called exactly once.
     assert len(minter.calls) == 1
@@ -383,8 +375,8 @@ def test_invalidate_describe_cache_forces_redescribe() -> None:
 
 
 def test_list_pods_materializes_auth_before_dispatch() -> None:
-    """The driver's list_pods passes a synthesized kubeconfig auth
-    to the pod backend — not the raw exec_plugin row."""
+    """The driver's list_pods passes a synthesized service_account_token
+    auth to the pod backend — not the raw exec_plugin row."""
     captured: dict[str, Any] = {}
 
     class _Backend:
@@ -409,8 +401,8 @@ def test_list_pods_materializes_auth_before_dispatch() -> None:
     driver.list_pods(auth=_exec_plugin_auth(), namespace="ns", app_slug="api")
 
     auth = captured["auth"]
-    assert auth.auth_method == "kubeconfig"
-    assert "kubeconfig" in auth.auth_config
+    assert auth.auth_method == "service_account_token"
+    assert "token" in auth.auth_config
     assert len(minter.calls) == 1
 
 
@@ -458,5 +450,5 @@ async def test_stream_logs_materializes_auth_before_dispatch() -> None:
         pass
 
     auth = captured["auth"]
-    assert auth.auth_method == "kubeconfig"
-    assert "kubeconfig" in auth.auth_config
+    assert auth.auth_method == "service_account_token"
+    assert "token" in auth.auth_config

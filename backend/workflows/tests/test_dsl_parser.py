@@ -236,9 +236,7 @@ def test_sync_creates_definition_and_stages_on_first_run():
     app.source_repo = "acme/my-app"
     connection = MagicMock()
 
-    with patch(
-        "astrolift_scm.providers.fetch_file", return_value=MINIMAL_YAML
-    ):
+    with patch("astrolift_scm.providers.fetch_file", return_value=MINIMAL_YAML):
         result = sync_workflows_from_repo(app, connection, ref="abc123")
 
     assert result["created"] == 1
@@ -267,9 +265,7 @@ def test_sync_updates_definition_and_replaces_stages_on_second_run():
     app.source_repo = "acme/my-app"
     connection = MagicMock()
 
-    with patch(
-        "workflows.services.workflow_sync.fetch_file", return_value=MINIMAL_YAML
-    ):
+    with patch("astrolift_scm.providers.fetch_file", return_value=MINIMAL_YAML):
         sync_workflows_from_repo(app, connection, ref="abc123")
 
     # Second run with an updated YAML — one stage removed, name changed.
@@ -284,9 +280,7 @@ workflows:
         on_failure: "fail"
 """
 
-    with patch(
-        "astrolift_scm.providers.fetch_file", return_value=updated_yaml
-    ):
+    with patch("astrolift_scm.providers.fetch_file", return_value=updated_yaml):
         result = sync_workflows_from_repo(app, connection, ref="def456")
 
     assert result["created"] == 0

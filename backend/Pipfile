@@ -85,6 +85,12 @@ pre-commit = "*"
 pytest = "*"
 pytest-django = "*"
 pytest-asyncio = "*"
+# moto fakes the AWS APIs the provider tests exercise (providers/tests/aws,
+# astrolift_* tests that mint EKS tokens / managed-service plans). The
+# providers package declares it under its own ``dev`` extra; mirror it here
+# so the backend image's test suite (which imports those modules) can run.
+# Extras match providers/pyproject.toml's dev extra.
+moto = {extras = ["s3", "iam", "sts", "ec2", "eks", "route53", "acm", "ecr", "secretsmanager", "ssm", "sqs", "sns", "dynamodb", "elasticache", "rds", "efs"], version = ">=5.0"}
 
 
 [requires]

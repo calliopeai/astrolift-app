@@ -47,6 +47,14 @@ RUN pip install --no-cache-dir tomli_w
 # install-explicitly pattern until the lock catches up.
 RUN pip install --no-cache-dir starlette
 
+# moto: declared in Pipfile dev-packages (mirrors providers'[dev] extra)
+# for the AWS-faking test surface (providers/tests/aws + the astrolift_*
+# EKS-token / managed-service tests). Same install-explicitly-until-the-
+# lock-catches-up pattern as above; without it the full suite errors on
+# ``import moto``. Extras match the Pipfile entry. (``kubernetes`` is
+# already pulled in below via ``providers[aws,k8s]``.)
+RUN pip install --no-cache-dir "moto[s3,iam,sts,ec2,eks,route53,acm,ecr,secretsmanager,ssm,sqs,sns,dynamodb,elasticache,rds,efs]>=5.0"
+
 COPY . .
 
 # Provider plugins live in-tree at backend/providers (formerly vendored under

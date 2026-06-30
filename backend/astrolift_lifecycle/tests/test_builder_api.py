@@ -282,7 +282,7 @@ def test_create_with_explicit_cluster_guid_binds(cluster, auth_headers, workflow
     r = _post_json(
         client,
         "/api/builder/v1/dev-environments/",
-        {"runtime": "node", "cluster_guid": cluster.guid},
+        {"runtime": "node", "cluster_guid": str(cluster.guid)},
         auth_headers,
     )
     assert r.status_code == 201

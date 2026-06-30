@@ -1372,12 +1372,21 @@ class LifecycleQuery:
         the response bounded; callers that need deeper history should add
         pagination (future ticket).
         """
+        # Org-scope to the active tenant. TaskRun has no organization FK
+        # of its own (it hangs off workload → registered_app), and
+        # @tenant_scoped only asserts a tenant exists — it does not filter.
+        # Without this a caller could read another org's runs by passing a
+        # known app/workload slug (mirrors astrolift_agent_runs #798).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         qs = TaskRun.objects.select_related(
             "workload",
             "workload__registered_app",
             "app_environment",
             "triggered_by_user",
         ).order_by("-created_at")
+        if org_id is not None:
+            qs = qs.filter(workload__registered_app__organization_id=org_id)
         if app_slug:
             qs = qs.filter(workload__registered_app__slug=app_slug)
         if workload_slug:

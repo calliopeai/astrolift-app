@@ -56,6 +56,7 @@ class GCPIngressDriver(IngressDriver):
                 workload=workload,
                 hostnames=hostnames,
                 tls_strategy=tls_strategy,
+                port=port,
             )
         if self._config.variant == "gateway_api":
             return self._render_gateway_api(
@@ -128,6 +129,7 @@ class GCPIngressDriver(IngressDriver):
         workload,
         hostnames,
         tls_strategy,
+        port: int = 80,
     ) -> list[Manifest]:
         annotations: dict[str, str] = {
             "kubernetes.io/ingress.class": "gce",

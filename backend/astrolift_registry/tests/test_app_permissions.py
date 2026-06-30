@@ -37,13 +37,36 @@ from django.utils import timezone
 from astrolift_identity.models import Organization, Project, Role, RoleBinding, Team
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.schema.queries import RegistryQuery
-from core.tenancy import TenantContext, tenant_context
+from core.tenancy import TenantContext, get_current_tenant, tenant_context
 
 pytestmark = pytest.mark.django_db
 
 
 def _info():
     return SimpleNamespace(context=SimpleNamespace(user=None, request=None))
+
+
+def _app_perms(app_slug: str) -> list[str]:
+    """Effective permission slugs the active-tenant viewer holds on one app.
+
+    The dedicated ``astroliftAppPermissions`` point query was removed in
+    #507 — per-app perms now ride the ``viewerPermissions`` field on the
+    apps-list resolvers. This exercises the same live backing logic
+    (``resolve_effective_permissions_for_apps``) against a single
+    tenant-scoped app, preserving the #478 scope-inheritance coverage.
+    """
+    from astrolift_identity.permission_resolver import resolve_effective_permissions_for_apps
+
+    tenant = get_current_tenant()
+    if tenant is None or tenant.actor_user_id is None:
+        return []
+    qs = RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+    if tenant.organization_id is not None:
+        qs = qs.filter(organization_id=tenant.organization_id)
+    app = qs.first()
+    if app is None:
+        return []
+    return sorted(resolve_effective_permissions_for_apps(tenant, [app]).get(app.pk, set()))
 
 
 def _user(username: str, **kw):
@@ -123,10 +146,9 @@ def test_org_admin_sees_full_permission_set_on_every_app():
     RoleBinding.objects.create(user=user, role=role, scope_kind="ORG", scope_id=org.id)
 
     expected = ["app.delete", "app.deploy", "app.read"]
-    q = RegistryQuery()
     with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
         for slug in ("alpha-perms", "beta-perms", "gamma-perms"):
-            assert q.astrolift_app_permissions(_info(), app_slug=slug) == expected
+            assert _app_perms(slug) == expected
 
 
 def test_team_binding_inherits_on_apps_under_that_team():
@@ -138,12 +160,11 @@ def test_team_binding_inherits_on_apps_under_that_team():
     role = _role("team-deployer-perms", ["app.read", "app.deploy"])
     RoleBinding.objects.create(user=user, role=role, scope_kind="TEAM", scope_id=team_eng.id)
 
-    q = RegistryQuery()
     with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
-        assert q.astrolift_app_permissions(_info(), app_slug="alpha-perms") == ["app.deploy", "app.read"]
-        assert q.astrolift_app_permissions(_info(), app_slug="beta-perms") == ["app.deploy", "app.read"]
+        assert _app_perms("alpha-perms") == ["app.deploy", "app.read"]
+        assert _app_perms("beta-perms") == ["app.deploy", "app.read"]
         # gamma lives under team_ops — no TEAM/ORG/PROJECT/APP match.
-        assert q.astrolift_app_permissions(_info(), app_slug="gamma-perms") == []
+        assert _app_perms("gamma-perms") == []
 
 
 def test_project_binding_grants_only_under_that_project():
@@ -160,15 +181,14 @@ def test_project_binding_grants_only_under_that_project():
     role = _role("project-reader-perms", ["app.read"])
     RoleBinding.objects.create(user=user, role=role, scope_kind="PROJECT", scope_id=project_demo.id)
 
-    q = RegistryQuery()
     with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
-        assert q.astrolift_app_permissions(_info(), app_slug="alpha-perms") == ["app.read"]
-        assert q.astrolift_app_permissions(_info(), app_slug="beta-perms") == ["app.read"]
+        assert _app_perms("alpha-perms") == ["app.read"]
+        assert _app_perms("beta-perms") == ["app.read"]
         # Sibling project under the same team — not reached by the
         # PROJECT binding on project_demo.
-        assert q.astrolift_app_permissions(_info(), app_slug="delta-perms") == []
+        assert _app_perms("delta-perms") == []
         # Other team / project entirely — empty.
-        assert q.astrolift_app_permissions(_info(), app_slug="gamma-perms") == []
+        assert _app_perms("gamma-perms") == []
 
 
 def test_app_direct_binding_grants_only_that_app():
@@ -179,13 +199,12 @@ def test_app_direct_binding_grants_only_that_app():
     role = _role("app-only-perms", ["app.read", "app.deploy"])
     RoleBinding.objects.create(user=user, role=role, scope_kind="APP", scope_id=apps["beta"].id)
 
-    q = RegistryQuery()
     with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
-        assert q.astrolift_app_permissions(_info(), app_slug="beta-perms") == ["app.deploy", "app.read"]
+        assert _app_perms("beta-perms") == ["app.deploy", "app.read"]
         # alpha sits in the same project/team but the APP binding is
         # the only one — so alpha returns empty.
-        assert q.astrolift_app_permissions(_info(), app_slug="alpha-perms") == []
-        assert q.astrolift_app_permissions(_info(), app_slug="gamma-perms") == []
+        assert _app_perms("alpha-perms") == []
+        assert _app_perms("gamma-perms") == []
 
 
 def test_no_binding_returns_empty_not_error():
@@ -194,12 +213,11 @@ def test_no_binding_returns_empty_not_error():
     so it must NOT raise."""
     org, *_rest, apps = _scaffold()
     user = _user("nobody-perms")
-    q = RegistryQuery()
     with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
-        assert q.astrolift_app_permissions(_info(), app_slug="alpha-perms") == []
+        assert _app_perms("alpha-perms") == []
         # Unknown slug also returns empty (no leakage about whether
         # the slug exists in another tenant).
-        assert q.astrolift_app_permissions(_info(), app_slug="does-not-exist") == []
+        assert _app_perms("does-not-exist") == []
 
 
 def test_expired_binding_does_not_grant():
@@ -216,9 +234,8 @@ def test_expired_binding_does_not_grant():
         scope_id=apps["alpha"].id,
         expires_at=timezone.now() - timedelta(hours=1),
     )
-    q = RegistryQuery()
     with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
-        assert q.astrolift_app_permissions(_info(), app_slug="alpha-perms") == []
+        assert _app_perms("alpha-perms") == []
 
 
 def test_cross_org_binding_does_not_leak_across_tenant():
@@ -238,16 +255,15 @@ def test_cross_org_binding_does_not_leak_across_tenant():
     role = _role("xtenant-role-perms", ["app.deploy"])
     RoleBinding.objects.create(user=user, role=role, scope_kind="ORG", scope_id=org_b.id)
 
-    q = RegistryQuery()
     # Acting in org A — the org B binding doesn't surface on the org A
     # app, and the org B app slug is invisible (returns []).
     with tenant_context(TenantContext(organization_id=org_a.id, actor_user_id=user.id)):
-        assert q.astrolift_app_permissions(_info(), app_slug="alpha-perms") == []
-        assert q.astrolift_app_permissions(_info(), app_slug="delta-other-perms") == []
+        assert _app_perms("alpha-perms") == []
+        assert _app_perms("delta-other-perms") == []
     # Flip tenant context to org B and the binding lights up on its
     # own app — sanity check that the binding itself is intact.
     with tenant_context(TenantContext(organization_id=org_b.id, actor_user_id=user.id)):
-        assert q.astrolift_app_permissions(_info(), app_slug="delta-other-perms") == ["app.deploy"]
+        assert _app_perms("delta-other-perms") == ["app.deploy"]
 
 
 # ---------- viewerPermissions on AstroliftRegisteredApp -----------------
@@ -339,8 +355,8 @@ def test_viewer_permissions_field_matches_app_permissions_query():
     q = RegistryQuery()
     with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
         list_result = {a.slug: a.viewer_permissions for a in q.astrolift_apps(_info())}
-        single_alpha = q.astrolift_app_permissions(_info(), app_slug="alpha-perms")
-        single_gamma = q.astrolift_app_permissions(_info(), app_slug="gamma-perms")
+        single_alpha = _app_perms("alpha-perms")
+        single_gamma = _app_perms("gamma-perms")
 
     # alpha picks up both bindings; gamma sees only the ORG reader.
     assert list_result["alpha-perms"] == single_alpha == ["app.deploy", "app.read"]

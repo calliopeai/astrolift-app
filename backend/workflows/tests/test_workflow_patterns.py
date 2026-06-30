@@ -7,7 +7,6 @@ from django.utils import timezone
 
 from workflows.models import WorkflowDefinition, WorkflowStage, WorkflowStageExecution
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -40,9 +39,9 @@ def workflow_run(db, workflow_def):
     """Minimal WorkflowRun row — no Temporal needed, FK is all we need."""
     from astrolift_operations.models import WorkflowRun
 
+    # WorkflowRun is identified by workflow_kind / workflow_id / run_id —
+    # it has no name/slug (not a NamedBaseCoreModel).
     return WorkflowRun.objects.create(
-        name=f"run-{workflow_def.slug}",
-        slug=f"run-{workflow_def.slug}",
         workflow_kind="FanOutAgentWorkflow",
         workflow_id="test-workflow-001",
         run_id="test-run-001",
@@ -143,9 +142,12 @@ def test_workflow_stage_human_gate(workflow_def):
 @pytest.mark.django_db
 def test_workflow_stage_ordering(workflow_def):
     """Stages are returned ordered by (definition, order)."""
-    WorkflowStage.objects.create(definition=workflow_def, order=2, kind="checkpoint")
-    WorkflowStage.objects.create(definition=workflow_def, order=0, kind="agent_dispatch")
-    WorkflowStage.objects.create(definition=workflow_def, order=1, kind="human_gate")
+    # Stage slug is unique (BaseCoreModel); mirror the mutation and give
+    # each a per-(definition, order) slug, else all default to "none" and
+    # the second insert collides.
+    WorkflowStage.objects.create(definition=workflow_def, order=2, kind="checkpoint", slug="stage-ord-2")
+    WorkflowStage.objects.create(definition=workflow_def, order=0, kind="agent_dispatch", slug="stage-ord-0")
+    WorkflowStage.objects.create(definition=workflow_def, order=1, kind="human_gate", slug="stage-ord-1")
 
     orders = list(WorkflowStage.objects.filter(definition=workflow_def).values_list("order", flat=True))
     assert orders == [0, 1, 2]
@@ -242,7 +244,11 @@ def test_terminal_statuses_are_terminal(workflow_def, workflow_run):
         WorkflowStageExecution.Status.CANCELLED,
     ]
     for i, status in enumerate(terminal_statuses):
+        # Execution slug is unique (BaseCoreModel); without an explicit
+        # slug every row defaults to "none" and the loop's 2nd insert
+        # collides. Mirror the activity layer's _unique_slug pattern.
         execution = WorkflowStageExecution.objects.create(
+            slug=f"wfse-term-{i}",
             workflow_run=workflow_run,
             stage=stage,
             status=status,
@@ -260,7 +266,9 @@ def test_pending_and_running_are_not_terminal(workflow_def, workflow_run):
         kind=WorkflowStage.StageKind.AGENT_DISPATCH,
     )
     for status in (WorkflowStageExecution.Status.PENDING, WorkflowStageExecution.Status.RUNNING):
+        # Unique slug per row — see test_terminal_statuses_are_terminal.
         execution = WorkflowStageExecution.objects.create(
+            slug=f"wfse-{status}",
             workflow_run=workflow_run,
             stage=stage,
             status=status,

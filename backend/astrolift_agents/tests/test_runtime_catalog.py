@@ -110,11 +110,18 @@ class _FakeContainer:
     def __init__(self, image_ref: str, port: int = 0):
         self.image_ref = image_ref
         self.port = port
+        self.is_primary = True
+        # command/args are JSONField(default=list) on the real Container;
+        # _render_agent_job reads both, so the fake must carry them.
+        self.command: list = []
+        self.args: list = []
 
 
 class _FakeWorkload:
     def __init__(self, image_ref: str, port: int = 0):
-        self.container_set = _FakeQS(_FakeContainer(image_ref, port))
+        # Prod reads ``workload.containers.filter(is_primary=True)`` —
+        # the related manager was renamed from ``container_set``.
+        self.containers = _FakeQS(_FakeContainer(image_ref, port))
 
 
 class _FakeSpec:

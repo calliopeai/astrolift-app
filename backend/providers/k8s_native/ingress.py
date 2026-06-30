@@ -115,6 +115,7 @@ class K8sIngressDriver(IngressDriver):
                 workload=workload,
                 hostnames=hostnames,
                 tls_strategy=tls_strategy,
+                port=port,
             )
         if self._config.variant == "traefik":
             return self._render_nginx_style(
@@ -123,6 +124,7 @@ class K8sIngressDriver(IngressDriver):
                 hostnames=hostnames,
                 tls_strategy=tls_strategy,
                 ingress_class="traefik",
+                port=port,
             )
         if self._config.variant == "gateway_api":
             return self._render_gateway_api(
@@ -138,6 +140,7 @@ class K8sIngressDriver(IngressDriver):
                 hostnames=hostnames,
                 tls_strategy=tls_strategy,
                 ingress_class="kong",
+                port=port,
             )
         if self._config.variant == "istio_gateway":
             return self._render_istio(
@@ -145,6 +148,7 @@ class K8sIngressDriver(IngressDriver):
                 workload=workload,
                 hostnames=hostnames,
                 tls_strategy=tls_strategy,
+                port=port,
             )
         raise ValueError(f"unhandled variant {self._config.variant!r}")
 
@@ -237,6 +241,7 @@ class K8sIngressDriver(IngressDriver):
         workload: str,
         hostnames: list[str],
         tls_strategy: str,
+        port: int = 80,
     ) -> list[Manifest]:
         return self._render_nginx_style(
             app=app,
@@ -244,6 +249,7 @@ class K8sIngressDriver(IngressDriver):
             hostnames=hostnames,
             tls_strategy=tls_strategy,
             ingress_class=self._config.ingress_class_name,
+            port=port,
         )
 
     def _render_nginx_style(
@@ -254,6 +260,7 @@ class K8sIngressDriver(IngressDriver):
         hostnames: list[str],
         tls_strategy: str,
         ingress_class: str,
+        port: int = 80,
     ) -> list[Manifest]:
         """Generic Ingress shape works for nginx, traefik, kong."""
         annotations: dict[str, str] = {}
@@ -360,6 +367,7 @@ class K8sIngressDriver(IngressDriver):
         workload: str,
         hostnames: list[str],
         tls_strategy: str,
+        port: int = 80,
     ) -> list[Manifest]:
         """Istio Gateway + VirtualService."""
         gateway: Manifest = {
