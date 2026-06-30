@@ -93,6 +93,14 @@ class AgentTask(BaseCoreModel):
     # Terminal outputs — only one is populated depending on outcome.
     result = models.JSONField(null=True, blank=True)
     failure = models.JSONField(null=True, blank=True)
+    # Per-dispatch ad-hoc input frozen at task creation (#930). Carries the
+    # ``runAstroliftAgent`` ad-hoc ``trigger_payload`` and the trigger-bound
+    # dispatch's ``input_mapping``-shaped webhook payload. Surfaced to the
+    # running agent container as the ``ASTROLIFT_TRIGGER_PAYLOAD`` env var
+    # (JSON-encoded) by the K8s Job spawner. ``None`` for unattended
+    # manual/cron/loop dispatch, which carry no ad-hoc input — those launch
+    # with no such env var.
+    dispatch_input = models.JSONField(null=True, blank=True)
     # Lifecycle timestamps.
     queued_at = models.DateTimeField(null=True, blank=True)
     provisioning_at = models.DateTimeField(null=True, blank=True)

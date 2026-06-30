@@ -189,6 +189,9 @@ def dispatch_agent_task_from_webhook(webhook, payload: dict | None) -> object | 
             agent_definition=workload,
             status=AgentTask.Status.DRAFT,
             timeout_seconds=int(workload.tool_timeout_seconds or 300),
+            # Freeze the mapped webhook payload on the task so the spawner
+            # surfaces it to the pod as ASTROLIFT_TRIGGER_PAYLOAD (#930).
+            dispatch_input=mapped or None,
         )
         task.transition_to(AgentTask.Status.QUEUED)
 

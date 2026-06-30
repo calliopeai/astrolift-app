@@ -204,6 +204,43 @@ def test_dispatch_binds_environment_spec_and_vnc(
     assert task.vnc_enabled is True
 
 
+def test_dispatch_persists_adhoc_trigger_payload(
+    permission_resolver, info, org, with_tenant_org, temporal_recorder
+):
+    """The ad-hoc ``trigger_payload`` is frozen on the task so the spawner can
+    surface it to the pod as ASTROLIFT_TRIGGER_PAYLOAD (#930)."""
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    workload = _agent_workload(org)
+    payload = {"prompt": "fix the bug", "pr": 42}
+
+    with with_tenant_org(org):
+        result = AgentsMutation().run_astrolift_agent(
+            info,
+            input=RunAstroliftAgentInput(agent_slug=workload.slug, trigger_payload=payload),
+        )
+
+    assert result.ok is True
+    task = AgentTask.objects.get(guid=str(result.data.id))
+    assert task.dispatch_input == payload
+
+
+def test_dispatch_without_payload_leaves_dispatch_input_null(
+    permission_resolver, info, org, with_tenant_org, temporal_recorder
+):
+    """No ad-hoc input -> no stored payload -> no spurious pod env var (#930)."""
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    workload = _agent_workload(org)
+
+    with with_tenant_org(org):
+        result = AgentsMutation().run_astrolift_agent(
+            info, input=RunAstroliftAgentInput(agent_slug=workload.slug)
+        )
+
+    assert result.ok is True
+    task = AgentTask.objects.get(guid=str(result.data.id))
+    assert task.dispatch_input is None
+
+
 # ---------------------------------------------------------------------------
 # The enqueued workflow's activity drives the SAME task to terminal
 # ---------------------------------------------------------------------------
