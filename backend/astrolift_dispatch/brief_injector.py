@@ -42,13 +42,35 @@ def brief_env_vars(task: AgentTask) -> list[dict[str, str]]:
     ]
 
 
+def dispatch_input_env_vars(task: AgentTask) -> list[dict[str, str]]:
+    """Return the env var that surfaces the per-dispatch ad-hoc input (#930).
+
+    When the task was dispatched with an ad-hoc input — ``runAstroliftAgent``'s
+    ``trigger_payload`` or a trigger-bound webhook's ``input_mapping``-shaped
+    payload, both frozen on ``AgentTask.dispatch_input`` at creation — the
+    running agent reads it from a single JSON-encoded ``ASTROLIFT_TRIGGER_PAYLOAD``
+    env var. Unattended manual/cron/loop dispatch leaves ``dispatch_input``
+    null and gets no env var (an empty payload is indistinguishable from no
+    payload, so we emit nothing rather than a spurious ``"null"``).
+    """
+    payload = getattr(task, "dispatch_input", None)
+    if not payload:
+        return []
+    return [
+        {
+            "name": "ASTROLIFT_TRIGGER_PAYLOAD",
+            "value": json.dumps(payload, separators=(",", ":")),
+        }
+    ]
+
+
 def inject_brief_into_job_spec(job_spec: dict[str, Any], task: AgentTask) -> dict[str, Any]:
-    """Add Brief environment variables to a K8s Job pod spec.
+    """Add Brief + dispatch-input environment variables to a K8s Job pod spec.
 
     Mutates the first container's env list in the pod template spec.
     Returns the updated job_spec.
     """
-    env_vars = brief_env_vars(task)
+    env_vars = brief_env_vars(task) + dispatch_input_env_vars(task)
     if not env_vars:
         return job_spec
 
