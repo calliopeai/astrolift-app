@@ -3549,6 +3549,9 @@ type CloudOrphanType {
   kind: String!
   identifier: String!
   classification: String!
+  clusterSlug: String!
+  reapKey: String!
+  reason: String!
 }
 
 type Clusteragentkeyissuedpayload {
@@ -4496,6 +4499,7 @@ type Mutation {
   setEnvironmentSetting(input: SetEnvironmentSettingInput!): AstroliftEnvironmentSettingMutationResult!
   clearEnvironmentSetting(input: ClearEnvironmentSettingInput!): AstroliftEnvironmentSettingMutationResult!
   runTask(input: RunTaskInput!): AstroliftTaskRunPayloadMutationResult!
+  reapCloudOrphan(input: ReapCloudOrphanInput!): ReapCloudOrphanPayloadMutationResult!
   connectSource(input: ConnectSourceInput!): AstroliftSourceConnectionMutationResult!
   updateSourceConnection(input: UpdateSourceConnectionInput!): AstroliftSourceConnectionMutationResult!
   disconnectSource(input: DisconnectSourceInput!): AstroliftSourceConnectionMutationResult!
@@ -5052,6 +5056,27 @@ type Query {
   """List stage executions for a WorkflowRun (by workflow_id + run_id)."""
   workflowStageExecutions(workflowId: String!, runId: String!): [WorkflowStageExecutionType!]!
   astroliftMyConnectedAccounts: [AstroliftMyConnectedAccount!]!
+}
+
+input ReapCloudOrphanInput {
+  kind: String!
+  reapKey: String!
+  clusterSlug: String = null
+  forceDestroy: Boolean! = false
+}
+
+type ReapCloudOrphanPayload {
+  kind: String!
+  identifier: String!
+  reaped: Boolean!
+  alreadyGone: Boolean!
+  message: String!
+}
+
+type ReapCloudOrphanPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: ReapCloudOrphanPayload
 }
 
 input RecheckDomainValidationInput {

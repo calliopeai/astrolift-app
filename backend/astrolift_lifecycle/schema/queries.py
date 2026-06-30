@@ -333,11 +333,20 @@ def _compute_manifest_diff(
 
 @strawberry.type
 class CloudOrphanType:
-    """A platform-owned cloud resource with no live owning DB row (#995)."""
+    """A platform-owned cloud resource with no live owning DB row (#995).
+
+    Carries enough identity to reap it: the cloud ``identifier`` (handle),
+    ``kind``, which managed ``cluster_slug`` can reap it, the ``reap_key`` the
+    ``reapCloudOrphan`` mutation dispatches on, and an operator-facing
+    ``reason``.
+    """
 
     kind: str
     identifier: str
     classification: str
+    cluster_slug: str
+    reap_key: str
+    reason: str
 
 
 @strawberry.type
@@ -368,6 +377,9 @@ class LifecycleQuery:
                     kind=o.kind,
                     identifier=o.identifier,
                     classification=o.classification,
+                    cluster_slug=o.cluster_slug,
+                    reap_key=o.reap_key,
+                    reason=o.reason,
                 )
                 for o in report.orphans
             ],
