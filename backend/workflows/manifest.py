@@ -336,3 +336,76 @@ def definition_to_manifest(definition: WorkflowDefinition) -> ParsedWorkflowMani
         )
 
     return ParsedWorkflowManifest(definition=def_spec, stages=stages)
+
+
+# --------------------------------------------------------------------------- #
+# Persist: ParsedWorkflowManifest → org-scoped WorkflowDefinition + stages
+# --------------------------------------------------------------------------- #
+
+
+def _fan_out_columns(fan_out: int | str) -> tuple[int | None, bool]:
+    """Map the manifest fan-out tri-state to the model's two columns (#969)."""
+    if fan_out == "dynamic":
+        return None, True
+    if isinstance(fan_out, int) and not isinstance(fan_out, bool) and fan_out > 0:
+        return fan_out, False
+    return None, False
+
+
+def _unique_definition_slug(base_slug: str, organization) -> str:
+    """First free ``(organization, slug)`` derived from ``base_slug``."""
+    candidate = base_slug or "imported-workflow"
+    suffix = 0
+    while WorkflowDefinition.objects.filter(
+        organization=organization, slug=candidate, deleted_at__isnull=True
+    ).exists():
+        suffix += 1
+        candidate = f"{base_slug}-{suffix}"
+    return candidate
+
+
+def create_definition_from_manifest(parsed: ParsedWorkflowManifest, *, organization, created_by=None):
+    """Persist a structured manifest as an org-scoped ``WorkflowDefinition`` +
+    its ordered stages. The single create path shared by the visual-flow
+    importers (#984) and any future native-TOML create surface — it consumes
+    the same ``ParsedWorkflowManifest`` the parser and importers emit, so the
+    persistence rules (org scope, fan-out tri-state → two columns, role-only
+    globals) live in exactly one place.
+
+    Imported definitions land disabled (``is_enabled=False``) with no concrete
+    ``agent_definition`` bindings — an operator reviews + binds agents before
+    enabling, exactly like a cloned global (spec 40 §2.1/§2.4). The slug is
+    made unique within the org on collision.
+    """
+    slug = _unique_definition_slug(parsed.definition.slug, organization)
+    definition = WorkflowDefinition.objects.create(
+        organization=organization,
+        name=parsed.definition.name,
+        slug=slug,
+        description=parsed.definition.description or "",
+        pattern_kind=parsed.definition.pattern,
+        model_label="",
+        is_enabled=False,
+        created_by=created_by,
+        updated_by=created_by,
+    )
+    for stage in parsed.stages:
+        fan_out_count, fan_out_dynamic = _fan_out_columns(stage.fan_out)
+        WorkflowStage.objects.create(
+            definition=definition,
+            slug=f"{slug}-stage-{stage.order}",
+            order=stage.order,
+            kind=stage.kind,
+            role=stage.role or "",
+            agent_definition=None,
+            skill_refs=list(stage.skills),
+            on_failure=stage.on_failure,
+            timeout_seconds=stage.timeout,
+            fan_out_count=fan_out_count,
+            fan_out_dynamic=fan_out_dynamic,
+            prompt=stage.prompt or "",
+            approvers=list(stage.approvers),
+            created_by=created_by,
+            updated_by=created_by,
+        )
+    return definition

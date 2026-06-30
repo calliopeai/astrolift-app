@@ -81,6 +81,8 @@ if is_enabled(Feature.WORKFLOWS):
     _query_bases.append(WorkflowsSchema.Query)
     _query_bases.append(AstroliftTemporalWorkflowsSchema.WorkflowManifestQuery)
     _mutation_bases.append(WorkflowsSchema.Mutation)
+    # Visual-flow importer (Langflow/Flowise → WorkflowDefinition, #984-#986).
+    _mutation_bases.append(AstroliftTemporalWorkflowsSchema.WorkflowImportMutation)
 
     # Configured-Workflow surface (spec 40 §6, #968) — lives under
     # astrolift_workflows for the #164 tenancy guardrail but needs the

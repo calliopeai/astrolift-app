@@ -4131,6 +4131,24 @@ input GroupOperationInput {
   operation: String!
 }
 
+type ImportGapType {
+  code: String!
+  message: String!
+  nodeId: String
+  nodeType: String
+  severity: String!
+}
+
+type ImportWorkflowFlowResult {
+  ok: Boolean!
+  errors: [ValidationError!]!
+  preview: Boolean!
+  createdSlug: String
+  definition: WorkflowManifestDefinitionType
+  stages: [WorkflowManifestStageType!]!
+  gaps: [ImportGapType!]!
+}
+
 input InstallClusterPrereqsInputType {
   clusterId: GUID!
   selectedComponents: [String!]!
@@ -4631,6 +4649,11 @@ type Mutation {
   Deep-copy a visible workflow definition + its stages into the caller's org as a new editable definition (spec 40 §2.1). New slug on collision; global stages copy with agent_definition cleared.
   """
   cloneWorkflowDefinition(slug: String!, orgId: ID!): CloneWorkflowDefinitionResult!
+
+  """
+  Import a popular visual agent/workflow builder export (Langflow, Flowise, …) into an Astrolift WorkflowDefinition. preview=true (default) returns the mapped manifest + gap report without persisting; preview=false creates an org-scoped, disabled definition + stages.
+  """
+  importWorkflowFlow(format: String!, payload: JSON!, preview: Boolean! = true): ImportWorkflowFlowResult!
 
   """Create a configured Workflow from a visible definition (spec 40 §2.2)."""
   createWorkflow(name: String!, definitionSlug: String!, slug: String = null, description: String = null, stageBindings: JSON = null, inputs: JSON = null, triggerKind: String! = "manual", scheduleCron: String = null, orgId: ID = null): CreateWorkflowResult!
