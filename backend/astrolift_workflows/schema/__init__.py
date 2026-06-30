@@ -7,6 +7,7 @@ StateMachine WorkflowDefinition) so the wiring in ``config.schema``
 stays narrow and the two domains can move independently.
 """
 
+from astrolift_workflows.schema.manifest import WorkflowManifestQuery
 from astrolift_workflows.schema.mutations import (
     TemporalWorkflowsMutation,
     WorkflowsMutation,
@@ -21,4 +22,5 @@ __all__ = [
     "TemporalWorkflowsMutation",
     "WorkflowsQuery",
     "WorkflowsMutation",
+    "WorkflowManifestQuery",
 ]

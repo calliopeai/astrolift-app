@@ -5089,6 +5089,8 @@ type Query {
 
   """List stage executions for a WorkflowRun (by workflow_id + run_id)."""
   workflowStageExecutions(workflowId: String!, runId: String!): [WorkflowStageExecutionType!]!
+  previewWorkflowManifest(toml: String!): WorkflowManifestPreviewType!
+  exportWorkflowManifest(definitionSlug: String!): WorkflowManifestExportType!
 
   """List the org's configured Workflows (tier 2)."""
   workflows(orgId: ID = null): [ConfiguredWorkflow!]!
@@ -5954,6 +5956,42 @@ type WorkflowInstanceType {
   stateLabel: String!
   availableTransitions: [AvailableTransition!]!
   history: [TransitionLogEntry!]!
+}
+
+type WorkflowManifestDefinitionType {
+  slug: String!
+  name: String!
+  pattern: String!
+  description: String!
+}
+
+type WorkflowManifestExportType {
+  ok: Boolean!
+  toml: String
+  error: String
+}
+
+type WorkflowManifestPreviewType {
+  ok: Boolean!
+  error: String
+  errorPath: String
+  errorLine: Int
+  errorColumn: Int
+  definition: WorkflowManifestDefinitionType
+  stages: [WorkflowManifestStageType!]!
+}
+
+type WorkflowManifestStageType {
+  order: Int!
+  kind: String!
+  role: String!
+  agent: String
+  skills: [String!]!
+  onFailure: String!
+  timeout: Int!
+  fanOut: String!
+  prompt: String
+  approvers: [String!]!
 }
 
 type WorkflowRun {
