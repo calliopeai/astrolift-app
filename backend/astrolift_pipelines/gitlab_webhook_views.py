@@ -27,8 +27,8 @@ from django.views.decorators.http import require_http_methods
 from astrolift_identity.models import Organization
 from astrolift_pipelines.models import Pipeline, PipelineRun, Trigger
 from astrolift_pipelines.webhook_views import (
-    _next_run_number,
     _dispatch_pipeline_run,
+    _next_run_number,
     _repo_url_matches,
     _trigger_matches,
 )
@@ -56,8 +56,16 @@ def _get_org_pipeline_secret(org: Organization) -> str | None:
     return None
 
 
-def _verify_gitlab_token(secret: str, provided: str) -> bool:
-    """Constant-time compare for GitLab's opaque token scheme."""
+def verify_signature(secret: str, provided: str) -> bool:
+    """Constant-time compare for GitLab's opaque token scheme.
+
+    Named ``verify_signature`` so the ``test_webhook_signature_guard`` CI
+    guard (#529) recognizes it as the auth boundary on
+    ``pipeline_gitlab_webhook``. GitLab doesn't HMAC the body — it sends
+    a shared ``X-Gitlab-Token`` we compare against the stored per-org
+    secret in constant time. Returns False on mismatch; the caller turns
+    False into a generic 403.
+    """
     return hmac.compare_digest(secret.encode(), provided.encode())
 
 
@@ -110,7 +118,7 @@ def pipeline_gitlab_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
         logger.warning("pipelines.gitlab_webhook: org %s has no pipeline webhook secret", org_slug)
         return JsonResponse({"error": "invalid token"}, status=403)
 
-    if not _verify_gitlab_token(secret, gitlab_token):
+    if not verify_signature(secret, gitlab_token):
         logger.warning("pipelines.gitlab_webhook: token mismatch for org %s", org_slug)
         return JsonResponse({"error": "invalid token"}, status=403)
 

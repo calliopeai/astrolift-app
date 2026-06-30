@@ -321,6 +321,90 @@ def test_empty_cron_string_clears_the_field(permission_resolver, org, with_tenan
 
 
 # ---------------------------------------------------------------------------
+# Clear scheduled scaling (#952): the dedicated "remove the schedule" seam
+# ---------------------------------------------------------------------------
+
+
+def test_clear_scheduled_scaling_clears_the_triple(permission_resolver, org, with_tenant_org):
+    """``clearScheduledScaling=True`` turns the whole scheduled-scaling triple
+    off — both crons to "" and the scale target to NULL — which a normal update
+    can't express (None on ``scheduled_scale_to`` means leave-unchanged).
+    ``replicas`` (the Service baseline) is deliberately left untouched."""
+    permission_resolver.grant(Permission.APP_UPDATE)
+    workload = _agent_workload(
+        org,
+        run_family=Workload.RunFamily.SERVICE,
+        replicas=2,
+        scheduled_scale_to=5,
+        scale_up_cron="0 8 * * 1-5",
+        scale_down_cron="0 18 * * 1-5",
+    )
+
+    result = _call(org, with_tenant_org, workload.slug, clear_scheduled_scaling=True)
+
+    assert result.ok is True
+    workload.refresh_from_db()
+    assert workload.scheduled_scale_to is None
+    assert workload.scale_up_cron == ""
+    assert workload.scale_down_cron == ""
+    # Baseline replica count is NOT part of the schedule — left as-is.
+    assert workload.replicas == 2
+    # The success envelope reads back the cleared state in one round-trip.
+    assert result.data.scheduled_scale_to is None
+    assert result.data.scale_up_cron == ""
+    assert result.data.scale_down_cron == ""
+
+
+def test_normal_update_does_not_clear_scaling(permission_resolver, org, with_tenant_org):
+    """Without the flag, a partial update that touches an unrelated field
+    leaves the stored scaling triple intact (a normal save can't accidentally
+    clear the schedule)."""
+    permission_resolver.grant(Permission.APP_UPDATE)
+    workload = _agent_workload(
+        org,
+        run_family=Workload.RunFamily.SERVICE,
+        scheduled_scale_to=5,
+        scale_up_cron="0 8 * * 1-5",
+        scale_down_cron="0 18 * * 1-5",
+    )
+
+    result = _call(org, with_tenant_org, workload.slug, replicas=3)
+
+    assert result.ok is True
+    workload.refresh_from_db()
+    assert workload.replicas == 3
+    # Scaling triple untouched.
+    assert workload.scheduled_scale_to == 5
+    assert workload.scale_up_cron == "0 8 * * 1-5"
+    assert workload.scale_down_cron == "0 18 * * 1-5"
+
+
+def test_clear_scheduled_scaling_with_scale_value_rejected(permission_resolver, org, with_tenant_org):
+    """Setting the clear flag AND a scaling value in one call is contradictory
+    (set vs clear) — rejected with a field error, nothing written."""
+    permission_resolver.grant(Permission.APP_UPDATE)
+    workload = _agent_workload(
+        org,
+        run_family=Workload.RunFamily.SERVICE,
+        scheduled_scale_to=5,
+    )
+
+    result = _call(
+        org,
+        with_tenant_org,
+        workload.slug,
+        clear_scheduled_scaling=True,
+        scheduled_scale_to=8,
+    )
+
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.VALIDATION.value
+    assert result.errors[0].field == "clearScheduledScaling"
+    workload.refresh_from_db()
+    assert workload.scheduled_scale_to == 5
+
+
+# ---------------------------------------------------------------------------
 # Validation: each rule rejects with a field error (no 500, no write)
 # ---------------------------------------------------------------------------
 

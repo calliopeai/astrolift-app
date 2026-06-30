@@ -29,6 +29,23 @@ from django.views.decorators.http import require_POST
 log = logging.getLogger("astrolift_agents.views.workflow_webhook")
 
 
+def verify_signature(*, provided: str, secret_hash: str) -> bool:
+    """Constant-time check of an inbound WorkflowWebhook signature (#983).
+
+    The caller sends the plaintext signing secret in the
+    ``X-Astrolift-Signature`` header; we compare SHA-256(provided)
+    against the stored ``secret_hash`` with ``hmac.compare_digest``.
+    Returns False on a missing header or any mismatch — the caller turns
+    False into a generic 401.
+
+    Named ``verify_signature`` so the ``test_webhook_signature_guard`` CI
+    guard (#529) recognizes it as the auth boundary on this view.
+    """
+    if not provided or not secret_hash:
+        return False
+    return hmac.compare_digest(hashlib.sha256(provided.encode()).hexdigest(), secret_hash)
+
+
 @csrf_exempt
 @require_POST
 def workflow_webhook(request: HttpRequest, org_slug: str, slug: str) -> JsonResponse:
@@ -50,10 +67,7 @@ def workflow_webhook(request: HttpRequest, org_slug: str, slug: str) -> JsonResp
         return JsonResponse({"ok": False, "error": "not found"}, status=404)
 
     provided = request.headers.get("X-Astrolift-Signature", "")
-    expected = webhook.secret_hash or ""
-    if not provided or not hmac.compare_digest(
-        hashlib.sha256(provided.encode()).hexdigest(), expected
-    ):
+    if not verify_signature(provided=provided, secret_hash=webhook.secret_hash or ""):
         return JsonResponse({"ok": False, "error": "invalid signature"}, status=401)
 
     try:

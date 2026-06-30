@@ -44,10 +44,15 @@ logger = logging.getLogger(__name__)
 _HANDLED_EVENTS = {"push", "pull_request"}
 
 
-def _verify_github_signature(secret: bytes, body: bytes, signature_header: str) -> bool:
+def verify_signature(secret: bytes, body: bytes, signature_header: str) -> bool:
     """Verify GitHub's HMAC-SHA256 payload signature.
 
     GitHub sends: ``X-Hub-Signature-256: sha256=<hex>``
+
+    Named ``verify_signature`` so the ``test_webhook_signature_guard`` CI
+    guard (#529) recognizes it as the HMAC trust boundary on
+    ``pipeline_github_webhook``. Returns False on a missing / malformed /
+    mismatched signature; the caller turns False into a generic 401.
     """
     if not signature_header.startswith("sha256="):
         return False
@@ -162,7 +167,7 @@ def pipeline_github_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
         logger.warning("pipelines.webhook: org %s has no pipeline webhook secret", org_slug)
         return JsonResponse({"error": "invalid signature"}, status=401)
 
-    if not _verify_github_signature(secret, body, signature):
+    if not verify_signature(secret, body, signature):
         logger.warning("pipelines.webhook: signature mismatch for org %s", org_slug)
         return JsonResponse({"error": "invalid signature"}, status=401)
 
