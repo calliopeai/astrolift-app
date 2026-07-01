@@ -45,6 +45,48 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+
+  /* ── Semantic status ─ solid + fg/bg/border per state (values in
+   *    :root / .dark below). Enables bg-success, text-warning-fg,
+   *    border-info-border, bg-danger/10, etc. Retires the hardcoded
+   *    emerald/amber/indigo/red classes (swept in #A4). ────────────── */
+  --color-success: var(--success);
+  --color-success-fg: var(--success-fg);
+  --color-success-bg: var(--success-bg);
+  --color-success-border: var(--success-border);
+  --color-warning: var(--warning);
+  --color-warning-fg: var(--warning-fg);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-border: var(--warning-border);
+  --color-info: var(--info);
+  --color-info-fg: var(--info-fg);
+  --color-info-bg: var(--info-bg);
+  --color-info-border: var(--info-border);
+  --color-danger: var(--danger);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-border: var(--danger-border);
+
+  /* ── Surface / elevation ─ depth by surface, not by stacking borders.
+   *    Aliases the existing background/card/popover tokens so both modes
+   *    resolve correctly. Powers the de-nesting primitives (#A2). ───── */
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+}
+
+/* ── Static design tokens (mode-independent) ──────────────────────────
+ * Type scale: adds the sub-`xs` micro step so `text-[10px]` / `text-[11px]`
+ * arbitrary escapes retire onto the named `text-2xs`. `xs`→`2xl` are the
+ * Tailwind defaults (kept, so existing screens render unchanged).
+ * Motion easings expose `ease-standard` / `ease-emphasized` utilities;
+ * durations live as `--motion-*` vars in :root. */
+@theme {
+  --text-2xs: 0.6875rem; /* 11px */
+  --text-2xs--line-height: 1rem; /* 16px */
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
 }
 
 :root {
@@ -99,6 +141,38 @@
   --sidebar-accent-foreground: var(--brand-text);
   --sidebar-border: oklch(0.91 0 0);
   --sidebar-ring: var(--brand-primary);
+
+  /* ── Semantic status — light. `-fg` is the accessible text/icon colour
+   *    on the matching `-bg` tint; the bare token is the solid accent
+   *    (dots, chart series, filled indicators). ─────────────────────── */
+  --success: oklch(0.6 0.14 163);
+  --success-fg: oklch(0.43 0.1 163);
+  --success-bg: oklch(0.95 0.03 163);
+  --success-border: oklch(0.84 0.07 163);
+  --warning: oklch(0.66 0.16 70);
+  --warning-fg: oklch(0.47 0.1 61);
+  --warning-bg: oklch(0.96 0.04 85);
+  --warning-border: oklch(0.83 0.09 78);
+  --info: oklch(0.58 0.17 258);
+  --info-fg: oklch(0.47 0.16 262);
+  --info-bg: oklch(0.95 0.03 260);
+  --info-border: oklch(0.84 0.08 260);
+  --danger: oklch(0.58 0.22 27);
+  --danger-fg: oklch(0.5 0.2 27);
+  --danger-bg: oklch(0.96 0.03 22);
+  --danger-border: oklch(0.84 0.1 25);
+
+  /* ── Surface / elevation — alias the existing page/card/raised tokens.
+   *    Single definition: var() re-resolves under .dark. ─────────────── */
+  --surface-0: var(--background);
+  --surface-1: var(--card);
+  --surface-2: var(--popover);
+
+  /* ── Motion — durations for var() use; heavy motion gated behind
+   *    prefers-reduced-motion (base layer). ──────────────────────────── */
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 320ms;
 }
 
 .dark {
@@ -137,6 +211,25 @@
   --sidebar-accent-foreground: #e0e5f2;
   --sidebar-border: #1a2035; /* navy.50 */
   --sidebar-ring: var(--brand-primary);
+
+  /* ── Semantic status — dark. Brighter solids + `-fg`, dark desaturated
+   *    `-bg` tints tuned for the navy surfaces. ─────────────────────── */
+  --success: oklch(0.72 0.15 163);
+  --success-fg: oklch(0.82 0.14 165);
+  --success-bg: oklch(0.27 0.05 165);
+  --success-border: oklch(0.42 0.07 165);
+  --warning: oklch(0.8 0.15 78);
+  --warning-fg: oklch(0.86 0.13 85);
+  --warning-bg: oklch(0.29 0.05 70);
+  --warning-border: oklch(0.44 0.07 72);
+  --info: oklch(0.7 0.15 258);
+  --info-fg: oklch(0.8 0.12 262);
+  --info-bg: oklch(0.29 0.06 262);
+  --info-border: oklch(0.44 0.09 262);
+  --danger: oklch(0.68 0.2 27);
+  --danger-fg: oklch(0.8 0.15 25);
+  --danger-bg: oklch(0.29 0.08 25);
+  --danger-border: oklch(0.46 0.13 27);
 }
 
 @layer base {
@@ -145,5 +238,18 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Gate the "mission-control" motion (glow, animated edges, live pulses)
+   * behind user preference — the calm baseline stays fully functional. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
