@@ -6,19 +6,19 @@ settings.
 
 ## Stack
 
-| Concern         | Choice                                               |
-|-----------------|------------------------------------------------------|
-| Framework       | Next.js 16+ (App Router)                             |
-| Language        | TypeScript (strict)                                  |
-| Data fetching   | Apollo Client 4 + `@apollo/client-integration-nextjs`|
-| Styling         | Tailwind 4 + shadcn/ui + Base UI                     |
-| Forms           | react-hook-form + zod                                |
-| Tables          | TanStack React Table                                 |
-| i18n            | next-intl                                            |
-| Theming         | next-themes (light / dark / system)                  |
-| Icons           | lucide-react                                         |
-| Toasts          | Sonner                                               |
-| Error tracking  | Sentry                                               |
+| Concern        | Choice                                                |
+| -------------- | ----------------------------------------------------- |
+| Framework      | Next.js 16+ (App Router)                              |
+| Language       | TypeScript (strict)                                   |
+| Data fetching  | Apollo Client 4 + `@apollo/client-integration-nextjs` |
+| Styling        | Tailwind 4 + shadcn/ui + Base UI                      |
+| Forms          | react-hook-form + zod                                 |
+| Tables         | TanStack React Table                                  |
+| i18n           | next-intl                                             |
+| Theming        | next-themes (light / dark / system)                   |
+| Icons          | lucide-react                                          |
+| Toasts         | Sonner                                                |
+| Error tracking | Sentry                                                |
 
 ## GraphQL schema
 
@@ -96,19 +96,108 @@ public/           Static assets
   `requirePermission()`. Client guard: `<PermissionGuard>`.
 - **No AI co-authorship messages** in commits or code.
 
+## Design system
+
+The theme lives in `app/globals.css`. Brand seeds (`--brand-*`, the teal +
+navy shared with `astrolift-site` / `astrolift-docs`) are **never** edited
+here; the app adds a _semantic_ + _scale_ layer on top. All tokens resolve in
+both light and dark; a guardrail keeps raw values from creeping back in.
+
+### Status tokens
+
+Four states, each a solid `base` plus `-fg` / `-bg` / `-border`:
+
+| Token         | Use                                 |
+| ------------- | ----------------------------------- |
+| `--success` … | positive / healthy / running        |
+| `--warning` … | degraded / attention                |
+| `--info` …    | neutral informational / in-progress |
+| `--danger` …  | failed / destructive                |
+
+| Variant   | Utility example          | Role                                                               |
+| --------- | ------------------------ | ------------------------------------------------------------------ |
+| base      | `text-success` `bg-info` | solid accent: dots, icons, chart series, emphasis borders          |
+| `-fg`     | `text-warning-fg`        | **accessible text/icon** on the matching tint (AA on card + `-bg`) |
+| `-bg`     | `bg-danger-bg`           | subtle tinted fill for callouts / badges                           |
+| `-border` | `border-info-border`     | hairline for a tinted container                                    |
+| alpha     | `bg-success/10`          | ad-hoc tint straight off the base                                  |
+
+Rule of thumb for a status callout: `bg-{s}-bg text-{s}-fg border-{s}-border`.
+For a status dot or chart series, use the bare `{s}` base. Prefer `-fg` for
+text (the bare base is tuned for accents, not body copy). These replace the
+hardcoded `emerald/amber/indigo/red` classes (swept in #A4).
+
+### Type scale
+
+Named steps only. `text-2xs` (11px) is the micro step that retires the
+`text-[10px]` / `text-[11px]` escapes; `text-xs` → `text-2xl` are the Tailwind
+defaults (unchanged). Never reach for `text-[Npx]`.
+
+### Surface / elevation
+
+`bg-surface-0` (page) · `bg-surface-1` (card) · `bg-surface-2` (raised /
+popover). Express depth by **surface**, not by stacking borders. In dark mode
+these are the three navy levels; in light they pair with a shadow.
+
+### Motion
+
+`--motion-fast` (120ms) · `--motion-base` (200ms) · `--motion-slow` (320ms),
+consumed via `var(--motion-base)` (e.g. `duration-[var(--motion-base)]`), plus
+`ease-standard` / `ease-emphasized` utilities. All heavy "mission-control"
+motion sits behind `@media (prefers-reduced-motion: reduce)`, which is reset
+globally in the base layer.
+
+### The container rule (de-nesting)
+
+**`PageShell > Section > (Card | Table | Chart)` — max 2 container depths.**
+A `Card` is a bounded _object_; a page _region_ is a `Section` (a heading, not
+a border). Never nest a `Section` inside a `Card`, and never wrap a bordered
+box around another bordered box.
+
+- Do: `<Section title="Deployments"><Card>…</Card></Section>`
+- Don't: `<section className="rounded-lg border p-5"><Card>…</Card></section>`
+- Do: metadata via `<DefinitionList>` inside a Card.
+- Don't: a grid of mini-cards for key/value metadata.
+
+### Primitives (`components/ui/`)
+
+- **`Section`** — a page region: heading + optional description/action, no
+  border by default (spacing, or a hairline via `divided`). Replaces the
+  `section.rounded-lg border` idiom.
+- **`StatTile`** — the canonical dense metric card (label + value + optional
+  icon / trend / `sparkline` slot). Supersedes `KpiTile`, which is now a thin
+  adapter over it; new stat surfaces import `StatTile` directly.
+- **`DefinitionList`** — key/value metadata as a semantic `<dl>` (`row` or
+  `stack`). Replaces metadata mini-cards.
+
+### Guardrail
+
+`astrolift/no-raw-design-values` (ESLint, **warn**) flags, in `className` /
+`cva` / `tv` under `components/**` and `app/**`: raw hex, `rgb()`/`hsl()`,
+arbitrary `text-[Npx]`, and arbitrary `rounded-[Npx]`. Token-referencing
+arbitrary values (`bg-[var(--x)]`, `rounded-[calc(…)]`) are allowed. Warn-level
+surfaces the existing debt (swept in #A4) without breaking the build and blocks
+new debt in review. Escape hatch for unavoidable chart / SVG / terminal exact
+colours:
+
+```tsx
+// eslint-disable-next-line astrolift/no-raw-design-values
+className = "… bg-[#0b0f17]";
+```
+
 ## Environment variables
 
 All external URLs and secrets are configured via environment variables. See
 `.env.example` for the full list. Key variables:
 
-| Variable                        | Purpose                              |
-|---------------------------------|--------------------------------------|
-| `NEXT_PUBLIC_API_ROOT`          | Astrolift API base URL               |
-| `NEXT_PUBLIC_GRAPHQL_ENDPOINT`  | GraphQL endpoint URL                 |
-| `NEXT_PUBLIC_MAIN_PAGE`         | Default redirect after login         |
-| `APP_BASE_URL`                  | Public URL of this app               |
-| `AUTH0_DOMAIN`                  | Auth0 tenant domain                  |
-| `AUTH0_CLIENT_ID`               | Auth0 application client ID          |
-| `AUTH0_CLIENT_SECRET`           | Auth0 application client secret      |
-| `AUTH0_SECRET`                  | Auth0 session encryption secret      |
-| `NEXT_PUBLIC_SENTRY_DSN`       | Sentry DSN (optional)                |
+| Variable                       | Purpose                         |
+| ------------------------------ | ------------------------------- |
+| `NEXT_PUBLIC_API_ROOT`         | Astrolift API base URL          |
+| `NEXT_PUBLIC_GRAPHQL_ENDPOINT` | GraphQL endpoint URL            |
+| `NEXT_PUBLIC_MAIN_PAGE`        | Default redirect after login    |
+| `APP_BASE_URL`                 | Public URL of this app          |
+| `AUTH0_DOMAIN`                 | Auth0 tenant domain             |
+| `AUTH0_CLIENT_ID`              | Auth0 application client ID     |
+| `AUTH0_CLIENT_SECRET`          | Auth0 application client secret |
+| `AUTH0_SECRET`                 | Auth0 session encryption secret |
+| `NEXT_PUBLIC_SENTRY_DSN`       | Sentry DSN (optional)           |

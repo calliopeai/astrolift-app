@@ -3,6 +3,72 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import prettierConfig from "eslint-config-prettier";
 
+/**
+ * Design-system guardrail (#1050 / epic #1046).
+ *
+ * Flags raw design values in `className` strings (and in `cva` / `tv`
+ * variant definitions) so the token debt swept in #A4 cannot regrow:
+ *   - raw hex / rgb() / hsl() colours   → use a semantic token
+ *     (`text-success`, `bg-warning`, `border-danger`, `bg-info/10`, …)
+ *   - arbitrary `text-[Npx]` sizes      → use the type scale (`text-2xs` … `text-2xl`)
+ *   - arbitrary `rounded-[Npx]` radii   → use the radius tokens (`rounded-md` … `rounded-2xl`)
+ *
+ * Runs at `warn` so it surfaces the ~350 existing violations for #A4 to burn
+ * down without breaking the build. `var(--token)` / `calc()` / `min()`
+ * arbitrary values are allowed (they already reference tokens). Escape hatch
+ * for the unavoidable case (chart/SVG/terminal exact colours):
+ *   // eslint-disable-next-line astrolift/no-raw-design-values
+ */
+const HEX = /#[0-9a-fA-F]{3,8}\b/;
+const COLOR_FN = /\b(?:rgb|rgba|hsl|hsla)\(/;
+const TEXT_SIZE = /(?<![\w-])text-\[[0-9.]+px\]/;
+const ROUND_SIZE = /(?<![\w-])rounded-\[[0-9.]+px\]/;
+const VARIANT_HELPERS = new Set(["cva", "tv"]);
+
+const designTokensPlugin = {
+  rules: {
+    "no-raw-design-values": {
+      meta: {
+        type: "problem",
+        docs: {
+          description:
+            "Disallow raw hex/rgb colours and arbitrary text/rounded sizes in class strings; use design tokens.",
+        },
+        messages: {
+          hex: "Raw hex colour in a class string. Use a semantic token (text-success, bg-warning, border-danger, bg-info/10 …) — see frontend/bootstrap.md.",
+          colorFn:
+            "Raw rgb()/hsl() colour in a class string. Use a semantic token — see frontend/bootstrap.md.",
+          textSize:
+            "Arbitrary text-[Npx] size. Use the type scale (text-2xs … text-2xl) — see frontend/bootstrap.md.",
+          roundSize:
+            "Arbitrary rounded-[Npx] radius. Use a radius token (rounded-md … rounded-2xl) — see frontend/bootstrap.md.",
+        },
+        schema: [],
+      },
+      create(context) {
+        const sourceCode = context.sourceCode ?? context.getSourceCode();
+        const check = (node, text) => {
+          if (HEX.test(text)) context.report({ node, messageId: "hex" });
+          if (COLOR_FN.test(text)) context.report({ node, messageId: "colorFn" });
+          if (TEXT_SIZE.test(text)) context.report({ node, messageId: "textSize" });
+          if (ROUND_SIZE.test(text)) context.report({ node, messageId: "roundSize" });
+        };
+        return {
+          JSXAttribute(node) {
+            if (node.name?.name !== "className" || !node.value) return;
+            check(node, sourceCode.getText(node.value));
+          },
+          CallExpression(node) {
+            if (node.callee?.type === "Identifier" && VARIANT_HELPERS.has(node.callee.name)) {
+              check(node, sourceCode.getText(node));
+            }
+          },
+        };
+      },
+    },
+  },
+};
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -25,6 +91,14 @@ const eslintConfig = defineConfig([
       "react-hooks/use-memo": "warn",
       "@next/next/no-img-element": "warn",
     },
+  },
+  // Design-token guardrail — scoped to the app + component surfaces where
+  // Tailwind classes live. Warn-level: surfaces existing debt for #A4,
+  // blocks new debt in review, never breaks the build.
+  {
+    files: ["components/**/*.{ts,tsx}", "app/**/*.{ts,tsx}"],
+    plugins: { astrolift: designTokensPlugin },
+    rules: { "astrolift/no-raw-design-values": "warn" },
   },
   // Override default ignores of eslint-config-next.
   globalIgnores([
