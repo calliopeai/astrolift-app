@@ -314,12 +314,12 @@ export function CiSetupSection({
             <ChevronDownIcon className="size-4 transition-transform group-open:rotate-180" />
             Reference GitHub Actions workflow
           </span>
-          <span className="text-muted-foreground text-[11px]">
+          <span className="text-muted-foreground text-2xs">
             paste into <span className="font-mono">.github/workflows/astrolift-ci.yml</span>
           </span>
         </summary>
         <div className="border-t">
-          <pre className="bg-background overflow-x-auto p-4 font-mono text-[11px] leading-relaxed">
+          <pre className="bg-background overflow-x-auto p-4 font-mono text-2xs leading-relaxed">
             {workflowYaml}
           </pre>
           <div className="flex justify-end border-t p-3">
@@ -517,15 +517,15 @@ function ValidateCiSecretsAction({ appSlug }: { appSlug: string }) {
               <span className="font-mono">{r.secretName}</span>
               <span className="inline-flex items-center gap-1.5">
                 {r.isSet && r.isCurrent ? (
-                  <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
+                  <span className="inline-flex items-center gap-1 text-success-fg">
                     <CheckIcon className="size-3" /> current
                   </span>
                 ) : r.isSet ? (
-                  <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-300">
+                  <span className="inline-flex items-center gap-1 text-warning-fg">
                     <CheckIcon className="size-3" /> set, stale
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-rose-700 dark:text-rose-300">
+                  <span className="inline-flex items-center gap-1 text-danger-fg">
                     <XIcon className="size-3" /> not set
                   </span>
                 )}
@@ -873,12 +873,12 @@ function InstallSourceWebhookAction({
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-medium">Source webhook</p>
           {installed ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+            <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-2xs font-medium text-success-fg">
               <CheckIcon className="size-3" />
               installed · {relative}
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+            <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2 py-0.5 text-2xs font-medium text-warning-fg">
               not installed
             </span>
           )}

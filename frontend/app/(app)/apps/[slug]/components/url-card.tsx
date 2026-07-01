@@ -77,7 +77,7 @@ function PendingUrlBadge({
 }) {
   if (isProvisioning) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-300">
+      <span className="inline-flex items-center gap-1 rounded-full border border-warning-border bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-fg">
         <Loader2Icon className="size-3 animate-spin" />
         <span>Provisioning · ~2 min</span>
       </span>
@@ -311,8 +311,8 @@ export function UrlCard({
                 </p>
               ) : (
                 <p className="text-muted-foreground text-xs">
-                  Press <kbd className="bg-muted rounded px-1 font-mono text-[10px]">Enter</kbd> to
-                  save or <kbd className="bg-muted rounded px-1 font-mono text-[10px]">Esc</kbd> to
+                  Press <kbd className="bg-muted rounded px-1 font-mono text-2xs">Enter</kbd> to
+                  save or <kbd className="bg-muted rounded px-1 font-mono text-2xs">Esc</kbd> to
                   cancel.
                 </p>
               )}

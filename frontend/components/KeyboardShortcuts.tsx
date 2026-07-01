@@ -175,7 +175,7 @@ function Kbd({ children }: { children: React.ReactNode }) {
   return (
     <Badge
       variant="outline"
-      className="border-border bg-muted text-foreground/80 font-mono text-[11px]"
+      className="border-border bg-muted text-foreground/80 font-mono text-2xs"
     >
       {children}
     </Badge>

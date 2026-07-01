@@ -171,7 +171,7 @@ function ManifestList({ resources }: { resources: K8sResource[] }) {
           <div className="text-muted-foreground mb-1 flex items-center gap-2 text-xs">
             <span className="font-mono font-semibold">{resource.kind}</span>
             <span className="font-mono">{resource.metadata.name}</span>
-            <span className="font-mono text-[10px]">{resource.apiVersion}</span>
+            <span className="font-mono text-2xs">{resource.apiVersion}</span>
           </div>
           <pre className="bg-muted max-h-96 overflow-auto rounded-md p-3 font-mono text-xs">
             {toYaml(resource)}
@@ -229,7 +229,7 @@ function ManifestDiff({
             </div>
             <div className="grid gap-2 md:grid-cols-2">
               <div>
-                <div className="text-muted-foreground mb-1 text-[10px] tracking-wide uppercase">
+                <div className="text-muted-foreground mb-1 text-2xs tracking-wide uppercase">
                   {labels.diffPreviousLabel}
                 </div>
                 <pre className="bg-muted max-h-96 overflow-auto rounded-md p-3 font-mono text-xs">
@@ -237,7 +237,7 @@ function ManifestDiff({
                 </pre>
               </div>
               <div>
-                <div className="text-muted-foreground mb-1 text-[10px] tracking-wide uppercase">
+                <div className="text-muted-foreground mb-1 text-2xs tracking-wide uppercase">
                   {labels.diffCurrentLabel}
                 </div>
                 <pre className="bg-muted max-h-96 overflow-auto rounded-md p-3 font-mono text-xs">
@@ -448,8 +448,8 @@ function renderDiffSide(full: string, lines: DiffLine[], side: "prev" | "cur"): 
           return <div key={idx}>&nbsp;</div>;
         }
         const cls = cn(
-          line.type === "rm" && "bg-rose-500/10 text-rose-700 dark:text-rose-300",
-          line.type === "add" && "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+          line.type === "rm" && "bg-danger/10 text-danger-fg",
+          line.type === "add" && "bg-success/10 text-success-fg"
         );
         return (
           <div key={idx} className={cls}>

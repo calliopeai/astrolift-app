@@ -355,6 +355,9 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
         ref={containerRef}
         role="region"
         aria-label={t("ariaLabel")}
+        // exact terminal-canvas background — must match the xterm
+        // theme.background literal set above; not tokenizable.
+        // eslint-disable-next-line astrolift/no-raw-design-values
         className="min-h-[20rem] rounded-md border bg-[#0b0f17] p-2 [&_.xterm-viewport]:!overflow-y-auto"
       />
     </div>
@@ -392,10 +395,10 @@ function ConnectionBanner({ state, message }: { state: ConnectionState; message:
 
   const cls =
     tone === "error"
-      ? "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300"
+      ? "border-danger-border bg-danger/10 text-danger-fg"
       : tone === "warn"
-        ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-        : "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300";
+        ? "border-warning-border bg-warning/10 text-warning-fg"
+        : "border-info-border bg-info/10 text-info-fg";
 
   return (
     <div className={cn("rounded-md border px-2.5 py-1.5 text-xs", cls)} role="status">

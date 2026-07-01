@@ -39,7 +39,7 @@ export function RepoBadge({ sourceKind, sourceUrl, sourceRepo, branch }: Props) 
     >
       <Badge
         variant="secondary"
-        className="hover:bg-accent hover:text-foreground gap-1.5 font-mono text-[10px] transition-colors"
+        className="hover:bg-accent hover:text-foreground gap-1.5 font-mono text-2xs transition-colors"
       >
         <Icon className="size-3" aria-hidden />
         <span>{displayRepo}</span>

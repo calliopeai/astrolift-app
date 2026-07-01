@@ -104,7 +104,7 @@ export function AddClientIdDialog({ connection, onClose }: Props) {
       <SheetContent className="flex flex-col">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
-            <AlertTriangleIcon className="size-4 text-amber-600 dark:text-amber-400" />
+            <AlertTriangleIcon className="size-4 text-warning-fg" />
             Add GitHub App Client ID
           </SheetTitle>
           <SheetDescription>

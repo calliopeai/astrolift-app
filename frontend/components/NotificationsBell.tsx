@@ -66,7 +66,7 @@ export function NotificationsBell() {
           {unread.length > 0 && (
             <Badge
               variant="destructive"
-              className="absolute -right-1 -top-1 h-4 min-w-[1rem] rounded-full px-1 text-[10px] tabular-nums leading-none"
+              className="absolute -right-1 -top-1 h-4 min-w-[1rem] rounded-full px-1 text-2xs tabular-nums leading-none"
             >
               {unread.length > 99 ? "99+" : unread.length}
             </Badge>
@@ -127,10 +127,10 @@ export function NotificationsBell() {
                     className="block"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <Badge variant="outline" className="text-[10px]">
+                      <Badge variant="outline" className="text-2xs">
                         {n.kind.replace(/_/g, " ")}
                       </Badge>
-                      <span className="text-muted-foreground text-[10px]">
+                      <span className="text-muted-foreground text-2xs">
                         {timeAgo(n.createdAt)}
                       </span>
                     </div>

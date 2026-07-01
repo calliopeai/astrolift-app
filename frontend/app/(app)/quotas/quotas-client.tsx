@@ -61,9 +61,9 @@ function pct(used: number, hard: number): number {
 }
 
 function severity(used: number, soft: number, hard: number) {
-  if (used >= hard) return "bg-red-500";
-  if (used >= soft) return "bg-amber-500";
-  return "bg-emerald-500";
+  if (used >= hard) return "bg-danger";
+  if (used >= soft) return "bg-warning";
+  return "bg-success";
 }
 
 function softUtilization(used: number, soft: number): number {

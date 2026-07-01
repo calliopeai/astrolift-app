@@ -94,20 +94,20 @@ const POD_POLL_MS = 15_000;
 // known set falls through to ``muted`` so a fresh kubelet reason
 // doesn't crash the surface.
 const STATUS_VARIANT: Record<string, string> = {
-  Running: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  Succeeded: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  Pending: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  ContainerCreating: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  Running: "bg-success/10 text-success-fg",
+  Succeeded: "bg-success/10 text-success-fg",
+  Pending: "bg-warning/10 text-warning-fg",
+  ContainerCreating: "bg-warning/10 text-warning-fg",
   Terminating: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
   Unknown: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
-  CrashLoopBackOff: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
-  ImagePullBackOff: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
-  ErrImagePull: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
-  CreateContainerConfigError: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
-  CreateContainerError: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
-  InvalidImageName: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
-  OOMKilled: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
-  Error: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
+  CrashLoopBackOff: "bg-danger/10 text-danger-fg",
+  ImagePullBackOff: "bg-danger/10 text-danger-fg",
+  ErrImagePull: "bg-danger/10 text-danger-fg",
+  CreateContainerConfigError: "bg-danger/10 text-danger-fg",
+  CreateContainerError: "bg-danger/10 text-danger-fg",
+  InvalidImageName: "bg-danger/10 text-danger-fg",
+  OOMKilled: "bg-danger/10 text-danger-fg",
+  Error: "bg-danger/10 text-danger-fg",
 };
 
 function statusClass(status: string): string {
@@ -672,7 +672,7 @@ function PodStatusGridRow({
                     <span
                       className={cn(
                         "text-muted-foreground font-mono",
-                        !p.ready && "text-rose-500 dark:text-rose-300"
+                        !p.ready && "text-danger-fg"
                       )}
                     >
                       {formatAge(p.age)}
@@ -774,7 +774,7 @@ function PodHealthTableCard({
                             heading={labels.restartReasonsHeading}
                           />
                           {flapping && (
-                            <Badge className="bg-rose-500/15 text-rose-700 dark:text-rose-300">
+                            <Badge className="bg-danger/15 text-danger-fg">
                               <RotateCwIcon className="size-3" /> {labels.flapping}
                             </Badge>
                           )}
@@ -1200,10 +1200,10 @@ const VOLUME_KIND_LABEL: Record<string, string> = {
 };
 
 const VOLUME_KIND_VARIANT: Record<string, string> = {
-  pvc: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300",
+  pvc: "bg-info/10 text-info-fg",
   empty_dir: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
-  config_map: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  secret: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
+  config_map: "bg-warning/10 text-warning-fg",
+  secret: "bg-danger/10 text-danger-fg",
 };
 
 function volumeDetail(v: VolumeDeclDict): string {

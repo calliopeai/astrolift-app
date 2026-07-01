@@ -198,10 +198,10 @@ export function TokensClient() {
         }
       >
         {createdToken && (
-          <Card className="border-emerald-500/30 bg-emerald-500/5">
+          <Card className="border-success-border bg-success/5">
             <CardContent className="flex flex-col gap-3 p-4">
               <div className="flex items-center gap-2">
-                <CheckCircle2Icon className="size-4 text-emerald-600" />
+                <CheckCircle2Icon className="size-4 text-success-fg" />
                 <p className="text-sm font-medium">
                   Token <span className="font-mono">{createdToken.apiToken.name}</span> created
                 </p>
@@ -284,7 +284,7 @@ export function TokensClient() {
                             <span className="text-muted-foreground text-xs">none</span>
                           ) : (
                             t.scopes.map((s) => (
-                              <Badge key={s} variant="outline" className="font-mono text-[10px]">
+                              <Badge key={s} variant="outline" className="font-mono text-2xs">
                                 {s}
                               </Badge>
                             ))
@@ -462,9 +462,9 @@ function LastUsedCell({ token }: { token: AstroliftApiToken }) {
         <span className="cursor-help underline decoration-dotted underline-offset-2">{ts}</span>
       </TooltipTrigger>
       <TooltipContent className="max-w-sm">
-        <p className="font-mono text-[10px]">IP: {token.lastUsedIp ?? "—"}</p>
+        <p className="font-mono text-2xs">IP: {token.lastUsedIp ?? "—"}</p>
         {token.lastUsedAgent && (
-          <p className="font-mono text-[10px] break-all opacity-75">UA: {token.lastUsedAgent}</p>
+          <p className="font-mono text-2xs break-all opacity-75">UA: {token.lastUsedAgent}</p>
         )}
       </TooltipContent>
     </Tooltip>

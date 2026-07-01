@@ -442,7 +442,7 @@ export function AlertsClient() {
                       {r.activeMute ? (
                         <VolumeOffIcon className="text-muted-foreground size-4" />
                       ) : r.isActive ? (
-                        <BellIcon className="size-4 text-emerald-500" />
+                        <BellIcon className="size-4 text-success-fg" />
                       ) : (
                         <BellOffIcon className="text-muted-foreground size-4" />
                       )}
@@ -450,7 +450,7 @@ export function AlertsClient() {
                     <TableCell className="font-medium">
                       {r.name}
                       {r.activeMute && (
-                        <Badge variant="secondary" className="ml-2 text-[11px]">
+                        <Badge variant="secondary" className="ml-2 text-2xs">
                           {t("mute.badge", {
                             remaining: formatRemaining(r.activeMute.ttlUntil),
                           })}
@@ -460,7 +460,7 @@ export function AlertsClient() {
                     <TableCell>
                       <Badge variant="outline">{r.target}</Badge>
                       {r.targetId && (
-                        <span className="text-muted-foreground ml-2 font-mono text-[11px]">
+                        <span className="text-muted-foreground ml-2 font-mono text-2xs">
                           {r.targetId}
                         </span>
                       )}

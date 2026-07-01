@@ -109,8 +109,8 @@ const KIND_OPTIONS = ["postgres", "redis", "s3", "sqs", "mysql", "kafka"];
 // hasn't yet populated the field.
 
 const GREEN_BADGE =
-  "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
-const AMBER_BADGE = "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300";
+  "border-success-border bg-success/15 text-success-fg";
+const AMBER_BADGE = "border-warning-border bg-warning/15 text-warning-fg";
 const RED_BADGE = "border-destructive/40 bg-destructive/15 text-destructive";
 
 function ValidationBadges({ service }: { service: ManagedService }) {
@@ -154,7 +154,7 @@ function ValidationBadges({ service }: { service: ManagedService }) {
       }
       if (typeof cfg.snapshot_policy === "string" && cfg.snapshot_policy) {
         items.push(
-          <Badge key="snap" variant="outline" className="font-mono text-[10px]">
+          <Badge key="snap" variant="outline" className="font-mono text-2xs">
             {cfg.snapshot_policy}
           </Badge>
         );
@@ -186,7 +186,7 @@ function ValidationBadges({ service }: { service: ManagedService }) {
             </Badge>
           </TooltipTrigger>
           <TooltipContent className="max-w-sm">
-            <span className="font-mono text-[11px] break-words">{service.statusError}</span>
+            <span className="font-mono text-2xs break-words">{service.statusError}</span>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -346,7 +346,7 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
                         {s.variant || "—"}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="font-mono text-[10px]">
+                        <Badge variant="outline" className="font-mono text-2xs">
                           {s.environmentName}
                         </Badge>
                       </TableCell>

@@ -140,20 +140,20 @@ function StateNode({
           <div className="font-medium">{data.label}</div>
           <div className="text-xs text-gray-500">{data.name}</div>
           {data.form_slug && (
-            <div className="mt-1 text-[10px] text-blue-500">Form: {data.form_slug}</div>
+            <div className="mt-1 text-2xs text-info-fg">Form: {data.form_slug}</div>
           )}
           {data.assigned_role && (
-            <div className="text-[10px] text-purple-500">Role: {data.assigned_role}</div>
+            <div className="text-2xs text-purple-500">Role: {data.assigned_role}</div>
           )}
         </div>
         <div className="flex flex-col gap-1">
           {data.is_initial && (
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-2xs">
               Start
             </Badge>
           )}
           {data.is_final && (
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-2xs">
               End
             </Badge>
           )}
@@ -208,7 +208,7 @@ function ConditionEditor({
         </Button>
       </div>
       {conditions.length === 0 && (
-        <p className="text-muted-foreground text-[11px]">
+        <p className="text-muted-foreground text-2xs">
           No conditions — transition is always available
         </p>
       )}
@@ -314,7 +314,7 @@ function ActionEditor({
         </Button>
       </div>
       {actions.length === 0 && (
-        <p className="text-muted-foreground text-[11px]">
+        <p className="text-muted-foreground text-2xs">
           No actions — nothing happens on transition
         </p>
       )}
@@ -758,7 +758,7 @@ export function WorkflowBuilder({
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-muted-foreground text-[10px]">
+                  <p className="text-muted-foreground text-2xs">
                     Form required at this step before transitioning
                   </p>
                 </div>
@@ -775,7 +775,7 @@ export function WorkflowBuilder({
                     }
                     placeholder="Type role and press Enter"
                   />
-                  <p className="text-muted-foreground text-[10px]">
+                  <p className="text-muted-foreground text-2xs">
                     Users with this role are responsible for this step
                   </p>
                 </div>

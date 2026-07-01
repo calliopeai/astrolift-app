@@ -79,7 +79,7 @@ export function CopyBadge({
       >
         <span className="truncate">{label ?? value}</span>
         {copied ? (
-          <CheckIcon className="size-3 text-emerald-600 dark:text-emerald-400" aria-hidden />
+          <CheckIcon className="size-3 text-success-fg" aria-hidden />
         ) : (
           <CopyIcon className="text-muted-foreground size-3" aria-hidden />
         )}

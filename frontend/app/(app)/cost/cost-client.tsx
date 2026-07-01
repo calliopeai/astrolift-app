@@ -222,10 +222,10 @@ export function CostClient() {
                             <div
                               className={
                                 usagePct >= 100
-                                  ? "h-full bg-red-500"
+                                  ? "h-full bg-danger"
                                   : usagePct >= 80
-                                    ? "h-full bg-amber-500"
-                                    : "h-full bg-emerald-500"
+                                    ? "h-full bg-warning"
+                                    : "h-full bg-success"
                               }
                               style={{ width: `${usagePct}%` }}
                             />
@@ -378,9 +378,9 @@ function ForecastCard({ forecast, loading, t }: ForecastCardProps) {
   const Direction = delta > 0 ? ArrowUpIcon : delta < 0 ? ArrowDownIcon : ArrowRightIcon;
   const deltaColor =
     delta > 0
-      ? "text-amber-600 dark:text-amber-400"
+      ? "text-warning-fg"
       : delta < 0
-        ? "text-emerald-600 dark:text-emerald-400"
+        ? "text-success-fg"
         : "text-muted-foreground";
   return (
     <Card>
@@ -420,13 +420,13 @@ function ConfidenceBadge({
 }) {
   const tone =
     value === "HIGH"
-      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+      ? "bg-success/15 text-success-fg"
       : value === "MEDIUM"
-        ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+        ? "bg-warning/15 text-warning-fg"
         : "bg-muted text-muted-foreground";
   const lowerKey = value.toLowerCase() as "low" | "medium" | "high";
   return (
-    <span className={"rounded-full px-2 py-0.5 text-[10px] font-medium " + tone}>
+    <span className={"rounded-full px-2 py-0.5 text-2xs font-medium " + tone}>
       {t(`forecast.confidence.${lowerKey}`)}
     </span>
   );
@@ -453,7 +453,7 @@ function TrendChart({ points, loading, currency, t }: TrendChartProps) {
           {anomalies.length > 0 && (
             <Badge
               variant="outline"
-              className="border-amber-500/40 text-amber-700 dark:text-amber-300"
+              className="border-warning-border text-warning-fg"
             >
               <TriangleAlertIcon className="mr-1 size-3" />
               {t("trend.anomaliesBadge", { count: anomalies.length })}

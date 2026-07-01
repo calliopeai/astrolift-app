@@ -30,11 +30,11 @@ const SURFACE: Record<
   },
   queue: {
     variant: "secondary",
-    classes: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/40",
+    classes: "bg-warning/10 text-warning-fg border-warning-border",
   },
   replace: {
     variant: "secondary",
-    classes: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/40",
+    classes: "bg-info/10 text-info-fg border-info-border",
   },
 };
 

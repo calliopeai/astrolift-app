@@ -94,11 +94,11 @@ export function ManifestClient({ schema }: Props) {
                 {section.title}
               </CardTitle>
               {section.required ? (
-                <Badge className="text-[10px] uppercase tracking-wide">
+                <Badge className="text-2xs uppercase tracking-wide">
                   required
                 </Badge>
               ) : (
-                <Badge variant="outline" className="text-[10px] uppercase">
+                <Badge variant="outline" className="text-2xs uppercase">
                   optional
                 </Badge>
               )}
@@ -127,7 +127,7 @@ export function ManifestClient({ schema }: Props) {
                       </TableCell>
                       <TableCell>
                         {field.required ? (
-                          <Badge className="text-[10px]">yes</Badge>
+                          <Badge className="text-2xs">yes</Badge>
                         ) : (
                           <span className="text-muted-foreground text-xs">
                             no

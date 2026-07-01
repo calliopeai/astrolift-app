@@ -224,7 +224,7 @@ export function DiscoveryStep({ state, setState, setValid }: Props) {
                   <div className="flex min-w-0 flex-1 flex-col">
                     <div className="flex min-w-0 items-center gap-2">
                       <span className="truncate text-sm font-medium">{a.name}</span>
-                      <Badge variant="outline" className="shrink-0 text-[10px]">
+                      <Badge variant="outline" className="shrink-0 text-2xs">
                         {a.workloadKind}
                       </Badge>
                     </div>
@@ -233,7 +233,7 @@ export function DiscoveryStep({ state, setState, setValid }: Props) {
                     </span>
                   </div>
                   {a.alreadyRegistered && (
-                    <Badge variant="secondary" className="shrink-0 text-[10px]">
+                    <Badge variant="secondary" className="shrink-0 text-2xs">
                       Already registered
                     </Badge>
                   )}
@@ -265,16 +265,16 @@ function ScanBanner({
   if (state === "idle" || state === "scanning") return null;
   if (state === "found") {
     return (
-      <div className="flex items-center gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm">
-        <CheckCircle2Icon className="size-4 text-emerald-600 dark:text-emerald-400" />
+      <div className="flex items-center gap-2 rounded-md border border-success-border bg-success/10 p-3 text-sm">
+        <CheckCircle2Icon className="size-4 text-success-fg" />
         <span className="flex-1">Scanned the repo for agent manifests.</span>
       </div>
     );
   }
   if (state === "empty") {
     return (
-      <div className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-        <FileXIcon className="size-4 text-amber-600 dark:text-amber-400" />
+      <div className="flex items-center gap-2 rounded-md border border-warning-border bg-warning/10 p-3 text-sm">
+        <FileXIcon className="size-4 text-warning-fg" />
         <span className="flex-1">
           No agent manifests found. We looked for{" "}
           <code className="font-mono">agents/*/astrolift.toml</code> and a root{" "}

@@ -163,7 +163,7 @@ function GaugeCard({
         <span
           className={cn(
             "font-mono text-2xl tabular-nums",
-            overBudget && "text-rose-600 dark:text-rose-300"
+            overBudget && "text-danger-fg"
           )}
         >
           {percent.toFixed(1)}%
@@ -201,9 +201,9 @@ function GaugeCard({
 // also push red at >100% (over-budget) which is the same color band —
 // the percent text itself goes red at >100 so the two channels agree.
 function colorFor(percent: number): string {
-  if (percent >= 80) return "bg-rose-500";
-  if (percent >= 50) return "bg-amber-500";
-  return "bg-emerald-500";
+  if (percent >= 80) return "bg-danger";
+  if (percent >= 50) return "bg-warning";
+  return "bg-success";
 }
 
 function formatCores(cores: number): string {

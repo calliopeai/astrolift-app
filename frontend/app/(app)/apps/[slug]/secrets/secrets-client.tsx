@@ -194,8 +194,8 @@ function SecretScopeBadge({ scope }: { scope: string | null | undefined }) {
       variant="outline"
       className={
         isProd
-          ? "ml-2 border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-300"
-          : "ml-2 border-sky-500/40 bg-sky-500/10 text-[10px] text-sky-700 dark:text-sky-300"
+          ? "ml-2 border-warning-border bg-warning/10 text-2xs text-warning-fg"
+          : "ml-2 border-info-border bg-info/10 text-2xs text-info-fg"
       }
     >
       {scopeBadgeLabel(scope)}
@@ -212,14 +212,14 @@ function SecretExpiryBadge({ expiresAt }: { expiresAt: string | null | undefined
   const days = Math.floor(ms / (1000 * 60 * 60 * 24));
   if (days < 0) {
     return (
-      <Badge variant="destructive" className="ml-2 text-[10px]">
+      <Badge variant="destructive" className="ml-2 text-2xs">
         Expired {Math.abs(days)}d ago
       </Badge>
     );
   }
   if (days <= 7) {
     return (
-      <Badge variant="destructive" className="ml-2 text-[10px]">
+      <Badge variant="destructive" className="ml-2 text-2xs">
         Rotate — expires in {days}d
       </Badge>
     );
@@ -228,14 +228,14 @@ function SecretExpiryBadge({ expiresAt }: { expiresAt: string | null | undefined
     return (
       <Badge
         variant="outline"
-        className="ml-2 border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-300"
+        className="ml-2 border-warning-border bg-warning/10 text-2xs text-warning-fg"
       >
         Expires in {days}d
       </Badge>
     );
   }
   return (
-    <Badge variant="outline" className="text-muted-foreground ml-2 text-[10px]">
+    <Badge variant="outline" className="text-muted-foreground ml-2 text-2xs">
       Expires in {days}d
     </Badge>
   );
@@ -797,16 +797,16 @@ function SecretRow({
           {SOURCE_LABEL[s.source] ?? s.source}
         </Badge>
         {s.bundleSlug && (
-          <span className="text-muted-foreground ml-2 font-mono text-[11px]">{s.bundleSlug}</span>
+          <span className="text-muted-foreground ml-2 font-mono text-2xs">{s.bundleSlug}</span>
         )}
         {s.managedServiceKind && (
-          <span className="text-muted-foreground ml-2 font-mono text-[11px]">
+          <span className="text-muted-foreground ml-2 font-mono text-2xs">
             {s.managedServiceKind}
           </span>
         )}
       </TableCell>
       <TableCell>
-        <Badge variant="outline" className="font-mono text-[10px]">
+        <Badge variant="outline" className="font-mono text-2xs">
           {s.environmentName || "—"}
         </Badge>
       </TableCell>
@@ -953,7 +953,7 @@ function SecretHistoryPanel({ appSlug, secretKey }: { appSlug: string; secretKey
     <div className="flex flex-col">
       <div className="border-b px-3 py-2">
         <p className="text-xs font-medium">Audit history</p>
-        <p className="text-muted-foreground font-mono text-[11px]">{secretKey}</p>
+        <p className="text-muted-foreground font-mono text-2xs">{secretKey}</p>
       </div>
       <div className="max-h-80 overflow-y-auto">
         {loading && entries.length === 0 ? (
@@ -972,7 +972,7 @@ function SecretHistoryPanel({ appSlug, secretKey }: { appSlug: string; secretKey
               <li key={i} className="flex items-start gap-2 px-3 py-2 text-xs">
                 <Badge
                   variant={e.success ? "secondary" : "destructive"}
-                  className="mt-0.5 text-[10px]"
+                  className="mt-0.5 text-2xs"
                 >
                   {e.action}
                 </Badge>
@@ -983,7 +983,7 @@ function SecretHistoryPanel({ appSlug, secretKey }: { appSlug: string; secretKey
                       <span className="text-muted-foreground font-mono"> · {e.sourceIp}</span>
                     ) : null}
                   </p>
-                  <p className="text-muted-foreground text-[11px]">
+                  <p className="text-muted-foreground text-2xs">
                     {new Date(e.timestamp).toLocaleString()}
                     {!e.success && e.errorCode ? ` · ${e.errorCode}` : ""}
                   </p>
@@ -1108,7 +1108,7 @@ function InlineValueEditor({
       >
         <XIcon className="size-4" />
       </Button>
-      <span className="text-muted-foreground hidden text-[10px] sm:inline">{t("edit.hint")}</span>
+      <span className="text-muted-foreground hidden text-2xs sm:inline">{t("edit.hint")}</span>
     </form>
   );
 }
@@ -1165,11 +1165,11 @@ function AttachedBundlesSection({
                 <TableRow key={a.id}>
                   <TableCell className="font-mono text-xs">
                     {a.bundleName}
-                    <span className="text-muted-foreground ml-2 text-[10px]">{a.bundleSlug}</span>
+                    <span className="text-muted-foreground ml-2 text-2xs">{a.bundleSlug}</span>
                   </TableCell>
                   <TableCell>
                     {a.teamSlug ? (
-                      <Badge variant="outline" className="font-mono text-[10px]">
+                      <Badge variant="outline" className="font-mono text-2xs">
                         {a.teamSlug}
                       </Badge>
                     ) : (
@@ -1177,7 +1177,7 @@ function AttachedBundlesSection({
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="font-mono text-[10px]">
+                    <Badge variant="outline" className="font-mono text-2xs">
                       {t("perEnvBadge", { env: a.environmentName })}
                     </Badge>
                   </TableCell>
@@ -1412,12 +1412,12 @@ function BulkImportSheet({
               </p>
               <div className="flex flex-wrap gap-1">
                 {previewKeys.slice(0, 20).map((k) => (
-                  <Badge key={k} variant="outline" className="font-mono text-[10px]">
+                  <Badge key={k} variant="outline" className="font-mono text-2xs">
                     {k}
                   </Badge>
                 ))}
                 {previewKeys.length > 20 && (
-                  <Badge variant="outline" className="font-mono text-[10px]">
+                  <Badge variant="outline" className="font-mono text-2xs">
                     +{previewKeys.length - 20}
                   </Badge>
                 )}

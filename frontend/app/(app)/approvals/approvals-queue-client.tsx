@@ -379,7 +379,7 @@ function QueueRow({
               {deployment.registeredAppSlug} → {deployment.environmentName}
             </Link>
             <span className="font-mono text-xs">{shortTag}</span>
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-2xs">
               {t("approvalsCount", {
                 received: deployment.approvalsReceived,
                 required:

@@ -258,7 +258,7 @@ export function ManifestPreviewStep({ state, setState, setValid }: Props) {
           </ul>
         )}
         {state.manifestValid && (
-          <p className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+          <p className="inline-flex items-center gap-1 text-xs text-success-fg">
             <CheckCircle2Icon className="size-3.5" />
             Manifest looks structurally valid (top-level <code className="font-mono">name</code> +
             at least one <code className="font-mono">[[workloads]]</code> block).
@@ -281,8 +281,8 @@ function FetchBanner({
   if (state === "idle" || state === "fetching") return null;
   if (state === "found") {
     return (
-      <div className="flex items-center gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm">
-        <CheckCircle2Icon className="size-4 text-emerald-600 dark:text-emerald-400" />
+      <div className="flex items-center gap-2 rounded-md border border-success-border bg-success/10 p-3 text-sm">
+        <CheckCircle2Icon className="size-4 text-success-fg" />
         <span className="flex-1">Loaded manifest from the repo.</span>
         <Badge variant="secondary" className="gap-1">
           <FileTextIcon className="size-3" /> from repo
@@ -292,8 +292,8 @@ function FetchBanner({
   }
   if (state === "missing") {
     return (
-      <div className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-        <FileXIcon className="size-4 text-amber-600 dark:text-amber-400" />
+      <div className="flex items-center gap-2 rounded-md border border-warning-border bg-warning/10 p-3 text-sm">
+        <FileXIcon className="size-4 text-warning-fg" />
         <span className="flex-1">
           No manifest at that path. We&apos;ve seeded a minimal template — edit it below or paste
           your own.

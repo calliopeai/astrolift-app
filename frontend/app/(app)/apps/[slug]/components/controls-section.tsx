@@ -286,7 +286,7 @@ function EnvironmentRow({
           {env.deploysPaused ? (
             <Badge
               variant="outline"
-              className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+              className="border-warning-border bg-warning/10 text-warning-fg"
             >
               <PauseIcon className="size-3" />
               {t("paused")}
@@ -360,7 +360,7 @@ function EnvironmentRow({
       </Can>
 
       {env.requiredApprovals > 0 && (
-        <p className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
+        <p className="text-muted-foreground flex items-center gap-1.5 text-2xs">
           <HammerIcon className="size-3" />
           {t("approvalsRequired", { count: env.requiredApprovals })}
         </p>
@@ -397,7 +397,7 @@ function EnvWorkloads({
   const t = useTranslations("apps.settings.controls");
   return (
     <div className="border-t pt-3">
-      <p className="text-muted-foreground mb-2 text-[11px] font-semibold tracking-wide uppercase">
+      <p className="text-muted-foreground mb-2 text-2xs font-semibold tracking-wide uppercase">
         {t("workloadsHeader")}
       </p>
       {loading ? (
@@ -505,7 +505,7 @@ function WorkloadRow({
     <div className="bg-background flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-2">
         <span className="truncate text-sm font-medium">{workload.name}</span>
-        <Badge variant="outline" className="text-muted-foreground font-mono text-[10px]">
+        <Badge variant="outline" className="text-muted-foreground font-mono text-2xs">
           {workload.slug}
         </Badge>
         <span className="text-muted-foreground text-xs">
@@ -603,7 +603,7 @@ function WorkloadRow({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel className="text-[11px] font-normal">
+              <DropdownMenuLabel className="text-2xs font-normal">
                 {t("dropdownLabel", { workload: workload.name, env: envName })}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />

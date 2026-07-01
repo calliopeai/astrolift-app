@@ -203,7 +203,7 @@ export function AssignProjectCard({
             ) : (
               <Badge
                 variant="outline"
-                className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                className="border-warning-border bg-warning/10 text-warning-fg"
               >
                 Unassigned
               </Badge>
@@ -245,13 +245,13 @@ export function AssignProjectCard({
                   <SelectContent>
                     {byTeam.map((group) => (
                       <SelectGroup key={group.teamSlug}>
-                        <SelectLabel className="text-[11px] uppercase tracking-wide">
+                        <SelectLabel className="text-2xs uppercase tracking-wide">
                           {group.teamName}
                         </SelectLabel>
                         {group.projects.map((p) => (
                           <SelectItem key={p.id} value={p.id}>
                             <span>{p.name}</span>
-                            <span className="text-muted-foreground ml-2 font-mono text-[11px]">
+                            <span className="text-muted-foreground ml-2 font-mono text-2xs">
                               {p.slug}
                             </span>
                           </SelectItem>

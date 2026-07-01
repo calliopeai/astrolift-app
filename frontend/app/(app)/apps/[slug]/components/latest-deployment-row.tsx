@@ -35,19 +35,19 @@ interface Props {
 
 const STATUS_TONE: Record<DeploymentStatus, string> = {
   running:
-    "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700/50 dark:bg-emerald-950/30 dark:text-emerald-300",
+    "border-success-border bg-success/10 text-success-fg",
   failed:
-    "border-red-300 bg-red-50 text-red-700 dark:border-red-700/50 dark:bg-red-950/30 dark:text-red-300",
+    "border-danger-border bg-danger/10 text-danger-fg",
   rolled_back: "border-muted-foreground/30 bg-muted text-muted-foreground",
   superseded: "border-muted-foreground/20 bg-muted text-muted-foreground",
   deploying:
-    "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-300",
+    "border-warning-border bg-warning/10 text-warning-fg",
   pending:
-    "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-300",
+    "border-warning-border bg-warning/10 text-warning-fg",
   pending_approval:
     "border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-700/50 dark:bg-purple-950/30 dark:text-purple-300",
   redeploying:
-    "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-300",
+    "border-warning-border bg-warning/10 text-warning-fg",
 };
 
 export function LatestDeploymentRow({ appSlug }: Props) {
@@ -92,7 +92,7 @@ export function LatestDeploymentRow({ appSlug }: Props) {
     >
       <div className="flex flex-wrap items-center gap-3 p-3">
         <RocketIcon aria-hidden className="text-muted-foreground size-4 shrink-0" />
-        <Badge variant="outline" className={cn("gap-1 font-mono text-[10px] uppercase", tone)}>
+        <Badge variant="outline" className={cn("gap-1 font-mono text-2xs uppercase", tone)}>
           {latest.status}
         </Badge>
         {shortSha ? <span className="text-foreground font-mono text-xs">{shortSha}</span> : null}

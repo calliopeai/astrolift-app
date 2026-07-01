@@ -153,7 +153,7 @@ function TimezoneCard() {
         <CardDescription>
           Override the browser-detected timezone for all timestamps in the
           dashboard. Leave blank to use the zone your browser reports (
-          <span className="font-mono text-[11px]">{browserTz}</span>).
+          <span className="font-mono text-2xs">{browserTz}</span>).
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 max-w-sm">

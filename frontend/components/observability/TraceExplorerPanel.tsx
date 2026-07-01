@@ -269,7 +269,7 @@ function StatusBadge({ code }: { code: string }) {
   const upper = code.toUpperCase();
   if (upper === "OK") {
     return (
-      <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" variant="outline">
+      <Badge className="bg-success/15 text-success-fg" variant="outline">
         OK
       </Badge>
     );

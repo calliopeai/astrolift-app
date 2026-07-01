@@ -46,8 +46,8 @@ const ACTIVITY_ICON: Record<ActivityStatus, React.ComponentType<{ className?: st
 
 const ACTIVITY_TONE: Record<ActivityStatus, string> = {
   pending: "text-muted-foreground",
-  running: "text-amber-500 animate-spin",
-  succeeded: "text-emerald-500",
+  running: "text-warning-fg animate-spin",
+  succeeded: "text-success-fg",
   failed: "text-destructive",
   cancelled: "text-muted-foreground",
 };
@@ -137,7 +137,7 @@ export function WorkflowTimeline({
               <p className="font-medium text-destructive">Workflow failed</p>
               <p className="mt-1 break-words text-muted-foreground">{run.errorMessage}</p>
               {run.errorStack && (
-                <pre className="mt-2 overflow-x-auto rounded bg-muted/40 p-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                <pre className="mt-2 overflow-x-auto rounded bg-muted/40 p-2 font-mono text-2xs leading-relaxed text-muted-foreground">
                   {run.errorStack}
                 </pre>
               )}
@@ -190,7 +190,7 @@ function ActivityRow({
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-sm">{activity.name}</span>
             {retryCount > 0 && (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-2xs">
                 {retryCount} retr{retryCount === 1 ? "y" : "ies"}
               </Badge>
             )}
@@ -230,7 +230,7 @@ function ActivityRow({
                 ))}
               </ul>
               {lastFailedAttempt?.errorStack && (
-                <pre className="overflow-x-auto rounded bg-muted/40 p-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                <pre className="overflow-x-auto rounded bg-muted/40 p-2 font-mono text-2xs leading-relaxed text-muted-foreground">
                   {lastFailedAttempt.errorStack}
                 </pre>
               )}

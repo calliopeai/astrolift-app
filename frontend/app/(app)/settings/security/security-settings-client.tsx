@@ -220,7 +220,7 @@ export function SecuritySettingsClient() {
                     </TableCell>
                     <TableCell>
                       {s.isCurrent ? (
-                        <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                        <Badge className="bg-success/15 text-success-fg">
                           {t("status.current")}
                         </Badge>
                       ) : (

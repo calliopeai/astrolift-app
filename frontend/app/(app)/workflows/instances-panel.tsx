@@ -371,7 +371,7 @@ function ActivityFeed({ history }: { history: WorkflowHistoryEvent[] }) {
                 {ev.retryCount > 1 && <Badge variant="outline">retry {ev.retryCount}</Badge>}
               </div>
               {Object.keys(ev.payload).length > 0 && (
-                <pre className="text-muted-foreground bg-muted/40 mt-1 max-h-32 overflow-auto rounded p-2 text-[10px]">
+                <pre className="text-muted-foreground bg-muted/40 mt-1 max-h-32 overflow-auto rounded p-2 text-2xs">
                   {JSON.stringify(ev.payload, null, 2)}
                 </pre>
               )}

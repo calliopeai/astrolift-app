@@ -175,15 +175,15 @@ export function MetricsClient() {
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
             <Badge variant="secondary" className="gap-1">
-              <CheckCircle2Icon className="size-3 text-emerald-600" />
+              <CheckCircle2Icon className="size-3 text-success-fg" />
               succeeded {metrics.succeeded}
             </Badge>
             <Badge variant="secondary" className="gap-1">
-              <FlameIcon className="size-3 text-red-600" />
+              <FlameIcon className="size-3 text-danger-fg" />
               failed {metrics.failed}
             </Badge>
             <Badge variant="secondary" className="gap-1">
-              <AlertTriangleIcon className="size-3 text-amber-600" />
+              <AlertTriangleIcon className="size-3 text-warning-fg" />
               rolled back {metrics.rolledBack}
             </Badge>
             <Badge variant="outline">in flight {metrics.inFlight}</Badge>
@@ -260,7 +260,7 @@ export function MetricsClient() {
                       {a.hasRecentFailure && (
                         <Badge
                           variant="outline"
-                          className="ml-2 gap-1 border-red-200 text-red-700"
+                          className="ml-2 gap-1 border-danger-border text-danger-fg"
                         >
                           <FlameIcon className="size-3" />
                           recent failure

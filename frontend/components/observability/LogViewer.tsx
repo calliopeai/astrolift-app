@@ -82,9 +82,9 @@ export function classifyLogLevel(message: string): LogLevel {
 }
 
 const LEVEL_BADGE_CLASS: Record<LogLevel, string> = {
-  error: "text-rose-700 dark:text-rose-300 bg-rose-500/10 border-rose-500/40",
-  warn: "text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-500/40",
-  info: "text-sky-700 dark:text-sky-300 bg-sky-500/10 border-sky-500/40",
+  error: "text-danger-fg bg-danger/10 border-danger-border",
+  warn: "text-warning-fg bg-warning/10 border-warning-border",
+  info: "text-info-fg bg-info/10 border-info-border",
   debug: "text-muted-foreground bg-muted/50 border-border",
   other: "text-muted-foreground bg-muted/30 border-border",
 };
@@ -200,11 +200,11 @@ function segmentLine(
 // state. djb2 hash + modulo. The palette is intentionally small (six
 // hues) so adjacent replicas stay visually distinct on small fleets.
 const POD_BADGE_PALETTE = [
-  "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300",
-  "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  "border-info-border bg-info/10 text-info-fg",
+  "border-success-border bg-success/10 text-success-fg",
   "border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300",
-  "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  "border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+  "border-warning-border bg-warning/10 text-warning-fg",
+  "border-danger-border bg-danger/10 text-danger-fg",
   "border-teal-500/40 bg-teal-500/10 text-teal-700 dark:text-teal-300",
 ] as const;
 
@@ -596,7 +596,7 @@ export function LogViewer({
               onClick={() => setLevelFilter(level)}
               aria-pressed={active}
               className={cn(
-                "rounded-full border px-2 py-0.5 font-mono text-[11px] transition-colors",
+                "rounded-full border px-2 py-0.5 font-mono text-2xs transition-colors",
                 active
                   ? "border-primary bg-primary/10 text-primary"
                   : level === "all"
@@ -630,7 +630,7 @@ export function LogViewer({
               {showPodBadge && row.line.podName ? (
                 <span
                   className={cn(
-                    "mr-1.5 inline-block rounded border px-1 py-px align-middle text-[10px] leading-none",
+                    "mr-1.5 inline-block rounded border px-1 py-px align-middle text-2xs leading-none",
                     podBadgeClass(row.line.podName)
                   )}
                   title={row.line.podName}

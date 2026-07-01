@@ -48,8 +48,8 @@ export function SecureContent({ agentName }: { agentName: string }) {
 
         {/* Deferred-integration gate. */}
         <div className="bg-muted/30 flex items-start gap-3 rounded-md border border-dashed px-4 py-3">
-          <div className="bg-amber-500/20 mt-1 flex size-4 shrink-0 items-center justify-center rounded-full">
-            <div className="bg-amber-500 size-1.5 rounded-full" />
+          <div className="bg-warning/20 mt-1 flex size-4 shrink-0 items-center justify-center rounded-full">
+            <div className="bg-warning size-1.5 rounded-full" />
           </div>
           <div>
             <p className="text-sm font-medium">Integration under design</p>

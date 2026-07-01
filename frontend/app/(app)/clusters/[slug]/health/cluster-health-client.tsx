@@ -164,7 +164,7 @@ function LiveHealthCard({ clusterId }: { clusterId: string }) {
                       variant={PHASE_VARIANT[p.phase] ?? "outline"}
                       className="gap-1.5"
                     >
-                      <span className="font-mono text-[10px]">{p.namespace}</span>
+                      <span className="font-mono text-2xs">{p.namespace}</span>
                       <span className="opacity-60">·</span>
                       <span>{p.phase}</span>
                       <span className="opacity-60">·</span>
@@ -196,7 +196,7 @@ function LiveHealthCard({ clusterId }: { clusterId: string }) {
                           {e.involvedObject}
                         </span>
                         {e.count > 1 && (
-                          <Badge variant="outline" className="text-[10px]">
+                          <Badge variant="outline" className="text-2xs">
                             ×{e.count}
                           </Badge>
                         )}
@@ -310,15 +310,15 @@ function WorkloadHealthCard({ clusterId }: { clusterId: string }) {
                     row.desiredReplicas - row.readyReplicas;
                   const readyTone =
                     deficit === 0
-                      ? "text-emerald-600"
+                      ? "text-success-fg"
                       : deficit === row.desiredReplicas
                         ? "text-destructive"
-                        : "text-amber-600";
+                        : "text-warning-fg";
                   const restartsTone =
                     row.restartCount24h === 0
                       ? "text-muted-foreground"
                       : row.restartCount24h < 5
-                        ? "text-amber-600"
+                        ? "text-warning-fg"
                         : "text-destructive";
                   return (
                     <tr

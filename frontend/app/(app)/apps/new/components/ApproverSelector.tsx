@@ -257,7 +257,7 @@ export function ApproverSelector({
           {orphanIds.map((id) => (
             <Badge key={id} variant="outline" className="flex items-center gap-1 pr-1 text-xs">
               <span className="font-mono">user {id}</span>
-              <span className="text-muted-foreground text-[10px]">{t("orphanSuffix")}</span>
+              <span className="text-muted-foreground text-2xs">{t("orphanSuffix")}</span>
               <button
                 type="button"
                 onClick={() => toggleUser(id)}
@@ -308,7 +308,7 @@ export function ApproverSelector({
                     </Avatar>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{u.displayName || u.email}</p>
-                      <p className="text-muted-foreground truncate text-[11px]">{u.email}</p>
+                      <p className="text-muted-foreground truncate text-2xs">{u.email}</p>
                     </div>
                     {selected && <CheckIcon className="text-primary size-3.5" />}
                   </button>

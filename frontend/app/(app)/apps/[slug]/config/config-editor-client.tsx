@@ -163,7 +163,7 @@ function ConflictResolverModal({
             <div className="text-muted-foreground mb-1 text-xs uppercase tracking-wider">
               {t("yourDraft")}
             </div>
-            <pre className="bg-muted max-h-[50vh] overflow-auto rounded p-3 font-mono text-[11px] leading-relaxed">
+            <pre className="bg-muted max-h-[50vh] overflow-auto rounded p-3 font-mono text-2xs leading-relaxed">
               {ours}
             </pre>
           </div>
@@ -171,7 +171,7 @@ function ConflictResolverModal({
             <div className="text-muted-foreground mb-1 text-xs uppercase tracking-wider">
               {t("serverCopy")}
             </div>
-            <pre className="bg-muted max-h-[50vh] overflow-auto rounded p-3 font-mono text-[11px] leading-relaxed">
+            <pre className="bg-muted max-h-[50vh] overflow-auto rounded p-3 font-mono text-2xs leading-relaxed">
               {theirs}
             </pre>
           </div>
@@ -483,7 +483,7 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
             <CardTitle className="text-base">
               <span className="font-mono">{a.manifestPath}</span>
               {isDirty && (
-                <Badge variant="outline" className="ml-2 text-[10px]">
+                <Badge variant="outline" className="ml-2 text-2xs">
                   {t("editor.unsaved")}
                 </Badge>
               )}

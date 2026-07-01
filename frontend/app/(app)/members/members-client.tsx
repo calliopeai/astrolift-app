@@ -94,10 +94,10 @@ interface InvitationsResp {
 }
 
 const scopeBadge: Record<string, string> = {
-  ORG: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+  ORG: "bg-info/15 text-info-fg",
   TEAM: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
-  PROJECT: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-  APP: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  PROJECT: "bg-success/15 text-success-fg",
+  APP: "bg-warning/15 text-warning-fg",
 };
 
 type RevokeTarget =
@@ -878,7 +878,7 @@ function LastActiveCell({ value }: { value: string | null | undefined }) {
         <TooltipContent>{fmt.formatDateTime(date)}</TooltipContent>
       </Tooltip>
       {isStale && (
-        <Badge variant="secondary" className="text-[10px]">
+        <Badge variant="secondary" className="text-2xs">
           {t("lastActiveInactive")}
         </Badge>
       )}
@@ -992,13 +992,13 @@ function AnonymizeUserDialog({
           <AlertDialogDescription asChild>
             <div className="space-y-4">
               {!backendReady && (
-                <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
+                <div className="flex items-start gap-2 rounded-md border border-warning-border bg-warning/10 p-3 text-xs text-warning-fg">
                   <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
                   <div>
                     <p className="font-medium">Backend wiring pending</p>
                     <p className="mt-0.5">
                       The Anonymize button is disabled until the
-                      <code className="mx-1 rounded bg-amber-500/10 px-1 font-mono">
+                      <code className="mx-1 rounded bg-warning/10 px-1 font-mono">
                         anonymizeUser
                       </code>
                       mutation lands. The flow, copy, and double-confirm below are reviewable;

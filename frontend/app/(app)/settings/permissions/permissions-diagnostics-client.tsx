@@ -27,14 +27,14 @@ interface MeResp {
 }
 
 const RESOURCE_TONE: Record<string, string> = {
-  app: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+  app: "bg-info/15 text-info-fg",
   cluster: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
-  org: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-  team: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-  project: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-  api_token: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  deploy_token: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  policy: "bg-red-500/15 text-red-700 dark:text-red-300",
+  org: "bg-success/15 text-success-fg",
+  team: "bg-success/15 text-success-fg",
+  project: "bg-success/15 text-success-fg",
+  api_token: "bg-warning/15 text-warning-fg",
+  deploy_token: "bg-warning/15 text-warning-fg",
+  policy: "bg-danger/15 text-danger-fg",
   audit_log: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
   billing: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
 };
@@ -167,7 +167,7 @@ export function PermissionsDiagnosticsClient() {
                       key={p}
                       className="bg-muted/40 inline-flex items-center gap-2 rounded px-2 py-1 font-mono text-xs"
                     >
-                      <CheckCircle2Icon className="text-emerald-600 size-3 shrink-0" />
+                      <CheckCircle2Icon className="text-success-fg size-3 shrink-0" />
                       {p}
                     </div>
                   ))}
@@ -188,7 +188,7 @@ export function PermissionsDiagnosticsClient() {
           {bindings.loading ? (
             <Skeleton className="h-16 w-full" />
           ) : myBindings.length === 0 ? (
-            <div className="bg-amber-100 border border-amber-300 rounded-md p-3 text-sm dark:bg-amber-950/40 dark:border-amber-900/60">
+            <div className="bg-warning/10 border border-warning-border rounded-md p-3 text-sm">
               <div className="flex items-center gap-2 font-medium">
                 <XCircleIcon className="size-4" /> No role bindings on your account
               </div>

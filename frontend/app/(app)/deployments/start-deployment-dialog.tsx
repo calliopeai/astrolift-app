@@ -172,7 +172,7 @@ export function StartDeploymentDialog({ open, onOpenChange }: Props) {
                       </span>
                     )}
                     {e.deploysPaused && (
-                      <span className="text-amber-600"> · {t("paused")}</span>
+                      <span className="text-warning-fg"> · {t("paused")}</span>
                     )}
                   </SelectItem>
                 ))}

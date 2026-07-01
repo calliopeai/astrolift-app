@@ -348,14 +348,14 @@ function severityBadgeProps(severity: string): {
     case "warn":
       return {
         variant: "outline",
-        className: "border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+        className: "border-warning-border bg-warning/10 text-warning-fg",
         label: severity,
       };
     case "info":
     default:
       return {
         variant: "outline",
-        className: "border-sky-500/50 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+        className: "border-info-border bg-info/10 text-info-fg",
         label: severity || "info",
       };
   }
@@ -853,7 +853,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
               ) : selectedPod ? (
                 <>
                   {t("logs.streaming")}{" "}
-                  <code className="bg-muted rounded px-1 py-0.5 font-mono text-[11px]">
+                  <code className="bg-muted rounded px-1 py-0.5 font-mono text-2xs">
                     {selectedPod}
                   </code>{" "}
                   {t("logs.fromCluster")}
@@ -964,7 +964,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
               We render before the LogViewer so the operator sees the
               reason for the empty pane immediately. */}
           {isHistorical && historicalUnavailable ? (
-            <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-300">
+            <div className="mb-3 flex items-start gap-2 rounded-md border border-warning-border bg-warning/10 p-2 text-xs text-warning-fg">
               <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" />
               <div>
                 <p className="font-medium">{t("logs.historicalUnavailableTitle")}</p>
@@ -1001,7 +1001,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
           />
           <p className="text-muted-foreground mt-2 text-xs">
             {t("logs.bufferCap", { limit: LOG_BUFFER_LIMIT })}{" "}
-            <code className="bg-muted rounded px-1 py-0.5 font-mono text-[11px]">
+            <code className="bg-muted rounded px-1 py-0.5 font-mono text-2xs">
               astro logs --app={a.slug} --follow
             </code>
             .{" "}
@@ -1152,7 +1152,7 @@ function AlertRulesPanel({ appId, appName }: { appId: string; appName: string })
                         <TableCell className="font-medium">
                           <div className="flex flex-col">
                             <span>{r.name}</span>
-                            <span className="text-muted-foreground font-mono text-[11px]">
+                            <span className="text-muted-foreground font-mono text-2xs">
                               {predicateSummary(r.predicate)}
                             </span>
                           </div>
@@ -1356,7 +1356,7 @@ function AlertEventsList({ ruleId }: { ruleId: string }) {
 
   return (
     <div className="p-4">
-      <p className="text-muted-foreground mb-2 text-[11px] tracking-wide uppercase">
+      <p className="text-muted-foreground mb-2 text-2xs tracking-wide uppercase">
         Last {eventList.length} event{eventList.length === 1 ? "" : "s"}
       </p>
       <Table>

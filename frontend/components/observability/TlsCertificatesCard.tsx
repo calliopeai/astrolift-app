@@ -61,7 +61,7 @@ function expiryChipClass(days: number): string {
     return "bg-destructive/10 text-destructive border-destructive/30";
   }
   if (days < 90) {
-    return "bg-amber-500/10 text-amber-700 border-amber-500/30 dark:text-amber-300";
+    return "bg-warning/10 text-warning-fg border-warning-border";
   }
   return "bg-muted text-muted-foreground border-transparent";
 }
@@ -173,7 +173,7 @@ export function TlsCertificatesCard({ appSlug, environmentName }: TlsCertificate
                   <TableCell className="font-mono text-xs">{formatNotAfter(c.notAfter)}</TableCell>
                   <TableCell>
                     <span
-                      className={`inline-flex items-center rounded border px-2 py-0.5 font-mono text-[11px] ${expiryChipClass(c.daysUntilExpiry)}`}
+                      className={`inline-flex items-center rounded border px-2 py-0.5 font-mono text-2xs ${expiryChipClass(c.daysUntilExpiry)}`}
                     >
                       {formatDays(c.daysUntilExpiry)}
                     </span>

@@ -907,7 +907,7 @@ function OptionCard({
       <div className="flex w-full items-center justify-between">
         <Icon className={cn("size-5", selected ? "text-primary" : "text-muted-foreground")} />
         {badge && (
-          <Badge variant="outline" className="text-[10px]">
+          <Badge variant="outline" className="text-2xs">
             {badge}
           </Badge>
         )}

@@ -92,13 +92,13 @@ function ProposalRow({
             <Link href={`/approvals/secret/${proposal.id}`} className="font-medium hover:underline">
               {proposal.registeredAppSlug} → {env}
             </Link>
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-2xs">
               {t("typeBadge")}
             </Badge>
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-2xs">
               {t("opLabel", { op: proposal.op })}
             </Badge>
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-2xs">
               {t("approvalsCount", {
                 received: proposal.approvalsCount,
                 required: proposal.requiredApproverCount,

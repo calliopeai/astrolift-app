@@ -383,7 +383,7 @@ export function ConsoleClient({ slug }: { slug: string }) {
               {selectedPod ? (
                 <>
                   {tObs("logs.streaming")}{" "}
-                  <code className="bg-muted rounded px-1 py-0.5 font-mono text-[11px]">
+                  <code className="bg-muted rounded px-1 py-0.5 font-mono text-2xs">
                     {selectedPod}
                   </code>{" "}
                   {tObs("logs.fromCluster")}
@@ -747,7 +747,7 @@ function Item({
           {done && (
             <Badge
               variant="secondary"
-              className="ml-2 bg-emerald-500/15 text-xs text-emerald-700 dark:text-emerald-300"
+              className="ml-2 bg-success/15 text-xs text-success-fg"
             >
               {shippedLabel}
             </Badge>

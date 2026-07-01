@@ -592,7 +592,7 @@ export function DeploymentDetailClient({ id }: { id: string }) {
                               ? "destructive"
                               : "outline"
                         }
-                        className="text-[10px] capitalize"
+                        className="text-2xs capitalize"
                       >
                         {e.decision}
                       </Badge>

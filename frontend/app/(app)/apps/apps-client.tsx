@@ -459,7 +459,7 @@ export function AppsClient() {
             />
             <kbd
               aria-hidden="true"
-              className="border-border bg-muted text-muted-foreground pointer-events-none absolute top-1/2 right-2 hidden h-5 -translate-y-1/2 items-center rounded border px-1.5 font-mono text-[10px] sm:inline-flex"
+              className="border-border bg-muted text-muted-foreground pointer-events-none absolute top-1/2 right-2 hidden h-5 -translate-y-1/2 items-center rounded border px-1.5 font-mono text-2xs sm:inline-flex"
             >
               /
             </kbd>
@@ -676,12 +676,12 @@ export function AppsClient() {
                       e.stopPropagation();
                       togglePin(app.slug);
                     }}
-                    className="text-muted-foreground hover:text-amber-500 absolute top-3 right-12 z-10 size-7 rounded-md p-1 transition-colors"
+                    className="text-muted-foreground hover:text-warning-fg absolute top-3 right-12 z-10 size-7 rounded-md p-1 transition-colors"
                     title={isPinned ? "Unpin app" : "Pin to top"}
                     aria-pressed={isPinned}
                   >
                     <StarIcon
-                      className={isPinned ? "size-4 fill-amber-500 text-amber-500" : "size-4"}
+                      className={isPinned ? "size-4 fill-warning text-warning-fg" : "size-4"}
                       aria-hidden
                     />
                     <span className="sr-only">{isPinned ? "Unpin app" : "Pin to top"}</span>

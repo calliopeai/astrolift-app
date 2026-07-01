@@ -57,7 +57,7 @@ export function ServiceDetailSheet({ service, onOpenChange }: Props) {
                   {service.kind}
                 </Badge>
                 {service.variant ? (
-                  <Badge variant="outline" className="font-mono text-[10px]">
+                  <Badge variant="outline" className="font-mono text-2xs">
                     {service.variant}
                   </Badge>
                 ) : null}
@@ -65,7 +65,7 @@ export function ServiceDetailSheet({ service, onOpenChange }: Props) {
               <SheetDescription>
                 <span className="text-muted-foreground inline-flex items-center gap-2 text-xs">
                   <span>Environment:</span>
-                  <Badge variant="outline" className="font-mono text-[10px]">
+                  <Badge variant="outline" className="font-mono text-2xs">
                     {service.environmentName}
                   </Badge>
                   <span>·</span>

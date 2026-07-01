@@ -367,15 +367,15 @@ function pct(v: number | null): string {
 
 function utilizationTone(v: number | null): string {
   if (v === null) return "text-foreground";
-  if (v < 0.7) return "text-emerald-600";
-  if (v < 0.9) return "text-amber-600";
+  if (v < 0.7) return "text-success-fg";
+  if (v < 0.9) return "text-warning-fg";
   return "text-destructive";
 }
 
 function healthTone(v: number | null): string {
   if (v === null) return "text-foreground";
-  if (v >= 0.9) return "text-emerald-600";
-  if (v >= 0.7) return "text-amber-600";
+  if (v >= 0.9) return "text-success-fg";
+  if (v >= 0.7) return "text-warning-fg";
   return "text-destructive";
 }
 

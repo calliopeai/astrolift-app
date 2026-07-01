@@ -42,15 +42,15 @@ import type {
 // ─── status styling ───────────────────────────────────────────────────────────
 
 const STATUS_RING: Record<TopologyNodeStatus, string> = {
-  running: "ring-emerald-500/50 bg-emerald-500/5",
-  provisioning: "ring-amber-500/50 bg-amber-500/5",
+  running: "ring-success bg-success/5",
+  provisioning: "ring-warning bg-warning/5",
   failed: "ring-destructive/60 bg-destructive/5",
   unknown: "ring-muted-foreground/20 bg-muted/40",
 };
 
 const STATUS_DOT: Record<TopologyNodeStatus, string> = {
-  running: "bg-emerald-500",
-  provisioning: "bg-amber-500 animate-pulse",
+  running: "bg-success",
+  provisioning: "bg-warning animate-pulse",
   failed: "bg-destructive",
   unknown: "bg-muted-foreground/40",
 };
@@ -92,13 +92,13 @@ function TopologyNodeCard({ data }: NodeProps<Node<TopologyNode>>) {
             <div className="truncate text-sm font-medium leading-tight">{data.label}</div>
           </div>
           {data.sublabel && (
-            <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
+            <div className="mt-0.5 truncate font-mono text-2xs text-muted-foreground">
               {data.sublabel}
             </div>
           )}
         </div>
         {ratio && (
-          <Badge variant="outline" className="font-mono text-[10px]">
+          <Badge variant="outline" className="font-mono text-2xs">
             {ratio}
           </Badge>
         )}
@@ -110,13 +110,13 @@ function TopologyNodeCard({ data }: NodeProps<Node<TopologyNode>>) {
             <Badge
               key={host}
               variant="secondary"
-              className="font-mono text-[10px] font-normal"
+              className="font-mono text-2xs font-normal"
             >
               {host}
             </Badge>
           ))}
           {data.hostnames.length > 3 && (
-            <Badge variant="outline" className="font-mono text-[10px]">
+            <Badge variant="outline" className="font-mono text-2xs">
               +{data.hostnames.length - 3}
             </Badge>
           )}

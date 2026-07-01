@@ -213,7 +213,7 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
           <div className="flex items-center gap-2">
             <Label htmlFor="connection">Source connection</Label>
             {pickedConnection && (
-              <Badge variant="outline" className="text-[10px] font-normal">
+              <Badge variant="outline" className="text-2xs font-normal">
                 {connectionKindLabel(pickedConnection.kind as ScmConnectionKind)}
               </Badge>
             )}
@@ -323,7 +323,7 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
                               {existingCount > 0 && (
                                 <Badge
                                   variant="secondary"
-                                  className="shrink-0 gap-1 px-1 py-0 text-[10px]"
+                                  className="shrink-0 gap-1 px-1 py-0 text-2xs"
                                   title={`This repo already hosts ${existingCount} registered agent${existingCount === 1 ? "" : "s"}. Re-scanning adds only newly-added agents.`}
                                 >
                                   {existingCount === 1
@@ -332,7 +332,7 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
                                 </Badge>
                               )}
                             </div>
-                            <div className="text-muted-foreground flex items-center gap-2 text-[10px]">
+                            <div className="text-muted-foreground flex items-center gap-2 text-2xs">
                               <VisibilityBadge visibility={r.visibility} />
                               {r.defaultBranch && (
                                 <span className="inline-flex items-center gap-1">
@@ -433,13 +433,13 @@ function connectionKindLabel(kind: ScmConnectionKind): string {
 function VisibilityBadge({ visibility }: { visibility: string }) {
   if (visibility === "private" || visibility === "internal") {
     return (
-      <Badge variant="secondary" className="gap-1 px-1 py-0 text-[10px]">
+      <Badge variant="secondary" className="gap-1 px-1 py-0 text-2xs">
         <LockIcon className="size-2.5" /> {visibility}
       </Badge>
     );
   }
   return (
-    <Badge variant="outline" className="gap-1 px-1 py-0 text-[10px]">
+    <Badge variant="outline" className="gap-1 px-1 py-0 text-2xs">
       <UnlockIcon className="size-2.5" /> {visibility}
     </Badge>
   );

@@ -62,11 +62,11 @@ export function PendingDeployments({ appSlug }: Props) {
         <h2 className="text-sm font-semibold">Pending approval</h2>
         <span className="text-muted-foreground text-xs">({pending.length})</span>
         {canApprove ? (
-          <Badge variant="secondary" className="ml-auto text-[10px]">
+          <Badge variant="secondary" className="ml-auto text-2xs">
             You can approve
           </Badge>
         ) : (
-          <span className="text-muted-foreground ml-auto text-[10px] italic">Read-only</span>
+          <span className="text-muted-foreground ml-auto text-2xs italic">Read-only</span>
         )}
       </div>
       <p className="text-muted-foreground text-xs">
@@ -151,7 +151,7 @@ function PendingRow({
             {deployment.environmentName && (
               <span className="text-muted-foreground text-xs">→ {deployment.environmentName}</span>
             )}
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-2xs">
               {deployment.approvalsReceived}/{deployment.approvalsRequired || 1} approvals
             </Badge>
           </div>

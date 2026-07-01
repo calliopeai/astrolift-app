@@ -19,7 +19,7 @@ const STEP_LABELS: Record<string, string> = {
 };
 
 function StepIcon({ state }: { state: "done" | "active" | "pending" }) {
-  if (state === "done") return <CheckCircle2Icon className="size-4 text-emerald-500" />;
+  if (state === "done") return <CheckCircle2Icon className="size-4 text-success-fg" />;
   if (state === "active")
     return (
       <LoaderCircleIcon className="size-4 animate-spin text-[color:var(--brand-primary)]" />

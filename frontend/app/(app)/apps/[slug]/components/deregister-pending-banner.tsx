@@ -182,7 +182,7 @@ export function DeregisterPendingBanner({ appSlug }: { appSlug: string }) {
     <div
       role="status"
       aria-live="polite"
-      className="flex items-center gap-3 rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-amber-900 dark:text-amber-100"
+      className="flex items-center gap-3 rounded-md border border-warning-border bg-warning/10 p-3 text-warning-fg"
     >
       <ShieldAlertIcon className="size-5 shrink-0" />
       <div className="min-w-0 flex-1">
@@ -194,7 +194,7 @@ export function DeregisterPendingBanner({ appSlug }: { appSlug: string }) {
       <Button
         size="sm"
         variant="outline"
-        className="border-amber-600/40 hover:bg-amber-500/20"
+        className="border-warning-border hover:bg-warning/20"
         onClick={() => void handleCancel()}
         disabled={loading}
       >

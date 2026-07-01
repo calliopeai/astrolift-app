@@ -201,7 +201,7 @@ function CertExpiryBadge({
   const [now] = React.useState(() => Date.now());
   if (status === "failed") {
     return (
-      <Badge variant="destructive" className="text-[10px]">
+      <Badge variant="destructive" className="text-2xs">
         Renewal failed
       </Badge>
     );
@@ -211,14 +211,14 @@ function CertExpiryBadge({
   const days = Math.floor(ms / (1000 * 60 * 60 * 24));
   if (days < 0) {
     return (
-      <Badge variant="destructive" className="text-[10px]">
+      <Badge variant="destructive" className="text-2xs">
         Expired {Math.abs(days)}d ago
       </Badge>
     );
   }
   if (days <= 7) {
     return (
-      <Badge variant="destructive" className="text-[10px]">
+      <Badge variant="destructive" className="text-2xs">
         Expires in {days}d
       </Badge>
     );
@@ -227,14 +227,14 @@ function CertExpiryBadge({
     return (
       <Badge
         variant="outline"
-        className="border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-300"
+        className="border-warning-border bg-warning/10 text-2xs text-warning-fg"
       >
         Expires in {days}d
       </Badge>
     );
   }
   return (
-    <Badge variant="outline" className="text-muted-foreground text-[10px]">
+    <Badge variant="outline" className="text-muted-foreground text-2xs">
       Expires in {days}d
     </Badge>
   );
@@ -840,7 +840,7 @@ function AddDomainSheet({
                                   <span className="truncate text-xs">
                                     {c.domainName || c.name}
                                   </span>
-                                  <span className="text-muted-foreground truncate font-mono text-[10px]">
+                                  <span className="text-muted-foreground truncate font-mono text-2xs">
                                     {c.arn}
                                   </span>
                                 </div>
@@ -899,8 +899,8 @@ function AddDomainSheet({
                 : t(`addSheet.methodHints.${method}`)}
             </p>
             {isByo && !isWildcard && (
-              <div className="rounded-md border border-sky-500/30 bg-sky-500/5 p-2 text-xs">
-                <p className="font-medium text-sky-700 dark:text-sky-400">
+              <div className="rounded-md border border-info-border bg-info/5 p-2 text-xs">
+                <p className="font-medium text-info-fg">
                   {t("addSheet.byoTitle")}
                 </p>
                 <p className="text-muted-foreground">{t("addSheet.byoFollowup")}</p>
@@ -967,12 +967,12 @@ function DomainHandshakeCard({
               so an operator can scan the list and see at a glance which
               domains cover a subtree vs a single host. */}
           {domain.isWildcard && (
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-2xs">
               wildcard
             </Badge>
           )}
           {domain.isPlatformManagedZone && (
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-2xs">
               {t("platformZone")}
             </Badge>
           )}
@@ -1186,7 +1186,7 @@ function DomainRedirectsSection({
     <section className="border-border space-y-2 rounded-md border p-3">
       <div className="flex items-center gap-2">
         <h4 className="text-sm font-semibold">Redirects</h4>
-        <Badge variant="outline" className="text-[10px]">
+        <Badge variant="outline" className="text-2xs">
           {rules.length}
         </Badge>
         <div className="ml-auto flex items-center gap-2">
@@ -1359,7 +1359,7 @@ function DomainRedirectsSection({
               Add to list
             </Button>
           </div>
-          <p className="text-muted-foreground text-[10px]">
+          <p className="text-muted-foreground text-2xs">
             New rules apply after you click Save above.
           </p>
         </div>
@@ -1448,7 +1448,7 @@ function DomainPathRoutesSection({
     <section className="border-border space-y-2 rounded-md border p-3">
       <div className="flex items-center gap-2">
         <h4 className="text-sm font-semibold">Path routing</h4>
-        <Badge variant="outline" className="text-[10px]">
+        <Badge variant="outline" className="text-2xs">
           {routes.length}
         </Badge>
         <div className="ml-auto flex items-center gap-2">
@@ -1606,7 +1606,7 @@ function DomainPathRoutesSection({
               Add to list
             </Button>
           </div>
-          <p className="text-muted-foreground text-[10px]">
+          <p className="text-muted-foreground text-2xs">
             New routes apply after you click Save above.
           </p>
         </div>
@@ -1642,18 +1642,18 @@ function CertStateBlock({
   }
   if (state === "issuing") {
     return (
-      <div className="text-muted-foreground flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs">
-        <Loader2Icon className="size-3.5 animate-spin text-amber-600" />
-        <span className="font-medium text-amber-700 dark:text-amber-400">{t("issuing")}</span>
+      <div className="text-muted-foreground flex items-center gap-2 rounded-md border border-warning-border bg-warning/5 p-2 text-xs">
+        <Loader2Icon className="size-3.5 animate-spin text-warning-fg" />
+        <span className="font-medium text-warning-fg">{t("issuing")}</span>
         <span>{domain.isPlatformManagedZone ? t("issuingPlatform") : t("issuingExternal")}</span>
       </div>
     );
   }
   if (state === "active") {
     return (
-      <div className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-2 text-xs">
-        <ShieldCheckIcon className="size-3.5 text-emerald-600" />
-        <span className="font-medium text-emerald-700 dark:text-emerald-400">{t("active")}</span>
+      <div className="flex items-center gap-2 rounded-md border border-success-border bg-success/5 p-2 text-xs">
+        <ShieldCheckIcon className="size-3.5 text-success-fg" />
+        <span className="font-medium text-success-fg">{t("active")}</span>
         <span className="text-muted-foreground">
           {t("activeDesc", { hostname: domain.hostname })}
         </span>
@@ -1662,11 +1662,11 @@ function CertStateBlock({
   }
   if (state === "byo") {
     return (
-      <div className="flex items-start gap-2 rounded-md border border-sky-500/30 bg-sky-500/5 p-2 text-xs">
-        <CheckCircle2Icon className="size-3.5 shrink-0 text-sky-600" />
+      <div className="flex items-start gap-2 rounded-md border border-info-border bg-info/5 p-2 text-xs">
+        <CheckCircle2Icon className="size-3.5 shrink-0 text-info-fg" />
         <div className="flex-1 space-y-1">
           <div>
-            <span className="font-medium text-sky-700 dark:text-sky-400">{t("byo")}</span>
+            <span className="font-medium text-info-fg">{t("byo")}</span>
             {domain.byoCertificateUploadedAt && (
               <span className="text-muted-foreground ml-2">
                 {t("byoUploaded", {
@@ -1709,7 +1709,7 @@ function CertStateBlock({
     );
   }
   return (
-    <div className="text-muted-foreground rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs">
+    <div className="text-muted-foreground rounded-md border border-warning-border bg-warning/5 p-2 text-xs">
       {t("queued")}
     </div>
   );
@@ -1857,7 +1857,7 @@ function IngressStatusCard({
           {paused ? (
             <Badge
               variant="outline"
-              className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+              className="border-warning-border bg-warning/10 text-warning-fg"
             >
               <PauseIcon className="size-3" />
               {t("paused")}
@@ -1865,7 +1865,7 @@ function IngressStatusCard({
           ) : (
             <Badge
               variant="outline"
-              className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+              className="border-success-border bg-success/10 text-success-fg"
             >
               <PlayIcon className="size-3" />
               {t("live")}
@@ -1898,7 +1898,7 @@ function IngressStatusCard({
           {managedHost && (
             <div className="flex items-center gap-2">
               <code className="font-mono break-all">{managedHost}</code>
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-2xs">
                 {tCert("managed")}
               </Badge>
             </div>
@@ -1908,7 +1908,7 @@ function IngressStatusCard({
             : customHosts.map((h) => (
                 <div key={h} className="flex items-center gap-2">
                   <code className="font-mono break-all">{h}</code>
-                  <Badge variant="outline" className="text-[10px]">
+                  <Badge variant="outline" className="text-2xs">
                     {tCert("custom")}
                   </Badge>
                 </div>
@@ -1916,10 +1916,10 @@ function IngressStatusCard({
         </div>
 
         {paused && (
-          <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs">
-            <AlertTriangleIcon className="size-3.5 shrink-0 text-amber-600" />
+          <div className="flex items-start gap-2 rounded-md border border-warning-border bg-warning/5 p-2 text-xs">
+            <AlertTriangleIcon className="size-3.5 shrink-0 text-warning-fg" />
             <span className="text-muted-foreground">
-              <span className="font-medium text-amber-700 dark:text-amber-400">
+              <span className="font-medium text-warning-fg">
                 {t("maintenance")}
               </span>{" "}
               {t("maintenanceDesc")}

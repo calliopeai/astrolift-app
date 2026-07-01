@@ -51,17 +51,17 @@ const OPEN_KEY = "astrolift.nav.tree.open.v1";
 // the status badge palette in app-detail-client.tsx so the sidebar
 // and detail page agree on what "failed" looks like at a glance.
 const STATUS_DOT_CLASS: Record<AstroliftAppStatus, string> = {
-  ready: "bg-emerald-500",
-  provisioning: "bg-amber-500",
+  ready: "bg-success",
+  provisioning: "bg-warning",
   pending: "bg-slate-400",
-  failed: "bg-rose-500",
+  failed: "bg-danger",
 };
 
 function statusIcon(status: AstroliftAppStatus) {
   if (status === "provisioning") {
     return (
       <Loader2Icon
-        className="size-3 shrink-0 animate-spin text-amber-500"
+        className="size-3 shrink-0 animate-spin text-warning-fg"
         aria-hidden
       />
     );
@@ -69,7 +69,7 @@ function statusIcon(status: AstroliftAppStatus) {
   if (status === "failed") {
     return (
       <AlertCircleIcon
-        className="size-3 shrink-0 text-rose-500"
+        className="size-3 shrink-0 text-danger-fg"
         aria-hidden
       />
     );
@@ -409,7 +409,7 @@ function AddProjectRow({ teamSlug }: { teamSlug: string }) {
           href={`/projects?team=${encodeURIComponent(teamSlug)}&new=1`}
           className="flex items-center gap-2 py-1 text-xs"
         >
-          <span aria-hidden className="text-[14px] leading-none">+</span>
+          <span aria-hidden className="text-sm leading-none">+</span>
           <span>Add project</span>
         </Link>
       </SidebarMenuSubButton>
@@ -529,7 +529,7 @@ function UnassignedAppsBlock({
 }: UnassignedAppsBlockProps) {
   return (
     <SidebarMenuSubItem>
-      <div className="flex items-center gap-2 px-2 py-1 text-[10px] font-medium text-sidebar-foreground/60 uppercase tracking-wide">
+      <div className="flex items-center gap-2 px-2 py-1 text-2xs font-medium text-sidebar-foreground/60 uppercase tracking-wide">
         <CircleDashedIcon className="size-3" aria-hidden />
         <span className="truncate">{label}</span>
       </div>
@@ -560,7 +560,7 @@ function EmptyRow({ href, label, cta }: EmptyRowProps) {
         className="text-sidebar-foreground/60 hover:text-sidebar-foreground"
       >
         <Link href={href} className="flex flex-col items-start gap-0 py-1">
-          <span className="text-[11px] uppercase tracking-wide">{label}</span>
+          <span className="text-2xs uppercase tracking-wide">{label}</span>
           <span className="text-xs">{cta} &rarr;</span>
         </Link>
       </SidebarMenuSubButton>

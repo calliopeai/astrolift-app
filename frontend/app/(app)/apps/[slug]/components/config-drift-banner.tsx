@@ -79,26 +79,26 @@ export function ConfigDriftBanner({ appSlug, drift }: Props) {
 
   return (
     <section
-      className="rounded-md border border-amber-300 bg-amber-50 p-4 dark:border-amber-700/50 dark:bg-amber-950/30"
+      className="rounded-md border border-warning-border bg-warning/10 p-4"
       aria-live="polite"
     >
       <div className="flex items-start gap-3">
         <GitPullRequestArrowIcon
           aria-hidden
-          className="size-5 shrink-0 text-amber-700 dark:text-amber-300"
+          className="size-5 shrink-0 text-warning-fg"
         />
         <div className="min-w-0 flex-1 space-y-2">
           <div>
-            <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+            <p className="text-sm font-semibold text-warning-fg">
               {t("headline")}
             </p>
-            <p className="text-xs leading-snug text-amber-900/80 dark:text-amber-200/80">
+            <p className="text-xs leading-snug text-warning-fg">
               {drift.environmentName
                 ? t("description", { env: drift.environmentName })
                 : t("descriptionNoEnv")}
             </p>
           </div>
-          <ul className="list-disc space-y-0.5 pl-5 text-xs text-amber-900/90 dark:text-amber-200/90">
+          <ul className="list-disc space-y-0.5 pl-5 text-xs text-warning-fg">
             {drift.fields.map((f) => (
               <li key={f} className="font-mono">
                 {KNOWN_FIELDS.has(f) ? t(`field.${f}`) : t("field.unknown", { field: f })}

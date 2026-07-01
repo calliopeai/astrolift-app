@@ -39,8 +39,8 @@ interface Props {
 
 const PULSE_BG: Record<AppHealthPulseStatus, string> = {
   OK: "bg-[var(--brand-primary)]",
-  DEGRADED: "bg-red-500 animate-pulse",
-  STALE: "bg-amber-500",
+  DEGRADED: "bg-danger animate-pulse",
+  STALE: "bg-warning",
   NEVER: "bg-zinc-400",
 };
 
@@ -85,7 +85,7 @@ export function AppFreshnessRow({ pulse, latestDeployment, lastDeployedAt }: Pro
 
   const staleChip =
     pulse.status === "STALE" ? (
-      <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+      <span className="inline-flex items-center gap-1 rounded-full border border-warning-border bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning-fg">
         {t("stale")}
       </span>
     ) : null;

@@ -183,7 +183,7 @@ export default function ObserveAgentsPage() {
             {TAB_ICONS[t]}
             {TAB_LABELS[t]}
             {ZENTINELLE_TABS.has(t) && (
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-normal ml-0.5">Zentinelle</Badge>
+              <Badge variant="secondary" className="text-2xs px-1.5 py-0 h-4 font-normal ml-0.5">Zentinelle</Badge>
             )}
           </button>
         ))}

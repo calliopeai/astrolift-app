@@ -29,19 +29,19 @@ interface PillStyle {
 
 const STATUS_STYLES: Record<DeploymentStatus, PillStyle> = {
   pending_approval: {
-    className: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+    className: "bg-warning/15 text-warning-fg border-warning-border",
     label: "Pending approval",
   },
   pending: {
-    className: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+    className: "bg-warning/15 text-warning-fg border-warning-border",
     label: "Pending",
   },
   deploying: {
-    className: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30 animate-pulse",
+    className: "bg-info/15 text-info-fg border-info-border animate-pulse",
     label: "Deploying",
   },
   redeploying: {
-    className: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30 animate-pulse",
+    className: "bg-info/15 text-info-fg border-info-border animate-pulse",
     label: "Redeploying",
   },
   running: {
@@ -50,7 +50,7 @@ const STATUS_STYLES: Record<DeploymentStatus, PillStyle> = {
     label: "Running",
   },
   failed: {
-    className: "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30",
+    className: "bg-danger/15 text-danger-fg border-danger-border",
     label: "Failed",
   },
   rolled_back: {

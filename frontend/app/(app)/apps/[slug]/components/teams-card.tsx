@@ -80,10 +80,10 @@ const LEVEL_DESCRIPTIONS: Record<AppTeamAccessLevel, string> = {
 };
 
 const LEVEL_BADGE: Record<AppTeamAccessLevel, string> = {
-  viewer: "border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+  viewer: "border-info-border bg-info/10 text-info-fg",
   deployer:
-    "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  owner: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    "border-success-border bg-success/10 text-success-fg",
+  owner: "border-warning-border bg-warning/10 text-warning-fg",
 };
 
 export function TeamsCard({ appSlug, appId, homeTeamSlug }: Props) {
@@ -232,7 +232,7 @@ export function TeamsCard({ appSlug, appId, homeTeamSlug }: Props) {
                       {a.isHome && (
                         <Badge
                           variant="outline"
-                          className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                          className="border-warning-border bg-warning/10 text-warning-fg"
                         >
                           <HomeIcon className="size-3" />
                           Home
@@ -272,7 +272,7 @@ export function TeamsCard({ appSlug, appId, homeTeamSlug }: Props) {
                         </SelectContent>
                       </Select>
                     </Can>
-                    <p className="text-muted-foreground mt-1 text-[10px]">
+                    <p className="text-muted-foreground mt-1 text-2xs">
                       {LEVEL_DESCRIPTIONS[a.accessLevel]}
                     </p>
                   </TableCell>

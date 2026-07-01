@@ -169,11 +169,11 @@ export function PodEventsPanel({
   const autoExpandedDueToWarnings = override === null && warningCount > 0;
 
   const headerToneClass = autoExpandedDueToWarnings
-    ? "bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-900/50"
+    ? "bg-warning/10 border-b border-warning-border"
     : "";
 
   const Icon = autoExpandedDueToWarnings ? AlertTriangleIcon : ActivityIcon;
-  const iconColorClass = autoExpandedDueToWarnings ? "text-amber-600 dark:text-amber-400" : "";
+  const iconColorClass = autoExpandedDueToWarnings ? "text-warning-fg" : "";
 
   return (
     <Card>
@@ -250,13 +250,13 @@ export function PodEventsPanel({
                       </Badge>
                       {isWarning && (
                         <AlertTriangleIcon
-                          className="size-3 text-amber-600 dark:text-amber-400"
+                          className="size-3 text-warning-fg"
                           aria-label={t("events.warningBadgeLabel")}
                         />
                       )}
                     </div>
                     {Object.keys(e.payload).length > 0 && (
-                      <pre className="text-muted-foreground mt-1 ml-44 overflow-x-auto font-mono text-[11px]">
+                      <pre className="text-muted-foreground mt-1 ml-44 overflow-x-auto font-mono text-2xs">
                         {JSON.stringify(e.payload, null, 2)}
                       </pre>
                     )}

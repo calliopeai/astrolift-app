@@ -113,7 +113,7 @@ export default function ImportSkillsPage() {
       {result && (
         <div className="max-w-2xl rounded-lg border p-4">
           <div className="mb-3 flex items-center gap-2">
-            <CheckCircle2Icon className="h-4 w-4 text-green-500" />
+            <CheckCircle2Icon className="h-4 w-4 text-success-fg" />
             <span className="text-sm font-medium">Import complete</span>
             <Badge variant="outline" className="font-mono text-xs">
               {result.sourceRef}

@@ -213,7 +213,7 @@ export function ReviewSubmitStep({
                   : "GitHub App installs handle this automatically; PAT/OAuth-User connections will get a per-repo webhook once that mutation lands."}
               </span>
             </div>
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-2xs">
               {state.connectionIsAppInstall ? "Already installed" : "Coming soon"}
             </Badge>
           </li>
@@ -375,7 +375,7 @@ function StatusBadge({ status, error }: { status: StepStatus; error?: string }) 
   }
   if (status === "done") {
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+      <span className="inline-flex items-center gap-1 text-xs text-success-fg">
         <CheckCircle2Icon className="size-3.5" /> Done
       </span>
     );
@@ -389,7 +389,7 @@ function StatusBadge({ status, error }: { status: StepStatus; error?: string }) 
   }
   if (status === "skipped") {
     return (
-      <Badge variant="outline" className="text-[10px]">
+      <Badge variant="outline" className="text-2xs">
         Skipped
       </Badge>
     );

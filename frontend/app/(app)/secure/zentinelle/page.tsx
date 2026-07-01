@@ -73,8 +73,8 @@ export default function ZentinellePage() {
 
         {/* Integration status chip */}
         <div className="rounded-md border border-dashed bg-muted/30 px-4 py-3 flex items-start gap-3">
-          <div className="mt-1 size-4 shrink-0 rounded-full bg-amber-500/20 flex items-center justify-center">
-            <div className="size-1.5 rounded-full bg-amber-500" />
+          <div className="mt-1 size-4 shrink-0 rounded-full bg-warning/20 flex items-center justify-center">
+            <div className="size-1.5 rounded-full bg-warning" />
           </div>
           <div>
             <p className="text-sm font-medium">Integration under design</p>
@@ -113,7 +113,7 @@ export default function ZentinellePage() {
 
       {/* What Zentinelle adds */}
       <div className="mt-6">
-        <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+        <p className="text-2xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
           What Zentinelle adds to Astrolift
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -139,8 +139,8 @@ export default function ZentinellePage() {
         <em>AI behavior layer</em>: what the agent says and does, whether it complies with
         policy, and the audit trail regulators require. In{" "}
         <strong className="text-foreground">OBSERVE › Agents</strong>, tabs marked{" "}
-        <code className="bg-muted px-1 rounded text-[10px]">Astrolift</code> are live today;{" "}
-        <code className="bg-muted px-1 rounded text-[10px]">Zentinelle</code> tabs activate
+        <code className="bg-muted px-1 rounded text-2xs">Astrolift</code> are live today;{" "}
+        <code className="bg-muted px-1 rounded text-2xs">Zentinelle</code> tabs activate
         once the integration ships.
       </div>
     </PageShell>

@@ -90,7 +90,7 @@ export function ActivityTimeline({ appSlug, limit = 20 }: Props) {
           Activity
         </h2>
         {events.length > 0 && (
-          <p className="text-muted-foreground text-[11px]">
+          <p className="text-muted-foreground text-2xs">
             {filterActive
               ? `${events.length} of ${allForApp.length} events`
               : `Last ${events.length} events`}
@@ -111,7 +111,7 @@ export function ActivityTimeline({ appSlug, limit = 20 }: Props) {
               onClick={() => setTypeKey(f.key)}
               aria-pressed={active}
               className={cn(
-                "rounded-full border px-2.5 py-0.5 text-[11px] transition-colors",
+                "rounded-full border px-2.5 py-0.5 text-2xs transition-colors",
                 active
                   ? "border-foreground bg-foreground text-background"
                   : "border-border text-muted-foreground hover:bg-accent",
@@ -147,7 +147,7 @@ export function ActivityTimeline({ appSlug, limit = 20 }: Props) {
           {filterActive ? (
             <>
               No events match{" "}
-              <Badge variant="secondary" className="text-[10px]">
+              <Badge variant="secondary" className="text-2xs">
                 {activeFilter.label}
                 {needle ? ` · "${needle}"` : ""}
               </Badge>
@@ -179,7 +179,7 @@ function TimelineRow({ event, relativeTime }: { event: AstroliftEvent; relativeT
       />
       <div className="min-w-0 flex-1">
         <p className="break-words">{summary}</p>
-        <p className="text-muted-foreground text-[11px]">
+        <p className="text-muted-foreground text-2xs">
           <span className="font-mono">{event.eventType}</span> · {relativeTime}
         </p>
       </div>

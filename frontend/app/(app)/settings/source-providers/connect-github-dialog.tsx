@@ -100,7 +100,7 @@ export function ConnectGitHubDialog({ open, onOpenChange }: Props) {
             )}
           </div>
 
-          <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-emerald-900 dark:text-emerald-200">
+          <div className="rounded-md border border-success-border bg-success/5 p-3 text-xs text-success-fg">
             <p className="flex items-center gap-2 font-medium">
               <ShieldCheckIcon className="size-4" />
               Permissions Astrolift will request

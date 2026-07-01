@@ -50,7 +50,7 @@ export function InvitationAcceptClient({ token }: { token: string }) {
         <CardContent className="space-y-4">
           {ok ? (
             <>
-              <div className="bg-green-100 border border-green-300 rounded-md p-3 text-sm dark:bg-green-950/40 dark:border-green-900/60">
+              <div className="bg-success/10 border border-success-border rounded-md p-3 text-sm">
                 <div className="flex items-center gap-2 font-medium">
                   <CheckCircle2Icon className="size-4" /> You&apos;re in
                 </div>
@@ -65,7 +65,7 @@ export function InvitationAcceptClient({ token }: { token: string }) {
             </>
           ) : errorMessage ? (
             <>
-              <div className="bg-red-100 border border-red-300 rounded-md p-3 text-sm dark:bg-red-950/40 dark:border-red-900/60">
+              <div className="bg-danger/10 border border-danger-border rounded-md p-3 text-sm">
                 <div className="flex items-center gap-2 font-medium">
                   <XCircleIcon className="size-4" /> Could not accept
                 </div>
