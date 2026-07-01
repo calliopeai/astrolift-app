@@ -224,7 +224,7 @@ export function DiscoveryStep({ state, setState, setValid }: Props) {
                   <div className="flex min-w-0 flex-1 flex-col">
                     <div className="flex min-w-0 items-center gap-2">
                       <span className="truncate text-sm font-medium">{a.name}</span>
-                      <Badge variant="outline" className="shrink-0 text-[10px]">
+                      <Badge variant="outline" className="shrink-0 text-2xs">
                         {a.workloadKind}
                       </Badge>
                     </div>
@@ -233,7 +233,7 @@ export function DiscoveryStep({ state, setState, setValid }: Props) {
                     </span>
                   </div>
                   {a.alreadyRegistered && (
-                    <Badge variant="secondary" className="shrink-0 text-[10px]">
+                    <Badge variant="secondary" className="shrink-0 text-2xs">
                       Already registered
                     </Badge>
                   )}

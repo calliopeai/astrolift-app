@@ -378,7 +378,7 @@ function CommitProvenance({
         <GitCommitIcon className="size-3.5" />
         {shortSha && <code className="font-mono text-xs">{shortSha}</code>}
         {deployment.branch && (
-          <Badge variant="outline" className="text-[10px]">
+          <Badge variant="outline" className="text-2xs">
             {deployment.branch}
           </Badge>
         )}
@@ -518,7 +518,7 @@ function HistoryEntry({
             {entry.actorDisplay || entry.actorKind || t("history.actorUnknown")}
           </span>
         </div>
-        <p className="text-muted-foreground text-[11px]">{fmt.formatDateTime(entry.occurredAt)}</p>
+        <p className="text-muted-foreground text-2xs">{fmt.formatDateTime(entry.occurredAt)}</p>
         {entry.reason && <p className="mt-1 text-xs whitespace-pre-wrap">{entry.reason}</p>}
       </div>
     </li>

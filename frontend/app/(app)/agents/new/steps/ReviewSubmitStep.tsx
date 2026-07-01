@@ -114,16 +114,16 @@ export function ReviewSubmitStep({
                       <CheckCircle2Icon className="size-3.5" /> Created
                     </span>
                   ) : (
-                    <Badge variant="outline" className="text-[10px]">
+                    <Badge variant="outline" className="text-2xs">
                       Already existed
                     </Badge>
                   )
                 ) : a.alreadyRegistered ? (
-                  <Badge variant="secondary" className="text-[10px]">
+                  <Badge variant="secondary" className="text-2xs">
                     Already registered
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="text-[10px]">
+                  <Badge variant="outline" className="text-2xs">
                     Will register
                   </Badge>
                 )}
@@ -170,7 +170,7 @@ export function ReviewSubmitStep({
                 needed.
               </span>
             </div>
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-2xs">
               Not applicable
             </Badge>
           </li>
@@ -287,7 +287,7 @@ function StatusBadge({ status, error }: { status: StepStatus; error?: string }) 
   }
   if (status === "skipped") {
     return (
-      <Badge variant="outline" className="text-[10px]">
+      <Badge variant="outline" className="text-2xs">
         Skipped
       </Badge>
     );

@@ -562,7 +562,7 @@ function ScheduledJobsExample({ caption }: { caption: string }) {
   return (
     <div className="mt-2 w-full max-w-xl text-left">
       <p className="text-muted-foreground mb-2 text-xs">{caption}</p>
-      <pre className="bg-muted text-muted-foreground overflow-x-auto rounded-md border p-3 font-mono text-[11px] leading-relaxed">
+      <pre className="bg-muted text-muted-foreground overflow-x-auto rounded-md border p-3 font-mono text-2xs leading-relaxed">
         {example}
       </pre>
     </div>

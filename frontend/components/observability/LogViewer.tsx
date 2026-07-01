@@ -596,7 +596,7 @@ export function LogViewer({
               onClick={() => setLevelFilter(level)}
               aria-pressed={active}
               className={cn(
-                "rounded-full border px-2 py-0.5 font-mono text-[11px] transition-colors",
+                "rounded-full border px-2 py-0.5 font-mono text-2xs transition-colors",
                 active
                   ? "border-primary bg-primary/10 text-primary"
                   : level === "all"
@@ -630,7 +630,7 @@ export function LogViewer({
               {showPodBadge && row.line.podName ? (
                 <span
                   className={cn(
-                    "mr-1.5 inline-block rounded border px-1 py-px align-middle text-[10px] leading-none",
+                    "mr-1.5 inline-block rounded border px-1 py-px align-middle text-2xs leading-none",
                     podBadgeClass(row.line.podName)
                   )}
                   title={row.line.podName}

@@ -179,7 +179,7 @@ export function AppDetailClient({ slug }: { slug: string }) {
             sourceRepo={a.sourceRepo}
             branch={a.deployBranch || a.defaultBranch}
           />
-          <Badge variant="outline" className="text-[10px]">
+          <Badge variant="outline" className="text-2xs">
             {sourceLabel}
           </Badge>
         </span>

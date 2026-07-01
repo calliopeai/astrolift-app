@@ -76,7 +76,7 @@
 }
 
 /* ── Static design tokens (mode-independent) ──────────────────────────
- * Type scale: adds the sub-`xs` micro step so `text-[10px]` / `text-[11px]`
+ * Type scale: adds the sub-`xs` micro step so `text-2xs` / `text-2xs`
  * arbitrary escapes retire onto the named `text-2xs`. `xs`→`2xl` are the
  * Tailwind defaults (kept, so existing screens render unchanged).
  * Motion easings expose `ease-standard` / `ease-emphasized` utilities;

@@ -459,7 +459,7 @@ export function AppsClient() {
             />
             <kbd
               aria-hidden="true"
-              className="border-border bg-muted text-muted-foreground pointer-events-none absolute top-1/2 right-2 hidden h-5 -translate-y-1/2 items-center rounded border px-1.5 font-mono text-[10px] sm:inline-flex"
+              className="border-border bg-muted text-muted-foreground pointer-events-none absolute top-1/2 right-2 hidden h-5 -translate-y-1/2 items-center rounded border px-1.5 font-mono text-2xs sm:inline-flex"
             >
               /
             </kbd>

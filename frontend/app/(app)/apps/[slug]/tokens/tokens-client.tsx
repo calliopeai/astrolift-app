@@ -227,7 +227,7 @@ export function AppDeployTokensClient({ slug }: { slug: string }) {
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {token.scopes.map((s) => (
-                            <Badge key={s} variant="outline" className="font-mono text-[10px]">
+                            <Badge key={s} variant="outline" className="font-mono text-2xs">
                               {s}
                             </Badge>
                           ))}

@@ -245,13 +245,13 @@ export function AssignProjectCard({
                   <SelectContent>
                     {byTeam.map((group) => (
                       <SelectGroup key={group.teamSlug}>
-                        <SelectLabel className="text-[11px] uppercase tracking-wide">
+                        <SelectLabel className="text-2xs uppercase tracking-wide">
                           {group.teamName}
                         </SelectLabel>
                         {group.projects.map((p) => (
                           <SelectItem key={p.id} value={p.id}>
                             <span>{p.name}</span>
-                            <span className="text-muted-foreground ml-2 font-mono text-[11px]">
+                            <span className="text-muted-foreground ml-2 font-mono text-2xs">
                               {p.slug}
                             </span>
                           </SelectItem>

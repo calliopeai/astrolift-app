@@ -878,7 +878,7 @@ function LastActiveCell({ value }: { value: string | null | undefined }) {
         <TooltipContent>{fmt.formatDateTime(date)}</TooltipContent>
       </Tooltip>
       {isStale && (
-        <Badge variant="secondary" className="text-[10px]">
+        <Badge variant="secondary" className="text-2xs">
           {t("lastActiveInactive")}
         </Badge>
       )}

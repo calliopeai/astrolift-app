@@ -114,6 +114,9 @@ export function VncViewer({ vncPath, className }: VncViewerProps) {
         ref={containerRef}
         role="region"
         aria-label="Live agent session"
+        // exact VNC-canvas background — must match the noVNC client.background
+        // literal set above; not tokenizable.
+        // eslint-disable-next-line astrolift/no-raw-design-values
         className="min-h-[24rem] flex-1 overflow-hidden rounded-md border bg-[#0b0f17]"
       />
     </div>

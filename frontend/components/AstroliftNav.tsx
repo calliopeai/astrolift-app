@@ -528,14 +528,14 @@ export function AstroliftNav() {
             <SidebarGroup>
               <SidebarGroupLabel asChild>
                 <CollapsibleTrigger className="group/section hover:text-sidebar-foreground flex w-full items-center justify-between">
-                  <span className="text-[12px] font-bold uppercase tracking-widest">{mod.label}</span>
+                  <span className="text-xs font-bold uppercase tracking-widest">{mod.label}</span>
                   <ChevronRightIcon className="size-3 transition-transform group-data-[state=open]/section:rotate-90" />
                 </CollapsibleTrigger>
               </SidebarGroupLabel>
               <CollapsibleContent>
                 {renderedGroups.map(({ group, items }) => (
                   <div key={group.label}>
-                    <p className="text-muted-foreground/60 px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest">
+                    <p className="text-muted-foreground/60 px-2 pb-1 pt-2 text-2xs font-semibold uppercase tracking-widest">
                       {group.label}
                     </p>
                     <SidebarMenu>{items}</SidebarMenu>

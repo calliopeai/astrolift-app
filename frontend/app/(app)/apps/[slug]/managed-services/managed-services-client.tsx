@@ -154,7 +154,7 @@ function ValidationBadges({ service }: { service: ManagedService }) {
       }
       if (typeof cfg.snapshot_policy === "string" && cfg.snapshot_policy) {
         items.push(
-          <Badge key="snap" variant="outline" className="font-mono text-[10px]">
+          <Badge key="snap" variant="outline" className="font-mono text-2xs">
             {cfg.snapshot_policy}
           </Badge>
         );
@@ -186,7 +186,7 @@ function ValidationBadges({ service }: { service: ManagedService }) {
             </Badge>
           </TooltipTrigger>
           <TooltipContent className="max-w-sm">
-            <span className="font-mono text-[11px] break-words">{service.statusError}</span>
+            <span className="font-mono text-2xs break-words">{service.statusError}</span>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -346,7 +346,7 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
                         {s.variant || "—"}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="font-mono text-[10px]">
+                        <Badge variant="outline" className="font-mono text-2xs">
                           {s.environmentName}
                         </Badge>
                       </TableCell>

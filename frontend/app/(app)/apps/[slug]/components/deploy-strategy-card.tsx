@@ -66,7 +66,7 @@ export function DeployStrategyCard({ app }: Props) {
     <section className="rounded-lg border p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+          <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
             {t("eyebrow")}
           </p>
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
@@ -74,12 +74,12 @@ export function DeployStrategyCard({ app }: Props) {
               <Icon className="size-3.5 text-[var(--brand-primary)]" />
               <span className="font-medium">{t(`modes.${mode}.label`)}</span>
             </Badge>
-            <Badge variant="secondary" className="gap-1 font-mono text-[10px]">
+            <Badge variant="secondary" className="gap-1 font-mono text-2xs">
               <GitBranchIcon className="size-3" />
               {app.deployBranch || app.defaultBranch}
             </Badge>
             {app.previewEnabled && (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-2xs">
                 {t("previewEnvironments")}
               </Badge>
             )}
@@ -185,7 +185,7 @@ function EditStrategySheet({
                 placeholder="0 6 * * *"
                 className="border-input bg-background rounded-md border px-2 py-2 font-mono text-sm"
               />
-              <span className="text-muted-foreground text-[11px]">{t("cronExpressionHelp")}</span>
+              <span className="text-muted-foreground text-2xs">{t("cronExpressionHelp")}</span>
             </label>
           )}
 
@@ -198,7 +198,7 @@ function EditStrategySheet({
               placeholder={app.defaultBranch}
               className="border-input bg-background rounded-md border px-2 py-2 font-mono text-sm"
             />
-            <span className="text-muted-foreground text-[11px]">
+            <span className="text-muted-foreground text-2xs">
               {t.rich("deployBranchHelp", {
                 branch: () => <span className="font-mono">{app.defaultBranch || "main"}</span>,
               })}

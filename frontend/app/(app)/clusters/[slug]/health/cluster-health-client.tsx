@@ -164,7 +164,7 @@ function LiveHealthCard({ clusterId }: { clusterId: string }) {
                       variant={PHASE_VARIANT[p.phase] ?? "outline"}
                       className="gap-1.5"
                     >
-                      <span className="font-mono text-[10px]">{p.namespace}</span>
+                      <span className="font-mono text-2xs">{p.namespace}</span>
                       <span className="opacity-60">·</span>
                       <span>{p.phase}</span>
                       <span className="opacity-60">·</span>
@@ -196,7 +196,7 @@ function LiveHealthCard({ clusterId }: { clusterId: string }) {
                           {e.involvedObject}
                         </span>
                         {e.count > 1 && (
-                          <Badge variant="outline" className="text-[10px]">
+                          <Badge variant="outline" className="text-2xs">
                             ×{e.count}
                           </Badge>
                         )}

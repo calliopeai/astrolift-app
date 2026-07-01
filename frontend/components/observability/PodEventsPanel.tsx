@@ -256,7 +256,7 @@ export function PodEventsPanel({
                       )}
                     </div>
                     {Object.keys(e.payload).length > 0 && (
-                      <pre className="text-muted-foreground mt-1 ml-44 overflow-x-auto font-mono text-[11px]">
+                      <pre className="text-muted-foreground mt-1 ml-44 overflow-x-auto font-mono text-2xs">
                         {JSON.stringify(e.payload, null, 2)}
                       </pre>
                     )}

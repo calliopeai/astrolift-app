@@ -201,7 +201,7 @@ function CertExpiryBadge({
   const [now] = React.useState(() => Date.now());
   if (status === "failed") {
     return (
-      <Badge variant="destructive" className="text-[10px]">
+      <Badge variant="destructive" className="text-2xs">
         Renewal failed
       </Badge>
     );
@@ -211,14 +211,14 @@ function CertExpiryBadge({
   const days = Math.floor(ms / (1000 * 60 * 60 * 24));
   if (days < 0) {
     return (
-      <Badge variant="destructive" className="text-[10px]">
+      <Badge variant="destructive" className="text-2xs">
         Expired {Math.abs(days)}d ago
       </Badge>
     );
   }
   if (days <= 7) {
     return (
-      <Badge variant="destructive" className="text-[10px]">
+      <Badge variant="destructive" className="text-2xs">
         Expires in {days}d
       </Badge>
     );
@@ -227,14 +227,14 @@ function CertExpiryBadge({
     return (
       <Badge
         variant="outline"
-        className="border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-300"
+        className="border-amber-500/40 bg-amber-500/10 text-2xs text-amber-700 dark:text-amber-300"
       >
         Expires in {days}d
       </Badge>
     );
   }
   return (
-    <Badge variant="outline" className="text-muted-foreground text-[10px]">
+    <Badge variant="outline" className="text-muted-foreground text-2xs">
       Expires in {days}d
     </Badge>
   );
@@ -840,7 +840,7 @@ function AddDomainSheet({
                                   <span className="truncate text-xs">
                                     {c.domainName || c.name}
                                   </span>
-                                  <span className="text-muted-foreground truncate font-mono text-[10px]">
+                                  <span className="text-muted-foreground truncate font-mono text-2xs">
                                     {c.arn}
                                   </span>
                                 </div>
@@ -967,12 +967,12 @@ function DomainHandshakeCard({
               so an operator can scan the list and see at a glance which
               domains cover a subtree vs a single host. */}
           {domain.isWildcard && (
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-2xs">
               wildcard
             </Badge>
           )}
           {domain.isPlatformManagedZone && (
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-2xs">
               {t("platformZone")}
             </Badge>
           )}
@@ -1186,7 +1186,7 @@ function DomainRedirectsSection({
     <section className="border-border space-y-2 rounded-md border p-3">
       <div className="flex items-center gap-2">
         <h4 className="text-sm font-semibold">Redirects</h4>
-        <Badge variant="outline" className="text-[10px]">
+        <Badge variant="outline" className="text-2xs">
           {rules.length}
         </Badge>
         <div className="ml-auto flex items-center gap-2">
@@ -1359,7 +1359,7 @@ function DomainRedirectsSection({
               Add to list
             </Button>
           </div>
-          <p className="text-muted-foreground text-[10px]">
+          <p className="text-muted-foreground text-2xs">
             New rules apply after you click Save above.
           </p>
         </div>
@@ -1448,7 +1448,7 @@ function DomainPathRoutesSection({
     <section className="border-border space-y-2 rounded-md border p-3">
       <div className="flex items-center gap-2">
         <h4 className="text-sm font-semibold">Path routing</h4>
-        <Badge variant="outline" className="text-[10px]">
+        <Badge variant="outline" className="text-2xs">
           {routes.length}
         </Badge>
         <div className="ml-auto flex items-center gap-2">
@@ -1606,7 +1606,7 @@ function DomainPathRoutesSection({
               Add to list
             </Button>
           </div>
-          <p className="text-muted-foreground text-[10px]">
+          <p className="text-muted-foreground text-2xs">
             New routes apply after you click Save above.
           </p>
         </div>
@@ -1898,7 +1898,7 @@ function IngressStatusCard({
           {managedHost && (
             <div className="flex items-center gap-2">
               <code className="font-mono break-all">{managedHost}</code>
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-2xs">
                 {tCert("managed")}
               </Badge>
             </div>
@@ -1908,7 +1908,7 @@ function IngressStatusCard({
             : customHosts.map((h) => (
                 <div key={h} className="flex items-center gap-2">
                   <code className="font-mono break-all">{h}</code>
-                  <Badge variant="outline" className="text-[10px]">
+                  <Badge variant="outline" className="text-2xs">
                     {tCert("custom")}
                   </Badge>
                 </div>

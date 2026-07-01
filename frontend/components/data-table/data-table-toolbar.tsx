@@ -117,7 +117,7 @@ const FilterPanel = <TData,>({
         <Button variant="outline" size="sm" className="h-8 gap-2">
           <ListFilterIcon className="h-3.5 w-3.5" />
           {t("filters")}
-          {activeCount > 0 && <Badge className="h-4 min-w-4 px-1 text-[10px]">{activeCount}</Badge>}
+          {activeCount > 0 && <Badge className="h-4 min-w-4 px-1 text-2xs">{activeCount}</Badge>}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-64 p-0">

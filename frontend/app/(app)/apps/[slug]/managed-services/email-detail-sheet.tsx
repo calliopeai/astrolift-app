@@ -254,7 +254,7 @@ export function EmailDetailSheet({
             <TemplateManagementPanel managedServiceId={managedServiceId} />
             {detail.unsupportedNotes.length > 0 ? (
               <Card className="bg-muted/40 p-3">
-                <p className="text-muted-foreground mb-1 text-[11px] font-semibold uppercase">
+                <p className="text-muted-foreground mb-1 text-2xs font-semibold uppercase">
                   Notes from {detail.pluginSlug.toUpperCase()}
                 </p>
                 <ul className="text-muted-foreground space-y-0.5 text-xs">
@@ -326,7 +326,7 @@ function ReputationPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
       </div>
       <div className="grid grid-cols-3 gap-3">
         <div>
-          <p className="text-muted-foreground text-[11px] uppercase">Reputation</p>
+          <p className="text-muted-foreground text-2xs uppercase">Reputation</p>
           <p className="font-mono text-lg">{repPct === null ? "—" : `${repPct.toFixed(0)}%`}</p>
           {repPct !== null ? (
             <div className="bg-muted mt-1.5 h-1.5 w-full overflow-hidden rounded-full">
@@ -338,14 +338,14 @@ function ReputationPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
           ) : null}
         </div>
         <div>
-          <p className="text-muted-foreground text-[11px] uppercase">Bounce rate (7d)</p>
+          <p className="text-muted-foreground text-2xs uppercase">Bounce rate (7d)</p>
           <p className="font-mono text-lg">{formatPct(status.bounceRatePct)}</p>
-          <p className="text-muted-foreground text-[10px]">SES throttles at ~10%</p>
+          <p className="text-muted-foreground text-2xs">SES throttles at ~10%</p>
         </div>
         <div>
-          <p className="text-muted-foreground text-[11px] uppercase">Complaint rate (7d)</p>
+          <p className="text-muted-foreground text-2xs uppercase">Complaint rate (7d)</p>
           <p className="font-mono text-lg">{formatPct(status.complaintRatePct)}</p>
-          <p className="text-muted-foreground text-[10px]">SES throttles at ~0.5%</p>
+          <p className="text-muted-foreground text-2xs">SES throttles at ~0.5%</p>
         </div>
       </div>
       {!status.productionAccess ? (
@@ -382,11 +382,11 @@ function QuotaPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
       </h3>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <p className="text-muted-foreground text-[11px] uppercase">Max send rate</p>
+          <p className="text-muted-foreground text-2xs uppercase">Max send rate</p>
           <p className="font-mono text-lg">{formatNumber(quota.maxSendRate, 1)} /sec</p>
         </div>
         <div>
-          <p className="text-muted-foreground text-[11px] uppercase">Sent today</p>
+          <p className="text-muted-foreground text-2xs uppercase">Sent today</p>
           <p className="font-mono text-lg">
             {formatNumber(quota.sentLast24h)} /{" "}
             <span className="text-muted-foreground text-base">
@@ -401,7 +401,7 @@ function QuotaPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
               />
             </div>
             <p
-              className={`mt-1 text-[10px] ${
+              className={`mt-1 text-2xs ${
                 dailyOverThreshold ? "text-amber-600" : "text-muted-foreground"
               }`}
             >
@@ -473,18 +473,18 @@ function CostPanel({
       ) : (
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-muted-foreground text-[11px] uppercase">This month</p>
+            <p className="text-muted-foreground text-2xs uppercase">This month</p>
             <p className="font-mono text-lg tabular-nums">
               {mtdSum === null ? "—" : formatMoney(mtdSum, currency)}
             </p>
-            <p className="text-muted-foreground text-[10px]">Month-to-date</p>
+            <p className="text-muted-foreground text-2xs">Month-to-date</p>
           </div>
           <div>
-            <p className="text-muted-foreground text-[11px] uppercase">Last 30 days</p>
+            <p className="text-muted-foreground text-2xs uppercase">Last 30 days</p>
             <p className="font-mono text-lg tabular-nums">
               {trailingSum === null ? "—" : formatMoney(trailingSum, currency)}
             </p>
-            <p className="text-muted-foreground text-[10px]">Trailing 30-day spend</p>
+            <p className="text-muted-foreground text-2xs">Trailing 30-day spend</p>
           </div>
         </div>
       )}
@@ -548,7 +548,7 @@ function IdentityPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
         {iv.isDomain ? "domain identity" : "email identity"})
       </p>
       {iv.verificationToken ? (
-        <div className="bg-muted/40 mb-3 rounded-md border p-2 font-mono text-[11px]">
+        <div className="bg-muted/40 mb-3 rounded-md border p-2 font-mono text-2xs">
           <p className="text-muted-foreground">TXT verification challenge:</p>
           <div className="mt-0.5 flex items-center gap-2">
             <code className="flex-1 break-all">{iv.verificationToken}</code>
@@ -565,11 +565,11 @@ function IdentityPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
       ) : null}
       {iv.dkimTokens.length > 0 ? (
         <div className="space-y-1.5">
-          <p className="text-muted-foreground text-[11px] uppercase">DKIM CNAMEs to publish</p>
+          <p className="text-muted-foreground text-2xs uppercase">DKIM CNAMEs to publish</p>
           {iv.dkimTokens.map((tok) => (
             <div
               key={tok.token}
-              className="bg-muted/40 flex items-center gap-2 rounded-md border p-2 font-mono text-[11px]"
+              className="bg-muted/40 flex items-center gap-2 rounded-md border p-2 font-mono text-2xs"
             >
               <div className="min-w-0 flex-1">
                 <p className="text-foreground truncate">{tok.cnameHost}</p>
@@ -620,7 +620,7 @@ function DnsAuthPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
         <DnsCheckRow check={dns.spf} />
         <DnsCheckRow check={dns.dmarc} />
       </div>
-      <p className="text-muted-foreground mt-3 text-[10px]">
+      <p className="text-muted-foreground mt-3 text-2xs">
         Probed {new Date(dns.checkedAt).toLocaleString()}
       </p>
     </Card>
@@ -636,17 +636,17 @@ function DnsCheckRow({ check }: { check: AstroliftEmailDnsAuthCheck }) {
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">
           {check.protocol}{" "}
-          <span className="text-muted-foreground text-[10px]">{OUTCOME_LABEL[check.outcome]}</span>
+          <span className="text-muted-foreground text-2xs">{OUTCOME_LABEL[check.outcome]}</span>
         </p>
         {check.message ? <p className="text-muted-foreground text-xs">{check.message}</p> : null}
         {check.records.length > 0 ? (
           <details className="mt-1">
-            <summary className="text-muted-foreground cursor-pointer text-[10px] uppercase">
+            <summary className="text-muted-foreground cursor-pointer text-2xs uppercase">
               {check.records.length} record{check.records.length > 1 ? "s" : ""}
             </summary>
             <ul className="mt-1 space-y-0.5">
               {check.records.map((r) => (
-                <li key={r} className="bg-muted/40 rounded p-1.5 font-mono text-[10px] break-all">
+                <li key={r} className="bg-muted/40 rounded p-1.5 font-mono text-2xs break-all">
                   {r}
                 </li>
               ))}
@@ -775,14 +775,14 @@ function SuppressionPanel({
     <Card className="p-4">
       <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
         Suppression list
-        <Badge variant="secondary" className="text-[10px]">
+        <Badge variant="secondary" className="text-2xs">
           {detail.suppressionEntries.length}
         </Badge>
       </h3>
 
       <Can permission="managed_service.update">
         <div className="bg-muted/30 mb-3 rounded-md border p-3">
-          <p className="text-muted-foreground mb-2 text-[11px] uppercase">Add manual entry</p>
+          <p className="text-muted-foreground mb-2 text-2xs uppercase">Add manual entry</p>
           <div className="space-y-2">
             <div>
               <Label htmlFor="suppress-address" className="text-xs">
@@ -840,7 +840,7 @@ function SuppressionPanel({
               <TableRow key={entry.address}>
                 <TableCell className="font-mono text-xs">{entry.address}</TableCell>
                 <TableCell>
-                  <Badge variant="outline" className="text-[10px]">
+                  <Badge variant="outline" className="text-2xs">
                     {entry.reason}
                   </Badge>
                 </TableCell>
@@ -1074,7 +1074,7 @@ function SenderConfigPanel({
                   )}
                 </p>
               )}
-              {editing ? <p className="text-muted-foreground text-[10px]">{f.hint}</p> : null}
+              {editing ? <p className="text-muted-foreground text-2xs">{f.hint}</p> : null}
             </div>
           );
         })}
@@ -1120,7 +1120,7 @@ function SnsEventPublishingPanel({ serviceConfig }: { serviceConfig: Record<stri
             platform&apos;s ingester via SNS. The recent-message log and engagement metrics below stay
             live.
           </p>
-          <div className="bg-muted/40 mb-2 flex items-center gap-2 rounded-md border p-2 font-mono text-[11px]">
+          <div className="bg-muted/40 mb-2 flex items-center gap-2 rounded-md border p-2 font-mono text-2xs">
             <code className="flex-1 truncate" title={arn}>
               {arn}
             </code>
@@ -1134,7 +1134,7 @@ function SnsEventPublishingPanel({ serviceConfig }: { serviceConfig: Record<stri
             </Button>
           </div>
           {configSet ? (
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-muted-foreground text-2xs">
               Configuration set: <code className="text-foreground font-mono">{configSet}</code>
             </p>
           ) : null}
@@ -1326,7 +1326,7 @@ function SenderAlertRulesPanel({ managedServiceId }: { managedServiceId: string 
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <BellIcon className="size-4" />
           Alert rules
-          <Badge variant="secondary" className="text-[10px]">
+          <Badge variant="secondary" className="text-2xs">
             {rules.length}
           </Badge>
         </h3>
@@ -1353,7 +1353,7 @@ function SenderAlertRulesPanel({ managedServiceId }: { managedServiceId: string 
             {rules.map((r) => (
               <TableRow key={r.id}>
                 <TableCell className="text-xs">{r.name}</TableCell>
-                <TableCell className="text-muted-foreground font-mono text-[11px]">
+                <TableCell className="text-muted-foreground font-mono text-2xs">
                   {predicateLabel(r.predicate)}
                 </TableCell>
                 <TableCell>
@@ -1384,7 +1384,7 @@ function SenderAlertRulesPanel({ managedServiceId }: { managedServiceId: string 
 
       <Can permission="managed_service.update">
         <div className="bg-muted/30 mt-3 rounded-md border p-3">
-          <p className="text-muted-foreground mb-2 text-[11px] uppercase">Add alert</p>
+          <p className="text-muted-foreground mb-2 text-2xs uppercase">Add alert</p>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <Label className="text-xs">Condition</Label>
@@ -1453,7 +1453,7 @@ function SenderAlertRulesPanel({ managedServiceId }: { managedServiceId: string 
             )}
             Create alert rule
           </Button>
-          <p className="text-muted-foreground mt-2 text-[10px]">
+          <p className="text-muted-foreground mt-2 text-2xs">
             {SES_ALERT_KINDS.find((k) => k.value === kind)?.hint}
           </p>
         </div>
@@ -1563,7 +1563,7 @@ function EngagementMetricsPanel({
           <BarChart3Icon className="size-4" />
           Engagement metrics
         </h3>
-        {m ? <span className="text-muted-foreground text-[11px]">Last {m.windowDays}d</span> : null}
+        {m ? <span className="text-muted-foreground text-2xs">Last {m.windowDays}d</span> : null}
       </div>
       {!snsConfigured ? (
         <p className="text-muted-foreground mb-3 text-xs">
@@ -1594,9 +1594,9 @@ function EngagementMetricsPanel({
                 : "text-foreground";
             return (
               <div key={t.label} className="bg-muted/30 rounded-md border p-3">
-                <p className="text-muted-foreground text-[11px] uppercase">{t.label}</p>
+                <p className="text-muted-foreground text-2xs uppercase">{t.label}</p>
                 <p className={`font-mono text-2xl tabular-nums ${tone}`}>{formatPct(t.pct, 2)}</p>
-                <p className="text-muted-foreground text-[10px]">
+                <p className="text-muted-foreground text-2xs">
                   {formatNumber(t.count)} of {formatNumber(t.denom)} {t.denomLabel}
                 </p>
               </div>
@@ -1605,7 +1605,7 @@ function EngagementMetricsPanel({
         </div>
       )}
       {m && m.totalSends > 0 ? (
-        <p className="text-muted-foreground mt-3 text-[10px]">
+        <p className="text-muted-foreground mt-3 text-2xs">
           {formatNumber(m.totalSends)} sends · {formatNumber(m.totalDeliveries)} delivered · last{" "}
           {m.windowDays}d
         </p>
@@ -1682,7 +1682,7 @@ function MessageLogPanel({ managedServiceId }: { managedServiceId: string }) {
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <InboxIcon className="size-4" />
           Recent messages
-          <Badge variant="secondary" className="text-[10px]">
+          <Badge variant="secondary" className="text-2xs">
             {messages.length}
           </Badge>
         </h3>
@@ -1767,7 +1767,7 @@ function MessageLogPanel({ managedServiceId }: { managedServiceId: string }) {
                         )
                       ) : null}
                     </TableCell>
-                    <TableCell className="font-mono text-[11px]">{m.recipient}</TableCell>
+                    <TableCell className="font-mono text-2xs">{m.recipient}</TableCell>
                     <TableCell className="max-w-[14rem] truncate text-xs" title={m.subject}>
                       {m.subject || (
                         <span className="text-muted-foreground italic">(no subject)</span>
@@ -1776,13 +1776,13 @@ function MessageLogPanel({ managedServiceId }: { managedServiceId: string }) {
                     <TableCell>
                       <Badge
                         variant="outline"
-                        className={`text-[10px] ${eventKindBadge(m.eventKind)}`}
+                        className={`text-2xs ${eventKindBadge(m.eventKind)}`}
                       >
                         {m.eventKind}
                       </Badge>
                     </TableCell>
                     <TableCell
-                      className="text-muted-foreground text-[11px]"
+                      className="text-muted-foreground text-2xs"
                       title={new Date(m.occurredAt).toLocaleString()}
                     >
                       {new Date(m.occurredAt).toLocaleString()}
@@ -1831,7 +1831,7 @@ function MessageMetadata({
 
   return (
     <div className="space-y-2 p-3 text-xs">
-      <div className="flex items-center gap-2 font-mono text-[11px]">
+      <div className="flex items-center gap-2 font-mono text-2xs">
         <span className="text-muted-foreground">message-id</span>
         <code className="text-foreground truncate" title={messageId}>
           {messageId}
@@ -1866,15 +1866,15 @@ function MessageMetadata({
         </div>
       ) : null}
       {diagnostic ? (
-        <div className="font-mono text-[10px]">
+        <div className="font-mono text-2xs">
           <span className="text-muted-foreground">diagnostic:</span> <span>{diagnostic}</span>
         </div>
       ) : null}
       <details>
-        <summary className="text-muted-foreground cursor-pointer text-[10px] uppercase">
+        <summary className="text-muted-foreground cursor-pointer text-2xs uppercase">
           Raw metadata
         </summary>
-        <pre className="bg-background/60 mt-1 max-h-48 overflow-auto rounded-md border p-2 font-mono text-[10px] break-all whitespace-pre-wrap">
+        <pre className="bg-background/60 mt-1 max-h-48 overflow-auto rounded-md border p-2 font-mono text-2xs break-all whitespace-pre-wrap">
           {JSON.stringify(metadata, null, 2)}
         </pre>
       </details>
@@ -2076,7 +2076,7 @@ function TemplateManagementPanel({ managedServiceId }: { managedServiceId: strin
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <FileTextIcon className="size-4" />
           Templates
-          <Badge variant="secondary" className="text-[10px]">
+          <Badge variant="secondary" className="text-2xs">
             {templates.length}
           </Badge>
         </h3>
@@ -2092,7 +2092,7 @@ function TemplateManagementPanel({ managedServiceId }: { managedServiceId: strin
 
       {formOpen ? (
         <div className="bg-muted/30 mb-3 space-y-2 rounded-md border p-3">
-          <p className="text-muted-foreground text-[11px] uppercase">
+          <p className="text-muted-foreground text-2xs uppercase">
             {creatingNew ? "New template" : `Editing ${editingName}`}
           </p>
           <div className="space-y-1">
@@ -2105,7 +2105,7 @@ function TemplateManagementPanel({ managedServiceId }: { managedServiceId: strin
               className="font-mono text-xs"
             />
             {!creatingNew ? (
-              <p className="text-muted-foreground text-[10px]">
+              <p className="text-muted-foreground text-2xs">
                 Name is the template identifier and can&apos;t be changed.
               </p>
             ) : null}
@@ -2183,7 +2183,7 @@ function TemplateManagementPanel({ managedServiceId }: { managedServiceId: strin
                     <TableCell className="max-w-[14rem] truncate text-xs" title={t.subject}>
                       {t.subject}
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-[11px]">
+                    <TableCell className="text-muted-foreground text-2xs">
                       {t.createdAt ? new Date(t.createdAt).toLocaleDateString() : "—"}
                     </TableCell>
                     <TableCell className="text-right">
@@ -2317,7 +2317,7 @@ function TemplateStats({ managedServiceId, name }: { managedServiceId: string; n
                   ) : null}
                 </div>
               </TooltipTrigger>
-              <TooltipContent className="text-[11px]">
+              <TooltipContent className="text-2xs">
                 <div className="font-mono">
                   <div>{new Date(p.timestamp).toLocaleDateString()}</div>
                   <div>
@@ -2331,7 +2331,7 @@ function TemplateStats({ managedServiceId, name }: { managedServiceId: string; n
           );
         })}
       </div>
-      <p className="text-muted-foreground text-[10px]">
+      <p className="text-muted-foreground text-2xs">
         14d · {formatNumber(totals.sends)} sends · {formatNumber(totals.deliveries)} delivered ·{" "}
         {formatNumber(totals.bounces)} bounces · {formatNumber(totals.complaints)} complaints
       </p>

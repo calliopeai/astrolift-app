@@ -108,7 +108,7 @@ export function GenerateSshKeyDialog({ open, onOpenChange }: Props) {
                 readOnly
                 rows={4}
                 value={pasted.publicKey}
-                className="bg-muted font-mono text-[11px] rounded-md border p-2"
+                className="bg-muted font-mono text-2xs rounded-md border p-2"
                 onClick={(e) =>
                   (e.target as HTMLTextAreaElement).select()
                 }

@@ -594,7 +594,7 @@ function DeploymentRow({
       <TableCell>
         <div className="font-mono text-xs">{d.imageTag || "—"}</div>
         {d.workloadSlug && (
-          <div className="text-muted-foreground mt-0.5 font-mono text-[11px]">{d.workloadSlug}</div>
+          <div className="text-muted-foreground mt-0.5 font-mono text-2xs">{d.workloadSlug}</div>
         )}
       </TableCell>
       <TableCell>
@@ -1143,7 +1143,7 @@ function DeploymentLog({
               <span className="text-muted-foreground tabular-nums">
                 {formatLogTime(e.occurredAt)}
               </span>
-              <Badge variant="outline" className="text-[10px] capitalize">
+              <Badge variant="outline" className="text-2xs capitalize">
                 {e.status.replace(/_/g, " ")}
               </Badge>
               <span className="text-foreground break-words">{e.message || "—"}</span>
@@ -1170,7 +1170,7 @@ function CommitMetaRow({
   }
   const sha = d.commitSha ? d.commitSha.slice(0, 7) : null;
   return (
-    <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
+    <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-2xs">
       {sha && (
         <span className="inline-flex items-center gap-1">
           <GitCommitIcon className="size-3" />
@@ -1303,11 +1303,11 @@ function StatCard({
 }) {
   return (
     <div className="bg-muted/30 border-border rounded-lg border px-4 py-3">
-      <div className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+      <div className="text-muted-foreground text-2xs font-medium uppercase tracking-wide">
         {label}
       </div>
       <div className={cn("text-xl font-semibold tabular-nums", valueClassName)}>{value}</div>
-      <div className="text-muted-foreground text-[11px]">{sub}</div>
+      <div className="text-muted-foreground text-2xs">{sub}</div>
     </div>
   );
 }
@@ -1341,7 +1341,7 @@ function FrequencyBars({ deployments }: { deployments: AstroliftDeployment[] }) 
 
   return (
     <div className="bg-muted/30 border-border flex min-w-[200px] flex-col rounded-lg border px-4 py-3">
-      <div className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+      <div className="text-muted-foreground text-2xs font-medium uppercase tracking-wide">
         Last 7 days
       </div>
       <div className="mt-2 flex h-10 items-end gap-1">
@@ -1366,7 +1366,7 @@ function FrequencyBars({ deployments }: { deployments: AstroliftDeployment[] }) 
           );
         })}
       </div>
-      <div className="text-muted-foreground mt-1 text-[11px]">{total} this week</div>
+      <div className="text-muted-foreground mt-1 text-2xs">{total} this week</div>
     </div>
   );
 }

@@ -336,7 +336,7 @@ export function ConnectedClustersClient() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="secondary" className="font-mono text-[10px]">
+                          <Badge variant="secondary" className="font-mono text-2xs">
                             {c.providerPluginSlug}
                           </Badge>
                         </TableCell>

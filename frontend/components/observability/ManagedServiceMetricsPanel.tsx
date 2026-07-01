@@ -260,7 +260,7 @@ function MetricSeriesCard({ series }: { series: AstroliftManagedServiceMetricSer
           </p>
         )}
       </div>
-      <p className="text-muted-foreground mt-2 text-[10px]">source: {series.source}</p>
+      <p className="text-muted-foreground mt-2 text-2xs">source: {series.source}</p>
     </div>
   );
 }

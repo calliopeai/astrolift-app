@@ -168,7 +168,7 @@ export function DeploymentPanel({ appSlug }: Props) {
     <section className="rounded-lg border p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+          <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
             Current deployment
           </p>
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
@@ -180,12 +180,12 @@ export function DeploymentPanel({ appSlug }: Props) {
               {(current.imageTag ?? current.id).slice(0, 12)}
             </span>
             {current.environmentName && (
-              <Badge variant="secondary" className="text-[10px]">
+              <Badge variant="secondary" className="text-2xs">
                 {current.environmentName}
               </Badge>
             )}
             {current.workloadSlug && (
-              <Badge variant="outline" className="font-mono text-[10px]">
+              <Badge variant="outline" className="font-mono text-2xs">
                 {current.workloadSlug}
               </Badge>
             )}
@@ -277,7 +277,7 @@ function ProgressBar({ status, startedAt }: { status: DeploymentStatus; startedA
 
   return (
     <div className="mt-4">
-      <div className="text-muted-foreground mb-1.5 flex items-center justify-between text-[11px]">
+      <div className="text-muted-foreground mb-1.5 flex items-center justify-between text-2xs">
         <span>{stage}</span>
         <span className="font-mono">
           since {new Date(startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}

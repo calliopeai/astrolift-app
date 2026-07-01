@@ -256,7 +256,7 @@ export function CommandRunnerClient({ slug }: { slug: string }) {
                   <SelectItem key={c.id} value={c.name}>
                     <span className="font-mono">{c.name}</span>
                     {c.isPrimary && (
-                      <Badge variant="outline" className="ml-2 text-[10px]">
+                      <Badge variant="outline" className="ml-2 text-2xs">
                         primary
                       </Badge>
                     )}
@@ -310,7 +310,7 @@ export function CommandRunnerClient({ slug }: { slug: string }) {
                   key={`${h}-${i}`}
                   onClick={() => setCommand(h)}
                   disabled={running}
-                  className="rounded border bg-muted/40 px-2 py-0.5 font-mono text-[11px] hover:bg-muted"
+                  className="rounded border bg-muted/40 px-2 py-0.5 font-mono text-2xs hover:bg-muted"
                 >
                   {h.length > 40 ? h.slice(0, 40) + "…" : h}
                 </button>
@@ -324,7 +324,7 @@ export function CommandRunnerClient({ slug }: { slug: string }) {
                     // ignore
                   }
                 }}
-                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[11px]"
+                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-2xs"
               >
                 <XIcon className="size-3" />
                 clear

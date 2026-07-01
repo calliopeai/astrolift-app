@@ -551,7 +551,7 @@ function ScalePopover({
             {loading ? <Loader2Icon className="size-3 animate-spin" /> : "Apply"}
           </Button>
         </div>
-        <p className="text-muted-foreground mt-2 text-[11px]">
+        <p className="text-muted-foreground mt-2 text-2xs">
           Current: {currentDesired}. Takes effect immediately.
         </p>
       </PopoverContent>

@@ -92,13 +92,13 @@ function TopologyNodeCard({ data }: NodeProps<Node<TopologyNode>>) {
             <div className="truncate text-sm font-medium leading-tight">{data.label}</div>
           </div>
           {data.sublabel && (
-            <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
+            <div className="mt-0.5 truncate font-mono text-2xs text-muted-foreground">
               {data.sublabel}
             </div>
           )}
         </div>
         {ratio && (
-          <Badge variant="outline" className="font-mono text-[10px]">
+          <Badge variant="outline" className="font-mono text-2xs">
             {ratio}
           </Badge>
         )}
@@ -110,13 +110,13 @@ function TopologyNodeCard({ data }: NodeProps<Node<TopologyNode>>) {
             <Badge
               key={host}
               variant="secondary"
-              className="font-mono text-[10px] font-normal"
+              className="font-mono text-2xs font-normal"
             >
               {host}
             </Badge>
           ))}
           {data.hostnames.length > 3 && (
-            <Badge variant="outline" className="font-mono text-[10px]">
+            <Badge variant="outline" className="font-mono text-2xs">
               +{data.hostnames.length - 3}
             </Badge>
           )}

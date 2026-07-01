@@ -257,27 +257,27 @@ function HistoryTooltipBody({
       <div className="flex items-center justify-between gap-3">
         <span className="font-semibold">{t("title")}</span>
         {rechecking ? (
-          <span className="text-background/70 inline-flex items-center gap-1 text-[10px]">
+          <span className="text-background/70 inline-flex items-center gap-1 text-2xs">
             <Loader2Icon className="size-3 animate-spin" /> {t("rechecking")}
           </span>
         ) : (
-          <span className="text-background/70 text-[10px]">{t("recheck")}</span>
+          <span className="text-background/70 text-2xs">{t("recheck")}</span>
         )}
       </div>
       {rows.length === 0 ? (
-        <p className="text-background/70 text-[11px]">
+        <p className="text-background/70 text-2xs">
           {loadingHistory ? t("rechecking") : t("empty")}
         </p>
       ) : (
         <>
-          <p className="text-background/80 font-mono text-[11px]">
+          <p className="text-background/80 font-mono text-2xs">
             {t("uptime", { ok: okCount, total: rows.length, avgMs: avg })}
           </p>
           <ul className="space-y-1">
             {rows.map((r, i) => (
               <li
                 key={`${r.lastChecked}-${i}`}
-                className="flex items-center justify-between gap-3 font-mono text-[11px]"
+                className="flex items-center justify-between gap-3 font-mono text-2xs"
               >
                 <span className="inline-flex items-center gap-1.5">
                   <span

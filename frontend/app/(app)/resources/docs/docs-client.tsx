@@ -292,7 +292,7 @@ export function DocsClient() {
                             <Badge
                               key={tag}
                               variant="outline"
-                              className="text-[10px]"
+                              className="text-2xs"
                             >
                               {tag}
                             </Badge>

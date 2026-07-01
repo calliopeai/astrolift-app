@@ -249,7 +249,7 @@ export function ManagedServicesSummaryCard({ appSlug }: { appSlug: string }) {
           <h2 className="flex items-center gap-2 text-base font-semibold">
             <PlugIcon className="text-primary size-4" />
             {t("title")}
-            <Badge variant="secondary" className="ml-1 text-[10px]">
+            <Badge variant="secondary" className="ml-1 text-2xs">
               {services.length}
             </Badge>
           </h2>
@@ -308,7 +308,7 @@ function ManagedServiceSummaryRow({
             {t("statusTooltip", { kind: svc.kind, status: svc.status })}
           </p>
           {svc.statusError ? (
-            <p className="text-destructive mt-1 max-w-xs text-[11px]">
+            <p className="text-destructive mt-1 max-w-xs text-2xs">
               {svc.statusError}
             </p>
           ) : null}
@@ -318,17 +318,17 @@ function ManagedServiceSummaryRow({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-1.5">
           <span className="text-foreground font-mono text-sm">{svc.name || svc.kind}</span>
-          <Badge variant="secondary" className="text-[10px]">
+          <Badge variant="secondary" className="text-2xs">
             {svc.kind}
             {svc.variant ? `/${svc.variant}` : ""}
           </Badge>
-          <Badge variant="outline" className="font-mono text-[10px]">
+          <Badge variant="outline" className="font-mono text-2xs">
             {svc.environmentName}
           </Badge>
           {svc.status === "failed" ? (
             <Badge
               variant="outline"
-              className="border-destructive/40 bg-destructive/10 text-destructive flex items-center gap-1 text-[10px]"
+              className="border-destructive/40 bg-destructive/10 text-destructive flex items-center gap-1 text-2xs"
             >
               <AlertTriangleIcon className="size-3" />
               {t("statusFailed")}
@@ -336,7 +336,7 @@ function ManagedServiceSummaryRow({
           ) : null}
         </div>
         {svc.lastActionAt && svc.lastActionKind ? (
-          <p className="text-muted-foreground mt-0.5 text-[11px]">
+          <p className="text-muted-foreground mt-0.5 text-2xs">
             {t("lastAction", {
               action: lastActionLabel(t, svc.lastActionKind),
               when: fmt.formatRelativeTime(svc.lastActionAt),
@@ -503,7 +503,7 @@ function RevealConnectionDialog({
               <p className="text-foreground mt-0.5 font-mono break-all">
                 {revealed.connectionSecretRef || t("noSecretRef")}
               </p>
-              <p className="text-muted-foreground mt-2 text-[11px]">
+              <p className="text-muted-foreground mt-2 text-2xs">
                 {t("revealedAt", { when: fmt.formatRelativeTime(revealed.revealedAt) })}
               </p>
             </div>
@@ -529,7 +529,7 @@ function RevealConnectionDialog({
                 </li>
               ))}
             </ul>
-            <p className="text-muted-foreground text-[11px]">{t("plaintextWarning")}</p>
+            <p className="text-muted-foreground text-2xs">{t("plaintextWarning")}</p>
           </div>
         ) : (
           <p className="text-muted-foreground text-xs">{t("loading")}</p>
@@ -654,7 +654,7 @@ function SendTestEmailDialog({
               rows={3}
             />
           </div>
-          <p className="text-muted-foreground text-[11px]">{t("hint")}</p>
+          <p className="text-muted-foreground text-2xs">{t("hint")}</p>
         </div>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={loading}>{t("cancel")}</AlertDialogCancel>
@@ -735,14 +735,14 @@ function ListObjectsDialog({
                     {formatBytes(o.sizeBytes)}
                   </span>
                   {o.lastModified ? (
-                    <span className="text-muted-foreground shrink-0 text-[10px]">
+                    <span className="text-muted-foreground shrink-0 text-2xs">
                       {fmt.formatRelativeTime(o.lastModified)}
                     </span>
                   ) : null}
                 </li>
               ))}
             </ul>
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-muted-foreground text-2xs">
               {result?.cacheAgeSeconds != null
                 ? t("cacheAge", { age: formatSecondsShort(result.cacheAgeSeconds) })
                 : t("noCacheAge")}
@@ -822,7 +822,7 @@ function QueueDepthDialog({
                 {result.inFlight}
               </p>
             </div>
-            <p className="text-muted-foreground col-span-2 text-[11px]">
+            <p className="text-muted-foreground col-span-2 text-2xs">
               {result.sampledAt
                 ? t("sampledAt", { when: fmt.formatRelativeTime(result.sampledAt) })
                 : t("noSnapshot")}

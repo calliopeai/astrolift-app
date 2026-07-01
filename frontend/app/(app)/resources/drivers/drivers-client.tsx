@@ -313,7 +313,7 @@ export function DriversClient() {
                               >
                                 <Badge
                                   variant="secondary"
-                                  className="text-[10px]"
+                                  className="text-2xs"
                                 >
                                   {boundCount}{" "}
                                   {boundCount === 1
@@ -322,7 +322,7 @@ export function DriversClient() {
                                 </Badge>
                               </Link>
                             ) : (
-                              <span className="text-muted-foreground text-[11px]">
+                              <span className="text-muted-foreground text-2xs">
                                 No clusters
                               </span>
                             )}
@@ -393,7 +393,7 @@ export function DriversClient() {
                       {managedKindColumns.map((kind) => (
                         <TableCell key={kind} className="text-center">
                           {row.managedServices.includes(kind) ? (
-                            <Badge className="text-[10px]">yes</Badge>
+                            <Badge className="text-2xs">yes</Badge>
                           ) : (
                             <span className="text-muted-foreground text-xs">
                               —

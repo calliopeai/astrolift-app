@@ -485,7 +485,7 @@ function ResyncSourceSection({
           </Tooltip>
         </Can>
       </div>
-      <p className="text-muted-foreground text-[11px]">
+      <p className="text-muted-foreground text-2xs">
         {lastResyncAt ? (
           <>
             {t("last")}{" "}
@@ -819,10 +819,10 @@ function WebhookDeploysPauseSection({
           ) : (
             <p className="text-muted-foreground italic">{t("noReason")}</p>
           )}
-          <p className="text-muted-foreground text-[11px]">{t("scopeNotePaused")}</p>
+          <p className="text-muted-foreground text-2xs">{t("scopeNotePaused")}</p>
         </div>
       ) : (
-        <p className="text-muted-foreground text-[11px]">{t("scopeNoteLive")}</p>
+        <p className="text-muted-foreground text-2xs">{t("scopeNoteLive")}</p>
       )}
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -846,7 +846,7 @@ function WebhookDeploysPauseSection({
               rows={3}
               maxLength={512}
             />
-            <p className="text-muted-foreground text-[11px]">{t("reasonHelp")}</p>
+            <p className="text-muted-foreground text-2xs">{t("reasonHelp")}</p>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={pausing}>{t("cancel")}</AlertDialogCancel>
@@ -1050,7 +1050,7 @@ function ForceRedeploySection({ appSlug }: { appSlug: string }) {
             </Tooltip>
           </Can>
         </Can>
-        <p className="text-muted-foreground mt-2 text-[11px]">{t("hint")}</p>
+        <p className="text-muted-foreground mt-2 text-2xs">{t("hint")}</p>
       </CardContent>
 
       <AlertDialog open={open} onOpenChange={setOpen}>
@@ -1085,7 +1085,7 @@ function ForceRedeploySection({ appSlug }: { appSlug: string }) {
                     className="border-border/60 flex flex-col gap-0.5 rounded-md border bg-transparent p-2 font-mono"
                   >
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <Badge variant="outline" className="text-[10px]">
+                      <Badge variant="outline" className="text-2xs">
                         {d.status}
                       </Badge>
                       <span className="text-foreground">{d.environmentName}</span>
@@ -1096,7 +1096,7 @@ function ForceRedeploySection({ appSlug }: { appSlug: string }) {
                         <span className="text-muted-foreground">@ {d.imageTag}</span>
                       ) : null}
                     </div>
-                    <p className="text-muted-foreground text-[10px]">
+                    <p className="text-muted-foreground text-2xs">
                       {tPreview("triggeredBy", {
                         actor: d.triggeredByDisplay,
                         when: fmt.formatRelativeTime(d.startedAt ?? d.createdAt),
@@ -1226,7 +1226,7 @@ function ResourceGroup({ group, labelKey }: { group: ResourceGroupSpec; labelKey
           />
           <Icon className="text-muted-foreground size-4" />
           <span className="text-foreground flex-1 font-medium">{t(labelKey)}</span>
-          <Badge variant="secondary" className="text-[10px]">
+          <Badge variant="secondary" className="text-2xs">
             {group.count}
           </Badge>
         </button>
@@ -1286,7 +1286,7 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
       groups.set(key, arr);
     }
     return (
-      <ul className="space-y-2 text-[11px]">
+      <ul className="space-y-2 text-2xs">
         {Array.from(groups.entries()).map(([key, items]) => (
           <li key={key}>
             <p className="text-muted-foreground font-mono">{key}</p>
@@ -1307,11 +1307,11 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
   const managedServicesBody = React.useMemo(() => {
     if (!preview || preview.managedServices.length === 0) return null;
     return (
-      <ul className="space-y-1 text-[11px]">
+      <ul className="space-y-1 text-2xs">
         {preview.managedServices.map((s) => (
           <li key={s.id} className="flex items-center gap-2 font-mono">
             <span className="text-foreground">{s.name || s.kind}</span>
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-2xs">
               {s.kind}
               {s.variant ? `/${s.variant}` : ""}
             </Badge>
@@ -1325,7 +1325,7 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
   const secretsBody = React.useMemo(() => {
     if (!preview || preview.secretRefs.length === 0) return null;
     return (
-      <ul className="space-y-1 font-mono text-[11px]">
+      <ul className="space-y-1 font-mono text-2xs">
         {preview.secretRefs.map((r) => (
           <li key={r.id}>
             <span className="text-foreground">{r.bundleSlug}</span>
@@ -1343,7 +1343,7 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
   const tokensBody = React.useMemo(() => {
     if (!preview || preview.deployTokens.length === 0) return null;
     return (
-      <ul className="space-y-1 font-mono text-[11px]">
+      <ul className="space-y-1 font-mono text-2xs">
         {preview.deployTokens.map((tok) => (
           <li key={tok.id}>
             <span className="text-foreground">{tok.name}</span>
@@ -1357,12 +1357,12 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
   const identityBody = React.useMemo(() => {
     if (!preview || preview.identityRoles.length === 0) return null;
     return (
-      <ul className="space-y-1 font-mono text-[11px]">
+      <ul className="space-y-1 font-mono text-2xs">
         {preview.identityRoles.map((r) => (
           <li key={`${r.clusterSlug}-${r.roleArnOrPrincipal}`}>
             <span className="text-muted-foreground">{r.clusterSlug}</span>{" "}
             <span className="text-foreground">{r.roleArnOrPrincipal}</span>
-            <Badge variant="outline" className="ml-1 text-[10px]">
+            <Badge variant="outline" className="ml-1 text-2xs">
               {r.kind}
             </Badge>
           </li>
@@ -1377,7 +1377,7 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
     const hasRegistry = !!preview.registryRepoUri;
     if (!hasWebhook && !hasRegistry) return null;
     return (
-      <ul className="space-y-1 font-mono text-[11px]">
+      <ul className="space-y-1 font-mono text-2xs">
         {hasWebhook && preview.sourceWebhook ? (
           <li>
             <span className="text-muted-foreground">{tPreview("sourceWebhookLabel")} →</span>{" "}
@@ -1506,7 +1506,7 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
               <Trash2Icon className="size-4" />
               {t("button")}
               {preview && preview.totalResourceCount > 0 ? (
-                <Badge variant="secondary" className="ml-1.5 text-[10px]">
+                <Badge variant="secondary" className="ml-1.5 text-2xs">
                   {preview.totalResourceCount}
                 </Badge>
               ) : null}
@@ -1517,7 +1517,7 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
               <p className="text-amber-700 dark:text-amber-400">
                 {t("stillLive", { count: stillLive.length })}
               </p>
-              <ul className="text-foreground mt-1 list-disc pl-5 font-mono text-[11px]">
+              <ul className="text-foreground mt-1 list-disc pl-5 font-mono text-2xs">
                 {stillLive.map((r) => (
                   <li key={r}>{r}</li>
                 ))}
@@ -1540,7 +1540,7 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
               </Can>
             </div>
           ) : (
-            <p className="text-muted-foreground mt-2 text-[11px]">{t("softHint")}</p>
+            <p className="text-muted-foreground mt-2 text-2xs">{t("softHint")}</p>
           )}
         </CardContent>
       </Card>
@@ -1759,7 +1759,7 @@ function RunScheduledJobCard({ appSlug }: { appSlug: string }) {
                   <SelectItem key={w.slug} value={w.slug}>
                     <span className="font-mono text-xs">{w.slug}</span>
                     {w.schedule ? (
-                      <span className="text-muted-foreground ml-2 text-[11px]">{w.schedule}</span>
+                      <span className="text-muted-foreground ml-2 text-2xs">{w.schedule}</span>
                     ) : null}
                   </SelectItem>
                 ))}
@@ -1798,7 +1798,7 @@ function RunScheduledJobCard({ appSlug }: { appSlug: string }) {
             </Button>
           </Can>
         </div>
-        <p className="text-muted-foreground mt-3 text-[11px]">
+        <p className="text-muted-foreground mt-3 text-2xs">
           {t("footer")}{" "}
           <Link href={`/apps/${appSlug}/jobs`} className="underline">
             {t("jobsPage")}
@@ -1896,7 +1896,7 @@ function RetentionPolicySection({
               <div className="flex items-center gap-3">
                 <Label className="w-28 shrink-0 text-sm font-medium">{label}</Label>
                 {isDefault ? (
-                  <Badge variant="secondary" className="text-[10px]">
+                  <Badge variant="secondary" className="text-2xs">
                     Platform default
                   </Badge>
                 ) : null}
@@ -2079,7 +2079,7 @@ function EnvironmentSettingsSection({ appSlug }: { appSlug: string }) {
       <Can permission="app.update">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-muted-foreground mr-1 text-[11px]">Suggested:</span>
+            <span className="text-muted-foreground mr-1 text-2xs">Suggested:</span>
             {SUGGESTED_OVERRIDE_KEYS.map((s) => {
               const alreadySet = settings.some((row) => row.key === s.key);
               return (
@@ -2089,7 +2089,7 @@ function EnvironmentSettingsSection({ appSlug }: { appSlug: string }) {
                       type="button"
                       size="sm"
                       variant="outline"
-                      className="h-6 px-2 font-mono text-[10px]"
+                      className="h-6 px-2 font-mono text-2xs"
                       disabled={alreadySet}
                       onClick={() => setNewKey(s.key)}
                     >
@@ -2389,19 +2389,19 @@ function ManagedServiceAdminRow({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-1.5">
           <span className="text-foreground font-mono text-sm">{svc.name || svc.kind}</span>
-          <Badge variant="secondary" className="text-[10px]">
+          <Badge variant="secondary" className="text-2xs">
             {svc.kind}
             {svc.variant ? `/${svc.variant}` : ""}
           </Badge>
-          <Badge variant="outline" className="font-mono text-[10px]">
+          <Badge variant="outline" className="font-mono text-2xs">
             {svc.environmentName}
           </Badge>
-          <Badge variant="outline" className="text-[10px] capitalize">
+          <Badge variant="outline" className="text-2xs capitalize">
             {svc.status}
           </Badge>
         </div>
         {svc.statusError ? (
-          <p className="text-destructive mt-0.5 max-w-md truncate text-[11px]">
+          <p className="text-destructive mt-0.5 max-w-md truncate text-2xs">
             {svc.statusError}
           </p>
         ) : null}
@@ -2420,7 +2420,7 @@ function ManagedServiceAdminRow({
                 <PencilIcon className="size-3.5" />
                 Edit
                 {editableCount > 0 ? (
-                  <Badge variant="secondary" className="ml-1 text-[10px]">
+                  <Badge variant="secondary" className="ml-1 text-2xs">
                     {editableCount}
                   </Badge>
                 ) : null}

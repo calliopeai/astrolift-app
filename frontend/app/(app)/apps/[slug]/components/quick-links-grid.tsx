@@ -81,7 +81,7 @@ export function QuickLinksGrid({ appSlug }: Props) {
 
   const count = data?.astroliftDeployments?.length ?? 0;
   const chip = loading && count === 0 ? null : (
-    <Badge variant="secondary" className="font-mono text-[10px]">
+    <Badge variant="secondary" className="font-mono text-2xs">
       {count} {count === 1 ? "deployment" : "deployments"}
     </Badge>
   );

@@ -254,7 +254,7 @@ export function PipelineSecretsTab({ pipelineId }: { pipelineId: string }) {
                   <TableRow key={s.id}>
                     <TableCell className="font-mono text-xs">{s.name}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="font-mono text-[10px]">
+                      <Badge variant="secondary" className="font-mono text-2xs">
                         Value set
                       </Badge>
                     </TableCell>

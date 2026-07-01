@@ -374,7 +374,7 @@ function SortableField({
               <SelectItem key={ft.value} value={ft.value}>
                 <div className="flex flex-col">
                   <span><span className="mr-2">{ft.icon}</span>{ft.label}</span>
-                  <span className="text-[10px] text-muted-foreground">{ft.hint}</span>
+                  <span className="text-2xs text-muted-foreground">{ft.hint}</span>
                 </div>
               </SelectItem>
             ))}
@@ -411,7 +411,7 @@ function SortableField({
       </div>
 
       {!expanded && typeInfo?.hint && (
-        <div className="px-3 pb-2 text-[11px] text-muted-foreground">{typeInfo.hint}</div>
+        <div className="px-3 pb-2 text-2xs text-muted-foreground">{typeInfo.hint}</div>
       )}
 
       {expanded && (

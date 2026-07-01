@@ -778,7 +778,7 @@ function BootstrapPlanCard({ clusterId }: { clusterId: string }) {
         </CardTitle>
         <CardDescription>
           Driver recipe from{" "}
-          <Badge variant="outline" className="mx-1 font-mono text-[10px]">
+          <Badge variant="outline" className="mx-1 font-mono text-2xs">
             {plan.providerPluginSlug || "unknown"}
           </Badge>
           — pre-tuned helm values per component. Re-installing converges via Flux; un-checking a
@@ -801,7 +801,7 @@ function BootstrapPlanCard({ clusterId }: { clusterId: string }) {
                 {c.requires.length > 0 && (
                   <div className="mt-1 flex flex-wrap gap-1">
                     {c.requires.map((r) => (
-                      <Badge key={r} variant="secondary" className="font-mono text-[10px]">
+                      <Badge key={r} variant="secondary" className="font-mono text-2xs">
                         requires: {r}
                       </Badge>
                     ))}
@@ -947,7 +947,7 @@ function LastBootstrapCard({ slug, run }: { slug: string; run: BootstrapRun | nu
             {fmt.formatRelativeTime(run.endedAt)}
           </span>
           {run.cliVersion && (
-            <Badge variant="outline" className="font-mono text-[10px]">
+            <Badge variant="outline" className="font-mono text-2xs">
               {run.cliVersion}
             </Badge>
           )}
@@ -1814,7 +1814,7 @@ function CognitoPoolCombobox({
               <ComboboxItem key={item.poolId} value={item}>
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="truncate text-sm">{item.name || item.poolId}</span>
-                  <span className="text-muted-foreground truncate font-mono text-[10px]">
+                  <span className="text-muted-foreground truncate font-mono text-2xs">
                     {item.poolId}
                     {item.domain ? ` · ${item.domain}` : ""}
                   </span>
@@ -1880,7 +1880,7 @@ function CognitoClientCombobox({
             <ComboboxItem key={item.clientId} value={item}>
               <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
                 <span className="truncate text-sm">{item.clientName || item.clientId}</span>
-                <span className="text-muted-foreground truncate font-mono text-[10px]">
+                <span className="text-muted-foreground truncate font-mono text-2xs">
                   {item.clientId}
                 </span>
               </div>

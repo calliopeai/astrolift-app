@@ -311,8 +311,8 @@ export function UrlCard({
                 </p>
               ) : (
                 <p className="text-muted-foreground text-xs">
-                  Press <kbd className="bg-muted rounded px-1 font-mono text-[10px]">Enter</kbd> to
-                  save or <kbd className="bg-muted rounded px-1 font-mono text-[10px]">Esc</kbd> to
+                  Press <kbd className="bg-muted rounded px-1 font-mono text-2xs">Enter</kbd> to
+                  save or <kbd className="bg-muted rounded px-1 font-mono text-2xs">Esc</kbd> to
                   cancel.
                 </p>
               )}

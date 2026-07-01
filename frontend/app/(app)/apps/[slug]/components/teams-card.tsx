@@ -272,7 +272,7 @@ export function TeamsCard({ appSlug, appId, homeTeamSlug }: Props) {
                         </SelectContent>
                       </Select>
                     </Can>
-                    <p className="text-muted-foreground mt-1 text-[10px]">
+                    <p className="text-muted-foreground mt-1 text-2xs">
                       {LEVEL_DESCRIPTIONS[a.accessLevel]}
                     </p>
                   </TableCell>

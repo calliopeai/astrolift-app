@@ -55,7 +55,7 @@ export function TagInput({ value, onChange, suggestions = [], placeholder, class
         onClick={() => inputRef.current?.focus()}
       >
         {value.map((tag) => (
-          <Badge key={tag} variant="secondary" className="gap-1 py-0 text-[11px]">
+          <Badge key={tag} variant="secondary" className="gap-1 py-0 text-2xs">
             {tag}
             <button
               type="button"

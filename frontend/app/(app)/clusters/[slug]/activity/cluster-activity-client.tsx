@@ -158,7 +158,7 @@ function RecentWorkflowsCard({ clusterId }: { clusterId: string }) {
                   <code className="font-mono text-xs">{r.workflowType}</code>
                   <Badge
                     variant={STATUS_VARIANT[r.status] ?? "outline"}
-                    className="text-[10px]"
+                    className="text-2xs"
                   >
                     {r.status}
                   </Badge>

@@ -71,7 +71,7 @@ export function WorkloadIdentityCard({ appSlug, environmentName }: WorkloadIdent
           <CardDescription>
             The cloud-IAM identity bound to this app&apos;s pods. Source: cluster&apos;s
             WorkloadIdentityDriver ({" "}
-            <code className="font-mono text-[11px]">describe_identity</code> ).
+            <code className="font-mono text-2xs">describe_identity</code> ).
           </CardDescription>
         </div>
         <div className="flex items-center gap-2">

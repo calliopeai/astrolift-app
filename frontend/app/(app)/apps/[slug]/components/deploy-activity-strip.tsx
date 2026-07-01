@@ -76,10 +76,10 @@ export function DeployActivityStrip({ appSlug, limit = 20 }: Props) {
     <section className="rounded-lg border p-4">
       <div className="mb-2 flex items-baseline justify-between gap-3">
         <div className="flex items-baseline gap-2">
-          <p className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+          <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
             Deploy activity
           </p>
-          <p className="text-muted-foreground text-[10px]">
+          <p className="text-muted-foreground text-2xs">
             Last {limit}
             {inFlight.length > 0 && (
               <span className="ml-2 text-amber-600 dark:text-amber-400">

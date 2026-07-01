@@ -147,7 +147,7 @@ export function ProfileIdentityClient() {
               readOnly
               className="font-mono text-xs"
             />
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-muted-foreground text-2xs">
               Username is the auth identifier; it never changes.
             </p>
           </div>
@@ -214,7 +214,7 @@ function FieldRow({
         {label}
         {locked && (
           <span
-            className="text-muted-foreground inline-flex items-center gap-1 text-[11px]"
+            className="text-muted-foreground inline-flex items-center gap-1 text-2xs"
             title="Managed by your identity provider — local edits would be overwritten on next sign-in"
           >
             <LockIcon className="size-3" />

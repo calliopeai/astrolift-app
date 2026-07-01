@@ -355,6 +355,9 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
         ref={containerRef}
         role="region"
         aria-label={t("ariaLabel")}
+        // exact terminal-canvas background — must match the xterm
+        // theme.background literal set above; not tokenizable.
+        // eslint-disable-next-line astrolift/no-raw-design-values
         className="min-h-[20rem] rounded-md border bg-[#0b0f17] p-2 [&_.xterm-viewport]:!overflow-y-auto"
       />
     </div>

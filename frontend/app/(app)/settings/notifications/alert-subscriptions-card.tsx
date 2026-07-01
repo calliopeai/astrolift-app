@@ -260,7 +260,7 @@ export function AlertSubscriptionsCard() {
         )}
 
         <div className="text-muted-foreground flex items-center gap-2 text-xs">
-          <Badge variant="outline" className="text-[10px]">
+          <Badge variant="outline" className="text-2xs">
             In-app channel
           </Badge>
           <span>

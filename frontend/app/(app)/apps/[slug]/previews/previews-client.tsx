@@ -635,7 +635,7 @@ function PreviewRow({
           {p.commitSha && <> · {p.commitSha.slice(0, 7)}</>}
         </div>
         {p.isManual && (
-          <Badge variant="outline" className="mt-1 text-[10px] uppercase">
+          <Badge variant="outline" className="mt-1 text-2xs uppercase">
             manual
           </Badge>
         )}
@@ -723,7 +723,7 @@ function PreviewRow({
       <TableCell className="text-muted-foreground text-sm">
         {p.lastDeployedAt ? new Date(p.lastDeployedAt).toLocaleString() : "—"}
         {isStale(p) && (
-          <Badge variant="outline" className="ml-2 text-[10px] uppercase">
+          <Badge variant="outline" className="ml-2 text-2xs uppercase">
             {t("staleBadge")}
           </Badge>
         )}

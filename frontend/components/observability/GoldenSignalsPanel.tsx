@@ -565,7 +565,7 @@ function PromQLDisclosure({ promql }: PromQLDisclosureProps) {
       <summary className="text-muted-foreground cursor-pointer text-xs select-none">
         Show PromQL
       </summary>
-      <pre className="bg-muted/40 mt-2 overflow-x-auto rounded border p-2 font-mono text-[11px] whitespace-pre-wrap">
+      <pre className="bg-muted/40 mt-2 overflow-x-auto rounded border p-2 font-mono text-2xs whitespace-pre-wrap">
         {promql}
       </pre>
     </details>

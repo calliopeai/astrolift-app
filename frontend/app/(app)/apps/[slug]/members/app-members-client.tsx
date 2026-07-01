@@ -155,7 +155,7 @@ export function AppMembersClient({ slug }: { slug: string }) {
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {appRoles.map((r) => (
-              <Badge key={r.id} variant="outline" className="font-mono text-[10px]">
+              <Badge key={r.id} variant="outline" className="font-mono text-2xs">
                 {r.slug}
               </Badge>
             ))}
@@ -228,7 +228,7 @@ export function AppMembersClient({ slug }: { slug: string }) {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="font-mono text-[10px]">
+                      <Badge variant="secondary" className="font-mono text-2xs">
                         {rb.role.slug}
                       </Badge>
                     </TableCell>

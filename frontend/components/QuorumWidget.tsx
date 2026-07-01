@@ -64,13 +64,13 @@ export function QuorumWidget({
           {t("header", { received, required: requiredApproverCount })}
         </h3>
         {remaining > 0 ? (
-          <Badge variant="secondary" className="text-[10px]">
+          <Badge variant="secondary" className="text-2xs">
             {t("remainingBadge", { count: remaining })}
           </Badge>
         ) : (
           <Badge
             variant="outline"
-            className="border-green-500/40 bg-green-500/10 text-[10px] text-green-700 dark:text-green-300"
+            className="border-green-500/40 bg-green-500/10 text-2xs text-green-700 dark:text-green-300"
           >
             {t("metBadge")}
           </Badge>
@@ -108,7 +108,7 @@ function ApproverGroup({
 }) {
   return (
     <div>
-      <div className="text-muted-foreground mb-2 text-[11px] font-medium tracking-wide uppercase">
+      <div className="text-muted-foreground mb-2 text-2xs font-medium tracking-wide uppercase">
         {label}
       </div>
       {approvers.length === 0 ? (
@@ -146,7 +146,7 @@ function ApproverChip({
     >
       <span
         aria-hidden
-        className="bg-muted text-muted-foreground inline-flex size-6 items-center justify-center rounded-full text-[10px] font-medium"
+        className="bg-muted text-muted-foreground inline-flex size-6 items-center justify-center rounded-full text-2xs font-medium"
       >
         {initials}
       </span>

@@ -173,7 +173,7 @@ export function TlsCertificatesCard({ appSlug, environmentName }: TlsCertificate
                   <TableCell className="font-mono text-xs">{formatNotAfter(c.notAfter)}</TableCell>
                   <TableCell>
                     <span
-                      className={`inline-flex items-center rounded border px-2 py-0.5 font-mono text-[11px] ${expiryChipClass(c.daysUntilExpiry)}`}
+                      className={`inline-flex items-center rounded border px-2 py-0.5 font-mono text-2xs ${expiryChipClass(c.daysUntilExpiry)}`}
                     >
                       {formatDays(c.daysUntilExpiry)}
                     </span>

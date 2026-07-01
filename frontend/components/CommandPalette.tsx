@@ -305,7 +305,7 @@ export function CommandPalette() {
           ) : (
             grouped.map(([group, routes]) => (
               <div key={group} className="py-1">
-                <div className="text-muted-foreground px-3 py-1 text-[10px] font-semibold uppercase tracking-wider">
+                <div className="text-muted-foreground px-3 py-1 text-2xs font-semibold uppercase tracking-wider">
                   {group}
                 </div>
                 <ul>
@@ -336,7 +336,7 @@ export function CommandPalette() {
             ))
           )}
         </div>
-        <div className="text-muted-foreground border-t px-3 py-2 text-[10px]">
+        <div className="text-muted-foreground border-t px-3 py-2 text-2xs">
           ↑↓ navigate · ↵ open · esc close · ⌘K to toggle
         </div>
       </div>

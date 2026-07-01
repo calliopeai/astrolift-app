@@ -136,7 +136,7 @@ export function AppDetailsStep({ state, setState, setValid }: Props) {
             )}
             <span
               className={cn(
-                "shrink-0 text-[10px] tabular-nums",
+                "shrink-0 text-2xs tabular-nums",
                 state.slug.length >= 40
                   ? "text-destructive"
                   : state.slug.length >= 32

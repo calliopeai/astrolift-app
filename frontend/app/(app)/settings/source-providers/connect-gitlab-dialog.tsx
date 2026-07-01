@@ -188,7 +188,7 @@ export function ConnectGitLabDialog({ open, onOpenChange }: Props) {
               <a href={gitlabAppsUrl} target="_blank" rel="noreferrer">
                 <ExternalLinkIcon className="size-4" />
                 Open GitLab Applications
-                <span className="text-muted-foreground ml-2 truncate font-mono text-[10px]">
+                <span className="text-muted-foreground ml-2 truncate font-mono text-2xs">
                   {gitlabAppsUrl}
                 </span>
               </a>
@@ -196,7 +196,7 @@ export function ConnectGitLabDialog({ open, onOpenChange }: Props) {
             <div className="space-y-1.5">
               <Label className="text-xs">Paste this Callback URL on GitLab</Label>
               <div className="flex items-center gap-2">
-                <code className="bg-muted flex-1 rounded px-2 py-1 font-mono text-[11px] break-all">
+                <code className="bg-muted flex-1 rounded px-2 py-1 font-mono text-2xs break-all">
                   {callbackUrl}
                 </code>
                 <Button type="button" size="sm" variant="outline" onClick={copyCallback}>

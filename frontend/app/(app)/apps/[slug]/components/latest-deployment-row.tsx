@@ -92,7 +92,7 @@ export function LatestDeploymentRow({ appSlug }: Props) {
     >
       <div className="flex flex-wrap items-center gap-3 p-3">
         <RocketIcon aria-hidden className="text-muted-foreground size-4 shrink-0" />
-        <Badge variant="outline" className={cn("gap-1 font-mono text-[10px] uppercase", tone)}>
+        <Badge variant="outline" className={cn("gap-1 font-mono text-2xs uppercase", tone)}>
           {latest.status}
         </Badge>
         {shortSha ? <span className="text-foreground font-mono text-xs">{shortSha}</span> : null}

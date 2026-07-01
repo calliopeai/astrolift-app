@@ -402,7 +402,7 @@ function FeaturedPlatformCallout({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold">{platform.label}</span>
-              <Badge className="text-[10px] uppercase tracking-wide">
+              <Badge className="text-2xs uppercase tracking-wide">
                 Recommended for your system
               </Badge>
             </div>
@@ -507,7 +507,7 @@ function PackageRow({
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium">{name}</span>
         {badge && (
-          <Badge variant="outline" className="text-[10px] uppercase">
+          <Badge variant="outline" className="text-2xs uppercase">
             {badge}
           </Badge>
         )}

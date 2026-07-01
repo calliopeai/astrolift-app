@@ -426,7 +426,7 @@ function ConfidenceBadge({
         : "bg-muted text-muted-foreground";
   const lowerKey = value.toLowerCase() as "low" | "medium" | "high";
   return (
-    <span className={"rounded-full px-2 py-0.5 text-[10px] font-medium " + tone}>
+    <span className={"rounded-full px-2 py-0.5 text-2xs font-medium " + tone}>
       {t(`forecast.confidence.${lowerKey}`)}
     </span>
   );

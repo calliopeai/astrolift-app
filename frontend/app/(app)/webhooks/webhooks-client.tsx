@@ -781,14 +781,14 @@ function ExpandedRow({ subscription }: { subscription: AstroliftWebhookSubscript
                     </TableCell>
                     <TableCell className="font-mono text-xs">{d.eventType}</TableCell>
                     <TableCell>
-                      <Badge variant={d.success ? "secondary" : "outline"} className="text-[10px]">
+                      <Badge variant={d.success ? "secondary" : "outline"} className="text-2xs">
                         {d.statusCode ?? "ERR"}
                       </Badge>
                     </TableCell>
                     <TableCell className="font-mono text-xs">{d.latencyMs}ms</TableCell>
                     <TableCell>
                       {d.isTest && (
-                        <Badge variant="outline" className="text-[10px]">
+                        <Badge variant="outline" className="text-2xs">
                           test
                         </Badge>
                       )}
@@ -847,7 +847,7 @@ function VerificationSnippetDisclosure() {
             Copy
           </Button>
         </div>
-        <pre className="bg-background max-h-72 overflow-auto rounded border p-3 font-mono text-[11px] leading-snug">
+        <pre className="bg-background max-h-72 overflow-auto rounded border p-3 font-mono text-2xs leading-snug">
           {SNIPPETS[lang]}
         </pre>
         <p className="text-muted-foreground text-xs">

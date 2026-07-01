@@ -150,14 +150,14 @@ function SparkCard({
 }) {
   return (
     <div className="bg-card flex flex-col rounded-md border p-3">
-      <p className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+      <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
         {label}
       </p>
       <p className="mt-0.5 text-2xl font-semibold">{value}</p>
-      <p className="text-muted-foreground text-[11px]">{sublabel}</p>
+      <p className="text-muted-foreground text-2xs">{sublabel}</p>
       <div className="mt-2 h-12">
         {empty ? (
-          <div className="text-muted-foreground flex h-full items-center justify-center text-[11px] italic">
+          <div className="text-muted-foreground flex h-full items-center justify-center text-2xs italic">
             {empty}
           </div>
         ) : (
@@ -170,7 +170,7 @@ function SparkCard({
                   if (!active || !payload?.length) return null;
                   const p = payload[0].payload as SparkPoint;
                   return (
-                    <div className="bg-background rounded border px-2 py-1 text-[11px] shadow-sm">
+                    <div className="bg-background rounded border px-2 py-1 text-2xs shadow-sm">
                       <p className="font-mono">{p.value}</p>
                       <p className="text-muted-foreground">
                         {new Date(p.ts).toLocaleDateString(undefined, {
@@ -215,12 +215,12 @@ function AlertSummaryCard({
       href={`/alerts?app=${appSlug}`}
       className="bg-card hover:bg-muted/40 group flex flex-col rounded-md border p-3 transition-colors"
     >
-      <p className="text-muted-foreground flex items-center gap-1 text-[11px] font-medium tracking-wide uppercase">
+      <p className="text-muted-foreground flex items-center gap-1 text-2xs font-medium tracking-wide uppercase">
         <AlertTriangleIcon className="size-3" />
         Unresolved alerts
       </p>
       <p className="mt-0.5 text-2xl font-semibold">{loading ? "—" : unresolved}</p>
-      <p className="text-muted-foreground text-[11px]">
+      <p className="text-muted-foreground text-2xs">
         {critical > 0 ? (
           <Badge variant="outline" className="border-red-500/40 text-red-600 dark:text-red-400">
             {critical} critical
@@ -232,7 +232,7 @@ function AlertSummaryCard({
         )}
       </p>
       <div className="mt-auto flex items-center justify-end pt-3">
-        <span className="text-muted-foreground inline-flex items-center gap-1 text-[11px] group-hover:text-[var(--brand-primary)]">
+        <span className="text-muted-foreground inline-flex items-center gap-1 text-2xs group-hover:text-[var(--brand-primary)]">
           Open
           <ExternalLinkIcon className="size-3" />
         </span>
