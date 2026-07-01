@@ -203,7 +203,7 @@ export function AssignProjectCard({
             ) : (
               <Badge
                 variant="outline"
-                className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                className="border-warning-border bg-warning/10 text-warning-fg"
               >
                 Unassigned
               </Badge>

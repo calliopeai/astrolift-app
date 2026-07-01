@@ -106,13 +106,13 @@ export default function PoliciesDocPage() {
             <CardTitle className="text-sm">
               2. Effect{" "}
               <Badge
-                className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ml-1"
+                className="bg-success/15 text-success-fg ml-1"
                 variant="secondary"
               >
                 ALLOW
               </Badge>{" "}
               <Badge
-                className="bg-red-500/15 text-red-700 dark:text-red-300 ml-1"
+                className="bg-danger/15 text-danger-fg ml-1"
                 variant="secondary"
               >
                 DENY

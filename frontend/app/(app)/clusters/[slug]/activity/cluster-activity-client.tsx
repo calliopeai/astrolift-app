@@ -234,7 +234,7 @@ function LifecycleTimelineCard({ clusterId }: { clusterId: string }) {
                   className={
                     "absolute -left-[27px] flex size-5 items-center justify-center rounded-full " +
                     (e.success
-                      ? "bg-emerald-500/15 text-emerald-600"
+                      ? "bg-success/15 text-success-fg"
                       : "bg-destructive/15 text-destructive")
                   }
                 >

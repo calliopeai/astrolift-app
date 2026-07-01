@@ -729,7 +729,7 @@ export default function ConfigurationDocPage() {
                     <TableCell className="align-top">
                       {v.required ? (
                         <Badge
-                          className="bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                          className="bg-warning/15 text-warning-fg"
                           variant="secondary"
                         >
                           yes

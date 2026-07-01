@@ -48,8 +48,8 @@ export function GithubConnectCallout({ sourceKind }: Props) {
     : `/settings/source-providers`;
 
   return (
-    <section className="flex flex-wrap items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4">
-      <GithubIcon className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400" />
+    <section className="flex flex-wrap items-start gap-3 rounded-lg border border-warning-border bg-warning/5 p-4">
+      <GithubIcon className="mt-0.5 size-4 shrink-0 text-warning-fg" />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">Connect your GitHub to manage this app</p>
         <p className="text-muted-foreground mt-1 max-w-2xl text-xs">

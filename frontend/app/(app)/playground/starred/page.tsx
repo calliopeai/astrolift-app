@@ -60,7 +60,7 @@ export default function PlaygroundStarredPage() {
           <Card key={item.title} className="flex flex-col">
             <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
               <CardTitle className="text-base">{item.title}</CardTitle>
-              <StarIcon className="h-4 w-4 shrink-0 fill-yellow-400 text-yellow-400" />
+              <StarIcon className="h-4 w-4 shrink-0 fill-warning text-warning-fg" />
             </CardHeader>
             <CardContent className="flex flex-1 flex-col gap-3">
               <p className="text-muted-foreground line-clamp-3 text-sm">{item.prompt}</p>

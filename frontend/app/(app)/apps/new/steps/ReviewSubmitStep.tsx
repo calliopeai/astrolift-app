@@ -375,7 +375,7 @@ function StatusBadge({ status, error }: { status: StepStatus; error?: string }) 
   }
   if (status === "done") {
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+      <span className="inline-flex items-center gap-1 text-xs text-success-fg">
         <CheckCircle2Icon className="size-3.5" /> Done
       </span>
     );

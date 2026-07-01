@@ -211,7 +211,7 @@ export function InviteDialog({ open, onOpenChange }: Props) {
         </SheetHeader>
         {created ? (
           <div className="space-y-4 px-4 py-6">
-            <div className="rounded-md border border-amber-300 bg-amber-100 p-3 text-sm dark:border-amber-900/60 dark:bg-amber-950/40">
+            <div className="rounded-md border border-warning-border bg-warning/10 p-3 text-sm">
               <strong className="mb-1 block">{t("reveal.saveTitle")}</strong>
               {t("reveal.saveDescription")}
             </div>
@@ -373,7 +373,7 @@ function SearchMatchPanel({
           </Avatar>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
-              <CheckCircle2Icon className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+              <CheckCircle2Icon className="size-3.5 text-success-fg" />
               <span className="font-medium">{t("search.alreadyMember")}</span>
             </div>
             <div className="text-muted-foreground truncate text-xs">
@@ -392,7 +392,7 @@ function SearchMatchPanel({
           </Avatar>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
-              <AlertCircleIcon className="size-3.5 text-amber-600 dark:text-amber-400" />
+              <AlertCircleIcon className="size-3.5 text-warning-fg" />
               <span className="font-medium">{t("search.invitationExists")}</span>
               {invitationMatch.expiresAt ? (
                 <InvitationExpiryBadge expiresAt={invitationMatch.expiresAt} />

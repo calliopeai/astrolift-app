@@ -587,7 +587,7 @@ function IngressRow({ env, appSlug }: { env: AstroliftAppEnvironment; appSlug: s
         {paused ? (
           <Badge
             variant="outline"
-            className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+            className="border-warning-border bg-warning/10 text-warning-fg"
           >
             <PauseIcon className="size-3" />
             {t("paused")}
@@ -595,7 +595,7 @@ function IngressRow({ env, appSlug }: { env: AstroliftAppEnvironment; appSlug: s
         ) : (
           <Badge
             variant="outline"
-            className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+            className="border-success-border bg-success/10 text-success-fg"
           >
             <PlayIcon className="size-3" />
             {t("live")}
@@ -748,7 +748,7 @@ function WebhookDeploysPauseSection({
           {paused ? (
             <Badge
               variant="outline"
-              className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+              className="border-warning-border bg-warning/10 text-warning-fg"
             >
               <PauseIcon className="size-3" />
               {t("paused")}
@@ -756,7 +756,7 @@ function WebhookDeploysPauseSection({
           ) : (
             <Badge
               variant="outline"
-              className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+              className="border-success-border bg-success/10 text-success-fg"
             >
               <PlayIcon className="size-3" />
               {t("live")}
@@ -829,7 +829,7 @@ function WebhookDeploysPauseSection({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <PauseIcon className="size-4 text-amber-600" />
+              <PauseIcon className="size-4 text-warning-fg" />
               {t("confirmTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>{t("confirmDescription")}</AlertDialogDescription>
@@ -1513,8 +1513,8 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
             </Button>
           </Can>
           {stillLive.length > 0 ? (
-            <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-xs">
-              <p className="text-amber-700 dark:text-amber-400">
+            <div className="mt-3 rounded-md border border-warning-border bg-warning/5 p-3 text-xs">
+              <p className="text-warning-fg">
                 {t("stillLive", { count: stillLive.length })}
               </p>
               <ul className="text-foreground mt-1 list-disc pl-5 font-mono text-2xs">
@@ -2213,7 +2213,7 @@ function ArchiveSection({
           {isArchived ? (
             <Badge
               variant="outline"
-              className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+              className="border-warning-border bg-warning/10 text-warning-fg"
             >
               Archived
             </Badge>

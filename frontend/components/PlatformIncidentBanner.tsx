@@ -113,8 +113,8 @@ export function PlatformIncidentBanner() {
   const severity = highestImpact(incidents);
   const tone =
     severity === "major" || severity === "critical"
-      ? "border-red-500/40 bg-red-500/10 text-red-800 dark:text-red-200"
-      : "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200";
+      ? "border-danger-border bg-danger/10 text-danger-fg"
+      : "border-warning-border bg-warning/10 text-warning-fg";
 
   const headline =
     incidents.length === 1 ? incidents[0]!.name : `${incidents.length} active platform incidents`;

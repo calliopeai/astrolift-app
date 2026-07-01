@@ -73,8 +73,8 @@ export default function ZentinellePage() {
 
         {/* Integration status chip */}
         <div className="rounded-md border border-dashed bg-muted/30 px-4 py-3 flex items-start gap-3">
-          <div className="mt-1 size-4 shrink-0 rounded-full bg-amber-500/20 flex items-center justify-center">
-            <div className="size-1.5 rounded-full bg-amber-500" />
+          <div className="mt-1 size-4 shrink-0 rounded-full bg-warning/20 flex items-center justify-center">
+            <div className="size-1.5 rounded-full bg-warning" />
           </div>
           <div>
             <p className="text-sm font-medium">Integration under design</p>

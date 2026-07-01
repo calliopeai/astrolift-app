@@ -198,10 +198,10 @@ export function TokensClient() {
         }
       >
         {createdToken && (
-          <Card className="border-emerald-500/30 bg-emerald-500/5">
+          <Card className="border-success-border bg-success/5">
             <CardContent className="flex flex-col gap-3 p-4">
               <div className="flex items-center gap-2">
-                <CheckCircle2Icon className="size-4 text-emerald-600" />
+                <CheckCircle2Icon className="size-4 text-success-fg" />
                 <p className="text-sm font-medium">
                   Token <span className="font-mono">{createdToken.apiToken.name}</span> created
                 </p>

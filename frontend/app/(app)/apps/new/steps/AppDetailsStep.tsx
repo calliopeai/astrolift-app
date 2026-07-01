@@ -140,7 +140,7 @@ export function AppDetailsStep({ state, setState, setValid }: Props) {
                 state.slug.length >= 40
                   ? "text-destructive"
                   : state.slug.length >= 32
-                    ? "text-amber-600 dark:text-amber-400"
+                    ? "text-warning-fg"
                     : "text-muted-foreground"
               )}
             >

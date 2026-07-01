@@ -118,7 +118,7 @@ export function ReprovisionCallout({ appSlug, reprovision }: Props) {
           "rounded-md border p-4",
           tone === "error"
             ? "border-destructive/40 bg-destructive/5"
-            : "border-amber-300 bg-amber-50 dark:border-amber-700/50 dark:bg-amber-950/30"
+            : "border-warning-border bg-warning/10"
         )}
         aria-live="polite"
       >
@@ -126,7 +126,7 @@ export function ReprovisionCallout({ appSlug, reprovision }: Props) {
           <AlertTriangleIcon
             className={cn(
               "size-5 shrink-0",
-              tone === "error" ? "text-destructive" : "text-amber-700 dark:text-amber-300"
+              tone === "error" ? "text-destructive" : "text-warning-fg"
             )}
             aria-hidden
           />
@@ -134,7 +134,7 @@ export function ReprovisionCallout({ appSlug, reprovision }: Props) {
             <p
               className={cn(
                 "text-sm font-semibold",
-                tone === "error" ? "text-destructive" : "text-amber-900 dark:text-amber-200"
+                tone === "error" ? "text-destructive" : "text-warning-fg"
               )}
             >
               {headline}
@@ -144,7 +144,7 @@ export function ReprovisionCallout({ appSlug, reprovision }: Props) {
                 "text-xs leading-snug",
                 tone === "error"
                   ? "text-destructive/90"
-                  : "text-amber-900/80 dark:text-amber-200/80"
+                  : "text-warning-fg"
               )}
             >
               {description}

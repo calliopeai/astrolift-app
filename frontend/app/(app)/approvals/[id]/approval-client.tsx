@@ -218,7 +218,7 @@ export function ApprovalClient({ id }: { id: string }) {
               )}
 
               {needsApproval ? (
-                <div className="rounded-md border border-amber-300 bg-amber-100 p-4 text-sm dark:border-amber-900/60 dark:bg-amber-950/40">
+                <div className="rounded-md border border-warning-border bg-warning/10 p-4 text-sm">
                   <div className="flex items-center gap-2 font-medium">
                     <ClockIcon className="size-4" /> {t("awaiting")}
                   </div>
@@ -269,7 +269,7 @@ export function ApprovalClient({ id }: { id: string }) {
                   </div>
                 </div>
               ) : alreadyDecided ? (
-                <div className="rounded-md border border-green-300 bg-green-100 p-4 text-sm dark:border-green-900/60 dark:bg-green-950/40">
+                <div className="rounded-md border border-success-border bg-success/10 p-4 text-sm">
                   <div className="flex items-center gap-2 font-medium">
                     <CheckCircle2Icon className="size-4" /> {t("alreadyApproved")}
                   </div>
@@ -281,7 +281,7 @@ export function ApprovalClient({ id }: { id: string }) {
                   </Button>
                 </div>
               ) : failed ? (
-                <div className="rounded-md border border-red-300 bg-red-100 p-4 text-sm dark:border-red-900/60 dark:bg-red-950/40">
+                <div className="rounded-md border border-danger-border bg-danger/10 p-4 text-sm">
                   <div className="flex items-center gap-2 font-medium">
                     <XCircleIcon className="size-4" /> {t("failed")}
                   </div>
@@ -340,7 +340,7 @@ function SelfTriggerBadge({ label }: { label: string }) {
   return (
     <span
       data-slot="badge"
-      className="inline-flex h-5 items-center gap-1 rounded-4xl border border-amber-400/60 bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200"
+      className="inline-flex h-5 items-center gap-1 rounded-4xl border border-warning-border bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-fg"
     >
       <AlertTriangleIcon className="size-3" />
       {label}

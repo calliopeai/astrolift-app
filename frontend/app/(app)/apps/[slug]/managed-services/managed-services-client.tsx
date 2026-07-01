@@ -109,8 +109,8 @@ const KIND_OPTIONS = ["postgres", "redis", "s3", "sqs", "mysql", "kafka"];
 // hasn't yet populated the field.
 
 const GREEN_BADGE =
-  "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
-const AMBER_BADGE = "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300";
+  "border-success-border bg-success/15 text-success-fg";
+const AMBER_BADGE = "border-warning-border bg-warning/15 text-warning-fg";
 const RED_BADGE = "border-destructive/40 bg-destructive/15 text-destructive";
 
 function ValidationBadges({ service }: { service: ManagedService }) {

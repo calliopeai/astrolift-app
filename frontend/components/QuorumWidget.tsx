@@ -70,7 +70,7 @@ export function QuorumWidget({
         ) : (
           <Badge
             variant="outline"
-            className="border-green-500/40 bg-green-500/10 text-2xs text-green-700 dark:text-green-300"
+            className="border-success-border bg-success/10 text-2xs text-success-fg"
           >
             {t("metBadge")}
           </Badge>
@@ -136,8 +136,8 @@ function ApproverChip({
   const initials = computeInitials(approver.displayName || approver.email);
   const ring =
     variant === "approved"
-      ? "ring-1 ring-green-500/40"
-      : "ring-1 ring-amber-500/40";
+      ? "ring-1 ring-success"
+      : "ring-1 ring-warning";
 
   return (
     <span
@@ -152,9 +152,9 @@ function ApproverChip({
       </span>
       <span className="max-w-[10rem] truncate font-medium">{approver.displayName}</span>
       {variant === "approved" ? (
-        <CheckIcon className="size-3 text-green-600 dark:text-green-400" aria-hidden />
+        <CheckIcon className="size-3 text-success-fg" aria-hidden />
       ) : (
-        <ClockIcon className="size-3 text-amber-600 dark:text-amber-400" aria-hidden />
+        <ClockIcon className="size-3 text-warning-fg" aria-hidden />
       )}
       {variant === "awaiting" && approver.mailtoUrl ? (
         <Button

@@ -39,12 +39,12 @@ const STATUS_TONE: Record<
 > = {
   running: {
     label: "Running",
-    className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
+    className: "bg-success/10 text-success-fg border-success-border",
     icon: CheckCircle2Icon,
   },
   failed: {
     label: "Failed",
-    className: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30",
+    className: "bg-danger/10 text-danger-fg border-danger-border",
     icon: XCircleIcon,
   },
   rolled_back: {
@@ -59,12 +59,12 @@ const STATUS_TONE: Record<
   },
   deploying: {
     label: "Deploying",
-    className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30",
+    className: "bg-warning/10 text-warning-fg border-warning-border",
     icon: Loader2Icon,
   },
   pending: {
     label: "Pending",
-    className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30",
+    className: "bg-warning/10 text-warning-fg border-warning-border",
     icon: ClockIcon,
   },
   pending_approval: {
@@ -74,7 +74,7 @@ const STATUS_TONE: Record<
   },
   redeploying: {
     label: "Redeploying",
-    className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30",
+    className: "bg-warning/10 text-warning-fg border-warning-border",
     icon: Loader2Icon,
   },
 };
@@ -235,8 +235,8 @@ export function DeploymentPanel({ appSlug }: Props) {
       )}
 
       {current.status === "failed" && (
-        <div className="mt-4 rounded-md border border-red-500/30 bg-red-500/5 p-3 text-xs">
-          <p className="font-medium text-red-700 dark:text-red-400">Deployment failed</p>
+        <div className="mt-4 rounded-md border border-danger-border bg-danger/5 p-3 text-xs">
+          <p className="font-medium text-danger-fg">Deployment failed</p>
           <p className="text-muted-foreground mt-1">
             Open the deployment for the full log.{" "}
             {lastGood

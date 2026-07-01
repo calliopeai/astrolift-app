@@ -200,8 +200,8 @@ export function PipelineSecretsTab({ pipelineId }: { pipelineId: string }) {
   return (
     <div className="space-y-4">
       {/* Write-only notice banner */}
-      <div className="bg-amber-500/5 border-amber-500/20 flex items-start gap-3 rounded-md border p-3">
-        <AlertTriangleIcon className="text-amber-500 mt-0.5 size-4 shrink-0" />
+      <div className="bg-warning/5 border-warning-border flex items-start gap-3 rounded-md border p-3">
+        <AlertTriangleIcon className="text-warning-fg mt-0.5 size-4 shrink-0" />
         <div className="text-xs">
           <p className="font-medium">Secret values are write-only.</p>
           <p className="text-muted-foreground mt-0.5">

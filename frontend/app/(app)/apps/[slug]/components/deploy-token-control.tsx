@@ -138,11 +138,11 @@ export function DeployTokenControl({ appSlug }: Props) {
   const missingToken = !loading && !active;
 
   return (
-    <section className={`rounded-lg border p-5${missingToken ? " border-amber-400/60 bg-amber-500/5 dark:border-amber-500/40" : ""}`}>
+    <section className={`rounded-lg border p-5${missingToken ? " border-warning-border bg-warning/5" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           {missingToken ? (
-            <AlertTriangleIcon className="mt-0.5 size-4 text-amber-600 dark:text-amber-400" />
+            <AlertTriangleIcon className="mt-0.5 size-4 text-warning-fg" />
           ) : (
             <KeyRoundIcon className="text-muted-foreground mt-0.5 size-4" />
           )}
@@ -166,7 +166,7 @@ export function DeployTokenControl({ appSlug }: Props) {
               </div>
             )}
             {missingToken && (
-              <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-400">
+              <p className="mt-2 text-xs font-medium text-warning-fg">
                 No token — CI cannot trigger deployments until one is generated.
               </p>
             )}
@@ -267,7 +267,7 @@ function RevealDialog({ token, onClose }: { token: string; onClose: () => void }
     <div className="bg-background/80 fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
       <div className="bg-card border-border w-full max-w-lg rounded-lg border p-6 shadow-xl">
         <h3 className="text-base font-semibold">Deploy token — copy it now</h3>
-        <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+        <p className="mt-2 text-xs text-warning-fg">
           This is the only time the token is shown. If you navigate away without copying, rotate
           again to mint a fresh one.
         </p>

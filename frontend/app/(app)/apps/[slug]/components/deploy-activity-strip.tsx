@@ -18,14 +18,14 @@ interface DeploymentsResp {
 // in-flight, slate for superseded. Pulse only on still-running rows so the
 // strip telegraphs which one the operator is waiting on.
 const TILE_TONE: Record<DeploymentStatus, string> = {
-  running: "bg-emerald-500/85 hover:bg-emerald-500 border-emerald-500/50",
-  failed: "bg-red-500/85 hover:bg-red-500 border-red-500/50",
+  running: "bg-success/85 hover:bg-success border-success-border",
+  failed: "bg-danger/85 hover:bg-danger border-danger-border",
   rolled_back: "bg-muted-foreground/40 hover:bg-muted-foreground/60 border-muted-foreground/30",
   superseded: "bg-muted-foreground/30 hover:bg-muted-foreground/50 border-muted-foreground/20",
-  deploying: "bg-amber-500/85 hover:bg-amber-500 border-amber-500/50 animate-pulse",
-  pending: "bg-amber-400/70 hover:bg-amber-400 border-amber-400/50 animate-pulse",
+  deploying: "bg-warning/85 hover:bg-warning border-warning-border animate-pulse",
+  pending: "bg-warning/70 hover:bg-warning border-warning-border animate-pulse",
   pending_approval: "bg-purple-500/85 hover:bg-purple-500 border-purple-500/50 animate-pulse",
-  redeploying: "bg-amber-500/85 hover:bg-amber-500 border-amber-500/50 animate-pulse",
+  redeploying: "bg-warning/85 hover:bg-warning border-warning-border animate-pulse",
 };
 
 const STATUS_LABEL: Record<DeploymentStatus, string> = {
@@ -82,7 +82,7 @@ export function DeployActivityStrip({ appSlug, limit = 20 }: Props) {
           <p className="text-muted-foreground text-2xs">
             Last {limit}
             {inFlight.length > 0 && (
-              <span className="ml-2 text-amber-600 dark:text-amber-400">
+              <span className="ml-2 text-warning-fg">
                 · {inFlight.length} in flight
               </span>
             )}

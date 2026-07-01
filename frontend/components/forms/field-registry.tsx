@@ -189,7 +189,7 @@ function RatingWidget({ name, schema, control }: FieldWidgetProps) {
               key={star}
               type="button"
               onClick={() => field.onChange(star)}
-              className={`text-2xl transition-colors ${star <= (field.value || 0) ? "text-yellow-400" : "text-gray-300"}`}
+              className={`text-2xl transition-colors ${star <= (field.value || 0) ? "text-warning-fg" : "text-gray-300"}`}
             >
               ★
             </button>

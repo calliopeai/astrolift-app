@@ -78,7 +78,7 @@ function StatusChip({ account }: StatusChipProps) {
     return (
       <Badge
         variant="outline"
-        className="border-amber-500/40 bg-amber-500/10 text-2xs text-amber-700 dark:text-amber-300"
+        className="border-warning-border bg-warning/10 text-2xs text-warning-fg"
       >
         Re-authorize
       </Badge>
@@ -87,7 +87,7 @@ function StatusChip({ account }: StatusChipProps) {
   return (
     <Badge
       variant="outline"
-      className="border-emerald-500/40 bg-emerald-500/10 text-2xs text-emerald-700 dark:text-emerald-300"
+      className="border-success-border bg-success/10 text-2xs text-success-fg"
     >
       Connected
     </Badge>

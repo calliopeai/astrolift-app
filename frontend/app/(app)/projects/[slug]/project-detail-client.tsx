@@ -427,9 +427,9 @@ interface StatTileProps {
 function StatTile({ icon: Icon, label, value, sub, tone }: StatTileProps) {
   const accent =
     tone === "error"
-      ? "border-red-500/30 bg-red-500/5"
+      ? "border-danger-border bg-danger/5"
       : tone === "warn"
-        ? "border-amber-500/30 bg-amber-500/5"
+        ? "border-warning-border bg-warning/5"
         : "";
   return (
     <Card className={accent}>

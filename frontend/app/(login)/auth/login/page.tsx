@@ -234,7 +234,7 @@ function Splash({
     tone === "destructive"
       ? "text-destructive"
       : tone === "warning"
-        ? "text-amber-600 dark:text-amber-400"
+        ? "text-warning-fg"
         : "text-muted-foreground";
   return (
     <div className="flex flex-col items-center gap-4">

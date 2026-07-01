@@ -326,7 +326,7 @@ const NOTIFICATIONS: Notification[] = [
   },
   {
     id: 2,
-    icon: <AlertTriangleIcon className="h-4 w-4 text-yellow-500" />,
+    icon: <AlertTriangleIcon className="h-4 w-4 text-warning-fg" />,
     title: "Usage threshold reached",
     description: "You have used 80% of your monthly token quota. Consider upgrading your plan.",
     time: "1 hr ago",
@@ -334,7 +334,7 @@ const NOTIFICATIONS: Notification[] = [
   },
   {
     id: 3,
-    icon: <CheckCircle2Icon className="h-4 w-4 text-green-500" />,
+    icon: <CheckCircle2Icon className="h-4 w-4 text-success-fg" />,
     title: "Fine-tuning job complete",
     description: "Your fine-tuning job 'customer-support-v2' finished successfully.",
     time: "3 hr ago",
@@ -350,7 +350,7 @@ const NOTIFICATIONS: Notification[] = [
   },
   {
     id: 5,
-    icon: <CheckCircle2Icon className="h-4 w-4 text-green-500" />,
+    icon: <CheckCircle2Icon className="h-4 w-4 text-success-fg" />,
     title: "API key rotated",
     description: "Your API key was successfully rotated. Update your integrations if needed.",
     time: "2 days ago",

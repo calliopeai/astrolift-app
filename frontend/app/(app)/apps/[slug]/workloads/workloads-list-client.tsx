@@ -140,9 +140,9 @@ function aggregatePodStatus(
 function readinessTone(ready: number, desired: number): string {
   if (desired === 0) return "bg-muted text-muted-foreground";
   if (ready === desired)
-    return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
-  if (ready === 0) return "bg-rose-500/15 text-rose-700 dark:text-rose-300";
-  return "bg-amber-500/15 text-amber-700 dark:text-amber-300";
+    return "bg-success/15 text-success-fg";
+  if (ready === 0) return "bg-danger/15 text-danger-fg";
+  return "bg-warning/15 text-warning-fg";
 }
 
 const KIND_ICON: Record<
@@ -413,7 +413,7 @@ export function WorkloadsListClient({ slug }: { slug: string }) {
                           <div className="mt-1" title={live.errorEvent.message}>
                             <Badge
                               variant="outline"
-                              className="border-rose-500/40 text-rose-700 dark:text-rose-300 gap-1"
+                              className="border-danger-border text-danger-fg gap-1"
                             >
                               <AlertCircleIcon className="size-3" />
                               {live.errorEvent.reason}
@@ -428,8 +428,8 @@ export function WorkloadsListClient({ slug }: { slug: string }) {
                             variant="outline"
                             className={
                               live.maxRestarts >= 3
-                                ? "border-rose-500/40 text-rose-700 dark:text-rose-300"
-                                : "border-amber-500/40 text-amber-700 dark:text-amber-300"
+                                ? "border-danger-border text-danger-fg"
+                                : "border-warning-border text-warning-fg"
                             }
                           >
                             {live.maxRestarts}
@@ -440,7 +440,7 @@ export function WorkloadsListClient({ slug }: { slug: string }) {
                       </TableCell>
                       <TableCell>
                         {w.isPublic ? (
-                          <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                          <Badge className="bg-success/15 text-success-fg">
                             <GlobeIcon className="size-3" /> public
                           </Badge>
                         ) : (

@@ -310,15 +310,15 @@ function WorkloadHealthCard({ clusterId }: { clusterId: string }) {
                     row.desiredReplicas - row.readyReplicas;
                   const readyTone =
                     deficit === 0
-                      ? "text-emerald-600"
+                      ? "text-success-fg"
                       : deficit === row.desiredReplicas
                         ? "text-destructive"
-                        : "text-amber-600";
+                        : "text-warning-fg";
                   const restartsTone =
                     row.restartCount24h === 0
                       ? "text-muted-foreground"
                       : row.restartCount24h < 5
-                        ? "text-amber-600"
+                        ? "text-warning-fg"
                         : "text-destructive";
                   return (
                     <tr

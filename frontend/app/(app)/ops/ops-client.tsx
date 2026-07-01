@@ -267,11 +267,11 @@ export function OpsClient() {
                         disabled
                       </Badge>
                     ) : c.capabilitiesProbedAt ? (
-                      <Badge className="bg-emerald-500/15 text-emerald-700 text-xs dark:text-emerald-300">
+                      <Badge className="bg-success/15 text-success-fg text-xs">
                         active
                       </Badge>
                     ) : (
-                      <Badge className="bg-amber-500/15 text-amber-700 text-xs dark:text-amber-300">
+                      <Badge className="bg-warning/15 text-warning-fg text-xs">
                         not probed
                       </Badge>
                     )}
@@ -490,9 +490,9 @@ export function OpsClient() {
                     variant="secondary"
                     className={
                       e.decision === "ALLOW"
-                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                        ? "bg-success/15 text-success-fg"
                         : e.decision === "DENY"
-                          ? "bg-red-500/15 text-red-700 dark:text-red-300"
+                          ? "bg-danger/15 text-danger-fg"
                           : ""
                     }
                   >
@@ -525,9 +525,9 @@ interface KpiTileProps {
 function KpiTile({ icon: Icon, label, value, sub, href, tone }: KpiTileProps) {
   const accent =
     tone === "error"
-      ? "border-red-500/30 bg-red-500/5"
+      ? "border-danger-border bg-danger/5"
       : tone === "warn"
-        ? "border-amber-500/30 bg-amber-500/5"
+        ? "border-warning-border bg-warning/5"
         : "";
   return (
     <Link href={href} className="contents">

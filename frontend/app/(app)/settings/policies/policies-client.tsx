@@ -36,8 +36,8 @@ interface Resp {
 }
 
 const effectStyles: Record<string, string> = {
-  ALLOW: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-  DENY: "bg-red-500/15 text-red-700 dark:text-red-300",
+  ALLOW: "bg-success/15 text-success-fg",
+  DENY: "bg-danger/15 text-danger-fg",
 };
 
 export function PoliciesClient() {

@@ -198,19 +198,19 @@ export function DashboardClient() {
           {health.loading ? (
             <Skeleton className="h-6 w-20" />
           ) : failingCount === 0 && recentFailureCount === 0 ? (
-            <Badge className="gap-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+            <Badge className="gap-1 bg-success/15 text-success-fg">
               <CheckCircle2Icon className="size-3" /> {t("fleetHealth.healthy")}
             </Badge>
           ) : failingCount > 0 ? (
             <Badge
               variant="destructive"
-              className="gap-1 bg-red-500/15 text-red-700 dark:text-red-300"
+              className="gap-1 bg-danger/15 text-danger-fg"
             >
               <CircleXIcon className="size-3" />
               {t("fleetHealth.failing", { count: failingCount })}
             </Badge>
           ) : (
-            <Badge className="gap-1 bg-amber-500/15 text-amber-700 dark:text-amber-300">
+            <Badge className="gap-1 bg-warning/15 text-warning-fg">
               <AlertTriangleIcon className="size-3" />
               {t("fleetHealth.hiccup", { count: recentFailureCount })}
             </Badge>
@@ -324,9 +324,9 @@ export function DashboardClient() {
 }
 
 const FLEET_TONE: Record<"ok" | "warn" | "error" | "muted", string> = {
-  ok: "border-emerald-500/30 bg-emerald-500/5",
-  warn: "border-amber-500/30 bg-amber-500/5",
-  error: "border-red-500/30 bg-red-500/5",
+  ok: "border-success-border bg-success/5",
+  warn: "border-warning-border bg-warning/5",
+  error: "border-danger-border bg-danger/5",
   muted: "border-muted bg-muted/20",
 };
 
@@ -368,9 +368,9 @@ function CostMtdDelta({ forecast, t }: CostMtdDeltaProps) {
   const Direction = delta > 0 ? ArrowUpIcon : delta < 0 ? ArrowDownIcon : ArrowRightIcon;
   const tone =
     delta > 0
-      ? "text-amber-600 dark:text-amber-400"
+      ? "text-warning-fg"
       : delta < 0
-        ? "text-emerald-600 dark:text-emerald-400"
+        ? "text-success-fg"
         : "text-muted-foreground";
   // Zero previous-month spend → no comparable signal; render the
   // neutral label rather than "0.0% vs prev month".

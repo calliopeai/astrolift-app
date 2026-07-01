@@ -442,7 +442,7 @@ export function AlertsClient() {
                       {r.activeMute ? (
                         <VolumeOffIcon className="text-muted-foreground size-4" />
                       ) : r.isActive ? (
-                        <BellIcon className="size-4 text-emerald-500" />
+                        <BellIcon className="size-4 text-success-fg" />
                       ) : (
                         <BellOffIcon className="text-muted-foreground size-4" />
                       )}

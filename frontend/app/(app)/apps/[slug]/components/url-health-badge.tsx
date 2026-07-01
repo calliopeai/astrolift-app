@@ -171,11 +171,11 @@ function statusContainerClass(status: UrlHealthStatus | string, loading: boolean
   if (loading) return "border-zinc-300 bg-zinc-50 text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300";
   switch (status) {
     case "ok":
-      return "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700/50 dark:bg-emerald-950/30 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-950/50";
+      return "border-success-border bg-success/10 text-success-fg hover:bg-success/20";
     case "degraded":
-      return "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-950/50";
+      return "border-warning-border bg-warning/10 text-warning-fg hover:bg-warning/20";
     case "down":
-      return "border-red-300 bg-red-50 text-red-700 dark:border-red-700/50 dark:bg-red-950/30 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-950/50";
+      return "border-danger-border bg-danger/10 text-danger-fg hover:bg-danger/20";
     case "unknown":
     default:
       return "border-zinc-300 bg-zinc-50 text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300";
@@ -185,11 +185,11 @@ function statusContainerClass(status: UrlHealthStatus | string, loading: boolean
 function statusDotClass(status: UrlHealthStatus | string): string {
   switch (status) {
     case "ok":
-      return "bg-emerald-500";
+      return "bg-success";
     case "degraded":
-      return "bg-amber-500";
+      return "bg-warning";
     case "down":
-      return "bg-red-500";
+      return "bg-danger";
     default:
       return "bg-zinc-400";
   }

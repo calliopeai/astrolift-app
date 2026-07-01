@@ -82,7 +82,7 @@ function LifecycleBadge({ lifecycle }: { lifecycle: string }) {
     return (
       <Badge
         variant="secondary"
-        className="border-emerald-600/40 bg-emerald-600/10 text-emerald-700 dark:text-emerald-400"
+        className="border-success-border bg-success/10 text-success-fg"
       >
         Managed
       </Badge>
@@ -100,7 +100,7 @@ function LifecycleBadge({ lifecycle }: { lifecycle: string }) {
     return (
       <Badge
         variant="secondary"
-        className="border-amber-600/40 bg-amber-600/10 text-amber-700 dark:text-amber-400"
+        className="border-warning-border bg-warning/10 text-warning-fg"
       >
         Registered
       </Badge>
@@ -176,7 +176,7 @@ function CapabilityCell({ state }: { state: CellState }) {
   if (state.state === "confirmed") {
     return (
       <CheckCircle2Icon
-        className="text-emerald-600 mx-auto size-4"
+        className="text-success-fg mx-auto size-4"
         aria-label="capability confirmed by probe"
       />
     );
@@ -187,7 +187,7 @@ function CapabilityCell({ state }: { state: CellState }) {
         <TooltipTrigger asChild>
           <span className="inline-flex">
             <AlertTriangleIcon
-              className="text-amber-500 mx-auto size-4"
+              className="text-warning-fg mx-auto size-4"
               aria-label="declared in manifest, not confirmed by probe"
             />
           </span>
@@ -378,7 +378,7 @@ export function ConnectedClustersClient() {
                             colSpan={CAPABILITIES.length + 5}
                             className="pt-0 pb-3"
                           >
-                            <p className="text-amber-700 dark:text-amber-400 inline-flex items-start gap-1.5 text-xs">
+                            <p className="text-warning-fg inline-flex items-start gap-1.5 text-xs">
                               <AlertTriangleIcon className="mt-0.5 size-3 shrink-0" />
                               <span className="font-mono">
                                 {c.lastManagementError}

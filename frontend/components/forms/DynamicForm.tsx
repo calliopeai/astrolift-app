@@ -80,7 +80,7 @@ export function DynamicForm({ slug, onSuccess }: DynamicFormProps) {
   if (submitted) {
     return (
       <Card className="flex flex-col items-center gap-4 p-8 text-center">
-        <CheckCircle2Icon className="h-12 w-12 text-green-500" />
+        <CheckCircle2Icon className="h-12 w-12 text-success-fg" />
         <h2 className="text-xl font-semibold">Submitted!</h2>
         <p className="text-muted-foreground">Your response to &quot;{formDef.name}&quot; has been recorded.</p>
       </Card>

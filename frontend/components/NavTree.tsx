@@ -51,17 +51,17 @@ const OPEN_KEY = "astrolift.nav.tree.open.v1";
 // the status badge palette in app-detail-client.tsx so the sidebar
 // and detail page agree on what "failed" looks like at a glance.
 const STATUS_DOT_CLASS: Record<AstroliftAppStatus, string> = {
-  ready: "bg-emerald-500",
-  provisioning: "bg-amber-500",
+  ready: "bg-success",
+  provisioning: "bg-warning",
   pending: "bg-slate-400",
-  failed: "bg-rose-500",
+  failed: "bg-danger",
 };
 
 function statusIcon(status: AstroliftAppStatus) {
   if (status === "provisioning") {
     return (
       <Loader2Icon
-        className="size-3 shrink-0 animate-spin text-amber-500"
+        className="size-3 shrink-0 animate-spin text-warning-fg"
         aria-hidden
       />
     );
@@ -69,7 +69,7 @@ function statusIcon(status: AstroliftAppStatus) {
   if (status === "failed") {
     return (
       <AlertCircleIcon
-        className="size-3 shrink-0 text-rose-500"
+        className="size-3 shrink-0 text-danger-fg"
         aria-hidden
       />
     );

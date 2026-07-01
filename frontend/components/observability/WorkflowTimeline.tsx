@@ -46,8 +46,8 @@ const ACTIVITY_ICON: Record<ActivityStatus, React.ComponentType<{ className?: st
 
 const ACTIVITY_TONE: Record<ActivityStatus, string> = {
   pending: "text-muted-foreground",
-  running: "text-amber-500 animate-spin",
-  succeeded: "text-emerald-500",
+  running: "text-warning-fg animate-spin",
+  succeeded: "text-success-fg",
   failed: "text-destructive",
   cancelled: "text-muted-foreground",
 };

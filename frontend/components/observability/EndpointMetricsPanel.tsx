@@ -122,7 +122,7 @@ function EndpointRow({ row }: { row: AstroliftAppEndpointMetric }) {
   if (errorPct > 5) {
     errorClass = "text-destructive font-medium";
   } else if (errorPct > 1) {
-    errorClass = "text-amber-600 dark:text-amber-500 font-medium";
+    errorClass = "text-warning-fg font-medium";
   }
 
   return (

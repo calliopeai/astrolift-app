@@ -145,9 +145,9 @@ interface RemoveResp {
 }
 
 const OUTCOME_DOT: Record<EmailDnsCheckOutcome, string> = {
-  GREEN: "bg-green-500",
-  YELLOW: "bg-amber-500",
-  RED: "bg-red-500",
+  GREEN: "bg-success",
+  YELLOW: "bg-warning",
+  RED: "bg-danger",
   UNKNOWN: "bg-muted-foreground",
 };
 
@@ -301,9 +301,9 @@ function ReputationPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
   const repPct = status.reputationScore !== null ? status.reputationScore * 100 : null;
   const repColor = (() => {
     if (repPct === null) return "bg-muted-foreground";
-    if (repPct >= 70) return "bg-green-500";
-    if (repPct >= 50) return "bg-amber-500";
-    return "bg-red-500";
+    if (repPct >= 70) return "bg-success";
+    if (repPct >= 50) return "bg-warning";
+    return "bg-danger";
   })();
 
   return (
@@ -317,8 +317,8 @@ function ReputationPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
           variant={status.productionAccess ? "default" : "outline"}
           className={
             status.productionAccess
-              ? "bg-green-500/10 text-green-700 dark:text-green-400"
-              : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+              ? "bg-success/10 text-success-fg"
+              : "border-warning-border bg-warning/10 text-warning-fg"
           }
         >
           {status.productionAccess ? "Production access" : "Sandbox"}
@@ -350,7 +350,7 @@ function ReputationPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
       </div>
       {!status.productionAccess ? (
         <p className="text-muted-foreground mt-3 flex items-start gap-1.5 text-xs">
-          <AlertTriangleIcon className="size-3.5 shrink-0 text-amber-500" />
+          <AlertTriangleIcon className="size-3.5 shrink-0 text-warning-fg" />
           Sandbox mode: this identity can only send to verified recipients + verified domains.
           Request production access from AWS Support before shipping to end users.
         </p>
@@ -396,13 +396,13 @@ function QuotaPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
           <div className="mt-2">
             <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
               <div
-                className={`h-full ${dailyOverThreshold ? "bg-amber-500" : "bg-primary"}`}
+                className={`h-full ${dailyOverThreshold ? "bg-warning" : "bg-primary"}`}
                 style={{ width: `${Math.min(100, dailyPct)}%` }}
               />
             </div>
             <p
               className={`mt-1 text-2xs ${
-                dailyOverThreshold ? "text-amber-600" : "text-muted-foreground"
+                dailyOverThreshold ? "text-warning-fg" : "text-muted-foreground"
               }`}
             >
               {dailyPct.toFixed(1)}% of 24h quota
@@ -526,10 +526,10 @@ function IdentityPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
         <Badge
           className={
             verified
-              ? "bg-green-500/10 text-green-700 dark:text-green-400"
+              ? "bg-success/10 text-success-fg"
               : failed
-                ? "bg-red-500/10 text-red-700 dark:text-red-400"
-                : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                ? "bg-danger/10 text-danger-fg"
+                : "bg-warning/10 text-warning-fg"
           }
           variant="outline"
         >
@@ -1106,8 +1106,8 @@ function SnsEventPublishingPanel({ serviceConfig }: { serviceConfig: Record<stri
           variant="outline"
           className={
             enabled
-              ? "bg-green-500/10 text-green-700 dark:text-green-400"
-              : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+              ? "bg-success/10 text-success-fg"
+              : "border-warning-border bg-warning/10 text-warning-fg"
           }
         >
           {enabled ? "Active" : "Not configured"}
@@ -1216,11 +1216,11 @@ const SEVERITY_OPTIONS = [
 function severityBadge(severity: string): string {
   switch (severity) {
     case "critical":
-      return "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400";
+      return "border-danger-border bg-danger/10 text-danger-fg";
     case "warning":
-      return "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400";
+      return "border-warning-border bg-warning/10 text-warning-fg";
     default:
-      return "border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-400";
+      return "border-info-border bg-info/10 text-info-fg";
   }
 }
 
@@ -1587,10 +1587,10 @@ function EngagementMetricsPanel({
             const tone =
               t.direction === "lower_better"
                 ? t.critAt && t.pct >= t.critAt
-                  ? "text-red-700 dark:text-red-400"
+                  ? "text-danger-fg"
                   : t.warnAt && t.pct >= t.warnAt
-                    ? "text-amber-700 dark:text-amber-400"
-                    : "text-green-700 dark:text-green-400"
+                    ? "text-warning-fg"
+                    : "text-success-fg"
                 : "text-foreground";
             return (
               <div key={t.label} className="bg-muted/30 rounded-md border p-3">
@@ -1634,16 +1634,16 @@ const EVENT_KIND_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
 function eventKindBadge(kind: string): string {
   switch (kind) {
     case "delivery":
-      return "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-400";
+      return "border-success-border bg-success/10 text-success-fg";
     case "bounce":
-      return "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400";
+      return "border-danger-border bg-danger/10 text-danger-fg";
     case "complaint":
-      return "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400";
+      return "border-danger-border bg-danger/10 text-danger-fg";
     case "open":
     case "click":
-      return "border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-400";
+      return "border-info-border bg-info/10 text-info-fg";
     case "reject":
-      return "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400";
+      return "border-warning-border bg-warning/10 text-warning-fg";
     default:
       return "border-muted-foreground/30 bg-muted/40";
   }
@@ -1850,7 +1850,7 @@ function MessageMetadata({
       </div>
       {eventKind === "bounce" && (bounceType || bounceSubType) ? (
         <div className="flex items-center gap-2">
-          <MailWarningIcon className="size-3.5 text-red-500" />
+          <MailWarningIcon className="size-3.5 text-danger-fg" />
           <span>
             <strong>{bounceType ?? "bounce"}</strong>
             {bounceSubType ? ` · ${bounceSubType}` : ""}
@@ -1859,7 +1859,7 @@ function MessageMetadata({
       ) : null}
       {eventKind === "complaint" && complaintType ? (
         <div className="flex items-center gap-2">
-          <MailWarningIcon className="size-3.5 text-red-500" />
+          <MailWarningIcon className="size-3.5 text-danger-fg" />
           <span>
             feedback-loop: <strong>{complaintType}</strong>
           </span>
@@ -2311,7 +2311,7 @@ function TemplateStats({ managedServiceId, name }: { managedServiceId: string; n
                   />
                   {failed > 0 ? (
                     <div
-                      className="absolute right-0 bottom-0 left-0 rounded-sm bg-red-500/70"
+                      className="absolute right-0 bottom-0 left-0 rounded-sm bg-danger/70"
                       style={{ height: `${(failedPct * pct) / 100}%` }}
                     />
                   ) : null}

@@ -83,11 +83,11 @@ const PAGE_SIZE = 100;
 const decisionStyles: Record<string, { icon: React.ReactNode; cls: string }> = {
   ALLOW: {
     icon: <CheckCircle2Icon className="size-3" />,
-    cls: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+    cls: "bg-success/15 text-success-fg",
   },
   DENY: {
     icon: <XCircleIcon className="size-3" />,
-    cls: "bg-red-500/15 text-red-700 dark:text-red-300",
+    cls: "bg-danger/15 text-danger-fg",
   },
   UNKNOWN: {
     icon: null,

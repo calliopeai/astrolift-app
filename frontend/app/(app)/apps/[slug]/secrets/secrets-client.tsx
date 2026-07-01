@@ -194,8 +194,8 @@ function SecretScopeBadge({ scope }: { scope: string | null | undefined }) {
       variant="outline"
       className={
         isProd
-          ? "ml-2 border-amber-500/40 bg-amber-500/10 text-2xs text-amber-700 dark:text-amber-300"
-          : "ml-2 border-sky-500/40 bg-sky-500/10 text-2xs text-sky-700 dark:text-sky-300"
+          ? "ml-2 border-warning-border bg-warning/10 text-2xs text-warning-fg"
+          : "ml-2 border-info-border bg-info/10 text-2xs text-info-fg"
       }
     >
       {scopeBadgeLabel(scope)}
@@ -228,7 +228,7 @@ function SecretExpiryBadge({ expiresAt }: { expiresAt: string | null | undefined
     return (
       <Badge
         variant="outline"
-        className="ml-2 border-amber-500/40 bg-amber-500/10 text-2xs text-amber-700 dark:text-amber-300"
+        className="ml-2 border-warning-border bg-warning/10 text-2xs text-warning-fg"
       >
         Expires in {days}d
       </Badge>

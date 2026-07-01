@@ -227,7 +227,7 @@ function CertExpiryBadge({
     return (
       <Badge
         variant="outline"
-        className="border-amber-500/40 bg-amber-500/10 text-2xs text-amber-700 dark:text-amber-300"
+        className="border-warning-border bg-warning/10 text-2xs text-warning-fg"
       >
         Expires in {days}d
       </Badge>
@@ -899,8 +899,8 @@ function AddDomainSheet({
                 : t(`addSheet.methodHints.${method}`)}
             </p>
             {isByo && !isWildcard && (
-              <div className="rounded-md border border-sky-500/30 bg-sky-500/5 p-2 text-xs">
-                <p className="font-medium text-sky-700 dark:text-sky-400">
+              <div className="rounded-md border border-info-border bg-info/5 p-2 text-xs">
+                <p className="font-medium text-info-fg">
                   {t("addSheet.byoTitle")}
                 </p>
                 <p className="text-muted-foreground">{t("addSheet.byoFollowup")}</p>
@@ -1642,18 +1642,18 @@ function CertStateBlock({
   }
   if (state === "issuing") {
     return (
-      <div className="text-muted-foreground flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs">
-        <Loader2Icon className="size-3.5 animate-spin text-amber-600" />
-        <span className="font-medium text-amber-700 dark:text-amber-400">{t("issuing")}</span>
+      <div className="text-muted-foreground flex items-center gap-2 rounded-md border border-warning-border bg-warning/5 p-2 text-xs">
+        <Loader2Icon className="size-3.5 animate-spin text-warning-fg" />
+        <span className="font-medium text-warning-fg">{t("issuing")}</span>
         <span>{domain.isPlatformManagedZone ? t("issuingPlatform") : t("issuingExternal")}</span>
       </div>
     );
   }
   if (state === "active") {
     return (
-      <div className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-2 text-xs">
-        <ShieldCheckIcon className="size-3.5 text-emerald-600" />
-        <span className="font-medium text-emerald-700 dark:text-emerald-400">{t("active")}</span>
+      <div className="flex items-center gap-2 rounded-md border border-success-border bg-success/5 p-2 text-xs">
+        <ShieldCheckIcon className="size-3.5 text-success-fg" />
+        <span className="font-medium text-success-fg">{t("active")}</span>
         <span className="text-muted-foreground">
           {t("activeDesc", { hostname: domain.hostname })}
         </span>
@@ -1662,11 +1662,11 @@ function CertStateBlock({
   }
   if (state === "byo") {
     return (
-      <div className="flex items-start gap-2 rounded-md border border-sky-500/30 bg-sky-500/5 p-2 text-xs">
-        <CheckCircle2Icon className="size-3.5 shrink-0 text-sky-600" />
+      <div className="flex items-start gap-2 rounded-md border border-info-border bg-info/5 p-2 text-xs">
+        <CheckCircle2Icon className="size-3.5 shrink-0 text-info-fg" />
         <div className="flex-1 space-y-1">
           <div>
-            <span className="font-medium text-sky-700 dark:text-sky-400">{t("byo")}</span>
+            <span className="font-medium text-info-fg">{t("byo")}</span>
             {domain.byoCertificateUploadedAt && (
               <span className="text-muted-foreground ml-2">
                 {t("byoUploaded", {
@@ -1709,7 +1709,7 @@ function CertStateBlock({
     );
   }
   return (
-    <div className="text-muted-foreground rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs">
+    <div className="text-muted-foreground rounded-md border border-warning-border bg-warning/5 p-2 text-xs">
       {t("queued")}
     </div>
   );
@@ -1857,7 +1857,7 @@ function IngressStatusCard({
           {paused ? (
             <Badge
               variant="outline"
-              className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+              className="border-warning-border bg-warning/10 text-warning-fg"
             >
               <PauseIcon className="size-3" />
               {t("paused")}
@@ -1865,7 +1865,7 @@ function IngressStatusCard({
           ) : (
             <Badge
               variant="outline"
-              className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+              className="border-success-border bg-success/10 text-success-fg"
             >
               <PlayIcon className="size-3" />
               {t("live")}
@@ -1916,10 +1916,10 @@ function IngressStatusCard({
         </div>
 
         {paused && (
-          <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs">
-            <AlertTriangleIcon className="size-3.5 shrink-0 text-amber-600" />
+          <div className="flex items-start gap-2 rounded-md border border-warning-border bg-warning/5 p-2 text-xs">
+            <AlertTriangleIcon className="size-3.5 shrink-0 text-warning-fg" />
             <span className="text-muted-foreground">
-              <span className="font-medium text-amber-700 dark:text-amber-400">
+              <span className="font-medium text-warning-fg">
                 {t("maintenance")}
               </span>{" "}
               {t("maintenanceDesc")}

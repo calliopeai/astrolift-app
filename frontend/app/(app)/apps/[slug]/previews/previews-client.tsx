@@ -390,9 +390,9 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
       </div>
 
       {!a.previewEnabled && (
-        <Card className="border-amber-500/30 bg-amber-500/5">
+        <Card className="border-warning-border bg-warning/5">
           <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3">
-            <AlertTriangleIcon className="mt-0.5 size-4 text-amber-700 dark:text-amber-300" />
+            <AlertTriangleIcon className="mt-0.5 size-4 text-warning-fg" />
             <div className="flex-1">
               <CardTitle className="text-sm">{t("disabled.title")}</CardTitle>
               <CardDescription>{t("disabled.description")}</CardDescription>
@@ -402,9 +402,9 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
       )}
 
       {stale.length > 0 && (
-        <Card className="border-amber-500/30 bg-amber-500/5">
+        <Card className="border-warning-border bg-warning/5">
           <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3">
-            <CalendarClockIcon className="mt-0.5 size-4 text-amber-700 dark:text-amber-300" />
+            <CalendarClockIcon className="mt-0.5 size-4 text-warning-fg" />
             <div className="flex-1">
               <CardTitle className="text-sm">{t("stale.title", { count: stale.length })}</CardTitle>
               <CardDescription>{t("stale.description", { days: STALE_DAYS })}</CardDescription>
@@ -660,7 +660,7 @@ function PreviewRow({
                 <span
                   className={cn(
                     "font-mono text-xs",
-                    countdown.expired ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground"
+                    countdown.expired ? "text-danger-fg" : "text-muted-foreground"
                   )}
                 >
                   {countdown.label}

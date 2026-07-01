@@ -222,7 +222,7 @@ function AlertSummaryCard({
       <p className="mt-0.5 text-2xl font-semibold">{loading ? "—" : unresolved}</p>
       <p className="text-muted-foreground text-2xs">
         {critical > 0 ? (
-          <Badge variant="outline" className="border-red-500/40 text-red-600 dark:text-red-400">
+          <Badge variant="outline" className="border-danger-border text-danger-fg">
             {critical} critical
           </Badge>
         ) : unresolved === 0 ? (

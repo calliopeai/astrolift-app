@@ -214,7 +214,7 @@ function SelectConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: Fiel
           </button>
         </div>
       ))}
-      <button type="button" onClick={addOption} className="text-xs text-blue-500 hover:text-blue-700 self-start">
+      <button type="button" onClick={addOption} className="text-xs text-info-fg hover:underline self-start">
         + Add option
       </button>
     </div>
@@ -298,7 +298,7 @@ function PercentageSplitConfig({ field, onUpdate }: { field: FieldDef; onUpdate:
           </button>
         </div>
       ))}
-      <button type="button" onClick={addCategory} className="text-xs text-blue-500 hover:text-blue-700 self-start">
+      <button type="button" onClick={addCategory} className="text-xs text-info-fg hover:underline self-start">
         + Add category
       </button>
     </div>

@@ -348,14 +348,14 @@ function severityBadgeProps(severity: string): {
     case "warn":
       return {
         variant: "outline",
-        className: "border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+        className: "border-warning-border bg-warning/10 text-warning-fg",
         label: severity,
       };
     case "info":
     default:
       return {
         variant: "outline",
-        className: "border-sky-500/50 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+        className: "border-info-border bg-info/10 text-info-fg",
         label: severity || "info",
       };
   }
@@ -964,7 +964,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
               We render before the LogViewer so the operator sees the
               reason for the empty pane immediately. */}
           {isHistorical && historicalUnavailable ? (
-            <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-300">
+            <div className="mb-3 flex items-start gap-2 rounded-md border border-warning-border bg-warning/10 p-2 text-xs text-warning-fg">
               <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" />
               <div>
                 <p className="font-medium">{t("logs.historicalUnavailableTitle")}</p>

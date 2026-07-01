@@ -448,8 +448,8 @@ function renderDiffSide(full: string, lines: DiffLine[], side: "prev" | "cur"): 
           return <div key={idx}>&nbsp;</div>;
         }
         const cls = cn(
-          line.type === "rm" && "bg-rose-500/10 text-rose-700 dark:text-rose-300",
-          line.type === "add" && "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+          line.type === "rm" && "bg-danger/10 text-danger-fg",
+          line.type === "add" && "bg-success/10 text-success-fg"
         );
         return (
           <div key={idx} className={cls}>

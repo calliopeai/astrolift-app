@@ -1200,8 +1200,8 @@ function ClusterAgentCard({ cluster }: { cluster: ClusterWithHeartbeat }) {
       <CardContent className="space-y-3">
         {issued ? (
           <>
-            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
-              <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
+            <div className="rounded-md border border-warning-border bg-warning/10 p-3">
+              <p className="text-xs font-medium text-warning-fg">
                 Copy this key now — it won&apos;t be shown again.
               </p>
               <div className="mt-2 flex items-center gap-2">
@@ -1352,7 +1352,7 @@ function AuthGateToggle({
         "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors",
         "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
         "disabled:cursor-not-allowed disabled:opacity-50",
-        checked ? "bg-emerald-600" : "bg-muted-foreground/30"
+        checked ? "bg-success" : "bg-muted-foreground/30"
       )}
     >
       <span
@@ -1588,7 +1588,7 @@ function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
               {enabled ? (
-                <ShieldIcon className="size-4 text-emerald-600" />
+                <ShieldIcon className="size-4 text-success-fg" />
               ) : (
                 <KeyRoundIcon className="size-4" />
               )}
@@ -1606,7 +1606,7 @@ function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
             <span
               className={cn(
                 "text-xs font-medium",
-                enabled ? "text-emerald-600" : "text-muted-foreground"
+                enabled ? "text-success-fg" : "text-muted-foreground"
               )}
             >
               {enabled ? "Enabled" : "Disabled"}
@@ -1735,9 +1735,9 @@ function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
-              <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-amber-600" />
-              <p className="text-sm text-amber-700 dark:text-amber-400">
+            <div className="flex items-start gap-2 rounded-md border border-warning-border bg-warning/10 p-3">
+              <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-warning-fg" />
+              <p className="text-sm text-warning-fg">
                 All apps on this cluster are publicly accessible. Enable the auth gate to put every
                 managed-subdomain Ingress behind {authMeta.label}.
               </p>

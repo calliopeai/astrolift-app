@@ -747,7 +747,7 @@ function Item({
           {done && (
             <Badge
               variant="secondary"
-              className="ml-2 bg-emerald-500/15 text-xs text-emerald-700 dark:text-emerald-300"
+              className="ml-2 bg-success/15 text-xs text-success-fg"
             >
               {shippedLabel}
             </Badge>

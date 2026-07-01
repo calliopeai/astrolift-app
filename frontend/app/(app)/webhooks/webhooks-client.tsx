@@ -317,10 +317,10 @@ export function WebhooksClient({
     >
       {tabs}
       {reveal && (
-        <Card className="border-emerald-500/30 bg-emerald-500/5">
+        <Card className="border-success-border bg-success/5">
           <CardContent className="flex flex-col gap-3 p-4">
             <div className="flex items-center gap-2">
-              <CheckCircle2Icon className="size-4 text-emerald-600" />
+              <CheckCircle2Icon className="size-4 text-success-fg" />
               <p className="text-sm font-medium">
                 Secret for <span className="font-mono">{reveal.subscription.url}</span> ready
               </p>
@@ -659,17 +659,17 @@ function TestResultCard({
   const ok =
     result.delivered && result.statusCode && result.statusCode >= 200 && result.statusCode < 300;
   const border = ok
-    ? "border-emerald-500/30 bg-emerald-500/5"
-    : "border-amber-500/30 bg-amber-500/5";
+    ? "border-success-border bg-success/5"
+    : "border-warning-border bg-warning/5";
   return (
     <Card className={border}>
       <CardContent className="flex flex-col gap-3 p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-medium">
             {ok ? (
-              <CheckCircle2Icon className="size-4 text-emerald-600" />
+              <CheckCircle2Icon className="size-4 text-success-fg" />
             ) : (
-              <XCircleIcon className="size-4 text-amber-600" />
+              <XCircleIcon className="size-4 text-warning-fg" />
             )}
             Test delivery to <span className="font-mono">{result.url}</span>
           </div>

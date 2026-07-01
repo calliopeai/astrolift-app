@@ -332,7 +332,7 @@ export function DriversClient() {
                           <TableCell key={cap.key} className="text-center">
                             {row.capabilities[cap.key] ? (
                               <CheckIcon
-                                className="text-emerald-600 mx-auto size-4"
+                                className="text-success-fg mx-auto size-4"
                                 aria-label="supported"
                               />
                             ) : (

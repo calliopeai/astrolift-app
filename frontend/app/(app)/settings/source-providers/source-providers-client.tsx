@@ -267,7 +267,7 @@ export function SourceProvidersPanel() {
             Client ID and runs UpdateSourceConnection in place.
           */}
           {incompleteClientIdConnections.length > 0 && (
-            <div className="border-amber-500/30 bg-amber-500/5 mx-6 mt-6 flex items-start gap-3 rounded-md border p-3 text-xs text-amber-900 dark:text-amber-200">
+            <div className="border-warning-border bg-warning/5 mx-6 mt-6 flex items-start gap-3 rounded-md border p-3 text-xs text-warning-fg">
               <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
               <div className="flex-1 space-y-2">
                 <p className="font-medium">
@@ -347,7 +347,7 @@ export function SourceProvidersPanel() {
                       {c.isPersonal && (
                         <Badge
                           variant="secondary"
-                          className="ml-2 gap-1 bg-blue-500/15 text-2xs text-blue-700 dark:text-blue-300"
+                          className="ml-2 gap-1 bg-info/15 text-2xs text-info-fg"
                         >
                           personal {c.userUsername ? `· ${c.userUsername}` : ""}
                         </Badge>
@@ -372,7 +372,7 @@ export function SourceProvidersPanel() {
                     <TableCell>
                       {c.isActive ? (
                         <Badge
-                          className="gap-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                          className="gap-1 bg-success/15 text-success-fg"
                           variant="secondary"
                         >
                           <CheckCircle2Icon className="size-3" />
@@ -399,7 +399,7 @@ export function SourceProvidersPanel() {
                                 variant="outline"
                                 onClick={() => setClientIdTarget(c)}
                               >
-                                <AlertTriangleIcon className="size-3.5 text-amber-600 dark:text-amber-400" />
+                                <AlertTriangleIcon className="size-3.5 text-warning-fg" />
                                 Add Client ID
                               </Button>
                             </Can>

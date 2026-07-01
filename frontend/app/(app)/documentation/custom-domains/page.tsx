@@ -146,7 +146,7 @@ Value:  ingress.<cluster>.astrolift.app`}</code>
           <Badge variant="secondary">validated</Badge>{" "}
           →{" "}
           <Badge
-            className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+            className="bg-success/15 text-success-fg"
             variant="secondary"
           >
             active

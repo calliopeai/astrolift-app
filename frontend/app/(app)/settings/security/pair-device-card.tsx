@@ -203,7 +203,7 @@ export function PairDeviceCard() {
                 />
                 <div className="flex items-center gap-2 text-sm">
                   {expired ? (
-                    <span className="flex items-center gap-1 font-medium text-red-600">
+                    <span className="flex items-center gap-1 font-medium text-danger-fg">
                       <AlertTriangleIcon className="size-4" /> {t("expiredLabel")}
                     </span>
                   ) : (

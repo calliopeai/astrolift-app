@@ -1254,9 +1254,9 @@ function DeploymentStatsBar({ deployments }: { deployments: AstroliftDeployment[
     stats.successRate == null
       ? "text-muted-foreground"
       : stats.successRate >= 80
-        ? "text-emerald-500"
+        ? "text-success-fg"
         : stats.successRate >= 50
-          ? "text-amber-500"
+          ? "text-warning-fg"
           : "text-destructive";
 
   return (
@@ -1483,13 +1483,13 @@ function ManifestDiffRow({
 }) {
   const badge =
     entry.op === "add" ? (
-      <Badge className="border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+      <Badge className="border-success-border bg-success/15 text-success-fg">
         + add
       </Badge>
     ) : entry.op === "remove" ? (
       <Badge variant="destructive">− remove</Badge>
     ) : (
-      <Badge className="border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300">
+      <Badge className="border-warning-border bg-warning/15 text-warning-fg">
         ~ replace
       </Badge>
     );
@@ -1501,7 +1501,7 @@ function ManifestDiffRow({
         <code className="break-all">{entry.path}</code>
       </div>
       {entry.op === "add" && (
-        <pre className="break-all whitespace-pre-wrap text-emerald-700 dark:text-emerald-300">
+        <pre className="break-all whitespace-pre-wrap text-success-fg">
           {jsonValue(entry.after)}
         </pre>
       )}
@@ -1515,7 +1515,7 @@ function ManifestDiffRow({
           <pre className="text-destructive break-all whitespace-pre-wrap">
             − {jsonValue(entry.before)}
           </pre>
-          <pre className="break-all whitespace-pre-wrap text-emerald-700 dark:text-emerald-300">
+          <pre className="break-all whitespace-pre-wrap text-success-fg">
             + {jsonValue(entry.after)}
           </pre>
         </div>

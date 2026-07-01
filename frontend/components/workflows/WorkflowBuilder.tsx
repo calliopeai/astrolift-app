@@ -140,7 +140,7 @@ function StateNode({
           <div className="font-medium">{data.label}</div>
           <div className="text-xs text-gray-500">{data.name}</div>
           {data.form_slug && (
-            <div className="mt-1 text-2xs text-blue-500">Form: {data.form_slug}</div>
+            <div className="mt-1 text-2xs text-info-fg">Form: {data.form_slug}</div>
           )}
           {data.assigned_role && (
             <div className="text-2xs text-purple-500">Role: {data.assigned_role}</div>

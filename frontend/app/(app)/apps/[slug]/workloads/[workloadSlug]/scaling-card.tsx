@@ -169,7 +169,7 @@ export function ScalingCard({
           <ScalingIcon className="size-4" />
           {labels.title}
           {status.isScaling && (
-            <Badge className="gap-1 bg-amber-500/15 text-amber-700 dark:text-amber-300">
+            <Badge className="gap-1 bg-warning/15 text-warning-fg">
               <ActivityIcon className="size-3 animate-pulse" />
               {pending > status.currentReplicas ? labels.scalingUp : labels.scalingDown}
             </Badge>
@@ -177,7 +177,7 @@ export function ScalingCard({
           {status.hpaEnabled && (
             <Badge
               variant="outline"
-              className="gap-1 border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+              className="gap-1 border-success-border text-success-fg"
             >
               <GaugeIcon className="size-3" />
               {labels.hpaEnabledLabel}
@@ -299,7 +299,7 @@ function HpaGaugeSection({ status, labels }: { status: ScalingStatus; labels: Sc
   // green.
   const atCeiling = status.currentReplicas >= max && max > 0;
   const nearCeiling = !atCeiling && status.currentReplicas >= max - 1;
-  const color = atCeiling ? "bg-rose-500" : nearCeiling ? "bg-amber-500" : "bg-emerald-500";
+  const color = atCeiling ? "bg-danger" : nearCeiling ? "bg-warning" : "bg-success";
 
   return (
     <div>

@@ -51,9 +51,9 @@ interface Resp {
 }
 
 const defaultForBadge: Record<string, string> = {
-  tenant_apps: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+  tenant_apps: "bg-info/15 text-info-fg",
   preview_envs: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
-  both: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  both: "bg-success/15 text-success-fg",
   none: "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300",
 };
 

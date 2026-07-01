@@ -104,9 +104,9 @@ interface ScanPayload {
 }
 
 const SEVERITY_TONE: Record<ScanFinding["severity"], string> = {
-  critical: "bg-red-500/15 text-red-700 dark:text-red-300",
+  critical: "bg-danger/15 text-danger-fg",
   high: "bg-orange-500/15 text-orange-700 dark:text-orange-300",
-  medium: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  medium: "bg-warning/15 text-warning-fg",
   low: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
 };
 
@@ -206,14 +206,14 @@ function SigningCard({ event, loading }: { event: AstroliftEvent | null; loading
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
         <div className="flex items-start gap-3">
-          <ShieldCheckIcon className="mt-0.5 size-4 text-emerald-700 dark:text-emerald-300" />
+          <ShieldCheckIcon className="mt-0.5 size-4 text-success-fg" />
           <div>
             <CardTitle className="text-sm">{t("title")}</CardTitle>
             <CardDescription>{t("description")}</CardDescription>
           </div>
         </div>
         {hasEvent ? (
-          <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+          <Badge className="bg-success/15 text-success-fg">
             {t("signed")}
           </Badge>
         ) : (
@@ -392,7 +392,7 @@ function ScanCard({ event, loading }: { event: AstroliftEvent | null; loading: b
           <p className="text-muted-foreground p-6 text-sm">{t("noEvent")}</p>
         ) : sortedFindings.length === 0 ? (
           <div className="flex items-center gap-2 p-6 text-sm">
-            <CheckCircle2Icon className="size-4 text-emerald-700 dark:text-emerald-300" />
+            <CheckCircle2Icon className="size-4 text-success-fg" />
             <span className="text-muted-foreground">
               {t("noVulns", { at: formatTime(payload.scanned_at ?? event?.occurredAt ?? null) })}
             </span>
@@ -433,7 +433,7 @@ function ScanCard({ event, loading }: { event: AstroliftEvent | null; loading: b
                   </TableCell>
                   <TableCell className="font-mono text-xs">
                     {f.fixed_in_version ? (
-                      <span className="text-emerald-700 dark:text-emerald-300">
+                      <span className="text-success-fg">
                         {t("upgrade", { version: f.fixed_in_version })}
                       </span>
                     ) : (

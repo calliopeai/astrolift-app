@@ -61,7 +61,7 @@ function expiryChipClass(days: number): string {
     return "bg-destructive/10 text-destructive border-destructive/30";
   }
   if (days < 90) {
-    return "bg-amber-500/10 text-amber-700 border-amber-500/30 dark:text-amber-300";
+    return "bg-warning/10 text-warning-fg border-warning-border";
   }
   return "bg-muted text-muted-foreground border-transparent";
 }
