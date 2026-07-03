@@ -22,6 +22,7 @@ import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import { SOFT_DELETE_APP } from "@/graphql/registry/registry.mutations";
@@ -244,12 +245,13 @@ export function AppDetailClient({ slug }: { slug: string }) {
 
       <ReprovisionCallout appSlug={a.slug} reprovision={a.reprovision} />
 
-      <DeployActivityStrip appSlug={a.slug} limit={20} />
-
       {a.configDrift?.hasDrift ? (
         <ConfigDriftBanner appSlug={a.slug} drift={a.configDrift} />
       ) : null}
 
+      <GithubConnectCallout sourceKind={a.sourceKind} />
+
+      {/* Primary object: the app's public URL / access surface. */}
       <UrlCard
         appId={a.id}
         appSlug={a.slug}
@@ -259,25 +261,27 @@ export function AppDetailClient({ slug }: { slug: string }) {
         provisioningStatus={a.provisioningStatus}
       />
 
-      <DeploymentPanel appSlug={a.slug} />
+      <Section title={tDetail("groups.deployment")}>
+        <DeployActivityStrip appSlug={a.slug} limit={20} />
+        <DeploymentPanel appSlug={a.slug} />
+        <PendingDeployments appSlug={a.slug} />
+        <DeployStrategyCard app={a} />
+        <LatestDeploymentRow appSlug={a.slug} />
+      </Section>
 
-      <PendingDeployments appSlug={a.slug} />
+      <Section title={tDetail("groups.controls")}>
+        <ControlsSection appSlug={a.slug} deployBranch={a.deployBranch} />
+        <DeployTokenControl appSlug={a.slug} />
+      </Section>
 
-      <ControlsSection appSlug={a.slug} deployBranch={a.deployBranch} />
+      <Section title={tDetail("groups.insights")}>
+        <ObservabilitySection appSlug={a.slug} />
+        <ActivityTimeline appSlug={a.slug} limit={20} />
+      </Section>
 
-      <DeployStrategyCard app={a} />
-
-      <DeployTokenControl appSlug={a.slug} />
-
-      <ObservabilitySection appSlug={a.slug} />
-
-      <GithubConnectCallout sourceKind={a.sourceKind} />
-
-      <ActivityTimeline appSlug={a.slug} limit={20} />
-
-      <LatestDeploymentRow appSlug={a.slug} />
-
-      <QuickLinksGrid appSlug={a.slug} />
+      <Section title={tDetail("groups.links")}>
+        <QuickLinksGrid appSlug={a.slug} />
+      </Section>
 
       <ConfirmDialog
         open={confirmOpen}

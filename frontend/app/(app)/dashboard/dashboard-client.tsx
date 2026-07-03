@@ -27,6 +27,7 @@ import { OnboardingHost } from "@/components/onboarding/OnboardingHost";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GET_COST_FORECAST } from "@/graphql/billing/billing.queries";
 import type { AstroliftCostForecast } from "@/graphql/billing/billing.types";
@@ -187,25 +188,22 @@ export function DashboardClient() {
         />
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <HeartPulseIcon className="size-4" /> {t("fleetHealth.title")}
-            </CardTitle>
-            <CardDescription>{t("fleetHealth.description")}</CardDescription>
-          </div>
-          {health.loading ? (
+      <Section
+        title={
+          <span className="flex items-center gap-2">
+            <HeartPulseIcon className="size-4" /> {t("fleetHealth.title")}
+          </span>
+        }
+        description={t("fleetHealth.description")}
+        action={
+          health.loading ? (
             <Skeleton className="h-6 w-20" />
           ) : failingCount === 0 && recentFailureCount === 0 ? (
             <Badge className="gap-1 bg-success/15 text-success-fg">
               <CheckCircle2Icon className="size-3" /> {t("fleetHealth.healthy")}
             </Badge>
           ) : failingCount > 0 ? (
-            <Badge
-              variant="destructive"
-              className="gap-1 bg-danger/15 text-danger-fg"
-            >
+            <Badge variant="destructive" className="gap-1 bg-danger/15 text-danger-fg">
               <CircleXIcon className="size-3" />
               {t("fleetHealth.failing", { count: failingCount })}
             </Badge>
@@ -214,43 +212,42 @@ export function DashboardClient() {
               <AlertTriangleIcon className="size-3" />
               {t("fleetHealth.hiccup", { count: recentFailureCount })}
             </Badge>
-          )}
-        </CardHeader>
-        <CardContent>
-          {health.loading ? (
-            <Skeleton className="h-12 w-full" />
-          ) : apps.length === 0 ? (
-            <p className="text-muted-foreground text-sm">{t("fleetHealth.empty")}</p>
-          ) : (
-            <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-              <FleetTile
-                label={t("fleetHealth.tiles.running")}
-                value={runningCount}
-                tone="ok"
-                href="/deployments"
-              />
-              <FleetTile
-                label={t("fleetHealth.tiles.recentFailure")}
-                value={recentFailureCount}
-                tone="warn"
-                href="/deployments"
-              />
-              <FleetTile
-                label={t("fleetHealth.tiles.failing")}
-                value={failingCount}
-                tone="error"
-                href="/deployments"
-              />
-              <FleetTile
-                label={t("fleetHealth.tiles.noDeploys")}
-                value={noDeployCount}
-                tone="muted"
-                href="/apps"
-              />
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          )
+        }
+      >
+        {health.loading ? (
+          <Skeleton className="h-12 w-full" />
+        ) : apps.length === 0 ? (
+          <p className="text-muted-foreground text-sm">{t("fleetHealth.empty")}</p>
+        ) : (
+          <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <FleetTile
+              label={t("fleetHealth.tiles.running")}
+              value={runningCount}
+              tone="ok"
+              href="/deployments"
+            />
+            <FleetTile
+              label={t("fleetHealth.tiles.recentFailure")}
+              value={recentFailureCount}
+              tone="warn"
+              href="/deployments"
+            />
+            <FleetTile
+              label={t("fleetHealth.tiles.failing")}
+              value={failingCount}
+              tone="error"
+              href="/deployments"
+            />
+            <FleetTile
+              label={t("fleetHealth.tiles.noDeploys")}
+              value={noDeployCount}
+              tone="muted"
+              href="/apps"
+            />
+          </div>
+        )}
+      </Section>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">

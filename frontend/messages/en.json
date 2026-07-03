@@ -614,6 +614,12 @@
       "latestDeploy": {
         "empty": "No deploys yet — trigger one from the CLI or push to the deploy branch.",
         "ariaLabel": "Latest deployment: {status}, {when}"
+      },
+      "groups": {
+        "deployment": "Deployment",
+        "controls": "Controls & access",
+        "insights": "Observability & activity",
+        "links": "Quick links"
       }
     },
     "wizard": {
