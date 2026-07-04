@@ -533,7 +533,16 @@ export function ClustersClient() {
                   <EmptyState
                     icon={<LayersIcon className="size-5" />}
                     title="No clusters registered"
-                    description="Register a cluster manually here or run the install playbook for your cloud (astrolift-opscode/INSTALL-<cloud>.md)."
+                    description="Register a tenant Kubernetes cluster to record its metadata, then bring it into management once its prerequisites are installed."
+                    learnMoreHref="/documentation/cluster-prerequisites"
+                    learnMoreLabel="Cluster prerequisites"
+                    secondary={
+                      <Can permission="cluster.register">
+                        <Button size="sm" onClick={() => setOpen(true)}>
+                          Register cluster
+                        </Button>
+                      </Can>
+                    }
                   />
                 </div>
               ) : (

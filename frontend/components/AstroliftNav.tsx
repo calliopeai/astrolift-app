@@ -185,7 +185,10 @@ const observeSection: { label: string; items: NavItem[] } = {
   items: [
     { label: "Dashboard", href: "/ops", icon: <LayoutDashboardIcon />, permission: "org.read" },
     {
-      label: "Deployments",
+      // Distinct from RUN>Deployments (release/rollout history); this is the
+      // running-fleet health view (#917). Relabelled so the sidebar doesn't
+      // read as a duplicate entry.
+      label: "Deployment health",
       href: "/observe/deployments",
       icon: <RocketIcon />,
       permission: "app.read",
