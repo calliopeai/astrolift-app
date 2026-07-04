@@ -408,11 +408,19 @@ export default function SkillBuilderPage() {
 
   if (skillError || !skill) {
     return (
-      <div className="flex flex-1 flex-col gap-6 p-6">
-        <div className="text-destructive bg-destructive/10 border-destructive/20 rounded-md border p-4 text-sm">
-          {skillError ? `Error: ${skillError.message}` : "Skill not found"}
-        </div>
-      </div>
+      <PageShell title="Skill not found">
+        <EmptyState
+          icon={<SparklesIcon className="size-5" />}
+          title={skillError ? "Couldn't load this skill" : "Skill not found"}
+          description={
+            skillError
+              ? skillError.message
+              : "This skill may have been deleted, or you may not have access to it."
+          }
+          actionHref="/agents/skills"
+          actionLabel="Back to skills"
+        />
+      </PageShell>
     );
   }
 

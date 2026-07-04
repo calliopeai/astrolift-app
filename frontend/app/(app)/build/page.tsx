@@ -38,7 +38,7 @@ export default function BuildPage() {
               </p>
             </div>
             <Button variant="outline" size="sm" className="w-fit gap-1.5" disabled>
-              Enable Build
+              Coming soon
             </Button>
           </CardContent>
         </Card>

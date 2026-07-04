@@ -188,39 +188,40 @@ export function PipelineDetailClient({ pipelineId }: { pipelineId: string }) {
         </div>
       )}
 
-      {/* Logs tab (#108) */}
+      {/* Logs tab (#108) — placeholder; per-run log streaming isn't built yet.
+          Copy must not instruct the impossible "select a run" action (#910). */}
       {tab === "logs" && (
         <EmptyState
           icon={<ScrollIcon className="size-5" />}
-          title="Live log streaming"
-          description="Select a run from the Runs tab to view its step-by-step logs."
+          title="Log streaming — coming soon"
+          description="Step-by-step log streaming for pipeline runs isn't available yet. The latest run's stage graph is on the Runs tab."
         />
       )}
 
-      {/* Artifacts tab (#109) */}
+      {/* Artifacts tab (#109) — inert placeholder (#912). */}
       {tab === "artifacts" && (
         <EmptyState
           icon={<DownloadIcon className="size-5" />}
-          title="Artifact browser"
-          description="Artifacts from pipeline runs — build outputs, test reports, and deployment packages."
+          title="Artifact browser — coming soon"
+          description="Browsing run artifacts (build outputs, test reports, deployment packages) isn't available yet."
         />
       )}
 
-      {/* Triggers tab (#110) */}
+      {/* Triggers tab (#110) — inert placeholder (#912). */}
       {tab === "triggers" && (
         <EmptyState
           icon={<SettingsIcon className="size-5" />}
-          title="Trigger configuration"
-          description="Configure webhook triggers, scheduled runs, and manual dispatch inputs."
+          title="Trigger configuration — coming soon"
+          description="Configuring webhook, scheduled, and manual-dispatch triggers from here isn't available yet."
         />
       )}
 
-      {/* Runners tab (#111) */}
+      {/* Runners tab (#111) — inert placeholder (#912). */}
       {tab === "runners" && (
         <EmptyState
           icon={<UsersIcon className="size-5" />}
-          title="Runner management"
-          description="Self-hosted runners registered for this pipeline. Add runners to run jobs on your own infrastructure."
+          title="Runner management — coming soon"
+          description="Registering and managing self-hosted runners for this pipeline isn't available yet."
         />
       )}
 

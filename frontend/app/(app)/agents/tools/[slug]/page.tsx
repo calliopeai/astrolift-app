@@ -8,12 +8,14 @@ import {
   ChevronRightIcon,
   Loader2Icon,
   TrashIcon,
+  WrenchIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/EmptyState";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageShell } from "@/components/PageShell";
@@ -222,11 +224,19 @@ export default function ToolDetailPage() {
 
   if (error || !tool) {
     return (
-      <div className="flex flex-1 flex-col gap-6 p-6">
-        <div className="text-destructive bg-destructive/10 border-destructive/20 rounded-md border p-4 text-sm">
-          {error ? `Error: ${error.message}` : "Tool not found"}
-        </div>
-      </div>
+      <PageShell title="Tool not found">
+        <EmptyState
+          icon={<WrenchIcon className="size-5" />}
+          title={error ? "Couldn't load this tool" : "Tool not found"}
+          description={
+            error
+              ? error.message
+              : "This tool may have been deleted, or you may not have access to it."
+          }
+          actionHref="/agents/tools"
+          actionLabel="Back to tools"
+        />
+      </PageShell>
     );
   }
 
