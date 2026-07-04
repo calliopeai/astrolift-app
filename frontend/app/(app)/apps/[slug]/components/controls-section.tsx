@@ -343,7 +343,7 @@ function EnvironmentRow({
           </Button>
           <Button
             size="sm"
-            variant="outline"
+            variant="ghost"
             onClick={handleRebuildAndDeploy}
             disabled={rebuilding || env.deploysPaused}
             title={env.deploysPaused ? t("tooltipResumeFirst") : t("tooltipRebuildAndDeploy")}
@@ -357,6 +357,7 @@ function EnvironmentRow({
             {t("rebuildAndDeploy")}
           </Button>
         </div>
+        <p className="text-muted-foreground text-xs">{t("deployCaption")}</p>
       </Can>
 
       {env.requiredApprovals > 0 && (

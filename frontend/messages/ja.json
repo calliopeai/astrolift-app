@@ -1086,7 +1086,8 @@
         "toastRestartIssued": "Rolling restart issued for {workload} in {env}.",
         "toastRestartFailed": "Rolling restart failed.",
         "toastScaled": "{workload} in {env} scaled to {count, plural, one {# replica} other {# replicas}}.",
-        "toastScaleFailed": "Scale failed."
+        "toastScaleFailed": "Scale failed.",
+        "deployCaption": "Deploy now ships the image tag above (defaults to the latest build). Rebuild & deploy dispatches CI to rebuild from the branch first."
       },
       "resync": {
         "title": "ソースから再同期",
