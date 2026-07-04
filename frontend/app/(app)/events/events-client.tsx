@@ -14,6 +14,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Sparkline } from "@/components/viz";
 import {
   LIST_EVENTS,
   LIST_EVENTS_AGGREGATED,
@@ -41,6 +42,51 @@ interface AggResp {
 }
 
 const DEFAULT_AGGREGATE_WINDOW_SECONDS = 300;
+const RATE_WINDOW_DAYS = 14;
+
+// Bucket weighted timestamps into the last N days (oldest → newest) so the
+// event stream gets an at-a-glance velocity line from already-fetched rows.
+function perDayCounts(
+  entries: { ts: string; weight: number }[],
+  windowDays = RATE_WINDOW_DAYS,
+): number[] {
+  const days = new Array<number>(windowDays).fill(0);
+  const now = Date.now();
+  const dayMs = 86_400_000;
+  for (const { ts, weight } of entries) {
+    const t = Date.parse(ts);
+    if (Number.isNaN(t)) continue;
+    const ago = Math.floor((now - t) / dayMs);
+    if (ago >= 0 && ago < windowDays) days[windowDays - 1 - ago] += weight;
+  }
+  return days;
+}
+
+function EventRate({ entries }: { entries: { ts: string; weight: number }[] }) {
+  const days = perDayCounts(entries);
+  const total = days.reduce((a, b) => a + b, 0);
+  if (total === 0) return null;
+  return (
+    <Card>
+      <CardContent className="flex items-center justify-between gap-4 p-3">
+        <div>
+          <p className="text-muted-foreground text-2xs uppercase tracking-wide">
+            Last {RATE_WINDOW_DAYS} days
+          </p>
+          <p className="text-xl font-semibold tabular-nums">{total}</p>
+        </div>
+        <Sparkline
+          data={days}
+          width={220}
+          height={40}
+          variant="area"
+          className="text-chart-1"
+          ariaLabel="Event rate over the last two weeks"
+        />
+      </CardContent>
+    </Card>
+  );
+}
 
 export function EventsClient() {
   const t = useTranslations("lists.events");
@@ -131,6 +177,7 @@ function RawList({ eventTypeFilter }: { eventTypeFilter: string }) {
 
   return (
     <div className="space-y-2">
+      <EventRate entries={list.map((e) => ({ ts: e.occurredAt, weight: 1 }))} />
       <div className="flex flex-wrap items-center gap-2">
         <SortableHeader
           sortKey="eventType"
@@ -221,6 +268,7 @@ function AggregatedList({ eventTypeFilter }: { eventTypeFilter: string }) {
 
   return (
     <div className="space-y-2">
+      <EventRate entries={buckets.map((b) => ({ ts: b.lastAt, weight: b.count }))} />
       <div className="flex flex-wrap items-center gap-2">
         <SortableHeader
           sortKey="eventType"

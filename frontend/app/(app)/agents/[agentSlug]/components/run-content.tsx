@@ -194,6 +194,19 @@ export function RunContent({
     [data?.agentTasks]
   );
 
+  // Terminal-outcome rollup for the at-a-glance summary above the table.
+  const statusCounts = React.useMemo(() => {
+    const c = { completed: 0, failed: 0, active: 0, other: 0 };
+    for (const t of rows) {
+      const s = t.status.toLowerCase();
+      if (s === "completed" || s === "succeeded") c.completed += 1;
+      else if (s === "failed" || s === "timed_out") c.failed += 1;
+      else if (s === "running" || s === "queued") c.active += 1;
+      else c.other += 1;
+    }
+    return c;
+  }, [rows]);
+
   return (
     <div className="space-y-6">
       {/* Dispatch now — the working Once-mode control (#896 unstub). */}
@@ -230,6 +243,17 @@ export function RunContent({
             Runs of this agent · running / queued / completed / failed / timed&nbsp;out
           </span>
         </div>
+
+        {rows.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3 text-xs tabular-nums">
+            <span className="text-success-fg font-medium">{statusCounts.completed} completed</span>
+            <span className="text-danger-fg font-medium">{statusCounts.failed} failed</span>
+            <span className="text-info-fg font-medium">{statusCounts.active} active</span>
+            {statusCounts.other > 0 && (
+              <span className="text-muted-foreground">{statusCounts.other} other</span>
+            )}
+          </div>
+        )}
 
         {loading && rows.length === 0 ? (
           <Card>
