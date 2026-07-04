@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
+import { isCiPushableKind } from "../ci-pushable";
 import type { WizardState } from "../wizard-client";
 import type { WizardStep } from "../components/WizardShell";
 
@@ -52,18 +53,8 @@ const DEPLOY_TIMING_LABELS: Record<string, string> = {
 
 // Connection kinds that hold a usable write-token. OAuth-app config
 // rows (kind ends in ``_oauth_app`` with no account_login) carry the
-// app's client secret, not a user token, so they can't push commits
-// until the OAuth dance produces a sibling ``_oauth_user`` row.
-const CI_PUSHABLE_KINDS = new Set<string>([
-  "github_oauth_user",
-  "github_app_install",
-  "github_pat",
-  "gitlab_oauth_user",
-  "gitlab_pat",
-]);
-
 function canPushCiWorkflow(state: WizardState): boolean {
-  return CI_PUSHABLE_KINDS.has(state.connectionKind);
+  return isCiPushableKind(state.connectionKind);
 }
 
 function describeApprovalPolicy(state: WizardState): string {

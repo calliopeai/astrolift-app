@@ -51,6 +51,7 @@ import type {
 } from "@/graphql/scm/scm.types";
 import type { SourceKind } from "@/graphql/registry/registry.types";
 
+import { CI_PUSHABLE_KINDS } from "../ci-pushable";
 import type { WizardState } from "../wizard-client";
 
 interface ConnectionsResp {
@@ -87,16 +88,8 @@ const KIND_TO_SOURCE_KIND: Record<ScmConnectionKind, SourceKind> = {
 
 // Connection kinds that hold a usable write-token so pushCiWorkflow
 // can commit on the operator's behalf. OAuth-app config rows carry the
-// app's client secret, not a user token, so they're excluded. Mirrors
-// the constant on ReviewSubmitStep; duplicated here so step 1 can flip
-// the default toggle when the operator picks a connection.
-const CI_PUSHABLE_KINDS = new Set<string>([
-  "github_oauth_user",
-  "github_app_install",
-  "github_pat",
-  "gitlab_oauth_user",
-  "gitlab_pat",
-]);
+// Pushable-kind set is shared via ../ci-pushable so step 1 (default toggle)
+// and the review step (disable + why-text) never drift (#908).
 
 interface Props {
   state: WizardState;
@@ -250,7 +243,9 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
           can list your repositories and watch them for pushes.
         </p>
         <Link
-          href="/settings/source-providers"
+          href="/providers#source"
+          target="_blank"
+          rel="noreferrer"
           className="text-primary text-sm underline-offset-4 hover:underline"
         >
           Set up a source provider →
@@ -276,7 +271,9 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
             )}
           </div>
           <Link
-            href="/settings/source-providers"
+            href="/providers#source"
+            target="_blank"
+            rel="noreferrer"
             className="text-primary text-xs underline-offset-4 hover:underline"
           >
             Missing a host? Connect another source →
@@ -328,7 +325,12 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
               {repoList.recoverable && (
                 <>
                   {" — "}
-                  <Link href="/settings/source-providers" className="underline">
+                  <Link
+                    href="/providers#source"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline"
+                  >
                     reconnect
                   </Link>
                 </>
@@ -422,8 +424,13 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
           ) : (
             <p className="text-muted-foreground text-xs">
               No repos visible to this connection. Adjust visibility scopes on{" "}
-              <Link href="/settings/source-providers" className="underline">
-                /settings/source-providers
+              <Link
+                href="/providers#source"
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                /providers
               </Link>
               .
             </p>

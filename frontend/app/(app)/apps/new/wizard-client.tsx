@@ -15,6 +15,8 @@ import type {
 } from "@/graphql/registry/registry.types";
 import { PUSH_CI_WORKFLOW } from "@/graphql/scm/scm.mutations";
 import type { AstroliftPushCiWorkflowResult, ScmConnectionKind } from "@/graphql/scm/scm.types";
+
+import { isCiPushableKind } from "./ci-pushable";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 
 import { WizardShell, type WizardStep } from "./components/WizardShell";
@@ -30,18 +32,8 @@ type StepNumber = 1 | 2 | 3 | 4 | 5;
 // Connection kinds that hold a usable write-token. OAuth-app config
 // rows carry the app's client secret rather than a user token, so they
 // can't drive a commit — pushCiWorkflow refuses them on the server
-// side, and we suppress the UI affordance for them as well.
-const CI_PUSHABLE_KINDS: ReadonlySet<string> = new Set([
-  "github_oauth_user",
-  "github_app_install",
-  "github_pat",
-  "gitlab_oauth_user",
-  "gitlab_pat",
-]);
-
-function isCiPushableKind(kind: ScmConnectionKind | ""): boolean {
-  return CI_PUSHABLE_KINDS.has(kind);
-}
+// side, and we suppress the UI affordance for them as well. The pushable
+// set is shared via ./ci-pushable (#908).
 
 function ciWorkflowPathForSourceKind(sourceKind: SourceKind): string {
   if (sourceKind === "gitlab") return ".gitlab-ci.yml";
@@ -382,7 +374,14 @@ export function WizardClient() {
         }
       }
 
-      router.push(`/apps/${result.data.slug}`);
+      // "skip" registers a non-deploying app (manual trigger, no first
+      // deploy). Land the operator on Settings — where they finish deploy
+      // config — instead of an Overview that will never show a deploy (#901).
+      router.push(
+        state.deployTiming === "skip"
+          ? `/apps/${result.data.slug}/settings`
+          : `/apps/${result.data.slug}`,
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Register failed";
       update("register", { status: "failed", error: msg });
