@@ -57,6 +57,22 @@ const slugify = (s: string) =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 100);
 
+// What each auth method needs, in plain terms. Kept descriptive rather than
+// prescribing exact JSON keys — the schema is driver-specific and enforced
+// server-side; the goal is to stop operators pasting the wrong shape (#902).
+function authConfigHint(authMethod: string): string {
+  switch (authMethod) {
+    case "kubeconfig":
+      return "Paste the cluster's kubeconfig contents — the API server URL, cluster CA, and the credential the platform should connect as.";
+    case "exec_plugin":
+      return "Provide an exec credential-plugin spec — the command, args, and env the kubelet-style client runs to mint a short-lived token (e.g. aws eks get-token).";
+    case "service_account_token":
+      return "Provide the in-cluster ServiceAccount bearer token, the cluster CA certificate, and the API server URL.";
+    default:
+      return "Driver-specific JSON. The exact shape depends on the selected auth method and is validated when you register.";
+  }
+}
+
 export function RegisterClusterDialog({ open, onOpenChange }: Props) {
   const plugins = useQuery<{
     astroliftProviderPlugins: AstroliftProviderPlugin[];
@@ -249,10 +265,11 @@ export function RegisterClusterDialog({ open, onOpenChange }: Props) {
               className="font-mono text-xs"
             />
             {error && <p className="text-destructive text-xs">{error}</p>}
-            <p className="text-muted-foreground text-xs">
-              Driver-specific. For kubeconfig, paste the in-cluster ServiceAccount
-              token / cert bundle JSON; for exec_plugin, the exec spec.
-            </p>
+            {/* Method-aware guidance (#902). The exact JSON schema is driver-
+                specific and validated server-side; this describes what each
+                method needs so operators don't paste a structurally-valid but
+                wrong blob. */}
+            <p className="text-muted-foreground text-xs">{authConfigHint(authMethod)}</p>
           </div>
 
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
