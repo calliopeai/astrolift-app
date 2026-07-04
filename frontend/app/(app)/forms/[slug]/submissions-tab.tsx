@@ -12,6 +12,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Sparkline } from "@/components/viz";
 import type { FormSubmission } from "@/graphql/forms/forms.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 
@@ -273,19 +274,6 @@ function buildSparkline(submissions: FormSubmission[]): SparklinePoint[] {
 }
 
 function SubmissionsSparkline({ data, total }: { data: SparklinePoint[]; total: number }) {
-  const max = Math.max(1, ...data.map((d) => d.count));
-  const width = 280;
-  const height = 48;
-  const stepX = data.length > 1 ? width / (data.length - 1) : width;
-
-  const points = data
-    .map((p, i) => {
-      const x = i * stepX;
-      const y = height - (p.count / max) * height;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-
   return (
     <div className="bg-muted/30 flex items-end justify-between gap-4 rounded-md border p-3">
       <div>
@@ -295,16 +283,14 @@ function SubmissionsSparkline({ data, total }: { data: SparklinePoint[]; total: 
           {data.reduce((acc, d) => acc + d.count, 0)} new in window
         </p>
       </div>
-      <svg
-        width={width}
-        height={height}
-        viewBox={`0 0 ${width} ${height}`}
+      <Sparkline
+        data={data.map((p) => p.count)}
+        width={280}
+        height={48}
+        variant="area"
         className="text-primary"
-        role="img"
-        aria-label="Submission trend"
-      >
-        <polyline fill="none" stroke="currentColor" strokeWidth="2" points={points} />
-      </svg>
+        ariaLabel="Submission trend"
+      />
     </div>
   );
 }
