@@ -2033,7 +2033,9 @@
         "toastSubmitted": "Quota bump requested",
         "toastFailed": "Failed to submit request",
         "pendingBadge": "Pending {factor}x — {reason}"
-      }
+      },
+      "overviewTitle": "Utilization",
+      "overviewDescription": "Current usage against hard limits, most-utilized first."
     },
     "alerts": {
       "mute": {
