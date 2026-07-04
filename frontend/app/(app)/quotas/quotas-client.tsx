@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Section } from "@/components/ui/section";
 import {
   Select,
   SelectContent,
@@ -38,6 +39,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { RadialGauge } from "@/components/viz";
 import {
   LIST_QUOTAS,
   REQUEST_QUOTA_INCREASE,
@@ -69,6 +71,35 @@ function severity(used: number, soft: number, hard: number) {
 function softUtilization(used: number, soft: number): number {
   if (!soft || soft <= 0) return 0;
   return used / soft;
+}
+
+// Gauge arc colour, matching the row-bar severity but as a text token.
+function gaugeTone(used: number, soft: number, hard: number): string {
+  if (used >= hard) return "text-danger-fg";
+  if (used >= soft) return "text-warning-fg";
+  return "text-success-fg";
+}
+
+function QuotaGauge({ quota }: { quota: AstroliftQuota }) {
+  const util = pct(quota.currentUsage, quota.hardLimit) / 100;
+  return (
+    <Card>
+      <CardContent className="flex items-center gap-3 p-4">
+        <RadialGauge
+          value={util}
+          size={56}
+          className={gaugeTone(quota.currentUsage, quota.softLimit, quota.hardLimit)}
+          ariaLabel={`${quota.resource} utilization`}
+        />
+        <div className="min-w-0">
+          <div className="truncate text-sm font-medium">{quota.resource}</div>
+          <div className="text-muted-foreground font-mono text-2xs tabular-nums">
+            {quota.currentUsage} / {quota.hardLimit}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export function QuotasClient() {
@@ -110,8 +141,23 @@ export function QuotasClient() {
     return false;
   }
 
+  // Most-utilized first, so the gauges surface pressure at a glance.
+  const byUtilization = [...list].sort(
+    (a, b) => pct(b.currentUsage, b.hardLimit) - pct(a.currentUsage, a.hardLimit),
+  );
+
   return (
     <PageShell title={t("title")} description={t("description")}>
+      {list.length > 0 && (
+        <Section title={t("overviewTitle")} description={t("overviewDescription")}>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {byUtilization.map((q) => (
+              <QuotaGauge key={q.id} quota={q} />
+            ))}
+          </div>
+        </Section>
+      )}
+
       <Card>
         <CardContent className="p-0">
           {loading && list.length === 0 ? (
