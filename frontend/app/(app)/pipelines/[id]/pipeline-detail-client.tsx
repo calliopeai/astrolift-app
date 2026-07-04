@@ -17,6 +17,7 @@ import { gql } from "@apollo/client";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PipelineDag, type PipelineDagStage } from "@/components/viz";
 
 const GET_PIPELINE = gql`
   query GetPipeline($id: ID!) {
@@ -44,6 +45,45 @@ const GET_PIPELINE_RUNS = gql`
     }
   }
 `;
+
+// A single run's job graph — jobs are the DAG nodes, `job.needs` the edges.
+const GET_PIPELINE_RUN_GRAPH = gql`
+  query GetPipelineRunGraph($id: String!) {
+    astroliftPipelineRun(id: $id) {
+      id
+      runNumber
+      status
+      jobRuns {
+        id
+        status
+        startedAt
+        finishedAt
+        job {
+          jobId
+          name
+          needs
+        }
+      }
+    }
+  }
+`;
+
+interface JobRunNode {
+  id: string;
+  status: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  job: { jobId: string; name: string; needs: unknown };
+}
+
+interface RunGraphResp {
+  astroliftPipelineRun: {
+    id: string;
+    runNumber: number;
+    status: string;
+    jobRuns: JobRunNode[];
+  } | null;
+}
 
 type DetailTab = "runs" | "logs" | "artifacts" | "triggers" | "runners" | "secrets";
 const TABS: readonly DetailTab[] = ["runs", "logs", "artifacts", "triggers", "runners", "secrets"];
@@ -113,13 +153,24 @@ export function PipelineDetailClient({ pipelineId }: { pipelineId: string }) {
         ))}
       </div>
 
-      {/* Runs tab — run list + DAG visualization (#107) */}
+      {/* Runs tab — latest-run DAG + run list (#107) */}
       {tab === "runs" && (
-        <div className="space-y-2">
+        <div className="space-y-4">
           {runsLoading && runs.length === 0 && <Skeleton className="h-40 w-full" />}
           {!runsLoading && runs.length === 0 && (
             <EmptyState icon={<ActivityIcon className="size-5" />} title="No runs yet" description="Trigger a run via webhook or manual dispatch." />
           )}
+          {runs.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <ActivityIcon className="size-4" />
+                Latest run · #{runs[0].runNumber}
+              </div>
+              {/* key on the run id so the graph re-flows when the newest run changes */}
+              <RunGraph key={runs[0].id} runId={runs[0].id} />
+            </div>
+          )}
+          <div className="space-y-2">
           {runs.map((run) => (
             <div key={run.id} className="flex items-center gap-3 rounded-md border px-4 py-3 text-sm">
               <Badge variant={run.status === "success" ? "default" : run.status === "failure" ? "destructive" : "secondary"} className="shrink-0">
@@ -133,6 +184,7 @@ export function PipelineDetailClient({ pipelineId }: { pipelineId: string }) {
               </span>
             </div>
           ))}
+          </div>
         </div>
       )}
 
@@ -178,4 +230,40 @@ export function PipelineDetailClient({ pipelineId }: { pipelineId: string }) {
       )}
     </div>
   );
+}
+
+/**
+ * Renders a single run's jobs as a status-coloured DAG. Jobs are nodes;
+ * `job.needs` (a JSON string array) supplies the edges. Polls while the run
+ * is in flight so the graph tracks live status.
+ */
+function RunGraph({ runId }: { runId: string }) {
+  const { data, loading } = useQuery<RunGraphResp>(GET_PIPELINE_RUN_GRAPH, {
+    variables: { id: runId },
+    fetchPolicy: "cache-and-network",
+    pollInterval: 10000,
+  });
+
+  const run = data?.astroliftPipelineRun ?? null;
+
+  const stages: PipelineDagStage[] = (run?.jobRuns ?? []).map((jr) => ({
+    id: jr.job.jobId,
+    name: jr.job.name,
+    status: jr.status,
+    // `needs` is a JSON scalar — coerce defensively to a string array.
+    needs: Array.isArray(jr.job.needs) ? jr.job.needs.map(String) : [],
+    startedAt: jr.startedAt,
+    finishedAt: jr.finishedAt,
+  }));
+
+  if (loading && !run) return <Skeleton className="h-64 w-full" />;
+  if (stages.length === 0) {
+    return (
+      <div className="text-muted-foreground rounded-md border border-dashed px-4 py-6 text-center text-sm">
+        This run has no jobs to graph.
+      </div>
+    );
+  }
+
+  return <PipelineDag stages={stages} height={320} />;
 }

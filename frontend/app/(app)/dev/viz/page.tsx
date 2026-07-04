@@ -2,7 +2,15 @@ import { PageShell } from "@/components/PageShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Section } from "@/components/ui/section";
 import { StatTile } from "@/components/ui/stat-tile";
-import { MiniBar, RadialGauge, Sparkline, SparklineCell, TrendStat } from "@/components/viz";
+import {
+  MiniBar,
+  PipelineDag,
+  RadialGauge,
+  Sparkline,
+  SparklineCell,
+  TrendStat,
+  type PipelineDagStage,
+} from "@/components/viz";
 
 // Dev-only gallery for the #1053 (B1) viz primitives. Not linked in nav;
 // reachable at /dev/viz for design review. Safe to remove once the primitives
@@ -12,6 +20,16 @@ const RISING = [3, 4, 4, 6, 5, 8, 7, 9, 12, 11, 14, 18];
 const FALLING = [18, 15, 16, 12, 13, 9, 10, 7, 6, 5, 4, 2];
 const NOISY = [5, 9, 4, 11, 6, 8, 3, 12, 7, 10, 5, 9];
 const FLAT = [6, 6, 6, 6, 6, 6];
+
+// A representative build → test → deploy-per-env pipeline run for the DAG demo.
+const DEMO_STAGES: PipelineDagStage[] = [
+  { id: "build", name: "build", status: "success", startedAt: "2026-07-04T00:00:00Z", finishedAt: "2026-07-04T00:01:12Z" },
+  { id: "test", name: "test", status: "success", needs: ["build"], startedAt: "2026-07-04T00:01:12Z", finishedAt: "2026-07-04T00:02:40Z" },
+  { id: "lint", name: "lint", status: "success", needs: ["build"], startedAt: "2026-07-04T00:01:12Z", finishedAt: "2026-07-04T00:01:39Z" },
+  { id: "deploy-staging", name: "deploy · staging", status: "success", needs: ["test", "lint"], startedAt: "2026-07-04T00:02:40Z", finishedAt: "2026-07-04T00:03:30Z" },
+  { id: "approve", name: "approval gate", status: "pending", needs: ["deploy-staging"] },
+  { id: "deploy-prod", name: "deploy · prod", status: "running", needs: ["approve"], startedAt: "2026-07-04T00:04:00Z" },
+];
 
 function Swatch({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -130,6 +148,13 @@ export default function VizGalleryPage() {
             ))}
           </CardContent>
         </Card>
+      </Section>
+
+      <Section
+        title="PipelineDag (B2 · #1054)"
+        description="build → test → deploy-per-env + approval gate, on the shared FlowGraph."
+      >
+        <PipelineDag stages={DEMO_STAGES} height={340} />
       </Section>
     </PageShell>
   );
