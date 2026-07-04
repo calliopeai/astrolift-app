@@ -27,6 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { RadialGauge } from "@/components/viz";
 import {
   GET_DEPLOYMENT_METRICS,
   LIST_APP_HEALTH_SUMMARY,
@@ -101,6 +102,47 @@ function MetricCard({
   );
 }
 
+// Success rate rendered as a gauge — the one KPI that's a bounded ratio.
+// Coloured by the same thresholds the fleet uses: ≥90% healthy, ≥70% watch.
+function SuccessRateCard({
+  rate,
+  label,
+  hint,
+}: {
+  rate: number;
+  label: string;
+  hint?: string;
+}) {
+  const known = rate >= 0;
+  const tone = !known
+    ? "text-muted-foreground"
+    : rate >= 0.9
+      ? "text-success-fg"
+      : rate >= 0.7
+        ? "text-warning-fg"
+        : "text-danger-fg";
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          Deployment success rate
+        </CardTitle>
+        <CheckCircle2Icon className="text-muted-foreground size-4" />
+      </CardHeader>
+      <CardContent className="flex items-center gap-3">
+        <RadialGauge
+          value={known ? rate : 0}
+          size={56}
+          label={known ? label : "—"}
+          className={tone}
+          ariaLabel="Deployment success rate"
+        />
+        {hint && <p className="text-muted-foreground min-w-0 text-xs">{hint}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function MetricsClient() {
   const fmt = useFormatters();
   const [windowDays] = React.useState(30);
@@ -139,10 +181,9 @@ export function MetricsClient() {
           ))
         ) : (
           <>
-            <MetricCard
-              icon={<CheckCircle2Icon className="size-4" />}
-              label="Deployment success rate"
-              value={successRateLabel}
+            <SuccessRateCard
+              rate={metrics?.successRate ?? -1}
+              label={successRateLabel}
               hint={successRateHint}
             />
             <MetricCard

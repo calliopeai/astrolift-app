@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { MiniBar } from "@/components/viz";
 import {
   Table,
   TableBody,
@@ -91,6 +92,48 @@ function formatDuration(seconds: number | null | undefined): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m}m ${s}s`;
+}
+
+// Kept out of the component body so the impure Date.now() isn't a render-phase
+// call (react-hooks/purity). Display-only; recomputed each poll.
+function summarizeJobRuns(runs: AstroliftScheduledJobRun[], window: number) {
+  const perDay = new Array<number>(window).fill(0);
+  const now = Date.now();
+  const counts = { succeeded: 0, failed: 0, running: 0 };
+  for (const r of runs) {
+    const t = Date.parse(r.startedAt ?? r.createdAt);
+    if (!Number.isNaN(t)) {
+      const ago = Math.floor((now - t) / 86_400_000);
+      if (ago >= 0 && ago < window) perDay[window - 1 - ago] += 1;
+    }
+    if (r.status === "succeeded") counts.succeeded += 1;
+    else if (r.status === "failed") counts.failed += 1;
+    else if (r.status === "running") counts.running += 1;
+  }
+  return { perDay, counts };
+}
+
+// At-a-glance overview above the runs table: 14-day run volume + terminal
+// outcome counts, from the already-fetched run list (no extra query).
+function JobRunsSummary({ runs }: { runs: AstroliftScheduledJobRun[] }) {
+  const WINDOW = 14;
+  const { perDay, counts } = summarizeJobRuns(runs, WINDOW);
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-4 border-b px-4 py-3">
+      <div className="flex flex-wrap items-center gap-3 text-xs tabular-nums">
+        <span className="text-success-fg font-medium">{counts.succeeded} succeeded</span>
+        <span className="text-danger-fg font-medium">{counts.failed} failed</span>
+        <span className="text-info-fg font-medium">{counts.running} running</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-muted-foreground text-2xs uppercase tracking-wide">
+          {WINDOW}-day volume
+        </span>
+        <MiniBar data={perDay} width={180} height={32} className="text-chart-1" />
+      </div>
+    </div>
+  );
 }
 
 function consoleHrefForJobRun(run: AstroliftScheduledJobRun): string {
@@ -354,6 +397,7 @@ export function JobsClient({ appSlug, tabs }: { appSlug?: string; tabs?: React.R
               </div>
             ) : (
               <>
+                <JobRunsSummary runs={jobs} />
                 <div className="px-4 pt-4 pb-2">
                   <ListControls controls={runsCtrl} searchPlaceholder="Filter runs…" />
                 </div>
