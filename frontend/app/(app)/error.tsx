@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { captureException } from "@/lib/sentry";
 import { AlertCircleIcon } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 export default function Error({
@@ -31,9 +32,17 @@ export default function Error({
           <p className="text-muted-foreground mt-2 font-mono text-xs">Error ID: {error.digest}</p>
         )}
       </div>
-      <Button onClick={reset} variant="outline" size="sm">
-        Try again
-      </Button>
+      {/* A deterministic error (bad param, persistent GraphQL failure) makes
+          reset() loop on the same failing subtree — always offer an escape to
+          a known-good page. */}
+      <div className="flex items-center gap-2">
+        <Button onClick={reset} variant="outline" size="sm">
+          Try again
+        </Button>
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/dashboard">Go to dashboard</Link>
+        </Button>
+      </div>
     </div>
   );
 }

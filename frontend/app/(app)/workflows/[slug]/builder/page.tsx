@@ -1,9 +1,11 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { Loader2Icon } from "lucide-react";
+import { Loader2Icon, WorkflowIcon } from "lucide-react";
 import { toast } from "sonner";
 
+import { EmptyState } from "@/components/EmptyState";
+import { PageShell } from "@/components/PageShell";
 import { Separator } from "@/components/ui/separator";
 import { WorkflowBuilder } from "@/components/workflows/WorkflowBuilder";
 import { useWorkflow, useUpdateWorkflow } from "@/graphql/workflows/workflows.hooks";
@@ -26,11 +28,19 @@ export default function WorkflowBuilderPage() {
 
   if (error || !workflow) {
     return (
-      <div className="flex flex-1 flex-col gap-6 p-6">
-        <div className="text-destructive bg-destructive/10 border-destructive/20 rounded-md border p-4 text-sm">
-          {error ? `Error: ${error.message}` : `Workflow "${slug}" not found`}
-        </div>
-      </div>
+      <PageShell title="Workflow not found">
+        <EmptyState
+          icon={<WorkflowIcon className="size-5" />}
+          title={error ? "Couldn't load this workflow" : "Workflow not found"}
+          description={
+            error
+              ? error.message
+              : `The workflow "${slug}" may have been deleted, or you may not have access to it.`
+          }
+          actionHref="/workflows"
+          actionLabel="Back to workflows"
+        />
+      </PageShell>
     );
   }
 
