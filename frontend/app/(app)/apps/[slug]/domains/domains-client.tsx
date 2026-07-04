@@ -464,6 +464,10 @@ export function AppDomainsClient({ slug }: { slug: string }) {
       }
       actions={
         <>
+          {/* Cross-link to the org-level DNS zones surface (#918). */}
+          <Button asChild size="sm" variant="outline">
+            <Link href="/domains">Org DNS zones</Link>
+          </Button>
           <Button asChild size="sm" variant="outline">
             <Link href={DOC_LINKS.customDomains}>
               <BookOpenIcon className="size-4" />

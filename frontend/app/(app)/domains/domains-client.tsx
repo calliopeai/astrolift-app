@@ -124,7 +124,7 @@ export function DomainsClient() {
   return (
     <PageShell
       title="Managed domains"
-      description="DNS zones the platform manages for apps and preview environments."
+      description="Org-level DNS zones the platform manages for apps and preview environments. Per-app hostnames are configured on each app's Domains tab."
       actions={
         <Button onClick={() => setCreateOpen(true)}>
           <PlusIcon className="size-4" />
@@ -144,6 +144,8 @@ export function DomainsClient() {
                 icon={<GlobeIcon className="size-5" />}
                 title="No managed domains"
                 description="Bind a DNS zone to a DnsDriver. The install playbook seeds one zone per cloud profile."
+                learnMoreHref="/documentation/custom-domains"
+                learnMoreLabel="Custom domains"
               />
             </div>
           ) : (
@@ -218,14 +220,18 @@ export function DomainsClient() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="dns-driver">DNS driver</Label>
-                <Input
-                  id="dns-driver"
-                  value={dnsDriver}
-                  onChange={(e) => setDnsDriver(e.target.value)}
-                  placeholder="route53 / cloud_dns / external_dns"
-                  required
-                  className="font-mono text-xs"
-                />
+                {/* A Select, not free text (#918): a typo'd driver binds the
+                    zone to a nonexistent driver that only fails later. */}
+                <Select value={dnsDriver} onValueChange={setDnsDriver}>
+                  <SelectTrigger id="dns-driver" className="font-mono text-xs">
+                    <SelectValue placeholder="Select a driver" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="route53">route53</SelectItem>
+                    <SelectItem value="cloud_dns">cloud_dns</SelectItem>
+                    <SelectItem value="external_dns">external_dns</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="default-for">Default for</Label>
