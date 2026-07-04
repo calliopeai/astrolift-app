@@ -1,21 +1,13 @@
 "use client";
 
 import {
-  Background,
-  Controls,
   Handle,
-  MarkerType,
-  MiniMap,
   Position,
-  ReactFlow,
-  useEdgesState,
-  useNodesState,
   type Edge,
   type Node,
   type NodeProps,
   type NodeTypes,
 } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
 import {
   BoxIcon,
   CloudIcon,
@@ -28,7 +20,7 @@ import { useRouter } from "next/navigation";
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { FlowGraph } from "@/components/viz/flow-graph";
 import { cn } from "@/lib/utils";
 
 import { autoLayout } from "./layout";
@@ -161,7 +153,7 @@ export function AppTopologyMap({
 }: AppTopologyMapProps) {
   const router = useRouter();
 
-  const initialNodes = React.useMemo<Node<TopologyNode>[]>(
+  const flowNodes = React.useMemo<Node<TopologyNode>[]>(
     () =>
       autoLayout(nodes).map((n) => ({
         id: n.id,
@@ -175,7 +167,7 @@ export function AppTopologyMap({
     [],
   );
 
-  const initialEdges = React.useMemo<Edge[]>(
+  const flowEdges = React.useMemo<Edge[]>(
     () =>
       edges.map((e) => ({
         id: e.id,
@@ -183,71 +175,31 @@ export function AppTopologyMap({
         target: e.target,
         label: e.label,
         animated: e.animated ?? false,
-        markerEnd: { type: MarkerType.ArrowClosed },
-        style: { strokeWidth: 1.5 },
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
-  const [flowNodes, , onNodesChange] = useNodesState(initialNodes);
-  const [flowEdges, , onEdgesChange] = useEdgesState(initialEdges);
-
-  // ReactFlow needs a DOM-measurement pass before fitView can position
-  // nodes correctly. Show a skeleton until onInit fires so the graph
-  // never flashes blank or with nodes stacked at origin.
-  const [isReady, setIsReady] = React.useState(false);
-  const handleInit = React.useCallback(() => {
-    setIsReady(true);
-  }, []);
-
   const handleNodeClick = React.useCallback(
-    (_: React.MouseEvent, node: Node<TopologyNode>) => {
+    (_id: string, data: unknown) => {
+      const node = data as TopologyNode;
       if (onNodeClick) {
-        onNodeClick(node.data);
+        onNodeClick(node);
         return;
       }
-      if (node.data.href) {
-        router.push(node.data.href);
-      }
+      if (node.href) router.push(node.href);
     },
     [onNodeClick, router],
   );
 
   return (
-    <div
-      className={cn("relative rounded-md border bg-card", className)}
-      style={{ height: typeof height === "number" ? `${height}px` : height }}
-    >
-      {!isReady && (
-        <div className="absolute inset-0 z-10 p-4">
-          <Skeleton className="h-full w-full" />
-        </div>
-      )}
-      <ReactFlow
-        nodes={flowNodes}
-        edges={flowEdges}
-        nodeTypes={NODE_TYPES}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeClick={handleNodeClick}
-        onInit={handleInit}
-        fitView
-        fitViewOptions={{ padding: 0.2, maxZoom: 1.2 }}
-        minZoom={0.4}
-        maxZoom={1.8}
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background gap={16} size={1} />
-        <Controls position="bottom-right" showInteractive={false} />
-        <MiniMap
-          position="bottom-left"
-          pannable
-          zoomable
-          nodeStrokeWidth={2}
-          className="!bg-card !rounded-md !border"
-        />
-      </ReactFlow>
-    </div>
+    <FlowGraph
+      nodes={flowNodes}
+      edges={flowEdges}
+      nodeTypes={NODE_TYPES}
+      onNodeClick={handleNodeClick}
+      height={height}
+      className={className}
+    />
   );
 }
