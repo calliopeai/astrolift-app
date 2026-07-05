@@ -56,7 +56,7 @@ export function AppSidebar({ ssrUser, ...props }: AppSidebarProps) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild size="sm" tooltip="Docs">
-              <Link href="/resources/docs">
+              <Link href="/documentation">
                 <BookOpenIcon />
                 <span>Docs</span>
               </Link>

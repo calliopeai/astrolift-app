@@ -10,7 +10,7 @@ interface EmptyStateProps {
   actionHref?: string;
   actionLabel?: string;
   /**
-   * Deep link into the in-app `/resources/docs` (or another doc surface)
+   * Deep link into the in-app `/documentation` hub (or another doc surface)
    * for context-sensitive help. When set, renders a subdued
    * "Learn more" link beneath the description.
    *
