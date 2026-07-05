@@ -57,19 +57,41 @@ const slugify = (s: string) =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 100);
 
-// What each auth method needs, in plain terms. Kept descriptive rather than
-// prescribing exact JSON keys — the schema is driver-specific and enforced
-// server-side; the goal is to stop operators pasting the wrong shape (#902).
+// Expected auth_config shape per method — the exact keys the platform reads in
+// providers/k8s_native/observability.py::build_api_client (and _config_for for
+// exec_plugin). Auto-seeded into the field so operators see the right shape
+// instead of pasting a structurally-valid-but-wrong blob (#902).
+const AUTH_CONFIG_EXAMPLES: Record<string, string> = {
+  kubeconfig: JSON.stringify(
+    { kubeconfig: "<paste your full kubeconfig YAML here>" },
+    null,
+    2,
+  ),
+  service_account_token: JSON.stringify(
+    {
+      token: "<serviceaccount bearer token>",
+      ca_cert: "<cluster CA — PEM or base64, optional if set on the row>",
+    },
+    null,
+    2,
+  ),
+  exec_plugin: JSON.stringify(
+    { region: "<cloud region>", cluster_name: "<cloud cluster name>" },
+    null,
+    2,
+  ),
+};
+
 function authConfigHint(authMethod: string): string {
   switch (authMethod) {
     case "kubeconfig":
-      return "Paste the cluster's kubeconfig contents — the API server URL, cluster CA, and the credential the platform should connect as.";
-    case "exec_plugin":
-      return "Provide an exec credential-plugin spec — the command, args, and env the kubelet-style client runs to mint a short-lived token (e.g. aws eks get-token).";
+      return "Keys: kubeconfig (full kubeconfig YAML, required); context (optional, to pick a non-default context). Use “Paste kubeconfig” below to escape a raw kubeconfig into JSON.";
     case "service_account_token":
-      return "Provide the in-cluster ServiceAccount bearer token, the cluster CA certificate, and the API server URL.";
+      return "Keys: token (ServiceAccount bearer token, required); ca_cert (cluster CA, PEM or base64, optional). The API server URL goes in the “API endpoint” field above, not here.";
+    case "exec_plugin":
+      return "Cloud-managed clusters (EKS/GKE/AKS) mint tokens for you; the platform derives region + cluster_name from the provider binding. Only override here if they differ.";
     default:
-      return "Driver-specific JSON. The exact shape depends on the selected auth method and is validated when you register.";
+      return "Driver-specific JSON, validated when you register.";
   }
 }
 
@@ -85,9 +107,33 @@ export function RegisterClusterDialog({ open, onOpenChange }: Props) {
   const [region, setRegion] = React.useState("");
   const [endpoint, setEndpoint] = React.useState("");
   const [authMethod, setAuthMethod] = React.useState("kubeconfig");
-  const [authConfigText, setAuthConfigText] = React.useState("{}");
+  const [authConfigText, setAuthConfigText] = React.useState(
+    AUTH_CONFIG_EXAMPLES.kubeconfig,
+  );
+  // Once the operator edits the JSON we stop auto-swapping the example on
+  // method change, so we never clobber real input.
+  const [authConfigTouched, setAuthConfigTouched] = React.useState(false);
+  const [rawKubeconfig, setRawKubeconfig] = React.useState("");
   const [ingressClass, setIngressClass] = React.useState("nginx");
   const [error, setError] = React.useState<string | null>(null);
+
+  function handleAuthMethodChange(next: string) {
+    setAuthMethod(next);
+    if (!authConfigTouched) {
+      setAuthConfigText(AUTH_CONFIG_EXAMPLES[next] ?? "{}");
+    }
+  }
+
+  // Wrap a raw kubeconfig (multi-line YAML) into the escaped JSON envelope —
+  // JSON.stringify handles the newline/quote escaping operators would
+  // otherwise do by hand.
+  function applyRawKubeconfig() {
+    const raw = rawKubeconfig.trim();
+    if (!raw) return;
+    setAuthConfigText(JSON.stringify({ kubeconfig: raw }, null, 2));
+    setAuthConfigTouched(true);
+    setRawKubeconfig("");
+  }
 
   React.useEffect(() => {
     const list = plugins.data?.astroliftProviderPlugins ?? [];
@@ -103,7 +149,10 @@ export function RegisterClusterDialog({ open, onOpenChange }: Props) {
       setSlugTouched(false);
       setRegion("");
       setEndpoint("");
-      setAuthConfigText("{}");
+      setAuthMethod("kubeconfig");
+      setAuthConfigText(AUTH_CONFIG_EXAMPLES.kubeconfig);
+      setAuthConfigTouched(false);
+      setRawKubeconfig("");
       setError(null);
     }
   }, [open]);
@@ -233,7 +282,7 @@ export function RegisterClusterDialog({ open, onOpenChange }: Props) {
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="auth-method">Auth method</Label>
-              <Select value={authMethod} onValueChange={setAuthMethod}>
+              <Select value={authMethod} onValueChange={handleAuthMethodChange}>
                 <SelectTrigger id="auth-method">
                   <SelectValue />
                 </SelectTrigger>
@@ -260,16 +309,44 @@ export function RegisterClusterDialog({ open, onOpenChange }: Props) {
             <Textarea
               id="auth-config"
               value={authConfigText}
-              onChange={(e) => setAuthConfigText(e.target.value)}
+              onChange={(e) => {
+                setAuthConfigText(e.target.value);
+                setAuthConfigTouched(true);
+              }}
               rows={6}
               className="font-mono text-xs"
             />
             {error && <p className="text-destructive text-xs">{error}</p>}
-            {/* Method-aware guidance (#902). The exact JSON schema is driver-
-                specific and validated server-side; this describes what each
-                method needs so operators don't paste a structurally-valid but
-                wrong blob. */}
+            {/* Method-aware guidance (#902): exact keys per method, seeded as an
+                example, so operators don't paste a valid-but-wrong shape. */}
             <p className="text-muted-foreground text-xs">{authConfigHint(authMethod)}</p>
+
+            {/* Paste-kubeconfig transform: raw multi-line YAML → escaped JSON
+                envelope, so operators don't hand-escape newlines/quotes. */}
+            {authMethod === "kubeconfig" && (
+              <div className="border-border mt-1 space-y-2 rounded-md border border-dashed p-3">
+                <Label htmlFor="raw-kubeconfig" className="text-xs">
+                  Paste kubeconfig
+                </Label>
+                <Textarea
+                  id="raw-kubeconfig"
+                  value={rawKubeconfig}
+                  onChange={(e) => setRawKubeconfig(e.target.value)}
+                  rows={4}
+                  placeholder={"apiVersion: v1\nkind: Config\nclusters:\n  - ..."}
+                  className="font-mono text-xs"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={!rawKubeconfig.trim()}
+                  onClick={applyRawKubeconfig}
+                >
+                  Convert to auth config
+                </Button>
+              </div>
+            )}
           </div>
 
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
