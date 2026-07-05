@@ -3,6 +3,10 @@ import {
   AlertTriangleIcon,
   ArrowRightIcon,
   BookOpenIcon,
+  CoinsIcon,
+  DatabaseIcon,
+  ExternalLinkIcon,
+  FileTextIcon,
   GitBranchIcon,
   GlobeIcon,
   GraduationCapIcon,
@@ -13,6 +17,8 @@ import {
   ScrollIcon,
   ServerCogIcon,
   SettingsIcon,
+  TerminalIcon,
+  UsersIcon,
   WebhookIcon,
   ZapIcon,
 } from "lucide-react";
@@ -25,11 +31,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+// Canonical source repo for reference docs not yet rendered in-app.
+const DOCS_REPO_URL = "https://github.com/calliopeai/astrolift-docs";
+
 interface DocCard {
   href: string;
   title: string;
   description: string;
   icon: typeof BookOpenIcon;
+  /** Opens in a new tab with an external indicator (GitHub reference). */
+  external?: boolean;
 }
 
 const sections: { label: string; cards: DocCard[] }[] = [
@@ -148,6 +159,100 @@ const sections: { label: string; cards: DocCard[] }[] = [
       },
     ],
   },
+  {
+    // Curated references that live in the astrolift-docs repo until they're
+    // rendered in-app. Migrated here from the retired /resources/docs stub
+    // (#894) so nothing is lost.
+    label: "Reference (on GitHub)",
+    cards: [
+      {
+        href: `${DOCS_REPO_URL}/blob/main/reference/manifest.md`,
+        title: "astrolift.toml manifest",
+        description:
+          "Full schema for the per-app manifest — sections, fields, validation, examples.",
+        icon: FileTextIcon,
+        external: true,
+      },
+      {
+        href: `${DOCS_REPO_URL}/blob/main/reference/providers.md`,
+        title: "Provider plugins",
+        description:
+          "How providers (aws, gcp, azure, k8s_native) advertise capabilities and which drivers they bundle.",
+        icon: ServerCogIcon,
+        external: true,
+      },
+      {
+        href: `${DOCS_REPO_URL}/blob/main/managed-services.md`,
+        title: "Managed services",
+        description:
+          "Provision Postgres, Redis, and object storage and inject the right env vars into your workload.",
+        icon: DatabaseIcon,
+        external: true,
+      },
+      {
+        href: `${DOCS_REPO_URL}/blob/main/ingress-dns.md`,
+        title: "Ingress and DNS",
+        description:
+          "Custom domains, wildcard zones, cert issuance, and the IngressDriver / DnsDriver split.",
+        icon: GlobeIcon,
+        external: true,
+      },
+      {
+        href: `${DOCS_REPO_URL}/blob/main/identity/rbac.md`,
+        title: "RBAC, teams, projects",
+        description:
+          "The Org → Team → Project → App scope tree and how role bindings cascade through it.",
+        icon: UsersIcon,
+        external: true,
+      },
+      {
+        href: `${DOCS_REPO_URL}/blob/main/identity/api-tokens.md`,
+        title: "API tokens",
+        description: "Mint, scope, and revoke programmatic tokens for the platform API.",
+        icon: KeyRoundIcon,
+        external: true,
+      },
+      {
+        href: `${DOCS_REPO_URL}/blob/main/observability/audit.md`,
+        title: "Audit log",
+        description:
+          "Every mutation recorded with actor + variables; how to forward via webhook for SIEM.",
+        icon: ScrollIcon,
+        external: true,
+      },
+      {
+        href: `${DOCS_REPO_URL}/blob/main/cost.md`,
+        title: "Cost and quotas",
+        description:
+          "Live pricing-API-driven cost estimation, org quotas, and overage handling.",
+        icon: CoinsIcon,
+        external: true,
+      },
+      {
+        href: `${DOCS_REPO_URL}/blob/main/specs/multi-cloud-topology.md`,
+        title: "Multi-cloud topology",
+        description:
+          "Modelling workloads across AWS, GCP, Azure, and self-managed clusters — placement, enforcement, federated observability.",
+        icon: ListTreeIcon,
+        external: true,
+      },
+      {
+        href: `${DOCS_REPO_URL}/tree/main/demo-apps`,
+        title: "Demo sample app manifests",
+        description:
+          "Example astrolift.toml files for Node.js, Python FastAPI, Go, and multi-workload apps.",
+        icon: RocketIcon,
+        external: true,
+      },
+      {
+        href: `${DOCS_REPO_URL}/blob/main/cli/reference.md`,
+        title: "CLI reference",
+        description: "Every astro subcommand, flag, and exit code.",
+        icon: TerminalIcon,
+        external: true,
+      },
+    ],
+  },
 ];
 
 export const metadata = {
@@ -173,25 +278,40 @@ export default function DocumentationIndexPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             {section.cards.map((card) => {
               const Icon = card.icon;
-              return (
-                <Link key={card.href} href={card.href} className="group">
-                  <Card className="flex h-full flex-col transition-colors group-hover:border-foreground/20">
-                    <CardHeader className="pb-2">
-                      <div className="bg-muted text-foreground/80 inline-flex size-9 items-center justify-center rounded-md">
-                        <Icon className="size-4" />
-                      </div>
-                      <CardTitle className="mt-3 text-base">
-                        {card.title}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex flex-1 flex-col justify-between gap-3">
-                      <CardDescription>{card.description}</CardDescription>
-                      <span className="text-muted-foreground group-hover:text-foreground flex items-center gap-1 text-xs transition-colors">
-                        Read guide
+              const body = (
+                <Card className="flex h-full flex-col transition-colors group-hover:border-foreground/20">
+                  <CardHeader className="pb-2">
+                    <div className="bg-muted text-foreground/80 inline-flex size-9 items-center justify-center rounded-md">
+                      <Icon className="size-4" />
+                    </div>
+                    <CardTitle className="mt-3 text-base">{card.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex flex-1 flex-col justify-between gap-3">
+                    <CardDescription>{card.description}</CardDescription>
+                    <span className="text-muted-foreground group-hover:text-foreground flex items-center gap-1 text-xs transition-colors">
+                      {card.external ? "Read on GitHub" : "Read guide"}
+                      {card.external ? (
+                        <ExternalLinkIcon className="h-3 w-3" />
+                      ) : (
                         <ArrowRightIcon className="h-3 w-3" />
-                      </span>
-                    </CardContent>
-                  </Card>
+                      )}
+                    </span>
+                  </CardContent>
+                </Card>
+              );
+              return card.external ? (
+                <a
+                  key={card.href}
+                  href={card.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group"
+                >
+                  {body}
+                </a>
+              ) : (
+                <Link key={card.href} href={card.href} className="group">
+                  {body}
                 </Link>
               );
             })}

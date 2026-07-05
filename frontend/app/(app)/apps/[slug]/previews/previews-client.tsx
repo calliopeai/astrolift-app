@@ -152,9 +152,9 @@ function formatCpuCores(cores: number): string {
 }
 
 // Docs URL — keeps the empty-state "Learn more" link consistent across
-// the platform. Lives in the in-app resources index (not an external
-// site) so operators stay inside the app.
-const DOCS_PREVIEWS_HREF = "/resources/docs#previews";
+// the platform. Points at the in-app documentation hub (#894) so operators
+// stay inside the app.
+const DOCS_PREVIEWS_HREF = "/documentation";
 
 // #659 — manual preview spin-up. Operators provision a preview from
 // any branch without opening a PR; the backend uses the same workflow

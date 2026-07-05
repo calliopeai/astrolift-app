@@ -21,7 +21,8 @@ interface SubnavLink {
 
 const LINKS: SubnavLink[] = [
   {
-    href: "/resources/docs",
+    // The docs directory moved to the canonical /documentation hub (#894).
+    href: "/documentation",
     label: "Docs",
     icon: <BookOpenIcon className="size-4" />,
   },
