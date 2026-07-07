@@ -139,9 +139,12 @@ def probe_app(app: RegisteredApp) -> AppUptimeResult | None:
         detail=detail,
     )
 
-    # Fire on a transition, or on a first-ever observation that's already
-    # down (so a permanently-broken app still pages once).
-    transitioned = (prev is not None and prev.is_up != is_up) or (prev is None and not is_up)
+    # Alert only on a genuine state change — never on the first observation.
+    # Otherwise a rollout (or a newly-registered app) pages once for every
+    # app that's already down, an alert storm. StatusCake/Pingdom semantics:
+    # alert on transitions. A never-up app is a deploy problem (surfaced in
+    # the OBSERVE UI + deploy status), not an uptime page.
+    transitioned = prev is not None and prev.is_up != is_up
     if transitioned:
         _emit_transition(app, result)
     return result
