@@ -45,6 +45,7 @@ import { GithubConnectCallout } from "./components/github-connect-callout";
 import { DeregisterPendingBanner } from "./components/deregister-pending-banner";
 import { LatestDeploymentRow } from "./components/latest-deployment-row";
 import { ObservabilitySection } from "./components/observability-section";
+import { UptimeCard } from "./components/uptime-card";
 import { PendingDeployments } from "./components/pending-deployments";
 import { ProvisioningProgressPanel } from "./components/provisioning-progress";
 import { QuickLinksGrid } from "./components/quick-links-grid";
@@ -275,6 +276,7 @@ export function AppDetailClient({ slug }: { slug: string }) {
       </Section>
 
       <Section title={tDetail("groups.insights")}>
+        <UptimeCard appSlug={a.slug} />
         <ObservabilitySection appSlug={a.slug} />
         <ActivityTimeline appSlug={a.slug} limit={20} />
       </Section>

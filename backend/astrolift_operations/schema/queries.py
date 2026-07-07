@@ -83,7 +83,82 @@ _TIME_RANGE_BUCKETS = {
 
 
 @strawberry.type
+class AstroliftAppUptimePoint:
+    checked_at: dt.datetime
+    is_up: bool
+    latency_ms: int
+    status_code: int | None
+
+
+@strawberry.type
+class AstroliftAppUptime:
+    """Synthetic-uptime rollup for one app (#uptime). ``is_up`` is the latest
+    probe verdict (null until the first probe); ``uptime_pct`` + ``recent``
+    drive the OBSERVE badge / graph."""
+
+    is_up: bool | None
+    last_checked_at: dt.datetime | None
+    uptime_pct: float
+    total_checks: int
+    window_hours: int
+    recent: list[AstroliftAppUptimePoint]
+
+
+@strawberry.type
 class OperationsQuery:
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_app_uptime(
+        self,
+        info: Info,
+        app_slug: str,
+        window_hours: int = 24,
+    ) -> AstroliftAppUptime | None:
+        """Uptime state + recent history for one app in the caller's org.
+
+        Returns null for an unknown/foreign-org slug. ``recent`` is oldest->
+        newest (sparkline order), capped at 120 points."""
+        tenant = get_current_tenant()
+        if tenant is None:
+            return None
+        from astrolift_operations.models import AppUptimeResult
+        from astrolift_registry.models import RegisteredApp
+
+        app = RegisteredApp.objects.filter(
+            slug=app_slug,
+            organization_id=tenant.organization_id,
+            deleted_at__isnull=True,
+        ).first()
+        if app is None:
+            return None
+
+        window = max(1, min(int(window_hours), 168))
+        since = timezone.now() - timedelta(hours=window)
+        base = AppUptimeResult.objects.filter(registered_app=app, deleted_at__isnull=True)
+        window_qs = base.filter(checked_at__gte=since)
+        total = window_qs.count()
+        up = window_qs.filter(is_up=True).count()
+        latest = base.order_by("-checked_at").first()
+        recent = list(base.order_by("-checked_at")[:120])
+        recent.reverse()
+        return AstroliftAppUptime(
+            is_up=(latest.is_up if latest else None),
+            last_checked_at=(latest.checked_at if latest else None),
+            uptime_pct=(round(100.0 * up / total, 2) if total else 0.0),
+            total_checks=total,
+            window_hours=window,
+            recent=[
+                AstroliftAppUptimePoint(
+                    checked_at=r.checked_at,
+                    is_up=r.is_up,
+                    latency_ms=r.latency_ms,
+                    status_code=r.status_code,
+                )
+                for r in recent
+            ],
+        )
+
     @strawberry.field
     @require_permission(Permission.AUDIT_LOG_READ)
     @tenant_scoped()
