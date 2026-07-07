@@ -67,6 +67,9 @@ PHASE_3A_ACTIVE_KINDS: frozenset[ScheduleKind] = frozenset(
         ScheduleKind.REHEAL_WEBHOOK_SUBSCRIPTIONS,
         ScheduleKind.DRIFT_DETECTION,
         ScheduleKind.SECRET_BUNDLE_REFRESH,
+        # Synthetic uptime probing ships active — it's the outage detector,
+        # of no value held. Safe: additive, self-guarded, read-only probes.
+        ScheduleKind.UPTIME_PROBE,
     }
 )
 
