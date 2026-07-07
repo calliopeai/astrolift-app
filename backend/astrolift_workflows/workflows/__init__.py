@@ -64,6 +64,7 @@ from astrolift_workflows.workflows.secret_rotation import (
 )
 from astrolift_workflows.workflows.tear_down_app import TearDownAppWorkflow
 from astrolift_workflows.workflows.tear_down_preview import TearDownPreviewWorkflow
+from astrolift_workflows.workflows.uptime_probe_tick import UptimeProbeTickWorkflow
 from astrolift_workflows.workflows.validate_custom_domain import (
     ValidateCustomDomainWorkflow,
 )
@@ -72,6 +73,7 @@ from astrolift_workflows.workflows.workflow_definition_run import (
 )
 
 __all__ = [
+    "UptimeProbeTickWorkflow",
     "AgentCronTickWorkflow",
     "AgentLoopTickWorkflow",
     "AgentReconcileTickWorkflow",
