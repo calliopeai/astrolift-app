@@ -61,6 +61,19 @@ DEFAULT_PREFERENCES: dict[tuple[str, str], bool] = {
     ("push", "auth.session.created.browser_extension"): True,
     # Fallback when the dispatcher can't infer client_kind.
     ("push", "auth.session.created"): True,
+    # ---- email channel --------------------------------------------
+    # Mirrors the page-me operational events onto email for an
+    # out-of-band notice. The whole email leg is master-gated by the
+    # EMAIL_NOTIFICATIONS constance flag (off by default), so these
+    # defaults only take effect once an operator enables email; a
+    # user can still mute any of them per-event. Noisy session events
+    # are intentionally push-only.
+    ("email", "app.down"): True,
+    ("email", "app.recovered"): True,
+    ("email", "deploy.failed"): True,
+    ("email", "cluster.bootstrap_failed"): True,
+    ("email", "secret.revealed"): True,
+    ("email", "app.deregister_pending"): True,
 }
 
 

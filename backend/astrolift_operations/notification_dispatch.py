@@ -770,6 +770,7 @@ def dispatch_event(envelope: EventEnvelope) -> None:
     if template is None:
         return
     _dispatch_template(envelope=envelope, template=template)
+    _dispatch_template_email(envelope=envelope, template=template)
 
 
 def _platform_for_device_row(device: Any) -> DevicePlatform:
@@ -881,6 +882,118 @@ def _dispatch_template(*, envelope: EventEnvelope, template: NotificationTemplat
                 envelope=envelope,
                 user_id=user_id,
             )
+
+
+def _render_notice_email(
+    *, template: NotificationTemplate, envelope: EventEnvelope
+) -> tuple[str, str]:
+    """Render (html_body, text_body) for a notice email.
+
+    The push template's ``title``/``body`` are short by design; the
+    email reuses them and, when the payload carries a real
+    ``target_url`` (uptime events do), surfaces it as a clickable
+    link -- the ``astrolift://`` action_url is a mobile deep link and
+    is useless in a mail client, so we don't render it.
+    """
+    title = template.title or envelope.event_type
+    body = template.body or ""
+    payload = envelope.payload or {}
+    target_url = str(payload.get("target_url", "") or "")
+
+    text_lines = [title, "", body]
+    link_html = ""
+    if target_url.startswith(("http://", "https://")):
+        text_lines += ["", target_url]
+        link_html = (
+            f'<p style="margin:16px 0 0"><a href="{target_url}">{target_url}</a></p>'
+        )
+    text_body = "\n".join(line for line in text_lines if line is not None)
+
+    html_body = (
+        '<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;'
+        'font-size:14px;line-height:1.5;color:#111">'
+        f"<h2 style=\"margin:0 0 8px;font-size:16px\">{title}</h2>"
+        f"<p style=\"margin:0\">{body}</p>"
+        f"{link_html}"
+        "</div>"
+    )
+    return html_body, text_body
+
+
+def _dispatch_template_email(*, envelope: EventEnvelope, template: NotificationTemplate) -> None:
+    """Email leg of the fan-out.
+
+    Mirrors the push leg's per-recipient preference gate on the
+    ``email`` channel. Master-gated by ``EMAIL_NOTIFICATIONS`` so a
+    fresh install never emails until an operator enables it. Each
+    opted-in recipient gets their own message (no cross-org-admin BCC
+    leak); sends are best-effort and audited as ``notification.email``.
+    """
+    from astrolift_operations.email_infra import is_valid_email
+    from astrolift_operations.models import is_enabled
+    from astrolift_operations.notification_email import (
+        notifications_email_enabled,
+        send_notice_email,
+    )
+
+    if not template.recipient_user_ids or not notifications_email_enabled():
+        return
+
+    effective_kind = _effective_event_kind(envelope)
+    html_body, text_body = _render_notice_email(template=template, envelope=envelope)
+
+    from django.contrib.auth import get_user_model
+
+    user_model = get_user_model()
+    seen: set[int] = set()
+    for user_id in template.recipient_user_ids:
+        if user_id in seen:
+            continue
+        seen.add(user_id)
+
+        if not is_enabled(user_id=user_id, channel="email", event_kind=effective_kind):
+            continue
+
+        address = user_model.objects.filter(pk=user_id).values_list("email", flat=True).first()
+        if not address or not is_valid_email(address):
+            _audit_email(envelope=envelope, user_id=user_id, status="no_address", detail="")
+            continue
+
+        sent = send_notice_email(
+            to=[address],
+            subject=template.title or envelope.event_type,
+            html_body=html_body,
+            text_body=text_body,
+            tag=envelope.event_type,
+        )
+        _audit_email(
+            envelope=envelope,
+            user_id=user_id,
+            status="sent" if sent else "failed",
+            detail=address.split("@", 1)[-1] if sent else "send returned 0",
+        )
+
+
+def _audit_email(*, envelope: EventEnvelope, user_id: int, status: str, detail: str) -> None:
+    """Audit row for one email fan-out decision (parity with push)."""
+    emit_audit(
+        AuditEntry(
+            actor_user_id=envelope.actor_user_id,
+            organization_id=envelope.organization_id,
+            action="notification.email",
+            decision="ALLOW" if status == "sent" else "DENY",
+            target_kind="user",
+            target_id=str(user_id),
+            duration_ms=0,
+            permissions=(),
+            extra={
+                "event_type": envelope.event_type,
+                "recipient_user_id": user_id,
+                "status": status,
+                "detail": detail,
+            },
+        )
+    )
 
 
 def _build_data_payload(*, template: NotificationTemplate, envelope: EventEnvelope) -> dict[str, str]:
