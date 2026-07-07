@@ -153,6 +153,7 @@ from astrolift_workflows.activities.static_site import (
     ensure_static_site_services,
     sync_static_assets,
 )
+from astrolift_workflows.activities.uptime import probe_uptime_tick
 from astrolift_workflows.activities.workflow_stage_activities import (
     aggregate_fan_out,
     create_stage_execution,
@@ -169,6 +170,7 @@ from astrolift_workflows.activities.workload_identity import (
 )
 
 __all__ = [
+    "probe_uptime_tick",
     "abort_in_flight_deploys",
     "aggregate_fan_out",
     "apply_manifests",

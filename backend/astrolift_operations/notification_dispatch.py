@@ -658,6 +658,44 @@ def _template_session_created(envelope: EventEnvelope) -> NotificationTemplate |
     )
 
 
+def _template_app_uptime_event(
+    envelope: EventEnvelope, action_label: str
+) -> NotificationTemplate | None:
+    """App up/down alert -> the app's org admins (#uptime).
+
+    Delivered to org admins rather than a per-user opt-in list because an
+    app being unreachable is a whoever-owns-this-must-know event; users can
+    still mute it via notification preferences.
+    """
+    if envelope.organization_id is None:
+        return None
+    admin_ids = _org_admin_user_ids(organization_id=envelope.organization_id)
+    if not admin_ids:
+        return None
+    payload = envelope.payload or {}
+    app_slug = str(payload.get("app_slug", "") or "")
+    app_name = str(payload.get("app_name", "") or app_slug or "app")
+    detail = str(payload.get("detail", "") or "")
+    if action_label == "down":
+        title = f"App down: {app_name}"
+        body = f"{app_slug} is unreachable" + (f" ({detail})" if detail else "")
+    else:
+        title = f"App recovered: {app_name}"
+        body = f"{app_slug} is reachable again"
+    action_url = f"astrolift://apps/{app_slug}" if app_slug else "astrolift://apps"
+    return NotificationTemplate(
+        title=_truncate(title, PUSH_TITLE_MAX),
+        body=_truncate(body, PUSH_BODY_MAX),
+        action_url=_truncate(action_url, PUSH_DATA_VALUE_MAX),
+        recipient_user_ids=tuple(sorted(admin_ids)),
+        extra_data={
+            "app_slug": _truncate(app_slug, PUSH_DATA_VALUE_MAX),
+            "target_url": _truncate(str(payload.get("target_url", "") or ""), PUSH_DATA_VALUE_MAX),
+            "status_code": _truncate(str(payload.get("status_code", "") or ""), PUSH_DATA_VALUE_MAX),
+        },
+    )
+
+
 NOTIFICATION_TEMPLATES = {
     "deploy.approved": lambda env: _template_deploy_event(env, "approved"),
     "deploy.rejected": lambda env: _template_deploy_event(env, "rejected"),
@@ -666,6 +704,8 @@ NOTIFICATION_TEMPLATES = {
     "alert.fired": _template_alert_fired,
     "cluster.bootstrap_failed": _template_cluster_bootstrap_failed,
     "app.deregister_pending": _template_app_deregister_pending,
+    "app.down": lambda env: _template_app_uptime_event(env, "down"),
+    "app.recovered": lambda env: _template_app_uptime_event(env, "recovered"),
     "auth.session.created": _template_session_created,
 }
 

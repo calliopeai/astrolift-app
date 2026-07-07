@@ -44,6 +44,11 @@ class ScheduleKind(StrEnum):
     """Every 15 min — preview environment teardown by TTL +
     max-active eviction (#88)."""
 
+    UPTIME_PROBE = "uptime_probe"
+    """Every 2 min — synthetic HTTP probe of each READY app's public
+    health URL; emit app.down / app.recovered on transitions. Catches
+    edge/routing/TLS outages the pod-health signals can't see."""
+
     POLL_SCHEDULED_JOB_RUNS = "poll_scheduled_job_runs"
     """Every 1 min — discover k8s Jobs created by tenant
     CronJobs (spec §4.16)."""
@@ -203,6 +208,13 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
         interval_seconds=15 * 60,
         schedule_id=schedule_id_for(kind=ScheduleKind.PREVIEW_GC),
         description="Preview env GC: TTL eviction + max-active",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.UPTIME_PROBE,
+        workflow_name="UptimeProbeTickWorkflow",
+        interval_seconds=120,
+        schedule_id=schedule_id_for(kind=ScheduleKind.UPTIME_PROBE),
+        description="Synthetic uptime probe of deployed apps",
     ),
     ScheduleDefinition(
         kind=ScheduleKind.POLL_SCHEDULED_JOB_RUNS,

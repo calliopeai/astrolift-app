@@ -47,6 +47,9 @@ DEFAULT_PREFERENCES: dict[tuple[str, str], bool] = {
     ("push", "alert.fired"): True,
     ("push", "cluster.bootstrap_failed"): True,
     ("push", "app.deregister_pending"): True,
+    # ---- uptime: an app going unreachable is a page-me event ----------
+    ("push", "app.down"): True,
+    ("push", "app.recovered"): True,
     # ---- #499 new-session ------------------------------------------
     # Mobile/web new sessions are security-critical → ON.
     # CLI sessions are a noisy bootstrap signal → OFF by default so

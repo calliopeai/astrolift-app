@@ -87,6 +87,7 @@ from astrolift_workflows.activities import (
     pre_flight,
     probe_capabilities,
     probe_required_records,
+    probe_uptime_tick,
     provision_dev_environment,
     provision_dns_zone,
     provision_managed_service,
@@ -166,12 +167,14 @@ from astrolift_workflows.workflows import (
     SyncDevEnvironmentFilesWorkflow,
     TearDownAppWorkflow,
     TearDownPreviewWorkflow,
+    UptimeProbeTickWorkflow,
     ValidateCustomDomainWorkflow,
     WorkflowDefinitionRunWorkflow,
 )
 
 WORKFLOWS = (
     AgentCronTickWorkflow,
+    UptimeProbeTickWorkflow,
     AgentLoopTickWorkflow,
     AgentReconcileTickWorkflow,
     AgentScaleTickWorkflow,
@@ -214,6 +217,7 @@ WORKFLOWS = (
 
 ACTIVITIES = (
     aggregate_fan_out,
+    probe_uptime_tick,
     apply_manifests,
     apply_platform_rbac,
     apply_to_target_cluster,
