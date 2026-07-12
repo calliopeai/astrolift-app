@@ -172,7 +172,6 @@ with comments. Headlines:
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — fork + PR flow + style requirements
 - **[SECURITY.md](SECURITY.md)** — vulnerability disclosure
 - **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** — community standards
-- **[CLAUDE.md](CLAUDE.md)** / **[AGENTS.md](AGENTS.md)** / **[GEMINI.md](GEMINI.md)** / **[CODEX.md](CODEX.md)** — agent shims (all point at `bootstrap.md`)
 - **Public docs** — [astrolift.dev](https://astrolift.dev)
 
 ---
