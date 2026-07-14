@@ -2,14 +2,17 @@
 
 import { useMutation, useQuery, useSubscription } from "@apollo/client/react";
 import {
+  BarChart3Icon,
   BoxIcon,
   CheckIcon,
   ClockIcon,
   ExternalLinkIcon,
+  GitBranchIcon,
   Loader2Icon,
   MoreHorizontalIcon,
   PlusIcon,
   RotateCcwIcon,
+  ScrollIcon,
   StopCircleIcon,
   UndoIcon,
 } from "lucide-react";
@@ -108,9 +111,53 @@ const TERMINAL: ReadonlySet<DeploymentStatus> = new Set(["failed", "rolled_back"
 // they live as tabs here rather than as top-level nav entries. The tab
 // replaces the older status-filter pills — the pills were themselves a
 // status axis, so stacking both would be redundant.
-type DeploymentTab = "active" | "previews" | "pending" | "history";
+type DeploymentTab = "active" | "previews" | "pending" | "history" | SignalTab;
 
-const DEPLOYMENT_TABS: readonly DeploymentTab[] = ["active", "previews", "pending", "history"];
+const DEPLOYMENT_TABS: readonly DeploymentTab[] = [
+  "active",
+  "previews",
+  "pending",
+  "history",
+  "metrics",
+  "logs",
+  "traces",
+];
+
+// Observe signal surfaces folded into the fleet tabs (#892). They are
+// gateway placeholders into the fleet-wide explorers — they render an
+// EmptyState instead of deployment rows, so they carry no badge count.
+type SignalTab = "metrics" | "logs" | "traces";
+
+const SIGNAL_COPY: Record<
+  SignalTab,
+  { label: string; icon: React.ReactNode; description: string; actionHref: string }
+> = {
+  metrics: {
+    label: "Metrics",
+    icon: <BarChart3Icon className="size-5" />,
+    description:
+      "Rollout success rate, request latency (p50/p95/p99), error rate, and pod restart counts across all deployment workloads.",
+    actionHref: "/administration/metrics",
+  },
+  logs: {
+    label: "Logs",
+    icon: <ScrollIcon className="size-5" />,
+    description:
+      "Fleet-wide log search across all deployment container stdout/stderr. Filter by app, workload, severity, or time range.",
+    actionHref: "/logs",
+  },
+  traces: {
+    label: "Traces",
+    icon: <GitBranchIcon className="size-5" />,
+    description:
+      "Distributed trace explorer for deployment workloads — latency, downstream errors, and service dependencies.",
+    actionHref: "/traces",
+  },
+};
+
+function signalTab(tab: DeploymentTab): SignalTab | null {
+  return tab === "metrics" || tab === "logs" || tab === "traces" ? tab : null;
+}
 
 interface TabCount {
   tab: DeploymentTab;
@@ -141,6 +188,11 @@ function tabMatches(tab: DeploymentTab, d: AstroliftDeployment): boolean {
       return d.status === "pending_approval";
     case "history":
       return TERMINAL.has(d.status);
+    case "metrics":
+    case "logs":
+    case "traces":
+      // Signal tabs render a gateway placeholder, not deployment rows.
+      return false;
   }
 }
 
@@ -168,6 +220,7 @@ export function DeploymentsClient() {
   const rawTab = searchParams.get("tab") as DeploymentTab | null;
   const tab: DeploymentTab =
     rawTab && DEPLOYMENT_TABS.includes(rawTab) ? rawTab : "active";
+  const signal = signalTab(tab);
   const [appFilter, setAppFilter] = React.useState<string>(
     () => searchParams.get("app") ?? ""
   );
@@ -497,10 +550,11 @@ export function DeploymentsClient() {
         </div>
       }
     >
-      {/* Sub-navigation: Active | Previews | Pending | History (#797).
+      {/* Sub-navigation: Active | Previews | Pending | History (#797),
+          plus the Metrics | Logs | Traces signal gateways (#892).
           Sits directly under the page header, above the filter row.
-          Each tab carries a live count badge; Pending's badge is the
-          approval-queue size. */}
+          Each fleet tab carries a live count badge; Pending's badge is
+          the approval-queue size. Signal tabs carry no badge. */}
       <div
         role="tablist"
         aria-label={t("tabs.ariaLabel")}
@@ -508,6 +562,7 @@ export function DeploymentsClient() {
       >
         {counts.map(({ tab: tabKey, count, labelKey }) => {
           const active = tab === tabKey;
+          const sig = signalTab(tabKey);
           return (
             <button
               key={tabKey}
@@ -522,7 +577,7 @@ export function DeploymentsClient() {
                   : "text-muted-foreground hover:text-foreground")
               }
             >
-              <span>{t(labelKey)}</span>
+              <span>{sig ? SIGNAL_COPY[sig].label : t(labelKey)}</span>
               {count > 0 && (
                 <span
                   className={
@@ -538,86 +593,99 @@ export function DeploymentsClient() {
         })}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          placeholder={t("filterApp")}
-          value={appFilter}
-          onChange={(e) => setAppFilter(e.target.value)}
-          className="max-w-xs"
+      {signal ? (
+        // Gateway placeholder ported from /observe/deployments (#892).
+        <EmptyState
+          icon={SIGNAL_COPY[signal].icon}
+          title={`Deployment ${SIGNAL_COPY[signal].label}`}
+          description={SIGNAL_COPY[signal].description}
+          actionHref={SIGNAL_COPY[signal].actionHref}
+          actionLabel={`Open ${SIGNAL_COPY[signal].label} explorer`}
         />
-        <ListControls controls={ctrl} hideSearch className="ml-auto" />
-      </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              placeholder={t("filterApp")}
+              value={appFilter}
+              onChange={(e) => setAppFilter(e.target.value)}
+              className="max-w-xs"
+            />
+            <ListControls controls={ctrl} hideSearch className="ml-auto" />
+          </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {loading && list.length === 0 ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : list.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<BoxIcon className="size-5" />}
-                title={t("emptyTitle")}
-                description={t("emptyDescription")}
-                actionHref="/apps"
-                actionLabel={t("openApps")}
-              />
-            </div>
-          ) : (
-            <TooltipProvider delayDuration={300}>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10">
-                      {hasAnyAction && (
-                        <input
-                          type="checkbox"
-                          aria-label={t("bulk.selectAllLabel")}
-                          checked={allVisibleSelected}
-                          ref={(el) => {
-                            if (el) el.indeterminate = someVisibleSelected;
-                          }}
-                          onChange={toggleAllVisible}
-                          className="size-4"
-                          onClick={(e) => e.stopPropagation()}
+          <Card>
+            <CardContent className="p-0">
+              {loading && list.length === 0 ? (
+                <div className="space-y-2 p-6">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ) : list.length === 0 ? (
+                <div className="p-6">
+                  <EmptyState
+                    icon={<BoxIcon className="size-5" />}
+                    title={t("emptyTitle")}
+                    description={t("emptyDescription")}
+                    actionHref="/apps"
+                    actionLabel={t("openApps")}
+                  />
+                </div>
+              ) : (
+                <TooltipProvider delayDuration={300}>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10">
+                          {hasAnyAction && (
+                            <input
+                              type="checkbox"
+                              aria-label={t("bulk.selectAllLabel")}
+                              checked={allVisibleSelected}
+                              ref={(el) => {
+                                if (el) el.indeterminate = someVisibleSelected;
+                              }}
+                              onChange={toggleAllVisible}
+                              className="size-4"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          )}
+                        </TableHead>
+                        <TableHead className="w-6"></TableHead>
+                        <TableHead><SortableHeader sortKey="app" sort={ctrl.sort} onToggle={ctrl.toggleSort}>{t("columns.appEnv")}</SortableHeader></TableHead>
+                        <TableHead>{t("columns.image")}</TableHead>
+                        <TableHead>{t("columns.trigger")}</TableHead>
+                        <TableHead><SortableHeader sortKey="status" sort={ctrl.sort} onToggle={ctrl.toggleSort}>{t("columns.status")}</SortableHeader></TableHead>
+                        <TableHead>{t("columns.duration")}</TableHead>
+                        <TableHead><SortableHeader sortKey="started" sort={ctrl.sort} onToggle={ctrl.toggleSort}>{t("columns.started")}</SortableHeader></TableHead>
+                        <TableHead className="w-44 text-right">{t("columns.actions")}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {ctrl.rows.map((d) => (
+                        <DeploymentRow
+                          key={d.id}
+                          deployment={d}
+                          checked={selected.has(d.id)}
+                          hasAnyAction={hasAnyAction}
+                          canDeploy={canDeploy}
+                          canApprove={canApprove}
+                          canRollback={canRollback}
+                          busy={busy || bulkRunning}
+                          onToggle={() => toggleRow(d.id)}
+                          onNavigate={() => navigateToDeployment(d.id)}
+                          onKeyDown={(e) => onRowKeyDown(e, d.id)}
+                          onAction={(kind) => setPendingAction({ kind, deployment: d })}
                         />
-                      )}
-                    </TableHead>
-                    <TableHead className="w-6"></TableHead>
-                    <TableHead><SortableHeader sortKey="app" sort={ctrl.sort} onToggle={ctrl.toggleSort}>{t("columns.appEnv")}</SortableHeader></TableHead>
-                    <TableHead>{t("columns.image")}</TableHead>
-                    <TableHead>{t("columns.trigger")}</TableHead>
-                    <TableHead><SortableHeader sortKey="status" sort={ctrl.sort} onToggle={ctrl.toggleSort}>{t("columns.status")}</SortableHeader></TableHead>
-                    <TableHead>{t("columns.duration")}</TableHead>
-                    <TableHead><SortableHeader sortKey="started" sort={ctrl.sort} onToggle={ctrl.toggleSort}>{t("columns.started")}</SortableHeader></TableHead>
-                    <TableHead className="w-44 text-right">{t("columns.actions")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {ctrl.rows.map((d) => (
-                    <DeploymentRow
-                      key={d.id}
-                      deployment={d}
-                      checked={selected.has(d.id)}
-                      hasAnyAction={hasAnyAction}
-                      canDeploy={canDeploy}
-                      canApprove={canApprove}
-                      canRollback={canRollback}
-                      busy={busy || bulkRunning}
-                      onToggle={() => toggleRow(d.id)}
-                      onNavigate={() => navigateToDeployment(d.id)}
-                      onKeyDown={(e) => onRowKeyDown(e, d.id)}
-                      onAction={(kind) => setPendingAction({ kind, deployment: d })}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
-            </TooltipProvider>
-          )}
-        </CardContent>
-      </Card>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TooltipProvider>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {/* Scope 2 — sticky bulk action bar. Appears only when at least
           one row is checked. Mixed-state selections get an inline

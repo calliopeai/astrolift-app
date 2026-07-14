@@ -1,21 +1,6 @@
-import {
-  LIST_CLUSTERS,
-  LIST_PROVIDER_PLUGINS,
-} from "@/graphql/clusters/clusters.queries";
-import { PreloadQuery } from "@/lib/apollo";
+import { redirect } from "next/navigation";
 
-import { ConnectedClustersClient } from "./clusters-client";
-
-export const metadata = {
-  title: "Connected clusters · Resources · Astrolift",
-};
-
-export default function ConnectedClustersPage() {
-  return (
-    <PreloadQuery query={LIST_CLUSTERS}>
-      <PreloadQuery query={LIST_PROVIDER_PLUGINS}>
-        <ConnectedClustersClient />
-      </PreloadQuery>
-    </PreloadQuery>
-  );
+// The live CONTROL page at /clusters owns this surface (#916).
+export default function LegacyConnectedClustersPage() {
+  redirect("/clusters");
 }

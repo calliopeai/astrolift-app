@@ -9,6 +9,7 @@ import {
   HistoryIcon,
   Loader2Icon,
   PlayIcon,
+  ScrollIcon,
   TerminalIcon,
   XCircleIcon,
 } from "lucide-react";
@@ -203,7 +204,9 @@ function cronWorkloadSortFn(a: WorkloadCronCardData, b: WorkloadCronCardData, so
 
 export function JobsClient({ appSlug, tabs }: { appSlug?: string; tabs?: React.ReactNode } = {}) {
   const t = useTranslations("jobs");
-  const [tab, setTab] = React.useState<"schedules" | "runs" | "failures" | "commands">("schedules");
+  const [tab, setTab] = React.useState<"schedules" | "runs" | "failures" | "commands" | "logs">(
+    "schedules"
+  );
   const variables = appSlug ? { appSlug, limit: 100 } : { limit: 100 };
   const { data: jobsData, loading: jobsLoading } = useQuery<JobResp>(LIST_SCHEDULED_JOB_RUNS, {
     variables,
@@ -346,6 +349,14 @@ export function JobsClient({ appSlug, tabs }: { appSlug?: string; tabs?: React.R
             {cmds.length}
           </Badge>
         </Button>
+        <Button
+          variant={tab === "logs" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setTab("logs")}
+          className="gap-2"
+        >
+          <ScrollIcon className="size-4" /> Logs
+        </Button>
       </div>
 
       {tab === "schedules" &&
@@ -460,6 +471,19 @@ export function JobsClient({ appSlug, tabs }: { appSlug?: string; tabs?: React.R
                 <CommandRunsTable cmds={cmdsCtrl.rows} ctrl={cmdsCtrl} />
               </>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Gateway placeholder ported from /observe/jobs (#892). */}
+      {tab === "logs" && (
+        <Card>
+          <CardContent className="p-6">
+            <EmptyState
+              icon={<ScrollIcon className="size-5" />}
+              title="Job Logs"
+              description="Stdout/stderr from completed job runs. Each run's log tail is stored inline; full log available on demand."
+            />
           </CardContent>
         </Card>
       )}

@@ -5,11 +5,14 @@ import { usePathname } from "next/navigation";
 import {
   AlertTriangleIcon,
   BookOpenIcon,
+  FileTextIcon,
   GitBranchIcon,
   GlobeIcon,
   GraduationCapIcon,
   KeyRoundIcon,
+  LifeBuoyIcon,
   ListTreeIcon,
+  PlugIcon,
   RocketIcon,
   ScaleIcon,
   ScrollIcon,
@@ -50,8 +53,11 @@ const navSections: { label: string; links: { href: string; label: string; icon: 
     label: "Reference",
     links: [
       { href: "/documentation/configuration", label: "Configuration", icon: SettingsIcon },
+      { href: "/documentation/manifest", label: "Manifest reference", icon: FileTextIcon },
+      { href: "/documentation/drivers", label: "Driver reference", icon: PlugIcon },
       { href: "/documentation/webhook-events", label: "Webhook events", icon: ListTreeIcon },
       { href: "/documentation/changelog", label: "Changelog", icon: ScrollIcon },
+      { href: "/documentation/help", label: "Get help", icon: LifeBuoyIcon },
     ],
   },
 ];
