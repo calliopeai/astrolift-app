@@ -72,14 +72,14 @@ function StageNode({ data }: NodeProps<Node<PipelineDagStage>>) {
   return (
     <div
       className={cn(
-        "min-w-[168px] max-w-[220px] rounded-md border bg-background p-3 ring-1 shadow-sm",
+        "viz-node min-w-[168px] max-w-[220px] rounded-md border bg-background p-3 ring-1 shadow-sm",
         TONE_RING[tone],
       )}
     >
       <Handle type="target" position={Position.Left} className="!bg-muted-foreground/30" />
       <Handle type="source" position={Position.Right} className="!bg-muted-foreground/30" />
       <div className="flex items-center gap-1.5">
-        <span className={cn("size-1.5 shrink-0 rounded-full", TONE_DOT[tone])} />
+        <span className={cn("viz-node-dot size-1.5 shrink-0 rounded-full", TONE_DOT[tone])} />
         <div className="truncate text-sm font-medium leading-tight">{data.name}</div>
       </div>
       <div className="text-muted-foreground mt-1 flex items-center justify-between gap-2 text-2xs">
@@ -97,6 +97,8 @@ export interface PipelineDagProps {
   height?: number | string;
   className?: string;
   onStageClick?: (stage: PipelineDagStage) => void;
+  /** Visual treatment — forwarded to `FlowGraph` (#1055). */
+  variant?: "default" | "telemetry";
 }
 
 /**
@@ -108,7 +110,7 @@ export interface PipelineDagProps {
  * by dependency depth. Remount via a `key` (e.g. the run id) to re-flow when a
  * different run is selected.
  */
-export function PipelineDag({ stages, height = 320, className, onStageClick }: PipelineDagProps) {
+export function PipelineDag({ stages, height = 320, className, onStageClick, variant }: PipelineDagProps) {
   const nodes = React.useMemo<Node<PipelineDagStage>[]>(() => {
     const ids = stages.map((s) => s.id);
     const edges = stages.flatMap((s) => (s.needs ?? []).map((dep) => ({ source: dep, target: s.id })));
@@ -151,6 +153,7 @@ export function PipelineDag({ stages, height = 320, className, onStageClick }: P
       onNodeClick={handleClick}
       showMiniMap={false}
       fitViewOptions={{ padding: 0.25, maxZoom: 1.1 }}
+      variant={variant}
     />
   );
 }

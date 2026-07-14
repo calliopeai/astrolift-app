@@ -173,6 +173,12 @@
   --motion-fast: 120ms;
   --motion-base: 200ms;
   --motion-slow: 320ms;
+
+  /* ── Telemetry glow — #1055 flagship variant. Brand-teal halos derived
+   *    from --primary (re-resolves under .dark); consumed only by the
+   *    [data-variant="telemetry"] scope at the end of this file. ─────── */
+  --glow-telemetry: 0 0 16px color-mix(in oklab, var(--primary) 30%, transparent);
+  --glow-telemetry-strong: 0 0 24px 2px color-mix(in oklab, var(--primary) 45%, transparent);
 }
 
 .dark {
@@ -250,6 +256,48 @@
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ── #1055 telemetry variant ─────────────────────────────────────────────────
+ * Opt-in "mission-control" treatment for graph surfaces. A component opts in
+ * via `variant="telemetry"`, which FlowGraph forwards as `data-variant` on
+ * its container div. Static glow is not motion, so it sits outside the media
+ * query; every keyframe/animation is gated behind prefers-reduced-motion:
+ * no-preference — the reduced-motion fallback is the default static look. */
+[data-variant="telemetry"] .viz-node {
+  box-shadow: var(--glow-telemetry);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Flowing dash on edges the caller marked `animated` — React-Flow adds the
+   * `.animated` class itself; this only restyles that dash into the
+   * brand-teal flow (never forces animation on). */
+  [data-variant="telemetry"] .react-flow__edge.animated .react-flow__edge-path {
+    stroke: color-mix(in oklab, var(--primary) 60%, transparent);
+    stroke-dasharray: 6 4;
+    animation: telemetry-edge-flow calc(var(--motion-slow) * 3) linear infinite;
+  }
+
+  /* Subtle live-indicator pulse on node status dots. */
+  [data-variant="telemetry"] .viz-node-dot {
+    animation: telemetry-live-pulse 2.4s var(--ease-standard) infinite;
+  }
+
+  @keyframes telemetry-edge-flow {
+    to {
+      stroke-dashoffset: -10;
+    }
+  }
+
+  @keyframes telemetry-live-pulse {
+    0% {
+      box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 45%, transparent);
+    }
+    70%,
+    100% {
+      box-shadow: 0 0 0 4px transparent;
     }
   }
 }

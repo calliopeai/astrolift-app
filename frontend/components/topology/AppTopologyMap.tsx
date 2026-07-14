@@ -67,7 +67,7 @@ function TopologyNodeCard({ data }: NodeProps<Node<TopologyNode>>) {
   return (
     <div
       className={cn(
-        "min-w-[180px] max-w-[220px] rounded-md border bg-background p-3 ring-1 shadow-sm",
+        "viz-node min-w-[180px] max-w-[220px] rounded-md border bg-background p-3 ring-1 shadow-sm",
         STATUS_RING[data.status],
       )}
     >
@@ -80,7 +80,7 @@ function TopologyNodeCard({ data }: NodeProps<Node<TopologyNode>>) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <span className={cn("size-1.5 rounded-full", STATUS_DOT[data.status])} />
+            <span className={cn("viz-node-dot size-1.5 rounded-full", STATUS_DOT[data.status])} />
             <div className="truncate text-sm font-medium leading-tight">{data.label}</div>
           </div>
           {data.sublabel && (
@@ -132,6 +132,8 @@ export interface AppTopologyMapProps {
   /** Map height — defaults to 480px so it fits inside an app-overview card. */
   height?: number | string;
   className?: string;
+  /** Visual treatment — forwarded to `FlowGraph` (#1055). */
+  variant?: "default" | "telemetry";
 }
 
 /**
@@ -150,6 +152,7 @@ export function AppTopologyMap({
   onNodeClick,
   height = 480,
   className,
+  variant,
 }: AppTopologyMapProps) {
   const router = useRouter();
 
@@ -200,6 +203,7 @@ export function AppTopologyMap({
       onNodeClick={handleNodeClick}
       height={height}
       className={className}
+      variant={variant}
     />
   );
 }

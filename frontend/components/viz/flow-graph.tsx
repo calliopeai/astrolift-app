@@ -34,6 +34,9 @@ export interface FlowGraphProps {
   maxZoom?: number;
   /** Show the minimap. Off is better for small DAGs. Default true. */
   showMiniMap?: boolean;
+  /** Visual treatment. `"telemetry"` opts into the glow / animated-edge
+   * scope in globals.css via `data-variant` on the container (#1055). */
+  variant?: "default" | "telemetry";
 }
 
 /**
@@ -62,6 +65,7 @@ export function FlowGraph({
   minZoom = 0.4,
   maxZoom = 1.8,
   showMiniMap = true,
+  variant = "default",
 }: FlowGraphProps) {
   // Fill in edge defaults (arrowhead + stroke) without clobbering caller
   // overrides. Computed once — the graph reads its initial data on mount.
@@ -91,6 +95,7 @@ export function FlowGraph({
 
   return (
     <div
+      data-variant={variant}
       className={cn("relative rounded-md border bg-card", className)}
       style={{ height: typeof height === "number" ? `${height}px` : height }}
     >
