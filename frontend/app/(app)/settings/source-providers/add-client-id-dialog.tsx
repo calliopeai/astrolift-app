@@ -6,6 +6,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { DefinitionList } from "@/components/ui/definition-list";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -121,23 +122,32 @@ export function AddClientIdDialog({ connection, onClose }: Props) {
           className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4"
         >
           {connection && (
-            <div className="text-muted-foreground rounded-md border p-3 text-xs">
-              <p>
-                <span className="font-medium">Connection:</span> {connection.name}
-              </p>
-              {connection.accountLogin && (
-                <p>
-                  <span className="font-medium">Account:</span>{" "}
-                  <code className="font-mono">{connection.accountLogin}</code>
-                </p>
-              )}
-              {connection.oauthClientId && (
-                <p>
-                  <span className="font-medium">App ID (existing):</span>{" "}
-                  <code className="font-mono">{connection.oauthClientId}</code>
-                </p>
-              )}
-            </div>
+            <DefinitionList
+              className="text-xs"
+              items={[
+                { term: "Connection", description: connection.name },
+                ...(connection.accountLogin
+                  ? [
+                      {
+                        term: "Account",
+                        description: (
+                          <code className="font-mono">{connection.accountLogin}</code>
+                        ),
+                      },
+                    ]
+                  : []),
+                ...(connection.oauthClientId
+                  ? [
+                      {
+                        term: "App ID (existing)",
+                        description: (
+                          <code className="font-mono">{connection.oauthClientId}</code>
+                        ),
+                      },
+                    ]
+                  : []),
+              ]}
+            />
           )}
 
           <div className="space-y-2">

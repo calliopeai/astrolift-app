@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LIST_SECRET_CHANGE_PROPOSALS } from "@/graphql/services/services.queries";
 import type { AstroliftSecretChangeProposal } from "@/graphql/services/services.types";
@@ -38,29 +39,26 @@ export function SecretProposalsQueueClient() {
 
   if (loading && !data) {
     return (
-      <section className="mt-8">
-        <h2 className="mb-3 text-lg font-semibold">{t("title")}</h2>
+      <Section title={t("title")} className="mt-8">
         <Skeleton className="h-24 w-full" />
-      </section>
+      </Section>
     );
   }
 
   if (proposals.length === 0) {
     return (
-      <section className="mt-8">
-        <h2 className="mb-3 text-lg font-semibold">{t("title")}</h2>
+      <Section title={t("title")} className="mt-8">
         <EmptyState
           title={t("empty.title")}
           description={t("empty.description")}
           icon={<ShieldCheckIcon className="size-6" aria-hidden />}
         />
-      </section>
+      </Section>
     );
   }
 
   return (
-    <section className="mt-8">
-      <h2 className="mb-3 text-lg font-semibold">{t("title")}</h2>
+    <Section title={t("title")} className="mt-8">
       <ul className="flex flex-col gap-2">
         {proposals.map((proposal) => (
           <li key={proposal.id}>
@@ -68,7 +66,7 @@ export function SecretProposalsQueueClient() {
           </li>
         ))}
       </ul>
-    </section>
+    </Section>
   );
 }
 

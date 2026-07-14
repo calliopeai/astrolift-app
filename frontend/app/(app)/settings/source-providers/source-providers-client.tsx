@@ -25,7 +25,6 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -207,19 +206,22 @@ export function SourceProvidersPanel() {
       className="gap-6"
     >
       {/* Connections */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <GitBranchIcon className="size-4" />
-              Hosts
-            </CardTitle>
-            <p className="text-muted-foreground mt-1 text-xs">
-              One-click GitHub App registration via the manifest flow, or a guided GitLab Group
-              OAuth wizard. Personal Access Tokens and pre-registered OAuth apps remain available
-              under <em>Advanced</em>.
-            </p>
-          </div>
+      <Section
+        headingLevel="h3"
+        title={
+          <span className="flex items-center gap-2">
+            <GitBranchIcon className="size-4" />
+            Hosts
+          </span>
+        }
+        description={
+          <span className="block max-w-2xl">
+            One-click GitHub App registration via the manifest flow, or a guided GitLab Group
+            OAuth wizard. Personal Access Tokens and pre-registered OAuth apps remain available
+            under <em>Advanced</em>.
+          </span>
+        }
+        action={
           <div className="flex flex-col items-end gap-1">
             <div className="flex flex-wrap justify-end gap-2">
               <Button asChild size="sm" variant="outline">
@@ -257,8 +259,8 @@ export function SourceProvidersPanel() {
               download Astrolift logo for your new App
             </a>
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
+        }
+      >
           {/*
             Action-required banner — surfaces GitHub connections that
             are missing the OAuth Client ID (post-#525 schema split).
@@ -270,7 +272,7 @@ export function SourceProvidersPanel() {
             Client ID and runs UpdateSourceConnection in place.
           */}
           {incompleteClientIdConnections.length > 0 && (
-            <div className="border-warning-border bg-warning/5 mx-6 mt-6 flex items-start gap-3 rounded-md border p-3 text-xs text-warning-fg">
+            <div className="border-warning-border bg-warning/5 flex items-start gap-3 rounded-md border p-3 text-xs text-warning-fg">
               <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
               <div className="flex-1 space-y-2">
                 <p className="font-medium">
@@ -302,21 +304,19 @@ export function SourceProvidersPanel() {
             </div>
           )}
           {allConnections.length > 0 && (
-            <ListControls controls={connCtrl} searchPlaceholder="Search connections…" className="mb-3" />
+            <ListControls controls={connCtrl} searchPlaceholder="Search connections…" />
           )}
           {conns.loading && connectionList.length === 0 ? (
-            <div className="space-y-2 p-6">
+            <div className="space-y-2">
               <Skeleton className="h-12 w-full" />
               <Skeleton className="h-12 w-full" />
             </div>
           ) : connectionList.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<GitBranchIcon className="size-5" />}
-                title="No hosts connected yet"
-                description="Click 'Connect to GitHub' to register an Astrolift GitHub App on github.com in one step — no client_id / secret paste required. For GitLab, the wizard walks you through creating a Group OAuth Application with copy-friendly callback URLs."
-              />
-            </div>
+            <EmptyState
+              icon={<GitBranchIcon className="size-5" />}
+              title="No hosts connected yet"
+              description="Click 'Connect to GitHub' to register an Astrolift GitHub App on github.com in one step — no client_id / secret paste required. For GitLab, the wizard walks you through creating a Group OAuth Application with copy-friendly callback URLs."
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -455,46 +455,46 @@ export function SourceProvidersPanel() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+      </Section>
 
       {/* SSH keys */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <KeyRoundIcon className="size-4" />
-              SSH deploy keys
-            </CardTitle>
-            <p className="text-muted-foreground mt-1 text-xs">
-              ed25519 keypairs for direct git-over-SSH access. The public key is shown for you to
-              paste into the repo&apos;s deploy-key settings; the private key stays encrypted in the
-              platform secrets backend.
-            </p>
-          </div>
+      <Section
+        headingLevel="h3"
+        title={
+          <span className="flex items-center gap-2">
+            <KeyRoundIcon className="size-4" />
+            SSH deploy keys
+          </span>
+        }
+        description={
+          <span className="block max-w-2xl">
+            ed25519 keypairs for direct git-over-SSH access. The public key is shown for you to
+            paste into the repo&apos;s deploy-key settings; the private key stays encrypted in the
+            platform secrets backend.
+          </span>
+        }
+        action={
           <Can permission="scm.key_create">
             <Button size="sm" onClick={() => setOpenGenerateKey(true)}>
               <PlusIcon className="size-4" />
               Generate key
             </Button>
           </Can>
-        </CardHeader>
-        <CardContent className="p-0">
+        }
+      >
           {allKeys.length > 0 && (
-            <ListControls controls={keyCtrl} searchPlaceholder="Search deploy keys…" className="mb-3" />
+            <ListControls controls={keyCtrl} searchPlaceholder="Search deploy keys…" />
           )}
           {keys.loading && keyList.length === 0 ? (
-            <div className="space-y-2 p-6">
+            <div className="space-y-2">
               <Skeleton className="h-12 w-full" />
             </div>
           ) : keyList.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<KeyRoundIcon className="size-5" />}
-                title="No SSH deploy keys yet"
-                description="Generate a key to let Astrolift clone over SSH. Org-scoped keys cover every app; per-app keys offer tighter blast-radius."
-              />
-            </div>
+            <EmptyState
+              icon={<KeyRoundIcon className="size-5" />}
+              title="No SSH deploy keys yet"
+              description="Generate a key to let Astrolift clone over SSH. Org-scoped keys cover every app; per-app keys offer tighter blast-radius."
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -539,8 +539,7 @@ export function SourceProvidersPanel() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+      </Section>
 
       {/* Advanced: pre-registered OAuth apps / PATs / GitHub-App-from-paste */}
       <Can permission="scm.connect">

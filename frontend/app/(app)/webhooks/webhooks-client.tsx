@@ -31,6 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { DefinitionList } from "@/components/ui/definition-list";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -279,7 +280,7 @@ export function WebhooksClient({
     initialPageSize: 25,
     sortFn: (a, b, sort) => {
       const dir = sort.dir === "asc" ? 1 : -1;
-      if (sort.key === "url") return ((a.url ?? "").localeCompare(b.url ?? "")) * dir;
+      if (sort.key === "url") return (a.url ?? "").localeCompare(b.url ?? "") * dir;
       return 0;
     },
   });
@@ -320,7 +321,7 @@ export function WebhooksClient({
         <Card className="border-success-border bg-success/5">
           <CardContent className="flex flex-col gap-3 p-4">
             <div className="flex items-center gap-2">
-              <CheckCircle2Icon className="size-4 text-success-fg" />
+              <CheckCircle2Icon className="text-success-fg size-4" />
               <p className="text-sm font-medium">
                 Secret for <span className="font-mono">{reveal.subscription.url}</span> ready
               </p>
@@ -658,18 +659,16 @@ function TestResultCard({
 }) {
   const ok =
     result.delivered && result.statusCode && result.statusCode >= 200 && result.statusCode < 300;
-  const border = ok
-    ? "border-success-border bg-success/5"
-    : "border-warning-border bg-warning/5";
+  const border = ok ? "border-success-border bg-success/5" : "border-warning-border bg-warning/5";
   return (
     <Card className={border}>
       <CardContent className="flex flex-col gap-3 p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-medium">
             {ok ? (
-              <CheckCircle2Icon className="size-4 text-success-fg" />
+              <CheckCircle2Icon className="text-success-fg size-4" />
             ) : (
-              <XCircleIcon className="size-4 text-warning-fg" />
+              <XCircleIcon className="text-warning-fg size-4" />
             )}
             Test delivery to <span className="font-mono">{result.url}</span>
           </div>
@@ -677,11 +676,18 @@ function TestResultCard({
             Dismiss
           </Button>
         </div>
-        <div className="grid grid-cols-3 gap-3 text-xs">
-          <KV label="Status" value={result.statusCode ?? "—"} />
-          <KV label="Latency" value={`${result.durationMs}ms`} />
-          <KV label="Delivery ID" value={result.deliveryId || "—"} mono />
-        </div>
+        <DefinitionList
+          orientation="stack"
+          className="grid grid-cols-3 gap-3 text-xs"
+          items={[
+            { term: "Status", description: result.statusCode ?? "—" },
+            { term: "Latency", description: `${result.durationMs}ms` },
+            {
+              term: "Delivery ID",
+              description: <span className="font-mono">{result.deliveryId || "—"}</span>,
+            },
+          ]}
+        />
         {result.error && (
           <div className="bg-background rounded border p-2 font-mono text-xs whitespace-pre-wrap">
             {result.error}
@@ -694,15 +700,6 @@ function TestResultCard({
         )}
       </CardContent>
     </Card>
-  );
-}
-
-function KV({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
-  return (
-    <div className="flex flex-col">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={mono ? "font-mono" : ""}>{value}</span>
-    </div>
   );
 }
 
@@ -722,29 +719,29 @@ function ExpandedRow({ subscription }: { subscription: AstroliftWebhookSubscript
 
   return (
     <div className="space-y-3 p-4">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KV
-          label="Secret rotated"
-          value={
-            subscription.secretRotatedAt
+      <DefinitionList
+        orientation="stack"
+        className="grid grid-cols-2 gap-3 md:grid-cols-4"
+        items={[
+          {
+            term: "Secret rotated",
+            description: subscription.secretRotatedAt
               ? fmt.formatDateTime(subscription.secretRotatedAt)
-              : "never"
-          }
-        />
-        <KV
-          label="Last delivery"
-          value={
-            subscription.lastDeliveryAt
+              : "never",
+          },
+          {
+            term: "Last delivery",
+            description: subscription.lastDeliveryAt
               ? fmt.formatDateTime(subscription.lastDeliveryAt)
-              : "never"
-          }
-        />
-        <KV label="Last status" value={subscription.lastResponseStatus ?? "—"} />
-        <KV label="Failure count" value={subscription.failureCount} />
-      </div>
+              : "never",
+          },
+          { term: "Last status", description: subscription.lastResponseStatus ?? "—" },
+          { term: "Failure count", description: subscription.failureCount },
+        ]}
+      />
 
       <div>
-        <div className="flex items-center justify-between mb-1">
+        <div className="mb-1 flex items-center justify-between">
           <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
             Recent deliveries
           </p>
@@ -759,7 +756,7 @@ function ExpandedRow({ subscription }: { subscription: AstroliftWebhookSubscript
             No deliveries yet. Use the Send test event button to fire one.
           </p>
         ) : (
-          <div className="bg-background rounded border">
+          <div className="bg-background overflow-hidden rounded">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -776,9 +773,7 @@ function ExpandedRow({ subscription }: { subscription: AstroliftWebhookSubscript
                 {rows.map((d) => (
                   <TableRow key={d.id}>
                     <TableCell className="font-mono text-xs">{d.retryAttempt}</TableCell>
-                    <TableCell className="text-xs">
-                      {fmt.formatDateTime(d.deliveredAt)}
-                    </TableCell>
+                    <TableCell className="text-xs">{fmt.formatDateTime(d.deliveredAt)}</TableCell>
                     <TableCell className="font-mono text-xs">{d.eventType}</TableCell>
                     <TableCell>
                       <Badge variant={d.success ? "secondary" : "outline"} className="text-2xs">
@@ -847,7 +842,7 @@ function VerificationSnippetDisclosure() {
             Copy
           </Button>
         </div>
-        <pre className="bg-background max-h-72 overflow-auto rounded border p-3 font-mono text-2xs leading-snug">
+        <pre className="bg-background text-2xs max-h-72 overflow-auto rounded border p-3 font-mono leading-snug">
           {SNIPPETS[lang]}
         </pre>
         <p className="text-muted-foreground text-xs">

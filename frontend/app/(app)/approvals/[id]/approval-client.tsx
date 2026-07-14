@@ -28,6 +28,7 @@ import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DefinitionList } from "@/components/ui/definition-list";
 import { Skeleton } from "@/components/ui/skeleton";
 import { APPROVE_DEPLOYMENT, REJECT_DEPLOYMENT } from "@/graphql/lifecycle/lifecycle.mutations";
 import {
@@ -197,14 +198,28 @@ export function ApprovalClient({ id }: { id: string }) {
               />
             </CardHeader>
             <CardContent className="space-y-4">
-              <dl className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                <Field label={t("fields.imageTag")} mono value={d.imageTag || "—"} />
-                <Field label={t("fields.imageDigest")} mono value={d.imageDigest || "—"} />
-                <Field label={t("fields.clusterRevision")} mono value={d.clusterRevision || "—"} />
-                <Field label={t("fields.workload")} mono value={d.workloadSlug || "—"} />
-                <Field label={t("fields.created")} value={formatTime(d.createdAt)} />
-                <Field label={t("fields.started")} value={formatTime(d.startedAt)} />
-              </dl>
+              <DefinitionList
+                items={[
+                  {
+                    term: t("fields.imageTag"),
+                    description: <span className="font-mono">{d.imageTag || "—"}</span>,
+                  },
+                  {
+                    term: t("fields.imageDigest"),
+                    description: <span className="font-mono">{d.imageDigest || "—"}</span>,
+                  },
+                  {
+                    term: t("fields.clusterRevision"),
+                    description: <span className="font-mono">{d.clusterRevision || "—"}</span>,
+                  },
+                  {
+                    term: t("fields.workload"),
+                    description: <span className="font-mono">{d.workloadSlug || "—"}</span>,
+                  },
+                  { term: t("fields.created"), description: formatTime(d.createdAt) },
+                  { term: t("fields.started"), description: formatTime(d.startedAt) },
+                ]}
+              />
 
               <CommitProvenance deployment={d} t={t} />
 
@@ -373,7 +388,7 @@ function CommitProvenance({
   const commitUrl = buildCommitUrl(deployment.repoUrl, deployment.commitSha);
 
   return (
-    <div className="bg-muted/30 rounded-md border p-3 text-sm">
+    <div className="text-sm">
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <GitCommitIcon className="size-3.5" />
         {shortSha && <code className="font-mono text-xs">{shortSha}</code>}
@@ -576,13 +591,4 @@ function decisionIcon(action: string) {
     return XCircleIcon;
   }
   return ClockIcon;
-}
-
-function Field({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
-  return (
-    <div>
-      <dt className="text-muted-foreground text-xs tracking-wide uppercase">{label}</dt>
-      <dd className={mono ? "font-mono text-sm" : "text-sm"}>{value}</dd>
-    </div>
-  );
 }

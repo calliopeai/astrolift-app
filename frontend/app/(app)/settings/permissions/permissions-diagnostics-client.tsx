@@ -7,8 +7,11 @@ import * as React from "react";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DefinitionList } from "@/components/ui/definition-list";
 import { Input } from "@/components/ui/input";
+import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatTile } from "@/components/ui/stat-tile";
 import { LIST_ROLE_BINDINGS } from "@/graphql/identity/identity.queries";
 import type { AstroliftRoleBinding } from "@/graphql/identity/identity.types";
 import { GET_ME } from "@/graphql/user/user.queries";
@@ -69,8 +72,7 @@ export function PermissionsDiagnosticsClient() {
   }, [filtered]);
 
   const myBindings =
-    bindings.data?.astroliftRoleBindings.filter((b) => b.user?.id === me.data?.me?.id) ??
-    [];
+    bindings.data?.astroliftRoleBindings.filter((b) => b.user?.id === me.data?.me?.id) ?? [];
 
   return (
     <PageShell
@@ -78,61 +80,40 @@ export function PermissionsDiagnosticsClient() {
       description="Your effective permissions in this organization, grouped by resource. Use this to figure out why a button is hidden or a mutation rejects."
     >
       <div className="grid gap-4 sm:grid-cols-3">
+        <StatTile label="Total permissions" value={allPerms.length} loading={perms.loading} />
+        <StatTile
+          label="Role bindings on you"
+          value={myBindings.length}
+          loading={bindings.loading}
+        />
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-muted-foreground text-sm font-medium">
-              Total permissions
-            </CardTitle>
+            <CardTitle className="text-muted-foreground text-sm font-medium">Account</CardTitle>
           </CardHeader>
           <CardContent>
-            {perms.loading ? (
-              <Skeleton className="h-8 w-12" />
-            ) : (
-              <p className="text-2xl font-bold tabular-nums">
-                {allPerms.length}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-muted-foreground text-sm font-medium">
-              Role bindings on you
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {bindings.loading ? (
-              <Skeleton className="h-8 w-12" />
-            ) : (
-              <p className="text-2xl font-bold tabular-nums">
-                {myBindings.length}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-muted-foreground text-sm font-medium">
-              Account
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="font-mono text-sm">
-              {me.data?.me?.profile?.username ?? "—"}
-            </p>
-            <p className="text-muted-foreground mt-1 text-xs">
-              ID:{" "}
-              <span className="font-mono">{me.data?.me?.id ?? "—"}</span>
-            </p>
+            <DefinitionList
+              orientation="stack"
+              items={[
+                {
+                  term: "Username",
+                  description: (
+                    <span className="font-mono text-sm">
+                      {me.data?.me?.profile?.username ?? "—"}
+                    </span>
+                  ),
+                },
+                {
+                  term: "ID",
+                  description: <span className="font-mono text-xs">{me.data?.me?.id ?? "—"}</span>,
+                },
+              ]}
+            />
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Effective permissions</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <Section title="Effective permissions">
+        <div className="space-y-4">
           <Input
             placeholder="Filter by name (e.g. 'app.deploy')"
             value={filter}
@@ -151,15 +132,10 @@ export function PermissionsDiagnosticsClient() {
             grouped.map(([resource, perms]) => (
               <div key={resource}>
                 <div className="mb-2 flex items-center gap-2">
-                  <Badge
-                    variant="secondary"
-                    className={RESOURCE_TONE[resource] ?? ""}
-                  >
+                  <Badge variant="secondary" className={RESOURCE_TONE[resource] ?? ""}>
                     {resource}
                   </Badge>
-                  <span className="text-muted-foreground text-xs">
-                    {perms.length}
-                  </span>
+                  <span className="text-muted-foreground text-xs">{perms.length}</span>
                 </div>
                 <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 lg:grid-cols-3">
                   {perms.map((p) => (
@@ -175,36 +151,27 @@ export function PermissionsDiagnosticsClient() {
               </div>
             ))
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
-            Why these permissions? (Role bindings)
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {bindings.loading ? (
-            <Skeleton className="h-16 w-full" />
-          ) : myBindings.length === 0 ? (
-            <div className="bg-warning/10 border border-warning-border rounded-md p-3 text-sm">
-              <div className="flex items-center gap-2 font-medium">
-                <XCircleIcon className="size-4" /> No role bindings on your account
-              </div>
-              <p className="text-muted-foreground mt-1">
-                Either you&apos;re a superuser (in which case all
-                permissions are bypassed at the resolver level), or this
-                org hasn&apos;t bound any roles to you yet. An org
-                admin can issue an invitation with a role.
-              </p>
+      <Section title="Why these permissions? (Role bindings)">
+        {bindings.loading ? (
+          <Skeleton className="h-16 w-full" />
+        ) : myBindings.length === 0 ? (
+          <div className="bg-warning/10 border-warning-border rounded-md border p-3 text-sm">
+            <div className="flex items-center gap-2 font-medium">
+              <XCircleIcon className="size-4" /> No role bindings on your account
             </div>
-          ) : (
-            myBindings.map((b) => (
-              <div
-                key={b.id}
-                className="border-muted rounded-md border p-3 text-sm"
-              >
+            <p className="text-muted-foreground mt-1">
+              Either you&apos;re a superuser (in which case all permissions are bypassed at the
+              resolver level), or this org hasn&apos;t bound any roles to you yet. An org admin can
+              issue an invitation with a role.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y">
+            {myBindings.map((b) => (
+              <div key={b.id} className="py-3 text-sm first:pt-0 last:pb-0">
                 <div className="flex flex-wrap items-baseline gap-2">
                   <span className="font-mono">{b.role.slug}</span>
                   <Badge variant="outline" className="text-xs">
@@ -223,10 +190,10 @@ export function PermissionsDiagnosticsClient() {
                   granted {fmt.formatDateTime(b.grantedAt)}
                 </div>
               </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
+            ))}
+          </div>
+        )}
+      </Section>
     </PageShell>
   );
 }
