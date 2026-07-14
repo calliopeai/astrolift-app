@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
+import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
@@ -280,21 +281,21 @@ export function CiSetupSection({
   }
 
   return (
-    <section className="rounded-lg border p-5">
-      <div className="mb-4 flex items-start gap-3">
-        <div className="bg-primary/10 text-primary shrink-0 rounded-md p-2.5">
-          <TerminalIcon className="size-5" />
-        </div>
-        <div>
-          <h2 className="text-base font-semibold">CI setup</h2>
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            Paste these values into your GitHub repo&rsquo;s Actions secrets, then drop in the
-            reference workflow below. The workflow keys off these exact names — rename one and the
-            run breaks.
-          </p>
-        </div>
-      </div>
-
+    <Section
+      title={
+        <span className="flex items-center gap-2">
+          <TerminalIcon className="text-primary size-4" />
+          CI setup
+        </span>
+      }
+      description={
+        <>
+          Paste these values into your GitHub repo&rsquo;s Actions secrets, then drop in the
+          reference workflow below. The workflow keys off these exact names — rename one and the
+          run breaks.
+        </>
+      }
+    >
       <TooltipProvider>
         <div className="bg-card overflow-hidden rounded-md border">
           {rows.map((row, idx) => (
@@ -308,7 +309,7 @@ export function CiSetupSection({
         </div>
       </TooltipProvider>
 
-      <details className="group bg-muted/30 mt-4 rounded-md border">
+      <details className="group bg-muted/30 rounded-md border">
         <summary className="hover:bg-muted/50 flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium">
           <span className="flex items-center gap-2">
             <ChevronDownIcon className="size-4 transition-transform group-open:rotate-180" />
@@ -340,7 +341,7 @@ export function CiSetupSection({
           sourceWebhookInstalledAt={sourceWebhookInstalledAt}
         />
       </Can>
-    </section>
+    </Section>
   );
 }
 
@@ -487,7 +488,7 @@ function ValidateCiSecretsAction({ appSlug }: { appSlug: string }) {
   }
 
   return (
-    <div className="mt-4 flex flex-col gap-3 rounded-md border border-dashed p-3">
+    <div className="flex flex-col gap-3 rounded-md border border-dashed p-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium">Validate CI secrets</p>
@@ -545,7 +546,7 @@ function ValidateCiSecretsAction({ appSlug }: { appSlug: string }) {
 
 function PushAndRotateAction({ appSlug }: { appSlug: string }) {
   return (
-    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3">
       <div className="min-w-0">
         <p className="text-sm font-medium">Push & rotate</p>
         <p className="text-muted-foreground text-xs">
@@ -778,7 +779,7 @@ function SyncWorkflowFileAction({ appSlug }: { appSlug: string }) {
   }
 
   return (
-    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3">
       <div className="min-w-0">
         <p className="text-sm font-medium">Sync workflow file</p>
         <p className="text-muted-foreground text-xs">
@@ -868,7 +869,7 @@ function InstallSourceWebhookAction({
     : null;
 
   return (
-    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-medium">Source webhook</p>

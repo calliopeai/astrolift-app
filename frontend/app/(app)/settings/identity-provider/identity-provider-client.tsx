@@ -121,9 +121,8 @@ export function IdentityProvidersPanel() {
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Identity providers</h2>
           <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-            Sign-in methods configured for the organization. Auth0, generic OIDC,
-            Cognito, Okta, Azure AD, Google, GitHub, SAML, or local accounts. Exactly
-            one is active at a time.
+            Sign-in methods configured for the organization. Auth0, generic OIDC, Cognito, Okta,
+            Azure AD, Google, GitHub, SAML, or local accounts. Exactly one is active at a time.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -217,13 +216,13 @@ export function IdentityProvidersPanel() {
                           // (set only when the IdP is flipped to
                           // active); fall back to `updatedAt` for
                           // legacy rows from before #467.
-                          <span className="text-muted-foreground text-[10px]">
+                          <span className="text-muted-foreground text-2xs">
                             Active since{" "}
                             {fmt.formatDate((idp.activatedAt ?? idp.updatedAt) as string)}
                           </span>
                         )}
                         {idp.isActive && idp.lastSwitchedByUsername && (
-                          <span className="text-muted-foreground text-[10px]">
+                          <span className="text-muted-foreground text-2xs">
                             by {idp.lastSwitchedByUsername}
                           </span>
                         )}

@@ -303,7 +303,7 @@ export function BuildContent({
               Skills could not be loaded right now.
             </p>
           ) : skills.length > 0 ? (
-            <div className="flex flex-col gap-4">
+            <div className="divide-y">
               {skills.map((binding) => (
                 <SkillBlock key={binding.skill.id} binding={binding} />
               ))}
@@ -346,8 +346,8 @@ export function BuildContent({
 function SkillBlock({ binding }: { binding: AstroliftAgentSkill }) {
   const { skill, toolDefs } = binding;
   return (
-    <div className="rounded-lg border">
-      <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
+    <div className="space-y-3 py-4 first:pt-0 last:pb-0">
+      <div className="flex flex-wrap items-center gap-2">
         <Link
           href={`/agents/skills/${skill.id}`}
           className="font-medium hover:underline"
@@ -368,21 +368,19 @@ function SkillBlock({ binding }: { binding: AstroliftAgentSkill }) {
         )}
       </div>
       {skill.description && (
-        <p className="text-muted-foreground px-4 pt-3 text-sm leading-relaxed">
+        <p className="text-muted-foreground text-sm leading-relaxed">
           {skill.description}
         </p>
       )}
-      <div className="px-4 py-3">
-        {toolDefs.length > 0 ? (
-          <div className="flex flex-col gap-2">
-            {toolDefs.map((tool) => (
-              <ToolRow key={tool.id} tool={tool} />
-            ))}
-          </div>
-        ) : (
-          <p className="text-muted-foreground text-xs">No tools registered for this skill.</p>
-        )}
-      </div>
+      {toolDefs.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          {toolDefs.map((tool) => (
+            <ToolRow key={tool.id} tool={tool} />
+          ))}
+        </div>
+      ) : (
+        <p className="text-muted-foreground text-xs">No tools registered for this skill.</p>
+      )}
     </div>
   );
 }
@@ -393,7 +391,7 @@ function SkillBlock({ binding }: { binding: AstroliftAgentSkill }) {
  */
 function ToolRow({ tool }: { tool: AstroliftToolDef }) {
   return (
-    <div className="flex items-center gap-4 rounded-md border px-3 py-2 text-sm">
+    <div className="flex items-center gap-4 text-sm">
       <WrenchIcon className="text-muted-foreground size-4 shrink-0" />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="font-medium">{tool.name}</span>

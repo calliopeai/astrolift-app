@@ -8,7 +8,9 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Section } from "@/components/ui/section";
 import { Separator } from "@/components/ui/separator";
+import { StatTile } from "@/components/ui/stat-tile";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";
 import {
@@ -167,28 +169,19 @@ function FormOverview({
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <div className="rounded-lg border p-4">
-          <h3 className="text-sm font-medium">Fields</h3>
-          <p className="text-2xl font-bold">{fieldCount}</p>
-        </div>
-        <div className="rounded-lg border p-4">
-          <h3 className="text-sm font-medium">Submissions</h3>
-          <p className="text-2xl font-bold">{form.submissionCount}</p>
-        </div>
-        <div className="rounded-lg border p-4">
-          <h3 className="text-sm font-medium">Published</h3>
-          <p className="text-muted-foreground text-sm">
-            {form.publishedAt ? fmt.formatDate(form.publishedAt) : "Not yet"}
-          </p>
-        </div>
+        <StatTile label="Fields" value={fieldCount} />
+        <StatTile label="Submissions" value={form.submissionCount} />
+        <StatTile
+          label="Published"
+          value={form.publishedAt ? fmt.formatDate(form.publishedAt) : "Not yet"}
+        />
       </div>
 
-      <div>
-        <h2 className="mb-3 text-lg font-semibold">Schema</h2>
+      <Section title="Schema">
         <pre className="bg-muted max-h-96 overflow-auto rounded-lg p-4 text-sm">
           {JSON.stringify(form.schema, null, 2)}
         </pre>
-      </div>
+      </Section>
     </div>
   );
 }

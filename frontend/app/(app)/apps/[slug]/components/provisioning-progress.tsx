@@ -3,6 +3,7 @@
 import { useQuery } from "@apollo/client/react";
 import { CheckCircle2Icon, CircleDashedIcon, LoaderCircleIcon } from "lucide-react";
 
+import { Card, CardContent } from "@/components/ui/card";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import type {
   AstroliftRegisteredApp,
@@ -48,35 +49,37 @@ export function ProvisioningProgressPanel({ app }: { app: AstroliftRegisteredApp
   const activeStep = steps.find((s) => !completed.has(s)) ?? null;
 
   return (
-    <div className="border-border bg-muted/20 rounded-lg border p-4">
-      <div className="mb-3 flex items-center gap-2">
-        <LoaderCircleIcon className="size-4 animate-spin text-[color:var(--brand-primary)]" />
-        <span className="text-sm font-medium">Provisioning infrastructure…</span>
-        <span className="text-muted-foreground ml-auto font-mono text-xs">{currentStep}</span>
-      </div>
-      <ol className="space-y-2">
-        {steps.map((step) => {
-          const isDone = completed.has(step);
-          const isActive = step === activeStep && !isDone;
-          return (
-            <li key={step} className="flex items-center gap-2.5 text-sm">
-              <StepIcon state={isDone ? "done" : isActive ? "active" : "pending"} />
-              <span
-                className={cn(
-                  isDone
-                    ? "text-foreground"
-                    : isActive
+    <Card>
+      <CardContent>
+        <div className="mb-3 flex items-center gap-2">
+          <LoaderCircleIcon className="size-4 animate-spin text-[color:var(--brand-primary)]" />
+          <span className="text-sm font-medium">Provisioning infrastructure…</span>
+          <span className="text-muted-foreground ml-auto font-mono text-xs">{currentStep}</span>
+        </div>
+        <ol className="space-y-2">
+          {steps.map((step) => {
+            const isDone = completed.has(step);
+            const isActive = step === activeStep && !isDone;
+            return (
+              <li key={step} className="flex items-center gap-2.5 text-sm">
+                <StepIcon state={isDone ? "done" : isActive ? "active" : "pending"} />
+                <span
+                  className={cn(
+                    isDone
                       ? "text-foreground"
-                      : "text-muted-foreground",
-                )}
-              >
-                {STEP_LABELS[step] ?? step}
-              </span>
-              {isDone && <span className="text-muted-foreground ml-auto text-xs">done</span>}
-            </li>
-          );
-        })}
-      </ol>
-    </div>
+                      : isActive
+                        ? "text-foreground"
+                        : "text-muted-foreground",
+                  )}
+                >
+                  {STEP_LABELS[step] ?? step}
+                </span>
+                {isDone && <span className="text-muted-foreground ml-auto text-xs">done</span>}
+              </li>
+            );
+          })}
+        </ol>
+      </CardContent>
+    </Card>
   );
 }

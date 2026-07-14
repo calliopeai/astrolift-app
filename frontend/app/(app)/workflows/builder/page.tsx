@@ -21,6 +21,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageShell } from "@/components/PageShell";
+import { Section } from "@/components/ui/section";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -176,112 +177,114 @@ function StageCard({
   onMoveDown: () => void;
 }) {
   return (
-    <div className="flex gap-3 rounded-lg border p-4">
-      <div className="text-muted-foreground flex flex-col items-center gap-1 pt-1">
-        <GripVerticalIcon className="h-4 w-4" />
-        <span className="text-xs font-medium">{index + 1}</span>
-      </div>
+    <Card>
+      <CardContent className="flex gap-3">
+        <div className="text-muted-foreground flex flex-col items-center gap-1 pt-1">
+          <GripVerticalIcon className="h-4 w-4" />
+          <span className="text-xs font-medium">{index + 1}</span>
+        </div>
 
-      <div className="flex flex-1 flex-col gap-3">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Kind */}
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs">Stage kind</Label>
-            <select
-              value={stage.kind}
-              onChange={(e) => onChange({ kind: e.target.value as StageKind })}
-              className="border-input bg-background rounded-md border px-3 py-1.5 text-sm"
-            >
-              {STAGE_KINDS.map((k) => (
-                <option key={k.value} value={k.value}>
-                  {k.label}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="flex flex-1 flex-col gap-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {/* Kind */}
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs">Stage kind</Label>
+              <select
+                value={stage.kind}
+                onChange={(e) => onChange({ kind: e.target.value as StageKind })}
+                className="border-input bg-background rounded-md border px-3 py-1.5 text-sm"
+              >
+                {STAGE_KINDS.map((k) => (
+                  <option key={k.value} value={k.value}>
+                    {k.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {/* Agent workload */}
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs">Agent workload</Label>
-            <Input
-              value={stage.agentWorkload}
-              placeholder="e.g. review-agent"
-              className="h-8 text-sm"
-              onChange={(e) => onChange({ agentWorkload: e.target.value })}
-            />
-          </div>
+            {/* Agent workload */}
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs">Agent workload</Label>
+              <Input
+                value={stage.agentWorkload}
+                placeholder="e.g. review-agent"
+                className="h-8 text-sm"
+                onChange={(e) => onChange({ agentWorkload: e.target.value })}
+              />
+            </div>
 
-          {/* On failure */}
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs">On failure</Label>
-            <select
-              value={stage.onFailure}
-              onChange={(e) =>
-                onChange({ onFailure: e.target.value as OnFailurePolicy })
-              }
-              className="border-input bg-background rounded-md border px-3 py-1.5 text-sm"
-            >
-              {ON_FAILURE_POLICIES.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </div>
+            {/* On failure */}
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs">On failure</Label>
+              <select
+                value={stage.onFailure}
+                onChange={(e) =>
+                  onChange({ onFailure: e.target.value as OnFailurePolicy })
+                }
+                className="border-input bg-background rounded-md border px-3 py-1.5 text-sm"
+              >
+                {ON_FAILURE_POLICIES.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {/* Timeout */}
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs">Timeout (seconds)</Label>
-            <Input
-              type="number"
-              min={1}
-              max={86400}
-              value={stage.timeoutSeconds}
-              className="h-8 text-sm"
-              onChange={(e) =>
-                onChange({ timeoutSeconds: parseInt(e.target.value, 10) || 300 })
-              }
-            />
+            {/* Timeout */}
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs">Timeout (seconds)</Label>
+              <Input
+                type="number"
+                min={1}
+                max={86400}
+                value={stage.timeoutSeconds}
+                className="h-8 text-sm"
+                onChange={(e) =>
+                  onChange({ timeoutSeconds: parseInt(e.target.value, 10) || 300 })
+                }
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Actions */}
-      <div className="flex flex-col gap-1">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          disabled={index === 0}
-          onClick={onMoveUp}
-          title="Move up"
-        >
-          <ArrowUpIcon className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          disabled={index === total - 1}
-          onClick={onMoveDown}
-          title="Move down"
-        >
-          <ArrowDownIcon className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="text-destructive hover:text-destructive hover:bg-destructive/10 h-7 w-7"
-          onClick={onRemove}
-          title="Remove stage"
-        >
-          <TrashIcon className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-    </div>
+        {/* Actions */}
+        <div className="flex flex-col gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            disabled={index === 0}
+            onClick={onMoveUp}
+            title="Move up"
+          >
+            <ArrowUpIcon className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            disabled={index === total - 1}
+            onClick={onMoveDown}
+            title="Move down"
+          >
+            <ArrowDownIcon className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="text-destructive hover:text-destructive hover:bg-destructive/10 h-7 w-7"
+            onClick={onRemove}
+            title="Remove stage"
+          >
+            <TrashIcon className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -360,8 +363,7 @@ export default function WorkflowBuilderPage() {
     >
       <div className="flex flex-col gap-8 max-w-5xl">
         {/* Metadata */}
-        <section className="flex flex-col gap-4">
-          <h2 className="text-base font-semibold">1. Workflow metadata</h2>
+        <Section title="1. Workflow metadata">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <Label>Name</Label>
@@ -380,13 +382,12 @@ export default function WorkflowBuilderPage() {
               />
             </div>
           </div>
-        </section>
+        </Section>
 
         <Separator />
 
         {/* Pattern picker */}
-        <section className="flex flex-col gap-4">
-          <h2 className="text-base font-semibold">2. Choose a pattern</h2>
+        <Section title="2. Choose a pattern">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {PATTERNS.map((p) => (
               <PatternCard
@@ -397,19 +398,19 @@ export default function WorkflowBuilderPage() {
               />
             ))}
           </div>
-        </section>
+        </Section>
 
         <Separator />
 
         {/* Stage builder */}
-        <section className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">3. Configure stages</h2>
+        <Section
+          title="3. Configure stages"
+          action={
             <Button type="button" variant="outline" size="sm" onClick={addStage}>
               <PlusIcon className="mr-1 h-3.5 w-3.5" /> Add stage
             </Button>
-          </div>
-
+          }
+        >
           {stages.length === 0 ? (
             <EmptyState
               icon={<WorkflowIcon className="size-5" />}
@@ -437,7 +438,7 @@ export default function WorkflowBuilderPage() {
               ))}
             </div>
           )}
-        </section>
+        </Section>
       </div>
     </PageShell>
   );

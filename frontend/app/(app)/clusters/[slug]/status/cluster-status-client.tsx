@@ -228,10 +228,10 @@ function seriesTone(series: RangeSeries): "ok" | "warn" | "bad" | "neutral" {
 }
 
 const TONE_COLORS = {
-  ok: { text: "text-emerald-600", stroke: "#10b981", fill: "#d1fae5" },
-  warn: { text: "text-amber-600", stroke: "#f59e0b", fill: "#fef3c7" },
-  bad: { text: "text-destructive", stroke: "#ef4444", fill: "#fee2e2" },
-  neutral: { text: "text-foreground", stroke: "#6366f1", fill: "#e0e7ff" },
+  ok: { text: "text-success-fg", stroke: "var(--success)", fill: "var(--success-bg)" },
+  warn: { text: "text-warning-fg", stroke: "var(--warning)", fill: "var(--warning-bg)" },
+  bad: { text: "text-destructive", stroke: "var(--danger)", fill: "var(--danger-bg)" },
+  neutral: { text: "text-foreground", stroke: "var(--info)", fill: "var(--info-bg)" },
 };
 
 type Tone = keyof typeof TONE_COLORS;
@@ -569,7 +569,7 @@ function LiveSnapshotGrid({ state, age }: { state: ClusterLiveState; age: string
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
         {tiles.map((t) => (
           <div key={t.label} className="space-y-1">
-            <p className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
+            <p className="text-muted-foreground text-2xs font-medium tracking-wider uppercase">
               {t.label}
             </p>
             <p className="text-xl font-semibold tabular-nums">{t.value}</p>
@@ -578,7 +578,7 @@ function LiveSnapshotGrid({ state, age }: { state: ClusterLiveState; age: string
       </div>
       {appEntries.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
+          <p className="text-muted-foreground text-2xs font-medium tracking-wider uppercase">
             App readiness
           </p>
           <div className="flex flex-wrap gap-2">
@@ -592,14 +592,14 @@ function LiveSnapshotGrid({ state, age }: { state: ClusterLiveState; age: string
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
           <span className="text-muted-foreground">Ingress:</span>
           {state.ingressIps.map((ip) => (
-            <code key={ip} className="bg-muted rounded px-1.5 py-0.5 font-mono text-[11px]">
+            <code key={ip} className="bg-muted text-2xs rounded px-1.5 py-0.5 font-mono">
               {ip}
             </code>
           ))}
         </div>
       )}
       {state.agentVersion && (
-        <p className="text-muted-foreground text-[11px]">Agent {state.agentVersion}</p>
+        <p className="text-muted-foreground text-2xs">Agent {state.agentVersion}</p>
       )}
     </div>
   );
@@ -779,7 +779,7 @@ function SaturationKPIBar({
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
       {kpis.map((k) => (
         <div key={k.label} className="space-y-1">
-          <p className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
+          <p className="text-muted-foreground text-2xs font-medium tracking-wider uppercase">
             {k.label}
           </p>
           <p className={`text-2xl font-semibold tabular-nums ${TONE_COLORS[k.tone].text}`}>
@@ -1020,7 +1020,7 @@ function WorkloadHealthSection({ clusterId }: { clusterId: string }) {
         <div className="space-y-4">
           {namespaces.map((ns) => (
             <div key={ns}>
-              <p className="text-muted-foreground mb-1.5 font-mono text-[11px]">{ns}/</p>
+              <p className="text-muted-foreground text-2xs mb-1.5 font-mono">{ns}/</p>
               <div>
                 {grouped.get(ns)!.map((row) => (
                   <WorkloadRowItem key={row.workloadName} row={row} />
@@ -1056,9 +1056,9 @@ function WorkloadRowItem({ row }: { row: WorkloadRow }) {
           {row.restartCount24h} restart{row.restartCount24h === 1 ? "" : "s"}
         </Badge>
       ) : (
-        <span className="text-muted-foreground/60 text-[11px]">no restarts</span>
+        <span className="text-muted-foreground/60 text-2xs">no restarts</span>
       )}
-      <span className="text-muted-foreground w-20 text-right font-mono text-[11px]">
+      <span className="text-muted-foreground text-2xs w-20 text-right font-mono">
         {deployedAge ?? "—"}
       </span>
     </div>
@@ -1111,7 +1111,7 @@ function LiveHealthSection({ clusterId }: { clusterId: string }) {
       ) : (
         <div className="space-y-4">
           <div>
-            <p className="text-muted-foreground mb-2 text-[10px] font-medium tracking-wider uppercase">
+            <p className="text-muted-foreground text-2xs mb-2 font-medium tracking-wider uppercase">
               Pod phases
             </p>
             {phasesSorted.length === 0 ? (
@@ -1125,7 +1125,7 @@ function LiveHealthSection({ clusterId }: { clusterId: string }) {
             )}
           </div>
           <div>
-            <p className="text-muted-foreground mb-2 text-[10px] font-medium tracking-wider uppercase">
+            <p className="text-muted-foreground text-2xs mb-2 font-medium tracking-wider uppercase">
               Recent events
             </p>
             {events.length === 0 ? (
@@ -1173,7 +1173,7 @@ function EventRow({ event }: { event: ClusterEvent }) {
   return (
     <div className="border-border/50 flex min-w-0 items-center gap-3 border-b py-2 text-sm last:border-0">
       <Icon className={`size-3.5 shrink-0 ${iconClass}`} />
-      <code className="shrink-0 font-mono text-[11px]">{event.reason}</code>
+      <code className="text-2xs shrink-0 font-mono">{event.reason}</code>
       <span className="text-muted-foreground flex-1 truncate text-xs">
         {event.involvedObject}
         {event.message && (
@@ -1184,11 +1184,11 @@ function EventRow({ event }: { event: ClusterEvent }) {
         )}
       </span>
       {event.count > 1 && (
-        <Badge variant="outline" className="text-[10px]">
+        <Badge variant="outline" className="text-2xs">
           ×{event.count}
         </Badge>
       )}
-      <span className="text-muted-foreground w-16 shrink-0 text-right font-mono text-[11px]">
+      <span className="text-muted-foreground text-2xs w-16 shrink-0 text-right font-mono">
         {lastSeen || "—"}
       </span>
     </div>
@@ -1239,16 +1239,16 @@ function WorkflowRunRow({ run }: { run: WorkflowRun }) {
     <div className="border-border/50 flex min-w-0 items-center gap-3 border-b py-2 text-sm last:border-0">
       <Icon className={`size-4 shrink-0 ${iconClass}`} />
       <span className="flex-1 truncate font-medium">{prettyWorkflowType(run.workflowType)}</span>
-      <Badge variant="outline" className="text-[10px]">
+      <Badge variant="outline" className="text-2xs">
         {label}
       </Badge>
       {duration && (
-        <span className="text-muted-foreground inline-flex items-center gap-1 font-mono text-[11px]">
+        <span className="text-muted-foreground text-2xs inline-flex items-center gap-1 font-mono">
           <ClockIcon className="size-3" />
           {duration}
         </span>
       )}
-      <span className="text-muted-foreground w-20 shrink-0 text-right font-mono text-[11px]">
+      <span className="text-muted-foreground text-2xs w-20 shrink-0 text-right font-mono">
         {startedAge || "—"}
       </span>
     </div>
@@ -1333,16 +1333,16 @@ function LifecycleRow({ entry }: { entry: AuditRow }) {
       <span className={`shrink-0 text-base leading-none ${dotClass}`}>●</span>
       <span className="flex-1 truncate font-medium">{prettyOperation(entry.operation)}</span>
       {entry.actor && (
-        <span className="text-muted-foreground text-[11px]">
+        <span className="text-muted-foreground text-2xs">
           by <span className="font-mono">{entry.actor}</span>
         </span>
       )}
       {!entry.success && entry.errors.length > 0 && (
-        <span className="text-destructive max-w-[40%] truncate text-[11px]" title={entry.errors[0]}>
+        <span className="text-destructive text-2xs max-w-[40%] truncate" title={entry.errors[0]}>
           {entry.errors[0]}
         </span>
       )}
-      <span className="text-muted-foreground w-20 shrink-0 text-right font-mono text-[11px]">
+      <span className="text-muted-foreground text-2xs w-20 shrink-0 text-right font-mono">
         {ts || "—"}
       </span>
     </div>

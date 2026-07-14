@@ -34,7 +34,7 @@ export function WelcomeStep({ state, setState }: Props) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="bg-muted/40 flex items-start gap-3 rounded-lg border p-4">
+      <div className="flex items-start gap-3">
         <div className="bg-primary/10 text-primary inline-flex size-9 items-center justify-center rounded-md">
           <RocketIcon className="size-4" />
         </div>

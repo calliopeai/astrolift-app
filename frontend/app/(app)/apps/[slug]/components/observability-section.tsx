@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from "recharts";
 
+import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { LIST_DEPLOYMENTS } from "@/graphql/lifecycle/lifecycle.queries";
@@ -64,18 +65,18 @@ export function ObservabilitySection({ appSlug }: Props) {
   const critical = unresolved.filter((a) => a.severity === "critical").length;
 
   return (
-    <section className="rounded-lg border p-5">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="flex items-center gap-2 text-base font-semibold">
-            <ChartSplineIcon className="text-muted-foreground size-4" />
-            Observability
-          </h2>
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            Last {days} days · deploy throughput, failure rate, unresolved alerts.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+    <Section
+      // Rendered inside the page-level "Insights" Section — nest the outline.
+      headingLevel="h3"
+      title={
+        <span className="flex items-center gap-2">
+          <ChartSplineIcon className="text-muted-foreground size-4" />
+          Observability
+        </span>
+      }
+      description={`Last ${days} days · deploy throughput, failure rate, unresolved alerts.`}
+      action={
+        <>
           <Link
             href={`/metrics?app=${appSlug}`}
             className="inline-flex items-center gap-1 text-xs text-[var(--brand-primary)] hover:underline"
@@ -90,9 +91,9 @@ export function ObservabilitySection({ appSlug }: Props) {
             Open alerts
             <ExternalLinkIcon className="size-3" />
           </Link>
-        </div>
-      </div>
-
+        </>
+      }
+    >
       {deps.loading && totalDeploys === 0 ? (
         <div className="grid gap-3 sm:grid-cols-3">
           <Skeleton className="h-24 w-full" />
@@ -129,7 +130,7 @@ export function ObservabilitySection({ appSlug }: Props) {
           />
         </div>
       )}
-    </section>
+    </Section>
   );
 }
 
@@ -150,14 +151,12 @@ function SparkCard({
 }) {
   return (
     <div className="bg-card flex flex-col rounded-md border p-3">
-      <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
-        {label}
-      </p>
+      <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">{label}</p>
       <p className="mt-0.5 text-2xl font-semibold">{value}</p>
       <p className="text-muted-foreground text-2xs">{sublabel}</p>
       <div className="mt-2 h-12">
         {empty ? (
-          <div className="text-muted-foreground flex h-full items-center justify-center text-2xs italic">
+          <div className="text-muted-foreground text-2xs flex h-full items-center justify-center italic">
             {empty}
           </div>
         ) : (
@@ -170,7 +169,7 @@ function SparkCard({
                   if (!active || !payload?.length) return null;
                   const p = payload[0].payload as SparkPoint;
                   return (
-                    <div className="bg-background rounded border px-2 py-1 text-2xs shadow-sm">
+                    <div className="bg-background text-2xs rounded border px-2 py-1 shadow-sm">
                       <p className="font-mono">{p.value}</p>
                       <p className="text-muted-foreground">
                         {new Date(p.ts).toLocaleDateString(undefined, {
@@ -215,7 +214,7 @@ function AlertSummaryCard({
       href={`/alerts?app=${appSlug}`}
       className="bg-card hover:bg-muted/40 group flex flex-col rounded-md border p-3 transition-colors"
     >
-      <p className="text-muted-foreground flex items-center gap-1 text-2xs font-medium tracking-wide uppercase">
+      <p className="text-muted-foreground text-2xs flex items-center gap-1 font-medium tracking-wide uppercase">
         <AlertTriangleIcon className="size-3" />
         Unresolved alerts
       </p>
@@ -232,7 +231,7 @@ function AlertSummaryCard({
         )}
       </p>
       <div className="mt-auto flex items-center justify-end pt-3">
-        <span className="text-muted-foreground inline-flex items-center gap-1 text-2xs group-hover:text-[var(--brand-primary)]">
+        <span className="text-muted-foreground text-2xs inline-flex items-center gap-1 group-hover:text-[var(--brand-primary)]">
           Open
           <ExternalLinkIcon className="size-3" />
         </span>

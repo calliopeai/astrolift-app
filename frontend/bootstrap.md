@@ -172,12 +172,12 @@ box around another bordered box.
 
 ### Guardrail
 
-`astrolift/no-raw-design-values` (ESLint, **warn**) flags, in `className` /
+`astrolift/no-raw-design-values` (ESLint, **error**) flags, in `className` /
 `cva` / `tv` under `components/**` and `app/**`: raw hex, `rgb()`/`hsl()`,
 arbitrary `text-[Npx]`, and arbitrary `rounded-[Npx]`. Token-referencing
-arbitrary values (`bg-[var(--x)]`, `rounded-[calc(…)]`) are allowed. Warn-level
-surfaces the existing debt (swept in #A4) without breaking the build and blocks
-new debt in review. Escape hatch for unavoidable chart / SVG / terminal exact
+arbitrary values (`bg-[var(--x)]`, `rounded-[calc(…)]`) are allowed. The debt
+surfaced at warn-level was swept in #A4 / #1050; new raw values now fail the
+build. Escape hatch for unavoidable chart / SVG / terminal exact
 colours:
 
 ```tsx

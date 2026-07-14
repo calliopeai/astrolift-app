@@ -8,7 +8,9 @@ import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "reac
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Section } from "@/components/ui/section";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -184,10 +186,13 @@ export default function NewFormPage() {
             </PanelResizeHandle>
             <Panel defaultSize={35} minSize={20}>
               <div className="h-full overflow-y-auto bg-muted/30 p-6">
-                <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Live Preview</h2>
-                <div className="rounded-lg border bg-background p-4 shadow-sm">
-                  <FormPreview schema={liveSchema} formName={nameValue || "Untitled Form"} />
-                </div>
+                <Section title="Live Preview">
+                  <Card>
+                    <CardContent>
+                      <FormPreview schema={liveSchema} formName={nameValue || "Untitled Form"} />
+                    </CardContent>
+                  </Card>
+                </Section>
               </div>
             </Panel>
           </>

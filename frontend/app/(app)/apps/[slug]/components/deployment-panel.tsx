@@ -16,6 +16,7 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Can } from "@/components/Can";
 import { useFormatters } from "@/lib/i18n/formatters";
@@ -146,15 +147,17 @@ export function DeploymentPanel({ appSlug }: Props) {
 
   if (!current) {
     return (
-      <section className="rounded-lg border p-6">
-        <div className="text-muted-foreground flex flex-col items-center gap-2 text-center text-sm">
-          <RocketIcon className="size-5" />
-          <p className="font-medium">No deployments yet</p>
-          <p className="text-xs">
-            Trigger a deploy from the CLI or push to the deploy branch to see status here.
-          </p>
-        </div>
-      </section>
+      <Card>
+        <CardContent className="py-2">
+          <div className="text-muted-foreground flex flex-col items-center gap-2 text-center text-sm">
+            <RocketIcon className="size-5" />
+            <p className="font-medium">No deployments yet</p>
+            <p className="text-xs">
+              Trigger a deploy from the CLI or push to the deploy branch to see status here.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -165,87 +168,89 @@ export function DeploymentPanel({ appSlug }: Props) {
   const elapsed = elapsedSeconds(elapsedFrom, current.endedAt);
 
   return (
-    <section className="rounded-lg border p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
-            Current deployment
-          </p>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className={tone.className}>
-              <Icon className={inProgress ? "size-3 animate-spin" : "size-3"} />
-              {tone.label}
-            </Badge>
-            <span className="font-mono text-sm">
-              {(current.imageTag ?? current.id).slice(0, 12)}
-            </span>
-            {current.environmentName && (
-              <Badge variant="secondary" className="text-2xs">
-                {current.environmentName}
+    <Card>
+      <CardContent>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
+              Current deployment
+            </p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className={tone.className}>
+                <Icon className={inProgress ? "size-3 animate-spin" : "size-3"} />
+                {tone.label}
               </Badge>
-            )}
-            {current.workloadSlug && (
-              <Badge variant="outline" className="font-mono text-2xs">
-                {current.workloadSlug}
-              </Badge>
+              <span className="font-mono text-sm">
+                {(current.imageTag ?? current.id).slice(0, 12)}
+              </span>
+              {current.environmentName && (
+                <Badge variant="secondary" className="text-2xs">
+                  {current.environmentName}
+                </Badge>
+              )}
+              {current.workloadSlug && (
+                <Badge variant="outline" className="text-2xs font-mono">
+                  {current.workloadSlug}
+                </Badge>
+              )}
+            </div>
+            <p className="text-muted-foreground mt-1.5 text-xs">
+              {fmt.formatRelativeTime(current.createdAt)}
+              {elapsed && (
+                <>
+                  {" · "}
+                  {inProgress ? "elapsed " : "took "}
+                  {elapsed}
+                </>
+              )}
+              {current.triggerKind && (
+                <>
+                  {" · trigger: "}
+                  <span className="capitalize">{current.triggerKind}</span>
+                </>
+              )}
+            </p>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/deployments/${current.id}`}>
+                <ExternalLinkIcon className="size-3.5" />
+                Open
+              </Link>
+            </Button>
+            {current.status === "failed" && lastGood && (
+              <Can permission="app.rollback">
+                <Button onClick={handleRollback} disabled={rolling} size="sm" variant="default">
+                  {rolling ? (
+                    <Loader2Icon className="size-3.5 animate-spin" />
+                  ) : (
+                    <RotateCcwIcon className="size-3.5" />
+                  )}
+                  Roll back
+                </Button>
+              </Can>
             )}
           </div>
-          <p className="text-muted-foreground mt-1.5 text-xs">
-            {fmt.formatRelativeTime(current.createdAt)}
-            {elapsed && (
-              <>
-                {" · "}
-                {inProgress ? "elapsed " : "took "}
-                {elapsed}
-              </>
-            )}
-            {current.triggerKind && (
-              <>
-                {" · trigger: "}
-                <span className="capitalize">{current.triggerKind}</span>
-              </>
-            )}
-          </p>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/deployments/${current.id}`}>
-              <ExternalLinkIcon className="size-3.5" />
-              Open
-            </Link>
-          </Button>
-          {current.status === "failed" && lastGood && (
-            <Can permission="app.rollback">
-              <Button onClick={handleRollback} disabled={rolling} size="sm" variant="default">
-                {rolling ? (
-                  <Loader2Icon className="size-3.5 animate-spin" />
-                ) : (
-                  <RotateCcwIcon className="size-3.5" />
-                )}
-                Roll back
-              </Button>
-            </Can>
-          )}
-        </div>
-      </div>
+        {inProgress && (
+          <ProgressBar status={current.status} startedAt={current.startedAt ?? current.createdAt} />
+        )}
 
-      {inProgress && (
-        <ProgressBar status={current.status} startedAt={current.startedAt ?? current.createdAt} />
-      )}
-
-      {current.status === "failed" && (
-        <div className="mt-4 rounded-md border border-danger-border bg-danger/5 p-3 text-xs">
-          <p className="font-medium text-danger-fg">Deployment failed</p>
-          <p className="text-muted-foreground mt-1">
-            Open the deployment for the full log.{" "}
-            {lastGood
-              ? `Rolling back targets ${(lastGood.imageTag ?? lastGood.id).slice(0, 10)}.`
-              : "No earlier successful deploy to roll back to."}
-          </p>
-        </div>
-      )}
-    </section>
+        {current.status === "failed" && (
+          <div className="border-danger-border bg-danger/5 mt-4 rounded-md border p-3 text-xs">
+            <p className="text-danger-fg font-medium">Deployment failed</p>
+            <p className="text-muted-foreground mt-1">
+              Open the deployment for the full log.{" "}
+              {lastGood
+                ? `Rolling back targets ${(lastGood.imageTag ?? lastGood.id).slice(0, 10)}.`
+                : "No earlier successful deploy to roll back to."}
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -277,7 +282,7 @@ function ProgressBar({ status, startedAt }: { status: DeploymentStatus; startedA
 
   return (
     <div className="mt-4">
-      <div className="text-muted-foreground mb-1.5 flex items-center justify-between text-2xs">
+      <div className="text-muted-foreground text-2xs mb-1.5 flex items-center justify-between">
         <span>{stage}</span>
         <span className="font-mono">
           since {new Date(startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}

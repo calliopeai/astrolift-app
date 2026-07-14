@@ -13,6 +13,13 @@ import {
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -83,88 +90,91 @@ export function ActivityTimeline({ appSlug, limit = 20 }: Props) {
   const filterActive = typeKey !== "all" || needle.length > 0;
 
   return (
-    <section className="rounded-lg border p-5">
-      <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="flex items-center gap-2 text-base font-semibold">
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 font-semibold">
           <ActivityIcon className="text-muted-foreground size-4" />
           Activity
-        </h2>
+        </CardTitle>
         {events.length > 0 && (
-          <p className="text-muted-foreground text-2xs">
-            {filterActive
-              ? `${events.length} of ${allForApp.length} events`
-              : `Last ${events.length} events`}
-          </p>
+          <CardAction>
+            <p className="text-muted-foreground text-2xs">
+              {filterActive
+                ? `${events.length} of ${allForApp.length} events`
+                : `Last ${events.length} events`}
+            </p>
+          </CardAction>
         )}
-      </div>
-
-      {/* #711 — filter chips + search input. Chips are buttons because
-          this isn't form data, just UI state; using buttons keeps the
-          a11y story simple (no aria-checked dance, just aria-pressed). */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        {TYPE_FILTERS.map((f) => {
-          const active = f.key === typeKey;
-          return (
-            <button
-              key={f.key}
-              type="button"
-              onClick={() => setTypeKey(f.key)}
-              aria-pressed={active}
-              className={cn(
-                "rounded-full border px-2.5 py-0.5 text-2xs transition-colors",
-                active
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-border text-muted-foreground hover:bg-accent",
-              )}
-            >
-              {f.label}
-            </button>
-          );
-        })}
-        <div className="relative ml-auto">
-          <SearchIcon
-            aria-hidden
-            className="text-muted-foreground absolute top-1/2 left-2 size-3 -translate-y-1/2"
-          />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search…"
-            className="h-7 w-40 pl-7 text-xs"
-            aria-label="Search activity"
-          />
+      </CardHeader>
+      <CardContent>
+        {/* #711 — filter chips + search input. Chips are buttons because
+            this isn't form data, just UI state; using buttons keeps the
+            a11y story simple (no aria-checked dance, just aria-pressed). */}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          {TYPE_FILTERS.map((f) => {
+            const active = f.key === typeKey;
+            return (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setTypeKey(f.key)}
+                aria-pressed={active}
+                className={cn(
+                  "rounded-full border px-2.5 py-0.5 text-2xs transition-colors",
+                  active
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-border text-muted-foreground hover:bg-accent",
+                )}
+              >
+                {f.label}
+              </button>
+            );
+          })}
+          <div className="relative ml-auto">
+            <SearchIcon
+              aria-hidden
+              className="text-muted-foreground absolute top-1/2 left-2 size-3 -translate-y-1/2"
+            />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search…"
+              className="h-7 w-40 pl-7 text-xs"
+              aria-label="Search activity"
+            />
+          </div>
         </div>
-      </div>
 
-      {loading && events.length === 0 ? (
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
-        </div>
-      ) : events.length === 0 ? (
-        <p className="text-muted-foreground py-1 text-xs italic">
-          {filterActive ? (
-            <>
-              No events match{" "}
-              <Badge variant="secondary" className="text-2xs">
-                {activeFilter.label}
-                {needle ? ` · "${needle}"` : ""}
-              </Badge>
-              .
-            </>
-          ) : (
-            "No recent events for this app."
-          )}
-        </p>
-      ) : (
-        <ol className="divide-border max-h-80 divide-y overflow-y-auto">
-          {events.map((e) => (
-            <TimelineRow key={e.id} event={e} relativeTime={fmt.formatRelativeTime(e.occurredAt)} />
-          ))}
-        </ol>
-      )}
-    </section>
+        {loading && events.length === 0 ? (
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : events.length === 0 ? (
+          <p className="text-muted-foreground py-1 text-xs italic">
+            {filterActive ? (
+              <>
+                No events match{" "}
+                <Badge variant="secondary" className="text-2xs">
+                  {activeFilter.label}
+                  {needle ? ` · "${needle}"` : ""}
+                </Badge>
+                .
+              </>
+            ) : (
+              "No recent events for this app."
+            )}
+          </p>
+        ) : (
+          <ol className="divide-border max-h-80 divide-y overflow-y-auto">
+            {events.map((e) => (
+              <TimelineRow key={e.id} event={e} relativeTime={fmt.formatRelativeTime(e.occurredAt)} />
+            ))}
+          </ol>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

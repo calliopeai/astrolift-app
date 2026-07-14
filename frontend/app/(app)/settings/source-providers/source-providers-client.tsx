@@ -26,6 +26,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -194,15 +195,17 @@ export function SourceProvidersPanel() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h2 className="text-lg font-semibold tracking-tight">Source providers</h2>
-        <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+    <Section
+      title="Source providers"
+      description={
+        <span className="block max-w-2xl">
           Connect Astrolift to a code-hosting service so it can clone your repos and
           watch for pushes. Use OAuth Apps / GitHub Apps for org-wide access, PATs for
           self-hosted GitLab or Gitea, and SSH deploy keys for direct git access to any host.
-        </p>
-      </div>
+        </span>
+      }
+      className="gap-6"
+    >
       {/* Connections */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -625,7 +628,7 @@ export function SourceProvidersPanel() {
           if (rotateSecretTarget) await handleRotateSecret(rotateSecretTarget);
         }}
       />
-    </div>
+    </Section>
   );
 }
 

@@ -60,6 +60,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Section } from "@/components/ui/section";
 import {
   Sheet,
   SheetContent,
@@ -463,12 +464,10 @@ function ResyncSourceSection({
   }
 
   return (
-    <section className="rounded-lg border p-5">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold">{t("title")}</h2>
-          <p className="text-muted-foreground mt-0.5 text-xs">{t("description")}</p>
-        </div>
+    <Section
+      title={t("title")}
+      description={t("description")}
+      action={
         <Can permission="app.update">
           <Tooltip>
             <TooltipTrigger asChild>
@@ -484,7 +483,8 @@ function ResyncSourceSection({
             <TooltipContent className="max-w-sm">{t("buttonTooltip")}</TooltipContent>
           </Tooltip>
         </Can>
-      </div>
+      }
+    >
       <p className="text-muted-foreground text-2xs">
         {lastResyncAt ? (
           <>
@@ -495,7 +495,7 @@ function ResyncSourceSection({
           t("never")
         )}
       </p>
-    </section>
+    </Section>
   );
 }
 
@@ -523,12 +523,7 @@ function IngressControlsSection({ appSlug }: { appSlug: string }) {
   const envs = data?.astroliftEnvironments ?? [];
 
   return (
-    <section className="rounded-lg border p-5">
-      <div className="mb-4">
-        <h2 className="text-base font-semibold">{t("title")}</h2>
-        <p className="text-muted-foreground mt-0.5 text-xs">{t("description")}</p>
-      </div>
-
+    <Section title={t("title")} description={t("description")}>
       {loading && envs.length === 0 ? (
         <div className="grid gap-3 sm:grid-cols-2">
           <Skeleton className="h-20 w-full" />
@@ -543,7 +538,7 @@ function IngressControlsSection({ appSlug }: { appSlug: string }) {
           ))}
         </div>
       )}
-    </section>
+    </Section>
   );
 }
 
@@ -738,13 +733,11 @@ function WebhookDeploysPauseSection({
   }
 
   return (
-    <section className="rounded-lg border p-5">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold">{t("title")}</h2>
-          <p className="text-muted-foreground mt-0.5 text-xs">{t("description")}</p>
-        </div>
-        <div className="flex items-center gap-2">
+    <Section
+      title={t("title")}
+      description={t("description")}
+      action={
+        <>
           {paused ? (
             <Badge
               variant="outline"
@@ -788,9 +781,9 @@ function WebhookDeploysPauseSection({
               </Button>
             )}
           </Can>
-        </div>
-      </div>
-
+        </>
+      }
+    >
       {/* Audit / explainer footer — the paused branch surfaces the
           actor + time + reason so the operator can spot a stale pause
           at a glance; the live branch reminds operators what the
@@ -864,7 +857,7 @@ function WebhookDeploysPauseSection({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </section>
+    </Section>
   );
 }
 
@@ -1872,17 +1865,20 @@ function RetentionPolicySection({
   }
 
   return (
-    <section className="rounded-lg border p-5">
-      <div className="mb-4 flex items-start gap-3">
-        <DatabaseIcon className="text-muted-foreground mt-0.5 size-4 shrink-0" />
-        <div>
-          <h2 className="text-base font-semibold">Data retention</h2>
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            How long observability data is kept per signal type. Defaults to{" "}
-            {RETENTION_DEFAULT_DAYS} days when no policy is set.
-          </p>
-        </div>
-      </div>
+    <Section
+      title={
+        <span className="flex items-center gap-2">
+          <DatabaseIcon className="text-muted-foreground size-4 shrink-0" />
+          Data retention
+        </span>
+      }
+      description={
+        <>
+          How long observability data is kept per signal type. Defaults to{" "}
+          {RETENTION_DEFAULT_DAYS} days when no policy is set.
+        </>
+      }
+    >
       <div className="flex flex-col gap-2">
         {RETENTION_SIGNALS.map(({ signal, label }) => {
           const current = policyMap[signal] ?? RETENTION_DEFAULT_DAYS;
@@ -1928,7 +1924,7 @@ function RetentionPolicySection({
           );
         })}
       </div>
-    </section>
+    </Section>
   );
 }
 
@@ -2019,19 +2015,17 @@ function EnvironmentSettingsSection({ appSlug }: { appSlug: string }) {
   }
 
   return (
-    <section className="rounded-lg border p-5">
-      <div className="mb-4 flex items-start gap-3">
-        <KeyIcon className="text-muted-foreground mt-0.5 size-4 shrink-0" />
-        <div>
-          <h2 className="text-base font-semibold">Environment overrides</h2>
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            Per-environment key/value settings that supplement the app&apos;s base configuration.
-          </p>
-        </div>
-      </div>
-
+    <Section
+      title={
+        <span className="flex items-center gap-2">
+          <KeyIcon className="text-muted-foreground size-4 shrink-0" />
+          Environment overrides
+        </span>
+      }
+      description="Per-environment key/value settings that supplement the app's base configuration."
+    >
       {envs.length > 1 && (
-        <div className="mb-4 flex items-center gap-2">
+        <div className="flex items-center gap-2">
           <Label className="text-muted-foreground text-xs">Environment</Label>
           <Select value={selectedEnvId || envs[0]?.id} onValueChange={setSelectedEnvId}>
             <SelectTrigger className="w-48">
@@ -2049,13 +2043,13 @@ function EnvironmentSettingsSection({ appSlug }: { appSlug: string }) {
       )}
 
       {settings.length === 0 ? (
-        <p className="text-muted-foreground mb-4 text-xs italic">
+        <p className="text-muted-foreground text-xs italic">
           No overrides set for{" "}
           <span className="text-foreground font-mono">{effectiveEnv?.name ?? ""}</span>. Add one
           below or pick a suggested key.
         </p>
       ) : (
-        <div className="mb-4 flex flex-col gap-1">
+        <div className="flex flex-col gap-1">
           {settings.map((s) => (
             <div key={s.id} className="flex items-center gap-2 rounded px-2 py-1 hover:bg-muted/40">
               <span className="w-40 shrink-0 font-mono text-xs">{s.key}</span>
@@ -2135,7 +2129,7 @@ function EnvironmentSettingsSection({ appSlug }: { appSlug: string }) {
           </div>
         </div>
       </Can>
-    </section>
+    </Section>
   );
 }
 
@@ -2197,19 +2191,17 @@ function ArchiveSection({
   }
 
   return (
-    <section className="rounded-lg border p-5">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold">App archive</h2>
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            {isArchived
-              ? archivedAt
-                ? `Archived ${fmt.formatRelativeTime(archivedAt)}. Workloads are at zero replicas; deploys are suppressed.`
-                : "App is archived. Workloads are at zero replicas."
-              : "Archiving scales all workloads to zero and suppresses deploys. Restore returns replicas to their pre-archive counts."}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+    <Section
+      title="App archive"
+      description={
+        isArchived
+          ? archivedAt
+            ? `Archived ${fmt.formatRelativeTime(archivedAt)}. Workloads are at zero replicas; deploys are suppressed.`
+            : "App is archived. Workloads are at zero replicas."
+          : "Archiving scales all workloads to zero and suppresses deploys. Restore returns replicas to their pre-archive counts."
+      }
+      action={
+        <>
           {isArchived ? (
             <Badge
               variant="outline"
@@ -2231,9 +2223,9 @@ function ArchiveSection({
               </Button>
             )}
           </Can>
-        </div>
-      </div>
-
+        </>
+      }
+    >
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -2272,7 +2264,7 @@ function ArchiveSection({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </section>
+    </Section>
   );
 }
 
@@ -2325,18 +2317,15 @@ function ManagedServicesAdminSection({ appSlug }: { appSlug: string }) {
   }
 
   return (
-    <section className="rounded-lg border p-5">
-      <div className="mb-4 flex items-start gap-3">
-        <PlugIcon className="text-muted-foreground mt-0.5 size-4 shrink-0" />
-        <div>
-          <h2 className="text-base font-semibold">Managed service admin</h2>
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            Edit hot-swappable fields in place; trigger a full re-provision when a config
-            change requires tearing down and recreating the backing cloud resource.
-          </p>
-        </div>
-      </div>
-
+    <Section
+      title={
+        <span className="flex items-center gap-2">
+          <PlugIcon className="text-muted-foreground size-4 shrink-0" />
+          Managed service admin
+        </span>
+      }
+      description="Edit hot-swappable fields in place; trigger a full re-provision when a config change requires tearing down and recreating the backing cloud resource."
+    >
       <Card className="overflow-hidden p-0">
         <ul className="divide-y">
           {services.map((svc) => (
@@ -2365,7 +2354,7 @@ function ManagedServicesAdminSection({ appSlug }: { appSlug: string }) {
           if (!open) setEditTarget(null);
         }}
       />
-    </section>
+    </Section>
   );
 }
 

@@ -20,6 +20,7 @@ import {
 import "@xyflow/react/dist/style.css";
 
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -124,10 +125,12 @@ function StateNode({
     <div
       className="cursor-pointer rounded-lg border-2 px-4 py-3 shadow-md transition-shadow hover:shadow-lg"
       style={{
-        borderColor: selected ? "#3b82f6" : data.color,
+        borderColor: selected ? "var(--info)" : data.color,
         backgroundColor: `${data.color}15`,
         minWidth: 150,
-        boxShadow: selected ? "0 0 0 2px rgba(59,130,246,0.3)" : undefined,
+        boxShadow: selected
+          ? "0 0 0 2px color-mix(in oklab, var(--info) 30%, transparent)"
+          : undefined,
       }}
       onClick={(e) => {
         e.stopPropagation();
@@ -140,7 +143,7 @@ function StateNode({
           <div className="font-medium">{data.label}</div>
           <div className="text-xs text-gray-500">{data.name}</div>
           {data.form_slug && (
-            <div className="mt-1 text-2xs text-info-fg">Form: {data.form_slug}</div>
+            <div className="text-2xs text-info-fg mt-1">Form: {data.form_slug}</div>
           )}
           {data.assigned_role && (
             <div className="text-2xs text-purple-500">Role: {data.assigned_role}</div>
@@ -218,10 +221,7 @@ function ConditionEditor({
           className="flex flex-col gap-1.5 rounded border bg-gray-50 p-2 dark:bg-gray-900"
         >
           <div className="flex items-center gap-1">
-            <Select
-              value={cond.type}
-              onValueChange={(v) => updateCondition(i, { type: v })}
-            >
+            <Select value={cond.type} onValueChange={(v) => updateCondition(i, { type: v })}>
               <SelectTrigger className="h-7 flex-1 text-xs">
                 <SelectValue />
               </SelectTrigger>
@@ -297,10 +297,7 @@ function ActionEditor({
   onChange: (a: Action[]) => void;
 }) {
   const addAction = () =>
-    onChange([
-      ...actions,
-      { type: "notify_user", user: "current_user", subject: "", message: "" },
-    ]);
+    onChange([...actions, { type: "notify_user", user: "current_user", subject: "", message: "" }]);
   const removeAction = (i: number) => onChange(actions.filter((_, idx) => idx !== i));
   const updateAction = (i: number, updates: Partial<Action>) =>
     onChange(actions.map((a, idx) => (idx === i ? { ...a, ...updates } : a)));
@@ -314,9 +311,7 @@ function ActionEditor({
         </Button>
       </div>
       {actions.length === 0 && (
-        <p className="text-muted-foreground text-2xs">
-          No actions — nothing happens on transition
-        </p>
+        <p className="text-muted-foreground text-2xs">No actions — nothing happens on transition</p>
       )}
       {actions.map((action, i) => (
         <div
@@ -324,10 +319,7 @@ function ActionEditor({
           className="flex flex-col gap-1.5 rounded border bg-gray-50 p-2 dark:bg-gray-900"
         >
           <div className="flex items-center gap-1">
-            <Select
-              value={action.type}
-              onValueChange={(v) => updateAction(i, { type: v })}
-            >
+            <Select value={action.type} onValueChange={(v) => updateAction(i, { type: v })}>
               <SelectTrigger className="h-7 flex-1 text-xs">
                 <SelectValue />
               </SelectTrigger>
@@ -444,13 +436,13 @@ export function WorkflowBuilder({
         };
       });
     },
-    [selectedStateName],
+    [selectedStateName]
   );
 
   const initialNodes: Node[] = useMemo(
     () => buildNodes(initialStates, []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    []
   );
 
   const initialEdges: Edge[] = useMemo(
@@ -465,7 +457,7 @@ export function WorkflowBuilder({
         style: { strokeWidth: 2 },
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    []
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -475,7 +467,7 @@ export function WorkflowBuilder({
     (states: WorkflowState[]) => {
       setNodes((currentNodes) => buildNodes(states, currentNodes));
     },
-    [buildNodes, setNodes],
+    [buildNodes, setNodes]
   );
 
   const onConnect = useCallback(
@@ -501,7 +493,7 @@ export function WorkflowBuilder({
         },
       ]);
     },
-    [setEdges],
+    [setEdges]
   );
 
   const addState = () => {
@@ -525,7 +517,7 @@ export function WorkflowBuilder({
     setWorkflowStates(updated);
     setEdges((eds) => eds.filter((e) => e.source !== name && e.target !== name));
     setWorkflowTransitions((prev) =>
-      prev.filter((t) => t.from_state !== name && t.to_state !== name),
+      prev.filter((t) => t.from_state !== name && t.to_state !== name)
     );
     if (selectedStateName === name) setSelectedStateName(null);
     refreshNodes(updated);
@@ -548,7 +540,7 @@ export function WorkflowBuilder({
     if (!edge) return;
     setEdges((eds) => eds.filter((e) => e.id !== edgeId));
     setWorkflowTransitions((prev) =>
-      prev.filter((t) => !(t.from_state === edge.source && t.to_state === edge.target)),
+      prev.filter((t) => !(t.from_state === edge.source && t.to_state === edge.target))
     );
     setSelectedEdgeId(null);
   };
@@ -559,8 +551,8 @@ export function WorkflowBuilder({
     if (edge) {
       setWorkflowTransitions((prev) =>
         prev.map((t) =>
-          t.from_state === edge.source && t.to_state === edge.target ? { ...t, label } : t,
-        ),
+          t.from_state === edge.source && t.to_state === edge.target ? { ...t, label } : t
+        )
       );
     }
   };
@@ -570,8 +562,8 @@ export function WorkflowBuilder({
     if (edge) {
       setWorkflowTransitions((prev) =>
         prev.map((t) =>
-          t.from_state === edge.source && t.to_state === edge.target ? { ...t, conditions } : t,
-        ),
+          t.from_state === edge.source && t.to_state === edge.target ? { ...t, conditions } : t
+        )
       );
     }
   };
@@ -581,8 +573,8 @@ export function WorkflowBuilder({
     if (edge) {
       setWorkflowTransitions((prev) =>
         prev.map((t) =>
-          t.from_state === edge.source && t.to_state === edge.target ? { ...t, actions } : t,
-        ),
+          t.from_state === edge.source && t.to_state === edge.target ? { ...t, actions } : t
+        )
       );
     }
   };
@@ -590,7 +582,7 @@ export function WorkflowBuilder({
   const handleSave = () => {
     const currentTransitions = edges.map((e) => {
       const wt = workflowTransitions.find(
-        (t) => t.from_state === e.source && t.to_state === e.target,
+        (t) => t.from_state === e.source && t.to_state === e.target
       );
       return {
         from_state: e.source,
@@ -607,7 +599,7 @@ export function WorkflowBuilder({
   const selectedEdge = edges.find((e) => e.id === selectedEdgeId);
   const selectedTransition = selectedEdge
     ? workflowTransitions.find(
-        (t) => t.from_state === selectedEdge.source && t.to_state === selectedEdge.target,
+        (t) => t.from_state === selectedEdge.source && t.to_state === selectedEdge.target
       )
     : null;
 
@@ -626,7 +618,7 @@ export function WorkflowBuilder({
 
       <div className="flex gap-4">
         {/* Canvas */}
-        <div className="h-[500px] flex-1 rounded-lg border bg-white dark:bg-gray-950">
+        <div className="bg-card h-[500px] flex-1 rounded-lg border">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -653,206 +645,208 @@ export function WorkflowBuilder({
 
         {/* Properties panel */}
         {(selectedState || selectedEdge) && (
-          <div className="w-80 shrink-0 overflow-y-auto rounded-lg border bg-white p-4 dark:bg-gray-950"
-               style={{ maxHeight: 500 }}>
-            {/* ---- STATE PANEL ---- */}
-            {selectedState && (
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold">Edit State</h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0"
-                    onClick={() => setSelectedStateName(null)}
-                  >
-                    <XIcon className="h-3 w-3" />
-                  </Button>
-                </div>
-                <Separator />
-
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs">Label</Label>
-                  <Input
-                    value={selectedState.label}
-                    onChange={(e) => updateState(selectedState.name, { label: e.target.value })}
-                    placeholder="Display name"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs">Name (slug)</Label>
-                  <Input
-                    value={selectedState.name}
-                    disabled
-                    className="bg-muted text-muted-foreground text-xs"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs">Color</Label>
-                  <div className="flex gap-2">
-                    {STATE_COLORS.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        className="h-6 w-6 rounded-full border-2 transition-transform hover:scale-110"
-                        style={{
-                          backgroundColor: c,
-                          borderColor: selectedState.color === c ? "#000" : "transparent",
-                        }}
-                        onClick={() => updateState(selectedState.name, { color: c })}
-                      />
-                    ))}
+          <Card className="max-h-[500px] w-80 shrink-0 overflow-y-auto">
+            <CardContent>
+              {/* ---- STATE PANEL ---- */}
+              {selectedState && (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold">Edit State</h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => setSelectedStateName(null)}
+                    >
+                      <XIcon className="h-3 w-3" />
+                    </Button>
                   </div>
-                </div>
+                  <Separator />
 
-                <Separator />
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-xs">Label</Label>
+                    <Input
+                      value={selectedState.label}
+                      onChange={(e) => updateState(selectedState.name, { label: e.target.value })}
+                      placeholder="Display name"
+                    />
+                  </div>
 
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={selectedState.is_initial}
-                    onChange={(e) =>
-                      updateState(selectedState.name, { is_initial: e.target.checked })
-                    }
-                    className="h-4 w-4 rounded"
-                  />
-                  <span className="text-sm">Initial state (start)</span>
-                </label>
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-xs">Name (slug)</Label>
+                    <Input
+                      value={selectedState.name}
+                      disabled
+                      className="bg-muted text-muted-foreground text-xs"
+                    />
+                  </div>
 
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={selectedState.is_final}
-                    onChange={(e) =>
-                      updateState(selectedState.name, { is_final: e.target.checked })
-                    }
-                    className="h-4 w-4 rounded"
-                  />
-                  <span className="text-sm">Final state (end)</span>
-                </label>
-
-                <Separator />
-
-                {/* Form picker */}
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs">Attached Form</Label>
-                  <Select
-                    value={selectedState.form_slug || "__none__"}
-                    onValueChange={(v) =>
-                      updateState(selectedState.name, {
-                        form_slug: v === "__none__" ? undefined : v,
-                      })
-                    }
-                  >
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="No form" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">No form</SelectItem>
-                      {availableForms.map((f) => (
-                        <SelectItem key={f.slug} value={f.slug}>
-                          {f.name}
-                        </SelectItem>
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-xs">Color</Label>
+                    <div className="flex gap-2">
+                      {STATE_COLORS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          className="h-6 w-6 rounded-full border-2 transition-transform hover:scale-110"
+                          style={{
+                            backgroundColor: c,
+                            borderColor:
+                              selectedState.color === c ? "var(--foreground)" : "transparent",
+                          }}
+                          onClick={() => updateState(selectedState.name, { color: c })}
+                        />
                       ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-muted-foreground text-2xs">
-                    Form required at this step before transitioning
-                  </p>
-                </div>
+                    </div>
+                  </div>
 
-                {/* Assigned role */}
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs">Assigned Role</Label>
-                  <TagInput
-                    value={selectedState.assigned_role ? [selectedState.assigned_role] : []}
-                    onChange={(tags) =>
-                      updateState(selectedState.name, {
-                        assigned_role: tags[tags.length - 1] || undefined,
-                      })
-                    }
-                    placeholder="Type role and press Enter"
-                  />
-                  <p className="text-muted-foreground text-2xs">
-                    Users with this role are responsible for this step
-                  </p>
-                </div>
+                  <Separator />
 
-                <Separator />
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedState.is_initial}
+                      onChange={(e) =>
+                        updateState(selectedState.name, { is_initial: e.target.checked })
+                      }
+                      className="h-4 w-4 rounded"
+                    />
+                    <span className="text-sm">Initial state (start)</span>
+                  </label>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  onClick={() => removeState(selectedState.name)}
-                >
-                  <TrashIcon className="mr-1 h-3 w-3" /> Delete State
-                </Button>
-              </div>
-            )}
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedState.is_final}
+                      onChange={(e) =>
+                        updateState(selectedState.name, { is_final: e.target.checked })
+                      }
+                      className="h-4 w-4 rounded"
+                    />
+                    <span className="text-sm">Final state (end)</span>
+                  </label>
 
-            {/* ---- TRANSITION PANEL ---- */}
-            {selectedEdge && (
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold">Edit Transition</h3>
+                  <Separator />
+
+                  {/* Form picker */}
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-xs">Attached Form</Label>
+                    <Select
+                      value={selectedState.form_slug || "__none__"}
+                      onValueChange={(v) =>
+                        updateState(selectedState.name, {
+                          form_slug: v === "__none__" ? undefined : v,
+                        })
+                      }
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="No form" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">No form</SelectItem>
+                        {availableForms.map((f) => (
+                          <SelectItem key={f.slug} value={f.slug}>
+                            {f.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-muted-foreground text-2xs">
+                      Form required at this step before transitioning
+                    </p>
+                  </div>
+
+                  {/* Assigned role */}
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-xs">Assigned Role</Label>
+                    <TagInput
+                      value={selectedState.assigned_role ? [selectedState.assigned_role] : []}
+                      onChange={(tags) =>
+                        updateState(selectedState.name, {
+                          assigned_role: tags[tags.length - 1] || undefined,
+                        })
+                      }
+                      placeholder="Type role and press Enter"
+                    />
+                    <p className="text-muted-foreground text-2xs">
+                      Users with this role are responsible for this step
+                    </p>
+                  </div>
+
+                  <Separator />
+
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    className="h-6 w-6 p-0"
-                    onClick={() => setSelectedEdgeId(null)}
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => removeState(selectedState.name)}
                   >
-                    <XIcon className="h-3 w-3" />
+                    <TrashIcon className="mr-1 h-3 w-3" /> Delete State
                   </Button>
                 </div>
-                <Separator />
+              )}
 
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs">Label</Label>
-                  <Input
-                    value={(selectedEdge.label as string) || ""}
-                    onChange={(e) => updateTransitionLabel(selectedEdge.id, e.target.value)}
-                    placeholder="Transition label"
+              {/* ---- TRANSITION PANEL ---- */}
+              {selectedEdge && (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold">Edit Transition</h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => setSelectedEdgeId(null)}
+                    >
+                      <XIcon className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <Separator />
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-xs">Label</Label>
+                    <Input
+                      value={(selectedEdge.label as string) || ""}
+                      onChange={(e) => updateTransitionLabel(selectedEdge.id, e.target.value)}
+                      placeholder="Transition label"
+                    />
+                  </div>
+
+                  <div className="text-muted-foreground text-xs">
+                    <span className="font-medium">{selectedEdge.source}</span>
+                    {" → "}
+                    <span className="font-medium">{selectedEdge.target}</span>
+                  </div>
+
+                  <Separator />
+
+                  {/* Conditions */}
+                  <ConditionEditor
+                    conditions={selectedTransition?.conditions ?? []}
+                    onChange={(c) => updateTransitionConditions(selectedEdge.id, c)}
                   />
+
+                  <Separator />
+
+                  {/* Actions */}
+                  <ActionEditor
+                    actions={selectedTransition?.actions ?? []}
+                    onChange={(a) => updateTransitionActions(selectedEdge.id, a)}
+                  />
+
+                  <Separator />
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => removeEdge(selectedEdge.id)}
+                  >
+                    <TrashIcon className="mr-1 h-3 w-3" /> Delete Transition
+                  </Button>
                 </div>
-
-                <div className="text-muted-foreground text-xs">
-                  <span className="font-medium">{selectedEdge.source}</span>
-                  {" → "}
-                  <span className="font-medium">{selectedEdge.target}</span>
-                </div>
-
-                <Separator />
-
-                {/* Conditions */}
-                <ConditionEditor
-                  conditions={selectedTransition?.conditions ?? []}
-                  onChange={(c) => updateTransitionConditions(selectedEdge.id, c)}
-                />
-
-                <Separator />
-
-                {/* Actions */}
-                <ActionEditor
-                  actions={selectedTransition?.actions ?? []}
-                  onChange={(a) => updateTransitionActions(selectedEdge.id, a)}
-                />
-
-                <Separator />
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  onClick={() => removeEdge(selectedEdge.id)}
-                >
-                  <TrashIcon className="mr-1 h-3 w-3" /> Delete Transition
-                </Button>
-              </div>
-            )}
-          </div>
+              )}
+            </CardContent>
+          </Card>
         )}
       </div>
 
