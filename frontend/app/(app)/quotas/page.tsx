@@ -1,14 +1,6 @@
-import { LIST_QUOTAS } from "@/graphql/billing/billing.queries";
-import { PreloadQuery } from "@/lib/apollo";
+import { redirect } from "next/navigation";
 
-import { QuotasClient } from "./quotas-client";
-
-export const metadata = { title: "Quotas · Astrolift" };
-
+// /administration/quotas is the canonical quotas page.
 export default function QuotasPage() {
-  return (
-    <PreloadQuery query={LIST_QUOTAS}>
-      <QuotasClient />
-    </PreloadQuery>
-  );
+  redirect("/administration/quotas");
 }

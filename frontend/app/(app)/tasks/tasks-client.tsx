@@ -7,6 +7,7 @@ import {
   HistoryIcon,
   Loader2Icon,
   PlayIcon,
+  ScrollIcon,
   TerminalIcon,
 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -89,8 +90,9 @@ const STATUS_VARIANT: Record<
 
 // ── tab definitions ────────────────────────────────────────────────────────
 
-type TaskTab = "templates" | "recent" | "history";
-const TASK_TABS: readonly TaskTab[] = ["templates", "recent", "history"];
+// "logs" is a gateway placeholder folded in from /observe/tasks (#892).
+type TaskTab = "templates" | "recent" | "history" | "logs";
+const TASK_TABS: readonly TaskTab[] = ["templates", "recent", "history", "logs"];
 
 // ── component ─────────────────────────────────────────────────────────────
 
@@ -149,7 +151,7 @@ export function TasksClient() {
     // so the rest of the page still renders.
     errorPolicy: "ignore",
     pollInterval: 15000,
-    skip: tab === "templates",
+    skip: tab === "templates" || tab === "logs",
   });
 
   const allRuns = React.useMemo(
@@ -239,11 +241,13 @@ export function TasksClient() {
             templates: <ClipboardListIcon className="size-3.5" />,
             recent: <ClockIcon className="size-3.5" />,
             history: <HistoryIcon className="size-3.5" />,
+            logs: <ScrollIcon className="size-3.5" />,
           };
           const labels: Record<TaskTab, string> = {
             templates: "Templates",
             recent: "Recent",
             history: "History",
+            logs: "Logs",
           };
           return (
             <button
@@ -266,26 +270,28 @@ export function TasksClient() {
         })}
       </div>
 
-      {/* Filter row */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          placeholder="Filter by app…"
-          value={appFilter}
-          onChange={(e) => setAppFilter(e.target.value)}
-          className="max-w-xs"
-        />
-        {tab === "history" && (
+      {/* Filter row — hidden on the logs placeholder, which lists nothing. */}
+      {tab !== "logs" && (
+        <div className="flex flex-wrap items-center gap-2">
           <Input
-            placeholder="Filter by status…"
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              updateParam("status", e.target.value);
-            }}
+            placeholder="Filter by app…"
+            value={appFilter}
+            onChange={(e) => setAppFilter(e.target.value)}
             className="max-w-xs"
           />
-        )}
-      </div>
+          {tab === "history" && (
+            <Input
+              placeholder="Filter by status…"
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                updateParam("status", e.target.value);
+              }}
+              className="max-w-xs"
+            />
+          )}
+        </div>
+      )}
 
       {/* Tab content */}
       {tab === "templates" && (
@@ -314,6 +320,18 @@ export function TasksClient() {
           emptyDescription="Once tasks are run they'll appear here. Use the Templates tab to trigger one."
           searchPlaceholder="Search history…"
         />
+      )}
+      {/* Gateway placeholder ported from /observe/tasks (#892). */}
+      {tab === "logs" && (
+        <Card>
+          <CardContent className="p-6">
+            <EmptyState
+              icon={<ScrollIcon className="size-5" />}
+              title="Task Logs"
+              description="Stdout/stderr from task run containers. Stored inline for quick inspection."
+            />
+          </CardContent>
+        </Card>
       )}
     </PageShell>
   );

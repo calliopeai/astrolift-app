@@ -81,7 +81,7 @@ export function AgentVncPopout({ taskId }: { taskId: string }) {
               ? "This agent isn't running a VNC-capable session."
               : "This agent is no longer running, so its live session has closed."
           }
-          actionHref="/observe/agents?tab=theatre"
+          actionHref="/agents?tab=theatre"
           actionLabel="Back to theatre"
         />
       </div>
@@ -99,7 +99,7 @@ export function AgentVncPopout({ taskId }: { taskId: string }) {
           <span className="text-muted-foreground font-mono text-xs">{taskId}</span>
         </div>
         <Button asChild variant="outline" size="sm">
-          <Link href="/observe/agents?tab=theatre">
+          <Link href="/agents?tab=theatre">
             <ArrowLeftIcon className="size-3.5" />
             Theatre
           </Link>

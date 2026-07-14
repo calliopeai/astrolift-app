@@ -184,29 +184,6 @@ const observeSection: { label: string; items: NavItem[] } = {
   label: "Observe",
   items: [
     { label: "Dashboard", href: "/ops", icon: <LayoutDashboardIcon />, permission: "org.read" },
-    {
-      // Distinct from RUN>Deployments (release/rollout history); this is the
-      // running-fleet health view (#917). Relabelled so the sidebar doesn't
-      // read as a duplicate entry.
-      label: "Deployment health",
-      href: "/observe/deployments",
-      icon: <RocketIcon />,
-      permission: "app.read",
-    },
-    { label: "Agents", href: "/observe/agents", icon: <BoxIcon />, permission: "app.read" },
-    {
-      label: "Jobs",
-      href: "/observe/jobs",
-      icon: <CalendarClockIcon />,
-      permission: "app.read_logs",
-    },
-    { label: "Tasks", href: "/observe/tasks", icon: <ClipboardListIcon />, permission: "app.read" },
-    {
-      label: "Functions",
-      href: "/observe/functions",
-      icon: <BoltIcon />,
-      permission: "app.read",
-    },
     { label: "Events", href: "/events", icon: <ActivityIcon />, permission: "audit_log.read" },
     { label: "Alerts", href: "/alerts", icon: <BellIcon />, permission: "org.read" },
     {
@@ -345,7 +322,7 @@ const modules: ModuleEntry[] = [
           },
           {
             label: "Tokens",
-            href: "/administration/tokens",
+            href: "/tokens",
             icon: <KeyRoundIcon />,
             permission: "api_token.create",
           },

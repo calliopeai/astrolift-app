@@ -1,16 +1,6 @@
-import { LIST_PROVIDER_PLUGINS } from "@/graphql/clusters/clusters.queries";
-import { PreloadQuery } from "@/lib/apollo";
+import { redirect } from "next/navigation";
 
-import { DriversClient } from "./drivers-client";
-
-export const metadata = {
-  title: "Driver reference · Resources · Astrolift",
-};
-
-export default function DriversReferencePage() {
-  return (
-    <PreloadQuery query={LIST_PROVIDER_PLUGINS}>
-      <DriversClient />
-    </PreloadQuery>
-  );
+// Moved into the documentation hub (#916).
+export default function LegacyDriversReferencePage() {
+  redirect("/documentation/drivers");
 }

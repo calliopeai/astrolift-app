@@ -1,9 +1,6 @@
-"use client";
+import { FunctionsClient } from "./functions-client";
 
-import { BoltIcon } from "lucide-react";
-
-import { EmptyState } from "@/components/EmptyState";
-import { PageShell } from "@/components/PageShell";
+export const metadata = { title: "Functions · Astrolift" };
 
 /**
  * Functions — event-driven, short-lived container invocations.
@@ -17,21 +14,10 @@ import { PageShell } from "@/components/PageShell";
  * - Scale: horizontal to zero between invocations (Knative Serving)
  * - Billing model: per-invocation, not per-pod-hour
  *
- * Not shipped yet: every tab was a placeholder EmptyState with no backing
- * query (#906), which read as a first-class, working primitive. Gated to a
- * single honest "coming soon" surface until a query backs it.
+ * The runtime layer hasn't shipped: the signal tabs (throughput / errors /
+ * latency / logs, folded in from /observe/functions — #892) are gateway
+ * placeholders until a query backs them, and the copy says so.
  */
 export default function FunctionsPage() {
-  return (
-    <PageShell
-      title="Functions"
-      description="Event-driven container invocations — scale to zero, trigger on HTTP, queues, or webhooks."
-    >
-      <EmptyState
-        icon={<BoltIcon className="size-5" />}
-        title="Functions — coming soon"
-        description="Event-driven, scale-to-zero function invocations aren't available yet. Invocations, errors, throughput, and per-function triggers will surface here once the runtime layer ships."
-      />
-    </PageShell>
-  );
+  return <FunctionsClient />;
 }

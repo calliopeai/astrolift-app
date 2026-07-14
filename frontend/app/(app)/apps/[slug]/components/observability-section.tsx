@@ -78,7 +78,7 @@ export function ObservabilitySection({ appSlug }: Props) {
       action={
         <>
           <Link
-            href={`/metrics?app=${appSlug}`}
+            href={`/administration/metrics?app=${appSlug}`}
             className="inline-flex items-center gap-1 text-xs text-[var(--brand-primary)] hover:underline"
           >
             Open metrics

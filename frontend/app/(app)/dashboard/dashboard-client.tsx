@@ -180,7 +180,7 @@ export function DashboardClient() {
           icon={CoinsIcon}
           value={mtdValue}
           loading={costForecast.loading && forecast == null}
-          href="/cost"
+          href="/administration/cost"
           emptyCta={t("tiles.costMtd.emptyCta")}
           trend={
             forecast && forecast.mtdCents > 0 ? <CostMtdDelta forecast={forecast} t={t} /> : null

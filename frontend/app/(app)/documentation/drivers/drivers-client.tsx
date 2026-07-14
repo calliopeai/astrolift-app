@@ -352,7 +352,7 @@ export function DriversClient() {
                 Matrix reflects manifest declarations · last probed varies by
                 cluster ·{" "}
                 <Link
-                  href="/resources/clusters"
+                  href="/clusters"
                   className="text-primary hover:underline"
                 >
                   See live capabilities →

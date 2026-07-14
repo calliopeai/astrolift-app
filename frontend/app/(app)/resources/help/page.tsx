@@ -1,17 +1,6 @@
-import { HelpClient } from "./help-client";
+import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: "Get help · Resources · Astrolift",
-};
-
-export default function HelpPage() {
-  // Read platform version on the server so it ships in the initial
-  // HTML. Falls back to the package.json version when the env var
-  // isn't set.
-  const platformVersion =
-    process.env.NEXT_PUBLIC_PLATFORM_VERSION ??
-    process.env.npm_package_version ??
-    "0.1.0";
-
-  return <HelpClient platformVersion={platformVersion} />;
+// Moved into the documentation hub (#916).
+export default function LegacyHelpPage() {
+  redirect("/documentation/help");
 }

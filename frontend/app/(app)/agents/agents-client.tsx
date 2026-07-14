@@ -2,11 +2,16 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import {
+  BarChart3Icon,
   BotIcon,
+  BrainIcon,
   ClockIcon,
+  ExternalLinkIcon,
   GitBranchIcon,
   Loader2Icon,
   MonitorPlayIcon,
+  ScrollIcon,
+  ShieldCheckIcon,
   ZapIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -46,6 +51,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { AgentTheatre } from "@/components/observability/AgentTheatre";
 import { VncViewer } from "@/components/observability/VncViewer";
 import { RUN_AGENT } from "@/graphql/agents/agents.mutations";
 import {
@@ -90,15 +96,62 @@ type RunAgentData = {
   };
 };
 
-type AgentTab = "active" | "dispatch" | "history" | "registry";
-const AGENT_TABS: readonly AgentTab[] = ["active", "dispatch", "history", "registry"];
+type AgentTab =
+  | "active"
+  | "dispatch"
+  | "history"
+  | "registry"
+  | "theatre"
+  | "metrics"
+  | "logs"
+  | "activity"
+  | "reasoning"
+  | "token-usage"
+  | "compliance";
+const AGENT_TABS: readonly AgentTab[] = [
+  "active",
+  "dispatch",
+  "history",
+  "registry",
+  "theatre",
+  "metrics",
+  "logs",
+  "activity",
+  "reasoning",
+  "token-usage",
+  "compliance",
+];
 
 const TAB_LABELS: Record<AgentTab, string> = {
   active: "Active",
   dispatch: "Dispatch",
   history: "History",
   registry: "Registry",
+  theatre: "Theatre",
+  metrics: "Metrics",
+  logs: "Logs",
+  activity: "Activity",
+  reasoning: "Reasoning Traces",
+  "token-usage": "Token Usage",
+  compliance: "Compliance",
 };
+
+const TAB_ICONS: Partial<Record<AgentTab, React.ReactNode>> = {
+  theatre: <MonitorPlayIcon className="size-4" />,
+  metrics: <BarChart3Icon className="size-4" />,
+  logs: <ScrollIcon className="size-4" />,
+  activity: <ShieldCheckIcon className="size-4" />,
+  reasoning: <BrainIcon className="size-4" />,
+  "token-usage": <ZapIcon className="size-4" />,
+  compliance: <ShieldCheckIcon className="size-4" />,
+};
+
+const ZENTINELLE_TABS = new Set<AgentTab>([
+  "activity",
+  "reasoning",
+  "token-usage",
+  "compliance",
+]);
 
 interface WorkloadResp {
   astroliftWorkloads: AstroliftWorkload[];
@@ -818,6 +871,35 @@ function RegistryTab({ orgId }: RegistryTabProps) {
 }
 
 // ---------------------------------------------------------------------------
+// Zentinelle-gated signal tabs
+// ---------------------------------------------------------------------------
+
+function ZentinelleGate({ tab }: { tab: AgentTab }) {
+  const descriptions: Record<string, string> = {
+    activity: "Policy evaluation results, content scans, blocked requests, and real-time agent behavior events — powered by Zentinelle's policy engine.",
+    reasoning: "Full interaction audit: prompts, model responses, tool calls, chain-of-thought steps, and retry attempts — from Zentinelle's InteractionLog.",
+    "token-usage": "Per-run and per-workload token consumption: input tokens, output tokens, cost attribution, and budget burn rate — from Zentinelle's cost meter.",
+    compliance: "SOC2, GDPR, HIPAA, and EU AI Act controls mapped to this agent workload — from Zentinelle's compliance engine.",
+  };
+  return (
+    <div className="rounded-lg border border-dashed p-8 flex flex-col items-center gap-4 text-center">
+      <div className="flex size-12 items-center justify-center rounded-full bg-muted">{TAB_ICONS[tab]}</div>
+      <div className="space-y-1">
+        <p className="font-semibold text-sm">{TAB_LABELS[tab]} — powered by Zentinelle</p>
+        <p className="text-muted-foreground text-sm max-w-md">{descriptions[tab as string]}</p>
+      </div>
+      <p className="text-xs text-muted-foreground border rounded px-3 py-2 bg-muted/40 max-w-sm">
+        Connect Zentinelle to enable AI agent GRC observability. Integration under design.
+      </p>
+      <a href="https://github.com/calliopeai/zentinelle" target="_blank" rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+        Learn about Zentinelle <ExternalLinkIcon className="size-3" />
+      </a>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Root client component
 // ---------------------------------------------------------------------------
 
@@ -889,7 +971,11 @@ export function AgentsClient() {
                   : "text-muted-foreground hover:text-foreground")
               }
             >
+              {TAB_ICONS[tabKey]}
               {TAB_LABELS[tabKey]}
+              {ZENTINELLE_TABS.has(tabKey) && (
+                <Badge variant="secondary" className="text-2xs px-1.5 py-0 h-4 font-normal ml-0.5">Zentinelle</Badge>
+              )}
             </button>
           );
         })}
@@ -901,6 +987,14 @@ export function AgentsClient() {
       )}
       {tab === "history" && <HistoryTab orgId={orgId} />}
       {tab === "registry" && <RegistryTab orgId={orgId} />}
+      {tab === "theatre" && <AgentTheatre />}
+      {tab === "metrics" && (
+        <EmptyState icon={<BarChart3Icon className="size-5" />} title="Agent Metrics" description="Dispatch rate, run duration (p50/p95), retry rate, and success counts — aggregated across all agent workloads." />
+      )}
+      {tab === "logs" && (
+        <EmptyState icon={<ScrollIcon className="size-5" />} title="Agent Logs" description="Container stdout/stderr from agent workload pods. Filter by app, workload, or pod." />
+      )}
+      {ZENTINELLE_TABS.has(tab) && <ZentinelleGate tab={tab} />}
     </PageShell>
   );
 }
