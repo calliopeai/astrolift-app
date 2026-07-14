@@ -13,6 +13,7 @@ import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   APPROVE_SECRET_CHANGE,
@@ -264,22 +265,19 @@ function DiffPanel({ proposal }: { proposal: AstroliftSecretChangeProposal }) {
   const after = diff.after ?? {};
 
   return (
-    <Card className="mt-3">
-      <CardContent className="p-4">
-        <h2 className="mb-3 text-lg font-semibold">{t("title")}</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-md border p-3">
-            <h3 className="mb-2 text-sm font-medium">{t("before")}</h3>
-            <DiffPairs entries={before} />
-          </div>
-          <div className="rounded-md border p-3">
-            <h3 className="mb-2 text-sm font-medium">{t("after")}</h3>
-            <DiffPairs entries={after} />
-          </div>
+    <Section title={t("title")}>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-md border p-3">
+          <h3 className="mb-2 text-sm font-medium">{t("before")}</h3>
+          <DiffPairs entries={before} />
         </div>
-        <p className="text-muted-foreground mt-3 text-xs">{t("maskNote")}</p>
-      </CardContent>
-    </Card>
+        <div className="rounded-md border p-3">
+          <h3 className="mb-2 text-sm font-medium">{t("after")}</h3>
+          <DiffPairs entries={after} />
+        </div>
+      </div>
+      <p className="text-muted-foreground text-xs">{t("maskNote")}</p>
+    </Section>
   );
 }
 
@@ -304,40 +302,34 @@ function ApproverList({ proposal }: { proposal: AstroliftSecretChangeProposal })
   const t = useTranslations("approvals.secretProposalDetail.approvers");
   if (proposal.approvals.length === 0) {
     return (
-      <Card className="mt-3">
-        <CardContent className="p-4">
-          <h2 className="mb-2 text-lg font-semibold">{t("title")}</h2>
-          <p className="text-muted-foreground text-sm">{t("empty")}</p>
-        </CardContent>
-      </Card>
+      <Section title={t("title")}>
+        <p className="text-muted-foreground text-sm">{t("empty")}</p>
+      </Section>
     );
   }
   return (
-    <Card className="mt-3">
-      <CardContent className="p-4">
-        <h2 className="mb-2 text-lg font-semibold">{t("title")}</h2>
-        <ul className="flex flex-col gap-2">
-          {proposal.approvals.map((approval) => (
-            <li
-              key={approval.id}
-              className="bg-background flex flex-col gap-1 rounded-md border p-2 text-sm sm:flex-row sm:items-center sm:justify-between"
-            >
-              <span>
-                <strong>{approval.approverDisplayName || t("unknownApprover")}</strong>
-                <Badge
-                  variant={approval.decision === "approved" ? "outline" : "destructive"}
-                  className="ml-2"
-                >
-                  {approval.decision}
-                </Badge>
-              </span>
-              {approval.reason && (
-                <span className="text-muted-foreground text-xs">{approval.reason}</span>
-              )}
-            </li>
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
+    <Section title={t("title")}>
+      <ul className="divide-y">
+        {proposal.approvals.map((approval) => (
+          <li
+            key={approval.id}
+            className="flex flex-col gap-1 py-2 text-sm first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <span>
+              <strong>{approval.approverDisplayName || t("unknownApprover")}</strong>
+              <Badge
+                variant={approval.decision === "approved" ? "outline" : "destructive"}
+                className="ml-2"
+              >
+                {approval.decision}
+              </Badge>
+            </span>
+            {approval.reason && (
+              <span className="text-muted-foreground text-xs">{approval.reason}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </Section>
   );
 }

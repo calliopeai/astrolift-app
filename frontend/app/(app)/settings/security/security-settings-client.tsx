@@ -21,6 +21,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -166,14 +167,14 @@ export function SecuritySettingsClient() {
 
   return (
     <div className="grid gap-4">
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <MonitorIcon className="size-4" /> {t("title")}
-            </CardTitle>
-            <CardDescription>{t("description")}</CardDescription>
-          </div>
+      <Section
+        title={
+          <span className="flex items-center gap-2">
+            <MonitorIcon className="size-4" /> {t("title")}
+          </span>
+        }
+        description={t("description")}
+        action={
           <Button
             onClick={requestSignOutAll}
             variant="outline"
@@ -182,77 +183,72 @@ export function SecuritySettingsClient() {
             <LogOutIcon className="size-4" />
             {signingOut ? t("signingOut") : t("signOutEverywhere")}
           </Button>
-        </CardHeader>
-        <CardContent>
-          {loading && !data ? (
-            <div className="space-y-2">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
+        }
+      >
+        {loading && !data ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : error ? (
+          <div className="border-destructive/40 bg-destructive/5 flex items-start gap-2 rounded-md border p-3 text-sm">
+            <AlertTriangleIcon className="text-destructive mt-0.5 size-4" />
+            <div className="flex-1">
+              <p className="text-destructive font-medium">{t("loadError")}</p>
+              <p className="text-muted-foreground text-xs">{error.message}</p>
             </div>
-          ) : error ? (
-            <div className="border-destructive/40 bg-destructive/5 flex items-start gap-2 rounded-md border p-3 text-sm">
-              <AlertTriangleIcon className="text-destructive mt-0.5 size-4" />
-              <div className="flex-1">
-                <p className="text-destructive font-medium">{t("loadError")}</p>
-                <p className="text-muted-foreground text-xs">{error.message}</p>
-              </div>
-            </div>
-          ) : sessions.length === 0 ? (
-            <p className="text-muted-foreground text-sm">{t("noSessions")}</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("columns.kind")}</TableHead>
-                  <TableHead>{t("columns.label")}</TableHead>
-                  <TableHead>{t("columns.status")}</TableHead>
-                  <TableHead>{t("columns.lastSeen")}</TableHead>
-                  <TableHead>{t("columns.expires")}</TableHead>
-                  <TableHead className="text-right">{t("columns.actions")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sessions.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell>{clientKindBadge(s.clientKind)}</TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {s.label || "—"}
-                    </TableCell>
-                    <TableCell>
-                      {s.isCurrent ? (
-                        <Badge className="bg-success/15 text-success-fg">
-                          {t("status.current")}
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary">{t("status.other")}</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell
-                      className="text-muted-foreground text-xs"
-                      title={s.lastSeenAt ? fmt.formatDateTime(s.lastSeenAt) : undefined}
+          </div>
+        ) : sessions.length === 0 ? (
+          <p className="text-muted-foreground text-sm">{t("noSessions")}</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("columns.kind")}</TableHead>
+                <TableHead>{t("columns.label")}</TableHead>
+                <TableHead>{t("columns.status")}</TableHead>
+                <TableHead>{t("columns.lastSeen")}</TableHead>
+                <TableHead>{t("columns.expires")}</TableHead>
+                <TableHead className="text-right">{t("columns.actions")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sessions.map((s) => (
+                <TableRow key={s.id}>
+                  <TableCell>{clientKindBadge(s.clientKind)}</TableCell>
+                  <TableCell className="text-muted-foreground text-xs">{s.label || "—"}</TableCell>
+                  <TableCell>
+                    {s.isCurrent ? (
+                      <Badge className="bg-success/15 text-success-fg">{t("status.current")}</Badge>
+                    ) : (
+                      <Badge variant="secondary">{t("status.other")}</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell
+                    className="text-muted-foreground text-xs"
+                    title={s.lastSeenAt ? fmt.formatDateTime(s.lastSeenAt) : undefined}
+                  >
+                    {relativeFromNow(s.lastSeenAt)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
+                    {s.expiresAt ? fmt.formatDateTime(s.expiresAt) : "—"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={s.isCurrent || revoking}
+                      onClick={() => setPendingRevokeId(s.id)}
                     >
-                      {relativeFromNow(s.lastSeenAt)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {s.expiresAt ? fmt.formatDateTime(s.expiresAt) : "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={s.isCurrent || revoking}
-                        onClick={() => setPendingRevokeId(s.id)}
-                      >
-                        {t("actions.revoke")}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                      {t("actions.revoke")}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Section>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>

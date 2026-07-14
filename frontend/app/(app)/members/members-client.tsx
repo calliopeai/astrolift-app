@@ -33,8 +33,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -337,9 +337,9 @@ export function MembersClient() {
           </div>
         }
       >
-        <Card>
-          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle>People</CardTitle>
+        <Section
+          title="People"
+          action={
             <div className="relative w-full sm:w-72">
               <SearchIcon
                 className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
@@ -354,341 +354,328 @@ export function MembersClient() {
                 className="pl-8"
               />
             </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {members.loading && memberList.length === 0 ? (
-              <div className="space-y-2 p-6">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-              </div>
-            ) : memberList.length === 0 ? (
-              <div className="p-6">
-                {hasActiveSearch ? (
-                  <EmptyState
-                    icon={<SearchIcon className="size-5" />}
-                    title={t("noMatchTitle")}
-                    description={t("noMatchDescription", { term: debouncedSearch.trim() })}
-                  />
-                ) : (
-                  <EmptyState
-                    icon={<UsersIcon className="size-5" />}
-                    title="No members"
-                    description="Members appear here once role bindings are granted to users."
-                  />
-                )}
-              </div>
+          }
+        >
+          {members.loading && memberList.length === 0 ? (
+            <div className="space-y-2">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : memberList.length === 0 ? (
+            hasActiveSearch ? (
+              <EmptyState
+                icon={<SearchIcon className="size-5" />}
+                title={t("noMatchTitle")}
+                description={t("noMatchDescription", { term: debouncedSearch.trim() })}
+              />
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Scope</TableHead>
-                    <TableHead>Roles</TableHead>
-                    <TableHead>{t("lastActiveColumn")}</TableHead>
-                    <TableHead>Joined</TableHead>
-                    <TableHead className="w-12 text-right">{t("actionsColumn")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {memberList.map((m) => {
-                    const userBindings = bindingsByUser.get(m.user.id) ?? [];
-                    const alreadyAnonymized = m.lifecycle === "anonymized";
-                    return (
-                      <TableRow key={m.id} id={`u-${m.user.id}`}>
-                        <TableCell>
-                          <div className="font-medium">{m.user.username}</div>
-                          <div className="text-muted-foreground text-xs">{m.user.email}</div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col items-start gap-1">
-                            <Badge className={scopeBadge[m.scopeKind]} variant="secondary">
-                              {m.scopeKind}
-                            </Badge>
-                            <span className="text-muted-foreground text-xs">{scopeLabel(m)}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {userBindings.length === 0 ? (
-                            <span className="text-muted-foreground text-xs">—</span>
-                          ) : (
-                            <div className="flex flex-wrap gap-1">
-                              {userBindings.map((b) => (
-                                <RoleSourcePill key={b.id} binding={b} />
-                              ))}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <LastActiveCell value={m.lastActiveAt} />
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {m.joinedAt ? fmt.formatDate(m.joinedAt) : fmt.formatDate(m.createdAt)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Can permission="org.manage_members">
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => setGrantForMember(m)}
-                                    aria-label={t("grantRoleRowLabel", {
-                                      name: m.user.username,
-                                    })}
-                                  >
-                                    <UserPlusIcon className="size-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  {t("grantRoleRowTooltip", { name: m.user.username })}
-                                </TooltipContent>
-                              </Tooltip>
-                            </Can>
-                            <Can permission="org.manage_members">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                disabled={alreadyAnonymized}
-                                onClick={() => openAnonymizeDialog(m)}
-                                aria-label={`Anonymize ${m.user.username}`}
-                                title={
-                                  alreadyAnonymized
-                                    ? "Already anonymized"
-                                    : "Anonymize user data (GDPR right-to-delete)"
-                                }
-                              >
-                                <UserMinusIcon className="size-4" />
-                              </Button>
-                            </Can>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <CardTitle>Role bindings</CardTitle>
-            <span className="text-muted-foreground text-xs">
-              {bindingList.length} binding{bindingList.length === 1 ? "" : "s"}
-            </span>
-          </CardHeader>
-          <CardContent className="p-0">
-            {bindings.loading ? (
-              <div className="space-y-2 p-6">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-              </div>
-            ) : bindingList.length === 0 ? (
-              <div className="p-6">
-                <EmptyState
-                  icon={<ShieldIcon className="size-5" />}
-                  title="No role bindings"
-                  description="Grant a system role to a user to give them access to the platform."
-                />
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {canManageMembers && (
-                      <TableHead className="w-10">
-                        <input
-                          type="checkbox"
-                          aria-label={tBulk("selectAllLabel")}
-                          checked={
-                            bindingList.length > 0 &&
-                            bindingList.every((b) => selectedBindings.has(b.id))
-                          }
-                          onChange={() => toggleAllBindings(bindingList.map((b) => b.id))}
-                          className="size-4"
-                          disabled={bulkRevoking}
-                        />
-                      </TableHead>
-                    )}
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>{t("sourceColumn")}</TableHead>
-                    <TableHead>Granted</TableHead>
-                    <TableHead className="text-right">{t("actionsColumn")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {bindingList.map((b) => (
-                    <TableRow key={b.id}>
-                      {canManageMembers && (
-                        <TableCell>
-                          <input
-                            type="checkbox"
-                            aria-label={tBulk("selectRowLabel", {
-                              role: b.role.slug,
-                              subject: b.user?.username ?? `group:${b.groupExternalId}`,
-                            })}
-                            checked={selectedBindings.has(b.id)}
-                            onChange={() => toggleBinding(b.id)}
-                            className="size-4"
-                            disabled={bulkRevoking}
-                          />
-                        </TableCell>
-                      )}
+              <EmptyState
+                icon={<UsersIcon className="size-5" />}
+                title="No members"
+                description="Members appear here once role bindings are granted to users."
+              />
+            )
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>User</TableHead>
+                  <TableHead>Scope</TableHead>
+                  <TableHead>Roles</TableHead>
+                  <TableHead>{t("lastActiveColumn")}</TableHead>
+                  <TableHead>Joined</TableHead>
+                  <TableHead className="w-12 text-right">{t("actionsColumn")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {memberList.map((m) => {
+                  const userBindings = bindingsByUser.get(m.user.id) ?? [];
+                  const alreadyAnonymized = m.lifecycle === "anonymized";
+                  return (
+                    <TableRow key={m.id} id={`u-${m.user.id}`}>
                       <TableCell>
-                        {b.user ? (
-                          <>
-                            <div className="font-medium">{b.user.username}</div>
-                            <div className="text-muted-foreground text-xs">{b.user.email}</div>
-                          </>
+                        <div className="font-medium">{m.user.username}</div>
+                        <div className="text-muted-foreground text-xs">{m.user.email}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col items-start gap-1">
+                          <Badge className={scopeBadge[m.scopeKind]} variant="secondary">
+                            {m.scopeKind}
+                          </Badge>
+                          <span className="text-muted-foreground text-xs">{scopeLabel(m)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {userBindings.length === 0 ? (
+                          <span className="text-muted-foreground text-xs">—</span>
                         ) : (
-                          <div className="font-mono text-xs">group:{b.groupExternalId}</div>
+                          <div className="flex flex-wrap gap-1">
+                            {userBindings.map((b) => (
+                              <RoleSourcePill key={b.id} binding={b} />
+                            ))}
+                          </div>
                         )}
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">{b.role.name}</div>
-                        <div className="text-muted-foreground font-mono text-xs">{b.role.slug}</div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          <Badge className={scopeBadge[b.scopeKind]} variant="secondary">
-                            {b.scopeKind}
-                          </Badge>
-                          {b.sourceScopeLabel && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  className="text-muted-foreground hover:text-foreground inline-flex"
-                                  aria-label={t("sourceTooltipAria", {
-                                    scope: b.sourceScopeLabel,
-                                  })}
-                                >
-                                  <InfoIcon className="size-3.5" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {t("rolePillTooltipPrefix", { scope: b.sourceScopeLabel })}
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-                        </div>
+                        <LastActiveCell value={m.lastActiveAt} />
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        {fmt.formatDate(b.grantedAt)}
+                        {m.joinedAt ? fmt.formatDate(m.joinedAt) : fmt.formatDate(m.createdAt)}
                       </TableCell>
                       <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Can permission="org.manage_members">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setGrantForMember(m)}
+                                  aria-label={t("grantRoleRowLabel", {
+                                    name: m.user.username,
+                                  })}
+                                >
+                                  <UserPlusIcon className="size-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {t("grantRoleRowTooltip", { name: m.user.username })}
+                              </TooltipContent>
+                            </Tooltip>
+                          </Can>
+                          <Can permission="org.manage_members">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={alreadyAnonymized}
+                              onClick={() => openAnonymizeDialog(m)}
+                              aria-label={`Anonymize ${m.user.username}`}
+                              title={
+                                alreadyAnonymized
+                                  ? "Already anonymized"
+                                  : "Anonymize user data (GDPR right-to-delete)"
+                              }
+                            >
+                              <UserMinusIcon className="size-4" />
+                            </Button>
+                          </Can>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </Section>
+
+        <Section
+          title="Role bindings"
+          action={
+            <span className="text-muted-foreground text-xs">
+              {bindingList.length} binding{bindingList.length === 1 ? "" : "s"}
+            </span>
+          }
+        >
+          {bindings.loading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : bindingList.length === 0 ? (
+            <EmptyState
+              icon={<ShieldIcon className="size-5" />}
+              title="No role bindings"
+              description="Grant a system role to a user to give them access to the platform."
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {canManageMembers && (
+                    <TableHead className="w-10">
+                      <input
+                        type="checkbox"
+                        aria-label={tBulk("selectAllLabel")}
+                        checked={
+                          bindingList.length > 0 &&
+                          bindingList.every((b) => selectedBindings.has(b.id))
+                        }
+                        onChange={() => toggleAllBindings(bindingList.map((b) => b.id))}
+                        className="size-4"
+                        disabled={bulkRevoking}
+                      />
+                    </TableHead>
+                  )}
+                  <TableHead>Subject</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>{t("sourceColumn")}</TableHead>
+                  <TableHead>Granted</TableHead>
+                  <TableHead className="text-right">{t("actionsColumn")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {bindingList.map((b) => (
+                  <TableRow key={b.id}>
+                    {canManageMembers && (
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          aria-label={tBulk("selectRowLabel", {
+                            role: b.role.slug,
+                            subject: b.user?.username ?? `group:${b.groupExternalId}`,
+                          })}
+                          checked={selectedBindings.has(b.id)}
+                          onChange={() => toggleBinding(b.id)}
+                          className="size-4"
+                          disabled={bulkRevoking}
+                        />
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      {b.user ? (
+                        <>
+                          <div className="font-medium">{b.user.username}</div>
+                          <div className="text-muted-foreground text-xs">{b.user.email}</div>
+                        </>
+                      ) : (
+                        <div className="font-mono text-xs">group:{b.groupExternalId}</div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{b.role.name}</div>
+                      <div className="text-muted-foreground font-mono text-xs">{b.role.slug}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        <Badge className={scopeBadge[b.scopeKind]} variant="secondary">
+                          {b.scopeKind}
+                        </Badge>
+                        {b.sourceScopeLabel && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                className="text-muted-foreground hover:text-foreground inline-flex"
+                                aria-label={t("sourceTooltipAria", {
+                                  scope: b.sourceScopeLabel,
+                                })}
+                              >
+                                <InfoIcon className="size-3.5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {t("rolePillTooltipPrefix", { scope: b.sourceScopeLabel })}
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {fmt.formatDate(b.grantedAt)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Can permission="org.manage_members">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setRevokeTarget({ kind: "binding", binding: b })}
+                          disabled={revoking || bulkRevoking}
+                        >
+                          <Trash2Icon className="size-4" />
+                          <span className="sr-only">Revoke</span>
+                        </Button>
+                      </Can>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </Section>
+
+        <Section title="Invitations">
+          {invitations.loading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : invitationList.length === 0 ? (
+            <EmptyState
+              icon={<MailIcon className="size-5" />}
+              title="No invitations"
+              description="Use Invite to send a one-time accept link. Tokens are hashed at rest; the plaintext is shown once at creation."
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Expires</TableHead>
+                  <TableHead>Invited by</TableHead>
+                  <TableHead className="w-12"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {invitationList.map((inv) => (
+                  <TableRow key={inv.id}>
+                    <TableCell className="font-medium">{inv.email}</TableCell>
+                    <TableCell>
+                      {inv.roleSlug ? (
+                        <Badge variant="outline" className="font-mono text-xs">
+                          {inv.roleSlug}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={inv.status === "pending" ? "default" : "secondary"}
+                        className="capitalize"
+                      >
+                        {inv.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {inv.status === "pending" ? (
+                        <InvitationExpiryBadge expiresAt={inv.expiresAt} />
+                      ) : (
+                        <span className="text-muted-foreground text-sm">
+                          {fmt.formatDate(inv.expiresAt)}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <InviterCell invitation={inv} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {inv.status === "pending" && (
                         <Can permission="org.manage_members">
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => setRevokeTarget({ kind: "binding", binding: b })}
-                            disabled={revoking || bulkRevoking}
+                            onClick={() =>
+                              setRevokeTarget({
+                                kind: "invitation",
+                                invitation: inv,
+                              })
+                            }
+                            disabled={revokingInvite}
                           >
                             <Trash2Icon className="size-4" />
                             <span className="sr-only">Revoke</span>
                           </Button>
                         </Can>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Invitations</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {invitations.loading ? (
-              <div className="space-y-2 p-6">
-                <Skeleton className="h-12 w-full" />
-              </div>
-            ) : invitationList.length === 0 ? (
-              <div className="p-6">
-                <EmptyState
-                  icon={<MailIcon className="size-5" />}
-                  title="No invitations"
-                  description="Use Invite to send a one-time accept link. Tokens are hashed at rest; the plaintext is shown once at creation."
-                />
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Expires</TableHead>
-                    <TableHead>Invited by</TableHead>
-                    <TableHead className="w-12"></TableHead>
+                      )}
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invitationList.map((inv) => (
-                    <TableRow key={inv.id}>
-                      <TableCell className="font-medium">{inv.email}</TableCell>
-                      <TableCell>
-                        {inv.roleSlug ? (
-                          <Badge variant="outline" className="font-mono text-xs">
-                            {inv.roleSlug}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={inv.status === "pending" ? "default" : "secondary"}
-                          className="capitalize"
-                        >
-                          {inv.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {inv.status === "pending" ? (
-                          <InvitationExpiryBadge expiresAt={inv.expiresAt} />
-                        ) : (
-                          <span className="text-muted-foreground text-sm">
-                            {fmt.formatDate(inv.expiresAt)}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <InviterCell invitation={inv} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {inv.status === "pending" && (
-                          <Can permission="org.manage_members">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() =>
-                                setRevokeTarget({
-                                  kind: "invitation",
-                                  invitation: inv,
-                                })
-                              }
-                              disabled={revokingInvite}
-                            >
-                              <Trash2Icon className="size-4" />
-                              <span className="sr-only">Revoke</span>
-                            </Button>
-                          </Can>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </Section>
 
         {canManageMembers && selectedBindings.size > 0 && (
           // Sticky bulk action bar — surfaces only while a selection is
@@ -992,13 +979,13 @@ function AnonymizeUserDialog({
           <AlertDialogDescription asChild>
             <div className="space-y-4">
               {!backendReady && (
-                <div className="flex items-start gap-2 rounded-md border border-warning-border bg-warning/10 p-3 text-xs text-warning-fg">
+                <div className="border-warning-border bg-warning/10 text-warning-fg flex items-start gap-2 rounded-md border p-3 text-xs">
                   <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
                   <div>
                     <p className="font-medium">Backend wiring pending</p>
                     <p className="mt-0.5">
                       The Anonymize button is disabled until the
-                      <code className="mx-1 rounded bg-warning/10 px-1 font-mono">
+                      <code className="bg-warning/10 mx-1 rounded px-1 font-mono">
                         anonymizeUser
                       </code>
                       mutation lands. The flow, copy, and double-confirm below are reviewable;

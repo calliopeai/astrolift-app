@@ -8,8 +8,8 @@ import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -102,8 +102,7 @@ export function AlertSubscriptionsCard() {
     const needle = filter.trim().toLowerCase();
     if (!needle) return appsList;
     return appsList.filter(
-      (a) =>
-        a.name.toLowerCase().includes(needle) || a.slug.toLowerCase().includes(needle)
+      (a) => a.name.toLowerCase().includes(needle) || a.slug.toLowerCase().includes(needle)
     );
   }, [appsList, filter]);
 
@@ -130,9 +129,7 @@ export function AlertSubscriptionsCard() {
           variables: { input: { id: existing.id } },
         });
         if (!data?.clearAlertSubscription.ok) {
-          toast.error(
-            data?.clearAlertSubscription.errors?.[0]?.message ?? "Unsubscribe failed"
-          );
+          toast.error(data?.clearAlertSubscription.errors?.[0]?.message ?? "Unsubscribe failed");
           return;
         }
       }
@@ -143,131 +140,124 @@ export function AlertSubscriptionsCard() {
   const loading = apps.loading || subs.loading;
 
   return (
-    <Card>
-      <CardContent className="space-y-4 p-5">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <div className="flex items-center gap-2">
-              <BellRingIcon className="size-4" />
-              <h2 className="text-base font-semibold">App alert subscriptions</h2>
-            </div>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Choose which apps and event types to receive alerts for.
-            </p>
-          </div>
-          <div className="relative w-full max-w-xs">
-            <SearchIcon className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
-            <Input
-              type="search"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder="Filter apps"
-              className="pl-8"
-            />
-          </div>
-        </div>
-
-        {loading && appsList.length === 0 ? (
-          <Skeleton className="h-32 w-full" />
-        ) : appsList.length === 0 ? (
-          <EmptyState
-            icon={<BellRingIcon className="size-5" />}
-            title="No apps registered"
-            description="Register an app to start configuring alerts for it."
+    <Section
+      title={
+        <span className="flex items-center gap-2">
+          <BellRingIcon className="size-4" /> App alert subscriptions
+        </span>
+      }
+      description="Choose which apps and event types to receive alerts for."
+      action={
+        <div className="relative w-full sm:w-64">
+          <SearchIcon className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+          <Input
+            type="search"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Filter apps"
+            className="pl-8"
           />
-        ) : (
-          <div className="border-border overflow-x-auto rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-40">App</TableHead>
-                  {ALERT_KINDS.map((k) => (
-                    <TableHead key={k.value} className="text-center text-xs">
-                      {k.label}
-                    </TableHead>
-                  ))}
-                  <TableHead className="w-40 text-right">Bulk</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredApps.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={ALERT_KINDS.length + 2}
-                      className="text-muted-foreground py-6 text-center text-sm"
-                    >
-                      No apps match the filter.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredApps.map((a) => {
-                    const rowSubs = ALERT_KINDS.map(
-                      (k) => subMap.get(subKey(a.slug, k.value)) ?? null
-                    );
-                    const allOn = rowSubs.every((s) => s?.enabled === true);
-                    return (
-                      <TableRow key={a.id}>
-                        <TableCell>
-                          <div className="font-medium">{a.name}</div>
-                          <div className="text-muted-foreground font-mono text-xs">
-                            {a.slug}
-                          </div>
-                        </TableCell>
-                        {ALERT_KINDS.map((k, i) => {
-                          const sub = rowSubs[i];
-                          const checked = sub?.enabled === true;
-                          return (
-                            <TableCell key={k.value} className="text-center">
-                              <label className="inline-flex cursor-pointer items-center">
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  disabled={busy}
-                                  onChange={async (e) => {
-                                    const next = e.target.checked;
-                                    if (!next && sub) {
-                                      await clearSubscription({
-                                        variables: { input: { id: sub.id } },
-                                      });
-                                    } else {
-                                      await setEnabled(a.slug, k.value, next);
-                                    }
-                                  }}
-                                  aria-label={`${k.label} for ${a.slug}`}
-                                  className="size-4"
-                                />
-                              </label>
-                            </TableCell>
-                          );
-                        })}
-                        <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setAllForApp(a.slug, !allOn)}
-                            disabled={busy}
-                          >
-                            {allOn ? "Unsubscribe all" : "Subscribe all"}
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-
-        <div className="text-muted-foreground flex items-center gap-2 text-xs">
-          <Badge variant="outline" className="text-2xs">
-            In-app channel
-          </Badge>
-          <span>
-            Email/Slack channels surface here once the user-channel preferences are configured.
-          </span>
         </div>
-      </CardContent>
-    </Card>
+      }
+    >
+      {loading && appsList.length === 0 ? (
+        <Skeleton className="h-32 w-full" />
+      ) : appsList.length === 0 ? (
+        <EmptyState
+          icon={<BellRingIcon className="size-5" />}
+          title="No apps registered"
+          description="Register an app to start configuring alerts for it."
+        />
+      ) : (
+        <div className="border-border overflow-x-auto rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="min-w-40">App</TableHead>
+                {ALERT_KINDS.map((k) => (
+                  <TableHead key={k.value} className="text-center text-xs">
+                    {k.label}
+                  </TableHead>
+                ))}
+                <TableHead className="w-40 text-right">Bulk</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredApps.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={ALERT_KINDS.length + 2}
+                    className="text-muted-foreground py-6 text-center text-sm"
+                  >
+                    No apps match the filter.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredApps.map((a) => {
+                  const rowSubs = ALERT_KINDS.map(
+                    (k) => subMap.get(subKey(a.slug, k.value)) ?? null
+                  );
+                  const allOn = rowSubs.every((s) => s?.enabled === true);
+                  return (
+                    <TableRow key={a.id}>
+                      <TableCell>
+                        <div className="font-medium">{a.name}</div>
+                        <div className="text-muted-foreground font-mono text-xs">{a.slug}</div>
+                      </TableCell>
+                      {ALERT_KINDS.map((k, i) => {
+                        const sub = rowSubs[i];
+                        const checked = sub?.enabled === true;
+                        return (
+                          <TableCell key={k.value} className="text-center">
+                            <label className="inline-flex cursor-pointer items-center">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                disabled={busy}
+                                onChange={async (e) => {
+                                  const next = e.target.checked;
+                                  if (!next && sub) {
+                                    await clearSubscription({
+                                      variables: { input: { id: sub.id } },
+                                    });
+                                  } else {
+                                    await setEnabled(a.slug, k.value, next);
+                                  }
+                                }}
+                                aria-label={`${k.label} for ${a.slug}`}
+                                className="size-4"
+                              />
+                            </label>
+                          </TableCell>
+                        );
+                      })}
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setAllForApp(a.slug, !allOn)}
+                          disabled={busy}
+                        >
+                          {allOn ? "Unsubscribe all" : "Subscribe all"}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      <div className="text-muted-foreground flex items-center gap-2 text-xs">
+        <Badge variant="outline" className="text-2xs">
+          In-app channel
+        </Badge>
+        <span>
+          Email/Slack channels surface here once the user-channel preferences are configured.
+        </span>
+      </div>
+    </Section>
   );
 }
