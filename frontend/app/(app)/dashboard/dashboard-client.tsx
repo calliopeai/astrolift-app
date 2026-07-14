@@ -1,7 +1,25 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useQuery } from "@apollo/client/react";
 import { ServerError } from "@apollo/client/errors";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  rectSortingStrategy,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   ActivityIcon,
   AlertTriangleIcon,
@@ -13,6 +31,7 @@ import {
   CircleXIcon,
   CoinsIcon,
   FileBoxIcon,
+  GripVerticalIcon,
   HeartPulseIcon,
   RocketIcon,
   UsersIcon,
@@ -58,6 +77,45 @@ interface CostForecastResp {
   astroliftCostForecast: AstroliftCostForecast;
 }
 
+/** Canonical KPI tile ids — also the default left-to-right order. */
+const KPI_TILE_IDS = ["teams", "projects", "apps", "deployments", "costMtd"] as const;
+type KpiTileId = (typeof KPI_TILE_IDS)[number];
+
+const KPI_ORDER_KEY = "astrolift.dashboard.kpiOrder.v1";
+
+/**
+ * Reconcile a saved order against the current tile set: unknown ids are
+ * dropped, tiles added since the save append in default position. This keeps
+ * old saved orders working when tiles are added or removed later.
+ */
+function reconcileTileOrder(saved: unknown): KpiTileId[] {
+  const savedIds = Array.isArray(saved)
+    ? saved.filter((id): id is KpiTileId => (KPI_TILE_IDS as readonly string[]).includes(id))
+    : [];
+  const missing = KPI_TILE_IDS.filter((id) => !savedIds.includes(id));
+  return [...savedIds, ...missing];
+}
+
+function loadTileOrder(): KpiTileId[] {
+  if (typeof window === "undefined") return [...KPI_TILE_IDS];
+  try {
+    const raw = window.localStorage.getItem(KPI_ORDER_KEY);
+    if (!raw) return [...KPI_TILE_IDS];
+    return reconcileTileOrder(JSON.parse(raw));
+  } catch {
+    return [...KPI_TILE_IDS];
+  }
+}
+
+function saveTileOrder(order: KpiTileId[]) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(KPI_ORDER_KEY, JSON.stringify(order));
+  } catch {
+    // localStorage might be disabled — degrade silently.
+  }
+}
+
 export function DashboardClient() {
   const t = useTranslations("overview");
   const teams = useQuery<TeamsResp>(LIST_TEAMS);
@@ -73,6 +131,32 @@ export function DashboardClient() {
   const costForecast = useQuery<CostForecastResp>(GET_COST_FORECAST, {
     fetchPolicy: "cache-and-network",
   });
+
+  // Tile order is per-operator, persisted in localStorage (#1056a). SSR and
+  // first client paint use the default order; the saved order applies after
+  // mount so hydration stays consistent.
+  const [tileOrder, setTileOrder] = useState<KpiTileId[]>([...KPI_TILE_IDS]);
+  useEffect(() => {
+    setTileOrder(loadTileOrder());
+  }, []);
+  // The distance constraint keeps plain clicks navigating the tile's Link;
+  // a drag only starts after 8px of pointer travel.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+  const handleTileDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setTileOrder((ids) => {
+        const oldIndex = ids.indexOf(active.id as KpiTileId);
+        const newIndex = ids.indexOf(over.id as KpiTileId);
+        const next = arrayMove(ids, oldIndex, newIndex);
+        saveTileOrder(next);
+        return next;
+      });
+    }
+  };
 
   // A 404 on a list query means the resource collection is empty
   // for this install — surface it as the empty state, not a banner.
@@ -125,6 +209,62 @@ export function DashboardClient() {
         ? formatMoney(forecast.mtdCents, forecast.currency)
         : 0;
 
+  const kpiTiles: Record<KpiTileId, React.ReactNode> = {
+    teams: (
+      <KpiTile
+        label={t("tiles.teams.label")}
+        icon={UsersIcon}
+        value={teamsCount}
+        loading={teams.loading}
+        href="/teams"
+        emptyCta={t("tiles.teams.emptyCta")}
+      />
+    ),
+    projects: (
+      <KpiTile
+        label={t("tiles.projects.label")}
+        icon={FileBoxIcon}
+        value={projectsCount}
+        loading={projects.loading}
+        href="/projects"
+        emptyCta={t("tiles.projects.emptyCta")}
+      />
+    ),
+    apps: (
+      <KpiTile
+        label={t("tiles.apps.label")}
+        icon={RocketIcon}
+        value={apps.length}
+        loading={health.loading}
+        href="/apps"
+        emptyCta={t("tiles.apps.emptyCta")}
+      />
+    ),
+    deployments: (
+      <KpiTile
+        label={t("tiles.deployments.label")}
+        icon={BoxIcon}
+        value={health.loading ? undefined : deployedCount}
+        loading={health.loading}
+        href="/deployments"
+        emptyCta={t("tiles.deployments.emptyCta")}
+      />
+    ),
+    costMtd: (
+      <KpiTile
+        label={t("tiles.costMtd.label")}
+        icon={CoinsIcon}
+        value={mtdValue}
+        loading={costForecast.loading && forecast == null}
+        href="/administration/cost"
+        emptyCta={t("tiles.costMtd.emptyCta")}
+        trend={
+          forecast && forecast.mtdCents > 0 ? <CostMtdDelta forecast={forecast} t={t} /> : null
+        }
+      />
+    ),
+  };
+
   return (
     <PageShell title={t("title")} description={t("description")}>
       <OnboardingHost />
@@ -140,53 +280,17 @@ export function DashboardClient() {
         </Card>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <KpiTile
-          label={t("tiles.teams.label")}
-          icon={UsersIcon}
-          value={teamsCount}
-          loading={teams.loading}
-          href="/teams"
-          emptyCta={t("tiles.teams.emptyCta")}
-        />
-        <KpiTile
-          label={t("tiles.projects.label")}
-          icon={FileBoxIcon}
-          value={projectsCount}
-          loading={projects.loading}
-          href="/projects"
-          emptyCta={t("tiles.projects.emptyCta")}
-        />
-        <div data-onboarding-tour="apps-tile">
-          <KpiTile
-            label={t("tiles.apps.label")}
-            icon={RocketIcon}
-            value={apps.length}
-            loading={health.loading}
-            href="/apps"
-            emptyCta={t("tiles.apps.emptyCta")}
-          />
-        </div>
-        <KpiTile
-          label={t("tiles.deployments.label")}
-          icon={BoxIcon}
-          value={health.loading ? undefined : deployedCount}
-          loading={health.loading}
-          href="/deployments"
-          emptyCta={t("tiles.deployments.emptyCta")}
-        />
-        <KpiTile
-          label={t("tiles.costMtd.label")}
-          icon={CoinsIcon}
-          value={mtdValue}
-          loading={costForecast.loading && forecast == null}
-          href="/administration/cost"
-          emptyCta={t("tiles.costMtd.emptyCta")}
-          trend={
-            forecast && forecast.mtdCents > 0 ? <CostMtdDelta forecast={forecast} t={t} /> : null
-          }
-        />
-      </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleTileDragEnd}>
+        <SortableContext items={tileOrder} strategy={rectSortingStrategy}>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {tileOrder.map((id) => (
+              <SortableKpiTile key={id} id={id} tourId={id === "apps" ? "apps-tile" : undefined}>
+                {kpiTiles[id]}
+              </SortableKpiTile>
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       <Section
         title={
@@ -317,6 +421,59 @@ export function DashboardClient() {
         </CardContent>
       </Card>
     </PageShell>
+  );
+}
+
+/**
+ * Sortable wrapper for one KPI tile (#1056a). A dedicated grip button is the
+ * drag handle (activator node), so the inner Link keeps normal click and
+ * keyboard activation while the grip is keyboard-reorderable (space to lift,
+ * arrows to move, space to drop). The corner dot is the #1055 hero accent,
+ * kept as a static ornament.
+ */
+function SortableKpiTile({
+  id,
+  tourId,
+  children,
+}: {
+  id: KpiTileId;
+  tourId?: string;
+  children: React.ReactNode;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`group relative ${isDragging ? "z-10 opacity-60" : ""}`}
+      data-onboarding-tour={tourId}
+    >
+      <span
+        aria-hidden
+        className="bg-primary/70 pointer-events-none absolute top-2 right-2 size-1.5 rounded-full"
+      />
+      <button
+        type="button"
+        ref={setActivatorNodeRef}
+        {...attributes}
+        {...listeners}
+        aria-label="Reorder tile"
+        className="text-muted-foreground absolute top-1 right-4 cursor-grab opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+      >
+        <GripVerticalIcon className="size-3.5" />
+      </button>
+      {children}
+    </div>
   );
 }
 

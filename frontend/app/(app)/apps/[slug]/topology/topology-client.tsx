@@ -119,7 +119,7 @@ export function TopologyClient({ slug }: { slug: string }) {
             </div>
           ) : (
             <div className="p-4">
-              <AppTopologyMap nodes={nodes} edges={edges} height={640} />
+              <AppTopologyMap nodes={nodes} edges={edges} height={640} variant="telemetry" />
             </div>
           )}
         </CardContent>
