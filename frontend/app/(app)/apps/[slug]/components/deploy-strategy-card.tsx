@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Can } from "@/components/Can";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Sheet,
   SheetClose,
@@ -63,8 +64,8 @@ export function DeployStrategyCard({ app }: Props) {
   const Icon = MODE_ICONS[mode] ?? MODE_ICONS.manual;
 
   return (
-    <section className="rounded-lg border p-5">
-      <div className="flex items-start justify-between gap-3">
+    <Card>
+      <CardContent className="flex items-start justify-between gap-3">
         <div>
           <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
             {t("eyebrow")}
@@ -92,10 +93,10 @@ export function DeployStrategyCard({ app }: Props) {
             {t("edit")}
           </Button>
         </Can>
-      </div>
+      </CardContent>
 
       <EditStrategySheet app={app} open={open} onOpenChange={setOpen} />
-    </section>
+    </Card>
   );
 }
 

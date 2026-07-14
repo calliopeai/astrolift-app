@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -180,10 +181,7 @@ const EMAIL_KINDS = new Set(["email"]);
 /** Maps a backend `last_action_kind` to a human label.  Falls back to
  *  the raw key when the i18n bundle doesn't carry it yet (forward-
  *  compatible for new action kinds without breaking existing locales). */
-function lastActionLabel(
-  t: ReturnType<typeof useTranslations>,
-  kind: string
-): string {
+function lastActionLabel(t: ReturnType<typeof useTranslations>, kind: string): string {
   const known = new Set(["connection.reveal", "test_email.send"]);
   if (known.has(kind)) {
     return t(`actionLabels.${kind}`);
@@ -225,14 +223,19 @@ export function ManagedServicesSummaryCard({ appSlug }: { appSlug: string }) {
   // card then a populated one; subsequent refetches re-render in place.
   if (loading && !data) {
     return (
-      <section className="rounded-lg border p-5">
-        <div className="mb-4 flex items-center gap-2">
-          <PlugIcon className="text-primary size-4" />
-          <h2 className="text-base font-semibold">{t("title")}</h2>
+      <Section
+        title={
+          <span className="flex items-center gap-2">
+            <PlugIcon className="text-primary size-4" />
+            {t("title")}
+          </span>
+        }
+      >
+        <div>
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="mt-2 h-12 w-full" />
         </div>
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="mt-2 h-12 w-full" />
-      </section>
+      </Section>
     );
   }
 
@@ -243,23 +246,23 @@ export function ManagedServicesSummaryCard({ appSlug }: { appSlug: string }) {
   }
 
   return (
-    <section className="rounded-lg border p-5">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h2 className="flex items-center gap-2 text-base font-semibold">
-            <PlugIcon className="text-primary size-4" />
-            {t("title")}
-            <Badge variant="secondary" className="ml-1 text-2xs">
-              {services.length}
-            </Badge>
-          </h2>
-          <p className="text-muted-foreground mt-0.5 text-xs">{t("description")}</p>
-        </div>
+    <Section
+      title={
+        <span className="flex items-center gap-2">
+          <PlugIcon className="text-primary size-4" />
+          {t("title")}
+          <Badge variant="secondary" className="text-2xs ml-1">
+            {services.length}
+          </Badge>
+        </span>
+      }
+      description={t("description")}
+      action={
         <Button asChild variant="outline" size="sm">
           <Link href={`/apps/${appSlug}/managed-services`}>{t("openAll")}</Link>
         </Button>
-      </div>
-
+      }
+    >
       <Card className="overflow-hidden p-0">
         <ul className="divide-y">
           {services.map((svc) => (
@@ -267,7 +270,7 @@ export function ManagedServicesSummaryCard({ appSlug }: { appSlug: string }) {
           ))}
         </ul>
       </Card>
-    </section>
+    </Section>
   );
 }
 
@@ -304,13 +307,9 @@ function ManagedServiceSummaryRow({
           </div>
         </TooltipTrigger>
         <TooltipContent>
-          <p className="text-xs">
-            {t("statusTooltip", { kind: svc.kind, status: svc.status })}
-          </p>
+          <p className="text-xs">{t("statusTooltip", { kind: svc.kind, status: svc.status })}</p>
           {svc.statusError ? (
-            <p className="text-destructive mt-1 max-w-xs text-2xs">
-              {svc.statusError}
-            </p>
+            <p className="text-destructive text-2xs mt-1 max-w-xs">{svc.statusError}</p>
           ) : null}
         </TooltipContent>
       </Tooltip>
@@ -322,13 +321,13 @@ function ManagedServiceSummaryRow({
             {svc.kind}
             {svc.variant ? `/${svc.variant}` : ""}
           </Badge>
-          <Badge variant="outline" className="font-mono text-2xs">
+          <Badge variant="outline" className="text-2xs font-mono">
             {svc.environmentName}
           </Badge>
           {svc.status === "failed" ? (
             <Badge
               variant="outline"
-              className="border-destructive/40 bg-destructive/10 text-destructive flex items-center gap-1 text-2xs"
+              className="border-destructive/40 bg-destructive/10 text-destructive text-2xs flex items-center gap-1"
             >
               <AlertTriangleIcon className="size-3" />
               {t("statusFailed")}
@@ -336,7 +335,7 @@ function ManagedServiceSummaryRow({
           ) : null}
         </div>
         {svc.lastActionAt && svc.lastActionKind ? (
-          <p className="text-muted-foreground mt-0.5 text-2xs">
+          <p className="text-muted-foreground text-2xs mt-0.5">
             {t("lastAction", {
               action: lastActionLabel(t, svc.lastActionKind),
               when: fmt.formatRelativeTime(svc.lastActionAt),
@@ -397,11 +396,7 @@ function ManagedServiceSummaryRow({
       </div>
 
       {isConnectionKind ? (
-        <RevealConnectionDialog
-          svc={svc}
-          open={revealOpen}
-          onOpenChange={setRevealOpen}
-        />
+        <RevealConnectionDialog svc={svc} open={revealOpen} onOpenChange={setRevealOpen} />
       ) : null}
       {isEmail ? (
         <SendTestEmailDialog svc={svc} open={emailOpen} onOpenChange={setEmailOpen} />
@@ -409,9 +404,7 @@ function ManagedServiceSummaryRow({
       {isObjectStore ? (
         <ListObjectsDialog svc={svc} open={objectsOpen} onOpenChange={setObjectsOpen} />
       ) : null}
-      {isQueue ? (
-        <QueueDepthDialog svc={svc} open={depthOpen} onOpenChange={setDepthOpen} />
-      ) : null}
+      {isQueue ? <QueueDepthDialog svc={svc} open={depthOpen} onOpenChange={setDepthOpen} /> : null}
     </li>
   );
 }
@@ -438,9 +431,7 @@ function RevealConnectionDialog({
 }) {
   const t = useTranslations("apps.settings.managedServicesSummary.revealDialog");
   const fmt = useFormatters();
-  const [revealed, setRevealed] = React.useState<AstroliftManagedServiceConnection | null>(
-    null
-  );
+  const [revealed, setRevealed] = React.useState<AstroliftManagedServiceConnection | null>(null);
   const [reveal, { loading }] = useMutation<RevealResp>(REVEAL_MANAGED_SERVICE_CONNECTION, {
     refetchQueries: [
       {
@@ -503,7 +494,7 @@ function RevealConnectionDialog({
               <p className="text-foreground mt-0.5 font-mono break-all">
                 {revealed.connectionSecretRef || t("noSecretRef")}
               </p>
-              <p className="text-muted-foreground mt-2 text-2xs">
+              <p className="text-muted-foreground text-2xs mt-2">
                 {t("revealedAt", { when: fmt.formatRelativeTime(revealed.revealedAt) })}
               </p>
             </div>
@@ -595,9 +586,7 @@ function SendTestEmailDialog({
         toast.error(t("noPayload"));
         return;
       }
-      toast.success(
-        t("sent", { recipient: payload.recipient, transport: payload.transport })
-      );
+      toast.success(t("sent", { recipient: payload.recipient, transport: payload.transport }));
       onOpenChange(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("failed"));
@@ -665,7 +654,9 @@ function SendTestEmailDialog({
               void handleSend();
             }}
           >
-            {loading ? <Loader2Icon className="size-4 animate-spin" /> : (
+            {loading ? (
+              <Loader2Icon className="size-4 animate-spin" />
+            ) : (
               <SendIcon className="size-4" />
             )}
             {t("send")}
@@ -700,9 +691,8 @@ function ListObjectsDialog({
   }, [open, load, svc.id]);
 
   const result =
-    (query.data?.astroliftManagedServiceObjects as
-      | AstroliftManagedServiceObjects
-      | undefined) ?? null;
+    (query.data?.astroliftManagedServiceObjects as AstroliftManagedServiceObjects | undefined) ??
+    null;
   const loading = query.loading && !result;
   const objects = result?.objects ?? [];
 
@@ -731,11 +721,9 @@ function ListObjectsDialog({
                   className="flex items-center gap-2 rounded-md border bg-transparent p-2 font-mono text-xs"
                 >
                   <span className="text-foreground flex-1 truncate">{o.key}</span>
-                  <span className="text-muted-foreground shrink-0">
-                    {formatBytes(o.sizeBytes)}
-                  </span>
+                  <span className="text-muted-foreground shrink-0">{formatBytes(o.sizeBytes)}</span>
                   {o.lastModified ? (
-                    <span className="text-muted-foreground shrink-0 text-2xs">
+                    <span className="text-muted-foreground text-2xs shrink-0">
                       {fmt.formatRelativeTime(o.lastModified)}
                     </span>
                   ) : null}
@@ -818,11 +806,9 @@ function QueueDepthDialog({
             </div>
             <div className="rounded-md border p-3 text-center">
               <p className="text-muted-foreground text-xs">{t("inFlight")}</p>
-              <p className="text-foreground mt-1 text-2xl font-semibold">
-                {result.inFlight}
-              </p>
+              <p className="text-foreground mt-1 text-2xl font-semibold">{result.inFlight}</p>
             </div>
-            <p className="text-muted-foreground col-span-2 text-2xs">
+            <p className="text-muted-foreground text-2xs col-span-2">
               {result.sampledAt
                 ? t("sampledAt", { when: fmt.formatRelativeTime(result.sampledAt) })
                 : t("noSnapshot")}

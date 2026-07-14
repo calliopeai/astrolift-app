@@ -4,6 +4,7 @@ import { GitBranchIcon, LayersIcon, RocketIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
+import { DefinitionList } from "@/components/ui/definition-list";
 import { cn } from "@/lib/utils";
 
 import type { DeployStrategy, OnboardingWizardState } from "./types";
@@ -68,33 +69,28 @@ export function DeployStrategyStep({ state, setState }: Props) {
         })}
       </fieldset>
 
-      <div className="bg-muted/40 grid gap-2 rounded-lg border p-4 text-sm">
+      <div className="grid gap-2 text-sm">
         <p className="text-xs font-semibold tracking-wide uppercase">{t("summaryTitle")}</p>
-        <SummaryRow label={t("summary.team")} value={`${state.teamName} (${state.teamSlug})`} />
-        <SummaryRow
-          label={t("summary.project")}
-          value={`${state.projectName} (${state.projectSlug})`}
-        />
-        <SummaryRow
-          label={t("summary.repo")}
-          value={state.sourceRepo || t("summary.repoSkipped")}
-        />
-        <SummaryRow
-          label={t("summary.strategy")}
-          value={t(`options.${state.deployStrategy}.label`)}
+        <DefinitionList
+          items={[
+            { term: t("summary.team"), description: `${state.teamName} (${state.teamSlug})` },
+            {
+              term: t("summary.project"),
+              description: `${state.projectName} (${state.projectSlug})`,
+            },
+            {
+              term: t("summary.repo"),
+              description: state.sourceRepo || t("summary.repoSkipped"),
+            },
+            {
+              term: t("summary.strategy"),
+              description: t(`options.${state.deployStrategy}.label`),
+            },
+          ]}
         />
       </div>
 
       <p className="text-muted-foreground text-xs">{t("intentNote")}</p>
-    </div>
-  );
-}
-
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span className="text-right font-mono text-xs">{value}</span>
     </div>
   );
 }

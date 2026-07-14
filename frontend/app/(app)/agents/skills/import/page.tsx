@@ -12,6 +12,7 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageShell } from "@/components/PageShell";
@@ -111,65 +112,67 @@ export default function ImportSkillsPage() {
       </form>
 
       {result && (
-        <div className="max-w-2xl rounded-lg border p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <CheckCircle2Icon className="h-4 w-4 text-success-fg" />
-            <span className="text-sm font-medium">Import complete</span>
-            <Badge variant="outline" className="font-mono text-xs">
-              {result.sourceRef}
-            </Badge>
-          </div>
-          <div className="grid gap-2 text-sm sm:grid-cols-2">
-            <div>
-              <p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
-                Skills ({result.importedSkills.length})
-              </p>
-              {result.importedSkills.length === 0 ? (
-                <p className="text-muted-foreground italic text-xs">none</p>
-              ) : (
-                <ul className="flex flex-col gap-0.5">
-                  {result.importedSkills.map((s) => (
-                    <li key={s} className="font-mono text-xs">
-                      {s}
-                    </li>
-                  ))}
-                </ul>
-              )}
+        <Card className="max-w-2xl">
+          <CardContent>
+            <div className="mb-3 flex items-center gap-2">
+              <CheckCircle2Icon className="h-4 w-4 text-success-fg" />
+              <span className="text-sm font-medium">Import complete</span>
+              <Badge variant="outline" className="font-mono text-xs">
+                {result.sourceRef}
+              </Badge>
             </div>
-            <div>
-              <p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
-                Tools ({result.importedTools.length})
-              </p>
-              {result.importedTools.length === 0 ? (
-                <p className="text-muted-foreground italic text-xs">none</p>
-              ) : (
-                <ul className="flex flex-col gap-0.5">
-                  {result.importedTools.map((t) => (
-                    <li key={t} className="font-mono text-xs">
-                      {t}
-                    </li>
-                  ))}
-                </ul>
-              )}
+            <div className="grid gap-2 text-sm sm:grid-cols-2">
+              <div>
+                <p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
+                  Skills ({result.importedSkills.length})
+                </p>
+                {result.importedSkills.length === 0 ? (
+                  <p className="text-muted-foreground italic text-xs">none</p>
+                ) : (
+                  <ul className="flex flex-col gap-0.5">
+                    {result.importedSkills.map((s) => (
+                      <li key={s} className="font-mono text-xs">
+                        {s}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div>
+                <p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
+                  Tools ({result.importedTools.length})
+                </p>
+                {result.importedTools.length === 0 ? (
+                  <p className="text-muted-foreground italic text-xs">none</p>
+                ) : (
+                  <ul className="flex flex-col gap-0.5">
+                    {result.importedTools.map((t) => (
+                      <li key={t} className="font-mono text-xs">
+                        {t}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
-          </div>
-          <div className="mt-3 flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => router.push("/agents/skills")}
-            >
-              View skills
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => { setResult(null); setRepoUrl(""); }}
-            >
-              Import another
-            </Button>
-          </div>
-        </div>
+            <div className="mt-3 flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => router.push("/agents/skills")}
+              >
+                View skills
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => { setResult(null); setRepoUrl(""); }}
+              >
+                Import another
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </PageShell>
   );

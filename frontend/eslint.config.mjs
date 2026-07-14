@@ -13,8 +13,8 @@ import prettierConfig from "eslint-config-prettier";
  *   - arbitrary `text-[Npx]` sizes      → use the type scale (`text-2xs` … `text-2xl`)
  *   - arbitrary `rounded-[Npx]` radii   → use the radius tokens (`rounded-md` … `rounded-2xl`)
  *
- * Runs at `warn` so it surfaces the ~350 existing violations for #A4 to burn
- * down without breaking the build. `var(--token)` / `calc()` / `min()`
+ * Runs at `error` now that the #A4 debt is burnt down (#1050 close-out).
+ * `var(--token)` / `calc()` / `min()`
  * arbitrary values are allowed (they already reference tokens). Escape hatch
  * for the unavoidable case (chart/SVG/terminal exact colours):
  *   // eslint-disable-next-line astrolift/no-raw-design-values
@@ -93,12 +93,12 @@ const eslintConfig = defineConfig([
     },
   },
   // Design-token guardrail — scoped to the app + component surfaces where
-  // Tailwind classes live. Warn-level: surfaces existing debt for #A4,
-  // blocks new debt in review, never breaks the build.
+  // Tailwind classes live. Error-level: the #A4 debt is swept, new raw
+  // values fail the build.
   {
     files: ["components/**/*.{ts,tsx}", "app/**/*.{ts,tsx}"],
     plugins: { astrolift: designTokensPlugin },
-    rules: { "astrolift/no-raw-design-values": "warn" },
+    rules: { "astrolift/no-raw-design-values": "error" },
   },
   // Override default ignores of eslint-config-next.
   globalIgnores([

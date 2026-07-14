@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Can } from "@/components/Can";
+import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
   CREATE_DEPLOY_TOKEN,
@@ -138,92 +139,94 @@ export function DeployTokenControl({ appSlug }: Props) {
   const missingToken = !loading && !active;
 
   return (
-    <section className={`rounded-lg border p-5${missingToken ? " border-warning-border bg-warning/5" : ""}`}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          {missingToken ? (
-            <AlertTriangleIcon className="mt-0.5 size-4 text-warning-fg" />
-          ) : (
-            <KeyRoundIcon className="text-muted-foreground mt-0.5 size-4" />
-          )}
-          <div>
-            <p className="text-sm font-medium">Deploy token</p>
-            <p className="text-muted-foreground mt-0.5 max-w-md text-xs">
-              App-scoped machine token. Use as{" "}
-              <code className="bg-muted rounded px-1 font-mono">ASTROLIFT_DEPLOY_TOKEN</code> in
-              your CI.
-            </p>
-            {!loading && active && (
-              <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-2 text-xs">
-                <Badge variant="outline" className="gap-1 font-mono">
-                  …{active.last4}
-                </Badge>
-                <span>
-                  {active.lastUsedAt
-                    ? `last used ${new Date(active.lastUsedAt).toLocaleDateString()}`
-                    : "never used"}
-                </span>
-              </div>
-            )}
-            {missingToken && (
-              <p className="mt-2 text-xs font-medium text-warning-fg">
-                No token — CI cannot trigger deployments until one is generated.
-              </p>
-            )}
-          </div>
-        </div>
-
-        <Can permission="app.update">
-          <div className="flex flex-wrap items-center gap-2">
-            {active ? (
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setConfirmRotate(true)}
-                  disabled={rotating}
-                  className="gap-1.5"
-                >
-                  {rotating ? (
-                    <Loader2Icon className="size-3.5 animate-spin" />
-                  ) : (
-                    <RotateCwIcon className="size-3.5" />
-                  )}
-                  Rotate
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setConfirmRevoke(true)}
-                  disabled={revoking}
-                  className="text-muted-foreground hover:text-destructive gap-1.5"
-                >
-                  {revoking ? (
-                    <Loader2Icon className="size-3.5 animate-spin" />
-                  ) : (
-                    <ShieldOffIcon className="size-3.5" />
-                  )}
-                  Revoke
-                </Button>
-              </>
+    <Card className={missingToken ? "ring-warning-border bg-warning/5" : undefined}>
+      <CardContent>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            {missingToken ? (
+              <AlertTriangleIcon className="text-warning-fg mt-0.5 size-4" />
             ) : (
-              <Button
-                size="sm"
-                onClick={handleCreate}
-                disabled={creating}
-                className="gap-1.5 border-amber-400/60 bg-amber-500 text-white hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-700"
-              >
-                {creating ? (
-                  <Loader2Icon className="size-3.5 animate-spin" />
-                ) : (
-                  <KeyRoundIcon className="size-3.5" />
-                )}
-                Generate token
-              </Button>
+              <KeyRoundIcon className="text-muted-foreground mt-0.5 size-4" />
             )}
+            <div>
+              <p className="text-sm font-medium">Deploy token</p>
+              <p className="text-muted-foreground mt-0.5 max-w-md text-xs">
+                App-scoped machine token. Use as{" "}
+                <code className="bg-muted rounded px-1 font-mono">ASTROLIFT_DEPLOY_TOKEN</code> in
+                your CI.
+              </p>
+              {!loading && active && (
+                <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-2 text-xs">
+                  <Badge variant="outline" className="gap-1 font-mono">
+                    …{active.last4}
+                  </Badge>
+                  <span>
+                    {active.lastUsedAt
+                      ? `last used ${new Date(active.lastUsedAt).toLocaleDateString()}`
+                      : "never used"}
+                  </span>
+                </div>
+              )}
+              {missingToken && (
+                <p className="text-warning-fg mt-2 text-xs font-medium">
+                  No token — CI cannot trigger deployments until one is generated.
+                </p>
+              )}
+            </div>
           </div>
-        </Can>
-      </div>
+
+          <Can permission="app.update">
+            <div className="flex flex-wrap items-center gap-2">
+              {active ? (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setConfirmRotate(true)}
+                    disabled={rotating}
+                    className="gap-1.5"
+                  >
+                    {rotating ? (
+                      <Loader2Icon className="size-3.5 animate-spin" />
+                    ) : (
+                      <RotateCwIcon className="size-3.5" />
+                    )}
+                    Rotate
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setConfirmRevoke(true)}
+                    disabled={revoking}
+                    className="text-muted-foreground hover:text-destructive gap-1.5"
+                  >
+                    {revoking ? (
+                      <Loader2Icon className="size-3.5 animate-spin" />
+                    ) : (
+                      <ShieldOffIcon className="size-3.5" />
+                    )}
+                    Revoke
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={handleCreate}
+                  disabled={creating}
+                  className="gap-1.5 border-amber-400/60 bg-amber-500 text-white hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-700"
+                >
+                  {creating ? (
+                    <Loader2Icon className="size-3.5 animate-spin" />
+                  ) : (
+                    <KeyRoundIcon className="size-3.5" />
+                  )}
+                  Generate token
+                </Button>
+              )}
+            </div>
+          </Can>
+        </div>
+      </CardContent>
 
       {reveal && <RevealDialog token={reveal} onClose={() => setReveal(null)} />}
 
@@ -245,7 +248,7 @@ export function DeployTokenControl({ appSlug }: Props) {
         destructive
         onConfirm={handleRevoke}
       />
-    </section>
+    </Card>
   );
 }
 
@@ -267,7 +270,7 @@ function RevealDialog({ token, onClose }: { token: string; onClose: () => void }
     <div className="bg-background/80 fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
       <div className="bg-card border-border w-full max-w-lg rounded-lg border p-6 shadow-xl">
         <h3 className="text-base font-semibold">Deploy token — copy it now</h3>
-        <p className="mt-2 text-xs text-warning-fg">
+        <p className="text-warning-fg mt-2 text-xs">
           This is the only time the token is shown. If you navigate away without copying, rotate
           again to mint a fresh one.
         </p>

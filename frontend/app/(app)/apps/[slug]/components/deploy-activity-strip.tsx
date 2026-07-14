@@ -4,6 +4,7 @@ import { useQuery } from "@apollo/client/react";
 import { RocketIcon } from "lucide-react";
 import Link from "next/link";
 
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";
@@ -73,49 +74,51 @@ export function DeployActivityStrip({ appSlug, limit = 20 }: Props) {
   const ordered = [...deployments].reverse();
 
   return (
-    <section className="rounded-lg border p-4">
-      <div className="mb-2 flex items-baseline justify-between gap-3">
-        <div className="flex items-baseline gap-2">
-          <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
-            Deploy activity
-          </p>
-          <p className="text-muted-foreground text-2xs">
-            Last {limit}
-            {inFlight.length > 0 && (
-              <span className="ml-2 text-warning-fg">
-                · {inFlight.length} in flight
-              </span>
-            )}
-          </p>
+    <Card size="sm">
+      <CardContent>
+        <div className="mb-2 flex items-baseline justify-between gap-3">
+          <div className="flex items-baseline gap-2">
+            <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
+              Deploy activity
+            </p>
+            <p className="text-muted-foreground text-2xs">
+              Last {limit}
+              {inFlight.length > 0 && (
+                <span className="ml-2 text-warning-fg">
+                  · {inFlight.length} in flight
+                </span>
+              )}
+            </p>
+          </div>
+          <Link
+            href={`/apps/${appSlug}/environments`}
+            className="text-xs text-[var(--brand-primary)] hover:underline"
+          >
+            View all
+          </Link>
         </div>
-        <Link
-          href={`/apps/${appSlug}/environments`}
-          className="text-xs text-[var(--brand-primary)] hover:underline"
-        >
-          View all
-        </Link>
-      </div>
 
-      {loading && deployments.length === 0 ? (
-        <Skeleton className="h-7 w-full" />
-      ) : deployments.length === 0 ? (
-        <div className="text-muted-foreground flex items-center gap-2 py-1 text-xs italic">
-          <RocketIcon className="size-3.5" />
-          No deploys yet — trigger one from the CLI or push to the deploy branch.
-        </div>
-      ) : (
-        <div className="flex flex-wrap items-center gap-1">
-          {ordered.map((d) => (
-            <DeployTile
-              key={d.id}
-              dep={d}
-              appSlug={appSlug}
-              relativeTime={fmt.formatRelativeTime(d.createdAt)}
-            />
-          ))}
-        </div>
-      )}
-    </section>
+        {loading && deployments.length === 0 ? (
+          <Skeleton className="h-7 w-full" />
+        ) : deployments.length === 0 ? (
+          <div className="text-muted-foreground flex items-center gap-2 py-1 text-xs italic">
+            <RocketIcon className="size-3.5" />
+            No deploys yet — trigger one from the CLI or push to the deploy branch.
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-1">
+            {ordered.map((d) => (
+              <DeployTile
+                key={d.id}
+                dep={d}
+                appSlug={appSlug}
+                relativeTime={fmt.formatRelativeTime(d.createdAt)}
+              />
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

@@ -353,7 +353,7 @@ function SortableField({
   const style = { transform: CSS.Transform.toString(transform), transition };
 
   return (
-    <div ref={setNodeRef} style={style} className="rounded-lg border bg-white dark:bg-gray-900">
+    <div ref={setNodeRef} style={style} className="bg-card rounded-lg border">
       <div className="flex items-center gap-2 p-3">
         <button type="button" {...attributes} {...listeners} className="cursor-grab text-gray-400 hover:text-gray-600">
           <GripVerticalIcon className="h-4 w-4" />

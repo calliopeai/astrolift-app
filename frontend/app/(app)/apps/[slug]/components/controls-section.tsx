@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Can } from "@/components/Can";
+import { Card } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +30,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -137,13 +139,10 @@ export function ControlsSection({ appSlug, deployBranch }: Props) {
   );
   const workloadsLoading = workloadsQuery.loading && workloads.length === 0;
 
+  // Rendered inside the page-level "Controls" Section — h3 keeps the
+  // document outline nested instead of emitting a sibling h2.
   return (
-    <section className="rounded-lg border p-5">
-      <div className="mb-4">
-        <h2 className="text-base font-semibold">{t("title")}</h2>
-        <p className="text-muted-foreground mt-0.5 text-xs">{t("description")}</p>
-      </div>
-
+    <Section headingLevel="h3" title={t("title")} description={t("description")}>
       {loading && envs.length === 0 ? (
         <div className="grid gap-3">
           <Skeleton className="h-40 w-full" />
@@ -165,7 +164,7 @@ export function ControlsSection({ appSlug, deployBranch }: Props) {
           ))}
         </div>
       )}
-    </section>
+    </Section>
   );
 }
 
@@ -279,7 +278,7 @@ function EnvironmentRow({
   }
 
   return (
-    <div className="bg-card flex flex-col gap-4 rounded-md border p-4">
+    <Card className="px-4">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium capitalize">{env.name}</span>
@@ -361,7 +360,7 @@ function EnvironmentRow({
       </Can>
 
       {env.requiredApprovals > 0 && (
-        <p className="text-muted-foreground flex items-center gap-1.5 text-2xs">
+        <p className="text-muted-foreground text-2xs flex items-center gap-1.5">
           <HammerIcon className="size-3" />
           {t("approvalsRequired", { count: env.requiredApprovals })}
         </p>
@@ -373,7 +372,7 @@ function EnvironmentRow({
         workloads={workloads}
         loading={workloadsLoading}
       />
-    </div>
+    </Card>
   );
 }
 
@@ -398,7 +397,7 @@ function EnvWorkloads({
   const t = useTranslations("apps.settings.controls");
   return (
     <div className="border-t pt-3">
-      <p className="text-muted-foreground mb-2 text-2xs font-semibold tracking-wide uppercase">
+      <p className="text-muted-foreground text-2xs mb-2 font-semibold tracking-wide uppercase">
         {t("workloadsHeader")}
       </p>
       {loading ? (
@@ -503,10 +502,10 @@ function WorkloadRow({
   const busy = scaling || restarting;
 
   return (
-    <div className="bg-background flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-2">
         <span className="truncate text-sm font-medium">{workload.name}</span>
-        <Badge variant="outline" className="text-muted-foreground font-mono text-2xs">
+        <Badge variant="outline" className="text-muted-foreground text-2xs font-mono">
           {workload.slug}
         </Badge>
         <span className="text-muted-foreground text-xs">

@@ -132,7 +132,7 @@ export default function IncidentResponseRunbookPage() {
           <li>
             Check{" "}
             <code>https://{"<astrolift-host>"}/app/health/</code> — expected
-            response: <code>{"{"}"status": "ok"{"}"}</code>.
+            response: <code>{'{"status": "ok"}'}</code>.
           </li>
           <li>
             Check the database connection. If the API container cannot reach

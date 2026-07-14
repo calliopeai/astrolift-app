@@ -41,11 +41,19 @@ const KINDS: { value: IdpKind; label: string; hint: string }[] = [
   { value: "cognito", label: "Amazon Cognito", hint: "user pool + region + OIDC fields" },
   { value: "auth0", label: "Auth0", hint: "tenant URL + client_id + client_secret_ref" },
   { value: "okta", label: "Okta", hint: "discovery URL + client_id + client_secret_ref" },
-  { value: "azure_ad", label: "Azure AD / Entra ID", hint: "discovery URL + client_id + client_secret_ref" },
+  {
+    value: "azure_ad",
+    label: "Azure AD / Entra ID",
+    hint: "discovery URL + client_id + client_secret_ref",
+  },
   { value: "google", label: "Google Workspace", hint: "discovery URL + client_id" },
   { value: "github", label: "GitHub OAuth", hint: "OAuth app client_id + client_secret_ref" },
   { value: "saml", label: "SAML 2.0", hint: "metadata URL or XML upload" },
-  { value: "local", label: "Local accounts", hint: "username + password (Django auth, dev/fallback)" },
+  {
+    value: "local",
+    label: "Local accounts",
+    hint: "username + password (Django auth, dev/fallback)",
+  },
 ];
 
 const COGNITO_TEMPLATE = `{
@@ -124,7 +132,9 @@ export function CreateIdentityProviderDialog({ open, onOpenChange }: Props) {
     }
   }
 
-  const showOidc = ["oidc", "cognito", "auth0", "okta", "azure_ad", "google", "github"].includes(kind);
+  const showOidc = ["oidc", "cognito", "auth0", "okta", "azure_ad", "google", "github"].includes(
+    kind
+  );
   const showSaml = kind === "saml";
   const isLocal = kind === "local";
 
@@ -134,15 +144,12 @@ export function CreateIdentityProviderDialog({ open, onOpenChange }: Props) {
         <SheetHeader>
           <SheetTitle>New identity provider</SheetTitle>
           <SheetDescription>
-            Configure how users sign in. Multiple providers can coexist; one is
-            active at a time. Secrets are stored as references into the
-            platform secrets backend, never plaintext in this row.
+            Configure how users sign in. Multiple providers can coexist; one is active at a time.
+            Secrets are stored as references into the platform secrets backend, never plaintext in
+            this row.
           </SheetDescription>
         </SheetHeader>
-        <form
-          onSubmit={submit}
-          className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4"
-        >
+        <form onSubmit={submit} className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
           <div className="space-y-2">
             <Label htmlFor="kind">Kind</Label>
             <Select value={kind} onValueChange={(v) => setKind(v as IdpKind)}>
@@ -171,8 +178,7 @@ export function CreateIdentityProviderDialog({ open, onOpenChange }: Props) {
               placeholder="e.g. Auth0 prod, Cognito staging"
             />
             <p className="text-muted-foreground text-xs">
-              Shown on the login screen and in audit logs. Defaults to the
-              kind name when blank.
+              Shown on the login screen and in audit logs. Defaults to the kind name when blank.
             </p>
           </div>
 
@@ -209,9 +215,8 @@ export function CreateIdentityProviderDialog({ open, onOpenChange }: Props) {
                     placeholder="secrets-backend-path/oidc/client-secret"
                     className="font-mono text-xs"
                   />
-                  <p className="text-muted-foreground text-[11px]">
-                    Path into the platform secrets backend; the value never
-                    lives in this row.
+                  <p className="text-muted-foreground text-2xs">
+                    Path into the platform secrets backend; the value never lives in this row.
                   </p>
                 </div>
               </div>
@@ -235,9 +240,7 @@ export function CreateIdentityProviderDialog({ open, onOpenChange }: Props) {
 
           {!isLocal && (
             <div className="space-y-2">
-              <Label htmlFor="config">
-                Kind-specific config (JSON)
-              </Label>
+              <Label htmlFor="config">Kind-specific config (JSON)</Label>
               <Textarea
                 id="config"
                 value={configText}
@@ -248,8 +251,7 @@ export function CreateIdentityProviderDialog({ open, onOpenChange }: Props) {
               {error && <p className="text-destructive text-xs">{error}</p>}
               {kind === "cognito" && (
                 <p className="text-muted-foreground text-xs">
-                  Required keys for Cognito: <code>user_pool_id</code>,{" "}
-                  <code>region</code>.
+                  Required keys for Cognito: <code>user_pool_id</code>, <code>region</code>.
                 </p>
               )}
             </div>
