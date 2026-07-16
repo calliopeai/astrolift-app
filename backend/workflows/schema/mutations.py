@@ -59,9 +59,9 @@ class CreateWorkflowTriggerResult(MutationResult):
 def _require_staff(user):
     """Raise GraphQLError if user is not authenticated staff/superuser."""
     if not user or not user.is_authenticated:
-        raise GraphQLError('Authentication required')
+        raise GraphQLError("Authentication required")
     if not (user.is_staff or user.is_superuser):
-        raise GraphQLError('Staff or superuser access required')
+        raise GraphQLError("Staff or superuser access required")
 
 
 def _caller_org_pk():
@@ -90,12 +90,25 @@ def _definition_write_error(user, definition):
 
 
 def _resolve_clone_org(org_id):
-    """Resolve ``org_id`` (Organization guid) to an Organization, asserting it
-    matches the caller's active tenant. Returns ``(org, None)`` on success or
-    ``(None, failure_result)``. Real org scoping per #1042."""
+    """Resolve ``org_id`` (Organization guid; ``None`` → the caller's active
+    org) to an Organization, asserting it matches the caller's active tenant.
+    Returns ``(org, None)`` on success or ``(None, failure_result)``. Real org
+    scoping per #1042."""
     from astrolift_identity.models import Organization
 
     user_org = _caller_org_pk()
+    if org_id is None:
+        org = (
+            Organization.objects.filter(pk=user_org, deleted_at__isnull=True).first()
+            if user_org is not None
+            else None
+        )
+        if org is None:
+            return None, CloneWorkflowDefinitionResult(
+                ok=False,
+                errors=[GQLValidationError(field="orgId", messages=["no active organization in context"])],
+            )
+        return org, None
     org = Organization.objects.filter(guid=str(org_id), deleted_at__isnull=True).first()
     if org is None:
         return None, CloneWorkflowDefinitionResult(
@@ -108,6 +121,20 @@ def _resolve_clone_org(org_id):
             errors=[GQLValidationError(field="orgId", messages=["PERMISSION_DENIED: organization mismatch"])],
         )
     return org, None
+
+
+def _definition_for_write(slug):
+    """Resolve *slug* for a write within the caller's visible scope — the
+    org's own definitions UNION platform-global, mirroring
+    ``WorkflowDefinition.visible_to_org`` — preferring the org-owned row on
+    slug collision; ``_definition_write_error`` then gates. A foreign org's
+    slug resolves to nothing (indistinguishable from nonexistent), so no
+    cross-tenant existence oracle."""
+    org_pk = _caller_org_pk()
+    qs = WorkflowDefinition.objects.filter(slug=slug, deleted_at__isnull=True).filter(
+        Q(organization_id=org_pk) | Q(organization__isnull=True)
+    )
+    return qs.filter(organization_id=org_pk).first() or qs.first()
 
 
 def _unique_clone_slug(base_slug, org):
@@ -124,23 +151,33 @@ def _unique_clone_slug(base_slug, org):
 
 @strawberry.type
 class Mutation:
-
     @strawberry.mutation(description="Start a workflow for an object.")
+    @require_permission(Permission.WORKFLOW_TRIGGER)
+    @tenant_scoped()
     def start_workflow(
-        self, info: Info, workflow_slug: str, model_label: str, object_id: int,
+        self,
+        info: Info,
+        workflow_slug: str,
+        model_label: str,
+        object_id: int,
     ) -> StartWorkflowResult:
         user = info.context.user
-        workflow = WorkflowDefinition.objects.filter(slug=workflow_slug, is_enabled=True).first()
-        if not workflow:
+        # Legacy forms state-machine entry (dormant, spec 40 §8) — gated
+        # deny-by-default like every mutation. Definition resolution uses the
+        # caller-org ∪ global scope so a foreign org's slug is not found.
+        workflow = _definition_for_write(workflow_slug)
+        if not workflow or not workflow.is_enabled:
             raise GraphQLError(f'Workflow "{workflow_slug}" not found or disabled')
 
-        # Resolve the model
+        # Resolve the model. The GFK target is an arbitrary legacy model
+        # (forms) with no org FK, so no object-level org filter is possible —
+        # the permission + tenant gates above are the scoping.
         try:
-            parts = model_label.split('.')
+            parts = model_label.split(".")
             model = apps.get_model(parts[0], parts[-1])
             obj = model.objects.get(pk=object_id)
         except Exception as e:
-            raise GraphQLError(f'Object not found: {model_label}:{object_id} — {e}')
+            raise GraphQLError(f"Object not found: {model_label}:{object_id} — {e}")
 
         try:
             instance = WorkflowInstance.start(workflow, obj, user)
@@ -186,9 +223,7 @@ class Mutation:
                 errors=[
                     GQLValidationError(
                         field="workflow_slug",
-                        messages=[
-                            f'Workflow "{workflow_slug}" has no stages to execute'
-                        ],
+                        messages=[f'Workflow "{workflow_slug}" has no stages to execute'],
                     )
                 ],
             )
@@ -239,16 +274,29 @@ class Mutation:
         )
 
     @strawberry.mutation(description="Transition a workflow instance to a new state.")
+    @require_permission(Permission.WORKFLOW_TRIGGER)
+    @tenant_scoped()
     def transition_workflow(
-        self, info: Info, instance_id: strawberry.ID, to_state: str, note: str = '',
+        self,
+        info: Info,
+        instance_id: strawberry.ID,
+        to_state: str,
+        note: str = "",
     ) -> MutationResult:
         user = info.context.user
-        instance = WorkflowInstance.objects.filter(pk=instance_id).first()
+        # Caller-org instances plus legacy org-less rows (pre-denormalization
+        # forms instances carry organization=NULL — spec 40 §2.3/§8); another
+        # org's instance is not found.
+        instance = (
+            WorkflowInstance.objects.filter(pk=instance_id)
+            .filter(Q(organization_id=_caller_org_pk()) | Q(organization__isnull=True))
+            .first()
+        )
         if not instance:
-            raise GraphQLError(f'Workflow instance {instance_id} not found')
+            raise GraphQLError(f"Workflow instance {instance_id} not found")
 
         if instance.is_completed:
-            raise GraphQLError('Workflow is already completed')
+            raise GraphQLError("Workflow is already completed")
 
         try:
             instance.transition(to_state, user, note)
@@ -258,17 +306,22 @@ class Mutation:
 
     @strawberry.mutation(description="Force a workflow instance to a specific state (admin override).")
     def override_workflow_state(
-        self, info: Info, instance_id: strawberry.ID, to_state: str, note: str = '',
+        self,
+        info: Info,
+        instance_id: strawberry.ID,
+        to_state: str,
+        note: str = "",
     ) -> MutationResult:
         user = info.context.user
         if not user.is_superuser:
-            raise GraphQLError('Only superusers can override workflow state')
+            raise GraphQLError("Only superusers can override workflow state")
 
         instance = WorkflowInstance.objects.filter(pk=instance_id).first()
         if not instance:
-            raise GraphQLError(f'Workflow instance {instance_id} not found')
+            raise GraphQLError(f"Workflow instance {instance_id} not found")
 
         from workflows.models import TransitionLog
+
         from_state = instance.current_state
         instance.current_state = to_state
         instance.updated_by = user
@@ -279,14 +332,15 @@ class Mutation:
             from_state=from_state,
             to_state=to_state,
             transitioned_by=user,
-            note=f'[ADMIN OVERRIDE] {note}',
+            note=f"[ADMIN OVERRIDE] {note}",
         )
 
         return MutationResult.success()
 
     @strawberry.mutation(description="Create a new workflow definition (staff only).")
     def create_workflow_definition(
-        self, info: Info,
+        self,
+        info: Info,
         name: str,
         slug: str,
         model_label: str,
@@ -307,7 +361,11 @@ class Mutation:
         if pattern_kind is not None and pattern_kind not in valid_patterns:
             return MutationResult(
                 ok=False,
-                errors=[GQLValidationError(field='pattern_kind', messages=[f'Invalid pattern_kind "{pattern_kind}"'])],
+                errors=[
+                    GQLValidationError(
+                        field="pattern_kind", messages=[f'Invalid pattern_kind "{pattern_kind}"']
+                    )
+                ],
             )
 
         workflow = WorkflowDefinition(
@@ -316,7 +374,7 @@ class Mutation:
             model_label=model_label,
             states=states,
             transitions=transitions,
-            description=description or '',
+            description=description or "",
             is_enabled=is_enabled,
             pattern_kind=pattern_kind or WorkflowDefinition.PatternKind.SINGLE,
             created_by=user,
@@ -330,19 +388,22 @@ class Mutation:
             if errors:
                 return MutationResult(
                     ok=False,
-                    errors=[GQLValidationError(field='definition', messages=errors)],
+                    errors=[GQLValidationError(field="definition", messages=errors)],
                 )
 
         try:
             workflow.save()
         except Exception as e:
-            raise GraphQLError(f'Failed to create workflow definition: {e}')
+            raise GraphQLError(f"Failed to create workflow definition: {e}")
 
         return MutationResult.success()
 
-    @strawberry.mutation(description="Update an existing workflow definition (staff only).")
+    @strawberry.mutation(description="Update an org-owned workflow definition (globals are read-only).")
+    @require_permission(Permission.WORKFLOW_UPDATE)
+    @tenant_scoped()
     def update_workflow_definition(
-        self, info: Info,
+        self,
+        info: Info,
         slug: str,
         name: Optional[str] = None,
         description: Optional[str] = None,
@@ -354,7 +415,7 @@ class Mutation:
     ) -> MutationResult:
         user = info.context.user
 
-        workflow = WorkflowDefinition.objects.filter(slug=slug, deleted_at__isnull=True).first()
+        workflow = _definition_for_write(slug)
         if not workflow:
             raise GraphQLError(f'Workflow definition "{slug}" not found')
 
@@ -370,7 +431,11 @@ class Mutation:
             if pattern_kind not in valid_patterns:
                 return MutationResult(
                     ok=False,
-                    errors=[GQLValidationError(field='pattern_kind', messages=[f'Invalid pattern_kind "{pattern_kind}"'])],
+                    errors=[
+                        GQLValidationError(
+                            field="pattern_kind", messages=[f'Invalid pattern_kind "{pattern_kind}"']
+                        )
+                    ],
                 )
             workflow.pattern_kind = pattern_kind
 
@@ -389,28 +454,35 @@ class Mutation:
 
         workflow.updated_by = user
 
-        errors = workflow.validate_definition()
+        # Agent/stage definitions carry no state machine (states == []) —
+        # validate only when states exist, mirroring the create path.
+        errors = workflow.validate_definition() if workflow.states else []
         if errors:
             return MutationResult(
                 ok=False,
-                errors=[GQLValidationError(field='definition', messages=errors)],
+                errors=[GQLValidationError(field="definition", messages=errors)],
             )
 
         try:
             workflow.save()
         except Exception as e:
-            raise GraphQLError(f'Failed to update workflow definition: {e}')
+            raise GraphQLError(f"Failed to update workflow definition: {e}")
 
         return MutationResult.success()
 
-    @strawberry.mutation(description="Delete a workflow definition by slug (staff only).")
+    @strawberry.mutation(description="Soft-delete an org-owned workflow definition by slug.")
+    @require_permission(Permission.WORKFLOW_DELETE)
+    @tenant_scoped()
     def delete_workflow_definition(
-        self, info: Info,
+        self,
+        info: Info,
         slug: str,
     ) -> MutationResult:
+        from django.utils import timezone
+
         user = info.context.user
 
-        workflow = WorkflowDefinition.objects.filter(slug=slug, deleted_at__isnull=True).first()
+        workflow = _definition_for_write(slug)
         if not workflow:
             raise GraphQLError(f'Workflow definition "{slug}" not found')
 
@@ -421,39 +493,83 @@ class Mutation:
                 errors=[GQLValidationError(field=write_err[0], messages=[write_err[1]])],
             )
 
-        if workflow.instances.exists():
-            raise GraphQLError(
-                f'Cannot delete workflow "{slug}" — it has {workflow.instances.count()} existing instance(s). '
-                f'Disable it instead.'
+        # PROTECT semantics for the tier-2 FK: a live configured Workflow
+        # still runs off this shape — surface a clean error, not a 500.
+        live_workflows = workflow.workflows.filter(deleted_at__isnull=True).count()
+        if live_workflows:
+            return MutationResult(
+                ok=False,
+                errors=[
+                    GQLValidationError(
+                        field="slug",
+                        messages=[
+                            f'Cannot delete workflow definition "{slug}" — '
+                            f"{live_workflows} configured Workflow(s) still use it. "
+                            f"Delete those first."
+                        ],
+                    )
+                ],
             )
 
-        try:
-            workflow.delete()
-        except Exception as e:
-            raise GraphQLError(f'Failed to delete workflow definition: {e}')
+        # Same PROTECT semantics for webhook triggers (createWorkflowTrigger →
+        # astrolift_agents.WorkflowWebhook, consumed by the inbound webhook
+        # view). The model is not soft-deletable — rows are append-only and
+        # retired via ``enabled`` — so "live" means enabled here.
+        live_triggers = workflow.webhooks.filter(enabled=True).count()
+        if live_triggers:
+            return MutationResult(
+                ok=False,
+                errors=[
+                    GQLValidationError(
+                        field="slug",
+                        messages=[
+                            f'Cannot delete workflow definition "{slug}" — '
+                            f"{live_triggers} enabled webhook trigger(s) still reference it. "
+                            f"Disable those first."
+                        ],
+                    )
+                ],
+            )
 
+        workflow.deleted_at = timezone.now()
+        workflow.deleted_by = user
+        workflow.save(update_fields=["deleted_at", "deleted_by", "updated_at", "version"])
         return MutationResult.success()
 
-    @strawberry.mutation(description="Add a stage to an agent workflow definition (staff only).")
+    @strawberry.mutation(
+        description=(
+            "Add a stage to a writable workflow definition. order=null appends "
+            "after the definition's last stage."
+        )
+    )
+    @require_permission(Permission.WORKFLOW_UPDATE)
+    @tenant_scoped()
     def create_workflow_stage(
         self,
         info: Info,
         workflow_slug: str,
-        order: int,
         kind: str,
+        order: int | None = None,
+        role: str | None = None,
         on_failure: str = "fail",
         timeout_seconds: int = 300,
         agent_definition_guid: Optional[str] = None,
         skill_refs: Optional[strawberry.scalars.JSON] = None,
         fan_out_count: Optional[int] = None,
+        prompt: str | None = None,
+        approvers: strawberry.scalars.JSON | None = None,
     ) -> CreateWorkflowStageResult:
         user = info.context.user
 
-        workflow = WorkflowDefinition.objects.filter(slug=workflow_slug, deleted_at__isnull=True).first()
+        workflow = _definition_for_write(workflow_slug)
         if not workflow:
             return CreateWorkflowStageResult(
                 ok=False,
-                errors=[GQLValidationError(field='workflow_slug', messages=[f'Workflow "{workflow_slug}" not found'])],
+                errors=[
+                    GQLValidationError(
+                        field="workflow_slug", messages=[f'Workflow "{workflow_slug}" not found']
+                    )
+                ],
             )
 
         write_err = _definition_write_error(user, workflow)
@@ -468,7 +584,7 @@ class Mutation:
         if kind not in valid_kinds:
             return CreateWorkflowStageResult(
                 ok=False,
-                errors=[GQLValidationError(field='kind', messages=[f'Invalid stage kind "{kind}"'])],
+                errors=[GQLValidationError(field="kind", messages=[f'Invalid stage kind "{kind}"'])],
             )
 
         # Validate on_failure
@@ -476,19 +592,37 @@ class Mutation:
         if on_failure not in valid_failures:
             return CreateWorkflowStageResult(
                 ok=False,
-                errors=[GQLValidationError(field='on_failure', messages=[f'Invalid on_failure "{on_failure}"'])],
+                errors=[
+                    GQLValidationError(field="on_failure", messages=[f'Invalid on_failure "{on_failure}"'])
+                ],
             )
 
-        # Resolve optional agent definition
+        # Resolve optional agent definition — scoped to the caller's org
+        # (Workload's org lives via registered_app.organization); a foreign
+        # org's workload resolves to not-found, never a cross-tenant binding.
         agent_definition = None
         if agent_definition_guid:
             from astrolift_registry.models import Workload
-            agent_definition = Workload.objects.filter(guid=agent_definition_guid).first()
+
+            agent_definition = Workload.objects.filter(
+                guid=agent_definition_guid,
+                registered_app__organization_id=_caller_org_pk(),
+            ).first()
             if agent_definition is None:
                 return CreateWorkflowStageResult(
                     ok=False,
-                    errors=[GQLValidationError(field='agent_definition_guid', messages=['Workload not found'])],
+                    errors=[
+                        GQLValidationError(field="agent_definition_guid", messages=["Workload not found"])
+                    ],
                 )
+
+        if order is None:
+            # Append after the highest order ever used — soft-deleted stages
+            # still occupy the (definition, order) unique constraint.
+            from django.db.models import Max
+
+            max_order = workflow.stages.aggregate(Max("order"))["order__max"]
+            order = 0 if max_order is None else max_order + 1
 
         stage = WorkflowStage(
             definition=workflow,
@@ -499,11 +633,14 @@ class Mutation:
             slug=f"{workflow.slug}-stage-{order}",
             order=order,
             kind=kind,
+            role=role or "",
             on_failure=on_failure,
             timeout_seconds=timeout_seconds,
             agent_definition=agent_definition,
             skill_refs=skill_refs or [],
             fan_out_count=fan_out_count,
+            prompt=prompt or "",
+            approvers=approvers or [],
             created_by=user,
             updated_by=user,
         )
@@ -511,11 +648,13 @@ class Mutation:
         try:
             stage.save()
         except Exception as e:
-            raise GraphQLError(f'Failed to create workflow stage: {e}')
+            raise GraphQLError(f"Failed to create workflow stage: {e}")
 
         return CreateWorkflowStageResult(ok=True, stage=stage)
 
-    @strawberry.mutation(description="Create an inbound webhook trigger for a workflow definition (staff only).")
+    @strawberry.mutation(
+        description="Create an inbound webhook trigger for a workflow definition (staff only)."
+    )
     def create_workflow_trigger(self, info: Info, workflow_slug: str) -> CreateWorkflowTriggerResult:
         """Register a ``WorkflowWebhook`` that fires *workflow_slug* on inbound
         POST (#1019). The webhook is owned by the CALLER's active org — a
@@ -535,13 +674,15 @@ class Mutation:
         user = info.context.user
         _require_staff(user)
 
-        workflow = WorkflowDefinition.objects.filter(
-            slug=workflow_slug, deleted_at__isnull=True
-        ).first()
+        workflow = WorkflowDefinition.objects.filter(slug=workflow_slug, deleted_at__isnull=True).first()
         if not workflow:
             return CreateWorkflowTriggerResult(
                 ok=False,
-                errors=[GQLValidationError(field='workflow_slug', messages=[f'Workflow "{workflow_slug}" not found'])],
+                errors=[
+                    GQLValidationError(
+                        field="workflow_slug", messages=[f'Workflow "{workflow_slug}" not found']
+                    )
+                ],
             )
 
         # The webhook is owned by the caller's org. WorkflowWebhook.organization
@@ -554,7 +695,9 @@ class Mutation:
         if org is None:
             return CreateWorkflowTriggerResult(
                 ok=False,
-                errors=[GQLValidationError(field='organization', messages=['no active organization in context'])],
+                errors=[
+                    GQLValidationError(field="organization", messages=["no active organization in context"])
+                ],
             )
 
         result = create_webhook_workflow_trigger(workflow, organization=org)
@@ -575,23 +718,28 @@ class Mutation:
     @require_permission(Permission.WORKFLOW_CREATE)
     @tenant_scoped()
     def clone_workflow_definition(
-        self, info: Info, slug: str, org_id: strawberry.ID,
+        self,
+        info: Info,
+        slug: str,
+        org_id: strawberry.ID | None = None,
     ) -> CloneWorkflowDefinitionResult:
         user = info.context.user
         org, err = _resolve_clone_org(org_id)
         if err is not None:
             return err
 
-        # Visible scope = caller's org UNION all platform-global definitions.
-        source = (
-            WorkflowDefinition.objects.filter(slug=slug, deleted_at__isnull=True)
-            .filter(Q(organization_id=org.pk) | Q(organization__isnull=True))
-            .first()
+        # Visible scope = caller's org UNION all platform-global definitions;
+        # the org's own wins over a same-slug global (spec 40 §2.1).
+        visible = WorkflowDefinition.objects.filter(slug=slug, deleted_at__isnull=True).filter(
+            Q(organization_id=org.pk) | Q(organization__isnull=True)
         )
+        source = visible.filter(organization_id=org.pk).first() or visible.first()
         if source is None:
             return CloneWorkflowDefinitionResult(
                 ok=False,
-                errors=[GQLValidationError(field="slug", messages=[f'Workflow definition "{slug}" not visible'])],
+                errors=[
+                    GQLValidationError(field="slug", messages=[f'Workflow definition "{slug}" not visible'])
+                ],
             )
 
         new_slug = _unique_clone_slug(source.slug, org)
@@ -622,8 +770,11 @@ class Mutation:
                     agent_definition=(stage.agent_definition if same_org else None),
                     skill_refs=list(stage.skill_refs or []),
                     fan_out_count=stage.fan_out_count,
+                    fan_out_dynamic=stage.fan_out_dynamic,
                     on_failure=stage.on_failure,
                     timeout_seconds=stage.timeout_seconds,
+                    prompt=stage.prompt,
+                    approvers=list(stage.approvers or []),
                     created_by=user,
                     updated_by=user,
                 )

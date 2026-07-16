@@ -1,6 +1,6 @@
 """Workflow manifest import/export GraphQL (spec 40 §5.4).
 
-Two read surfaces for the builder's Code view (§5.1) and import/export:
+Two read surfaces for the builder's Code view (§5.1) plus the write path:
 
 * ``previewWorkflowManifest(toml)`` — parse a TOML string into its
   structured form for preview/validate. **No persistence.** Malformed
@@ -9,8 +9,14 @@ Two read surfaces for the builder's Code view (§5.1) and import/export:
 * ``exportWorkflowManifest(definitionSlug)`` — emit the canonical TOML for
   a visible ``WorkflowDefinition`` (the org's own UNION platform-global,
   spec 40 §2.1).
+* ``importWorkflowManifest(toml, preview)`` — the native-TOML create
+  surface (#970/#972): ``preview = true`` mirrors the preview query;
+  ``preview = false`` persists via the same
+  :func:`workflows.manifest.create_definition_from_manifest` routine the
+  visual-flow importers use, always into the caller's org (never global).
 
-Both are ``WORKFLOW_READ``-gated and ``@tenant_scoped``.
+Reads are ``WORKFLOW_READ``-gated, the import is ``WORKFLOW_CREATE``-gated;
+all are ``@tenant_scoped``.
 """
 
 from __future__ import annotations
@@ -21,8 +27,10 @@ from strawberry.types import Info
 from astrolift_manifest.parser import ManifestError
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
+from core.schema.common import MutationResult, ValidationError
 from core.tenancy import get_current_tenant
 from workflows.manifest import (
+    ParsedWorkflowManifest,
     definition_to_manifest,
     emit_workflow_manifest,
     parse_workflow_manifest,
@@ -85,6 +93,33 @@ def _preview_error(exc: ManifestError) -> WorkflowManifestPreviewType:
     )
 
 
+def _preview_type(parsed: ParsedWorkflowManifest) -> WorkflowManifestPreviewType:
+    return WorkflowManifestPreviewType(
+        ok=True,
+        definition=WorkflowManifestDefinitionType(
+            slug=parsed.definition.slug,
+            name=parsed.definition.name,
+            pattern=parsed.definition.pattern,
+            description=parsed.definition.description,
+        ),
+        stages=[
+            WorkflowManifestStageType(
+                order=s.order,
+                kind=s.kind,
+                role=s.role,
+                agent=s.agent,
+                skills=list(s.skills),
+                on_failure=s.on_failure,
+                timeout=s.timeout,
+                fan_out=str(s.fan_out),
+                prompt=s.prompt,
+                approvers=list(s.approvers),
+            )
+            for s in parsed.stages
+        ],
+    )
+
+
 @strawberry.type
 class WorkflowManifestQuery:
     @strawberry.field
@@ -102,30 +137,7 @@ class WorkflowManifestQuery:
         except ManifestError as exc:
             return _preview_error(exc)
 
-        return WorkflowManifestPreviewType(
-            ok=True,
-            definition=WorkflowManifestDefinitionType(
-                slug=parsed.definition.slug,
-                name=parsed.definition.name,
-                pattern=parsed.definition.pattern,
-                description=parsed.definition.description,
-            ),
-            stages=[
-                WorkflowManifestStageType(
-                    order=s.order,
-                    kind=s.kind,
-                    role=s.role,
-                    agent=s.agent,
-                    skills=list(s.skills),
-                    on_failure=s.on_failure,
-                    timeout=s.timeout,
-                    fan_out=str(s.fan_out),
-                    prompt=s.prompt,
-                    approvers=list(s.approvers),
-                )
-                for s in parsed.stages
-            ],
-        )
+        return _preview_type(parsed)
 
     @strawberry.field
     @require_permission(Permission.WORKFLOW_READ)
@@ -152,3 +164,64 @@ class WorkflowManifestQuery:
 
         toml = emit_workflow_manifest(definition_to_manifest(definition))
         return WorkflowManifestExportType(ok=True, toml=toml)
+
+
+@strawberry.type
+class ImportWorkflowManifestResult(MutationResult):
+    """Parsed manifest (or its structured parse error) + the created slug
+    when persisting. ``created_slug`` may differ from the manifest's slug —
+    it is uniquified within the org on collision."""
+
+    created_slug: str | None = None
+    manifest: WorkflowManifestPreviewType | None = None
+
+
+@strawberry.type
+class WorkflowManifestMutation:
+    @strawberry.mutation(
+        description=(
+            "Import a workflow manifest TOML. preview=true (default) returns "
+            "the parsed shape without persisting; preview=false creates a "
+            "disabled, org-scoped WorkflowDefinition + stages in the caller's "
+            "org and returns the (possibly uniquified) slug."
+        )
+    )
+    @require_permission(Permission.WORKFLOW_CREATE)
+    @tenant_scoped()
+    def import_workflow_manifest(
+        self,
+        info: Info,
+        toml: str,
+        preview: bool = True,
+        org_id: strawberry.ID | None = None,
+    ) -> ImportWorkflowManifestResult:
+        try:
+            parsed = parse_workflow_manifest(toml)
+        except ManifestError as exc:
+            return ImportWorkflowManifestResult(
+                ok=False,
+                errors=[ValidationError(field="toml", messages=[str(exc)])],
+                manifest=_preview_error(exc),
+            )
+
+        if preview:
+            return ImportWorkflowManifestResult(ok=True, manifest=_preview_type(parsed))
+
+        from django.db import transaction
+
+        from astrolift_workflows.schema.mutations import _resolve_caller_org
+        from workflows.manifest import create_definition_from_manifest
+
+        org, err = _resolve_caller_org(org_id)
+        if err is not None:
+            return ImportWorkflowManifestResult(ok=err.ok, errors=err.errors)
+
+        with transaction.atomic():
+            definition = create_definition_from_manifest(
+                parsed, organization=org, created_by=info.context.user
+            )
+
+        manifest_type = _preview_type(parsed)
+        # Report the slug that actually persisted (uniquified on collision).
+        manifest_type.definition.slug = definition.slug
+        return ImportWorkflowManifestResult(ok=True, created_slug=definition.slug, manifest=manifest_type)

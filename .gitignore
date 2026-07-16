@@ -30,9 +30,10 @@ node_modules/
 # Docker runtime data — bind-mounted, never committed
 docker/runtime/
 
-# Build output
+# Build output (backend/ and frontend/ cover their own build dirs;
+# unanchored build/ would swallow app-router routes like app/**/build/)
 dist/
-build/
+/build/
 
 # Secrets — env files live in subdirs and are sourced from examples
 .env

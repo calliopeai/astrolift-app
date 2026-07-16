@@ -90,8 +90,11 @@ class WorkflowDefinition(BaseCoreModel):
 
     class Meta:
         constraints = [
+            # Live rows only — a soft-deleted definition must not squat its
+            # slug (same partial-uniqueness convention as NamedBaseCoreModel).
             models.UniqueConstraint(
                 fields=["organization", "slug"],
+                condition=models.Q(deleted_at__isnull=True),
                 name="workflowdefinition_org_slug_unique",
             ),
         ]
@@ -559,8 +562,11 @@ class Workflow(BaseCoreModel):
 
     class Meta:
         constraints = [
+            # Live rows only — soft delete must free the slug (see
+            # workflowdefinition_org_slug_unique).
             models.UniqueConstraint(
                 fields=["organization", "slug"],
+                condition=models.Q(deleted_at__isnull=True),
                 name="workflow_org_slug_unique",
             ),
         ]

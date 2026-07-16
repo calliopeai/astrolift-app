@@ -800,6 +800,22 @@ type AstroliftAppTrace {
   statusCode: String!
 }
 
+type AstroliftAppUptime {
+  isUp: Boolean
+  lastCheckedAt: DateTime
+  uptimePct: Float!
+  totalChecks: Int!
+  windowHours: Int!
+  recent: [AstroliftAppUptimePoint!]!
+}
+
+type AstroliftAppUptimePoint {
+  checkedAt: DateTime!
+  isUp: Boolean!
+  latencyMs: Int!
+  statusCode: Int
+}
+
 type AstroliftAppUrlHealth {
   url: String!
   status: String!
@@ -4149,6 +4165,13 @@ type ImportWorkflowFlowResult {
   gaps: [ImportGapType!]!
 }
 
+type ImportWorkflowManifestResult {
+  ok: Boolean!
+  errors: [ValidationError!]!
+  createdSlug: String
+  manifest: WorkflowManifestPreviewType
+}
+
 input InstallClusterPrereqsInputType {
   clusterId: GUID!
   selectedComponents: [String!]!
@@ -4631,14 +4654,16 @@ type Mutation {
   """Create a new workflow definition (staff only)."""
   createWorkflowDefinition(name: String!, slug: String!, modelLabel: String!, states: JSON!, transitions: JSON!, description: String = null, isEnabled: Boolean! = false, patternKind: String = null): MutationResult!
 
-  """Update an existing workflow definition (staff only)."""
+  """Update an org-owned workflow definition (globals are read-only)."""
   updateWorkflowDefinition(slug: String!, name: String = null, description: String = null, modelLabel: String = null, states: JSON = null, transitions: JSON = null, isEnabled: Boolean = null, patternKind: String = null): MutationResult!
 
-  """Delete a workflow definition by slug (staff only)."""
+  """Soft-delete an org-owned workflow definition by slug."""
   deleteWorkflowDefinition(slug: String!): MutationResult!
 
-  """Add a stage to an agent workflow definition (staff only)."""
-  createWorkflowStage(workflowSlug: String!, order: Int!, kind: String!, onFailure: String! = "fail", timeoutSeconds: Int! = 300, agentDefinitionGuid: String = null, skillRefs: JSON = null, fanOutCount: Int = null): CreateWorkflowStageResult!
+  """
+  Add a stage to a writable workflow definition. order=null appends after the definition's last stage.
+  """
+  createWorkflowStage(workflowSlug: String!, kind: String!, order: Int = null, role: String = null, onFailure: String! = "fail", timeoutSeconds: Int! = 300, agentDefinitionGuid: String = null, skillRefs: JSON = null, fanOutCount: Int = null, prompt: String = null, approvers: JSON = null): CreateWorkflowStageResult!
 
   """
   Create an inbound webhook trigger for a workflow definition (staff only).
@@ -4648,12 +4673,17 @@ type Mutation {
   """
   Deep-copy a visible workflow definition + its stages into the caller's org as a new editable definition (spec 40 §2.1). New slug on collision; global stages copy with agent_definition cleared.
   """
-  cloneWorkflowDefinition(slug: String!, orgId: ID!): CloneWorkflowDefinitionResult!
+  cloneWorkflowDefinition(slug: String!, orgId: ID = null): CloneWorkflowDefinitionResult!
 
   """
   Import a popular visual agent/workflow builder export (Langflow, Flowise, …) into an Astrolift WorkflowDefinition. preview=true (default) returns the mapped manifest + gap report without persisting; preview=false creates an org-scoped, disabled definition + stages.
   """
   importWorkflowFlow(format: String!, payload: JSON!, preview: Boolean! = true): ImportWorkflowFlowResult!
+
+  """
+  Import a workflow manifest TOML. preview=true (default) returns the parsed shape without persisting; preview=false creates a disabled, org-scoped WorkflowDefinition + stages in the caller's org and returns the (possibly uniquified) slug.
+  """
+  importWorkflowManifest(toml: String!, preview: Boolean! = true, orgId: ID = null): ImportWorkflowManifestResult!
 
   """Create a configured Workflow from a visible definition (spec 40 §2.2)."""
   createWorkflow(name: String!, definitionSlug: String!, slug: String = null, description: String = null, stageBindings: JSON = null, inputs: JSON = null, triggerKind: String! = "manual", scheduleCron: String = null, orgId: ID = null): CreateWorkflowResult!
@@ -4958,6 +4988,7 @@ type Query {
   astroliftActiveIdentityProvider: AstroliftIdentityProvider
   astroliftActiveSessions: [AstroliftActiveSession!]!
   astroliftElevationStatus: AstroliftElevationStatus!
+  astroliftAppUptime(appSlug: String!, windowHours: Int! = 24): AstroliftAppUptime
   astroliftEvents(limit: Int! = 100, eventType: String = null, severity: String = null, appSlug: String = null): [AstroliftEvent!]!
   astroliftEventsAggregated(limit: Int! = 100, eventType: String = null, severity: String = null, appSlug: String = null, aggregateWindowSeconds: Int! = 300): [AstroliftAggregatedEvent!]!
   astroliftEventsPage(limit: Int! = 100, after: String = null, eventType: String = null, severity: String = null, appSlug: String = null): AstroliftEventPage!
