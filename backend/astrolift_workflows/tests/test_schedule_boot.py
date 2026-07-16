@@ -169,6 +169,9 @@ def test_default_allowlist_is_phase_3a_yes_set():
         ScheduleKind.REHEAL_WEBHOOK_SUBSCRIPTIONS,
         ScheduleKind.DRIFT_DETECTION,
         ScheduleKind.SECRET_BUNDLE_REFRESH,
+        # Uptime-monitoring increment: the synthetic probe joined the
+        # default-on set alongside app.down/recovered alerting.
+        ScheduleKind.UPTIME_PROBE,
     }
     assert PHASE_3A_ACTIVE_KINDS == expected
     assert resolve_active_kinds(None) == frozenset(expected)
@@ -257,9 +260,7 @@ async def test_create_path_default_set(monkeypatch):
     assert client.updated == []
 
     # HELD kinds must NOT be created.
-    held_ids = {
-        schedule_id_for(kind=k) for k in (set(ScheduleKind) - PHASE_3A_ACTIVE_KINDS)
-    }
+    held_ids = {schedule_id_for(kind=k) for k in (set(ScheduleKind) - PHASE_3A_ACTIVE_KINDS)}
     assert created_ids.isdisjoint(held_ids)
     # Spot-check a few HOLD ids explicitly.
     for k in (
@@ -361,9 +362,7 @@ async def test_update_path_on_workflow_name_drift(monkeypatch):
 @pytest.mark.asyncio
 async def test_env_override_controls_what_is_created(monkeypatch):
     """ASTROLIFT_ACTIVE_SCHEDULES adds a HOLD kind + restricts the rest."""
-    monkeypatch.setenv(
-        ACTIVE_SCHEDULES_ENV, "agent_reconcile_tick,prune_audit_log"
-    )
+    monkeypatch.setenv(ACTIVE_SCHEDULES_ENV, "agent_reconcile_tick,prune_audit_log")
     client = _FakeClient(existing=[])
     await register_schedules(client)
 

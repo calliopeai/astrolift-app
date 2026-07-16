@@ -297,9 +297,7 @@ def _bucket_pods_by_status(pods: list) -> list[WorkloadPodStatusBucketType]:
     return buckets
 
 
-def _compute_manifest_diff(
-    snap_a: dict, snap_b: dict
-) -> list[ManifestDiffEntryType]:
+def _compute_manifest_diff(snap_a: dict, snap_b: dict) -> list[ManifestDiffEntryType]:
     """Flat JSON-patch list for the manifest diff surface (#737).
 
     Walks the top-level keys of both snapshots.  For each key:
@@ -315,18 +313,12 @@ def _compute_manifest_diff(
         in_a = key in snap_a
         in_b = key in snap_b
         if in_a and not in_b:
-            entries.append(
-                ManifestDiffEntryType(op="remove", path=key, before=snap_a[key], after=None)
-            )
+            entries.append(ManifestDiffEntryType(op="remove", path=key, before=snap_a[key], after=None))
         elif not in_a and in_b:
-            entries.append(
-                ManifestDiffEntryType(op="add", path=key, before=None, after=snap_b[key])
-            )
+            entries.append(ManifestDiffEntryType(op="add", path=key, before=None, after=snap_b[key]))
         elif snap_a[key] != snap_b[key]:
             entries.append(
-                ManifestDiffEntryType(
-                    op="replace", path=key, before=snap_a[key], after=snap_b[key]
-                )
+                ManifestDiffEntryType(op="replace", path=key, before=snap_a[key], after=snap_b[key])
             )
     return entries
 
@@ -392,9 +384,13 @@ class LifecycleQuery:
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_environments(self, info: Info, app_slug: str | None = None) -> list[AppEnvironmentType]:
-        qs = AppEnvironment.objects.select_related(
-            "registered_app", "tenant_cluster", "tenant_cluster__provider_plugin", "managed_domain"
-        ).prefetch_related("settings").order_by("registered_app__slug", "name")
+        qs = (
+            AppEnvironment.objects.select_related(
+                "registered_app", "tenant_cluster", "tenant_cluster__provider_plugin", "managed_domain"
+            )
+            .prefetch_related("settings")
+            .order_by("registered_app__slug", "name")
+        )
         if app_slug:
             qs = qs.filter(registered_app__slug=app_slug)
         return [app_env_to_type(e) for e in qs[:300]]
@@ -510,9 +506,7 @@ class LifecycleQuery:
     @strawberry.field
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
-    def astrolift_deployment_release_notes(
-        self, info: Info, deployment_id: str
-    ) -> ReleaseNotesType | None:
+    def astrolift_deployment_release_notes(self, info: Info, deployment_id: str) -> ReleaseNotesType | None:
         """Merged-PR descriptions + non-merge commit subjects between the
         previous-successful deploy's SHA and this deploy's SHA (#738).
 
@@ -873,10 +867,7 @@ class LifecycleQuery:
         # event lookup is best-effort: empty dict on driver failure
         # means the rows render without chips.
         warnings = _recent_pod_warnings_for_app(app_slug, environment_name=environment_name)
-        return [
-            pod_info_to_type(p, recent_error_event=_event_to_type(warnings.get(p.name)))
-            for p in pods
-        ]
+        return [pod_info_to_type(p, recent_error_event=_event_to_type(warnings.get(p.name))) for p in pods]
 
     @strawberry.field
     @require_permission(Permission.APP_READ_LOGS)

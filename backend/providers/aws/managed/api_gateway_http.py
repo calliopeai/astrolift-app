@@ -183,7 +183,10 @@ class ApiGatewayHttpDriver:
             pass
         except Exception as exc:
             return DeprovisionResult(
-                ok=False, handle=spec.handle, message=f"delete_api: {exc}", errors=[str(exc)],
+                ok=False,
+                handle=spec.handle,
+                message=f"delete_api: {exc}",
+                errors=[str(exc)],
             )
         return DeprovisionResult(ok=True, handle=spec.handle, message=f"http api {api_id} deleted")
 
@@ -196,7 +199,9 @@ class ApiGatewayHttpDriver:
             self._api.get_api(ApiId=api_id)
         except self._api.exceptions.NotFoundException:
             return ServiceStatus(
-                handle=handle.handle, state="deprovisioned", message=f"http api {api_id} does not exist",
+                handle=handle.handle,
+                state="deprovisioned",
+                message=f"http api {api_id} does not exist",
             )
         except Exception as exc:
             return ServiceStatus(handle=handle.handle, state="error", message=str(exc))
@@ -218,14 +223,16 @@ class ApiGatewayHttpDriver:
     @driver_op(cloud="aws", driver="api_gateway_http")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         raise ManagedServiceError(
-            "an HTTP API has no snapshot semantic -- it is reconstructed from "
-            "the function ARN on every provision",
+            "an HTTP API has no snapshot semantic -- it is reconstructed from the function ARN on every provision",
         )
 
     @driver_op(cloud="aws", driver="api_gateway_http")
     def restore(self, snapshot: SnapshotHandle, target: ProvisionSpec) -> ProvisionResult:
         return ProvisionResult(
-            ok=False, handle="", message="HTTP API has no snapshot, hence no restore", errors=["not_implemented"],
+            ok=False,
+            handle="",
+            message="HTTP API has no snapshot, hence no restore",
+            errors=["not_implemented"],
         )
 
     @driver_op(cloud="aws", driver="api_gateway_http", heartbeat=False)

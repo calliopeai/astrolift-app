@@ -32,7 +32,7 @@ from azure.managed.cache_redis import (
 # ---- fakes ------------------------------------------------------
 
 
-class _NotFound(Exception):  # noqa: N818
+class _NotFound(Exception):
     pass
 
 

@@ -32,13 +32,13 @@ import re
 import urllib.request
 from typing import Any
 
+from temporalio import activity
+
 _FLUX_VERSION = os.environ.get("ASTROLIFT_FLUX_VERSION", "v2.4.0")
 _FLUX_INSTALL_URL = os.environ.get(
     "ASTROLIFT_FLUX_INSTALL_URL",
     f"https://github.com/fluxcd/flux2/releases/download/{_FLUX_VERSION}/install.yaml",
 )
-
-from temporalio import activity
 
 log = logging.getLogger("astrolift_workflows.activities.install_prereqs")
 

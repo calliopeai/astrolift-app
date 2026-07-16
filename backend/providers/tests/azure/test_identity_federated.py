@@ -29,7 +29,10 @@ class FakeUAIs:
     identities: dict[str, FakeUAI] = field(default_factory=dict)
 
     def create_or_update(
-        self, *, resource_group_name: str, resource_name: str,
+        self,
+        *,
+        resource_group_name: str,
+        resource_name: str,
         parameters: dict[str, Any],
     ) -> FakeUAI:
         sa = FakeUAI(name=resource_name)
@@ -37,14 +40,20 @@ class FakeUAIs:
         return sa
 
     def get(
-        self, *, resource_group_name: str, resource_name: str,
+        self,
+        *,
+        resource_group_name: str,
+        resource_name: str,
     ) -> FakeUAI:
         if resource_name not in self.identities:
             raise _NotFound(resource_name)
         return self.identities[resource_name]
 
     def delete(
-        self, *, resource_group_name: str, resource_name: str,
+        self,
+        *,
+        resource_group_name: str,
+        resource_name: str,
     ) -> None:
         if resource_name not in self.identities:
             raise _NotFound(resource_name)
@@ -56,16 +65,20 @@ class FakeFederatedCredentials:
     creds: list[dict[str, Any]] = field(default_factory=list)
 
     def create_or_update(
-        self, *,
-        resource_group_name: str, resource_name: str,
+        self,
+        *,
+        resource_group_name: str,
+        resource_name: str,
         federated_identity_credential_resource_name: str,
         parameters: dict[str, Any],
     ) -> Any:
-        self.creds.append({
-            "identity": resource_name,
-            "credential_name": federated_identity_credential_resource_name,
-            "parameters": parameters,
-        })
+        self.creds.append(
+            {
+                "identity": resource_name,
+                "credential_name": federated_identity_credential_resource_name,
+                "parameters": parameters,
+            }
+        )
 
 
 @dataclass
@@ -89,16 +102,15 @@ def driver(fake_msi: FakeMSI) -> AzureFederatedIdentityDriver:
             tenant_id="tenant-1",
             subscription_id="sub-1",
             resource_group="rg",
-            cluster_oidc_issuer=(
-                "https://oidc.prod.azure.com/abc"
-            ),
+            cluster_oidc_issuer=("https://oidc.prod.azure.com/abc"),
             msi_client=fake_msi,
         ),
     )
 
 
 def test_create_identity_role(
-    driver: AzureFederatedIdentityDriver, fake_msi: FakeMSI,
+    driver: AzureFederatedIdentityDriver,
+    fake_msi: FakeMSI,
 ) -> None:
     client_id = driver.create_identity_role("api", permissions=[])
     assert client_id == "client-1234"
@@ -106,24 +118,30 @@ def test_create_identity_role(
 
 
 def test_bind_emits_workload_identity_annotation(
-    driver: AzureFederatedIdentityDriver, fake_msi: FakeMSI,
+    driver: AzureFederatedIdentityDriver,
+    fake_msi: FakeMSI,
 ) -> None:
     driver.create_identity_role("api", permissions=[])
     annos = driver.bind_service_account(
-        cluster="aks-prod", namespace="acme-api",
-        sa_name="api-sa", identity_role="api",
+        cluster="aks-prod",
+        namespace="acme-api",
+        sa_name="api-sa",
+        identity_role="api",
     )
     assert annos["azure.workload.identity/client-id"] == "client-1234"
     assert annos["azure.workload.identity/tenant-id"] == "tenant-1"
 
 
 def test_bind_creates_federated_credential(
-    driver: AzureFederatedIdentityDriver, fake_msi: FakeMSI,
+    driver: AzureFederatedIdentityDriver,
+    fake_msi: FakeMSI,
 ) -> None:
     driver.create_identity_role("api", permissions=[])
     driver.bind_service_account(
-        cluster="aks-prod", namespace="ns",
-        sa_name="sa", identity_role="api",
+        cluster="aks-prod",
+        namespace="ns",
+        sa_name="sa",
+        identity_role="api",
     )
     creds = fake_msi.federated_identity_credentials.creds
     assert len(creds) == 1
@@ -135,17 +153,22 @@ def test_bind_creates_federated_credential(
     assert props["issuer"] == "https://oidc.prod.azure.com/abc"
 
 
-def test_bind_without_msi_client_raises(
-) -> None:
+def test_bind_without_msi_client_raises() -> None:
     driver = AzureFederatedIdentityDriver(
         config=FederatedIdentityConfig(
-            tenant_id="t", subscription_id="s", resource_group="rg",
-            cluster_oidc_issuer="i", msi_client=None,
+            tenant_id="t",
+            subscription_id="s",
+            resource_group="rg",
+            cluster_oidc_issuer="i",
+            msi_client=None,
         ),
     )
     with pytest.raises(RuntimeError, match="msi_client"):
         driver.bind_service_account(
-            cluster="c", namespace="n", sa_name="s", identity_role="r",
+            cluster="c",
+            namespace="n",
+            sa_name="s",
+            identity_role="r",
         )
 
 
@@ -158,7 +181,8 @@ def test_attach_policy_is_noop(
 
 
 def test_delete_identity_removes_uai(
-    driver: AzureFederatedIdentityDriver, fake_msi: FakeMSI,
+    driver: AzureFederatedIdentityDriver,
+    fake_msi: FakeMSI,
 ) -> None:
     driver.create_identity_role("doomed", permissions=[])
     driver.delete_identity_role("doomed")

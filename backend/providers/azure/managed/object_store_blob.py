@@ -129,7 +129,7 @@ class BlobStorageDriver(ManagedServiceDriver):
         return UpdateResult(
             ok=True,
             handle=spec.handle,
-            message="Blob container access tier / lifecycle policies " "are operator-managed",
+            message="Blob container access tier / lifecycle policies are operator-managed",
         )
 
     @driver_op(
@@ -216,7 +216,7 @@ class BlobStorageDriver(ManagedServiceDriver):
                 ),
                 "AZURE_BLOB_CONTAINER": ValueRef(literal=container_name),
                 "AZURE_BLOB_ENDPOINT": ValueRef(
-                    literal=(f"https://{self._config.storage_account}" f".blob.core.windows.net/{container_name}"),
+                    literal=(f"https://{self._config.storage_account}.blob.core.windows.net/{container_name}"),
                 ),
             },
             iam_grants=[
@@ -231,7 +231,7 @@ class BlobStorageDriver(ManagedServiceDriver):
                 ),
             ],
             notes=(
-                "Workload Identity grants Storage Blob Data Contributor " "via Microsoft.Authorization/roleAssignments."
+                "Workload Identity grants Storage Blob Data Contributor via Microsoft.Authorization/roleAssignments."
             ),
         )
 
@@ -428,7 +428,7 @@ class AzureBlobStorageDriver(ManagedServiceDriver):
             return DeprovisionResult(
                 ok=True,
                 handle=spec.handle,
-                message=(f"container {container_name} retained " f"(force_destroy={force_destroy})"),
+                message=(f"container {container_name} retained (force_destroy={force_destroy})"),
             )
 
         # delete_data=True: actually drop the container.
@@ -521,7 +521,7 @@ class AzureBlobStorageDriver(ManagedServiceDriver):
     @driver_op(cloud="azure", driver="object_store_blob_v2")
     def binding(self, handle: ServiceHandle) -> Binding:
         container_name = self._container_name_from_handle(handle.handle)
-        endpoint = f"https://{self._config.storage_account}" f".blob.core.windows.net/{container_name}"
+        endpoint = f"https://{self._config.storage_account}.blob.core.windows.net/{container_name}"
         container_resource = (
             f"/subscriptions/{self._config.subscription_id}"
             f"/resourceGroups/{self._config.resource_group}"

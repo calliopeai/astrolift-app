@@ -114,49 +114,97 @@ TIMESCALEDB = ExtensionEntry(
 # variants gate on what the cloud's parameter-group surface allows.
 POLICIES: tuple[VariantExtensionPolicy, ...] = (
     VariantExtensionPolicy(
-        plugin_id="aws", variant="rds",
+        plugin_id="aws",
+        variant="rds",
         allow=(
-            PGCRYPTO, UUID_OSSP, PG_TRGM, HSTORE, CITEXT,
-            PG_STAT_STATEMENTS, PG_PARTMAN, PGVECTOR, POSTGIS,
+            PGCRYPTO,
+            UUID_OSSP,
+            PG_TRGM,
+            HSTORE,
+            CITEXT,
+            PG_STAT_STATEMENTS,
+            PG_PARTMAN,
+            PGVECTOR,
+            POSTGIS,
         ),
     ),
     VariantExtensionPolicy(
-        plugin_id="aws", variant="aurora",
+        plugin_id="aws",
+        variant="aurora",
         allow=(
-            PGCRYPTO, UUID_OSSP, PG_TRGM, HSTORE, CITEXT,
-            PG_STAT_STATEMENTS, PG_PARTMAN, PGVECTOR, POSTGIS,
+            PGCRYPTO,
+            UUID_OSSP,
+            PG_TRGM,
+            HSTORE,
+            CITEXT,
+            PG_STAT_STATEMENTS,
+            PG_PARTMAN,
+            PGVECTOR,
+            POSTGIS,
         ),
     ),
     VariantExtensionPolicy(
-        plugin_id="gcp", variant="cloudsql",
+        plugin_id="gcp",
+        variant="cloudsql",
         allow=(
-            PGCRYPTO, UUID_OSSP, PG_TRGM, HSTORE, CITEXT,
-            PG_STAT_STATEMENTS, PG_PARTMAN, PGVECTOR, POSTGIS,
+            PGCRYPTO,
+            UUID_OSSP,
+            PG_TRGM,
+            HSTORE,
+            CITEXT,
+            PG_STAT_STATEMENTS,
+            PG_PARTMAN,
+            PGVECTOR,
+            POSTGIS,
         ),
     ),
     VariantExtensionPolicy(
-        plugin_id="gcp", variant="alloydb",
+        plugin_id="gcp",
+        variant="alloydb",
         allow=(
-            PGCRYPTO, UUID_OSSP, PG_TRGM, HSTORE, CITEXT,
-            PG_STAT_STATEMENTS, PGVECTOR, POSTGIS,
+            PGCRYPTO,
+            UUID_OSSP,
+            PG_TRGM,
+            HSTORE,
+            CITEXT,
+            PG_STAT_STATEMENTS,
+            PGVECTOR,
+            POSTGIS,
         ),
     ),
     VariantExtensionPolicy(
-        plugin_id="azure", variant="flexible_server",
+        plugin_id="azure",
+        variant="flexible_server",
         allow=(
-            PGCRYPTO, UUID_OSSP, PG_TRGM, HSTORE, CITEXT,
-            PG_STAT_STATEMENTS, PG_PARTMAN, PGVECTOR, POSTGIS,
+            PGCRYPTO,
+            UUID_OSSP,
+            PG_TRGM,
+            HSTORE,
+            CITEXT,
+            PG_STAT_STATEMENTS,
+            PG_PARTMAN,
+            PGVECTOR,
+            POSTGIS,
             PG_CRON,
         ),
     ),
     VariantExtensionPolicy(
-        plugin_id="k8s_native", variant="cnpg",
+        plugin_id="k8s_native",
+        variant="cnpg",
         # CNPG runs operator-provisioned containers — anything the
         # image ships works. Allow the full common set.
         allow=(
-            PGCRYPTO, UUID_OSSP, PG_TRGM, HSTORE, CITEXT,
-            PG_STAT_STATEMENTS, PG_CRON, PG_PARTMAN, PGVECTOR,
-            POSTGIS, TIMESCALEDB,
+            PGCRYPTO,
+            UUID_OSSP,
+            PG_TRGM,
+            HSTORE,
+            CITEXT,
+            PG_STAT_STATEMENTS,
+            PG_CRON,
+            PG_PARTMAN,
+            PGVECTOR,
+            POSTGIS,
+            TIMESCALEDB,
         ),
     ),
 )
@@ -172,7 +220,9 @@ class ExtensionValidationResult:
 
 
 def policy_for(
-    *, plugin_id: str, variant: str,
+    *,
+    plugin_id: str,
+    variant: str,
 ) -> VariantExtensionPolicy | None:
     for p in POLICIES:
         if p.plugin_id == plugin_id and p.variant == variant:
@@ -194,7 +244,8 @@ def validate_extensions(
         # Unknown variant — fail closed: reject everything so
         # operator notices the missing policy.
         return ExtensionValidationResult(
-            ok=False, rejected=list(requested),
+            ok=False,
+            rejected=list(requested),
         )
     rejected: list[str] = []
     needs_restart: list[str] = []

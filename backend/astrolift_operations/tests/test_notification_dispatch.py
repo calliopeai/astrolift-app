@@ -563,9 +563,9 @@ def test_dispatcher_module_does_not_define_local_notification_driver_protocol():
     from astrolift_operations import notification_dispatch
 
     proto = notification_dispatch.NotificationDriver
-    assert proto.__module__ == "_sdk.notification", (
-        f"NotificationDriver must come from _sdk.notification; got {proto.__module__!r}"
-    )
+    assert (
+        proto.__module__ == "_sdk.notification"
+    ), f"NotificationDriver must come from _sdk.notification; got {proto.__module__!r}"
 
 
 def test_dispatcher_module_does_not_define_local_notification_payload():

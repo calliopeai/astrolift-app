@@ -1499,6 +1499,6 @@ def test_deregister_workflow_pins_bool_result_type():
     marker = "mark_app_tearing_down,"
     assert marker in src
     call_args = src.split(marker, 1)[1].split("start_to_close_timeout", 1)[0]
-    assert "result_type=bool" in call_args, (
-        "execute_activity(mark_app_tearing_down, ...) must pass result_type=bool"
-    )
+    assert (
+        "result_type=bool" in call_args
+    ), "execute_activity(mark_app_tearing_down, ...) must pass result_type=bool"

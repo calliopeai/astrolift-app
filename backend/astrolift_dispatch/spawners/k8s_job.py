@@ -96,12 +96,10 @@ class K8sJobSpawner(ContainerSpawner):
             conditions = ws.conditions or []
 
             succeeded = any(
-                str(c.get("type")) == "Complete" and str(c.get("status")) == "True"
-                for c in conditions
+                str(c.get("type")) == "Complete" and str(c.get("status")) == "True" for c in conditions
             )
             failed = any(
-                str(c.get("type")) == "Failed" and str(c.get("status")) == "True"
-                for c in conditions
+                str(c.get("type")) == "Failed" and str(c.get("status")) == "True" for c in conditions
             )
 
             return TaskStatus(

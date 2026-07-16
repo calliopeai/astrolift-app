@@ -360,9 +360,7 @@ def test_dispatch_non_agent_workload_rejected(
     """A workload that exists in the caller's org but is not kind=agent is
     rejected with VALIDATION (not dispatched)."""
     permission_resolver.grant(Permission.AGENT_DISPATCH)
-    deployment = _agent_workload(
-        org, app_slug="web-app", workload_slug="web", kind=Workload.Kind.DEPLOYMENT
-    )
+    deployment = _agent_workload(org, app_slug="web-app", workload_slug="web", kind=Workload.Kind.DEPLOYMENT)
 
     with with_tenant_org(org):
         result = AgentsMutation().run_astrolift_agent(

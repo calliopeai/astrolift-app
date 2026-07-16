@@ -166,7 +166,7 @@ def test_filters_include_region_location(
         size="custom",
     )
     estimator.estimate(request)
-    args, kwargs = fake_pricing.get_products.call_args
+    _args, kwargs = fake_pricing.get_products.call_args
     filters = kwargs["Filters"]
     location_filter = next(f for f in filters if f["Field"] == "location")
     assert location_filter["Value"] == "US East (N. Virginia)"

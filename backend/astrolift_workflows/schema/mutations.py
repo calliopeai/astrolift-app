@@ -429,6 +429,8 @@ class WorkflowsMutation:
         agent_definition_guid: str | None = None,
         skill_refs: JSON | None = None,
         fan_out_count: int | None = None,
+        prompt: str | None = None,
+        approvers: JSON | None = None,
     ) -> MutationResult:
         from workflows.models import WorkflowStage
         from workflows.schema.mutations import _definition_write_error
@@ -461,6 +463,10 @@ class WorkflowsMutation:
             stage.skill_refs = skill_refs
         if fan_out_count is not None:
             stage.fan_out_count = fan_out_count
+        if prompt is not None:
+            stage.prompt = prompt
+        if approvers is not None:
+            stage.approvers = approvers
         if agent_definition_guid is not None:
             from astrolift_registry.models import Workload
 

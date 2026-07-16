@@ -22,9 +22,11 @@ def test_render_certificate_basic() -> None:
 
 
 def test_render_uses_cluster_issuer() -> None:
-    driver = CertManagerDriver(config=CertManagerConfig(
-        cluster_issuer="letsencrypt-staging",
-    ))
+    driver = CertManagerDriver(
+        config=CertManagerConfig(
+            cluster_issuer="letsencrypt-staging",
+        )
+    )
     cert = driver.render_certificate(domain="api.acme.example")
     assert cert["spec"]["issuerRef"]["name"] == "letsencrypt-staging"
     assert cert["spec"]["issuerRef"]["kind"] == "ClusterIssuer"
@@ -44,7 +46,8 @@ def test_unknown_strategy_rejected() -> None:
     driver = CertManagerDriver()
     with pytest.raises(ValueError):
         driver.ensure_certificate(
-            domain="api.acme.example", strategy="weird",
+            domain="api.acme.example",
+            strategy="weird",
         )
 
 
@@ -61,11 +64,15 @@ def test_ensure_certificate_applies_when_cluster_driver_bound() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = ApplyResult(
         created=["Certificate/api-acme-example"],
-        updated=[], unchanged=[], errors=[],
+        updated=[],
+        unchanged=[],
+        errors=[],
     )
-    driver = CertManagerDriver(config=CertManagerConfig(
-        cluster_driver=cluster_driver,
-    ))
+    driver = CertManagerDriver(
+        config=CertManagerConfig(
+            cluster_driver=cluster_driver,
+        )
+    )
     driver.ensure_certificate(domain="api.acme.example")
     cluster_driver.apply_manifests.assert_called_once()
 
@@ -74,11 +81,14 @@ def test_revoke_certificate_calls_delete() -> None:
     cluster_driver = MagicMock()
     cluster_driver.delete_manifests.return_value = DeleteResult(
         deleted=["Certificate/api-acme-example"],
-        not_found=[], errors=[],
+        not_found=[],
+        errors=[],
     )
-    driver = CertManagerDriver(config=CertManagerConfig(
-        cluster_driver=cluster_driver,
-    ))
+    driver = CertManagerDriver(
+        config=CertManagerConfig(
+            cluster_driver=cluster_driver,
+        )
+    )
     driver.revoke_certificate("api-acme-example")
     cluster_driver.delete_manifests.assert_called_once()
 

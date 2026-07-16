@@ -28,7 +28,10 @@ class FakeHttp:
     last_params: dict[str, str] = field(default_factory=dict)
 
     def get(
-        self, url: str, *, params: dict[str, str] | None = None,
+        self,
+        url: str,
+        *,
+        params: dict[str, str] | None = None,
     ) -> Any:
         self.last_url = url
         self.last_params = dict(params or {})
@@ -51,55 +54,69 @@ def driver(fake_http: FakeHttp) -> PrometheusMetricsDriver:
 
 
 def test_promql_label_matchers_serialized(
-    driver: PrometheusMetricsDriver, fake_http: FakeHttp,
+    driver: PrometheusMetricsDriver,
+    fake_http: FakeHttp,
 ) -> None:
-    fake_http.response = FakeResponse(body={
-        "status": "success",
-        "data": {"result": []},
-    })
+    fake_http.response = FakeResponse(
+        body={
+            "status": "success",
+            "data": {"result": []},
+        }
+    )
     driver.query_metric(
         metric="http_requests_total",
         labels={"app": "api", "method": "GET"},
         range_start="2026-05-01T00:00:00Z",
         range_end="2026-05-01T01:00:00Z",
     )
-    assert fake_http.last_params["query"] == (
-        'http_requests_total{app="api",method="GET"}'
-    )
+    assert fake_http.last_params["query"] == ('http_requests_total{app="api",method="GET"}')
 
 
 def test_query_returns_empty_series_on_no_results(
-    driver: PrometheusMetricsDriver, fake_http: FakeHttp,
+    driver: PrometheusMetricsDriver,
+    fake_http: FakeHttp,
 ) -> None:
-    fake_http.response = FakeResponse(body={
-        "status": "success", "data": {"result": []},
-    })
+    fake_http.response = FakeResponse(
+        body={
+            "status": "success",
+            "data": {"result": []},
+        }
+    )
     series = driver.query_metric(
-        metric="up", labels={},
-        range_start="0", range_end="1",
+        metric="up",
+        labels={},
+        range_start="0",
+        range_end="1",
     )
     assert series.metric == "up"
     assert series.datapoints == []
 
 
 def test_query_parses_datapoints(
-    driver: PrometheusMetricsDriver, fake_http: FakeHttp,
+    driver: PrometheusMetricsDriver,
+    fake_http: FakeHttp,
 ) -> None:
-    fake_http.response = FakeResponse(body={
-        "status": "success",
-        "data": {
-            "result": [{
-                "metric": {"__name__": "up", "job": "api"},
-                "values": [
-                    [1717200000, "1"],
-                    [1717200060, "0"],
+    fake_http.response = FakeResponse(
+        body={
+            "status": "success",
+            "data": {
+                "result": [
+                    {
+                        "metric": {"__name__": "up", "job": "api"},
+                        "values": [
+                            [1717200000, "1"],
+                            [1717200060, "0"],
+                        ],
+                    }
                 ],
-            }],
-        },
-    })
+            },
+        }
+    )
     series = driver.query_metric(
-        metric="up", labels={"job": "api"},
-        range_start="0", range_end="1",
+        metric="up",
+        labels={"job": "api"},
+        range_start="0",
+        range_end="1",
     )
     assert len(series.datapoints) == 2
     assert series.datapoints[0].value == 1.0
@@ -109,25 +126,38 @@ def test_query_parses_datapoints(
 
 
 def test_query_failure_raises(
-    driver: PrometheusMetricsDriver, fake_http: FakeHttp,
+    driver: PrometheusMetricsDriver,
+    fake_http: FakeHttp,
 ) -> None:
-    fake_http.response = FakeResponse(body={
-        "status": "error", "error": "bad query",
-    })
+    fake_http.response = FakeResponse(
+        body={
+            "status": "error",
+            "error": "bad query",
+        }
+    )
     with pytest.raises(RuntimeError, match="prometheus query failed"):
         driver.query_metric(
-            metric="bad", labels={}, range_start="0", range_end="1",
+            metric="bad",
+            labels={},
+            range_start="0",
+            range_end="1",
         )
 
 
 def test_no_labels_emits_bare_metric(
-    driver: PrometheusMetricsDriver, fake_http: FakeHttp,
+    driver: PrometheusMetricsDriver,
+    fake_http: FakeHttp,
 ) -> None:
-    fake_http.response = FakeResponse(body={
-        "status": "success", "data": {"result": []},
-    })
+    fake_http.response = FakeResponse(
+        body={
+            "status": "success",
+            "data": {"result": []},
+        }
+    )
     driver.query_metric(
-        metric="bare_metric", labels={},
-        range_start="0", range_end="1",
+        metric="bare_metric",
+        labels={},
+        range_start="0",
+        range_end="1",
     )
     assert fake_http.last_params["query"] == "bare_metric"

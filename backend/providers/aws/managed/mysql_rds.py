@@ -168,7 +168,7 @@ class RDSMySQLDriver(ManagedServiceDriver):
             return ProvisionResult(
                 ok=True,
                 handle=handle_for(kind=KIND, resource_id=instance_id),
-                message=(f"db instance {instance_id} already exists " f"(status={existing.get('DBInstanceStatus')})"),
+                message=(f"db instance {instance_id} already exists (status={existing.get('DBInstanceStatus')})"),
             )
 
         master_password = _generate_master_password()
@@ -241,7 +241,7 @@ class RDSMySQLDriver(ManagedServiceDriver):
         return ProvisionResult(
             ok=True,
             handle=handle_for(kind=KIND, resource_id=instance_id),
-            message=(f"db instance {instance_id} provisioning " f"(password in {secret_arn})"),
+            message=(f"db instance {instance_id} provisioning (password in {secret_arn})"),
         )
 
     @driver_op(cloud="aws", driver="mysql_rds")
@@ -341,7 +341,7 @@ class RDSMySQLDriver(ManagedServiceDriver):
                 ok=False,
                 handle=spec.handle,
                 message=(
-                    f"db instance {instance_id} has DeletionProtection " f"enabled -- pass force_destroy=True to bypass"
+                    f"db instance {instance_id} has DeletionProtection enabled -- pass force_destroy=True to bypass"
                 ),
                 errors=["deletion_protection_enabled"],
             )
@@ -446,7 +446,7 @@ class RDSMySQLDriver(ManagedServiceDriver):
         from datetime import UTC, datetime
 
         _, instance_id = parse_handle(handle.handle)
-        snap_id = f"{instance_id}-snap-" f"{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
+        snap_id = f"{instance_id}-snap-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
         try:
             self._rds.create_db_snapshot(
                 DBInstanceIdentifier=instance_id,
@@ -525,7 +525,7 @@ class RDSMySQLDriver(ManagedServiceDriver):
                 "DATABASE_NAME": "Initial database name",
                 "DATABASE_USER": "Master username (astrolift)",
                 "DATABASE_PASSWORD": ("Secrets Manager ref to the master password"),
-                "DATABASE_URL": ("Secrets Manager ref to the fully-formed " "mysql:// connection string"),
+                "DATABASE_URL": ("Secrets Manager ref to the fully-formed mysql:// connection string"),
             },
         )
 
@@ -577,7 +577,7 @@ class RDSMySQLDriver(ManagedServiceDriver):
             resp = self._sm.create_secret(
                 Name=name,
                 Description=(
-                    f"Master password for RDS MySQL {instance_id} " f"(app {spec.app_slug}/{spec.environment_name})"
+                    f"Master password for RDS MySQL {instance_id} (app {spec.app_slug}/{spec.environment_name})"
                 ),
                 SecretString=password,
                 Tags=tags_for(spec),

@@ -18,13 +18,11 @@ steps in the pipeline. Per-job scoping is explicitly a v2 concern.
 
 from __future__ import annotations
 
-import hashlib
 import logging
-import secrets as _secrets_stdlib
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from astrolift_pipelines.models import PipelineRun, JobRun
+    from astrolift_pipelines.models import JobRun, PipelineRun
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +34,7 @@ class SecretResolutionError(Exception):
     """Raised when one or more pipeline secrets cannot be resolved."""
 
 
-def resolve_pipeline_secrets(pipeline_run: "PipelineRun", secret_names: list[str]) -> dict[str, str]:
+def resolve_pipeline_secrets(pipeline_run: PipelineRun, secret_names: list[str]) -> dict[str, str]:
     """Resolve a list of secret names from the org's tenant secret store.
 
     Returns a mapping of {secret_name: plaintext_value}. Raises
@@ -73,13 +71,14 @@ def _read_org_secret(org, name: str) -> str | None:
     """
     try:
         from astrolift_lifecycle.services.secrets import read_org_secret
+
         return read_org_secret(org, name)
     except Exception:  # noqa: BLE001
         return None
 
 
 def materialize_job_secrets(
-    job_run: "JobRun",
+    job_run: JobRun,
     secret_bundle: dict[str, str],
     *,
     namespace: str,
@@ -124,7 +123,7 @@ def materialize_job_secrets(
 
 
 def cleanup_job_secrets(
-    job_run: "JobRun",
+    job_run: JobRun,
     *,
     namespace: str,
     cluster,
@@ -148,7 +147,6 @@ def cleanup_job_secrets(
 
 def _apply_k8s_secret(cluster, manifest: dict, namespace: str) -> None:
     """Apply a K8s Secret manifest via the cluster's dynamic client."""
-    from core.app_deploy import driver_for_capability
     from core.cluster_observability import get_dynamic_client
 
     client = get_dynamic_client(cluster)

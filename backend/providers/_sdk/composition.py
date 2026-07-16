@@ -68,11 +68,13 @@ class CompositionRegistry:
             raise ValueError(
                 "delegation requires distinct target + source plugins",
             )
-        self.delegated_drivers.append(DelegatedDriver(
-            target_plugin_id=target_plugin_id,
-            role=role,
-            source_plugin_id=source_plugin_id,
-        ))
+        self.delegated_drivers.append(
+            DelegatedDriver(
+                target_plugin_id=target_plugin_id,
+                role=role,
+                source_plugin_id=source_plugin_id,
+            )
+        )
 
     def delegate_managed_service(
         self,
@@ -86,12 +88,14 @@ class CompositionRegistry:
             raise ValueError(
                 "delegation requires distinct target + source plugins",
             )
-        self.delegated_managed_services.append(DelegatedManagedService(
-            target_plugin_id=target_plugin_id,
-            kind=kind,
-            variant=variant,
-            source_plugin_id=source_plugin_id,
-        ))
+        self.delegated_managed_services.append(
+            DelegatedManagedService(
+                target_plugin_id=target_plugin_id,
+                kind=kind,
+                variant=variant,
+                source_plugin_id=source_plugin_id,
+            )
+        )
 
     def resolve_driver(
         self,
@@ -103,10 +107,7 @@ class CompositionRegistry:
         when delegation applies, or None when the target plugin's
         own driver should be used."""
         for delegation in self.delegated_drivers:
-            if (
-                delegation.target_plugin_id == target_plugin_id
-                and delegation.role == role
-            ):
+            if delegation.target_plugin_id == target_plugin_id and delegation.role == role:
                 return delegation.source_plugin_id
         return None
 

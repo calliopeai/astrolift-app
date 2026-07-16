@@ -79,7 +79,9 @@ def teardown_pipeline_namespace(namespace: str, cluster) -> None:
         ns_api.delete(name=namespace)
         logger.info("pipelines.isolation: namespace %s deleted", namespace)
     except Exception:  # noqa: BLE001
-        logger.warning("pipelines.isolation: could not delete namespace %s — manual cleanup needed", namespace)
+        logger.warning(
+            "pipelines.isolation: could not delete namespace %s — manual cleanup needed", namespace
+        )
 
 
 # ---------------------------------------------------------------------------

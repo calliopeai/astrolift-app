@@ -36,7 +36,9 @@ def subscribed():
     _events_mod._subscribers[:] = snapshot
 
 
-def _admin(org, email: str = "admin@astrolift.dev"):
+def _admin(org, email: str = "ops-admin@astrolift.dev"):
+    # NB: not admin@ — the derived username would collide with the
+    # migration-seeded ``admin`` user in the test database.
     user = User.objects.create(email=email, username=email.split("@")[0])
     Member.objects.create(
         user=user,
@@ -100,9 +102,7 @@ def test_no_email_when_flag_off(subscribed):
 def test_per_user_email_optout_suppresses(subscribed):
     org = _org()
     user = _admin(org)
-    NotificationPreference.objects.create(
-        user=user, channel="email", event_kind="app.down", enabled=False
-    )
+    NotificationPreference.objects.create(user=user, channel="email", event_kind="app.down", enabled=False)
     with (
         mock.patch("astrolift_operations.notification_email.notifications_email_enabled", return_value=True),
         mock.patch("astrolift_operations.notification_email.send_notice_email") as send,

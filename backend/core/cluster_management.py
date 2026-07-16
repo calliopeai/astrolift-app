@@ -220,10 +220,7 @@ def provider_regions_dispatch(*, provider_plugin_slug: str) -> list[dict[str, st
         raise ClusterManagementError(
             f"plugin {provider_plugin_slug!r}: list_regions raised {exc}",
         ) from exc
-    return [
-        {"id": r.id, "label": r.label, "continent": r.continent}
-        for r in regions
-    ]
+    return [{"id": r.id, "label": r.label, "continent": r.continent} for r in regions]
 
 
 def cognito_user_pools_dispatch(*, cluster: TenantCluster) -> list[dict[str, str]]:
@@ -280,10 +277,7 @@ def cognito_user_pool_clients_dispatch(
         raise ClusterManagementError(
             f"cluster {cluster.slug}: list_cognito_user_pool_clients raised {exc}",
         ) from exc
-    return [
-        {"client_id": c.client_id, "client_name": c.client_name}
-        for c in clients
-    ]
+    return [{"client_id": c.client_id, "client_name": c.client_name} for c in clients]
 
 
 def bring_cluster_into_management(
@@ -516,7 +510,7 @@ def build_agent_manifests(cluster: TenantCluster) -> list[dict[str, Any]]:
                                     },
                                 ],
                             }
-                        ]
+                        ],
                     },
                 },
             },

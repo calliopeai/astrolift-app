@@ -20,7 +20,7 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from astrolift_pipelines.models import JobRun, PipelineRun
+    pass
 
 logger = logging.getLogger(__name__)
 

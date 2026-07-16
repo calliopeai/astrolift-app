@@ -27,19 +27,19 @@ from aws.managed.cdn_cloudfront import (
 # ---- recording fakes -------------------------------------------------
 
 
-class _DistributionAlreadyExists(Exception):  # noqa: N818 -- mimics SDK class name
+class _DistributionAlreadyExists(Exception):
     pass
 
 
-class _CNAMEAlreadyExists(Exception):  # noqa: N818 -- mimics SDK class name
+class _CNAMEAlreadyExists(Exception):
     pass
 
 
-class _NoSuchDistribution(Exception):  # noqa: N818 -- mimics SDK class name
+class _NoSuchDistribution(Exception):
     pass
 
 
-class _OriginAccessControlAlreadyExists(Exception):  # noqa: N818 -- mimics SDK class name
+class _OriginAccessControlAlreadyExists(Exception):
     pass
 
 

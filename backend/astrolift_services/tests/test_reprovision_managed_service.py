@@ -42,9 +42,7 @@ def _make_user(username: str = "reprovision-test"):
 def _scaffold():
     org = Organization.objects.create(name="Acme", slug="acme-reprv")
     team = Team.objects.create(organization=org, name="Eng", slug="eng-reprv")
-    project = Project.objects.create(
-        organization=org, team=team, name="Demo", slug="demo-reprv"
-    )
+    project = Project.objects.create(organization=org, team=team, name="Demo", slug="demo-reprv")
     ProviderPlugin.objects.bulk_create(
         [
             ProviderPlugin(

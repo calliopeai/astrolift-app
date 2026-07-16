@@ -83,7 +83,7 @@ class AzureDNSDriver(DnsDriver):
         except Exception as exc:
             if exc.__class__.__name__ == "ResourceNotFoundError":
                 raise NotFoundError(
-                    f"record {name} ({record_type}) in zone {zone} " f"not found",
+                    f"record {name} ({record_type}) in zone {zone} not found",
                 ) from exc
             raise map_api_error(exc) from exc
 

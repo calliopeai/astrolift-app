@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator
+from typing import TYPE_CHECKING
 
 import boto3
 import pytest
@@ -15,6 +15,9 @@ from _sdk.managed_service import (
 )
 from aws.managed._base import ManagedServiceError, parse_handle
 from aws.managed.queue_sqs import KIND, SQSConfig, SQSDriver
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @pytest.fixture
@@ -69,7 +72,8 @@ def test_provision_idempotent(driver: SQSDriver) -> None:
 
 
 def test_provision_fifo_when_configured(
-    driver: SQSDriver, sqs_client,
+    driver: SQSDriver,
+    sqs_client,
 ) -> None:
     result = driver.provision(_spec(config={"fifo": True}))
     _, queue_name = parse_handle(result.handle)
@@ -88,7 +92,8 @@ def test_provision_default_size_small(driver: SQSDriver, sqs_client) -> None:
 
 
 def test_provision_large_size_higher_visibility(
-    driver: SQSDriver, sqs_client,
+    driver: SQSDriver,
+    sqs_client,
 ) -> None:
     result = driver.provision(_spec(size="large"))
     _, queue_name = parse_handle(result.handle)
@@ -101,11 +106,14 @@ def test_provision_large_size_higher_visibility(
 
 
 def test_provision_explicit_visibility_in_config(
-    driver: SQSDriver, sqs_client,
+    driver: SQSDriver,
+    sqs_client,
 ) -> None:
-    result = driver.provision(_spec(
-        config={"visibility_timeout_seconds": 120},
-    ))
+    result = driver.provision(
+        _spec(
+            config={"visibility_timeout_seconds": 120},
+        )
+    )
     _, queue_name = parse_handle(result.handle)
     response = sqs_client.get_queue_url(QueueName=queue_name)
     attrs = sqs_client.get_queue_attributes(
@@ -188,7 +196,8 @@ def test_deprovision_deletes_queue(driver: SQSDriver, sqs_client) -> None:
     result = driver.provision(_spec())
     _, queue_name = parse_handle(result.handle)
     deprov = driver.deprovision(
-        DeprovisionSpec(handle=result.handle), delete_data=True,
+        DeprovisionSpec(handle=result.handle),
+        delete_data=True,
     )
     assert deprov.ok is True
     response = sqs_client.list_queues()
@@ -198,7 +207,8 @@ def test_deprovision_deletes_queue(driver: SQSDriver, sqs_client) -> None:
 
 def test_deprovision_already_gone_idempotent(driver: SQSDriver) -> None:
     deprov = driver.deprovision(
-        DeprovisionSpec(handle="queue/never-existed"), delete_data=True,
+        DeprovisionSpec(handle="queue/never-existed"),
+        delete_data=True,
     )
     assert deprov.ok is True
 

@@ -91,7 +91,8 @@ class DnsDriver(Protocol):
         )
 
     def provision_zone(self, zone: str) -> dict[str, Any]:
-        """Provision a new hosted zone for the given domain. Returns zone metadata including the authoritative nameservers to set at the registrar."""
+        """Provision a new hosted zone for the given domain. Returns zone
+        metadata including the authoritative nameservers to set at the registrar."""
         from _sdk import UnsupportedOperationError
 
         raise UnsupportedOperationError(
@@ -99,7 +100,8 @@ class DnsDriver(Protocol):
         )
 
     def request_wildcard_cert(self, zone: str, zone_id: str) -> dict[str, Any]:
-        """Request a wildcard cert for *.<zone> via the cloud cert service. Returns cert metadata and DNS validation records to write into the zone."""
+        """Request a wildcard cert for *.<zone> via the cloud cert service. Returns
+        cert metadata and DNS validation records to write into the zone."""
         from _sdk import UnsupportedOperationError
 
         raise UnsupportedOperationError(
@@ -107,7 +109,8 @@ class DnsDriver(Protocol):
         )
 
     def poll_cert_status(self, zone: str, cert_id: str) -> dict[str, Any]:
-        """Poll the issuance status of a cert by its cert_id. Returns status ('pending'/'issued'/'failed') and the final cert identifier once issued."""
+        """Poll the issuance status of a cert by its cert_id. Returns status
+        ('pending'/'issued'/'failed') and the final cert identifier once issued."""
         from _sdk import UnsupportedOperationError
 
         raise UnsupportedOperationError(
@@ -123,6 +126,7 @@ class DnsDriver(Protocol):
         cert; Azure → delete Key Vault cert; k8s-native → delete Certificate CR.
         """
         from _sdk import UnsupportedOperationError
+
         raise UnsupportedOperationError(
             f"dns.revoke_cert({zone=}, {cert_id=}) not supported on this driver",
         )

@@ -56,7 +56,9 @@ def aws_mock() -> Generator:
             ("10.0.2.0/24", "us-east-1b"),
         ):
             sub = ec2.create_subnet(
-                VpcId=vpc, CidrBlock=cidr, AvailabilityZone=az,
+                VpcId=vpc,
+                CidrBlock=cidr,
+                AvailabilityZone=az,
             )["Subnet"]["SubnetId"]
             subnets.append(sub)
         rds.create_db_subnet_group(
@@ -116,7 +118,8 @@ def _spec(**overrides) -> ProvisionSpec:
 
 
 def test_provision_creates_db_instance(
-    driver: RDSPostgresDriver, rds_client,
+    driver: RDSPostgresDriver,
+    rds_client,
 ) -> None:
     result = driver.provision(_spec())
     assert result.ok is True
@@ -144,21 +147,21 @@ def test_provision_idempotent(driver: RDSPostgresDriver) -> None:
 
 
 def test_provision_stores_master_password_in_secrets_manager(
-    driver: RDSPostgresDriver, sm_client,
+    driver: RDSPostgresDriver,
+    sm_client,
 ) -> None:
     result = driver.provision(_spec())
     _, instance_id = parse_handle(result.handle)
-    secret_name = (
-        f"astrolift/rds/{instance_id}/master"
-    )
+    secret_name = f"astrolift/rds/{instance_id}/master"
     resp = sm_client.get_secret_value(SecretId=secret_name)
     assert len(resp["SecretString"]) >= 16
     # Password is opaque, but matches our generator's character set
-    assert all(c.isascii() and c not in "/@\"\\ " for c in resp["SecretString"])
+    assert all(c.isascii() and c not in '/@"\\ ' for c in resp["SecretString"])
 
 
 def test_provision_honours_size_to_instance_class(
-    driver: RDSPostgresDriver, rds_client,
+    driver: RDSPostgresDriver,
+    rds_client,
 ) -> None:
     result = driver.provision(_spec(size="large"))
     _, instance_id = parse_handle(result.handle)
@@ -170,7 +173,8 @@ def test_provision_honours_size_to_instance_class(
 
 
 def test_provision_honours_spec_config_override(
-    driver: RDSPostgresDriver, rds_client,
+    driver: RDSPostgresDriver,
+    rds_client,
 ) -> None:
     result = driver.provision(
         _spec(
@@ -202,7 +206,8 @@ def _arn_for(rds_client, instance_id: str) -> str:
 
 
 def test_provision_tags_db_instance(
-    driver: RDSPostgresDriver, rds_client,
+    driver: RDSPostgresDriver,
+    rds_client,
 ) -> None:
     result = driver.provision(_spec())
     _, instance_id = parse_handle(result.handle)
@@ -216,7 +221,8 @@ def test_provision_tags_db_instance(
 
 
 def test_provision_stamps_binding_and_managed_service_ids(
-    driver: RDSPostgresDriver, rds_client,
+    driver: RDSPostgresDriver,
+    rds_client,
 ) -> None:
     """#438: cost collector joins on astrolift.io/binding +
     astrolift.io/managed_service_id. Both must land on the cloud-side
@@ -255,7 +261,8 @@ def test_update_resize(driver: RDSPostgresDriver, rds_client) -> None:
 
 
 def test_update_engine_version(
-    driver: RDSPostgresDriver, rds_client,
+    driver: RDSPostgresDriver,
+    rds_client,
 ) -> None:
     provisioned = driver.provision(_spec())
     result = driver.update(
@@ -296,7 +303,8 @@ def test_deprovision_default_takes_snapshot_respects_protection(
 
 
 def test_deprovision_delete_data_only_skips_snapshot(
-    driver: RDSPostgresDriver, rds_client,
+    driver: RDSPostgresDriver,
+    rds_client,
 ) -> None:
     # Disable DeletionProtection at provision time so this corner
     # of the matrix can complete without force_destroy.
@@ -364,7 +372,8 @@ def test_deprovision_idempotent_when_already_gone(
 
 
 def test_deprovision_with_data_delete_drops_master_password_secret(
-    driver: RDSPostgresDriver, sm_client,
+    driver: RDSPostgresDriver,
+    sm_client,
 ) -> None:
     provisioned = driver.provision(
         _spec(config={"deletion_protection": False}),
@@ -394,7 +403,8 @@ def test_status_for_missing_returns_deprovisioned(
 
 
 def test_status_maps_available_to_protocol(
-    driver: RDSPostgresDriver, rds_client,
+    driver: RDSPostgresDriver,
+    rds_client,
 ) -> None:
     provisioned = driver.provision(_spec())
     # moto reports "available" immediately
@@ -413,18 +423,19 @@ def test_binding_returns_connection_envelope(
         ServiceHandle(handle=provisioned.handle),
     )
     env = binding.env_vars
-    assert "DATABASE_HOST" in env
-    assert "DATABASE_PORT" in env
-    assert "DATABASE_NAME" in env
-    assert "DATABASE_USER" in env
-    assert "DATABASE_PASSWORD" in env
+    # Canonical postgres envelope (#1003).
+    assert "POSTGRES_HOST" in env
+    assert "POSTGRES_PORT" in env
+    assert "POSTGRES_DB" in env
+    assert "POSTGRES_USER" in env
+    assert "POSTGRES_PASSWORD" in env
     assert "DATABASE_URL" in env
     # Password + URL come via secret_ref, not literal
-    assert env["DATABASE_PASSWORD"].secret_ref is not None
-    assert env["DATABASE_PASSWORD"].literal is None
+    assert env["POSTGRES_PASSWORD"].secret_ref is not None
+    assert env["POSTGRES_PASSWORD"].literal is None
     # Host/port/user/db are literal
-    assert env["DATABASE_HOST"].literal is not None
-    assert env["DATABASE_USER"].literal == "astrolift"
+    assert env["POSTGRES_HOST"].literal is not None
+    assert env["POSTGRES_USER"].literal == "astrolift"
 
 
 def test_binding_iam_grant_scoped_to_secret(
@@ -448,7 +459,8 @@ def test_binding_for_missing_raises(driver: RDSPostgresDriver) -> None:
 
 
 def test_snapshot_creates_handle(
-    driver: RDSPostgresDriver, rds_client,
+    driver: RDSPostgresDriver,
+    rds_client,
 ) -> None:
     provisioned = driver.provision(_spec())
     snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
@@ -470,7 +482,8 @@ def test_snapshot_surfaces_driver_error(
 
 
 def test_restore_from_snapshot_creates_new_instance(
-    driver: RDSPostgresDriver, rds_client,
+    driver: RDSPostgresDriver,
+    rds_client,
 ) -> None:
     # Take a snapshot from one instance, restore into a new one with
     # a different service_handle_hint so the target instance id
@@ -502,7 +515,8 @@ def test_restore_surfaces_error_on_missing_snapshot(
 
 
 def test_provision_with_kms_and_parameter_group(
-    driver: RDSPostgresDriver, rds_client,
+    driver: RDSPostgresDriver,
+    rds_client,
 ) -> None:
     """KMS key + parameter group are optional config; exercising them
     drives the optional ``if cfg.get(...)`` branches in provision()."""
@@ -518,7 +532,8 @@ def test_provision_with_kms_and_parameter_group(
 
 
 def test_provision_secret_idempotency_updates_existing(
-    driver: RDSPostgresDriver, sm_client,
+    driver: RDSPostgresDriver,
+    sm_client,
 ) -> None:
     """When the password secret already exists (operator retried a
     failed provision), the driver must update it rather than crash."""
@@ -563,7 +578,8 @@ def test_secret_name_for_url_distinct_from_master(
 
 
 def test_status_maps_deleting_to_deprovisioning(
-    driver: RDSPostgresDriver, rds_client,
+    driver: RDSPostgresDriver,
+    rds_client,
 ) -> None:
     """Cover the DBInstanceStatus -> protocol mapping table for the
     states we expect during teardown."""
@@ -580,7 +596,8 @@ def test_status_maps_deleting_to_deprovisioning(
 
 
 def test_update_multi_az_and_backup_retention(
-    driver: RDSPostgresDriver, rds_client,
+    driver: RDSPostgresDriver,
+    rds_client,
 ) -> None:
     provisioned = driver.provision(_spec())
     result = driver.update(
@@ -629,7 +646,7 @@ def test_db_name_for_prefixes_when_starts_with_digit() -> None:
 def test_generated_password_uses_safe_charset() -> None:
     pw = _generate_master_password(length=64)
     assert len(pw) == 64
-    forbidden = set("/@\"\\ ")
+    forbidden = set('/@"\\ ')
     assert not (set(pw) & forbidden)
 
 
@@ -640,10 +657,17 @@ def test_config_schema_shape(driver: RDSPostgresDriver) -> None:
     schema = driver.config_schema()
     assert schema["type"] == "object"
     props = schema["properties"]
-    for key in ("engine_version", "instance_class", "allocated_storage",
-                "multi_az", "deletion_protection",
-                "backup_retention_days", "parameter_group",
-                "kms_key_arn", "apply_immediately"):
+    for key in (
+        "engine_version",
+        "instance_class",
+        "allocated_storage",
+        "multi_az",
+        "deletion_protection",
+        "backup_retention_days",
+        "parameter_group",
+        "kms_key_arn",
+        "apply_immediately",
+    ):
         assert key in props
 
 
@@ -651,6 +675,12 @@ def test_binding_schema_lists_all_env_vars(
     driver: RDSPostgresDriver,
 ) -> None:
     schema = driver.binding_schema()
-    for key in ("DATABASE_HOST", "DATABASE_PORT", "DATABASE_NAME",
-                "DATABASE_USER", "DATABASE_PASSWORD", "DATABASE_URL"):
+    for key in (
+        "DATABASE_HOST",
+        "DATABASE_PORT",
+        "DATABASE_NAME",
+        "DATABASE_USER",
+        "DATABASE_PASSWORD",
+        "DATABASE_URL",
+    ):
         assert key in schema.env_vars

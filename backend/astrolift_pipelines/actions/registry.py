@@ -65,10 +65,7 @@ def resolve_action(uses: str) -> BuiltinAction:
         return _REGISTRY[versioned]
 
     known = sorted(_REGISTRY.keys())
-    raise UnknownActionError(
-        f"Unknown built-in action: '{uses}'. "
-        f"Known actions: {', '.join(known)}."
-    )
+    raise UnknownActionError(f"Unknown built-in action: '{uses}'. " f"Known actions: {', '.join(known)}.")
 
 
 def list_actions() -> list[BuiltinAction]:

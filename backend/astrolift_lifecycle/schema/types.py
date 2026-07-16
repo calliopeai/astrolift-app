@@ -844,9 +844,7 @@ def task_run_to_type(r) -> TaskRunType:
         registered_app_slug=r.workload.registered_app.slug,
         workload_slug=r.workload.slug,
         trigger_kind=r.trigger_kind,
-        triggered_by_username=(
-            r.triggered_by_user.username if r.triggered_by_user_id else None
-        ),
+        triggered_by_username=(r.triggered_by_user.username if r.triggered_by_user_id else None),
         command=r.command or [],
         status=r.status,
         exit_code=r.exit_code,
@@ -897,9 +895,7 @@ def agent_run_to_type(r) -> AgentRunType:
         registered_app_slug=r.workload.registered_app.slug,
         workload_slug=r.workload.slug,
         trigger_kind=r.trigger_kind,
-        triggered_by_username=(
-            r.triggered_by_user.username if r.triggered_by_user_id else None
-        ),
+        triggered_by_username=(r.triggered_by_user.username if r.triggered_by_user_id else None),
         status=r.status,
         input=r.input,
         output=r.output,

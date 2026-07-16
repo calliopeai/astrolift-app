@@ -31,6 +31,7 @@ master user) — the only operator-facing differences from postgres.
 
 from __future__ import annotations
 
+import contextlib
 import secrets
 import string
 from dataclasses import dataclass
@@ -145,10 +146,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
             return ProvisionResult(
                 ok=True,
                 handle=_handle_for(instance_id),
-                message=(
-                    f"cloudsql-mysql {instance_id} already exists "
-                    f"(state={_get(existing, 'state', '?')})"
-                ),
+                message=(f"cloudsql-mysql {instance_id} already exists (state={_get(existing, 'state', '?')})"),
             )
 
         master_password = _generate_master_password()
@@ -159,15 +157,13 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
         )
 
         tier = cfg.get("tier") or _SIZE_TO_TIER.get(
-            spec.size, "db-custom-1-3840",
+            spec.size,
+            "db-custom-1-3840",
         )
         storage_gb = int(
-            cfg.get("storage_gb")
-            or _SIZE_TO_STORAGE_GB.get(spec.size, 20),
+            cfg.get("storage_gb") or _SIZE_TO_STORAGE_GB.get(spec.size, 20),
         )
-        engine_version = (
-            cfg.get("engine_version") or self._config.engine_version
-        )
+        engine_version = cfg.get("engine_version") or self._config.engine_version
         ha = bool(
             cfg.get(
                 "high_availability",
@@ -207,9 +203,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
                     ),
                 },
                 "ipConfiguration": {
-                    "ipv4Enabled": (
-                        self._config.private_network is None
-                    ),
+                    "ipv4Enabled": (self._config.private_network is None),
                     "privateNetwork": self._config.private_network,
                     "requireSsl": True,
                 },
@@ -233,7 +227,8 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
         except Exception as exc:
             self._delete_master_password_secret(instance_id)
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message=f"insert: {exc}",
                 errors=[str(exc)],
             )
@@ -241,10 +236,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
         return ProvisionResult(
             ok=True,
             handle=_handle_for(instance_id),
-            message=(
-                f"cloudsql-mysql {instance_id} provisioning "
-                f"(password in {secret_name})"
-            ),
+            message=(f"cloudsql-mysql {instance_id} provisioning (password in {secret_name})"),
         )
 
     @driver_op(cloud="gcp", driver="mysql_cloudsql")
@@ -261,17 +253,16 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
             if new_storage:
                 settings["dataDiskSizeGb"] = new_storage
         if "high_availability" in cfg:
-            settings["availabilityType"] = (
-                "REGIONAL" if cfg["high_availability"] else "ZONAL"
-            )
+            settings["availabilityType"] = "REGIONAL" if cfg["high_availability"] else "ZONAL"
         if "backup_retention_days" in cfg:
-            settings.setdefault("backupConfiguration", {})[
-                "transactionLogRetentionDays"
-            ] = int(cfg["backup_retention_days"])
+            settings.setdefault("backupConfiguration", {})["transactionLogRetentionDays"] = int(
+                cfg["backup_retention_days"]
+            )
 
         if not settings:
             return UpdateResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message="no modifiable attributes provided — no-op",
             )
 
@@ -283,12 +274,14 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
             )
         except Exception as exc:
             return UpdateResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"patch: {exc}",
                 errors=[str(exc)],
             )
         return UpdateResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message=f"cloudsql-mysql {instance_id} update queued",
         )
 
@@ -311,7 +304,8 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
         if existing is None:
             self._delete_master_password_secret(instance_id)
             return DeprovisionResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message=f"cloudsql-mysql {instance_id} already gone",
             )
 
@@ -333,17 +327,17 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
                 )
             except Exception as exc:
                 return DeprovisionResult(
-                    ok=False, handle=spec.handle,
+                    ok=False,
+                    handle=spec.handle,
                     message=f"failed to clear deletionProtection: {exc}",
                     errors=[str(exc)],
                 )
         elif protected:
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=(
-                    f"cloudsql-mysql {instance_id} has "
-                    f"deletionProtection enabled — pass "
-                    f"force_destroy=True to bypass"
+                    f"cloudsql-mysql {instance_id} has deletionProtection enabled — pass force_destroy=True to bypass"
                 ),
                 errors=["deletion_protection_enabled"],
             )
@@ -352,16 +346,14 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
             # Take a final on-demand backup before delete. CloudSQL
             # has no "skip final backup" delete-time flag like RDS;
             # we do it as a pre-step. delete_data=True skips it.
-            try:
+            # Don't block delete on backup failure — defeats the
+            # safety path. Surface via message but proceed.
+            with contextlib.suppress(Exception):
                 self._sql.insert_backup_run(
                     project=self._config.project_id,
                     instance=instance_id,
                     body={"description": f"final-{instance_id}"},
                 )
-            except Exception:
-                # Don't block delete on backup failure — defeats the
-                # safety path. Surface via message but proceed.
-                pass
 
         try:
             self._sql.delete(
@@ -370,7 +362,8 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
             )
         except Exception as exc:
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"delete: {exc}",
                 errors=[str(exc)],
             )
@@ -379,7 +372,8 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
             self._delete_master_password_secret(instance_id)
 
         return DeprovisionResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message=(
                 f"cloudsql-mysql {instance_id} delete queued "
                 f"(backup={'skipped' if delete_data else 'taken'}, "
@@ -395,7 +389,8 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
         existing = self._describe(instance_id)
         if existing is None:
             return ServiceStatus(
-                handle=handle.handle, state="deprovisioned",
+                handle=handle.handle,
+                state="deprovisioned",
                 message=f"cloudsql-mysql {instance_id} not found",
             )
         state = _get(existing, "state", "UNKNOWN")
@@ -456,10 +451,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
         from datetime import UTC, datetime
 
         instance_id = _parse_handle(handle.handle)
-        snap_id = (
-            f"{instance_id}-snap-"
-            f"{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
-        )
+        snap_id = f"{instance_id}-snap-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
         try:
             self._sql.insert_backup_run(
                 project=self._config.project_id,
@@ -478,7 +470,9 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
 
     @driver_op(cloud="gcp", driver="mysql_cloudsql")
     def restore(
-        self, snapshot: SnapshotHandle, target: ProvisionSpec,
+        self,
+        snapshot: SnapshotHandle,
+        target: ProvisionSpec,
     ) -> ProvisionResult:
         target_id = self._instance_id_for(spec=target)
         source_id = _parse_handle(snapshot.handle)
@@ -495,7 +489,8 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
             )
         except Exception as exc:
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message=f"clone: {exc}",
                 errors=[str(exc)],
             )
@@ -516,7 +511,9 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
                 "high_availability": {"type": "boolean"},
                 "deletion_protection": {"type": "boolean"},
                 "backup_retention_days": {
-                    "type": "integer", "minimum": 0, "maximum": 35,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 35,
                 },
                 "kms_key_name": {"type": "string"},
                 "zone": {"type": "string"},
@@ -531,13 +528,8 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
                 "DATABASE_PORT": "3306 (MySQL default)",
                 "DATABASE_NAME": "Initial database name (mysql)",
                 "DATABASE_USER": "Master user (root)",
-                "DATABASE_PASSWORD": (
-                    "Secret Manager ref to the master password"
-                ),
-                "DATABASE_URL": (
-                    "Secret Manager ref to the fully-formed "
-                    "mysql:// connection string"
-                ),
+                "DATABASE_PASSWORD": ("Secret Manager ref to the master password"),
+                "DATABASE_URL": ("Secret Manager ref to the fully-formed mysql:// connection string"),
             },
         )
 
@@ -559,35 +551,30 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
             from google.protobuf.json_format import MessageToDict
 
             return MessageToDict(
-                resp._pb, preserving_proto_field_name=True,
+                resp._pb,
+                preserving_proto_field_name=True,
             )
-        return (
-            dict(resp)
-            if isinstance(resp, dict)
-            else getattr(resp, "__dict__", {})
-        )
+        return dict(resp) if isinstance(resp, dict) else getattr(resp, "__dict__", {})
 
     def _instance_id_for(self, *, spec: ProvisionSpec) -> str:
         # CloudSQL instance names: lowercase, letters/digits/hyphens,
         # ≤98 chars, must start with letter.
         raw = (
-            f"{self._config.instance_name_prefix}-"
-            f"{spec.organization_slug}-{spec.app_slug}-"
-            f"{spec.environment_name}-{spec.service_handle_hint or 'my'}"
-        ).lower().replace("_", "-")
-        return "".join(
-            c for c in raw if c.isalnum() or c == "-"
-        )[:98]
+            (
+                f"{self._config.instance_name_prefix}-"
+                f"{spec.organization_slug}-{spec.app_slug}-"
+                f"{spec.environment_name}-{spec.service_handle_hint or 'my'}"
+            )
+            .lower()
+            .replace("_", "-")
+        )
+        return "".join(c for c in raw if c.isalnum() or c == "-")[:98]
 
     def _master_secret_for(self, *, instance_id: str) -> str:
-        return (
-            f"{self._config.secret_manager_prefix}/{instance_id}/master"
-        )
+        return f"{self._config.secret_manager_prefix}/{instance_id}/master"
 
     def _url_secret_for(self, *, instance_id: str) -> str:
-        return (
-            f"{self._config.secret_manager_prefix}/{instance_id}/url"
-        )
+        return f"{self._config.secret_manager_prefix}/{instance_id}/url"
 
     def _store_master_password(
         self,
@@ -598,7 +585,8 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
     ) -> str:
         name = self._master_secret_for(instance_id=instance_id)
         parent = f"projects/{self._config.project_id}"
-        try:
+        # AlreadyExists or similar — fall through to add_version.
+        with contextlib.suppress(Exception):
             self._sm.create_secret(
                 request={
                     "parent": parent,
@@ -609,15 +597,10 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
                     },
                 },
             )
-        except Exception:
-            # AlreadyExists or similar — fall through to add_version.
-            pass
         try:
             self._sm.add_secret_version(
                 request={
-                    "parent": (
-                        f"{parent}/secrets/{name.replace('/', '_')}"
-                    ),
+                    "parent": (f"{parent}/secrets/{name.replace('/', '_')}"),
                     "payload": {"data": password.encode("utf-8")},
                 },
             )
@@ -632,10 +615,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
         try:
             self._sm.delete_secret(
                 request={
-                    "name": (
-                        f"projects/{self._config.project_id}/secrets/"
-                        f"{name.replace('/', '_')}"
-                    ),
+                    "name": (f"projects/{self._config.project_id}/secrets/{name.replace('/', '_')}"),
                 },
             )
         except Exception:
@@ -649,9 +629,7 @@ _PASSWORD_ALPHABET = string.ascii_letters + string.digits + "-_."
 
 
 def _generate_master_password(length: int = 32) -> str:
-    return "".join(
-        secrets.choice(_PASSWORD_ALPHABET) for _ in range(length)
-    )
+    return "".join(secrets.choice(_PASSWORD_ALPHABET) for _ in range(length))
 
 
 def _handle_for(instance_id: str) -> str:
@@ -676,9 +654,7 @@ def _tags_for(spec: ProvisionSpec) -> dict[str, str]:
     leading underscores; only [a-z0-9_-]."""
 
     def _sanitize(s: str) -> str:
-        return "".join(
-            c if c.isalnum() or c in "-_" else "-" for c in s.lower()
-        )
+        return "".join(c if c.isalnum() or c in "-_" else "-" for c in s.lower())
 
     base = {
         "astrolift-managed-by": "platform",

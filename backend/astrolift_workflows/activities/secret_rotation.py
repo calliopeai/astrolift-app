@@ -207,7 +207,8 @@ def _refresh_in_cluster_sync(target: dict[str, Any]) -> dict[str, Any]:
     if not result.ok:
         raise AppDeployError(
             f"refresh_secret_bundle apply failed for bundle "
-            f"{target['bundle_slug']!r} on cluster {cluster.slug!r}: " + "; ".join(str(e) for e in result.errors),
+            f"{target['bundle_slug']!r} on cluster {cluster.slug!r}: "
+            + "; ".join(str(e) for e in result.errors),
         )
     return {
         "cluster_slug": cluster.slug,

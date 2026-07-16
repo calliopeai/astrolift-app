@@ -293,9 +293,7 @@ class K8sNativeClusterDriver(ClusterDriver):
             out.append(
                 StorageClassInfo(
                     name=meta.get("name", ""),
-                    is_default=(
-                        ann.get("storageclass.kubernetes.io/is-default-class") == "true"
-                    ),
+                    is_default=(ann.get("storageclass.kubernetes.io/is-default-class") == "true"),
                 )
             )
         return out

@@ -14,6 +14,7 @@ Manager at ``astrolift/memorystore/<id>/auth``.
 
 from __future__ import annotations
 
+import contextlib
 import secrets
 import string
 from dataclasses import dataclass
@@ -111,19 +112,13 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             return ProvisionResult(
                 ok=True,
                 handle=_handle_for(instance_id),
-                message=(
-                    f"memorystore {instance_id} already exists "
-                    f"(state={_get(existing, 'state', '?')})"
-                ),
+                message=(f"memorystore {instance_id} already exists (state={_get(existing, 'state', '?')})"),
             )
 
         memory_gb = int(
-            cfg.get("memory_gb")
-            or _SIZE_TO_MEMORY_GB.get(spec.size, 1),
+            cfg.get("memory_gb") or _SIZE_TO_MEMORY_GB.get(spec.size, 1),
         )
-        tier = cfg.get("tier") or (
-            "STANDARD_HA" if cfg.get("high_availability") else self._config.tier_default
-        )
+        tier = cfg.get("tier") or ("STANDARD_HA" if cfg.get("high_availability") else self._config.tier_default)
         transit_encryption = bool(
             cfg.get(
                 "transit_encryption",
@@ -151,9 +146,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             "redis_version": cfg.get("redis_version") or self._config.redis_version,
             "authorized_network": self._config.authorized_network,
             "auth_enabled": auth_enabled,
-            "transit_encryption_mode": (
-                "SERVER_AUTHENTICATION" if transit_encryption else "DISABLED"
-            ),
+            "transit_encryption_mode": ("SERVER_AUTHENTICATION" if transit_encryption else "DISABLED"),
             "labels": _labels_for(spec),
         }
         if cfg.get("kms_key_name"):
@@ -171,7 +164,8 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             if secret_name is not None:
                 self._delete_auth_secret(instance_id)
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message=f"create_instance: {exc}",
                 errors=[str(exc)],
             )
@@ -180,8 +174,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             ok=True,
             handle=_handle_for(instance_id),
             message=(
-                f"memorystore {instance_id} provisioning"
-                + (f" (auth token in {secret_name})" if secret_name else "")
+                f"memorystore {instance_id} provisioning" + (f" (auth token in {secret_name})" if secret_name else "")
             ),
         )
 
@@ -203,7 +196,8 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
 
         if not update_mask:
             return UpdateResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message="no modifiable attributes provided — no-op",
             )
 
@@ -216,12 +210,14 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             )
         except Exception as exc:
             return UpdateResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"update_instance: {exc}",
                 errors=[str(exc)],
             )
         return UpdateResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message=f"memorystore {instance_id} update queued",
         )
 
@@ -244,7 +240,8 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
         if existing is None:
             self._delete_auth_secret(instance_id)
             return DeprovisionResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message=f"memorystore {instance_id} already gone",
             )
 
@@ -253,25 +250,19 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             # endpoint. Memorystore has no "final snapshot" knob on
             # delete, so we do it as a pre-step. delete_data=True
             # skips it.
-            try:
+            # Don't block delete on export failure; surface the
+            # message but proceed.
+            with contextlib.suppress(Exception):
                 self._redis.export_instance(
                     request={
                         "name": self._full_name(instance_id),
                         "output_config": {
                             "gcs_destination": {
-                                "uri": (
-                                    f"gs://astrolift-final-redis-"
-                                    f"{self._config.project_id}/"
-                                    f"{instance_id}.rdb"
-                                ),
+                                "uri": (f"gs://astrolift-final-redis-{self._config.project_id}/{instance_id}.rdb"),
                             },
                         },
                     },
                 )
-            except Exception:
-                # Don't block delete on export failure; surface the
-                # message but proceed.
-                pass
 
         try:
             self._redis.delete_instance(
@@ -279,20 +270,16 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             )
         except Exception as exc:
             err_str = str(exc)
-            if (
-                not force_destroy
-                and "FAILED_PRECONDITION" in err_str
-            ):
+            if not force_destroy and "FAILED_PRECONDITION" in err_str:
                 return DeprovisionResult(
-                    ok=False, handle=spec.handle,
-                    message=(
-                        f"memorystore {instance_id} is mid-modify; "
-                        f"wait or pass force_destroy=True for retry"
-                    ),
+                    ok=False,
+                    handle=spec.handle,
+                    message=(f"memorystore {instance_id} is mid-modify; wait or pass force_destroy=True for retry"),
                     errors=[err_str],
                 )
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"delete_instance: {err_str}",
                 errors=[err_str],
             )
@@ -301,7 +288,8 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             self._delete_auth_secret(instance_id)
 
         return DeprovisionResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message=(
                 f"memorystore {instance_id} delete queued "
                 f"(export={'skipped' if delete_data else 'taken'}, "
@@ -317,15 +305,14 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
         existing = self._describe(instance_id)
         if existing is None:
             return ServiceStatus(
-                handle=handle.handle, state="deprovisioned",
+                handle=handle.handle,
+                state="deprovisioned",
                 message=f"memorystore {instance_id} not found",
             )
         state = _get(existing, "state", "UNKNOWN")
         # Memorystore State enum may be an int or a string depending
         # on SDK variant; normalize.
-        state_name = (
-            state.name if hasattr(state, "name") else str(state)
-        )
+        state_name = state.name if hasattr(state, "name") else str(state)
         return ServiceStatus(
             handle=handle.handle,
             state=_MEMORYSTORE_STATE_TO_PROTOCOL.get(state_name, "updating"),
@@ -343,11 +330,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
         host = _get(existing, "host", "") or ""
         port = str(_get(existing, "port", 6379) or 6379)
         transit_mode = _get(existing, "transit_encryption_mode", "")
-        tls_on = (
-            "SERVER_AUTHENTICATION" in str(transit_mode)
-            if transit_mode
-            else False
-        )
+        tls_on = "SERVER_AUTHENTICATION" in str(transit_mode) if transit_mode else False
         auth_enabled = bool(_get(existing, "auth_enabled", False))
 
         env_vars: dict[str, ValueRef] = {
@@ -391,10 +374,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
 
         instance_id = _parse_handle(handle.handle)
         stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
-        snap_uri = (
-            f"gs://astrolift-snap-redis-{self._config.project_id}/"
-            f"{instance_id}-{stamp}.rdb"
-        )
+        snap_uri = f"gs://astrolift-snap-redis-{self._config.project_id}/{instance_id}-{stamp}.rdb"
         try:
             self._redis.export_instance(
                 request={
@@ -416,7 +396,9 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
 
     @driver_op(cloud="gcp", driver="redis_memorystore")
     def restore(
-        self, snapshot: SnapshotHandle, target: ProvisionSpec,
+        self,
+        snapshot: SnapshotHandle,
+        target: ProvisionSpec,
     ) -> ProvisionResult:
         target_id = self._instance_id_for(spec=target)
         try:
@@ -430,7 +412,8 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             )
         except Exception as exc:
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message=f"import_instance: {exc}",
                 errors=[str(exc)],
             )
@@ -462,13 +445,8 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
                 "REDIS_HOST": "Memorystore primary endpoint host",
                 "REDIS_PORT": "Memorystore primary endpoint port (6379)",
                 "REDIS_TLS": "1 if TLS is enabled, 0 otherwise",
-                "REDIS_AUTH_TOKEN": (
-                    "Secret Manager ref to the AUTH token (auth_enabled only)"
-                ),
-                "REDIS_URL": (
-                    "Literal redis(s):// URL when auth is off; "
-                    "Secret Manager ref to rediss:// URL when on"
-                ),
+                "REDIS_AUTH_TOKEN": ("Secret Manager ref to the AUTH token (auth_enabled only)"),
+                "REDIS_URL": ("Literal redis(s):// URL when auth is off; Secret Manager ref to rediss:// URL when on"),
             },
         )
 
@@ -498,10 +476,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
         return sanitized[:40]
 
     def _full_name(self, instance_id: str) -> str:
-        return (
-            f"projects/{self._config.project_id}/locations/"
-            f"{self._config.region}/instances/{instance_id}"
-        )
+        return f"projects/{self._config.project_id}/locations/{self._config.region}/instances/{instance_id}"
 
     def _auth_secret_for(self, *, instance_id: str) -> str:
         return f"{self._config.secret_manager_prefix}/{instance_id}/auth"
@@ -510,12 +485,16 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
         return f"{self._config.secret_manager_prefix}/{instance_id}/url"
 
     def _store_auth_token(
-        self, *, instance_id: str, token: str, spec: ProvisionSpec,
+        self,
+        *,
+        instance_id: str,
+        token: str,
+        spec: ProvisionSpec,
     ) -> str:
         name = self._auth_secret_for(instance_id=instance_id)
         parent = f"projects/{self._config.project_id}"
         sid = name.replace("/", "_")
-        try:
+        with contextlib.suppress(Exception):
             self._sm.create_secret(
                 request={
                     "parent": parent,
@@ -526,8 +505,6 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
                     },
                 },
             )
-        except Exception:
-            pass
         try:
             self._sm.add_secret_version(
                 request={
@@ -547,9 +524,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
         try:
             self._sm.delete_secret(
                 request={
-                    "name": (
-                        f"projects/{self._config.project_id}/secrets/{sid}"
-                    ),
+                    "name": (f"projects/{self._config.project_id}/secrets/{sid}"),
                 },
             )
         except Exception:

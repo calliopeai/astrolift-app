@@ -66,7 +66,10 @@ SIZE_TO_SETTINGS = {
 
 class SQSDriver(ManagedServiceDriver):
     def __init__(
-        self, *, config: SQSConfig, client: Any | None = None,
+        self,
+        *,
+        config: SQSConfig,
+        client: Any | None = None,
     ) -> None:
         self._config = config
         if client is not None:
@@ -129,13 +132,15 @@ class SQSDriver(ManagedServiceDriver):
                 response = self._sqs.get_queue_url(QueueName=queue_name)
             except Exception as exc:
                 return ProvisionResult(
-                    ok=False, handle="",
+                    ok=False,
+                    handle="",
                     message=f"queue already exists but lookup failed: {exc}",
                     errors=[str(exc)],
                 )
         except Exception as exc:
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message=f"create_queue: {exc}",
                 errors=[str(exc)],
             )
@@ -154,7 +159,9 @@ class SQSDriver(ManagedServiceDriver):
             queue_url = self._queue_url(queue_name=queue_name)
         except ManagedServiceError as exc:
             return UpdateResult(
-                ok=False, handle=spec.handle, message=str(exc),
+                ok=False,
+                handle=spec.handle,
+                message=str(exc),
                 errors=[str(exc)],
             )
 
@@ -173,22 +180,26 @@ class SQSDriver(ManagedServiceDriver):
 
         if not attributes:
             return UpdateResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message="no updatable attributes in spec",
             )
 
         try:
             self._sqs.set_queue_attributes(
-                QueueUrl=queue_url, Attributes=attributes,
+                QueueUrl=queue_url,
+                Attributes=attributes,
             )
         except Exception as exc:
             return UpdateResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"set_queue_attributes: {exc}",
                 errors=[str(exc)],
             )
         return UpdateResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message=f"queue {queue_name} updated",
         )
 
@@ -217,7 +228,8 @@ class SQSDriver(ManagedServiceDriver):
             queue_url = self._queue_url(queue_name=queue_name)
         except ManagedServiceError:
             return DeprovisionResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message=f"queue {queue_name} already gone",
             )
 
@@ -225,12 +237,14 @@ class SQSDriver(ManagedServiceDriver):
             self._sqs.delete_queue(QueueUrl=queue_url)
         except Exception as exc:
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"delete_queue: {exc}",
                 errors=[str(exc)],
             )
         return DeprovisionResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message=f"queue {queue_name} deleted",
         )
 
@@ -243,11 +257,13 @@ class SQSDriver(ManagedServiceDriver):
             self._queue_url(queue_name=queue_name)
         except ManagedServiceError:
             return ServiceStatus(
-                handle=handle.handle, state="deprovisioned",
+                handle=handle.handle,
+                state="deprovisioned",
                 message=f"queue {queue_name} does not exist",
             )
         return ServiceStatus(
-            handle=handle.handle, state="available",
+            handle=handle.handle,
+            state="available",
             message=f"queue {queue_name} reachable",
         )
 
@@ -269,12 +285,8 @@ class SQSDriver(ManagedServiceDriver):
             queue_arn = response["Attributes"]["QueueArn"]
         except Exception:
             # Best-effort ARN — derivable form
-            queue_arn = (
-                f"arn:aws:sqs:{self._config.region}:UNKNOWN:{queue_name}"
-            )
-            queue_url = (
-                f"https://sqs.{self._config.region}.amazonaws.com/UNKNOWN/{queue_name}"
-            )
+            queue_arn = f"arn:aws:sqs:{self._config.region}:UNKNOWN:{queue_name}"
+            queue_url = f"https://sqs.{self._config.region}.amazonaws.com/UNKNOWN/{queue_name}"
 
         return Binding(
             env_vars={
@@ -295,9 +307,7 @@ class SQSDriver(ManagedServiceDriver):
                     ],
                 ),
             ],
-            notes=(
-                "Standard SQS perms for produce/consume + receive."
-            ),
+            notes=("Standard SQS perms for produce/consume + receive."),
         )
 
     @driver_op(cloud="aws", driver="queue_sqs")
@@ -306,13 +316,14 @@ class SQSDriver(ManagedServiceDriver):
         ephemeral by definition. Per platform-side #87/#127 policy:
         queues never snapshot."""
         raise ManagedServiceError(
-            "SQS does not support snapshots — in-flight messages "
-            "have no recovery value (per platform-side #87/#127)",
+            "SQS does not support snapshots — in-flight messages have no recovery value (per platform-side #87/#127)",
         )
 
     @driver_op(cloud="aws", driver="queue_sqs")
     def restore(
-        self, snapshot: SnapshotHandle, target: ProvisionSpec,
+        self,
+        snapshot: SnapshotHandle,
+        target: ProvisionSpec,
     ) -> ProvisionResult:
         raise ManagedServiceError(
             "SQS does not support snapshots, hence no restore",
@@ -342,12 +353,14 @@ class SQSDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="queue_sqs", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
-        return BindingSchema(env_vars={
-            "SQS_QUEUE_NAME": "Queue name",
-            "SQS_QUEUE_URL": "SQS HTTPS URL for SDK calls",
-            "SQS_QUEUE_ARN": "Full queue ARN",
-            "AWS_REGION": "Queue's region",
-        })
+        return BindingSchema(
+            env_vars={
+                "SQS_QUEUE_NAME": "Queue name",
+                "SQS_QUEUE_URL": "SQS HTTPS URL for SDK calls",
+                "SQS_QUEUE_ARN": "Full queue ARN",
+                "AWS_REGION": "Queue's region",
+            }
+        )
 
     # ---- internals ------------------------------------------------
 
@@ -364,10 +377,7 @@ class SQSDriver(ManagedServiceDriver):
         # SQS names: alphanumeric + dash + underscore; max 80 chars
         # (.fifo suffix added separately for FIFO queues, max 80
         # total)
-        clean = "".join(
-            c if c.isalnum() or c in "-_" else "-"
-            for c in raw
-        )
+        clean = "".join(c if c.isalnum() or c in "-_" else "-" for c in raw)
         while "--" in clean:
             clean = clean.replace("--", "-")
         return clean.strip("-")[:75]  # leaves room for .fifo suffix

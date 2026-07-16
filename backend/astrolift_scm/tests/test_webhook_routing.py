@@ -144,18 +144,18 @@ def _make_webhook(
 def push_stack(org):
     """Full stack for push webhook tests (via auth1/scm_webhook)."""
     team = Team.objects.create(organization=org, name="Eng", slug="eng-wr")
-    project = Project.objects.create(
-        organization=org, team=team, name="Demo", slug="demo-wr"
+    project = Project.objects.create(organization=org, team=team, name="Demo", slug="demo-wr")
+    ProviderPlugin.objects.bulk_create(
+        [
+            ProviderPlugin(
+                name="P",
+                slug="p-wr",
+                version="0.0.1",
+                capabilities_manifest={},
+                config_schema={},
+            )
+        ]
     )
-    ProviderPlugin.objects.bulk_create([
-        ProviderPlugin(
-            name="P",
-            slug="p-wr",
-            version="0.0.1",
-            capabilities_manifest={},
-            config_schema={},
-        )
-    ])
     plugin = ProviderPlugin.objects.get(slug="p-wr")
     cluster = TenantCluster.objects.create(
         organization=org,
@@ -206,18 +206,18 @@ def push_stack(org):
 def pr_stack(org):
     """Full stack for PR webhook tests (via astrolift_scm.webhook_views)."""
     team = Team.objects.create(organization=org, name="Eng2", slug="eng2-wr")
-    project = Project.objects.create(
-        organization=org, team=team, name="Demo2", slug="demo2-wr"
+    project = Project.objects.create(organization=org, team=team, name="Demo2", slug="demo2-wr")
+    ProviderPlugin.objects.bulk_create(
+        [
+            ProviderPlugin(
+                name="P2",
+                slug="p2-wr",
+                version="0.0.1",
+                capabilities_manifest={},
+                config_schema={},
+            )
+        ]
     )
-    ProviderPlugin.objects.bulk_create([
-        ProviderPlugin(
-            name="P2",
-            slug="p2-wr",
-            version="0.0.1",
-            capabilities_manifest={},
-            config_schema={},
-        )
-    ])
     plugin = ProviderPlugin.objects.get(slug="p2-wr")
     cluster = TenantCluster.objects.create(
         organization=org,
@@ -328,14 +328,15 @@ def _post_pr(client, app_guid, *, body, secret, event="pull_request"):
 
 class TestScmEventMatches:
     """Pure-logic tests — no DB required."""
+
     def _event(self, **kw) -> ScmEvent:
-        defaults = dict(
-            organization_id=1,
-            repo_full_name="owner/repo",
-            branch="main",
-            head_sha="abc",
-            event_kind="push",
-        )
+        defaults = {
+            "organization_id": 1,
+            "repo_full_name": "owner/repo",
+            "branch": "main",
+            "head_sha": "abc",
+            "event_kind": "push",
+        }
         return ScmEvent(**{**defaults, **kw})
 
     def _hook(self, scm_repo="", branch_pattern="") -> MagicMock:
@@ -402,9 +403,7 @@ class TestRoutePushToWorkflowWebhooks:
     def test_matching_webhook_fires(self, org, workflow_def):
         hook = _make_webhook(org, workflow_def, slug="wh-fires-1")
 
-        with patch(
-            "astrolift_agents.services.workflow_triggers.trigger_workflow_instance"
-        ) as mock_trigger:
+        with patch("astrolift_agents.services.workflow_triggers.trigger_workflow_instance") as mock_trigger:
             mock_trigger.return_value = MagicMock()
             event = ScmEvent(
                 organization_id=org.pk,
@@ -424,9 +423,7 @@ class TestRoutePushToWorkflowWebhooks:
     def test_non_matching_repo_does_not_fire(self, org, workflow_def):
         _make_webhook(org, workflow_def, slug="wh-no-fire-repo", scm_repo="acme-org/hello")
 
-        with patch(
-            "astrolift_agents.services.workflow_triggers.trigger_workflow_instance"
-        ) as mock_trigger:
+        with patch("astrolift_agents.services.workflow_triggers.trigger_workflow_instance") as mock_trigger:
             event = ScmEvent(
                 organization_id=org.pk,
                 repo_full_name="acme-org/different-repo",
@@ -440,13 +437,9 @@ class TestRoutePushToWorkflowWebhooks:
         assert instances == []
 
     def test_non_matching_branch_does_not_fire(self, org, workflow_def):
-        _make_webhook(
-            org, workflow_def, slug="wh-no-fire-branch", branch_pattern="main"
-        )
+        _make_webhook(org, workflow_def, slug="wh-no-fire-branch", branch_pattern="main")
 
-        with patch(
-            "astrolift_agents.services.workflow_triggers.trigger_workflow_instance"
-        ) as mock_trigger:
+        with patch("astrolift_agents.services.workflow_triggers.trigger_workflow_instance") as mock_trigger:
             event = ScmEvent(
                 organization_id=org.pk,
                 repo_full_name="acme-org/hello",
@@ -460,13 +453,9 @@ class TestRoutePushToWorkflowWebhooks:
         assert instances == []
 
     def test_disabled_webhook_does_not_fire(self, org, workflow_def):
-        _make_webhook(
-            org, workflow_def, slug="wh-disabled-1", enabled=False
-        )
+        _make_webhook(org, workflow_def, slug="wh-disabled-1", enabled=False)
 
-        with patch(
-            "astrolift_agents.services.workflow_triggers.trigger_workflow_instance"
-        ) as mock_trigger:
+        with patch("astrolift_agents.services.workflow_triggers.trigger_workflow_instance") as mock_trigger:
             event = ScmEvent(
                 organization_id=org.pk,
                 repo_full_name="acme-org/hello",
@@ -483,9 +472,7 @@ class TestRoutePushToWorkflowWebhooks:
         """A webhook belonging to org2 must not fire for org's events."""
         _make_webhook(org2, workflow_def2, slug="wh-org2-1", scm_repo="acme-org/hello")
 
-        with patch(
-            "astrolift_agents.services.workflow_triggers.trigger_workflow_instance"
-        ) as mock_trigger:
+        with patch("astrolift_agents.services.workflow_triggers.trigger_workflow_instance") as mock_trigger:
             event = ScmEvent(
                 organization_id=org.pk,
                 repo_full_name="acme-org/hello",
@@ -502,9 +489,7 @@ class TestRoutePushToWorkflowWebhooks:
         _make_webhook(org, workflow_def, slug="wh-multi-1")
         _make_webhook(org, workflow_def2, slug="wh-multi-2")
 
-        with patch(
-            "astrolift_agents.services.workflow_triggers.trigger_workflow_instance"
-        ) as mock_trigger:
+        with patch("astrolift_agents.services.workflow_triggers.trigger_workflow_instance") as mock_trigger:
             mock_trigger.return_value = MagicMock()
             event = ScmEvent(
                 organization_id=org.pk,
@@ -522,9 +507,7 @@ class TestRoutePushToWorkflowWebhooks:
         """A webhook with scm_repo='' should fire for any repo in the org."""
         _make_webhook(org, workflow_def, slug="wh-any-repo", scm_repo="", branch_pattern="main")
 
-        with patch(
-            "astrolift_agents.services.workflow_triggers.trigger_workflow_instance"
-        ) as mock_trigger:
+        with patch("astrolift_agents.services.workflow_triggers.trigger_workflow_instance") as mock_trigger:
             mock_trigger.return_value = MagicMock()
             event = ScmEvent(
                 organization_id=org.pk,
@@ -539,13 +522,9 @@ class TestRoutePushToWorkflowWebhooks:
         assert len(instances) == 1
 
     def test_glob_branch_pattern_fires(self, org, workflow_def):
-        _make_webhook(
-            org, workflow_def, slug="wh-glob-1", branch_pattern="feature/*"
-        )
+        _make_webhook(org, workflow_def, slug="wh-glob-1", branch_pattern="feature/*")
 
-        with patch(
-            "astrolift_agents.services.workflow_triggers.trigger_workflow_instance"
-        ) as mock_trigger:
+        with patch("astrolift_agents.services.workflow_triggers.trigger_workflow_instance") as mock_trigger:
             mock_trigger.return_value = MagicMock()
             event = ScmEvent(
                 organization_id=org.pk,
@@ -584,9 +563,7 @@ class TestRoutePushToWorkflowWebhooks:
         hook = _make_webhook(org, workflow_def, slug="wh-ts-1")
         assert hook.last_triggered_at is None
 
-        with patch(
-            "astrolift_agents.services.workflow_triggers.trigger_workflow_instance"
-        ) as mock_trigger:
+        with patch("astrolift_agents.services.workflow_triggers.trigger_workflow_instance") as mock_trigger:
             mock_trigger.return_value = MagicMock()
             event = ScmEvent(
                 organization_id=org.pk,
@@ -608,9 +585,7 @@ class TestRoutePushToWorkflowWebhooks:
 class TestPushWebhookIntegration:
     """Verify the auth1 push-webhook handler calls the routing function."""
 
-    def test_push_to_matching_repo_fires_workflow_webhooks(
-        self, push_stack, workflow_def
-    ):
+    def test_push_to_matching_repo_fires_workflow_webhooks(self, push_stack, workflow_def):
         """A push event to a matching repo+branch triggers the routing call."""
         org = push_stack["org"]
         _make_webhook(org, workflow_def, slug="wh-push-intg-1")
@@ -620,9 +595,7 @@ class TestPushWebhookIntegration:
         ) as mock_route:
             mock_route.return_value = []
             body = _push_payload("acme-org/hello", branch="main", sha="def789")
-            resp = _post_push(
-                Client(), push_stack["conn"].guid, body=body, secret=push_stack["secret"]
-            )
+            resp = _post_push(Client(), push_stack["conn"].guid, body=body, secret=push_stack["secret"])
 
         assert resp.status_code == 202
         # The actual routing function is invoked from within the view's try block.
@@ -638,9 +611,7 @@ class TestPushWebhookIntegration:
             side_effect=RuntimeError("routing exploded"),
         ):
             body = _push_payload("acme-org/hello", branch="main")
-            resp = _post_push(
-                Client(), push_stack["conn"].guid, body=body, secret=push_stack["secret"]
-            )
+            resp = _post_push(Client(), push_stack["conn"].guid, body=body, secret=push_stack["secret"])
 
         assert resp.status_code == 202
 
@@ -661,9 +632,7 @@ class TestPrWebhookIntegration:
         ) as mock_route:
             mock_route.return_value = []
             body = _pr_payload(action="opened", pr_number=77, head_ref="feature/x")
-            resp = _post_pr(
-                Client(), str(pr_stack["app"].guid), body=body, secret=pr_stack["secret"]
-            )
+            resp = _post_pr(Client(), str(pr_stack["app"].guid), body=body, secret=pr_stack["secret"])
 
         assert resp.status_code == 200
         # The view calls _route_pr_to_workflow_webhooks which builds a ScmEvent
@@ -679,26 +648,18 @@ class TestPrWebhookIntegration:
             side_effect=RuntimeError("routing exploded"),
         ):
             body = _pr_payload(action="opened", pr_number=88)
-            resp = _post_pr(
-                Client(), str(pr_stack["app"].guid), body=body, secret=pr_stack["secret"]
-            )
+            resp = _post_pr(Client(), str(pr_stack["app"].guid), body=body, secret=pr_stack["secret"])
 
         assert resp.status_code == 200
 
     def test_pr_non_matching_repo_does_not_fire(self, pr_stack, workflow_def):
         org = pr_stack["org"]
         # Webhook only fires for a different repo.
-        _make_webhook(
-            org, workflow_def, slug="wh-pr-nomatch-1", scm_repo="acme-org/different"
-        )
+        _make_webhook(org, workflow_def, slug="wh-pr-nomatch-1", scm_repo="acme-org/different")
 
-        with patch(
-            "astrolift_agents.services.workflow_triggers.trigger_workflow_instance"
-        ) as mock_trigger:
+        with patch("astrolift_agents.services.workflow_triggers.trigger_workflow_instance") as mock_trigger:
             body = _pr_payload(action="opened", pr_number=99, repo="acme-org/hello")
-            resp = _post_pr(
-                Client(), str(pr_stack["app"].guid), body=body, secret=pr_stack["secret"]
-            )
+            resp = _post_pr(Client(), str(pr_stack["app"].guid), body=body, secret=pr_stack["secret"])
 
         assert resp.status_code == 200
         # scm_repo filter means the trigger should not fire.

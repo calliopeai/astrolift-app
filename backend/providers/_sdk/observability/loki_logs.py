@@ -8,12 +8,14 @@ API.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from _sdk._telemetry import driver_op
 from _sdk.log_stream import LogLine, LogStreamDriver
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 
 @dataclass(frozen=True)

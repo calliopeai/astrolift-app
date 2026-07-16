@@ -141,7 +141,8 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
             import boto3
 
             self._os = boto3.client(
-                "opensearch", region_name=config.region,
+                "opensearch",
+                region_name=config.region,
             )
         if secrets_client is not None:
             self._sm = secrets_client
@@ -149,7 +150,8 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
             import boto3
 
             self._sm = boto3.client(
-                "secretsmanager", region_name=config.region,
+                "secretsmanager",
+                region_name=config.region,
             )
 
     # ---- lifecycle ----------------------------------------------------
@@ -169,10 +171,7 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
             return ProvisionResult(
                 ok=True,
                 handle=handle_for(kind=KIND, resource_id=domain_name),
-                message=(
-                    f"opensearch domain {domain_name} already exists "
-                    f"(processing={existing.get('Processing')})"
-                ),
+                message=(f"opensearch domain {domain_name} already exists (processing={existing.get('Processing')})"),
             )
 
         master_password = _generate_master_password()
@@ -182,19 +181,14 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
             spec=spec,
         )
 
-        engine_version = (
-            cfg.get("engine_version") or self._config.engine_version
-        )
-        instance_type = (
-            cfg.get("instance_type")
-            or _SIZE_TO_INSTANCE_TYPE.get(
-                spec.size, "t3.small.search",
-            )
+        engine_version = cfg.get("engine_version") or self._config.engine_version
+        instance_type = cfg.get("instance_type") or _SIZE_TO_INSTANCE_TYPE.get(
+            spec.size,
+            "t3.small.search",
         )
         instance_count = int(cfg.get("instance_count", 1))
         volume_size = int(
-            cfg.get("volume_size_gb")
-            or _SIZE_TO_VOLUME_GB.get(spec.size, 10),
+            cfg.get("volume_size_gb") or _SIZE_TO_VOLUME_GB.get(spec.size, 10),
         )
         deletion_protection = bool(
             cfg.get(
@@ -215,9 +209,7 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
             cluster_config["DedicatedMasterCount"] = int(
                 cfg["dedicated_master_count"],
             )
-            cluster_config["DedicatedMasterType"] = (
-                cfg.get("dedicated_master_type") or instance_type
-            )
+            cluster_config["DedicatedMasterType"] = cfg.get("dedicated_master_type") or instance_type
 
         create_kwargs: dict[str, Any] = {
             "DomainName": domain_name,
@@ -245,9 +237,7 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
             "TagList": tags_for(spec),
         }
         if cfg.get("kms_key_id"):
-            create_kwargs["EncryptionAtRestOptions"]["KmsKeyId"] = (
-                cfg["kms_key_id"]
-            )
+            create_kwargs["EncryptionAtRestOptions"]["KmsKeyId"] = cfg["kms_key_id"]
         if self._config.subnet_ids:
             create_kwargs["VPCOptions"] = {
                 "SubnetIds": list(self._config.subnet_ids),
@@ -260,7 +250,8 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
             self._os.create_domain(**create_kwargs)
         except Exception as exc:
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message=f"create_domain: {exc}",
                 errors=[str(exc)],
             )
@@ -278,10 +269,7 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
         return ProvisionResult(
             ok=True,
             handle=handle_for(kind=KIND, resource_id=domain_name),
-            message=(
-                f"opensearch domain {domain_name} provisioning "
-                f"(master password in {secret_arn})"
-            ),
+            message=(f"opensearch domain {domain_name} provisioning (master password in {secret_arn})"),
         )
 
     @driver_op(cloud="aws", driver="search_opensearch")
@@ -291,10 +279,7 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
 
         cluster_config: dict[str, Any] = {}
         if spec.size:
-            instance_type = (
-                cfg.get("instance_type")
-                or _SIZE_TO_INSTANCE_TYPE.get(spec.size)
-            )
+            instance_type = cfg.get("instance_type") or _SIZE_TO_INSTANCE_TYPE.get(spec.size)
             if instance_type:
                 cluster_config["InstanceType"] = instance_type
         if cfg.get("instance_count") is not None:
@@ -321,27 +306,29 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
 
         if len(body) == 1 and "deletion_protection" not in cfg:
             return UpdateResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message="no modifiable attributes provided — no-op",
             )
         if len(body) == 1:
             return UpdateResult(
-                ok=True, handle=spec.handle,
-                message=(
-                    f"deletion_protection updated for {domain_name}"
-                ),
+                ok=True,
+                handle=spec.handle,
+                message=(f"deletion_protection updated for {domain_name}"),
             )
 
         try:
             self._os.update_domain_config(**body)
         except Exception as exc:
             return UpdateResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"update_domain_config: {exc}",
                 errors=[str(exc)],
             )
         return UpdateResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message=f"opensearch domain {domain_name} update queued",
         )
 
@@ -365,13 +352,15 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
             self._delete_master_password_secret(domain_name)
             self._delete_protection_marker(domain_name)
             return DeprovisionResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message=f"opensearch domain {domain_name} already gone",
             )
 
         if self._deletion_protection_on(domain_name) and not force_destroy:
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=(
                     f"opensearch domain {domain_name} has "
                     f"DeletionProtection enabled — pass "
@@ -394,7 +383,8 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
             self._os.delete_domain(DomainName=domain_name)
         except Exception as exc:
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"delete_domain: {exc}",
                 errors=[str(exc)],
             )
@@ -409,7 +399,8 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
         self._delete_protection_marker(domain_name)
 
         return DeprovisionResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message=(
                 f"opensearch domain {domain_name} delete queued "
                 f"(snapshot={'taken' if snapshot_taken else 'skipped'}, "
@@ -425,37 +416,37 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
         existing = self._describe(domain_name)
         if existing is None:
             return ServiceStatus(
-                handle=handle.handle, state="deprovisioned",
+                handle=handle.handle,
+                state="deprovisioned",
                 message=f"opensearch domain {domain_name} not found",
             )
         if existing.get("Deleted"):
             return ServiceStatus(
-                handle=handle.handle, state="deprovisioning",
+                handle=handle.handle,
+                state="deprovisioning",
                 message=f"opensearch domain {domain_name} deleting",
             )
         if existing.get("Processing"):
             return ServiceStatus(
-                handle=handle.handle, state="updating",
-                message=(
-                    f"opensearch domain {domain_name} processing "
-                    f"config change"
-                ),
+                handle=handle.handle,
+                state="updating",
+                message=(f"opensearch domain {domain_name} processing config change"),
             )
         if existing.get("UpgradeProcessing"):
             return ServiceStatus(
-                handle=handle.handle, state="updating",
-                message=(
-                    f"opensearch domain {domain_name} engine upgrade "
-                    f"in progress"
-                ),
+                handle=handle.handle,
+                state="updating",
+                message=(f"opensearch domain {domain_name} engine upgrade in progress"),
             )
         if not existing.get("Endpoint") and not existing.get("Endpoints"):
             return ServiceStatus(
-                handle=handle.handle, state="provisioning",
+                handle=handle.handle,
+                state="provisioning",
                 message=f"opensearch domain {domain_name} provisioning",
             )
         return ServiceStatus(
-            handle=handle.handle, state="available",
+            handle=handle.handle,
+            state="available",
             message=f"opensearch domain {domain_name} available",
         )
 
@@ -467,11 +458,7 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
             raise ManagedServiceError(
                 f"binding requested for missing domain {domain_name}",
             )
-        endpoint = (
-            existing.get("Endpoint")
-            or (existing.get("Endpoints") or {}).get("vpc")
-            or ""
-        )
+        endpoint = existing.get("Endpoint") or (existing.get("Endpoints") or {}).get("vpc") or ""
         url = f"https://{endpoint}" if endpoint else ""
         secret_name = self._secret_name_for(domain_name=domain_name)
         index_name = _index_name_for(domain_name=domain_name)
@@ -499,11 +486,7 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
                     actions=["secretsmanager:GetSecretValue"],
                 ),
                 Grant(
-                    resource=(
-                        existing.get("ARN")
-                        or f"arn:aws:es:{self._config.region}:*:"
-                           f"domain/{domain_name}"
-                    ),
+                    resource=(existing.get("ARN") or f"arn:aws:es:{self._config.region}:*:domain/{domain_name}"),
                     actions=[
                         "es:ESHttpGet",
                         "es:ESHttpPost",
@@ -545,7 +528,9 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="search_opensearch")
     def restore(
-        self, snapshot: SnapshotHandle, target: ProvisionSpec,
+        self,
+        snapshot: SnapshotHandle,
+        target: ProvisionSpec,
     ) -> ProvisionResult:
         # Restore from an OpenSearch snapshot is also a cluster-REST
         # operation (POST _snapshot/<repo>/<id>/_restore). The driver
@@ -558,10 +543,7 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
         return ProvisionResult(
             ok=True,
             handle=provisioned.handle,
-            message=(
-                f"target domain provisioned; restore snapshot "
-                f"{snapshot.snapshot_id} via cluster REST"
-            ),
+            message=(f"target domain provisioned; restore snapshot {snapshot.snapshot_id} via cluster REST"),
         )
 
     @driver_op(cloud="aws", driver="search_opensearch", heartbeat=False)
@@ -575,7 +557,9 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
                 "volume_size_gb": {"type": "integer", "minimum": 10},
                 "dedicated_master_enabled": {"type": "boolean"},
                 "dedicated_master_count": {
-                    "type": "integer", "minimum": 3, "maximum": 5,
+                    "type": "integer",
+                    "minimum": 3,
+                    "maximum": 5,
                 },
                 "dedicated_master_type": {"type": "string"},
                 "deletion_protection": {"type": "boolean"},
@@ -588,20 +572,12 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
         return BindingSchema(
             env_vars={
                 "SEARCH_URL": "OpenSearch HTTPS endpoint",
-                "SEARCH_API_KEY": (
-                    "Secrets Manager ref to the master-user password"
-                ),
-                "SEARCH_INDEX_PREFIX": (
-                    "Conventional index-name prefix for this app"
-                ),
+                "SEARCH_API_KEY": ("Secrets Manager ref to the master-user password"),
+                "SEARCH_INDEX_PREFIX": ("Conventional index-name prefix for this app"),
                 "OPENSEARCH_ENDPOINT": "Alias for SEARCH_URL",
-                "OPENSEARCH_INDEX_NAME": (
-                    "Alias for SEARCH_INDEX_PREFIX"
-                ),
+                "OPENSEARCH_INDEX_NAME": ("Alias for SEARCH_INDEX_PREFIX"),
                 "OPENSEARCH_MASTER_USER": "Master username (astrolift)",
-                "OPENSEARCH_MASTER_PASSWORD": (
-                    "Secrets Manager ref to the master-user password"
-                ),
+                "OPENSEARCH_MASTER_PASSWORD": ("Secrets Manager ref to the master-user password"),
             },
         )
 
@@ -628,9 +604,7 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
             f"{spec.environment_name}-"
             f"{spec.service_handle_hint or 'search'}"
         ).lower()
-        clean = "".join(
-            c if (c.isalnum() or c == "-") else "-" for c in raw
-        )
+        clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in raw)
         while "--" in clean:
             clean = clean.replace("--", "-")
         clean = clean.strip("-")
@@ -639,15 +613,10 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
         return clean[:28]
 
     def _secret_name_for(self, *, domain_name: str) -> str:
-        return (
-            f"{self._config.secrets_manager_prefix}/{domain_name}/master"
-        )
+        return f"{self._config.secrets_manager_prefix}/{domain_name}/master"
 
     def _protection_marker_name(self, domain_name: str) -> str:
-        return (
-            f"{self._config.secrets_manager_prefix}/{domain_name}"
-            f"/protection"
-        )
+        return f"{self._config.secrets_manager_prefix}/{domain_name}/protection"
 
     def _store_master_password(
         self,
@@ -672,7 +641,8 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
         except Exception as exc:
             if "ResourceExistsException" in type(exc).__name__:
                 self._sm.put_secret_value(
-                    SecretId=name, SecretString=password,
+                    SecretId=name,
+                    SecretString=password,
                 )
                 return name
             raise ManagedServiceError(
@@ -690,7 +660,10 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
             return
 
     def _set_deletion_protection(
-        self, *, domain_name: str, enabled: bool,
+        self,
+        *,
+        domain_name: str,
+        enabled: bool,
     ) -> None:
         name = self._protection_marker_name(domain_name)
         value = "1" if enabled else "0"
@@ -700,7 +673,8 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
             if "ResourceExistsException" in type(exc).__name__:
                 try:
                     self._sm.put_secret_value(
-                        SecretId=name, SecretString=value,
+                        SecretId=name,
+                        SecretString=value,
                     )
                 except Exception:
                     return
@@ -724,7 +698,8 @@ class OpenSearchSearchDriver(ManagedServiceDriver):
         name = self._protection_marker_name(domain_name)
         try:
             self._sm.delete_secret(
-                SecretId=name, ForceDeleteWithoutRecovery=True,
+                SecretId=name,
+                ForceDeleteWithoutRecovery=True,
             )
         except Exception:
             return
@@ -748,10 +723,7 @@ def _generate_master_password(length: int = 32) -> str:
         secrets.choice(string.digits),
         secrets.choice("-_."),
     ]
-    base += [
-        secrets.choice(_PASSWORD_ALPHABET)
-        for _ in range(length - len(base))
-    ]
+    base += [secrets.choice(_PASSWORD_ALPHABET) for _ in range(length - len(base))]
     # secrets-grade shuffle: pick uniformly random positions.
     out = []
     pool = list(base)

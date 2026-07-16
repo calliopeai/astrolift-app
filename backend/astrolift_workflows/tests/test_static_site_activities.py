@@ -301,7 +301,9 @@ def test_cloudfront_cert_reuses_issued(monkeypatch, app, env, org):
 def test_cloudfront_cert_requests_validates_and_stores(monkeypatch, app, env, org):
     _attach(app, env, org, with_domain=False)
     md = _domain_without_cert(org, env, dns_config={"zone_id": "Z123"})
-    fake = _FakeCertDns(statuses=[{"status": "pending", "cert_arn": None}, {"status": "issued", "cert_arn": "c"}])
+    fake = _FakeCertDns(
+        statuses=[{"status": "pending", "cert_arn": None}, {"status": "issued", "cert_arn": "c"}]
+    )
     monkeypatch.setattr(static_site, "_us_east_1_dns_driver", lambda: fake)
     monkeypatch.setattr(static_site.time, "sleep", lambda _s: None)
     dep = _deployment(app, env)

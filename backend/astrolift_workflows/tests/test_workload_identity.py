@@ -112,7 +112,10 @@ def test_inject_handles_cronjob_nested_pod_spec():
     }
 
     out = _inject_workload_identity(
-        [cron], sa_name="sa", role_arn="arn:x", namespace="org-app",
+        [cron],
+        sa_name="sa",
+        role_arn="arn:x",
+        namespace="org-app",
     )
 
     cj = next(r for r in out if r["kind"] == "CronJob")
@@ -128,7 +131,10 @@ def test_inject_leaves_non_workload_kinds_untouched():
     }
 
     out = _inject_workload_identity(
-        [svc], sa_name="sa", role_arn="arn:x", namespace="org-app",
+        [svc],
+        sa_name="sa",
+        role_arn="arn:x",
+        namespace="org-app",
     )
 
     service = next(r for r in out if r["kind"] == "Service")

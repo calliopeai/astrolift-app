@@ -490,6 +490,22 @@ def _managed_hostnames_for_apps(apps: Iterable[RegisteredApp]) -> dict[int, str]
     return out
 
 
+def _viewer_permissions_for_apps(apps: Iterable[RegisteredApp]) -> dict[int, set[str]]:
+    """Bulk per-app viewer permissions for the list resolvers (#478).
+
+    One RoleBinding query for the whole page via
+    :func:`astrolift_identity.permission_resolver.resolve_effective_permissions_for_apps`;
+    ``app_to_type`` reads the map via the ``viewer_permissions=`` kwarg.
+    Empty when there is no acting user (e.g. system callers).
+    """
+    from astrolift_identity.permission_resolver import resolve_effective_permissions_for_apps
+
+    tenant = get_current_tenant()
+    if tenant is None or tenant.actor_user_id is None:
+        return {}
+    return resolve_effective_permissions_for_apps(tenant, apps)
+
+
 def _viewer_scope_filter() -> Q | None:
     """Return the ``Q`` that limits a queryset to apps the viewer's
     RoleBindings reach (#312). ``None`` when no scope applies — caller
@@ -832,12 +848,14 @@ class RegistryQuery:
             apps = _filter_apps_by_status(apps, freshness_by_app, status)
         preview_counts = _active_preview_counts(apps)
         managed_hostnames = _managed_hostnames_for_apps(apps)
+        viewer_perms = _viewer_permissions_for_apps(apps)
         if not include_freshness:
             return [
                 app_to_type(
                     a,
                     active_preview_count=preview_counts.get(a.pk, 0),
                     managed_hostname=managed_hostnames.get(a.pk, ""),
+                    viewer_permissions=viewer_perms.get(a.pk),
                 )
                 for a in apps
             ]
@@ -847,6 +865,7 @@ class RegistryQuery:
                 freshness=freshness_by_app.get(a.pk),
                 active_preview_count=preview_counts.get(a.pk, 0),
                 managed_hostname=managed_hostnames.get(a.pk, ""),
+                viewer_permissions=viewer_perms.get(a.pk),
             )
             for a in apps
         ]
@@ -1000,12 +1019,14 @@ class RegistryQuery:
             scoped_apps = _filter_apps_by_status(scoped_apps, freshness_by_app, status)
         preview_counts = _active_preview_counts(scoped_apps)
         managed_hostnames = _managed_hostnames_for_apps(scoped_apps)
+        viewer_perms = _viewer_permissions_for_apps(scoped_apps)
         if not include_freshness:
             return [
                 app_to_type(
                     a,
                     active_preview_count=preview_counts.get(a.pk, 0),
                     managed_hostname=managed_hostnames.get(a.pk, ""),
+                    viewer_permissions=viewer_perms.get(a.pk),
                 )
                 for a in scoped_apps
             ]
@@ -1015,6 +1036,7 @@ class RegistryQuery:
                 freshness=freshness_by_app.get(a.pk),
                 active_preview_count=preview_counts.get(a.pk, 0),
                 managed_hostname=managed_hostnames.get(a.pk, ""),
+                viewer_permissions=viewer_perms.get(a.pk),
             )
             for a in scoped_apps
         ]
@@ -1148,9 +1170,7 @@ class RegistryQuery:
         org_id = _caller_org_id()
         if org_id is None:
             return []
-        qs = Workload.objects.select_related("registered_app").filter(
-            registered_app__organization_id=org_id
-        )
+        qs = Workload.objects.select_related("registered_app").filter(registered_app__organization_id=org_id)
         if app_slug:
             qs = qs.filter(registered_app__slug=app_slug)
         return [workload_to_type(w) for w in qs[:200]]

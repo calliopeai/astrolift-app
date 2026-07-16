@@ -8,7 +8,7 @@ canned responses. Test surface mirrors AWS ElastiCache (#352).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 
@@ -48,17 +48,14 @@ class FakeRedisClient:
 
     def create_instance(self, *, request):
         self._record("create_instance", request=request)
-        full_name = (
-            request["parent"]
-            + "/instances/"
-            + request["instance_id"]
-        )
+        full_name = request["parent"] + "/instances/" + request["instance_id"]
         inst_body = request["instance"]
         self.instances[request["instance_id"]] = FakeRedisInstance(
             name=full_name,
             host="10.0.0.10",
             transit_encryption_mode=inst_body.get(
-                "transit_encryption_mode", "DISABLED",
+                "transit_encryption_mode",
+                "DISABLED",
             ),
             auth_enabled=bool(inst_body.get("auth_enabled", False)),
         )
@@ -158,9 +155,7 @@ def test_provision_idempotent(driver):
 def test_provision_stores_auth_token_in_secret_manager(driver):
     result = driver.provision(_spec())
     instance_id = _parse_handle(result.handle)
-    sid = (
-        f"astrolift/memorystore/{instance_id}/auth".replace("/", "_")
-    )
+    sid = f"astrolift/memorystore/{instance_id}/auth".replace("/", "_")
     versions = driver._sm.secrets[sid]  # type: ignore[attr-defined]
     assert versions and len(versions[0]) >= 16
 
@@ -168,27 +163,21 @@ def test_provision_stores_auth_token_in_secret_manager(driver):
 def test_provision_no_auth_token_when_auth_disabled(driver):
     result = driver.provision(_spec(config={"auth_enabled": False}))
     instance_id = _parse_handle(result.handle)
-    sid = (
-        f"astrolift/memorystore/{instance_id}/auth".replace("/", "_")
-    )
+    sid = f"astrolift/memorystore/{instance_id}/auth".replace("/", "_")
     assert sid not in driver._sm.secrets  # type: ignore[attr-defined]
 
 
 def test_provision_size_to_memory(driver):
-    result = driver.provision(_spec(size="large"))
+    driver.provision(_spec(size="large"))
     redis_client = driver._redis  # type: ignore[attr-defined]
-    create_call = next(
-        k for op, k in redis_client.calls if op == "create_instance"
-    )
+    create_call = next(k for op, k in redis_client.calls if op == "create_instance")
     assert create_call["request"]["instance"]["memory_size_gb"] == 16
 
 
 def test_provision_high_availability_bumps_tier(driver):
-    result = driver.provision(_spec(config={"high_availability": True}))
+    driver.provision(_spec(config={"high_availability": True}))
     redis_client = driver._redis  # type: ignore[attr-defined]
-    create_call = next(
-        k for op, k in redis_client.calls if op == "create_instance"
-    )
+    create_call = next(k for op, k in redis_client.calls if op == "create_instance")
     assert create_call["request"]["instance"]["tier"] == "STANDARD_HA"
 
 
@@ -257,9 +246,7 @@ def test_deprovision_idempotent_when_already_gone(driver):
 def test_deprovision_delete_data_drops_auth_secret(driver):
     provisioned = driver.provision(_spec())
     instance_id = _parse_handle(provisioned.handle)
-    sid = (
-        f"astrolift/memorystore/{instance_id}/auth".replace("/", "_")
-    )
+    sid = f"astrolift/memorystore/{instance_id}/auth".replace("/", "_")
     assert sid in driver._sm.secrets  # type: ignore[attr-defined]
     driver.deprovision(
         DeprovisionSpec(handle=provisioned.handle),
@@ -282,7 +269,7 @@ def test_deprovision_force_destroy_retries_on_failed_precondition():
             pass
 
     class _SM:
-        secrets: dict = {}
+        secrets: ClassVar[dict] = {}
 
         def delete_secret(self, **_):
             pass
@@ -383,8 +370,13 @@ def test_instance_id_starts_with_letter_and_under_limit(driver):
 def test_config_schema_shape(driver):
     schema = driver.config_schema()
     for key in (
-        "memory_gb", "redis_version", "tier", "high_availability",
-        "transit_encryption", "auth_enabled", "kms_key_name",
+        "memory_gb",
+        "redis_version",
+        "tier",
+        "high_availability",
+        "transit_encryption",
+        "auth_enabled",
+        "kms_key_name",
     ):
         assert key in schema["properties"]
 
@@ -392,7 +384,10 @@ def test_config_schema_shape(driver):
 def test_binding_schema_lists_all_env_vars(driver):
     schema = driver.binding_schema()
     for key in (
-        "REDIS_HOST", "REDIS_PORT", "REDIS_TLS",
-        "REDIS_AUTH_TOKEN", "REDIS_URL",
+        "REDIS_HOST",
+        "REDIS_PORT",
+        "REDIS_TLS",
+        "REDIS_AUTH_TOKEN",
+        "REDIS_URL",
     ):
         assert key in schema.env_vars

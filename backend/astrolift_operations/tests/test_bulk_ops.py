@@ -33,9 +33,7 @@ def _info():
 
 
 def _scaffold(slug_suffix="bulk"):
-    org = Organization.objects.create(
-        name=f"Bulk-{slug_suffix}", slug=f"bulk-org-{slug_suffix}"
-    )
+    org = Organization.objects.create(name=f"Bulk-{slug_suffix}", slug=f"bulk-org-{slug_suffix}")
     team = Team.objects.create(organization=org, name="Eng", slug=f"bulk-eng-{slug_suffix}")
     project = Project.objects.create(
         organization=org, team=team, name="Demo", slug=f"bulk-demo-{slug_suffix}"
@@ -102,10 +100,13 @@ def test_bulk_rolling_restart_fans_out(permission_resolver):
     )
     _grant(permission_resolver)
     restart_result = MagicMock(new_revision=2)
-    with _tenant(org, user), patch(
-        "astrolift_lifecycle.services.k8s_ops.rollout_restart_workload",
-        return_value=restart_result,
-    ) as mock_restart:
+    with (
+        _tenant(org, user),
+        patch(
+            "astrolift_lifecycle.services.k8s_ops.rollout_restart_workload",
+            return_value=restart_result,
+        ) as mock_restart,
+    ):
         result = OperationsMutation().bulk_rolling_restart(
             info=_info(),
             input=BulkRollingRestartInput(app_slugs=[app.slug]),
@@ -208,11 +209,14 @@ def test_bulk_push_secrets_idempotent(permission_resolver):
             ),
         )
     assert result.ok_count == 1
-    assert AppSecretBundleRef.objects.filter(
-        registered_app=app,
-        secret_bundle=bundle,
-        deleted_at__isnull=True,
-    ).count() == 1
+    assert (
+        AppSecretBundleRef.objects.filter(
+            registered_app=app,
+            secret_bundle=bundle,
+            deleted_at__isnull=True,
+        ).count()
+        == 1
+    )
 
 
 def test_bulk_push_secrets_bundle_not_found(permission_resolver):
@@ -238,9 +242,12 @@ def test_bulk_resync_manifest_fans_out(permission_resolver):
     org, app, env, cluster, user = _scaffold("resync1")
     _grant(permission_resolver)
     sync_result = MagicMock(status="applied", error=None)
-    with _tenant(org, user), patch(
-        "astrolift_registry.services.manifest_sync.resync_app_manifest_from_repo",
-        return_value=sync_result,
+    with (
+        _tenant(org, user),
+        patch(
+            "astrolift_registry.services.manifest_sync.resync_app_manifest_from_repo",
+            return_value=sync_result,
+        ),
     ):
         result = OperationsMutation().bulk_resync_manifest(
             info=_info(),
@@ -254,9 +261,12 @@ def test_bulk_resync_manifest_fetch_failed(permission_resolver):
     org, app, env, cluster, user = _scaffold("resync2")
     _grant(permission_resolver)
     sync_result = MagicMock(status="fetch_failed", error="couldn't reach repo")
-    with _tenant(org, user), patch(
-        "astrolift_registry.services.manifest_sync.resync_app_manifest_from_repo",
-        return_value=sync_result,
+    with (
+        _tenant(org, user),
+        patch(
+            "astrolift_registry.services.manifest_sync.resync_app_manifest_from_repo",
+            return_value=sync_result,
+        ),
     ):
         result = OperationsMutation().bulk_resync_manifest(
             info=_info(),

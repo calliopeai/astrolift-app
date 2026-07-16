@@ -755,6 +755,7 @@ class GKEClusterDriver(ClusterDriver):
             namespaces=default_namespaces(namespaces),
         )
 
+    @driver_op(cloud="gcp", driver="cluster")
     def list_regions(self) -> list[RegionInfo]:
         """Curated static list of GCP regions for the register picker
         (#860).

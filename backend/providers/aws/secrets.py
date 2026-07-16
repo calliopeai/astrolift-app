@@ -80,10 +80,9 @@ class AWSSecretsBackend(SecretsBackend):
 
             self._ssm = boto3.client("ssm", region_name=config.region)
 
+    @driver_op(cloud="aws", driver="secrets")
     def ensure_initialized(self) -> dict | None:
-        raise NotImplementedError(
-            "AWSSecretsBackend does not require out-of-band initialisation"
-        )
+        raise NotImplementedError("AWSSecretsBackend does not require out-of-band initialisation")
 
     @driver_op(cloud="aws", driver="secrets", audit=True, sensitive_kind="secret.read")
     def get(self, path: str) -> dict[str, str] | None:

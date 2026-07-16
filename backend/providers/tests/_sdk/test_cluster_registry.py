@@ -20,11 +20,18 @@ class _Stub:
 
 def _full_plugin() -> ProviderPlugin:
     return ProviderPlugin(
-        id="aws", display_name="aws",
+        id="aws",
+        display_name="aws",
         drivers={
-            r: _Stub for r in (
-                "cluster", "ingress", "dns", "tls",
-                "secrets", "identity", "registry",
+            r: _Stub
+            for r in (
+                "cluster",
+                "ingress",
+                "dns",
+                "tls",
+                "secrets",
+                "identity",
+                "registry",
             )
         },
     )
@@ -32,7 +39,8 @@ def _full_plugin() -> ProviderPlugin:
 
 def _bare_plugin() -> ProviderPlugin:
     return ProviderPlugin(
-        id="bare", display_name="bare",
+        id="bare",
+        display_name="bare",
         drivers={"cluster": _Stub},
     )
 
@@ -54,7 +62,8 @@ def test_register_missing_required_role_raises() -> None:
     registry = TenantClusterRegistry()
     with pytest.raises(ValueError, match="missing required roles"):
         registry.register(
-            cluster_id="bare", plugin=_bare_plugin(),
+            cluster_id="bare",
+            plugin=_bare_plugin(),
             display_name="bare",
             location="local",
         )
@@ -63,16 +72,24 @@ def test_register_missing_required_role_raises() -> None:
 def test_register_with_composition_satisfies_missing() -> None:
     composition = CompositionRegistry()
     for role in (
-        "ingress", "dns", "tls", "secrets", "identity", "registry",
+        "ingress",
+        "dns",
+        "tls",
+        "secrets",
+        "identity",
+        "registry",
     ):
         composition.delegate_driver(
-            target_plugin_id="bare", role=role,
+            target_plugin_id="bare",
+            role=role,
             source_plugin_id="k8s_native",
         )
     registry = TenantClusterRegistry()
     record = registry.register(
-        cluster_id="bare", plugin=_bare_plugin(),
-        display_name="bare", location="local",
+        cluster_id="bare",
+        plugin=_bare_plugin(),
+        display_name="bare",
+        location="local",
         composition=composition,
     )
     assert record.composition is composition
@@ -81,12 +98,16 @@ def test_register_with_composition_satisfies_missing() -> None:
 def test_get_and_list() -> None:
     registry = TenantClusterRegistry()
     registry.register(
-        cluster_id="aws-1", plugin=_full_plugin(),
-        display_name="AWS-1", location="us-east-1",
+        cluster_id="aws-1",
+        plugin=_full_plugin(),
+        display_name="AWS-1",
+        location="us-east-1",
     )
     registry.register(
-        cluster_id="aws-2", plugin=_full_plugin(),
-        display_name="AWS-2", location="us-west-2",
+        cluster_id="aws-2",
+        plugin=_full_plugin(),
+        display_name="AWS-2",
+        location="us-west-2",
     )
     assert registry.get("aws-1").display_name == "AWS-1"
     ids = {r.cluster_id for r in registry.list()}
@@ -96,8 +117,10 @@ def test_get_and_list() -> None:
 def test_deregister_removes() -> None:
     registry = TenantClusterRegistry()
     registry.register(
-        cluster_id="x", plugin=_full_plugin(),
-        display_name="X", location="us-east-1",
+        cluster_id="x",
+        plugin=_full_plugin(),
+        display_name="X",
+        location="us-east-1",
     )
     registry.deregister("x")
     assert registry.get("x") is None
@@ -106,34 +129,41 @@ def test_deregister_removes() -> None:
 def test_probe_succeeds_when_get_namespace_works() -> None:
     registry = TenantClusterRegistry()
     record = registry.register(
-        cluster_id="aws-1", plugin=_full_plugin(),
-        display_name="AWS-1", location="us-east-1",
+        cluster_id="aws-1",
+        plugin=_full_plugin(),
+        display_name="AWS-1",
+        location="us-east-1",
     )
     cluster_driver = MagicMock()
     cluster_driver.get_namespace.return_value = MagicMock()
     result = probe_connectivity(
-        record=record, cluster_driver=cluster_driver,
+        record=record,
+        cluster_driver=cluster_driver,
         now_iso="2026-05-09T00:00:00Z",
     )
     assert result.ok is True
     assert "reachable" in result.message
     cluster_driver.get_namespace.assert_called_once_with(
-        "aws-1", "astrolift-system",
+        "aws-1",
+        "astrolift-system",
     )
 
 
 def test_probe_fails_on_apiserver_error() -> None:
     registry = TenantClusterRegistry()
     record = registry.register(
-        cluster_id="aws-1", plugin=_full_plugin(),
-        display_name="AWS-1", location="us-east-1",
+        cluster_id="aws-1",
+        plugin=_full_plugin(),
+        display_name="AWS-1",
+        location="us-east-1",
     )
     cluster_driver = MagicMock()
     cluster_driver.get_namespace.side_effect = RuntimeError(
         "401 unauthorized",
     )
     result = probe_connectivity(
-        record=record, cluster_driver=cluster_driver,
+        record=record,
+        cluster_driver=cluster_driver,
         now_iso="2026-05-09T00:00:00Z",
     )
     assert result.ok is False

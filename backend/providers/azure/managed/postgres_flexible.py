@@ -210,7 +210,7 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
             return ProvisionResult(
                 ok=False,
                 handle="",
-                message=("azure postgres driver requires a Key Vault " "(set keyvault_url or inject secret_client)"),
+                message=("azure postgres driver requires a Key Vault (set keyvault_url or inject secret_client)"),
                 errors=["no_secret_backend"],
             )
         server_name = self._server_name_for(spec=spec)
@@ -222,7 +222,7 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
             return ProvisionResult(
                 ok=True,
                 handle=self._handle_for(server_name=server_name),
-                message=(f"flexible server {server_name} already exists " f"(state={_state_of(existing)})"),
+                message=(f"flexible server {server_name} already exists (state={_state_of(existing)})"),
             )
 
         master_password = _generate_master_password()
@@ -311,9 +311,7 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
         return ProvisionResult(
             ok=True,
             handle=self._handle_for(server_name=server_name),
-            message=(
-                f"flexible server {server_name} provisioning " f"(password in key vault {self._config.keyvault_url})"
-            ),
+            message=(f"flexible server {server_name} provisioning (password in key vault {self._config.keyvault_url})"),
         )
 
     @driver_op(cloud="azure", driver="postgres_flexible")
@@ -578,7 +576,7 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
         from datetime import UTC, datetime
 
         server_name = self._server_name_from_handle(handle.handle)
-        backup_name = f"{server_name}-snap-" f"{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
+        backup_name = f"{server_name}-snap-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
         try:
             self._mgmt.backups.begin_put(
                 resource_group_name=self._config.resource_group,
@@ -678,7 +676,7 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
                 "DATABASE_NAME": "Initial database name (postgres)",
                 "DATABASE_USER": "Master username (astrolift)",
                 "DATABASE_PASSWORD": ("Key Vault ref to the master password"),
-                "DATABASE_URL": ("Key Vault ref to the fully-formed " "postgres:// connection string"),
+                "DATABASE_URL": ("Key Vault ref to the fully-formed postgres:// connection string"),
             },
         )
 

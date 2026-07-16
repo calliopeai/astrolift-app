@@ -122,7 +122,8 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             import boto3
 
             self._bedrock = boto3.client(
-                "bedrock", region_name=config.region,
+                "bedrock",
+                region_name=config.region,
             )
         if logs_client is not None:
             self._logs = logs_client
@@ -130,7 +131,8 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             import boto3
 
             self._logs = boto3.client(
-                "logs", region_name=config.region,
+                "logs",
+                region_name=config.region,
             )
         # Bedrock has no first-party "model record" resource for
         # on-demand models. The driver owns this dict as the
@@ -157,17 +159,10 @@ class AmazonBedrockDriver(ManagedServiceDriver):
                 ok=True,
                 handle=handle_for(kind=KIND, resource_id=record_id),
                 ready=not (existing.get("ProvisionedThroughputArn") or ""),
-                message=(
-                    f"bedrock model endpoint {record_id} already exists "
-                    f"(model_id={existing.get('ModelId')})"
-                ),
+                message=(f"bedrock model endpoint {record_id} already exists (model_id={existing.get('ModelId')})"),
             )
 
-        model_id = (
-            cfg.get("model_id")
-            or _SIZE_TO_MODEL_ID.get(spec.size)
-            or self._config.default_model_id
-        )
+        model_id = cfg.get("model_id") or _SIZE_TO_MODEL_ID.get(spec.size) or self._config.default_model_id
 
         # CloudWatch log group for invocation logs. Idempotent: a
         # pre-existing group is left alone.
@@ -185,16 +180,12 @@ class AmazonBedrockDriver(ManagedServiceDriver):
                     commitmentDuration=commitment_duration,
                     tags=_pt_tags(spec),
                 )
-                provisioned_throughput_arn = (
-                    resp.get("provisionedModelArn") or ""
-                )
+                provisioned_throughput_arn = resp.get("provisionedModelArn") or ""
             except Exception as exc:
                 return ProvisionResult(
                     ok=False,
                     handle="",
-                    message=(
-                        f"create_provisioned_model_throughput: {exc}"
-                    ),
+                    message=(f"create_provisioned_model_throughput: {exc}"),
                     errors=[str(exc)],
                 )
 
@@ -264,10 +255,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
         return UpdateResult(
             ok=True,
             handle=spec.handle,
-            message=(
-                f"bedrock model endpoint {record_id} updated "
-                f"(model_id={existing['ModelId']})"
-            ),
+            message=(f"bedrock model endpoint {record_id} updated (model_id={existing['ModelId']})"),
         )
 
     @driver_op(
@@ -290,9 +278,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             return DeprovisionResult(
                 ok=True,
                 handle=spec.handle,
-                message=(
-                    f"bedrock model endpoint {record_id} already gone"
-                ),
+                message=(f"bedrock model endpoint {record_id} already gone"),
             )
 
         pt_arn = existing.get("ProvisionedThroughputArn") or ""
@@ -318,17 +304,14 @@ class AmazonBedrockDriver(ManagedServiceDriver):
                 return DeprovisionResult(
                     ok=False,
                     handle=spec.handle,
-                    message=(
-                        f"delete_provisioned_model_throughput: {exc}"
-                    ),
+                    message=(f"delete_provisioned_model_throughput: {exc}"),
                     errors=[str(exc)],
                 )
 
         log_action = "preserved"
         if delete_data:
             self._delete_log_group(
-                log_group=existing.get("LogGroup")
-                or self._log_group_for(record_id=record_id),
+                log_group=existing.get("LogGroup") or self._log_group_for(record_id=record_id),
             )
             log_action = "deleted"
             self._records.pop(record_id, None)
@@ -362,17 +345,13 @@ class AmazonBedrockDriver(ManagedServiceDriver):
                     return ServiceStatus(
                         handle=handle.handle,
                         state="provisioning",
-                        message=(
-                            f"provisioned throughput {pt_arn} creating"
-                        ),
+                        message=(f"provisioned throughput {pt_arn} creating"),
                     )
                 if pt_state == "failed":
                     return ServiceStatus(
                         handle=handle.handle,
                         state="error",
-                        message=(
-                            f"provisioned throughput {pt_arn} failed"
-                        ),
+                        message=(f"provisioned throughput {pt_arn} failed"),
                     )
             except Exception:
                 # Best-effort -- fall through to available.
@@ -388,10 +367,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
         return ServiceStatus(
             handle=handle.handle,
             state="available",
-            message=(
-                f"bedrock model endpoint {record_id} available "
-                f"(model_id={model_id})"
-            ),
+            message=(f"bedrock model endpoint {record_id} available (model_id={model_id})"),
         )
 
     @driver_op(cloud="aws", driver="model_endpoint_bedrock")
@@ -410,8 +386,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
         existing = self._describe(record_id) or {}
         cfg = config or {}
         invoke_endpoint = (
-            self._config.invoke_endpoint_override
-            or f"https://bedrock-runtime.{self._config.region}.amazonaws.com"
+            self._config.invoke_endpoint_override or f"https://bedrock-runtime.{self._config.region}.amazonaws.com"
         )
         model_id = (
             existing.get("ModelId")
@@ -422,9 +397,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
         log_group = existing.get("LogGroup") or self._log_group_for(
             record_id=record_id,
         )
-        irsa_role_tag_value = (
-            f"{self._config.irsa_role_tag_value_prefix}-{record_id}"
-        )
+        irsa_role_tag_value = f"{self._config.irsa_role_tag_value_prefix}-{record_id}"
         return Binding(
             env_vars={
                 # Canonical contract envs
@@ -440,10 +413,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             },
             iam_grants=[
                 Grant(
-                    resource=(
-                        f"arn:aws:bedrock:{self._config.region}::"
-                        f"foundation-model/{model_id}"
-                    ),
+                    resource=(f"arn:aws:bedrock:{self._config.region}::foundation-model/{model_id}"),
                     actions=[
                         "bedrock:InvokeModel",
                         "bedrock:InvokeModelWithResponseStream",
@@ -516,20 +486,12 @@ class AmazonBedrockDriver(ManagedServiceDriver):
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={
-                "MODEL_ENDPOINT_URL": (
-                    "Bedrock runtime HTTPS endpoint"
-                ),
-                "MODEL_ENDPOINT_MODEL_ID": (
-                    "Foundation model id (e.g. anthropic.claude-3-...)"
-                ),
-                "MODEL_ENDPOINT_PROVIDER": (
-                    "Provider literal: 'bedrock'"
-                ),
+                "MODEL_ENDPOINT_URL": ("Bedrock runtime HTTPS endpoint"),
+                "MODEL_ENDPOINT_MODEL_ID": ("Foundation model id (e.g. anthropic.claude-3-...)"),
+                "MODEL_ENDPOINT_PROVIDER": ("Provider literal: 'bedrock'"),
                 "BEDROCK_REGION": "AWS region hosting the endpoint",
                 "BEDROCK_MODEL_ID": "Alias for MODEL_ENDPOINT_MODEL_ID",
-                "BEDROCK_INVOKE_ENDPOINT": (
-                    "Alias for MODEL_ENDPOINT_URL"
-                ),
+                "BEDROCK_INVOKE_ENDPOINT": ("Alias for MODEL_ENDPOINT_URL"),
             },
         )
 
@@ -576,9 +538,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             f"{spec.environment_name}-"
             f"{spec.service_handle_hint or 'model'}"
         ).lower()
-        clean = "".join(
-            c if (c.isalnum() or c == "-") else "-" for c in raw
-        )
+        clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in raw)
         while "--" in clean:
             clean = clean.replace("--", "-")
         clean = clean.strip("-")

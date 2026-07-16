@@ -107,11 +107,7 @@ def runner_register(request):
         return JsonResponse({"detail": "missing registration token"}, status=400)
 
     token_hash = _sha256(token)
-    runner = (
-        Runner.objects.select_related("organization")
-        .filter(registration_token_hash=token_hash)
-        .first()
-    )
+    runner = Runner.objects.select_related("organization").filter(registration_token_hash=token_hash).first()
     if runner is None:
         # Opaque 404 — no signal about whether guid exists or token is wrong.
         log.warning("runner_register: unknown or already-consumed token")
@@ -189,13 +185,10 @@ def runner_heartbeat(request):
             runner.status = Runner.Status.IDLE
             update_fields += ["current_job_run", "status"]
         else:
-            job_run = (
-                JobRun.objects.filter(
-                    guid=job_run_guid,
-                    organization=runner.organization,
-                )
-                .first()
-            )
+            job_run = JobRun.objects.filter(
+                guid=job_run_guid,
+                organization=runner.organization,
+            ).first()
             if job_run is not None:
                 runner.current_job_run = job_run
                 runner.status = Runner.Status.ACTIVE
@@ -340,9 +333,7 @@ def runner_job_complete(request, runner_guid: str, job_run_guid: str):
     job_run.status = new_status
     job_run.finished_at = now
     job_run.steps_result = body.get("steps", [])
-    job_run.save(
-        update_fields=["status", "finished_at", "steps_result", "updated_at", "version"]
-    )
+    job_run.save(update_fields=["status", "finished_at", "steps_result", "updated_at", "version"])
 
     # Clear runner's current job pointer and return to idle.
     runner.current_job_run = None

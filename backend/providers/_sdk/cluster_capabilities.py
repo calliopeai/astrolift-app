@@ -100,25 +100,13 @@ def probe_capabilities(
         kubernetes_version=kubernetes_version,
         vpa_installed=(
             "verticalpodautoscalers.autoscaling.k8s.io" in crd_names
-            and any(
-                "vpa-recommender" in d for d in deployment_names
-            )
+            and any("vpa-recommender" in d for d in deployment_names)
         ),
-        gateway_api_installed=(
-            "gateways.gateway.networking.k8s.io" in crd_names
-        ),
-        cnpg_installed=(
-            "clusters.postgresql.cnpg.io" in crd_names
-        ),
-        cert_manager_installed=(
-            "certificates.cert-manager.io" in crd_names
-        ),
-        external_secrets_installed=(
-            "externalsecrets.external-secrets.io" in crd_names
-        ),
-        external_dns_installed=(
-            any("external-dns" in d for d in deployment_names)
-        ),
+        gateway_api_installed=("gateways.gateway.networking.k8s.io" in crd_names),
+        cnpg_installed=("clusters.postgresql.cnpg.io" in crd_names),
+        cert_manager_installed=("certificates.cert-manager.io" in crd_names),
+        external_secrets_installed=("externalsecrets.external-secrets.io" in crd_names),
+        external_dns_installed=(any("external-dns" in d for d in deployment_names)),
     )
 
 
@@ -127,16 +115,16 @@ def _list_crd_names(*, k8s_client: object) -> list[str]:
     if list_method is None:
         return []
     try:
-        items = list_method(
-            kind="CustomResourceDefinition",
-            namespace=None,
-        ) or []
+        items = (
+            list_method(
+                kind="CustomResourceDefinition",
+                namespace=None,
+            )
+            or []
+        )
     except Exception:
         return []
-    return [
-        item.get("metadata", {}).get("name", "")
-        for item in items
-    ]
+    return [item.get("metadata", {}).get("name", "") for item in items]
 
 
 def _list_deployment_names(*, k8s_client: object) -> list[str]:
@@ -147,7 +135,4 @@ def _list_deployment_names(*, k8s_client: object) -> list[str]:
         items = list_method(kind="Deployment", namespace=None) or []
     except Exception:
         return []
-    return [
-        item.get("metadata", {}).get("name", "")
-        for item in items
-    ]
+    return [item.get("metadata", {}).get("name", "") for item in items]

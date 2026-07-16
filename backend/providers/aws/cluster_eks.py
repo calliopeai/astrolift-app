@@ -31,8 +31,6 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-log = logging.getLogger("astrolift_providers.aws.cluster_eks")
-
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
 
@@ -99,6 +97,8 @@ from k8s_native.observability import (
     PodBackend,
     default_log_backend,
 )
+
+log = logging.getLogger("astrolift_providers.aws.cluster_eks")
 
 # Region slug -> (display label, continent grouping) for the
 # cluster-register picker (#860). ec2:DescribeRegions returns only the
@@ -434,6 +434,7 @@ class EKSClusterDriver(ClusterDriver):
             phase=ns.get("status", {}).get("phase", "Active"),
         )
 
+    @driver_op(cloud="aws", driver="cluster")
     def storage_class_exists(self, cluster: str, name: str) -> bool:
         """Return True if a StorageClass with the given name exists on the cluster.
 
@@ -1579,6 +1580,7 @@ class EKSClusterDriver(ClusterDriver):
             namespaces=default_namespaces(namespaces),
         )
 
+    @driver_op(cloud="aws", driver="cluster")
     def get_alb_http_metrics(
         self,
         cluster: ClusterContext,
@@ -1800,6 +1802,7 @@ class EKSClusterDriver(ClusterDriver):
 
     # ---- certificate discovery (#858) ------------------------------
 
+    @driver_op(cloud="aws", driver="cluster")
     def list_certificates(self, cluster: ClusterContext) -> list[CertificateInfo]:
         """List ACM certificates available in the cluster's region (#858).
 
@@ -1845,10 +1848,7 @@ class EKSClusterDriver(ClusterDriver):
                     domain_name = cert.get("DomainName", domain_name) or domain_name
                     status = cert.get("Status", status) or status
                     sans = cert.get("SubjectAlternativeNames", []) or []
-                    if domain_name and len(sans) > 1:
-                        label = f"{domain_name} (+{len(sans) - 1})"
-                    else:
-                        label = domain_name
+                    label = f"{domain_name} (+{len(sans) - 1})" if domain_name and len(sans) > 1 else domain_name
                 except Exception as exc:
                     log.warning(
                         "list_certificates: DescribeCertificate failed arn=%s: %s",

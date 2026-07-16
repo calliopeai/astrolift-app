@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-import pytest
-
 from astrolift_pipelines.secret_plumbing import (
     SECRET_REDACTION_MARKER,
     SecretRedactor,
-    SecretResolutionError,
     build_redactor_for_job,
     make_env_from_refs,
 )
-
 
 # ---------------------------------------------------------------------------
 # SecretRedactor
@@ -20,7 +16,9 @@ from astrolift_pipelines.secret_plumbing import (
 
 def test_redactor_replaces_known_value():
     redactor = SecretRedactor(["super-secret-value"])
-    assert redactor.redact("the value is super-secret-value ok") == f"the value is {SECRET_REDACTION_MARKER} ok"
+    assert (
+        redactor.redact("the value is super-secret-value ok") == f"the value is {SECRET_REDACTION_MARKER} ok"
+    )
 
 
 def test_redactor_longer_secrets_first():

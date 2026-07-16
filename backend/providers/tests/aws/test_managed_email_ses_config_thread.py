@@ -27,13 +27,13 @@ class _RecordingSES:
         self._verified = verified or {}
 
     def get_identity_verification_attributes(
-        self, *, Identities: list[str],  # noqa: N803  (boto3 API kwarg)
+        self,
+        *,
+        Identities: list[str],  # noqa: N803  (boto3 API kwarg)
     ) -> dict[str, Any]:
         return {
             "VerificationAttributes": {
-                ident: {"VerificationStatus": self._verified[ident]}
-                for ident in Identities
-                if ident in self._verified
+                ident: {"VerificationStatus": self._verified[ident]} for ident in Identities if ident in self._verified
             },
         }
 

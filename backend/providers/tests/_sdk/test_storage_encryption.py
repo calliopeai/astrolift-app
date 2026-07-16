@@ -41,7 +41,9 @@ def test_cloud_variants_default_to_kms() -> None:
 
 def test_k8s_variants_default_to_pv_luks() -> None:
     cnpg = policy_for(
-        plugin_id="k8s_native", kind="postgres", variant="cnpg",
+        plugin_id="k8s_native",
+        kind="postgres",
+        variant="cnpg",
     )
     assert cnpg is not None
     assert cnpg.mode == "pv_luks"
@@ -49,7 +51,9 @@ def test_k8s_variants_default_to_pv_luks() -> None:
 
 def test_check_with_cmek_passes() -> None:
     result = check_encryption(
-        plugin_id="aws", kind="object_store", variant="s3",
+        plugin_id="aws",
+        kind="object_store",
+        variant="s3",
         cmek_key="arn:aws:kms:us-east-1:123:key/abc",
     )
     assert result.ok is True
@@ -61,7 +65,9 @@ def test_pci_compliance_without_cmek_fails() -> None:
     """Compliance framework requires CMEK but bind didn't supply
     a key — fail bind."""
     result = check_encryption(
-        plugin_id="aws", kind="object_store", variant="s3",
+        plugin_id="aws",
+        kind="object_store",
+        variant="s3",
         compliance_frameworks=["pci"],
     )
     assert result.ok is False
@@ -72,19 +78,21 @@ def test_pci_compliance_in_local_dev_warns_not_fails() -> None:
     """Local-dev allows iteration without full KMS plumbing —
     surface the warning explicitly so promotion fails."""
     result = check_encryption(
-        plugin_id="aws", kind="object_store", variant="s3",
+        plugin_id="aws",
+        kind="object_store",
+        variant="s3",
         compliance_frameworks=["pci"],
         is_local_dev=True,
     )
     assert result.ok is True
-    assert any(
-        "local-dev" in w for w in result.warnings
-    )
+    assert any("local-dev" in w for w in result.warnings)
 
 
 def test_unknown_variant_fails_closed() -> None:
     result = check_encryption(
-        plugin_id="aws", kind="postgres", variant="not_yet_added",
+        plugin_id="aws",
+        kind="postgres",
+        variant="not_yet_added",
     )
     assert result.ok is False
     assert any("no encryption policy" in f for f in result.failures)
@@ -94,7 +102,9 @@ def test_cmek_on_unsupported_variant_warns() -> None:
     """Supplying a CMEK to a variant that doesn't support it —
     operator probably misconfigured. Warn + accept."""
     result = check_encryption(
-        plugin_id="k8s_native", kind="postgres", variant="cnpg",
+        plugin_id="k8s_native",
+        kind="postgres",
+        variant="cnpg",
         cmek_key="arn:aws:kms:...",
     )
     assert result.ok is True
@@ -114,6 +124,5 @@ def test_compliance_required_only_for_payment_or_health() -> None:
     for key, policy in POLICIES.items():
         if policy.cmek_required_for_compliance:
             assert policy.cmek_supported, (
-                f"{key} declares CMEK-required compliance but "
-                f"cmek_supported=False — contradiction"
+                f"{key} declares CMEK-required compliance but cmek_supported=False — contradiction"
             )

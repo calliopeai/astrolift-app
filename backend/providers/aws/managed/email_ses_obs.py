@@ -170,9 +170,7 @@ class AmazonSESObservabilityDriver(EmailObservabilityDriver):
     def get_account_send_status(self) -> AccountSendStatus:
         sending_enabled = True
         try:
-            sending_enabled = bool(
-                self._ses.get_account_sending_enabled().get("Enabled", True)
-            )
+            sending_enabled = bool(self._ses.get_account_sending_enabled().get("Enabled", True))
         except Exception as exc:
             log.debug("get_account_sending_enabled fallback: %s", exc)
 
@@ -182,9 +180,7 @@ class AmazonSESObservabilityDriver(EmailObservabilityDriver):
             pa = account.get("ProductionAccessEnabled")
             if pa is None:
                 # Some SES regions expose a string field instead of a bool.
-                pa_status = (account.get("Details") or {}).get(
-                    "ReviewDetails", {}
-                ).get("Status")
+                pa_status = (account.get("Details") or {}).get("ReviewDetails", {}).get("Status")
                 production_access = pa_status in _PRODUCTION_GRANTED_STATUSES
             else:
                 production_access = bool(pa)
@@ -221,9 +217,7 @@ class AmazonSESObservabilityDriver(EmailObservabilityDriver):
     # ---- identity / dns auth ---------------------------------------
 
     @driver_op(driver="email", cloud="aws")
-    def get_identity_verification_details(
-        self, identity: str
-    ) -> IdentityVerification:
+    def get_identity_verification_details(self, identity: str) -> IdentityVerification:
         is_domain = "@" not in identity
 
         # Verification status
@@ -291,15 +285,11 @@ class AmazonSESObservabilityDriver(EmailObservabilityDriver):
             if not address:
                 continue
             reason_raw = raw.get("Reason") or "BOUNCE"
-            reason = _SES_TO_REASON.get(
-                reason_raw.upper(), SuppressionReason.MANUAL
-            )
+            reason = _SES_TO_REASON.get(reason_raw.upper(), SuppressionReason.MANUAL)
             suppressed_at = raw.get("LastUpdateTime")
             if isinstance(suppressed_at, str):
                 try:
-                    suppressed_at = datetime.fromisoformat(
-                        suppressed_at.replace("Z", "+00:00")
-                    )
+                    suppressed_at = datetime.fromisoformat(suppressed_at.replace("Z", "+00:00"))
                 except ValueError:
                     suppressed_at = datetime.now(UTC)
             elif suppressed_at is None:
@@ -364,9 +354,7 @@ class AmazonSESObservabilityDriver(EmailObservabilityDriver):
             if isinstance(response, dict):
                 code = (response.get("Error") or {}).get("Code", "")
             msg = str(exc).lower()
-            if code == "NotFoundException" or (
-                "notfound" in msg or "not found" in msg
-            ):
+            if code == "NotFoundException" or ("notfound" in msg or "not found" in msg):
                 return False
             raise
 
@@ -610,9 +598,7 @@ class AmazonSESObservabilityDriver(EmailObservabilityDriver):
         return _DkimAttributes(
             enabled=bool(attrs.get("DkimEnabled", False)),
             tokens=list(attrs.get("DkimTokens") or []),
-            verification_status=str(
-                attrs.get("DkimVerificationStatus") or "Pending"
-            ),
+            verification_status=str(attrs.get("DkimVerificationStatus") or "Pending"),
         )
 
     def _check_dkim(self, domain: str, *, is_domain: bool) -> DnsAuthCheck:
@@ -622,10 +608,7 @@ class AmazonSESObservabilityDriver(EmailObservabilityDriver):
             return DnsAuthCheck(
                 protocol="DKIM",
                 outcome=DnsCheckOutcome.YELLOW,
-                message=(
-                    "identity is a single email address; DKIM signing "
-                    "requires a domain identity"
-                ),
+                message=("identity is a single email address; DKIM signing requires a domain identity"),
             )
         try:
             dkim = self._fetch_dkim(domain)
@@ -649,10 +632,7 @@ class AmazonSESObservabilityDriver(EmailObservabilityDriver):
                 protocol="DKIM",
                 outcome=DnsCheckOutcome.RED,
                 records=list(dkim.tokens),
-                message=(
-                    "DKIM verification pending — publish the 3 CNAMEs in "
-                    "DNS and wait for SES to detect them"
-                ),
+                message=("DKIM verification pending — publish the 3 CNAMEs in DNS and wait for SES to detect them"),
             )
         if status == "Failed":
             return DnsAuthCheck(
@@ -693,33 +673,22 @@ def _check_spf(domain: str) -> DnsAuthCheck:
         return DnsAuthCheck(
             protocol="SPF",
             outcome=DnsCheckOutcome.RED,
-            message=(
-                f"no SPF (v=spf1) record at {domain} — add "
-                "'v=spf1 include:amazonses.com ~all' to authorize SES"
-            ),
+            message=(f"no SPF (v=spf1) record at {domain} — add 'v=spf1 include:amazonses.com ~all' to authorize SES"),
         )
     if len(spf_records) > 1:
         return DnsAuthCheck(
             protocol="SPF",
             outcome=DnsCheckOutcome.RED,
             records=spf_records,
-            message=(
-                f"multiple SPF records at {domain} — RFC 7208 forbids "
-                "this; consolidate into one TXT"
-            ),
+            message=(f"multiple SPF records at {domain} — RFC 7208 forbids this; consolidate into one TXT"),
         )
     record = spf_records[0]
-    if "include:amazonses.com" not in record.lower() and (
-        "include:_spf.amazonses.com" not in record.lower()
-    ):
+    if "include:amazonses.com" not in record.lower() and ("include:_spf.amazonses.com" not in record.lower()):
         return DnsAuthCheck(
             protocol="SPF",
             outcome=DnsCheckOutcome.YELLOW,
             records=[record],
-            message=(
-                "SPF present but doesn't include amazonses.com — "
-                "SES sends will fail SPF alignment"
-            ),
+            message=("SPF present but doesn't include amazonses.com — SES sends will fail SPF alignment"),
         )
     return DnsAuthCheck(
         protocol="SPF",
@@ -753,10 +722,7 @@ def _check_dmarc(domain: str) -> DnsAuthCheck:
         return DnsAuthCheck(
             protocol="DMARC",
             outcome=DnsCheckOutcome.RED,
-            message=(
-                f"no DMARC record at {qname} — add "
-                "'v=DMARC1; p=none; rua=mailto:...' to start monitoring"
-            ),
+            message=(f"no DMARC record at {qname} — add 'v=DMARC1; p=none; rua=mailto:...' to start monitoring"),
         )
     record = dmarc_records[0]
     lower = record.lower()
@@ -779,10 +745,7 @@ def _check_dmarc(domain: str) -> DnsAuthCheck:
             protocol="DMARC",
             outcome=DnsCheckOutcome.YELLOW,
             records=[record],
-            message=(
-                "DMARC policy=none (monitor-only) — escalate to "
-                "quarantine or reject once you trust the reports"
-            ),
+            message=("DMARC policy=none (monitor-only) — escalate to quarantine or reject once you trust the reports"),
         )
     return DnsAuthCheck(
         protocol="DMARC",

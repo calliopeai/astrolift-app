@@ -130,10 +130,7 @@ def tags_for(spec: ProvisionSpec) -> dict[str, str]:
         base["astrolift.io/binding"] = spec.binding_id
     if spec.managed_service_id:
         base["astrolift.io/managed_service_id"] = spec.managed_service_id
-    base.update({
-        f"astrolift.io/extra/{k}": v
-        for k, v in (spec.tags or {}).items()
-    })
+    base.update({f"astrolift.io/extra/{k}": v for k, v in (spec.tags or {}).items()})
     return base
 
 
@@ -176,10 +173,7 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
             return ProvisionResult(
                 ok=False,
                 handle="",
-                message=(
-                    "azure ai search driver requires a Key Vault "
-                    "(set keyvault_url or inject secret_client)"
-                ),
+                message=("azure ai search driver requires a Key Vault (set keyvault_url or inject secret_client)"),
                 errors=["no_secret_backend"],
             )
         service_name = self._service_name_for(spec=spec)
@@ -190,30 +184,25 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
             return ProvisionResult(
                 ok=True,
                 handle=self._handle_for(service_name=service_name),
-                message=(
-                    f"search service {service_name} already exists "
-                    f"(state={_state_of(existing)})"
-                ),
+                message=(f"search service {service_name} already exists (state={_state_of(existing)})"),
             )
 
-        sku_name = (
-            cfg.get("sku") or _SIZE_TO_SKU.get(
-                spec.size, self._config.default_sku,
-            )
+        sku_name = cfg.get("sku") or _SIZE_TO_SKU.get(
+            spec.size,
+            self._config.default_sku,
         )
         replicas = int(
             cfg.get("replica_count", self._config.replica_count_default),
         )
         partitions = int(
             cfg.get(
-                "partition_count", self._config.partition_count_default,
+                "partition_count",
+                self._config.partition_count_default,
             ),
         )
-        public_network = (
-            cfg.get(
-                "public_network_access",
-                self._config.public_network_access_default,
-            )
+        public_network = cfg.get(
+            "public_network_access",
+            self._config.public_network_access_default,
         )
 
         parameters: dict[str, Any] = {
@@ -268,8 +257,7 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
             ok=True,
             handle=self._handle_for(service_name=service_name),
             message=(
-                f"search service {service_name} provisioning "
-                f"(admin keys in key vault {self._config.keyvault_url})"
+                f"search service {service_name} provisioning (admin keys in key vault {self._config.keyvault_url})"
             ),
         )
 
@@ -352,17 +340,11 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
             poller.result()
         except Exception as exc:
             err_str = str(exc)
-            if not force_destroy and (
-                "ServiceNotInDesiredState" in err_str
-                or "FAILED_PRECONDITION" in err_str
-            ):
+            if not force_destroy and ("ServiceNotInDesiredState" in err_str or "FAILED_PRECONDITION" in err_str):
                 return DeprovisionResult(
                     ok=False,
                     handle=spec.handle,
-                    message=(
-                        f"search service {service_name} is mid-modify;"
-                        f" wait or pass force_destroy=True for retry"
-                    ),
+                    message=(f"search service {service_name} is mid-modify; wait or pass force_destroy=True for retry"),
                     errors=[err_str],
                 )
             return DeprovisionResult(
@@ -417,7 +399,8 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
         return ServiceStatus(
             handle=handle.handle,
             state=_AZURE_STATE_TO_PROTOCOL.get(
-                azure_state.lower(), "updating",
+                azure_state.lower(),
+                "updating",
             ),
             message=f"azure reports {azure_state}",
         )
@@ -430,9 +413,7 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
             raise AzureAISearchError(
                 f"binding requested for missing service {service_name}",
             )
-        endpoint = (
-            f"https://{service_name}.search.windows.net"
-        )
+        endpoint = f"https://{service_name}.search.windows.net"
         primary_secret = self._primary_secret_for(
             service_name=service_name,
         )
@@ -468,10 +449,7 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
                     ),
                     actions=[
                         "Microsoft.Search/searchServices/read",
-                        (
-                            "Microsoft.Search/searchServices/"
-                            "listAdminKeys/action"
-                        ),
+                        ("Microsoft.Search/searchServices/listAdminKeys/action"),
                     ],
                 ),
                 Grant(
@@ -524,10 +502,7 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
         return ProvisionResult(
             ok=True,
             handle=provisioned.handle,
-            message=(
-                f"target service provisioned; restore snapshot "
-                f"{snapshot.snapshot_id} via index-rebuild workflow"
-            ),
+            message=(f"target service provisioned; restore snapshot {snapshot.snapshot_id} via index-rebuild workflow"),
         )
 
     @driver_op(cloud="azure", driver="search_aisearch", heartbeat=False)
@@ -548,10 +523,14 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
                     ],
                 },
                 "replica_count": {
-                    "type": "integer", "minimum": 1, "maximum": 12,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12,
                 },
                 "partition_count": {
-                    "type": "integer", "minimum": 1, "maximum": 12,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12,
                 },
                 "public_network_access": {
                     "type": "string",
@@ -569,27 +548,13 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={
-                "SEARCH_URL": (
-                    "AI Search HTTPS endpoint "
-                    "(https://<name>.search.windows.net)"
-                ),
-                "SEARCH_API_KEY": (
-                    "Key Vault ref to the primary admin key"
-                ),
-                "SEARCH_INDEX_PREFIX": (
-                    "Conventional index-name prefix for this app"
-                ),
+                "SEARCH_URL": ("AI Search HTTPS endpoint (https://<name>.search.windows.net)"),
+                "SEARCH_API_KEY": ("Key Vault ref to the primary admin key"),
+                "SEARCH_INDEX_PREFIX": ("Conventional index-name prefix for this app"),
                 "AZURE_SEARCH_ENDPOINT": "Alias for SEARCH_URL",
-                "AZURE_SEARCH_INDEX_NAME": (
-                    "Alias for SEARCH_INDEX_PREFIX"
-                ),
-                "AZURE_SEARCH_ADMIN_KEY": (
-                    "Key Vault ref to the primary admin key"
-                ),
-                "AZURE_SEARCH_SECONDARY_ADMIN_KEY": (
-                    "Key Vault ref to the secondary admin key "
-                    "(for rotation)"
-                ),
+                "AZURE_SEARCH_INDEX_NAME": ("Alias for SEARCH_INDEX_PREFIX"),
+                "AZURE_SEARCH_ADMIN_KEY": ("Key Vault ref to the primary admin key"),
+                "AZURE_SEARCH_SECONDARY_ADMIN_KEY": ("Key Vault ref to the secondary admin key (for rotation)"),
             },
         )
 
@@ -621,9 +586,7 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
             spec.service_handle_hint or "search",
         ]
         raw = "-".join(p for p in parts if p).lower()
-        clean = "".join(
-            c if (c.isalnum() or c == "-") else "-" for c in raw
-        )
+        clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in raw)
         while "--" in clean:
             clean = clean.replace("--", "-")
         clean = clean.strip("-")
@@ -647,28 +610,19 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
         return service_name
 
     def _primary_secret_for(self, *, service_name: str) -> str:
-        return (
-            f"{self._config.secret_name_prefix}-{service_name}-primary"
-        )
+        return f"{self._config.secret_name_prefix}-{service_name}-primary"
 
     def _secondary_secret_for(self, *, service_name: str) -> str:
-        return (
-            f"{self._config.secret_name_prefix}-{service_name}-secondary"
-        )
+        return f"{self._config.secret_name_prefix}-{service_name}-secondary"
 
     def _store_admin_keys(
-        self, *, service_name: str, keys: Any,
+        self,
+        *,
+        service_name: str,
+        keys: Any,
     ) -> None:
-        primary = (
-            _key_field(keys, "primary_key")
-            or _key_field(keys, "primaryKey")
-            or ""
-        )
-        secondary = (
-            _key_field(keys, "secondary_key")
-            or _key_field(keys, "secondaryKey")
-            or ""
-        )
+        primary = _key_field(keys, "primary_key") or _key_field(keys, "primaryKey") or ""
+        secondary = _key_field(keys, "secondary_key") or _key_field(keys, "secondaryKey") or ""
         self._secrets.set_secret(
             self._primary_secret_for(service_name=service_name),
             primary,

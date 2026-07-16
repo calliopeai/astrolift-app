@@ -44,7 +44,12 @@ def test_creates_new_setting(org, env, actor, fake_info, permission_resolver):
     assert result.ok, result.errors
     assert result.data.key == "LOG_LEVEL"
     assert result.data.value == "debug"
-    assert EnvironmentSetting.objects.filter(app_environment=env, key="LOG_LEVEL", deleted_at__isnull=True).count() == 1
+    assert (
+        EnvironmentSetting.objects.filter(
+            app_environment=env, key="LOG_LEVEL", deleted_at__isnull=True
+        ).count()
+        == 1
+    )
 
 
 def test_updates_existing_setting(org, env, actor, fake_info, permission_resolver):
@@ -62,7 +67,9 @@ def test_updates_existing_setting(org, env, actor, fake_info, permission_resolve
 
     assert result.ok, result.errors
     assert result.data.value == "second"
-    assert EnvironmentSetting.objects.filter(app_environment=env, key="X", deleted_at__isnull=True).count() == 1
+    assert (
+        EnvironmentSetting.objects.filter(app_environment=env, key="X", deleted_at__isnull=True).count() == 1
+    )
 
 
 def test_rejects_empty_key(org, env, actor, fake_info, permission_resolver):
@@ -124,7 +131,10 @@ def test_soft_deletes_setting(org, env, actor, fake_info, permission_resolver):
         )
 
     assert result.ok, result.errors
-    assert EnvironmentSetting.objects.filter(app_environment=env, key="FEAT", deleted_at__isnull=True).count() == 0
+    assert (
+        EnvironmentSetting.objects.filter(app_environment=env, key="FEAT", deleted_at__isnull=True).count()
+        == 0
+    )
     assert EnvironmentSetting.all_objects.filter(app_environment=env, key="FEAT").count() == 1
 
 

@@ -47,8 +47,39 @@ const config: CodegenConfig = {
     // Excluded until the backend schema catches up.
     "!graphql/pipelines/pipelines.queries.ts",
     "!graphql/pipelines/pipelines.mutations.ts",
+    // These files interpolate PLAIN template-literal constants (bare field
+    // lists, not gql-tagged fragments) into their gql documents, e.g.
+    // `${AGENT_LIST_ITEM_FIELDS}`. graphql-tag-pluck can't resolve those,
+    // substitutes nothing, and the resulting document fails to parse — which
+    // (before `noSilentErrors` below) silently dropped EVERY operation in the
+    // file from operations.ts (#934). Excluded so codegen stays green; with
+    // `noSilentErrors: true` any new offender now fails the run loudly instead
+    // of vanishing. To re-include a file, rewrite its shared field-list
+    // constants as named gql fragments and spread them (`...FragmentName`).
+    "!graphql/agents/agents.queries.ts",
+    "!graphql/identity/identity.queries.ts",
+    "!graphql/identity/identity.mutations.ts",
+    "!graphql/lifecycle/lifecycle.mutations.ts",
+    "!graphql/observability/observability.queries.ts",
+    "!graphql/operations/alerts.queries.ts",
+    "!graphql/registry/registry.queries.ts",
+    "!graphql/registry/registry.mutations.ts",
+    "!graphql/scm/scm.queries.ts",
+    "!graphql/services/services.mutations.ts",
+    "!graphql/workflows/tiered.queries.ts",
+    "!graphql/workflows/tiered.mutations.ts",
   ],
   ignoreNoDocuments: true,
+  // Shared plugin config. The CLI also spreads this object into
+  // @graphql-tools loadDocuments options, which is how `noSilentErrors`
+  // reaches the code-file loader: without it, a gql template that
+  // graphql-tag-pluck can't extract (see the exclusion block above) makes the
+  // loader swallow the parse error and return zero documents for the whole
+  // file — operations disappear from operations.ts with a green exit code.
+  // With it, the run fails and names the offending file.
+  config: {
+    noSilentErrors: true,
+  },
   generates: {
     "graphql/__generated__/schema.ts": {
       plugins: ["typescript"],

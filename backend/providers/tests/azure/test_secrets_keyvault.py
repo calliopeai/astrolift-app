@@ -42,7 +42,11 @@ class FakeSecretClient:
         return FakeSecret(name=name, value=self.secrets[name])
 
     def set_secret(
-        self, *, name: str, value: str, tags: dict[str, str] | None = None,
+        self,
+        *,
+        name: str,
+        value: str,
+        tags: dict[str, str] | None = None,
     ) -> FakeSecret:
         self.secrets[name] = value
         return FakeSecret(name=name, value=value)
@@ -74,7 +78,8 @@ def backend(fake_client: FakeSecretClient) -> KeyVaultSecretsBackend:
 
 
 def test_upsert_writes_json_payload(
-    backend: KeyVaultSecretsBackend, fake_client: FakeSecretClient,
+    backend: KeyVaultSecretsBackend,
+    fake_client: FakeSecretClient,
 ) -> None:
     backend.upsert("/database/url", {"url": "postgres://..."})
     assert "astrolift-database--url" in fake_client.secrets
@@ -97,7 +102,8 @@ def test_get_missing_returns_none(
 
 
 def test_get_non_json_wraps_as_value(
-    backend: KeyVaultSecretsBackend, fake_client: FakeSecretClient,
+    backend: KeyVaultSecretsBackend,
+    fake_client: FakeSecretClient,
 ) -> None:
     fake_client.secrets["astrolift-legacy"] = "plain-string"
     result = backend.get("legacy")
@@ -112,7 +118,8 @@ def test_delete_raises_not_found_for_missing(
 
 
 def test_delete_removes(
-    backend: KeyVaultSecretsBackend, fake_client: FakeSecretClient,
+    backend: KeyVaultSecretsBackend,
+    fake_client: FakeSecretClient,
 ) -> None:
     backend.upsert("/y", {"k": "v"})
     backend.delete("/y")
@@ -133,7 +140,8 @@ def test_secret_name_canonicalization() -> None:
 
 
 def test_list_filters_by_prefix(
-    backend: KeyVaultSecretsBackend, fake_client: FakeSecretClient,
+    backend: KeyVaultSecretsBackend,
+    fake_client: FakeSecretClient,
 ) -> None:
     backend.upsert("/database/url", {"u": "v"})
     backend.upsert("/api/key", {"k": "v"})

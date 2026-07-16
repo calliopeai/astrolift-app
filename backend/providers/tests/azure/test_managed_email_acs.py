@@ -38,7 +38,7 @@ from azure.managed.email_acs import (
 # ---- fakes ------------------------------------------------------
 
 
-class _NotFound(Exception):  # noqa: N818
+class _NotFound(Exception):
     pass
 
 
@@ -64,14 +64,8 @@ class FakeDomain:
 
 @dataclass
 class FakeConnectionKeys:
-    primary_connection_string: str = (
-        "endpoint=https://acme.communication.azure.com/;"
-        "accesskey=zzzzzzzzzzzzzz"
-    )
-    secondary_connection_string: str = (
-        "endpoint=https://acme.communication.azure.com/;"
-        "accesskey=yyyyyyyyyyyyyy"
-    )
+    primary_connection_string: str = "endpoint=https://acme.communication.azure.com/;accesskey=zzzzzzzzzzzzzz"
+    secondary_connection_string: str = "endpoint=https://acme.communication.azure.com/;accesskey=yyyyyyyyyyyyyy"
 
 
 @dataclass
@@ -108,7 +102,8 @@ class FakeDomainsOperations:
             name=domain_name,
             provisioning_state="Succeeded",
             domain_management=props.get(
-                "domain_management", "AzureManaged",
+                "domain_management",
+                "AzureManaged",
             ),
             from_sender_domain=domain_name,
             properties=dict(props),
@@ -150,10 +145,7 @@ class FakeDomainsOperations:
 
 @dataclass
 class FakeCommunicationServicesOperations:
-    primary_connection_string: str = (
-        "endpoint=https://acme.communication.azure.com/;"
-        "accesskey=primarykey"
-    )
+    primary_connection_string: str = "endpoint=https://acme.communication.azure.com/;accesskey=primarykey"
     list_keys_calls: list[str] = field(default_factory=list)
 
     def list_keys(
@@ -247,8 +239,7 @@ class FakeLocksClient:
 
 
 _COMM_RESOURCE_ID = (
-    "/subscriptions/sub-1/resourceGroups/rg-test/providers/"
-    "Microsoft.Communication/CommunicationServices/acme"
+    "/subscriptions/sub-1/resourceGroups/rg-test/providers/Microsoft.Communication/CommunicationServices/acme"
 )
 
 
@@ -325,7 +316,8 @@ def test_constructor_requires_communication_resource_id(
 
 
 def test_provision_creates_domain(
-    driver: AzureCommunicationEmailDriver, mgmt: FakeMgmtClient,
+    driver: AzureCommunicationEmailDriver,
+    mgmt: FakeMgmtClient,
 ) -> None:
     result = driver.provision(_spec())
     assert result.ok
@@ -334,27 +326,23 @@ def test_provision_creates_domain(
 
 
 def test_provision_defaults_to_azure_managed(
-    driver: AzureCommunicationEmailDriver, mgmt: FakeMgmtClient,
+    driver: AzureCommunicationEmailDriver,
+    mgmt: FakeMgmtClient,
 ) -> None:
     driver.provision(_spec())
     create = mgmt.domains_obj.create_calls[0]
-    assert (
-        create["parameters"]["properties"]["domain_management"]
-        == "AzureManaged"
-    )
+    assert create["parameters"]["properties"]["domain_management"] == "AzureManaged"
 
 
 def test_provision_honours_customer_managed(
-    driver: AzureCommunicationEmailDriver, mgmt: FakeMgmtClient,
+    driver: AzureCommunicationEmailDriver,
+    mgmt: FakeMgmtClient,
 ) -> None:
     driver.provision(
         _spec(config={"domain_management": "CustomerManaged"}),
     )
     create = mgmt.domains_obj.create_calls[0]
-    assert (
-        create["parameters"]["properties"]["domain_management"]
-        == "CustomerManaged"
-    )
+    assert create["parameters"]["properties"]["domain_management"] == "CustomerManaged"
 
 
 def test_provision_rejects_unknown_domain_management(
@@ -368,7 +356,8 @@ def test_provision_rejects_unknown_domain_management(
 
 
 def test_provision_idempotent(
-    driver: AzureCommunicationEmailDriver, mgmt: FakeMgmtClient,
+    driver: AzureCommunicationEmailDriver,
+    mgmt: FakeMgmtClient,
 ) -> None:
     a = driver.provision(_spec())
     b = driver.provision(_spec())
@@ -384,15 +373,14 @@ def test_provision_persists_connection_string_in_key_vault(
 ) -> None:
     result = driver.provision(_spec())
     domain_name = result.handle.split("/", 1)[1]
-    secret_name = (
-        f"astrolift-acs-email-{_safe(domain_name)}-connection-string"
-    )
+    secret_name = f"astrolift-acs-email-{_safe(domain_name)}-connection-string"
     assert secret_name in secrets_client.secrets
     assert secrets_client.secrets[secret_name].startswith("endpoint=")
 
 
 def test_provision_tags_domain_with_astrolift_namespace(
-    driver: AzureCommunicationEmailDriver, mgmt: FakeMgmtClient,
+    driver: AzureCommunicationEmailDriver,
+    mgmt: FakeMgmtClient,
 ) -> None:
     driver.provision(_spec())
     tags = mgmt.domains_obj.create_calls[0]["parameters"]["tags"]
@@ -402,7 +390,8 @@ def test_provision_tags_domain_with_astrolift_namespace(
 
 
 def test_provision_explicit_domain_name(
-    driver: AzureCommunicationEmailDriver, mgmt: FakeMgmtClient,
+    driver: AzureCommunicationEmailDriver,
+    mgmt: FakeMgmtClient,
 ) -> None:
     result = driver.provision(
         _spec(config={"domain_name": "ACME-Hosted"}),
@@ -478,7 +467,8 @@ def test_provision_surfaces_connection_string_fetch_failure(
 
 
 def test_update_user_engagement_tracking(
-    driver: AzureCommunicationEmailDriver, mgmt: FakeMgmtClient,
+    driver: AzureCommunicationEmailDriver,
+    mgmt: FakeMgmtClient,
 ) -> None:
     provisioned = driver.provision(_spec())
     result = driver.update(
@@ -489,13 +479,12 @@ def test_update_user_engagement_tracking(
     )
     assert result.ok
     last = mgmt.domains_obj.update_calls[-1]
-    assert last["parameters"]["properties"][
-        "user_engagement_tracking"
-    ] == "Enabled"
+    assert last["parameters"]["properties"]["user_engagement_tracking"] == "Enabled"
 
 
 def test_update_noop_when_nothing_to_change(
-    driver: AzureCommunicationEmailDriver, mgmt: FakeMgmtClient,
+    driver: AzureCommunicationEmailDriver,
+    mgmt: FakeMgmtClient,
 ) -> None:
     provisioned = driver.provision(_spec())
     before = len(mgmt.domains_obj.update_calls)
@@ -515,9 +504,7 @@ def test_deprovision_default_retains_domain_and_secret(
 ) -> None:
     provisioned = driver.provision(_spec())
     domain_name = provisioned.handle.split("/", 1)[1]
-    secret_name = (
-        f"astrolift-acs-email-{_safe(domain_name)}-connection-string"
-    )
+    secret_name = f"astrolift-acs-email-{_safe(domain_name)}-connection-string"
     result = driver.deprovision(
         DeprovisionSpec(handle=provisioned.handle),
     )
@@ -536,9 +523,7 @@ def test_deprovision_delete_data_drops_domain_and_secret(
 ) -> None:
     provisioned = driver.provision(_spec())
     domain_name = provisioned.handle.split("/", 1)[1]
-    secret_name = (
-        f"astrolift-acs-email-{_safe(domain_name)}-connection-string"
-    )
+    secret_name = f"astrolift-acs-email-{_safe(domain_name)}-connection-string"
     result = driver.deprovision(
         DeprovisionSpec(handle=provisioned.handle),
         delete_data=True,
@@ -556,9 +541,7 @@ def test_deprovision_force_destroy_only_retains_domain(
 ) -> None:
     provisioned = driver.provision(_spec())
     domain_name = provisioned.handle.split("/", 1)[1]
-    secret_name = (
-        f"astrolift-acs-email-{_safe(domain_name)}-connection-string"
-    )
+    secret_name = f"astrolift-acs-email-{_safe(domain_name)}-connection-string"
     result = driver.deprovision(
         DeprovisionSpec(handle=provisioned.handle),
         delete_data=False,
@@ -577,9 +560,7 @@ def test_deprovision_atomic_both_flags(
 ) -> None:
     provisioned = driver.provision(_spec())
     domain_name = provisioned.handle.split("/", 1)[1]
-    secret_name = (
-        f"astrolift-acs-email-{_safe(domain_name)}-connection-string"
-    )
+    secret_name = f"astrolift-acs-email-{_safe(domain_name)}-connection-string"
     result = driver.deprovision(
         DeprovisionSpec(handle=provisioned.handle),
         delete_data=True,
@@ -641,9 +622,7 @@ def test_deprovision_force_destroy_attempts_lock_removal(
     )
     assert result.ok
     assert domain_name in locks.management_locks.list_calls
-    assert f"{domain_name}/prod-lock" in (
-        locks.management_locks.delete_calls
-    )
+    assert f"{domain_name}/prod-lock" in (locks.management_locks.delete_calls)
 
 
 # ---- status -----------------------------------------------------
@@ -665,13 +644,12 @@ def test_status_maps_succeeded_to_available(
 
 
 def test_status_maps_creating_to_provisioning(
-    driver: AzureCommunicationEmailDriver, mgmt: FakeMgmtClient,
+    driver: AzureCommunicationEmailDriver,
+    mgmt: FakeMgmtClient,
 ) -> None:
     provisioned = driver.provision(_spec())
     domain_name = provisioned.handle.split("/", 1)[1]
-    mgmt.domains_obj.domains[domain_name].provisioning_state = (
-        "Creating"
-    )
+    mgmt.domains_obj.domains[domain_name].provisioning_state = "Creating"
     state = driver.status(ServiceHandle(handle=provisioned.handle))
     assert state.state == "provisioning"
 
@@ -701,9 +679,7 @@ def test_binding_returns_connection_envelope(
     assert env["EMAIL_API_KEY"].secret_ref is not None
     assert env["EMAIL_API_KEY"].literal is None
     assert env["ACS_CONNECTION_STRING"].secret_ref is not None
-    assert env["ACS_MAILER_ENDPOINT"].literal == (
-        "https://acme.communication.azure.com"
-    )
+    assert env["ACS_MAILER_ENDPOINT"].literal == ("https://acme.communication.azure.com")
     assert env["EMAIL_FROM_ADDRESS"].literal.startswith("noreply@")
 
 
@@ -747,7 +723,8 @@ def test_snapshot_for_missing_raises(
 
 
 def test_restore_provisions_target_domain(
-    driver: AzureCommunicationEmailDriver, mgmt: FakeMgmtClient,
+    driver: AzureCommunicationEmailDriver,
+    mgmt: FakeMgmtClient,
 ) -> None:
     provisioned = driver.provision(_spec())
     snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
@@ -803,12 +780,8 @@ def test_parent_name_from_resource_id() -> None:
 
 
 def test_acs_hostname_falls_back_when_id_malformed() -> None:
-    assert _acs_hostname_from_resource_id("") == (
-        "communication.azure.com"
-    )
-    assert _acs_hostname_from_resource_id(_COMM_RESOURCE_ID) == (
-        "acme.communication.azure.com"
-    )
+    assert _acs_hostname_from_resource_id("") == ("communication.azure.com")
+    assert _acs_hostname_from_resource_id(_COMM_RESOURCE_ID) == ("acme.communication.azure.com")
 
 
 def test_from_address_for_uses_sender_domain_attr() -> None:

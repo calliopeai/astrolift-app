@@ -38,7 +38,7 @@ class ConcurrencyViolation(Exception):
     """Raised when a new run is rejected by the concurrency or rate-limit policy."""
 
 
-def get_concurrency_config(pipeline: "Pipeline") -> dict:
+def get_concurrency_config(pipeline: Pipeline) -> dict:
     """Extract the [concurrency] block from a pipeline's TOML config.
 
     Returns a dict with ``group`` (str | None) and ``cancel_in_progress`` (bool).
@@ -53,7 +53,7 @@ def get_concurrency_config(pipeline: "Pipeline") -> dict:
     }
 
 
-def enforce_concurrency(new_run: "PipelineRun") -> None:
+def enforce_concurrency(new_run: PipelineRun) -> None:
     """Enforce the concurrency policy for a newly-created pipeline run.
 
     Raises ConcurrencyViolation if the run should be rejected (queued-only
@@ -90,12 +90,13 @@ def enforce_concurrency(new_run: "PipelineRun") -> None:
         )
 
 
-def check_rate_limit(pipeline: "Pipeline") -> bool:
+def check_rate_limit(pipeline: Pipeline) -> bool:
     """Return True if a new run is allowed under the per-org rate limit.
 
     False means the run should be rejected (too many runs in the last minute).
     """
     from datetime import timedelta
+
     from astrolift_pipelines.models import PipelineRun
 
     org = pipeline.organization
@@ -120,9 +121,7 @@ def check_rate_limit(pipeline: "Pipeline") -> bool:
     return True
 
 
-def _find_active_runs_in_group(
-    pipeline: "Pipeline", group: str, *, exclude_run: "PipelineRun"
-) -> list:
+def _find_active_runs_in_group(pipeline: Pipeline, group: str, *, exclude_run: PipelineRun) -> list:
     """Return runs in the concurrency group that are active (pending or running)."""
     from astrolift_pipelines.models import PipelineRun
 
@@ -152,6 +151,7 @@ def _signal_temporal_cancel(run) -> None:
         return
     try:
         from astrolift_workflows.client import signal_workflow
+
         signal_workflow(
             run.temporal_workflow_id,
             signal_name="cancel",

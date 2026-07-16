@@ -99,7 +99,7 @@ def test_endpoint_error_rate_query_groups_by_route():
         app_slug="myapp", environment_name="prod", range_seconds=3600
     )
     assert "by (http_route)" in plan.promql
-    assert '5..' in plan.promql
+    assert "5.." in plan.promql
     assert "clamp_min" in plan.promql
 
 
@@ -119,18 +119,14 @@ def test_endpoint_metrics_requires_app_read(permission_resolver):
     org, app = _scaffold()
     with _ctx(org):
         with pytest.raises(PermissionDenied):
-            GoldenSignalsQuery().astrolift_app_endpoint_metrics(
-                _info(), app_slug=app.slug
-            )
+            GoldenSignalsQuery().astrolift_app_endpoint_metrics(_info(), app_slug=app.slug)
 
 
 def test_endpoint_metrics_app_not_found(permission_resolver):
     org, _ = _scaffold()
     permission_resolver.grant(Permission.APP_READ)
     with _ctx(org):
-        result = GoldenSignalsQuery().astrolift_app_endpoint_metrics(
-            _info(), app_slug="no-such-app"
-        )
+        result = GoldenSignalsQuery().astrolift_app_endpoint_metrics(_info(), app_slug="no-such-app")
     assert result == []
 
 
@@ -138,22 +134,21 @@ def test_endpoint_metrics_no_prom_endpoint(permission_resolver):
     org, app = _scaffold(prometheus_endpoint=None)
     permission_resolver.grant(Permission.APP_READ)
     with _ctx(org):
-        result = GoldenSignalsQuery().astrolift_app_endpoint_metrics(
-            _info(), app_slug=app.slug
-        )
+        result = GoldenSignalsQuery().astrolift_app_endpoint_metrics(_info(), app_slug=app.slug)
     assert result == []
 
 
 def test_endpoint_metrics_prom_error_degrades(permission_resolver):
     org, app = _scaffold()
     permission_resolver.grant(Permission.APP_READ)
-    with _ctx(org), patch(
-        "astrolift_observability.prom_client.query_range_series",
-        side_effect=PrometheusQueryError("prom down"),
+    with (
+        _ctx(org),
+        patch(
+            "astrolift_observability.prom_client.query_range_series",
+            side_effect=PrometheusQueryError("prom down"),
+        ),
     ):
-        result = GoldenSignalsQuery().astrolift_app_endpoint_metrics(
-            _info(), app_slug=app.slug
-        )
+        result = GoldenSignalsQuery().astrolift_app_endpoint_metrics(_info(), app_slug=app.slug)
     assert result == []
 
 
@@ -215,13 +210,14 @@ def test_endpoint_metrics_happy_path(permission_resolver):
         # request rate
         return rate_series
 
-    with _ctx(org), patch(
-        "astrolift_observability.prom_client.query_range_series",
-        side_effect=_qs,
+    with (
+        _ctx(org),
+        patch(
+            "astrolift_observability.prom_client.query_range_series",
+            side_effect=_qs,
+        ),
     ):
-        result = GoldenSignalsQuery().astrolift_app_endpoint_metrics(
-            _info(), app_slug=app.slug
-        )
+        result = GoldenSignalsQuery().astrolift_app_endpoint_metrics(_info(), app_slug=app.slug)
 
     # Routes returned alphabetically
     assert len(result) == 2
@@ -255,13 +251,14 @@ def test_endpoint_metrics_zero_rate_routes_excluded(permission_resolver):
             return []
         return rate_series
 
-    with _ctx(org), patch(
-        "astrolift_observability.prom_client.query_range_series",
-        side_effect=_qs,
+    with (
+        _ctx(org),
+        patch(
+            "astrolift_observability.prom_client.query_range_series",
+            side_effect=_qs,
+        ),
     ):
-        result = GoldenSignalsQuery().astrolift_app_endpoint_metrics(
-            _info(), app_slug=app.slug
-        )
+        result = GoldenSignalsQuery().astrolift_app_endpoint_metrics(_info(), app_slug=app.slug)
 
     routes = [m.route for m in result]
     assert "GET /active" in routes
@@ -281,13 +278,14 @@ def test_endpoint_metrics_none_latency_when_no_histogram(permission_resolver):
             return []
         return rate_series
 
-    with _ctx(org), patch(
-        "astrolift_observability.prom_client.query_range_series",
-        side_effect=_qs,
+    with (
+        _ctx(org),
+        patch(
+            "astrolift_observability.prom_client.query_range_series",
+            side_effect=_qs,
+        ),
     ):
-        result = GoldenSignalsQuery().astrolift_app_endpoint_metrics(
-            _info(), app_slug=app.slug
-        )
+        result = GoldenSignalsQuery().astrolift_app_endpoint_metrics(_info(), app_slug=app.slug)
 
     assert len(result) == 1
     assert result[0].p50_ms is None

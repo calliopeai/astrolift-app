@@ -189,7 +189,7 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
                 ok=False,
                 handle="",
                 message=(
-                    "azure cache for redis driver requires a Key " "Vault (set keyvault_url or inject secret_client)"
+                    "azure cache for redis driver requires a Key Vault (set keyvault_url or inject secret_client)"
                 ),
                 errors=["no_secret_backend"],
             )
@@ -201,7 +201,7 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
             return ProvisionResult(
                 ok=True,
                 handle=self._handle_for(cache_name=cache_name),
-                message=(f"cache {cache_name} already exists " f"(state={_state_of(existing)})"),
+                message=(f"cache {cache_name} already exists (state={_state_of(existing)})"),
             )
 
         sku_name = cfg.get("sku_name") or _SIZE_TO_SKU.get(spec.size, self._config.default_sku)
@@ -268,7 +268,7 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
         return ProvisionResult(
             ok=True,
             handle=self._handle_for(cache_name=cache_name),
-            message=(f"cache {cache_name} provisioning " f"(keys in key vault {self._config.keyvault_url})"),
+            message=(f"cache {cache_name} provisioning (keys in key vault {self._config.keyvault_url})"),
         )
 
     @driver_op(cloud="azure", driver="cache_redis")
@@ -363,7 +363,7 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
                     name=cache_name,
                     parameters={
                         "prefix": f"final-{cache_name}",
-                        "container": ("https://astrolift-final-redis.blob.core." "windows.net/exports"),
+                        "container": ("https://astrolift-final-redis.blob.core.windows.net/exports"),
                         "format": "RDB",
                     },
                 ).result()
@@ -385,7 +385,7 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
                 return DeprovisionResult(
                     ok=False,
                     handle=spec.handle,
-                    message=(f"cache {cache_name} is mid-modify; " f"wait or pass force_destroy=True for retry"),
+                    message=(f"cache {cache_name} is mid-modify; wait or pass force_destroy=True for retry"),
                     errors=[err_str],
                 )
             return DeprovisionResult(
@@ -515,7 +515,7 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
                 name=cache_name,
                 parameters={
                     "prefix": snap_id,
-                    "container": ("https://astrolift-snap-redis.blob.core." "windows.net/snapshots"),
+                    "container": ("https://astrolift-snap-redis.blob.core.windows.net/snapshots"),
                     "format": "RDB",
                 },
             ).result()
@@ -542,7 +542,7 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
                 name=target_cache,
                 parameters={
                     "files": [
-                        f"https://astrolift-snap-redis.blob.core." f"windows.net/snapshots/{snapshot.snapshot_id}.rdb",
+                        f"https://astrolift-snap-redis.blob.core.windows.net/snapshots/{snapshot.snapshot_id}.rdb",
                     ],
                     "format": "RDB",
                 },
@@ -567,7 +567,7 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
             "properties": {
                 "sku_name": {
                     "type": "string",
-                    "description": ("SKU shape <tier>_<family><capacity>, e.g. " "Standard_C1, Premium_P1."),
+                    "description": ("SKU shape <tier>_<family><capacity>, e.g. Standard_C1, Premium_P1."),
                 },
                 "minimum_tls_version": {
                     "type": "string",

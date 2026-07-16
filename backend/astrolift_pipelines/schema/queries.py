@@ -59,9 +59,7 @@ class PipelinesQuery:
     @strawberry.field
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
-    def astrolift_pipeline_runs(
-        self, info: Info, pipeline_id: str, limit: int = 50
-    ) -> list[PipelineRunType]:
+    def astrolift_pipeline_runs(self, info: Info, pipeline_id: str, limit: int = 50) -> list[PipelineRunType]:
         """Pipeline runs for a given pipeline, most-recent first.
 
         Tenant scoping flows through the pipeline FK — only runs whose

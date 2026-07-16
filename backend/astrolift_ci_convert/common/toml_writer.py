@@ -111,7 +111,7 @@ def write_toml(pipeline: PipelineDef) -> str:
 
     # Header
     header: list[str] = []
-    header.append(f'name = {_toml_string(pipeline.name)}')
+    header.append(f"name = {_toml_string(pipeline.name)}")
 
     sections.append(header)
 
@@ -119,7 +119,7 @@ def write_toml(pipeline: PipelineDef) -> str:
     if pipeline.env:
         env_lines = ["[env]"]
         for k, v in pipeline.env.items():
-            env_lines.append(f'{k} = {_toml_string(str(v))}')
+            env_lines.append(f"{k} = {_toml_string(str(v))}")
         sections.append(env_lines)
 
     # Triggers
@@ -143,7 +143,7 @@ def write_toml(pipeline: PipelineDef) -> str:
         sections.append(["[on.workflow_dispatch]"])
 
     for sched in pipeline.on_schedule:
-        sections.append([f'[[on.schedule]]\ncron = {_toml_string(sched.cron)}'])
+        sections.append([f"[[on.schedule]]\ncron = {_toml_string(sched.cron)}"])
 
     for todo in pipeline.todos:
         sections.append([f"# TODO: unsupported — {todo}"])

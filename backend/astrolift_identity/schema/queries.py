@@ -190,7 +190,9 @@ class IdentityQuery:
                 .values_list("scope_id", flat=True)
                 .distinct()
             )
-            orgs = Organization.objects.filter(pk__in=member_org_ids, deleted_at__isnull=True).order_by("name")[:100]
+            orgs = Organization.objects.filter(pk__in=member_org_ids, deleted_at__isnull=True).order_by(
+                "name"
+            )[:100]
         return [organization_to_type(o) for o in orgs]
 
     @strawberry.field

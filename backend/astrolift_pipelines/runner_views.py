@@ -26,7 +26,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from astrolift_pipelines.models import JobRun, Pipeline, PipelineRun, Runner
+from astrolift_pipelines.models import JobRun, Runner
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ def _get_runner_from_request(request: HttpRequest) -> Runner | None:
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         return None
-    raw_key = auth[len("Bearer "):]
+    raw_key = auth[len("Bearer ") :]
     key_hash = _hash(raw_key)
     return Runner.objects.filter(
         api_key_hash=key_hash,
@@ -67,6 +67,7 @@ def runner_register(request: HttpRequest) -> JsonResponse:
     Returns: {runner_id, api_key}
     """
     from django.conf import settings
+
     reg_token = getattr(settings, _REGISTRATION_TOKEN_SETTING, None)
     if reg_token:
         auth = request.headers.get("Authorization", "")
@@ -171,23 +172,28 @@ def runner_claim_job(request: HttpRequest) -> JsonResponse:
     job_run.save(update_fields=["status", "started_at", "updated_at", "version"])
 
     job = job_run.job
-    return JsonResponse({
-        "job_run_id": str(job_run.guid),
-        "job_id": job.job_id,
-        "job_name": job.name,
-        "container_image": job.container_image or "ghcr.io/calliopeai/astrolift-builder:latest",
-        "env": {},  # populated from pipeline context evaluator
-        "toml_path": job_run.pipeline_run.pipeline.toml_path,
-    })
+    return JsonResponse(
+        {
+            "job_run_id": str(job_run.guid),
+            "job_id": job.job_id,
+            "job_name": job.name,
+            "container_image": job.container_image or "ghcr.io/calliopeai/astrolift-builder:latest",
+            "env": {},  # populated from pipeline context evaluator
+            "toml_path": job_run.pipeline_run.pipeline.toml_path,
+        }
+    )
 
 
 def _find_matching_job_run(runner: Runner) -> JobRun | None:
     """Find the oldest PENDING JobRun that matches this runner's capabilities."""
-    from astrolift_pipelines.dispatch_router import _glob_match as _match
 
-    pending = JobRun.objects.filter(
-        status="pending",
-    ).select_related("job", "pipeline_run__pipeline").order_by("created_at")
+    pending = (
+        JobRun.objects.filter(
+            status="pending",
+        )
+        .select_related("job", "pipeline_run__pipeline")
+        .order_by("created_at")
+    )
 
     for job_run in pending[:50]:  # check up to 50 to find a match
         runs_on = job_run.job.runs_on or "astrolift/default"
@@ -201,13 +207,14 @@ def _runs_on_matches_runner(runs_on: str, runner: Runner) -> bool:
     if runs_on in ("astrolift/default", "self-hosted"):
         return True
     if runs_on.startswith("runner:"):
-        name = runs_on[len("runner:"):]
+        name = runs_on[len("runner:") :]
         return runner.slug.endswith(name) or runner.name == name
     if runs_on.startswith("labels:"):
         try:
             import json
-            required = json.loads(runs_on[len("labels:"):])
-            runner_labels = {l.split("=")[0]: l.split("=")[1] for l in runner.labels if "=" in l}
+
+            required = json.loads(runs_on[len("labels:") :])
+            runner_labels = {lbl.split("=")[0]: lbl.split("=")[1] for lbl in runner.labels if "=" in lbl}
             return all(runner_labels.get(k) == v for k, v in required.items())
         except Exception:  # noqa: BLE001
             return False
@@ -246,7 +253,7 @@ def runner_complete_job(request: HttpRequest, runner_guid: str, job_run_guid: st
     if new_status not in {"success", "failure", "cancelled"}:
         return JsonResponse({"error": f"invalid status: {new_status!r}"}, status=400)
 
-    from astrolift_pipelines.state_machine import transition_job_run, InvalidTransition
+    from astrolift_pipelines.state_machine import InvalidTransition, transition_job_run
 
     try:
         transition_job_run(job_run, new_status, actor_display=f"runner:{runner.slug}")

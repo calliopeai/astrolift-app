@@ -184,7 +184,7 @@ def test_cluster_apply_manifests_has_per_loop_heartbeat() -> None:
     ]
     for src in sources:
         assert "maybe_heartbeat" in src, (
-            "expected apply_manifests to call maybe_heartbeat per manifest " "(audit #595-#598)"
+            "expected apply_manifests to call maybe_heartbeat per manifest (audit #595-#598)"
         )
 
 

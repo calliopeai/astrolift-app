@@ -11,8 +11,10 @@ from k8s_native.dns_external import ExternalDnsConfig, ExternalDnsDriver
 def test_render_endpoint_basic() -> None:
     driver = ExternalDnsDriver()
     endpoint = driver.render_endpoint(
-        zone="acme.example", name="api",
-        type="A", value="192.0.2.1",
+        zone="acme.example",
+        name="api",
+        type="A",
+        value="192.0.2.1",
     )
     assert endpoint["kind"] == "DNSEndpoint"
     assert endpoint["spec"]["endpoints"][0]["dnsName"] == "api.acme.example"
@@ -23,8 +25,10 @@ def test_render_endpoint_basic() -> None:
 def test_render_endpoint_apex() -> None:
     driver = ExternalDnsDriver()
     endpoint = driver.render_endpoint(
-        zone="acme.example", name="@",
-        type="TXT", value='"verify=abc"',
+        zone="acme.example",
+        name="@",
+        type="TXT",
+        value='"verify=abc"',
     )
     assert endpoint["spec"]["endpoints"][0]["dnsName"] == "acme.example"
 
@@ -32,8 +36,10 @@ def test_render_endpoint_apex() -> None:
 def test_render_uses_safe_endpoint_name() -> None:
     driver = ExternalDnsDriver()
     endpoint = driver.render_endpoint(
-        zone="ACME.example", name="My_API",
-        type="A", value="192.0.2.1",
+        zone="ACME.example",
+        name="My_API",
+        type="A",
+        value="192.0.2.1",
     )
     name = endpoint["metadata"]["name"]
     # k8s-safe: lowercase, no underscores
@@ -45,8 +51,10 @@ def test_render_only_mode_no_cluster_driver() -> None:
     """ensure_record returns a Record without applying."""
     driver = ExternalDnsDriver()
     record = driver.ensure_record(
-        zone="acme.example", name="api",
-        type="A", value="192.0.2.1",
+        zone="acme.example",
+        name="api",
+        type="A",
+        value="192.0.2.1",
     )
     assert record.name == "api"
 
@@ -55,14 +63,18 @@ def test_ensure_record_applies_when_cluster_driver_bound() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = ApplyResult(
         created=["DNSEndpoint/acme-example-api-a"],
-        updated=[], unchanged=[], errors=[],
+        updated=[],
+        unchanged=[],
+        errors=[],
     )
     driver = ExternalDnsDriver(
         config=ExternalDnsConfig(cluster_driver=cluster_driver),
     )
     driver.ensure_record(
-        zone="acme.example", name="api",
-        type="A", value="192.0.2.1",
+        zone="acme.example",
+        name="api",
+        type="A",
+        value="192.0.2.1",
     )
     cluster_driver.apply_manifests.assert_called_once()
 
@@ -71,7 +83,8 @@ def test_delete_record_calls_delete() -> None:
     cluster_driver = MagicMock()
     cluster_driver.delete_manifests.return_value = DeleteResult(
         deleted=["DNSEndpoint/acme-example-api-a"],
-        not_found=[], errors=[],
+        not_found=[],
+        errors=[],
     )
     driver = ExternalDnsDriver(
         config=ExternalDnsConfig(cluster_driver=cluster_driver),

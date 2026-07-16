@@ -109,7 +109,7 @@ class ACRDriver(ImageRegistryDriver):
         except Exception as exc:
             if type(exc).__name__ == "ResourceNotFoundError":
                 raise NotFoundError(
-                    f"ACR registry {self._config.registry_name} " f"not found in {self._config.resource_group}",
+                    f"ACR registry {self._config.registry_name} not found in {self._config.resource_group}",
                 ) from exc
             raise map_api_error(exc) from exc
 
@@ -294,8 +294,7 @@ class ACRDriver(ImageRegistryDriver):
         tenant_id = self._config.tenant_id or getattr(identity, "tenant_id", "") or ""
         if not tenant_id:
             raise ValueError(
-                "ACRConfig.tenant_id must be set (or the MI must return a tenant_id) "
-                "to construct a CI push role ref",
+                "ACRConfig.tenant_id must be set (or the MI must return a tenant_id) to construct a CI push role ref",
             )
 
         # 2) Idempotent AcrPush role assignment. Azure's role-assignment

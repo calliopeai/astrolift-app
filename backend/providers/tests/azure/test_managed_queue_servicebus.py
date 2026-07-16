@@ -33,25 +33,34 @@ class FakeQueues:
     queues: dict[str, FakeQueue] = field(default_factory=dict)
 
     def create_or_update(
-        self, *,
-        resource_group_name: str, namespace_name: str,
-        queue_name: str, parameters: dict[str, Any],
+        self,
+        *,
+        resource_group_name: str,
+        namespace_name: str,
+        queue_name: str,
+        parameters: dict[str, Any],
     ) -> FakeQueue:
         q = FakeQueue(name=queue_name, parameters=dict(parameters))
         self.queues[queue_name] = q
         return q
 
     def get(
-        self, *,
-        resource_group_name: str, namespace_name: str, queue_name: str,
+        self,
+        *,
+        resource_group_name: str,
+        namespace_name: str,
+        queue_name: str,
     ) -> FakeQueue:
         if queue_name not in self.queues:
             raise _NotFound(queue_name)
         return self.queues[queue_name]
 
     def delete(
-        self, *,
-        resource_group_name: str, namespace_name: str, queue_name: str,
+        self,
+        *,
+        resource_group_name: str,
+        namespace_name: str,
+        queue_name: str,
     ) -> None:
         if queue_name not in self.queues:
             raise _NotFound(queue_name)
@@ -102,7 +111,8 @@ def _spec(**overrides: Any) -> ProvisionSpec:
 
 
 def test_provision_creates_queue(
-    driver: ServiceBusDriver, fake_client: FakeSBClient,
+    driver: ServiceBusDriver,
+    fake_client: FakeSBClient,
 ) -> None:
     result = driver.provision(_spec())
     assert result.ok
@@ -110,10 +120,11 @@ def test_provision_creates_queue(
 
 
 def test_provision_dead_lettering_enabled(
-    driver: ServiceBusDriver, fake_client: FakeSBClient,
+    driver: ServiceBusDriver,
+    fake_client: FakeSBClient,
 ) -> None:
     driver.provision(_spec())
-    q = list(fake_client.queues_obj.queues.values())[0]
+    q = next(iter(fake_client.queues_obj.queues.values()))
     assert q.parameters["dead_lettering_on_message_expiration"] is True
     assert q.parameters["max_delivery_count"] == 10
 
@@ -130,11 +141,13 @@ def test_status_deprovisioned(driver: ServiceBusDriver) -> None:
 
 
 def test_deprovision_deletes_queue(
-    driver: ServiceBusDriver, fake_client: FakeSBClient,
+    driver: ServiceBusDriver,
+    fake_client: FakeSBClient,
 ) -> None:
     res = driver.provision(_spec())
     driver.deprovision(
-        DeprovisionSpec(handle=res.handle), delete_data=True,
+        DeprovisionSpec(handle=res.handle),
+        delete_data=True,
     )
     assert fake_client.queues_obj.queues == {}
 
@@ -157,9 +170,7 @@ def test_binding_envs_and_iam_grants(driver: ServiceBusDriver) -> None:
         "SERVICEBUS_QUEUE",
         "SERVICEBUS_ENDPOINT",
     }
-    actions = {
-        a for grant in binding.iam_grants for a in grant.actions
-    }
+    actions = {a for grant in binding.iam_grants for a in grant.actions}
     assert "Azure Service Bus Data Sender" in actions
     assert "Azure Service Bus Data Receiver" in actions
 

@@ -129,7 +129,7 @@ def _translate_expr(text: str) -> str:
         expr = m.group(1).strip()
         if expr in _GITHUB_CTX_MAP:
             return "${" + _GITHUB_CTX_MAP[expr] + "}"
-        if expr.startswith("env.") or expr.startswith("secrets."):
+        if expr.startswith(("env.", "secrets.")):
             return "${" + expr + "}"
         # Simple variable reference — pass through
         return "${" + expr + "}"

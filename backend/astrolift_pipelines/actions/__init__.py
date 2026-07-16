@@ -55,9 +55,7 @@ class BuiltinAction:
             if param_name in with_params:
                 resolved[param_name] = with_params[param_name]
             elif spec.required:
-                raise ActionInputError(
-                    f"Action '{self.name}': required input '{param_name}' is missing."
-                )
+                raise ActionInputError(f"Action '{self.name}': required input '{param_name}' is missing.")
             else:
                 resolved[param_name] = spec.default
         return resolved

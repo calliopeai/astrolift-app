@@ -47,6 +47,7 @@ def _get_org_pipeline_secret(org: Organization) -> str | None:
 
     try:
         from astrolift_lifecycle.services.secrets import read_org_secret
+
         value = read_org_secret(org, "astrolift/pipeline/webhook_secret")
         if value:
             return value if isinstance(value, str) else value.decode()

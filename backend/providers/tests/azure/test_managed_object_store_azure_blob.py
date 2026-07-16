@@ -29,14 +29,14 @@ from azure.managed.object_store_blob import (
 # ---- fakes ------------------------------------------------------
 
 
-class _NotFound(Exception):  # noqa: N818
+class _NotFound(Exception):
     pass
 
 
 _NotFound.__name__ = "ResourceNotFoundError"
 
 
-class _Exists(Exception):  # noqa: N818
+class _Exists(Exception):
     pass
 
 

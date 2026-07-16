@@ -34,7 +34,7 @@ from azure.managed.search_aisearch import (
 # ---- fakes ------------------------------------------------------
 
 
-class _NotFound(Exception):  # noqa: N818
+class _NotFound(Exception):
     pass
 
 
@@ -102,7 +102,8 @@ class FakeServicesOperations:
             replica_count=int(service.get("replica_count", 1)),
             partition_count=int(service.get("partition_count", 1)),
             public_network_access=service.get(
-                "public_network_access", "enabled",
+                "public_network_access",
+                "enabled",
             ),
             properties=dict(service),
         )
@@ -585,9 +586,7 @@ def test_status_maps_provisioning(
 ) -> None:
     provisioned = driver.provision(_spec())
     service_name = provisioned.handle.split("/", 1)[1]
-    mgmt.services_obj.services[service_name].provisioning_state = (
-        "provisioning"
-    )
+    mgmt.services_obj.services[service_name].provisioning_state = "provisioning"
     state = driver.status(ServiceHandle(handle=provisioned.handle))
     assert state.state == "provisioning"
 
@@ -714,9 +713,7 @@ def test_handle_rejects_malformed(
 
 
 def test_index_name_for_swaps_hyphens_to_underscores() -> None:
-    assert _index_name_for(service_name="acme-prod-search") == (
-        "acme_prod_search"
-    )
+    assert _index_name_for(service_name="acme-prod-search") == ("acme_prod_search")
 
 
 # ---- config + binding schemas -----------------------------------

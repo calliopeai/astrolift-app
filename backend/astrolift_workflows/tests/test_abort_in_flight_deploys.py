@@ -35,9 +35,7 @@ def test_signals_active_env_with_abort(app, env, monkeypatch):
 def test_not_recorded_when_no_running_deploy(app, env, monkeypatch):
     # signal_workflow returns False when nothing is running (or Temporal is
     # off) — we must not record it or terminate a speculative id.
-    monkeypatch.setattr(
-        "astrolift_workflows.client.signal_workflow", lambda *a, **k: False
-    )
+    monkeypatch.setattr("astrolift_workflows.client.signal_workflow", lambda *a, **k: False)
     assert _abort_in_flight_deploys_sync(app.pk) == []
 
 

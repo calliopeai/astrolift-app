@@ -30,7 +30,7 @@ _LAMBDA_ARN = "arn:aws:lambda:us-east-1:123456789012:function:astrolift-acme-api
 # ---- recording fakes -------------------------------------------------
 
 
-class _NotFoundException(Exception):  # noqa: N818 -- mimics SDK class name
+class _NotFoundException(Exception):
     pass
 
 
@@ -148,11 +148,11 @@ class FakeApiGateway:
         return self._stages[key]
 
 
-class _ResourceConflictException(Exception):  # noqa: N818 -- mimics SDK class name
+class _ResourceConflictException(Exception):
     pass
 
 
-class _ResourceNotFoundException(Exception):  # noqa: N818 -- mimics SDK class name
+class _ResourceNotFoundException(Exception):
     pass
 
 
@@ -193,9 +193,7 @@ class FakeLambda:
 def _driver(*, api: FakeApiGateway | None = None, lam: FakeLambda | None = None):
     api = api or FakeApiGateway()
     lam = lam or FakeLambda()
-    drv = ApiGatewayHttpDriver(
-        config=ApiGatewayHttpConfig(region="us-east-1"), client=api, lambda_client=lam
-    )
+    drv = ApiGatewayHttpDriver(config=ApiGatewayHttpConfig(region="us-east-1"), client=api, lambda_client=lam)
     return drv, api, lam
 
 

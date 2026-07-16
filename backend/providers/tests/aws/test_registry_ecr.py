@@ -90,14 +90,12 @@ def test_delete_repo_force_removes(driver: ECRDriver, ecr_client) -> None:
     driver.ensure_repo("acme/old")
     driver.delete_repo("acme/old", archive=False)
     response = ecr_client.describe_repositories()
-    assert all(
-        r["repositoryName"] != "acme/old"
-        for r in response["repositories"]
-    )
+    assert all(r["repositoryName"] != "acme/old" for r in response["repositories"])
 
 
 def test_delete_repo_archive_blocks_push(
-    driver: ECRDriver, ecr_client,
+    driver: ECRDriver,
+    ecr_client,
 ) -> None:
     """archive=True keeps the repo but applies a deny-push policy
     so deployed pods can still pull until torn down."""
@@ -113,15 +111,13 @@ def test_delete_repo_archive_blocks_push(
         repositoryName="acme/archived",
     )
     policy = json.loads(policy_resp["policyText"])
-    assert any(
-        s["Effect"] == "Deny" and "ecr:PutImage" in s.get("Action", [])
-        for s in policy["Statement"]
-    )
+    assert any(s["Effect"] == "Deny" and "ecr:PutImage" in s.get("Action", []) for s in policy["Statement"])
 
 
-def test_delete_repo_not_found(driver: ECRDriver) -> None:
-    with pytest.raises(NotFoundError):
-        driver.delete_repo("acme/never-existed", archive=False)
+def test_delete_repo_not_found_is_idempotent(driver: ECRDriver) -> None:
+    # #998: deleting an absent repo is the desired end state — succeed
+    # so teardown re-runs complete instead of halting.
+    driver.delete_repo("acme/never-existed", archive=False)
 
 
 # ---- get_pull_secret ----------------------------------------------
@@ -155,9 +151,7 @@ def test_pull_secret_tracks_expiry_annotation(driver: ECRDriver) -> None:
     """ECR token expires every 12h — annotation prompts the
     refresh-scheduler workflow."""
     secret = driver.get_pull_secret(cluster="x", namespace="y")
-    annotation = secret["metadata"]["annotations"][
-        "astrolift.io/expires-at-utc-hours"
-    ]
+    annotation = secret["metadata"]["annotations"]["astrolift.io/expires-at-utc-hours"]
     assert annotation == "12"
 
 
@@ -168,7 +162,9 @@ def test_push_returns_canonical_ref(driver: ECRDriver) -> None:
     """boto3 doesn't push image layers; this returns the ref the
     build runner pushes to."""
     ref = driver.push(
-        local_image="my-app:dev", repo="acme/api", tag="v1.2.3",
+        local_image="my-app:dev",
+        repo="acme/api",
+        tag="v1.2.3",
     )
     assert ref == "123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api:v1.2.3"
 
@@ -177,7 +173,9 @@ def test_push_creates_repo_if_missing(driver: ECRDriver, ecr_client) -> None:
     """push() ensures the repo exists first — first-deploy on a
     fresh app must work without explicit ensure_repo from caller."""
     driver.push(
-        local_image="my-app:dev", repo="brand-new/repo", tag="v1",
+        local_image="my-app:dev",
+        repo="brand-new/repo",
+        tag="v1",
     )
     response = ecr_client.describe_repositories(
         repositoryNames=["brand-new/repo"],
@@ -223,10 +221,10 @@ class _RecordingIam:
     """
 
     class exceptions:  # noqa: N801 — mirrors boto3's lowercase ``client.exceptions``
-        class EntityAlreadyExistsException(Exception):  # noqa: N818 — boto3 name
+        class EntityAlreadyExistsException(Exception):
             pass
 
-        class NoSuchEntityException(Exception):  # noqa: N818 — boto3 name
+        class NoSuchEntityException(Exception):
             pass
 
     def __init__(self) -> None:

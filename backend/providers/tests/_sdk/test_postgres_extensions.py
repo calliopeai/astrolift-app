@@ -17,9 +17,7 @@ def test_pgvector_in_every_variant() -> None:
     """pgvector is core for the agent stack — every variant
     must allow it."""
     for policy in POLICIES:
-        assert policy.supports("vector"), (
-            f"{policy.plugin_id}/{policy.variant} missing pgvector"
-        )
+        assert policy.supports("vector"), f"{policy.plugin_id}/{policy.variant} missing pgvector"
 
 
 def test_timescale_only_on_cnpg() -> None:
@@ -42,7 +40,8 @@ def test_pg_cron_on_azure_flexible_only() -> None:
 
 def test_validate_returns_rejected() -> None:
     result = validate_extensions(
-        plugin_id="aws", variant="rds",
+        plugin_id="aws",
+        variant="rds",
         requested=["pgcrypto", "pg_cron", "timescaledb"],
     )
     assert result.ok is False
@@ -55,7 +54,8 @@ def test_validate_flags_restart_required() -> None:
     """pg_stat_statements is on every variant's allow list and
     requires a restart — the provisioner needs to know."""
     result = validate_extensions(
-        plugin_id="aws", variant="rds",
+        plugin_id="aws",
+        variant="rds",
         requested=["pgcrypto", "pg_stat_statements"],
     )
     assert result.ok is True
@@ -67,7 +67,8 @@ def test_unknown_variant_fails_closed() -> None:
     """Missing policy → reject everything. Better to surface as
     a missing-policy bug than silently allow."""
     result = validate_extensions(
-        plugin_id="azure", variant="not_yet_added",
+        plugin_id="azure",
+        variant="not_yet_added",
         requested=["pgcrypto"],
     )
     assert result.ok is False
@@ -78,7 +79,8 @@ def test_deny_overrides_allow() -> None:
     """Operator can deny an extension that's on the allow list
     (e.g., security policy banning pgcrypto in regulated tenant)."""
     custom = VariantExtensionPolicy(
-        plugin_id="aws", variant="rds",
+        plugin_id="aws",
+        variant="rds",
         allow=(PGVECTOR,),
         deny=("vector",),
     )

@@ -766,31 +766,6 @@ def webhook_delivery_to_type(d) -> WebhookDeliveryType:
     )
 
 
-@strawberry.type(name="AstroliftDeviceRegistration")
-class DeviceRegistrationType:
-    """A user's push-notification device row (#490).
-
-    Surfaced by ``astroliftMyDevices`` so the caller can audit
-    which of their devices the platform will fan notifications to.
-    The frontend uses the ``platform`` literal (``ios``/``android``/
-    ``web``) to render the right icon."""
-
-    id: GUID
-    user_id: str
-    platform: str
-    """``ios`` | ``android`` | ``web``."""
-
-    label: str
-    driver_name: str
-    """Which NotificationDriver minted the registration (e.g.
-    ``aws_sns``). Helpful when troubleshooting cross-driver
-    migrations."""
-
-    registration_id: str
-    last_used_at: dt.datetime | None
-    created_at: dt.datetime
-
-
 @strawberry.type(name="AstroliftNotificationDelivery")
 class NotificationDeliveryType:
     """One per-send audit row from the NotificationDispatcher."""
@@ -811,19 +786,6 @@ class NotificationDeliveryType:
     retriable: bool
     payload_excerpt: str
     delivered_at: dt.datetime
-
-
-def device_registration_to_type(d) -> DeviceRegistrationType:
-    return DeviceRegistrationType(
-        id=GUID(str(d.guid)),
-        user_id=str(d.user_id) if d.user_id else "",
-        platform=d.platform,
-        label=d.label or "",
-        driver_name=d.driver_name or "",
-        registration_id=d.registration_id or "",
-        last_used_at=d.last_used_at,
-        created_at=d.created_at,
-    )
 
 
 def notification_delivery_to_type(d) -> NotificationDeliveryType:

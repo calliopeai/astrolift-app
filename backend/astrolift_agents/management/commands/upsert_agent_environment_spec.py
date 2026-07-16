@@ -49,27 +49,33 @@ class Command(BaseCommand):
     help = "Create or update an org-scoped AgentEnvironmentSpec (idempotent on org+slug)."
 
     def add_arguments(self, parser):
-        parser.add_argument("--org", required=True,
-                            help="Organization slug or guid.")
+        parser.add_argument("--org", required=True, help="Organization slug or guid.")
         parser.add_argument("--slug", required=True, help="Spec slug (lookup key).")
         parser.add_argument("--name", default="", help="Display name (defaults to slug).")
-        parser.add_argument("--agent-type", required=True,
-                            choices=AgentEnvironmentSpec.AgentType.values)
-        parser.add_argument("--image-tag", default="",
-                            help="Explicit image URI (wins over --runtime).")
-        parser.add_argument("--runtime", default="",
-                            help="Catalog runtime short-name (used only if --image-tag is blank).")
+        parser.add_argument("--agent-type", required=True, choices=AgentEnvironmentSpec.AgentType.values)
+        parser.add_argument("--image-tag", default="", help="Explicit image URI (wins over --runtime).")
+        parser.add_argument(
+            "--runtime", default="", help="Catalog runtime short-name (used only if --image-tag is blank)."
+        )
         parser.add_argument("--tool-preset", default="")
         parser.add_argument("--config-repo", default="", help='"owner/repo" of the config repo.')
         parser.add_argument("--config-branch", default="main")
-        parser.add_argument("--manifest-path", default="",
-                            help="Repo-relative path to this agent's astrolift.toml (or its dir).")
+        parser.add_argument(
+            "--manifest-path",
+            default="",
+            help="Repo-relative path to this agent's astrolift.toml (or its dir).",
+        )
         parser.add_argument("--allow-install", action="store_true")
         parser.add_argument("--vnc", action="store_true")
-        parser.add_argument("--env", action="append", metavar="KEY=VALUE",
-                            help="Non-secret env var (repeatable).")
-        parser.add_argument("--secret", action="append", metavar="ENV_VAR=SECRET_NAME",
-                            help="Secret reference: env var <- secret store name/URI (repeatable).")
+        parser.add_argument(
+            "--env", action="append", metavar="KEY=VALUE", help="Non-secret env var (repeatable)."
+        )
+        parser.add_argument(
+            "--secret",
+            action="append",
+            metavar="ENV_VAR=SECRET_NAME",
+            help="Secret reference: env var <- secret store name/URI (repeatable).",
+        )
 
     @transaction.atomic
     def handle(self, *args, **options):
@@ -77,9 +83,7 @@ class Command(BaseCommand):
         if org is None:
             # Fall back to guid; a non-UUID string just means "not found".
             try:
-                org = Organization.objects.filter(
-                    guid=options["org"], deleted_at__isnull=True
-                ).first()
+                org = Organization.objects.filter(guid=options["org"], deleted_at__isnull=True).first()
             except (ValidationError, ValueError):
                 org = None
         if org is None:
@@ -114,8 +118,10 @@ class Command(BaseCommand):
         spec.save()
 
         verb = "Created" if is_new else "Updated"
-        self.stdout.write(self.style.SUCCESS(
-            f"{verb} AgentEnvironmentSpec {org.slug}/{slug} "
-            f"(agent_type={spec.agent_type}, image_tag={spec.image_tag or '-'}, "
-            f"config={spec.config_repo}@{spec.config_branch}:{spec.config_manifest_path or '/'})"
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"{verb} AgentEnvironmentSpec {org.slug}/{slug} "
+                f"(agent_type={spec.agent_type}, image_tag={spec.image_tag or '-'}, "
+                f"config={spec.config_repo}@{spec.config_branch}:{spec.config_manifest_path or '/'})"
+            )
+        )

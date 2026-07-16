@@ -128,18 +128,14 @@ def test_app_traces_requires_app_read(permission_resolver):
     org, app = _scaffold()
     with _ctx(org):
         with pytest.raises(PermissionDenied):
-            GoldenSignalsQuery().astrolift_app_traces(
-                _info(), app_slug=app.slug, since="now-1h", until="now"
-            )
+            GoldenSignalsQuery().astrolift_app_traces(_info(), app_slug=app.slug, since="now-1h", until="now")
 
 
 def test_trace_spans_requires_app_read(permission_resolver):
     org, app = _scaffold()
     with _ctx(org):
         with pytest.raises(PermissionDenied):
-            GoldenSignalsQuery().astrolift_trace_spans(
-                _info(), app_slug=app.slug, trace_id="abc"
-            )
+            GoldenSignalsQuery().astrolift_trace_spans(_info(), app_slug=app.slug, trace_id="abc")
 
 
 # ---- empty-state paths ----------------------------------------------
@@ -169,9 +165,12 @@ def test_app_traces_driver_error_degrades(permission_resolver):
     org, app = _scaffold()
     permission_resolver.grant(Permission.APP_READ)
     driver = _mock_driver(raises=True)
-    with _ctx(org), patch(
-        "astrolift_observability.trace_client.resolve_trace_driver",
-        return_value=driver,
+    with (
+        _ctx(org),
+        patch(
+            "astrolift_observability.trace_client.resolve_trace_driver",
+            return_value=driver,
+        ),
     ):
         result = GoldenSignalsQuery().astrolift_app_traces(
             _info(), app_slug=app.slug, since="now-1h", until="now"
@@ -183,9 +182,7 @@ def test_trace_spans_app_not_found(permission_resolver):
     org, _ = _scaffold()
     permission_resolver.grant(Permission.APP_READ)
     with _ctx(org):
-        result = GoldenSignalsQuery().astrolift_trace_spans(
-            _info(), app_slug="no-such-app", trace_id="abc"
-        )
+        result = GoldenSignalsQuery().astrolift_trace_spans(_info(), app_slug="no-such-app", trace_id="abc")
     assert result == []
 
 
@@ -193,13 +190,14 @@ def test_trace_spans_driver_error_degrades(permission_resolver):
     org, app = _scaffold()
     permission_resolver.grant(Permission.APP_READ)
     driver = _mock_driver(raises=True)
-    with _ctx(org), patch(
-        "astrolift_observability.trace_client.resolve_trace_driver",
-        return_value=driver,
+    with (
+        _ctx(org),
+        patch(
+            "astrolift_observability.trace_client.resolve_trace_driver",
+            return_value=driver,
+        ),
     ):
-        result = GoldenSignalsQuery().astrolift_trace_spans(
-            _info(), app_slug=app.slug, trace_id="abc"
-        )
+        result = GoldenSignalsQuery().astrolift_trace_spans(_info(), app_slug=app.slug, trace_id="abc")
     assert result == []
 
 
@@ -211,9 +209,12 @@ def test_app_traces_returns_summary_list(permission_resolver):
     permission_resolver.grant(Permission.APP_READ)
     summaries = [_fake_summary("t1"), _fake_summary("t2")]
     driver = _mock_driver(traces=summaries)
-    with _ctx(org), patch(
-        "astrolift_observability.trace_client.resolve_trace_driver",
-        return_value=driver,
+    with (
+        _ctx(org),
+        patch(
+            "astrolift_observability.trace_client.resolve_trace_driver",
+            return_value=driver,
+        ),
     ):
         result = GoldenSignalsQuery().astrolift_app_traces(
             _info(), app_slug=app.slug, since="now-1h", until="now"
@@ -230,9 +231,12 @@ def test_app_traces_passes_filters_to_driver(permission_resolver):
     org, app = _scaffold()
     permission_resolver.grant(Permission.APP_READ)
     driver = _mock_driver(traces=[])
-    with _ctx(org), patch(
-        "astrolift_observability.trace_client.resolve_trace_driver",
-        return_value=driver,
+    with (
+        _ctx(org),
+        patch(
+            "astrolift_observability.trace_client.resolve_trace_driver",
+            return_value=driver,
+        ),
     ):
         GoldenSignalsQuery().astrolift_app_traces(
             _info(),
@@ -264,13 +268,14 @@ def test_trace_spans_returns_span_list(permission_resolver):
         _fake_span("t1", "s2", "s1"),
     ]
     driver = _mock_driver(spans=spans)
-    with _ctx(org), patch(
-        "astrolift_observability.trace_client.resolve_trace_driver",
-        return_value=driver,
+    with (
+        _ctx(org),
+        patch(
+            "astrolift_observability.trace_client.resolve_trace_driver",
+            return_value=driver,
+        ),
     ):
-        result = GoldenSignalsQuery().astrolift_trace_spans(
-            _info(), app_slug=app.slug, trace_id="t1"
-        )
+        result = GoldenSignalsQuery().astrolift_trace_spans(_info(), app_slug=app.slug, trace_id="t1")
     assert len(result) == 2
     root = next(s for s in result if s.span_id == "s1")
     child = next(s for s in result if s.span_id == "s2")
@@ -284,11 +289,12 @@ def test_trace_spans_passes_trace_id_to_driver(permission_resolver):
     org, app = _scaffold()
     permission_resolver.grant(Permission.APP_READ)
     driver = _mock_driver(spans=[])
-    with _ctx(org), patch(
-        "astrolift_observability.trace_client.resolve_trace_driver",
-        return_value=driver,
+    with (
+        _ctx(org),
+        patch(
+            "astrolift_observability.trace_client.resolve_trace_driver",
+            return_value=driver,
+        ),
     ):
-        GoldenSignalsQuery().astrolift_trace_spans(
-            _info(), app_slug=app.slug, trace_id="deadbeef"
-        )
+        GoldenSignalsQuery().astrolift_trace_spans(_info(), app_slug=app.slug, trace_id="deadbeef")
     driver.get_trace.assert_called_once_with("deadbeef")

@@ -74,6 +74,21 @@ _ROLLOUT_RETRY = RetryPolicy(maximum_attempts=1)
 _MARK_TIMEOUT = timedelta(minutes=2)
 
 
+def _failure_reason(exc: BaseException) -> str:
+    """One-line, sanitized failure cause for ``aborted_reason`` (#1093).
+
+    ``str(ActivityError)`` is the generic "Activity task failed" — the
+    actual message lives on the innermost ``cause`` (the ApplicationError
+    wrapping the activity's exception). Walk to it and keep the first
+    line only, capped, so the persisted reason is the activity's own
+    error message — never a stack trace."""
+    cause: BaseException = exc
+    while getattr(cause, "cause", None) is not None:
+        cause = cause.cause  # type: ignore[attr-defined]
+    lines = (str(cause) or cause.__class__.__name__).strip().splitlines()
+    return (lines[0].strip() if lines else "deploy failed")[:500]
+
+
 @workflow.defn(name="DeployAppWorkflow")
 class DeployAppWorkflow:
     def __init__(self) -> None:
@@ -247,10 +262,15 @@ class DeployAppWorkflow:
             # deregistered-mid-deploy workload) is terminal. Mark the
             # deployment failed and exit cleanly — never loop a poll
             # forever and saturate the worker.
+            #
+            # #1093: thread the actual cause into mark_failed so the
+            # aborted_reason persistence has something to show — str(exc)
+            # is the generic "Activity task failed" envelope.
+            reason = _failure_reason(exc)
             await workflow.execute_activity(
                 mark_failed,
-                args=[deployment_id, str(exc)],
+                args=[deployment_id, reason],
                 start_to_close_timeout=_MARK_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
-            return WorkflowResult(ok=False, message=f"deploy failed: {exc}")
+            return WorkflowResult(ok=False, message=f"deploy failed: {reason}")

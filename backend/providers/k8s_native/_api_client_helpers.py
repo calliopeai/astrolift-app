@@ -59,9 +59,7 @@ def list_cluster_crd_names(api_client: Any, *, timeout_seconds: int = 10) -> lis
     )
     items = (response or {}).get("items") or []
     return sorted(
-        (item.get("metadata") or {}).get("name", "")
-        for item in items
-        if (item.get("metadata") or {}).get("name")
+        (item.get("metadata") or {}).get("name", "") for item in items if (item.get("metadata") or {}).get("name")
     )
 
 

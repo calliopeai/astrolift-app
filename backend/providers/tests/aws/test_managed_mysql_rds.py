@@ -135,18 +135,19 @@ def test_provision_creates_db_instance(
     assert inst["MasterUsername"] == "astrolift"
 
 
-def test_provision_defaults_to_mysql_8_0(
+def test_provision_pinned_engine_version_passes_through(
     driver: RDSMySQLDriver,
     rds_client,
 ) -> None:
-    result = driver.provision(_spec())
+    # The driver omits EngineVersion when unpinned (RDS resolves the
+    # latest); a pinned spec.config.engine_version must pass through
+    # unchanged — moto reflects the EngineVersion the caller passed.
+    result = driver.provision(_spec(config={"engine_version": "8.0.35"}))
     _, instance_id = parse_handle(result.handle)
     resp = rds_client.describe_db_instances(
         DBInstanceIdentifier=instance_id,
     )
-    # moto reflects the EngineVersion the caller passed; the driver
-    # default is 8.0 -- must show up here unchanged.
-    assert resp["DBInstances"][0]["EngineVersion"].startswith("8.0")
+    assert resp["DBInstances"][0]["EngineVersion"] == "8.0.35"
 
 
 def test_provision_idempotent(driver: RDSMySQLDriver) -> None:

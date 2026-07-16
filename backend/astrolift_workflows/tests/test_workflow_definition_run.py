@@ -86,17 +86,13 @@ def test_retry_under_budget_requests_retry():
 
 def test_retry_at_last_allowed_attempt_still_retries():
     """Attempt N-1 (< max) still gets one final retry."""
-    decision = decide_after_agent_run(
-        "failed", ON_FAILURE_RETRY, attempt_number=MAX_STAGE_ATTEMPTS - 1
-    )
+    decision = decide_after_agent_run("failed", ON_FAILURE_RETRY, attempt_number=MAX_STAGE_ATTEMPTS - 1)
     assert decision.retry is True
 
 
 def test_retry_exhausted_degrades_to_abort():
     """Once attempts hit the cap, retry degrades to abort — no infinite loop."""
-    decision = decide_after_agent_run(
-        "failed", ON_FAILURE_RETRY, attempt_number=MAX_STAGE_ATTEMPTS
-    )
+    decision = decide_after_agent_run("failed", ON_FAILURE_RETRY, attempt_number=MAX_STAGE_ATTEMPTS)
     assert decision.abort is True
     assert decision.retry is False
     assert decision.terminal_status == STATUS_FAILED
@@ -105,13 +101,9 @@ def test_retry_exhausted_degrades_to_abort():
 def test_retry_budget_is_overridable():
     """A caller can widen/narrow the retry budget."""
     # attempt 2 with max=2 → exhausted → abort
-    assert decide_after_agent_run(
-        "failed", ON_FAILURE_RETRY, attempt_number=2, max_attempts=2
-    ).abort
+    assert decide_after_agent_run("failed", ON_FAILURE_RETRY, attempt_number=2, max_attempts=2).abort
     # attempt 2 with max=5 → still retries
-    assert decide_after_agent_run(
-        "failed", ON_FAILURE_RETRY, attempt_number=2, max_attempts=5
-    ).retry
+    assert decide_after_agent_run("failed", ON_FAILURE_RETRY, attempt_number=2, max_attempts=5).retry
 
 
 def test_cancelled_run_treated_as_failure():
@@ -169,29 +161,17 @@ def _stage(kind: str) -> dict:
 
 
 def test_fan_out_only_for_fan_out_pattern():
-    assert is_fan_out_stage(
-        PATTERN_FAN_OUT, _stage(KIND_AGENT_DISPATCH), already_fanned=False
-    )
+    assert is_fan_out_stage(PATTERN_FAN_OUT, _stage(KIND_AGENT_DISPATCH), already_fanned=False)
     # Non-fan-out patterns never fan out.
-    assert not is_fan_out_stage(
-        "chained", _stage(KIND_AGENT_DISPATCH), already_fanned=False
-    )
-    assert not is_fan_out_stage(
-        "single", _stage(KIND_AGENT_DISPATCH), already_fanned=False
-    )
+    assert not is_fan_out_stage("chained", _stage(KIND_AGENT_DISPATCH), already_fanned=False)
+    assert not is_fan_out_stage("single", _stage(KIND_AGENT_DISPATCH), already_fanned=False)
 
 
 def test_fan_out_only_for_agent_dispatch_kind():
-    assert not is_fan_out_stage(
-        PATTERN_FAN_OUT, _stage(KIND_HUMAN_GATE), already_fanned=False
-    )
-    assert not is_fan_out_stage(
-        PATTERN_FAN_OUT, _stage("checkpoint"), already_fanned=False
-    )
+    assert not is_fan_out_stage(PATTERN_FAN_OUT, _stage(KIND_HUMAN_GATE), already_fanned=False)
+    assert not is_fan_out_stage(PATTERN_FAN_OUT, _stage("checkpoint"), already_fanned=False)
 
 
 def test_fan_out_only_first_agent_dispatch_stage():
     """Once a fan-out has happened, later agent stages run inline."""
-    assert not is_fan_out_stage(
-        PATTERN_FAN_OUT, _stage(KIND_AGENT_DISPATCH), already_fanned=True
-    )
+    assert not is_fan_out_stage(PATTERN_FAN_OUT, _stage(KIND_AGENT_DISPATCH), already_fanned=True)

@@ -249,7 +249,7 @@ def test_delete_role_with_inline_policies(
         permissions=[{"Effect": "Allow", "Action": "*", "Resource": "*"}],
     )
     driver.delete_identity_role("acme-api")
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017 — moto raises a bare ClientError here
         iam_client.get_role(RoleName="acme-api")
 
 
@@ -279,13 +279,14 @@ def test_delete_role_with_managed_policy(
         policy="arn:aws:iam::123456789012:policy/extra",
     )
     driver.delete_identity_role("acme-api")
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017 — moto raises a bare ClientError here
         iam_client.get_role(RoleName="acme-api")
 
 
-def test_delete_role_not_found(driver: IRSADriver) -> None:
-    with pytest.raises(NotFoundError):
-        driver.delete_identity_role("never-existed")
+def test_delete_role_not_found_is_idempotent(driver: IRSADriver) -> None:
+    # #998: deleting an absent role is the desired end state — succeed
+    # so teardown re-runs complete instead of halting.
+    driver.delete_identity_role("never-existed")
 
 
 # ---- attach_policy -----------------------------------------------
@@ -314,10 +315,10 @@ class _RecordingIam:
     # catches self._iam.exceptions.{EntityAlreadyExists,NoSuchEntity}Exception),
     # so the casing can't follow ruff's class/exception conventions here.
     class exceptions:  # noqa: N801
-        class EntityAlreadyExistsException(Exception):  # noqa: N818
+        class EntityAlreadyExistsException(Exception):
             pass
 
-        class NoSuchEntityException(Exception):  # noqa: N818
+        class NoSuchEntityException(Exception):
             pass
 
     def __init__(self) -> None:

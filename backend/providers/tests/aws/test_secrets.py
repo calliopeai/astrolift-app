@@ -10,12 +10,15 @@ from aws.secrets import AWSSecretsBackend, SecretsConfig, _split_backend
 # ---- routing -----------------------------------------------------
 
 
-@pytest.mark.parametrize("path,expected_backend,expected_sub", [
-    ("sm:my-app/db", "sm", "my-app/db"),
-    ("ssm:my-app/db", "ssm", "my-app/db"),
-    ("my-app/db", "sm", "my-app/db"),  # default
-    ("ssm:/my/path", "ssm", "/my/path"),
-])
+@pytest.mark.parametrize(
+    "path,expected_backend,expected_sub",
+    [
+        ("sm:my-app/db", "sm", "my-app/db"),
+        ("ssm:my-app/db", "ssm", "my-app/db"),
+        ("my-app/db", "sm", "my-app/db"),  # default
+        ("ssm:/my/path", "ssm", "/my/path"),
+    ],
+)
 def test_split_backend(path, expected_backend, expected_sub):
     backend, sub = _split_backend(path)
     assert backend == expected_backend
@@ -77,12 +80,14 @@ def test_sm_list_prefix(sm_backend: AWSSecretsBackend) -> None:
 
 
 def test_sm_handles_plain_string_secret(
-    sm_backend: AWSSecretsBackend, secrets_client,
+    sm_backend: AWSSecretsBackend,
+    secrets_client,
 ) -> None:
     """Externally-created secrets might be plain strings, not JSON.
     Wrap under 'value' key to match contract."""
     secrets_client.create_secret(
-        Name="astrolift/legacy/path", SecretString="plain-token",
+        Name="astrolift/legacy/path",
+        SecretString="plain-token",
     )
     got = sm_backend.get("legacy/path")
     assert got == {"value": "plain-token"}
@@ -110,11 +115,13 @@ def test_ssm_uses_securestring(ssm_backend: AWSSecretsBackend, ssm_client) -> No
     """SSM-backed values are SecureString (KMS-encrypted at rest)."""
     ssm_backend.upsert("ssm:my-app/secret", {"TOKEN": "x"})
     response = ssm_client.describe_parameters(
-        ParameterFilters=[{
-            "Key": "Name",
-            "Option": "BeginsWith",
-            "Values": ["/astrolift/my-app/"],
-        }],
+        ParameterFilters=[
+            {
+                "Key": "Name",
+                "Option": "BeginsWith",
+                "Values": ["/astrolift/my-app/"],
+            }
+        ],
     )
     assert response["Parameters"][0]["Type"] == "SecureString"
 

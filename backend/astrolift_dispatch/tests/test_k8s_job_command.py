@@ -87,9 +87,7 @@ def test_args_set_when_non_empty():
 
 
 def test_command_and_args_both_set():
-    rendered = _render(
-        _FakeContainer(command=["python", "main.py"], args=["--serve"])
-    )
+    rendered = _render(_FakeContainer(command=["python", "main.py"], args=["--serve"]))
     assert rendered["command"] == ["python", "main.py"]
     assert rendered["args"] == ["--serve"]
 

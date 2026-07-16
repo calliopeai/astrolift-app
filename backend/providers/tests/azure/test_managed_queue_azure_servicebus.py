@@ -29,7 +29,7 @@ from azure.managed.queue_servicebus import (
 # ---- fakes ------------------------------------------------------
 
 
-class _NotFound(Exception):  # noqa: N818
+class _NotFound(Exception):
     pass
 
 

@@ -174,9 +174,9 @@ class TestOrganizationQueryTenantFilter:
         result_a = OrgQuery.members(None, _Info(two_tenants.a.user))
         ids_a = set(result_a.values_list("pk", flat=True))
         assert two_tenants.a.membership.pk in ids_a
-        assert two_tenants.b.membership.pk not in ids_a, (
-            "members query must not surface members from non-caller orgs"
-        )
+        assert (
+            two_tenants.b.membership.pk not in ids_a
+        ), "members query must not surface members from non-caller orgs"
 
     def test_employees_query_filters_to_caller_organizations(self, two_tenants):
         result = schema.execute_sync(
@@ -603,9 +603,7 @@ class TestFileUploadTypeTenantIsolation:
         qs = FileUploadType.get_queryset(FileUpload.objects.all(), _Info(two_tenants.a.user))
         ids = set(qs.values_list("pk", flat=True))
         assert fu_a.pk in ids
-        assert fu_b.pk not in ids, (
-            "user-A must not see org-B FileUpload rows — this is the #723 leak"
-        )
+        assert fu_b.pk not in ids, "user-A must not see org-B FileUpload rows — this is the #723 leak"
 
     def test_anonymous_caller_sees_nothing(self, two_tenants):
         from django.contrib.auth.models import AnonymousUser
@@ -656,6 +654,6 @@ class TestFileUploadTypeTenantIsolation:
 
         qs = FileUploadType.get_queryset(FileUpload.objects.all(), _Info(superuser))
         ids = set(qs.values_list("pk", flat=True))
-        assert {fu_a.pk, fu_b.pk}.issubset(ids), (
-            "superusers retain cross-tenant read for support / audit access"
-        )
+        assert {fu_a.pk, fu_b.pk}.issubset(
+            ids
+        ), "superusers retain cross-tenant read for support / audit access"

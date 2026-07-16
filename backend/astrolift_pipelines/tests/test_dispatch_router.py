@@ -17,7 +17,6 @@ import pytest
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization
 from astrolift_pipelines.dispatch_router import (
-    RoutingResult,
     _cluster_matches,
     _is_runner_only,
     _normalise_labels,

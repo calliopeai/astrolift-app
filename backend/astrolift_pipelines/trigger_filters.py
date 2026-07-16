@@ -97,10 +97,7 @@ def _apply_push_filters(config: dict, ref: str, payload: dict) -> TriggerFilterR
     path_filters = config.get("paths", [])
     if path_filters:
         changed_files = _extract_changed_files_github(payload)
-        if not any(
-            any(_glob_match(f, pattern) for f in changed_files)
-            for pattern in path_filters
-        ):
+        if not any(any(_glob_match(f, pattern) for f in changed_files) for pattern in path_filters):
             return TriggerFilterResult(
                 should_trigger=False,
                 reason=f"no changed files match path filters: {path_filters}",

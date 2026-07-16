@@ -17,8 +17,10 @@ from __future__ import annotations
 
 import inspect
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
-from _sdk.base import ProviderPlugin
+if TYPE_CHECKING:
+    from _sdk.base import ProviderPlugin
 
 
 @dataclass(frozen=True)
@@ -70,28 +72,26 @@ def check_class_against_protocol(
     for method in required_methods(protocol):
         actual = getattr(cls, method, None)
         if actual is None:
-            issues.append(ParityIssue(
-                plugin_id=plugin_id,
-                role_or_kind=role_or_kind,
-                code="missing_method",
-                method=method,
-                detail=(
-                    f"{cls.__name__} does not implement "
-                    f"{protocol.__name__}.{method}"
-                ),
-            ))
+            issues.append(
+                ParityIssue(
+                    plugin_id=plugin_id,
+                    role_or_kind=role_or_kind,
+                    code="missing_method",
+                    method=method,
+                    detail=(f"{cls.__name__} does not implement {protocol.__name__}.{method}"),
+                )
+            )
             continue
         if not callable(actual):
-            issues.append(ParityIssue(
-                plugin_id=plugin_id,
-                role_or_kind=role_or_kind,
-                code="not_callable",
-                method=method,
-                detail=(
-                    f"{cls.__name__}.{method} is not callable "
-                    f"(found {type(actual).__name__})"
-                ),
-            ))
+            issues.append(
+                ParityIssue(
+                    plugin_id=plugin_id,
+                    role_or_kind=role_or_kind,
+                    code="not_callable",
+                    method=method,
+                    detail=(f"{cls.__name__}.{method} is not callable (found {type(actual).__name__})"),
+                )
+            )
     return issues
 
 
@@ -112,20 +112,24 @@ def check_plugin_parity(
         proto = role_protocols.get(role)
         if proto is None:
             continue  # role not in the protocol registry → skip
-        issues.extend(check_class_against_protocol(
-            plugin_id=plugin.id,
-            role_or_kind=role,
-            cls=cls,
-            protocol=proto,
-        ))
+        issues.extend(
+            check_class_against_protocol(
+                plugin_id=plugin.id,
+                role_or_kind=role,
+                cls=cls,
+                protocol=proto,
+            )
+        )
 
     for (kind, variant), cls in plugin.managed_service_drivers.items():
-        issues.extend(check_class_against_protocol(
-            plugin_id=plugin.id,
-            role_or_kind=f"{kind}/{variant}",
-            cls=cls,
-            protocol=managed_service_protocol,
-        ))
+        issues.extend(
+            check_class_against_protocol(
+                plugin_id=plugin.id,
+                role_or_kind=f"{kind}/{variant}",
+                cls=cls,
+                protocol=managed_service_protocol,
+            )
+        )
 
     return ParityReport(ok=not issues, issues=issues)
 

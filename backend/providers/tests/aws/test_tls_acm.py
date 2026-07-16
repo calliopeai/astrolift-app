@@ -37,9 +37,7 @@ def test_ensure_certificate_dns_validation(driver: ACMDriver, acm_client) -> Non
     """ACM driver always uses DNS validation (auto-renew via DNS)."""
     cert = driver.ensure_certificate(domain="api.acme.platform.example")
     raw = acm_client.describe_certificate(CertificateArn=cert.id)
-    assert raw["Certificate"]["DomainValidationOptions"][0][
-        "ValidationMethod"
-    ] == "DNS"
+    assert raw["Certificate"]["DomainValidationOptions"][0]["ValidationMethod"] == "DNS"
 
 
 def test_ensure_certificate_unknown_strategy_rejected(driver: ACMDriver) -> None:

@@ -10,6 +10,7 @@ workflow layer doesn't special-case S3.
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass
 from typing import Any
 
@@ -62,7 +63,10 @@ class S3Config:
 
 class S3Driver(ManagedServiceDriver):
     def __init__(
-        self, *, config: S3Config, client: Any | None = None,
+        self,
+        *,
+        config: S3Config,
+        client: Any | None = None,
     ) -> None:
         self._config = config
         if client is not None:
@@ -103,7 +107,8 @@ class S3Driver(ManagedServiceDriver):
             )
         except Exception as exc:
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message=f"create_bucket: {exc}",
                 errors=[str(exc)],
             )
@@ -112,19 +117,14 @@ class S3Driver(ManagedServiceDriver):
         try:
             self._s3.put_bucket_tagging(
                 Bucket=bucket_name,
-                Tagging={"TagSet": [
-                    {"Key": t["Key"], "Value": t["Value"]}
-                    for t in tags_for(spec)
-                ]},
+                Tagging={"TagSet": [{"Key": t["Key"], "Value": t["Value"]} for t in tags_for(spec)]},
             )
         except Exception as exc:
             # Tag failure isn't fatal — surface but proceed
             return ProvisionResult(
                 ok=True,
                 handle=handle_for(kind=KIND, resource_id=bucket_name),
-                message=(
-                    f"bucket created but tagging failed: {exc}"
-                ),
+                message=(f"bucket created but tagging failed: {exc}"),
             )
 
         # Versioning
@@ -138,9 +138,7 @@ class S3Driver(ManagedServiceDriver):
                 return ProvisionResult(
                     ok=True,
                     handle=handle_for(kind=KIND, resource_id=bucket_name),
-                    message=(
-                        f"bucket created but versioning failed: {exc}"
-                    ),
+                    message=(f"bucket created but versioning failed: {exc}"),
                 )
 
         # Public access block
@@ -159,10 +157,7 @@ class S3Driver(ManagedServiceDriver):
                 return ProvisionResult(
                     ok=True,
                     handle=handle_for(kind=KIND, resource_id=bucket_name),
-                    message=(
-                        f"bucket created but public-access-block "
-                        f"failed: {exc}"
-                    ),
+                    message=(f"bucket created but public-access-block failed: {exc}"),
                 )
 
         return ProvisionResult(
@@ -177,10 +172,11 @@ class S3Driver(ManagedServiceDriver):
         Spec acceptance: 'update_managed_service is idempotent.'"""
         _, bucket_name = parse_handle(spec.handle)
         return UpdateResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message=f"bucket {bucket_name} has no updatable attributes "
-                    "via this driver (config changes go through "
-                    "the bucket-policy editor)",
+            "via this driver (config changes go through "
+            "the bucket-policy editor)",
         )
 
     @driver_op(
@@ -224,11 +220,9 @@ class S3Driver(ManagedServiceDriver):
             # platform's record of the binding is what gets cleaned up
             # by the calling activity, not this driver call.
             return DeprovisionResult(
-                ok=True, handle=spec.handle,
-                message=(
-                    f"bucket {bucket_name} retained (delete_data=False); "
-                    "platform unbinding only"
-                ),
+                ok=True,
+                handle=spec.handle,
+                message=(f"bucket {bucket_name} retained (delete_data=False); platform unbinding only"),
             )
 
         # delete_data=True branch — irreversibly delete bucket contents.
@@ -237,19 +231,18 @@ class S3Driver(ManagedServiceDriver):
             # lets the bucket be re-emptied if a previous attempt
             # half-finished. Best-effort: ignore errors (most buckets
             # are non-versioned).
-            try:
+            with contextlib.suppress(Exception):
                 self._s3.put_bucket_versioning(
                     Bucket=bucket_name,
                     VersioningConfiguration={"Status": "Suspended"},
                 )
-            except Exception:
-                pass
 
         try:
             self._empty_bucket(bucket_name=bucket_name)
         except Exception as exc:
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"empty failed: {exc}",
                 errors=[str(exc)],
             )
@@ -259,13 +252,15 @@ class S3Driver(ManagedServiceDriver):
             pass
         except Exception as exc:
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"delete_bucket: {exc}",
                 errors=[str(exc)],
             )
         suffix = " (force_destroy)" if force_destroy else ""
         return DeprovisionResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message=f"bucket {bucket_name} deleted with data{suffix}",
         )
 
@@ -278,7 +273,8 @@ class S3Driver(ManagedServiceDriver):
             self._s3.head_bucket(Bucket=bucket_name)
         except self._s3.exceptions.NoSuchBucket:
             return ServiceStatus(
-                handle=handle.handle, state="deprovisioned",
+                handle=handle.handle,
+                state="deprovisioned",
                 message=f"bucket {bucket_name} does not exist",
             )
         except Exception as exc:
@@ -288,20 +284,20 @@ class S3Driver(ManagedServiceDriver):
             response = getattr(exc, "response", None) or {}
             metadata = response.get("ResponseMetadata", {}) or {}
             error_code = response.get("Error", {}).get("Code", "")
-            if (
-                metadata.get("HTTPStatusCode") == 404
-                or error_code in ("404", "NoSuchBucket")
-            ):
+            if metadata.get("HTTPStatusCode") == 404 or error_code in ("404", "NoSuchBucket"):
                 return ServiceStatus(
-                    handle=handle.handle, state="deprovisioned",
+                    handle=handle.handle,
+                    state="deprovisioned",
                     message=f"bucket {bucket_name} does not exist",
                 )
             return ServiceStatus(
-                handle=handle.handle, state="error",
+                handle=handle.handle,
+                state="error",
                 message=str(exc),
             )
         return ServiceStatus(
-            handle=handle.handle, state="available",
+            handle=handle.handle,
+            state="available",
             message=f"bucket {bucket_name} reachable",
         )
 
@@ -355,11 +351,10 @@ class S3Driver(ManagedServiceDriver):
         which is out of scope for this driver."""
         from datetime import UTC, datetime
 
-        _, bucket_name = parse_handle(handle.handle)
+        _, _bucket_name = parse_handle(handle.handle)
         if not self._config.versioning_enabled:
             raise ManagedServiceError(
-                "snapshot requires versioning_enabled=True; this "
-                "config has versioning disabled",
+                "snapshot requires versioning_enabled=True; this config has versioning disabled",
             )
         marker_id = f"v-{datetime.now(tz=UTC).strftime('%Y%m%d-%H%M%S')}"
         return SnapshotHandle(
@@ -370,7 +365,9 @@ class S3Driver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="object_store_s3")
     def restore(
-        self, snapshot: SnapshotHandle, target: ProvisionSpec,
+        self,
+        snapshot: SnapshotHandle,
+        target: ProvisionSpec,
     ) -> ProvisionResult:
         """S3 restore is best-effort: provision the target bucket
         + copy from source. Full point-in-time restore needs AWS
@@ -394,21 +391,20 @@ class S3Driver(ManagedServiceDriver):
             "properties": {
                 "versioning_override": {
                     "type": "boolean",
-                    "description": (
-                        "Override the cluster-level versioning "
-                        "default for this binding."
-                    ),
+                    "description": ("Override the cluster-level versioning default for this binding."),
                 },
             },
         }
 
     @driver_op(cloud="aws", driver="object_store_s3", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
-        return BindingSchema(env_vars={
-            "S3_BUCKET_NAME": "S3 bucket name",
-            "S3_BUCKET_ARN": "Full bucket ARN",
-            "AWS_REGION": "Bucket's region",
-        })
+        return BindingSchema(
+            env_vars={
+                "S3_BUCKET_NAME": "S3 bucket name",
+                "S3_BUCKET_ARN": "Full bucket ARN",
+                "AWS_REGION": "Bucket's region",
+            }
+        )
 
     # ---- internals ------------------------------------------------
 
@@ -428,10 +424,7 @@ class S3Driver(ManagedServiceDriver):
         # S3 names: lowercase, 3-63 chars, no underscores, no dots
         # in the way (DNS-style). Collapse underscores/dots → dash.
         raw = "-".join(p for p in parts if p).lower()
-        clean = "".join(
-            c if (c.isalnum() or c == "-") else "-"
-            for c in raw
-        )
+        clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in raw)
         # Collapse runs of dashes
         while "--" in clean:
             clean = clean.replace("--", "-")
@@ -451,10 +444,7 @@ class S3Driver(ManagedServiceDriver):
             for page in paginator.paginate(Bucket=bucket_name):
                 versions = page.get("Versions", []) or []
                 markers = page.get("DeleteMarkers", []) or []
-                objects = [
-                    {"Key": v["Key"], "VersionId": v["VersionId"]}
-                    for v in versions + markers
-                ]
+                objects = [{"Key": v["Key"], "VersionId": v["VersionId"]} for v in versions + markers]
                 if objects:
                     self._s3.delete_objects(
                         Bucket=bucket_name,

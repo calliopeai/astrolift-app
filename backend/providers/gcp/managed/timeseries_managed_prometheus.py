@@ -176,10 +176,7 @@ class GCPManagedPrometheusDriver(ManagedServiceDriver):
             return ProvisionResult(
                 ok=False,
                 handle="",
-                message=(
-                    f"retention_months={retention_months} out of bounds; "
-                    f"GMP hard ceiling is 24 months"
-                ),
+                message=(f"retention_months={retention_months} out of bounds; GMP hard ceiling is 24 months"),
                 errors=["retention_out_of_bounds"],
             )
 
@@ -244,10 +241,7 @@ class GCPManagedPrometheusDriver(ManagedServiceDriver):
                 return UpdateResult(
                     ok=False,
                     handle=spec.handle,
-                    message=(
-                        f"retention_months={new_retention} out of bounds; "
-                        f"GMP hard ceiling is 24 months"
-                    ),
+                    message=(f"retention_months={new_retention} out of bounds; GMP hard ceiling is 24 months"),
                     errors=["retention_out_of_bounds"],
                 )
             update_body["retention_months"] = new_retention
@@ -422,7 +416,9 @@ class GCPManagedPrometheusDriver(ManagedServiceDriver):
         # scoped to the project; the write side uses the v1
         # prometheus push gateway URL. Both are deterministic from
         # project_id, so we don't need to fetch them.
-        prometheus_query_endpoint = f"https://monitoring.googleapis.com/v1/projects/{self._config.project_id}/location/global/prometheus"
+        prometheus_query_endpoint = (
+            f"https://monitoring.googleapis.com/v1/projects/{self._config.project_id}/location/global/prometheus"
+        )
         remote_write_endpoint = (
             f"https://monitoring.googleapis.com/v1/projects/"
             f"{self._config.project_id}/location/global/prometheus/"
@@ -586,9 +582,7 @@ class GCPManagedPrometheusDriver(ManagedServiceDriver):
         # GMP workspace ids: 1-63 chars, [a-z0-9-], must start with
         # a letter.
         raw = (
-            f"{self._config.workspace_name_prefix}-"
-            f"{spec.organization_slug}-{spec.app_slug}-"
-            f"{spec.environment_name}"
+            f"{self._config.workspace_name_prefix}-{spec.organization_slug}-{spec.app_slug}-{spec.environment_name}"
         ).lower()
         clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in raw)
         while "--" in clean:

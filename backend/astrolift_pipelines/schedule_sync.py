@@ -22,7 +22,7 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from astrolift_pipelines.models import Pipeline, Trigger
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -47,13 +47,12 @@ def create_or_update_schedule(trigger) -> None:
     """
     cron = _cron_from_trigger(trigger)
     if not cron:
-        logger.warning(
-            "pipelines.schedule_sync: trigger %s has no cron expression — skipping", trigger.guid
-        )
+        logger.warning("pipelines.schedule_sync: trigger %s has no cron expression — skipping", trigger.guid)
         return
 
     try:
         from astrolift_workflows.client import get_temporal_client
+
         client = get_temporal_client()
     except Exception:  # noqa: BLE001 — Temporal may not be running
         logger.info("pipelines.schedule_sync: Temporal not available, skipping schedule sync")
@@ -77,8 +76,8 @@ def create_or_update_schedule(trigger) -> None:
             Schedule,
             ScheduleActionStartWorkflow,
             ScheduleSpec,
-            ScheduleIntervalSpec,
         )
+
         # Try to delete existing schedule (update via delete+recreate)
         try:
             handle = client.get_schedule_handle(schedule_id)
@@ -100,12 +99,12 @@ def create_or_update_schedule(trigger) -> None:
                 ),
             ),
         )
-        logger.info(
-            "pipelines.schedule_sync: schedule %s created/updated (cron=%s)", schedule_id, cron
-        )
+        logger.info("pipelines.schedule_sync: schedule %s created/updated (cron=%s)", schedule_id, cron)
     except ImportError:
         # Temporal SDK not fully installed — fallback to a simpler note
-        logger.info("pipelines.schedule_sync: Temporal SDK not available, schedule %s not synced", schedule_id)
+        logger.info(
+            "pipelines.schedule_sync: Temporal SDK not available, schedule %s not synced", schedule_id
+        )
     except Exception:  # noqa: BLE001
         logger.exception("pipelines.schedule_sync: failed to sync schedule %s", schedule_id)
 
@@ -118,6 +117,7 @@ def delete_schedule(trigger) -> None:
     schedule_id = _temporal_schedule_id(trigger)
     try:
         from astrolift_workflows.client import get_temporal_client
+
         client = get_temporal_client()
         handle = client.get_schedule_handle(schedule_id)
         handle.delete()
@@ -132,6 +132,7 @@ def sync_pipeline_schedules(pipeline) -> None:
     Called when a pipeline is enabled/disabled or its default_branch changes.
     """
     from astrolift_pipelines.models import Trigger
+
     triggers = Trigger.objects.filter(
         pipeline=pipeline,
         kind="schedule",

@@ -18,7 +18,9 @@ def test_build_spec_defaults() -> None:
 
 def test_build_result_failure_path() -> None:
     result = BuildResult(
-        success=False, image_uri="", digest="",
+        success=False,
+        image_uri="",
+        digest="",
         duration_seconds=12.5,
         errors=["dockerfile not found"],
     )
@@ -60,9 +62,13 @@ def test_trace_summary_shape() -> None:
 
 def test_span_ref_with_attributes() -> None:
     s = SpanRef(
-        trace_id="abc", span_id="def", parent_span_id=None,
-        operation="db.query", service="api",
-        start_time="2026-05-09T00:00:00Z", duration_ms=12.0,
+        trace_id="abc",
+        span_id="def",
+        parent_span_id=None,
+        operation="db.query",
+        service="api",
+        start_time="2026-05-09T00:00:00Z",
+        duration_ms=12.0,
         status_code="OK",
         attributes={"db.statement": "SELECT 1"},
     )

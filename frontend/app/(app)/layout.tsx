@@ -11,6 +11,7 @@ import { SessionExpiredModal } from "@/components/SessionExpiredModal";
 import { SkipToContent } from "@/components/SkipToContent";
 import { StepUpPrompt } from "@/components/StepUpPrompt";
 import { getClient } from "@/lib/apollo";
+import { ActiveOrgProvider } from "@/graphql/identity/identity.hooks";
 import { GET_ME } from "@/graphql/user/user.queries";
 import { GET_MY_PERMISSIONS } from "@/graphql/permissions/astrolift.queries";
 import { LIST_ORGANIZATIONS } from "@/graphql/identity/identity.queries";
@@ -50,28 +51,29 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <LiveRegionProvider>
-      <SkipToContent />
-      <div className="flex min-h-svh flex-col">
-        <PlatformIncidentBanner />
-        <SidebarProvider className="flex-1">
-          <AppSidebar ssrUser={ssrUser} />
-          <SidebarInset className="overflow-x-hidden">
-            <PageHeader />
-            <main
-              id="main-content"
-              tabIndex={-1}
-              className="flex flex-1 flex-col outline-none"
-            >
-              {children}
-            </main>
-          </SidebarInset>
-          <CommandPalette />
-          <KeyboardShortcuts />
-          <ScmCallbackToast />
-          <SessionExpiredModal />
-          <StepUpPrompt />
-        </SidebarProvider>
-      </div>
+      {/* Resolves the install's org once for the whole (app) tree and pins
+          the org cookie before any child renders — every useActiveOrg
+          consumer gates its org-scoped queries on it (#1022). */}
+      <ActiveOrgProvider>
+        <SkipToContent />
+        <div className="flex min-h-svh flex-col">
+          <PlatformIncidentBanner />
+          <SidebarProvider className="flex-1">
+            <AppSidebar ssrUser={ssrUser} />
+            <SidebarInset className="overflow-x-hidden">
+              <PageHeader />
+              <main id="main-content" tabIndex={-1} className="flex flex-1 flex-col outline-none">
+                {children}
+              </main>
+            </SidebarInset>
+            <CommandPalette />
+            <KeyboardShortcuts />
+            <ScmCallbackToast />
+            <SessionExpiredModal />
+            <StepUpPrompt />
+          </SidebarProvider>
+        </div>
+      </ActiveOrgProvider>
     </LiveRegionProvider>
   );
 }

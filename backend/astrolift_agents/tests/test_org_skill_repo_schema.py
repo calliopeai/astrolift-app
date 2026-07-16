@@ -164,9 +164,7 @@ def test_register_duplicate_alias_rejected(permission_resolver, org, with_tenant
     assert OrgSkillRepo.objects.filter(organization=org, alias="acme").count() == 1
 
 
-def test_register_same_alias_allowed_in_different_orgs(
-    permission_resolver, org, other_org, with_tenant_org
-):
+def test_register_same_alias_allowed_in_different_orgs(permission_resolver, org, other_org, with_tenant_org):
     """Alias uniqueness is per-org: two orgs can each register 'acme'."""
     _grant_write(permission_resolver)
     with with_tenant_org(org):

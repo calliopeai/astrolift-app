@@ -90,16 +90,12 @@ class ArtifactRegistryDriver(ImageRegistryDriver):
             # GCP NotFound = "Repository not found"; create it
             if type(exc).__name__ == "NotFound":
                 self._create_artifact_registry_repo(
-                    parent=(f"projects/{self._config.project_id}" f"/locations/{self._config.location}")
+                    parent=(f"projects/{self._config.project_id}/locations/{self._config.location}")
                 )
             else:
                 raise map_api_error(exc) from exc
 
-        uri = (
-            f"{self._config.location}-docker.pkg.dev"
-            f"/{self._config.project_id}"
-            f"/{self._config.repository_id}/{name}"
-        )
+        uri = f"{self._config.location}-docker.pkg.dev/{self._config.project_id}/{self._config.repository_id}/{name}"
         return Repo(name=name, uri=uri)
 
     @driver_op(cloud="gcp", driver="registry", audit=True, sensitive_kind="registry.delete")
@@ -237,7 +233,7 @@ class ArtifactRegistryDriver(ImageRegistryDriver):
             )
         if "/" not in scm_repo_full_name:
             raise ValueError(
-                "scm_repo_full_name must be 'owner/repo'; got " f"{scm_repo_full_name!r}",
+                f"scm_repo_full_name must be 'owner/repo'; got {scm_repo_full_name!r}",
             )
 
         self._ensure_iam_clients()
@@ -345,23 +341,23 @@ class ArtifactRegistryDriver(ImageRegistryDriver):
         sa_id = f"astrolift-{repo_slug}-ar-push"
         if len(sa_id) < _SA_ID_MIN or len(sa_id) > _SA_ID_MAX:
             raise ValueError(
-                f"derived SA id {sa_id!r} violates GCP length bounds " f"({_SA_ID_MIN}-{_SA_ID_MAX} chars)",
+                f"derived SA id {sa_id!r} violates GCP length bounds ({_SA_ID_MIN}-{_SA_ID_MAX} chars)",
             )
         if not _SA_ID_RE.match(sa_id):
             raise ValueError(
-                f"derived SA id {sa_id!r} violates GCP charset " f"({_SA_ID_RE.pattern})",
+                f"derived SA id {sa_id!r} violates GCP charset ({_SA_ID_RE.pattern})",
             )
         return sa_id
 
     def _wip_pool_resource(self, *, project_id: str) -> str:
-        return f"projects/{project_id}/locations/global" f"/workloadIdentityPools/{_WIP_POOL_ID}"
+        return f"projects/{project_id}/locations/global/workloadIdentityPools/{_WIP_POOL_ID}"
 
     def _wip_provider_resource(self, *, project_id: str) -> str:
-        return f"{self._wip_pool_resource(project_id=project_id)}" f"/providers/{_WIP_PROVIDER_ID}"
+        return f"{self._wip_pool_resource(project_id=project_id)}/providers/{_WIP_PROVIDER_ID}"
 
     def _ensure_wip_pool(self, *, project_id: str) -> None:
         base = "https://iam.googleapis.com/v1"
-        get_url = f"{base}/projects/{project_id}/locations/global" f"/workloadIdentityPools/{_WIP_POOL_ID}"
+        get_url = f"{base}/projects/{project_id}/locations/global/workloadIdentityPools/{_WIP_POOL_ID}"
         get_resp = self._wip.get(get_url)
         status = getattr(get_resp, "status_code", 200)
         if status == 200:
@@ -375,15 +371,14 @@ class ArtifactRegistryDriver(ImageRegistryDriver):
                 ),
             )
         create_url = (
-            f"{base}/projects/{project_id}/locations/global"
-            f"/workloadIdentityPools?workloadIdentityPoolId={_WIP_POOL_ID}"
+            f"{base}/projects/{project_id}/locations/global/workloadIdentityPools?workloadIdentityPoolId={_WIP_POOL_ID}"
         )
         create_resp = self._wip.post(
             create_url,
             json={
                 "displayName": _WIP_POOL_DISPLAY,
                 "description": (
-                    "Astrolift-managed pool federating GitHub Actions OIDC " "tokens for image-registry push."
+                    "Astrolift-managed pool federating GitHub Actions OIDC tokens for image-registry push."
                 ),
             },
         )
@@ -391,13 +386,13 @@ class ArtifactRegistryDriver(ImageRegistryDriver):
         if create_status >= 400 and create_status != 409:
             raise map_api_error(
                 RuntimeError(
-                    f"WIF pool create failed: HTTP {create_status} " f"{getattr(create_resp, 'text', '')!r}",
+                    f"WIF pool create failed: HTTP {create_status} {getattr(create_resp, 'text', '')!r}",
                 ),
             )
 
     def _ensure_wip_provider(self, *, project_id: str) -> str:
         base = "https://iam.googleapis.com/v1"
-        pool_path = f"projects/{project_id}/locations/global" f"/workloadIdentityPools/{_WIP_POOL_ID}"
+        pool_path = f"projects/{project_id}/locations/global/workloadIdentityPools/{_WIP_POOL_ID}"
         provider_resource = self._wip_provider_resource(project_id=project_id)
         get_url = f"{base}/{pool_path}/providers/{_WIP_PROVIDER_ID}"
         get_resp = self._wip.get(get_url)
@@ -410,7 +405,7 @@ class ArtifactRegistryDriver(ImageRegistryDriver):
                     f"WIF provider lookup failed: HTTP {status}",
                 ),
             )
-        create_url = f"{base}/{pool_path}/providers" f"?workloadIdentityPoolProviderId={_WIP_PROVIDER_ID}"
+        create_url = f"{base}/{pool_path}/providers?workloadIdentityPoolProviderId={_WIP_PROVIDER_ID}"
         create_resp = self._wip.post(
             create_url,
             json={
@@ -444,8 +439,7 @@ class ArtifactRegistryDriver(ImageRegistryDriver):
                 service_account={
                     "display_name": f"astrolift {sa_id}",
                     "description": (
-                        "Astrolift Artifact Registry push role for GitHub "
-                        "Actions CI (managed by ImageRegistryDriver)."
+                        "Astrolift Artifact Registry push role for GitHub Actions CI (managed by ImageRegistryDriver)."
                     ),
                 },
             )

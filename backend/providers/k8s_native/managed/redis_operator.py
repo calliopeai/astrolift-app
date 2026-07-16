@@ -213,7 +213,7 @@ class RedisOperatorDriver(ManagedServiceDriver):
                 ),
             },
             iam_grants=[],
-            notes=("Connect via REDIS_HOST + port; password from " "the operator-generated Secret."),
+            notes=("Connect via REDIS_HOST + port; password from the operator-generated Secret."),
         )
 
     @driver_op(cloud="k8s_native", driver="redis_operator")

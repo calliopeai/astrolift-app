@@ -182,7 +182,9 @@ def test_server_side_apply_returns_created_when_pre_get_404() -> None:
     # The apply call carried the right field_manager + no dry_run kwarg.
     _, kwargs = fake_resource.server_side_apply.call_args
     assert kwargs["field_manager"] == "astrolift"
-    assert kwargs["force_conflicts"] is False
+    # force_conflicts defaults to True — the platform owns its manifests
+    # and must reclaim fields from stale field managers.
+    assert kwargs["force_conflicts"] is True
     assert kwargs["namespace"] == "ns"
     assert "dry_run" not in kwargs
     # Token was refreshed before the call (provider called > once).

@@ -50,7 +50,11 @@ class FakeSMClient:
         return FakeSecret(name=name)
 
     def create_secret(
-        self, *, parent: str, secret_id: str, secret: dict[str, Any],
+        self,
+        *,
+        parent: str,
+        secret_id: str,
+        secret: dict[str, Any],
     ) -> FakeSecret:
         if secret_id in self.secrets:
             raise _AlreadyExists(secret_id)
@@ -58,7 +62,10 @@ class FakeSMClient:
         return FakeSecret(name=f"{parent}/secrets/{secret_id}")
 
     def add_secret_version(
-        self, *, parent: str, payload: dict[str, Any],
+        self,
+        *,
+        parent: str,
+        payload: dict[str, Any],
     ) -> Any:
         secret_id = parent.rsplit("/", 1)[-1]
         self.secrets.setdefault(secret_id, []).append(payload["data"])
@@ -79,12 +86,12 @@ class FakeSMClient:
         del self.secrets[secret_id]
 
     def list_secrets(
-        self, *, parent: str, filter: str = "",
+        self,
+        *,
+        parent: str,
+        filter: str = "",
     ) -> list[FakeSecret]:
-        return [
-            FakeSecret(name=f"{parent}/secrets/{k}")
-            for k in self.secrets
-        ]
+        return [FakeSecret(name=f"{parent}/secrets/{k}") for k in self.secrets]
 
 
 @pytest.fixture
@@ -100,13 +107,15 @@ def fake_sm_client() -> FakeSMClient:
 def backend(fake_sm_client: FakeSMClient) -> GCPSecretsBackend:
     return GCPSecretsBackend(
         config=GCPSecretsConfig(
-            project_id="acme-prod", client=fake_sm_client,
+            project_id="acme-prod",
+            client=fake_sm_client,
         ),
     )
 
 
 def test_upsert_creates_secret_then_adds_version(
-    backend: GCPSecretsBackend, fake_sm_client: FakeSMClient,
+    backend: GCPSecretsBackend,
+    fake_sm_client: FakeSMClient,
 ) -> None:
     backend.upsert("/database/url", {"url": "postgres://..."})
     assert "astrolift--database-url" in fake_sm_client.secrets
@@ -117,7 +126,8 @@ def test_upsert_creates_secret_then_adds_version(
 
 
 def test_upsert_idempotent_on_existing_secret(
-    backend: GCPSecretsBackend, fake_sm_client: FakeSMClient,
+    backend: GCPSecretsBackend,
+    fake_sm_client: FakeSMClient,
 ) -> None:
     backend.upsert("/api/key", {"k": "v1"})
     backend.upsert("/api/key", {"k": "v2"})
@@ -126,7 +136,8 @@ def test_upsert_idempotent_on_existing_secret(
 
 
 def test_get_returns_kvs(
-    backend: GCPSecretsBackend, fake_sm_client: FakeSMClient,
+    backend: GCPSecretsBackend,
+    fake_sm_client: FakeSMClient,
 ) -> None:
     backend.upsert("/x", {"alpha": "1", "beta": "2"})
     result = backend.get("/x")
@@ -140,7 +151,8 @@ def test_get_returns_none_on_missing(
 
 
 def test_get_wraps_non_json_payload_as_value(
-    backend: GCPSecretsBackend, fake_sm_client: FakeSMClient,
+    backend: GCPSecretsBackend,
+    fake_sm_client: FakeSMClient,
 ) -> None:
     fake_sm_client.secrets["astrolift--legacy"] = [b"plain-string"]
     result = backend.get("/legacy")
@@ -155,7 +167,8 @@ def test_delete_raises_not_found_for_missing(
 
 
 def test_delete_removes_secret(
-    backend: GCPSecretsBackend, fake_sm_client: FakeSMClient,
+    backend: GCPSecretsBackend,
+    fake_sm_client: FakeSMClient,
 ) -> None:
     backend.upsert("/y", {"k": "v"})
     backend.delete("/y")

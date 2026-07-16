@@ -44,11 +44,7 @@ class _StubVault:
     def list(self, path, headers):
         self.calls.append(("LIST", path, None))
         prefix = path.split("/metadata/", 1)[1]
-        children = [
-            k[len(prefix) + 1:].split("/", 1)[0]
-            for k in self.kv
-            if k.startswith(prefix + "/")
-        ]
+        children = [k[len(prefix) + 1 :].split("/", 1)[0] for k in self.kv if k.startswith(prefix + "/")]
         return {
             "status_code": 200,
             "body": {"data": {"keys": sorted(set(children))}},
@@ -62,13 +58,15 @@ def stub() -> _StubVault:
 
 @pytest.fixture
 def backend(stub: _StubVault) -> VaultSecretsBackend:
-    return VaultSecretsBackend(config=VaultConfig(
-        address="http://vault.test:8200",
-        token="dev-token",
-        kv_mount="secret",
-        kv_path_prefix="astrolift",
-        http_client=stub,
-    ))
+    return VaultSecretsBackend(
+        config=VaultConfig(
+            address="http://vault.test:8200",
+            token="dev-token",
+            kv_mount="secret",
+            kv_path_prefix="astrolift",
+            http_client=stub,
+        )
+    )
 
 
 def test_upsert_then_get(backend: VaultSecretsBackend) -> None:
@@ -88,7 +86,8 @@ def test_upsert_overwrites(backend: VaultSecretsBackend) -> None:
 
 
 def test_path_prefix_applied(
-    backend: VaultSecretsBackend, stub: _StubVault,
+    backend: VaultSecretsBackend,
+    stub: _StubVault,
 ) -> None:
     """All keys land under the configured prefix."""
     backend.upsert("acme/db", {"K": "v"})
@@ -96,7 +95,8 @@ def test_path_prefix_applied(
 
 
 def test_delete_removes(
-    backend: VaultSecretsBackend, stub: _StubVault,
+    backend: VaultSecretsBackend,
+    stub: _StubVault,
 ) -> None:
     backend.upsert("acme/db", {"K": "v"})
     backend.delete("acme/db")
@@ -104,7 +104,8 @@ def test_delete_removes(
 
 
 def test_list_returns_children(
-    backend: VaultSecretsBackend, stub: _StubVault,
+    backend: VaultSecretsBackend,
+    stub: _StubVault,
 ) -> None:
     backend.upsert("acme/api", {"K": "v"})
     backend.upsert("acme/worker", {"K": "v"})
@@ -117,11 +118,14 @@ def test_list_returns_children(
 
 def test_namespace_header_applied(stub: _StubVault) -> None:
     """Vault Enterprise namespace flows through headers."""
-    backend = VaultSecretsBackend(config=VaultConfig(
-        address="http://vault.test", token="t",
-        namespace="astro-ns",
-        http_client=stub,
-    ))
+    backend = VaultSecretsBackend(
+        config=VaultConfig(
+            address="http://vault.test",
+            token="t",
+            namespace="astro-ns",
+            http_client=stub,
+        )
+    )
     # Our stub doesn't capture headers explicitly, but we can
     # just verify the call goes through. Real client would
     # include X-Vault-Namespace.

@@ -4698,7 +4698,7 @@ type Mutation {
   runWorkflow(workflowId: ID!, inputs: JSON = null, orgId: ID = null): RunWorkflowResult!
 
   """Update a stage's fields on a writable definition (spec 40 §6)."""
-  updateWorkflowStage(stageGuid: ID!, kind: String = null, role: String = null, onFailure: String = null, timeoutSeconds: Int = null, agentDefinitionGuid: String = null, skillRefs: JSON = null, fanOutCount: Int = null): MutationResult!
+  updateWorkflowStage(stageGuid: ID!, kind: String = null, role: String = null, onFailure: String = null, timeoutSeconds: Int = null, agentDefinitionGuid: String = null, skillRefs: JSON = null, fanOutCount: Int = null, prompt: String = null, approvers: JSON = null): MutationResult!
 
   """Soft-delete a stage from a writable definition (spec 40 §6)."""
   deleteWorkflowStage(stageGuid: ID!): MutationResult!
@@ -6103,6 +6103,9 @@ type WorkflowStageType {
   guid: ID!
   order: Int!
   kind: String!
+  role: String!
+  prompt: String!
+  approvers: JSON!
   skillRefs: JSON!
   fanOutCount: Int
   onFailure: String!

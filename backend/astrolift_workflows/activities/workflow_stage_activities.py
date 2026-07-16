@@ -95,9 +95,7 @@ def _get_workflow_stages_sync(workflow_definition_slug: str) -> list[dict]:
         .first()
     )
     if definition is None:
-        raise RuntimeError(
-            f"WorkflowDefinition {workflow_definition_slug!r} not found, disabled, or deleted"
-        )
+        raise RuntimeError(f"WorkflowDefinition {workflow_definition_slug!r} not found, disabled, or deleted")
 
     stages: list[dict] = []
     for stage in definition.stages.filter(deleted_at__isnull=True).order_by("order"):
@@ -237,16 +235,11 @@ def _dispatch_agent_for_stage_sync(
     from astrolift_lifecycle.models import AgentRun
     from workflows.models import WorkflowStage, WorkflowStageExecution
 
-    stage = WorkflowStage.objects.select_related("agent_definition", "definition").get(
-        pk=int(stage_id)
-    )
-    execution = WorkflowStageExecution.objects.select_related("workflow_run").get(
-        pk=int(execution_id)
-    )
+    stage = WorkflowStage.objects.select_related("agent_definition", "definition").get(pk=int(stage_id))
+    execution = WorkflowStageExecution.objects.select_related("workflow_run").get(pk=int(execution_id))
     if stage.agent_definition is None:
         raise RuntimeError(
-            f"stage {stage_id} is kind={stage.kind} with no agent_definition — "
-            "cannot dispatch an agent"
+            f"stage {stage_id} is kind={stage.kind} with no agent_definition — " "cannot dispatch an agent"
         )
 
     run = execution.workflow_run
@@ -286,8 +279,7 @@ def _dispatch_agent_for_stage_sync(
         # push-mode callback) can still advance the run. We do NOT fail
         # the dispatch here because registration may be in flight.
         log.warning(
-            "dispatch_agent_for_stage: no ACTIVE dispatcher for org=%s; "
-            "AgentRun %s left PENDING",
+            "dispatch_agent_for_stage: no ACTIVE dispatcher for org=%s; " "AgentRun %s left PENDING",
             organization_id,
             agent_run.pk,
         )
@@ -324,20 +316,15 @@ def _dispatch_agent_for_stage_sync(
         agent_run.status = AgentRun.Status.FAILED
         agent_run.ended_at = timezone.now()
         agent_run.output = {"spawn_error": result.error}
-        agent_run.save(
-            update_fields=["status", "ended_at", "output", "updated_at", "version"]
-        )
+        agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
         raise RuntimeError(
-            f"spawn failed for stage {stage_id} via dispatcher "
-            f"{dispatcher.slug!r}: {result.error}"
+            f"spawn failed for stage {stage_id} via dispatcher " f"{dispatcher.slug!r}: {result.error}"
         )
 
     task.transition_to(AgentTask.Status.RUNNING)
     agent_run.status = AgentRun.Status.RUNNING
     agent_run.k8s_pod_name = result.external_id
-    agent_run.save(
-        update_fields=["status", "k8s_pod_name", "updated_at", "version"]
-    )
+    agent_run.save(update_fields=["status", "k8s_pod_name", "updated_at", "version"])
     return str(agent_run.pk)
 
 
@@ -397,9 +384,7 @@ def _poll_agent_run_status_sync(agent_run_id: str) -> str:
         agent_run.status = AgentRun.Status.SUCCEEDED
         agent_run.ended_at = timezone.now()
         agent_run.output = {"exit_code": status.exit_code or 0}
-        agent_run.save(
-            update_fields=["status", "ended_at", "output", "updated_at", "version"]
-        )
+        agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
     elif status.failed:
         if task.status == AgentTask.Status.RUNNING:
             task.transition_to(AgentTask.Status.FAILED)
@@ -409,9 +394,7 @@ def _poll_agent_run_status_sync(agent_run_id: str) -> str:
             "exit_code": status.exit_code,
             "error": status.error_message,
         }
-        agent_run.save(
-            update_fields=["status", "ended_at", "output", "updated_at", "version"]
-        )
+        agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
     # else: still running — no change.
     return agent_run.status
 
@@ -520,11 +503,7 @@ def _aggregate_fan_out_sync(
 
     run = WorkflowRun.objects.get(pk=_parent_run_pk(workflow_run_id))
     stage = WorkflowStage.objects.get(pk=int(stage_id))
-    sources = list(
-        WorkflowStageExecution.objects.filter(
-            pk__in=[int(s) for s in source_execution_ids]
-        )
-    )
+    sources = list(WorkflowStageExecution.objects.filter(pk__in=[int(s) for s in source_execution_ids]))
 
     merged: list[dict] = []
     ok_count = 0
@@ -626,9 +605,7 @@ async def create_stage_execution(
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    return await sync_to_async(_create_stage_execution_sync)(
-        workflow_run_id, stage_id, attempt_number
-    )
+    return await sync_to_async(_create_stage_execution_sync)(workflow_run_id, stage_id, attempt_number)
 
 
 @activity.defn(name="astrolift.workflow_stage.update_stage_execution")
@@ -642,9 +619,7 @@ async def update_stage_execution(
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    await sync_to_async(_update_stage_execution_sync)(
-        execution_id, status, output, error
-    )
+    await sync_to_async(_update_stage_execution_sync)(execution_id, status, output, error)
 
 
 @activity.defn(name="astrolift.workflow_stage.dispatch_agent_for_stage")
@@ -657,9 +632,7 @@ async def dispatch_agent_for_stage(
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    return await sync_to_async(_dispatch_agent_for_stage_sync)(
-        stage_id, execution_id, trigger_payload
-    )
+    return await sync_to_async(_dispatch_agent_for_stage_sync)(stage_id, execution_id, trigger_payload)
 
 
 @activity.defn(name="astrolift.workflow_stage.poll_agent_run_status")
@@ -682,9 +655,7 @@ async def record_human_gate_decision(
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    await sync_to_async(_record_human_gate_decision_sync)(
-        execution_id, decision, decided_by_user_id, note
-    )
+    await sync_to_async(_record_human_gate_decision_sync)(execution_id, decision, decided_by_user_id, note)
 
 
 @activity.defn(name="astrolift.workflow_stage.snapshot_checkpoint")
@@ -697,9 +668,7 @@ async def snapshot_checkpoint(
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    return await sync_to_async(_snapshot_checkpoint_sync)(
-        workflow_run_id, stage_id, previous_output
-    )
+    return await sync_to_async(_snapshot_checkpoint_sync)(workflow_run_id, stage_id, previous_output)
 
 
 @activity.defn(name="astrolift.workflow_stage.aggregate_fan_out")
@@ -712,9 +681,7 @@ async def aggregate_fan_out(
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    return await sync_to_async(_aggregate_fan_out_sync)(
-        workflow_run_id, stage_id, source_execution_ids
-    )
+    return await sync_to_async(_aggregate_fan_out_sync)(workflow_run_id, stage_id, source_execution_ids)
 
 
 @activity.defn(name="astrolift.workflow_stage.mark_workflow_run")
@@ -728,6 +695,4 @@ async def mark_workflow_run(
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    await sync_to_async(_mark_workflow_run_sync)(
-        workflow_run_id, status, result, failure
-    )
+    await sync_to_async(_mark_workflow_run_sync)(workflow_run_id, status, result, failure)

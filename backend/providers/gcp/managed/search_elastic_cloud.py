@@ -125,8 +125,7 @@ class GCPElasticCloudStubDriver:
         return {
             "type": "object",
             "description": (
-                "Stub: GCP search variant is not yet implemented. "
-                "Provisioning will raise NotImplementedError."
+                "Stub: GCP search variant is not yet implemented. Provisioning will raise NotImplementedError."
             ),
             "properties": {},
         }
@@ -135,15 +134,13 @@ class GCPElasticCloudStubDriver:
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={
-                "SEARCH_URL": (
-                    "Elastic Cloud HTTPS endpoint (not yet implemented)"
-                ),
-                "SEARCH_API_KEY": (
-                    "Secret Manager ref to the deployment API key "
-                    "(not yet implemented)"
-                ),
-                "SEARCH_INDEX_PREFIX": (
-                    "Index-name prefix for the app (not yet implemented)"
-                ),
+                "SEARCH_URL": ("Elastic Cloud HTTPS endpoint (not yet implemented)"),
+                "SEARCH_API_KEY": ("Secret Manager ref to the deployment API key (not yet implemented)"),
+                "SEARCH_INDEX_PREFIX": ("Index-name prefix for the app (not yet implemented)"),
             },
         )
+
+    @driver_op(cloud="gcp", driver="search_elastic_cloud_stub", heartbeat=False)
+    def editable_fields(self) -> list[str]:
+        # Stub — update() raises anyway; "*" matches the protocol default.
+        return ["*"]

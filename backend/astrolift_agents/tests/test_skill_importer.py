@@ -323,7 +323,8 @@ def _make_subdir_zipball(toml_bytes: bytes, *, top_dir: str = "owner-repo-abc123
 def test_import_uses_manifest_path_when_given(monkeypatch, org):
     _patch_get(monkeypatch, _FakeResponse(_make_subdir_zipball(_TOML)))
     result = import_skills_from_repo(
-        organization=org, repo_url="https://github.com/acme/cfg",
+        organization=org,
+        repo_url="https://github.com/acme/cfg",
         manifest_path="libs/emr/astrolift.toml",
     )
     # Pulled the subdir library (reviewer/builder), not the root one.

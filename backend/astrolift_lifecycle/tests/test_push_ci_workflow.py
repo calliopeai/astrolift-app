@@ -666,7 +666,9 @@ def test_gitlab_protected_branch_opens_mr(
             return "error", _http_error(404, b"", url)
         # POST create file on side branch
         if method == "POST" and "repository/files" in url:
-            return "response", json.dumps({"file_path": ".gitlab-ci.yml", "branch": "astrolift/ci-workflow-hello-app"}).encode()
+            return "response", json.dumps(
+                {"file_path": ".gitlab-ci.yml", "branch": "astrolift/ci-workflow-hello-app"}
+            ).encode()
         # GET branch head SHA (for put_file's follow-up SHA fetch)
         if method == "GET" and "repository/branches" in url:
             return "response", json.dumps({"commit": {"id": "sidesha999"}}).encode()
@@ -675,7 +677,9 @@ def test_gitlab_protected_branch_opens_mr(
             payload = json.loads(req.data.decode("utf-8"))
             assert payload["target_branch"] == "main"
             assert "astrolift/ci-workflow-" in payload["source_branch"]
-            return "response", json.dumps({"web_url": "https://gitlab.com/acme/api/-/merge_requests/7", "iid": 7}).encode()
+            return "response", json.dumps(
+                {"web_url": "https://gitlab.com/acme/api/-/merge_requests/7", "iid": 7}
+            ).encode()
         raise AssertionError(f"unexpected request {method} {url}")
 
     router.install(monkeypatch, handler, host="gitlab")

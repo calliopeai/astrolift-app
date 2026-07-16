@@ -30,7 +30,9 @@ def _info():
 def _scaffold(org_slug, project_slug, app_slug):
     org = Organization.objects.create(name=org_slug.title(), slug=org_slug)
     team = Team.objects.create(organization=org, name=f"{org_slug} team", slug=f"{org_slug}-team")
-    project = Project.objects.create(organization=org, team=team, name=project_slug.title(), slug=project_slug)
+    project = Project.objects.create(
+        organization=org, team=team, name=project_slug.title(), slug=project_slug
+    )
     app = RegisteredApp.objects.create(
         organization=org,
         team=team,
@@ -51,7 +53,11 @@ def test_agent_runs_filtered_by_project(permission_resolver):
     team_b = Team.objects.create(organization=org, name="beta team", slug="beta-team")
     project_b = Project.objects.create(organization=org, team=team_b, name="Beta", slug="beta")
     app_b = RegisteredApp.objects.create(
-        organization=org, team=team_b, project=project_b, name="App B", slug="app-b",
+        organization=org,
+        team=team_b,
+        project=project_b,
+        name="App B",
+        slug="app-b",
         provisioning_status="ready",
     )
     workload_b = Workload.objects.create(

@@ -52,7 +52,7 @@ class GCPManagedCertDriver(TlsDriver):
                 f"unknown strategy {strategy!r} for GCP managed cert",
             )
         cert_name = self._cert_name(domain=domain)
-        domains = [domain] + list(sans or [])
+        domains = [domain, *list(sans or [])]
         try:
             from google.cloud.compute_v1 import (
                 SslCertificate,

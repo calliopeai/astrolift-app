@@ -55,7 +55,7 @@ class RoutingResult:
             or macos labels).  The caller is responsible for the runner path.
     """
 
-    cluster: "TenantCluster | None"
+    cluster: TenantCluster | None
     reason: str
     runner_only: bool = False
 
@@ -80,7 +80,7 @@ def _is_runner_only(labels: frozenset[str]) -> bool:
     return LABEL_SELF_HOSTED in labels or LABEL_MACOS in labels
 
 
-def _cluster_matches(cluster: "TenantCluster", labels: frozenset[str]) -> bool:
+def _cluster_matches(cluster: TenantCluster, labels: frozenset[str]) -> bool:
     """Return True when the cluster's capabilities satisfy the label selector.
 
     Matching rules:
@@ -99,15 +99,17 @@ def _cluster_matches(cluster: "TenantCluster", labels: frozenset[str]) -> bool:
     required_os = labels & os_labels
     required_arch = labels & arch_labels
     # Remaining labels after stripping OS, arch, and routing meta-labels.
-    meta_labels = {
-        LABEL_SELF_HOSTED,
-        LABEL_ASTROLIFT,
-        LABEL_MACOS,
-        LABEL_DEFAULT,
-    } | os_labels | arch_labels
-    custom_required = labels - meta_labels - {
-        l for l in labels if l.startswith("cluster:")
-    }
+    meta_labels = (
+        {
+            LABEL_SELF_HOSTED,
+            LABEL_ASTROLIFT,
+            LABEL_MACOS,
+            LABEL_DEFAULT,
+        }
+        | os_labels
+        | arch_labels
+    )
+    custom_required = labels - meta_labels - {lbl for lbl in labels if lbl.startswith("cluster:")}
 
     if required_os and cluster.node_os not in required_os:
         return False
@@ -116,10 +118,7 @@ def _cluster_matches(cluster: "TenantCluster", labels: frozenset[str]) -> bool:
         return False
 
     # node_labels on the cluster model is a list of strings.
-    cluster_label_set = frozenset(
-        lbl.strip().lower()
-        for lbl in (cluster.node_labels or [])
-    )
+    cluster_label_set = frozenset(lbl.strip().lower() for lbl in (cluster.node_labels or []))
     if not custom_required.issubset(cluster_label_set):
         return False
 
@@ -133,8 +132,8 @@ def _cluster_matches(cluster: "TenantCluster", labels: frozenset[str]) -> bool:
 
 def select_cluster(
     runs_on: str | list[str],
-    org: "Organization",
-) -> "TenantCluster | None":
+    org: Organization,
+) -> TenantCluster | None:
     """Select a TenantCluster for the job's ``runs_on`` selector.
 
     Matches against active, managed clusters belonging to ``org``.
@@ -151,7 +150,7 @@ def select_cluster(
 
 def route(
     runs_on: str | list[str],
-    org: "Organization",
+    org: Organization,
 ) -> RoutingResult:
     """Full routing decision with reason string.
 
@@ -199,13 +198,10 @@ def route(
         )
 
     # --- "cluster:<name>" → lookup by name or slug ---
-    cluster_directives = [l for l in labels if l.startswith("cluster:")]
+    cluster_directives = [lbl for lbl in labels if lbl.startswith("cluster:")]
     if cluster_directives:
-        target_name = cluster_directives[0][len("cluster:"):]
-        cluster = (
-            qs.filter(slug=target_name).first()
-            or qs.filter(name__iexact=target_name).first()
-        )
+        target_name = cluster_directives[0][len("cluster:") :]
+        cluster = qs.filter(slug=target_name).first() or qs.filter(name__iexact=target_name).first()
         if cluster is None:
             return RoutingResult(
                 cluster=None,
@@ -221,16 +217,12 @@ def route(
         if _cluster_matches(cluster, labels):
             return RoutingResult(
                 cluster=cluster,
-                reason=(
-                    f"Cluster '{cluster.slug}' satisfies label selector "
-                    f"{sorted(labels)!r}."
-                ),
+                reason=(f"Cluster '{cluster.slug}' satisfies label selector " f"{sorted(labels)!r}."),
             )
 
     return RoutingResult(
         cluster=None,
         reason=(
-            f"No active managed cluster satisfies label selector "
-            f"{sorted(labels)!r} for org '{org.slug}'."
+            f"No active managed cluster satisfies label selector " f"{sorted(labels)!r} for org '{org.slug}'."
         ),
     )

@@ -65,9 +65,7 @@ class ManagedDomainAdmin(_AllObjectsAdmin):
         if db_field.name == "dns_driver":
             kwargs["widget"] = forms.Select(choices=self.DNS_DRIVER_CHOICES)
         if db_field.name == "default_for":
-            kwargs["widget"] = forms.Select(
-                choices=ManagedDomain.DefaultFor.choices
-            )
+            kwargs["widget"] = forms.Select(choices=ManagedDomain.DefaultFor.choices)
         return super().formfield_for_dbfield(db_field, request, **kwargs)
 
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
 from core.cluster_observability import managed_config_for
 
 from aws.managed._networking import ensure_db_networking
@@ -72,6 +73,9 @@ def test_cdn_config_defaults_and_overrides():
 
 def test_managed_service_kind_has_cdn():
     # The cdn ManagedService row shape relies on the enum addition (#1010).
+    # Backend-tree contract — runs in the backend test job (which has
+    # Django); the standalone providers job skips it.
+    pytest.importorskip("django")
     from astrolift_services.models import ManagedService
 
     assert ManagedService.Kind.CDN == "cdn"

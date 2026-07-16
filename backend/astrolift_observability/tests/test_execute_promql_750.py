@@ -34,7 +34,9 @@ def _info():
     return SimpleNamespace(context=SimpleNamespace(user=None, request=SimpleNamespace(user=None)))
 
 
-def _scaffold(*, prometheus_endpoint: str | None = "http://prom.test:9090") -> tuple[Organization, RegisteredApp]:
+def _scaffold(
+    *, prometheus_endpoint: str | None = "http://prom.test:9090"
+) -> tuple[Organization, RegisteredApp]:
     org = Organization.objects.create(name="PromOrg", slug="prom-exec-org")
     team = Team.objects.create(organization=org, name="Eng", slug="prom-exec-eng")
     project = Project.objects.create(organization=org, team=team, name="Demo", slug="prom-exec-demo")
@@ -87,7 +89,7 @@ _STEP = 60
 def _fake_row(labels: dict, values: list) -> MagicMock:
     row = MagicMock()
     row.metric_labels = labels
-    row.values = [(ts, v) for ts, v in values]
+    row.values = [tuple(pair) for pair in values]
     return row
 
 
@@ -101,7 +103,7 @@ def test_execute_promql_requires_app_read(permission_resolver):
             GoldenSignalsQuery().astrolift_execute_promql(
                 _info(),
                 app_slug=app.slug,
-                query='up',
+                query="up",
                 start_unix=_START,
                 end_unix=_END,
                 step_seconds=_STEP,
@@ -197,9 +199,12 @@ def test_execute_promql_no_endpoint_returns_error(permission_resolver):
 def test_execute_promql_prometheus_error_degrades(permission_resolver):
     org, app = _scaffold()
     permission_resolver.grant(Permission.APP_READ)
-    with _ctx(org), patch(
-        "astrolift_observability.schema.queries.prometheus_client.query_range",
-        side_effect=PrometheusQueryError("invalid expression"),
+    with (
+        _ctx(org),
+        patch(
+            "astrolift_observability.schema.queries.prometheus_client.query_range",
+            side_effect=PrometheusQueryError("invalid expression"),
+        ),
     ):
         result = GoldenSignalsQuery().astrolift_execute_promql(
             _info(),
@@ -224,9 +229,12 @@ def test_execute_promql_returns_series(permission_resolver):
         _fake_row({"code": "200"}, [(_START + 60, 1.5), (_START + 120, 2.0)]),
         _fake_row({"code": "500"}, [(_START + 60, 0.1), (_START + 120, 0.2)]),
     ]
-    with _ctx(org), patch(
-        "astrolift_observability.schema.queries.prometheus_client.query_range",
-        return_value=rows,
+    with (
+        _ctx(org),
+        patch(
+            "astrolift_observability.schema.queries.prometheus_client.query_range",
+            return_value=rows,
+        ),
     ):
         result = GoldenSignalsQuery().astrolift_execute_promql(
             _info(),
@@ -252,14 +260,17 @@ def test_execute_promql_empty_labels_on_aggregate(permission_resolver):
     org, app = _scaffold()
     permission_resolver.grant(Permission.APP_READ)
     rows = [_fake_row({}, [(_START + 60, 42.0)])]
-    with _ctx(org), patch(
-        "astrolift_observability.schema.queries.prometheus_client.query_range",
-        return_value=rows,
+    with (
+        _ctx(org),
+        patch(
+            "astrolift_observability.schema.queries.prometheus_client.query_range",
+            return_value=rows,
+        ),
     ):
         result = GoldenSignalsQuery().astrolift_execute_promql(
             _info(),
             app_slug=app.slug,
-            query='sum(up)',
+            query="sum(up)",
             start_unix=_START,
             end_unix=_END,
             step_seconds=_STEP,
@@ -276,14 +287,17 @@ def test_execute_promql_no_rows_returns_ok_empty(permission_resolver):
     rather than the error state."""
     org, app = _scaffold()
     permission_resolver.grant(Permission.APP_READ)
-    with _ctx(org), patch(
-        "astrolift_observability.schema.queries.prometheus_client.query_range",
-        return_value=[],
+    with (
+        _ctx(org),
+        patch(
+            "astrolift_observability.schema.queries.prometheus_client.query_range",
+            return_value=[],
+        ),
     ):
         result = GoldenSignalsQuery().astrolift_execute_promql(
             _info(),
             app_slug=app.slug,
-            query='nonexistent_metric',
+            query="nonexistent_metric",
             start_unix=_START,
             end_unix=_END,
             step_seconds=_STEP,

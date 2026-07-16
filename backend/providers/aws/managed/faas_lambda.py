@@ -225,7 +225,10 @@ class LambdaDriver(ManagedServiceDriver):
             pass
         except Exception as exc:
             return DeprovisionResult(
-                ok=False, handle=spec.handle, message=f"delete function-url: {exc}", errors=[str(exc)],
+                ok=False,
+                handle=spec.handle,
+                message=f"delete function-url: {exc}",
+                errors=[str(exc)],
             )
 
         try:
@@ -234,14 +237,20 @@ class LambdaDriver(ManagedServiceDriver):
             pass
         except Exception as exc:
             return DeprovisionResult(
-                ok=False, handle=spec.handle, message=f"delete_function: {exc}", errors=[str(exc)],
+                ok=False,
+                handle=spec.handle,
+                message=f"delete_function: {exc}",
+                errors=[str(exc)],
             )
 
         try:
             self._delete_exec_role(self._role_name_for(function_name))
         except Exception as exc:
             return DeprovisionResult(
-                ok=False, handle=spec.handle, message=f"delete exec-role: {exc}", errors=[str(exc)],
+                ok=False,
+                handle=spec.handle,
+                message=f"delete exec-role: {exc}",
+                errors=[str(exc)],
             )
 
         return DeprovisionResult(ok=True, handle=spec.handle, message=f"function {function_name} deleted")
@@ -265,14 +274,20 @@ class LambdaDriver(ManagedServiceDriver):
         last = resp.get("LastUpdateStatus", "")
         if state == "Failed" or last == "Failed":
             return ServiceStatus(
-                handle=handle.handle, state="error", message=f"function {function_name} in {state}/{last}",
+                handle=handle.handle,
+                state="error",
+                message=f"function {function_name} in {state}/{last}",
             )
         if state == "Active" and last in ("Successful", ""):
             return ServiceStatus(
-                handle=handle.handle, state="available", message=f"function {function_name} active",
+                handle=handle.handle,
+                state="available",
+                message=f"function {function_name} active",
             )
         return ServiceStatus(
-            handle=handle.handle, state="provisioning", message=f"function {function_name} state {state}/{last}",
+            handle=handle.handle,
+            state="provisioning",
+            message=f"function {function_name} state {state}/{last}",
         )
 
     @driver_op(cloud="aws", driver="faas_lambda")

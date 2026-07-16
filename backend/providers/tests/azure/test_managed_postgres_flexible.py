@@ -38,7 +38,7 @@ from azure.managed.postgres_flexible import (
 # ---- fakes ------------------------------------------------------
 
 
-class _NotFound(Exception):  # noqa: N818  -- mimics SDK class name
+class _NotFound(Exception):
     """Stand-in for azure.core.exceptions.ResourceNotFoundError; the
     driver sniffs error type via ``__class__.__name__`` so we just
     have to make the name match."""
@@ -511,7 +511,7 @@ def test_deprovision_respects_delegated_subnet_lock(
     mgmt: FakeMgmtClient,
 ) -> None:
     """VNet-injected servers refuse delete unless force_destroy=True."""
-    subnet_id = "/subscriptions/sub-1/resourceGroups/rg/providers/" "Microsoft.Network/virtualNetworks/v/subnets/s"
+    subnet_id = "/subscriptions/sub-1/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/v/subnets/s"
     provisioned = driver.provision(
         _spec(
             config={
@@ -530,7 +530,7 @@ def test_deprovision_force_destroy_bypasses_subnet_lock(
     driver: AzurePostgresFlexibleDriver,
     mgmt: FakeMgmtClient,
 ) -> None:
-    subnet_id = "/subscriptions/sub-1/resourceGroups/rg/providers/" "Microsoft.Network/virtualNetworks/v/subnets/s"
+    subnet_id = "/subscriptions/sub-1/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/v/subnets/s"
     provisioned = driver.provision(
         _spec(
             config={

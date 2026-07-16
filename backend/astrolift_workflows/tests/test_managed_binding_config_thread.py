@@ -62,7 +62,9 @@ def _patched(monkeypatch: pytest.MonkeyPatch):
     from core import cluster_observability
 
     monkeypatch.setattr(
-        cluster_observability, "managed_config_for", lambda *a, **k: object(),
+        cluster_observability,
+        "managed_config_for",
+        lambda *a, **k: object(),
     )
     _ConfigAwareDriver.last_config = None
     _ConfigBlindDriver.called = False

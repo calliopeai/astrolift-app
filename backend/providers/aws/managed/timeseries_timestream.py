@@ -496,10 +496,7 @@ class TimestreamDriver(ManagedServiceDriver):
             return ServiceStatus(
                 handle=handle.handle,
                 state="provisioning",
-                message=(
-                    f"timestream database {database_name} exists but table "
-                    f"{table_name} not yet visible"
-                ),
+                message=(f"timestream database {database_name} exists but table {table_name} not yet visible"),
             )
         ts_state = existing_table.get("TableStatus", "UNKNOWN")
         return ServiceStatus(
@@ -778,10 +775,7 @@ class TimestreamDriver(ManagedServiceDriver):
         return f"arn:aws:timestream:{self._config.region}:*:database/{database_name}"
 
     def _table_arn(self, *, database_name: str, table_name: str) -> str:
-        return (
-            f"arn:aws:timestream:{self._config.region}:*:database/"
-            f"{database_name}/table/{table_name}"
-        )
+        return f"arn:aws:timestream:{self._config.region}:*:database/{database_name}/table/{table_name}"
 
     def _endpoint_url(self, client: Any) -> str:
         # Both clients expose ``describe_endpoints``; we pick the first

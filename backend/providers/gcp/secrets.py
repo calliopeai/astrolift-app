@@ -32,15 +32,14 @@ class GCPSecretsBackend(SecretsBackend):
 
             self._client = secretmanager.SecretManagerServiceClient()
 
+    @driver_op(cloud="gcp", driver="secrets")
     def ensure_initialized(self) -> dict | None:
-        raise NotImplementedError(
-            "GCPSecretsBackend does not require out-of-band initialisation"
-        )
+        raise NotImplementedError("GCPSecretsBackend does not require out-of-band initialisation")
 
     @driver_op(cloud="gcp", driver="secrets", audit=True, sensitive_kind="secret.read")
     def get(self, path: str) -> dict[str, str] | None:
         secret_name = self._secret_name(path)
-        version_path = f"projects/{self._config.project_id}" f"/secrets/{secret_name}/versions/latest"
+        version_path = f"projects/{self._config.project_id}/secrets/{secret_name}/versions/latest"
         try:
             response = self._client.access_secret_version(
                 name=version_path,
@@ -81,7 +80,7 @@ class GCPSecretsBackend(SecretsBackend):
 
     @driver_op(cloud="gcp", driver="secrets", audit=True, sensitive_kind="secret.delete")
     def delete(self, path: str) -> None:
-        secret_path = f"projects/{self._config.project_id}" f"/secrets/{self._secret_name(path)}"
+        secret_path = f"projects/{self._config.project_id}/secrets/{self._secret_name(path)}"
         try:
             self._client.delete_secret(name=secret_path)
         except Exception as exc:

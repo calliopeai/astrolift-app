@@ -117,7 +117,7 @@ class MySQLOperatorDriver(ManagedServiceDriver):
             return ProvisionResult(
                 ok=True,
                 handle=handle,
-                message=("MySQL CRD rendered (no cluster_driver injected; " "manifest dispatched out of band)"),
+                message=("MySQL CRD rendered (no cluster_driver injected; manifest dispatched out of band)"),
             )
         result = self._config.cluster_driver.apply_manifests(
             spec.tenant_cluster_id,
@@ -142,7 +142,7 @@ class MySQLOperatorDriver(ManagedServiceDriver):
         return UpdateResult(
             ok=True,
             handle=spec.handle,
-            message=("MySQL operator reconciles size/storage updates " "via re-applied CRD spec"),
+            message=("MySQL operator reconciles size/storage updates via re-applied CRD spec"),
         )
 
     @driver_op(
@@ -248,9 +248,7 @@ class MySQLOperatorDriver(ManagedServiceDriver):
             ok=False,
             handle="",
             message=(
-                "MySQL restore via operator's restore CRD; "
-                "wire the operator-specific restore workflow at "
-                "deploy time"
+                "MySQL restore via operator's restore CRD; wire the operator-specific restore workflow at deploy time"
             ),
             errors=["not_implemented"],
         )

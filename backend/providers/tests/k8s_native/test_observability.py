@@ -14,12 +14,12 @@ its constructor. These tests exercise:
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
+
 from _sdk.cluster import (
     ClusterAuth,
     ContainerStatusInfo,
@@ -35,6 +35,9 @@ from k8s_native.observability import (
     _to_container_statuses,
     build_api_client,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 # ---- Fakes --------------------------------------------------------
 

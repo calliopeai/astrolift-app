@@ -146,18 +146,15 @@ class GCPEmailStubDriver:
         return BindingSchema(
             env_vars={
                 "EMAIL_PROVIDER": (
-                    "Third-party provider name (sendgrid / mailgun / "
-                    "postmark / resend) -- not yet implemented"
+                    "Third-party provider name (sendgrid / mailgun / postmark / resend) -- not yet implemented"
                 ),
-                "EMAIL_API_KEY": (
-                    "Secret Manager ref to the provider API key "
-                    "(not yet implemented)"
-                ),
-                "EMAIL_FROM_ADDRESS": (
-                    "Default From: address (not yet implemented)"
-                ),
-                "EMAIL_REGION": (
-                    "Provider region (not yet implemented)"
-                ),
+                "EMAIL_API_KEY": ("Secret Manager ref to the provider API key (not yet implemented)"),
+                "EMAIL_FROM_ADDRESS": ("Default From: address (not yet implemented)"),
+                "EMAIL_REGION": ("Provider region (not yet implemented)"),
             },
         )
+
+    @driver_op(cloud="gcp", driver="email_thirdparty_stub", heartbeat=False)
+    def editable_fields(self) -> list[str]:
+        # Stub — update() raises anyway; "*" matches the protocol default.
+        return ["*"]

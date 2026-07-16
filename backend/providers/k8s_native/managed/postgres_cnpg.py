@@ -141,7 +141,7 @@ class CNPGPostgresDriver(ManagedServiceDriver):
         return ProvisionResult(
             ok=True,
             handle=handle,
-            message=(f"CNPG Cluster {cluster_name} applied; CNPG operator " "reconciles asynchronously"),
+            message=(f"CNPG Cluster {cluster_name} applied; CNPG operator reconciles asynchronously"),
         )
 
     @driver_op(cloud="k8s_native", driver="postgres_cnpg")
@@ -152,7 +152,7 @@ class CNPGPostgresDriver(ManagedServiceDriver):
             ok=True,
             handle=spec.handle,
             message=(
-                "to update CNPG cluster size, call provision again " "with the new size — CNPG handles rolling resize"
+                "to update CNPG cluster size, call provision again with the new size — CNPG handles rolling resize"
             ),
         )
 
@@ -219,7 +219,7 @@ class CNPGPostgresDriver(ManagedServiceDriver):
         return DeprovisionResult(
             ok=True,
             handle=spec.handle,
-            message=(f"CNPG Cluster {parsed.name} deleted " f"({'with data' if delete_data else 'PVCs retained'})"),
+            message=(f"CNPG Cluster {parsed.name} deleted ({'with data' if delete_data else 'PVCs retained'})"),
         )
 
     # ---- read-only -------------------------------------------------
@@ -229,7 +229,7 @@ class CNPGPostgresDriver(ManagedServiceDriver):
         return ServiceStatus(
             handle=handle.handle,
             state="provisioning",
-            message=("live status requires querying the Cluster CRD's " "status block via cluster_driver"),
+            message=("live status requires querying the Cluster CRD's status block via cluster_driver"),
         )
 
     @driver_op(cloud="k8s_native", driver="postgres_cnpg")
@@ -260,9 +260,7 @@ class CNPGPostgresDriver(ManagedServiceDriver):
                 ),
             },
             iam_grants=[],
-            notes=(
-                "CNPG generates the app Secret with rotation. The " "platform mounts via envFrom or projected volume."
-            ),
+            notes=("CNPG generates the app Secret with rotation. The platform mounts via envFrom or projected volume."),
         )
 
     @driver_op(cloud="k8s_native", driver="postgres_cnpg")
@@ -311,7 +309,7 @@ class CNPGPostgresDriver(ManagedServiceDriver):
                 "extensions": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": ("Postgres extensions to enable (pg_trgm, " "vector, postgis, etc.)."),
+                    "description": ("Postgres extensions to enable (pg_trgm, vector, postgis, etc.)."),
                 },
                 "storage_size": {
                     "type": "string",

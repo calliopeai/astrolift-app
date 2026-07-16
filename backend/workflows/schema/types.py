@@ -21,6 +21,9 @@ class WorkflowStageType:
     guid: strawberry.ID
     order: int
     kind: str
+    role: str
+    prompt: str
+    approvers: strawberry.scalars.JSON
     skill_refs: strawberry.scalars.JSON
     fan_out_count: Optional[int]
     on_failure: str

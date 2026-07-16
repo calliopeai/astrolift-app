@@ -20,8 +20,8 @@ class Step(BaseCoreModel):
     )
     position = models.PositiveIntegerField()
     step_id = models.CharField(max_length=200, blank=True, default="")
-    uses = models.CharField(max_length=512, null=True, blank=True)
-    run = models.TextField(null=True, blank=True)
+    uses = models.CharField(max_length=512, null=True, blank=True)  # noqa: DJ001 — null = "no uses clause"
+    run = models.TextField(null=True, blank=True)  # noqa: DJ001 — null = "no run clause"
     env = models.JSONField(default=dict, blank=True)
     with_params = models.JSONField(default=dict, blank=True)
 

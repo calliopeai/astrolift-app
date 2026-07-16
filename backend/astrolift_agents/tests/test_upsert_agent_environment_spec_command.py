@@ -32,13 +32,22 @@ def org():
 def test_creates_spec_with_config_and_refs(org):
     call_command(
         "upsert_agent_environment_spec",
-        "--org", "spec-cmd-org", "--slug", "emr-bug-triage",
-        "--agent-type", "claude",
-        "--image-tag", "acct.dkr.ecr.us-west-2.amazonaws.com/astrolift/agent-claude:latest",
-        "--config-repo", "steadymd/smd-agents",
-        "--manifest-path", "agents/emr-bug-triage/astrolift.toml",
-        "--env", "EMR_SERVICE_BASE_URL=https://emr.prd.smdinfra.net",
-        "--secret", "EMR_AGENT_TOKEN=smd-emr-agent-token",
+        "--org",
+        "spec-cmd-org",
+        "--slug",
+        "emr-bug-triage",
+        "--agent-type",
+        "claude",
+        "--image-tag",
+        "acct.dkr.ecr.us-west-2.amazonaws.com/astrolift/agent-claude:latest",
+        "--config-repo",
+        "steadymd/smd-agents",
+        "--manifest-path",
+        "agents/emr-bug-triage/astrolift.toml",
+        "--env",
+        "EMR_SERVICE_BASE_URL=https://emr.prd.smdinfra.net",
+        "--secret",
+        "EMR_AGENT_TOKEN=smd-emr-agent-token",
     )
     spec = AgentEnvironmentSpec.objects.get(organization=org, slug="emr-bug-triage")
     assert spec.agent_type == "claude"
@@ -50,8 +59,16 @@ def test_creates_spec_with_config_and_refs(org):
 
 
 def test_idempotent_full_replace(org):
-    args = ["--org", "spec-cmd-org", "--slug", "a", "--agent-type", "claude",
-            "--config-repo", "steadymd/smd-agents"]
+    args = [
+        "--org",
+        "spec-cmd-org",
+        "--slug",
+        "a",
+        "--agent-type",
+        "claude",
+        "--config-repo",
+        "steadymd/smd-agents",
+    ]
     call_command("upsert_agent_environment_spec", *args)
     call_command("upsert_agent_environment_spec", *args)
     # One row, not two — matched on (org, slug).
@@ -60,17 +77,28 @@ def test_idempotent_full_replace(org):
 
 def test_unknown_org_errors():
     with pytest.raises(CommandError, match="organization not found"):
-        call_command("upsert_agent_environment_spec", "--org", "nope",
-                     "--slug", "a", "--agent-type", "claude")
+        call_command(
+            "upsert_agent_environment_spec", "--org", "nope", "--slug", "a", "--agent-type", "claude"
+        )
 
 
 def test_bad_env_pair_errors(org):
     with pytest.raises(CommandError, match="KEY=VALUE"):
-        call_command("upsert_agent_environment_spec", "--org", "spec-cmd-org",
-                     "--slug", "a", "--agent-type", "claude", "--env", "NOPE")
+        call_command(
+            "upsert_agent_environment_spec",
+            "--org",
+            "spec-cmd-org",
+            "--slug",
+            "a",
+            "--agent-type",
+            "claude",
+            "--env",
+            "NOPE",
+        )
 
 
 def test_invalid_agent_type_rejected(org):
     with pytest.raises((CommandError, SystemExit)):
-        call_command("upsert_agent_environment_spec", "--org", "spec-cmd-org",
-                     "--slug", "a", "--agent-type", "gpt5")
+        call_command(
+            "upsert_agent_environment_spec", "--org", "spec-cmd-org", "--slug", "a", "--agent-type", "gpt5"
+        )

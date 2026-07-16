@@ -401,10 +401,13 @@ def test_select_manifest_member_rootmost_and_path():
     # No path -> root-most (historical behaviour).
     assert brief_assembler.select_manifest_member(names) == "owner-repo-sha/astrolift.toml"
     # File path and directory form both resolve the subfolder manifest.
-    assert (brief_assembler.select_manifest_member(names, "agents/a/astrolift.toml")
-            == "owner-repo-sha/agents/a/astrolift.toml")
-    assert (brief_assembler.select_manifest_member(names, "agents/a")
-            == "owner-repo-sha/agents/a/astrolift.toml")
+    assert (
+        brief_assembler.select_manifest_member(names, "agents/a/astrolift.toml")
+        == "owner-repo-sha/agents/a/astrolift.toml"
+    )
+    assert (
+        brief_assembler.select_manifest_member(names, "agents/a") == "owner-repo-sha/agents/a/astrolift.toml"
+    )
     assert brief_assembler.select_manifest_member(names, "agents/missing") is None
     assert brief_assembler.select_manifest_member([]) is None
 
@@ -412,7 +415,8 @@ def test_select_manifest_member_rootmost_and_path():
 def test_manifest_path_selects_subfolder_agent(monkeypatch, org):
     _patch_get(monkeypatch, _FakeResponse(_make_monorepo_zip()))
     brief = brief_assembler.assemble_agent_brief(
-        organization=org, config_repo="owner/repo",
+        organization=org,
+        config_repo="owner/repo",
         manifest_path="agents/agent-a/astrolift.toml",
     )
     assert brief.manifest_snapshot["skill_slug"] == "agent_a"
@@ -422,7 +426,9 @@ def test_manifest_path_selects_subfolder_agent(monkeypatch, org):
 def test_manifest_path_directory_form(monkeypatch, org):
     _patch_get(monkeypatch, _FakeResponse(_make_monorepo_zip()))
     brief = brief_assembler.assemble_agent_brief(
-        organization=org, config_repo="owner/repo", manifest_path="agents/agent-b",
+        organization=org,
+        config_repo="owner/repo",
+        manifest_path="agents/agent-b",
     )
     assert brief.manifest_snapshot["skill_slug"] == "agent_b"
 
@@ -430,12 +436,16 @@ def test_manifest_path_directory_form(monkeypatch, org):
 def test_different_manifest_paths_are_distinct_briefs(monkeypatch, org):
     _patch_get(monkeypatch, _FakeResponse(_make_monorepo_zip()))
     a = brief_assembler.assemble_agent_brief(
-        organization=org, config_repo="owner/repo",
-        manifest_path="agents/agent-a/astrolift.toml", context={"task": "t"},
+        organization=org,
+        config_repo="owner/repo",
+        manifest_path="agents/agent-a/astrolift.toml",
+        context={"task": "t"},
     )
     b = brief_assembler.assemble_agent_brief(
-        organization=org, config_repo="owner/repo",
-        manifest_path="agents/agent-b/astrolift.toml", context={"task": "t"},
+        organization=org,
+        config_repo="owner/repo",
+        manifest_path="agents/agent-b/astrolift.toml",
+        context={"task": "t"},
     )
     # Same repo+branch+context, different manifest_path -> distinct briefs.
     assert a.pk != b.pk
@@ -451,18 +461,25 @@ def test_empty_manifest_path_hash_matches_pre_change_formula(org):
     expected = hashlib.sha256(
         json.dumps(
             {"org": str(org.guid), "zip_sha256": "abc", "context": {"task": "t"}},
-            sort_keys=True, separators=(",", ":"),
+            sort_keys=True,
+            separators=(",", ":"),
         ).encode("utf-8")
     ).hexdigest()
-    assert brief_assembler._content_hash(
-        organization=org, zip_digest="abc", context={"task": "t"},
-    ) == expected
+    assert (
+        brief_assembler._content_hash(
+            organization=org,
+            zip_digest="abc",
+            context={"task": "t"},
+        )
+        == expected
+    )
 
 
 def test_missing_manifest_path_raises(monkeypatch, org):
     _patch_get(monkeypatch, _FakeResponse(_make_monorepo_zip()))
     with pytest.raises(brief_assembler.ManifestNotFoundError):
         brief_assembler.assemble_agent_brief(
-            organization=org, config_repo="owner/repo",
+            organization=org,
+            config_repo="owner/repo",
             manifest_path="agents/does-not-exist/astrolift.toml",
         )

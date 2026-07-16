@@ -252,9 +252,7 @@ def test_workload_gql_returns_volumes(permission_resolver):
     permission_resolver.grant(Permission.APP_READ)
 
     with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
-        result = RegistryQuery().astrolift_workload(
-            info=_info(user), app_slug=app.slug, slug="web"
-        )
+        result = RegistryQuery().astrolift_workload(info=_info(user), app_slug=app.slug, slug="web")
 
     assert result is not None
     assert len(result.volumes) == 1
@@ -267,7 +265,11 @@ def test_container_gql_has_probe_fields(permission_resolver):
     permission_resolver.grant(Permission.APP_READ)
 
     w = Workload.objects.get(registered_app=app, slug="web")
-    probe_data = {"initialDelaySeconds": 5, "periodSeconds": 10, "httpGet": {"path": "/healthz", "port": 8080}}
+    probe_data = {
+        "initialDelaySeconds": 5,
+        "periodSeconds": 10,
+        "httpGet": {"path": "/healthz", "port": 8080},
+    }
     c = Container.objects.get(workload=w)
     c.startup_probe = probe_data
     c.readiness_probe = {"initialDelaySeconds": 3, "periodSeconds": 5}

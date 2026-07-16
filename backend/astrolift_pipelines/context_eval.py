@@ -67,7 +67,7 @@ class PipelineContext:
         self.job_outputs: dict[str, dict[str, str]] = job_outputs or {}
 
     @classmethod
-    def from_pipeline_run(cls, run) -> "PipelineContext":
+    def from_pipeline_run(cls, run) -> PipelineContext:
         """Build a PipelineContext from a PipelineRun model instance."""
         ref = run.trigger_ref or ""
         branch = ""
@@ -147,9 +147,7 @@ def _resolve_variable(var_path: str, ctx: PipelineContext) -> str:
     if namespace == "jobs":
         # jobs.<id>.outputs.<key>
         if len(parts) < 4 or parts[2] != "outputs":
-            raise ContextEvalError(
-                f"jobs variable must be jobs.<id>.outputs.<key>: ${{{var_path}}}"
-            )
+            raise ContextEvalError(f"jobs variable must be jobs.<id>.outputs.<key>: ${{{var_path}}}")
         job_id = parts[1]
         output_key = ".".join(parts[3:])
         outputs = ctx.job_outputs.get(job_id)
@@ -158,9 +156,7 @@ def _resolve_variable(var_path: str, ctx: PipelineContext) -> str:
                 f"Job '{job_id}' has no outputs (check `needs` declaration): ${{{var_path}}}"
             )
         if output_key not in outputs:
-            raise ContextEvalError(
-                f"Job '{job_id}' has no output '{output_key}': ${{{var_path}}}"
-            )
+            raise ContextEvalError(f"Job '{job_id}' has no output '{output_key}': ${{{var_path}}}")
         return outputs[output_key]
 
     raise ContextEvalError(f"Unknown variable namespace '{namespace}': ${{{var_path}}}")
@@ -206,14 +202,11 @@ def _eval_value(value: Any, ctx: PipelineContext) -> Any:
 
 def is_secret_placeholder(value: str) -> bool:
     """Return True if ``value`` is a secret placeholder string."""
-    return (
-        value.startswith(_SECRET_PLACEHOLDER_PREFIX)
-        and value.endswith(_SECRET_PLACEHOLDER_SUFFIX)
-    )
+    return value.startswith(_SECRET_PLACEHOLDER_PREFIX) and value.endswith(_SECRET_PLACEHOLDER_SUFFIX)
 
 
 def extract_secret_name(placeholder: str) -> str | None:
     """Extract the secret name from a placeholder string, or None."""
     if not is_secret_placeholder(placeholder):
         return None
-    return placeholder[len(_SECRET_PLACEHOLDER_PREFIX):-len(_SECRET_PLACEHOLDER_SUFFIX)]
+    return placeholder[len(_SECRET_PLACEHOLDER_PREFIX) : -len(_SECRET_PLACEHOLDER_SUFFIX)]

@@ -10,12 +10,14 @@ operation / duration / status, fetch a single trace by id.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from _sdk._telemetry import driver_op
 from _sdk.trace import SpanRef, TraceDriver, TraceSummary
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 
 @dataclass(frozen=True)
@@ -92,7 +94,7 @@ class TempoTraceDriver(TraceDriver):
 
     @driver_op(driver="tempo_traces")
     def get_trace(self, trace_id: str) -> list[SpanRef]:
-        url = f"{self._config.base_url.rstrip('/')}" f"/api/traces/{trace_id}"
+        url = f"{self._config.base_url.rstrip('/')}/api/traces/{trace_id}"
         response = self._http.get(url)
         body = response.json() if hasattr(response, "json") else response
         spans = body.get("spans", []) or self._extract_spans(body)

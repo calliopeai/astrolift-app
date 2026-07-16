@@ -30,7 +30,7 @@ class TomlFetchError(Exception):
     """Raised when the pipeline TOML cannot be fetched or parsed."""
 
 
-def fetch_pipeline_toml(pipeline_run: "PipelineRun") -> str:
+def fetch_pipeline_toml(pipeline_run: PipelineRun) -> str:
     """Fetch the pipeline TOML from the source repo at the trigger ref.
 
     Returns the raw TOML string. Raises TomlFetchError on failure.
@@ -49,7 +49,7 @@ def fetch_pipeline_toml(pipeline_run: "PipelineRun") -> str:
         return _fetch_generic_git(pipeline, ref, toml_path)
 
 
-def _fetch_from_github(pipeline: "Pipeline", ref: str, path: str) -> str:
+def _fetch_from_github(pipeline: Pipeline, ref: str, path: str) -> str:
     """Fetch TOML from a GitHub repository using the org's source connection."""
     import base64
     import json
@@ -68,6 +68,7 @@ def _fetch_from_github(pipeline: "Pipeline", ref: str, path: str) -> str:
     owner_repo = _extract_owner_repo_github(pipeline.repo_url)
 
     import urllib.request
+
     api_url = f"https://api.github.com/repos/{owner_repo}/contents/{path}?ref={ref}"
     req = urllib.request.Request(
         api_url,
@@ -95,9 +96,8 @@ def _fetch_from_github(pipeline: "Pipeline", ref: str, path: str) -> str:
         raise TomlFetchError(f"Failed to fetch TOML from GitHub: {exc}") from exc
 
 
-def _fetch_from_gitlab(pipeline: "Pipeline", ref: str, path: str) -> str:
+def _fetch_from_gitlab(pipeline: Pipeline, ref: str, path: str) -> str:
     """Fetch TOML from a GitLab repository."""
-    import json
     import urllib.parse
     import urllib.request
 
@@ -125,7 +125,7 @@ def _fetch_from_gitlab(pipeline: "Pipeline", ref: str, path: str) -> str:
         raise TomlFetchError(f"Failed to fetch TOML from GitLab: {exc}") from exc
 
 
-def _fetch_generic_git(pipeline: "Pipeline", ref: str, path: str) -> str:
+def _fetch_generic_git(pipeline: Pipeline, ref: str, path: str) -> str:
     """Fetch TOML via git archive (for generic Git hosts)."""
     # For v1, fall back to the stored toml_path on the Pipeline record.
     # Real fetch from arbitrary Git hosts requires credential storage per-host.
@@ -139,6 +139,7 @@ def _get_github_token(org, repo_url: str) -> str | None:
     """Look up a GitHub access token from the org's source connections."""
     try:
         from astrolift_scm.models import SourceConnection
+
         conn = SourceConnection.objects.filter(
             organization=org,
             kind="github",
@@ -155,6 +156,7 @@ def _get_gitlab_token(org, repo_url: str) -> str | None:
     """Look up a GitLab access token from the org's source connections."""
     try:
         from astrolift_scm.models import SourceConnection
+
         conn = SourceConnection.objects.filter(
             organization=org,
             kind__in=["gitlab", "gitea"],
@@ -171,6 +173,7 @@ def _decrypt_token(ciphertext: str) -> str | None:
     """Decrypt an access token ciphertext using the platform's key management."""
     try:
         from core.encryption import decrypt
+
         return decrypt(ciphertext)
     except Exception:  # noqa: BLE001
         return None
@@ -193,7 +196,7 @@ def _extract_project_path_gitlab(url: str) -> str:
     # Remove scheme and host
     for prefix in ("https://", "http://", "git@"):
         if url.startswith(prefix):
-            url = url[len(prefix):]
+            url = url[len(prefix) :]
             break
     parts = url.split("/", 1)
     return parts[1] if len(parts) > 1 else url
@@ -203,7 +206,7 @@ def _extract_gitlab_host(url: str) -> str:
     """Extract the GitLab host from a repo URL."""
     for prefix in ("https://", "http://"):
         if url.startswith(prefix):
-            return url[len(prefix):].split("/")[0]
+            return url[len(prefix) :].split("/")[0]
     if "gitlab.com" in url:
         return "gitlab.com"
     return "gitlab.com"

@@ -96,7 +96,8 @@ def fake_sub() -> FakeSubscriber:
 
 @pytest.fixture
 def driver(
-    fake_pub: FakePublisher, fake_sub: FakeSubscriber,
+    fake_pub: FakePublisher,
+    fake_sub: FakeSubscriber,
 ) -> PubSubDriver:
     return PubSubDriver(
         config=PubSubConfig(
@@ -128,7 +129,9 @@ def _spec(
 
 
 def test_provision_creates_topic_and_subscription(
-    driver: PubSubDriver, fake_pub: FakePublisher, fake_sub: FakeSubscriber,
+    driver: PubSubDriver,
+    fake_pub: FakePublisher,
+    fake_sub: FakeSubscriber,
 ) -> None:
     result = driver.provision(_spec())
     assert result.ok
@@ -144,11 +147,14 @@ def test_provision_idempotent(driver: PubSubDriver) -> None:
 
 
 def test_deprovision_deletes_both(
-    driver: PubSubDriver, fake_pub: FakePublisher, fake_sub: FakeSubscriber,
+    driver: PubSubDriver,
+    fake_pub: FakePublisher,
+    fake_sub: FakeSubscriber,
 ) -> None:
     res = driver.provision(_spec())
     deprov = driver.deprovision(
-        DeprovisionSpec(handle=res.handle), delete_data=True,
+        DeprovisionSpec(handle=res.handle),
+        delete_data=True,
     )
     assert deprov.ok
     assert fake_pub.topics == set()
@@ -181,11 +187,11 @@ def test_binding_envs_and_iam_grants(driver: PubSubDriver) -> None:
         ServiceHandle(handle="queue/astrolift-acme-api-prod"),
     )
     assert set(binding.env_vars.keys()) == {
-        "PUBSUB_TOPIC", "PUBSUB_SUBSCRIPTION", "GCP_PROJECT_ID",
+        "PUBSUB_TOPIC",
+        "PUBSUB_SUBSCRIPTION",
+        "GCP_PROJECT_ID",
     }
-    grant_actions = {
-        action for grant in binding.iam_grants for action in grant.actions
-    }
+    grant_actions = {action for grant in binding.iam_grants for action in grant.actions}
     assert "roles/pubsub.publisher" in grant_actions
     assert "roles/pubsub.subscriber" in grant_actions
 
@@ -217,7 +223,8 @@ def test_topic_id_canonicalization(driver: PubSubDriver) -> None:
 
 def test_deprovision_default_drains_subscription(
     driver: PubSubDriver,
-    fake_pub: FakePublisher, fake_sub: FakeSubscriber,
+    fake_pub: FakePublisher,
+    fake_sub: FakeSubscriber,
 ) -> None:
     """delete_data=False (default) seeks the subscription forward
     to drain in-flight messages before deleting."""
@@ -233,11 +240,13 @@ def test_deprovision_default_drains_subscription(
 
 def test_deprovision_delete_data_skips_drain(
     driver: PubSubDriver,
-    fake_pub: FakePublisher, fake_sub: FakeSubscriber,
+    fake_pub: FakePublisher,
+    fake_sub: FakeSubscriber,
 ) -> None:
     res = driver.provision(_spec())
     deprov = driver.deprovision(
-        DeprovisionSpec(handle=res.handle), delete_data=True,
+        DeprovisionSpec(handle=res.handle),
+        delete_data=True,
     )
     assert deprov.ok
     assert fake_sub.seeks == []
@@ -245,7 +254,8 @@ def test_deprovision_delete_data_skips_drain(
 
 
 def test_deprovision_refuses_active_subscribers(
-    driver: PubSubDriver, fake_sub: FakeSubscriber,
+    driver: PubSubDriver,
+    fake_sub: FakeSubscriber,
 ) -> None:
     """FAILED_PRECONDITION on delete_subscription (active pull
     consumers) errors out cleanly when force_destroy=False."""
@@ -256,7 +266,8 @@ def test_deprovision_refuses_active_subscribers(
     )
 
     deprov = driver.deprovision(
-        DeprovisionSpec(handle=res.handle), delete_data=True,
+        DeprovisionSpec(handle=res.handle),
+        delete_data=True,
     )
     assert not deprov.ok
     assert "force_destroy=True" in deprov.message
@@ -264,7 +275,8 @@ def test_deprovision_refuses_active_subscribers(
 
 def test_deprovision_force_destroy_bypasses_active_subscribers(
     driver: PubSubDriver,
-    fake_pub: FakePublisher, fake_sub: FakeSubscriber,
+    fake_pub: FakePublisher,
+    fake_sub: FakeSubscriber,
 ) -> None:
     res = driver.provision(_spec())
     sub_id = next(iter(fake_sub.subscriptions))
@@ -274,7 +286,8 @@ def test_deprovision_force_destroy_bypasses_active_subscribers(
 
     deprov = driver.deprovision(
         DeprovisionSpec(handle=res.handle),
-        delete_data=True, force_destroy=True,
+        delete_data=True,
+        force_destroy=True,
     )
     assert deprov.ok
     # Topic still gets deleted even when subscription delete is

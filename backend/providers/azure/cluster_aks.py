@@ -776,6 +776,7 @@ class AKSClusterDriver(ClusterDriver):
             namespaces=default_namespaces(namespaces),
         )
 
+    @driver_op(cloud="azure", driver="cluster")
     def list_regions(self) -> list[RegionInfo]:
         """Curated static list of Azure regions for the register picker
         (#860).
@@ -786,9 +787,7 @@ class AKSClusterDriver(ClusterDriver):
         returns a curated static list. The frontend keeps free-entry on
         top for regions not listed here.
         """
-        return [
-            RegionInfo(id=slug, label=label, continent=continent) for slug, label, continent in _AZURE_REGIONS
-        ]
+        return [RegionInfo(id=slug, label=label, continent=continent) for slug, label, continent in _AZURE_REGIONS]
 
     def _k8s(self, cluster: str) -> Any:
         if cluster in self._k8s_cache:
@@ -867,18 +866,18 @@ class AKSClusterDriver(ClusterDriver):
         except Exception as exc:
             mapped = map_api_error(exc)
             raise ClusterAuthError(
-                f"AKS {resource_group}/{cluster_name}: " f"list_cluster_admin_credentials failed: {mapped}",
+                f"AKS {resource_group}/{cluster_name}: list_cluster_admin_credentials failed: {mapped}",
             ) from exc
 
         kubeconfigs = getattr(result, "kubeconfigs", None) or []
         if not kubeconfigs:
             raise ClusterAuthError(
-                f"AKS {resource_group}/{cluster_name}: " "list_cluster_admin_credentials returned no kubeconfigs",
+                f"AKS {resource_group}/{cluster_name}: list_cluster_admin_credentials returned no kubeconfigs",
             )
         raw = getattr(kubeconfigs[0], "value", None)
         if raw is None:
             raise ClusterAuthError(
-                f"AKS {resource_group}/{cluster_name}: " "list_cluster_admin_credentials kubeconfig.value is empty",
+                f"AKS {resource_group}/{cluster_name}: list_cluster_admin_credentials kubeconfig.value is empty",
             )
         # Azure returns ``value`` as bytes (the kubeconfig YAML) on
         # the real SDK; some fakes return str directly. Some operator
@@ -891,7 +890,7 @@ class AKSClusterDriver(ClusterDriver):
                     blob = base64.b64decode(raw).decode("utf-8")
                 except Exception as exc:
                     raise ClusterAuthError(
-                        f"AKS {resource_group}/{cluster_name}: " "kubeconfig blob is neither UTF-8 nor base64-UTF-8",
+                        f"AKS {resource_group}/{cluster_name}: kubeconfig blob is neither UTF-8 nor base64-UTF-8",
                     ) from exc
         else:
             blob = str(raw)

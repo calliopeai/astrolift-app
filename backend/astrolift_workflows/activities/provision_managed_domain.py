@@ -49,7 +49,7 @@ def _get_cluster_and_dns_driver(cluster_id: int) -> tuple[Any, Any]:
 
 
 def _provision_dns_zone_sync(cluster_id: int, zone: str) -> dict[str, Any]:
-    from astrolift_clusters.models import ManagedDomain, TenantCluster
+    from astrolift_clusters.models import ManagedDomain
 
     cluster, dns_driver = _get_cluster_and_dns_driver(cluster_id)
     result = dns_driver.provision_zone(zone)
@@ -128,18 +128,21 @@ def _request_wildcard_cert_sync(cluster_id: int, zone: str, zone_id: str) -> str
         domain.provision_cert_id = cert_id
         domain.provision_validation_records = validation_records
         domain.provision_state = "configure_cert_policy"
-        domain.save(update_fields=[
-            "provision_cert_id", "provision_validation_records",
-            "provision_state", "updated_at", "version",
-        ])
+        domain.save(
+            update_fields=[
+                "provision_cert_id",
+                "provision_validation_records",
+                "provision_state",
+                "updated_at",
+                "version",
+            ]
+        )
 
     return cert_id
 
 
 @activity.defn(name="astrolift.managed_domain.request_wildcard_cert")
-async def request_wildcard_cert_for_zone(
-    cluster_id: int, zone: str, zone_id: str
-) -> str:
+async def request_wildcard_cert_for_zone(cluster_id: int, zone: str, zone_id: str) -> str:
     """Request a wildcard cert for ``*.<zone>`` and write CNAME
     validation records into the zone. Returns the cert_id."""
     from asgiref.sync import sync_to_async
@@ -208,10 +211,16 @@ def _register_managed_domain_row_sync(
         existing.dns_config = dns_config
         existing.is_wildcard_managed = True
         existing.provision_state = "register_managed_domain"
-        existing.save(update_fields=[
-            "dns_driver", "dns_config", "is_wildcard_managed",
-            "provision_state", "updated_at", "version",
-        ])
+        existing.save(
+            update_fields=[
+                "dns_driver",
+                "dns_config",
+                "is_wildcard_managed",
+                "provision_state",
+                "updated_at",
+                "version",
+            ]
+        )
         return existing.pk
 
     domain = ManagedDomain.objects.create(
@@ -236,9 +245,7 @@ async def register_managed_domain_row(
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    pk = await sync_to_async(_register_managed_domain_row_sync)(
-        cluster_id, zone, zone_id, cert_id
-    )
+    pk = await sync_to_async(_register_managed_domain_row_sync)(cluster_id, zone, zone_id, cert_id)
     log.info(
         "register_managed_domain_row zone=%s pk=%d",
         zone,

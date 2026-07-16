@@ -155,7 +155,7 @@ def _parse_rules(rules: list) -> tuple[list[str], list[str], bool]:
             push_branches.append(branch_m.group(1))
 
         # e.g. $CI_COMMIT_TAG =~ /^v/
-        tag_m = re.search(r'CI_COMMIT_TAG', if_clause)
+        tag_m = re.search(r"CI_COMMIT_TAG", if_clause)
         if tag_m and "=~" in if_clause:
             push_tags.append("*")  # best-effort: tag any pattern → wildcard
 
@@ -205,10 +205,7 @@ def _parse_job(
     explicit_needs = raw.get("needs", raw.get("dependencies"))
     if explicit_needs is not None:
         if isinstance(explicit_needs, list):
-            needs = [
-                (n["job"] if isinstance(n, dict) else str(n))
-                for n in explicit_needs
-            ]
+            needs = [(n["job"] if isinstance(n, dict) else str(n)) for n in explicit_needs]
         else:
             needs = [str(explicit_needs)]
     elif stage_needs:
@@ -256,7 +253,9 @@ def _parse_job(
         todos.append(f"'extends: {extends_val}' — resolve manually; YAML anchors are expanded where possible")
 
     if "trigger" in raw:
-        todos.append("'trigger' (child pipeline) has no direct equivalent — restructure as a separate pipeline")
+        todos.append(
+            "'trigger' (child pipeline) has no direct equivalent — restructure as a separate pipeline"
+        )
 
     if "cache" in raw:
         todos.append("'cache' is a deferred feature — configure caching in a future Astrolift release")
@@ -265,7 +264,9 @@ def _parse_job(
         env_name = raw["environment"]
         if isinstance(env_name, dict):
             env_name = env_name.get("name", env_name)
-        todos.append(f"'environment: {env_name}' — configure environment promotion via Astrolift Environments UI")
+        todos.append(
+            f"'environment: {env_name}' — configure environment promotion via Astrolift Environments UI"
+        )
 
     return JobDef(
         job_id=job_id,
@@ -303,7 +304,9 @@ def parse(yaml_str: str) -> PipelineDef:
 
     # Handle include (remote templates)
     if "include" in raw:
-        todos.append("'include' directives reference external templates — verify they are available in Astrolift")
+        todos.append(
+            "'include' directives reference external templates — verify they are available in Astrolift"
+        )
 
     # Collect job definitions
     job_defs: list[JobDef] = []

@@ -238,7 +238,7 @@ class Route53Driver(DnsDriver):
                     cert = desc.get("Certificate", {}) or {}
                     domain_name = cert.get("DomainName", domain_name) or domain_name
                     status = cert.get("Status", status) or status
-                except Exception:  # noqa: BLE001 — describe is best-effort
+                except Exception:
                     pass
                 out.append(
                     {
@@ -341,9 +341,7 @@ class Route53Driver(DnsDriver):
             desc = acm.describe_certificate(CertificateArn=cert_arn)
         except Exception as exc:
             raise map_client_error(exc) from exc
-        options = (
-            desc.get("Certificate", {}).get("DomainValidationOptions", []) or []
-        )
+        options = desc.get("Certificate", {}).get("DomainValidationOptions", []) or []
         validation_records = [
             {
                 "name": r["ResourceRecord"]["Name"],

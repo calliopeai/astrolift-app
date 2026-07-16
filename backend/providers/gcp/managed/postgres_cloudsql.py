@@ -32,6 +32,7 @@ stored in Secret Manager at ``astrolift/cloudsql/<id>/master``.
 
 from __future__ import annotations
 
+import contextlib
 import secrets
 import string
 from dataclasses import dataclass
@@ -146,10 +147,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             return ProvisionResult(
                 ok=True,
                 handle=_handle_for(instance_id),
-                message=(
-                    f"cloudsql {instance_id} already exists "
-                    f"(state={_get(existing, 'state', '?')})"
-                ),
+                message=(f"cloudsql {instance_id} already exists (state={_get(existing, 'state', '?')})"),
             )
 
         master_password = _generate_master_password()
@@ -160,15 +158,13 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
         )
 
         tier = cfg.get("tier") or _SIZE_TO_TIER.get(
-            spec.size, "db-custom-1-3840",
+            spec.size,
+            "db-custom-1-3840",
         )
         storage_gb = int(
-            cfg.get("storage_gb")
-            or _SIZE_TO_STORAGE_GB.get(spec.size, 20),
+            cfg.get("storage_gb") or _SIZE_TO_STORAGE_GB.get(spec.size, 20),
         )
-        engine_version = (
-            cfg.get("engine_version") or self._config.engine_version
-        )
+        engine_version = cfg.get("engine_version") or self._config.engine_version
         ha = bool(
             cfg.get("high_availability", self._config.high_availability_default),
         )
@@ -226,7 +222,8 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
         except Exception as exc:
             self._delete_master_password_secret(instance_id)
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message=f"insert: {exc}",
                 errors=[str(exc)],
             )
@@ -234,10 +231,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
         return ProvisionResult(
             ok=True,
             handle=_handle_for(instance_id),
-            message=(
-                f"cloudsql {instance_id} provisioning "
-                f"(password in {secret_name})"
-            ),
+            message=(f"cloudsql {instance_id} provisioning (password in {secret_name})"),
         )
 
     @driver_op(cloud="gcp", driver="postgres_cloudsql")
@@ -254,17 +248,16 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             if new_storage:
                 settings["dataDiskSizeGb"] = new_storage
         if "high_availability" in cfg:
-            settings["availabilityType"] = (
-                "REGIONAL" if cfg["high_availability"] else "ZONAL"
-            )
+            settings["availabilityType"] = "REGIONAL" if cfg["high_availability"] else "ZONAL"
         if "backup_retention_days" in cfg:
-            settings.setdefault("backupConfiguration", {})[
-                "transactionLogRetentionDays"
-            ] = int(cfg["backup_retention_days"])
+            settings.setdefault("backupConfiguration", {})["transactionLogRetentionDays"] = int(
+                cfg["backup_retention_days"]
+            )
 
         if not settings:
             return UpdateResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message="no modifiable attributes provided — no-op",
             )
 
@@ -276,12 +269,14 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             )
         except Exception as exc:
             return UpdateResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"patch: {exc}",
                 errors=[str(exc)],
             )
         return UpdateResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message=f"cloudsql {instance_id} update queued",
         )
 
@@ -304,7 +299,8 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
         if existing is None:
             self._delete_master_password_secret(instance_id)
             return DeprovisionResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message=f"cloudsql {instance_id} already gone",
             )
 
@@ -322,17 +318,16 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
                 )
             except Exception as exc:
                 return DeprovisionResult(
-                    ok=False, handle=spec.handle,
+                    ok=False,
+                    handle=spec.handle,
                     message=f"failed to clear deletionProtection: {exc}",
                     errors=[str(exc)],
                 )
         elif protected:
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
-                message=(
-                    f"cloudsql {instance_id} has deletionProtection "
-                    f"enabled — pass force_destroy=True to bypass"
-                ),
+                ok=False,
+                handle=spec.handle,
+                message=(f"cloudsql {instance_id} has deletionProtection enabled — pass force_destroy=True to bypass"),
                 errors=["deletion_protection_enabled"],
             )
 
@@ -341,17 +336,15 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             # doesn't offer "skip final backup" as a delete-time flag
             # like RDS does; we do it as a pre-step. delete_data=True
             # skips this pre-step.
-            try:
+            # Don't block delete on backup failure — that defeats
+            # the purpose of the safety path. Surface to operator
+            # via the message but proceed.
+            with contextlib.suppress(Exception):
                 self._sql.insert_backup_run(
                     project=self._config.project_id,
                     instance=instance_id,
                     body={"description": f"final-{instance_id}"},
                 )
-            except Exception:
-                # Don't block delete on backup failure — that defeats
-                # the purpose of the safety path. Surface to operator
-                # via the message but proceed.
-                pass
 
         try:
             self._sql.delete(
@@ -360,7 +353,8 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             )
         except Exception as exc:
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"delete: {exc}",
                 errors=[str(exc)],
             )
@@ -369,7 +363,8 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             self._delete_master_password_secret(instance_id)
 
         return DeprovisionResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message=(
                 f"cloudsql {instance_id} delete queued "
                 f"(backup={'skipped' if delete_data else 'taken'}, "
@@ -385,7 +380,8 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
         existing = self._describe(instance_id)
         if existing is None:
             return ServiceStatus(
-                handle=handle.handle, state="deprovisioned",
+                handle=handle.handle,
+                state="deprovisioned",
                 message=f"cloudsql {instance_id} not found",
             )
         state = _get(existing, "state", "UNKNOWN")
@@ -465,7 +461,9 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
 
     @driver_op(cloud="gcp", driver="postgres_cloudsql")
     def restore(
-        self, snapshot: SnapshotHandle, target: ProvisionSpec,
+        self,
+        snapshot: SnapshotHandle,
+        target: ProvisionSpec,
     ) -> ProvisionResult:
         target_id = self._instance_id_for(spec=target)
         source_id = _parse_handle(snapshot.handle)
@@ -482,7 +480,8 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             )
         except Exception as exc:
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message=f"clone: {exc}",
                 errors=[str(exc)],
             )
@@ -503,7 +502,9 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
                 "high_availability": {"type": "boolean"},
                 "deletion_protection": {"type": "boolean"},
                 "backup_retention_days": {
-                    "type": "integer", "minimum": 0, "maximum": 35,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 35,
                 },
                 "kms_key_name": {"type": "string"},
                 "zone": {"type": "string"},
@@ -518,13 +519,8 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
                 "DATABASE_PORT": "5432 (Postgres default)",
                 "DATABASE_NAME": "Initial database name (postgres)",
                 "DATABASE_USER": "Master user (postgres)",
-                "DATABASE_PASSWORD": (
-                    "Secret Manager ref to the master password"
-                ),
-                "DATABASE_URL": (
-                    "Secret Manager ref to the fully-formed "
-                    "postgres:// connection string"
-                ),
+                "DATABASE_PASSWORD": ("Secret Manager ref to the master password"),
+                "DATABASE_URL": ("Secret Manager ref to the fully-formed postgres:// connection string"),
             },
         )
 
@@ -552,10 +548,14 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
         # CloudSQL instance names: lowercase, letters/digits/hyphens,
         # ≤98 chars, must start with letter.
         raw = (
-            f"{self._config.instance_name_prefix}-"
-            f"{spec.organization_slug}-{spec.app_slug}-"
-            f"{spec.environment_name}-{spec.service_handle_hint or 'pg'}"
-        ).lower().replace("_", "-")
+            (
+                f"{self._config.instance_name_prefix}-"
+                f"{spec.organization_slug}-{spec.app_slug}-"
+                f"{spec.environment_name}-{spec.service_handle_hint or 'pg'}"
+            )
+            .lower()
+            .replace("_", "-")
+        )
         return "".join(c for c in raw if c.isalnum() or c == "-")[:98]
 
     def _master_secret_for(self, *, instance_id: str) -> str:
@@ -573,8 +573,9 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
     ) -> str:
         name = self._master_secret_for(instance_id=instance_id)
         parent = f"projects/{self._config.project_id}"
-        try:
-            # Create the secret (idempotent via AlreadyExists catch).
+        # Create the secret (idempotent — AlreadyExists or similar falls
+        # through to add_version).
+        with contextlib.suppress(Exception):
             self._sm.create_secret(
                 request={
                     "parent": parent,
@@ -585,9 +586,6 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
                     },
                 },
             )
-        except Exception:
-            # AlreadyExists or similar — fall through to add_version.
-            pass
         try:
             self._sm.add_secret_version(
                 request={
@@ -606,10 +604,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
         try:
             self._sm.delete_secret(
                 request={
-                    "name": (
-                        f"projects/{self._config.project_id}/secrets/"
-                        f"{name.replace('/', '_')}"
-                    ),
+                    "name": (f"projects/{self._config.project_id}/secrets/{name.replace('/', '_')}"),
                 },
             )
         except Exception:
@@ -623,9 +618,7 @@ _PASSWORD_ALPHABET = string.ascii_letters + string.digits + "-_."
 
 
 def _generate_master_password(length: int = 32) -> str:
-    return "".join(
-        secrets.choice(_PASSWORD_ALPHABET) for _ in range(length)
-    )
+    return "".join(secrets.choice(_PASSWORD_ALPHABET) for _ in range(length))
 
 
 def _handle_for(instance_id: str) -> str:

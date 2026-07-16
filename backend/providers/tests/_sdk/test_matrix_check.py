@@ -17,10 +17,15 @@ class _Stub:
 
 def _aws_plugin() -> ProviderPlugin:
     return ProviderPlugin(
-        id="aws", display_name="aws",
+        id="aws",
+        display_name="aws",
         drivers={
-            "cluster": _Stub, "ingress": _Stub, "dns": _Stub,
-            "tls": _Stub, "secrets": _Stub, "identity": _Stub,
+            "cluster": _Stub,
+            "ingress": _Stub,
+            "dns": _Stub,
+            "tls": _Stub,
+            "secrets": _Stub,
+            "identity": _Stub,
             "registry": _Stub,
         },
         managed_service_drivers={("object_store", "s3"): _Stub},
@@ -33,13 +38,20 @@ def test_in_sync_plugin_and_matrix_passes() -> None:
         drivers=tuple(
             DriverEntry(role=role, plugin_id="aws")
             for role in (
-                "cluster", "ingress", "dns", "tls",
-                "secrets", "identity", "registry",
+                "cluster",
+                "ingress",
+                "dns",
+                "tls",
+                "secrets",
+                "identity",
+                "registry",
             )
         ),
         managed_services=(
             ManagedServiceEntry(
-                kind="object_store", variant="s3", plugin_id="aws",
+                kind="object_store",
+                variant="s3",
+                plugin_id="aws",
             ),
         ),
     )
@@ -59,7 +71,8 @@ def test_manifest_missing_from_matrix_drift() -> None:
 
 def test_matrix_listed_role_not_in_manifest() -> None:
     plugin = ProviderPlugin(
-        id="aws", display_name="aws",
+        id="aws",
+        display_name="aws",
         drivers={"cluster": _Stub},
     )
     matrix = AvailabilityMatrix(

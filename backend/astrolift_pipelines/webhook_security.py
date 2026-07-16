@@ -19,12 +19,13 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
+from datetime import UTC
 from typing import TYPE_CHECKING
 
 from django.core.cache import cache
 
 if TYPE_CHECKING:
-    from django.http import HttpRequest
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -91,10 +92,10 @@ def check_webhook_rate_limit(org_slug: str) -> None:
     Uses a sliding window counter in the Django cache.
     Raises WebhookSecurityError if over the limit.
     """
-    from datetime import datetime, timezone as _tz
+    from datetime import datetime
 
     # Bucket key: per-org, per-minute
-    minute = datetime.now(_tz.utc).strftime("%Y%m%d%H%M")
+    minute = datetime.now(UTC).strftime("%Y%m%d%H%M")
     cache_key = f"webhook:rate:{org_slug}:{minute}"
 
     count = cache.get(cache_key, 0)

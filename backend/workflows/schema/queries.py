@@ -3,14 +3,40 @@ from __future__ import annotations
 from typing import Optional
 
 import strawberry
+from django.db.models import Q
 from strawberry.types import Info
 
+from core.tenancy import get_current_tenant
 from workflows.models import WorkflowDefinition, WorkflowInstance, WorkflowStage, WorkflowStageExecution
 from workflows.schema.types import (
     WorkflowInstanceType,
     WorkflowStageExecutionType,
     WorkflowStageType,
 )
+
+
+def _caller_org_pk():
+    tenant = get_current_tenant()
+    return tenant.organization_id if tenant else None
+
+
+def _org_scope_q(org_pk) -> Q:
+    """Read scope for the workflows domain (spec 40 §2.1): rows owned by the
+    caller's org UNION platform-global (null-org) rows."""
+    return Q(organization_id=org_pk) | Q(organization__isnull=True)
+
+
+def _visible_definition(slug):
+    """Resolve *slug* within the caller's read scope — org-owned ∪ platform-
+    global, preferring the org-owned row on slug collision. Mirrors
+    ``_definition_for_write`` (workflows/schema/mutations.py): a foreign
+    org's slug resolves to nothing, byte-identical to nonexistent, so no
+    cross-tenant existence oracle."""
+    org_pk = _caller_org_pk()
+    qs = WorkflowDefinition.objects.filter(slug=slug, deleted_at__isnull=True).filter(
+        _org_scope_q(org_pk)
+    )
+    return qs.filter(organization_id=org_pk).first() or qs.first()
 
 
 @strawberry.type
@@ -21,7 +47,9 @@ class Query:
 
     @strawberry.field(description="Get a workflow instance by ID.")
     def workflow_instance(self, info: Info, id: strawberry.ID) -> Optional[WorkflowInstanceType]:
-        return WorkflowInstance.objects.filter(pk=id).first()
+        # Org-scoped: a foreign org's instance id resolves to nothing,
+        # same closure as the definition readers (#968 follow-up).
+        return WorkflowInstance.objects.filter(pk=id).filter(_org_scope_q(_caller_org_pk())).first()
 
     @strawberry.field(description="List workflow instances for a specific object.")
     def workflow_instances(
@@ -30,7 +58,9 @@ class Query:
         object_id: int,
         model_label: Optional[str] = None,
     ) -> list[WorkflowInstanceType]:
-        qs = WorkflowInstance.objects.filter(object_id=object_id)
+        qs = WorkflowInstance.objects.filter(object_id=object_id).filter(
+            _org_scope_q(_caller_org_pk())
+        )
         if model_label:
             from django.contrib.contenttypes.models import ContentType
 
@@ -48,7 +78,10 @@ class Query:
         info: Info,
         workflow_slug: str,
     ) -> list[WorkflowStageType]:
-        workflow = WorkflowDefinition.objects.filter(slug=workflow_slug).first()
+        # Org-scoped (#968 follow-up): stages carry prompt/approvers/role,
+        # so the definition must resolve within the caller's read scope —
+        # a foreign org's slug returns [] exactly like a nonexistent one.
+        workflow = _visible_definition(workflow_slug)
         if not workflow:
             return []
         return (
@@ -66,7 +99,13 @@ class Query:
     ) -> list[WorkflowStageExecutionType]:
         from astrolift_operations.models import WorkflowRun
 
-        run = WorkflowRun.objects.filter(workflow_id=workflow_id, run_id=run_id).first()
+        # Org-scoped: a foreign org's run resolves to nothing (same
+        # closure as workflow_stages above).
+        run = (
+            WorkflowRun.objects.filter(workflow_id=workflow_id, run_id=run_id)
+            .filter(_org_scope_q(_caller_org_pk()))
+            .first()
+        )
         if not run:
             return []
         return (

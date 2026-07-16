@@ -160,9 +160,7 @@ def test_build_image_sync_real_build_records_digest(monkeypatch):
     class FakeDriver:
         def build(self, spec, repo, tag):
             assert tag == "sha-abc"
-            return BuildResult(
-                success=True, image_uri=f"{repo}:{tag}", digest="", duration_seconds=1.0
-            )
+            return BuildResult(success=True, image_uri=f"{repo}:{tag}", digest="", duration_seconds=1.0)
 
     class FakeTag:
         def __init__(self, name, digest):
@@ -201,20 +199,24 @@ def test_build_image_sync_raises_on_build_failure(monkeypatch):
     class FailingDriver:
         def build(self, spec, repo, tag):
             return BuildResult(
-                success=False, image_uri=f"{repo}:{tag}", digest="", duration_seconds=1.0,
+                success=False,
+                image_uri=f"{repo}:{tag}",
+                digest="",
+                duration_seconds=1.0,
                 errors=["kaniko exited 1: COPY failed"],
             )
 
     prepared = _PreparedBuild(
-        driver=FailingDriver(), registry_driver=object(), repo_name="bo/app", repo_uri="r/bo/app",
+        driver=FailingDriver(),
+        registry_driver=object(),
+        repo_name="bo/app",
+        repo_uri="r/bo/app",
     )
     monkeypatch.setattr(build_image_mod, "cluster_for_deployment", lambda _d: object(), raising=False)
     monkeypatch.setattr(build_image_mod, "_prepare_build", lambda *a, **k: prepared)
 
     with pytest.raises(RuntimeError, match="COPY failed"):
-        _build_image_sync(
-            BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha="")
-        )
+        _build_image_sync(BuildImageInput(deployment_id=deployment.pk, image_tag="sha-abc", commit_sha=""))
 
 
 # ---------------------------------------------------------------------------

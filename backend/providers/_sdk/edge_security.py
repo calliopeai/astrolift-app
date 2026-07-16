@@ -95,9 +95,7 @@ class EdgeSecurityProfile:
                 directives.append("preload")
             out["Strict-Transport-Security"] = "; ".join(directives)
         if self.headers.content_security_policy:
-            out["Content-Security-Policy"] = (
-                self.headers.content_security_policy
-            )
+            out["Content-Security-Policy"] = self.headers.content_security_policy
         if self.headers.permissions_policy:
             out["Permissions-Policy"] = self.headers.permissions_policy
         return out
@@ -114,9 +112,7 @@ def nginx_annotations(
     """Translate to nginx-ingress's annotation surface."""
     annotations: dict[str, str] = {
         "nginx.ingress.kubernetes.io/ssl-protocols": (
-            "TLSv1.3 TLSv1.2"
-            if profile.tls.min_version == "TLSv1.2"
-            else "TLSv1.3"
+            "TLSv1.3 TLSv1.2" if profile.tls.min_version == "TLSv1.2" else "TLSv1.3"
         ),
         "nginx.ingress.kubernetes.io/ssl-prefer-server-ciphers": "true",
     }
@@ -126,18 +122,14 @@ def nginx_annotations(
             f'more_set_headers "{header}: {value}";',
         )
     if snippet_lines:
-        annotations[
-            "nginx.ingress.kubernetes.io/configuration-snippet"
-        ] = "\n".join(snippet_lines)
+        annotations["nginx.ingress.kubernetes.io/configuration-snippet"] = "\n".join(snippet_lines)
     if profile.waf.rate_limit_requests_per_5min is not None:
         # nginx rate-limit per source IP
         rps = max(
             1,
             profile.waf.rate_limit_requests_per_5min // 300,
         )
-        annotations[
-            "nginx.ingress.kubernetes.io/limit-rps"
-        ] = str(rps)
+        annotations["nginx.ingress.kubernetes.io/limit-rps"] = str(rps)
     return annotations
 
 
@@ -154,9 +146,7 @@ def alb_annotations(
     }
     if profile.waf.enabled:
         # Operator pre-creates the WebACL; driver references it.
-        out["alb.ingress.kubernetes.io/wafv2-acl-arn"] = (
-            "AUTO_RESOLVE"
-        )
+        out["alb.ingress.kubernetes.io/wafv2-acl-arn"] = "AUTO_RESOLVE"
     return out
 
 
@@ -165,16 +155,12 @@ def gcp_annotations(
 ) -> dict[str, str]:
     """Translate to GKE Ingress / Gateway annotation surface."""
     out: dict[str, str] = {
-        "networking.gke.io/v1beta1.FrontendConfig": (
-            "AUTO_RESOLVE"
-        ),
+        "networking.gke.io/v1beta1.FrontendConfig": ("AUTO_RESOLVE"),
     }
     if profile.waf.enabled:
         # Cloud Armor policy attached via BackendConfig — operator
         # pre-creates the policy.
-        out[
-            "cloud.google.com/backend-config"
-        ] = '{"default": "astrolift-default"}'
+        out["cloud.google.com/backend-config"] = '{"default": "astrolift-default"}'
     return out
 
 
@@ -184,13 +170,9 @@ def appgw_annotations(
     """Translate to AGIC's annotation surface."""
     out: dict[str, str] = {}
     if profile.tls.min_version == "TLSv1.3":
-        out[
-            "appgw.ingress.kubernetes.io/ssl-redirect"
-        ] = "true"
+        out["appgw.ingress.kubernetes.io/ssl-redirect"] = "true"
     if profile.waf.enabled:
         # App Gateway has WAF v2 attached at gateway level —
         # operator pre-configures.
-        out["appgw.ingress.kubernetes.io/waf-policy-for-path"] = (
-            "AUTO_RESOLVE"
-        )
+        out["appgw.ingress.kubernetes.io/waf-policy-for-path"] = "AUTO_RESOLVE"
     return out

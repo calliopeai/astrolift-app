@@ -16,13 +16,16 @@ single boolean.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from _sdk.availability import (
     REQUIRED_ROLES,
     AvailabilityMatrix,
 )
-from _sdk.base import ProviderPlugin
-from _sdk.composition import CompositionRegistry
+
+if TYPE_CHECKING:
+    from _sdk.base import ProviderPlugin
+    from _sdk.composition import CompositionRegistry
 
 
 @dataclass(frozen=True)
@@ -76,32 +79,38 @@ def validate_cluster_binding(
         if (
             composition is not None
             and composition.resolve_driver(
-                target_plugin_id=plugin.id, role=role,
-            ) is not None
+                target_plugin_id=plugin.id,
+                role=role,
+            )
+            is not None
         ):
             continue
         if matrix.has_role(plugin_id=plugin.id, role=role):
             # Matrix advertises it but plugin manifest doesn't —
             # surface as a manifest drift bug.
-            issues.append(BindingIssue(
-                code="manifest_matrix_drift",
+            issues.append(
+                BindingIssue(
+                    code="manifest_matrix_drift",
+                    role=role,
+                    message=(
+                        f"matrix lists role={role!r} for plugin "
+                        f"{plugin.id!r} but the manifest doesn't "
+                        f"register a driver"
+                    ),
+                )
+            )
+            continue
+        issues.append(
+            BindingIssue(
+                code="missing_required_role",
                 role=role,
                 message=(
-                    f"matrix lists role={role!r} for plugin "
-                    f"{plugin.id!r} but the manifest doesn't "
-                    f"register a driver"
+                    f"plugin {plugin.id!r} doesn't ship a driver for "
+                    f"required role {role!r} and no composition "
+                    f"delegation is registered"
                 ),
-            ))
-            continue
-        issues.append(BindingIssue(
-            code="missing_required_role",
-            role=role,
-            message=(
-                f"plugin {plugin.id!r} doesn't ship a driver for "
-                f"required role {role!r} and no composition "
-                f"delegation is registered"
-            ),
-        ))
+            )
+        )
 
     for dep in deps:
         if plugin.get_managed_service_driver(dep.kind, dep.variant) is not None:
@@ -112,21 +121,24 @@ def validate_cluster_binding(
                 target_plugin_id=plugin.id,
                 kind=dep.kind,
                 variant=dep.variant,
-            ) is not None
+            )
+            is not None
         ):
             continue
         if dep.required:
-            issues.append(BindingIssue(
-                code="missing_managed_service",
-                kind=dep.kind,
-                variant=dep.variant,
-                message=(
-                    f"app requires {dep.kind}/{dep.variant} but "
-                    f"plugin {plugin.id!r} doesn't ship that "
-                    f"variant and no composition delegation is "
-                    f"registered"
-                ),
-            ))
+            issues.append(
+                BindingIssue(
+                    code="missing_managed_service",
+                    kind=dep.kind,
+                    variant=dep.variant,
+                    message=(
+                        f"app requires {dep.kind}/{dep.variant} but "
+                        f"plugin {plugin.id!r} doesn't ship that "
+                        f"variant and no composition delegation is "
+                        f"registered"
+                    ),
+                )
+            )
 
     return BindingValidation(ok=not issues, issues=issues)
 

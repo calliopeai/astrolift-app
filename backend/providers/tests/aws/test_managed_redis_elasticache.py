@@ -48,7 +48,9 @@ def aws_mock() -> Generator:
             ("10.0.2.0/24", "us-east-1b"),
         ):
             sub = ec2.create_subnet(
-                VpcId=vpc, CidrBlock=cidr, AvailabilityZone=az,
+                VpcId=vpc,
+                CidrBlock=cidr,
+                AvailabilityZone=az,
             )["Subnet"]["SubnetId"]
             subnets.append(sub)
         ec.create_cache_subnet_group(
@@ -108,7 +110,8 @@ def _spec(**overrides) -> ProvisionSpec:
 
 
 def test_provision_creates_replication_group(
-    driver: ElastiCacheRedisDriver, ec_client,
+    driver: ElastiCacheRedisDriver,
+    ec_client,
 ) -> None:
     result = driver.provision(_spec())
     assert result.ok
@@ -131,7 +134,8 @@ def test_provision_idempotent(driver: ElastiCacheRedisDriver) -> None:
 
 
 def test_provision_stores_auth_token_in_secrets_manager(
-    driver: ElastiCacheRedisDriver, sm_client,
+    driver: ElastiCacheRedisDriver,
+    sm_client,
 ) -> None:
     result = driver.provision(_spec())
     _, rg_id = parse_handle(result.handle)
@@ -141,7 +145,8 @@ def test_provision_stores_auth_token_in_secrets_manager(
 
 
 def test_provision_no_auth_token_when_transit_encryption_off(
-    driver: ElastiCacheRedisDriver, sm_client,
+    driver: ElastiCacheRedisDriver,
+    sm_client,
 ) -> None:
     result = driver.provision(
         _spec(config={"transit_encryption": False}),
@@ -153,7 +158,8 @@ def test_provision_no_auth_token_when_transit_encryption_off(
 
 
 def test_provision_size_to_node_type(
-    driver: ElastiCacheRedisDriver, ec_client,
+    driver: ElastiCacheRedisDriver,
+    ec_client,
 ) -> None:
     result = driver.provision(_spec(size="large"))
     _, rg_id = parse_handle(result.handle)
@@ -164,7 +170,8 @@ def test_provision_size_to_node_type(
 
 
 def test_provision_replicas_enable_automatic_failover(
-    driver: ElastiCacheRedisDriver, ec_client,
+    driver: ElastiCacheRedisDriver,
+    ec_client,
 ) -> None:
     result = driver.provision(
         _spec(config={"replicas_per_node_group": 1}),
@@ -180,7 +187,8 @@ def test_provision_replicas_enable_automatic_failover(
 
 
 def test_provision_tags_replication_group(
-    driver: ElastiCacheRedisDriver, ec_client,
+    driver: ElastiCacheRedisDriver,
+    ec_client,
 ) -> None:
     result = driver.provision(_spec())
     _, rg_id = parse_handle(result.handle)
@@ -289,7 +297,8 @@ def test_deprovision_idempotent_when_already_gone(
 
 
 def test_deprovision_delete_data_drops_auth_secret(
-    driver: ElastiCacheRedisDriver, sm_client,
+    driver: ElastiCacheRedisDriver,
+    sm_client,
 ) -> None:
     provisioned = driver.provision(_spec())
     _, rg_id = parse_handle(provisioned.handle)
@@ -332,8 +341,9 @@ def test_binding_with_tls_uses_secret_refs(
         ServiceHandle(handle=provisioned.handle),
     )
     env = binding.env_vars
+    # Canonical redis envelope (#1003) — the auth token rides REDIS_PASSWORD.
     assert env["REDIS_TLS"].literal == "1"
-    assert env["REDIS_AUTH_TOKEN"].secret_ref is not None
+    assert env["REDIS_PASSWORD"].secret_ref is not None
     assert env["REDIS_URL"].secret_ref is not None
     assert len(binding.iam_grants) == 1
 
@@ -381,7 +391,8 @@ def test_snapshot_surfaces_driver_error(
 
 
 def test_restore_creates_new_replication_group(
-    driver: ElastiCacheRedisDriver, ec_client,
+    driver: ElastiCacheRedisDriver,
+    ec_client,
 ) -> None:
     provisioned = driver.provision(_spec())
     snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
@@ -437,11 +448,19 @@ def test_replication_group_id_sanitized(
 def test_config_schema_shape(driver: ElastiCacheRedisDriver) -> None:
     schema = driver.config_schema()
     assert schema["type"] == "object"
-    for key in ("node_type", "engine_version", "num_node_groups",
-                "replicas_per_node_group", "transit_encryption",
-                "at_rest_encryption", "auth_token",
-                "snapshot_retention_days", "multi_az",
-                "parameter_group", "kms_key_arn"):
+    for key in (
+        "node_type",
+        "engine_version",
+        "num_node_groups",
+        "replicas_per_node_group",
+        "transit_encryption",
+        "at_rest_encryption",
+        "auth_token",
+        "snapshot_retention_days",
+        "multi_az",
+        "parameter_group",
+        "kms_key_arn",
+    ):
         assert key in schema["properties"]
 
 
@@ -449,8 +468,7 @@ def test_binding_schema_lists_all_env_vars(
     driver: ElastiCacheRedisDriver,
 ) -> None:
     schema = driver.binding_schema()
-    for key in ("REDIS_HOST", "REDIS_PORT", "REDIS_TLS",
-                "REDIS_AUTH_TOKEN", "REDIS_URL"):
+    for key in ("REDIS_HOST", "REDIS_PORT", "REDIS_TLS", "REDIS_AUTH_TOKEN", "REDIS_URL"):
         assert key in schema.env_vars
 
 
@@ -478,7 +496,9 @@ def test_provision_failure_rolls_back_auth_token_secret(
     class RaisingEC:
         def describe_replication_groups(self, **_kwargs):
             raise type(
-                "ReplicationGroupNotFoundFault", (Exception,), {},
+                "ReplicationGroupNotFoundFault",
+                (Exception,),
+                {},
             )("not found")
 
         def create_replication_group(self, **_kwargs):
@@ -571,8 +591,7 @@ def test_deprovision_force_destroy_retries_on_invalid_state() -> None:
 
         def delete_replication_group(self, **_kwargs):
             raise RuntimeError(
-                "An error occurred (InvalidReplicationGroupState) "
-                "when calling the DeleteReplicationGroup operation",
+                "An error occurred (InvalidReplicationGroupState) when calling the DeleteReplicationGroup operation",
             )
 
     class FakeSM:
@@ -581,7 +600,8 @@ def test_deprovision_force_destroy_retries_on_invalid_state() -> None:
 
     driver = ElastiCacheRedisDriver(
         config=ElastiCacheConfig(
-            region="us-east-1", cache_subnet_group="x",
+            region="us-east-1",
+            cache_subnet_group="x",
         ),
         elasticache_client=FakeEC(),
         secrets_client=FakeSM(),

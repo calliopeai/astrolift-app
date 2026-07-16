@@ -634,7 +634,7 @@ def _stub_acm(certs: list[dict[str, Any]], describe: dict[str, dict[str, Any]] |
 
     acm = MagicMock()
     acm.get_paginator.return_value = _Paginator()
-    acm.describe_certificate.side_effect = lambda CertificateArn: {
+    acm.describe_certificate.side_effect = lambda CertificateArn: {  # noqa: N803 — mirrors the boto3 kwarg
         "Certificate": describe.get(CertificateArn, {}),
     }
     return acm

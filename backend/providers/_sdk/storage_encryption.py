@@ -59,35 +59,41 @@ class EncryptionPolicy:
 POLICIES: dict[tuple[str, str, str], EncryptionPolicy] = {
     # AWS — every variant supports KMS CMEK
     ("aws", "object_store", "s3"): EncryptionPolicy(
-        mode="cloud_kms", cmek_supported=True,
+        mode="cloud_kms",
+        cmek_supported=True,
         cmek_required_for_compliance=("pci", "hipaa", "fedramp_high"),
     ),
     ("aws", "queue", "sqs"): EncryptionPolicy(
-        mode="cloud_kms", cmek_supported=True,
+        mode="cloud_kms",
+        cmek_supported=True,
     ),
     # GCP
     ("gcp", "object_store", "gcs"): EncryptionPolicy(
-        mode="cloud_kms", cmek_supported=True,
+        mode="cloud_kms",
+        cmek_supported=True,
         cmek_required_for_compliance=("pci", "hipaa"),
     ),
     ("gcp", "queue", "pubsub"): EncryptionPolicy(
-        mode="cloud_kms", cmek_supported=True,
+        mode="cloud_kms",
+        cmek_supported=True,
     ),
     # Azure
     ("azure", "object_store", "blob"): EncryptionPolicy(
-        mode="cloud_kms", cmek_supported=True,
+        mode="cloud_kms",
+        cmek_supported=True,
         cmek_required_for_compliance=("pci", "hipaa"),
         notes=(
-            "Azure-managed key by default; customer-managed key "
-            "via Storage Account encryption settings + Key Vault."
+            "Azure-managed key by default; customer-managed key via Storage Account encryption settings + Key Vault."
         ),
     ),
     ("azure", "queue", "servicebus"): EncryptionPolicy(
-        mode="cloud_kms", cmek_supported=True,
+        mode="cloud_kms",
+        cmek_supported=True,
     ),
     # k8s_native operator-backed variants
     ("k8s_native", "postgres", "cnpg"): EncryptionPolicy(
-        mode="pv_luks", cmek_supported=False,
+        mode="pv_luks",
+        cmek_supported=False,
         notes=(
             "PV-level encryption depends on the StorageClass "
             "having an encrypted underlying provisioner (e.g., "
@@ -96,25 +102,32 @@ POLICIES: dict[tuple[str, str, str], EncryptionPolicy] = {
         ),
     ),
     ("k8s_native", "redis", "operator"): EncryptionPolicy(
-        mode="pv_luks", cmek_supported=False,
+        mode="pv_luks",
+        cmek_supported=False,
     ),
     ("k8s_native", "mysql", "operator"): EncryptionPolicy(
-        mode="pv_luks", cmek_supported=False,
+        mode="pv_luks",
+        cmek_supported=False,
     ),
     ("k8s_native", "document_db", "mongodb_operator"): EncryptionPolicy(
-        mode="pv_luks", cmek_supported=False,
+        mode="pv_luks",
+        cmek_supported=False,
     ),
     ("k8s_native", "event_stream", "kafka_strimzi"): EncryptionPolicy(
-        mode="pv_luks", cmek_supported=False,
+        mode="pv_luks",
+        cmek_supported=False,
     ),
     ("k8s_native", "event_stream", "nats"): EncryptionPolicy(
-        mode="pv_luks", cmek_supported=False,
+        mode="pv_luks",
+        cmek_supported=False,
     ),
     ("k8s_native", "queue", "rabbitmq_operator"): EncryptionPolicy(
-        mode="pv_luks", cmek_supported=False,
+        mode="pv_luks",
+        cmek_supported=False,
     ),
     ("k8s_native", "filesystem", "nfs_csi"): EncryptionPolicy(
-        mode="pv_luks", cmek_supported=False,
+        mode="pv_luks",
+        cmek_supported=False,
         notes=(
             "Encryption depends on the NFS server's underlying "
             "filesystem (LUKS / ZFS native encryption) — Astrolift "
@@ -137,7 +150,10 @@ class EncryptionCheckResult:
 
 
 def policy_for(
-    *, plugin_id: str, kind: str, variant: str,
+    *,
+    plugin_id: str,
+    kind: str,
+    variant: str,
 ) -> EncryptionPolicy | None:
     return POLICIES.get((plugin_id, kind, variant))
 
@@ -159,11 +175,15 @@ def check_encryption(
     full KMS plumbing — but the warning surfaces explicitly so
     promotion to staging/prod fails the encryption preflight."""
     policy = policy_for(
-        plugin_id=plugin_id, kind=kind, variant=variant,
+        plugin_id=plugin_id,
+        kind=kind,
+        variant=variant,
     )
     if policy is None:
         return EncryptionCheckResult(
-            ok=False, mode="none", cmek_used=False,
+            ok=False,
+            mode="none",
+            cmek_used=False,
             failures=[
                 f"no encryption policy registered for "
                 f"({plugin_id!r}, {kind!r}, {variant!r}) — "
@@ -177,10 +197,7 @@ def check_encryption(
     frameworks = compliance_frameworks or []
 
     # Compliance: CMEK required by framework but not provided
-    required_by = [
-        f for f in policy.cmek_required_for_compliance
-        if f in frameworks
-    ]
+    required_by = [f for f in policy.cmek_required_for_compliance if f in frameworks]
     if required_by and not cmek_used:
         msg = (
             f"compliance framework(s) {required_by} require CMEK "
@@ -196,10 +213,7 @@ def check_encryption(
 
     # Mode==none is only acceptable when explicitly local_dev
     if policy.mode == "none":
-        msg = (
-            f"({plugin_id}, {kind}, {variant}) policy mode='none' "
-            f"— no encryption at rest"
-        )
+        msg = f"({plugin_id}, {kind}, {variant}) policy mode='none' — no encryption at rest"
         if is_local_dev:
             warnings.append(msg)
         else:
@@ -208,8 +222,7 @@ def check_encryption(
     # CMEK supplied for a variant that doesn't support it
     if cmek_key and not policy.cmek_supported:
         warnings.append(
-            f"({plugin_id}, {kind}, {variant}) doesn't support CMEK; "
-            f"the supplied key will be ignored",
+            f"({plugin_id}, {kind}, {variant}) doesn't support CMEK; the supplied key will be ignored",
         )
 
     return EncryptionCheckResult(
