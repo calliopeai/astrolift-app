@@ -441,7 +441,7 @@ export function OpsClient() {
             </CardDescription>
           </div>
           <Link
-            href="/audit"
+            href="/administration/audit"
             className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
           >
             Full audit log <ExternalLinkIcon className="size-3" />

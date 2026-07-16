@@ -216,7 +216,7 @@ export function DashboardClient() {
         icon={UsersIcon}
         value={teamsCount}
         loading={teams.loading}
-        href="/teams"
+        href="/administration/teams"
         emptyCta={t("tiles.teams.emptyCta")}
       />
     ),
@@ -226,7 +226,7 @@ export function DashboardClient() {
         icon={FileBoxIcon}
         value={projectsCount}
         loading={projects.loading}
-        href="/projects"
+        href="/administration/projects"
         emptyCta={t("tiles.projects.emptyCta")}
       />
     ),
@@ -371,7 +371,7 @@ export function DashboardClient() {
                 icon={<FileBoxIcon className="size-5" />}
                 title={t("recentProjects.emptyTitle")}
                 description={t("recentProjects.emptyDescription")}
-                actionHref="/teams"
+                actionHref="/administration/teams"
                 actionLabel={t("recentProjects.emptyAction")}
               />
             ) : (
@@ -379,7 +379,7 @@ export function DashboardClient() {
                 {recentProjects.map((p) => (
                   <li key={p.id} className="flex items-center justify-between py-3">
                     <div>
-                      <Link href="/projects" className="font-medium hover:underline">
+                      <Link href="/administration/projects" className="font-medium hover:underline">
                         {p.team.slug}/{p.slug}
                       </Link>
                       <p className="text-muted-foreground text-xs">{p.name}</p>

@@ -121,7 +121,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
           icon={<AlertTriangleIcon className="size-5" />}
           title={`No project with slug ${slug}`}
           description="It may have been soft-deleted, or you may not have permission to read it."
-          actionHref="/projects"
+          actionHref="/administration/projects"
           actionLabel="Back to projects"
         />
       </PageShell>
@@ -135,7 +135,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
     });
     if (data?.softDeleteProject.ok) {
       toast.success(`Deleted ${project.slug}`);
-      router.push("/projects");
+      router.push("/administration/projects");
     } else {
       throw new Error(data?.softDeleteProject.errors?.[0]?.message ?? "Delete failed");
     }
@@ -156,7 +156,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
         <nav aria-label="breadcrumb" className="text-muted-foreground text-sm">
           <ol className="flex flex-wrap items-center gap-1">
             <li>
-              <Link href="/teams" className="hover:text-foreground hover:underline">
+              <Link href="/administration/teams" className="hover:text-foreground hover:underline">
                 {project.organization.slug}
               </Link>
             </li>
@@ -164,7 +164,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
               <ChevronRightIcon className="size-3" />
             </li>
             <li>
-              <Link href="/teams" className="hover:text-foreground hover:underline">
+              <Link href="/administration/teams" className="hover:text-foreground hover:underline">
                 {project.team.slug}
               </Link>
             </li>
@@ -306,7 +306,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
           </div>
           <Can permission="org.manage_members">
             <Button asChild size="sm">
-              <Link href="/members">
+              <Link href="/administration/members">
                 <PlusIcon className="size-4" /> Invite
               </Link>
             </Button>
@@ -324,7 +324,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
                 icon={<UsersIcon className="size-5" />}
                 title="No direct project members"
                 description="Anyone with team or org-wide access already sees this project. Grant explicit project-scope access from the Members page."
-                actionHref="/members"
+                actionHref="/administration/members"
                 actionLabel="Manage members"
               />
             </div>

@@ -20,7 +20,10 @@
     "account": "Compte",
     "notifications": "Notifications",
     "rerunOnboarding": "Relancer l'intégration",
-    "logout": "Se déconnecter"
+    "logout": "Se déconnecter",
+    "profile": "Profil",
+    "documentation": "Documentation",
+    "downloads": "Téléchargements"
   },
   "language": {
     "label": "Langue",

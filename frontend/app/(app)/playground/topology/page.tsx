@@ -1,11 +1,14 @@
 "use client";
 
+import { notFound } from "next/navigation";
 import { PageShell } from "@/components/PageShell";
 import {
   AppTopologyMap,
   type TopologyEdge,
   type TopologyNode,
 } from "@/components/topology";
+
+import { isRouteEnabled } from "@/lib/route-flags";
 
 // Demo dataset wired to no real data — exercises every node type and
 // every status colour so the component can be eyeballed without
@@ -102,6 +105,8 @@ const DEMO_EDGES: TopologyEdge[] = [
 ];
 
 export default function TopologyPlaygroundPage() {
+  if (!isRouteEnabled("/playground")) notFound();
+
   return (
     <PageShell
       title="Topology map"

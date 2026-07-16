@@ -212,7 +212,7 @@ export default function IdentityProvidersDocPage() {
           <li className="list-decimal leading-relaxed">
             Open{" "}
             <Link
-              href="/settings/organization"
+              href="/administration/organization"
               className="text-foreground underline-offset-2 hover:underline"
             >
               Settings · Organization

@@ -1,11 +1,16 @@
 """Admin mutations for the Temporal workflow viewer (#437) + the
 configured-Workflow write surface (spec 40 §3/§6, #967/#968).
 
-Cancel / terminate / signal are admin-gated because they can wedge
-real production workflows (mid-deploy, mid-migration). The viewer's
-read surfaces are scoped to ``AUDIT_LOG_READ``; these writes layer
+Cancel / terminate / signal are gated per run ownership (the tier-2
+re-gate). Two paths are valid. The legacy elevated viewer pair —
+reads are scoped to ``AUDIT_LOG_READ``; these writes layer
 ``ADMIN_ELEVATE`` on top so an operator with read access doesn't
-accidentally fire a terminate.
+accidentally fire a terminate — reaches every run (own-org,
+foreign-org, legacy org-less): platform operators act fleet-wide.
+Otherwise the tenant path applies: ``WORKFLOW_TRIGGER`` scoped to the
+caller's org, with everything else — a foreign org's run, a legacy
+org-less run, a nonexistent id — answered by one identical not-found
+envelope (oracle closure).
 """
 
 from __future__ import annotations
@@ -22,8 +27,13 @@ from astrolift_workflows.schema.workflow_config_types import (
     ConfiguredWorkflowType,
     workflow_to_type,
 )
-from core.decorators import tenant_scoped
-from core.permissions import Permission, require_permission
+from core.decorators import TenantRequired, tenant_scoped
+from core.permissions import (
+    Permission,
+    PermissionDenied,
+    check_permission,
+    require_permission,
+)
 from core.schema.common import MutationResult, ValidationError
 from core.tenancy import get_current_tenant
 
@@ -57,6 +67,73 @@ def _resolve_caller_org(org_id: str | None):
     return org, None
 
 
+def _run_owner_org_id(workflow_id: str) -> int | None:
+    """Owning org pk for a Temporal workflow id, when a mirror row carries
+    one (the tier-3 ``WorkflowInstance`` or the operations ``WorkflowRun``);
+    ``None`` for legacy org-less runs."""
+    from astrolift_operations.models import WorkflowRun
+    from workflows.models import WorkflowInstance
+
+    org_id = (
+        WorkflowInstance.objects.filter(
+            temporal_workflow_id=workflow_id,
+            organization__isnull=False,
+            deleted_at__isnull=True,
+        )
+        .values_list("organization_id", flat=True)
+        .first()
+    )
+    if org_id is not None:
+        return org_id
+    return (
+        WorkflowRun.objects.filter(
+            workflow_id=workflow_id,
+            organization__isnull=False,
+            deleted_at__isnull=True,
+        )
+        .order_by("-pk")
+        .values_list("organization_id", flat=True)
+        .first()
+    )
+
+
+def _has_elevated_viewer_access() -> bool:
+    """True when the caller holds the legacy platform-operator pair
+    (``AUDIT_LOG_READ`` + ``ADMIN_ELEVATE``) that gates the viewer's
+    writes."""
+    try:
+        check_permission(Permission.AUDIT_LOG_READ)
+        check_permission(Permission.ADMIN_ELEVATE)
+    except PermissionDenied:
+        return False
+    return True
+
+
+def _gate_instance_op(workflow_id: str) -> MutationResult | None:
+    """Data-dependent permission gate for cancel / terminate / signal.
+
+    The branch depends on the looked-up run, so it cannot live in a static
+    ``@require_permission`` stack. The elevated platform-operator pair
+    (``AUDIT_LOG_READ`` + ``ADMIN_ELEVATE``, the legacy viewer gate)
+    reaches every run — own-org, foreign-org, legacy org-less. Otherwise
+    the tenant path applies: ``WORKFLOW_TRIGGER`` plus a resolved tenant
+    context, reaching only the caller org's runs; anything else — a
+    foreign org's run, an org-less run, a nonexistent id — is answered
+    with one identical not-found envelope, never a forbidden that
+    confirms the id exists (oracle closure). Raises ``PermissionDenied``
+    / ``TenantRequired`` exactly like the decorator stack; returns a
+    failure envelope only for the not-found case."""
+    if _has_elevated_viewer_access():
+        return None
+    check_permission(Permission.WORKFLOW_TRIGGER)
+    caller = _caller_org_pk()
+    if caller is None:
+        raise TenantRequired("instance ops on org-owned runs require a resolved tenant context")
+    if _run_owner_org_id(workflow_id) != caller:
+        return _failure("workflow_id", "workflow instance not found")
+    return None
+
+
 @strawberry.type
 class CreateWorkflowResult(MutationResult):
     workflow: ConfiguredWorkflowType | None = None
@@ -77,7 +154,6 @@ class RunWorkflowResult(MutationResult):
 @strawberry.type
 class TemporalWorkflowsMutation:
     @strawberry.mutation
-    @require_permission(Permission.AUDIT_LOG_READ, Permission.ADMIN_ELEVATE)
     def cancel_workflow_instance(
         self,
         info: Info,
@@ -88,6 +164,9 @@ class TemporalWorkflowsMutation:
         external resources (deploys, migrations) so they teardown
         cleanly. Returns ``ok=False`` with a non-empty errors list when
         Temporal is disabled or the handle is missing."""
+        gate = _gate_instance_op(workflow_id)
+        if gate is not None:
+            return gate
         if not workflow_id:
             return _failure("workflow_id", "workflow_id is required")
         delivered = cancel_workflow(workflow_id)
@@ -96,7 +175,6 @@ class TemporalWorkflowsMutation:
         return MutationResult.success()
 
     @strawberry.mutation
-    @require_permission(Permission.AUDIT_LOG_READ, Permission.ADMIN_ELEVATE)
     def terminate_workflow_instance(
         self,
         info: Info,
@@ -107,6 +185,9 @@ class TemporalWorkflowsMutation:
         no cleanup runs. Reserve for wedged workflows that the
         cooperative cancel can't unstick. ``reason`` is required and
         stored on the Temporal record so the next operator sees why."""
+        gate = _gate_instance_op(workflow_id)
+        if gate is not None:
+            return gate
         if not workflow_id:
             return _failure("workflow_id", "workflow_id is required")
         reason = (reason or "").strip()
@@ -118,7 +199,6 @@ class TemporalWorkflowsMutation:
         return MutationResult.success()
 
     @strawberry.mutation
-    @require_permission(Permission.AUDIT_LOG_READ, Permission.ADMIN_ELEVATE)
     def signal_workflow_instance(
         self,
         info: Info,
@@ -134,6 +214,9 @@ class TemporalWorkflowsMutation:
         signals that take no args. Returns ``ok=False`` when Temporal
         is disabled or the signal couldn't be delivered (workflow
         already complete, handle missing)."""
+        gate = _gate_instance_op(workflow_id)
+        if gate is not None:
+            return gate
         if not workflow_id:
             return _failure("workflow_id", "workflow_id is required")
         signal_name = (signal_name or "").strip()

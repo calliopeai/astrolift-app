@@ -183,7 +183,7 @@ export function AppMembersClient({ slug }: { slug: string }) {
                 icon={<ShieldIcon className="size-5" />}
                 title={t("emptyTitle")}
                 description={t("emptyDescription")}
-                actionHref="/members"
+                actionHref="/administration/members"
                 actionLabel={t("openMembers")}
               />
             </div>

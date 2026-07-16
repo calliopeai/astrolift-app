@@ -1,5 +1,6 @@
 "use client";
 
+import { notFound } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   BotIcon,
@@ -44,6 +45,8 @@ import {
   toggleStar,
 } from "./saved-sessions";
 
+import { isRouteEnabled } from "@/lib/route-flags";
+
 const MODELS = ["Genesis", "Explorer", "Quantum"];
 
 type Tab = "chat" | "batch";
@@ -65,6 +68,8 @@ function newId(): string {
 }
 
 export default function PlaygroundPage() {
+  if (!isRouteEnabled("/playground")) notFound();
+
   const [tab, setTab] = useState<Tab>("chat");
   const [sessionId, setSessionId] = useState<string>(() => newId());
   const [title, setTitle] = useState<string>("");

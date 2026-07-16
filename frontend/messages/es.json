@@ -20,7 +20,10 @@
     "account": "Cuenta",
     "notifications": "Notificaciones",
     "rerunOnboarding": "Volver a ejecutar la incorporación",
-    "logout": "Cerrar sesión"
+    "logout": "Cerrar sesión",
+    "profile": "Perfil",
+    "documentation": "Documentación",
+    "downloads": "Descargas"
   },
   "language": {
     "label": "Idioma",

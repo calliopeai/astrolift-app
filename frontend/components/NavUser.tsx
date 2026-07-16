@@ -30,12 +30,15 @@ import {
 import {
   BellIcon,
   BadgeCheckIcon,
+  BookOpenIcon,
   ChevronsUpDownIcon,
+  DownloadIcon,
   KeyRoundIcon,
   LockIcon,
   LogOutIcon,
   ShieldIcon,
   SparklesIcon,
+  UserIcon,
   ZapIcon,
   AlertTriangleIcon,
   InfoIcon,
@@ -138,13 +141,26 @@ export const NavUser = ({ ssrUser: _ssrUser }: { ssrUser: CurrentUser | null }) 
                   <BadgeCheckIcon />
                   {t("account")}
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setNotificationsOpen(true)}>
-                  <BellIcon />
-                  {t("notifications")}
+                {/* Account pages keep their /settings/* URLs (spec 36) —
+                    the menu links to the full pages; the quick-glance
+                    sheets above/below stay on disk (flag-off). */}
+                <DropdownMenuItem asChild>
+                  <Link href="/settings/profile">
+                    <UserIcon />
+                    {t("profile")}
+                  </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setSecurityOpen(true)}>
-                  <ShieldIcon />
-                  {t("security")}
+                <DropdownMenuItem asChild>
+                  <Link href="/settings/security">
+                    <ShieldIcon />
+                    {t("security")}
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/settings/notifications">
+                    <BellIcon />
+                    {t("notifications")}
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/tokens">
@@ -156,6 +172,21 @@ export const NavUser = ({ ssrUser: _ssrUser }: { ssrUser: CurrentUser | null }) 
                   <Link href="/dashboard?onboarding=1">
                     <SparklesIcon />
                     {t("rerunOnboarding")}
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuItem asChild>
+                  <Link href="/documentation">
+                    <BookOpenIcon />
+                    {t("documentation")}
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/downloads">
+                    <DownloadIcon />
+                    {t("downloads")}
                   </Link>
                 </DropdownMenuItem>
               </DropdownMenuGroup>

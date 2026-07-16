@@ -1,5 +1,6 @@
 "use client";
 
+import { notFound } from "next/navigation";
 import { PageShell } from "@/components/PageShell";
 import {
   GitOpsCommitTimeline,
@@ -8,6 +9,8 @@ import {
   type WorkflowActivity,
   type WorkflowRunSummary,
 } from "@/components/observability";
+
+import { isRouteEnabled } from "@/lib/route-flags";
 
 const DEMO_RUN: WorkflowRunSummary = {
   workflowId: "deploy-app:acme/eng/api:abc12",
@@ -104,6 +107,8 @@ const DEMO_COMMITS: GitOpsCommit[] = [
 ];
 
 export default function ObservabilityPlaygroundPage() {
+  if (!isRouteEnabled("/playground")) notFound();
+
   return (
     <PageShell
       title="Observability components"

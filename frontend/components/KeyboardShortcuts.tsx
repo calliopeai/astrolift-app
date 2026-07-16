@@ -49,8 +49,8 @@ const NAV_SHORTCUTS: NavShortcut[] = [
   { combo: "g p", label: "Previews", href: "/previews" },
   { combo: "g c", label: "Clusters", href: "/clusters" },
   { combo: "g j", label: "Jobs", href: "/jobs" },
-  { combo: "g t", label: "Teams", href: "/teams" },
-  { combo: "g s", label: "Settings", href: "/settings/account" },
+  { combo: "g t", label: "Teams", href: "/administration/teams" },
+  { combo: "g s", label: "Settings", href: "/administration/organization" },
 ];
 
 interface OneShotShortcut {

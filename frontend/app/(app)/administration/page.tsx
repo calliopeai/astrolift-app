@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
 export default function AdministrationIndexPage() {
-  redirect("/administration/teams");
+  // Land on the first entry of the Admin subnav's Organization group.
+  redirect("/administration/organization");
 }

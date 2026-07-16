@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { PageShell } from "@/components/PageShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Section } from "@/components/ui/section";
@@ -11,6 +12,8 @@ import {
   TrendStat,
   type PipelineDagStage,
 } from "@/components/viz";
+
+import { isRouteEnabled } from "@/lib/route-flags";
 
 // Dev-only gallery for the #1053 (B1) viz primitives. Not linked in nav;
 // reachable at /dev/viz for design review. Safe to remove once the primitives
@@ -43,6 +46,8 @@ function Swatch({ title, children }: { title: string; children: React.ReactNode 
 }
 
 export default function VizGalleryPage() {
+  if (!isRouteEnabled("/dev/viz")) notFound();
+
   return (
     <PageShell title="Viz primitives" description="B1 (#1053) — small-viz gallery for design review.">
       <Section title="Sparkline" description="Axis-less micro trend for tiles and table cells.">
