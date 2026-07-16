@@ -179,8 +179,7 @@ def test_start_deployment_allows_service_family_agent_only_app(
     all service-family agents must deploy, not be refused (#1093)."""
     _grant_all(permission_resolver, org.id)
     app.manifest_raw = (
-        'name = "hello"\n\n'
-        '[[workloads]]\nname = "agent-svc"\nkind = "agent"\nrun_family = "service"\n'
+        'name = "hello"\n\n' '[[workloads]]\nname = "agent-svc"\nkind = "agent"\nrun_family = "service"\n'
     )
     app.save(update_fields=["manifest_raw", "updated_at", "version"])
 

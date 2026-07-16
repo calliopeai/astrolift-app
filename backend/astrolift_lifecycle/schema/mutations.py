@@ -824,8 +824,7 @@ def _manifest_job_agents_only(app: RegisteredApp) -> bool:
         return False
     workloads = manifest.workloads
     return bool(workloads) and all(
-        getattr(w, "kind", "") == "agent" and getattr(w, "run_family", "task") != "service"
-        for w in workloads
+        getattr(w, "kind", "") == "agent" and getattr(w, "run_family", "task") != "service" for w in workloads
     )
 
 
