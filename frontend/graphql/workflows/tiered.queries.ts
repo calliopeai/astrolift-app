@@ -1,0 +1,179 @@
+import { gql } from "@apollo/client";
+
+// Tiered workflows domain (spec 40). Operation names carry a "Tiered" /
+// "Configured" qualifier where a legacy operation (workflows.queries.ts)
+// already claimed the natural name — the legacy docs stay untouched because
+// the Temporal instances panel still consumes them.
+
+const CONFIGURED_WORKFLOW_FIELDS = `
+  guid
+  name
+  slug
+  description
+  triggerKind
+  scheduleCron
+  isEnabled
+  inputs
+  stageBindings
+  organizationGuid
+  definitionSlug
+  definitionName
+  patternKind
+  runCount
+  createdAt
+`;
+
+const WORKFLOW_RUN_FIELDS = `
+  guid
+  currentState
+  temporalWorkflowId
+  startedAt
+  completedAt
+  isCompleted
+`;
+
+const DEFINITION_SUMMARY_FIELDS = `
+  guid
+  name
+  slug
+  description
+  patternKind
+  isEnabled
+  isGlobal
+  organizationGuid
+  stageCount
+  createdAt
+`;
+
+const STAGE_FIELDS = `
+  guid
+  order
+  kind
+  skillRefs
+  fanOutCount
+  onFailure
+  timeoutSeconds
+  createdAt
+  agentDefinitionGuid
+  agentDefinitionName
+`;
+
+// ─── Tier 2 — configured workflows ───────────────────────────────────────
+
+export const LIST_CONFIGURED_WORKFLOWS = gql`
+  query ListConfiguredWorkflows($orgId: ID) {
+    workflows(orgId: $orgId) {
+      ${CONFIGURED_WORKFLOW_FIELDS}
+    }
+  }
+`;
+
+export const GET_CONFIGURED_WORKFLOW = gql`
+  query GetConfiguredWorkflow($slug: String!, $orgId: ID) {
+    workflow(slug: $slug, orgId: $orgId) {
+      ${CONFIGURED_WORKFLOW_FIELDS}
+      runs {
+        ${WORKFLOW_RUN_FIELDS}
+      }
+    }
+  }
+`;
+
+// ─── Tier 1 — definitions + stages ───────────────────────────────────────
+
+export const LIST_TIERED_WORKFLOW_DEFINITIONS = gql`
+  query ListTieredWorkflowDefinitions($orgId: ID) {
+    workflowDefinitions(orgId: $orgId) {
+      ${DEFINITION_SUMMARY_FIELDS}
+    }
+  }
+`;
+
+export const GET_TIERED_WORKFLOW_DEFINITION = gql`
+  query GetTieredWorkflowDefinition($slug: String!, $orgId: ID) {
+    workflowDefinition(slug: $slug, orgId: $orgId) {
+      ${DEFINITION_SUMMARY_FIELDS}
+    }
+  }
+`;
+
+export const LIST_WORKFLOW_STAGES = gql`
+  query ListWorkflowStages($workflowSlug: String!) {
+    workflowStages(workflowSlug: $workflowSlug) {
+      ${STAGE_FIELDS}
+    }
+  }
+`;
+
+// ─── Tier 3 — runs ───────────────────────────────────────────────────────
+
+export const LIST_WORKFLOW_RUNS = gql`
+  query ListTieredWorkflowRuns($workflowId: ID!, $orgId: ID) {
+    workflowRuns(workflowId: $workflowId, orgId: $orgId) {
+      ${WORKFLOW_RUN_FIELDS}
+    }
+  }
+`;
+
+export const LIST_WORKFLOW_STAGE_EXECUTIONS = gql`
+  query ListWorkflowStageExecutions($workflowId: String!, $runId: String!) {
+    workflowStageExecutions(workflowId: $workflowId, runId: $runId) {
+      guid
+      status
+      attemptNumber
+      startedAt
+      endedAt
+      output
+      failure
+      errorMessage
+      createdAt
+      executionId
+      stageGuid
+      stageKind
+      stageOrder
+      agentRunGuid
+    }
+  }
+`;
+
+// ─── Manifest (TOML code view) ───────────────────────────────────────────
+
+export const EXPORT_WORKFLOW_MANIFEST = gql`
+  query ExportWorkflowManifest($definitionSlug: String!) {
+    exportWorkflowManifest(definitionSlug: $definitionSlug) {
+      ok
+      toml
+      error
+    }
+  }
+`;
+
+export const PREVIEW_WORKFLOW_MANIFEST = gql`
+  query PreviewWorkflowManifest($toml: String!) {
+    previewWorkflowManifest(toml: $toml) {
+      ok
+      error
+      errorPath
+      errorLine
+      errorColumn
+      definition {
+        slug
+        name
+        pattern
+        description
+      }
+      stages {
+        order
+        kind
+        role
+        agent
+        skills
+        onFailure
+        timeout
+        fanOut
+        prompt
+        approvers
+      }
+    }
+  }
+`;

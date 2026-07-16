@@ -1,67 +1,25 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 
 import {
-  GET_WORKFLOW,
   GET_WORKFLOW_INSTANCE_DETAIL,
   GET_WORKFLOW_INSTANCES,
-  GET_WORKFLOWS,
 } from "./workflows.queries";
 import {
   CANCEL_WORKFLOW_INSTANCE,
-  CREATE_WORKFLOW,
-  DELETE_WORKFLOW,
   SIGNAL_WORKFLOW_INSTANCE,
   START_WORKFLOW,
   TERMINATE_WORKFLOW_INSTANCE,
   TRANSITION_WORKFLOW,
-  UPDATE_WORKFLOW,
 } from "./workflows.mutations";
 import type {
   CancelWorkflowInstanceData,
-  CreateWorkflowData,
-  DeleteWorkflowData,
   SignalWorkflowInstanceData,
   StartWorkflowData,
   TerminateWorkflowInstanceData,
   TransitionWorkflowData,
-  UpdateWorkflowData,
-  WorkflowDefinitionData,
-  WorkflowDefinitionsData,
   WorkflowInstanceDetailData,
   WorkflowInstancesData,
 } from "./workflows.types";
-
-export const useWorkflows = (modelLabel?: string) => {
-  const { data, loading, error, refetch } = useQuery<WorkflowDefinitionsData>(GET_WORKFLOWS, {
-    variables: { modelLabel },
-    fetchPolicy: "cache-and-network",
-  });
-  return { workflows: data?.workflowDefinitions ?? [], loading, error, refetch };
-};
-
-export const useWorkflow = (slug: string) => {
-  const { data, loading, error, refetch } = useQuery<WorkflowDefinitionData>(GET_WORKFLOW, {
-    variables: { slug },
-    fetchPolicy: "cache-and-network",
-    skip: !slug,
-  });
-  return { workflow: data?.workflowDefinition ?? null, loading, error, refetch };
-};
-
-export const useCreateWorkflow = () =>
-  useMutation<CreateWorkflowData>(CREATE_WORKFLOW, {
-    refetchQueries: [GET_WORKFLOWS],
-  });
-
-export const useUpdateWorkflow = () =>
-  useMutation<UpdateWorkflowData>(UPDATE_WORKFLOW, {
-    refetchQueries: [GET_WORKFLOWS],
-  });
-
-export const useDeleteWorkflow = () =>
-  useMutation<DeleteWorkflowData>(DELETE_WORKFLOW, {
-    refetchQueries: [GET_WORKFLOWS],
-  });
 
 export const useStartWorkflow = () => useMutation<StartWorkflowData>(START_WORKFLOW);
 

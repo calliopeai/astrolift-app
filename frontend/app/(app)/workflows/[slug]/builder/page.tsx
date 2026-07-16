@@ -1,90 +1,10 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { Loader2Icon, WorkflowIcon } from "lucide-react";
-import { toast } from "sonner";
 
-import { EmptyState } from "@/components/EmptyState";
-import { PageShell } from "@/components/PageShell";
-import { Separator } from "@/components/ui/separator";
-import { WorkflowBuilder } from "@/components/workflows/WorkflowBuilder";
-import { useWorkflow, useUpdateWorkflow } from "@/graphql/workflows/workflows.hooks";
-import { useFormDefinitions } from "@/graphql/forms/forms.hooks";
-import type { WorkflowState, WorkflowTransition } from "@/graphql/workflows/workflows.types";
+import { StageBuilder } from "@/components/workflows/StageBuilder";
 
 export default function WorkflowBuilderPage() {
   const { slug } = useParams<{ slug: string }>();
-  const { workflow, loading, error, refetch } = useWorkflow(slug);
-  const [updateWorkflow] = useUpdateWorkflow();
-  const { forms } = useFormDefinitions("published");
-
-  if (loading && !workflow) {
-    return (
-      <div className="flex flex-1 items-center justify-center p-6">
-        <Loader2Icon className="text-muted-foreground h-6 w-6 animate-spin" />
-      </div>
-    );
-  }
-
-  if (error || !workflow) {
-    return (
-      <PageShell title="Workflow not found">
-        <EmptyState
-          icon={<WorkflowIcon className="size-5" />}
-          title={error ? "Couldn't load this workflow" : "Workflow not found"}
-          description={
-            error
-              ? error.message
-              : `The workflow "${slug}" may have been deleted, or you may not have access to it.`
-          }
-          actionHref="/workflows"
-          actionLabel="Back to workflows"
-        />
-      </PageShell>
-    );
-  }
-
-  const handleSave = async (states: WorkflowState[], transitions: WorkflowTransition[]) => {
-    const { data } = await updateWorkflow({
-      variables: { slug, states, transitions },
-    });
-
-    if (data?.updateWorkflowDefinition?.ok) {
-      toast.success("Workflow saved", {
-        description: `${states.length} states, ${transitions.length} transitions`,
-      });
-      refetch();
-    } else {
-      const errors = data?.updateWorkflowDefinition?.errors ?? [];
-      if (errors.length > 0) {
-        for (const e of errors) {
-          toast.error(`${e.field}: ${e.messages.join(", ")}`);
-        }
-      } else {
-        toast.error("Failed to save workflow");
-      }
-    }
-  };
-
-  return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
-      <div>
-        <h1 className="text-xl font-semibold">{workflow.name} — Builder</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Drag states, draw transitions. Click Save to update the workflow.
-        </p>
-      </div>
-      <Separator />
-      <WorkflowBuilder
-        states={workflow.states || []}
-        // GraphQL types model conditions/actions as unknown[]; the
-        // builder narrows them to Condition[]/Action[]. Trust the
-        // shape coming back from the platform API here — the editor
-        // surfaces anything malformed.
-        transitions={(workflow.transitions || []) as never}
-        onSave={handleSave as never}
-        availableForms={(forms ?? []).map((f: { slug: string; name: string }) => ({ slug: f.slug, name: f.name }))}
-      />
-    </div>
-  );
+  return <StageBuilder slug={slug} />;
 }
