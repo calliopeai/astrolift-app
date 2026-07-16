@@ -8,7 +8,10 @@ from types import SimpleNamespace
 import pytest
 from django.test import RequestFactory
 
-from astrolift_workflows.schema.manifest import WorkflowManifestQuery
+from astrolift_workflows.schema.manifest import (
+    WorkflowManifestMutation,
+    WorkflowManifestQuery,
+)
 from core.permissions import Permission, PermissionDenied
 from core.tenancy import TenantContext, tenant_context
 from workflows.models import WorkflowDefinition, WorkflowStage
@@ -137,3 +140,84 @@ def test_export_unknown_slug_returns_error(permission_resolver):
         result = q.export_workflow_manifest(_info(), definition_slug="does-not-exist")
     assert result.ok is False
     assert result.toml is None
+
+
+# ---- import (#970/#972) -------------------------------------------------------
+
+
+def test_import_denied_without_create():
+    m = WorkflowManifestMutation()
+    with _tenant():
+        with pytest.raises(PermissionDenied):
+            m.import_workflow_manifest(_info(), toml=VALID_TOML)
+
+
+def test_import_preview_parses_without_persisting(permission_resolver):
+    permission_resolver.grant(Permission.WORKFLOW_CREATE)
+    before = WorkflowDefinition.objects.count()
+    m = WorkflowManifestMutation()
+    with _tenant():
+        result = m.import_workflow_manifest(_info(), toml=VALID_TOML)
+    assert result.ok is True
+    assert result.created_slug is None
+    assert result.manifest.definition.slug == "feature-dev"
+    assert result.manifest.definition.pattern == "chained"
+    assert WorkflowDefinition.objects.count() == before
+
+
+def test_import_malformed_toml_returns_structured_error(permission_resolver):
+    permission_resolver.grant(Permission.WORKFLOW_CREATE)
+    before = WorkflowDefinition.objects.count()
+    m = WorkflowManifestMutation()
+    with _tenant():
+        result = m.import_workflow_manifest(_info(), toml="[workflow]\nslug = ", preview=False)
+    assert result.ok is False
+    assert result.errors[0].field == "toml"
+    assert result.manifest.ok is False
+    assert result.manifest.error
+    assert WorkflowDefinition.objects.count() == before
+
+
+def test_import_persists_into_caller_org(permission_resolver):
+    permission_resolver.grant(Permission.WORKFLOW_CREATE)
+    org = _make_org()
+    m = WorkflowManifestMutation()
+    with _tenant(org_id=org.pk):
+        result = m.import_workflow_manifest(_info(), toml=VALID_TOML, preview=False)
+
+    assert result.ok is True
+    assert result.created_slug == "feature-dev"
+    # A catalogue global may share the slug — the import lands org-scoped.
+    definition = WorkflowDefinition.objects.get(slug="feature-dev", organization_id=org.pk)
+    assert definition.is_enabled is False  # imported disabled, bind agents first
+    stage = definition.stages.get()
+    assert stage.kind == WorkflowStage.StageKind.AGENT_DISPATCH.value
+    assert stage.role == "implementer"
+
+
+def test_import_uniquifies_slug_on_collision(permission_resolver):
+    permission_resolver.grant(Permission.WORKFLOW_CREATE)
+    org = _make_org()
+    m = WorkflowManifestMutation()
+    with _tenant(org_id=org.pk):
+        first = m.import_workflow_manifest(_info(), toml=VALID_TOML, preview=False)
+        second = m.import_workflow_manifest(_info(), toml=VALID_TOML, preview=False)
+    assert first.created_slug == "feature-dev"
+    assert second.created_slug == "feature-dev-1"
+    # The manifest echoes the slug that actually persisted.
+    assert second.manifest.definition.slug == "feature-dev-1"
+
+
+def test_import_foreign_org_id_rejected(permission_resolver):
+    from astrolift_identity.models import Organization
+
+    permission_resolver.grant(Permission.WORKFLOW_CREATE)
+    org = _make_org()
+    other = Organization.objects.create(name="Other Org", slug="other-manifest-org")
+    before = WorkflowDefinition.objects.count()
+    m = WorkflowManifestMutation()
+    with _tenant(org_id=org.pk):
+        result = m.import_workflow_manifest(_info(), toml=VALID_TOML, preview=False, org_id=str(other.guid))
+    assert result.ok is False
+    assert any("mismatch" in msg for e in result.errors for msg in e.messages)
+    assert WorkflowDefinition.objects.count() == before

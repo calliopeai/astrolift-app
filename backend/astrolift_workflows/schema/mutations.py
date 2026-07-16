@@ -464,8 +464,15 @@ class WorkflowsMutation:
         if agent_definition_guid is not None:
             from astrolift_registry.models import Workload
 
+            # Scoped to the caller's org (via registered_app.organization) —
+            # a foreign org's workload is not-found, never a cross-tenant bind.
             workload = (
-                Workload.objects.filter(guid=agent_definition_guid).first() if agent_definition_guid else None
+                Workload.objects.filter(
+                    guid=agent_definition_guid,
+                    registered_app__organization_id=_caller_org_pk(),
+                ).first()
+                if agent_definition_guid
+                else None
             )
             if agent_definition_guid and workload is None:
                 return _failure("agent_definition_guid", "Workload not found")

@@ -363,6 +363,43 @@ def test_global_definition_stage_write_denied(member, org, permission_resolver):
     assert any("platform template" in msg for e in res.errors for msg in e.messages)
 
 
+def test_update_stage_rejects_foreign_org_workload(member, org, other_org, permission_resolver):
+    """Org A must not rebind its stage to org B's agent workload — the
+    workload lookup is scoped via registered_app.organization."""
+    from astrolift_identity.models import Project, Team
+    from astrolift_registry.models import RegisteredApp, Workload
+
+    permission_resolver.grant(Permission.WORKFLOW_UPDATE)
+    d = _make_def("cw-xbind", organization=org)
+    stage = d.stages.first()
+    team = Team.objects.create(organization=other_org, name="Eng", slug="cw-eng-b")
+    project = Project.objects.create(organization=other_org, team=team, name="Demo", slug="cw-demo-b")
+    app = RegisteredApp.objects.create(
+        organization=other_org,
+        team=team,
+        project=project,
+        name="App",
+        slug="cw-app-b",
+        provisioning_status="ready",
+    )
+    theirs = Workload.objects.create(
+        registered_app=app,
+        name="Coder",
+        slug="cw-coder-b",
+        kind=Workload.Kind.AGENT.value,
+        run_family=Workload.RunFamily.TASK.value,
+    )
+    m = WorkflowsMutation()
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        res = m.update_workflow_stage(
+            _info(member), stage_guid=str(stage.guid), agent_definition_guid=str(theirs.guid)
+        )
+    assert not res.ok
+    assert any("Workload not found" in msg for e in res.errors for msg in e.messages)
+    stage.refresh_from_db()
+    assert stage.agent_definition_id is None
+
+
 def test_reorder_stages_on_org_definition(member, org, permission_resolver):
     permission_resolver.grant(Permission.WORKFLOW_UPDATE)
     d = _make_def("cw-reorder", organization=org)

@@ -14,6 +14,7 @@ from types import SimpleNamespace
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from graphql import GraphQLError
 
 from core.permissions import Permission
 from core.tenancy import TenantContext
@@ -110,10 +111,11 @@ def _make_def(slug, *, organization=None, pattern="chained", stage_agent=None, w
 # --------------------------------------------------------------------------
 
 
-def test_global_definition_write_denied_to_member(member, org):
+def test_global_definition_write_denied_to_member(member, org, permission_resolver):
+    permission_resolver.grant(Permission.WORKFLOW_UPDATE)
     _make_def("g-readonly", organization=None)
     m = Mutation()
-    with _tenant_ctx(TenantContext(organization_id=org.id)):
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
         res = m.update_workflow_definition(_info(member), slug="g-readonly", name="hacked")
     assert not res.ok
     assert any("platform template" in msg for e in res.errors for msg in e.messages)
@@ -134,13 +136,17 @@ def test_superuser_can_seed_global(superuser):
     assert WorkflowDefinition.objects.get(slug="seed-global").organization_id is None
 
 
-def test_cross_org_definition_write_denied(member, org, other_org):
-    _make_def("x-other", organization=other_org)
+def test_cross_org_definition_write_denied(member, org, other_org, permission_resolver):
+    """A foreign org's slug resolves to not-found — no cross-tenant
+    existence oracle, and no write."""
+    permission_resolver.grant(Permission.WORKFLOW_UPDATE)
+    d = _make_def("x-other", organization=other_org)
     m = Mutation()
-    with _tenant_ctx(TenantContext(organization_id=org.id)):
-        res = m.update_workflow_definition(_info(member), slug="x-other", name="hax")
-    assert not res.ok
-    assert any("not your organization" in msg for e in res.errors for msg in e.messages)
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        with pytest.raises(GraphQLError, match="not found"):
+            m.update_workflow_definition(_info(member), slug="x-other", name="hax")
+    d.refresh_from_db()
+    assert d.name == "Def x-other"
 
 
 def test_read_scope_org_union_global(org, other_org):

@@ -83,6 +83,8 @@ if is_enabled(Feature.WORKFLOWS):
     _mutation_bases.append(WorkflowsSchema.Mutation)
     # Visual-flow importer (Langflow/Flowise → WorkflowDefinition, #984-#986).
     _mutation_bases.append(AstroliftTemporalWorkflowsSchema.WorkflowImportMutation)
+    # Native TOML manifest import (#970/#972).
+    _mutation_bases.append(AstroliftTemporalWorkflowsSchema.WorkflowManifestMutation)
 
     # Configured-Workflow surface (spec 40 §6, #968) — lives under
     # astrolift_workflows for the #164 tenancy guardrail but needs the
