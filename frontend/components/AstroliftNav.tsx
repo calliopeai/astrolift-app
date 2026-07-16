@@ -5,6 +5,7 @@ import {
   BellIcon,
   BoltIcon,
   BoxIcon,
+  Building2Icon,
   ClipboardListIcon,
   LayoutDashboardIcon,
   BookOpenIcon,
@@ -14,6 +15,7 @@ import {
   ChevronRightIcon,
   CreditCardIcon,
   FolderIcon,
+  GaugeIcon,
   GitBranchIcon,
   CloudIcon,
   GlobeIcon,
@@ -42,9 +44,12 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
 import { type ModuleKey, useModules } from "@/graphql/user/user.hooks";
-import { type PermissionCheck, useMyPermissions } from "@/lib/permissions/use-my-permissions";
+import type { PermissionCheck } from "@/lib/permissions/use-my-permissions";
 
 const COLLAPSED_KEY = "astrolift.nav.collapsed.v1";
 
@@ -57,13 +62,12 @@ interface NavItem {
    * `permission` are visible to every authenticated user (e.g.
    * Settings, which itself routes deeper into per-section guards).
    *
-   * NOTE (spec 36 §1.3): top-level *module* visibility no longer uses
-   * this field — modules are gated by the server-authoritative
-   * `me.modules.canView` (see `moduleKey` below). This field survives
-   * only for the **Admin module's internal sub-nav**, which §1.2 keeps
-   * "exactly as today" (its per-item reorg is Phase 2). The frontend
-   * carries no permission *logic* for the switcher itself — it renders
-   * the server's answer.
+   * NOTE (spec 36 §1.3): the rendered nav no longer uses this field —
+   * modules are gated by the server-authoritative `me.modules.canView`
+   * (see `moduleKey` below) and finer gating lives in-page (`<Can>`).
+   * The field survives only on the deferred (flag-off) section
+   * definitions kept on disk below. The frontend carries no permission
+   * *logic* for the switcher — it renders the server's answer.
    */
   permission?: PermissionCheck;
   /**
@@ -102,6 +106,12 @@ interface ModuleEntry {
   href?: string;
   tourTarget?: string;
   /**
+   * Flat child links rendered as an indented sub-nav directly beneath a
+   * landing-link module (Apps → Deployments/Approvals, Workflows →
+   * Jobs/Tasks/Functions). Only meaningful alongside `href`.
+   */
+  items?: NavItem[];
+  /**
    * Labeled sub-groups for a module rendered as a collapsible section
    * (Admin). Mutually exclusive with `href` — a module is either a flat
    * landing link or a collapsible container of sub-nav.
@@ -120,9 +130,9 @@ interface ModuleEntry {
 //   Apps       — iff `modules.apps.canView`.
 //   Agents     — iff `modules.agents.canView`.
 //   Workflows  — iff `modules.workflows.canView`.
-//   Admin      — iff `modules.admin.canView`. Absorbs the former `Control`
-//                group's Infra + Settings + Platform sub-groups VERBATIM as
-//                its internal sub-nav (their per-item reorg is Phase 2).
+//   Admin      — iff `modules.admin.canView`. The former `Control` group,
+//                restructured into four sub-groups: Organization /
+//                Infrastructure / Usage & Governance / Platform Signals.
 //
 // The former `NAV_FLAGS`-gated Build / Observe / Secure / runExtras sections
 // and the Run & Observe "Workloads" placeholder are dropped FROM THE SWITCHER
@@ -142,6 +152,7 @@ const NAV_FLAGS = {
   runExtras: false, // old flat RUN extras now off-nav (see runExtrasSection)
   observe: false, // OBSERVE pillar: ops dashboard dupe + per-primitive signals
   secure: false, // SECURE pillar: Zentinelle GRC handoff
+  platform: false, // former Admin > Platform group (Django admin escape hatch)
 } as const;
 
 // BUILD — CI pipelines, image builder, artifact management.
@@ -201,6 +212,25 @@ const secureSection: { label: string; items: NavItem[] } = {
   items: [{ label: "Zentinelle", href: "/secure/zentinelle", icon: <ShieldCheckIcon /> }],
 };
 
+// Former Admin > Platform group. The Django admin lives outside the Next
+// app and is server-rendered, so it opens via a plain <a> in the same tab.
+// Not in the four restructured Admin sub-groups (spec 36 §1.2) — kept here
+// flag-off; the /app/admin route itself remains reachable directly. Gate
+// kept as the existing platform-admin proxy `cluster.register` (there is
+// no `me.isStaff` field yet).
+const platformSection: { label: string; items: NavItem[] } = {
+  label: "Platform",
+  items: [
+    {
+      label: "Admin",
+      href: "/app/admin",
+      icon: <ShieldCheckIcon />,
+      permission: "cluster.register",
+      external: true,
+    },
+  ],
+};
+
 // Retention anchor: keeps the flags + deferred definitions live for
 // re-enable / Phase-5 cut planning without tripping no-unused-vars. The
 // flags are all `false`, so this resolves to an empty list — the deferred
@@ -210,15 +240,16 @@ const DEFERRED_SECTIONS = [
   ...(NAV_FLAGS.runExtras ? [runExtrasSection] : []),
   ...(NAV_FLAGS.observe ? [observeSection] : []),
   ...(NAV_FLAGS.secure ? [secureSection] : []),
+  ...(NAV_FLAGS.platform ? [platformSection] : []),
 ];
 void DEFERRED_SECTIONS;
 
 // ---------------------------------------------------------------------------
 // The five modules.
 // ---------------------------------------------------------------------------
-// Dashboard / Apps / Agents / Workflows are flat landing links. Admin is a
-// collapsible container whose sub-groups are the former Control group's
-// Infra / Settings / Platform items, kept exactly as today (§1.2).
+// Dashboard / Agents are flat landing links; Apps and Workflows are landing
+// links with an indented child sub-nav. Admin is a collapsible container of
+// four labeled sub-groups (§1.2).
 const modules: ModuleEntry[] = [
   {
     // Dashboard — always rendered (no `me.modules` key; `org.read` implicit).
@@ -232,6 +263,10 @@ const modules: ModuleEntry[] = [
     moduleKey: "apps",
     icon: <RocketIcon />,
     href: "/apps",
+    items: [
+      { label: "Deployments", href: "/deployments", icon: <RocketIcon /> },
+      { label: "Approvals", href: "/approvals", icon: <CheckCircle2Icon /> },
+    ],
   },
   {
     label: "Agents",
@@ -244,122 +279,76 @@ const modules: ModuleEntry[] = [
     moduleKey: "workflows",
     icon: <WorkflowIcon />,
     href: "/workflows",
+    items: [
+      { label: "Jobs", href: "/jobs", icon: <CalendarClockIcon /> },
+      { label: "Tasks", href: "/tasks", icon: <ClipboardListIcon /> },
+      { label: "Functions", href: "/functions", icon: <BoltIcon /> },
+    ],
   },
   {
-    // Admin — absorbs the former top-level `Control` group's three
-    // sub-groups VERBATIM (Phase 2 reorganises their contents). Top-level
-    // visibility is `modules.admin.canView`; the sub-items keep their own
-    // `permission` filtering exactly as today.
+    // Admin — the former `Control` group restructured into four labeled
+    // sub-groups (spec 36 §1.2 Phase 2). Top-level visibility is
+    // `modules.admin.canView`; finer gating is in-page (`<Can>`), not
+    // per-item nav permission strings. Moved /administration/* routes
+    // are created by the B2 route pass — hrefs point at the targets.
     label: "Admin",
     moduleKey: "admin",
     icon: <ShieldCheckIcon />,
     subGroups: [
       {
-        label: "Infra",
+        label: "Organization",
+        items: [
+          {
+            label: "Organization",
+            href: "/administration/organization",
+            icon: <Building2Icon />,
+          },
+          { label: "Members", href: "/administration/members", icon: <UsersIcon /> },
+          { label: "Teams", href: "/administration/teams", icon: <UsersRoundIcon /> },
+          { label: "Projects", href: "/administration/projects", icon: <FolderIcon /> },
+          { label: "Policies", href: "/administration/policies", icon: <ShieldIcon /> },
+          { label: "Permissions", href: "/administration/permissions", icon: <LockIcon /> },
+        ],
+      },
+      {
+        label: "Infrastructure",
         items: [
           {
             label: "Clusters",
             href: "/clusters",
             icon: <LayersIcon />,
-            permission: { anyOf: ["cluster.register", "provider_plugin.read"] },
             tourTarget: "clusters-nav",
           },
-          {
-            label: "Domains",
-            href: "/domains",
-            icon: <GlobeIcon />,
-            permission: { anyOf: ["cluster.register", "app.read"] },
-          },
-          {
-            label: "Providers",
-            href: "/providers",
-            icon: <CloudIcon />,
-            permission: "provider_plugin.read",
-          },
-          {
-            label: "Webhooks",
-            href: "/webhooks",
-            icon: <WebhookIcon />,
-            permission: { anyOf: ["webhook.create", "webhook.update"] },
-          },
+          { label: "Domains", href: "/domains", icon: <GlobeIcon /> },
+          { label: "Providers", href: "/providers", icon: <CloudIcon /> },
+          { label: "Webhooks", href: "/webhooks", icon: <WebhookIcon /> },
         ],
       },
       {
-        // Settings — org settings + RBAC/governance. Destinations kept
-        // as-is (Members and friends still point at /administration/*,
-        // /settings/*, etc.).
-        label: "Settings",
+        label: "Usage & Governance",
         items: [
-          {
-            label: "Members",
-            href: "/administration/members",
-            icon: <UsersIcon />,
-            permission: "org.manage_members",
-          },
-          {
-            label: "Teams",
-            href: "/administration/teams",
-            icon: <UsersRoundIcon />,
-            permission: "team.read",
-          },
-          {
-            label: "Projects",
-            href: "/administration/projects",
-            icon: <FolderIcon />,
-            permission: "project.read",
-          },
-          {
-            label: "Policies",
-            href: "/settings/policies",
-            icon: <ShieldIcon />,
-            permission: "org.manage_members",
-          },
-          {
-            label: "Permissions",
-            href: "/settings/permissions",
-            icon: <LockIcon />,
-            permission: "org.manage_members",
-          },
-          {
-            label: "Tokens",
-            href: "/tokens",
-            icon: <KeyRoundIcon />,
-            permission: "api_token.create",
-          },
-          {
-            label: "Cost",
-            href: "/administration/cost",
-            icon: <CreditCardIcon />,
-            permission: "billing.read",
-          },
+          { label: "Cost", href: "/administration/cost", icon: <CreditCardIcon /> },
           {
             label: "Quotas",
             href: "/administration/quotas",
             icon: <SlidersHorizontalIcon />,
-            permission: "org.manage_members",
           },
-          {
-            label: "Audit",
-            href: "/audit",
-            icon: <ScrollTextIcon />,
-            permission: "audit_log.read",
-          },
+          { label: "Metrics", href: "/administration/metrics", icon: <GaugeIcon /> },
+          // /tokens stays top-level canonical (#893) — this entry points AT it.
+          { label: "Tokens", href: "/tokens", icon: <KeyRoundIcon /> },
+          { label: "Audit", href: "/administration/audit", icon: <ScrollTextIcon /> },
         ],
       },
       {
-        label: "Platform",
+        label: "Platform Signals",
         items: [
           {
-            // Admin — the Django admin lives outside the Next app and is
-            // server-rendered, so it opens via a plain <a> in the same tab.
-            // Gate kept as the existing platform-admin proxy `cluster.register`
-            // (there is no `me.isStaff` field yet). FOLLOW-UP unchanged.
-            label: "Admin",
-            href: "/app/admin",
-            icon: <ShieldCheckIcon />,
-            permission: "cluster.register",
-            external: true,
+            label: "Platform Activity",
+            href: "/platform-activity",
+            icon: <ActivityIcon />,
           },
+          { label: "Alerts", href: "/alerts", icon: <BellIcon /> },
+          { label: "Events", href: "/events", icon: <ActivityIcon /> },
         ],
       },
     ],
@@ -396,12 +385,10 @@ function saveCollapsedState(state: Record<string, boolean>) {
 
 export function AstroliftNav() {
   const pathname = usePathname();
-  // Top-level module visibility comes from the server-authoritative
-  // `me.modules` (spec 36 §1.3). The Admin module's internal sub-nav keeps
-  // its own per-item permission filtering (§1.2 — "exactly as today"), so we
-  // still read the granted-permission set for that.
+  // All nav visibility comes from the server-authoritative `me.modules`
+  // (spec 36 §1.3) — module gating only, no per-item permission strings.
+  // Finer gating lives in-page (`<Can>`).
   const { canView, loading: modulesLoading } = useModules();
-  const { can, loading: permsLoading } = useMyPermissions();
 
   // Collapsed sections persist in localStorage so refreshes keep the layout
   // the operator chose.
@@ -418,13 +405,11 @@ export function AstroliftNav() {
     });
   }
 
-  // Render a list of sub-nav items as sidebar menu entries. Sub-items keep
-  // their per-item permission filtering (Admin internal nav, §1.2). While the
-  // permission set is loading we show every item so the sidebar doesn't
-  // shrink-and-grow on refresh; once warm, the filter takes effect.
+  // Render a list of sub-nav items as sidebar menu entries. Items are not
+  // permission-filtered — visibility is the containing module's `canView`
+  // (spec 36 §1.3); in-page guards handle the rest.
   const renderItems = (items: NavItem[]) =>
     items
-      .filter((item) => !item.permission || permsLoading || can(item.permission))
       .map((item) => {
         const active =
           pathname === item.href ||
@@ -466,8 +451,9 @@ export function AstroliftNav() {
           mod.moduleKey === undefined || modulesLoading || canView(mod.moduleKey);
         if (!visible) return null;
 
-        // Flat module (Dashboard / Apps / Agents / Workflows) — a single
-        // landing link, no section chrome.
+        // Flat module (Dashboard / Apps / Agents / Workflows) — a landing
+        // link, optionally with an indented child sub-nav (Apps →
+        // Deployments/Approvals, Workflows → Jobs/Tasks/Functions).
         if (mod.href) {
           const active =
             pathname === mod.href || pathname.startsWith(mod.href + "/");
@@ -481,6 +467,24 @@ export function AstroliftNav() {
                       <span>{mod.label}</span>
                     </Link>
                   </SidebarMenuButton>
+                  {mod.items && mod.items.length > 0 && (
+                    <SidebarMenuSub>
+                      {mod.items.map((item) => {
+                        const subActive =
+                          pathname === item.href || pathname.startsWith(item.href + "/");
+                        return (
+                          <SidebarMenuSubItem key={item.href}>
+                            <SidebarMenuSubButton asChild isActive={subActive}>
+                              <Link href={item.href}>
+                                {item.icon}
+                                <span>{item.label}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        );
+                      })}
+                    </SidebarMenuSub>
+                  )}
                 </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroup>
@@ -492,8 +496,7 @@ export function AstroliftNav() {
         const renderedGroups = subGroups
           .map((group) => ({ group, items: renderItems(group.items) }))
           .filter(({ items }) => items.length > 0);
-        // If the viewer can see the module but none of its sub-items pass
-        // their own permission filter, omit the empty shell.
+        // Guard against an empty shell (a module defined with no sub-items).
         if (renderedGroups.length === 0) return null;
 
         const isOpen = !collapsed[mod.label];

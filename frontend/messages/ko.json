@@ -20,7 +20,10 @@
     "account": "Account",
     "notifications": "Notifications",
     "rerunOnboarding": "온보딩 다시 실행",
-    "logout": "Log out"
+    "logout": "Log out",
+    "profile": "프로필",
+    "documentation": "문서",
+    "downloads": "다운로드"
   },
   "language": {
     "label": "Language",

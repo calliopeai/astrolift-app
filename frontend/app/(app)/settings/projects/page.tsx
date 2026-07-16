@@ -6,9 +6,9 @@ export const metadata = {
 
 /**
  * /settings/projects is an alias for the canonical org-projects
- * surface at /projects (#413). Server-side redirect — same
+ * surface at /administration/projects. Server-side redirect — same
  * reasoning as the sibling members alias.
  */
 export default function SettingsProjectsAliasPage() {
-  redirect("/projects");
+  redirect("/administration/projects");
 }

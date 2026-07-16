@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useModules } from "@/graphql/user/user.hooks";
 import { LIST_NAV_TREE } from "@/graphql/identity/identity.queries";
 import type {
   AstroliftAppStatus,
@@ -159,6 +160,7 @@ function NavTreeSkeleton({ rows = 3 }: NavTreeSkeletonProps) {
  */
 export function NavTree() {
   const pathname = usePathname();
+  const { canView, loading: modulesLoading } = useModules();
   const { data, loading, error } = useQuery<NavTreeResp>(LIST_NAV_TREE, {
     fetchPolicy: "cache-and-network",
   });
@@ -221,6 +223,13 @@ export function NavTree() {
     });
   }
 
+  // Apps module gate (spec 36 §1.3): this Org -> Team -> Project -> App
+  // tree exists solely to navigate to apps, so it inherits the Apps
+  // module's server-authoritative visibility. While `me.modules` loads we
+  // keep rendering to avoid a sidebar shrink-and-grow on refresh — matching
+  // AstroliftNav.
+  if (!modulesLoading && !canView("apps")) return null;
+
   if (loading && !data) {
     return <NavTreeSkeleton />;
   }
@@ -261,7 +270,7 @@ export function NavTree() {
             >
               <div className="flex w-full items-center">
                 <Link
-                  href="/settings/organization"
+                  href="/administration/organization"
                   className="flex flex-1 items-center gap-2 min-w-0"
                   title={tree.organization.name}
                 >
@@ -282,7 +291,7 @@ export function NavTree() {
               <SidebarMenuSub className="mx-2 px-1.5">
                 {tree.teams.length === 0 ? (
                   <EmptyRow
-                    href="/teams"
+                    href="/administration/teams"
                     label="No teams yet"
                     cta="Create your first team"
                   />
@@ -343,7 +352,7 @@ function TeamNode({ node, activeAppSlug, open, toggle }: TeamNodeProps) {
           <div className="flex w-full min-w-0 items-start gap-2">
             <UsersIcon className="shrink-0 text-sidebar-foreground/70 mt-0.5" />
             <Link
-              href={`/teams?team=${encodeURIComponent(node.team.slug)}`}
+              href={`/administration/teams?team=${encodeURIComponent(node.team.slug)}`}
               className="flex-1 min-w-0 break-words whitespace-normal text-left leading-tight"
               title={node.team.name}
             >
@@ -406,7 +415,7 @@ function AddProjectRow({ teamSlug }: { teamSlug: string }) {
         className="text-sidebar-foreground/60 hover:text-sidebar-foreground"
       >
         <Link
-          href={`/projects?team=${encodeURIComponent(teamSlug)}&new=1`}
+          href={`/administration/projects?team=${encodeURIComponent(teamSlug)}&new=1`}
           className="flex items-center gap-2 py-1 text-xs"
         >
           <span aria-hidden className="text-sm leading-none">+</span>

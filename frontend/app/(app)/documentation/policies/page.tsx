@@ -73,7 +73,7 @@ export default function PoliciesDocPage() {
         <p className="text-muted-foreground text-sm leading-relaxed">
           Open{" "}
           <Link
-            href="/settings/policies"
+            href="/administration/policies"
             className="text-foreground underline-offset-2 hover:underline"
           >
             Settings · Policies
@@ -251,7 +251,7 @@ Conditions:
             request fails at the resolver when ABAC denies. Either tighten
             the role binding, or surface the ABAC outcome in the UI via{" "}
             <Link
-              href="/settings/permissions"
+              href="/administration/permissions"
               className="text-foreground underline-offset-2 hover:underline"
             >
               Permissions diagnostic
@@ -287,7 +287,7 @@ Conditions:
           </li>
           <li>
             <Link
-              href="/settings/permissions"
+              href="/administration/permissions"
               className="text-foreground underline-offset-2 hover:underline"
             >
               Permissions diagnostic

@@ -1,27 +1,13 @@
-import {
-  LIST_INVITATIONS,
-  LIST_MEMBERS,
-  LIST_ROLES,
-  LIST_ROLE_BINDINGS,
-} from "@/graphql/identity/identity.queries";
-import { PreloadQuery } from "@/lib/apollo";
+import { redirect } from "next/navigation";
 
-import { MembersClient } from "./members-client";
+export const metadata = { title: "Members · Astrolift" };
 
-export const metadata = {
-  title: "Members · Astrolift",
-};
-
-export default function MembersPage() {
-  return (
-    <PreloadQuery query={LIST_MEMBERS}>
-      <PreloadQuery query={LIST_ROLE_BINDINGS}>
-        <PreloadQuery query={LIST_ROLES}>
-          <PreloadQuery query={LIST_INVITATIONS}>
-            <MembersClient />
-          </PreloadQuery>
-        </PreloadQuery>
-      </PreloadQuery>
-    </PreloadQuery>
-  );
+/**
+ * /administration/members is the canonical org-members surface (it
+ * renders the same MembersClient that lives in this directory).
+ * Server-side redirect keeps old deep-links working without a
+ * client-side bounce.
+ */
+export default function MembersAliasPage() {
+  redirect("/administration/members");
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { notFound, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { Loader2Icon, PlusIcon, CodeIcon, LayoutIcon, EyeIcon, EyeOffIcon, GripVerticalIcon } from "lucide-react";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
@@ -18,6 +18,8 @@ import { useCreateFormDefinition } from "@/graphql/forms/forms.hooks";
 import { FormBuilder } from "@/components/forms/FormBuilder";
 import { FormPreview } from "@/components/forms/FormPreview";
 
+import { isRouteEnabled } from "@/lib/route-flags";
+
 type FormValues = {
   name: string;
   slug: string;
@@ -31,6 +33,8 @@ const DEFAULT_SCHEMA = {
 };
 
 export default function NewFormPage() {
+  if (!isRouteEnabled("/forms")) notFound();
+
   const router = useRouter();
   const [createForm] = useCreateFormDefinition();
   const [mode, setMode] = useState<"visual" | "json">("visual");

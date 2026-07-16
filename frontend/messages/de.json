@@ -20,7 +20,10 @@
     "account": "Konto",
     "notifications": "Benachrichtigungen",
     "rerunOnboarding": "Onboarding erneut starten",
-    "logout": "Abmelden"
+    "logout": "Abmelden",
+    "profile": "Profil",
+    "documentation": "Dokumentation",
+    "downloads": "Downloads"
   },
   "language": {
     "label": "Sprache",

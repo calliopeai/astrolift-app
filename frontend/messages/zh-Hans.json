@@ -20,7 +20,10 @@
     "account": "Account",
     "notifications": "Notifications",
     "rerunOnboarding": "重新运行引导",
-    "logout": "Log out"
+    "logout": "Log out",
+    "profile": "个人资料",
+    "documentation": "文档",
+    "downloads": "下载"
   },
   "language": {
     "label": "Language",

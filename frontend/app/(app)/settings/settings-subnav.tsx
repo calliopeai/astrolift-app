@@ -1,9 +1,9 @@
 "use client";
 
 import {
-  BuildingIcon,
-  ScaleIcon,
+  BellIcon,
   ShieldCheckIcon,
+  UserIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -17,10 +17,13 @@ interface SubnavLink {
   icon: React.ReactNode;
 }
 
+// /settings is the personal-account surface. Org-level pages
+// (organization, policies, permissions) moved to the Admin control
+// plane at /administration/* — the old /settings/* paths redirect.
 const LINKS: SubnavLink[] = [
-  { href: "/settings/organization", label: "Organization", icon: <BuildingIcon className="size-4" /> },
-  { href: "/settings/policies", label: "Policies", icon: <ScaleIcon className="size-4" /> },
-  { href: "/settings/permissions", label: "Permissions", icon: <ShieldCheckIcon className="size-4" /> },
+  { href: "/settings/profile", label: "Profile", icon: <UserIcon className="size-4" /> },
+  { href: "/settings/security", label: "Security", icon: <ShieldCheckIcon className="size-4" /> },
+  { href: "/settings/notifications", label: "Notifications", icon: <BellIcon className="size-4" /> },
 ];
 
 export function SettingsSubnav() {

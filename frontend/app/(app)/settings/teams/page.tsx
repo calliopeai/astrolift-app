@@ -6,9 +6,9 @@ export const metadata = {
 
 /**
  * /settings/teams is an alias for the canonical org-teams surface
- * at /teams (#413). Server-side redirect — same reasoning as the
- * sibling members alias.
+ * at /administration/teams. Server-side redirect — same reasoning as
+ * the sibling members alias.
  */
 export default function SettingsTeamsAliasPage() {
-  redirect("/teams");
+  redirect("/administration/teams");
 }

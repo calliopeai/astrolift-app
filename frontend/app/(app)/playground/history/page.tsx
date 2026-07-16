@@ -1,5 +1,8 @@
+import { notFound } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+
+import { isRouteEnabled } from "@/lib/route-flags";
 
 const sessions = [
   {
@@ -77,6 +80,8 @@ const sessions = [
 const statusVariant = (status: string) => (status === "completed" ? "default" : "destructive");
 
 export default function PlaygroundHistoryPage() {
+  if (!isRouteEnabled("/playground")) notFound();
+
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
       <div>

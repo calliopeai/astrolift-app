@@ -266,3 +266,185 @@ def test_signal_omits_payload_when_none(permission_resolver, monkeypatch):
     result = m.signal_workflow_instance(_info(), "wf-1", "abort", payload=None)
     assert result.ok is True
     assert captured["args"] == ()
+
+
+# ---- instance-op re-gating: org-owned vs legacy org-less runs -----------
+
+
+@pytest.fixture
+def org():
+    from astrolift_identity.models import Organization
+
+    return Organization.objects.create(name="Viewer Org A", slug="vw-org-a")
+
+
+@pytest.fixture
+def other_org():
+    from astrolift_identity.models import Organization
+
+    return Organization.objects.create(name="Viewer Org B", slug="vw-org-b")
+
+
+def _org_tenant(org):
+    return tenant_context(TenantContext(organization_id=org.pk))
+
+
+def _org_run(org, wid):
+    from workflows.models import WorkflowInstance
+
+    return WorkflowInstance.objects.create(
+        organization=org, temporal_workflow_id=wid, current_state="running"
+    )
+
+
+def test_cancel_org_owned_run_with_workflow_trigger(permission_resolver, monkeypatch, org):
+    """Own-org run: WORKFLOW_TRIGGER alone is enough — no admin perms."""
+    _org_run(org, "wf-own-1")
+    permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
+    monkeypatch.setattr("astrolift_workflows.schema.mutations.cancel_workflow", lambda wid: True)
+    m = TemporalWorkflowsMutation()
+    with _org_tenant(org):
+        result = m.cancel_workflow_instance(_info(), "wf-own-1")
+    assert result.ok is True
+    assert result.errors == []
+
+
+def test_cancel_org_owned_run_with_elevated_pair(permission_resolver, monkeypatch, org):
+    """Own-org run: the legacy AUDIT_LOG_READ + ADMIN_ELEVATE platform
+    operator still works — both paths are valid."""
+    _org_run(org, "wf-own-2")
+    permission_resolver.grant(Permission.AUDIT_LOG_READ)
+    permission_resolver.grant(Permission.ADMIN_ELEVATE)
+    monkeypatch.setattr("astrolift_workflows.schema.mutations.cancel_workflow", lambda wid: True)
+    m = TemporalWorkflowsMutation()
+    with _org_tenant(org):
+        result = m.cancel_workflow_instance(_info(), "wf-own-2")
+    assert result.ok is True
+    assert result.errors == []
+
+
+def test_cancel_org_owned_run_requires_tenant_context(permission_resolver, org):
+    _org_run(org, "wf-own-3")
+    permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
+    from core.decorators import TenantRequired
+
+    m = TemporalWorkflowsMutation()
+    with pytest.raises(TenantRequired):
+        m.cancel_workflow_instance(_info(), "wf-own-3")
+
+
+def test_cancel_foreign_org_run_reads_as_not_found(permission_resolver, monkeypatch, org, other_org):
+    """Oracle closure: to an un-elevated caller a foreign org's run is
+    INDISTINGUISHABLE from a nonexistent id — same envelope, same code —
+    never a forbidden that confirms the id exists. Nothing is delivered."""
+    _org_run(other_org, "wf-foreign-1")
+    permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
+
+    def _boom(wid):
+        raise AssertionError("cancel must not be delivered for a foreign-org run")
+
+    monkeypatch.setattr("astrolift_workflows.schema.mutations.cancel_workflow", _boom)
+    m = TemporalWorkflowsMutation()
+    with _org_tenant(org):
+        foreign = m.cancel_workflow_instance(_info(), "wf-foreign-1")
+        nonexistent = m.cancel_workflow_instance(_info(), "wf-does-not-exist")
+    assert foreign.ok is False
+    assert foreign.errors[0].field == "workflow_id"
+    assert "not found" in foreign.errors[0].messages[0]
+    # The two envelopes must be byte-identical.
+    assert nonexistent.ok == foreign.ok
+    assert [(e.field, e.messages) for e in nonexistent.errors] == [
+        (e.field, e.messages) for e in foreign.errors
+    ]
+
+
+def test_cancel_foreign_org_run_allowed_for_elevated_pair(permission_resolver, monkeypatch, org, other_org):
+    """The elevated platform operator reaches foreign-org runs — the
+    fleet-wide Running tab admin actions must keep working."""
+    _org_run(other_org, "wf-foreign-elevated")
+    permission_resolver.grant(Permission.AUDIT_LOG_READ)
+    permission_resolver.grant(Permission.ADMIN_ELEVATE)
+    monkeypatch.setattr("astrolift_workflows.schema.mutations.cancel_workflow", lambda wid: True)
+    m = TemporalWorkflowsMutation()
+    with _org_tenant(org):
+        result = m.cancel_workflow_instance(_info(), "wf-foreign-elevated")
+    assert result.ok is True
+    assert result.errors == []
+
+
+def test_signal_foreign_org_run_reads_as_not_found(permission_resolver, monkeypatch, org, other_org):
+    _org_run(other_org, "wf-foreign-2")
+    permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
+
+    def _boom(wid, name, *args):
+        raise AssertionError("signal must not be delivered for a foreign-org run")
+
+    monkeypatch.setattr("astrolift_workflows.schema.mutations.signal_workflow", _boom)
+    m = TemporalWorkflowsMutation()
+    with _org_tenant(org):
+        result = m.signal_workflow_instance(_info(), "wf-foreign-2", "abort")
+    assert result.ok is False
+    assert result.errors[0].field == "workflow_id"
+    assert "not found" in result.errors[0].messages[0]
+
+
+def test_terminate_org_owned_via_workflow_run_mirror(permission_resolver, monkeypatch, org):
+    """Ownership also resolves through the astrolift_operations WorkflowRun
+    mirror when no WorkflowInstance row carries the org."""
+    from astrolift_operations.models import WorkflowRun
+
+    WorkflowRun.objects.create(
+        workflow_kind="WorkflowDefinitionRunWorkflow",
+        workflow_id="wf-mirror-1",
+        run_id="r1",
+        organization=org,
+    )
+    permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
+    monkeypatch.setattr("astrolift_workflows.schema.mutations.terminate_workflow", lambda wid, reason: True)
+    m = TemporalWorkflowsMutation()
+    with _org_tenant(org):
+        result = m.terminate_workflow_instance(_info(), "wf-mirror-1", "wedged")
+    assert result.ok is True
+
+
+def test_cancel_org_less_run_not_found_for_workflow_trigger_holder(permission_resolver, monkeypatch, org):
+    """Legacy org-less runs stay on the elevated path — to a WORKFLOW_TRIGGER
+    holder they answer the same not-found as a nonexistent id (oracle
+    closure), and nothing is delivered."""
+    from workflows.models import WorkflowInstance
+
+    WorkflowInstance.objects.create(
+        organization=None, temporal_workflow_id="wf-legacy-1", current_state="running"
+    )
+    permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
+
+    def _boom(wid):
+        raise AssertionError("cancel must not be delivered for an org-less run on the tenant path")
+
+    monkeypatch.setattr("astrolift_workflows.schema.mutations.cancel_workflow", _boom)
+    m = TemporalWorkflowsMutation()
+    with _org_tenant(org):
+        org_less = m.cancel_workflow_instance(_info(), "wf-legacy-1")
+        nonexistent = m.cancel_workflow_instance(_info(), "wf-does-not-exist")
+    assert org_less.ok is False
+    assert "not found" in org_less.errors[0].messages[0]
+    assert [(e.field, e.messages) for e in nonexistent.errors] == [
+        (e.field, e.messages) for e in org_less.errors
+    ]
+
+
+def test_cancel_org_less_run_allowed_for_elevated_pair(permission_resolver, monkeypatch):
+    """Legacy org-less runs remain reachable via AUDIT_LOG_READ +
+    ADMIN_ELEVATE, as before."""
+    from workflows.models import WorkflowInstance
+
+    WorkflowInstance.objects.create(
+        organization=None, temporal_workflow_id="wf-legacy-2", current_state="running"
+    )
+    permission_resolver.grant(Permission.AUDIT_LOG_READ)
+    permission_resolver.grant(Permission.ADMIN_ELEVATE)
+    monkeypatch.setattr("astrolift_workflows.schema.mutations.cancel_workflow", lambda wid: True)
+    m = TemporalWorkflowsMutation()
+    result = m.cancel_workflow_instance(_info(), "wf-legacy-2")
+    assert result.ok is True
+    assert result.errors == []

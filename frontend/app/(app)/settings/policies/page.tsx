@@ -1,14 +1,12 @@
-import { LIST_POLICIES } from "@/graphql/identity/identity.queries";
-import { PreloadQuery } from "@/lib/apollo";
+import { redirect } from "next/navigation";
 
-import { PoliciesClient } from "./policies-client";
+export const metadata = { title: "Policies · Astrolift" };
 
-export const metadata = { title: "Policies · Settings · Astrolift" };
-
-export default function PoliciesSettingsPage() {
-  return (
-    <PreloadQuery query={LIST_POLICIES}>
-      <PoliciesClient />
-    </PreloadQuery>
-  );
+/**
+ * Policies moved to the Admin control plane at
+ * /administration/policies. Server-side redirect keeps old
+ * deep-links working without a client-side bounce.
+ */
+export default function SettingsPoliciesAliasPage() {
+  redirect("/administration/policies");
 }

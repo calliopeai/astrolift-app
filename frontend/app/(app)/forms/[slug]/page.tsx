@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { notFound, useParams } from "next/navigation";
 import { Loader2Icon, PenLineIcon, SendIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -24,6 +24,8 @@ import { formStatusBadgeProps } from "../status-badge";
 import { FormPreviewTab } from "./preview-tab";
 import { FormSubmissionsTab } from "./submissions-tab";
 
+import { isRouteEnabled } from "@/lib/route-flags";
+
 type Tab = "overview" | "preview" | "submissions";
 
 const TABS: { key: Tab; label: string }[] = [
@@ -33,6 +35,8 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 export default function FormDetailPage() {
+  if (!isRouteEnabled("/forms")) notFound();
+
   const { slug } = useParams<{ slug: string }>();
   const [tab, setTab] = useState<Tab>("overview");
   const { form, loading, error } = useFormDefinition(slug);

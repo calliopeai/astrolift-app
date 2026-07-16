@@ -22,7 +22,10 @@
     "security": "Security",
     "apiTokens": "API Tokens",
     "rerunOnboarding": "Re-run onboarding",
-    "logout": "Log out"
+    "logout": "Log out",
+    "profile": "Profile",
+    "documentation": "Documentation",
+    "downloads": "Downloads"
   },
   "language": {
     "label": "Language",

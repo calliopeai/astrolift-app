@@ -1,5 +1,6 @@
 "use client";
 
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Loader2Icon, PlusIcon } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
@@ -9,7 +10,11 @@ import { useFormDefinitions } from "@/graphql/forms/forms.hooks";
 
 import { formStatusBadgeProps } from "./status-badge";
 
+import { isRouteEnabled } from "@/lib/route-flags";
+
 export default function FormsPage() {
+  if (!isRouteEnabled("/forms")) notFound();
+
   const { forms, loading, error } = useFormDefinitions();
 
   return (

@@ -20,7 +20,10 @@
     "account": "Account",
     "notifications": "Notifications",
     "rerunOnboarding": "オンボーディングをやり直す",
-    "logout": "Log out"
+    "logout": "Log out",
+    "profile": "プロフィール",
+    "documentation": "ドキュメント",
+    "downloads": "ダウンロード"
   },
   "language": {
     "label": "Language",

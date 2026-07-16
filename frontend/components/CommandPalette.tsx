@@ -10,23 +10,31 @@ import { LIST_APPS } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 import type { AstroliftPermission } from "@/lib/permissions/astrolift-permissions";
+import { type ModuleKey, useModules } from "@/graphql/user/user.hooks";
 
 interface PaletteEntry {
   label: string;
   href: string;
   group: string;
   hint?: string;
+  /**
+   * Server-authoritative `me.modules` gate (spec 36 §1.2) — mirrors the
+   * sidebar's module switcher. Entries with no `module` are visible to
+   * every authenticated user (Dashboard, Documentation, account pages).
+   */
+  module?: ModuleKey;
   permission?: AstroliftPermission;
   keywords?: string[];
 }
 
-// IA restructure (spec 31, step 1) — keep the palette in lockstep with
-// the sidebar nav in components/AstroliftNav.tsx. Routes whose nav entry
-// is flagged OFF there (the BUILD / OBSERVE pillars and the old flat RUN
-// extras: Deployments, Environments, Workflows, Jobs, Previews, Events,
-// Metrics) are pulled out of PAGES below so Cmd-K can't jump to a surface
-// the nav has hidden. The pages still EXIST — re-add the entry here when
-// the matching NAV_FLAGS flag flips back on.
+// Module IA (spec 36) — keep the palette in lockstep with the module
+// switcher in components/AstroliftNav.tsx: Dashboard / Apps / Agents /
+// Workflows / Admin, gated by the server-authoritative `me.modules`
+// manifest. Routes off the switcher (the old BUILD / OBSERVE pillars,
+// flat RUN extras, and the route-flagged surfaces in
+// lib/route-flags.ts) carry no PAGES entry so Cmd-K can't jump to a
+// surface the nav has hidden. The pages still EXIST — re-add the entry
+// here when the matching flag flips back on.
 //
 // `SHOW_RECENT_DEPLOYS` mirrors that gate for the dynamic "Recent deploys"
 // group (deployments are off-nav in step 1). Flip to `true` alongside the
@@ -42,6 +50,7 @@ const QUICK_ACTIONS: PaletteEntry[] = [
     href: "/apps/new",
     group: "Quick Actions",
     hint: "wizard",
+    module: "apps",
     permission: "app.create",
     keywords: ["new", "create", "register", "app"],
   },
@@ -50,6 +59,7 @@ const QUICK_ACTIONS: PaletteEntry[] = [
     href: "/providers#source",
     group: "Quick Actions",
     hint: "github / gitlab",
+    module: "admin",
     permission: "scm.connect",
     keywords: ["github", "gitlab", "scm", "source", "repo", "oauth"],
   },
@@ -58,6 +68,7 @@ const QUICK_ACTIONS: PaletteEntry[] = [
     href: "/tokens",
     group: "Quick Actions",
     hint: "API tokens",
+    module: "admin",
     permission: "api_token.create",
     keywords: ["api", "token", "pat"],
   },
@@ -69,32 +80,37 @@ const QUICK_ACTIONS: PaletteEntry[] = [
 // palette is searched by free-text rather than the hierarchical nav
 // structure, so a flat list is the right shape.
 const PAGES: PaletteEntry[] = [
-  // Run & Observe (live primitives) + Dashboard.
+  // The flat module landings + Dashboard.
   { label: "Dashboard", href: "/dashboard", group: "Pages", keywords: ["overview", "home"] },
-  { label: "Apps", href: "/apps", group: "Pages", permission: "app.read" },
-  { label: "Agents", href: "/agents", group: "Pages", permission: "app.read" },
+  { label: "Apps", href: "/apps", group: "Pages", module: "apps" },
+  { label: "Agents", href: "/agents", group: "Pages", module: "agents" },
+  { label: "Workflows", href: "/workflows", group: "Pages", module: "workflows", keywords: ["definitions", "runs", "stages"] },
 
-  // Control — Infra.
-  { label: "Clusters", href: "/clusters", group: "Pages", permission: "cluster.update" },
-  { label: "Domains", href: "/domains", group: "Pages" },
-  { label: "Providers", href: "/providers", group: "Pages", permission: "cluster.update" },
-  { label: "Webhooks", href: "/webhooks", group: "Pages" },
+  // Admin — Infra.
+  { label: "Clusters", href: "/clusters", group: "Pages", module: "admin", permission: "cluster.update" },
+  { label: "Domains", href: "/domains", group: "Pages", module: "admin" },
+  { label: "Providers", href: "/providers", group: "Pages", module: "admin", permission: "cluster.update" },
+  { label: "Webhooks", href: "/webhooks", group: "Pages", module: "admin" },
 
-  // Control — Settings (org config + RBAC/governance). Destinations match
-  // the sidebar's Settings group; deep settings pages stay reachable here.
-  { label: "Members", href: "/administration/members", group: "Pages", permission: "org.manage_members" },
-  { label: "Teams", href: "/administration/teams", group: "Pages", permission: "team.read" },
-  { label: "Projects", href: "/administration/projects", group: "Pages", permission: "project.read" },
-  { label: "Tokens", href: "/tokens", group: "Pages", permission: "api_token.create" },
-  { label: "Cost", href: "/administration/cost", group: "Pages", permission: "billing.read" },
-  { label: "Quotas", href: "/administration/quotas", group: "Pages", permission: "org.manage_members" },
-  { label: "Metrics", href: "/administration/metrics", group: "Pages", permission: "app.read" },
-  { label: "Audit log", href: "/audit", group: "Pages", permission: "audit_log.read" },
-  { label: "Policies", href: "/settings/policies", group: "Pages" },
-  { label: "Permissions diagnostics", href: "/settings/permissions", group: "Pages", keywords: ["why", "denied", "rbac", "role"] },
-  { label: "Source providers", href: "/providers#source", group: "Pages", keywords: ["github", "scm", "git"] },
-  { label: "Identity provider", href: "/providers#identity", group: "Pages", keywords: ["sso", "oidc", "saml", "idp"] },
-  { label: "Organization", href: "/settings/organization", group: "Pages", permission: "org.update" },
+  // Admin — Settings (org config + RBAC/governance). Destinations match
+  // the sidebar's Admin group; /administration/* is canonical (except
+  // /tokens, which stays top-level — shipped #893).
+  { label: "Members", href: "/administration/members", group: "Pages", module: "admin", permission: "org.manage_members" },
+  { label: "Teams", href: "/administration/teams", group: "Pages", module: "admin", permission: "team.read" },
+  { label: "Projects", href: "/administration/projects", group: "Pages", module: "admin", permission: "project.read" },
+  { label: "Tokens", href: "/tokens", group: "Pages", module: "admin", permission: "api_token.create" },
+  { label: "Cost", href: "/administration/cost", group: "Pages", module: "admin", permission: "billing.read" },
+  { label: "Quotas", href: "/administration/quotas", group: "Pages", module: "admin", permission: "org.manage_members" },
+  { label: "Metrics", href: "/administration/metrics", group: "Pages", module: "admin", permission: "app.read" },
+  { label: "Audit log", href: "/administration/audit", group: "Pages", module: "admin", permission: "audit_log.read" },
+  { label: "Policies", href: "/administration/policies", group: "Pages", module: "admin" },
+  { label: "Permissions diagnostics", href: "/administration/permissions", group: "Pages", module: "admin", keywords: ["why", "denied", "rbac", "role"] },
+  { label: "Source providers", href: "/providers#source", group: "Pages", module: "admin", keywords: ["github", "scm", "git"] },
+  { label: "Identity provider", href: "/providers#identity", group: "Pages", module: "admin", keywords: ["sso", "oidc", "saml", "idp"] },
+  { label: "Organization", href: "/administration/organization", group: "Pages", module: "admin", permission: "org.update" },
+
+  // Always-visible (no module gate): docs + account pages.
+  { label: "Documentation", href: "/documentation", group: "Pages", keywords: ["docs", "help", "guide", "reference"] },
   { label: "Profile", href: "/settings/profile", group: "Pages" },
   { label: "Notifications", href: "/settings/notifications", group: "Pages" },
   { label: "Security", href: "/settings/security", group: "Pages" },
@@ -131,6 +147,7 @@ export function CommandPalette() {
   const router = useRouter();
   const inputRef = React.useRef<HTMLInputElement>(null);
   const { can, loading: permsLoading } = useMyPermissions();
+  const { canView, loading: modulesLoading } = useModules();
 
   // Lazily load the org's apps so first-load doesn't pay for it. We
   // pre-fetch on first palette open and then keep the cache warm with
@@ -225,11 +242,21 @@ export function CommandPalette() {
   const visible = React.useMemo(
     () =>
       allEntries
-        .filter((r) =>
-          permsLoading || !r.permission ? true : can(r.permission),
-        )
+        .filter((r) => {
+          // Permission-authoritative gating (spec 36): when an entry
+          // carries its own fine permission, that permission is the sole
+          // gate. The module `canView` manifest only reflects the coarse
+          // cluster/org-manage grants, so ANDing it in wrongly hides
+          // entries (cost / quota / audit-read) that a role legitimately
+          // holds. Module `canView` gates only the permission-less
+          // entries — matching the pre-change Can/useMyPermissions
+          // semantics.
+          if (r.permission) return permsLoading || can(r.permission);
+          if (r.module) return modulesLoading || canView(r.module);
+          return true;
+        })
         .filter((r) => matches(r, query)),
-    [allEntries, query, can, permsLoading],
+    [allEntries, query, can, permsLoading, canView, modulesLoading],
   );
 
   const grouped = React.useMemo(() => {

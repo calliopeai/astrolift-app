@@ -20,7 +20,10 @@
     "account": "Account",
     "notifications": "Notifications",
     "rerunOnboarding": "Reexecutar a integração",
-    "logout": "Log out"
+    "logout": "Log out",
+    "profile": "Perfil",
+    "documentation": "Documentação",
+    "downloads": "Downloads"
   },
   "language": {
     "label": "Language",

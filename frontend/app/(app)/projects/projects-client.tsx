@@ -110,7 +110,7 @@ export function ProjectsClient() {
                     ? "Create a team first — projects live under teams."
                     : "Group your apps under a project so cost and quotas roll up cleanly."
                 }
-                actionHref={teams.data?.astroliftTeams.length === 0 ? "/teams" : undefined}
+                actionHref={teams.data?.astroliftTeams.length === 0 ? "/administration/teams" : undefined}
                 actionLabel={teams.data?.astroliftTeams.length === 0 ? "Manage teams" : undefined}
               />
             </div>

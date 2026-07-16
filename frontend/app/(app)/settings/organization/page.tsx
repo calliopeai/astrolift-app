@@ -1,9 +1,12 @@
-import { OrganizationSettingsClient } from "./organization-settings-client";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Organization · Settings · Astrolift" };
+export const metadata = { title: "Organization · Astrolift" };
 
-// LIST_ORGANIZATIONS is primed at the (app) layout level — see #269 —
-// so this page reads from cache. No PreloadQuery needed here.
-export default function OrganizationSettingsPage() {
-  return <OrganizationSettingsClient />;
+/**
+ * Organization settings moved to the Admin control plane at
+ * /administration/organization. Server-side redirect keeps old
+ * deep-links working without a client-side bounce.
+ */
+export default function SettingsOrganizationAliasPage() {
+  redirect("/administration/organization");
 }

@@ -1,6 +1,9 @@
+import { notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { StarIcon } from "lucide-react";
+
+import { isRouteEnabled } from "@/lib/route-flags";
 
 const starred = [
   {
@@ -48,6 +51,8 @@ const starred = [
 ];
 
 export default function PlaygroundStarredPage() {
+  if (!isRouteEnabled("/playground")) notFound();
+
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
       <div>

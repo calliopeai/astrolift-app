@@ -2,8 +2,7 @@
 
 import { useLazyQuery, useMutation, useQuery } from "@apollo/client/react";
 
-import { GET_ME } from "@/graphql/user/user.queries";
-import type { MeQueryData, MeQueryVariables } from "@/graphql/user/user.types";
+import { useModules } from "@/graphql/user/user.hooks";
 
 import {
   CLONE_WORKFLOW_DEFINITION,
@@ -56,30 +55,19 @@ import type {
 
 // ─── Entitlement ─────────────────────────────────────────────────────────
 
-const NO_WORKFLOW_CAPS = Object.freeze({
-  canView: false,
-  canCreate: false,
-  canManage: false,
-  canRun: false,
-});
-
 /**
  * Server-authoritative capability flags for the workflows module
- * (`me.modules` key `"workflows"`). Reads the SSR-primed GET_ME cache
- * entry (the (app) layout primes it), so this is a cache read on every
- * mount. Affordances render exactly what the server answered — no
- * client permission math.
+ * (`me.modules` key `"workflows"`). Thin per-module view over the shared
+ * {@link useModules} manifest (SSR-primed GET_ME cache) — affordances
+ * render exactly what the server answered, no client permission math.
  */
 export const useWorkflowsEntitlement = () => {
-  const { data, loading, error } = useQuery<MeQueryData, MeQueryVariables>(GET_ME, {
-    fetchPolicy: "cache-first",
-  });
-  const entry = data?.me?.modules?.find((m) => m.key === "workflows");
+  const { canView, canCreate, canManage, canRun, loading, error } = useModules();
   return {
-    canView: entry?.canView ?? NO_WORKFLOW_CAPS.canView,
-    canCreate: entry?.canCreate ?? NO_WORKFLOW_CAPS.canCreate,
-    canManage: entry?.canManage ?? NO_WORKFLOW_CAPS.canManage,
-    canRun: entry?.canRun ?? NO_WORKFLOW_CAPS.canRun,
+    canView: canView("workflows"),
+    canCreate: canCreate("workflows"),
+    canManage: canManage("workflows"),
+    canRun: canRun("workflows"),
     loading,
     error,
   };
