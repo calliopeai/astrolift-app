@@ -65,7 +65,8 @@ def test_managed_strategy_returns_pending(
     driver: AzureAppGatewayTlsDriver,
 ) -> None:
     cert = driver.ensure_certificate(
-        domain="api.example.com", strategy="azure_managed_cert",
+        domain="api.example.com",
+        strategy="azure_managed_cert",
     )
     assert cert.status == "pending"
     assert cert.strategy == "azure_managed_cert"
@@ -75,19 +76,22 @@ def test_akv_referenced_returns_pending_when_missing(
     driver: AzureAppGatewayTlsDriver,
 ) -> None:
     cert = driver.ensure_certificate(
-        domain="api.example.com", strategy="akv_referenced",
+        domain="api.example.com",
+        strategy="akv_referenced",
     )
     assert cert.status == "pending"
 
 
 def test_akv_referenced_returns_issued_when_present(
-    driver: AzureAppGatewayTlsDriver, fake_cert_client: FakeCertClient,
+    driver: AzureAppGatewayTlsDriver,
+    fake_cert_client: FakeCertClient,
 ) -> None:
     fake_cert_client.certs["astrolift-api-example-com"] = FakeCert(
         name="astrolift-api-example-com",
     )
     cert = driver.ensure_certificate(
-        domain="api.example.com", strategy="akv_referenced",
+        domain="api.example.com",
+        strategy="akv_referenced",
     )
     assert cert.status == "issued"
     assert cert.not_after == "2027-01-01"
@@ -108,7 +112,8 @@ def test_get_certificate_not_found(
 
 
 def test_revoke_deletes(
-    driver: AzureAppGatewayTlsDriver, fake_cert_client: FakeCertClient,
+    driver: AzureAppGatewayTlsDriver,
+    fake_cert_client: FakeCertClient,
 ) -> None:
     fake_cert_client.certs["astrolift-x"] = FakeCert(name="astrolift-x")
     driver.revoke_certificate("astrolift-x")

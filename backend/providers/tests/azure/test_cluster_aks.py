@@ -22,10 +22,14 @@ class FakeManagedClusters:
     clusters: dict[str, FakeManagedCluster] = field(default_factory=dict)
 
     def get(
-        self, *, resource_group_name: str, resource_name: str,
+        self,
+        *,
+        resource_group_name: str,
+        resource_name: str,
     ) -> FakeManagedCluster:
         return self.clusters.setdefault(
-            resource_name, FakeManagedCluster(),
+            resource_name,
+            FakeManagedCluster(),
         )
 
 
@@ -67,13 +71,17 @@ def driver(fake_k8s_client: Any) -> AKSClusterDriver:
 
 
 def test_apply_aggregates(
-    driver: AKSClusterDriver, fake_k8s_client,
+    driver: AKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     fake_k8s_client.server_side_apply.side_effect = [
-        "created", "updated", "unchanged",
+        "created",
+        "updated",
+        "unchanged",
     ]
     result = driver.apply_manifests(
-        "azure-prod", "ns",
+        "azure-prod",
+        "ns",
         [
             {"kind": "Deployment", "metadata": {"name": "a"}},
             {"kind": "Service", "metadata": {"name": "b"}},
@@ -85,11 +93,13 @@ def test_apply_aggregates(
 
 
 def test_delete_classifies_not_found(
-    driver: AKSClusterDriver, fake_k8s_client,
+    driver: AKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     fake_k8s_client.delete.side_effect = [None, _NotFound()]
     result = driver.delete_manifests(
-        "azure-prod", "ns",
+        "azure-prod",
+        "ns",
         [
             {"kind": "Deployment", "metadata": {"name": "exists"}},
             {"kind": "Deployment", "metadata": {"name": "absent"}},
@@ -100,7 +110,8 @@ def test_delete_classifies_not_found(
 
 
 def test_get_namespace_returns_state(
-    driver: AKSClusterDriver, fake_k8s_client,
+    driver: AKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     state = driver.get_namespace("azure-prod", "ns")
     assert state is not None
@@ -108,54 +119,72 @@ def test_get_namespace_returns_state(
 
 
 def test_get_namespace_missing_returns_none(
-    driver: AKSClusterDriver, fake_k8s_client,
+    driver: AKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     fake_k8s_client.get_namespace.side_effect = _NotFound()
     assert driver.get_namespace("azure-prod", "missing") is None
 
 
 def test_workload_status_not_found(
-    driver: AKSClusterDriver, fake_k8s_client,
+    driver: AKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     fake_k8s_client.get.side_effect = _NotFound()
     with pytest.raises(NotFoundError):
         driver.get_workload_status(
-            "azure-prod", "ns", "Deployment", "missing",
+            "azure-prod",
+            "ns",
+            "Deployment",
+            "missing",
         )
 
 
 def test_poll_rollout_success(
-    driver: AKSClusterDriver, fake_k8s_client,
+    driver: AKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     result = driver.poll_rollout(
-        "azure-prod", "ns", "Deployment", "api", timeout=5,
+        "azure-prod",
+        "ns",
+        "Deployment",
+        "api",
+        timeout=5,
     )
     assert result.success is True
 
 
 def test_poll_rollout_progressing_false(
-    driver: AKSClusterDriver, fake_k8s_client,
+    driver: AKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     fake_k8s_client.get.return_value = {
         "metadata": {"name": "api"},
         "spec": {"replicas": 3},
         "status": {
             "readyReplicas": 0,
-            "conditions": [{
-                "type": "Progressing",
-                "status": "False",
-                "message": "ProgressDeadlineExceeded",
-            }],
+            "conditions": [
+                {
+                    "type": "Progressing",
+                    "status": "False",
+                    "message": "ProgressDeadlineExceeded",
+                }
+            ],
         },
     }
     result = driver.poll_rollout(
-        "azure-prod", "ns", "Deployment", "api", timeout=5,
+        "azure-prod",
+        "ns",
+        "Deployment",
+        "api",
+        timeout=5,
     )
     assert result.success is False
 
 
 def test_k8s_client_caches(
-    driver: AKSClusterDriver, fake_k8s_client,
+    driver: AKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     driver.apply_manifests("azure-prod", "ns", [])
     driver.apply_manifests("azure-prod", "ns", [])

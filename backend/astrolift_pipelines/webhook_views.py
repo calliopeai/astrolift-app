@@ -78,6 +78,7 @@ def _get_org_pipeline_secret(org: Organization) -> bytes | None:
     # The secret is written by installPipelineWebhook at setup time.
     try:
         from astrolift_lifecycle.services.secrets import read_org_secret
+
         value = read_org_secret(org, "astrolift/pipeline/webhook_secret")
         if value:
             return value.encode() if isinstance(value, str) else value
@@ -92,6 +93,7 @@ def _repo_url_matches(pipeline_url: str, payload_clone_url: str, payload_html_ur
 
     Handles HTTPS vs SSH, trailing slashes, and .git suffix differences.
     """
+
     def normalize(url: str) -> str:
         url = url.lower().rstrip("/")
         if url.endswith(".git"):
@@ -223,6 +225,7 @@ def pipeline_github_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
 def _next_run_number(pipeline: Pipeline) -> int:
     """Return the next monotonic run number for a pipeline."""
     from django.db.models import Max
+
     result = PipelineRun.objects.filter(pipeline=pipeline).aggregate(Max("run_number"))
     current = result["run_number__max"] or 0
     return current + 1

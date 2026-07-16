@@ -16,9 +16,8 @@ cluster-driver test suites in the same tests/ tree.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -27,6 +26,9 @@ from _sdk.cluster import ClusterAuth, ContainerStatusInfo, PodInfo, PodLogLine
 from aws.cluster_eks import EKSClusterDriver, EKSConfig
 from azure.cluster_aks import AKSClusterDriver, AKSConfig
 from gcp.cluster_gke import GKEClusterDriver, GKEConfig
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 
 def _auth() -> ClusterAuth:
@@ -64,9 +66,7 @@ class _PodBackend:
         self.calls: list[dict[str, Any]] = []
 
     def list_pods(self, *, auth: ClusterAuth, namespace: str, app_slug: str) -> list[PodInfo]:
-        self.calls.append(
-            {"auth_slug": auth.slug, "namespace": namespace, "app_slug": app_slug}
-        )
+        self.calls.append({"auth_slug": auth.slug, "namespace": namespace, "app_slug": app_slug})
         return [_pod()]
 
 

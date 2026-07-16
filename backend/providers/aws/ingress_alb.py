@@ -15,7 +15,7 @@ in-cluster Ingress via the ClusterDriver (#29).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
@@ -249,14 +249,14 @@ class ALBIngressDriver(IngressDriver):
         if self._config.cognito_auth:
             auth = self._config.cognito_auth
             annotations["alb.ingress.kubernetes.io/auth-type"] = "cognito"
-            annotations["alb.ingress.kubernetes.io/auth-idp-cognito"] = json.dumps({
-                "UserPoolArn": auth.user_pool_arn,
-                "UserPoolClientId": auth.user_pool_client_id,
-                "UserPoolDomain": auth.user_pool_domain,
-            })
-            annotations["alb.ingress.kubernetes.io/auth-on-unauthenticated-request"] = (
-                auth.on_unauthenticated_request
+            annotations["alb.ingress.kubernetes.io/auth-idp-cognito"] = json.dumps(
+                {
+                    "UserPoolArn": auth.user_pool_arn,
+                    "UserPoolClientId": auth.user_pool_client_id,
+                    "UserPoolDomain": auth.user_pool_domain,
+                }
             )
+            annotations["alb.ingress.kubernetes.io/auth-on-unauthenticated-request"] = auth.on_unauthenticated_request
             annotations["alb.ingress.kubernetes.io/auth-scope"] = auth.scope
             annotations["alb.ingress.kubernetes.io/auth-session-cookie"] = auth.session_cookie_name
             annotations["alb.ingress.kubernetes.io/auth-session-timeout"] = str(auth.session_timeout)

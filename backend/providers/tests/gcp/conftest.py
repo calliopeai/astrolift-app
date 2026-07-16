@@ -74,10 +74,17 @@ class FakeManagedZone:
         return list(self.record_sets)
 
     def resource_record_set(
-        self, fqdn: str, type: str, ttl: int, values: list[str],
+        self,
+        fqdn: str,
+        type: str,
+        ttl: int,
+        values: list[str],
     ) -> FakeRecordSet:
         return FakeRecordSet(
-            name=fqdn, record_type=type, ttl=ttl, rrdatas=list(values),
+            name=fqdn,
+            record_type=type,
+            ttl=ttl,
+            rrdatas=list(values),
         )
 
 
@@ -96,11 +103,9 @@ class _FakeChanges:
     def create(self) -> None:
         # Apply deletions then additions to the zone's in-memory list
         kept = [
-            rs for rs in self.zone.record_sets
-            if not any(
-                rs.name == d.name and rs.record_type == d.record_type
-                for d in self.deletions
-            )
+            rs
+            for rs in self.zone.record_sets
+            if not any(rs.name == d.name and rs.record_type == d.record_type for d in self.deletions)
         ]
         self.zone.record_sets = kept + self.additions
 

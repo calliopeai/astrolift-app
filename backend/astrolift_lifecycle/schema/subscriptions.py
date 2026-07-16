@@ -227,9 +227,7 @@ class LifecycleSubscription:
 
         def _resolve():
             app = (
-                RegisteredApp.objects.select_related(
-                    "organization", "default_tenant_cluster"
-                )
+                RegisteredApp.objects.select_related("organization", "default_tenant_cluster")
                 .filter(
                     slug=app_slug,
                     organization_id=org_id,

@@ -94,19 +94,16 @@ class AvailabilityMatrix:
         return sorted({m.variant for m in self.managed_services if m.kind == kind})
 
     def has_role(self, *, plugin_id: str, role: str) -> bool:
-        return any(
-            d.plugin_id == plugin_id and d.role == role
-            for d in self.drivers
-        )
+        return any(d.plugin_id == plugin_id and d.role == role for d in self.drivers)
 
     def has_managed(
-        self, *, plugin_id: str, kind: str, variant: str,
+        self,
+        *,
+        plugin_id: str,
+        kind: str,
+        variant: str,
     ) -> bool:
-        return any(
-            m.plugin_id == plugin_id and m.kind == kind
-            and m.variant == variant
-            for m in self.managed_services
-        )
+        return any(m.plugin_id == plugin_id and m.kind == kind and m.variant == variant for m in self.managed_services)
 
 
 # The canonical matrix. New driver / managed-service entries land
@@ -122,6 +119,7 @@ MATRIX = AvailabilityMatrix(
         DriverEntry(role="secrets", plugin_id="aws", variant="secrets_manager"),
         DriverEntry(role="identity", plugin_id="aws", variant="irsa"),
         DriverEntry(role="registry", plugin_id="aws", variant="ecr"),
+        DriverEntry(role="notification", plugin_id="aws", variant="sns"),
         # GCP plugin
         DriverEntry(role="cluster", plugin_id="gcp"),
         DriverEntry(role="ingress", plugin_id="gcp", variant="gce_ingress"),
@@ -131,6 +129,7 @@ MATRIX = AvailabilityMatrix(
         DriverEntry(role="secrets", plugin_id="gcp", variant="secret_manager"),
         DriverEntry(role="identity", plugin_id="gcp", variant="workload_identity"),
         DriverEntry(role="registry", plugin_id="gcp", variant="artifact_registry"),
+        DriverEntry(role="notification", plugin_id="gcp", variant="fcm"),
         # Azure plugin
         DriverEntry(role="cluster", plugin_id="azure"),
         DriverEntry(role="ingress", plugin_id="azure", variant="agic"),
@@ -140,10 +139,12 @@ MATRIX = AvailabilityMatrix(
         DriverEntry(role="tls", plugin_id="azure", variant="akv_referenced"),
         DriverEntry(role="secrets", plugin_id="azure", variant="key_vault"),
         DriverEntry(
-            role="identity", plugin_id="azure",
+            role="identity",
+            plugin_id="azure",
             variant="federated_credentials",
         ),
         DriverEntry(role="registry", plugin_id="azure", variant="acr"),
+        DriverEntry(role="notification", plugin_id="azure", variant="notification_hubs"),
         # k8s_native plugin
         DriverEntry(role="cluster", plugin_id="k8s_native"),
         DriverEntry(role="ingress", plugin_id="k8s_native", variant="nginx_ingress"),
@@ -155,7 +156,8 @@ MATRIX = AvailabilityMatrix(
         DriverEntry(role="tls", plugin_id="k8s_native", variant="cert_manager"),
         DriverEntry(role="secrets", plugin_id="k8s_native", variant="vault"),
         DriverEntry(
-            role="identity", plugin_id="k8s_native",
+            role="identity",
+            plugin_id="k8s_native",
             variant="projected_sa_token",
         ),
         DriverEntry(role="registry", plugin_id="k8s_native", variant="generic_oci"),
@@ -163,112 +165,346 @@ MATRIX = AvailabilityMatrix(
         DriverEntry(role="registry", plugin_id="k8s_native", variant="dockerhub"),
         DriverEntry(role="registry", plugin_id="k8s_native", variant="ghcr"),
         DriverEntry(role="registry", plugin_id="k8s_native", variant="harbor"),
+        DriverEntry(role="notification", plugin_id="k8s_native", variant="webhook_smtp"),
     ),
     managed_services=(
         # AWS — MVP set; extended catalog tracked in #79
         ManagedServiceEntry(
-            kind="object_store", variant="s3", plugin_id="aws",
+            kind="object_store",
+            variant="s3",
+            plugin_id="aws",
             description="Amazon S3 with versioning + public-access block",
             binding_envs=("S3_BUCKET_NAME", "S3_REGION"),
         ),
         ManagedServiceEntry(
-            kind="queue", variant="sqs", plugin_id="aws",
+            kind="queue",
+            variant="sqs",
+            plugin_id="aws",
             description="Amazon SQS standard or FIFO queue",
             binding_envs=("SQS_QUEUE_URL", "SQS_QUEUE_NAME", "AWS_REGION"),
         ),
+        # AWS — extended catalog (#79): entries mirror aws/plugin.py
+        ManagedServiceEntry(
+            kind="postgres",
+            variant="rds",
+            plugin_id="aws",
+            description="Amazon RDS for PostgreSQL",
+        ),
+        ManagedServiceEntry(
+            kind="mysql",
+            variant="rds_mysql",
+            plugin_id="aws",
+            description="Amazon RDS for MySQL",
+        ),
+        ManagedServiceEntry(
+            kind="redis",
+            variant="elasticache",
+            plugin_id="aws",
+            description="Amazon ElastiCache for Redis",
+        ),
+        ManagedServiceEntry(
+            kind="kv_store",
+            variant="dynamodb",
+            plugin_id="aws",
+            description="Amazon DynamoDB table",
+        ),
+        ManagedServiceEntry(
+            kind="cdn",
+            variant="cloudfront",
+            plugin_id="aws",
+            description="Amazon CloudFront distribution (static-site topology)",
+        ),
+        ManagedServiceEntry(
+            kind="faas",
+            variant="lambda",
+            plugin_id="aws",
+            description="AWS Lambda function",
+        ),
+        ManagedServiceEntry(
+            kind="api_gateway",
+            variant="http_api",
+            plugin_id="aws",
+            description="Amazon API Gateway HTTP API",
+        ),
+        ManagedServiceEntry(
+            kind="search",
+            variant="opensearch",
+            plugin_id="aws",
+            description="Amazon OpenSearch full-text domain",
+        ),
+        ManagedServiceEntry(
+            kind="vector_index",
+            variant="opensearch_vector",
+            plugin_id="aws",
+            description="Amazon OpenSearch k-NN vector index",
+        ),
+        ManagedServiceEntry(
+            kind="time_series",
+            variant="timestream",
+            plugin_id="aws",
+            description="Amazon Timestream database",
+        ),
+        ManagedServiceEntry(
+            kind="email",
+            variant="ses",
+            plugin_id="aws",
+            description="Amazon SES identity + configuration set",
+        ),
+        ManagedServiceEntry(
+            kind="model_endpoint",
+            variant="bedrock",
+            plugin_id="aws",
+            description="Amazon Bedrock model endpoint",
+        ),
         # GCP
         ManagedServiceEntry(
-            kind="object_store", variant="gcs", plugin_id="gcp",
+            kind="object_store",
+            variant="gcs",
+            plugin_id="gcp",
             description="Google Cloud Storage bucket",
             binding_envs=("GCS_BUCKET_NAME", "GCS_BUCKET_URI", "GCP_PROJECT_ID"),
         ),
         ManagedServiceEntry(
-            kind="queue", variant="pubsub", plugin_id="gcp",
+            kind="queue",
+            variant="pubsub",
+            plugin_id="gcp",
             description="Pub/Sub topic + subscription pair",
             binding_envs=(
-                "PUBSUB_TOPIC", "PUBSUB_SUBSCRIPTION", "GCP_PROJECT_ID",
+                "PUBSUB_TOPIC",
+                "PUBSUB_SUBSCRIPTION",
+                "GCP_PROJECT_ID",
             ),
+        ),
+        ManagedServiceEntry(
+            kind="postgres",
+            variant="cloudsql",
+            plugin_id="gcp",
+            description="Cloud SQL for PostgreSQL",
+        ),
+        ManagedServiceEntry(
+            kind="mysql",
+            variant="cloudsql",
+            plugin_id="gcp",
+            description="Cloud SQL for MySQL",
+        ),
+        ManagedServiceEntry(
+            kind="redis",
+            variant="memorystore",
+            plugin_id="gcp",
+            description="Memorystore for Redis",
+        ),
+        ManagedServiceEntry(
+            kind="kv_store",
+            variant="bigtable",
+            plugin_id="gcp",
+            description="Cloud Bigtable instance",
+        ),
+        ManagedServiceEntry(
+            kind="search",
+            variant="gcp_elastic_cloud",
+            plugin_id="gcp",
+            status="planned",
+            description="Elastic Cloud on GCP (stub driver)",
+        ),
+        ManagedServiceEntry(
+            kind="vector_index",
+            variant="vertex_matching_engine",
+            plugin_id="gcp",
+            description="Vertex AI Matching Engine index",
+        ),
+        ManagedServiceEntry(
+            kind="time_series",
+            variant="gcp_managed_prometheus",
+            plugin_id="gcp",
+            description="Google Cloud Managed Service for Prometheus",
+        ),
+        ManagedServiceEntry(
+            kind="email",
+            variant="gcp_thirdparty",
+            plugin_id="gcp",
+            status="planned",
+            description="Third-party email on GCP (stub driver)",
+        ),
+        ManagedServiceEntry(
+            kind="model_endpoint",
+            variant="vertex_ai",
+            plugin_id="gcp",
+            description="Vertex AI model endpoint",
         ),
         # Azure
         ManagedServiceEntry(
-            kind="object_store", variant="blob", plugin_id="azure",
+            kind="object_store",
+            variant="blob",
+            plugin_id="azure",
             description="Azure Blob Storage container",
             binding_envs=(
-                "AZURE_STORAGE_ACCOUNT", "AZURE_BLOB_CONTAINER",
+                "AZURE_STORAGE_ACCOUNT",
+                "AZURE_BLOB_CONTAINER",
                 "AZURE_BLOB_ENDPOINT",
             ),
         ),
         ManagedServiceEntry(
-            kind="queue", variant="servicebus", plugin_id="azure",
+            kind="queue",
+            variant="servicebus",
+            plugin_id="azure",
             description="Service Bus queue with dead-lettering",
             binding_envs=(
-                "SERVICEBUS_NAMESPACE", "SERVICEBUS_QUEUE",
+                "SERVICEBUS_NAMESPACE",
+                "SERVICEBUS_QUEUE",
                 "SERVICEBUS_ENDPOINT",
             ),
         ),
+        ManagedServiceEntry(
+            kind="postgres",
+            variant="azure_pg_flex",
+            plugin_id="azure",
+            description="Azure Database for PostgreSQL Flexible Server",
+        ),
+        ManagedServiceEntry(
+            kind="mysql",
+            variant="azure_mysql_flex",
+            plugin_id="azure",
+            description="Azure Database for MySQL Flexible Server",
+        ),
+        ManagedServiceEntry(
+            kind="redis",
+            variant="azure_cache_redis",
+            plugin_id="azure",
+            description="Azure Cache for Redis",
+        ),
+        ManagedServiceEntry(
+            kind="object_store",
+            variant="azure_blob",
+            plugin_id="azure",
+            description="Azure Blob Storage container (managed-service catalog id)",
+        ),
+        ManagedServiceEntry(
+            kind="queue",
+            variant="azure_servicebus",
+            plugin_id="azure",
+            description="Azure Service Bus queue (managed-service catalog id)",
+        ),
+        ManagedServiceEntry(
+            kind="kv_store",
+            variant="cosmos",
+            plugin_id="azure",
+            description="Azure Cosmos DB (NoSQL) container",
+        ),
+        ManagedServiceEntry(
+            kind="search",
+            variant="azure_ai_search_fulltext",
+            plugin_id="azure",
+            description="Azure AI Search full-text index",
+        ),
+        ManagedServiceEntry(
+            kind="vector_index",
+            variant="azure_ai_search_vector",
+            plugin_id="azure",
+            description="Azure AI Search vector index",
+        ),
+        ManagedServiceEntry(
+            kind="time_series",
+            variant="azure_monitor_prometheus",
+            plugin_id="azure",
+            description="Azure Monitor managed Prometheus",
+        ),
+        ManagedServiceEntry(
+            kind="email",
+            variant="azure_acs",
+            plugin_id="azure",
+            description="Azure Communication Services email",
+        ),
+        ManagedServiceEntry(
+            kind="model_endpoint",
+            variant="azure_openai",
+            plugin_id="azure",
+            description="Azure OpenAI model deployment",
+        ),
         # k8s_native (operator-backed)
         ManagedServiceEntry(
-            kind="postgres", variant="cnpg", plugin_id="k8s_native",
+            kind="postgres",
+            variant="cnpg",
+            plugin_id="k8s_native",
             description="CloudNativePG-backed Postgres cluster",
             binding_envs=(
-                "POSTGRES_HOST", "POSTGRES_PORT", "POSTGRES_DB",
-                "POSTGRES_USER", "POSTGRES_PASSWORD",
+                "POSTGRES_HOST",
+                "POSTGRES_PORT",
+                "POSTGRES_DB",
+                "POSTGRES_USER",
+                "POSTGRES_PASSWORD",
             ),
         ),
         ManagedServiceEntry(
-            kind="redis", variant="operator", plugin_id="k8s_native",
+            kind="redis",
+            variant="operator",
+            plugin_id="k8s_native",
             description="Bitnami Redis operator with primary + replicas",
             binding_envs=("REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD"),
         ),
         ManagedServiceEntry(
-            kind="mysql", variant="operator", plugin_id="k8s_native",
-            description=(
-                "Percona XtraDB Cluster (default) / MariaDB / Oracle "
-                "MySQL operator-backed cluster"
-            ),
+            kind="mysql",
+            variant="operator",
+            plugin_id="k8s_native",
+            description=("Percona XtraDB Cluster (default) / MariaDB / Oracle MySQL operator-backed cluster"),
             binding_envs=(
-                "MYSQL_HOST", "MYSQL_PORT", "MYSQL_DB",
-                "MYSQL_USER", "MYSQL_PASSWORD",
+                "MYSQL_HOST",
+                "MYSQL_PORT",
+                "MYSQL_DB",
+                "MYSQL_USER",
+                "MYSQL_PASSWORD",
             ),
         ),
         ManagedServiceEntry(
-            kind="document_db", variant="mongodb_operator",
+            kind="document_db",
+            variant="mongodb_operator",
             plugin_id="k8s_native",
             description="Percona Server for MongoDB operator",
             binding_envs=(
-                "DOCDB_URI", "DOCDB_DB", "DOCDB_USER", "DOCDB_PASSWORD",
+                "DOCDB_URI",
+                "DOCDB_DB",
+                "DOCDB_USER",
+                "DOCDB_PASSWORD",
             ),
         ),
         ManagedServiceEntry(
-            kind="event_stream", variant="kafka_strimzi",
+            kind="event_stream",
+            variant="kafka_strimzi",
             plugin_id="k8s_native",
             description="Strimzi-managed Kafka cluster (KRaft)",
             binding_envs=(
-                "EVENT_STREAM_BROKERS", "EVENT_STREAM_USERNAME",
-                "EVENT_STREAM_PASSWORD", "EVENT_STREAM_TLS",
+                "EVENT_STREAM_BROKERS",
+                "EVENT_STREAM_USERNAME",
+                "EVENT_STREAM_PASSWORD",
+                "EVENT_STREAM_TLS",
             ),
         ),
         ManagedServiceEntry(
-            kind="event_stream", variant="nats",
+            kind="event_stream",
+            variant="nats",
             plugin_id="k8s_native",
             description="NATS StatefulSet (with optional JetStream)",
             binding_envs=("EVENT_STREAM_BROKERS", "EVENT_STREAM_TLS"),
         ),
         ManagedServiceEntry(
-            kind="queue", variant="rabbitmq_operator",
+            kind="queue",
+            variant="rabbitmq_operator",
             plugin_id="k8s_native",
             description="RabbitMQ Cluster Operator-backed cluster",
             binding_envs=(
-                "RABBITMQ_HOST", "RABBITMQ_PORT",
-                "RABBITMQ_USER", "RABBITMQ_PASSWORD",
+                "RABBITMQ_HOST",
+                "RABBITMQ_PORT",
+                "RABBITMQ_USER",
+                "RABBITMQ_PASSWORD",
             ),
         ),
         ManagedServiceEntry(
-            kind="filesystem", variant="nfs_csi",
+            kind="filesystem",
+            variant="nfs_csi",
             plugin_id="k8s_native",
             description="NFS CSI driver-backed RWX PVC",
             binding_envs=(
-                "FILESYSTEM_HANDLE", "FILESYSTEM_MOUNT_PATH",
+                "FILESYSTEM_HANDLE",
+                "FILESYSTEM_MOUNT_PATH",
                 "FILESYSTEM_TLS",
             ),
         ),
@@ -277,11 +513,11 @@ MATRIX = AvailabilityMatrix(
 
 
 __all__ = [
-    "AvailabilityMatrix",
-    "DriverEntry",
     "MATRIX",
-    "ManagedServiceEntry",
     "OPTIONAL_ROLES",
     "REQUIRED_ROLES",
+    "AvailabilityMatrix",
+    "DriverEntry",
+    "ManagedServiceEntry",
     "Status",
 ]

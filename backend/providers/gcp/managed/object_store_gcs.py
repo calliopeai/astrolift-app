@@ -97,7 +97,8 @@ class GCSDriver(ManagedServiceDriver):
                 bucket.iam_configuration.uniform_bucket_level_access_enabled = True
             try:
                 self._client.create_bucket(
-                    bucket, location=self._config.location,
+                    bucket,
+                    location=self._config.location,
                 )
             except Exception as exc:
                 if type(exc).__name__ == "Conflict":
@@ -125,7 +126,8 @@ class GCSDriver(ManagedServiceDriver):
             bucket.patch()
         except Exception as exc:
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message=f"provision failed: {exc}",
                 errors=[str(exc)],
             )
@@ -138,11 +140,9 @@ class GCSDriver(ManagedServiceDriver):
     @driver_op(cloud="gcp", driver="object_store_gcs")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         return UpdateResult(
-            ok=True, handle=spec.handle,
-            message=(
-                "GCS update via lifecycle/storage_class is "
-                "operator-managed"
-            ),
+            ok=True,
+            handle=spec.handle,
+            message=("GCS update via lifecycle/storage_class is operator-managed"),
         )
 
     @driver_op(
@@ -165,7 +165,8 @@ class GCSDriver(ManagedServiceDriver):
             # is a no-op at the bucket level; the platform's binding
             # record is what gets cleaned up by the calling activity.
             return DeprovisionResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message=f"bucket {bucket_name} retained",
             )
 
@@ -174,18 +175,18 @@ class GCSDriver(ManagedServiceDriver):
         except Exception as exc:
             if type(exc).__name__ == "NotFound":
                 return DeprovisionResult(
-                    ok=True, handle=spec.handle,
+                    ok=True,
+                    handle=spec.handle,
                     message="already gone",
                 )
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"get_bucket: {exc}",
                 errors=[str(exc)],
             )
 
-        retention_policy = (
-            getattr(bucket, "retention_policy", None) or {}
-        )
+        retention_policy = getattr(bucket, "retention_policy", None) or {}
         # ``retention_policy`` may be a dict (REST mode) or an object
         # with ``.is_locked`` + ``.retention_period`` attrs. Normalize.
         if isinstance(retention_policy, dict):
@@ -201,7 +202,8 @@ class GCSDriver(ManagedServiceDriver):
 
         if policy_active and not force_destroy:
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=(
                     f"bucket {bucket_name} has an active retention "
                     f"policy — pass force_destroy=True to attempt "
@@ -211,7 +213,8 @@ class GCSDriver(ManagedServiceDriver):
             )
         if policy_active and force_destroy and policy_locked:
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=(
                     f"bucket {bucket_name} has a LOCKED retention "
                     f"policy — GCS does not allow API-level bypass; "
@@ -226,7 +229,8 @@ class GCSDriver(ManagedServiceDriver):
                 bucket.patch()
             except Exception as exc:
                 return DeprovisionResult(
-                    ok=False, handle=spec.handle,
+                    ok=False,
+                    handle=spec.handle,
                     message=f"failed to clear retention_policy: {exc}",
                     errors=[str(exc)],
                 )
@@ -251,17 +255,20 @@ class GCSDriver(ManagedServiceDriver):
         except Exception as exc:
             if type(exc).__name__ == "NotFound":
                 return DeprovisionResult(
-                    ok=True, handle=spec.handle,
+                    ok=True,
+                    handle=spec.handle,
                     message="already gone",
                 )
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"delete failed: {exc}",
                 errors=[str(exc)],
             )
         suffix = " (force_destroy)" if force_destroy else ""
         return DeprovisionResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message=f"bucket {bucket_name} deleted with data{suffix}",
         )
 
@@ -273,15 +280,18 @@ class GCSDriver(ManagedServiceDriver):
         except Exception as exc:
             if type(exc).__name__ == "NotFound":
                 return ServiceStatus(
-                    handle=handle.handle, state="deprovisioned",
+                    handle=handle.handle,
+                    state="deprovisioned",
                     message=f"bucket {bucket_name} does not exist",
                 )
             return ServiceStatus(
-                handle=handle.handle, state="error",
+                handle=handle.handle,
+                state="error",
                 message=str(exc),
             )
         return ServiceStatus(
-            handle=handle.handle, state="available",
+            handle=handle.handle,
+            state="available",
             message=f"bucket {bucket_name} reachable",
         )
 
@@ -298,17 +308,11 @@ class GCSDriver(ManagedServiceDriver):
             },
             iam_grants=[
                 Grant(
-                    resource=(
-                        f"//storage.googleapis.com/projects/_/buckets/"
-                        f"{bucket_name}"
-                    ),
+                    resource=(f"//storage.googleapis.com/projects/_/buckets/{bucket_name}"),
                     actions=["roles/storage.objectAdmin"],
                 ),
             ],
-            notes=(
-                "GCS object IAM via roles/storage.objectAdmin role "
-                "binding."
-            ),
+            notes=("GCS object IAM via roles/storage.objectAdmin role binding."),
         )
 
     @driver_op(cloud="gcp", driver="object_store_gcs")
@@ -317,22 +321,20 @@ class GCSDriver(ManagedServiceDriver):
 
         return SnapshotHandle(
             handle=handle.handle,
-            snapshot_id=(
-                f"v-{datetime.now(tz=UTC).strftime('%Y%m%d-%H%M%S')}"
-            ),
+            snapshot_id=(f"v-{datetime.now(tz=UTC).strftime('%Y%m%d-%H%M%S')}"),
             created_at=datetime.now(tz=UTC).isoformat(),
         )
 
     @driver_op(cloud="gcp", driver="object_store_gcs")
     def restore(
-        self, snapshot: SnapshotHandle, target: ProvisionSpec,
+        self,
+        snapshot: SnapshotHandle,
+        target: ProvisionSpec,
     ) -> ProvisionResult:
         return ProvisionResult(
-            ok=False, handle="",
-            message=(
-                "GCS restore via cross-bucket copy not implemented "
-                "in this driver"
-            ),
+            ok=False,
+            handle="",
+            message=("GCS restore via cross-bucket copy not implemented in this driver"),
             errors=["not_implemented"],
         )
 
@@ -348,11 +350,13 @@ class GCSDriver(ManagedServiceDriver):
 
     @driver_op(cloud="gcp", driver="object_store_gcs", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
-        return BindingSchema(env_vars={
-            "GCS_BUCKET_NAME": "Bucket name",
-            "GCS_BUCKET_URI": "gs:// URI",
-            "GCP_PROJECT_ID": "Project ID",
-        })
+        return BindingSchema(
+            env_vars={
+                "GCS_BUCKET_NAME": "Bucket name",
+                "GCS_BUCKET_URI": "gs:// URI",
+                "GCP_PROJECT_ID": "Project ID",
+            }
+        )
 
     def _bucket_name_for(self, *, spec: ProvisionSpec) -> str:
         # GCS bucket names: 3-63 chars, lowercase letters / digits /
@@ -360,16 +364,14 @@ class GCSDriver(ManagedServiceDriver):
         # (project-scoped naming via prefix).
         parts = [
             self._config.bucket_name_prefix,
-            spec.organization_slug, spec.app_slug,
+            spec.organization_slug,
+            spec.app_slug,
             spec.environment_name,
         ]
         if spec.service_handle_hint:
             parts.append(spec.service_handle_hint)
         raw = "-".join(p for p in parts if p).lower()
-        clean = "".join(
-            c if (c.isalnum() or c == "-") else "-"
-            for c in raw
-        )
+        clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in raw)
         while "--" in clean:
             clean = clean.replace("--", "-")
         return clean.strip("-")[:63]

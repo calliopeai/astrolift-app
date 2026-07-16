@@ -160,7 +160,8 @@ class AmazonSESDriver(ManagedServiceDriver):
             import boto3
 
             self._sm = boto3.client(
-                "secretsmanager", region_name=config.region,
+                "secretsmanager",
+                region_name=config.region,
             )
         # Lazily constructed Route53 driver used to publish the SES
         # domain-verification + Easy-DKIM records so a domain identity
@@ -183,8 +184,10 @@ class AmazonSESDriver(ManagedServiceDriver):
             identity = self._identity_for(spec=spec)
         except ManagedServiceError as exc:
             return ProvisionResult(
-                ok=False, handle="",
-                message=str(exc), errors=[str(exc)],
+                ok=False,
+                handle="",
+                message=str(exc),
+                errors=[str(exc)],
             )
 
         cfg = spec.config or {}
@@ -199,14 +202,12 @@ class AmazonSESDriver(ManagedServiceDriver):
             # still pending.
             self._ensure_configuration_set(spec=spec, identity=identity)
             smtp_ok = self._ensure_smtp_credentials(
-                spec=spec, identity=identity,
+                spec=spec,
+                identity=identity,
             )
             if is_domain:
                 self._publish_verification_dns(identity=identity)
-            message = (
-                f"ses identity {identity} already registered "
-                f"(state={existing_state})"
-            )
+            message = f"ses identity {identity} already registered (state={existing_state})"
             if not smtp_ok:
                 message += "; smtp placeholder secrets not stored"
             return ProvisionResult(
@@ -222,7 +223,8 @@ class AmazonSESDriver(ManagedServiceDriver):
                 self._ses.verify_email_identity(EmailAddress=identity)
         except Exception as exc:
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message=f"verify_identity: {exc}",
                 errors=[str(exc)],
             )
@@ -239,7 +241,8 @@ class AmazonSESDriver(ManagedServiceDriver):
         # identity. Configuration sets carry event destinations
         # (CloudWatch, SNS, Kinesis); operators wire those out-of-band.
         cset_name = self._ensure_configuration_set(
-            spec=spec, identity=identity,
+            spec=spec,
+            identity=identity,
         )
 
         # Best-effort: publish the domain-verification TXT + Easy-DKIM
@@ -267,18 +270,14 @@ class AmazonSESDriver(ManagedServiceDriver):
             ),
         )
         self._set_deletion_protection(
-            identity=identity, enabled=deletion_protection,
+            identity=identity,
+            enabled=deletion_protection,
         )
 
-        message = (
-            f"ses identity {identity} verification requested "
-            f"(configuration set={cset_name})"
-        )
+        message = f"ses identity {identity} verification requested (configuration set={cset_name})"
         if is_domain:
             message += (
-                "; dns records published"
-                if dns_published
-                else "; pending dns verification (publish records manually)"
+                "; dns records published" if dns_published else "; pending dns verification (publish records manually)"
             )
         if not smtp_ok:
             message += "; smtp placeholder secrets not stored"
@@ -302,12 +301,14 @@ class AmazonSESDriver(ManagedServiceDriver):
                 enabled=bool(cfg["deletion_protection"]),
             )
             return UpdateResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message=f"deletion_protection updated for {identity}",
             )
 
         return UpdateResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message="no modifiable attributes provided -- no-op",
         )
 
@@ -331,20 +332,17 @@ class AmazonSESDriver(ManagedServiceDriver):
             self._delete_smtp_credentials(identity=identity)
             self._delete_protection_marker(identity)
             return DeprovisionResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message=f"ses identity {identity} already gone",
             )
 
-        if (
-            self._deletion_protection_on(identity)
-            and not force_destroy
-            and delete_data
-        ):
+        if self._deletion_protection_on(identity) and not force_destroy and delete_data:
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=(
-                    f"ses identity {identity} has deletion_protection "
-                    f"enabled -- pass force_destroy=True to bypass"
+                    f"ses identity {identity} has deletion_protection enabled -- pass force_destroy=True to bypass"
                 ),
                 errors=["deletion_protection_enabled"],
             )
@@ -361,7 +359,8 @@ class AmazonSESDriver(ManagedServiceDriver):
                 self._ses.delete_identity(Identity=identity)
             except Exception as exc:
                 return DeprovisionResult(
-                    ok=False, handle=spec.handle,
+                    ok=False,
+                    handle=spec.handle,
                     message=f"delete_identity: {exc}",
                     errors=[str(exc)],
                 )
@@ -375,7 +374,8 @@ class AmazonSESDriver(ManagedServiceDriver):
             self._delete_protection_marker(identity)
 
         return DeprovisionResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message=(
                 f"ses identity {identity} "
                 f"{'deleted' if delete_data else 'retained'} "
@@ -392,32 +392,31 @@ class AmazonSESDriver(ManagedServiceDriver):
         state = self._identity_verified_state(identity)
         if state is None:
             return ServiceStatus(
-                handle=handle.handle, state="deprovisioned",
+                handle=handle.handle,
+                state="deprovisioned",
                 message=f"ses identity {identity} not found",
             )
         if state == "Success":
             return ServiceStatus(
-                handle=handle.handle, state="available",
+                handle=handle.handle,
+                state="available",
                 message=f"ses identity {identity} verified",
             )
         if state == "Pending":
             return ServiceStatus(
-                handle=handle.handle, state="provisioning",
-                message=(
-                    f"ses identity {identity} pending DNS / email "
-                    f"verification"
-                ),
+                handle=handle.handle,
+                state="provisioning",
+                message=(f"ses identity {identity} pending DNS / email verification"),
             )
         if state == "Failed":
             return ServiceStatus(
-                handle=handle.handle, state="error",
-                message=(
-                    f"ses identity {identity} verification failed "
-                    f"-- operator must re-trigger"
-                ),
+                handle=handle.handle,
+                state="error",
+                message=(f"ses identity {identity} verification failed -- operator must re-trigger"),
             )
         return ServiceStatus(
-            handle=handle.handle, state="updating",
+            handle=handle.handle,
+            state="updating",
             message=f"ses identity {identity} reports {state}",
         )
 
@@ -494,9 +493,7 @@ class AmazonSESDriver(ManagedServiceDriver):
                     literal=preview_sender,
                 )
 
-        identity_arn = (
-            f"arn:aws:ses:{self._config.region}:*:identity/{identity}"
-        )
+        identity_arn = f"arn:aws:ses:{self._config.region}:*:identity/{identity}"
         return Binding(
             env_vars=env_vars,
             iam_grants=[
@@ -550,7 +547,9 @@ class AmazonSESDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="email_ses")
     def restore(
-        self, snapshot: SnapshotHandle, target: ProvisionSpec,
+        self,
+        snapshot: SnapshotHandle,
+        target: ProvisionSpec,
     ) -> ProvisionResult:
         provisioned = self.provision(target)
         if not provisioned.ok:
@@ -583,23 +582,16 @@ class AmazonSESDriver(ManagedServiceDriver):
                 "from_name": {
                     "type": "string",
                     "description": (
-                        "Optional display name folded into the From: "
-                        "header (emitted as EMAIL_FROM_NAME) (#637)."
+                        "Optional display name folded into the From: header (emitted as EMAIL_FROM_NAME) (#637)."
                     ),
                 },
                 "reply_to": {
                     "type": "string",
-                    "description": (
-                        "Optional Reply-To: address (emitted as "
-                        "EMAIL_REPLY_TO) (#637)."
-                    ),
+                    "description": ("Optional Reply-To: address (emitted as EMAIL_REPLY_TO) (#637)."),
                 },
                 "return_path": {
                     "type": "string",
-                    "description": (
-                        "Optional Return-Path: (bounce) address "
-                        "(emitted as EMAIL_RETURN_PATH) (#639)."
-                    ),
+                    "description": ("Optional Return-Path: (bounce) address (emitted as EMAIL_RETURN_PATH) (#639)."),
                 },
                 "env_senders": {
                     "type": "object",
@@ -622,16 +614,9 @@ class AmazonSESDriver(ManagedServiceDriver):
         return BindingSchema(
             env_vars={
                 "EMAIL_PROVIDER": "Always 'ses' for this driver",
-                "EMAIL_API_KEY": (
-                    "Secrets Manager ref to the SES SMTP secret-access-"
-                    "key"
-                ),
-                "EMAIL_FROM_ADDRESS": (
-                    "Default From: address derived from the identity"
-                ),
-                "EMAIL_REGION": (
-                    "AWS region hosting the SES identity"
-                ),
+                "EMAIL_API_KEY": ("Secrets Manager ref to the SES SMTP secret-access-key"),
+                "EMAIL_FROM_ADDRESS": ("Default From: address derived from the identity"),
+                "EMAIL_REGION": ("AWS region hosting the SES identity"),
                 "EMAIL_FROM_NAME": (
                     "Optional human-readable display name for the From: "
                     "header. Sourced from ``ManagedService.config."
@@ -661,23 +646,17 @@ class AmazonSESDriver(ManagedServiceDriver):
                 ),
                 "SES_FROM_ADDRESS": "Alias for EMAIL_FROM_ADDRESS",
                 "SES_REGION": "Alias for EMAIL_REGION",
-                "SES_SMTP_ENDPOINT": (
-                    "SES SMTP hostname (email-smtp.<region>.amazonaws.com)"
-                ),
-                "SES_SMTP_USER": (
-                    "Secrets Manager ref to the SES SMTP access-key-id"
-                ),
-                "SES_SMTP_PASSWORD": (
-                    "Secrets Manager ref to the SES SMTP secret-access-"
-                    "key"
-                ),
+                "SES_SMTP_ENDPOINT": ("SES SMTP hostname (email-smtp.<region>.amazonaws.com)"),
+                "SES_SMTP_USER": ("Secrets Manager ref to the SES SMTP access-key-id"),
+                "SES_SMTP_PASSWORD": ("Secrets Manager ref to the SES SMTP secret-access-key"),
             },
         )
 
     # ---- internals ----------------------------------------------------
 
     def _identity_verified_state(
-        self, identity: str,
+        self,
+        identity: str,
     ) -> str | None:
         try:
             resp = self._ses.get_identity_verification_attributes(
@@ -720,13 +699,13 @@ class AmazonSESDriver(ManagedServiceDriver):
         return f"{sub}.{base_domain}".lower()
 
     def _configuration_set_name_for(self, identity: str) -> str:
-        return (
-            f"{self._config.configuration_set_name_prefix}-"
-            f"{_safe(identity)}"
-        )[:64]
+        return (f"{self._config.configuration_set_name_prefix}-{_safe(identity)}")[:64]
 
     def _ensure_configuration_set(
-        self, *, spec: ProvisionSpec, identity: str,
+        self,
+        *,
+        spec: ProvisionSpec,
+        identity: str,
     ) -> str:
         name = self._configuration_set_name_for(identity)
         try:
@@ -735,9 +714,7 @@ class AmazonSESDriver(ManagedServiceDriver):
             )
         except Exception as exc:
             # AlreadyExists is the happy idempotent path.
-            if "AlreadyExists" not in type(exc).__name__ and (
-                "AlreadyExists" not in str(exc)
-            ):
+            if "AlreadyExists" not in type(exc).__name__ and ("AlreadyExists" not in str(exc)):
                 # Don't fail provision on configuration-set errors --
                 # the identity is still usable; surface via message.
                 return name
@@ -777,11 +754,7 @@ class AmazonSESDriver(ManagedServiceDriver):
             except Exception as exc:
                 # EventDestinationAlreadyExists / ConfigurationSet
                 # already wired -- treat as idempotent success.
-                if (
-                    "AlreadyExists"
-                    not in type(exc).__name__
-                    and "AlreadyExists" not in str(exc)
-                ):
+                if "AlreadyExists" not in type(exc).__name__ and "AlreadyExists" not in str(exc):
                     # Soft-fail: log via the result message in the
                     # caller would be nicer, but the caller doesn't
                     # surface partial failures; swallow so identity
@@ -824,19 +797,16 @@ class AmazonSESDriver(ManagedServiceDriver):
             return
 
     def _smtp_access_key_secret_name(self, *, identity: str) -> str:
-        return (
-            f"{self._config.secrets_manager_prefix}/"
-            f"{_safe(identity)}/smtp-access-key-id"
-        )
+        return f"{self._config.secrets_manager_prefix}/{_safe(identity)}/smtp-access-key-id"
 
     def _smtp_secret_key_secret_name(self, *, identity: str) -> str:
-        return (
-            f"{self._config.secrets_manager_prefix}/"
-            f"{_safe(identity)}/smtp-secret-key"
-        )
+        return f"{self._config.secrets_manager_prefix}/{_safe(identity)}/smtp-secret-key"
 
     def _ensure_smtp_credentials(
-        self, *, spec: ProvisionSpec, identity: str,
+        self,
+        *,
+        spec: ProvisionSpec,
+        identity: str,
     ) -> bool:
         """Store the placeholder SMTP secret pair. Returns ``True`` when
         both refs exist (created now or already present), ``False`` when a
@@ -873,7 +843,8 @@ class AmazonSESDriver(ManagedServiceDriver):
         as a soft warning rather than aborting the provision."""
         try:
             self._sm.create_secret(
-                Name=name, SecretString=value,
+                Name=name,
+                SecretString=value,
             )
             return True
         except Exception as exc:
@@ -976,13 +947,13 @@ class AmazonSESDriver(ManagedServiceDriver):
                 continue
 
     def _protection_marker_name(self, identity: str) -> str:
-        return (
-            f"{self._config.secrets_manager_prefix}/"
-            f"{_safe(identity)}/protection"
-        )
+        return f"{self._config.secrets_manager_prefix}/{_safe(identity)}/protection"
 
     def _set_deletion_protection(
-        self, *, identity: str, enabled: bool,
+        self,
+        *,
+        identity: str,
+        enabled: bool,
     ) -> None:
         name = self._protection_marker_name(identity)
         value = "1" if enabled else "0"
@@ -992,7 +963,8 @@ class AmazonSESDriver(ManagedServiceDriver):
             if "ResourceExistsException" in type(exc).__name__:
                 try:
                     self._sm.put_secret_value(
-                        SecretId=name, SecretString=value,
+                        SecretId=name,
+                        SecretString=value,
                     )
                 except Exception:
                     return
@@ -1009,7 +981,8 @@ class AmazonSESDriver(ManagedServiceDriver):
         name = self._protection_marker_name(identity)
         try:
             self._sm.delete_secret(
-                SecretId=name, ForceDeleteWithoutRecovery=True,
+                SecretId=name,
+                ForceDeleteWithoutRecovery=True,
             )
         except Exception:
             return
@@ -1022,10 +995,7 @@ def _safe(value: str) -> str:
     """Coerce a slug to lowercase + replace anything outside
     ``[a-z0-9._-]`` with ``-``. SES + Secrets-Manager names share
     the same restrictive character set."""
-    cleaned = "".join(
-        c if (c.isalnum() or c in "-._") else "-"
-        for c in value.lower()
-    )
+    cleaned = "".join(c if (c.isalnum() or c in "-._") else "-" for c in value.lower())
     while "--" in cleaned:
         cleaned = cleaned.replace("--", "-")
     return cleaned.strip("-")
@@ -1040,9 +1010,7 @@ def _from_address_for(*, identity: str) -> str:
     return f"noreply@{identity}"
 
 
-_SMTP_PASSWORD_ALPHABET = (
-    string.ascii_letters + string.digits + "-_."
-)
+_SMTP_PASSWORD_ALPHABET = string.ascii_letters + string.digits + "-_."
 
 
 def _generate_smtp_password(length: int = 40) -> str:
@@ -1051,6 +1019,4 @@ def _generate_smtp_password(length: int = 40) -> str:
     derivation; that is an operator-side rotation step. The driver
     seeds a high-entropy value so binding has a stable ref the
     operator can overwrite."""
-    return "".join(
-        secrets.choice(_SMTP_PASSWORD_ALPHABET) for _ in range(length)
-    )
+    return "".join(secrets.choice(_SMTP_PASSWORD_ALPHABET) for _ in range(length))

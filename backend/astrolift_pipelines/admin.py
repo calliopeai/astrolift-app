@@ -56,7 +56,14 @@ class RunnerAdmin(_AllObjectsAdmin):
     )
     list_filter = ("status", "os", "arch", "organization")
     search_fields = ("slug", "name", "organization__slug")
-    readonly_fields = ("guid", "created_at", "updated_at", "version", "registration_token_hash", "api_key_hash")
+    readonly_fields = (
+        "guid",
+        "created_at",
+        "updated_at",
+        "version",
+        "registration_token_hash",
+        "api_key_hash",
+    )
 
 
 @admin.register(JobRun)

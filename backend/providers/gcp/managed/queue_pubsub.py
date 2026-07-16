@@ -132,9 +132,7 @@ class PubSubDriver(ManagedServiceDriver):
         return UpdateResult(
             ok=True,
             handle=spec.handle,
-            message=(
-                "pubsub mutable settings (ack_deadline, retention) " "via subscription patch are operator-managed"
-            ),
+            message=("pubsub mutable settings (ack_deadline, retention) via subscription patch are operator-managed"),
         )
 
     @driver_op(
@@ -200,9 +198,7 @@ class PubSubDriver(ManagedServiceDriver):
                     return DeprovisionResult(
                         ok=False,
                         handle=spec.handle,
-                        message=(
-                            f"subscription {sub_id} has active " f"subscribers — pass force_destroy=True " f"to bypass"
-                        ),
+                        message=(f"subscription {sub_id} has active subscribers — pass force_destroy=True to bypass"),
                         errors=[str(exc)],
                     )
                 # force_destroy: log the bypass via message and treat
@@ -237,8 +233,7 @@ class PubSubDriver(ManagedServiceDriver):
             ok=True,
             handle=spec.handle,
             message=(
-                f"Pub/Sub topic + subscription deleted: {topic_id} "
-                f"(drained={'no' if delete_data else 'yes'}){suffix}"
+                f"Pub/Sub topic + subscription deleted: {topic_id} (drained={'no' if delete_data else 'yes'}){suffix}"
             ),
         )
 
@@ -276,7 +271,7 @@ class PubSubDriver(ManagedServiceDriver):
     def binding(self, handle: ServiceHandle) -> Binding:
         _, _, topic_id = handle.handle.partition("/")
         topic_path = f"projects/{self._config.project_id}/topics/{topic_id}"
-        sub_path = f"projects/{self._config.project_id}" f"/subscriptions/{topic_id}-sub"
+        sub_path = f"projects/{self._config.project_id}/subscriptions/{topic_id}-sub"
         return Binding(
             env_vars={
                 "PUBSUB_TOPIC": ValueRef(literal=topic_path),
@@ -303,7 +298,7 @@ class PubSubDriver(ManagedServiceDriver):
         from _sdk import UnsupportedOperationError
 
         raise UnsupportedOperationError(
-            "managed_service.snapshot(Pub/Sub) not supported -- Pub/Sub " "messages are ephemeral; no snapshot (#618)",
+            "managed_service.snapshot(Pub/Sub) not supported -- Pub/Sub messages are ephemeral; no snapshot (#618)",
         )
 
     @driver_op(cloud="gcp", driver="queue_pubsub")
@@ -315,7 +310,7 @@ class PubSubDriver(ManagedServiceDriver):
         from _sdk import UnsupportedOperationError
 
         raise UnsupportedOperationError(
-            "managed_service.restore(Pub/Sub) not supported -- Pub/Sub " "doesn't restore from snapshot (#618)",
+            "managed_service.restore(Pub/Sub) not supported -- Pub/Sub doesn't restore from snapshot (#618)",
         )
 
     @driver_op(cloud="gcp", driver="queue_pubsub", heartbeat=False)

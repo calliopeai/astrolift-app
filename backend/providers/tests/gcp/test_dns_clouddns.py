@@ -17,8 +17,10 @@ def fake_zone() -> FakeManagedZone:
         dns_name="example.com.",
         record_sets=[
             FakeRecordSet(
-                name="api.example.com.", record_type="A",
-                ttl=300, rrdatas=["1.2.3.4"],
+                name="api.example.com.",
+                record_type="A",
+                ttl=300,
+                rrdatas=["1.2.3.4"],
             ),
         ],
     )
@@ -37,7 +39,8 @@ def driver(fake_client: FakeDNSClient) -> CloudDNSDriver:
 
 
 def test_ensure_record_creates_new(
-    driver: CloudDNSDriver, fake_zone: FakeManagedZone,
+    driver: CloudDNSDriver,
+    fake_zone: FakeManagedZone,
 ) -> None:
     record = driver.ensure_record(
         zone="example.com",
@@ -53,29 +56,28 @@ def test_ensure_record_creates_new(
 
 
 def test_ensure_record_replaces_existing(
-    driver: CloudDNSDriver, fake_zone: FakeManagedZone,
+    driver: CloudDNSDriver,
+    fake_zone: FakeManagedZone,
 ) -> None:
     """ensure_record is UPSERT: a second call should replace the
     earlier rrset, not stack alongside it."""
     driver.ensure_record(
-        zone="example.com", name="api", type="A", value="5.5.5.5",
+        zone="example.com",
+        name="api",
+        type="A",
+        value="5.5.5.5",
     )
-    apis = [
-        rs for rs in fake_zone.record_sets
-        if rs.name == "api.example.com." and rs.record_type == "A"
-    ]
+    apis = [rs for rs in fake_zone.record_sets if rs.name == "api.example.com." and rs.record_type == "A"]
     assert len(apis) == 1
     assert apis[0].rrdatas == ["5.5.5.5"]
 
 
 def test_delete_record_removes(
-    driver: CloudDNSDriver, fake_zone: FakeManagedZone,
+    driver: CloudDNSDriver,
+    fake_zone: FakeManagedZone,
 ) -> None:
     driver.delete_record(zone="example.com", name="api", type="A")
-    apis = [
-        rs for rs in fake_zone.record_sets
-        if rs.name == "api.example.com." and rs.record_type == "A"
-    ]
+    apis = [rs for rs in fake_zone.record_sets if rs.name == "api.example.com." and rs.record_type == "A"]
     assert apis == []
 
 
@@ -97,7 +99,10 @@ def test_zone_caches_after_first_lookup(
     driver: CloudDNSDriver,
 ) -> None:
     driver.ensure_record(
-        zone="example.com", name="x", type="A", value="1.1.1.1",
+        zone="example.com",
+        name="x",
+        type="A",
+        value="1.1.1.1",
     )
     assert "example.com." in driver._config._zone_cache
 
@@ -107,18 +112,22 @@ def test_unknown_zone_raises_not_found(
 ) -> None:
     with pytest.raises(NotFoundError):
         driver.ensure_record(
-            zone="nope.com", name="x", type="A", value="1.1.1.1",
+            zone="nope.com",
+            name="x",
+            type="A",
+            value="1.1.1.1",
         )
 
 
 def test_apex_record_uses_zone_fqdn(
-    driver: CloudDNSDriver, fake_zone: FakeManagedZone,
+    driver: CloudDNSDriver,
+    fake_zone: FakeManagedZone,
 ) -> None:
     driver.ensure_record(
-        zone="example.com", name="@", type="A", value="1.1.1.1",
+        zone="example.com",
+        name="@",
+        type="A",
+        value="1.1.1.1",
     )
-    apex = [
-        rs for rs in fake_zone.record_sets
-        if rs.name == "example.com." and rs.record_type == "A"
-    ]
+    apex = [rs for rs in fake_zone.record_sets if rs.name == "example.com." and rs.record_type == "A"]
     assert len(apex) == 1

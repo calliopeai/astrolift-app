@@ -32,19 +32,18 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from astrolift_pipelines.models import JobRun, PipelineRun, StepRun
+    from astrolift_pipelines.models import JobRun, PipelineRun
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_JOB_TIMEOUT_SECONDS = 30 * 60  # 30 minutes
 
 
-def get_job_timeout_seconds(job_run: "JobRun") -> int:
+def get_job_timeout_seconds(job_run: JobRun) -> int:
     """Return the timeout in seconds for a job run.
 
     Reads from Job.config (from the pipeline TOML). Falls back to the default.
     """
-    config = getattr(job_run, "job", None) and getattr(job_run.job, "with_params", None) or {}
     if hasattr(job_run, "job") and job_run.job_id:
         # Extract from the raw TOML config if available
         timeout_minutes = job_run.job.with_params.get("timeout_minutes") if job_run.job.with_params else None
@@ -53,7 +52,7 @@ def get_job_timeout_seconds(job_run: "JobRun") -> int:
     return _DEFAULT_JOB_TIMEOUT_SECONDS
 
 
-def cancel_pipeline_run(run: "PipelineRun", *, actor_display: str = "operator") -> None:
+def cancel_pipeline_run(run: PipelineRun, *, actor_display: str = "operator") -> None:
     """Cancel a pipeline run and all its job runs.
 
     1. Signals Temporal to stop the PipelineRunWorkflow.
@@ -63,9 +62,9 @@ def cancel_pipeline_run(run: "PipelineRun", *, actor_display: str = "operator") 
     """
     from astrolift_pipelines.models import JobRun, StepRun
     from astrolift_pipelines.state_machine import (
-        transition_pipeline_run,
-        transition_job_run,
         InvalidTransition,
+        transition_job_run,
+        transition_pipeline_run,
     )
 
     # Signal Temporal first (best-effort)
@@ -97,12 +96,13 @@ def cancel_pipeline_run(run: "PipelineRun", *, actor_display: str = "operator") 
     logger.info("pipelines.cancellation: PipelineRun %s cancelled by %s", run.guid, actor_display)
 
 
-def _signal_temporal_cancel(run: "PipelineRun") -> None:
+def _signal_temporal_cancel(run: PipelineRun) -> None:
     """Signal the Temporal PipelineRunWorkflow to cancel."""
     if not run.temporal_workflow_id:
         return
     try:
         from astrolift_workflows.client import signal_workflow
+
         signal_workflow(
             run.temporal_workflow_id,
             signal_name="cancel",
@@ -132,9 +132,14 @@ def check_timed_out_runs() -> int:
     number of runs timed out.
     """
     from datetime import timedelta
+
     from django.utils import timezone
+
     from astrolift_pipelines.models import JobRun
-    from astrolift_pipelines.state_machine import transition_pipeline_run, transition_job_run, InvalidTransition
+    from astrolift_pipelines.state_machine import (
+        InvalidTransition,
+        transition_job_run,
+    )
 
     count = 0
     running_jobs = JobRun.objects.filter(
@@ -149,7 +154,9 @@ def check_timed_out_runs() -> int:
         if now < deadline:
             continue
 
-        logger.info("pipelines.cancellation: job run %s exceeded timeout (%ds)", job_run.guid, timeout_seconds)
+        logger.info(
+            "pipelines.cancellation: job run %s exceeded timeout (%ds)", job_run.guid, timeout_seconds
+        )
         try:
             transition_job_run(job_run, "failure", actor_display="timeout-checker")
             count += 1

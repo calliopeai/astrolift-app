@@ -96,18 +96,21 @@ def test_default_namespaces_passthrough():
 
 
 def test_pod_phase_summary_aggregates_by_namespace_and_phase():
-    client = FakeClient(pods={
-        "ns-a": [
-            _Pod(status=_PodStatus(phase="Running")),
-            _Pod(status=_PodStatus(phase="Running")),
-            _Pod(status=_PodStatus(phase="Pending")),
-        ],
-        "ns-b": [
-            _Pod(status=_PodStatus(phase="Failed")),
-        ],
-    })
+    client = FakeClient(
+        pods={
+            "ns-a": [
+                _Pod(status=_PodStatus(phase="Running")),
+                _Pod(status=_PodStatus(phase="Running")),
+                _Pod(status=_PodStatus(phase="Pending")),
+            ],
+            "ns-b": [
+                _Pod(status=_PodStatus(phase="Failed")),
+            ],
+        }
+    )
     out = pod_phase_summary_from_client(
-        client, namespaces=["ns-a", "ns-b"],
+        client,
+        namespaces=["ns-a", "ns-b"],
     )
     counts = {(r.namespace, r.phase): r.count for r in out}
     assert counts[("ns-a", "Running")] == 2
@@ -116,12 +119,14 @@ def test_pod_phase_summary_aggregates_by_namespace_and_phase():
 
 
 def test_pod_phase_summary_handles_missing_status():
-    client = FakeClient(pods={
-        "ns": [
-            _Pod(status=None),
-            _Pod(status=_PodStatus(phase=None)),
-        ],
-    })
+    client = FakeClient(
+        pods={
+            "ns": [
+                _Pod(status=None),
+                _Pod(status=_PodStatus(phase=None)),
+            ],
+        }
+    )
     out = pod_phase_summary_from_client(client, namespaces=["ns"])
     assert len(out) == 1
     assert out[0].phase == "Unknown"
@@ -136,7 +141,8 @@ def test_pod_phase_summary_skips_unreachable_namespace():
         fail_namespaces={"ns-bad"},
     )
     out = pod_phase_summary_from_client(
-        client, namespaces=["ns-bad", "ns-ok"],
+        client,
+        namespaces=["ns-bad", "ns-ok"],
     )
     assert len(out) == 1
     assert out[0].namespace == "ns-ok"
@@ -169,47 +175,52 @@ def _ev(name, reason, message, t="Warning", count=1, last="2026-05-15T10:00:00")
 
 
 def test_events_filters_to_warning_by_default():
-    client = FakeClient(events={
-        "ns": [
-            _ev("e1", "OOMKilled", "out of memory", t="Warning"),
-            _ev("e2", "Pulled", "image pulled", t="Normal"),
-        ],
-    })
+    client = FakeClient(
+        events={
+            "ns": [
+                _ev("e1", "OOMKilled", "out of memory", t="Warning"),
+                _ev("e2", "Pulled", "image pulled", t="Normal"),
+            ],
+        }
+    )
     out = events_from_client(client, namespaces=["ns"])
     assert len(out) == 1
     assert out[0].reason == "OOMKilled"
 
 
 def test_events_event_type_none_returns_all():
-    client = FakeClient(events={
-        "ns": [
-            _ev("e1", "X", "x", t="Warning"),
-            _ev("e2", "Y", "y", t="Normal"),
-        ],
-    })
+    client = FakeClient(
+        events={
+            "ns": [
+                _ev("e1", "X", "x", t="Warning"),
+                _ev("e2", "Y", "y", t="Normal"),
+            ],
+        }
+    )
     out = events_from_client(client, namespaces=["ns"], event_type=None)
     assert len(out) == 2
 
 
 def test_events_sorts_by_last_seen_desc():
-    client = FakeClient(events={
-        "ns": [
-            _ev("old", "X", "x", last="2026-05-15T08:00:00"),
-            _ev("new", "Y", "y", last="2026-05-15T12:00:00"),
-            _ev("mid", "Z", "z", last="2026-05-15T10:00:00"),
-        ],
-    })
+    client = FakeClient(
+        events={
+            "ns": [
+                _ev("old", "X", "x", last="2026-05-15T08:00:00"),
+                _ev("new", "Y", "y", last="2026-05-15T12:00:00"),
+                _ev("mid", "Z", "z", last="2026-05-15T10:00:00"),
+            ],
+        }
+    )
     out = events_from_client(client, namespaces=["ns"])
     assert [e.name for e in out] == ["new", "mid", "old"]
 
 
 def test_events_respects_limit():
-    client = FakeClient(events={
-        "ns": [
-            _ev(f"e{i}", "X", "x", last=f"2026-05-15T10:0{i}:00")
-            for i in range(5)
-        ],
-    })
+    client = FakeClient(
+        events={
+            "ns": [_ev(f"e{i}", "X", "x", last=f"2026-05-15T10:0{i}:00") for i in range(5)],
+        }
+    )
     out = events_from_client(client, namespaces=["ns"], limit=2)
     assert len(out) == 2
 
@@ -226,7 +237,8 @@ def test_events_skips_unreachable_namespace():
         fail_namespaces={"ns-bad"},
     )
     out = events_from_client(
-        client, namespaces=["ns-bad", "ns-ok"],
+        client,
+        namespaces=["ns-bad", "ns-ok"],
     )
     assert len(out) == 1
     assert out[0].namespace == "ns-ok"

@@ -33,7 +33,7 @@ from azure.managed.model_endpoint_aoai import (
 # ---- fakes ------------------------------------------------------
 
 
-class _NotFound(Exception):  # noqa: N818
+class _NotFound(Exception):
     pass
 
 
@@ -291,10 +291,7 @@ def test_provision_defaults_to_standard_sku_gpt35turbo(
     create = mgmt.deployments_obj.create_calls[0]
     assert create["parameters"]["sku"]["name"] == "Standard"
     assert create["parameters"]["sku"]["capacity"] == 10
-    assert (
-        create["parameters"]["properties"]["model"]["name"]
-        == "gpt-35-turbo"
-    )
+    assert create["parameters"]["properties"]["model"]["name"] == "gpt-35-turbo"
 
 
 def test_provision_idempotent(
@@ -335,9 +332,7 @@ def test_provision_large_picks_gpt4(
 ) -> None:
     driver.provision(_spec(size="large"))
     create = mgmt.deployments_obj.create_calls[0]
-    assert (
-        create["parameters"]["properties"]["model"]["name"] == "gpt-4"
-    )
+    assert create["parameters"]["properties"]["model"]["name"] == "gpt-4"
 
 
 def test_provision_honours_spec_config_override(
@@ -437,9 +432,7 @@ def test_update_model_version_passes_through(
     )
     assert result.ok
     last = mgmt.deployments_obj.update_calls[-1]
-    assert (
-        last["parameters"]["properties"]["model"]["version"] == "0301"
-    )
+    assert last["parameters"]["properties"]["model"]["version"] == "0301"
 
 
 def test_update_noop_when_nothing_to_change(
@@ -628,9 +621,7 @@ def test_status_maps_creating_to_provisioning(
 ) -> None:
     provisioned = driver.provision(_spec())
     deployment_name = provisioned.handle.split("/", 1)[1]
-    mgmt.deployments_obj.deployments[
-        deployment_name
-    ].provisioning_state = "Creating"
+    mgmt.deployments_obj.deployments[deployment_name].provisioning_state = "Creating"
     state = driver.status(ServiceHandle(handle=provisioned.handle))
     assert state.state == "provisioning"
 
@@ -641,9 +632,7 @@ def test_status_maps_failed_to_error(
 ) -> None:
     provisioned = driver.provision(_spec())
     deployment_name = provisioned.handle.split("/", 1)[1]
-    mgmt.deployments_obj.deployments[
-        deployment_name
-    ].provisioning_state = "Failed"
+    mgmt.deployments_obj.deployments[deployment_name].provisioning_state = "Failed"
     state = driver.status(ServiceHandle(handle=provisioned.handle))
     assert state.state == "error"
 
@@ -676,9 +665,7 @@ def test_binding_returns_connection_envelope(
     assert env["AZURE_OPENAI_ENDPOINT"].literal.endswith(
         ".openai.azure.com",
     )
-    assert (
-        env["AZURE_OPENAI_API_VERSION"].literal == "2024-02-15-preview"
-    )
+    assert env["AZURE_OPENAI_API_VERSION"].literal == "2024-02-15-preview"
 
 
 def test_binding_iam_grants_cover_account_and_keyvault(

@@ -14,15 +14,17 @@ as a real workload deploy.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from _sdk.availability import (
     MATRIX,
     REQUIRED_ROLES,
     AvailabilityMatrix,
 )
-from _sdk.base import ProviderPlugin
-from _sdk.composition import CompositionRegistry
+
+if TYPE_CHECKING:
+    from _sdk.base import ProviderPlugin
+    from _sdk.composition import CompositionRegistry
 
 
 @dataclass(frozen=True)
@@ -78,8 +80,10 @@ class TenantClusterRegistry:
             if (
                 composition is not None
                 and composition.resolve_driver(
-                    target_plugin_id=plugin.id, role=role,
-                ) is not None
+                    target_plugin_id=plugin.id,
+                    role=role,
+                )
+                is not None
             ):
                 continue
             if matrix.has_role(plugin_id=plugin.id, role=role):
@@ -135,11 +139,13 @@ def probe_connectivity(
         cluster_driver.get_namespace(record.cluster_id, sentinel_namespace)
     except Exception as exc:
         return ProbeResult(
-            ok=False, last_probed_at=timestamp,
+            ok=False,
+            last_probed_at=timestamp,
             message=f"connectivity probe failed: {exc}",
         )
     return ProbeResult(
-        ok=True, last_probed_at=timestamp,
+        ok=True,
+        last_probed_at=timestamp,
         message="apiserver reachable",
         capabilities=list(REQUIRED_ROLES),
     )

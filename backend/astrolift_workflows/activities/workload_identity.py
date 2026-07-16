@@ -90,9 +90,8 @@ def _ensure_workload_identity_sync(
     registered_app_id: int,
     app_environment_id: int,
 ) -> dict[str, Any]:
-    from astrolift_services.models import ManagedService
     from astrolift_registry.models import RegisteredApp
-
+    from astrolift_services.models import ManagedService
     from astrolift_workflows.activities.capability_deprovision import (
         _resolve_capability_driver,
     )

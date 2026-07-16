@@ -61,9 +61,12 @@ def test_set_alert_subscription_creates_new_row():
     assert result.data.channel == "email"
     assert result.data.enabled is True
 
-    assert UserAlertSubscription.objects.filter(
-        user=user, registered_app=app, alert_kind="deploy_failure", deleted_at__isnull=True
-    ).count() == 1
+    assert (
+        UserAlertSubscription.objects.filter(
+            user=user, registered_app=app, alert_kind="deploy_failure", deleted_at__isnull=True
+        ).count()
+        == 1
+    )
 
 
 def test_set_alert_subscription_upserts_existing():
@@ -84,9 +87,12 @@ def test_set_alert_subscription_upserts_existing():
     assert result.ok is True
     assert result.data.channel == "both"
     assert result.data.enabled is False
-    assert UserAlertSubscription.objects.filter(
-        user=user, registered_app=app, alert_kind="deploy_failure", deleted_at__isnull=True
-    ).count() == 1
+    assert (
+        UserAlertSubscription.objects.filter(
+            user=user, registered_app=app, alert_kind="deploy_failure", deleted_at__isnull=True
+        ).count()
+        == 1
+    )
 
 
 def test_set_alert_subscription_rejects_invalid_kind():
@@ -143,14 +149,18 @@ def test_clear_alert_subscription_soft_deletes():
             input=ClearAlertSubscriptionInput(id=sub_guid),
         )
     assert result.ok is True
-    assert UserAlertSubscription.objects.filter(
-        user=user, registered_app=app, alert_kind="error_spike", deleted_at__isnull=True
-    ).count() == 0
+    assert (
+        UserAlertSubscription.objects.filter(
+            user=user, registered_app=app, alert_kind="error_spike", deleted_at__isnull=True
+        ).count()
+        == 0
+    )
 
 
 def test_clear_alert_subscription_not_found():
     org, app, user = _scaffold()
     import uuid
+
     with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
         result = OperationsMutation().clear_alert_subscription(
             info=_info(),
@@ -207,9 +217,7 @@ def test_my_alert_subscriptions_filters_by_app_slug():
                 app_slug=app2.slug, alert_kind="error_spike", channel="web", enabled=True
             ),
         )
-        subs = OperationsQuery().astrolift_my_alert_subscriptions(
-            info=_info(), app_slug=_app.slug
-        )
+        subs = OperationsQuery().astrolift_my_alert_subscriptions(info=_info(), app_slug=_app.slug)
 
     assert len(subs) == 1
     assert subs[0].app_slug == _app.slug

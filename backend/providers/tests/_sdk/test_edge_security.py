@@ -28,9 +28,7 @@ def test_headers_dict_includes_hsts_and_security() -> None:
     headers = DEFAULT_PROFILE.headers_dict()
     assert headers["X-Content-Type-Options"] == "nosniff"
     assert headers["X-Frame-Options"] == "DENY"
-    assert headers["Referrer-Policy"] == (
-        "strict-origin-when-cross-origin"
-    )
+    assert headers["Referrer-Policy"] == ("strict-origin-when-cross-origin")
     assert "max-age=31536000" in headers["Strict-Transport-Security"]
     assert "includeSubDomains" in headers["Strict-Transport-Security"]
     assert "preload" in headers["Strict-Transport-Security"]
@@ -43,9 +41,11 @@ def test_hsts_disabled_omits_header() -> None:
 
 
 def test_csp_emitted_when_set() -> None:
-    profile = EdgeSecurityProfile(headers=SecurityHeaders(
-        content_security_policy="default-src 'self'",
-    ))
+    profile = EdgeSecurityProfile(
+        headers=SecurityHeaders(
+            content_security_policy="default-src 'self'",
+        )
+    )
     headers = profile.headers_dict()
     assert headers["Content-Security-Policy"] == "default-src 'self'"
 
@@ -53,26 +53,23 @@ def test_csp_emitted_when_set() -> None:
 def test_nginx_annotations_set_tls_policy() -> None:
     annos = nginx_annotations(DEFAULT_PROFILE)
     assert annos["nginx.ingress.kubernetes.io/ssl-protocols"] == "TLSv1.3"
-    assert (
-        annos["nginx.ingress.kubernetes.io/ssl-prefer-server-ciphers"]
-        == "true"
-    )
+    assert annos["nginx.ingress.kubernetes.io/ssl-prefer-server-ciphers"] == "true"
 
 
 def test_nginx_emits_security_headers_snippet() -> None:
     annos = nginx_annotations(DEFAULT_PROFILE)
-    snippet = annos[
-        "nginx.ingress.kubernetes.io/configuration-snippet"
-    ]
+    snippet = annos["nginx.ingress.kubernetes.io/configuration-snippet"]
     assert "X-Content-Type-Options: nosniff" in snippet
     assert "X-Frame-Options: DENY" in snippet
     assert "Strict-Transport-Security:" in snippet
 
 
 def test_nginx_rate_limit_translated() -> None:
-    profile = EdgeSecurityProfile(waf=WafPolicy(
-        rate_limit_requests_per_5min=600,
-    ))
+    profile = EdgeSecurityProfile(
+        waf=WafPolicy(
+            rate_limit_requests_per_5min=600,
+        )
+    )
     annos = nginx_annotations(profile)
     # 600 / 300 = 2 rps
     assert annos["nginx.ingress.kubernetes.io/limit-rps"] == "2"
@@ -80,9 +77,7 @@ def test_nginx_rate_limit_translated() -> None:
 
 def test_alb_annotations_use_tls13_policy() -> None:
     annos = alb_annotations(DEFAULT_PROFILE)
-    assert annos["alb.ingress.kubernetes.io/ssl-policy"] == (
-        "ELBSecurityPolicy-TLS13-1-2-2021-06"
-    )
+    assert annos["alb.ingress.kubernetes.io/ssl-policy"] == ("ELBSecurityPolicy-TLS13-1-2-2021-06")
 
 
 def test_alb_with_tls12_floor() -> None:
@@ -90,9 +85,7 @@ def test_alb_with_tls12_floor() -> None:
         tls=TlsPolicy(min_version="TLSv1.2"),
     )
     annos = alb_annotations(profile)
-    assert annos["alb.ingress.kubernetes.io/ssl-policy"] == (
-        "ELBSecurityPolicy-TLS-1-2-2017-01"
-    )
+    assert annos["alb.ingress.kubernetes.io/ssl-policy"] == ("ELBSecurityPolicy-TLS-1-2-2017-01")
 
 
 def test_alb_includes_waf_when_enabled() -> None:

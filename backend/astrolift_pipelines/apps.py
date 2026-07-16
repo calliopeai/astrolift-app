@@ -9,6 +9,7 @@ class AstroliftPipelinesConfig(AppConfig):
 
     def ready(self) -> None:
         from django.db.models.signals import post_save
+
         from astrolift_pipelines.models import Trigger
         from astrolift_pipelines.signals import on_trigger_save
 

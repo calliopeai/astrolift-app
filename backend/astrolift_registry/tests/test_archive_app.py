@@ -140,7 +140,9 @@ def test_archive_rejects_unknown_app(permission_resolver):
     permission_resolver.grant(Permission.APP_UPDATE)
 
     with _ctx(org, actor):
-        result = RegistryMutation().archive_app(_info(actor), input=ArchiveAppInput(app_slug="does-not-exist"))
+        result = RegistryMutation().archive_app(
+            _info(actor), input=ArchiveAppInput(app_slug="does-not-exist")
+        )
 
     assert not result.ok
     assert result.errors[0].code == "NOT_FOUND"

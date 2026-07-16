@@ -43,14 +43,17 @@ def route53_with_zone(route53_client) -> tuple[Route53Driver, str]:
 
 
 def test_list_records_for_app_by_zone_returns_dnsrecord_shape(
-    route53_with_zone, route53_client,
+    route53_with_zone,
+    route53_client,
 ) -> None:
     """Happy path: passing a zone name returns DnsRecord items with the
     propagation field populated (even if "unknown")."""
     driver, _ = route53_with_zone
     driver.ensure_record(
         zone="acme.platform.example",
-        name="api", type="A", value="192.0.2.1",
+        name="api",
+        type="A",
+        value="192.0.2.1",
     )
     records = driver.list_records_for_app("acme.platform.example")
 
@@ -80,13 +83,15 @@ def test_list_records_for_app_unknown_input_raises(route53_client) -> None:
     "not yet supported / not configured" empty state via the
     backend's translation layer."""
     from aws._errors import NotFoundError
+
     driver = Route53Driver(client=route53_client)
     with pytest.raises(NotFoundError):
         driver.list_records_for_app("never-existed-zone.example")
 
 
 def test_list_records_for_app_falls_back_to_app_slug_tag(
-    route53_with_zone, route53_client,
+    route53_with_zone,
+    route53_client,
 ) -> None:
     """When the input doesn't match a zone name, the driver scans
     hosted zones for the ``astrolift.io/app-slug`` tag."""
@@ -98,7 +103,9 @@ def test_list_records_for_app_falls_back_to_app_slug_tag(
     )
     driver.ensure_record(
         zone="acme.platform.example",
-        name="web", type="A", value="192.0.2.5",
+        name="web",
+        type="A",
+        value="192.0.2.5",
     )
     records = driver.list_records_for_app("acme-api")
     assert any(r.value == "192.0.2.5" for r in records)
@@ -111,9 +118,11 @@ def test_list_records_for_app_propagates_client_errors(
     ProviderError (via map_client_error). The resolver layer catches that
     and renders an empty card."""
     driver, _ = route53_with_zone
+
     # Force the paginator path to error out by replacing get_paginator.
     def _bad_paginator(name):
         raise RuntimeError("boom")
+
     driver._r53.get_paginator = _bad_paginator  # type: ignore[assignment]
     with pytest.raises((ProviderError, RuntimeError)):
         driver.list_records_for_app("acme.platform.example")
@@ -167,7 +176,8 @@ def test_list_certificates_filter_hostname(acm_driver: ACMDriver) -> None:
 
 
 def test_list_certificates_skips_deleted_between_list_and_describe(
-    acm_driver: ACMDriver, acm_client,
+    acm_driver: ACMDriver,
+    acm_client,
 ) -> None:
     """Race: cert disappears between the list_certificates pagination
     and the per-id describe_certificate call. We swallow the
@@ -195,15 +205,18 @@ def test_list_certificates_propagates_client_errors(
 ) -> None:
     """A boto3 error on the initial pagination surfaces — distinct from
     the per-cert RNF skip (above), which is benign."""
+
     def _bad_paginator(name):
         raise RuntimeError("acm boom")
+
     acm_driver._acm.get_paginator = _bad_paginator  # type: ignore[assignment]
     with pytest.raises((ProviderError, RuntimeError)):
         acm_driver.list_certificates()
 
 
 def test_list_certificates_days_until_expiry_clamps_negative(
-    acm_driver: ACMDriver, acm_client,
+    acm_driver: ACMDriver,
+    acm_client,
 ) -> None:
     """An expired cert must report 0 days, not a negative number."""
     cert = acm_driver.ensure_certificate(domain="expired.example")
@@ -226,7 +239,8 @@ def test_list_certificates_days_until_expiry_clamps_negative(
 
 
 def test_list_certificates_renewal_failed_status(
-    acm_driver: ACMDriver, acm_client,
+    acm_driver: ACMDriver,
+    acm_client,
 ) -> None:
     """ACM RenewalSummary FAILED is mapped to ``renewal_status="failed"``."""
     cert = acm_driver.ensure_certificate(domain="failing.example")
@@ -249,7 +263,8 @@ def test_list_certificates_renewal_failed_status(
 
 
 def test_list_certificates_imported_is_manual(
-    acm_driver: ACMDriver, acm_client,
+    acm_driver: ACMDriver,
+    acm_client,
 ) -> None:
     """Cert with Type=IMPORTED is renewal_status='manual' (operator
     brought their own — no auto renewal)."""
@@ -292,7 +307,9 @@ def test_describe_identity_happy_path(irsa_driver: IRSADriver) -> None:
     with a one-subject summary."""
     irsa_driver.create_identity_role(name="astrolift-acme-api", permissions=[])
     irsa_driver.bind_service_account(
-        cluster="x", namespace="acme", sa_name="api",
+        cluster="x",
+        namespace="acme",
+        sa_name="api",
         identity_role="astrolift-acme-api",
     )
     binding = irsa_driver.describe_identity("acme-api")
@@ -317,11 +334,15 @@ def test_describe_identity_multiple_subjects_summary(
     subject — the card stays one line."""
     irsa_driver.create_identity_role(name="astrolift-shared", permissions=[])
     irsa_driver.bind_service_account(
-        cluster="x", namespace="acme", sa_name="api",
+        cluster="x",
+        namespace="acme",
+        sa_name="api",
         identity_role="astrolift-shared",
     )
     irsa_driver.bind_service_account(
-        cluster="x", namespace="acme", sa_name="worker",
+        cluster="x",
+        namespace="acme",
+        sa_name="worker",
         identity_role="astrolift-shared",
     )
     binding = irsa_driver.describe_identity("shared")
@@ -335,15 +356,18 @@ def test_describe_identity_propagates_client_errors(
 ) -> None:
     """An unexpected boto3 error (not NoSuchEntity) surfaces — the
     resolver layer catches ProviderError and degrades the card."""
+
     def _explode(**_kwargs: Any) -> None:
         raise RuntimeError("iam api boom")
+
     irsa_driver._iam.get_role = _explode  # type: ignore[assignment]
     with pytest.raises((ProviderError, RuntimeError)):
         irsa_driver.describe_identity("acme-api")
 
 
 def test_describe_identity_no_last_used_yet(
-    irsa_driver: IRSADriver, iam_client,
+    irsa_driver: IRSADriver,
+    iam_client,
 ) -> None:
     """Freshly-created role has no RoleLastUsed — last_used_at is
     None, the UI renders that as '—' rather than now()."""
@@ -354,7 +378,8 @@ def test_describe_identity_no_last_used_yet(
 
 
 def test_describe_identity_with_last_used(
-    irsa_driver: IRSADriver, iam_client,
+    irsa_driver: IRSADriver,
+    iam_client,
 ) -> None:
     """When IAM populates RoleLastUsed, we surface the ISO timestamp."""
     irsa_driver.create_identity_role(name="astrolift-used", permissions=[])
@@ -381,23 +406,27 @@ def test_describe_identity_with_last_used(
 
 def test_summarize_trust_empty() -> None:
     from aws.identity_irsa import _summarize_trust
+
     assert "empty" in _summarize_trust(
-        {}, "oidc.eks.us-east-1.amazonaws.com/id/X",
+        {},
+        "oidc.eks.us-east-1.amazonaws.com/id/X",
     )
 
 
 def test_summarize_trust_single_subject() -> None:
     from aws.identity_irsa import _summarize_trust
+
     doc = {
-        "Statement": [{
-            "Effect": "Allow",
-            "Condition": {
-                "StringEquals": {
-                    "oidc.eks.us-east-1.amazonaws.com/id/X:sub":
-                        "system:serviceaccount:ns:sa",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Condition": {
+                    "StringEquals": {
+                        "oidc.eks.us-east-1.amazonaws.com/id/X:sub": "system:serviceaccount:ns:sa",
+                    },
                 },
-            },
-        }],
+            }
+        ],
     }
     summary = _summarize_trust(doc, "oidc.eks.us-east-1.amazonaws.com/id/X")
     assert summary == "OIDC trust: system:serviceaccount:ns:sa"
@@ -405,6 +434,7 @@ def test_summarize_trust_single_subject() -> None:
 
 def test_summarize_trust_no_oidc_subject_falls_back() -> None:
     from aws.identity_irsa import _summarize_trust
+
     doc = {"Statement": [{"Effect": "Allow", "Action": "sts:AssumeRole"}]}
     summary = _summarize_trust(doc, "oidc.eks.us-east-1.amazonaws.com/id/X")
     assert "1 statement" in summary
@@ -420,13 +450,21 @@ def test_dataclasses_are_frozen() -> None:
     backing instance and confuse a downstream consumer."""
     rec = DnsRecord(name="x", type="A", value="1.2.3.4", ttl=60)
     info = CertificateInfo(
-        id="i", hostname="h", issuer="i", not_after="2030", days_until_expiry=1,
+        id="i",
+        hostname="h",
+        issuer="i",
+        not_after="2030",
+        days_until_expiry=1,
     )
     binding = IdentityBinding(
-        kind="irsa", role_arn_or_principal="arn:x", trust_policy_summary="x",
+        kind="irsa",
+        role_arn_or_principal="arn:x",
+        trust_policy_summary="x",
     )
     for obj, attr in (
-        (rec, "name"), (info, "hostname"), (binding, "kind"),
+        (rec, "name"),
+        (info, "hostname"),
+        (binding, "kind"),
     ):
         with pytest.raises((AttributeError, TypeError)):
             setattr(obj, attr, "mutated")

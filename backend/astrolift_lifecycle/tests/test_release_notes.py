@@ -178,9 +178,7 @@ def test_returns_release_notes_when_prior_deploy_exists(
     tc = TenantContext(organization_id=org.pk)
     with tenant_context(tc):
         q = LifecycleQuery()
-        result = q.astrolift_deployment_release_notes(
-            fake_info, deployment_id=str(head_deployment.guid)
-        )
+        result = q.astrolift_deployment_release_notes(fake_info, deployment_id=str(head_deployment.guid))
 
     assert result is not None
     assert result.base_sha == "abc123sha"
@@ -207,9 +205,7 @@ def test_returns_none_when_no_prior_deploy(
     tc = TenantContext(organization_id=org.pk)
     with tenant_context(tc):
         q = LifecycleQuery()
-        result = q.astrolift_deployment_release_notes(
-            fake_info, deployment_id=str(head_deployment.guid)
-        )
+        result = q.astrolift_deployment_release_notes(fake_info, deployment_id=str(head_deployment.guid))
     assert result is None
 
 
@@ -231,9 +227,7 @@ def test_returns_none_when_no_commit_sha(
     tc = TenantContext(organization_id=org.pk)
     with tenant_context(tc):
         q = LifecycleQuery()
-        result = q.astrolift_deployment_release_notes(
-            fake_info, deployment_id=str(deploy.guid)
-        )
+        result = q.astrolift_deployment_release_notes(fake_info, deployment_id=str(deploy.guid))
     assert result is None
 
 
@@ -249,9 +243,7 @@ def test_returns_none_when_no_source_connection(
     tc = TenantContext(organization_id=org.pk)
     with tenant_context(tc):
         q = LifecycleQuery()
-        result = q.astrolift_deployment_release_notes(
-            fake_info, deployment_id=str(head_deployment.guid)
-        )
+        result = q.astrolift_deployment_release_notes(fake_info, deployment_id=str(head_deployment.guid))
     assert result is None
 
 
@@ -277,8 +269,6 @@ def test_caches_result(
     ]
     fake_resp = _make_github_compare_response(commits_payload)
 
-    original_urlopen = __import__("urllib.request", fromlist=["urlopen"]).urlopen
-
     def _counting_urlopen(req, timeout=None):
         nonlocal call_count
         call_count += 1
@@ -289,6 +279,7 @@ def test_caches_result(
         _counting_urlopen,
     )
     from django.core.cache import cache as django_cache
+
     django_cache.clear()
 
     tc = TenantContext(organization_id=org.pk)

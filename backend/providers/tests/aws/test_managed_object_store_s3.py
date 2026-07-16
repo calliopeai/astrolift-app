@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator
+from typing import TYPE_CHECKING
 
 import boto3
 import pytest
@@ -15,6 +15,9 @@ from _sdk.managed_service import (
 )
 from aws.managed._base import ManagedServiceError, parse_handle
 from aws.managed.object_store_s3 import KIND, S3Config, S3Driver
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @pytest.fixture
@@ -72,7 +75,8 @@ def test_provision_idempotent(driver: S3Driver) -> None:
 
 
 def test_provision_applies_versioning(
-    driver: S3Driver, s3_client,
+    driver: S3Driver,
+    s3_client,
 ) -> None:
     result = driver.provision(_spec())
     _, bucket_name = parse_handle(result.handle)
@@ -81,7 +85,8 @@ def test_provision_applies_versioning(
 
 
 def test_provision_applies_public_access_block(
-    driver: S3Driver, s3_client,
+    driver: S3Driver,
+    s3_client,
 ) -> None:
     result = driver.provision(_spec())
     _, bucket_name = parse_handle(result.handle)
@@ -103,10 +108,12 @@ def test_provision_tags_bucket(driver: S3Driver, s3_client) -> None:
 
 
 def test_bucket_name_collapses_invalid_chars(driver: S3Driver) -> None:
-    result = driver.provision(_spec(
-        organization_slug="ACME_Org",
-        app_slug="my.app",
-    ))
+    result = driver.provision(
+        _spec(
+            organization_slug="ACME_Org",
+            app_slug="my.app",
+        )
+    )
     _, bucket_name = parse_handle(result.handle)
     # No uppercase, no underscores, no dots
     assert bucket_name == bucket_name.lower()
@@ -115,11 +122,13 @@ def test_bucket_name_collapses_invalid_chars(driver: S3Driver) -> None:
 
 
 def test_bucket_name_at_most_63_chars(driver: S3Driver) -> None:
-    result = driver.provision(_spec(
-        organization_slug="x" * 30,
-        app_slug="y" * 30,
-        environment_name="z" * 30,
-    ))
+    result = driver.provision(
+        _spec(
+            organization_slug="x" * 30,
+            app_slug="y" * 30,
+            environment_name="z" * 30,
+        )
+    )
     _, bucket_name = parse_handle(result.handle)
     assert len(bucket_name) <= 63
 
@@ -143,11 +152,12 @@ def test_status_deprovisioned_when_missing(driver: S3Driver) -> None:
 
 
 def test_binding_emits_env_vars(driver: S3Driver) -> None:
+    # Canonical object_store envelope (#1003) + the S3_BUCKET_ARN extra.
     result = driver.provision(_spec())
     binding = driver.binding(ServiceHandle(handle=result.handle))
-    assert "S3_BUCKET_NAME" in binding.env_vars
+    assert "BUCKET_NAME" in binding.env_vars
+    assert "BUCKET_REGION" in binding.env_vars
     assert "S3_BUCKET_ARN" in binding.env_vars
-    assert "AWS_REGION" in binding.env_vars
     bucket_arn = binding.env_vars["S3_BUCKET_ARN"].literal
     assert bucket_arn.startswith("arn:aws:s3:::")
 
@@ -157,12 +167,8 @@ def test_binding_emits_iam_grants(driver: S3Driver) -> None:
     result = driver.provision(_spec())
     binding = driver.binding(ServiceHandle(handle=result.handle))
     assert len(binding.iam_grants) == 2
-    bucket_grant = next(
-        g for g in binding.iam_grants if not g.resource.endswith("/*")
-    )
-    object_grant = next(
-        g for g in binding.iam_grants if g.resource.endswith("/*")
-    )
+    bucket_grant = next(g for g in binding.iam_grants if not g.resource.endswith("/*"))
+    object_grant = next(g for g in binding.iam_grants if g.resource.endswith("/*"))
     # Bucket-level: read-only
     assert "s3:ListBucket" in bucket_grant.actions
     assert "s3:DeleteObject" not in bucket_grant.actions
@@ -190,7 +196,8 @@ def test_deprovision_keep_data(driver: S3Driver, s3_client) -> None:
     result = driver.provision(_spec())
     _, bucket_name = parse_handle(result.handle)
     deprov = driver.deprovision(
-        DeprovisionSpec(handle=result.handle), delete_data=False,
+        DeprovisionSpec(handle=result.handle),
+        delete_data=False,
     )
     assert deprov.ok is True
     # Bucket still exists
@@ -204,7 +211,8 @@ def test_deprovision_delete_data(driver: S3Driver, s3_client) -> None:
     # Put an object so we exercise the empty-bucket path
     s3_client.put_object(Bucket=bucket_name, Key="test.txt", Body=b"hi")
     deprov = driver.deprovision(
-        DeprovisionSpec(handle=result.handle), delete_data=True,
+        DeprovisionSpec(handle=result.handle),
+        delete_data=True,
     )
     assert deprov.ok is True
     # Bucket gone
@@ -218,27 +226,33 @@ def test_deprovision_already_gone_idempotent(driver: S3Driver) -> None:
     so teardown converges instead of stranding the row (#1034)."""
     fake_handle = "object_store/never-existed-bucket-xyz"
     deprov = driver.deprovision(
-        DeprovisionSpec(handle=fake_handle), delete_data=True,
+        DeprovisionSpec(handle=fake_handle),
+        delete_data=True,
     )
     assert deprov.ok is True
     assert not deprov.errors
 
 
 def test_deprovision_delete_data_idempotent_on_second_run(
-    driver: S3Driver, s3_client,
+    driver: S3Driver,
+    s3_client,
 ) -> None:
     """Re-running delete_data deprovision after the bucket is already gone
     must still report ok=True (re-trigger / partial-teardown convergence)."""
     result = driver.provision(_spec())
     s3_client.put_object(
-        Bucket=parse_handle(result.handle)[1], Key="x", Body=b"y",
+        Bucket=parse_handle(result.handle)[1],
+        Key="x",
+        Body=b"y",
     )
     first = driver.deprovision(
-        DeprovisionSpec(handle=result.handle), delete_data=True,
+        DeprovisionSpec(handle=result.handle),
+        delete_data=True,
     )
     assert first.ok is True
     second = driver.deprovision(
-        DeprovisionSpec(handle=result.handle), delete_data=True,
+        DeprovisionSpec(handle=result.handle),
+        delete_data=True,
     )
     assert second.ok is True
     assert not second.errors

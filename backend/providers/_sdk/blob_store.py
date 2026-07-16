@@ -15,10 +15,13 @@ LocalFsBlobStoreDriver (dev only).
 
 from __future__ import annotations
 
+import contextlib
 import os
 from dataclasses import dataclass
-from typing import Iterator, Protocol
+from typing import TYPE_CHECKING, Protocol
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 # ---------------------------------------------------------------------------
 # Data shapes
@@ -142,7 +145,7 @@ class BlobStoreSizeError(BlobStoreError):
         self.key = key
         self.limit_bytes = limit_bytes
         self.actual_bytes = actual_bytes
-        super().__init__(f"Blob {key!r} exceeds size limit: " f"{actual_bytes} > {limit_bytes} bytes")
+        super().__init__(f"Blob {key!r} exceeds size limit: {actual_bytes} > {limit_bytes} bytes")
 
 
 class BlobStoreNotConfiguredError(BlobStoreError):
@@ -189,10 +192,7 @@ class LocalFsBlobStoreDriver:
     ) -> None:
         path = self._full_path(key)
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        if isinstance(data, bytes):
-            payload = data
-        else:
-            payload = b"".join(data)
+        payload = data if isinstance(data, bytes) else b"".join(data)
         with open(path, "wb") as fh:
             fh.write(payload)
 
@@ -243,7 +243,7 @@ class LocalFsBlobStoreDriver:
                 BlobInfo(
                     key=rel,
                     size_bytes=stat.st_size,
-                    last_modified=datetime.datetime.fromtimestamp(stat.st_mtime, tz=datetime.timezone.utc).isoformat(),
+                    last_modified=datetime.datetime.fromtimestamp(stat.st_mtime, tz=datetime.UTC).isoformat(),
                 )
             )
             return results
@@ -258,9 +258,7 @@ class LocalFsBlobStoreDriver:
                     BlobInfo(
                         key=rel,
                         size_bytes=stat.st_size,
-                        last_modified=datetime.datetime.fromtimestamp(
-                            stat.st_mtime, tz=datetime.timezone.utc
-                        ).isoformat(),
+                        last_modified=datetime.datetime.fromtimestamp(stat.st_mtime, tz=datetime.UTC).isoformat(),
                     )
                 )
         return sorted(results, key=lambda b: b.key)
@@ -338,8 +336,8 @@ class S3BlobStoreDriver:
         try:
             resp = self._s3.get_object(Bucket=self._bucket, Key=full_key)
             return resp["Body"].read()
-        except self._s3.exceptions.NoSuchKey:
-            raise BlobStoreNotFoundError(f"Blob not found: {key!r}")
+        except self._s3.exceptions.NoSuchKey as exc:
+            raise BlobStoreNotFoundError(f"Blob not found: {key!r}") from exc
 
     def presigned_url(self, key: str, *, expires_in: int = 900) -> str:
         full_key = self._full_key(key)
@@ -347,8 +345,8 @@ class S3BlobStoreDriver:
         # clear error rather than a presigned URL that 404s at access time.
         try:
             self._s3.head_object(Bucket=self._bucket, Key=full_key)
-        except Exception:
-            raise BlobStoreNotFoundError(f"Blob not found: {key!r}")
+        except Exception as exc:
+            raise BlobStoreNotFoundError(f"Blob not found: {key!r}") from exc
         return self._s3.generate_presigned_url(
             "get_object",
             Params={"Bucket": self._bucket, "Key": full_key},
@@ -462,13 +460,11 @@ class GCSBlobStoreDriver:
         blob = self._bucket.blob(self._full_key(key))
         try:
             return blob.download_as_bytes()
-        except NotFound:
-            raise BlobStoreNotFoundError(f"Blob not found: {key!r}")
+        except NotFound as exc:
+            raise BlobStoreNotFoundError(f"Blob not found: {key!r}") from exc
 
     def presigned_url(self, key: str, *, expires_in: int = 900) -> str:
         import datetime
-
-        from google.cloud.exceptions import NotFound  # type: ignore[import-untyped]
 
         blob = self._bucket.blob(self._full_key(key))
         if not blob.exists():
@@ -502,10 +498,8 @@ class GCSBlobStoreDriver:
         from google.cloud.exceptions import NotFound  # type: ignore[import-untyped]
 
         blob = self._bucket.blob(self._full_key(key))
-        try:
+        with contextlib.suppress(NotFound):  # Idempotent
             blob.delete()
-        except NotFound:
-            pass  # Idempotent
 
     def list_keys(self, prefix: str) -> list[BlobInfo]:
         full_prefix = self._full_key(prefix)
@@ -583,8 +577,8 @@ class ABSBlobStoreDriver:
         client = self._service.get_blob_client(container=self._container, blob=self._full_key(key))
         try:
             return client.download_blob().readall()
-        except ResourceNotFoundError:
-            raise BlobStoreNotFoundError(f"Blob not found: {key!r}")
+        except ResourceNotFoundError as exc:
+            raise BlobStoreNotFoundError(f"Blob not found: {key!r}") from exc
 
     def presigned_url(self, key: str, *, expires_in: int = 900) -> str:
         import datetime
@@ -599,8 +593,8 @@ class ABSBlobStoreDriver:
         client = self._service.get_blob_client(container=self._container, blob=full_key)
         try:
             client.get_blob_properties()
-        except ResourceNotFoundError:
-            raise BlobStoreNotFoundError(f"Blob not found: {key!r}")
+        except ResourceNotFoundError as exc:
+            raise BlobStoreNotFoundError(f"Blob not found: {key!r}") from exc
 
         sas = generate_blob_sas(
             account_name=self._service.account_name,
@@ -644,10 +638,8 @@ class ABSBlobStoreDriver:
         from azure.core.exceptions import ResourceNotFoundError  # type: ignore[import-untyped]
 
         client = self._service.get_blob_client(container=self._container, blob=self._full_key(key))
-        try:
+        with contextlib.suppress(ResourceNotFoundError):  # Idempotent
             client.delete_blob()
-        except ResourceNotFoundError:
-            pass  # Idempotent
 
     def list_keys(self, prefix: str) -> list[BlobInfo]:
         full_prefix = self._full_key(prefix)
@@ -762,7 +754,7 @@ def artifact_blob_key(
     All path components are URL-safe by convention; callers must validate
     ``artifact_name`` before passing it here.
     """
-    return f"astrolift/{env}/{org_id}/pipelines/{pipeline_id}" f"/runs/{run_number}/{job_id}/{artifact_name}"
+    return f"astrolift/{env}/{org_id}/pipelines/{pipeline_id}/runs/{run_number}/{job_id}/{artifact_name}"
 
 
 def run_blob_prefix(
@@ -784,7 +776,7 @@ def run_blob_prefix(
 # ---------------------------------------------------------------------------
 
 
-def get_blob_driver(org: object) -> "BlobStoreDriver | None":
+def get_blob_driver(org: object) -> BlobStoreDriver | None:
     """Return the configured BlobStoreDriver for the org's install, or None.
 
     Resolution order:

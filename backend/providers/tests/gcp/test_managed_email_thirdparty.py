@@ -129,7 +129,9 @@ def test_restore_raises_not_implemented(
     driver: GCPEmailStubDriver,
 ) -> None:
     snap = SnapshotHandle(
-        handle="email/x", snapshot_id="snap-1", created_at="",
+        handle="email/x",
+        snapshot_id="snap-1",
+        created_at="",
     )
     with pytest.raises(NotImplementedError):
         driver.restore(snap, _spec())

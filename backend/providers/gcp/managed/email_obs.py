@@ -62,9 +62,7 @@ class GcpEmailObservabilityDriver(EmailObservabilityDriver):
         raise UnsupportedOperationError(_UNSUPPORTED_MSG)
 
     @driver_op(driver="email", cloud="gcp")
-    def get_identity_verification_details(
-        self, identity: str
-    ) -> IdentityVerification:
+    def get_identity_verification_details(self, identity: str) -> IdentityVerification:
         raise UnsupportedOperationError(_UNSUPPORTED_MSG)
 
     @driver_op(driver="email", cloud="gcp")
@@ -72,9 +70,7 @@ class GcpEmailObservabilityDriver(EmailObservabilityDriver):
         raise UnsupportedOperationError(_UNSUPPORTED_MSG)
 
     @driver_op(driver="email", cloud="gcp")
-    def list_suppression_entries(
-        self, *, page_size: int = 100
-    ) -> list[SuppressionEntry]:
+    def list_suppression_entries(self, *, page_size: int = 100) -> list[SuppressionEntry]:
         raise UnsupportedOperationError(_UNSUPPORTED_MSG)
 
     @driver_op(

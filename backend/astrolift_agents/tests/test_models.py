@@ -173,9 +173,7 @@ def test_briefskillref_links_brief_to_skill(org):
 def agent_workload(org):
     """A ``Workload(kind=agent)`` plus its required app/team/project chain."""
     team = Team.objects.create(organization=org, name="Eng", slug="eng-skillref")
-    project = Project.objects.create(
-        organization=org, team=team, name="Demo", slug="demo-skillref"
-    )
+    project = Project.objects.create(organization=org, team=team, name="Demo", slug="demo-skillref")
     app = RegisteredApp.objects.create(
         organization=org,
         team=team,

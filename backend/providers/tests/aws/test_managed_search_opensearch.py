@@ -89,7 +89,8 @@ def _spec(**overrides: Any) -> ProvisionSpec:
 
 
 def test_provision_creates_domain(
-    driver: OpenSearchSearchDriver, os_client,
+    driver: OpenSearchSearchDriver,
+    os_client,
 ) -> None:
     result = driver.provision(_spec())
     assert result.ok is True
@@ -104,7 +105,8 @@ def test_provision_creates_domain(
 
 
 def test_provision_default_instance_type_is_t3_small(
-    driver: OpenSearchSearchDriver, os_client,
+    driver: OpenSearchSearchDriver,
+    os_client,
 ) -> None:
     result = driver.provision(_spec())
     _, domain_name = parse_handle(result.handle)
@@ -123,7 +125,8 @@ def test_provision_idempotent(driver: OpenSearchSearchDriver) -> None:
 
 
 def test_provision_stores_master_password_in_secrets_manager(
-    driver: OpenSearchSearchDriver, sm_client,
+    driver: OpenSearchSearchDriver,
+    sm_client,
 ) -> None:
     result = driver.provision(_spec())
     _, domain_name = parse_handle(result.handle)
@@ -133,7 +136,8 @@ def test_provision_stores_master_password_in_secrets_manager(
 
 
 def test_provision_records_deletion_protection_marker(
-    driver: OpenSearchSearchDriver, sm_client,
+    driver: OpenSearchSearchDriver,
+    sm_client,
 ) -> None:
     result = driver.provision(_spec())
     _, domain_name = parse_handle(result.handle)
@@ -143,7 +147,8 @@ def test_provision_records_deletion_protection_marker(
 
 
 def test_provision_marker_off_when_disabled(
-    driver: OpenSearchSearchDriver, sm_client,
+    driver: OpenSearchSearchDriver,
+    sm_client,
 ) -> None:
     result = driver.provision(
         _spec(config={"deletion_protection": False}),
@@ -155,20 +160,19 @@ def test_provision_marker_off_when_disabled(
 
 
 def test_provision_honours_size_to_instance_type(
-    driver: OpenSearchSearchDriver, os_client,
+    driver: OpenSearchSearchDriver,
+    os_client,
 ) -> None:
     result = driver.provision(_spec(size="large"))
     _, domain_name = parse_handle(result.handle)
     resp = os_client.describe_domain(DomainName=domain_name)
-    assert (
-        resp["DomainStatus"]["ClusterConfig"]["InstanceType"]
-        == "m6g.large.search"
-    )
+    assert resp["DomainStatus"]["ClusterConfig"]["InstanceType"] == "m6g.large.search"
     assert resp["DomainStatus"]["EBSOptions"]["VolumeSize"] == 50
 
 
 def test_provision_honours_spec_config_override(
-    driver: OpenSearchSearchDriver, os_client,
+    driver: OpenSearchSearchDriver,
+    os_client,
 ) -> None:
     result = driver.provision(
         _spec(
@@ -185,13 +189,12 @@ def test_provision_honours_spec_config_override(
     cluster = resp["DomainStatus"]["ClusterConfig"]
     assert cluster["InstanceType"] == "r6g.xlarge.search"
     assert cluster["InstanceCount"] == 3
-    assert (
-        resp["DomainStatus"]["EBSOptions"]["VolumeSize"] == 200
-    )
+    assert resp["DomainStatus"]["EBSOptions"]["VolumeSize"] == 200
 
 
 def test_provision_tags_domain(
-    driver: OpenSearchSearchDriver, os_client,
+    driver: OpenSearchSearchDriver,
+    os_client,
 ) -> None:
     result = driver.provision(_spec())
     _, domain_name = parse_handle(result.handle)
@@ -208,7 +211,8 @@ def test_provision_tags_domain(
 
 
 def test_update_resize(
-    driver: OpenSearchSearchDriver, os_client,
+    driver: OpenSearchSearchDriver,
+    os_client,
 ) -> None:
     provisioned = driver.provision(
         _spec(config={"deletion_protection": False}),
@@ -229,7 +233,8 @@ def test_update_noop_when_nothing_to_change(
 
 
 def test_update_deletion_protection_toggle(
-    driver: OpenSearchSearchDriver, sm_client,
+    driver: OpenSearchSearchDriver,
+    sm_client,
 ) -> None:
     provisioned = driver.provision(_spec())
     result = driver.update(
@@ -325,7 +330,8 @@ def test_deprovision_idempotent_when_already_gone(
 
 
 def test_deprovision_with_data_delete_drops_master_password_secret(
-    driver: OpenSearchSearchDriver, sm_client,
+    driver: OpenSearchSearchDriver,
+    sm_client,
 ) -> None:
     provisioned = driver.provision(
         _spec(config={"deletion_protection": False}),
@@ -343,7 +349,8 @@ def test_deprovision_with_data_delete_drops_master_password_secret(
 
 
 def test_deprovision_keeps_secret_on_data_retained_path(
-    driver: OpenSearchSearchDriver, sm_client,
+    driver: OpenSearchSearchDriver,
+    sm_client,
 ) -> None:
     provisioned = driver.provision(
         _spec(config={"deletion_protection": False}),
@@ -446,7 +453,8 @@ def test_snapshot_for_missing_raises(
 
 
 def test_restore_provisions_target_domain(
-    driver: OpenSearchSearchDriver, os_client,
+    driver: OpenSearchSearchDriver,
+    os_client,
 ) -> None:
     provisioned = driver.provision(_spec())
     snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
@@ -483,9 +491,7 @@ def test_domain_name_canonicalization(
 
 
 def test_index_name_for_swaps_hyphens_to_underscores() -> None:
-    assert _index_name_for(domain_name="acme-prod-search") == (
-        "acme_prod_search"
-    )
+    assert _index_name_for(domain_name="acme-prod-search") == ("acme_prod_search")
 
 
 def test_generated_master_password_complexity() -> None:
@@ -573,7 +579,8 @@ def test_deprovision_skips_snapshot_when_no_bucket_configured(
 
 
 def test_provision_surfaces_create_domain_error(
-    sm_client, os_client,
+    sm_client,
+    os_client,
 ) -> None:
     """A real create_domain failure (e.g. duplicate name probed via
     a separate domain) must surface a clean error rather than

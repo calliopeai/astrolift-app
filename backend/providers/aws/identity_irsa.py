@@ -564,6 +564,7 @@ class IRSADriver(WorkloadIdentityDriver):
             last_used_at=last_used_iso,
         )
 
+    @driver_op(cloud="aws", driver="identity")
     def list_owned_roles(self) -> list[str]:
         """Enumerate IAM role names the platform owns (#995).
 

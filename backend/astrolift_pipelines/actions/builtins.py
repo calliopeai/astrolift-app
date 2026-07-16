@@ -64,9 +64,7 @@ class GitCheckoutAction(BuiltinAction):
         steps = [
             {
                 "name": "git clone",
-                "run": " ".join(
-                    filter(None, ["git", "clone", depth_flag, shlex.quote(repo_url), "."])
-                ),
+                "run": " ".join(filter(None, ["git", "clone", depth_flag, shlex.quote(repo_url), "."])),
             },
             {
                 "name": "git checkout",
@@ -133,14 +131,11 @@ class DockerBuildAction(BuiltinAction):
 
         tags: list[str] = [raw_tags] if isinstance(raw_tags, str) else list(raw_tags)
         if not tags:
-            raise ActionInputError(
-                f"Action '{self.name}': 'tags' must contain at least one tag."
-            )
+            raise ActionInputError(f"Action '{self.name}': 'tags' must contain at least one tag.")
 
         tag_flags = " ".join(f"-t {shlex.quote(t)}" for t in tags)
         arg_flags = " ".join(
-            f"--build-arg {shlex.quote(k)}={shlex.quote(str(v))}"
-            for k, v in build_args.items()
+            f"--build-arg {shlex.quote(k)}={shlex.quote(str(v))}" for k, v in build_args.items()
         )
         push_flag = "--push" if push else ""
 
@@ -210,9 +205,7 @@ class KubectlApplyAction(BuiltinAction):
 
         ns_flag = f"--namespace={shlex.quote(namespace)}" if namespace else ""
 
-        cmd = " ".join(
-            filter(None, ["kubectl", "apply", "-f", shlex.quote(manifest), ns_flag])
-        )
+        cmd = " ".join(filter(None, ["kubectl", "apply", "-f", shlex.quote(manifest), ns_flag]))
 
         step: dict = {"name": "kubectl apply", "run": cmd}
 
@@ -250,8 +243,7 @@ class AstroliftDeployAction(BuiltinAction):
         ),
         "image_tag": InputSpec(
             required=True,
-            description="Full image reference to deploy "
-            "(e.g. 'registry.example.com/app:abc1234').",
+            description="Full image reference to deploy " "(e.g. 'registry.example.com/app:abc1234').",
         ),
         "cluster": InputSpec(
             required=False,

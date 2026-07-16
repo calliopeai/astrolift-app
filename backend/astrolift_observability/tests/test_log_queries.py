@@ -66,9 +66,7 @@ def _no_opensearch(monkeypatch):
 
 
 def _info(user=None):
-    return SimpleNamespace(
-        context=SimpleNamespace(user=user, request=SimpleNamespace(user=user))
-    )
+    return SimpleNamespace(context=SimpleNamespace(user=user, request=SimpleNamespace(user=user)))
 
 
 def _scaffold(
@@ -80,9 +78,7 @@ def _scaffold(
     whether the cluster carries a wired log-aggregator driver."""
     org = Organization.objects.create(name="Acme Logs", slug="acme-logs")
     team = Team.objects.create(organization=org, name="Eng", slug="eng-logs")
-    project = Project.objects.create(
-        organization=org, team=team, name="Demo", slug="demo-logs"
-    )
+    project = Project.objects.create(organization=org, team=team, name="Demo", slug="demo-logs")
     plugin = ProviderPlugin(
         name="K8s",
         slug="k8s-logs",

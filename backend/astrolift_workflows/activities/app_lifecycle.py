@@ -1196,6 +1196,13 @@ def _mark_failed_sync(deployment_id: int, reason: str) -> None:
     if d.status == Deployment.Status.FAILED:
         return
     log.warning("deploy %s marked failed: %s", deployment_id, (reason or "")[:500])
+    # #1093: persist WHY on the row — pre-pipeline refusals (pre_flight)
+    # and exhausted-retry failures were flipping to FAILED with an empty
+    # aborted_reason, leaving nothing for the history sidebar. A reason
+    # already written (e.g. an operator reject) wins over the workflow's.
+    if reason and not d.aborted_reason:
+        d.aborted_reason = reason
+        d.save(update_fields=["aborted_reason", "updated_at", "version"])
     d.transition_to(Deployment.Status.FAILED)
 
 

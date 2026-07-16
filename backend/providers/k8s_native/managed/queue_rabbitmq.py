@@ -219,7 +219,7 @@ class RabbitMQOperatorDriver(ManagedServiceDriver):
         from _sdk import UnsupportedOperationError
 
         raise UnsupportedOperationError(
-            "managed_service.snapshot(RabbitMQ) not supported -- snapshots " "via cluster export; out of scope (#618)",
+            "managed_service.snapshot(RabbitMQ) not supported -- snapshots via cluster export; out of scope (#618)",
         )
 
     @driver_op(cloud="k8s_native", driver="queue_rabbitmq")
@@ -227,7 +227,7 @@ class RabbitMQOperatorDriver(ManagedServiceDriver):
         from _sdk import UnsupportedOperationError
 
         raise UnsupportedOperationError(
-            "managed_service.restore(RabbitMQ) not supported -- RabbitMQ " "doesn't restore from snapshot (#618)",
+            "managed_service.restore(RabbitMQ) not supported -- RabbitMQ doesn't restore from snapshot (#618)",
         )
 
     @driver_op(cloud="k8s_native", driver="queue_rabbitmq", heartbeat=False)

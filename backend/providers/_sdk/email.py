@@ -34,9 +34,11 @@ exception; the resolver layer treats both cases uniformly.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import StrEnum
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class SuppressionReason(StrEnum):

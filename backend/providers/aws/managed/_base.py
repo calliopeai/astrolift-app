@@ -9,7 +9,10 @@ Each driver follows the same pattern:
 
 from __future__ import annotations
 
-from _sdk.managed_service import ProvisionSpec
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from _sdk.managed_service import ProvisionSpec
 
 
 class ManagedServiceError(Exception):
@@ -71,9 +74,6 @@ def tags_for(spec: ProvisionSpec) -> list[dict[str, str]]:
         base["astrolift.io/binding"] = spec.binding_id
     if spec.managed_service_id:
         base["astrolift.io/managed_service_id"] = spec.managed_service_id
-    base.update({
-        f"astrolift.io/extra/{k}": v
-        for k, v in (spec.tags or {}).items()
-    })
+    base.update({f"astrolift.io/extra/{k}": v for k, v in (spec.tags or {}).items()})
     # AWS tag list shape
     return [{"Key": k, "Value": v} for k, v in base.items()]

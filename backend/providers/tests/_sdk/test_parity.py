@@ -33,16 +33,27 @@ def test_class_with_all_methods_passes() -> None:
     class FullDriver:
         def get(self, path):
             return None
+
         def upsert(self, path, kvs):
             return None
+
         def delete(self, path):
             return None
+
         def list(self, prefix):
             return []
 
+        def list_keys(self, path):
+            return []
+
+        def ensure_initialized(self):
+            return None
+
     issues = check_class_against_protocol(
-        plugin_id="x", role_or_kind="secrets",
-        cls=FullDriver, protocol=SecretsBackend,
+        plugin_id="x",
+        role_or_kind="secrets",
+        cls=FullDriver,
+        protocol=SecretsBackend,
     )
     assert issues == []
 
@@ -51,11 +62,14 @@ def test_class_missing_method_flagged() -> None:
     class Partial:
         def get(self, path):
             return None
+
         # missing upsert / delete / list
 
     issues = check_class_against_protocol(
-        plugin_id="x", role_or_kind="secrets",
-        cls=Partial, protocol=SecretsBackend,
+        plugin_id="x",
+        role_or_kind="secrets",
+        cls=Partial,
+        protocol=SecretsBackend,
     )
     codes = {i.code for i in issues}
     assert codes == {"missing_method"}
@@ -70,15 +84,25 @@ def test_check_plugin_parity_with_full_plugin() -> None:
         # SecretsBackend signatures
         def get(self, path):
             return None
+
         def upsert(self, path, kvs):
             return None
+
         def delete(self, path):
             return None
+
         def list(self, prefix):
             return []
 
+        def list_keys(self, path):
+            return []
+
+        def ensure_initialized(self):
+            return None
+
     plugin = ProviderPlugin(
-        id="x", display_name="x",
+        id="x",
+        display_name="x",
         drivers={"secrets": _Full},
     )
     report = check_plugin_parity(
@@ -102,21 +126,20 @@ def test_real_plugins_pass_parity() -> None:
         role_protocols=ROLE_PROTOCOLS,
         managed_service_protocol=ManagedServiceDriver,
     )
-    assert report.ok is True, [
-        f"{i.plugin_id}/{i.role_or_kind}: {i.detail}"
-        for i in report.issues
-    ]
+    assert report.ok is True, [f"{i.plugin_id}/{i.role_or_kind}: {i.detail}" for i in report.issues]
 
 
 def test_parity_skips_unmapped_roles() -> None:
     """A driver registered under a role that's not in the
     role_protocols dict should NOT cause a failure — it just
     doesn't get checked."""
+
     class _Anything:
         pass
 
     plugin = ProviderPlugin(
-        id="x", display_name="x",
+        id="x",
+        display_name="x",
         drivers={"experimental_role": _Anything},
     )
     report = check_plugin_parity(

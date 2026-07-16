@@ -228,10 +228,13 @@ def test_tick_fills_to_cap_and_enqueues_dispatch(loop_agent, settings):
         # Loop dispatch carries no ad-hoc input (matches the cron tick + PR-1).
         assert args[0].trigger_payload is None
     # The cap was respected exactly — never exceeded.
-    assert AgentTask.objects.filter(
-        agent_definition=loop_agent["workload"],
-        status__in=AgentTask.NON_TERMINAL_STATUSES,
-    ).count() == 3
+    assert (
+        AgentTask.objects.filter(
+            agent_definition=loop_agent["workload"],
+            status__in=AgentTask.NON_TERMINAL_STATUSES,
+        ).count()
+        == 3
+    )
 
 
 @pytest.mark.django_db

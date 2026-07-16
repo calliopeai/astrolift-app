@@ -36,9 +36,6 @@ import strawberry
 from strawberry.types import Info
 
 from astrolift_observability import prom_client, prom_queries, url_probe, url_resolution
-
-log = logging.getLogger(__name__)
-from core.cluster_observability import namespace_for_app
 from astrolift_observability.schema.types import (
     AppEndpointMetric,
     AppGoldenSignal,
@@ -62,8 +59,11 @@ from astrolift_operations import prometheus_client
 from astrolift_operations.prometheus_client import PrometheusError
 from astrolift_registry.models import RegisteredApp
 from astrolift_services.models.managed_service import ManagedService
+from core.cluster_observability import namespace_for_app
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
+
+log = logging.getLogger(__name__)
 
 # Default window when the FE doesn't pass one — 1h matches the time-
 # range picker's "1h" default.
@@ -138,14 +138,15 @@ def _backfill_from_cloudwatch(
     ).lower()
     log.warning(
         "cloudwatch fallback: app=%s cluster=%s plugin=%s",
-        app.slug, cluster.slug, plugin_slug or "(none)",
+        app.slug,
+        cluster.slug,
+        plugin_slug or "(none)",
     )
     if plugin_slug != "aws":
         return out
 
     try:
         from core.cluster_management import (  # noqa: PLC0415
-            ClusterManagementError,
             cluster_alb_http_metrics_dispatch,
         )
 
@@ -163,7 +164,8 @@ def _backfill_from_cloudwatch(
     has_data = any(bool(v) for v in cw_data.values())
     log.warning(
         "cloudwatch fallback: app=%s has_data=%s keys=%s",
-        app.slug, has_data,
+        app.slug,
+        has_data,
         {k: len(v) for k, v in cw_data.items()},
     )
     if not has_data:
@@ -171,18 +173,18 @@ def _backfill_from_cloudwatch(
 
     # Map CloudWatch key → GoldenSignalKind enum (for sig.name comparison)
     _CW_KIND_MAP: dict[str, GoldenSignalKind] = {
-        "rps":          GoldenSignalKind.TRAFFIC,
-        "error_rate":   GoldenSignalKind.ERRORS,
-        "latency_p50":  GoldenSignalKind.LATENCY_P50,
-        "latency_p95":  GoldenSignalKind.LATENCY_P95,
-        "latency_p99":  GoldenSignalKind.LATENCY_P99,
+        "rps": GoldenSignalKind.TRAFFIC,
+        "error_rate": GoldenSignalKind.ERRORS,
+        "latency_p50": GoldenSignalKind.LATENCY_P50,
+        "latency_p95": GoldenSignalKind.LATENCY_P95,
+        "latency_p99": GoldenSignalKind.LATENCY_P99,
     }
     _CW_UNIT_MAP = {
-        "rps":          "rps",
-        "error_rate":   "ratio",
-        "latency_p50":  "seconds",
-        "latency_p95":  "seconds",
-        "latency_p99":  "seconds",
+        "rps": "rps",
+        "error_rate": "ratio",
+        "latency_p50": "seconds",
+        "latency_p95": "seconds",
+        "latency_p99": "seconds",
     }
     # p90 kept for wire compat — alias it to the p95 CloudWatch series
     _CW_ALIAS: dict[GoldenSignalKind, list] = {
@@ -193,9 +195,7 @@ def _backfill_from_cloudwatch(
     patched: list[AppGoldenSignal] = []
     for sig in out:
         # sig.name is a GoldenSignalKind enum instance
-        cw_key = next(
-            (k for k, kind_enum in _CW_KIND_MAP.items() if kind_enum == sig.name), None
-        )
+        cw_key = next((k for k, kind_enum in _CW_KIND_MAP.items() if kind_enum == sig.name), None)
         alias_pairs = _CW_ALIAS.get(sig.name)  # type: ignore[arg-type]
         cw_pairs = cw_data.get(cw_key, []) if cw_key else []
         if cw_pairs or alias_pairs:
@@ -468,9 +468,7 @@ class GoldenSignalsQuery:
         }
         signals_by_kind = {s.name: s for s in out}
         http_all_empty = all(
-            not signals_by_kind[k.value].samples
-            for k in _HTTP_KINDS
-            if k.value in signals_by_kind
+            not signals_by_kind[k.value].samples for k in _HTTP_KINDS if k.value in signals_by_kind
         )
         if http_all_empty:
             out = _backfill_from_cloudwatch(
@@ -955,17 +953,11 @@ class GoldenSignalsQuery:
         cAdvisor dropped its series).
         """
         seconds = _clamp_range(range_seconds or _DEFAULT_RANGE_SECONDS)
-        app = (
-            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
-            .only("id", "slug")
-            .first()
-        )
+        app = RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True).only("id", "slug").first()
         if app is None:
             return None
 
-        endpoint = prom_client.resolve_prometheus_endpoint(
-            app=app, environment_name=environment_name
-        )
+        endpoint = prom_client.resolve_prometheus_endpoint(app=app, environment_name=environment_name)
         if endpoint is None:
             return None
 
@@ -1115,17 +1107,11 @@ class GoldenSignalsQuery:
         if end_unix <= start_unix:
             return ExecutePromqlResult(ok=False, error="end_unix must be greater than start_unix", series=[])
 
-        app = (
-            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
-            .only("id", "slug")
-            .first()
-        )
+        app = RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True).only("id", "slug").first()
         if app is None:
             return ExecutePromqlResult(ok=False, error="app not found", series=[])
 
-        endpoint = prom_client.resolve_prometheus_endpoint(
-            app=app, environment_name=environment_name
-        )
+        endpoint = prom_client.resolve_prometheus_endpoint(app=app, environment_name=environment_name)
         if endpoint is None:
             return ExecutePromqlResult(
                 ok=False,
@@ -1192,11 +1178,7 @@ class GoldenSignalsQuery:
         """
         from astrolift_observability import trace_client
 
-        app = (
-            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
-            .only("id", "slug")
-            .first()
-        )
+        app = RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True).only("id", "slug").first()
         if app is None:
             return []
 
@@ -1248,11 +1230,7 @@ class GoldenSignalsQuery:
         """
         from astrolift_observability import trace_client
 
-        app = (
-            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
-            .only("id", "slug")
-            .first()
-        )
+        app = RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True).only("id", "slug").first()
         if app is None:
             return []
 
@@ -1308,17 +1286,11 @@ class GoldenSignalsQuery:
         observability resolvers.
         """
         seconds = _clamp_range(range_seconds or _DEFAULT_RANGE_SECONDS)
-        app = (
-            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
-            .only("id", "slug")
-            .first()
-        )
+        app = RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True).only("id", "slug").first()
         if app is None:
             return []
 
-        endpoint = prom_client.resolve_prometheus_endpoint(
-            app=app, environment_name=environment_name
-        )
+        endpoint = prom_client.resolve_prometheus_endpoint(app=app, environment_name=environment_name)
         if endpoint is None:
             return []
 

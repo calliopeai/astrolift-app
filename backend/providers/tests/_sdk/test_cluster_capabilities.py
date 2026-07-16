@@ -71,7 +71,8 @@ def test_probe_detects_cnpg_via_crd(
         "Deployment": [],
     }[kind]
     caps = probe_capabilities(
-        cluster_id="x", k8s_client=fake_k8s,
+        cluster_id="x",
+        k8s_client=fake_k8s,
     )
     assert caps.cnpg_installed is True
 
@@ -85,7 +86,8 @@ def test_probe_detects_gateway_api(fake_k8s: MagicMock) -> None:
         "Deployment": [],
     }[kind]
     caps = probe_capabilities(
-        cluster_id="x", k8s_client=fake_k8s,
+        cluster_id="x",
+        k8s_client=fake_k8s,
     )
     assert caps.gateway_api_installed is True
 
@@ -98,7 +100,8 @@ def test_probe_detects_external_dns_via_deployment(
         "Deployment": _deployments("external-dns"),
     }[kind]
     caps = probe_capabilities(
-        cluster_id="x", k8s_client=fake_k8s,
+        cluster_id="x",
+        k8s_client=fake_k8s,
     )
     assert caps.external_dns_installed is True
 
@@ -108,7 +111,8 @@ def test_probe_safe_on_failing_list(fake_k8s: MagicMock) -> None:
     return capabilities all-False rather than blow up the probe."""
     fake_k8s.list.side_effect = RuntimeError("forbidden")
     caps = probe_capabilities(
-        cluster_id="x", k8s_client=fake_k8s,
+        cluster_id="x",
+        k8s_client=fake_k8s,
     )
     assert caps.vpa_installed is False
     assert caps.gateway_api_installed is False
@@ -116,9 +120,12 @@ def test_probe_safe_on_failing_list(fake_k8s: MagicMock) -> None:
 
 def test_render_capability_summary() -> None:
     caps = ClusterCapabilities(
-        cluster_id="x", kubernetes_version="1.30",
-        vpa_installed=True, gateway_api_installed=True,
-        cnpg_installed=True, cert_manager_installed=True,
+        cluster_id="x",
+        kubernetes_version="1.30",
+        vpa_installed=True,
+        gateway_api_installed=True,
+        cnpg_installed=True,
+        cert_manager_installed=True,
         network_policy_engine="cilium",
         pod_security_admission_level="restricted",
     )
@@ -134,7 +141,8 @@ def test_render_capability_summary() -> None:
 
 def test_render_summary_minimal_cluster() -> None:
     caps = ClusterCapabilities(
-        cluster_id="x", kubernetes_version="1.29",
+        cluster_id="x",
+        kubernetes_version="1.29",
     )
     summary = render_capability_summary(caps)
     assert summary.startswith("k8s 1.29")

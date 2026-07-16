@@ -42,7 +42,8 @@ def test_ghcr_driver_uses_pat_as_password() -> None:
         pat="ghp_xyz",
     )
     secret = driver.get_pull_secret(
-        cluster="prod", namespace="acme-api",
+        cluster="prod",
+        namespace="acme-api",
     )
     docker = json.loads(
         base64.b64decode(secret["data"][".dockerconfigjson"]).decode(),
@@ -66,17 +67,21 @@ def test_quay_driver_returns_real_oci_driver() -> None:
     """The factory returns a working driver, not a stub."""
     driver = quay_driver(
         organization="acme",
-        username="u", password="p",
+        username="u",
+        password="p",
     )
     assert isinstance(driver, OCIRegistryDriver)
 
 
 def test_pull_secret_credentials_round_trip() -> None:
     driver = dockerhub_driver(
-        namespace="acme", username="user", password="pass",
+        namespace="acme",
+        username="user",
+        password="pass",
     )
     secret = driver.get_pull_secret(
-        cluster="prod", namespace="acme-api",
+        cluster="prod",
+        namespace="acme-api",
     )
     docker = json.loads(
         base64.b64decode(secret["data"][".dockerconfigjson"]).decode(),

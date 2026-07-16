@@ -61,14 +61,10 @@ OTEL_COLLECTOR_SIDECAR = SidecarSpec(
     args=("--config=/conf/otel-collector-config.yaml",),
     env={
         "OTEL_RESOURCE_ATTRIBUTES": (
-            "k8s.namespace.name=$(K8S_NAMESPACE),"
-            "k8s.pod.name=$(K8S_POD_NAME),"
-            "service.name=$(SERVICE_NAME)"
+            "k8s.namespace.name=$(K8S_NAMESPACE),k8s.pod.name=$(K8S_POD_NAME),service.name=$(SERVICE_NAME)"
         ),
     },
-    volume_mounts=(
-        {"name": "otel-config", "mountPath": "/conf"},
-    ),
+    volume_mounts=({"name": "otel-config", "mountPath": "/conf"},),
     resources={
         "requests": {"cpu": "50m", "memory": "128Mi"},
         "limits": {"cpu": "200m", "memory": "512Mi"},
@@ -79,9 +75,7 @@ VECTOR_SIDECAR = SidecarSpec(
     name="vector-agent",
     image="timberio/vector:0.39.0-alpine",
     args=("--config=/etc/vector/vector.yaml",),
-    volume_mounts=(
-        {"name": "vector-config", "mountPath": "/etc/vector"},
-    ),
+    volume_mounts=({"name": "vector-config", "mountPath": "/etc/vector"},),
     resources={
         "requests": {"cpu": "20m", "memory": "64Mi"},
         "limits": {"cpu": "100m", "memory": "256Mi"},
@@ -104,25 +98,21 @@ def inject_sidecar(
             out.append(m)
             continue
         containers = (
-            m.setdefault("spec", {})
-             .setdefault("template", {})
-             .setdefault("spec", {})
-             .setdefault("containers", [])
+            m.setdefault("spec", {}).setdefault("template", {}).setdefault("spec", {}).setdefault("containers", [])
         )
         if any(c.get("name") == sidecar.name for c in containers):
             out.append(m)  # already injected — idempotent
             continue
-        containers.append({
-            "name": sidecar.name,
-            "image": sidecar.image,
-            "args": list(sidecar.args),
-            "env": [
-                {"name": k, "value": v}
-                for k, v in sidecar.env.items()
-            ],
-            "volumeMounts": [dict(v) for v in sidecar.volume_mounts],
-            "resources": deepcopy(sidecar.resources),
-        })
+        containers.append(
+            {
+                "name": sidecar.name,
+                "image": sidecar.image,
+                "args": list(sidecar.args),
+                "env": [{"name": k, "value": v} for k, v in sidecar.env.items()],
+                "volumeMounts": [dict(v) for v in sidecar.volume_mounts],
+                "resources": deepcopy(sidecar.resources),
+            }
+        )
         out.append(m)
     return out
 
@@ -132,7 +122,9 @@ def annotate_for_mesh(
     *,
     config: ServiceMeshConfig,
     target_kinds: tuple[str, ...] = (
-        "Deployment", "StatefulSet", "DaemonSet",
+        "Deployment",
+        "StatefulSet",
+        "DaemonSet",
     ),
 ) -> list[Manifest]:
     """Add mesh-injection annotations to the Pod template."""
@@ -143,11 +135,7 @@ def annotate_for_mesh(
         if m.get("kind") not in target_kinds:
             out.append(m)
             continue
-        meta = (
-            m.setdefault("spec", {})
-             .setdefault("template", {})
-             .setdefault("metadata", {})
-        )
+        meta = m.setdefault("spec", {}).setdefault("template", {}).setdefault("metadata", {})
         existing = meta.setdefault("annotations", {})
         for key, value in annotations.items():
             existing.setdefault(key, value)
@@ -195,23 +183,17 @@ def annotate_ingress_tracing(
 def _mesh_annotations(*, config: ServiceMeshConfig) -> dict[str, str]:
     if config.mesh == "istio":
         return {
-            "sidecar.istio.io/inject": (
-                "true" if config.automatic_injection else "false"
-            ),
+            "sidecar.istio.io/inject": ("true" if config.automatic_injection else "false"),
             **config.extra_annotations,
         }
     if config.mesh == "linkerd":
         return {
-            "linkerd.io/inject": (
-                "enabled" if config.automatic_injection else "disabled"
-            ),
+            "linkerd.io/inject": ("enabled" if config.automatic_injection else "disabled"),
             **config.extra_annotations,
         }
     if config.mesh == "consul":
         return {
-            "consul.hashicorp.com/connect-inject": (
-                "true" if config.automatic_injection else "false"
-            ),
+            "consul.hashicorp.com/connect-inject": ("true" if config.automatic_injection else "false"),
             **config.extra_annotations,
         }
     raise ValueError(f"unknown service mesh {config.mesh!r}")

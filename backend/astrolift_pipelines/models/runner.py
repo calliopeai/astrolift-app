@@ -49,13 +49,13 @@ class Runner(NamedBaseCoreModel):
     # consumed on first successful agent auth; api_key_hash is issued
     # after successful registration and carries the long-lived credential.
     # Both fields are null when not yet set or after consumption.
-    registration_token_hash = models.CharField(
+    registration_token_hash = models.CharField(  # noqa: DJ001 — null marks "consumed", distinct from ""
         max_length=64,
         null=True,
         blank=True,
         db_index=True,
     )
-    api_key_hash = models.CharField(
+    api_key_hash = models.CharField(  # noqa: DJ001 — null marks "not yet issued", distinct from ""
         max_length=64,
         null=True,
         blank=True,

@@ -27,14 +27,15 @@ class FakeHttp:
     call_count: int = 0
 
     def get(
-        self, url: str, *, params: dict[str, str] | None = None,
+        self,
+        url: str,
+        *,
+        params: dict[str, str] | None = None,
     ) -> Any:
         self.last_url = url
         self.last_params = dict(params or {})
         if self.multi_responses:
-            r = self.multi_responses[
-                min(self.call_count, len(self.multi_responses) - 1)
-            ]
+            r = self.multi_responses[min(self.call_count, len(self.multi_responses) - 1)]
             self.call_count += 1
             return r
         return self.response
@@ -56,22 +57,27 @@ def driver(fake_http: FakeHttp) -> TempoTraceDriver:
 
 
 def test_list_traces_returns_summaries(
-    driver: TempoTraceDriver, fake_http: FakeHttp,
+    driver: TempoTraceDriver,
+    fake_http: FakeHttp,
 ) -> None:
-    fake_http.response = FakeResponse(body={
-        "traces": [
-            {
-                "traceID": "abc",
-                "rootServiceName": "api",
-                "rootTraceName": "GET /v1/users",
-                "spanCount": 12,
-                "durationMs": 145.7,
-                "status": "OK",
-            },
-        ],
-    })
+    fake_http.response = FakeResponse(
+        body={
+            "traces": [
+                {
+                    "traceID": "abc",
+                    "rootServiceName": "api",
+                    "rootTraceName": "GET /v1/users",
+                    "spanCount": 12,
+                    "durationMs": 145.7,
+                    "status": "OK",
+                },
+            ],
+        }
+    )
     summaries = driver.list_traces(
-        service="api", since="0", until="1",
+        service="api",
+        since="0",
+        until="1",
     )
     assert len(summaries) == 1
     assert summaries[0].trace_id == "abc"
@@ -79,13 +85,17 @@ def test_list_traces_returns_summaries(
 
 
 def test_list_traces_translates_filters_to_tags(
-    driver: TempoTraceDriver, fake_http: FakeHttp,
+    driver: TempoTraceDriver,
+    fake_http: FakeHttp,
 ) -> None:
     fake_http.response = FakeResponse(body={"traces": []})
     driver.list_traces(
-        service="api", operation="GET /v1", status="ERROR",
+        service="api",
+        operation="GET /v1",
+        status="ERROR",
         min_duration_ms=100,
-        since="0", until="1",
+        since="0",
+        until="1",
     )
     tags = fake_http.last_params["tags"]
     assert "service.name=api" in tags
@@ -95,32 +105,41 @@ def test_list_traces_translates_filters_to_tags(
 
 
 def test_get_trace_extracts_otlp_batches(
-    driver: TempoTraceDriver, fake_http: FakeHttp,
+    driver: TempoTraceDriver,
+    fake_http: FakeHttp,
 ) -> None:
-    fake_http.response = FakeResponse(body={
-        "batches": [{
-            "instrumentationLibrarySpans": [{
-                "spans": [{
-                    "spanId": "s1",
-                    "parentSpanId": None,
-                    "name": "GET /v1/users",
-                    "startTimeUnixNano": 1717200000000000000,
-                    "endTimeUnixNano": 1717200000100000000,
-                    "status": {"code": 1},
-                    "attributes": [
+    fake_http.response = FakeResponse(
+        body={
+            "batches": [
+                {
+                    "instrumentationLibrarySpans": [
                         {
-                            "key": "service.name",
-                            "value": {"stringValue": "api"},
-                        },
-                        {
-                            "key": "http.status_code",
-                            "value": {"intValue": 200},
-                        },
+                            "spans": [
+                                {
+                                    "spanId": "s1",
+                                    "parentSpanId": None,
+                                    "name": "GET /v1/users",
+                                    "startTimeUnixNano": 1717200000000000000,
+                                    "endTimeUnixNano": 1717200000100000000,
+                                    "status": {"code": 1},
+                                    "attributes": [
+                                        {
+                                            "key": "service.name",
+                                            "value": {"stringValue": "api"},
+                                        },
+                                        {
+                                            "key": "http.status_code",
+                                            "value": {"intValue": 200},
+                                        },
+                                    ],
+                                }
+                            ],
+                        }
                     ],
-                }],
-            }],
-        }],
-    })
+                }
+            ],
+        }
+    )
     spans = driver.get_trace("abc")
     assert len(spans) == 1
     assert spans[0].operation == "GET /v1/users"
@@ -131,54 +150,84 @@ def test_get_trace_extracts_otlp_batches(
 
 
 def test_get_trace_status_error(
-    driver: TempoTraceDriver, fake_http: FakeHttp,
+    driver: TempoTraceDriver,
+    fake_http: FakeHttp,
 ) -> None:
-    fake_http.response = FakeResponse(body={
-        "spans": [{
-            "spanId": "s2", "name": "x",
-            "startTimeUnixNano": 0, "endTimeUnixNano": 0,
-            "status": {"code": 2},
-        }],
-    })
+    fake_http.response = FakeResponse(
+        body={
+            "spans": [
+                {
+                    "spanId": "s2",
+                    "name": "x",
+                    "startTimeUnixNano": 0,
+                    "endTimeUnixNano": 0,
+                    "status": {"code": 2},
+                }
+            ],
+        }
+    )
     spans = driver.get_trace("trace2")
     assert spans[0].status_code == "ERROR"
 
 
 @pytest.mark.asyncio
 async def test_stream_spans_pages_through_traces(
-    driver: TempoTraceDriver, fake_http: FakeHttp,
+    driver: TempoTraceDriver,
+    fake_http: FakeHttp,
 ) -> None:
     fake_http.multi_responses = [
-        FakeResponse(body={
-            "traces": [
-                {
-                    "traceID": "t1", "rootServiceName": "api",
-                    "rootTraceName": "x", "spanCount": 1,
-                    "durationMs": 1, "status": "OK",
-                },
-                {
-                    "traceID": "t2", "rootServiceName": "api",
-                    "rootTraceName": "y", "spanCount": 1,
-                    "durationMs": 2, "status": "OK",
-                },
-            ],
-        }),
-        FakeResponse(body={"spans": [
-            {
-                "spanId": "s1", "name": "x",
-                "startTimeUnixNano": 0, "endTimeUnixNano": 0,
-            },
-        ]}),
-        FakeResponse(body={"spans": [
-            {
-                "spanId": "s2", "name": "y",
-                "startTimeUnixNano": 0, "endTimeUnixNano": 0,
-            },
-        ]}),
+        FakeResponse(
+            body={
+                "traces": [
+                    {
+                        "traceID": "t1",
+                        "rootServiceName": "api",
+                        "rootTraceName": "x",
+                        "spanCount": 1,
+                        "durationMs": 1,
+                        "status": "OK",
+                    },
+                    {
+                        "traceID": "t2",
+                        "rootServiceName": "api",
+                        "rootTraceName": "y",
+                        "spanCount": 1,
+                        "durationMs": 2,
+                        "status": "OK",
+                    },
+                ],
+            }
+        ),
+        FakeResponse(
+            body={
+                "spans": [
+                    {
+                        "spanId": "s1",
+                        "name": "x",
+                        "startTimeUnixNano": 0,
+                        "endTimeUnixNano": 0,
+                    },
+                ]
+            }
+        ),
+        FakeResponse(
+            body={
+                "spans": [
+                    {
+                        "spanId": "s2",
+                        "name": "y",
+                        "startTimeUnixNano": 0,
+                        "endTimeUnixNano": 0,
+                    },
+                ]
+            }
+        ),
     ]
     spans = []
     async for span in driver.stream_spans(
-        service="api", since="0", until="1",
+        service="api",
+        since="0",
+        until="1",
     ):
         spans.append(span)
     assert {s.span_id for s in spans} == {"s1", "s2"}

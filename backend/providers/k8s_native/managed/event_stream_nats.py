@@ -199,7 +199,7 @@ class NATSDriver(ManagedServiceDriver):
         from _sdk import UnsupportedOperationError
 
         raise UnsupportedOperationError(
-            "managed_service.restore(NATS) not supported -- NATS doesn't " "restore from snapshot (#618)",
+            "managed_service.restore(NATS) not supported -- NATS doesn't restore from snapshot (#618)",
         )
 
     @driver_op(cloud="k8s_native", driver="event_stream_nats", heartbeat=False)

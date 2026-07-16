@@ -52,33 +52,41 @@ def test_ensure_record_idempotent(driver_with_zone) -> None:
     driver, _ = driver_with_zone
     driver.ensure_record(
         zone="acme.platform.example",
-        name="api", type="A", value="192.0.2.1",
+        name="api",
+        type="A",
+        value="192.0.2.1",
     )
     driver.ensure_record(
         zone="acme.platform.example",
-        name="api", type="A", value="192.0.2.1",
+        name="api",
+        type="A",
+        value="192.0.2.1",
     )
 
 
 def test_ensure_record_overwrites_with_new_value(
-    driver_with_zone, route53_client,
+    driver_with_zone,
+    route53_client,
 ) -> None:
     """Same (name, type) with different value updates."""
     driver, zone_id = driver_with_zone
     driver.ensure_record(
         zone="acme.platform.example",
-        name="api", type="A", value="192.0.2.1",
+        name="api",
+        type="A",
+        value="192.0.2.1",
     )
     driver.ensure_record(
         zone="acme.platform.example",
-        name="api", type="A", value="192.0.2.99",
+        name="api",
+        type="A",
+        value="192.0.2.99",
     )
     response = route53_client.list_resource_record_sets(
         HostedZoneId=zone_id,
     )
     api_records = [
-        rs for rs in response["ResourceRecordSets"]
-        if rs.get("Name", "").startswith("api.acme.platform.example")
+        rs for rs in response["ResourceRecordSets"] if rs.get("Name", "").startswith("api.acme.platform.example")
     ]
     assert len(api_records) == 1
     values = [r["Value"] for r in api_records[0]["ResourceRecords"]]
@@ -91,7 +99,9 @@ def test_zone_not_found_raises(route53_client) -> None:
     with pytest.raises(NotFoundError):
         driver.ensure_record(
             zone="never-existed.example",
-            name="api", type="A", value="192.0.2.1",
+            name="api",
+            type="A",
+            value="192.0.2.1",
         )
 
 
@@ -99,17 +109,20 @@ def test_delete_record(driver_with_zone, route53_client) -> None:
     driver, zone_id = driver_with_zone
     driver.ensure_record(
         zone="acme.platform.example",
-        name="api", type="A", value="192.0.2.1",
+        name="api",
+        type="A",
+        value="192.0.2.1",
     )
     driver.delete_record(
-        zone="acme.platform.example", name="api", type="A",
+        zone="acme.platform.example",
+        name="api",
+        type="A",
     )
     response = route53_client.list_resource_record_sets(
         HostedZoneId=zone_id,
     )
     api_records = [
-        rs for rs in response["ResourceRecordSets"]
-        if rs.get("Name", "").startswith("api.acme.platform.example")
+        rs for rs in response["ResourceRecordSets"] if rs.get("Name", "").startswith("api.acme.platform.example")
     ]
     assert api_records == []
 
@@ -119,7 +132,8 @@ def test_delete_record_not_found(driver_with_zone) -> None:
     with pytest.raises(NotFoundError):
         driver.delete_record(
             zone="acme.platform.example",
-            name="never-existed", type="A",
+            name="never-existed",
+            type="A",
         )
 
 
@@ -127,11 +141,15 @@ def test_list_records(driver_with_zone) -> None:
     driver, _ = driver_with_zone
     driver.ensure_record(
         zone="acme.platform.example",
-        name="api", type="A", value="192.0.2.1",
+        name="api",
+        type="A",
+        value="192.0.2.1",
     )
     driver.ensure_record(
         zone="acme.platform.example",
-        name="worker", type="A", value="192.0.2.2",
+        name="worker",
+        type="A",
+        value="192.0.2.2",
     )
     records = driver.list_records("acme.platform.example")
     api_record = next((r for r in records if r.name == "api"), None)
@@ -145,11 +163,15 @@ def test_zone_resolution_cached(driver_with_zone) -> None:
     driver, _ = driver_with_zone
     driver.ensure_record(
         zone="acme.platform.example",
-        name="a", type="A", value="192.0.2.1",
+        name="a",
+        type="A",
+        value="192.0.2.1",
     )
     driver.ensure_record(
         zone="acme.platform.example",
-        name="b", type="A", value="192.0.2.2",
+        name="b",
+        type="A",
+        value="192.0.2.2",
     )
     # Cache populated after first call
     assert "acme.platform.example." in driver._zone_cache
@@ -208,9 +230,13 @@ def test_list_certificates_returns_issued() -> None:
     class _Paginator:
         def paginate(self, **kwargs):
             assert kwargs.get("CertificateStatuses") == ["ISSUED"]
-            return [{"CertificateSummaryList": [
-                {"CertificateArn": arn, "DomainName": "api.acme.example", "Status": "ISSUED"},
-            ]}]
+            return [
+                {
+                    "CertificateSummaryList": [
+                        {"CertificateArn": arn, "DomainName": "api.acme.example", "Status": "ISSUED"},
+                    ]
+                }
+            ]
 
     acm = MagicMock()
     acm.get_paginator.return_value = _Paginator()

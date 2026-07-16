@@ -54,14 +54,15 @@ def _spec(**overrides: Any) -> ProvisionSpec:
 def test_mysql_provision_emits_percona_crd() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = MagicMock(
-        ok=True, errors=[],
+        ok=True,
+        errors=[],
     )
     driver = MySQLOperatorDriver(
         config=MySQLOperatorConfig(cluster_driver=cluster_driver),
     )
     result = driver.provision(_spec())
     assert result.ok
-    args, kwargs = cluster_driver.apply_manifests.call_args
+    args, _kwargs = cluster_driver.apply_manifests.call_args
     manifests = args[2]
     assert manifests[0]["apiVersion"] == "pxc.percona.com/v1"
     assert manifests[0]["kind"] == "PerconaXtraDBCluster"
@@ -88,15 +89,14 @@ def test_mysql_binding_envs() -> None:
     binding = driver.binding(ServiceHandle(handle="mysql/api-prod"))
     assert "MYSQL_HOST" in binding.env_vars
     assert "MYSQL_DB" in binding.env_vars
-    assert binding.env_vars["MYSQL_USER"].secret_ref == (
-        "api-prod-app-secret#username"
-    )
+    assert binding.env_vars["MYSQL_USER"].secret_ref == ("api-prod-app-secret#username")
 
 
 def test_mysql_mariadb_brand_emits_mariadb_crd() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = MagicMock(
-        ok=True, errors=[],
+        ok=True,
+        errors=[],
     )
     driver = MySQLOperatorDriver(
         config=MySQLOperatorConfig(
@@ -105,7 +105,7 @@ def test_mysql_mariadb_brand_emits_mariadb_crd() -> None:
         ),
     )
     driver.provision(_spec())
-    args, kwargs = cluster_driver.apply_manifests.call_args
+    args, _kwargs = cluster_driver.apply_manifests.call_args
     manifests = args[2]
     assert manifests[0]["apiVersion"] == "k8s.mariadb.com/v1alpha1"
     assert manifests[0]["kind"] == "MariaDB"
@@ -117,20 +117,19 @@ def test_mysql_mariadb_brand_emits_mariadb_crd() -> None:
 def test_mongodb_provision_emits_psmdb_crd() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = MagicMock(
-        ok=True, errors=[],
+        ok=True,
+        errors=[],
     )
     driver = MongoDBOperatorDriver(
         config=MongoDBOperatorConfig(cluster_driver=cluster_driver),
     )
     result = driver.provision(_spec())
     assert result.ok
-    args, kwargs = cluster_driver.apply_manifests.call_args
+    args, _kwargs = cluster_driver.apply_manifests.call_args
     manifests = args[2]
     assert manifests[0]["apiVersion"] == "psmdb.percona.com/v1"
     assert manifests[0]["kind"] == "PerconaServerMongoDB"
-    assert (
-        manifests[0]["spec"]["replsets"][0]["name"] == "rs0"
-    )
+    assert manifests[0]["spec"]["replsets"][0]["name"] == "rs0"
 
 
 def test_mongodb_binding_uses_replica_set_uri() -> None:
@@ -150,14 +149,15 @@ def test_mongodb_binding_uses_replica_set_uri() -> None:
 def test_kafka_provision_emits_kraft_kafka() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = MagicMock(
-        ok=True, errors=[],
+        ok=True,
+        errors=[],
     )
     driver = StrimziKafkaDriver(
         config=StrimziKafkaConfig(cluster_driver=cluster_driver),
     )
     result = driver.provision(_spec())
     assert result.ok
-    args, kwargs = cluster_driver.apply_manifests.call_args
+    args, _kwargs = cluster_driver.apply_manifests.call_args
     manifests = args[2]
     kinds = {m["kind"] for m in manifests}
     assert "Kafka" in kinds
@@ -180,19 +180,16 @@ def test_kafka_binding_emits_bootstrap() -> None:
 def test_kafka_size_xlarge_has_more_replicas() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = MagicMock(
-        ok=True, errors=[],
+        ok=True,
+        errors=[],
     )
     driver = StrimziKafkaDriver(
         config=StrimziKafkaConfig(cluster_driver=cluster_driver),
     )
     driver.provision(_spec(size="xlarge"))
-    args, kwargs = cluster_driver.apply_manifests.call_args
+    args, _kwargs = cluster_driver.apply_manifests.call_args
     manifests = args[2]
-    brokers = next(
-        m for m in manifests
-        if m["kind"] == "KafkaNodePool"
-        and m["metadata"]["name"] == "brokers"
-    )
+    brokers = next(m for m in manifests if m["kind"] == "KafkaNodePool" and m["metadata"]["name"] == "brokers")
     assert brokers["spec"]["replicas"] == 7
 
 
@@ -208,14 +205,15 @@ def test_kafka_snapshot_unsupported() -> None:
 def test_rabbitmq_provision_emits_cluster_crd() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = MagicMock(
-        ok=True, errors=[],
+        ok=True,
+        errors=[],
     )
     driver = RabbitMQOperatorDriver(
         config=RabbitMQOperatorConfig(cluster_driver=cluster_driver),
     )
     result = driver.provision(_spec())
     assert result.ok
-    args, kwargs = cluster_driver.apply_manifests.call_args
+    args, _kwargs = cluster_driver.apply_manifests.call_args
     manifests = args[2]
     assert manifests[0]["apiVersion"] == "rabbitmq.com/v1beta1"
     assert manifests[0]["kind"] == "RabbitmqCluster"
@@ -226,9 +224,7 @@ def test_rabbitmq_binding_uses_default_user_secret() -> None:
     binding = driver.binding(
         ServiceHandle(handle="queue/api-prod"),
     )
-    assert binding.env_vars["RABBITMQ_USER"].secret_ref == (
-        "api-prod-default-user#username"
-    )
+    assert binding.env_vars["RABBITMQ_USER"].secret_ref == ("api-prod-default-user#username")
 
 
 def test_rabbitmq_pause_minority_partition_handling() -> None:
@@ -236,13 +232,14 @@ def test_rabbitmq_pause_minority_partition_handling() -> None:
     pause_minority — production-recommended for consistency."""
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = MagicMock(
-        ok=True, errors=[],
+        ok=True,
+        errors=[],
     )
     driver = RabbitMQOperatorDriver(
         config=RabbitMQOperatorConfig(cluster_driver=cluster_driver),
     )
     driver.provision(_spec())
-    args, kwargs = cluster_driver.apply_manifests.call_args
+    args, _kwargs = cluster_driver.apply_manifests.call_args
     manifests = args[2]
     config = manifests[0]["spec"]["rabbitmq"]["additionalConfig"]
     assert "pause_minority" in config
@@ -254,12 +251,13 @@ def test_rabbitmq_pause_minority_partition_handling() -> None:
 def test_nats_provision_emits_statefulset() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = MagicMock(
-        ok=True, errors=[],
+        ok=True,
+        errors=[],
     )
     driver = NATSDriver(config=NATSConfig(cluster_driver=cluster_driver))
     result = driver.provision(_spec())
     assert result.ok
-    args, kwargs = cluster_driver.apply_manifests.call_args
+    args, _kwargs = cluster_driver.apply_manifests.call_args
     manifests = args[2]
     assert manifests[0]["kind"] == "StatefulSet"
 
@@ -267,15 +265,17 @@ def test_nats_provision_emits_statefulset() -> None:
 def test_nats_jetstream_arg_passed_when_enabled() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = MagicMock(
-        ok=True, errors=[],
+        ok=True,
+        errors=[],
     )
     driver = NATSDriver(
         config=NATSConfig(
-            enable_jetstream=True, cluster_driver=cluster_driver,
+            enable_jetstream=True,
+            cluster_driver=cluster_driver,
         ),
     )
     driver.provision(_spec())
-    args, kwargs = cluster_driver.apply_manifests.call_args
+    args, _kwargs = cluster_driver.apply_manifests.call_args
     manifests = args[2]
     args_list = manifests[0]["spec"]["template"]["spec"]["containers"][0]["args"]
     assert "--jetstream" in args_list
@@ -284,15 +284,17 @@ def test_nats_jetstream_arg_passed_when_enabled() -> None:
 def test_nats_jetstream_omitted_when_disabled() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = MagicMock(
-        ok=True, errors=[],
+        ok=True,
+        errors=[],
     )
     driver = NATSDriver(
         config=NATSConfig(
-            enable_jetstream=False, cluster_driver=cluster_driver,
+            enable_jetstream=False,
+            cluster_driver=cluster_driver,
         ),
     )
     driver.provision(_spec())
-    args, kwargs = cluster_driver.apply_manifests.call_args
+    args, _kwargs = cluster_driver.apply_manifests.call_args
     manifests = args[2]
     args_list = manifests[0]["spec"]["template"]["spec"]["containers"][0]["args"]
     assert "--jetstream" not in args_list
@@ -304,15 +306,18 @@ def test_nats_jetstream_omitted_when_disabled() -> None:
 def test_nfs_provision_emits_rwx_pvc() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = MagicMock(
-        ok=True, errors=[],
+        ok=True,
+        errors=[],
     )
-    driver = NFSDriver(config=NFSConfig(
-        storage_class_name="nfs-csi",
-        cluster_driver=cluster_driver,
-    ))
+    driver = NFSDriver(
+        config=NFSConfig(
+            storage_class_name="nfs-csi",
+            cluster_driver=cluster_driver,
+        )
+    )
     result = driver.provision(_spec())
     assert result.ok
-    args, kwargs = cluster_driver.apply_manifests.call_args
+    args, _kwargs = cluster_driver.apply_manifests.call_args
     manifests = args[2]
     pvc = manifests[0]
     assert pvc["kind"] == "PersistentVolumeClaim"
@@ -323,14 +328,17 @@ def test_nfs_provision_emits_rwx_pvc() -> None:
 def test_nfs_size_storage_mapping() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = MagicMock(
-        ok=True, errors=[],
+        ok=True,
+        errors=[],
     )
-    driver = NFSDriver(config=NFSConfig(
-        storage_class_name="nfs-csi",
-        cluster_driver=cluster_driver,
-    ))
+    driver = NFSDriver(
+        config=NFSConfig(
+            storage_class_name="nfs-csi",
+            cluster_driver=cluster_driver,
+        )
+    )
     driver.provision(_spec(size="large"))
-    args, kwargs = cluster_driver.apply_manifests.call_args
+    args, _kwargs = cluster_driver.apply_manifests.call_args
     manifests = args[2]
     storage = manifests[0]["spec"]["resources"]["requests"]["storage"]
     assert storage == "1Ti"

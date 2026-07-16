@@ -536,9 +536,7 @@ def _render_managed_subdomain_ingress(
     # reached via a CNAME -> CloudFront written by the deploy flow, not an Ingress
     # (#1010 static_site, #1035 public faas), so drop them from the
     # hostname-to-backend maps below.
-    serviceless_workloads = {
-        w.name for w in manifest.workloads if w.kind in ("static_site", "faas")
-    }
+    serviceless_workloads = {w.name for w in manifest.workloads if w.kind in ("static_site", "faas")}
 
     cert_arn: str | None = (
         managed_domain.dns_config.get("certificate_arn") if managed_domain.dns_config else None

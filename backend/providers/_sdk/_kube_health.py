@@ -69,17 +69,14 @@ def events_from_client(
             if event_type and ev_type != event_type:
                 continue
             involved = getattr(raw, "involved_object", None)
-            io_str = (
-                f"{getattr(involved, 'kind', '')}/"
-                f"{getattr(involved, 'name', '')}"
-                if involved is not None
-                else ""
-            )
+            io_str = f"{getattr(involved, 'kind', '')}/{getattr(involved, 'name', '')}" if involved is not None else ""
             events.append(
                 ClusterEvent(
                     namespace=ns,
                     name=getattr(
-                        getattr(raw, "metadata", None), "name", "",
+                        getattr(raw, "metadata", None),
+                        "name",
+                        "",
                     )
                     or "",
                     reason=getattr(raw, "reason", "") or "",
@@ -233,16 +230,8 @@ def _restart_count_for_deployment(
             if restart_count == 0:
                 continue
             last_state = getattr(cs, "last_state", None)
-            terminated = (
-                getattr(last_state, "terminated", None)
-                if last_state is not None
-                else None
-            )
-            finished_at = (
-                getattr(terminated, "finished_at", None)
-                if terminated is not None
-                else None
-            )
+            terminated = getattr(last_state, "terminated", None) if last_state is not None else None
+            finished_at = getattr(terminated, "finished_at", None) if terminated is not None else None
             if finished_at is None:
                 # No termination timestamp — best-effort: contribute
                 # the running counter rather than dropping the signal.

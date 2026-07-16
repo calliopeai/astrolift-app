@@ -99,9 +99,10 @@ def test_default_schedules_complete():
     #498 added the stale-session prune; #779 added the pending-approval
     expiry sweep; spec 33 PR-4 added the agent-cron dispatcher tick;
     spec 33 PR-5 added the scheduled-scaling tick; spec 33 PR-6 added the
-    Loop-dispatch tick; #808 added the keep-alive agent reconcile tick.
+    Loop-dispatch tick; #808 added the keep-alive agent reconcile tick;
+    the uptime-monitoring increment added the synthetic uptime probe.
     Lock the count so future additions stay visible in a diff."""
-    assert len(DEFAULT_SCHEDULES) == 15
+    assert len(DEFAULT_SCHEDULES) == 16
 
 
 def test_default_schedules_include_all_kinds():

@@ -17,11 +17,11 @@ from gcp.registry_artifact import (
 )
 
 
-class _NotFound(Exception):  # noqa: N818 — mocks google.cloud exception name verbatim
+class _NotFound(Exception):
     pass
 
 
-class _AlreadyExists(Exception):  # noqa: N818 — mocks google.cloud exception name verbatim
+class _AlreadyExists(Exception):
     pass
 
 
@@ -54,14 +54,21 @@ class FakeARClient:
         return self.repos[name]
 
     def create_repository(
-        self, *, parent: str, repository: Any, repository_id: str,
+        self,
+        *,
+        parent: str,
+        repository: Any,
+        repository_id: str,
     ) -> FakeOperation:
         full = f"{parent}/repositories/{repository_id}"
         self.repos[full] = FakeRepository(name=full)
-        self.create_calls.append({
-            "parent": parent, "repository_id": repository_id,
-            "repository": repository,
-        })
+        self.create_calls.append(
+            {
+                "parent": parent,
+                "repository_id": repository_id,
+                "repository": repository,
+            }
+        )
         return FakeOperation()
 
     def list_tags(self, *, parent: str) -> list[FakeTag]:
@@ -93,7 +100,8 @@ def patch_ar_module(monkeypatch: pytest.MonkeyPatch) -> None:
 
     google_module = sys.modules.get("google", types.ModuleType("google"))
     cloud_module = sys.modules.get(
-        "google.cloud", types.ModuleType("google.cloud"),
+        "google.cloud",
+        types.ModuleType("google.cloud"),
     )
     sys.modules.setdefault("google", google_module)
     sys.modules.setdefault("google.cloud", cloud_module)
@@ -119,7 +127,8 @@ def driver(fake_client: FakeARClient) -> ArtifactRegistryDriver:
 
 
 def test_ensure_repo_creates_ar_repo_when_missing(
-    driver: ArtifactRegistryDriver, fake_client: FakeARClient,
+    driver: ArtifactRegistryDriver,
+    fake_client: FakeARClient,
 ) -> None:
     repo = driver.ensure_repo("api")
     assert repo.name == "api"
@@ -129,7 +138,8 @@ def test_ensure_repo_creates_ar_repo_when_missing(
 
 
 def test_ensure_repo_idempotent(
-    driver: ArtifactRegistryDriver, fake_client: FakeARClient,
+    driver: ArtifactRegistryDriver,
+    fake_client: FakeARClient,
 ) -> None:
     driver.ensure_repo("api")
     driver.ensure_repo("api")  # second call hits the existing AR repo
@@ -137,7 +147,8 @@ def test_ensure_repo_idempotent(
 
 
 def test_ensure_repo_different_apps_share_ar_repo(
-    driver: ArtifactRegistryDriver, fake_client: FakeARClient,
+    driver: ArtifactRegistryDriver,
+    fake_client: FakeARClient,
 ) -> None:
     a = driver.ensure_repo("api")
     b = driver.ensure_repo("worker")
@@ -151,14 +162,12 @@ def test_get_pull_secret_marker_for_gke(
     driver: ArtifactRegistryDriver,
 ) -> None:
     secret = driver.get_pull_secret(
-        cluster="prod", namespace="acme-api",
+        cluster="prod",
+        namespace="acme-api",
     )
     assert secret["kind"] == "Secret"
     assert secret["metadata"]["namespace"] == "acme-api"
-    assert (
-        secret["metadata"]["annotations"]["astrolift.io/note"]
-        .startswith("GKE clusters use Workload Identity")
-    )
+    assert secret["metadata"]["annotations"]["astrolift.io/note"].startswith("GKE clusters use Workload Identity")
     docker = json.loads(
         base64.b64decode(secret["data"][".dockerconfigjson"]).decode(),
     )
@@ -169,9 +178,7 @@ def test_push_returns_full_uri(
     driver: ArtifactRegistryDriver,
 ) -> None:
     uri = driver.push("local:dev", "api", "abc123")
-    assert uri == (
-        "us-central1-docker.pkg.dev/acme/astrolift-images/api:abc123"
-    )
+    assert uri == ("us-central1-docker.pkg.dev/acme/astrolift-images/api:abc123")
 
 
 def test_push_rejects_blank_local_image(
@@ -182,18 +189,15 @@ def test_push_rejects_blank_local_image(
 
 
 def test_list_tags_translates_response(
-    driver: ArtifactRegistryDriver, fake_client: FakeARClient,
+    driver: ArtifactRegistryDriver,
+    fake_client: FakeARClient,
 ) -> None:
-    package_path = (
-        "projects/acme/locations/us-central1"
-        "/repositories/astrolift-images/packages/api"
-    )
+    package_path = "projects/acme/locations/us-central1/repositories/astrolift-images/packages/api"
     fake_client.tags[package_path] = [
         FakeTag(
             name=f"{package_path}/tags/v1",
             version=(
-                "projects/acme/locations/us-central1"
-                "/repositories/astrolift-images/packages/api/versions/sha256:abc"
+                "projects/acme/locations/us-central1/repositories/astrolift-images/packages/api/versions/sha256:abc"
             ),
         ),
     ]
@@ -218,7 +222,8 @@ def test_list_tags_missing_package_raises_not_found(
 
 
 def test_delete_repo_archive_is_noop(
-    driver: ArtifactRegistryDriver, fake_client: FakeARClient,
+    driver: ArtifactRegistryDriver,
+    fake_client: FakeARClient,
 ) -> None:
     # archive=True doesn't touch any AR state
     driver.delete_repo("api", archive=True)

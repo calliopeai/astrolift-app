@@ -27,15 +27,15 @@ from aws.managed.faas_lambda import (
 # ---- recording fakes -------------------------------------------------
 
 
-class _ResourceNotFoundException(Exception):  # noqa: N818 -- mimics SDK class name
+class _ResourceNotFoundException(Exception):
     pass
 
 
-class _ResourceConflictException(Exception):  # noqa: N818 -- mimics SDK class name
+class _ResourceConflictException(Exception):
     pass
 
 
-class _InvalidParameterValueException(Exception):  # noqa: N818 -- mimics SDK class name
+class _InvalidParameterValueException(Exception):
     pass
 
 
@@ -174,11 +174,11 @@ class FakeLambda:
         return _Waiter(self.calls, name)
 
 
-class _EntityAlreadyExistsException(Exception):  # noqa: N818 -- mimics SDK class name
+class _EntityAlreadyExistsException(Exception):
     pass
 
 
-class _NoSuchEntityException(Exception):  # noqa: N818 -- mimics SDK class name
+class _NoSuchEntityException(Exception):
     pass
 
 
@@ -398,9 +398,7 @@ def test_public_creates_aws_iam_function_url_not_public():
     assert result.ok is True
     assert lam.kwargs_for("create_function_url_config")["AuthType"] == "AWS_IAM"
     # No public grant added during provision.
-    public_grants = [
-        kw for n, kw in lam.calls if n == "add_permission" and kw.get("Principal") == "*"
-    ]
+    public_grants = [kw for n, kw in lam.calls if n == "add_permission" and kw.get("Principal") == "*"]
     assert public_grants == []
 
 

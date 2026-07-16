@@ -151,7 +151,12 @@ def test_manual_deployment_leaves_pr_fields_zero(org, app, env, fake_info, permi
 
 
 def test_deployment_to_type_derives_pr_url_when_repo_known(
-    org, app, env, fake_info, permission_resolver, settings,
+    org,
+    app,
+    env,
+    fake_info,
+    permission_resolver,
+    settings,
 ):
     """``deployment_to_type`` builds ``pr_url`` from the registered
     app's ``source_url`` + ``pr_number`` — matching the preview-env

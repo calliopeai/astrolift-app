@@ -216,8 +216,7 @@ async def _existing_snapshot(
             )
         except Exception:  # noqa: BLE001 — never let one odd live schedule abort the snapshot
             log.warning(
-                "schedule registrar: could not map existing schedule %s; "
-                "treating as create/update target",
+                "schedule registrar: could not map existing schedule %s; " "treating as create/update target",
                 sid,
             )
 
@@ -326,9 +325,7 @@ async def register_schedules(client: Client) -> None:
     # *allowlisted* catalog: either a HOLD kind that was previously active,
     # or a kind removed from the catalog. We leave it running and surface it.
     catalog_ids = set(by_id.keys())
-    orphans = sorted(
-        sid for sid in existing_ids if sid.startswith("astro-") and sid not in catalog_ids
-    )
+    orphans = sorted(sid for sid in existing_ids if sid.startswith("astro-") and sid not in catalog_ids)
     if orphans:
         log.info(
             "schedule registrar: %d orphaned platform schedule(s) left untouched "
@@ -338,8 +335,7 @@ async def register_schedules(client: Client) -> None:
         )
 
     log.info(
-        "schedule registrar: created=%d updated=%d skipped=%d held=%d "
-        "active_kinds=[%s] queue=%s",
+        "schedule registrar: created=%d updated=%d skipped=%d held=%d " "active_kinds=[%s] queue=%s",
         created,
         updated,
         skipped,

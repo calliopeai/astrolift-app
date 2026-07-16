@@ -50,7 +50,10 @@ def _make_service(*, variant: str = "bedrock") -> ManagedService:
     org = Organization.objects.create(name="Acme", slug="acme-msr")
     team = Team.objects.create(organization=org, name="Eng", slug="eng-msr")
     project = Project.objects.create(
-        organization=org, team=team, name="Demo", slug="demo-msr",
+        organization=org,
+        team=team,
+        name="Demo",
+        slug="demo-msr",
     )
     # bulk_create bypasses BaseCoreModel.save(), whose integer
     # optimistic-version bump collides with ProviderPlugin's CharField
@@ -100,12 +103,15 @@ def _make_service(*, variant: str = "bedrock") -> ManagedService:
 
 def test_provision_sync_surfaces_ready_true():
     svc = _make_service()
-    with patch(
-        "astrolift_drivers.registry.plugins.get",
-        return_value=_fake_driver_cls(True),
-    ), patch(
-        "core.cluster_observability.managed_config_for",
-        return_value={},
+    with (
+        patch(
+            "astrolift_drivers.registry.plugins.get",
+            return_value=_fake_driver_cls(True),
+        ),
+        patch(
+            "core.cluster_observability.managed_config_for",
+            return_value={},
+        ),
     ):
         result = _provision_sync(svc.pk)
     assert result["ok"] is True
@@ -114,12 +120,15 @@ def test_provision_sync_surfaces_ready_true():
 
 def test_provision_sync_surfaces_ready_false():
     svc = _make_service()
-    with patch(
-        "astrolift_drivers.registry.plugins.get",
-        return_value=_fake_driver_cls(False),
-    ), patch(
-        "core.cluster_observability.managed_config_for",
-        return_value={},
+    with (
+        patch(
+            "astrolift_drivers.registry.plugins.get",
+            return_value=_fake_driver_cls(False),
+        ),
+        patch(
+            "core.cluster_observability.managed_config_for",
+            return_value={},
+        ),
     ):
         result = _provision_sync(svc.pk)
     assert result["ok"] is True

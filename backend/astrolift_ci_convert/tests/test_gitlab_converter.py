@@ -1,9 +1,6 @@
 """Tests for the GitLab CI → Astrolift TOML converter."""
 
-import pytest
-
 from astrolift_ci_convert.gitlab import convert, parse
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

@@ -566,9 +566,8 @@ class OperationsQuery:
         viewer = getattr(request, "user", None) if request else None
         if viewer is None or not viewer.is_authenticated:
             return []
-        qs = (
-            DeviceRegistration.objects.filter(user_id=viewer.pk, stale_at__isnull=True)
-            .order_by("-registered_at")
+        qs = DeviceRegistration.objects.filter(user_id=viewer.pk, stale_at__isnull=True).order_by(
+            "-registered_at"
         )
         return [device_registration_to_type(d) for d in qs]
 
@@ -663,13 +662,10 @@ class OperationsQuery:
         tenant = get_current_tenant()
         if tenant is None or tenant.actor_user_id is None:
             return []
-        qs = (
-            DeviceRegistration.objects.filter(
-                user_id=tenant.actor_user_id,
-                deleted_at__isnull=True,
-            )
-            .order_by("-last_used_at", "-created_at")
-        )
+        qs = DeviceRegistration.objects.filter(
+            user_id=tenant.actor_user_id,
+            deleted_at__isnull=True,
+        ).order_by("-last_used_at", "-created_at")
         return [device_registration_to_type(d) for d in qs]
 
     @strawberry.field

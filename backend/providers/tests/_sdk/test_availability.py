@@ -23,14 +23,9 @@ def test_required_roles_complete() -> None:
 def test_every_plugin_covers_required_roles() -> None:
     plugin_ids = {entry.plugin_id for entry in MATRIX.drivers}
     for plugin_id in plugin_ids:
-        roles = {
-            entry.role for entry in MATRIX.drivers
-            if entry.plugin_id == plugin_id
-        }
+        roles = {entry.role for entry in MATRIX.drivers if entry.plugin_id == plugin_id}
         missing = set(REQUIRED_ROLES) - roles
-        assert not missing, (
-            f"plugin {plugin_id!r} matrix coverage missing {missing}"
-        )
+        assert not missing, f"plugin {plugin_id!r} matrix coverage missing {missing}"
 
 
 def test_drivers_for_role_returns_all() -> None:
@@ -52,10 +47,14 @@ def test_has_role_lookup() -> None:
 
 def test_has_managed_lookup() -> None:
     assert MATRIX.has_managed(
-        plugin_id="aws", kind="object_store", variant="s3",
+        plugin_id="aws",
+        kind="object_store",
+        variant="s3",
     )
     assert not MATRIX.has_managed(
-        plugin_id="aws", kind="object_store", variant="gcs",
+        plugin_id="aws",
+        kind="object_store",
+        variant="gcs",
     )
 
 
@@ -65,10 +64,7 @@ def test_status_field_defaults_to_ga() -> None:
 
 
 def test_managed_service_binding_envs_recorded() -> None:
-    s3 = next(
-        m for m in MATRIX.managed_services
-        if m.plugin_id == "aws" and m.variant == "s3"
-    )
+    s3 = next(m for m in MATRIX.managed_services if m.plugin_id == "aws" and m.variant == "s3")
     assert "S3_BUCKET_NAME" in s3.binding_envs
 
 

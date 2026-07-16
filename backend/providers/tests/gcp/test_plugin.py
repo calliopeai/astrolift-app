@@ -12,8 +12,13 @@ def test_plugin_id_and_display() -> None:
 
 def test_required_driver_roles_present() -> None:
     expected = {
-        "registry", "secrets", "identity",
-        "dns", "tls", "cluster", "ingress",
+        "registry",
+        "secrets",
+        "identity",
+        "dns",
+        "tls",
+        "cluster",
+        "ingress",
     }
     assert expected.issubset(PLUGIN.drivers.keys())
 
@@ -40,7 +45,5 @@ def test_config_schema_requires_core_fields() -> None:
 
 
 def test_ingress_variant_options() -> None:
-    variant = (
-        PLUGIN.config_schema["properties"]["ingress_variant"]
-    )
+    variant = PLUGIN.config_schema["properties"]["ingress_variant"]
     assert set(variant["enum"]) == {"gce_ingress", "gateway_api"}

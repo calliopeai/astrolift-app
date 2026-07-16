@@ -51,6 +51,32 @@ def member():
     return User.objects.create_user(username="cw_member", email="cw_m@t.com", password="pw")
 
 
+@pytest.fixture
+def agent_workload(org):
+    """A concrete kind=agent Workload in ``org`` — stage_bindings must
+    resolve to one (#1094)."""
+    from astrolift_identity.models import Project, Team
+    from astrolift_registry.models import RegisteredApp, Workload
+
+    team = Team.objects.create(organization=org, name="Eng", slug="cw-eng-a")
+    project = Project.objects.create(organization=org, team=team, name="Demo", slug="cw-demo-a")
+    app = RegisteredApp.objects.create(
+        organization=org,
+        team=team,
+        project=project,
+        name="App",
+        slug="cw-app-a",
+        provisioning_status="ready",
+    )
+    return Workload.objects.create(
+        registered_app=app,
+        name="Coder",
+        slug="cw-coder-a",
+        kind=Workload.Kind.AGENT.value,
+        run_family=Workload.RunFamily.TASK.value,
+    )
+
+
 def _make_def(slug, *, organization=None, agent=None):
     d = WorkflowDefinition.objects.create(
         name=f"Def {slug}",
@@ -145,7 +171,7 @@ def test_create_workflow_rejects_unbound_agent_stage(member, org, permission_res
     assert any("stage 0" in msg for e in res.errors for msg in e.messages)
 
 
-def test_create_workflow_bound_via_stage_bindings(member, org, permission_resolver):
+def test_create_workflow_bound_via_stage_bindings(member, org, agent_workload, permission_resolver):
     permission_resolver.grant(Permission.WORKFLOW_CREATE)
     _make_def("cw-bound", organization=org)
     m = WorkflowsMutation()
@@ -155,7 +181,7 @@ def test_create_workflow_bound_via_stage_bindings(member, org, permission_resolv
             name="Bound WF",
             slug="bound-wf",
             definition_slug="cw-bound",
-            stage_bindings={"0": {"agent_workload_id": str(uuid.uuid4())}},
+            stage_bindings={"0": {"agent_workload_id": str(agent_workload.guid)}},
         )
     assert res.ok, res.errors
     wf = Workflow.objects.get(slug="bound-wf")
@@ -163,15 +189,88 @@ def test_create_workflow_bound_via_stage_bindings(member, org, permission_resolv
     assert res.workflow.guid == str(wf.guid)
 
 
+def test_create_workflow_rejects_garbage_binding(member, org, permission_resolver):
+    """#1094: an agent_workload_id that resolves to no live kind=agent
+    Workload in the caller's org is rejected at save time with a field
+    error naming the stage order."""
+    permission_resolver.grant(Permission.WORKFLOW_CREATE)
+    _make_def("cw-garbage", organization=org)
+    m = WorkflowsMutation()
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        res = m.create_workflow(
+            _info(member),
+            name="Garbage WF",
+            slug="garbage-wf",
+            definition_slug="cw-garbage",
+            stage_bindings={"0": {"agent_workload_id": str(uuid.uuid4())}},
+        )
+    assert not res.ok
+    assert any(e.field == "stage_bindings" for e in res.errors)
+    assert any("stage 0" in msg for e in res.errors for msg in e.messages)
+    assert not Workflow.objects.filter(slug="garbage-wf").exists()
+
+
+def test_update_workflow_rejects_foreign_org_binding(
+    member, org, other_org, agent_workload, permission_resolver
+):
+    """#1094: rebinding a Workflow to another org's agent workload is
+    rejected — the resolution is scoped via registered_app.organization."""
+    permission_resolver.grant(Permission.WORKFLOW_CREATE)
+    permission_resolver.grant(Permission.WORKFLOW_UPDATE)
+    from astrolift_identity.models import Project, Team
+    from astrolift_registry.models import RegisteredApp, Workload
+
+    team = Team.objects.create(organization=other_org, name="Eng", slug="cw-eng-x")
+    project = Project.objects.create(organization=other_org, team=team, name="Demo", slug="cw-demo-x")
+    app = RegisteredApp.objects.create(
+        organization=other_org,
+        team=team,
+        project=project,
+        name="App",
+        slug="cw-app-x",
+        provisioning_status="ready",
+    )
+    theirs = Workload.objects.create(
+        registered_app=app,
+        name="Coder",
+        slug="cw-coder-x",
+        kind=Workload.Kind.AGENT.value,
+        run_family=Workload.RunFamily.TASK.value,
+    )
+
+    _make_def("cw-rebind", organization=org)
+    m = WorkflowsMutation()
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        res = m.create_workflow(
+            _info(member),
+            name="Rebind WF",
+            slug="rebind-wf",
+            definition_slug="cw-rebind",
+            stage_bindings={"0": {"agent_workload_id": str(agent_workload.guid)}},
+        )
+        assert res.ok, res.errors
+        res = m.update_workflow(
+            _info(member),
+            slug="rebind-wf",
+            stage_bindings={"0": {"agent_workload_id": str(theirs.guid)}},
+        )
+    assert not res.ok
+    assert any("stage 0" in msg for e in res.errors for msg in e.messages)
+    wf = Workflow.objects.get(slug="rebind-wf")
+    assert wf.stage_bindings == {"0": {"agent_workload_id": str(agent_workload.guid)}}
+
+
 # ---------------------------------------------------------------------------
 # runWorkflow — validates bindings, starts the engine, returns a run id (§3)
 # ---------------------------------------------------------------------------
 
 
-def test_run_workflow_starts_engine_and_creates_instance(member, org, permission_resolver, patched_start):
+def test_run_workflow_starts_engine_and_creates_instance(
+    member, org, agent_workload, permission_resolver, patched_start
+):
     permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
     d = _make_def("cw-run", organization=org)
-    agent_guid = str(uuid.uuid4())
+    agent_guid = str(agent_workload.guid)
     wf = Workflow.objects.create(
         organization=org,
         definition=d,
@@ -207,7 +306,9 @@ def test_run_workflow_starts_engine_and_creates_instance(member, org, permission
     assert res.instance_id == str(inst.pk)
 
 
-def test_run_workflow_rejects_unbound_bindings(member, org, permission_resolver, patched_start):
+def test_run_workflow_rejects_unbound_bindings(
+    member, org, agent_workload, permission_resolver, patched_start
+):
     permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
     d = _make_def("cw-run-unbound", organization=org)
     # Save with a binding so the row persists, then strip it to simulate drift.
@@ -216,7 +317,7 @@ def test_run_workflow_rejects_unbound_bindings(member, org, permission_resolver,
         definition=d,
         name="Unbound run",
         slug="unbound-run",
-        stage_bindings={"0": {"agent_workload_id": str(uuid.uuid4())}},
+        stage_bindings={"0": {"agent_workload_id": str(agent_workload.guid)}},
     )
     Workflow.objects.filter(pk=wf.pk).update(stage_bindings={})
     wf.refresh_from_db()
@@ -233,7 +334,9 @@ def test_run_workflow_rejects_unbound_bindings(member, org, permission_resolver,
 # ---------------------------------------------------------------------------
 
 
-def test_schedule_created_on_scheduled_workflow(member, org, permission_resolver, patched_schedule):
+def test_schedule_created_on_scheduled_workflow(
+    member, org, agent_workload, permission_resolver, patched_schedule
+):
     permission_resolver.grant(Permission.WORKFLOW_CREATE)
     _make_def("cw-sched", organization=org)
     m = WorkflowsMutation()
@@ -243,7 +346,7 @@ def test_schedule_created_on_scheduled_workflow(member, org, permission_resolver
             name="Sched WF",
             slug="sched-wf",
             definition_slug="cw-sched",
-            stage_bindings={"0": {"agent_workload_id": str(uuid.uuid4())}},
+            stage_bindings={"0": {"agent_workload_id": str(agent_workload.guid)}},
             trigger_kind="schedule",
             schedule_cron="*/5 * * * *",
         )
@@ -253,7 +356,7 @@ def test_schedule_created_on_scheduled_workflow(member, org, permission_resolver
     assert ("create_schedule", sched_id) in patched_schedule
 
 
-def test_schedule_deleted_when_disabled(member, org, permission_resolver, patched_schedule):
+def test_schedule_deleted_when_disabled(member, org, agent_workload, permission_resolver, patched_schedule):
     permission_resolver.grant(Permission.WORKFLOW_CREATE)
     permission_resolver.grant(Permission.WORKFLOW_UPDATE)
     permission_resolver.grant(Permission.WORKFLOW_DELETE)
@@ -265,7 +368,7 @@ def test_schedule_deleted_when_disabled(member, org, permission_resolver, patche
             name="Sched2",
             slug="sched2",
             definition_slug="cw-sched2",
-            stage_bindings={"0": {"agent_workload_id": str(uuid.uuid4())}},
+            stage_bindings={"0": {"agent_workload_id": str(agent_workload.guid)}},
             trigger_kind="schedule",
             schedule_cron="*/5 * * * *",
         )
@@ -290,7 +393,7 @@ def test_schedule_deleted_when_disabled(member, org, permission_resolver, patche
 # ---------------------------------------------------------------------------
 
 
-def test_cross_org_workflow_query_denied(member, org, other_org, permission_resolver):
+def test_cross_org_workflow_query_denied(member, org, other_org, agent_workload, permission_resolver):
     permission_resolver.grant(Permission.WORKFLOW_READ)
     d = _make_def("cw-xorg", organization=org)
     Workflow.objects.create(
@@ -298,7 +401,7 @@ def test_cross_org_workflow_query_denied(member, org, other_org, permission_reso
         definition=d,
         name="A WF",
         slug="a-wf",
-        stage_bindings={"0": {"agent_workload_id": str(uuid.uuid4())}},
+        stage_bindings={"0": {"agent_workload_id": str(agent_workload.guid)}},
     )
     q = WorkflowsQuery()
     # Caller in other_org cannot see org A's workflow.
@@ -310,7 +413,7 @@ def test_cross_org_workflow_query_denied(member, org, other_org, permission_reso
         assert q.workflow(_info(member), slug="a-wf") is not None
 
 
-def test_cross_org_run_denied(member, org, other_org, permission_resolver, patched_start):
+def test_cross_org_run_denied(member, org, other_org, agent_workload, permission_resolver, patched_start):
     permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
     d = _make_def("cw-xrun", organization=org)
     wf = Workflow.objects.create(
@@ -318,7 +421,7 @@ def test_cross_org_run_denied(member, org, other_org, permission_resolver, patch
         definition=d,
         name="X run",
         slug="x-run",
-        stage_bindings={"0": {"agent_workload_id": str(uuid.uuid4())}},
+        stage_bindings={"0": {"agent_workload_id": str(agent_workload.guid)}},
     )
     m = WorkflowsMutation()
     with _tenant_ctx(TenantContext(organization_id=other_org.id, actor_user_id=member.id)):
@@ -327,7 +430,7 @@ def test_cross_org_run_denied(member, org, other_org, permission_resolver, patch
     assert patched_start == []
 
 
-def test_workflow_runs_query_org_scoped(member, org, permission_resolver, patched_start):
+def test_workflow_runs_query_org_scoped(member, org, agent_workload, permission_resolver, patched_start):
     permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
     permission_resolver.grant(Permission.WORKFLOW_READ)
     d = _make_def("cw-runs", organization=org)
@@ -336,7 +439,7 @@ def test_workflow_runs_query_org_scoped(member, org, permission_resolver, patche
         definition=d,
         name="Runs WF",
         slug="runs-wf",
-        stage_bindings={"0": {"agent_workload_id": str(uuid.uuid4())}},
+        stage_bindings={"0": {"agent_workload_id": str(agent_workload.guid)}},
     )
     m = WorkflowsMutation()
     q = WorkflowsQuery()
@@ -398,6 +501,29 @@ def test_update_stage_rejects_foreign_org_workload(member, org, other_org, permi
     assert any("Workload not found" in msg for e in res.errors for msg in e.messages)
     stage.refresh_from_db()
     assert stage.agent_definition_id is None
+
+
+def test_update_stage_prompt_and_approvers(member, org, permission_resolver):
+    """#1095: a gate's prompt/approvers are editable after create — the
+    update surface previously dropped them, so a saved human_gate could
+    never change its question or approver set."""
+    permission_resolver.grant(Permission.WORKFLOW_UPDATE)
+    d = _make_def("cw-gate-edit", organization=org)
+    stage = d.stages.first()
+    m = WorkflowsMutation()
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        res = m.update_workflow_stage(
+            _info(member),
+            stage_guid=str(stage.guid),
+            kind="human_gate",
+            prompt="Ship it?",
+            approvers=["team-leads"],
+        )
+    assert res.ok, res.errors
+    stage.refresh_from_db()
+    assert stage.kind == "human_gate"
+    assert stage.prompt == "Ship it?"
+    assert stage.approvers == ["team-leads"]
 
 
 def test_reorder_stages_on_org_definition(member, org, permission_resolver):

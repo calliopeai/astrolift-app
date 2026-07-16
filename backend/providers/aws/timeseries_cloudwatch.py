@@ -13,7 +13,7 @@ http_requests_total / http_request_duration_seconds_bucket data.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 log = logging.getLogger(__name__)
@@ -31,11 +31,7 @@ def alb_arn_for_app_namespace(
     try:
         ingresses = k8s_client.list_namespaced_ingress(namespace)
         for ingress in ingresses.items:
-            lb_list = (
-                ingress.status
-                and ingress.status.load_balancer
-                and ingress.status.load_balancer.ingress
-            ) or []
+            lb_list = (ingress.status and ingress.status.load_balancer and ingress.status.load_balancer.ingress) or []
             hostname = next((lb.hostname for lb in lb_list if lb.hostname), None)
             if not hostname:
                 continue
@@ -64,7 +60,7 @@ def _extract_points(
             continue
         pairs = sorted(
             (ts.timestamp(), val / divisor)
-            for ts, val in zip(result.get("Timestamps", []), result.get("Values", []))
+            for ts, val in zip(result.get("Timestamps", []), result.get("Values", []), strict=False)
         )
         return pairs
     return []
@@ -82,21 +78,23 @@ def request_rate(
     dim = _cw_dimension(alb_arn)
     try:
         resp = cw.get_metric_data(
-            MetricDataQueries=[{
-                "Id": "rps",
-                "MetricStat": {
-                    "Metric": {
-                        "Namespace": _ALB_NAMESPACE,
-                        "MetricName": "RequestCount",
-                        "Dimensions": [{"Name": "LoadBalancer", "Value": dim}],
+            MetricDataQueries=[
+                {
+                    "Id": "rps",
+                    "MetricStat": {
+                        "Metric": {
+                            "Namespace": _ALB_NAMESPACE,
+                            "MetricName": "RequestCount",
+                            "Dimensions": [{"Name": "LoadBalancer", "Value": dim}],
+                        },
+                        "Period": period,
+                        "Stat": "Sum",
                     },
-                    "Period": period,
-                    "Stat": "Sum",
-                },
-                "ReturnData": True,
-            }],
-            StartTime=datetime.fromtimestamp(start_unix, tz=timezone.utc),
-            EndTime=datetime.fromtimestamp(end_unix, tz=timezone.utc),
+                    "ReturnData": True,
+                }
+            ],
+            StartTime=datetime.fromtimestamp(start_unix, tz=UTC),
+            EndTime=datetime.fromtimestamp(end_unix, tz=UTC),
         )
         return _extract_points(resp, "rps", divisor=period)
     except Exception as exc:
@@ -144,8 +142,8 @@ def error_rate(
                     "ReturnData": True,
                 },
             ],
-            StartTime=datetime.fromtimestamp(start_unix, tz=timezone.utc),
-            EndTime=datetime.fromtimestamp(end_unix, tz=timezone.utc),
+            StartTime=datetime.fromtimestamp(start_unix, tz=UTC),
+            EndTime=datetime.fromtimestamp(end_unix, tz=UTC),
         )
         err_map = {t: v for t, v in _extract_points(resp, "err5")}
         total_map = {t: v for t, v in _extract_points(resp, "total")}
@@ -190,8 +188,8 @@ def latency(
 
         resp = cw.get_metric_data(
             MetricDataQueries=[{"Id": "lat", "MetricStat": metric_stat, "ReturnData": True}],
-            StartTime=datetime.fromtimestamp(start_unix, tz=timezone.utc),
-            EndTime=datetime.fromtimestamp(end_unix, tz=timezone.utc),
+            StartTime=datetime.fromtimestamp(start_unix, tz=UTC),
+            EndTime=datetime.fromtimestamp(end_unix, tz=UTC),
         )
         return _extract_points(resp, "lat")
     except Exception as exc:

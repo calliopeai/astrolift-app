@@ -154,10 +154,7 @@ def tags_for(spec: ProvisionSpec) -> dict[str, str]:
         base["astrolift.io/binding"] = spec.binding_id
     if spec.managed_service_id:
         base["astrolift.io/managed_service_id"] = spec.managed_service_id
-    base.update({
-        f"astrolift.io/extra/{k}": v
-        for k, v in (spec.tags or {}).items()
-    })
+    base.update({f"astrolift.io/extra/{k}": v for k, v in (spec.tags or {}).items()})
     return base
 
 
@@ -202,10 +199,7 @@ class AzureOpenAIDriver(ManagedServiceDriver):
             return ProvisionResult(
                 ok=False,
                 handle="",
-                message=(
-                    "azure openai driver requires a Key Vault "
-                    "(set keyvault_url or inject secret_client)"
-                ),
+                message=("azure openai driver requires a Key Vault (set keyvault_url or inject secret_client)"),
                 errors=["no_secret_backend"],
             )
         deployment_name = self._deployment_name_for(spec=spec)
@@ -216,26 +210,15 @@ class AzureOpenAIDriver(ManagedServiceDriver):
             return ProvisionResult(
                 ok=True,
                 handle=self._handle_for(deployment_name=deployment_name),
-                message=(
-                    f"aoai deployment {deployment_name} already exists "
-                    f"(state={_state_of(existing)})"
-                ),
+                message=(f"aoai deployment {deployment_name} already exists (state={_state_of(existing)})"),
             )
 
-        sku_name = (
-            cfg.get("sku") or _SIZE_TO_SKU.get(spec.size, "Standard")
-        )
+        sku_name = cfg.get("sku") or _SIZE_TO_SKU.get(spec.size, "Standard")
         capacity = int(
             cfg.get("capacity") or _SIZE_TO_CAPACITY.get(spec.size, 10),
         )
-        model_name = (
-            cfg.get("model_name")
-            or _SIZE_TO_MODEL_NAME.get(spec.size, "gpt-35-turbo")
-        )
-        model_version = (
-            cfg.get("model_version")
-            or _DEFAULT_MODEL_VERSION.get(model_name, "")
-        )
+        model_name = cfg.get("model_name") or _SIZE_TO_MODEL_NAME.get(spec.size, "gpt-35-turbo")
+        model_version = cfg.get("model_version") or _DEFAULT_MODEL_VERSION.get(model_name, "")
         rai_policy = cfg.get("rai_policy_name") or "Microsoft.Default"
 
         parameters: dict[str, Any] = {
@@ -323,15 +306,11 @@ class AzureOpenAIDriver(ManagedServiceDriver):
         if cfg.get("rai_policy_name"):
             properties["rai_policy_name"] = cfg["rai_policy_name"]
         if cfg.get("version_upgrade_option"):
-            properties["version_upgrade_option"] = (
-                cfg["version_upgrade_option"]
-            )
+            properties["version_upgrade_option"] = cfg["version_upgrade_option"]
         if cfg.get("model_version"):
             existing = self._describe(deployment_name)
             current_model_name = (
-                _model_field_of(existing, "name")
-                if existing is not None
-                else cfg.get("model_name", "gpt-35-turbo")
+                _model_field_of(existing, "name") if existing is not None else cfg.get("model_name", "gpt-35-turbo")
             )
             properties["model"] = {
                 "format": "OpenAI",
@@ -468,7 +447,8 @@ class AzureOpenAIDriver(ManagedServiceDriver):
         return ServiceStatus(
             handle=handle.handle,
             state=_AZURE_STATE_TO_PROTOCOL.get(
-                azure_state.lower(), "updating",
+                azure_state.lower(),
+                "updating",
             ),
             message=f"azure reports {azure_state}",
         )
@@ -479,12 +459,9 @@ class AzureOpenAIDriver(ManagedServiceDriver):
         existing = self._describe(deployment_name)
         if existing is None:
             raise AzureOpenAIError(
-                f"binding requested for missing deployment "
-                f"{deployment_name}",
+                f"binding requested for missing deployment {deployment_name}",
             )
-        endpoint_url = (
-            f"https://{self._config.account_name}.openai.azure.com"
-        )
+        endpoint_url = f"https://{self._config.account_name}.openai.azure.com"
         api_key_secret = self._api_key_secret_for(
             deployment_name=deployment_name,
         )
@@ -517,15 +494,10 @@ class AzureOpenAIDriver(ManagedServiceDriver):
             env_vars=env_vars,
             iam_grants=[
                 Grant(
-                    resource=(
-                        f"{account_resource_id}/deployments/"
-                        f"{deployment_name}"
-                    ),
+                    resource=(f"{account_resource_id}/deployments/{deployment_name}"),
                     actions=[
-                        "Microsoft.CognitiveServices/accounts/"
-                        "deployments/read",
-                        "Microsoft.CognitiveServices/accounts/"
-                        "OpenAI/deployments/action",
+                        "Microsoft.CognitiveServices/accounts/deployments/read",
+                        "Microsoft.CognitiveServices/accounts/OpenAI/deployments/action",
                     ],
                 ),
                 Grant(
@@ -612,28 +584,15 @@ class AzureOpenAIDriver(ManagedServiceDriver):
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={
-                "MODEL_ENDPOINT_URL": (
-                    "Azure OpenAI account HTTPS endpoint"
-                ),
-                "MODEL_ENDPOINT_MODEL_ID": (
-                    "Deployment name within the account"
-                ),
-                "MODEL_ENDPOINT_PROVIDER": (
-                    "Provider literal: 'azure_openai'"
-                ),
+                "MODEL_ENDPOINT_URL": ("Azure OpenAI account HTTPS endpoint"),
+                "MODEL_ENDPOINT_MODEL_ID": ("Deployment name within the account"),
+                "MODEL_ENDPOINT_PROVIDER": ("Provider literal: 'azure_openai'"),
                 "AZURE_OPENAI_ENDPOINT": "Alias for MODEL_ENDPOINT_URL",
-                "AZURE_OPENAI_DEPLOYMENT_NAME": (
-                    "Alias for MODEL_ENDPOINT_MODEL_ID"
-                ),
-                "AZURE_OPENAI_API_VERSION": (
-                    "Pinned API version for the AOAI REST surface"
-                ),
-                "AZURE_OPENAI_API_KEY": (
-                    "Key Vault ref to the shared account API key"
-                ),
+                "AZURE_OPENAI_DEPLOYMENT_NAME": ("Alias for MODEL_ENDPOINT_MODEL_ID"),
+                "AZURE_OPENAI_API_VERSION": ("Pinned API version for the AOAI REST surface"),
+                "AZURE_OPENAI_API_KEY": ("Key Vault ref to the shared account API key"),
                 "AZURE_OPENAI_MODEL_NAME": (
-                    "Underlying model name (e.g. gpt-4) -- "
-                    "informational; routing is by deployment_name"
+                    "Underlying model name (e.g. gpt-4) -- informational; routing is by deployment_name"
                 ),
             },
         )
@@ -664,13 +623,15 @@ class AzureOpenAIDriver(ManagedServiceDriver):
         if client is None:
             return False
         try:
-            locks = list(client.list_at_resource_level(
-                resource_group_name=self._config.resource_group,
-                resource_provider_namespace="Microsoft.CognitiveServices",
-                parent_resource_path="",
-                resource_type="accounts",
-                resource_name=self._config.account_name,
-            ))
+            locks = list(
+                client.list_at_resource_level(
+                    resource_group_name=self._config.resource_group,
+                    resource_provider_namespace="Microsoft.CognitiveServices",
+                    parent_resource_path="",
+                    resource_type="accounts",
+                    resource_name=self._config.account_name,
+                )
+            )
         except Exception:
             return False
         return bool(locks)
@@ -684,11 +645,13 @@ class AzureOpenAIDriver(ManagedServiceDriver):
         if client is None:
             return []
         try:
-            return list(client.list_referencing_deployment(
-                resource_group_name=self._config.resource_group,
-                account_name=self._config.account_name,
-                deployment_name=deployment_name,
-            ))
+            return list(
+                client.list_referencing_deployment(
+                    resource_group_name=self._config.resource_group,
+                    account_name=self._config.account_name,
+                    deployment_name=deployment_name,
+                )
+            )
         except Exception:
             return []
 
@@ -701,9 +664,7 @@ class AzureOpenAIDriver(ManagedServiceDriver):
             spec.service_handle_hint or "model",
         ]
         raw = "-".join(p for p in parts if p).lower()
-        clean = "".join(
-            c if (c.isalnum() or c in "-_") else "-" for c in raw
-        )
+        clean = "".join(c if (c.isalnum() or c in "-_") else "-" for c in raw)
         while "--" in clean:
             clean = clean.replace("--", "-")
         clean = clean.strip("-_")
@@ -727,20 +688,15 @@ class AzureOpenAIDriver(ManagedServiceDriver):
         return deployment_name
 
     def _api_key_secret_for(self, *, deployment_name: str) -> str:
-        return (
-            f"{self._config.secret_name_prefix}-"
-            f"{self._config.account_name}-{deployment_name}-key"
-        )
+        return f"{self._config.secret_name_prefix}-{self._config.account_name}-{deployment_name}-key"
 
     def _store_api_key(
-        self, *, deployment_name: str, keys: Any,
+        self,
+        *,
+        deployment_name: str,
+        keys: Any,
     ) -> None:
-        primary = (
-            _key_field(keys, "key1")
-            or _key_field(keys, "primary_key")
-            or _key_field(keys, "primaryKey")
-            or ""
-        )
+        primary = _key_field(keys, "key1") or _key_field(keys, "primary_key") or _key_field(keys, "primaryKey") or ""
         self._secrets.set_secret(
             self._api_key_secret_for(deployment_name=deployment_name),
             primary,
@@ -797,11 +753,7 @@ def _model_field_of(deployment: Any, field_name: str) -> str:
     nested ``properties.model.<field>`` dict, or attr objects."""
     if deployment is None:
         return ""
-    props = (
-        deployment.get("properties")
-        if isinstance(deployment, dict)
-        else getattr(deployment, "properties", None)
-    )
+    props = deployment.get("properties") if isinstance(deployment, dict) else getattr(deployment, "properties", None)
     model = None
     if isinstance(props, dict):
         model = props.get("model")

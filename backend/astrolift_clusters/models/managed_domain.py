@@ -35,8 +35,7 @@ class ManagedDomain(BaseCoreModel):
         blank=True,
         default="",
         help_text=(
-            "Current ZoneRegistrationStep. Empty = not started; "
-            "'mark_active' = fully provisioned."
+            "Current ZoneRegistrationStep. Empty = not started; " "'mark_active' = fully provisioned."
         ),
     )
     provision_nameservers = models.JSONField(

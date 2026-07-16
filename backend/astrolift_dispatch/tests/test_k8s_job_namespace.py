@@ -8,8 +8,6 @@ cluster driver's idempotent ``ensure_namespace`` first; this pins that order.
 
 from __future__ import annotations
 
-import pytest
-
 from astrolift_dispatch.spawners.k8s_job import K8sJobSpawner
 
 

@@ -68,9 +68,12 @@ def org_and_cluster():
 def _seed(*extra):
     call_command(
         "seed_flow_test_agent",
-        "--org-slug", "seed-cmd-org",
-        "--cluster-slug", "seed-cluster",
-        "--image", _IMAGE,
+        "--org-slug",
+        "seed-cmd-org",
+        "--cluster-slug",
+        "seed-cluster",
+        "--image",
+        _IMAGE,
         *extra,
     )
 

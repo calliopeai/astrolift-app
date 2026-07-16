@@ -21,6 +21,17 @@ class SecretsBackend(Protocol):
 
     def list(self, prefix: str) -> list[str]: ...
 
+    def list_keys(self, path: str) -> list[str]:
+        """Key names stored at ``path`` — never the values.
+
+        Default implementation fetches the payload once via :meth:`get`
+        and returns its keys sorted; a ``None`` payload normalises to
+        ``[]``. Backends with a cheaper native key-listing API should
+        override. Backs the secret-bundle known-keys refresh (#441 B).
+        """
+        payload = self.get(path)
+        return sorted(payload) if payload else []
+
     def ensure_initialized(self) -> dict | None:
         """Bootstrap the secrets backend if it requires out-of-band setup
         (e.g. creating a KMS key, enabling a Vault secrets engine).
@@ -33,6 +44,4 @@ class SecretsBackend(Protocol):
         Backends that do perform setup (Vault, custom) should return a
         ``dict`` with any relevant output, or ``None``.
         """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not require out-of-band initialisation"
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not require out-of-band initialisation")

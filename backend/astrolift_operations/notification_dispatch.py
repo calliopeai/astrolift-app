@@ -658,9 +658,7 @@ def _template_session_created(envelope: EventEnvelope) -> NotificationTemplate |
     )
 
 
-def _template_app_uptime_event(
-    envelope: EventEnvelope, action_label: str
-) -> NotificationTemplate | None:
+def _template_app_uptime_event(envelope: EventEnvelope, action_label: str) -> NotificationTemplate | None:
     """App up/down alert -> the app's org admins (#uptime).
 
     Delivered to org admins rather than a per-user opt-in list because an
@@ -884,9 +882,7 @@ def _dispatch_template(*, envelope: EventEnvelope, template: NotificationTemplat
             )
 
 
-def _render_notice_email(
-    *, template: NotificationTemplate, envelope: EventEnvelope
-) -> tuple[str, str]:
+def _render_notice_email(*, template: NotificationTemplate, envelope: EventEnvelope) -> tuple[str, str]:
     """Render (html_body, text_body) for a notice email.
 
     The push template's ``title``/``body`` are short by design; the
@@ -904,16 +900,14 @@ def _render_notice_email(
     link_html = ""
     if target_url.startswith(("http://", "https://")):
         text_lines += ["", target_url]
-        link_html = (
-            f'<p style="margin:16px 0 0"><a href="{target_url}">{target_url}</a></p>'
-        )
+        link_html = f'<p style="margin:16px 0 0"><a href="{target_url}">{target_url}</a></p>'
     text_body = "\n".join(line for line in text_lines if line is not None)
 
     html_body = (
         '<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;'
         'font-size:14px;line-height:1.5;color:#111">'
-        f"<h2 style=\"margin:0 0 8px;font-size:16px\">{title}</h2>"
-        f"<p style=\"margin:0\">{body}</p>"
+        f'<h2 style="margin:0 0 8px;font-size:16px">{title}</h2>'
+        f'<p style="margin:0">{body}</p>'
         f"{link_html}"
         "</div>"
     )

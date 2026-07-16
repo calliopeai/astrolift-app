@@ -36,6 +36,24 @@ from _sdk._telemetry import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _propagate_provider_logs():
+    """Force propagation so ``caplog`` sees the records.
+
+    The backend test job runs this file under Django's LOGGING config,
+    which sets ``propagate: False`` on the ``astrolift`` logger tree —
+    pytest's caplog handler sits on the root logger and would otherwise
+    receive nothing. The standalone providers job has no such config;
+    this keeps the assertions identical in both environments."""
+    loggers = [logging.getLogger("astrolift.providers"), logging.getLogger("astrolift")]
+    prev = [lg.propagate for lg in loggers]
+    for lg in loggers:
+        lg.propagate = True
+    yield
+    for lg, val in zip(loggers, prev, strict=True):
+        lg.propagate = val
+
+
 def _counter_value(cloud: str, driver: str, method: str, outcome: str) -> float:
     """Read the current value of the driver-op counter for the labels."""
     return _op_counter.labels(cloud, driver, method, outcome)._value.get()

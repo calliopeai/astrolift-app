@@ -14,7 +14,6 @@ from astrolift_identity.models import Organization, Team
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.schema.types import app_to_type
 
-
 pytestmark = pytest.mark.django_db
 
 

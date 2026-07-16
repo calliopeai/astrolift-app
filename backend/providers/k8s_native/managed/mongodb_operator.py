@@ -213,7 +213,7 @@ class MongoDBOperatorDriver(ManagedServiceDriver):
                 ),
             },
             iam_grants=[],
-            notes=("MongoDB connection via operator-managed replica-set " "Service. Credentials in <cluster>-secrets."),
+            notes=("MongoDB connection via operator-managed replica-set Service. Credentials in <cluster>-secrets."),
         )
 
     @driver_op(cloud="k8s_native", driver="mongodb_operator")

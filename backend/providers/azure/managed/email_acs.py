@@ -150,21 +150,19 @@ def tags_for(spec: ProvisionSpec) -> dict[str, str]:
         base["astrolift.io/binding"] = spec.binding_id
     if spec.managed_service_id:
         base["astrolift.io/managed_service_id"] = spec.managed_service_id
-    base.update({
-        f"astrolift.io/extra/{k}": v
-        for k, v in (spec.tags or {}).items()
-    })
+    base.update({f"astrolift.io/extra/{k}": v for k, v in (spec.tags or {}).items()})
     return base
 
 
 class AzureCommunicationEmailDriver(ManagedServiceDriver):
     def __init__(
-        self, *, config: AzureCommunicationEmailConfig,
+        self,
+        *,
+        config: AzureCommunicationEmailConfig,
     ) -> None:
         if not config.communication_resource_id:
             raise AzureCommunicationEmailError(
-                "azure communication email driver requires "
-                "communication_resource_id",
+                "azure communication email driver requires communication_resource_id",
             )
         self._config = config
         if config.mgmt_client is not None:
@@ -204,28 +202,25 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         if self._secrets is None:
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message=(
-                    "azure communication email driver requires a Key "
-                    "Vault (set keyvault_url or inject secret_client)"
+                    "azure communication email driver requires a Key Vault (set keyvault_url or inject secret_client)"
                 ),
                 errors=["no_secret_backend"],
             )
         cfg = spec.config or {}
         domain_name = self._domain_name_for(spec=spec)
-        domain_management = (
-            cfg.get(
-                "domain_management",
-                self._config.default_domain_management,
-            )
+        domain_management = cfg.get(
+            "domain_management",
+            self._config.default_domain_management,
         )
         if domain_management not in _VALID_DOMAIN_MANAGEMENT:
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message=(
-                    f"domain_management must be one of "
-                    f"{sorted(_VALID_DOMAIN_MANAGEMENT)} "
-                    f"(got {domain_management!r})"
+                    f"domain_management must be one of {sorted(_VALID_DOMAIN_MANAGEMENT)} (got {domain_management!r})"
                 ),
                 errors=["invalid_domain_management"],
             )
@@ -236,10 +231,7 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
             return ProvisionResult(
                 ok=True,
                 handle=self._handle_for(domain_name=domain_name),
-                message=(
-                    f"acs email domain {domain_name} already exists "
-                    f"(state={_state_of(existing)})"
-                ),
+                message=(f"acs email domain {domain_name} already exists (state={_state_of(existing)})"),
             )
 
         parameters: dict[str, Any] = {
@@ -250,9 +242,7 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
             "tags": tags_for(spec),
         }
         if cfg.get("user_engagement_tracking"):
-            parameters["properties"]["user_engagement_tracking"] = (
-                cfg["user_engagement_tracking"]
-            )
+            parameters["properties"]["user_engagement_tracking"] = cfg["user_engagement_tracking"]
 
         try:
             poller = self._mgmt.domains.begin_create_or_update(
@@ -264,7 +254,8 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
             poller.result()
         except Exception as exc:
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message=f"begin_create_or_update: {exc}",
                 errors=[str(exc)],
             )
@@ -273,7 +264,8 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
             self._store_connection_string(domain_name=domain_name)
         except Exception as exc:
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message=f"list_keys / set_secret: {exc}",
                 errors=[str(exc)],
             )
@@ -296,13 +288,12 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
         body: dict[str, Any] = {}
         if cfg.get("user_engagement_tracking"):
             body.setdefault("properties", {})
-            body["properties"]["user_engagement_tracking"] = (
-                cfg["user_engagement_tracking"]
-            )
+            body["properties"]["user_engagement_tracking"] = cfg["user_engagement_tracking"]
 
         if not body:
             return UpdateResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message="no modifiable attributes provided -- no-op",
             )
 
@@ -315,12 +306,14 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
             )
         except Exception as exc:
             return UpdateResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"update: {exc}",
                 errors=[str(exc)],
             )
         return UpdateResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message=f"acs email domain {domain_name} update queued",
         )
 
@@ -344,7 +337,8 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
             if delete_data:
                 self._delete_connection_secret(domain_name)
             return DeprovisionResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message=f"acs email domain {domain_name} already gone",
             )
 
@@ -354,11 +348,10 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
             # marker so a follow-up delete can succeed' -- nothing to
             # do at the resource layer since we're not deleting.
             return DeprovisionResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message=(
-                    f"acs email domain {domain_name} retained "
-                    f"(dns_records=preserved, force_destroy="
-                    f"{force_destroy})"
+                    f"acs email domain {domain_name} retained (dns_records=preserved, force_destroy={force_destroy})"
                 ),
             )
 
@@ -374,33 +367,27 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
             poller.result()
         except Exception as exc:
             err_str = str(exc)
-            if not force_destroy and (
-                "ScopeLocked" in err_str
-                or "CanNotDelete" in err_str
-                or "ReadOnly" in err_str
-            ):
+            if not force_destroy and ("ScopeLocked" in err_str or "CanNotDelete" in err_str or "ReadOnly" in err_str):
                 return DeprovisionResult(
-                    ok=False, handle=spec.handle,
+                    ok=False,
+                    handle=spec.handle,
                     message=(
-                        f"acs email domain {domain_name} has a "
-                        f"resource lock -- pass force_destroy=True "
-                        f"to bypass"
+                        f"acs email domain {domain_name} has a resource lock -- pass force_destroy=True to bypass"
                     ),
                     errors=[err_str],
                 )
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"begin_delete: {err_str}",
                 errors=[err_str],
             )
 
         self._delete_connection_secret(domain_name)
         return DeprovisionResult(
-            ok=True, handle=spec.handle,
-            message=(
-                f"acs email domain {domain_name} deleted "
-                f"(dns_records=discarded, force_destroy={force_destroy})"
-            ),
+            ok=True,
+            handle=spec.handle,
+            message=(f"acs email domain {domain_name} deleted (dns_records=discarded, force_destroy={force_destroy})"),
         )
 
     # ---- read-only ops ------------------------------------------------
@@ -411,14 +398,16 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
         existing = self._describe(domain_name)
         if existing is None:
             return ServiceStatus(
-                handle=handle.handle, state="deprovisioned",
+                handle=handle.handle,
+                state="deprovisioned",
                 message=f"acs email domain {domain_name} not found",
             )
         azure_state = _state_of(existing)
         return ServiceStatus(
             handle=handle.handle,
             state=_AZURE_STATE_TO_PROTOCOL.get(
-                azure_state.lower(), "updating",
+                azure_state.lower(),
+                "updating",
             ),
             message=f"azure reports {azure_state}",
         )
@@ -432,11 +421,10 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
                 f"binding requested for missing domain {domain_name}",
             )
         from_address = _from_address_for(
-            domain_name=domain_name, domain=existing,
+            domain_name=domain_name,
+            domain=existing,
         )
-        mailer_endpoint = (
-            f"https://{_acs_hostname_from_resource_id(self._config.communication_resource_id)}"
-        )
+        mailer_endpoint = f"https://{_acs_hostname_from_resource_id(self._config.communication_resource_id)}"
         connection_secret = self._connection_secret_name(domain_name)
 
         env_vars = {
@@ -458,23 +446,14 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
                 Grant(
                     resource=self._config.communication_resource_id,
                     actions=[
-                        (
-                            "Microsoft.Communication/CommunicationServices"
-                            "/read"
-                        ),
-                        (
-                            "Microsoft.Communication/CommunicationServices"
-                            "/listKeys/action"
-                        ),
+                        ("Microsoft.Communication/CommunicationServices/read"),
+                        ("Microsoft.Communication/CommunicationServices/listKeys/action"),
                     ],
                 ),
                 Grant(
                     resource=self._domain_resource_id(domain_name),
                     actions=[
-                        (
-                            "Microsoft.Communication/emailServices/"
-                            "domains/read"
-                        ),
+                        ("Microsoft.Communication/emailServices/domains/read"),
                     ],
                 ),
                 Grant(
@@ -550,8 +529,7 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
                 "domain_name": {
                     "type": "string",
                     "description": (
-                        "Explicit domain name override. When omitted "
-                        "the driver derives one from the app slug."
+                        "Explicit domain name override. When omitted the driver derives one from the app slug."
                     ),
                 },
             },
@@ -562,24 +540,12 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
         return BindingSchema(
             env_vars={
                 "EMAIL_PROVIDER": "Always 'azure_acs' for this driver",
-                "EMAIL_API_KEY": (
-                    "Key Vault ref to the ACS connection string"
-                ),
-                "EMAIL_FROM_ADDRESS": (
-                    "Default From: address derived from the domain"
-                ),
-                "EMAIL_REGION": (
-                    "Azure location of the email domain resource"
-                ),
-                "ACS_CONNECTION_STRING": (
-                    "Alias for EMAIL_API_KEY (Key Vault ref to the "
-                    "primary connection string)"
-                ),
+                "EMAIL_API_KEY": ("Key Vault ref to the ACS connection string"),
+                "EMAIL_FROM_ADDRESS": ("Default From: address derived from the domain"),
+                "EMAIL_REGION": ("Azure location of the email domain resource"),
+                "ACS_CONNECTION_STRING": ("Alias for EMAIL_API_KEY (Key Vault ref to the primary connection string)"),
                 "ACS_FROM_ADDRESS": "Alias for EMAIL_FROM_ADDRESS",
-                "ACS_MAILER_ENDPOINT": (
-                    "HTTPS endpoint of the parent CommunicationServices"
-                    " resource"
-                ),
+                "ACS_MAILER_ENDPOINT": ("HTTPS endpoint of the parent CommunicationServices resource"),
             },
         )
 
@@ -641,10 +607,7 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
         )
 
     def _connection_secret_name(self, domain_name: str) -> str:
-        return (
-            f"{self._config.secret_name_prefix}-{_safe(domain_name)}"
-            f"-connection-string"
-        )
+        return f"{self._config.secret_name_prefix}-{_safe(domain_name)}-connection-string"
 
     def _store_connection_string(self, *, domain_name: str) -> None:
         # The connection string lives on the parent CommunicationServices
@@ -658,9 +621,7 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
             communication_service_name=parent_name,
         )
         connection_string = (
-            _key_field(keys, "primary_connection_string")
-            or _key_field(keys, "primaryConnectionString")
-            or ""
+            _key_field(keys, "primary_connection_string") or _key_field(keys, "primaryConnectionString") or ""
         )
         self._secrets.set_secret(
             self._connection_secret_name(domain_name),
@@ -687,31 +648,19 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
             scope = self._domain_resource_id(domain_name)
             locks = self._locks.management_locks.list_at_resource_level(
                 resource_group_name=self._config.resource_group,
-                resource_provider_namespace=(
-                    "Microsoft.Communication"
-                ),
-                parent_resource_path=(
-                    f"emailServices/"
-                    f"{self._config.email_service_name}"
-                ),
+                resource_provider_namespace=("Microsoft.Communication"),
+                parent_resource_path=(f"emailServices/{self._config.email_service_name}"),
                 resource_type="domains",
                 resource_name=domain_name,
             )
             for lock in locks:
-                lock_name = getattr(lock, "name", None) or (
-                    lock.get("name") if isinstance(lock, dict) else None
-                )
+                lock_name = getattr(lock, "name", None) or (lock.get("name") if isinstance(lock, dict) else None)
                 if not lock_name:
                     continue
                 self._locks.management_locks.delete_at_resource_level(
                     resource_group_name=self._config.resource_group,
-                    resource_provider_namespace=(
-                        "Microsoft.Communication"
-                    ),
-                    parent_resource_path=(
-                        f"emailServices/"
-                        f"{self._config.email_service_name}"
-                    ),
+                    resource_provider_namespace=("Microsoft.Communication"),
+                    parent_resource_path=(f"emailServices/{self._config.email_service_name}"),
                     resource_type="domains",
                     resource_name=domain_name,
                     lock_name=lock_name,
@@ -729,10 +678,7 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
 def _safe(value: str) -> str:
     """Coerce a slug to lowercase + replace anything outside
     ``[a-z0-9._-]`` with ``-``."""
-    cleaned = "".join(
-        c if (c.isalnum() or c in "-._") else "-"
-        for c in value.lower()
-    )
+    cleaned = "".join(c if (c.isalnum() or c in "-._") else "-" for c in value.lower())
     while "--" in cleaned:
         cleaned = cleaned.replace("--", "-")
     return cleaned.strip("-")
@@ -773,14 +719,8 @@ def _from_address_for(*, domain_name: str, domain: Any) -> str:
     fqdn = (
         getattr(domain, "from_sender_domain", None)
         or getattr(domain, "fromSenderDomain", None)
-        or (
-            domain.get("from_sender_domain")
-            if isinstance(domain, dict) else None
-        )
-        or (
-            domain.get("fromSenderDomain")
-            if isinstance(domain, dict) else None
-        )
+        or (domain.get("from_sender_domain") if isinstance(domain, dict) else None)
+        or (domain.get("fromSenderDomain") if isinstance(domain, dict) else None)
         or domain_name
     )
     return f"noreply@{fqdn}"

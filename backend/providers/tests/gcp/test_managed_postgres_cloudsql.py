@@ -34,7 +34,7 @@ class FakeSqlInstance:
     name: str
     state: str = "RUNNABLE"
     settings: dict[str, Any] = field(default_factory=dict)
-    ipAddresses: list[dict[str, Any]] = field(default_factory=list)
+    ipAddresses: list[dict[str, Any]] = field(default_factory=list)  # noqa: N815 — mirrors the CloudSQL API shape
 
 
 class FakeSqlClient:
@@ -48,9 +48,7 @@ class FakeSqlClient:
     def insert(self, *, project, body):
         self._record("insert", project=project, body=body)
         name = body["name"]
-        ip_kind = "PRIVATE" if body.get("settings", {}).get(
-            "ipConfiguration", {}
-        ).get("privateNetwork") else "PRIMARY"
+        ip_kind = "PRIVATE" if body.get("settings", {}).get("ipConfiguration", {}).get("privateNetwork") else "PRIMARY"
         self.instances[name] = FakeSqlInstance(
             name=name,
             state="RUNNABLE",
@@ -81,16 +79,22 @@ class FakeSqlClient:
     def insert_backup_run(self, *, project, instance, body):
         self._record(
             "insert_backup_run",
-            project=project, instance=instance, body=body,
+            project=project,
+            instance=instance,
+            body=body,
         )
 
     def clone(self, *, project, instance, body):
         self._record(
-            "clone", project=project, instance=instance, body=body,
+            "clone",
+            project=project,
+            instance=instance,
+            body=body,
         )
         target = body["cloneContext"]["destinationInstanceName"]
         self.instances[target] = FakeSqlInstance(
-            name=target, state="PENDING_CREATE",
+            name=target,
+            state="PENDING_CREATE",
         )
 
 
@@ -168,9 +172,7 @@ def test_provision_idempotent(driver):
 def test_provision_stores_master_password_in_secret_manager(driver):
     result = driver.provision(_spec())
     instance_id = _parse_handle(result.handle)
-    secret_id = (
-        f"astrolift/cloudsql/{instance_id}/master".replace("/", "_")
-    )
+    secret_id = f"astrolift/cloudsql/{instance_id}/master".replace("/", "_")
     versions = driver._sm.secrets[secret_id]  # type: ignore[attr-defined]
     assert len(versions) == 1
     assert len(versions[0]) >= 16
@@ -287,10 +289,7 @@ def test_deprovision_force_destroy_clears_protection_first(driver):
     # before delete.
     patch_calls = [k for op, k in sql.calls if op == "patch"]
     delete_calls = [k for op, k in sql.calls if op == "delete"]
-    assert any(
-        k["body"]["settings"].get("deletionProtectionEnabled") is False
-        for k in patch_calls
-    )
+    assert any(k["body"]["settings"].get("deletionProtectionEnabled") is False for k in patch_calls)
     assert delete_calls
     # Order: protection-cleared patch precedes delete.
     op_seq = [op for op, _ in sql.calls]
@@ -322,9 +321,7 @@ def test_deprovision_delete_data_drops_master_secret(driver):
         _spec(config={"deletion_protection": False}),
     )
     instance_id = _parse_handle(provisioned.handle)
-    secret_id = (
-        f"astrolift/cloudsql/{instance_id}/master".replace("/", "_")
-    )
+    secret_id = f"astrolift/cloudsql/{instance_id}/master".replace("/", "_")
     assert secret_id in driver._sm.secrets  # type: ignore[attr-defined]
     driver.deprovision(
         DeprovisionSpec(handle=provisioned.handle),
@@ -352,8 +349,12 @@ def test_binding_returns_connection_envelope(driver):
     binding = driver.binding(ServiceHandle(handle=provisioned.handle))
     env = binding.env_vars
     for key in (
-        "DATABASE_HOST", "DATABASE_PORT", "DATABASE_NAME",
-        "DATABASE_USER", "DATABASE_PASSWORD", "DATABASE_URL",
+        "DATABASE_HOST",
+        "DATABASE_PORT",
+        "DATABASE_NAME",
+        "DATABASE_USER",
+        "DATABASE_PASSWORD",
+        "DATABASE_URL",
     ):
         assert key in env
     assert env["DATABASE_PASSWORD"].secret_ref is not None
@@ -392,7 +393,7 @@ def test_restore_clones_instance(driver):
 def test_password_safe_alphabet():
     pw = _generate_master_password(length=64)
     assert len(pw) == 64
-    forbidden = set("/@\"\\ ")
+    forbidden = set('/@"\\ ')
     assert not (set(pw) & forbidden)
 
 
@@ -418,9 +419,14 @@ def test_instance_id_sanitized():
 def test_config_schema_shape(driver):
     schema = driver.config_schema()
     for key in (
-        "engine_version", "tier", "storage_gb", "high_availability",
-        "deletion_protection", "backup_retention_days",
-        "kms_key_name", "zone",
+        "engine_version",
+        "tier",
+        "storage_gb",
+        "high_availability",
+        "deletion_protection",
+        "backup_retention_days",
+        "kms_key_name",
+        "zone",
     ):
         assert key in schema["properties"]
 
@@ -428,7 +434,11 @@ def test_config_schema_shape(driver):
 def test_binding_schema_lists_all_env_vars(driver):
     schema = driver.binding_schema()
     for key in (
-        "DATABASE_HOST", "DATABASE_PORT", "DATABASE_NAME",
-        "DATABASE_USER", "DATABASE_PASSWORD", "DATABASE_URL",
+        "DATABASE_HOST",
+        "DATABASE_PORT",
+        "DATABASE_NAME",
+        "DATABASE_USER",
+        "DATABASE_PASSWORD",
+        "DATABASE_URL",
     ):
         assert key in schema.env_vars

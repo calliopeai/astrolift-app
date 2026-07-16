@@ -209,10 +209,7 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
             return ProvisionResult(
                 ok=True,
                 handle=self._handle_for(workspace_name=workspace_name),
-                message=(
-                    f"azure monitor workspace {workspace_name} "
-                    f"already exists (state={_state_of(existing)})"
-                ),
+                message=(f"azure monitor workspace {workspace_name} already exists (state={_state_of(existing)})"),
             )
 
         public_network_access = cfg.get(

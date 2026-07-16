@@ -10,7 +10,6 @@ from astrolift_pipelines.state_machine import (
     validate_pipeline_run_transition,
 )
 
-
 # ---------------------------------------------------------------------------
 # PipelineRun transitions
 # ---------------------------------------------------------------------------

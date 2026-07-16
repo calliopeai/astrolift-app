@@ -38,7 +38,7 @@ from azure.managed.mysql_flexible import (
 # ---- fakes ------------------------------------------------------
 
 
-class _NotFound(Exception):  # noqa: N818  -- mimics SDK class name
+class _NotFound(Exception):
     """Stand-in for azure.core.exceptions.ResourceNotFoundError; the
     driver sniffs error type via ``__class__.__name__`` so we just
     have to make the name match."""

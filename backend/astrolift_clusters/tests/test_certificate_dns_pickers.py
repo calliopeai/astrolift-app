@@ -340,6 +340,7 @@ def test_cluster_certificates_dispatch_maps_driver_objects(cluster, monkeypatch)
     resolver layer consumes. ``supported=True`` when the driver
     implements the method."""
     from _sdk.cluster import CertificateInfo
+
     from core import cluster_management
 
     fake_driver = SimpleNamespace(

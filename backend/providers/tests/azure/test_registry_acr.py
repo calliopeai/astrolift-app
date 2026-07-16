@@ -43,7 +43,11 @@ class FakeACRClient:
         return self.registries_obj
 
     def list_tags(
-        self, *, resource_group_name: str, registry_name: str, repository: str,
+        self,
+        *,
+        resource_group_name: str,
+        registry_name: str,
+        repository: str,
     ) -> list[Any]:
         if repository not in self.tags_data:
             raise _NotFound(repository)
@@ -102,10 +106,7 @@ def test_pull_secret_marker_for_aks(driver: ACRDriver) -> None:
     secret = driver.get_pull_secret(cluster="prod", namespace="acme-api")
     assert secret["kind"] == "Secret"
     assert secret["metadata"]["namespace"] == "acme-api"
-    assert (
-        secret["metadata"]["annotations"]["astrolift.io/note"]
-        .startswith("AKS clusters use --attach-acr")
-    )
+    assert secret["metadata"]["annotations"]["astrolift.io/note"].startswith("AKS clusters use --attach-acr")
     docker = json.loads(
         base64.b64decode(secret["data"][".dockerconfigjson"]).decode(),
     )
@@ -123,7 +124,8 @@ def test_push_rejects_blank_local_image(driver: ACRDriver) -> None:
 
 
 def test_list_tags_translates_response(
-    driver: ACRDriver, fake_client: FakeACRClient,
+    driver: ACRDriver,
+    fake_client: FakeACRClient,
 ) -> None:
     @dataclass
     class _T:

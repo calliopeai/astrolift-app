@@ -162,9 +162,7 @@ def _fetch_github(connection, *, app, base_sha: str, head_sha: str) -> ReleaseNo
         author_data = c.get("author") or {}
         author = author_data.get("login") or (commit_data.get("author") or {}).get("name") or ""
         is_merge = subject.lower().startswith("merge pull request")
-        commits.append(
-            ReleaseNotesCommit(sha=sha, subject=subject, author=author, is_merge=is_merge)
-        )
+        commits.append(ReleaseNotesCommit(sha=sha, subject=subject, author=author, is_merge=is_merge))
 
     for c in payload.get("commits") or []:
         for pr_raw in c.get("pull_requests") or []:

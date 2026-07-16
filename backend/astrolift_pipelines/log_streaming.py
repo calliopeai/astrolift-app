@@ -22,7 +22,8 @@ This module provides:
 from __future__ import annotations
 
 import logging
-from typing import Generator, TYPE_CHECKING
+from collections.abc import Generator
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from astrolift_pipelines.models import JobRun, StepRun
@@ -33,7 +34,7 @@ _MAX_LOG_LINES = 10_000
 
 
 def stream_job_logs(
-    job_run: "JobRun",
+    job_run: JobRun,
     k8s_job_name: str,
     namespace: str,
     cluster,
@@ -50,6 +51,7 @@ def stream_job_logs(
     """
     try:
         from core.cluster_observability import get_dynamic_client
+
         client = get_dynamic_client(cluster)
     except Exception as exc:
         logger.warning("pipelines.log_streaming: could not connect to cluster: %s", exc)
@@ -88,7 +90,7 @@ def stream_job_logs(
         yield f"[log streaming error: {exc}]"
 
 
-def store_log_chunk(step_run: "StepRun", lines: list[str]) -> None:
+def store_log_chunk(step_run: StepRun, lines: list[str]) -> None:
     """Append log lines to a StepRun's log_excerpt, keeping the last N lines.
 
     Uses a ring-buffer approach: keep only the last _MAX_LOG_LINES lines.
@@ -103,7 +105,7 @@ def store_log_chunk(step_run: "StepRun", lines: list[str]) -> None:
     step_run.save(update_fields=["log_excerpt", "updated_at", "version"])
 
 
-def finalize_job_logs(job_run: "JobRun") -> None:
+def finalize_job_logs(job_run: JobRun) -> None:
     """Mark log streaming complete for a job run.
 
     Forward logs to the org's observability backend if configured.
@@ -111,7 +113,7 @@ def finalize_job_logs(job_run: "JobRun") -> None:
     _forward_to_observability_backend(job_run)
 
 
-def _forward_to_observability_backend(job_run: "JobRun") -> None:
+def _forward_to_observability_backend(job_run: JobRun) -> None:
     """Forward step run logs to the org's configured log backend.
 
     No-ops gracefully if no log backend is configured (common in dev).
@@ -140,7 +142,7 @@ def _forward_to_observability_backend(job_run: "JobRun") -> None:
         pass  # Observability is best-effort
 
 
-def build_log_excerpt_for_run(job_run: "JobRun") -> str:
+def build_log_excerpt_for_run(job_run: JobRun) -> str:
     """Return a combined log excerpt for all steps in a job run.
 
     Useful for the job detail view which shows a combined log without

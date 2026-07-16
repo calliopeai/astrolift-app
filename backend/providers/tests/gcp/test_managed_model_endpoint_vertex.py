@@ -112,9 +112,7 @@ class FakeEndpointClient:
         ep = self.endpoints.get(ep_display)
         if ep is None:
             raise RuntimeError("404 NotFound")
-        ep.deployed_models = [
-            d for d in ep.deployed_models if d.id != di_id
-        ]
+        ep.deployed_models = [d for d in ep.deployed_models if d.id != di_id]
         ep.traffic_split.pop(di_id, None)
 
     def mutate_deployed_model(self, *, request: dict[str, Any]) -> None:
@@ -223,9 +221,7 @@ def test_provision_idempotent(
     assert a.ok and b.ok
     assert "already exists" in b.message
     # No double-create on the endpoint
-    create_calls = [
-        c for op, c in endpoint_client.calls if op == "create_endpoint"
-    ]
+    create_calls = [c for op, c in endpoint_client.calls if op == "create_endpoint"]
     assert len(create_calls) == 1
 
 
@@ -234,13 +230,8 @@ def test_provision_defaults_to_text_bison(
     endpoint_client: FakeEndpointClient,
 ) -> None:
     driver.provision(_spec())
-    deploy = next(
-        c for op, c in endpoint_client.calls if op == "deploy_model"
-    )
-    assert (
-        deploy["request"]["deployed_model"]["model"]
-        == "publishers/google/models/text-bison"
-    )
+    deploy = next(c for op, c in endpoint_client.calls if op == "deploy_model")
+    assert deploy["request"]["deployed_model"]["model"] == "publishers/google/models/text-bison"
 
 
 def test_provision_larger_size_picks_gemini_pro(
@@ -248,13 +239,8 @@ def test_provision_larger_size_picks_gemini_pro(
     endpoint_client: FakeEndpointClient,
 ) -> None:
     driver.provision(_spec(size="large"))
-    deploy = next(
-        c for op, c in endpoint_client.calls if op == "deploy_model"
-    )
-    assert (
-        deploy["request"]["deployed_model"]["model"]
-        == "publishers/google/models/gemini-pro"
-    )
+    deploy = next(c for op, c in endpoint_client.calls if op == "deploy_model")
+    assert deploy["request"]["deployed_model"]["model"] == "publishers/google/models/gemini-pro"
 
 
 def test_provision_honours_model_artifact_override(
@@ -264,15 +250,11 @@ def test_provision_honours_model_artifact_override(
     driver.provision(
         _spec(
             config={
-                "model_artifact": (
-                    "projects/acme-prod/locations/us-west1/models/custom"
-                ),
+                "model_artifact": ("projects/acme-prod/locations/us-west1/models/custom"),
             },
         ),
     )
-    deploy = next(
-        c for op, c in endpoint_client.calls if op == "deploy_model"
-    )
+    deploy = next(c for op, c in endpoint_client.calls if op == "deploy_model")
     assert deploy["request"]["deployed_model"]["model"].endswith(
         "/models/custom",
     )
@@ -283,9 +265,7 @@ def test_provision_size_to_machine_type(
     endpoint_client: FakeEndpointClient,
 ) -> None:
     driver.provision(_spec(size="large"))
-    deploy = next(
-        c for op, c in endpoint_client.calls if op == "deploy_model"
-    )
+    deploy = next(c for op, c in endpoint_client.calls if op == "deploy_model")
     dedicated = deploy["request"]["deployed_model"]["dedicated_resources"]
     assert dedicated["machine_spec"]["machine_type"] == "n1-standard-8"
     assert dedicated["min_replica_count"] == 2
@@ -296,9 +276,7 @@ def test_provision_labels_with_astrolift_namespace(
     endpoint_client: FakeEndpointClient,
 ) -> None:
     driver.provision(_spec())
-    create = next(
-        c for op, c in endpoint_client.calls if op == "create_endpoint"
-    )
+    create = next(c for op, c in endpoint_client.calls if op == "create_endpoint")
     labels = create["request"]["endpoint"]["labels"]
     assert labels["astrolift-managed-by"] == "platform"
     assert labels["astrolift-app"] == "api"
@@ -309,15 +287,11 @@ def test_provision_public_endpoint_off_by_default(
     endpoint_client: FakeEndpointClient,
 ) -> None:
     driver.provision(_spec())
-    create = next(
-        c for op, c in endpoint_client.calls if op == "create_endpoint"
-    )
+    create = next(c for op, c in endpoint_client.calls if op == "create_endpoint")
     # public_endpoint_enabled isn't passed when off by default
     assert (
-        "public_endpoint_enabled"
-        not in create["request"]["endpoint"]
-        or create["request"]["endpoint"]["public_endpoint_enabled"]
-        is False
+        "public_endpoint_enabled" not in create["request"]["endpoint"]
+        or create["request"]["endpoint"]["public_endpoint_enabled"] is False
     )
 
 
@@ -331,7 +305,8 @@ def test_provision_surfaces_create_endpoint_error(
     endpoint_client.create_endpoint = boom  # type: ignore[assignment]
     d = VertexAIEndpointDriver(
         config=VertexAIEndpointConfig(
-            project_id="p", region="us-west1",
+            project_id="p",
+            region="us-west1",
         ),
         endpoint_client=endpoint_client,
         model_client=model_client,
@@ -353,10 +328,7 @@ def test_update_resize_mutates_deployed_model(
         UpdateSpec(handle=provisioned.handle, size="large"),
     )
     assert result.ok
-    mutate = next(
-        c for op, c in endpoint_client.calls
-        if op == "mutate_deployed_model"
-    )
+    mutate = next(c for op, c in endpoint_client.calls if op == "mutate_deployed_model")
     dedicated = mutate["request"]["deployed_model"]["dedicated_resources"]
     assert dedicated["machine_spec"]["machine_type"] == "n1-standard-8"
 
@@ -373,9 +345,7 @@ def test_update_traffic_percentage_calls_update_endpoint(
         ),
     )
     assert result.ok
-    update = next(
-        c for op, c in endpoint_client.calls if op == "update_endpoint"
-    )
+    update = next(c for op, c in endpoint_client.calls if op == "update_endpoint")
     ep_body = update["request"]["endpoint"]
     di_id = next(iter(ep_body["traffic_split"]))
     assert ep_body["traffic_split"][di_id] == 50
@@ -469,9 +439,7 @@ def test_deprovision_delete_data_drops_owned_artifact(
     driver: VertexAIEndpointDriver,
     model_client: FakeModelClient,
 ) -> None:
-    custom_artifact = (
-        "projects/acme-prod/locations/us-west1/models/custom-llama"
-    )
+    custom_artifact = "projects/acme-prod/locations/us-west1/models/custom-llama"
     provisioned = driver.provision(
         _spec(config={"model_artifact": custom_artifact}),
     )

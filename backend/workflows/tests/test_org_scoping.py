@@ -226,17 +226,82 @@ def test_workflow_requires_org(org):
         wf.save()
 
 
-def test_workflow_rejects_unbound_agent_dispatch(org):
+def test_workflow_rejects_unbound_agent_dispatch(org, agent_workload):
     d = _make_def("wf-unbound-def", organization=org, stage_agent=None)
     wf = Workflow(organization=org, definition=d, name="My WF", slug="my-wf")
     with pytest.raises(ValidationError) as exc:
         wf.save()
     assert "stage 0" in str(exc.value)
 
-    # Bind the stage via stage_bindings → now valid.
-    wf.stage_bindings = {"0": {"agent_workload_id": str(uuid.uuid4())}}
+    # Bind the stage via stage_bindings to a real agent workload → now valid.
+    wf.stage_bindings = {"0": {"agent_workload_id": str(agent_workload.guid)}}
     wf.save()
     assert wf.pk is not None
+
+
+def test_workflow_rejects_garbage_binding(org):
+    """#1094: an agent_workload_id that resolves to no live kind=agent
+    Workload in the org — a random guid, or plain garbage — is rejected at
+    save time, naming the stage order."""
+    d = _make_def("wf-garbage-def", organization=org, stage_agent=None)
+    wf = Workflow(
+        organization=org,
+        definition=d,
+        name="Garbage WF",
+        slug="garbage-wf",
+        stage_bindings={"0": {"agent_workload_id": str(uuid.uuid4())}},
+    )
+    with pytest.raises(ValidationError) as exc:
+        wf.save()
+    assert "stage 0" in str(exc.value)
+
+    # A non-guid string must not blow up the guid lookup — same rejection.
+    wf.stage_bindings = {"0": {"agent_workload_id": "not-a-guid"}}
+    with pytest.raises(ValidationError) as exc:
+        wf.save()
+    assert "stage 0" in str(exc.value)
+
+
+def test_workflow_rejects_foreign_org_binding(org, other_org, agent_workload):
+    """#1094: org B cannot bind org A's agent workload — the resolution is
+    scoped via registered_app.organization, so a foreign workload is simply
+    unresolved."""
+    d = _make_def("wf-xorg-def", organization=other_org, stage_agent=None)
+    wf = Workflow(
+        organization=other_org,
+        definition=d,
+        name="Foreign bind",
+        slug="foreign-bind",
+        # agent_workload lives in ``org``, not ``other_org``.
+        stage_bindings={"0": {"agent_workload_id": str(agent_workload.guid)}},
+    )
+    with pytest.raises(ValidationError) as exc:
+        wf.save()
+    assert "stage 0" in str(exc.value)
+
+
+def test_workflow_rejects_non_agent_workload_binding(org, agent_workload):
+    """#1094: a live Workload of the wrong kind (deployment) does not satisfy
+    an agent binding."""
+    from astrolift_registry.models import Workload
+
+    web = Workload.objects.create(
+        registered_app=agent_workload.registered_app,
+        name="Web",
+        slug="web-a",
+        kind=Workload.Kind.DEPLOYMENT.value,
+    )
+    d = _make_def("wf-nonagent-def", organization=org, stage_agent=None)
+    wf = Workflow(
+        organization=org,
+        definition=d,
+        name="Non-agent bind",
+        slug="non-agent-bind",
+        stage_bindings={"0": {"agent_workload_id": str(web.guid)}},
+    )
+    with pytest.raises(ValidationError) as exc:
+        wf.save()
+    assert "stage 0" in str(exc.value)
 
 
 def test_workflow_bound_via_stage_agent_is_valid(org, agent_workload):
@@ -316,3 +381,80 @@ def test_migration_0004_backfills_existing_rows_org_null():
 
     assert NewDef.objects.get(slug="legacy-mig-row").organization_id is None
     assert NewInst.objects.get(pk=inst.pk).organization_id is None
+
+
+# --------------------------------------------------------------------------
+# workflows.schema.queries read scoping (#968 follow-up)
+# --------------------------------------------------------------------------
+
+
+def _query():
+    from workflows.schema.queries import Query
+
+    return Query()
+
+
+def test_workflow_stages_cross_org_returns_empty(member, org, other_org):
+    """A foreign org's definition slug must be byte-identical to a
+    nonexistent one — stages carry prompt/approvers/role, so an unscoped
+    read leaks gate config cross-tenant."""
+    _make_def("foreign-stages", organization=other_org)
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        stages = _query().workflow_stages(_info(member), workflow_slug="foreign-stages")
+    assert list(stages) == []
+
+
+def test_workflow_stages_own_org_and_global_visible(member, org, other_org):
+    own = _make_def("own-stages", organization=org)
+    glob = _make_def("global-stages", organization=None)
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        own_stages = list(_query().workflow_stages(_info(member), workflow_slug="own-stages"))
+        glob_stages = list(_query().workflow_stages(_info(member), workflow_slug="global-stages"))
+    assert [s.definition_id for s in own_stages] == [own.id]
+    assert [s.definition_id for s in glob_stages] == [glob.id]
+
+
+def test_workflow_stages_org_row_preferred_on_slug_collision(member, org):
+    """On an (org, global) slug collision the org-owned definition wins —
+    same preference as _definition_for_write."""
+    _make_def("collide-stages", organization=None)
+    own = _make_def("collide-stages", organization=org)
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        stages = list(_query().workflow_stages(_info(member), workflow_slug="collide-stages"))
+    assert {s.definition_id for s in stages} == {own.id}
+
+
+def test_workflow_instance_cross_org_returns_none(member, org, other_org):
+    from django.contrib.contenttypes.models import ContentType
+
+    from workflows.models import WorkflowInstance
+
+    d = _make_def("foreign-inst-def", organization=other_org, with_stage=False)
+    inst = WorkflowInstance.objects.create(
+        workflow=d,
+        organization=other_org,
+        current_state="running",
+        content_type=ContentType.objects.first(),
+        object_id=424242,
+    )
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        assert _query().workflow_instance(_info(member), id=inst.pk) is None
+        # Same closure on the list reader.
+        listed = list(_query().workflow_instances(_info(member), object_id=424242))
+    assert inst.pk not in {i.pk for i in listed}
+
+
+def test_workflow_stage_executions_cross_org_returns_empty(member, org, other_org):
+    from astrolift_operations.models import WorkflowRun
+
+    WorkflowRun.objects.create(
+        workflow_kind="workflow_definition_run",
+        workflow_id="wfid-foreign",
+        run_id="rid-foreign",
+        organization=other_org,
+    )
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        rows = _query().workflow_stage_executions(
+            _info(member), workflow_id="wfid-foreign", run_id="rid-foreign"
+        )
+    assert list(rows) == []

@@ -83,9 +83,7 @@ class _RecordingDriver(EmailObservabilityDriver):
         self.account_status = account_status
         self.identity_verification = identity_verification
         self.dns_auth_status = dns_auth_status
-        self.suppression_entries = (
-            list(suppression_entries) if suppression_entries else []
-        )
+        self.suppression_entries = list(suppression_entries) if suppression_entries else []
         self.calls: list[tuple[str, tuple, dict]] = []
 
     def _record(self, name: str, *args, **kwargs) -> None:
@@ -107,9 +105,7 @@ class _RecordingDriver(EmailObservabilityDriver):
             raise RuntimeError("account_status not configured")
         return self.account_status
 
-    def get_identity_verification_details(
-        self, identity: str
-    ) -> IdentityVerification:
+    def get_identity_verification_details(self, identity: str) -> IdentityVerification:
         self._record("get_identity_verification_details", identity)
         if self.identity_verification is None:
             raise RuntimeError("identity_verification not configured")
@@ -121,9 +117,7 @@ class _RecordingDriver(EmailObservabilityDriver):
             raise RuntimeError("dns_auth_status not configured")
         return self.dns_auth_status
 
-    def list_suppression_entries(
-        self, *, page_size: int = 100
-    ) -> list[SuppressionEntry]:
+    def list_suppression_entries(self, *, page_size: int = 100) -> list[SuppressionEntry]:
         self._record("list_suppression_entries", page_size=page_size)
         return list(self.suppression_entries)
 
@@ -152,9 +146,7 @@ class _RecordingDriver(EmailObservabilityDriver):
     def remove_suppression_entry(self, *, address: str) -> bool:
         self._record("remove_suppression_entry", address=address)
         before = len(self.suppression_entries)
-        self.suppression_entries = [
-            e for e in self.suppression_entries if e.address != address
-        ]
+        self.suppression_entries = [e for e in self.suppression_entries if e.address != address]
         return len(self.suppression_entries) < before
 
 
@@ -177,17 +169,13 @@ class _UnsupportedDriver(EmailObservabilityDriver):
     def get_account_send_status(self) -> AccountSendStatus:
         raise UnsupportedOperationError(self._MSG)
 
-    def get_identity_verification_details(
-        self, identity: str
-    ) -> IdentityVerification:
+    def get_identity_verification_details(self, identity: str) -> IdentityVerification:
         raise UnsupportedOperationError(self._MSG)
 
     def verify_dns_authentication(self, identity: str) -> DnsAuthStatus:
         raise UnsupportedOperationError(self._MSG)
 
-    def list_suppression_entries(
-        self, *, page_size: int = 100
-    ) -> list[SuppressionEntry]:
+    def list_suppression_entries(self, *, page_size: int = 100) -> list[SuppressionEntry]:
         raise UnsupportedOperationError(self._MSG)
 
     def add_suppression_entry(
@@ -232,9 +220,7 @@ def _make_user(username: str = "email-obs-test"):
 
 def _scaffold(*, plugin_slug: str = "aws", region: str = "us-east-1"):
     org = Organization.objects.create(name="Acme", slug=f"acme-email-{plugin_slug}")
-    team = Team.objects.create(
-        organization=org, name="Eng", slug=f"eng-email-{plugin_slug}"
-    )
+    team = Team.objects.create(organization=org, name="Eng", slug=f"eng-email-{plugin_slug}")
     project = Project.objects.create(
         organization=org,
         team=team,
@@ -315,7 +301,9 @@ def test_email_detail_full_payload(permission_resolver):
 
     fake = _RecordingDriver(
         quota=SendQuota(
-            max_send_rate=14.0, max_24_hour_send=50000.0, sent_last_24h=210.0,
+            max_send_rate=14.0,
+            max_24_hour_send=50000.0,
+            sent_last_24h=210.0,
         ),
         account_status=AccountSendStatus(
             sending_enabled=True,
@@ -341,13 +329,16 @@ def test_email_detail_full_payload(permission_resolver):
             identity="full.example.com",
             checked_at=datetime.now(UTC),
             dkim=DnsAuthCheck(
-                protocol="DKIM", outcome=DnsCheckOutcome.GREEN,
+                protocol="DKIM",
+                outcome=DnsCheckOutcome.GREEN,
             ),
             spf=DnsAuthCheck(
-                protocol="SPF", outcome=DnsCheckOutcome.GREEN,
+                protocol="SPF",
+                outcome=DnsCheckOutcome.GREEN,
             ),
             dmarc=DnsAuthCheck(
-                protocol="DMARC", outcome=DnsCheckOutcome.GREEN,
+                protocol="DMARC",
+                outcome=DnsCheckOutcome.GREEN,
             ),
         ),
         suppression_entries=[
@@ -390,7 +381,9 @@ def test_email_detail_unsupported_collects_notes(permission_resolver):
     permission_resolver.grant(Permission.MANAGED_SERVICE_UPDATE)
 
     register_driver_override(
-        slug="gcp", region="us-west1", driver=_UnsupportedDriver(),
+        slug="gcp",
+        region="us-west1",
+        driver=_UnsupportedDriver(),
     )
 
     with _ctx(org):
@@ -440,13 +433,16 @@ def test_email_detail_partial_failure_keeps_other_tiles(permission_resolver):
             identity="partial.example.com",
             checked_at=datetime.now(UTC),
             dkim=DnsAuthCheck(
-                protocol="DKIM", outcome=DnsCheckOutcome.RED,
+                protocol="DKIM",
+                outcome=DnsCheckOutcome.RED,
             ),
             spf=DnsAuthCheck(
-                protocol="SPF", outcome=DnsCheckOutcome.RED,
+                protocol="SPF",
+                outcome=DnsCheckOutcome.RED,
             ),
             dmarc=DnsAuthCheck(
-                protocol="DMARC", outcome=DnsCheckOutcome.RED,
+                protocol="DMARC",
+                outcome=DnsCheckOutcome.RED,
             ),
         ),
     )
@@ -555,7 +551,9 @@ def test_add_suppression_validates_address(permission_resolver):
     permission_resolver.grant(Permission.MANAGED_SERVICE_UPDATE)
 
     register_driver_override(
-        slug="aws", region="us-east-1", driver=_RecordingDriver(),
+        slug="aws",
+        region="us-east-1",
+        driver=_RecordingDriver(),
     )
 
     with _ctx(org):
@@ -577,7 +575,9 @@ def test_add_suppression_rejects_bad_reason(permission_resolver):
     permission_resolver.grant(Permission.APP_UPDATE)
     permission_resolver.grant(Permission.MANAGED_SERVICE_UPDATE)
     register_driver_override(
-        slug="aws", region="us-east-1", driver=_RecordingDriver(),
+        slug="aws",
+        region="us-east-1",
+        driver=_RecordingDriver(),
     )
 
     with _ctx(org):
@@ -619,7 +619,9 @@ def test_add_suppression_unsupported_cloud_returns_precondition(
     permission_resolver.grant(Permission.APP_UPDATE)
     permission_resolver.grant(Permission.MANAGED_SERVICE_UPDATE)
     register_driver_override(
-        slug="azure", region="westus", driver=_UnsupportedDriver(),
+        slug="azure",
+        region="westus",
+        driver=_UnsupportedDriver(),
     )
     with _ctx(org):
         result = ServicesMutation().add_email_suppression_entry(
@@ -700,7 +702,9 @@ def test_remove_suppression_validates_address(permission_resolver):
     permission_resolver.grant(Permission.APP_UPDATE)
     permission_resolver.grant(Permission.MANAGED_SERVICE_UPDATE)
     register_driver_override(
-        slug="aws", region="us-east-1", driver=_RecordingDriver(),
+        slug="aws",
+        region="us-east-1",
+        driver=_RecordingDriver(),
     )
     with _ctx(org):
         result = ServicesMutation().remove_email_suppression_entry(
@@ -722,9 +726,7 @@ def test_remove_suppression_not_found_service(permission_resolver):
         result = ServicesMutation().remove_email_suppression_entry(
             _info(_make_user("u-rm-missing")),
             input=RemoveEmailSuppressionEntryInput(
-                managed_service_id=GUID(
-                    "00000000-0000-0000-0000-000000000000"
-                ),
+                managed_service_id=GUID("00000000-0000-0000-0000-000000000000"),
                 address="bouncy@example.com",
             ),
         )

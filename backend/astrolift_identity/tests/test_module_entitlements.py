@@ -86,7 +86,9 @@ def _info_for(user=None):
     anonymous user when ``None``). ``me.modules`` reads is_staff /
     is_superuser off this user."""
     if user is None:
-        request_user = SimpleNamespace(is_authenticated=False, is_superuser=False, is_staff=False, is_active=True)
+        request_user = SimpleNamespace(
+            is_authenticated=False, is_superuser=False, is_staff=False, is_active=True
+        )
     else:
         request_user = user
     return SimpleNamespace(context=SimpleNamespace(request=SimpleNamespace(user=request_user)))
@@ -143,9 +145,7 @@ class TestMixAndMatch:
 
         with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
             # CAN query the agent workload surface (empty fleet → []).
-            assert (
-                AgentsQuery().agent_workloads(info, org_id=GUID(str(org.guid))) == []
-            )
+            assert AgentsQuery().agent_workloads(info, org_id=GUID(str(org.guid))) == []
             assert AgentsQuery().agent_fleet(info, org_id=GUID(str(org.guid))) == []
 
             # CANNOT query the apps surface (app.read not granted).

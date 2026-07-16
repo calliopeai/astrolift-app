@@ -154,7 +154,13 @@ def _seed_full_agent(org, app):
 
     # Primary container carries the image; a sidecar must be ignored.
     _container(agent, "sidecar", is_primary=False, image_ref="sidecar:latest")
-    _container(agent, "app", is_primary=True, image_ref="ghcr.io/acme/triage:1.2.3", dockerfile_path="agent.Dockerfile")
+    _container(
+        agent,
+        "app",
+        is_primary=True,
+        image_ref="ghcr.io/acme/triage:1.2.3",
+        dockerfile_path="agent.Dockerfile",
+    )
     return agent
 
 
@@ -270,9 +276,7 @@ def test_agent_ignores_non_agent_workload(permission_resolver, info, with_tenant
     project, team = _project(org, "demo")
     app = _app(org, project, team, "hello")
     permission_resolver.grant(Permission.AGENT_READ)
-    Workload.objects.create(
-        registered_app=app, name="Web", slug="web-svc", kind=Workload.Kind.DEPLOYMENT
-    )
+    Workload.objects.create(registered_app=app, name="Web", slug="web-svc", kind=Workload.Kind.DEPLOYMENT)
 
     with with_tenant_org(org):
         detail = AgentsQuery().agent(info(), org_id=str(org.guid), slug="web-svc")

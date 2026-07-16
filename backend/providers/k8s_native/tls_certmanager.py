@@ -166,7 +166,7 @@ class CertManagerDriver(TlsDriver):
         spec: dict[str, Any] = {
             "secretName": f"{cert_name}-tls",
             "commonName": domain,
-            "dnsNames": [domain] + list(sans),
+            "dnsNames": [domain, *list(sans)],
             "issuerRef": {
                 "name": self._config.cluster_issuer,
                 "kind": STRATEGY_TO_ISSUER[strategy],

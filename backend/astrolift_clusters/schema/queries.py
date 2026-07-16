@@ -141,10 +141,7 @@ class ClustersQuery:
             rows = provider_regions_dispatch(provider_plugin_slug=provider_plugin_slug)
         except ClusterManagementError:
             return []
-        return [
-            ProviderRegionType(id=r["id"], label=r["label"], continent=r["continent"])
-            for r in rows
-        ]
+        return [ProviderRegionType(id=r["id"], label=r["label"], continent=r["continent"]) for r in rows]
 
     @strawberry.field
     @require_permission(Permission.CLUSTER_REGISTER)

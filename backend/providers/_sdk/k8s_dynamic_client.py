@@ -122,7 +122,7 @@ def split_kind(kind: str) -> tuple[str, str]:
     api_version = DEFAULT_API_VERSION_FOR_KIND.get(kind)
     if api_version is None:
         raise KeyError(
-            f"no default apiVersion for bare kind {kind!r}; pass " f"'group/version/Kind' for CRDs",
+            f"no default apiVersion for bare kind {kind!r}; pass 'group/version/Kind' for CRDs",
         )
     return api_version, kind
 
@@ -216,7 +216,7 @@ class KubernetesDynamicClient:
         if ca_bytes is not None:
             import tempfile
 
-            ca_file = tempfile.NamedTemporaryFile(
+            ca_file = tempfile.NamedTemporaryFile(  # noqa: SIM115 — must outlive this scope; client reads lazily
                 suffix=".crt",
                 delete=False,
             )

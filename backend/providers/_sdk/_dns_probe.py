@@ -156,9 +156,7 @@ def _query_txt(*, server: str, qname: str, timeout: float = 3.0) -> list[str]:
     answers: list[str] = []
     for _ in range(ancount):
         _, offset = _decode_name(data, offset)
-        rtype, _rclass, _ttl, rdlength = struct.unpack(
-            ">HHIH", data[offset : offset + 10]
-        )
+        rtype, _rclass, _ttl, rdlength = struct.unpack(">HHIH", data[offset : offset + 10])
         offset += 10
         rdata = data[offset : offset + rdlength]
         offset += rdlength
@@ -196,6 +194,4 @@ def lookup_txt(qname: str, *, timeout: float = 3.0) -> list[str]:
         except (OSError, DnsResolveError) as exc:
             last_exc = exc
             continue
-    raise DnsResolveError(
-        f"all resolvers failed for {qname!r}: {last_exc}"
-    ) from last_exc
+    raise DnsResolveError(f"all resolvers failed for {qname!r}: {last_exc}") from last_exc

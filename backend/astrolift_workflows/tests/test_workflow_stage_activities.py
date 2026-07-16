@@ -16,10 +16,10 @@ from astrolift_operations.models import WorkflowRun
 from astrolift_workflows.activities.workflow_stage_activities import (
     _aggregate_fan_out_sync,
     _create_stage_execution_sync,
-    _parent_run_pk,
     _dispatch_agent_for_stage_sync,
     _get_workflow_stages_sync,
     _mark_workflow_run_sync,
+    _parent_run_pk,
     _record_human_gate_decision_sync,
     _snapshot_checkpoint_sync,
     _update_stage_execution_sync,
@@ -54,9 +54,7 @@ def agent_workload(db, org):
     from astrolift_registry.models import RegisteredApp, Workload
 
     team = Team.objects.create(organization=org, name="T", slug="t-stage")
-    project = Project.objects.create(
-        organization=org, team=team, name="P", slug="p-stage"
-    )
+    project = Project.objects.create(organization=org, team=team, name="P", slug="p-stage")
     app = RegisteredApp.objects.create(
         organization=org,
         project=project,
@@ -221,9 +219,7 @@ def test_update_stage_execution_completes_with_output(run, definition):
     stage = _stage(definition, 0)
     execution_id = _create_stage_execution_sync(str(run.pk), str(stage.pk), 1)
 
-    _update_stage_execution_sync(
-        execution_id, "completed", {"result": "ok"}, None
-    )
+    _update_stage_execution_sync(execution_id, "completed", {"result": "ok"}, None)
 
     execution = WorkflowStageExecution.objects.get(pk=int(execution_id))
     assert execution.status == "completed"
@@ -384,9 +380,7 @@ def test_aggregate_fan_out_merges_sources_and_links_them(run, definition):
         output=None,
     )
 
-    aggregated = _aggregate_fan_out_sync(
-        str(run.pk), str(agg_stage.pk), [str(src1.pk), str(src2.pk)]
-    )
+    aggregated = _aggregate_fan_out_sync(str(run.pk), str(agg_stage.pk), [str(src1.pk), str(src2.pk)])
 
     assert aggregated["total"] == 2
     assert aggregated["ok_count"] == 1  # only the COMPLETED one counts
@@ -394,9 +388,7 @@ def test_aggregate_fan_out_merges_sources_and_links_them(run, definition):
     assert statuses == {"completed", "failed"}
 
     # The aggregation execution links both sources via fan_out_sources.
-    agg_exec = (
-        WorkflowStageExecution.objects.filter(stage=agg_stage).order_by("-pk").first()
-    )
+    agg_exec = WorkflowStageExecution.objects.filter(stage=agg_stage).order_by("-pk").first()
     assert agg_exec.status == "completed"
     assert set(agg_exec.fan_out_sources.values_list("pk", flat=True)) == {
         src1.pk,
@@ -458,9 +450,7 @@ def test_mark_workflow_run_invalid_status_raises(run):
 
 
 @pytest.mark.django_db
-def test_dispatch_agent_creates_run_and_links_execution_without_dispatcher(
-    run, definition
-):
+def test_dispatch_agent_creates_run_and_links_execution_without_dispatcher(run, definition):
     """With no ACTIVE dispatcher registered, the dispatch still creates the
     AgentRun history row (left PENDING) and links it to the stage execution
     — the workflow's timeout governs the wait, and a push-mode callback can
@@ -471,9 +461,7 @@ def test_dispatch_agent_creates_run_and_links_execution_without_dispatcher(
     stage = _stage(definition, 0)
     execution_id = _create_stage_execution_sync(str(run.pk), str(stage.pk), 1)
 
-    agent_run_id = _dispatch_agent_for_stage_sync(
-        str(stage.pk), execution_id, {"trigger": "manual"}
-    )
+    agent_run_id = _dispatch_agent_for_stage_sync(str(stage.pk), execution_id, {"trigger": "manual"})
 
     agent_run = AgentRun.objects.get(pk=int(agent_run_id))
     assert agent_run.status == AgentRun.Status.PENDING

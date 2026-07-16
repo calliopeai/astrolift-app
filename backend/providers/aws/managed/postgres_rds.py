@@ -149,7 +149,8 @@ class RDSPostgresDriver(ManagedServiceDriver):
             import boto3
 
             self._sm = boto3.client(
-                "secretsmanager", region_name=config.region,
+                "secretsmanager",
+                region_name=config.region,
             )
 
     # ---- lifecycle ----------------------------------------------------
@@ -170,27 +171,20 @@ class RDSPostgresDriver(ManagedServiceDriver):
             return ProvisionResult(
                 ok=True,
                 handle=handle_for(kind=KIND, resource_id=instance_id),
-                message=(
-                    f"db instance {instance_id} already exists "
-                    f"(status={existing.get('DBInstanceStatus')})"
-                ),
+                message=(f"db instance {instance_id} already exists (status={existing.get('DBInstanceStatus')})"),
             )
 
         master_password = _generate_master_password()
         secret_arn = self._store_master_password(
-            instance_id=instance_id, password=master_password, spec=spec,
+            instance_id=instance_id,
+            password=master_password,
+            spec=spec,
         )
 
-        engine_version = (
-            cfg.get("engine_version") or self._config.engine_version
-        )
-        instance_class = (
-            cfg.get("instance_class")
-            or _SIZE_TO_INSTANCE_CLASS.get(spec.size, "db.t4g.small")
-        )
+        engine_version = cfg.get("engine_version") or self._config.engine_version
+        instance_class = cfg.get("instance_class") or _SIZE_TO_INSTANCE_CLASS.get(spec.size, "db.t4g.small")
         allocated_storage = int(
-            cfg.get("allocated_storage")
-            or _SIZE_TO_STORAGE_GB.get(spec.size, 20),
+            cfg.get("allocated_storage") or _SIZE_TO_STORAGE_GB.get(spec.size, 20),
         )
         multi_az = bool(
             cfg.get("multi_az", self._config.multi_az_default),
@@ -241,7 +235,8 @@ class RDSPostgresDriver(ManagedServiceDriver):
             self._rds.create_db_instance(**create_kwargs)
         except Exception as exc:
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message=f"create_db_instance: {exc}",
                 errors=[str(exc)],
             )
@@ -249,10 +244,7 @@ class RDSPostgresDriver(ManagedServiceDriver):
         return ProvisionResult(
             ok=True,
             handle=handle_for(kind=KIND, resource_id=instance_id),
-            message=(
-                f"db instance {instance_id} provisioning "
-                f"(password in {secret_arn})"
-            ),
+            message=(f"db instance {instance_id} provisioning (password in {secret_arn})"),
         )
 
     @driver_op(cloud="aws", driver="postgres_rds")
@@ -265,10 +257,7 @@ class RDSPostgresDriver(ManagedServiceDriver):
             "ApplyImmediately": bool(cfg.get("apply_immediately", False)),
         }
         if spec.size:
-            instance_class = (
-                cfg.get("instance_class")
-                or _SIZE_TO_INSTANCE_CLASS.get(spec.size)
-            )
+            instance_class = cfg.get("instance_class") or _SIZE_TO_INSTANCE_CLASS.get(spec.size)
             if instance_class:
                 modify_kwargs["DBInstanceClass"] = instance_class
             new_storage = _SIZE_TO_STORAGE_GB.get(spec.size)
@@ -290,7 +279,8 @@ class RDSPostgresDriver(ManagedServiceDriver):
 
         if len(modify_kwargs) <= 2:
             return UpdateResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message="no modifiable attributes provided — no-op",
             )
 
@@ -298,12 +288,14 @@ class RDSPostgresDriver(ManagedServiceDriver):
             self._rds.modify_db_instance(**modify_kwargs)
         except Exception as exc:
             return UpdateResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"modify_db_instance: {exc}",
                 errors=[str(exc)],
             )
         return UpdateResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message=f"db instance {instance_id} update queued",
         )
 
@@ -327,7 +319,8 @@ class RDSPostgresDriver(ManagedServiceDriver):
             self._delete_master_password_secret(instance_id)
             self._delete_url_secret(instance_id)
             return DeprovisionResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message=f"db instance {instance_id} already gone",
             )
 
@@ -342,16 +335,17 @@ class RDSPostgresDriver(ManagedServiceDriver):
                 )
             except Exception as exc:
                 return DeprovisionResult(
-                    ok=False, handle=spec.handle,
+                    ok=False,
+                    handle=spec.handle,
                     message=f"failed to clear DeletionProtection: {exc}",
                     errors=[str(exc)],
                 )
         elif existing.get("DeletionProtection"):
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=(
-                    f"db instance {instance_id} has DeletionProtection "
-                    f"enabled — pass force_destroy=True to bypass"
+                    f"db instance {instance_id} has DeletionProtection enabled — pass force_destroy=True to bypass"
                 ),
                 errors=["deletion_protection_enabled"],
             )
@@ -361,15 +355,14 @@ class RDSPostgresDriver(ManagedServiceDriver):
             "SkipFinalSnapshot": bool(delete_data),
         }
         if not delete_data:
-            delete_kwargs["FinalDBSnapshotIdentifier"] = (
-                _final_snapshot_id(instance_id=instance_id)
-            )
+            delete_kwargs["FinalDBSnapshotIdentifier"] = _final_snapshot_id(instance_id=instance_id)
 
         try:
             self._rds.delete_db_instance(**delete_kwargs)
         except Exception as exc:
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"delete_db_instance: {exc}",
                 errors=[str(exc)],
             )
@@ -384,7 +377,8 @@ class RDSPostgresDriver(ManagedServiceDriver):
             self._delete_url_secret(instance_id)
 
         return DeprovisionResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message=(
                 f"db instance {instance_id} delete queued "
                 f"(snapshot={'skipped' if delete_data else 'taken'}, "
@@ -400,7 +394,8 @@ class RDSPostgresDriver(ManagedServiceDriver):
         existing = self._describe(instance_id)
         if existing is None:
             return ServiceStatus(
-                handle=handle.handle, state="deprovisioned",
+                handle=handle.handle,
+                state="deprovisioned",
                 message=f"db instance {instance_id} not found",
             )
         rds_state = existing.get("DBInstanceStatus", "unknown")
@@ -476,10 +471,7 @@ class RDSPostgresDriver(ManagedServiceDriver):
         from datetime import UTC, datetime
 
         _, instance_id = parse_handle(handle.handle)
-        snap_id = (
-            f"{instance_id}-snap-"
-            f"{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
-        )
+        snap_id = f"{instance_id}-snap-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
         try:
             self._rds.create_db_snapshot(
                 DBInstanceIdentifier=instance_id,
@@ -497,7 +489,9 @@ class RDSPostgresDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="postgres_rds")
     def restore(
-        self, snapshot: SnapshotHandle, target: ProvisionSpec,
+        self,
+        snapshot: SnapshotHandle,
+        target: ProvisionSpec,
     ) -> ProvisionResult:
         target_instance_id = self._instance_id_for(spec=target)
         try:
@@ -514,16 +508,15 @@ class RDSPostgresDriver(ManagedServiceDriver):
             )
         except Exception as exc:
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message=f"restore_db_instance_from_db_snapshot: {exc}",
                 errors=[str(exc)],
             )
         return ProvisionResult(
             ok=True,
             handle=handle_for(kind=KIND, resource_id=target_instance_id),
-            message=(
-                f"restore from snapshot {snapshot.snapshot_id} queued"
-            ),
+            message=(f"restore from snapshot {snapshot.snapshot_id} queued"),
         )
 
     @driver_op(cloud="aws", driver="postgres_rds", heartbeat=False)
@@ -537,7 +530,9 @@ class RDSPostgresDriver(ManagedServiceDriver):
                 "multi_az": {"type": "boolean"},
                 "deletion_protection": {"type": "boolean"},
                 "backup_retention_days": {
-                    "type": "integer", "minimum": 0, "maximum": 35,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 35,
                 },
                 "parameter_group": {"type": "string"},
                 "kms_key_arn": {"type": "string"},
@@ -554,13 +549,8 @@ class RDSPostgresDriver(ManagedServiceDriver):
                 "DATABASE_PORT": "RDS endpoint port (5432)",
                 "DATABASE_NAME": "Initial database name",
                 "DATABASE_USER": "Master username (astrolift)",
-                "DATABASE_PASSWORD": (
-                    "Secrets Manager ref to the master password"
-                ),
-                "DATABASE_URL": (
-                    "Secrets Manager ref to the fully-formed "
-                    "postgres:// connection string"
-                ),
+                "DATABASE_PASSWORD": ("Secrets Manager ref to the master password"),
+                "DATABASE_URL": ("Secrets Manager ref to the fully-formed postgres:// connection string"),
             },
         )
 
@@ -584,10 +574,14 @@ class RDSPostgresDriver(ManagedServiceDriver):
 
     def _instance_id_for(self, *, spec: ProvisionSpec) -> str:
         return (
-            f"{self._config.instance_name_prefix}-"
-            f"{spec.organization_slug}-{spec.app_slug}-"
-            f"{spec.environment_name}-{spec.service_handle_hint or 'pg'}"
-        ).lower().replace("_", "-")[:60]
+            (
+                f"{self._config.instance_name_prefix}-"
+                f"{spec.organization_slug}-{spec.app_slug}-"
+                f"{spec.environment_name}-{spec.service_handle_hint or 'pg'}"
+            )
+            .lower()
+            .replace("_", "-")[:60]
+        )
 
     def _secret_name_for(self, *, instance_id: str) -> str:
         return f"{self._config.secrets_manager_prefix}/{instance_id}/master"
@@ -607,8 +601,7 @@ class RDSPostgresDriver(ManagedServiceDriver):
             resp = self._sm.create_secret(
                 Name=name,
                 Description=(
-                    f"Master password for RDS Postgres {instance_id} "
-                    f"(app {spec.app_slug}/{spec.environment_name})"
+                    f"Master password for RDS Postgres {instance_id} (app {spec.app_slug}/{spec.environment_name})"
                 ),
                 SecretString=password,
                 Tags=tags_for(spec),
@@ -619,7 +612,8 @@ class RDSPostgresDriver(ManagedServiceDriver):
             # idempotent across retry-on-failed-provision scenarios.
             if "ResourceExistsException" in type(exc).__name__:
                 self._sm.put_secret_value(
-                    SecretId=name, SecretString=password,
+                    SecretId=name,
+                    SecretString=password,
                 )
                 return name
             raise ManagedServiceError(
@@ -648,10 +642,7 @@ class RDSPostgresDriver(ManagedServiceDriver):
             ).get("SecretString", "")
         except Exception:
             return
-        url = (
-            f"postgresql://{username}:{quote(pw, safe='')}@{host}:{port}/"
-            f"{db_name}?sslmode=require"
-        )
+        url = f"postgresql://{username}:{quote(pw, safe='')}@{host}:{port}/{db_name}?sslmode=require"
         name = self._secret_name_for_url(instance_id=instance_id)
         try:
             self._sm.create_secret(
@@ -671,7 +662,8 @@ class RDSPostgresDriver(ManagedServiceDriver):
         name = self._secret_name_for_url(instance_id=instance_id)
         with contextlib.suppress(Exception):
             self._sm.delete_secret(
-                SecretId=name, ForceDeleteWithoutRecovery=True,
+                SecretId=name,
+                ForceDeleteWithoutRecovery=True,
             )
 
     def _delete_master_password_secret(self, instance_id: str) -> None:
@@ -694,9 +686,7 @@ Our subset is conservative: no shell-special characters at all."""
 
 
 def _generate_master_password(length: int = 32) -> str:
-    return "".join(
-        secrets.choice(_PASSWORD_ALPHABET) for _ in range(length)
-    )
+    return "".join(secrets.choice(_PASSWORD_ALPHABET) for _ in range(length))
 
 
 def _db_name_for(spec: ProvisionSpec) -> str:

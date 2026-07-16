@@ -74,7 +74,7 @@ def test_classify_uses_http_status_when_set() -> None:
     ``status`` attribute on HTTP errors; the classifier prefers status
     over class name."""
 
-    class _ApiException(Exception):  # noqa: N818 -- mirrors kubernetes-client name
+    class _ApiException(Exception):
         pass
 
     e500 = _ApiException("err")

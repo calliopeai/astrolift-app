@@ -2421,9 +2421,7 @@ class IdentityMutation:
 
     @strawberry.field
     @mutation_audit(action="auth.attestation.submitted")
-    def attest_session(
-        self, info: Info, input: AttestSessionInput
-    ) -> MutationResultType[_AttestationResult]:
+    def attest_session(self, info: Info, input: AttestSessionInput) -> MutationResultType[_AttestationResult]:
         from astrolift_identity.attestation import AttestationError
         from astrolift_identity.attestation.service import attest_session
         from astrolift_identity.models import AstroliftSession
@@ -2441,9 +2439,7 @@ class IdentityMutation:
         if row is None:
             current_key = getattr(getattr(request, "session", None), "session_key", None)
             if current_key:
-                row = AstroliftSession.objects.filter(
-                    session_key=current_key, user=viewer
-                ).first()
+                row = AstroliftSession.objects.filter(session_key=current_key, user=viewer).first()
         if row is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -2478,9 +2474,7 @@ class IdentityMutation:
 
     @strawberry.field
     @mutation_audit(action="auth.attestation.asserted")
-    def assert_session(
-        self, info: Info, input: AssertSessionInput
-    ) -> MutationResultType[_AttestationResult]:
+    def assert_session(self, info: Info, input: AssertSessionInput) -> MutationResultType[_AttestationResult]:
         from astrolift_identity.attestation import AttestationError
         from astrolift_identity.attestation.service import assert_session
         from astrolift_identity.models import AstroliftSession
@@ -2495,9 +2489,7 @@ class IdentityMutation:
         if row is None:
             current_key = getattr(getattr(request, "session", None), "session_key", None)
             if current_key:
-                row = AstroliftSession.objects.filter(
-                    session_key=current_key, user=viewer
-                ).first()
+                row = AstroliftSession.objects.filter(session_key=current_key, user=viewer).first()
         if row is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,

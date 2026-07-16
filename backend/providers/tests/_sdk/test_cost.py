@@ -20,8 +20,10 @@ from _sdk.cost import (
 
 def test_request_defaults() -> None:
     req = CostEstimateRequest(
-        kind="postgres", variant="rds",
-        region="us-east-1", size="small",
+        kind="postgres",
+        variant="rds",
+        region="us-east-1",
+        size="small",
     )
     assert req.currency == "USD"
     assert req.config == {}
@@ -34,8 +36,10 @@ def test_estimate_carries_pricing_provenance() -> None:
     cloud's own catalog. The dataclass shape pins them at the
     type level so a driver author can't ship without them."""
     req = CostEstimateRequest(
-        kind="postgres", variant="rds",
-        region="us-east-1", size="small",
+        kind="postgres",
+        variant="rds",
+        region="us-east-1",
+        size="small",
     )
     estimate = CostEstimate(
         request=req,
@@ -60,11 +64,14 @@ def test_unavailable_distinct_from_zero_cost() -> None:
     from returning CostEstimate(monthly_total=0). Callers branch
     on the type to avoid showing 'free!' for unsupported variants."""
     req = CostEstimateRequest(
-        kind="postgres", variant="cnpg",
-        region="local", size="small",
+        kind="postgres",
+        variant="cnpg",
+        region="local",
+        size="small",
     )
     unavail = CostEstimateUnavailable(
-        request=req, reason="unsupported",
+        request=req,
+        reason="unsupported",
         message="k8s_native runs in-cluster; no cloud pricing API",
     )
     assert unavail.reason == "unsupported"
@@ -80,7 +87,8 @@ def test_line_item_sku_is_required_field() -> None:
     with pytest.raises(TypeError):
         # Missing SKU — should fail at construction
         CostLineItem(  # type: ignore[call-arg]
-            label="x", monthly_amount=1.0,
+            label="x",
+            monthly_amount=1.0,
         )
 
 
@@ -97,7 +105,10 @@ def test_unavailable_reasons_are_documented() -> None:
     for reason in valid:
         unavail = CostEstimateUnavailable(
             request=CostEstimateRequest(
-                kind="x", variant="y", region="r", size="small",
+                kind="x",
+                variant="y",
+                region="r",
+                size="small",
             ),
             reason=reason,
         )
@@ -106,8 +117,10 @@ def test_unavailable_reasons_are_documented() -> None:
 
 def test_expected_usage_metrics_passed_through() -> None:
     req = CostEstimateRequest(
-        kind="object_store", variant="s3",
-        region="us-east-1", size="custom",
+        kind="object_store",
+        variant="s3",
+        region="us-east-1",
+        size="custom",
         expected_usage={
             "storage_gb_month": 1000,
             "get_requests_per_month": 5_000_000,

@@ -14,8 +14,9 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from _sdk.managed_service import ServiceHandle
 from astrolift_manifest.env_injection import envelope_keys_for
+
+from _sdk.managed_service import ServiceHandle
 
 
 def test_s3_binding_emits_canonical_object_store_envelope():
@@ -34,12 +35,14 @@ def test_postgres_binding_emits_canonical_postgres_envelope():
 
     rds = MagicMock()
     rds.describe_db_instances.return_value = {
-        "DBInstances": [{
-            "DBInstanceStatus": "available",
-            "Endpoint": {"Address": "db.example.rds.amazonaws.com", "Port": 5432},
-            "DBName": "acme_prod",
-            "MasterUsername": "astrolift",
-        }],
+        "DBInstances": [
+            {
+                "DBInstanceStatus": "available",
+                "Endpoint": {"Address": "db.example.rds.amazonaws.com", "Port": 5432},
+                "DBName": "acme_prod",
+                "MasterUsername": "astrolift",
+            }
+        ],
     }
     sm = MagicMock()
     sm.get_secret_value.return_value = {"SecretString": "s3cr3t/p@ss"}
@@ -70,11 +73,13 @@ def test_redis_binding_emits_canonical_redis_envelope():
 
     ec = MagicMock()
     ec.describe_replication_groups.return_value = {
-        "ReplicationGroups": [{
-            "Status": "available",
-            "TransitEncryptionEnabled": True,
-            "NodeGroups": [{"PrimaryEndpoint": {"Address": "redis.example.cache.amazonaws.com", "Port": 6379}}],
-        }],
+        "ReplicationGroups": [
+            {
+                "Status": "available",
+                "TransitEncryptionEnabled": True,
+                "NodeGroups": [{"PrimaryEndpoint": {"Address": "redis.example.cache.amazonaws.com", "Port": 6379}}],
+            }
+        ],
     }
     drv = ElastiCacheRedisDriver(
         config=ElastiCacheConfig(region="us-west-2", cache_subnet_group="g", security_group_ids=["sg-1"]),

@@ -80,11 +80,7 @@ def test_query_txt_round_trip(monkeypatch) -> None:
             # ttl=300, rdlength = 1 + len(content)
             content = b"v=spf1 include:amazonses.com ~all"
             rdata = bytes([len(content)]) + content
-            answer = (
-                bytes([0xC0, 0x0C])
-                + struct.pack(">HHIH", 16, 1, 300, len(rdata))
-                + rdata
-            )
+            answer = bytes([0xC0, 0x0C]) + struct.pack(">HHIH", 16, 1, 300, len(rdata)) + rdata
             return header + question + answer, ("127.0.0.1", 53)
 
         def close(self) -> None:
@@ -98,7 +94,8 @@ def test_query_txt_round_trip(monkeypatch) -> None:
     monkeypatch.setattr(_dns_probe.socket, "socket", _factory)
 
     answers = _dns_probe._query_txt(
-        server="127.0.0.1", qname="example.com",
+        server="127.0.0.1",
+        qname="example.com",
     )
     assert answers == ["v=spf1 include:amazonses.com ~all"]
 
@@ -129,9 +126,12 @@ def test_query_txt_nxdomain_returns_empty(monkeypatch) -> None:
 
     fake = _FakeSock()
     monkeypatch.setattr(
-        _dns_probe.socket, "socket", lambda *a, **k: fake,
+        _dns_probe.socket,
+        "socket",
+        lambda *a, **k: fake,
     )
     answers = _dns_probe._query_txt(
-        server="127.0.0.1", qname="missing.example.com",
+        server="127.0.0.1",
+        qname="missing.example.com",
     )
     assert answers == []

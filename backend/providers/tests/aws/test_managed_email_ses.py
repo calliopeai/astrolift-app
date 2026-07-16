@@ -90,7 +90,8 @@ def _spec(**overrides: Any) -> ProvisionSpec:
 
 
 def test_provision_verifies_domain_identity(
-    driver: AmazonSESDriver, ses_client,
+    driver: AmazonSESDriver,
+    ses_client,
 ) -> None:
     result = driver.provision(_spec())
     assert result.ok is True
@@ -101,7 +102,8 @@ def test_provision_verifies_domain_identity(
 
 
 def test_provision_records_pending_state_for_new_domain(
-    driver: AmazonSESDriver, ses_client,
+    driver: AmazonSESDriver,
+    ses_client,
 ) -> None:
     result = driver.provision(_spec())
     _, identity = parse_handle(result.handle)
@@ -120,7 +122,8 @@ def test_provision_idempotent(driver: AmazonSESDriver) -> None:
 
 
 def test_provision_with_explicit_identity_email(
-    driver: AmazonSESDriver, ses_client,
+    driver: AmazonSESDriver,
+    ses_client,
 ) -> None:
     result = driver.provision(
         _spec(config={"identity": "ops@example.com"}),
@@ -133,7 +136,8 @@ def test_provision_with_explicit_identity_email(
 
 
 def test_provision_with_explicit_identity_domain(
-    driver: AmazonSESDriver, ses_client,
+    driver: AmazonSESDriver,
+    ses_client,
 ) -> None:
     result = driver.provision(
         _spec(config={"identity": "explicit.example.com"}),
@@ -151,7 +155,8 @@ def test_provision_without_base_domain_or_explicit_identity_errors() -> None:
             config=SESEmailConfig(region="us-east-1"),
             ses_client=boto3.client("ses", region_name="us-east-1"),
             secrets_client=boto3.client(
-                "secretsmanager", region_name="us-east-1",
+                "secretsmanager",
+                region_name="us-east-1",
             ),
         )
         result = d.provision(_spec())
@@ -160,22 +165,20 @@ def test_provision_without_base_domain_or_explicit_identity_errors() -> None:
 
 
 def test_provision_stores_smtp_secret_pair(
-    driver: AmazonSESDriver, sm_client,
+    driver: AmazonSESDriver,
+    sm_client,
 ) -> None:
     result = driver.provision(_spec())
     _, identity = parse_handle(result.handle)
-    user_name = (
-        f"astrolift/ses/{_safe(identity)}/smtp-access-key-id"
-    )
-    pass_name = (
-        f"astrolift/ses/{_safe(identity)}/smtp-secret-key"
-    )
+    user_name = f"astrolift/ses/{_safe(identity)}/smtp-access-key-id"
+    pass_name = f"astrolift/ses/{_safe(identity)}/smtp-secret-key"
     assert sm_client.get_secret_value(SecretId=user_name)["SecretString"]
     assert sm_client.get_secret_value(SecretId=pass_name)["SecretString"]
 
 
 def test_provision_creates_configuration_set(
-    driver: AmazonSESDriver, ses_client,
+    driver: AmazonSESDriver,
+    ses_client,
 ) -> None:
     result = driver.provision(_spec())
     _, identity = parse_handle(result.handle)
@@ -263,7 +266,8 @@ def test_provision_skips_sns_destination_when_arn_blank(aws_mock) -> None:
 
 
 def test_provision_records_deletion_protection_marker_default_on(
-    driver: AmazonSESDriver, sm_client,
+    driver: AmazonSESDriver,
+    sm_client,
 ) -> None:
     result = driver.provision(_spec())
     _, identity = parse_handle(result.handle)
@@ -273,7 +277,8 @@ def test_provision_records_deletion_protection_marker_default_on(
 
 
 def test_provision_marker_off_when_disabled(
-    driver: AmazonSESDriver, sm_client,
+    driver: AmazonSESDriver,
+    sm_client,
 ) -> None:
     result = driver.provision(
         _spec(config={"deletion_protection": False}),
@@ -285,11 +290,13 @@ def test_provision_marker_off_when_disabled(
 
 
 def test_provision_surfaces_verify_failure(
-    sm_client, ses_client,
+    sm_client,
+    ses_client,
 ) -> None:
     d = AmazonSESDriver(
         config=SESEmailConfig(
-            region="us-east-1", base_domain="astrolift.test",
+            region="us-east-1",
+            base_domain="astrolift.test",
         ),
         ses_client=ses_client,
         secrets_client=sm_client,
@@ -308,7 +315,8 @@ def test_provision_surfaces_verify_failure(
 
 
 def test_update_deletion_protection_toggle(
-    driver: AmazonSESDriver, sm_client,
+    driver: AmazonSESDriver,
+    sm_client,
 ) -> None:
     provisioned = driver.provision(_spec())
     result = driver.update(
@@ -337,7 +345,8 @@ def test_update_noop_when_nothing_to_change(
 
 
 def test_deprovision_default_retains_identity_and_stats(
-    driver: AmazonSESDriver, ses_client,
+    driver: AmazonSESDriver,
+    ses_client,
 ) -> None:
     provisioned = driver.provision(_spec())
     _, identity = parse_handle(provisioned.handle)
@@ -351,7 +360,8 @@ def test_deprovision_default_retains_identity_and_stats(
 
 
 def test_deprovision_delete_data_with_protection_off_drops_identity(
-    driver: AmazonSESDriver, ses_client,
+    driver: AmazonSESDriver,
+    ses_client,
 ) -> None:
     provisioned = driver.provision(
         _spec(config={"deletion_protection": False}),
@@ -379,7 +389,8 @@ def test_deprovision_delete_data_refuses_with_protection_on(
 
 
 def test_deprovision_force_destroy_bypasses_protection(
-    driver: AmazonSESDriver, ses_client,
+    driver: AmazonSESDriver,
+    ses_client,
 ) -> None:
     provisioned = driver.provision(_spec())
     _, identity = parse_handle(provisioned.handle)
@@ -394,7 +405,9 @@ def test_deprovision_force_destroy_bypasses_protection(
 
 
 def test_deprovision_force_destroy_keep_data_drops_marker_only(
-    driver: AmazonSESDriver, sm_client, ses_client,
+    driver: AmazonSESDriver,
+    sm_client,
+    ses_client,
 ) -> None:
     provisioned = driver.provision(_spec())
     _, identity = parse_handle(provisioned.handle)
@@ -425,7 +438,9 @@ def test_deprovision_idempotent_when_already_gone(
 
 
 def test_deprovision_atomic_both_flags(
-    driver: AmazonSESDriver, ses_client, sm_client,
+    driver: AmazonSESDriver,
+    ses_client,
+    sm_client,
 ) -> None:
     provisioned = driver.provision(_spec())
     _, identity = parse_handle(provisioned.handle)
@@ -437,9 +452,7 @@ def test_deprovision_atomic_both_flags(
     assert result.ok
     assert identity not in ses_client.list_identities()["Identities"]
     # SMTP secrets purged
-    user_name = (
-        f"astrolift/ses/{_safe(identity)}/smtp-access-key-id"
-    )
+    user_name = f"astrolift/ses/{_safe(identity)}/smtp-access-key-id"
     with pytest.raises(sm_client.exceptions.ResourceNotFoundException):
         sm_client.get_secret_value(SecretId=user_name)
 
@@ -494,9 +507,7 @@ def test_binding_returns_connection_envelope(
     assert env["SES_SMTP_PASSWORD"].secret_ref is not None
     assert env["SES_SMTP_USER"].secret_ref is not None
     assert env["EMAIL_REGION"].literal == "us-east-1"
-    assert env["SES_SMTP_ENDPOINT"].literal == (
-        "email-smtp.us-east-1.amazonaws.com"
-    )
+    assert env["SES_SMTP_ENDPOINT"].literal == ("email-smtp.us-east-1.amazonaws.com")
     assert env["EMAIL_FROM_ADDRESS"].literal.startswith("noreply@")
 
 
@@ -575,14 +586,8 @@ def test_binding_emits_per_environment_senders(
         },
     )
     env = binding.env_vars
-    assert (
-        env["EMAIL_FROM_ADDRESS_PRODUCTION"].literal
-        == "prod-bot@acme.example"
-    )
-    assert (
-        env["EMAIL_FROM_ADDRESS_PREVIEW"].literal
-        == "preview-bot@acme.example"
-    )
+    assert env["EMAIL_FROM_ADDRESS_PRODUCTION"].literal == "prod-bot@acme.example"
+    assert env["EMAIL_FROM_ADDRESS_PREVIEW"].literal == "preview-bot@acme.example"
     # identity-derived EMAIL_FROM_ADDRESS still emitted as the fallback
     assert env["EMAIL_FROM_ADDRESS"].literal.startswith("noreply@")
 
@@ -641,10 +646,7 @@ def test_binding_partial_env_senders_emits_only_set_keys(
         config={"env_senders": {"production": "prod@acme.example"}},
     )
     env = binding.env_vars
-    assert (
-        env["EMAIL_FROM_ADDRESS_PRODUCTION"].literal
-        == "prod@acme.example"
-    )
+    assert env["EMAIL_FROM_ADDRESS_PRODUCTION"].literal == "prod@acme.example"
     assert "EMAIL_FROM_ADDRESS_PREVIEW" not in env
 
 
@@ -696,7 +698,8 @@ def test_snapshot_for_missing_raises(
 
 
 def test_restore_provisions_target_identity(
-    driver: AmazonSESDriver, ses_client,
+    driver: AmazonSESDriver,
+    ses_client,
 ) -> None:
     provisioned = driver.provision(_spec())
     snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
@@ -727,21 +730,15 @@ def test_identity_derivation_from_base_domain(
 
 
 def test_smtp_endpoint_for_region() -> None:
-    assert _smtp_endpoint_for("us-west-2") == (
-        "email-smtp.us-west-2.amazonaws.com"
-    )
+    assert _smtp_endpoint_for("us-west-2") == ("email-smtp.us-west-2.amazonaws.com")
 
 
 def test_from_address_for_domain_prepends_noreply() -> None:
-    assert _from_address_for(identity="example.com") == (
-        "noreply@example.com"
-    )
+    assert _from_address_for(identity="example.com") == ("noreply@example.com")
 
 
 def test_from_address_for_address_returns_verbatim() -> None:
-    assert _from_address_for(identity="hello@example.com") == (
-        "hello@example.com"
-    )
+    assert _from_address_for(identity="hello@example.com") == ("hello@example.com")
 
 
 def test_safe_strips_unsafe_chars() -> None:
@@ -768,7 +765,8 @@ def test_default_client_construction_path() -> None:
     with mock_aws():
         d = AmazonSESDriver(
             config=SESEmailConfig(
-                region="us-east-1", base_domain="astrolift.test",
+                region="us-east-1",
+                base_domain="astrolift.test",
             ),
         )
         assert d._ses is not None  # type: ignore[attr-defined]

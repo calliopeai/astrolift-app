@@ -122,9 +122,12 @@ def test_provision_creates_pending_row_and_starts_workflow(permission_resolver):
     org, app, env = _scaffold()
     permission_resolver.grant(Permission.APP_UPDATE)
 
-    with _ctx(org), patch(
-        "astrolift_workflows.client.start_workflow",
-    ) as start_wf:
+    with (
+        _ctx(org),
+        patch(
+            "astrolift_workflows.client.start_workflow",
+        ) as start_wf,
+    ):
         result = ServicesMutation().provision_managed_service(
             _info(user=_make_user()),
             input=ProvisionManagedServiceInput(

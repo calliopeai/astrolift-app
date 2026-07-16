@@ -253,6 +253,16 @@ EXEMPT: dict[str, str] = {
         "category as the Temporal admin resolvers that span tenants; gated on "
         "APP_DELETE. Read-only — never deletes."
     ),
+    "LifecycleMutation.reap_cloud_orphan": (
+        "install-wide operator action (#995): the write counterpart to "
+        "scan_cloud_orphans. An orphan by construction has NO owning DB row "
+        "(that's what makes it an orphan), so there is no tenant to scope "
+        "on — @tenant_scoped would have no org column to filter. Gated on "
+        "CLUSTER_MANAGE + mutation_audit; the reaper itself re-checks "
+        "ownership and refuses anything with a live owner, and deletion "
+        "reuses the same idempotent driver deprovision path teardown uses "
+        "(#1034) — never a raw cloud API delete."
+    ),
     "LifecycleMutation.approve_deployment_by_token": (
         "public: approval magic-link token IS the auth proof; no tenant context at the point of click"
     ),

@@ -25,9 +25,8 @@ that don't use these features are unaffected.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
-
 
 CURRENT_SCHEMA_VERSION = 1
 
@@ -39,6 +38,7 @@ class DslValidationError(ValueError):
 @dataclass
 class StepOutput:
     """A step-level output declaration."""
+
     name: str
     value_expression: str  # ${ctx.*} expression or literal string
 
@@ -46,9 +46,10 @@ class StepOutput:
 @dataclass
 class ConditionalExpr:
     """A parsed `if:` conditional expression."""
-    left: str           # LHS variable path (e.g. ctx.git.branch)
-    operator: str       # == or !=
-    right: str          # RHS literal string
+
+    left: str  # LHS variable path (e.g. ctx.git.branch)
+    operator: str  # == or !=
+    right: str  # RHS literal string
 
 
 def parse_schema_version(toml_dict: dict[str, Any]) -> int:
@@ -62,8 +63,8 @@ def parse_schema_version(toml_dict: dict[str, Any]) -> int:
 
     try:
         version = int(version)
-    except (TypeError, ValueError):
-        raise DslValidationError(f"Invalid schema_version: {version!r}")
+    except (TypeError, ValueError) as exc:
+        raise DslValidationError(f"Invalid schema_version: {version!r}") from exc
 
     if version > CURRENT_SCHEMA_VERSION:
         raise DslValidationError(
@@ -89,7 +90,7 @@ def parse_conditional(if_expr: str) -> ConditionalExpr:
     if not match:
         raise DslValidationError(
             f"Unsupported conditional expression: {if_expr!r}. "
-            "v1 supports: ${{ctx.*}} == \"value\" or ${{ctx.*}} != \"value\""
+            'v1 supports: ${{ctx.*}} == "value" or ${{ctx.*}} != "value"'
         )
     return ConditionalExpr(
         left=match.group(1),
@@ -127,10 +128,7 @@ def parse_step_outputs(outputs_block: dict[str, str]) -> list[StepOutput]:
         [jobs.build.steps.build-step.outputs]
         image_tag = "${ctx.git.sha}"
     """
-    return [
-        StepOutput(name=key, value_expression=value)
-        for key, value in (outputs_block or {}).items()
-    ]
+    return [StepOutput(name=key, value_expression=value) for key, value in (outputs_block or {}).items()]
 
 
 def validate_needs(job_needs: list[str], all_job_ids: set[str]) -> None:
@@ -141,6 +139,5 @@ def validate_needs(job_needs: list[str], all_job_ids: set[str]) -> None:
     unknown = set(job_needs) - all_job_ids
     if unknown:
         raise DslValidationError(
-            f"Unknown job(s) in `needs`: {sorted(unknown)}. "
-            f"Defined jobs: {sorted(all_job_ids)}"
+            f"Unknown job(s) in `needs`: {sorted(unknown)}. " f"Defined jobs: {sorted(all_job_ids)}"
         )

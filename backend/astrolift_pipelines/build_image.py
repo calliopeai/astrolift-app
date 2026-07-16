@@ -38,6 +38,7 @@ def resolve_job_image(job, pipeline_run) -> str:
     # 4. Django settings override
     try:
         from django.conf import settings
+
         settings_default = getattr(settings, "PIPELINE_DEFAULT_IMAGE", None)
         if settings_default:
             return settings_default
@@ -55,7 +56,6 @@ def resolve_pull_secret_name(pipeline_run) -> str | None:
     and attached to the per-pipeline ServiceAccount created by isolation.py.
     Returns None when no registry credentials are configured.
     """
-    from astrolift_pipelines.isolation import service_account_name
 
     org = pipeline_run.pipeline.organization
     extra = getattr(org, "extra_data", None) or {}
@@ -72,6 +72,7 @@ def get_platform_default_image() -> str:
     """Return the platform default build image."""
     try:
         from django.conf import settings
+
         return getattr(settings, "PIPELINE_DEFAULT_IMAGE", _PLATFORM_DEFAULT_IMAGE)
     except Exception:  # noqa: BLE001
         return _PLATFORM_DEFAULT_IMAGE

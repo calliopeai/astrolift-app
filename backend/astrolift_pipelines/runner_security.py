@@ -28,17 +28,16 @@ Reference: issue #91.
 from __future__ import annotations
 
 import logging
-from urllib.parse import urlparse
 
 log = logging.getLogger("astrolift_pipelines.runner_security")
 
 # Default per-job resource limits applied when the org hasn't configured
 # custom values. Operators may lower these per runner; pipeline authors
 # cannot raise them (the agent enforces this floor-and-ceiling contract).
-_DEFAULT_CPU = "2"          # --cpus for Docker / cpu limit for K8s
-_DEFAULT_MEMORY = "4g"      # --memory for Docker
-_DEFAULT_MEMORY_K8S = "4Gi" # requests.memory / limits.memory for K8s pods
-_DEFAULT_PIDS_LIMIT = 512   # --pids-limit (prevents fork bombs)
+_DEFAULT_CPU = "2"  # --cpus for Docker / cpu limit for K8s
+_DEFAULT_MEMORY = "4g"  # --memory for Docker
+_DEFAULT_MEMORY_K8S = "4Gi"  # requests.memory / limits.memory for K8s pods
+_DEFAULT_PIDS_LIMIT = 512  # --pids-limit (prevents fork bombs)
 
 # The rootless runner process user. Nobody (65534) is conventional for
 # this purpose; it has no home directory and no shell.

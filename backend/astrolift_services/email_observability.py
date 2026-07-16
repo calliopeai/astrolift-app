@@ -100,9 +100,7 @@ def _build_driver(*, slug: str, region: str) -> EmailObservabilityDriver:
     )
 
 
-def register_driver_override(
-    *, slug: str, region: str, driver: EmailObservabilityDriver
-) -> None:
+def register_driver_override(*, slug: str, region: str, driver: EmailObservabilityDriver) -> None:
     """Test seam — register a stub driver under one (slug, region) key.
 
     Used by the resolver tests so they don't need to round-trip through

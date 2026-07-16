@@ -113,7 +113,7 @@ class NFSDriver(ManagedServiceDriver):
         return UpdateResult(
             ok=True,
             handle=spec.handle,
-            message=("PVC resize via re-applied spec; underlying CSI " "must support volume expansion"),
+            message=("PVC resize via re-applied spec; underlying CSI must support volume expansion"),
         )
 
     @driver_op(
@@ -175,7 +175,7 @@ class NFSDriver(ManagedServiceDriver):
         return DeprovisionResult(
             ok=True,
             handle=spec.handle,
-            message=(f"PVC {parsed.name} deleted (PV reclaim follows " "the StorageClass's reclaimPolicy)"),
+            message=(f"PVC {parsed.name} deleted (PV reclaim follows the StorageClass's reclaimPolicy)"),
         )
 
     @driver_op(cloud="k8s_native", driver="filesystem_nfs")
@@ -198,7 +198,7 @@ class NFSDriver(ManagedServiceDriver):
                 "FILESYSTEM_TLS": ValueRef(literal="false"),
             },
             iam_grants=[],
-            notes=("PVC mount; workload manifests must reference the " "PVC by name in volumes + volumeMounts."),
+            notes=("PVC mount; workload manifests must reference the PVC by name in volumes + volumeMounts."),
         )
 
     @driver_op(cloud="k8s_native", driver="filesystem_nfs")

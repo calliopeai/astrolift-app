@@ -591,6 +591,34 @@ class Workflow(BaseCoreModel):
                 unbound.append((stage.order, stage.role or ""))
         return unbound
 
+    def unresolved_agent_bindings(self) -> list[str]:
+        """Return the stage-order keys of ``stage_bindings`` entries whose
+        ``agent_workload_id`` does not resolve to a live ``kind=agent``
+        Workload in this workflow's org (#1094).
+
+        Same org scoping ``createWorkflowStage`` uses — the Workload's org
+        lives via ``registered_app.organization``, so a foreign org's
+        workload (or a garbage / deleted / non-agent guid) is simply
+        unresolved, never a cross-tenant bind."""
+        from astrolift_registry.models import Workload
+
+        unresolved: list[str] = []
+        for order, binding in (self.stage_bindings or {}).items():
+            workload_id = binding.get("agent_workload_id") if isinstance(binding, dict) else None
+            if not workload_id:
+                continue
+            try:
+                resolved = Workload.objects.filter(
+                    guid=str(workload_id),
+                    kind=Workload.Kind.AGENT,
+                    registered_app__organization_id=self.organization_id,
+                ).exists()
+            except (ValueError, ValidationError):  # not even a valid guid
+                resolved = False
+            if not resolved:
+                unresolved.append(str(order))
+        return unresolved
+
     def validate_bindings(self) -> None:
         """Raise ``ValidationError`` naming unbound ``agent_dispatch`` stages
         (spec 40 §2.2: validation on save/run)."""
@@ -601,6 +629,13 @@ class Workflow(BaseCoreModel):
                 for order, role in unbound
             )
             raise ValidationError(f"Unbound agent_dispatch stage(s): {labels}")
+        unresolved = self.unresolved_agent_bindings()
+        if unresolved:
+            labels = ", ".join(f"stage {order}" for order in unresolved)
+            raise ValidationError(
+                "stage_bindings agent_workload_id does not resolve to a live "
+                f"kind=agent workload in this organization: {labels}"
+            )
 
     def save(self, *args, **kwargs):
         skip_binding_validation = kwargs.pop("skip_binding_validation", False)

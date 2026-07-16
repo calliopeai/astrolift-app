@@ -194,8 +194,7 @@ def _fetch_zipball(owner_repo: str, branch: str) -> bytes:
     return resp.content
 
 
-def _content_hash(*, organization, zip_digest: str, context: dict,
-                  manifest_path: str = "") -> str:
+def _content_hash(*, organization, zip_digest: str, context: dict, manifest_path: str = "") -> str:
     """SHA-256 of the canonical JSON payload identifying this Brief.
 
     The payload binds the org identity, the zipball digest, and the task
@@ -246,8 +245,7 @@ def select_manifest_member(names: list[str], manifest_path: str = "") -> str | N
     return None
 
 
-def _parse_manifest(zip_bytes: bytes,
-                    manifest_path: str = "") -> tuple[dict[str, Any], list[dict[str, str]]]:
+def _parse_manifest(zip_bytes: bytes, manifest_path: str = "") -> tuple[dict[str, Any], list[dict[str, str]]]:
     """Parse ``astrolift.toml`` from the zipball.
 
     Returns ``(manifest_snapshot, secrets_refs)``. When the archive contains no
@@ -264,9 +262,7 @@ def _parse_manifest(zip_bytes: bytes,
         toml_path = select_manifest_member(zf.namelist(), manifest_path)
         if toml_path is None:
             if manifest_path:
-                raise ManifestNotFoundError(
-                    f"no astrolift.toml at {manifest_path!r} in the config repo"
-                )
+                raise ManifestNotFoundError(f"no astrolift.toml at {manifest_path!r} in the config repo")
             return manifest, secrets_refs
         with zf.open(toml_path) as fh:
             config = tomllib.load(fh)

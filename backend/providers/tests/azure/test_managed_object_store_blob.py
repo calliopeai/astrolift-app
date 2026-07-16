@@ -39,7 +39,9 @@ class FakeContainer:
         self.metadata: dict[str, str] = {}
 
     def create_container(
-        self, *, metadata: dict[str, str] | None = None,
+        self,
+        *,
+        metadata: dict[str, str] | None = None,
     ) -> None:
         if self.created:
             raise _Exists(self.name)
@@ -103,7 +105,8 @@ def _spec(**overrides: Any) -> ProvisionSpec:
 
 
 def test_provision_creates_container(
-    driver: BlobStorageDriver, fake_client: FakeBlobServiceClient,
+    driver: BlobStorageDriver,
+    fake_client: FakeBlobServiceClient,
 ) -> None:
     result = driver.provision(_spec())
     assert result.ok
@@ -112,10 +115,11 @@ def test_provision_creates_container(
 
 
 def test_provision_metadata_recorded(
-    driver: BlobStorageDriver, fake_client: FakeBlobServiceClient,
+    driver: BlobStorageDriver,
+    fake_client: FakeBlobServiceClient,
 ) -> None:
     driver.provision(_spec())
-    container = list(fake_client.containers.values())[0]
+    container = next(iter(fake_client.containers.values()))
     assert container.metadata["astrolift_io_organization"] == "acme"
     assert container.metadata["astrolift_io_app"] == "api"
 
@@ -138,21 +142,25 @@ def test_status_deprovisioned(driver: BlobStorageDriver) -> None:
 
 
 def test_deprovision_retains_by_default(
-    driver: BlobStorageDriver, fake_client: FakeBlobServiceClient,
+    driver: BlobStorageDriver,
+    fake_client: FakeBlobServiceClient,
 ) -> None:
     res = driver.provision(_spec())
     driver.deprovision(
-        DeprovisionSpec(handle=res.handle), delete_data=False,
+        DeprovisionSpec(handle=res.handle),
+        delete_data=False,
     )
     assert len(fake_client.containers) == 1
 
 
 def test_deprovision_deletes_when_flag(
-    driver: BlobStorageDriver, fake_client: FakeBlobServiceClient,
+    driver: BlobStorageDriver,
+    fake_client: FakeBlobServiceClient,
 ) -> None:
     res = driver.provision(_spec())
     driver.deprovision(
-        DeprovisionSpec(handle=res.handle), delete_data=True,
+        DeprovisionSpec(handle=res.handle),
+        delete_data=True,
     )
     assert fake_client.containers == {}
 
@@ -167,10 +175,7 @@ def test_binding_emits_required_envs(driver: BlobStorageDriver) -> None:
         "AZURE_BLOB_CONTAINER",
         "AZURE_BLOB_ENDPOINT",
     }
-    assert (
-        binding.env_vars["AZURE_BLOB_ENDPOINT"].literal
-        == "https://acmeprod.blob.core.windows.net/foo-bucket"
-    )
+    assert binding.env_vars["AZURE_BLOB_ENDPOINT"].literal == "https://acmeprod.blob.core.windows.net/foo-bucket"
 
 
 def test_container_name_canonicalization(driver: BlobStorageDriver) -> None:

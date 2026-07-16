@@ -135,6 +135,97 @@ def test_start_deployment_refuses_when_paused(
     assert result.errors[0].code == "PRECONDITION"
 
 
+def test_start_deployment_refuses_job_family_agent_only_app(
+    org, app, env, actor, fake_info, permission_resolver, no_temporal
+):
+    """#1093: an app whose manifest declares ONLY Job-family (task) agent
+    workloads renders zero deployable resources — refuse synchronously with
+    a pointer at registerAgentRepo instead of async-failing in pre-flight
+    (the live repro: pending→failed with an empty aborted_reason). Covers
+    both the implicit default (run_family omitted → task) and the explicit
+    ``run_family = "task"`` spelling."""
+    _grant_all(permission_resolver, org.id)
+    app.manifest_raw = (
+        'name = "hello"\n\n'
+        '[[workloads]]\nname = "helper-agent"\nkind = "agent"\n\n'
+        '[[workloads]]\nname = "batch-agent"\nkind = "agent"\nrun_family = "task"\n'
+    )
+    app.save(update_fields=["manifest_raw", "updated_at", "version"])
+
+    mut = LifecycleMutation()
+    with _tenant_for(org, actor):
+        result = mut.start_deployment(
+            fake_info,
+            input=StartDeploymentInput(
+                app_slug=app.slug,
+                environment_name=env.name,
+                image_tag="v1.0.0",
+            ),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "PRECONDITION"
+    assert "registerAgentRepo" in result.errors[0].message
+    # No Deployment row minted — the refusal is fully synchronous.
+    assert Deployment.objects.filter(registered_app=app).count() == 0
+
+
+def test_start_deployment_allows_service_family_agent_only_app(
+    org, app, env, actor, fake_info, permission_resolver, temporal_recorder
+):
+    """A service-family agent IS deployable — the manifest renderer emits a
+    standing Deployment (+Service/HPA) for ``kind=agent`` with
+    ``run_family = "service"`` (#1012/#1027) — so an app whose workloads are
+    all service-family agents must deploy, not be refused (#1093)."""
+    _grant_all(permission_resolver, org.id)
+    app.manifest_raw = (
+        'name = "hello"\n\n'
+        '[[workloads]]\nname = "agent-svc"\nkind = "agent"\nrun_family = "service"\n'
+    )
+    app.save(update_fields=["manifest_raw", "updated_at", "version"])
+
+    mut = LifecycleMutation()
+    with _tenant_for(org, actor):
+        result = mut.start_deployment(
+            fake_info,
+            input=StartDeploymentInput(
+                app_slug=app.slug,
+                environment_name=env.name,
+                image_tag="v1.0.0",
+            ),
+        )
+
+    assert result.ok, result.errors
+    assert result.data.status == Deployment.Status.PENDING.value
+
+
+def test_start_deployment_allows_mixed_manifest_with_agent(
+    org, app, env, actor, fake_info, permission_resolver, temporal_recorder
+):
+    """A manifest that carries an agent NEXT TO a deployable workload still
+    deploys — only the agent-ONLY shape is refused (#1093)."""
+    _grant_all(permission_resolver, org.id)
+    app.manifest_raw = (
+        'name = "hello"\n\n'
+        '[[workloads]]\nname = "web"\nkind = "deployment"\n\n'
+        '[[workloads]]\nname = "helper-agent"\nkind = "agent"\n'
+    )
+    app.save(update_fields=["manifest_raw", "updated_at", "version"])
+
+    mut = LifecycleMutation()
+    with _tenant_for(org, actor):
+        result = mut.start_deployment(
+            fake_info,
+            input=StartDeploymentInput(
+                app_slug=app.slug,
+                environment_name=env.name,
+                image_tag="v1.0.0",
+            ),
+        )
+
+    assert result.ok, result.errors
+
+
 def test_start_deployment_unknown_trigger_kind(
     org, app, env, actor, fake_info, permission_resolver, no_temporal
 ):

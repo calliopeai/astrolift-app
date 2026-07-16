@@ -90,11 +90,11 @@ class ChainValidationResult:
 # accounts via OIDC federation) require both sides to wire
 # matching trust policies.
 SUPPORTED_CROSS_PLUGIN_PAIRS: set[tuple[str, str]] = {
-    ("aws", "aws"),       # AssumeRole chain within AWS
-    ("gcp", "gcp"),       # service-account impersonation within GCP
-    ("azure", "azure"),   # cross-subscription managed identity
-    ("k8s_native", "aws"),    # k8s SA → AWS via OIDC IRSA
-    ("k8s_native", "gcp"),    # k8s SA → GCP via WI federation
+    ("aws", "aws"),  # AssumeRole chain within AWS
+    ("gcp", "gcp"),  # service-account impersonation within GCP
+    ("azure", "azure"),  # cross-subscription managed identity
+    ("k8s_native", "aws"),  # k8s SA → AWS via OIDC IRSA
+    ("k8s_native", "gcp"),  # k8s SA → GCP via WI federation
     ("k8s_native", "azure"),  # k8s SA → Azure via federated credentials
     # Cross-cloud federation pairs (operator opt-in; require
     # explicit OIDC-issuer trust at both ends)
@@ -113,11 +113,12 @@ def validate_chain(chain: IdentityChain) -> ChainValidationResult:
     if not chain.hops:
         return ChainValidationResult(
             ok=False,
-            failures=[ChainValidationFailure(
-                code="empty_chain",
-                message="chain has no hops; at least the k8s SA "
-                        "+ a terminal role are required",
-            )],
+            failures=[
+                ChainValidationFailure(
+                    code="empty_chain",
+                    message="chain has no hops; at least the k8s SA + a terminal role are required",
+                )
+            ],
         )
 
     # Cycle detection — same (plugin_id, account_id, identity_name)
@@ -126,15 +127,15 @@ def validate_chain(chain: IdentityChain) -> ChainValidationResult:
     for index, hop in enumerate(chain.hops):
         key = (hop.plugin_id, hop.account_id, hop.identity_name)
         if key in seen:
-            failures.append(ChainValidationFailure(
-                code="cycle",
-                hop_index=index,
-                message=(
-                    f"hop {index} repeats earlier hop "
-                    f"({hop.plugin_id}, {hop.account_id}, "
-                    f"{hop.identity_name})"
-                ),
-            ))
+            failures.append(
+                ChainValidationFailure(
+                    code="cycle",
+                    hop_index=index,
+                    message=(
+                        f"hop {index} repeats earlier hop ({hop.plugin_id}, {hop.account_id}, {hop.identity_name})"
+                    ),
+                )
+            )
         seen.add(key)
 
     # Cross-plugin transitions must be supported pairs
@@ -144,25 +145,26 @@ def validate_chain(chain: IdentityChain) -> ChainValidationResult:
         if prev.plugin_id != curr.plugin_id:
             pair = (prev.plugin_id, curr.plugin_id)
             if pair not in SUPPORTED_CROSS_PLUGIN_PAIRS:
-                failures.append(ChainValidationFailure(
-                    code="unsupported_cross_plugin",
-                    hop_index=index,
-                    message=(
-                        f"transition {prev.plugin_id} → "
-                        f"{curr.plugin_id} not in supported pairs"
-                    ),
-                ))
+                failures.append(
+                    ChainValidationFailure(
+                        code="unsupported_cross_plugin",
+                        hop_index=index,
+                        message=(f"transition {prev.plugin_id} → {curr.plugin_id} not in supported pairs"),
+                    )
+                )
             # Cross-plugin hops require an explicit audience
             if not curr.audience:
-                failures.append(ChainValidationFailure(
-                    code="missing_audience",
-                    hop_index=index,
-                    message=(
-                        f"cross-plugin hop {index} "
-                        f"({prev.plugin_id} → {curr.plugin_id}) "
-                        f"requires an OIDC audience claim"
-                    ),
-                ))
+                failures.append(
+                    ChainValidationFailure(
+                        code="missing_audience",
+                        hop_index=index,
+                        message=(
+                            f"cross-plugin hop {index} "
+                            f"({prev.plugin_id} → {curr.plugin_id}) "
+                            f"requires an OIDC audience claim"
+                        ),
+                    )
+                )
 
     return ChainValidationResult(ok=not failures, failures=failures)
 

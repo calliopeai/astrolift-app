@@ -160,17 +160,11 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
             )
 
         model_artifact = (
-            cfg.get("model_artifact")
-            or _SIZE_TO_MODEL_ARTIFACT.get(spec.size)
-            or self._config.default_model_artifact
+            cfg.get("model_artifact") or _SIZE_TO_MODEL_ARTIFACT.get(spec.size) or self._config.default_model_artifact
         )
-        machine_type = (
-            cfg.get("machine_type")
-            or _SIZE_TO_MACHINE_TYPE.get(spec.size, "n1-standard-2")
-        )
+        machine_type = cfg.get("machine_type") or _SIZE_TO_MACHINE_TYPE.get(spec.size, "n1-standard-2")
         min_replicas = int(
-            cfg.get("min_replica_count")
-            or _SIZE_TO_REPLICAS.get(spec.size, 1),
+            cfg.get("min_replica_count") or _SIZE_TO_REPLICAS.get(spec.size, 1),
         )
         max_replicas = int(
             cfg.get("max_replica_count") or max(min_replicas, 1) * 2,
@@ -188,10 +182,7 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
             ),
         )
 
-        parent = (
-            f"projects/{self._config.project_id}"
-            f"/locations/{self._config.region}"
-        )
+        parent = f"projects/{self._config.project_id}/locations/{self._config.region}"
         endpoint_body: dict[str, Any] = {
             "display_name": base_name,
             "labels": _labels_for(spec),
@@ -359,15 +350,8 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
             )
 
         deployed = _get(existing, "deployed_models", []) or []
-        live_models = [
-            d for d in deployed
-            if _live_traffic_for(existing, _get(d, "id", "")) > 0
-        ]
-        if (
-            not force_destroy
-            and not delete_data
-            and live_models
-        ):
+        live_models = [d for d in deployed if _live_traffic_for(existing, _get(d, "id", "")) > 0]
+        if not force_destroy and not delete_data and live_models:
             return DeprovisionResult(
                 ok=False,
                 handle=spec.handle,
@@ -455,10 +439,7 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
         return ServiceStatus(
             handle=handle.handle,
             state=state,
-            message=(
-                f"vertex endpoint reports {len(deployed)} "
-                f"deployed model(s)"
-            ),
+            message=(f"vertex endpoint reports {len(deployed)} deployed model(s)"),
         )
 
     @driver_op(cloud="gcp", driver="model_endpoint_vertex")
@@ -470,21 +451,14 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
                 f"binding requested for missing vertex endpoint {base_name}",
             )
         deployed = _get(existing, "deployed_models", []) or []
-        deployed_id = (
-            _get(deployed[0], "id", "")
-            if deployed
-            else _deployed_model_id_for(base_name=base_name)
-        )
+        deployed_id = _get(deployed[0], "id", "") if deployed else _deployed_model_id_for(base_name=base_name)
         endpoint_id = _resource_id_of(existing) or base_name
 
         return Binding(
             env_vars={
                 # Canonical contract envs
                 "MODEL_ENDPOINT_URL": ValueRef(
-                    literal=(
-                        f"https://{self._config.region}-aiplatform"
-                        f".googleapis.com"
-                    ),
+                    literal=(f"https://{self._config.region}-aiplatform.googleapis.com"),
                 ),
                 "MODEL_ENDPOINT_MODEL_ID": ValueRef(literal=deployed_id),
                 "MODEL_ENDPOINT_PROVIDER": ValueRef(literal="vertex_ai"),
@@ -565,7 +539,9 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
                 "min_replica_count": {"type": "integer", "minimum": 1},
                 "max_replica_count": {"type": "integer", "minimum": 1},
                 "traffic_percentage": {
-                    "type": "integer", "minimum": 0, "maximum": 100,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100,
                 },
                 "public_endpoint_enabled": {"type": "boolean"},
                 "network": {"type": "string"},
@@ -576,23 +552,13 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={
-                "MODEL_ENDPOINT_URL": (
-                    "Vertex AI Platform HTTPS endpoint base URL"
-                ),
-                "MODEL_ENDPOINT_MODEL_ID": (
-                    "Deployed-model id within the endpoint"
-                ),
-                "MODEL_ENDPOINT_PROVIDER": (
-                    "Provider literal: 'vertex_ai'"
-                ),
+                "MODEL_ENDPOINT_URL": ("Vertex AI Platform HTTPS endpoint base URL"),
+                "MODEL_ENDPOINT_MODEL_ID": ("Deployed-model id within the endpoint"),
+                "MODEL_ENDPOINT_PROVIDER": ("Provider literal: 'vertex_ai'"),
                 "VERTEX_PROJECT_ID": "GCP project hosting the endpoint",
                 "VERTEX_REGION": "Region of the endpoint",
-                "VERTEX_ENDPOINT_ID": (
-                    "Resource id of the Endpoint to call predict on"
-                ),
-                "VERTEX_DEPLOYED_MODEL_ID": (
-                    "Deployed-model id (string) within the endpoint"
-                ),
+                "VERTEX_ENDPOINT_ID": ("Resource id of the Endpoint to call predict on"),
+                "VERTEX_DEPLOYED_MODEL_ID": ("Deployed-model id (string) within the endpoint"),
             },
         )
 
@@ -605,11 +571,7 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
             )
         except Exception as exc:
             err = str(exc)
-            if (
-                "404" in err
-                or "NotFound" in err
-                or "not found" in err.lower()
-            ):
+            if "404" in err or "NotFound" in err or "not found" in err.lower():
                 return None
             raise
 
@@ -620,9 +582,7 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
             f"{spec.environment_name}-"
             f"{spec.service_handle_hint or 'm'}"
         ).lower()
-        clean = "".join(
-            c if (c.isalnum() or c == "-") else "-" for c in raw
-        )
+        clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in raw)
         while "--" in clean:
             clean = clean.replace("--", "-")
         clean = clean.strip("-")
@@ -646,11 +606,7 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
         return base_name
 
     def _endpoint_name(self, base_name: str) -> str:
-        return (
-            f"projects/{self._config.project_id}"
-            f"/locations/{self._config.region}"
-            f"/endpoints/{base_name}"
-        )
+        return f"projects/{self._config.project_id}/locations/{self._config.region}/endpoints/{base_name}"
 
 
 # ----- module-level helpers --------------------------------------------
@@ -660,9 +616,7 @@ def _deployed_model_id_for(*, base_name: str) -> str:
     """Vertex deployed-model ids: ``[a-z][a-z0-9_]{0,127}``.
     Derive deterministically from the base name so provision +
     binding agree without round-tripping state."""
-    sanitized = "".join(
-        c if (c.isalnum() or c == "_") else "_" for c in base_name
-    )
+    sanitized = "".join(c if (c.isalnum() or c == "_") else "_" for c in base_name)
     if not sanitized or not sanitized[0].isalpha():
         sanitized = "d" + sanitized
     return f"{sanitized}_d"[:128]
@@ -670,9 +624,7 @@ def _deployed_model_id_for(*, base_name: str) -> str:
 
 def _labels_for(spec: ProvisionSpec) -> dict[str, str]:
     def _sanitize(s: str) -> str:
-        return "".join(
-            c if c.isalnum() or c in "-_" else "-" for c in s.lower()
-        )
+        return "".join(c if c.isalnum() or c in "-_" else "-" for c in s.lower())
 
     base = {
         "astrolift-managed-by": "platform",
@@ -715,11 +667,7 @@ def _live_traffic_for(endpoint: Any, deployed_id: str) -> int:
     split = _get(endpoint, "traffic_split", None)
     if split is None:
         return 0
-    val = (
-        split.get(deployed_id)
-        if isinstance(split, dict)
-        else getattr(split, deployed_id, None)
-    )
+    val = split.get(deployed_id) if isinstance(split, dict) else getattr(split, deployed_id, None)
     try:
         return int(val or 0)
     except (TypeError, ValueError):

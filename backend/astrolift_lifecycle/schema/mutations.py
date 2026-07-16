@@ -802,6 +802,33 @@ def _resolve_app_env(app_slug: str, environment_name: str) -> tuple[RegisteredAp
     return app, env
 
 
+def _manifest_job_agents_only(app: RegisteredApp) -> bool:
+    """True when the app's saved manifest declares workloads and ALL are
+    Job-family agents — ``kind=agent`` with ``run_family != "service"``
+    (#1093, #1027).
+
+    Only a task-family agent renders nothing on the deploy pipeline (it
+    is dispatched as a one-shot K8s Job by the agent spine). A
+    ``service``-family agent IS deployable — the renderer emits a
+    standing Deployment (+Service/HPA) for it, so it must flow through
+    startDeployment like any other workload (#1012). Refuse only when
+    the manifest would yield zero deployable resources. Best-effort: an
+    empty or unparseable manifest falls through to the pre-flight gates,
+    which already produce clear errors for those cases."""
+    try:
+        from astrolift_manifest.normalize import NormalizationDefaults, normalize
+        from astrolift_manifest.parser import parse_raw
+
+        manifest = normalize(parse_raw(app.manifest_raw or ""), defaults=NormalizationDefaults())
+    except Exception:  # noqa: BLE001 — unparseable manifest: defer to pre-flight
+        return False
+    workloads = manifest.workloads
+    return bool(workloads) and all(
+        getattr(w, "kind", "") == "agent" and getattr(w, "run_family", "task") != "service"
+        for w in workloads
+    )
+
+
 def _required_approvals_for(app: RegisteredApp, env: AppEnvironment) -> int:
     """How many approvals does this deploy need?
 
@@ -1266,6 +1293,20 @@ class LifecycleMutation:
                 f"app {input.app_slug!r} environment {input.environment_name!r} not found",
             )
         app, env = resolved
+
+        # #1093: an app whose manifest yields zero deployable resources
+        # (all workloads are Job-family agents) has nothing the deploy
+        # pipeline can roll out — refuse here with a pointer at the right
+        # surface instead of letting the workflow async-fail in pre-flight.
+        # Service-family agents deploy normally (#1012/#1027).
+        if _manifest_job_agents_only(app):
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"app {app.slug!r} declares only Job-family (run_family=task) agent "
+                "workloads, which render no deployable resources — they dispatch via "
+                "the agent spine (registerAgentRepo); nothing to deploy",
+                field="appSlug",
+            )
 
         if env.deploys_paused:
             return gql_failure(
@@ -4434,8 +4475,8 @@ class LifecycleMutation:
     def run_task(
         self,
         info: Info,
-        input: "RunTaskInput",
-    ) -> "MutationResultType[TaskRunPayloadType]":
+        input: RunTaskInput,
+    ) -> MutationResultType[TaskRunPayloadType]:
         """Trigger a one-shot execution of a ``kind: task`` workload.
 
         Creates a ``TaskRun`` record in ``pending`` status and returns it.

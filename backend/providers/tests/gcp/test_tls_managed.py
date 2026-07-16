@@ -44,7 +44,10 @@ class FakeComputeClient:
     certs: dict[str, FakeSslCertificate] = field(default_factory=dict)
 
     def insert(
-        self, *, project: str, ssl_certificate_resource: Any,
+        self,
+        *,
+        project: str,
+        ssl_certificate_resource: Any,
     ) -> FakeOperation:
         if ssl_certificate_resource.name in self.certs:
             raise _AlreadyExists(ssl_certificate_resource.name)
@@ -57,7 +60,10 @@ class FakeComputeClient:
         return self.certs[ssl_certificate]
 
     def delete(
-        self, *, project: str, ssl_certificate: str,
+        self,
+        *,
+        project: str,
+        ssl_certificate: str,
     ) -> FakeOperation:
         if ssl_certificate not in self.certs:
             raise _NotFound(ssl_certificate)
@@ -89,7 +95,8 @@ def patch_compute_module() -> Any:
 
     google_module = sys.modules.get("google", types.ModuleType("google"))
     cloud_module = sys.modules.get(
-        "google.cloud", types.ModuleType("google.cloud"),
+        "google.cloud",
+        types.ModuleType("google.cloud"),
     )
     if not hasattr(google_module, "cloud"):
         google_module.cloud = cloud_module
@@ -116,7 +123,8 @@ def driver(fake_client: FakeComputeClient) -> GCPManagedCertDriver:
 
 
 def test_ensure_certificate_creates_managed_ssl(
-    driver: GCPManagedCertDriver, fake_client: FakeComputeClient,
+    driver: GCPManagedCertDriver,
+    fake_client: FakeComputeClient,
 ) -> None:
     cert = driver.ensure_certificate(
         domain="api.example.com",
@@ -125,21 +133,20 @@ def test_ensure_certificate_creates_managed_ssl(
     )
     assert cert.domain == "api.example.com"
     # The fake client recorded an insert
-    assert any(
-        c.name.startswith("astrolift-")
-        for c in fake_client.certs.values()
-    )
+    assert any(c.name.startswith("astrolift-") for c in fake_client.certs.values())
 
 
 def test_ensure_certificate_idempotent_on_already_exists(
     driver: GCPManagedCertDriver,
 ) -> None:
     driver.ensure_certificate(
-        domain="api.example.com", strategy="gcp_managed_cert",
+        domain="api.example.com",
+        strategy="gcp_managed_cert",
     )
     # Second call shouldn't blow up
     cert = driver.ensure_certificate(
-        domain="api.example.com", strategy="gcp_managed_cert",
+        domain="api.example.com",
+        strategy="gcp_managed_cert",
     )
     assert cert.domain == "api.example.com"
 
@@ -149,7 +156,8 @@ def test_unknown_strategy_rejected(
 ) -> None:
     with pytest.raises(ValueError, match="unknown strategy"):
         driver.ensure_certificate(
-            domain="x.com", strategy="invalid",
+            domain="x.com",
+            strategy="invalid",
         )
 
 
@@ -161,12 +169,14 @@ def test_get_certificate_not_found(
 
 
 def test_revoke_deletes_cert(
-    driver: GCPManagedCertDriver, fake_client: FakeComputeClient,
+    driver: GCPManagedCertDriver,
+    fake_client: FakeComputeClient,
 ) -> None:
     driver.ensure_certificate(
-        domain="api.example.com", strategy="gcp_managed_cert",
+        domain="api.example.com",
+        strategy="gcp_managed_cert",
     )
-    name = list(fake_client.certs.keys())[0]
+    name = next(iter(fake_client.certs.keys()))
     driver.revoke_certificate(name)
     assert fake_client.certs == {}
 

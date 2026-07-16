@@ -226,7 +226,7 @@ class ServiceBusDriver(ManagedServiceDriver):
                     ],
                 ),
             ],
-            notes=("Workload Identity grants sender + receiver roles via " "Microsoft.Authorization/roleAssignments."),
+            notes=("Workload Identity grants sender + receiver roles via Microsoft.Authorization/roleAssignments."),
         )
 
     @driver_op(cloud="azure", driver="queue_servicebus")
@@ -243,7 +243,7 @@ class ServiceBusDriver(ManagedServiceDriver):
         from _sdk import UnsupportedOperationError
 
         raise UnsupportedOperationError(
-            "managed_service.restore(ServiceBus) not supported -- Service " "Bus doesn't restore from snapshot (#618)",
+            "managed_service.restore(ServiceBus) not supported -- Service Bus doesn't restore from snapshot (#618)",
         )
 
     @driver_op(cloud="azure", driver="queue_servicebus", heartbeat=False)
@@ -442,7 +442,7 @@ class AzureServiceBusDriver(ManagedServiceDriver):
         return ProvisionResult(
             ok=True,
             handle=self._handle_for(topic_name=topic_name),
-            message=(f"Service Bus topic {topic_name} + subscription " f"{sub_name} provisioned"),
+            message=(f"Service Bus topic {topic_name} + subscription {sub_name} provisioned"),
         )
 
     @driver_op(cloud="azure", driver="queue_servicebus_v2")
@@ -659,7 +659,7 @@ class AzureServiceBusDriver(ManagedServiceDriver):
         target: ProvisionSpec,
     ) -> ProvisionResult:
         raise AzureServiceBusError(
-            "Service Bus has no restore counterpart -- in-flight " "messages have no recovery value",
+            "Service Bus has no restore counterpart -- in-flight messages have no recovery value",
         )
 
     @driver_op(cloud="azure", driver="queue_servicebus_v2", heartbeat=False)

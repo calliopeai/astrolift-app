@@ -81,7 +81,12 @@ def discover_vpc(cluster, *, region: str, ec2, eks) -> tuple[str, list[str], str
 
 
 def ensure_security_group(
-    *, vpc_id: str, vpc_cidr: str, port: int, name: str, ec2,
+    *,
+    vpc_id: str,
+    vpc_cidr: str,
+    port: int,
+    name: str,
+    ec2,
 ) -> str:
     """Find-or-create a SG in ``vpc_id`` admitting ``port`` from the VPC
     CIDR (the pods that consume the DB live in this VPC). Idempotent."""
@@ -132,14 +137,16 @@ def ensure_rds_subnet_group(*, name: str, subnet_ids: list[str], rds) -> str:
             Tags=_MANAGED_TAGS,
         )
     except Exception as exc:
-        if "DBSubnetGroupAlreadyExists" not in type(exc).__name__ and \
-                "already exists" not in str(exc).lower():
+        if "DBSubnetGroupAlreadyExists" not in type(exc).__name__ and "already exists" not in str(exc).lower():
             raise
     return name
 
 
 def ensure_elasticache_subnet_group(
-    *, name: str, subnet_ids: list[str], elasticache,
+    *,
+    name: str,
+    subnet_ids: list[str],
+    elasticache,
 ) -> str:
     try:
         elasticache.create_cache_subnet_group(
@@ -149,8 +156,7 @@ def ensure_elasticache_subnet_group(
             Tags=_MANAGED_TAGS,
         )
     except Exception as exc:
-        if "CacheSubnetGroupAlreadyExists" not in type(exc).__name__ and \
-                "already exists" not in str(exc).lower():
+        if "CacheSubnetGroupAlreadyExists" not in type(exc).__name__ and "already exists" not in str(exc).lower():
             raise
     return name
 
@@ -177,22 +183,37 @@ def ensure_db_networking(
 
     ec2, rds, elasticache, eks = clients or _clients(region)
     vpc_id, subnet_ids, vpc_cidr = discover_vpc(
-        cluster, region=region, ec2=ec2, eks=eks,
+        cluster,
+        region=region,
+        ec2=ec2,
+        eks=eks,
     )
     sg_name = f"astrolift-{cluster.slug}-db"[:255]
-    sg_id = str(pc["db_security_group_ids"][0]) if pc.get("db_security_group_ids") else \
-        ensure_security_group(
-            vpc_id=vpc_id, vpc_cidr=vpc_cidr, port=port, name=sg_name, ec2=ec2,
+    sg_id = (
+        str(pc["db_security_group_ids"][0])
+        if pc.get("db_security_group_ids")
+        else ensure_security_group(
+            vpc_id=vpc_id,
+            vpc_cidr=vpc_cidr,
+            port=port,
+            name=sg_name,
+            ec2=ec2,
         )
+    )
     grp_name = str(pc.get(group_key, f"astrolift-{cluster.slug}-db"))[:255]
     if service == "elasticache":
         ensure_elasticache_subnet_group(
-            name=grp_name, subnet_ids=subnet_ids, elasticache=elasticache,
+            name=grp_name,
+            subnet_ids=subnet_ids,
+            elasticache=elasticache,
         )
     else:
         ensure_rds_subnet_group(name=grp_name, subnet_ids=subnet_ids, rds=rds)
     log.info(
         "ensured db networking cluster=%s service=%s group=%s sg=%s",
-        cluster.slug, service, grp_name, sg_id,
+        cluster.slug,
+        service,
+        grp_name,
+        sg_id,
     )
     return grp_name, [sg_id]

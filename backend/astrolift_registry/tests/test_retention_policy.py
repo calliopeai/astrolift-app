@@ -60,7 +60,10 @@ def test_creates_new_policy(permission_resolver):
     assert result.ok, result.errors
     assert result.data.signal == "logs"
     assert result.data.retention_days == 30
-    assert RetentionPolicy.objects.filter(registered_app=app, signal="logs", deleted_at__isnull=True).count() == 1
+    assert (
+        RetentionPolicy.objects.filter(registered_app=app, signal="logs", deleted_at__isnull=True).count()
+        == 1
+    )
 
 
 def test_updates_existing_policy(permission_resolver):
@@ -79,7 +82,10 @@ def test_updates_existing_policy(permission_resolver):
 
     assert result.ok, result.errors
     assert result.data.retention_days == 60
-    assert RetentionPolicy.objects.filter(registered_app=app, signal="metrics", deleted_at__isnull=True).count() == 1
+    assert (
+        RetentionPolicy.objects.filter(registered_app=app, signal="metrics", deleted_at__isnull=True).count()
+        == 1
+    )
 
 
 def test_rejects_invalid_signal(permission_resolver):

@@ -172,7 +172,7 @@ class Command(BaseCommand):
         except json.JSONDecodeError as exc:
             raise CommandError(f"--command is not valid JSON: {exc}") from exc
         if not isinstance(command, list) or not all(isinstance(part, str) for part in command):
-            raise CommandError("--command must be a JSON list of strings, e.g. '[\"/bin/sh\",\"-c\",\"...\"]'")
+            raise CommandError('--command must be a JSON list of strings, e.g. \'["/bin/sh","-c","..."]\'')
 
         app_slug = options["app_slug"]
         workflow_slug = options["workflow_slug"]
@@ -310,9 +310,7 @@ class Command(BaseCommand):
         self.stdout.write(f"  tenant_cluster    {cluster.slug} (pk={cluster.pk}) [resolved]")
         self.stdout.write(f"  team              {team.slug} (pk={team.pk})")
         self.stdout.write(f"  project           {project.slug} (pk={project.pk})")
-        self.stdout.write(
-            f"  registered_app    {app.slug} (pk={app.pk}) [{_verb(app_created)}]"
-        )
+        self.stdout.write(f"  registered_app    {app.slug} (pk={app.pk}) [{_verb(app_created)}]")
         self.stdout.write(
             f"  workload          {workload.slug} (pk={workload.pk}, "
             f"kind={workload.kind}) [{_verb(workload_created)}]"

@@ -22,9 +22,12 @@ from k8s_native.managed.redis_operator import (
 
 def _spec(**overrides) -> ProvisionSpec:
     base = dict(
-        organization_id="1", organization_slug="acme",
-        app_id="1", app_slug="api",
-        environment_id="1", environment_name="prod",
+        organization_id="1",
+        organization_slug="acme",
+        app_id="1",
+        app_slug="api",
+        environment_id="1",
+        environment_name="prod",
         tenant_cluster_id="local-k8s",
         service_handle_hint="db",
         size="small",
@@ -48,11 +51,15 @@ def test_cnpg_size_translates_to_instances() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = ApplyResult(
         created=["Cluster/api-prod-db"],
-        updated=[], unchanged=[], errors=[],
+        updated=[],
+        unchanged=[],
+        errors=[],
     )
-    driver = CNPGPostgresDriver(config=CNPGConfig(
-        cluster_driver=cluster_driver,
-    ))
+    driver = CNPGPostgresDriver(
+        config=CNPGConfig(
+            cluster_driver=cluster_driver,
+        )
+    )
     driver.provision(_spec(size="large"))
     args, _ = cluster_driver.apply_manifests.call_args
     manifest = args[2][0]
@@ -63,11 +70,16 @@ def test_cnpg_size_translates_to_instances() -> None:
 def test_cnpg_extensions_in_post_init_sql() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = ApplyResult(
-        created=[], updated=[], unchanged=[], errors=[],
+        created=[],
+        updated=[],
+        unchanged=[],
+        errors=[],
     )
-    driver = CNPGPostgresDriver(config=CNPGConfig(
-        cluster_driver=cluster_driver,
-    ))
+    driver = CNPGPostgresDriver(
+        config=CNPGConfig(
+            cluster_driver=cluster_driver,
+        )
+    )
     driver.provision(_spec(config={"extensions": ["pg_trgm", "vector"]}))
     args, _ = cluster_driver.apply_manifests.call_args
     manifest = args[2][0]
@@ -79,12 +91,17 @@ def test_cnpg_extensions_in_post_init_sql() -> None:
 def test_cnpg_storage_class_config_threaded() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = ApplyResult(
-        created=[], updated=[], unchanged=[], errors=[],
+        created=[],
+        updated=[],
+        unchanged=[],
+        errors=[],
     )
-    driver = CNPGPostgresDriver(config=CNPGConfig(
-        cluster_driver=cluster_driver,
-        storage_class="fast-ssd",
-    ))
+    driver = CNPGPostgresDriver(
+        config=CNPGConfig(
+            cluster_driver=cluster_driver,
+            storage_class="fast-ssd",
+        )
+    )
     driver.provision(_spec())
     args, _ = cluster_driver.apply_manifests.call_args
     manifest = args[2][0]
@@ -103,12 +120,16 @@ def test_cnpg_binding_emits_db_env_vars() -> None:
 def test_cnpg_provision_failure_propagates() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = ApplyResult(
-        created=[], updated=[], unchanged=[],
+        created=[],
+        updated=[],
+        unchanged=[],
         errors=["webhook denied"],
     )
-    driver = CNPGPostgresDriver(config=CNPGConfig(
-        cluster_driver=cluster_driver,
-    ))
+    driver = CNPGPostgresDriver(
+        config=CNPGConfig(
+            cluster_driver=cluster_driver,
+        )
+    )
     result = driver.provision(_spec())
     assert result.ok is False
 
@@ -119,11 +140,16 @@ def test_cnpg_provision_failure_propagates() -> None:
 def test_redis_provision_single_instance_for_small() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = ApplyResult(
-        created=[], updated=[], unchanged=[], errors=[],
+        created=[],
+        updated=[],
+        unchanged=[],
+        errors=[],
     )
-    driver = RedisOperatorDriver(config=RedisOperatorConfig(
-        cluster_driver=cluster_driver,
-    ))
+    driver = RedisOperatorDriver(
+        config=RedisOperatorConfig(
+            cluster_driver=cluster_driver,
+        )
+    )
     driver.provision(_spec(size="small"))
     args, _ = cluster_driver.apply_manifests.call_args
     manifest = args[2][0]
@@ -134,11 +160,16 @@ def test_redis_provision_single_instance_for_small() -> None:
 def test_redis_provision_replicated_for_medium() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = ApplyResult(
-        created=[], updated=[], unchanged=[], errors=[],
+        created=[],
+        updated=[],
+        unchanged=[],
+        errors=[],
     )
-    driver = RedisOperatorDriver(config=RedisOperatorConfig(
-        cluster_driver=cluster_driver,
-    ))
+    driver = RedisOperatorDriver(
+        config=RedisOperatorConfig(
+            cluster_driver=cluster_driver,
+        )
+    )
     driver.provision(_spec(size="medium"))
     args, _ = cluster_driver.apply_manifests.call_args
     manifest = args[2][0]
@@ -149,11 +180,17 @@ def test_redis_provision_replicated_for_medium() -> None:
 def test_redis_persistent_storage_block() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = ApplyResult(
-        created=[], updated=[], unchanged=[], errors=[],
+        created=[],
+        updated=[],
+        unchanged=[],
+        errors=[],
     )
-    driver = RedisOperatorDriver(config=RedisOperatorConfig(
-        cluster_driver=cluster_driver, persistent=True,
-    ))
+    driver = RedisOperatorDriver(
+        config=RedisOperatorConfig(
+            cluster_driver=cluster_driver,
+            persistent=True,
+        )
+    )
     driver.provision(_spec())
     args, _ = cluster_driver.apply_manifests.call_args
     manifest = args[2][0]
@@ -163,11 +200,17 @@ def test_redis_persistent_storage_block() -> None:
 def test_redis_cache_mode_no_storage() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = ApplyResult(
-        created=[], updated=[], unchanged=[], errors=[],
+        created=[],
+        updated=[],
+        unchanged=[],
+        errors=[],
     )
-    driver = RedisOperatorDriver(config=RedisOperatorConfig(
-        cluster_driver=cluster_driver, persistent=False,
-    ))
+    driver = RedisOperatorDriver(
+        config=RedisOperatorConfig(
+            cluster_driver=cluster_driver,
+            persistent=False,
+        )
+    )
     driver.provision(_spec(config={"persistent": False}))
     args, _ = cluster_driver.apply_manifests.call_args
     manifest = args[2][0]

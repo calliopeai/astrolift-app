@@ -31,7 +31,7 @@ from aws.managed.dynamodb import (
 )
 
 
-class ResourceNotFoundException(Exception):  # noqa: N818
+class ResourceNotFoundException(Exception):
     """Mirrors the botocore exception class the driver sniffs for by name
     (``type(exc).__name__ == "ResourceNotFoundException"``); the name must
     match verbatim, so the conventional ``Error`` suffix can't apply."""
@@ -544,6 +544,9 @@ def test_managed_config_for_kv_store_defaults_and_overrides() -> None:
 
 
 def test_managed_service_kind_has_kv_store() -> None:
+    # Backend-tree contract — runs in the backend test job (which has
+    # Django); the standalone providers job skips it.
+    pytest.importorskip("django")
     from astrolift_services.models import ManagedService
 
     assert ManagedService.Kind.KV_STORE == "kv_store"

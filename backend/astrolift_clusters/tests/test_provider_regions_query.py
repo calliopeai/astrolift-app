@@ -190,7 +190,9 @@ def test_gcp_driver_list_regions_static():
     from gcp.cluster_gke import GKEClusterDriver, GKEConfig
 
     driver = GKEClusterDriver(
-        config=GKEConfig(project_id="", location="", cluster_name="_region_probe", container_client=MagicMock()),
+        config=GKEConfig(
+            project_id="", location="", cluster_name="_region_probe", container_client=MagicMock()
+        ),
     )
     regions = driver.list_regions()
     slugs = {r.id for r in regions}

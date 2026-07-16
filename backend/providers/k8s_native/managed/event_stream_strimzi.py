@@ -248,8 +248,7 @@ class StrimziKafkaDriver(ManagedServiceDriver):
             },
             iam_grants=[],
             notes=(
-                "Kafka bootstrap routed via Strimzi-managed Service. "
-                "App user credentials live in <cluster>-app-user."
+                "Kafka bootstrap routed via Strimzi-managed Service. App user credentials live in <cluster>-app-user."
             ),
         )
 
@@ -267,7 +266,7 @@ class StrimziKafkaDriver(ManagedServiceDriver):
         from _sdk import UnsupportedOperationError
 
         raise UnsupportedOperationError(
-            "managed_service.restore(Kafka) not supported -- Kafka doesn't " "restore from a snapshot (#618)",
+            "managed_service.restore(Kafka) not supported -- Kafka doesn't restore from a snapshot (#618)",
         )
 
     @driver_op(cloud="k8s_native", driver="event_stream_strimzi", heartbeat=False)

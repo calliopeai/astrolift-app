@@ -63,6 +63,7 @@ def _run_detail_url(pipeline_run) -> str:
     """
     try:
         from django.conf import settings
+
         base = getattr(settings, "ASTROLIFT_UI_BASE_URL", "").rstrip("/")
     except Exception:
         base = ""
@@ -118,8 +119,7 @@ def post_github_commit_status(
     owner, repo = _parse_github_owner_repo(pipeline.repo_url)
     if not owner or not repo:
         logger.warning(
-            "pipeline.commit_status.github.skipped_bad_repo_url "
-            "pipeline=%s repo_url=%r",
+            "pipeline.commit_status.github.skipped_bad_repo_url " "pipeline=%s repo_url=%r",
             pipeline.guid,
             pipeline.repo_url,
         )
@@ -212,10 +212,7 @@ def post_gitlab_commit_status(
 
     # URL-encode the project_id in case it's a namespace/project string.
     encoded_project = urllib.parse.quote(str(project_id), safe="")
-    url = (
-        f"{gitlab_base_url.rstrip('/')}/api/v4/projects"
-        f"/{encoded_project}/statuses/{commit_sha}"
-    )
+    url = f"{gitlab_base_url.rstrip('/')}/api/v4/projects" f"/{encoded_project}/statuses/{commit_sha}"
 
     payload: dict = {
         "state": status,
@@ -299,6 +296,7 @@ def _get_github_token(pipeline) -> str | None:
     # For now fall through to env-based override (useful in dev/test).
     try:
         from django.conf import settings
+
         return getattr(settings, "PIPELINE_GITHUB_STATUS_TOKEN", None) or None
     except Exception:
         return None

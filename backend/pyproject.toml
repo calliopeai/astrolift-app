@@ -6,6 +6,10 @@ target-version = "py312"
 # in this tree is excluded from automatic formatting until it is
 # refactored or removed; touching it churns diffs without value.
 extend-exclude = [
+  # The providers tree has its own CI job (test (providers)), its own
+  # [tool.ruff] config, and its own ruff pin — checking it here too with
+  # a different ruff version makes the two jobs disagree on formatting.
+  "providers",
   "migrations",
   "**/migrations/**",
   "static",

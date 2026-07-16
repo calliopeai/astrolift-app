@@ -224,9 +224,7 @@ def test_kubeconfig_refetched_after_ttl_expiry() -> None:
 
     # Drop the cached blob's value so the second call sees a different
     # kubeconfig and we can verify the refetch end-to-end.
-    fake.managed_clusters.kubeconfig_blob = (
-        b"apiVersion: v1\nkind: Config\nclusters: [{name: rotated}]\n"
-    )
+    fake.managed_clusters.kubeconfig_blob = b"apiVersion: v1\nkind: Config\nclusters: [{name: rotated}]\n"
     clock.advance(50 * 60 + 1)  # one second past the TTL
     backend = RecordingPodBackend()
     drv._pod_backend = backend  # tail-call into a fresh recorder
@@ -277,8 +275,10 @@ def test_separate_cache_keys_per_cluster() -> None:
 def test_clusterautherror_raised_when_sdk_call_fails() -> None:
     fake = FakeAKS(
         managed_clusters=FakeManagedClusters(
-            raise_exc=RuntimeError("HTTP 403 Forbidden — managed identity lacks"
-                                   " Microsoft.ContainerService/managedClusters/listClusterAdminCredential/action"),
+            raise_exc=RuntimeError(
+                "HTTP 403 Forbidden — managed identity lacks"
+                " Microsoft.ContainerService/managedClusters/listClusterAdminCredential/action"
+            ),
         ),
     )
     drv, _ = _driver(fake_aks=fake, clock=_Clock())

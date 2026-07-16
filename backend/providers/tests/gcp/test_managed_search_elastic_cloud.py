@@ -127,7 +127,9 @@ def test_restore_raises_not_implemented(
     driver: GCPElasticCloudStubDriver,
 ) -> None:
     snap = SnapshotHandle(
-        handle="search/x", snapshot_id="snap-1", created_at="",
+        handle="search/x",
+        snapshot_id="snap-1",
+        created_at="",
     )
     with pytest.raises(NotImplementedError):
         driver.restore(snap, _spec())

@@ -178,6 +178,7 @@ def test_post_github_commit_status_context_field():
 
     request = mock_open.call_args[0][0]
     import json
+
     body = json.loads(request.data)
     assert body["context"] == "astrolift/ci"
 
@@ -187,12 +188,11 @@ def test_post_github_commit_status_description_truncated():
     long_desc = "x" * 200
     run = _make_run(status="success")
     with patch("urllib.request.urlopen", return_value=_FakeHTTPResponse(201)) as mock_open:
-        post_github_commit_status(
-            run, "ghp_token", commit_sha="a" * 40, description=long_desc
-        )
+        post_github_commit_status(run, "ghp_token", commit_sha="a" * 40, description=long_desc)
 
     request = mock_open.call_args[0][0]
     import json
+
     body = json.loads(request.data)
     assert len(body["description"]) <= 140
 
@@ -214,6 +214,7 @@ def test_post_github_commit_status_bad_repo_url_skips(caplog):
 
 def test_post_github_commit_status_http_error_does_not_raise():
     import urllib.error
+
     run = _make_run(status="success")
     with patch(
         "urllib.request.urlopen",
@@ -261,9 +262,7 @@ def test_post_gitlab_commit_status_namespace_project_encoded():
     """project_id with slashes must be URL-encoded in the path."""
     run = _make_run(status="success")
     with patch("urllib.request.urlopen", return_value=_FakeHTTPResponse(201)) as mock_open:
-        post_gitlab_commit_status(
-            run, "glpat_token", commit_sha="b" * 40, project_id="acme/myapp"
-        )
+        post_gitlab_commit_status(run, "glpat_token", commit_sha="b" * 40, project_id="acme/myapp")
 
     request = mock_open.call_args[0][0]
     assert "acme%2Fmyapp" in request.full_url
@@ -278,9 +277,7 @@ def test_call_commit_status_skips_non_push_trigger_kinds():
     """schedule / manual / api runs must not trigger a status post."""
     for trigger_kind in ("schedule", "manual", "api"):
         run = _make_run(status="success", trigger_kind=trigger_kind)
-        with patch(
-            "astrolift_pipelines.commit_status.post_github_commit_status"
-        ) as mock_gh:
+        with patch("astrolift_pipelines.commit_status.post_github_commit_status") as mock_gh:
             call_commit_status_after_run(run, commit_sha="a" * 40)
         mock_gh.assert_not_called()
 
@@ -310,9 +307,7 @@ def test_call_commit_status_dispatches_github(monkeypatch):
         "astrolift_pipelines.commit_status._get_github_token",
         lambda pipeline: "ghp_fake",
     )
-    with patch(
-        "astrolift_pipelines.commit_status.post_github_commit_status"
-    ) as mock_gh:
+    with patch("astrolift_pipelines.commit_status.post_github_commit_status") as mock_gh:
         call_commit_status_after_run(run, commit_sha="a" * 40)
 
     mock_gh.assert_called_once()
@@ -330,9 +325,7 @@ def test_call_commit_status_dispatches_gitlab_when_no_github(monkeypatch):
         "astrolift_pipelines.commit_status._get_gitlab_credential",
         lambda pipeline: {"token": "glpat_fake", "project_id": 99},
     )
-    with patch(
-        "astrolift_pipelines.commit_status.post_gitlab_commit_status"
-    ) as mock_gl:
+    with patch("astrolift_pipelines.commit_status.post_gitlab_commit_status") as mock_gl:
         call_commit_status_after_run(run, commit_sha="b" * 40)
 
     mock_gl.assert_called_once()

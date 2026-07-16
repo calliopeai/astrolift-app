@@ -32,13 +32,10 @@ class Command(BaseCommand):
         dry_run = options["dry_run"]
         prefix = "[DRY RUN] " if dry_run else ""
 
-        qs = (
-            AppEnvironment.objects.filter(
-                managed_domain__isnull=True,
-                deleted_at__isnull=True,
-            )
-            .select_related("registered_app__organization")
-        )
+        qs = AppEnvironment.objects.filter(
+            managed_domain__isnull=True,
+            deleted_at__isnull=True,
+        ).select_related("registered_app__organization")
 
         total = qs.count()
         self.stdout.write(f"{prefix}Found {total} AppEnvironment(s) with managed_domain=NULL")
@@ -49,21 +46,15 @@ class Command(BaseCommand):
             org = getattr(env.registered_app, "organization", None)
             domain = resolve_managed_domain(org, for_preview=False)
             if domain is None:
-                self.stdout.write(
-                    f"  SKIP  {env.registered_app.slug}/{env.name} — no matching ManagedDomain"
-                )
+                self.stdout.write(f"  SKIP  {env.registered_app.slug}/{env.name} — no matching ManagedDomain")
                 skipped += 1
                 continue
 
-            self.stdout.write(
-                f"  {prefix}SET   {env.registered_app.slug}/{env.name} → {domain.zone}"
-            )
+            self.stdout.write(f"  {prefix}SET   {env.registered_app.slug}/{env.name} → {domain.zone}")
             if not dry_run:
                 AppEnvironment.objects.filter(pk=env.pk).update(managed_domain=domain)
             updated += 1
 
         self.stdout.write(
-            self.style.SUCCESS(
-                f"{prefix}Done — {updated} updated, {skipped} skipped (no domain found)"
-            )
+            self.style.SUCCESS(f"{prefix}Done — {updated} updated, {skipped} skipped (no domain found)")
         )

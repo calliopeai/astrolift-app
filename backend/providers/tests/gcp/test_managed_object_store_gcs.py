@@ -129,28 +129,31 @@ def _spec(
 
 
 def test_provision_creates_bucket_with_versioning(
-    driver: GCSDriver, fake_storage: FakeStorageClient,
+    driver: GCSDriver,
+    fake_storage: FakeStorageClient,
 ) -> None:
     result = driver.provision(_spec())
     assert result.ok
     assert "object_store/" in result.handle
-    bucket = list(fake_storage.buckets.values())[0]
+    bucket = next(iter(fake_storage.buckets.values()))
     assert bucket.versioning_enabled is True
     assert bucket.iam_configuration.uniform_bucket_level_access_enabled
 
 
 def test_provision_applies_labels(
-    driver: GCSDriver, fake_storage: FakeStorageClient,
+    driver: GCSDriver,
+    fake_storage: FakeStorageClient,
 ) -> None:
     driver.provision(_spec())
-    bucket = list(fake_storage.buckets.values())[0]
+    bucket = next(iter(fake_storage.buckets.values()))
     assert bucket.labels["astrolift-io-organization"] == "acme"
     assert bucket.labels["astrolift-io-app"] == "api"
     assert bucket.labels["astrolift-io-environment"] == "prod"
 
 
 def test_provision_idempotent_on_conflict(
-    driver: GCSDriver, fake_storage: FakeStorageClient,
+    driver: GCSDriver,
+    fake_storage: FakeStorageClient,
 ) -> None:
     driver.provision(_spec())
     # second time, the same bucket name will hit Conflict and be
@@ -171,11 +174,13 @@ def test_status_deprovisioned(driver: GCSDriver) -> None:
 
 
 def test_deprovision_retains_by_default(
-    driver: GCSDriver, fake_storage: FakeStorageClient,
+    driver: GCSDriver,
+    fake_storage: FakeStorageClient,
 ) -> None:
     result = driver.provision(_spec())
     deprov = driver.deprovision(
-        DeprovisionSpec(handle=result.handle), delete_data=False,
+        DeprovisionSpec(handle=result.handle),
+        delete_data=False,
     )
     assert deprov.ok
     # bucket still there
@@ -183,14 +188,16 @@ def test_deprovision_retains_by_default(
 
 
 def test_deprovision_deletes_when_flag_set(
-    driver: GCSDriver, fake_storage: FakeStorageClient,
+    driver: GCSDriver,
+    fake_storage: FakeStorageClient,
 ) -> None:
     result = driver.provision(_spec())
-    bucket = list(fake_storage.buckets.values())[0]
+    bucket = next(iter(fake_storage.buckets.values()))
     bucket.blobs.extend([FakeBlob(name="x"), FakeBlob(name="y")])
 
     deprov = driver.deprovision(
-        DeprovisionSpec(handle=result.handle), delete_data=True,
+        DeprovisionSpec(handle=result.handle),
+        delete_data=True,
     )
     assert deprov.ok
     assert all(b.deleted for b in bucket.blobs)
@@ -204,9 +211,7 @@ def test_binding_emits_required_envs(driver: GCSDriver) -> None:
     keys = set(binding.env_vars.keys())
     assert keys == {"GCS_BUCKET_NAME", "GCS_BUCKET_URI", "GCP_PROJECT_ID"}
     # gs:// URI prefix
-    assert binding.env_vars["GCS_BUCKET_URI"].literal == (
-        "gs://foo-bucket"
-    )
+    assert binding.env_vars["GCS_BUCKET_URI"].literal == ("gs://foo-bucket")
 
 
 def test_bucket_name_canonicalization(driver: GCSDriver) -> None:
@@ -227,45 +232,51 @@ def test_bucket_name_canonicalization(driver: GCSDriver) -> None:
 
 
 def test_deprovision_retain_with_force_destroy_is_safe_path(
-    driver: GCSDriver, fake_storage: FakeStorageClient,
+    driver: GCSDriver,
+    fake_storage: FakeStorageClient,
 ) -> None:
     """delete_data=False + force_destroy=True is a no-op at the
     bucket level — the bucket is retained either way."""
     result = driver.provision(_spec())
     deprov = driver.deprovision(
         DeprovisionSpec(handle=result.handle),
-        delete_data=False, force_destroy=True,
+        delete_data=False,
+        force_destroy=True,
     )
     assert deprov.ok
     assert len(fake_storage.buckets) == 1
-    bucket = list(fake_storage.buckets.values())[0]
+    bucket = next(iter(fake_storage.buckets.values()))
     assert bucket.deleted is False
 
 
 def test_deprovision_atomic_both_flags_deletes_with_message(
-    driver: GCSDriver, fake_storage: FakeStorageClient,
+    driver: GCSDriver,
+    fake_storage: FakeStorageClient,
 ) -> None:
     result = driver.provision(_spec())
     deprov = driver.deprovision(
         DeprovisionSpec(handle=result.handle),
-        delete_data=True, force_destroy=True,
+        delete_data=True,
+        force_destroy=True,
     )
     assert deprov.ok
     assert "force_destroy" in deprov.message
 
 
 def test_deprovision_refuses_when_retention_policy_active(
-    driver: GCSDriver, fake_storage: FakeStorageClient,
+    driver: GCSDriver,
+    fake_storage: FakeStorageClient,
 ) -> None:
     """Active retention policy + force_destroy=False errors out
     cleanly."""
     result = driver.provision(_spec())
-    bucket = list(fake_storage.buckets.values())[0]
+    bucket = next(iter(fake_storage.buckets.values()))
     bucket.retention_policy = {"retentionPeriod": 86400}
 
     deprov = driver.deprovision(
         DeprovisionSpec(handle=result.handle),
-        delete_data=True, force_destroy=False,
+        delete_data=True,
+        force_destroy=False,
     )
     assert not deprov.ok
     assert "retention" in deprov.message.lower()
@@ -273,17 +284,20 @@ def test_deprovision_refuses_when_retention_policy_active(
 
 
 def test_deprovision_force_destroy_clears_unlocked_retention(
-    driver: GCSDriver, fake_storage: FakeStorageClient,
+    driver: GCSDriver,
+    fake_storage: FakeStorageClient,
 ) -> None:
     result = driver.provision(_spec())
-    bucket = list(fake_storage.buckets.values())[0]
+    bucket = next(iter(fake_storage.buckets.values()))
     bucket.retention_policy = {
-        "retentionPeriod": 86400, "isLocked": False,
+        "retentionPeriod": 86400,
+        "isLocked": False,
     }
 
     deprov = driver.deprovision(
         DeprovisionSpec(handle=result.handle),
-        delete_data=True, force_destroy=True,
+        delete_data=True,
+        force_destroy=True,
     )
     assert deprov.ok
     assert bucket.retention_policy is None
@@ -291,19 +305,22 @@ def test_deprovision_force_destroy_clears_unlocked_retention(
 
 
 def test_deprovision_refuses_locked_retention_even_with_force(
-    driver: GCSDriver, fake_storage: FakeStorageClient,
+    driver: GCSDriver,
+    fake_storage: FakeStorageClient,
 ) -> None:
     """A locked retention policy CANNOT be cleared via the API —
     GCS contract. The driver surfaces this distinctly."""
     result = driver.provision(_spec())
-    bucket = list(fake_storage.buckets.values())[0]
+    bucket = next(iter(fake_storage.buckets.values()))
     bucket.retention_policy = {
-        "retentionPeriod": 86400, "isLocked": True,
+        "retentionPeriod": 86400,
+        "isLocked": True,
     }
 
     deprov = driver.deprovision(
         DeprovisionSpec(handle=result.handle),
-        delete_data=True, force_destroy=True,
+        delete_data=True,
+        force_destroy=True,
     )
     assert not deprov.ok
     assert "locked" in deprov.message.lower()
@@ -311,17 +328,19 @@ def test_deprovision_refuses_locked_retention_even_with_force(
 
 
 def test_deprovision_force_destroy_releases_object_holds(
-    driver: GCSDriver, fake_storage: FakeStorageClient,
+    driver: GCSDriver,
+    fake_storage: FakeStorageClient,
 ) -> None:
     result = driver.provision(_spec())
-    bucket = list(fake_storage.buckets.values())[0]
+    bucket = next(iter(fake_storage.buckets.values()))
     held = FakeBlob(name="held", event_based_hold=True)
     soft_held = FakeBlob(name="soft", temporary_hold=True)
     bucket.blobs.extend([held, soft_held])
 
     deprov = driver.deprovision(
         DeprovisionSpec(handle=result.handle),
-        delete_data=True, force_destroy=True,
+        delete_data=True,
+        force_destroy=True,
     )
     assert deprov.ok
     assert held.deleted and soft_held.deleted
@@ -331,18 +350,20 @@ def test_deprovision_force_destroy_releases_object_holds(
 
 
 def test_deprovision_held_objects_block_default_delete(
-    driver: GCSDriver, fake_storage: FakeStorageClient,
+    driver: GCSDriver,
+    fake_storage: FakeStorageClient,
 ) -> None:
     """delete_data=True without force_destroy fails when an object
     has a hold — the FakeBlob's delete raises and the driver
     surfaces it."""
     result = driver.provision(_spec())
-    bucket = list(fake_storage.buckets.values())[0]
+    bucket = next(iter(fake_storage.buckets.values()))
     bucket.blobs.append(FakeBlob(name="x", event_based_hold=True))
 
     deprov = driver.deprovision(
         DeprovisionSpec(handle=result.handle),
-        delete_data=True, force_destroy=False,
+        delete_data=True,
+        force_destroy=False,
     )
     assert not deprov.ok
     assert bucket.deleted is False

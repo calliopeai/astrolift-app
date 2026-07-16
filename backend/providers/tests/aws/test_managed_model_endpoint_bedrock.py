@@ -47,9 +47,7 @@ class _BotoResourceAlreadyExistsError(Exception):
 # The bedrock driver matches boto3's ``ResourceAlreadyExistsException``
 # by class name (``type(exc).__name__``), so we set the runtime name
 # explicitly here. The Python-side identifier stays N818-compliant.
-_BotoResourceAlreadyExistsError.__name__ = (
-    "ResourceAlreadyExistsException"
-)
+_BotoResourceAlreadyExistsError.__name__ = "ResourceAlreadyExistsException"
 
 
 @dataclass
@@ -69,7 +67,8 @@ class FakeBedrockClient:
     create_calls: list[dict[str, Any]] = field(default_factory=list)
     delete_calls: list[str] = field(default_factory=list)
 
-    def create_provisioned_model_throughput(        self,
+    def create_provisioned_model_throughput(
+        self,
         *,
         modelUnits: int,
         provisionedModelName: str,
@@ -86,10 +85,7 @@ class FakeBedrockClient:
                 "tags": tags,
             },
         )
-        arn = (
-            f"arn:aws:bedrock:us-east-1:123:provisioned-model/"
-            f"{provisionedModelName}"
-        )
+        arn = f"arn:aws:bedrock:us-east-1:123:provisioned-model/{provisionedModelName}"
         self.provisioned[arn] = {
             "status": "InService",
             "modelId": modelId,
@@ -98,12 +94,18 @@ class FakeBedrockClient:
         }
         return {"provisionedModelArn": arn}
 
-    def delete_provisioned_model_throughput(        self, *, provisionedModelId: str,
+    def delete_provisioned_model_throughput(
+        self,
+        *,
+        provisionedModelId: str,
     ) -> None:
         self.delete_calls.append(provisionedModelId)
         self.provisioned.pop(provisionedModelId, None)
 
-    def get_provisioned_model_throughput(        self, *, provisionedModelId: str,
+    def get_provisioned_model_throughput(
+        self,
+        *,
+        provisionedModelId: str,
     ) -> dict[str, Any]:
         if provisionedModelId not in self.provisioned:
             raise RuntimeError(f"ResourceNotFound: {provisionedModelId}")
@@ -124,7 +126,10 @@ class FakeLogsClient:
         self.log_groups[logGroupName] = {"retention": None}
 
     def put_retention_policy(
-        self, *, logGroupName: str, retentionInDays: int,
+        self,
+        *,
+        logGroupName: str,
+        retentionInDays: int,
     ) -> None:
         self.retention_calls.append((logGroupName, retentionInDays))
         if logGroupName in self.log_groups:
@@ -598,10 +603,7 @@ def test_binding_without_record_reconstructs_envelope(
     binding = fresh.binding(ServiceHandle(handle=provisioned.handle))
     assert binding.env_vars["MODEL_ENDPOINT_PROVIDER"].literal == "bedrock"
     assert binding.env_vars["BEDROCK_REGION"].literal == "us-east-1"
-    assert (
-        "bedrock-runtime"
-        in binding.env_vars["MODEL_ENDPOINT_URL"].literal
-    )
+    assert "bedrock-runtime" in binding.env_vars["MODEL_ENDPOINT_URL"].literal
     actions = {a for g in binding.iam_grants for a in g.actions}
     assert "bedrock:InvokeModel" in actions
 
@@ -616,10 +618,7 @@ def test_binding_without_record_honours_config_model_id(
         ServiceHandle(handle=f"{KIND}/acme-api-prod-model"),
         config={"model_id": "mistral.mistral-large-2402-v1:0"},
     )
-    assert (
-        binding.env_vars["BEDROCK_MODEL_ID"].literal
-        == "mistral.mistral-large-2402-v1:0"
-    )
+    assert binding.env_vars["BEDROCK_MODEL_ID"].literal == "mistral.mistral-large-2402-v1:0"
 
 
 def test_binding_notes_mention_irsa_tag(
@@ -639,19 +638,14 @@ def test_binding_endpoint_honours_override(
     d = AmazonBedrockDriver(
         config=AmazonBedrockConfig(
             region="us-east-1",
-            invoke_endpoint_override=(
-                "https://bedrock-runtime.acme.local"
-            ),
+            invoke_endpoint_override=("https://bedrock-runtime.acme.local"),
         ),
         bedrock_client=bedrock_client,
         logs_client=logs_client,
     )
     provisioned = d.provision(_spec())
     binding = d.binding(ServiceHandle(handle=provisioned.handle))
-    assert (
-        binding.env_vars["MODEL_ENDPOINT_URL"].literal
-        == "https://bedrock-runtime.acme.local"
-    )
+    assert binding.env_vars["MODEL_ENDPOINT_URL"].literal == "https://bedrock-runtime.acme.local"
 
 
 # ---- snapshot + restore -----------------------------------------

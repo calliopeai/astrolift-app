@@ -115,7 +115,8 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
             import boto3
 
             self._ec = boto3.client(
-                "elasticache", region_name=config.region,
+                "elasticache",
+                region_name=config.region,
             )
         if secrets_client is not None:
             self._sm = secrets_client
@@ -123,7 +124,8 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
             import boto3
 
             self._sm = boto3.client(
-                "secretsmanager", region_name=config.region,
+                "secretsmanager",
+                region_name=config.region,
             )
 
     # ---- lifecycle ----------------------------------------------------
@@ -143,21 +145,13 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
             return ProvisionResult(
                 ok=True,
                 handle=handle_for(kind=KIND, resource_id=rg_id),
-                message=(
-                    f"replication group {rg_id} already exists "
-                    f"(status={existing.get('Status')})"
-                ),
+                message=(f"replication group {rg_id} already exists (status={existing.get('Status')})"),
             )
 
-        node_type = (
-            cfg.get("node_type")
-            or _SIZE_TO_NODE_TYPE.get(spec.size, "cache.t4g.micro")
-        )
+        node_type = cfg.get("node_type") or _SIZE_TO_NODE_TYPE.get(spec.size, "cache.t4g.micro")
         num_node_groups = int(cfg.get("num_node_groups", 1))
         replicas_per_node_group = int(cfg.get("replicas_per_node_group", 0))
-        engine_version = (
-            cfg.get("engine_version") or self._config.engine_version
-        )
+        engine_version = cfg.get("engine_version") or self._config.engine_version
         transit_encryption = bool(
             cfg.get(
                 "transit_encryption",
@@ -182,15 +176,14 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
         if transit_encryption and cfg.get("auth_token", True):
             auth_token = _generate_auth_token()
             secret_arn = self._store_auth_token(
-                rg_id=rg_id, token=auth_token, spec=spec,
+                rg_id=rg_id,
+                token=auth_token,
+                spec=spec,
             )
 
         create_kwargs: dict[str, Any] = {
             "ReplicationGroupId": rg_id,
-            "ReplicationGroupDescription": (
-                f"Astrolift Redis for {spec.app_slug}/"
-                f"{spec.environment_name}"
-            ),
+            "ReplicationGroupDescription": (f"Astrolift Redis for {spec.app_slug}/{spec.environment_name}"),
             "Engine": "redis",
             "EngineVersion": engine_version,
             "CacheNodeType": node_type,
@@ -199,7 +192,8 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
             "AutomaticFailoverEnabled": replicas_per_node_group > 0,
             "MultiAZEnabled": bool(
                 cfg.get(
-                    "multi_az", replicas_per_node_group > 0,
+                    "multi_az",
+                    replicas_per_node_group > 0,
                 ),
             ),
             "CacheSubnetGroupName": self._config.cache_subnet_group,
@@ -226,7 +220,8 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
                 # secret would otherwise be a dangling reference.
                 self._delete_auth_token_secret(rg_id)
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message=f"create_replication_group: {exc}",
                 errors=[str(exc)],
             )
@@ -235,8 +230,7 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
             ok=True,
             handle=handle_for(kind=KIND, resource_id=rg_id),
             message=(
-                f"replication group {rg_id} provisioning"
-                + (f" (auth token in {secret_arn})" if secret_arn else "")
+                f"replication group {rg_id} provisioning" + (f" (auth token in {secret_arn})" if secret_arn else "")
             ),
         )
 
@@ -250,10 +244,7 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
             "ApplyImmediately": bool(cfg.get("apply_immediately", False)),
         }
         if spec.size:
-            node_type = (
-                cfg.get("node_type")
-                or _SIZE_TO_NODE_TYPE.get(spec.size)
-            )
+            node_type = cfg.get("node_type") or _SIZE_TO_NODE_TYPE.get(spec.size)
             if node_type:
                 modify_kwargs["CacheNodeType"] = node_type
         if cfg.get("engine_version"):
@@ -267,7 +258,8 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
 
         if len(modify_kwargs) <= 2:
             return UpdateResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message="no modifiable attributes provided — no-op",
             )
 
@@ -275,12 +267,14 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
             self._ec.modify_replication_group(**modify_kwargs)
         except Exception as exc:
             return UpdateResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"modify_replication_group: {exc}",
                 errors=[str(exc)],
             )
         return UpdateResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message=f"replication group {rg_id} update queued",
         )
 
@@ -303,7 +297,8 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
         if existing is None:
             self._delete_auth_token_secret(rg_id)
             return DeprovisionResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message=f"replication group {rg_id} already gone",
             )
 
@@ -314,9 +309,7 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
             "RetainPrimaryCluster": False,
         }
         if not delete_data:
-            delete_kwargs["FinalSnapshotIdentifier"] = (
-                _final_snapshot_id(rg_id=rg_id)
-            )
+            delete_kwargs["FinalSnapshotIdentifier"] = _final_snapshot_id(rg_id=rg_id)
 
         # force_destroy: ElastiCache refuses delete while the cluster
         # is in 'modifying' state. There's no API to bypass it short
@@ -326,12 +319,10 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
             self._ec.delete_replication_group(**delete_kwargs)
         except Exception as exc:
             err_str = str(exc)
-            if (
-                not force_destroy
-                and "InvalidReplicationGroupState" in err_str
-            ):
+            if not force_destroy and "InvalidReplicationGroupState" in err_str:
                 return DeprovisionResult(
-                    ok=False, handle=spec.handle,
+                    ok=False,
+                    handle=spec.handle,
                     message=(
                         f"replication group {rg_id} is mid-modify; "
                         f"wait for stable state or pass "
@@ -341,7 +332,8 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
                     errors=[err_str],
                 )
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"delete_replication_group: {exc}",
                 errors=[err_str],
             )
@@ -350,7 +342,8 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
             self._delete_auth_token_secret(rg_id)
 
         return DeprovisionResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message=(
                 f"replication group {rg_id} delete queued "
                 f"(snapshot={'skipped' if delete_data else 'taken'}, "
@@ -366,7 +359,8 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
         existing = self._describe(rg_id)
         if existing is None:
             return ServiceStatus(
-                handle=handle.handle, state="deprovisioned",
+                handle=handle.handle,
+                state="deprovisioned",
                 message=f"replication group {rg_id} not found",
             )
         ec_state = existing.get("Status", "unknown")
@@ -385,9 +379,7 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
                 f"binding requested for missing replication group {rg_id}",
             )
         endpoint = (
-            existing.get("ConfigurationEndpoint")
-            or existing.get("NodeGroups", [{}])[0].get("PrimaryEndpoint")
-            or {}
+            existing.get("ConfigurationEndpoint") or existing.get("NodeGroups", [{}])[0].get("PrimaryEndpoint") or {}
         )
         host = endpoint.get("Address", "")
         port = str(endpoint.get("Port", 6379))
@@ -442,10 +434,7 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
         from datetime import UTC, datetime
 
         _, rg_id = parse_handle(handle.handle)
-        snap_id = (
-            f"{rg_id}-snap-"
-            f"{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
-        )[:255]
+        snap_id = (f"{rg_id}-snap-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}")[:255]
         try:
             self._ec.create_snapshot(
                 ReplicationGroupId=rg_id,
@@ -463,15 +452,15 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="redis_elasticache")
     def restore(
-        self, snapshot: SnapshotHandle, target: ProvisionSpec,
+        self,
+        snapshot: SnapshotHandle,
+        target: ProvisionSpec,
     ) -> ProvisionResult:
         target_rg_id = self._replication_group_id_for(spec=target)
         try:
             self._ec.create_replication_group(
                 ReplicationGroupId=target_rg_id,
-                ReplicationGroupDescription=(
-                    f"Restored from snapshot {snapshot.snapshot_id}"
-                ),
+                ReplicationGroupDescription=(f"Restored from snapshot {snapshot.snapshot_id}"),
                 SnapshotName=snapshot.snapshot_id,
                 CacheSubnetGroupName=self._config.cache_subnet_group,
                 SecurityGroupIds=list(self._config.security_group_ids),
@@ -479,16 +468,15 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
             )
         except Exception as exc:
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message=f"restore via create_replication_group: {exc}",
                 errors=[str(exc)],
             )
         return ProvisionResult(
             ok=True,
             handle=handle_for(kind=KIND, resource_id=target_rg_id),
-            message=(
-                f"restore from snapshot {snapshot.snapshot_id} queued"
-            ),
+            message=(f"restore from snapshot {snapshot.snapshot_id} queued"),
         )
 
     @driver_op(cloud="aws", driver="redis_elasticache", heartbeat=False)
@@ -500,13 +488,17 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
                 "engine_version": {"type": "string"},
                 "num_node_groups": {"type": "integer", "minimum": 1},
                 "replicas_per_node_group": {
-                    "type": "integer", "minimum": 0, "maximum": 5,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5,
                 },
                 "transit_encryption": {"type": "boolean"},
                 "at_rest_encryption": {"type": "boolean"},
                 "auth_token": {"type": "boolean"},
                 "snapshot_retention_days": {
-                    "type": "integer", "minimum": 0, "maximum": 35,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 35,
                 },
                 "multi_az": {"type": "boolean"},
                 "parameter_group": {"type": "string"},
@@ -522,12 +514,9 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
                 "REDIS_HOST": "ElastiCache primary endpoint host",
                 "REDIS_PORT": "ElastiCache primary endpoint port (6379)",
                 "REDIS_TLS": "1 if TLS is enabled, 0 otherwise",
-                "REDIS_AUTH_TOKEN": (
-                    "Secrets Manager ref to the AUTH token (TLS only)"
-                ),
+                "REDIS_AUTH_TOKEN": ("Secrets Manager ref to the AUTH token (TLS only)"),
                 "REDIS_URL": (
-                    "Literal redis:// URL when TLS is off; "
-                    "Secrets Manager ref to rediss:// URL when TLS is on"
+                    "Literal redis:// URL when TLS is off; Secrets Manager ref to rediss:// URL when TLS is on"
                 ),
             },
         )
@@ -554,9 +543,7 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
             f"{spec.organization_slug}-{spec.app_slug}-"
             f"{spec.environment_name}-{spec.service_handle_hint or 'rd'}"
         ).lower()
-        sanitized = "".join(
-            c for c in raw if c.isalnum() or c == "-"
-        )
+        sanitized = "".join(c for c in raw if c.isalnum() or c == "-")
         if not sanitized or not sanitized[0].isalpha():
             sanitized = f"a{sanitized}"
         return sanitized[:40]
@@ -568,16 +555,17 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
         return f"{self._config.secrets_manager_prefix}/{rg_id}/url"
 
     def _store_auth_token(
-        self, *, rg_id: str, token: str, spec: ProvisionSpec,
+        self,
+        *,
+        rg_id: str,
+        token: str,
+        spec: ProvisionSpec,
     ) -> str:
         name = self._auth_secret_name_for(rg_id=rg_id)
         try:
             resp = self._sm.create_secret(
                 Name=name,
-                Description=(
-                    f"AUTH token for ElastiCache {rg_id} "
-                    f"(app {spec.app_slug}/{spec.environment_name})"
-                ),
+                Description=(f"AUTH token for ElastiCache {rg_id} (app {spec.app_slug}/{spec.environment_name})"),
                 SecretString=token,
                 Tags=tags_for(spec),
             )
@@ -585,7 +573,8 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
         except Exception as exc:
             if "ResourceExistsException" in type(exc).__name__:
                 self._sm.put_secret_value(
-                    SecretId=name, SecretString=token,
+                    SecretId=name,
+                    SecretString=token,
                 )
                 return name
             raise ManagedServiceError(
@@ -613,9 +602,7 @@ Redis clients painless."""
 
 
 def _generate_auth_token(length: int = 48) -> str:
-    return "".join(
-        secrets.choice(_AUTH_TOKEN_ALPHABET) for _ in range(length)
-    )
+    return "".join(secrets.choice(_AUTH_TOKEN_ALPHABET) for _ in range(length))
 
 
 def _final_snapshot_id(*, rg_id: str) -> str:

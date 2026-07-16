@@ -144,7 +144,7 @@ class OCIRegistryDriver(ImageRegistryDriver):
         if self._http is None:
             return []
         response = self._http.get(
-            f"{self._config.registry_url.rstrip('/')}" f"/v2/{repo}/tags/list",
+            f"{self._config.registry_url.rstrip('/')}/v2/{repo}/tags/list",
             headers=self._auth_header(),
         )
         if response.get("status_code", 0) != 200:

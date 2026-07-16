@@ -24,7 +24,7 @@ from aws.managed.email_ses import (
 # ---- recording fakes -------------------------------------------------
 
 
-class _AlreadyExistsException(Exception):  # noqa: N818 -- mimics SDK class name
+class _AlreadyExistsException(Exception):
     pass
 
 
@@ -59,13 +59,12 @@ class FakeSes:
         return {"DkimTokens": tokens}
 
     def get_identity_verification_attributes(
-        self, *, Identities: list[str], **_: Any,  # noqa: N803
+        self,
+        *,
+        Identities: list[str],  # noqa: N803 — mirrors the boto3 kwarg
+        **_: Any,
     ) -> dict:
-        attrs = {
-            i: self._identities[i]
-            for i in Identities
-            if i in self._identities
-        }
+        attrs = {i: self._identities[i] for i in Identities if i in self._identities}
         return {"VerificationAttributes": attrs}
 
     def create_configuration_set(self, *, ConfigurationSet: dict, **_: Any) -> dict:  # noqa: N803
@@ -83,7 +82,7 @@ class FakeSecretsManager:
     ``secretsmanager:CreateSecret`` on the SES secret prefix -- the
     failure mode that hard-failed provision before #1038."""
 
-    class _ResourceExistsException(Exception):  # noqa: N818 -- mimics SDK
+    class _ResourceExistsException(Exception):
         pass
 
     def __init__(self, *, deny_create: bool = False) -> None:
@@ -114,7 +113,13 @@ class FakeRoute53Driver:
         self._raise = raise_on_ensure
 
     def ensure_record(
-        self, *, zone: str, name: str, type: str, value: str, ttl: int = 300,
+        self,
+        *,
+        zone: str,
+        name: str,
+        type: str,
+        value: str,
+        ttl: int = 300,
     ) -> None:
         if self._raise:
             raise RuntimeError("AccessDenied: route53:ChangeResourceRecordSets")

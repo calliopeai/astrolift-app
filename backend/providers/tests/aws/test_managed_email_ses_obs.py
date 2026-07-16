@@ -57,7 +57,10 @@ class _FakeSesV2:
     # below match the shape the driver passes through so the fake is
     # interchangeable with the real client.
     def list_suppressed_destinations(
-        self, *, PageSize: int = 100, **_: Any  # noqa: N803
+        self,
+        *,
+        PageSize: int = 100,  # noqa: N803 — mirrors the boto3 kwarg
+        **_: Any,
     ) -> dict[str, Any]:
         items = []
         for address, row in self._suppressed.items():
@@ -71,7 +74,11 @@ class _FakeSesV2:
         return {"SuppressedDestinationSummaries": items[:PageSize]}
 
     def put_suppressed_destination(
-        self, *, EmailAddress: str, Reason: str, **_: Any  # noqa: N803
+        self,
+        *,
+        EmailAddress: str,  # noqa: N803 — mirrors the boto3 kwarg
+        Reason: str,  # noqa: N803 — mirrors the boto3 kwarg
+        **_: Any,
     ) -> dict[str, Any]:
         self._suppressed[EmailAddress] = {
             "Reason": Reason,
@@ -80,12 +87,13 @@ class _FakeSesV2:
         return {}
 
     def delete_suppressed_destination(
-        self, *, EmailAddress: str, **_: Any  # noqa: N803
+        self,
+        *,
+        EmailAddress: str,  # noqa: N803 — mirrors the boto3 kwarg
+        **_: Any,
     ) -> dict[str, Any]:
         if EmailAddress not in self._suppressed:
-            raise self._NotFoundError(
-                f"NotFoundException: {EmailAddress} not on suppression list"
-            )
+            raise self._NotFoundError(f"NotFoundException: {EmailAddress} not on suppression list")
         del self._suppressed[EmailAddress]
         return {}
 
@@ -194,7 +202,8 @@ def test_identity_verification_details_for_unknown_domain(
 
 
 def test_identity_verification_details_for_email_no_dkim(
-    driver: AmazonSESObservabilityDriver, aws_mock,
+    driver: AmazonSESObservabilityDriver,
+    aws_mock,
 ) -> None:
     aws_mock["ses"].verify_email_identity(EmailAddress="ops@example.com")
     details = driver.get_identity_verification_details("ops@example.com")
@@ -204,7 +213,8 @@ def test_identity_verification_details_for_email_no_dkim(
 
 
 def test_identity_verification_details_for_domain_carries_dkim(
-    driver: AmazonSESObservabilityDriver, aws_mock,
+    driver: AmazonSESObservabilityDriver,
+    aws_mock,
 ) -> None:
     aws_mock["ses"].verify_domain_identity(Domain="signed.example.com")
     aws_mock["ses"].verify_domain_dkim(Domain="signed.example.com")

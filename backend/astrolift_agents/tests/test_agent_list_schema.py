@@ -131,7 +131,9 @@ def test_agent_workloads_lists_only_agents_in_project(permission_resolver, info,
 def test_agent_workloads_carries_source_and_run_spec(permission_resolver, info, with_tenant_org):
     org = _org("acme")
     project, team = _project(org, "demo")
-    app = _app(org, project, team, "hello", source_repo="acme/agents", source_url="https://github.com/acme/agents")
+    app = _app(
+        org, project, team, "hello", source_repo="acme/agents", source_url="https://github.com/acme/agents"
+    )
     permission_resolver.grant(Permission.AGENT_READ)
     _agent_workload(
         app,
@@ -415,9 +417,7 @@ def test_live_status_workload_id_narrows_to_one_agent(permission_resolver, info,
     _agent_workload(app, "other-bot")
 
     with with_tenant_org(org):
-        rows = AgentsQuery().agent_live_status(
-            info(), org_id=str(org.guid), workload_id=str(target.guid)
-        )
+        rows = AgentsQuery().agent_live_status(info(), org_id=str(org.guid), workload_id=str(target.guid))
 
     assert len(rows) == 1
     assert rows[0].workload_slug == "target-bot"
@@ -434,9 +434,7 @@ def test_live_status_foreign_workload_id_returns_empty(permission_resolver, info
     permission_resolver.grant(Permission.AGENT_READ)
 
     with with_tenant_org(org_a):
-        rows = AgentsQuery().agent_live_status(
-            info(), org_id=str(org_a.guid), workload_id=str(foreign.guid)
-        )
+        rows = AgentsQuery().agent_live_status(info(), org_id=str(org_a.guid), workload_id=str(foreign.guid))
 
     assert rows == []
 

@@ -51,7 +51,7 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
         roles/iam.workloadIdentityUser binding, then returns the
         annotation the manifest renderer applies."""
         gcp_sa_email = self._sa_email(name=identity_role)
-        member = f"serviceAccount:{self._config.project_id}.svc.id.goog" f"[{namespace}/{sa_name}]"
+        member = f"serviceAccount:{self._config.project_id}.svc.id.goog[{namespace}/{sa_name}]"
         try:
             policy = self._iam.get_iam_policy(
                 resource=self._sa_resource(name=identity_role),
@@ -107,7 +107,6 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
         # Attach project-level roles via the operator-supplied
         # permissions list. Each entry is {role: '...'}.
         if permissions:
-
             for perm in permissions:
                 role = perm.get("role")
                 if role:
@@ -140,7 +139,7 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
         return f"{name}@{self._config.project_id}.iam.gserviceaccount.com"
 
     def _sa_resource(self, *, name: str) -> str:
-        return f"projects/-/serviceAccounts/" f"{self._sa_email(name=name)}"
+        return f"projects/-/serviceAccounts/{self._sa_email(name=name)}"
 
     def _add_project_role(self, *, sa_email: str, role: str) -> None:
         # Project-level IAM mutation goes through Resource Manager.

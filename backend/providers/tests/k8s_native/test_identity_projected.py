@@ -10,8 +10,7 @@ from k8s_native.identity_projected import (
 )
 
 
-def test_create_role_returns_path(
-) -> None:
+def test_create_role_returns_path() -> None:
     driver = ProjectedSaTokenDriver()
     arn = driver.create_identity_role(
         name="acme-api",
@@ -24,7 +23,9 @@ def test_bind_unknown_role_raises() -> None:
     driver = ProjectedSaTokenDriver()
     with pytest.raises(KeyError):
         driver.bind_service_account(
-            cluster="x", namespace="ns", sa_name="api",
+            cluster="x",
+            namespace="ns",
+            sa_name="api",
             identity_role="missing",
         )
 
@@ -33,7 +34,9 @@ def test_bind_returns_annotations() -> None:
     driver = ProjectedSaTokenDriver()
     driver.create_identity_role(name="acme-api", permissions=[])
     annotations = driver.bind_service_account(
-        cluster="x", namespace="ns", sa_name="api",
+        cluster="x",
+        namespace="ns",
+        sa_name="api",
         identity_role="acme-api",
     )
     assert "astrolift.io/identity-role" in annotations
@@ -43,12 +46,16 @@ def test_bind_returns_annotations() -> None:
 
 
 def test_audience_from_config() -> None:
-    driver = ProjectedSaTokenDriver(config=ProjectedSaTokenConfig(
-        audience="custom-audience",
-    ))
+    driver = ProjectedSaTokenDriver(
+        config=ProjectedSaTokenConfig(
+            audience="custom-audience",
+        )
+    )
     driver.create_identity_role(name="r", permissions=[])
     annotations = driver.bind_service_account(
-        cluster="x", namespace="ns", sa_name="api",
+        cluster="x",
+        namespace="ns",
+        sa_name="api",
         identity_role="r",
     )
     assert annotations["astrolift.io/token-audience"] == "custom-audience"
@@ -58,13 +65,11 @@ def test_attach_policy_to_known_role() -> None:
     driver = ProjectedSaTokenDriver()
     driver.create_identity_role(name="acme-api", permissions=[])
     driver.attach_policy(
-        role="acme-api", policy="arn:platform:policy/extra",
+        role="acme-api",
+        policy="arn:platform:policy/extra",
     )
     # Catalog reflects the attachment
-    assert any(
-        p.get("managed_policy") == "arn:platform:policy/extra"
-        for p in driver._roles["acme-api"]
-    )
+    assert any(p.get("managed_policy") == "arn:platform:policy/extra" for p in driver._roles["acme-api"])
 
 
 def test_attach_policy_unknown_role() -> None:

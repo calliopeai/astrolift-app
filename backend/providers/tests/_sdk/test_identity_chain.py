@@ -12,7 +12,8 @@ from _sdk.identity_chain import (
 
 def test_simple_chain_passes() -> None:
     chain = build_simple_chain(
-        namespace="acme-api", sa_name="api",
+        namespace="acme-api",
+        sa_name="api",
         target_plugin_id="aws",
         target_account_id="123456789012",
         target_identity_name="astrolift-api-role",
@@ -24,7 +25,8 @@ def test_simple_chain_passes() -> None:
 def test_empty_chain_fails() -> None:
     chain = IdentityChain(
         hops=(),
-        namespace="ns", sa_name="sa",
+        namespace="ns",
+        sa_name="sa",
     )
     result = validate_chain(chain)
     assert result.ok is False
@@ -33,7 +35,8 @@ def test_empty_chain_fails() -> None:
 
 def test_cycle_detected() -> None:
     chain = IdentityChain(
-        namespace="ns", sa_name="sa",
+        namespace="ns",
+        sa_name="sa",
         hops=(
             IdentityHop(
                 plugin_id="k8s_native",
@@ -61,7 +64,8 @@ def test_cycle_detected() -> None:
 
 def test_cross_cloud_aws_to_gcp_supported() -> None:
     chain = IdentityChain(
-        namespace="ns", sa_name="sa",
+        namespace="ns",
+        sa_name="sa",
         hops=(
             IdentityHop(
                 plugin_id="k8s_native",
@@ -92,10 +96,12 @@ def test_unsupported_cross_plugin_pair_fails() -> None:
     """k8s_native → k8s_native (different cluster) isn't a defined
     cross-plugin transition."""
     chain = IdentityChain(
-        namespace="ns", sa_name="sa",
+        namespace="ns",
+        sa_name="sa",
         hops=(
             IdentityHop(
-                plugin_id="aws", account_id="111",
+                plugin_id="aws",
+                account_id="111",
                 identity_name="role-A",
             ),
             IdentityHop(
@@ -116,7 +122,8 @@ def test_cross_plugin_hop_without_audience_fails() -> None:
     """OIDC trust requires the next hop to claim a specific
     audience — missing it is a misconfiguration."""
     chain = IdentityChain(
-        namespace="ns", sa_name="sa",
+        namespace="ns",
+        sa_name="sa",
         hops=(
             IdentityHop(
                 plugin_id="k8s_native",
@@ -138,7 +145,8 @@ def test_cross_plugin_hop_without_audience_fails() -> None:
 
 def test_terminal_hop_accessor() -> None:
     chain = build_simple_chain(
-        namespace="ns", sa_name="sa",
+        namespace="ns",
+        sa_name="sa",
         target_plugin_id="aws",
         target_account_id="111",
         target_identity_name="role",
@@ -149,7 +157,8 @@ def test_terminal_hop_accessor() -> None:
 def test_intra_plugin_aws_chain() -> None:
     """AWS-to-AWS account chaining (cross-account AssumeRole)."""
     chain = IdentityChain(
-        namespace="ns", sa_name="sa",
+        namespace="ns",
+        sa_name="sa",
         hops=(
             IdentityHop(
                 plugin_id="k8s_native",
@@ -157,13 +166,15 @@ def test_intra_plugin_aws_chain() -> None:
                 identity_name="ns/sa",
             ),
             IdentityHop(
-                plugin_id="aws", account_id="111",
+                plugin_id="aws",
+                account_id="111",
                 identity_name="hub-role",
                 audience="sts.amazonaws.com",
                 trust_principal="oidc:ns:sa",
             ),
             IdentityHop(
-                plugin_id="aws", account_id="222",
+                plugin_id="aws",
+                account_id="222",
                 identity_name="spoke-role",
                 trust_principal="aws:iam::111:role/hub-role",
             ),

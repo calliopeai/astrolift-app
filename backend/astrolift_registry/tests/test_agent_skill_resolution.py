@@ -534,9 +534,7 @@ def test_org_repo_skill_resolves_via_registered_public_repo(
     assert calls == [("acme/dev-skills", "v2", False)]
 
 
-def test_org_repo_skill_resolves_via_private_repo_connection(
-    org, with_connection, mock_org_repo_fetch
-):
+def test_org_repo_skill_resolves_via_private_repo_connection(org, with_connection, mock_org_repo_fetch):
     with_connection(org)
     project = _project(org)
     calls = mock_org_repo_fetch(_org_repo_tree())
@@ -663,7 +661,9 @@ def test_org_repo_skill_is_org_scoped(org, other_org, with_connection, mock_org_
     )
 
     # Org B registers an agent referencing alias "acme" — unknown in B.
-    res = _register(project_b, files=_agent_repo_tree(toml_text=_agent_toml_with_org_repo_skill()), repo="b/agents")
+    res = _register(
+        project_b, files=_agent_repo_tree(toml_text=_agent_toml_with_org_repo_skill()), repo="b/agents"
+    )
     assert res.status == "ok"
     [agent] = res.agents
     assert any("no skill repo registered" in n for n in agent.skill_notes)

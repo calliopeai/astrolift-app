@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Generator
+from typing import TYPE_CHECKING
 
 import boto3
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @pytest.fixture(autouse=True)

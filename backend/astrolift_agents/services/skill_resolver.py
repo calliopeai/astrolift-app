@@ -215,8 +215,7 @@ def resolve_org_repo_skill(ref: SkillRef, *, repo_tree: dict[str, str]) -> Loade
         if f"{folder}/SKILL.md" in repo_tree:
             return load_skill(repo_tree, folder=folder)
     raise SkillResolutionError(
-        f"org-repo skill {subpath!r} not found in repo (looked at "
-        f"{nested}/ and {subpath}/)",
+        f"org-repo skill {subpath!r} not found in repo (looked at " f"{nested}/ and {subpath}/)",
         path=ref.name,
     )
 

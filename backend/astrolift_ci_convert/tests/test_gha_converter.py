@@ -1,9 +1,6 @@
 """Tests for the GitHub Actions → Astrolift TOML converter."""
 
-import pytest
-
 from astrolift_ci_convert.gha import convert, parse
-
 
 # ---------------------------------------------------------------------------
 # Fixtures — representative real-world GitHub Actions snippets

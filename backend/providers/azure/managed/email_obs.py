@@ -60,9 +60,7 @@ class AzureAcsEmailObservabilityDriver(EmailObservabilityDriver):
         raise UnsupportedOperationError(_UNSUPPORTED_MSG)
 
     @driver_op(driver="email", cloud="azure")
-    def get_identity_verification_details(
-        self, identity: str
-    ) -> IdentityVerification:
+    def get_identity_verification_details(self, identity: str) -> IdentityVerification:
         raise UnsupportedOperationError(_UNSUPPORTED_MSG)
 
     @driver_op(driver="email", cloud="azure")
@@ -70,9 +68,7 @@ class AzureAcsEmailObservabilityDriver(EmailObservabilityDriver):
         raise UnsupportedOperationError(_UNSUPPORTED_MSG)
 
     @driver_op(driver="email", cloud="azure")
-    def list_suppression_entries(
-        self, *, page_size: int = 100
-    ) -> list[SuppressionEntry]:
+    def list_suppression_entries(self, *, page_size: int = 100) -> list[SuppressionEntry]:
         raise UnsupportedOperationError(_UNSUPPORTED_MSG)
 
     @driver_op(

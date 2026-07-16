@@ -69,8 +69,11 @@ def test_validate_binding_envs_complete_returns_empty() -> None:
     missing = validate_binding_envs(
         kind="postgres",
         emitted_envs=[
-            "POSTGRES_HOST", "POSTGRES_PORT", "POSTGRES_DB",
-            "POSTGRES_USER", "POSTGRES_PASSWORD",
+            "POSTGRES_HOST",
+            "POSTGRES_PORT",
+            "POSTGRES_DB",
+            "POSTGRES_USER",
+            "POSTGRES_PASSWORD",
         ],
     )
     assert missing == []
@@ -80,7 +83,8 @@ def test_validate_unknown_kind_returns_empty() -> None:
     """Unknown kinds skip validation (operator-defined kinds may
     not yet be in the canonical catalog)."""
     missing = validate_binding_envs(
-        kind="not_a_real_kind", emitted_envs=[],
+        kind="not_a_real_kind",
+        emitted_envs=[],
     )
     assert missing == []
 
@@ -92,13 +96,15 @@ def test_kind_catalog_get_returns_none_for_missing() -> None:
 
 def test_custom_catalog_extension() -> None:
     """Plugin authors can extend the catalog at import time."""
-    custom = KindCatalog(kinds=(
-        ManagedServiceKind(
-            name="vector_db",
-            description="Vector similarity search store",
-            binding_envs_required=("VECTOR_DB_URL", "VECTOR_DB_TOKEN"),
-        ),
-    ))
+    custom = KindCatalog(
+        kinds=(
+            ManagedServiceKind(
+                name="vector_db",
+                description="Vector similarity search store",
+                binding_envs_required=("VECTOR_DB_URL", "VECTOR_DB_TOKEN"),
+            ),
+        )
+    )
     missing = validate_binding_envs(
         kind="vector_db",
         emitted_envs=["VECTOR_DB_URL"],

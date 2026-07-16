@@ -21,8 +21,10 @@ delegation only resolves if CNPG is actually installed.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
-from _sdk.cluster_capabilities import ClusterCapabilities
+if TYPE_CHECKING:
+    from _sdk.cluster_capabilities import ClusterCapabilities
 
 
 @dataclass(frozen=True)
@@ -70,10 +72,7 @@ REQUIREMENTS: dict[tuple[str, str], OperatorRequirement] = {
             "clusters.postgresql.cnpg.io",
             "backups.postgresql.cnpg.io",
         ),
-        install_hint=(
-            "helm install cnpg cnpg/cloudnative-pg "
-            "--namespace cnpg-system --create-namespace"
-        ),
+        install_hint=("helm install cnpg cnpg/cloudnative-pg --namespace cnpg-system --create-namespace"),
     ),
     ("redis", "operator"): OperatorRequirement(
         operator_id="redis-operator",
@@ -83,8 +82,7 @@ REQUIREMENTS: dict[tuple[str, str], OperatorRequirement] = {
             "redisreplications.redis.redis.opstreelabs.in",
         ),
         install_hint=(
-            "helm install redis-operator ot-helm/redis-operator "
-            "--namespace redis-operator --create-namespace"
+            "helm install redis-operator ot-helm/redis-operator --namespace redis-operator --create-namespace"
         ),
     ),
     ("mysql", "operator"): OperatorRequirement(
@@ -94,20 +92,14 @@ REQUIREMENTS: dict[tuple[str, str], OperatorRequirement] = {
             "perconaxtradbclusters.pxc.percona.com",
             "perconaxtradbclusterbackups.pxc.percona.com",
         ),
-        install_hint=(
-            "helm install pxc-operator percona/pxc-operator "
-            "--namespace pxc-operator --create-namespace"
-        ),
+        install_hint=("helm install pxc-operator percona/pxc-operator --namespace pxc-operator --create-namespace"),
     ),
     ("document_db", "mongodb_operator"): OperatorRequirement(
         operator_id="psmdb-operator",
         display_name="Percona Server for MongoDB",
-        required_crds=(
-            "perconaservermongodbs.psmdb.percona.com",
-        ),
+        required_crds=("perconaservermongodbs.psmdb.percona.com",),
         install_hint=(
-            "helm install psmdb-operator percona/psmdb-operator "
-            "--namespace psmdb-operator --create-namespace"
+            "helm install psmdb-operator percona/psmdb-operator --namespace psmdb-operator --create-namespace"
         ),
     ),
     ("event_stream", "kafka_strimzi"): OperatorRequirement(
@@ -118,26 +110,20 @@ REQUIREMENTS: dict[tuple[str, str], OperatorRequirement] = {
             "kafkanodepools.kafka.strimzi.io",
             "kafkausers.kafka.strimzi.io",
         ),
-        install_hint=(
-            "helm install strimzi strimzi/strimzi-kafka-operator "
-            "--namespace kafka --create-namespace"
-        ),
+        install_hint=("helm install strimzi strimzi/strimzi-kafka-operator --namespace kafka --create-namespace"),
     ),
     ("event_stream", "nats"): OperatorRequirement(
         operator_id="nats-server",
         display_name="NATS",
         required_crds=(),  # NATS uses plain StatefulSets
         install_hint=(
-            "Plain StatefulSet — no operator install needed; "
-            "ensure the NATS image is reachable from the cluster"
+            "Plain StatefulSet — no operator install needed; ensure the NATS image is reachable from the cluster"
         ),
     ),
     ("queue", "rabbitmq_operator"): OperatorRequirement(
         operator_id="rabbitmq-cluster-operator",
         display_name="RabbitMQ Cluster Operator",
-        required_crds=(
-            "rabbitmqclusters.rabbitmq.com",
-        ),
+        required_crds=("rabbitmqclusters.rabbitmq.com",),
         install_hint=(
             "kubectl apply -f https://github.com/rabbitmq/cluster"
             "-operator/releases/latest/download/cluster-operator.yml"
@@ -147,10 +133,7 @@ REQUIREMENTS: dict[tuple[str, str], OperatorRequirement] = {
         operator_id="nfs-csi",
         display_name="NFS CSI Driver",
         required_crds=(),  # CSI drivers don't ship CRDs
-        install_hint=(
-            "helm install csi-driver-nfs csi-driver-nfs/csi-driver-nfs "
-            "--namespace kube-system"
-        ),
+        install_hint=("helm install csi-driver-nfs csi-driver-nfs/csi-driver-nfs --namespace kube-system"),
     ),
     ("filesystem", "nfs_subdir_provisioner"): OperatorRequirement(
         operator_id="nfs-subdir-provisioner",
@@ -179,26 +162,25 @@ def preflight(
         return PreflightReport(
             ok=False,
             variant_key=key,
-            failures=[PreflightFailure(
-                requirement_id="",
-                code="unknown_variant",
-                message=(
-                    f"no preflight requirement registered for "
-                    f"({kind!r}, {variant!r})"
-                ),
-            )],
+            failures=[
+                PreflightFailure(
+                    requirement_id="",
+                    code="unknown_variant",
+                    message=(f"no preflight requirement registered for ({kind!r}, {variant!r})"),
+                )
+            ],
         )
 
     failures: list[PreflightFailure] = []
     hints: list[str] = []
 
     # k8s version check
-    if capabilities.kubernetes_version:
-        if _version_too_old(
-            actual=capabilities.kubernetes_version,
-            minimum=requirement.minimum_kubernetes_version,
-        ):
-            failures.append(PreflightFailure(
+    if capabilities.kubernetes_version and _version_too_old(
+        actual=capabilities.kubernetes_version,
+        minimum=requirement.minimum_kubernetes_version,
+    ):
+        failures.append(
+            PreflightFailure(
                 requirement_id=requirement.operator_id,
                 code="k8s_too_old",
                 message=(
@@ -207,19 +189,21 @@ def preflight(
                     f"{requirement.display_name} requires "
                     f"{requirement.minimum_kubernetes_version}+"
                 ),
-            ))
+            )
+        )
 
-    # CRDs are typically the strongest signal an operator is up
-    if requirement.required_crds:
-        # The probe in cluster_capabilities populates per-operator
-        # bool flags (cnpg_installed, gateway_api_installed, etc.).
-        # For broader CRD checks, a future iteration should expose
-        # the raw CRD list from the probe; for now we use the
-        # bool flags where they exist.
-        if not _operator_present(
-            capabilities=capabilities, operator_id=requirement.operator_id,
-        ):
-            failures.append(PreflightFailure(
+    # CRDs are typically the strongest signal an operator is up.
+    # The probe in cluster_capabilities populates per-operator
+    # bool flags (cnpg_installed, gateway_api_installed, etc.).
+    # For broader CRD checks, a future iteration should expose
+    # the raw CRD list from the probe; for now we use the
+    # bool flags where they exist.
+    if requirement.required_crds and not _operator_present(
+        capabilities=capabilities,
+        operator_id=requirement.operator_id,
+    ):
+        failures.append(
+            PreflightFailure(
                 requirement_id=requirement.operator_id,
                 code="missing_operator",
                 message=(
@@ -227,8 +211,9 @@ def preflight(
                     f"detected on cluster {capabilities.cluster_id!r}; "
                     f"install via: {requirement.install_hint}"
                 ),
-            ))
-            hints.append(requirement.install_hint)
+            )
+        )
+        hints.append(requirement.install_hint)
 
     return PreflightReport(
         ok=not failures,
@@ -239,7 +224,9 @@ def preflight(
 
 
 def _operator_present(
-    *, capabilities: ClusterCapabilities, operator_id: str,
+    *,
+    capabilities: ClusterCapabilities,
+    operator_id: str,
 ) -> bool:
     """Map operator_id → ClusterCapabilities boolean flag.
     Future iterations expose raw CRD list and check that directly."""

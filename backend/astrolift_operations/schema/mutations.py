@@ -1938,9 +1938,7 @@ class OperationsMutation:
                 env_qs = env_qs.filter(name=input.environment_name)
             env = env_qs.order_by("id").first()
             if env is None:
-                per_app.append(
-                    BulkAppResultItem(app_slug=slug, ok=False, errors=["no matching environment"])
-                )
+                per_app.append(BulkAppResultItem(app_slug=slug, ok=False, errors=["no matching environment"]))
                 continue
 
             exists = AppSecretBundleRef.objects.filter(
@@ -1957,9 +1955,7 @@ class OperationsMutation:
                         secret_bundle=bundle,
                     )
                 except Exception as exc:  # noqa: BLE001
-                    per_app.append(
-                        BulkAppResultItem(app_slug=slug, ok=False, errors=[str(exc)[:256]])
-                    )
+                    per_app.append(BulkAppResultItem(app_slug=slug, ok=False, errors=[str(exc)[:256]]))
                     continue
 
             per_app.append(BulkAppResultItem(app_slug=slug, ok=True, errors=[]))
@@ -2004,9 +2000,7 @@ class OperationsMutation:
             try:
                 result = resync_app_manifest_from_repo(app)
             except Exception as exc:  # noqa: BLE001
-                per_app.append(
-                    BulkAppResultItem(app_slug=slug, ok=False, errors=[str(exc)[:256]])
-                )
+                per_app.append(BulkAppResultItem(app_slug=slug, ok=False, errors=[str(exc)[:256]]))
                 continue
 
             if result.status in ("applied", "in_sync"):

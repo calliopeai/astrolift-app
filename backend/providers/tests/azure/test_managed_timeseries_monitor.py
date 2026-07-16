@@ -29,7 +29,7 @@ from azure.managed.timeseries_monitor import (
 # ---- fakes ------------------------------------------------------
 
 
-class _NotFound(Exception):  # noqa: N818
+class _NotFound(Exception):
     pass
 
 
@@ -122,7 +122,8 @@ class FakeMonitorWorkspacesOps:
             tags=dict(azure_monitor_workspace_properties.get("tags", {})),
             public_network_access=(
                 azure_monitor_workspace_properties.get("properties", {}).get(
-                    "public_network_access", "Enabled",
+                    "public_network_access",
+                    "Enabled",
                 )
             ),
         )
@@ -499,12 +500,7 @@ def test_provision_honours_public_network_access_override(
         _spec(config={"public_network_access": "Disabled"}),
     )
     workspace_name = result.handle.split("/", 1)[1]
-    assert (
-        monitor_client.azure_monitor_workspaces_obj.workspaces[
-            workspace_name
-        ].public_network_access
-        == "Disabled"
-    )
+    assert monitor_client.azure_monitor_workspaces_obj.workspaces[workspace_name].public_network_access == "Disabled"
 
 
 def test_provision_surfaces_create_failure(
@@ -536,12 +532,7 @@ def test_update_public_network_access(
     )
     assert result.ok
     workspace_name = provisioned.handle.split("/", 1)[1]
-    assert (
-        monitor_client.azure_monitor_workspaces_obj.workspaces[
-            workspace_name
-        ].public_network_access
-        == "Disabled"
-    )
+    assert monitor_client.azure_monitor_workspaces_obj.workspaces[workspace_name].public_network_access == "Disabled"
 
 
 def test_update_retention_days_patches_la(
@@ -703,9 +694,7 @@ def test_status_maps_deleting_to_deprovisioning(
 ) -> None:
     provisioned = driver.provision(_spec())
     workspace_name = provisioned.handle.split("/", 1)[1]
-    monitor_client.azure_monitor_workspaces_obj.workspaces[
-        workspace_name
-    ].provisioning_state = "Deleting"
+    monitor_client.azure_monitor_workspaces_obj.workspaces[workspace_name].provisioning_state = "Deleting"
     state = driver.status(ServiceHandle(handle=provisioned.handle))
     assert state.state == "deprovisioning"
 

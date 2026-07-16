@@ -99,9 +99,7 @@ def test_manifest_diff_empty_both():
 
 
 @pytest.mark.django_db
-def test_compare_deployments_manifest_diff(
-    deploy_a, deploy_b, org, actor, permission_resolver
-):
+def test_compare_deployments_manifest_diff(deploy_a, deploy_b, org, actor, permission_resolver):
     _grant(permission_resolver)
     with _tenant(org, actor):
         result = LifecycleQuery().astrolift_compare_deployments(
@@ -119,9 +117,7 @@ def test_compare_deployments_manifest_diff(
 
 
 @pytest.mark.django_db
-def test_compare_deployments_commit_range(
-    deploy_a, deploy_b, org, actor, permission_resolver
-):
+def test_compare_deployments_commit_range(deploy_a, deploy_b, org, actor, permission_resolver):
     _grant(permission_resolver)
     with _tenant(org, actor):
         result = LifecycleQuery().astrolift_compare_deployments(
@@ -134,9 +130,7 @@ def test_compare_deployments_commit_range(
 
 
 @pytest.mark.django_db
-def test_compare_deployments_image_diff(
-    deploy_a, deploy_b, org, actor, permission_resolver
-):
+def test_compare_deployments_image_diff(deploy_a, deploy_b, org, actor, permission_resolver):
     _grant(permission_resolver)
     with _tenant(org, actor):
         result = LifecycleQuery().astrolift_compare_deployments(
@@ -149,21 +143,25 @@ def test_compare_deployments_image_diff(
 
 
 @pytest.mark.django_db
-def test_compare_deployments_same_image(
-    app, env, org, actor, permission_resolver
-):
+def test_compare_deployments_same_image(app, env, org, actor, permission_resolver):
     _grant(permission_resolver)
     da = Deployment.objects.create(
-        registered_app=app, app_environment=env, workload=None,
+        registered_app=app,
+        app_environment=env,
+        workload=None,
         trigger_kind=Deployment.TriggerKind.MANUAL,
         status=Deployment.Status.RUNNING,
-        image_tag="v1.0", image_digest="sha256:same",
+        image_tag="v1.0",
+        image_digest="sha256:same",
     )
     db = Deployment.objects.create(
-        registered_app=app, app_environment=env, workload=None,
+        registered_app=app,
+        app_environment=env,
+        workload=None,
         trigger_kind=Deployment.TriggerKind.MANUAL,
         status=Deployment.Status.RUNNING,
-        image_tag="v1.0", image_digest="sha256:same",
+        image_tag="v1.0",
+        image_digest="sha256:same",
     )
     with _tenant(org, actor):
         result = LifecycleQuery().astrolift_compare_deployments(
@@ -175,19 +173,21 @@ def test_compare_deployments_same_image(
 
 
 @pytest.mark.django_db
-def test_compare_deployments_null_snapshot_empty_diff(
-    app, env, org, actor, permission_resolver
-):
+def test_compare_deployments_null_snapshot_empty_diff(app, env, org, actor, permission_resolver):
     """Pre-#737 deployments have null snapshot → empty manifest diff."""
     _grant(permission_resolver)
     da = Deployment.objects.create(
-        registered_app=app, app_environment=env, workload=None,
+        registered_app=app,
+        app_environment=env,
+        workload=None,
         trigger_kind=Deployment.TriggerKind.MANUAL,
         status=Deployment.Status.RUNNING,
         rendered_manifest_snapshot=None,
     )
     db = Deployment.objects.create(
-        registered_app=app, app_environment=env, workload=None,
+        registered_app=app,
+        app_environment=env,
+        workload=None,
         trigger_kind=Deployment.TriggerKind.MANUAL,
         status=Deployment.Status.RUNNING,
         rendered_manifest_snapshot=None,
@@ -202,9 +202,7 @@ def test_compare_deployments_null_snapshot_empty_diff(
 
 
 @pytest.mark.django_db
-def test_compare_deployments_not_found(
-    deploy_a, org, actor, permission_resolver
-):
+def test_compare_deployments_not_found(deploy_a, org, actor, permission_resolver):
     _grant(permission_resolver)
     with _tenant(org, actor):
         result = LifecycleQuery().astrolift_compare_deployments(
@@ -216,9 +214,7 @@ def test_compare_deployments_not_found(
 
 
 @pytest.mark.django_db
-def test_compare_deployments_tenant_isolation(
-    deploy_a, deploy_b, actor, permission_resolver
-):
+def test_compare_deployments_tenant_isolation(deploy_a, deploy_b, actor, permission_resolver):
     """Cross-tenant call: org_id filter means neither deployment is found."""
     from astrolift_identity.models import Organization
 

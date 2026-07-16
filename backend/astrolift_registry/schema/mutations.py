@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import strawberry
 from django.db.models import Q
 from django.utils import timezone
