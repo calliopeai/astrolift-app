@@ -100,6 +100,8 @@ def _deprovision_dns_record_sync(
     speaks records relative to the zone. Returns a summary dict the
     mutation surfaces back to the operator.
     """
+    from aws._errors import NotFoundError
+
     from astrolift_lifecycle.custom_domain_handshake import hostname_parent_zone
     from astrolift_registry.models import RegisteredApp
 
@@ -116,17 +118,33 @@ def _deprovision_dns_record_sync(
         raise CapabilityDeprovisionError(
             f"dns driver for cluster {cluster.slug!r} does not support delete_record",
         )
+    skipped = False
     try:
         delete_record(parent_zone, name, record_type)
     except NotImplementedError as exc:
         raise CapabilityDeprovisionError(
             f"dns driver delete_record not implemented for cluster {cluster.slug!r}: {exc}",
         ) from exc
+    except NotFoundError:
+        # Idempotent teardown (#1100): the record is already absent — the
+        # desired end state of a delete. A resumed / partial teardown must
+        # converge, so treat not-found as success instead of retrying to
+        # exhaustion and wedging DeregisterAppWorkflow at ``tearing_down``.
+        # Genuine driver errors (perms, throttling) still propagate → retry.
+        skipped = True
+        log.info(
+            "deprovision dns_record already absent cluster=%s zone=%s name=%s type=%s",
+            cluster.slug,
+            parent_zone,
+            name,
+            record_type,
+        )
     return {
         "cluster_slug": cluster.slug,
         "zone": parent_zone,
         "name": name,
         "type": record_type,
+        "skipped": skipped,
     }
 
 
@@ -166,6 +184,8 @@ def _deprovision_certificate_sync(*, custom_domain_id: int) -> dict[str, Any]:
     re-issue or BYO without re-adding the hostname. Only the cert
     state is reset.
     """
+    from aws._errors import NotFoundError
+
     from astrolift_lifecycle.models import CustomDomain
 
     domain = CustomDomain.all_objects.select_related(
@@ -181,6 +201,7 @@ def _deprovision_certificate_sync(*, custom_domain_id: int) -> dict[str, Any]:
         )
     cert_id = (domain.certificate_id or "").strip()
     revoked = False
+    skipped = False
     if cert_id:
         try:
             revoke(cert_id)
@@ -189,6 +210,18 @@ def _deprovision_certificate_sync(*, custom_domain_id: int) -> dict[str, Any]:
             raise CapabilityDeprovisionError(
                 f"tls driver revoke_certificate not implemented for cluster {cluster.slug!r}: {exc}",
             ) from exc
+        except NotFoundError:
+            # Idempotent teardown (#1100): the cert is already gone (revoked
+            # out-of-band, or a prior partial teardown removed it). Treat as
+            # success and fall through to reset the row's cert state so the
+            # workflow converges instead of retrying to exhaustion.
+            skipped = True
+            log.info(
+                "deprovision certificate already absent cluster=%s domain_id=%s cert_id=%s",
+                cluster.slug,
+                custom_domain_id,
+                cert_id,
+            )
     # Reset cert state regardless — even if there was no auto-issued
     # cert (e.g., BYO path), the operator is asking us to clear the
     # cert binding so the renderer stops emitting the Ingress.
@@ -213,6 +246,7 @@ def _deprovision_certificate_sync(*, custom_domain_id: int) -> dict[str, Any]:
         "custom_domain_id": custom_domain_id,
         "certificate_id": cert_id,
         "revoked": revoked,
+        "skipped": skipped,
     }
 
 
@@ -254,6 +288,8 @@ def _identity_role_name_for(app) -> str:
 def _deprovision_identity_role_sync(*, registered_app_id: int) -> dict[str, Any]:
     """Delete the cloud IAM/identity role bound to the app's
     ServiceAccount via the cluster's WorkloadIdentityDriver."""
+    from aws._errors import NotFoundError
+
     from astrolift_registry.models import RegisteredApp
 
     app = RegisteredApp.all_objects.select_related(
@@ -272,30 +308,41 @@ def _deprovision_identity_role_sync(*, registered_app_id: int) -> dict[str, Any]
     # Delete every per-app IAM role the platform mints: the runtime
     # workload-identity role, the platform-build role (#978), the
     # GitHub-OIDC CI push role (#994/#1026), and the static-asset
-    # build/sync role (#1010). delete_identity_role is idempotent (swallows
-    # NoSuchEntity per #998), so deleting a role the app never created is a
-    # safe no-op — otherwise it orphans on teardown (the CI push role isn't
-    # even tagged for the #995 scan to catch).
+    # build/sync role (#1010). The AWS driver already swallows NoSuchEntity
+    # (#998), but a driver that surfaces a typed NotFoundError instead must
+    # not halt the loop — a role the app never created is a safe no-op —
+    # otherwise it orphans on teardown (the CI push role isn't even tagged
+    # for the #995 scan to catch) and wedges the workflow (#1100).
     role = _identity_role_name_for(app)
     deleted: list[str] = []
-    try:
-        for name in (
-            role,
-            build_identity_role_name(app),
-            ci_push_role_name(app),
-            static_build_role_name(app),
-        ):
+    skipped: list[str] = []
+    for name in (
+        role,
+        build_identity_role_name(app),
+        ci_push_role_name(app),
+        static_build_role_name(app),
+    ):
+        try:
             delete_role(name)
             deleted.append(name)
-    except NotImplementedError as exc:
-        raise CapabilityDeprovisionError(
-            f"identity driver delete_identity_role not implemented for cluster {cluster.slug!r}: {exc}",
-        ) from exc
+        except NotImplementedError as exc:
+            raise CapabilityDeprovisionError(
+                f"identity driver delete_identity_role not implemented for cluster {cluster.slug!r}: {exc}",
+            ) from exc
+        except NotFoundError:
+            # Idempotent (#1100): role already absent — desired end state.
+            skipped.append(name)
+            log.info(
+                "deprovision identity_role already absent cluster=%s role=%s",
+                cluster.slug,
+                name,
+            )
     return {
         "cluster_slug": cluster.slug,
         "registered_app_id": registered_app_id,
         "role": role,
         "roles_deleted": deleted,
+        "roles_skipped": skipped,
     }
 
 
@@ -328,6 +375,8 @@ def _deprovision_registry_repo_sync(
     """Archive (soft-delete on the registry side) the app's image repo
     + clear the platform's stored registry URI so a future provision
     starts cleanly."""
+    from aws._errors import NotFoundError
+
     from astrolift_registry.models import RegisteredApp
 
     app = RegisteredApp.all_objects.select_related(
@@ -352,17 +401,35 @@ def _deprovision_registry_repo_sync(
         repo_name = repo_uri.split("/", 1)[1]
     else:
         repo_name = repo_uri or app.slug
+    skipped = False
     try:
         delete_repo(repo_name, archive=archive)
     except NotImplementedError as exc:
         raise CapabilityDeprovisionError(
             f"registry driver delete_repo not implemented for cluster {cluster.slug!r}: {exc}",
         ) from exc
+    except NotFoundError:
+        # Idempotent (#1100): repo already absent — desired end state. Still
+        # clear the URI below so a future provision starts clean.
+        skipped = True
+        log.info(
+            "deprovision registry_repo already absent cluster=%s repo=%s",
+            cluster.slug,
+            repo_name,
+        )
     except TypeError:
         # Older driver impls may not accept the ``archive`` kwarg —
         # fall back to positional / no-kwarg call so the deprovision
         # still goes through.
-        delete_repo(repo_name)
+        try:
+            delete_repo(repo_name)
+        except NotFoundError:
+            skipped = True
+            log.info(
+                "deprovision registry_repo already absent cluster=%s repo=%s",
+                cluster.slug,
+                repo_name,
+            )
     # Clear the URI so a future ``provision_registry_repo`` re-runs
     # cleanly rather than skipping on the cached URI.
     app.registry_repo_uri = ""
@@ -372,6 +439,7 @@ def _deprovision_registry_repo_sync(
         "registered_app_id": registered_app_id,
         "repo": repo_name,
         "archived": bool(archive),
+        "skipped": skipped,
     }
 
 
@@ -417,6 +485,8 @@ def _deprovision_ingress_sync(
     * ``hostname`` None → call ``IngressDriver.delete_ingress`` for
       every CustomDomain attached to the app on its bound cluster.
     """
+    from aws._errors import NotFoundError
+
     from astrolift_lifecycle.models import CustomDomain
     from astrolift_registry.models import RegisteredApp
     from core.app_deploy import namespace_for_app
@@ -478,6 +548,18 @@ def _deprovision_ingress_sync(
             raise CapabilityDeprovisionError(
                 f"ingress driver delete_ingress not implemented for cluster {cluster.slug!r}: {exc}",
             ) from exc
+        except NotFoundError:
+            # Idempotent (#1100): the Ingress is already gone — the desired
+            # end state. Still soft-delete the row so the binding is revoked,
+            # and count it as deleted rather than an error so a resumed
+            # teardown converges instead of surfacing a spurious failure.
+            log.info(
+                "deprovision ingress already absent cluster=%s host=%s",
+                cluster.slug,
+                d.hostname,
+            )
+            deleted_hostnames.append(d.hostname)
+            d.soft_delete()
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{d.hostname}: {exc}")
     return {
