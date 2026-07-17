@@ -128,6 +128,127 @@ def test_list_records_for_app_propagates_client_errors(
         driver.list_records_for_app("acme.platform.example")
 
 
+# ---- shared-zone scoping (#1114) ------------------------------------------
+
+
+def test_list_records_for_app_shared_zone_scopes_to_app_host(route53_client) -> None:
+    """One shared hosted zone holds many apps (the multi-app / SteadyMD
+    topology). A slug names no zone and can't be tagged per-app, so the
+    driver resolves the containing zone from ``app_host`` and returns only
+    that app's host + subdomains — other apps' records don't leak in."""
+    route53_client.create_hosted_zone(
+        Name="astrolift.smdinfra.net.",
+        CallerReference="shared-1114",
+    )
+    driver = Route53Driver(client=route53_client)
+    driver.ensure_record(zone="astrolift.smdinfra.net", name="pickup", type="A", value="10.0.0.1")
+    driver.ensure_record(zone="astrolift.smdinfra.net", name="api.pickup", type="A", value="10.0.0.2")
+    # A prefix sibling + an unrelated app share the same zone.
+    driver.ensure_record(zone="astrolift.smdinfra.net", name="pickup-staging", type="A", value="10.0.0.9")
+    driver.ensure_record(zone="astrolift.smdinfra.net", name="faasprobe", type="A", value="10.0.0.3")
+
+    records = driver.list_records_for_app("pickup", app_host="pickup.astrolift.smdinfra.net")
+
+    values = {r.value for r in records}
+    names = {r.name for r in records}
+    assert values == {"10.0.0.1", "10.0.0.2"}
+    assert "pickup.astrolift.smdinfra.net" in names
+    assert "api.pickup.astrolift.smdinfra.net" in names
+    # Prefix sibling, unrelated app, and the shared zone's apex NS/SOA are
+    # all excluded — the label-boundary suffix test keeps siblings out.
+    assert "10.0.0.9" not in values
+    assert "10.0.0.3" not in values
+    assert not any(r.type in {"SOA", "NS"} for r in records)
+
+
+def test_list_records_for_app_shared_zone_includes_vanity_cname(route53_client) -> None:
+    """A CNAME elsewhere in the shared zone that targets the app's host is
+    part of the app's DNS surface, so it's kept even though its own name
+    isn't under the host."""
+    route53_client.create_hosted_zone(
+        Name="astrolift.smdinfra.net.",
+        CallerReference="vanity-1114",
+    )
+    driver = Route53Driver(client=route53_client)
+    driver.ensure_record(zone="astrolift.smdinfra.net", name="pickup", type="A", value="10.0.0.1")
+    driver.ensure_record(
+        zone="astrolift.smdinfra.net",
+        name="go",
+        type="CNAME",
+        value="pickup.astrolift.smdinfra.net",
+    )
+    records = driver.list_records_for_app("pickup", app_host="pickup.astrolift.smdinfra.net")
+    cnames = [r for r in records if r.type == "CNAME"]
+    assert any(r.value.rstrip(".") == "pickup.astrolift.smdinfra.net" for r in cnames)
+
+
+def test_list_records_for_app_dedicated_zone_host_filter_is_noop(route53_client) -> None:
+    """A dedicated-per-app zone still works: the containing-zone walk finds
+    the app's own zone and the host-filter keeps every record (apex +
+    subdomains are all the app's), including the zone's own SOA/NS."""
+    route53_client.create_hosted_zone(
+        Name="pickup.smdinfra.net.",
+        CallerReference="dedicated-1114",
+    )
+    driver = Route53Driver(client=route53_client)
+    driver.ensure_record(zone="pickup.smdinfra.net", name="@", type="A", value="10.1.0.1")
+    driver.ensure_record(zone="pickup.smdinfra.net", name="api", type="A", value="10.1.0.2")
+
+    records = driver.list_records_for_app("pickup", app_host="pickup.smdinfra.net")
+
+    values = {r.value for r in records}
+    assert "10.1.0.1" in values
+    assert "10.1.0.2" in values
+    # SOA/NS live at the apex == app_host, so the dedicated-zone view is
+    # unchanged — the host-filter is genuinely a no-op here.
+    assert any(r.type == "SOA" for r in records)
+
+
+def test_list_records_for_app_tag_dedicated_zone_with_host(route53_client) -> None:
+    """Dedicated zone resolved via the ``astrolift.io/app-slug`` TAG (not a
+    containing-zone walk) with a host passed: the tag path wins and the
+    host-filter stays a no-op."""
+    response = route53_client.create_hosted_zone(
+        Name="acme.example.",
+        CallerReference="tag-1114",
+    )
+    zone_id = response["HostedZone"]["Id"].rsplit("/", 1)[-1]
+    route53_client.change_tags_for_resource(
+        ResourceType="hostedzone",
+        ResourceId=zone_id,
+        AddTags=[{"Key": "astrolift.io/app-slug", "Value": "acme"}],
+    )
+    driver = Route53Driver(client=route53_client)
+    driver.ensure_record(zone="acme.example", name="@", type="A", value="10.2.0.1")
+    records = driver.list_records_for_app("acme", app_host="acme.example")
+    assert any(r.value == "10.2.0.1" for r in records)
+
+
+def test_record_scoped_to_host_predicate() -> None:
+    """Unit-level truth table for the host-scoping predicate."""
+    from aws.dns_route53 import _record_scoped_to_host
+
+    host = "pickup.astrolift.smdinfra.net"
+
+    def rec(name: str, type: str = "A", value: str = "1.2.3.4") -> DnsRecord:
+        return DnsRecord(name=name, type=type, value=value, ttl=60)
+
+    assert _record_scoped_to_host(rec("pickup.astrolift.smdinfra.net"), host)
+    assert _record_scoped_to_host(rec("api.pickup.astrolift.smdinfra.net"), host)
+    assert _record_scoped_to_host(rec("*.pickup.astrolift.smdinfra.net"), host)
+    # Trailing-dot + case normalization on both sides.
+    assert _record_scoped_to_host(rec("PICKUP.astrolift.smdinfra.net."), host)
+    # Prefix sibling / unrelated / apex are out (label-boundary match).
+    assert not _record_scoped_to_host(rec("pickup-staging.astrolift.smdinfra.net"), host)
+    assert not _record_scoped_to_host(rec("faasprobe.astrolift.smdinfra.net"), host)
+    assert not _record_scoped_to_host(rec("astrolift.smdinfra.net", type="SOA"), host)
+    # CNAME target pointing at the app host (or a subdomain of it) counts.
+    assert _record_scoped_to_host(
+        rec("go.astrolift.smdinfra.net", type="CNAME", value="Pickup.astrolift.smdinfra.net."), host
+    )
+    assert not _record_scoped_to_host(rec("go.astrolift.smdinfra.net", type="CNAME", value="other.smdinfra.net"), host)
+
+
 # ---------------------------------------------------------------------------
 # ACMDriver.list_certificates
 # ---------------------------------------------------------------------------

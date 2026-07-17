@@ -982,8 +982,18 @@ class LifecycleQuery:
             driver = driver_for_capability(cluster, "dns")
         except AppDeployError:
             return AppDnsRecordsResult(reason=ObservabilityPanelReason.NOT_CONFIGURED, records=[])
+
+        # Multi-app installs share one hosted zone (#1114); scope the read
+        # to the app's public FQDN so the card shows only this app's records,
+        # not every app's. On a dedicated-per-app zone the host-filter is a
+        # no-op (every record is already the app's). No host -> pass None and
+        # the driver returns the whole resolved zone (unchanged behavior).
+        from astrolift_observability.url_resolution import resolved_public_host
+
+        app = RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True).first()
+        app_host = resolved_public_host(app) if app is not None else None
         try:
-            records = driver.list_records_for_app(app_slug)
+            records = driver.list_records_for_app(app_slug, app_host=app_host)
         except NotImplementedError:
             return AppDnsRecordsResult(reason=ObservabilityPanelReason.NOT_SUPPORTED_BY_PROVIDER, records=[])
         except Exception:  # noqa: BLE001 — unexpected driver failure

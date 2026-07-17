@@ -71,13 +71,24 @@ class DnsDriver(Protocol):
     def list_records_for_app(
         self,
         zone_or_app: str,
+        *,
+        app_host: str | None = None,
     ) -> list[DnsRecord]:
         """Return the records relevant to the given zone or app slug.
 
         Drivers may interpret ``zone_or_app`` as either a DNS zone name
         (``"acme.platform.example"``) or an app slug — whichever the
-        driver can resolve via its tag scheme. The default implementation
-        raises :class:`UnsupportedOperationError` so non-AWS drivers stay
+        driver can resolve via its tag scheme.
+
+        ``app_host`` is the app's public FQDN (e.g.
+        ``pickup.astrolift.smdinfra.net``). When provided, the driver
+        scopes the returned records to that host and its subdomains — the
+        multi-app case where one shared hosted zone holds every app's
+        records (#1114). ``None`` returns the whole resolved zone
+        (dedicated-per-app-zone installs).
+
+        The default implementation raises
+        :class:`UnsupportedOperationError` so non-AWS drivers stay
         shape-compatible without forcing every plugin to ship a stub.
         Resolvers translate this exception to a "not supported on this
         cloud" user-facing message (#619).
