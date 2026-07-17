@@ -3670,6 +3670,16 @@ type ConfirmUploadResult {
   ack: Boolean!
 }
 
+input ConnectExistingGithubAppInput {
+  appId: String!
+  privateKeyPem: String!
+  clientId: String = null
+  clientSecret: String = null
+  webhookSecret: String = null
+  apiBaseUrl: String = null
+  orgLogin: String = null
+}
+
 input ConnectSourceInput {
   kind: String!
   displayName: String = null
@@ -4625,6 +4635,7 @@ type Mutation {
   runTask(input: RunTaskInput!): AstroliftTaskRunPayloadMutationResult!
   reapCloudOrphan(input: ReapCloudOrphanInput!): ReapCloudOrphanPayloadMutationResult!
   connectSource(input: ConnectSourceInput!): AstroliftSourceConnectionMutationResult!
+  connectExistingGithubApp(input: ConnectExistingGithubAppInput!): AstroliftSourceConnectionMutationResult!
   updateSourceConnection(input: UpdateSourceConnectionInput!): AstroliftSourceConnectionMutationResult!
   disconnectSource(input: DisconnectSourceInput!): AstroliftSourceConnectionMutationResult!
   generateSshDeployKey(input: GenerateSshDeployKeyInput!): AstroliftSshDeployKeyCreatedMutationResult!

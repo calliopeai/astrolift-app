@@ -24,6 +24,29 @@ export const CONNECT_SOURCE = gql`
   }
 `;
 
+export const CONNECT_EXISTING_GITHUB_APP = gql`
+  mutation ConnectExistingGithubApp($input: ConnectExistingGithubAppInput!) {
+    connectExistingGithubApp(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        kind
+        name
+        displayName
+        accountLogin
+        installationId
+        isActive
+        createdAt
+      }
+    }
+  }
+`;
+
 export const UPDATE_SOURCE_CONNECTION = gql`
   mutation UpdateSourceConnection($input: UpdateSourceConnectionInput!) {
     updateSourceConnection(input: $input) {

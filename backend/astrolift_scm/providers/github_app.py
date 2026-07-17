@@ -53,11 +53,25 @@ GITHUB_API_DEFAULT = "https://api.github.com"
 
 
 class GithubAppError(Exception):
-    def __init__(self, code: str, message: str, *, recoverable: bool = False):
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        *,
+        recoverable: bool = False,
+        http_status: int | None = None,
+    ):
         super().__init__(message)
         self.code = code
         self.message = message
         self.recoverable = recoverable
+        # HTTP status when the failure came from a GitHub API response
+        # (None for local crypto / network / shape failures). A definitive
+        # 404 on the installation-token endpoint means the installation or
+        # the App itself was deleted upstream; ``installation_token`` reads
+        # this to self-orphan the connection so a dead App can't wedge the
+        # platform.
+        self.http_status = http_status
 
 
 @dataclasses.dataclass(slots=True)
@@ -130,8 +144,11 @@ def _exchange_for_installation_token(
                 "AUTH_FAILED",
                 f"GitHub rejected the App credentials ({exc.code}): {body}",
                 recoverable=True,
+                http_status=exc.code,
             ) from exc
-        raise GithubAppError("API_ERROR", f"GitHub returned {exc.code}: {body}") from exc
+        raise GithubAppError(
+            "API_ERROR", f"GitHub returned {exc.code}: {body}", http_status=exc.code
+        ) from exc
     except urllib.error.URLError as exc:
         raise GithubAppError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
 
@@ -201,8 +218,99 @@ def installation_token(connection) -> str:
 
     private_pem = _decrypt_pem(connection)
     jwt_token = _mint_jwt(issuer, private_pem)
-    token, expires_at = _exchange_for_installation_token(_api_base(connection), jwt_token, installation_id)
+    try:
+        token, expires_at = _exchange_for_installation_token(
+            _api_base(connection), jwt_token, installation_id
+        )
+    except GithubAppError as exc:
+        # A 404 on the token endpoint is definitive: the installation was
+        # uninstalled or the App itself was deleted on GitHub (its JWT no
+        # longer resolves). Self-orphan the connection so the #1122 dedup and
+        # the connection_resolver skip it — a deleted App must never wedge the
+        # platform. 401/403 (bad-JWT clock skew, suspended App, missing
+        # permission) stay recoverable and do NOT orphan; network/shape
+        # failures carry no http_status so they don't either.
+        if exc.http_status == 404:
+            from astrolift_scm.orphan import mark_connection_orphaned
+
+            mark_connection_orphaned(
+                connection,
+                reason="github app installation or app deleted (404 on installation-token mint)",
+            )
+        raise
 
     with _LOCK:
         _CACHE[cache_key] = _CachedToken(token=token, expires_at=expires_at)
     return token
+
+
+# ---------------------------------------------------------------------------
+# App-JWT discovery (BYO adopt flow) — read an existing App's installations +
+# metadata using a JWT signed by its PEM, BEFORE we have a persisted
+# connection to mint an installation token from. Used by
+# astrolift_scm.schema.mutations.connect_existing_github_app.
+# ---------------------------------------------------------------------------
+
+
+def _github_app_api_get(api_base: str, path: str, jwt_token: str) -> tuple[object, GithubAppError | None]:
+    """GET an App-JWT-authenticated GitHub endpoint.
+
+    Returns ``(parsed_json, None)`` on success or ``(None, error)``. The
+    JWT authenticates as the App itself (``Authorization: Bearer <jwt>``),
+    which is what the ``/app`` and ``/app/installations`` endpoints require.
+    """
+    url = f"{api_base}{path}"
+    req = urllib.request.Request(
+        url,
+        method="GET",
+        headers={
+            "Authorization": f"Bearer {jwt_token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read().decode("utf-8")), None
+    except urllib.error.HTTPError as exc:
+        body = ""
+        try:
+            body = exc.read().decode("utf-8", "replace")[:200]
+        except Exception:
+            pass
+        return None, GithubAppError(
+            "AUTH_FAILED" if exc.code in (401, 403, 404) else "API_ERROR",
+            f"GitHub returned {exc.code} for {path}: {body}",
+            recoverable=exc.code in (401, 403, 404),
+            http_status=exc.code,
+        )
+    except urllib.error.URLError as exc:
+        return None, GithubAppError("NETWORK", f"Couldn't reach GitHub: {exc.reason}")
+    except (ValueError, json.JSONDecodeError):
+        return None, GithubAppError("UNEXPECTED_SHAPE", f"GitHub returned non-JSON for {path}")
+
+
+def list_app_installations(api_base: str, jwt_token: str) -> tuple[list[dict], GithubAppError | None]:
+    """All installations of the App the JWT was signed for (GET /app/installations).
+
+    Each item carries ``id`` (the installation id) and ``account.login``
+    (the org/user the App is installed on). The adopt flow matches on
+    ``account.login`` to pick the right installation for the current org."""
+    data, err = _github_app_api_get(api_base, "/app/installations?per_page=100", jwt_token)
+    if err is not None:
+        return [], err
+    if not isinstance(data, list):
+        return [], GithubAppError("UNEXPECTED_SHAPE", "GitHub /app/installations didn't return a list")
+    return [item for item in data if isinstance(item, dict)], None
+
+
+def fetch_app_metadata(api_base: str, jwt_token: str) -> tuple[dict, GithubAppError | None]:
+    """The App's own metadata (GET /app) — used for the App URL slug so the
+    stored connection gets a human-friendly ``GitHub App: <slug>`` name."""
+    data, err = _github_app_api_get(api_base, "/app", jwt_token)
+    if err is not None:
+        return {}, err
+    if not isinstance(data, dict):
+        return {}, GithubAppError("UNEXPECTED_SHAPE", "GitHub /app didn't return an object")
+    return data, None
