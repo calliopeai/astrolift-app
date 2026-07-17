@@ -162,6 +162,14 @@ export const GET_APP = gql`
         environmentName
         lastChecked
       }
+      autowire {
+        connected
+        ciWorkflow
+        webhook
+        secrets
+        checkedAt
+        detail
+      }
       settingsLastModified {
         deployStrategy
         deployTokens

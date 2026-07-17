@@ -611,6 +611,34 @@ export const PUSH_CI_WORKFLOW_TO_REPO = gql`
   }
 `;
 
+// --- Retry autowire (#1108) ----------------------------------------
+//
+// Re-runs the full CI-workflow → webhook → secrets chain registration
+// fires (and repairs a phantom webhook), so an app that onboarded
+// half-wired can be completed from the detail page. Always resolves
+// `ok` — the payload's per-step statuses (and `connected=false` for the
+// "connect for auto-deploy" state) carry the outcome.
+export const RETRY_ASTROLIFT_AUTOWIRE = gql`
+  mutation RetryAstroliftAutowire($input: RetryAstroliftAutowireInput!) {
+    retryAstroliftAutowire(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        connected
+        allOk
+        ciWorkflow
+        webhook
+        secrets
+        detail
+      }
+    }
+  }
+`;
+
 // --- Push CI secrets to repo (#383) --------------------------------
 //
 // Seals the five `ASTROLIFT_*` GitHub Actions secret values with the
