@@ -3754,10 +3754,16 @@ class LifecycleMutation:
         ``webhook_secret_*`` columns.
 
         Status codes:
-        * ``created`` — a brand-new hook landed on the host.
-        * ``refreshed`` — same URL already registered (or the App's
-          own webhook covers this repo); we rotated the secret and
-          advanced the ``installed_at`` marker.
+        * ``created`` — a brand-new hook landed on the host; ``hook_id``
+          is the host-side identifier.
+        * ``refreshed`` — same URL already registered on the host; we
+          rotated the secret and advanced the ``installed_at`` marker.
+        * ``app_delivers`` — the connection is a github_app_install and
+          the org App is installed on the repo, so its own webhook
+          already delivers pushes. No per-repo hook exists, so
+          ``hook_id`` is empty (honestly, not a masked hook).
+        * ``not_installed`` — maps to a PRECONDITION failure: the App is
+          NOT installed on the target repo, so nothing hears pushes.
         """
         from astrolift_scm.services.webhooks import (
             install_astrolift_source_webhook as install_webhook_service,
@@ -3784,6 +3790,14 @@ class LifecycleMutation:
             return gql_failure(
                 ErrorCode.PRECONDITION.value,
                 result.error or "no source connection available",
+            )
+        if result.status == "not_installed":
+            # The org GitHub App isn't installed on the target repo, so
+            # nothing delivers pushes. Report the truth instead of a
+            # fake success with an empty hook id.
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                result.error or "the GitHub App is not installed on this repo",
             )
         if result.status == "fetch_failed":
             return gql_failure(
@@ -4756,15 +4770,21 @@ class InstallSourceWebhookPayload:
 
     ``status`` is one of:
     * ``created`` — the host registered a brand-new hook.
-    * ``refreshed`` — a hook with the same URL already existed (or the
-      GitHub App's own webhook covers this repo); we rotated the
-      shared HMAC secret and advanced the ``installed_at`` timestamp
-      so the operator's click is observable in the UI.
+    * ``refreshed`` — a hook with the same URL already existed on the
+      host; we rotated the shared HMAC secret and advanced the
+      ``installed_at`` timestamp so the operator's click is observable.
+    * ``app_delivers`` — the connection is a github_app_install and the
+      org App is installed on the repo; its own webhook already delivers
+      pushes. There is no per-repo hook, so ``hook_id`` is empty by
+      design — the CLI keys off ``status`` to report this distinctly
+      from a real hook. (``not_installed`` never reaches this payload;
+      it surfaces as a PRECONDITION failure.)
 
     ``hook_id`` is the host-side identifier (numeric on GitHub,
-    stored as string for GitLab / Bitbucket forward-compat). Empty
-    for GitHub-App-install connections where the App's own webhook
-    routes deliveries.
+    stored as string for GitLab / Bitbucket forward-compat). Empty for
+    ``app_delivers`` — the App's own webhook routes deliveries and no
+    per-repo hook is created; never treat an empty ``hook_id`` as a
+    real hook.
 
     ``receiver_url`` is the canonical platform URL the host POSTs
     deliveries to — surfaced in the toast so the operator can paste

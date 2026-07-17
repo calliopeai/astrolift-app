@@ -16,11 +16,16 @@ affordance's confirm-dialog copy reflects reality: the old token
 stops working the moment GitHub accepts the new sealed value. In-
 flight CI runs holding the previous token will need to be re-kicked.
 
-The personal-OAuth connection is the auth surface (per #395): we use
-the *viewer's* GitHub identity, not an org-level PAT, so the resulting
-secrets are attributed to the human who clicked the button. The
-operator must have completed the OAuth dance through their Account
-drawer first; PRECONDITION otherwise.
+Auth surface: pushing CI secrets is an autonomous *platform* write, so
+it authenticates as the org **GitHub App installation** — resolved via
+``connection_resolver.resolve_connection(purpose=PLATFORM_REPO_WRITE)``,
+the same identity the webhook install / workflow dispatch / manifest
+read use. It is NOT the viewer's personal OAuth token: that token is a
+human's, expires silently, and mixing it into a platform write was the
+source of the intermittent 401 on secret pushes. The human who clicked
+the button is still recorded — but out-of-band, as the deploy-token
+issuer/rotator (``by_user_id``), not by borrowing their GitHub identity.
+If the org hasn't installed the App, resolution raises PRECONDITION.
 
 GitHub is the only host that exposes a ``PUT secrets`` primitive
 today. GitLab masked variables and Bitbucket Pipelines variables
@@ -49,6 +54,11 @@ from astrolift_scm.providers.github import (
     GITHUB_API_DEFAULT,
     GithubProviderError,
     _token,
+)
+from astrolift_scm.services.connection_resolver import (
+    PLATFORM_REPO_WRITE,
+    ConnectionResolutionError,
+    resolve_connection,
 )
 
 # Names the workflow YAML keys off. Order is the order the FE renders
@@ -133,34 +143,25 @@ def seal_secret_for_repo(public_key_b64: str, value: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Personal-connection picker (#395)
+# GitHub connection resolution
 # ---------------------------------------------------------------------------
+#
+# The GitHub CI-secrets paths (push + validate) resolve the org GitHub
+# App installation via ``connection_resolver`` — see the module
+# docstring. There is deliberately no personal-GitHub picker here any
+# more: authenticating a platform write as a human's OAuth token was the
+# bug this module split away from. GitLab still uses a personal picker
+# below because GitLab has no App-installation identity to separate onto.
 
 
-def _pick_personal_github_connection(*, organization_id: int, user_id: int) -> SourceConnection | None:
-    """Return the viewer's active personal GitHub OAuth connection in
-    the app's org, or None when no usable row exists.
+def _github_auth_scheme(connection: SourceConnection) -> str:
+    """The ``Authorization`` scheme for a GitHub connection's token.
 
-    The push-secrets path is intentionally user-scoped: the resulting
-    secrets are attributed to the human who clicked the button on
-    GitHub's audit log, not to an org-level PAT shared across the
-    organization. We don't fall through to org-level connections —
-    that's a deliberate choice (#395) so an operator who hasn't
-    connected their personal account gets a clear PRECONDITION rather
-    than a silent attribution swap.
-    """
-    return (
-        SourceConnection.objects.filter(
-            organization_id=organization_id,
-            user_id=user_id,
-            kind=SourceConnection.Kind.GITHUB_OAUTH_USER,
-            is_active=True,
-            is_orphaned=False,
-            deleted_at__isnull=True,
-        )
-        .order_by("-updated_at", "-pk")
-        .first()
-    )
+    App-installation tokens go out as ``Bearer``; user/PAT tokens as
+    ``token``. Mirrors ``services.workflows._github_auth_header`` so the
+    secrets writes speak the same auth dialect as the other GitHub
+    call sites."""
+    return "Bearer" if connection.kind == "github_app_install" else "token"
 
 
 def _pick_personal_gitlab_connection(*, organization_id: int, user_id: int) -> SourceConnection | None:
@@ -203,6 +204,7 @@ def _fetch_repo_public_key(
     token: str,
     base: str,
     repo_full_name: str,
+    token_scheme: str = "token",
 ) -> tuple[str, str]:
     """GET /repos/{owner}/{repo}/actions/secrets/public-key.
 
@@ -215,7 +217,7 @@ def _fetch_repo_public_key(
     req = urllib.request.Request(
         url,
         headers={
-            "Authorization": f"token {token}",
+            "Authorization": f"{token_scheme} {token}",
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
             "User-Agent": "astrolift",
@@ -267,12 +269,18 @@ def _put_repo_secret(
     name: str,
     sealed_b64: str,
     key_id: str,
+    token_scheme: str = "token",
 ) -> None:
     """PUT /repos/{owner}/{repo}/actions/secrets/{name}.
 
     GitHub returns 201 on first create, 204 on update. Anything else
     bubbles as a ``GithubProviderError`` so the service can map it
     onto the ``PushSecretsResult`` envelope.
+
+    Authenticating as the org App (the platform-write identity) means a
+    403 here now signals the App is missing the "Secrets: write" repo
+    permission, and a 404 signals the App isn't installed on this repo —
+    distinct causes from the old stale-user-token 401.
     """
     url = f"{base}/repos/{_safe_repo(repo_full_name)}/actions/secrets/{urllib.parse.quote(name, safe='')}"
     body = {"encrypted_value": sealed_b64, "key_id": key_id}
@@ -281,7 +289,7 @@ def _put_repo_secret(
         data=json.dumps(body).encode("utf-8"),
         method="PUT",
         headers={
-            "Authorization": f"token {token}",
+            "Authorization": f"{token_scheme} {token}",
             "Accept": "application/vnd.github+json",
             "Content-Type": "application/json",
             "X-GitHub-Api-Version": "2022-11-28",
@@ -371,6 +379,7 @@ def _list_github_repo_secret_names(
     token: str,
     base: str,
     repo_full_name: str,
+    token_scheme: str = "token",
 ) -> dict[str, str]:
     """GET /repos/{owner}/{repo}/actions/secrets — return a name → updated_at
     mapping for every Actions secret on the repo.
@@ -386,7 +395,7 @@ def _list_github_repo_secret_names(
         req = urllib.request.Request(
             next_url,
             headers={
-                "Authorization": f"token {token}",
+                "Authorization": f"{token_scheme} {token}",
                 "Accept": "application/vnd.github+json",
                 "X-GitHub-Api-Version": "2022-11-28",
                 "User-Agent": "astrolift",
@@ -460,10 +469,11 @@ def validate_astrolift_ci_secrets(
     """Validate the five Astrolift CI secrets are set on the app's repo
     (#693).
 
-    Read-only — never writes anything.  Auth is the viewer's personal
-    OAuth connection (same scoping as the push path); failure to find
-    one returns ``NO_PERSONAL_CONNECTION`` so the FE can render a
-    "connect GitHub" CTA.
+    Read-only — never writes anything.  Auth is the org GitHub App
+    installation (``purpose=PLATFORM_REPO_WRITE``), the same identity
+    the push side uses, so validate reads exactly what the platform can
+    write. ``viewer_user`` is accepted for signature parity with the
+    push path but no longer selects the credential.
 
     For non-GitHub hosts the function returns ``UNSUPPORTED_SOURCE`` —
     GitLab / Bitbucket / Gitea each have their own variables API and
@@ -471,6 +481,8 @@ def validate_astrolift_ci_secrets(
     surfacing them as separate ungated error codes keeps the FE's
     error mapping simple.
     """
+    del viewer_user  # credential is now the org App, not the viewer.
+
     if not app.source_repo:
         return ValidateCiSecretsResult(
             ok=False,
@@ -489,29 +501,17 @@ def validate_astrolift_ci_secrets(
             ),
         )
 
-    viewer_id = getattr(viewer_user, "pk", None) or getattr(viewer_user, "id", None)
-    if not viewer_id or not getattr(viewer_user, "is_authenticated", False):
-        return ValidateCiSecretsResult(
-            ok=False,
-            error_code="NO_PERSONAL_CONNECTION",
-            error_message=(
-                "Sign in and connect your personal GitHub account in your "
-                "account drawer before validating CI secrets."
-            ),
+    try:
+        connection = resolve_connection(
+            app.organization_id,
+            purpose=PLATFORM_REPO_WRITE,
+            source_kind="github",
         )
-
-    connection = _pick_personal_github_connection(
-        organization_id=app.organization_id,
-        user_id=viewer_id,
-    )
-    if connection is None:
+    except ConnectionResolutionError as exc:
         return ValidateCiSecretsResult(
             ok=False,
-            error_code="NO_PERSONAL_CONNECTION",
-            error_message=(
-                "No personal GitHub OAuth connection found in this org. "
-                "Connect GitHub in your account drawer and retry."
-            ),
+            error_code=exc.code,
+            error_message=exc.message,
         )
 
     base = _github_api_base(connection)
@@ -529,6 +529,7 @@ def validate_astrolift_ci_secrets(
             token=token,
             base=base,
             repo_full_name=app.source_repo,
+            token_scheme=_github_auth_scheme(connection),
         )
     except GithubProviderError as exc:
         return ValidateCiSecretsResult(
@@ -626,15 +627,18 @@ def push_astrolift_ci_secrets(
 ) -> PushSecretsResult:
     """Push the five Astrolift CI secrets to ``app``'s source repo.
 
-    Auth is the viewer's personal GitHub OAuth connection in the app's
-    org; the repo's public sealed-box key is fetched, each secret value
-    is sealed under that key, and the encrypted bytes are PUT to the
-    Actions secrets endpoint. The deploy token slot is rotated as part
-    of the push (the old plaintext isn't recoverable) — callers see the
-    new last-4 in the returned envelope.
+    Auth is the org GitHub App installation (``PLATFORM_REPO_WRITE``),
+    not the viewer's personal token; the repo's public sealed-box key is
+    fetched, each secret value is sealed under that key, and the
+    encrypted bytes are PUT to the Actions secrets endpoint. The deploy
+    token slot is rotated as part of the push (the old plaintext isn't
+    recoverable) — callers see the new last-4 in the returned envelope.
+    The clicking human is recorded out-of-band as the deploy-token
+    issuer (``by_user_id``), preserving attribution without borrowing
+    their GitHub identity for the write.
 
     Raises ``PushSecretsError`` for caller-fault conditions (no repo,
-    unsupported source kind, no personal connection); returns a
+    unsupported source kind, org App not installed); returns a
     ``PushSecretsResult(ok=False, ...)`` for runtime failures against
     the host.
     """
@@ -678,22 +682,26 @@ def push_astrolift_ci_secrets(
             f"unsupported source_kind {app.source_kind!r} for CI-secret push",
         )
 
+    # Attribution only: who clicked the button. Best-effort — the
+    # deploy-token rotation records it as issuer/rotator, out-of-band
+    # from the GitHub credential. A missing viewer doesn't block the
+    # push (the mutation layer already gated on permission).
     viewer_id = getattr(viewer_user, "pk", None) or getattr(viewer_user, "id", None)
-    if not viewer_id or not getattr(viewer_user, "is_authenticated", False):
-        raise PushSecretsError(
-            "NO_PERSONAL_CONNECTION",
-            ("Connect your GitHub account first (Account drawer → Connected accounts)."),
-        )
+    if not getattr(viewer_user, "is_authenticated", False):
+        viewer_id = None
 
-    connection = _pick_personal_github_connection(
-        organization_id=app.organization_id,
-        user_id=viewer_id,
-    )
-    if connection is None:
-        raise PushSecretsError(
-            "NO_PERSONAL_CONNECTION",
-            ("Connect your GitHub account first (Account drawer → Connected accounts)."),
+    # The credential is the org App installation, not the human. If the
+    # org hasn't installed the App, resolution raises PRECONDITION.
+    try:
+        connection = resolve_connection(
+            app.organization_id,
+            purpose=PLATFORM_REPO_WRITE,
+            source_kind="github",
         )
+    except ConnectionResolutionError as exc:
+        raise PushSecretsError(exc.code, exc.message) from exc
+
+    token_scheme = _github_auth_scheme(connection)
 
     try:
         token = _token(connection)
@@ -711,6 +719,7 @@ def push_astrolift_ci_secrets(
             token=token,
             base=base,
             repo_full_name=app.source_repo,
+            token_scheme=token_scheme,
         )
     except GithubProviderError as exc:
         return PushSecretsResult(
@@ -745,6 +754,7 @@ def push_astrolift_ci_secrets(
                 name=name,
                 sealed_b64=sealed,
                 key_id=key_id,
+                token_scheme=token_scheme,
             )
         except GithubProviderError as exc:
             return PushSecretsResult(

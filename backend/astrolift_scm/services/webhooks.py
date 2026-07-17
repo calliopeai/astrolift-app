@@ -53,6 +53,16 @@ class InstallSourceWebhookResult:
       rotated the HMAC secret + advanced ``installed_at``. ``hook_id``
       is whatever the app row carried before (the host's id stays
       the same).
+    * ``app_delivers``: the connection is a github_app_install and the
+      org App is installed on the target repo — its own webhook already
+      delivers pushes, so no per-repo hook exists (``hook_id`` is empty
+      by design, and the empty value is honest, not a masked hook). The
+      status flips the UI green and records ``installed_at``.
+    * ``not_installed``: the connection is a github_app_install but the
+      App is NOT installed on the target repo, so nothing delivers
+      pushes. A real precondition failure — the resolver maps it to
+      PRECONDITION so the operator installs the App on that repo. We do
+      NOT record ``installed_at`` (the app is not wired).
     * ``no_connection``: no active SourceConnection in the app's org
       for the app's source kind. The resolver maps this to a clean
       PRECONDITION so the FE can prompt to connect.
@@ -73,13 +83,26 @@ class InstallSourceWebhookResult:
 # ---------------------------------------------------------------------------
 # Connection picker
 # ---------------------------------------------------------------------------
-
-
-# Mirror the priority used elsewhere in this app's CI plumbing
-# (``services/workflows.py``): App-install first (no silent expiry,
-# scoped per-install), then OAuth-user, then PAT. Picking the same
-# winner keeps the manifest read, the workflow dispatch, and the
-# webhook all pinned to one identity per app.
+#
+# DOCUMENTED EXCEPTION to the "platform writes are App-only" rule.
+#
+# Unlike the workflow-dispatch / manifest-read pickers (which resolve
+# the org GitHub App via ``connection_resolver`` and nothing else), this
+# picker keeps the App-first-then-OAuth-user-then-PAT preference. It has
+# to: it resolves the connection that OWNS a repo's webhook, and the
+# webhook secret lifecycle is a closed loop over one connection —
+#
+#   install  → mints + persists ``webhook_secret_*`` on the picked row
+#   ingest   → webhook_views re-picks the same row to HMAC-verify a
+#              delivery (astrolift_scm/webhook_views.py)
+#   teardown → app_deregister re-picks it to delete the hook
+#
+# For a per-repo hook installed through a PAT / OAuth-user connection,
+# the secret lives on THAT row. Forcing App-only here would strand every
+# such hook: inbound deliveries would fail signature verification (401)
+# and teardown couldn't find the hook to delete. App-delivered webhooks
+# (github_app_install) are a separate mechanism owned elsewhere; this
+# picker still prefers the App when one exists, so new installs pin to it.
 _KIND_PREFERENCE: dict[str, tuple[str, ...]] = {
     "github": (
         "github_app_install",
@@ -87,11 +110,6 @@ _KIND_PREFERENCE: dict[str, tuple[str, ...]] = {
         "github_pat",
     ),
     "gitlab": (
-        # No App-install equivalent on GitLab — the closest is the
-        # OAuth-app row, but that's the issuer config and never the
-        # connection-with-token. PAT and OAuth-user both carry a usable
-        # Bearer token; prefer OAuth-user for the per-operator
-        # attribution, fall back to PAT for the org-shared case.
         "gitlab_oauth_user",
         "gitlab_pat",
     ),
@@ -99,6 +117,10 @@ _KIND_PREFERENCE: dict[str, tuple[str, ...]] = {
 
 
 def _pick_source_connection(app: RegisteredApp) -> SourceConnection | None:
+    """Resolve the connection that owns ``app``'s webhook (see the
+    exception note above). App-first, then OAuth-user, then PAT; None
+    when no usable row exists, which every caller maps to its own
+    ``no_connection`` / 401 response."""
     accepted = _KIND_PREFERENCE.get(app.source_kind, ())
     if not accepted:
         return None
@@ -224,11 +246,12 @@ def install_astrolift_source_webhook(app: RegisteredApp) -> InstallSourceWebhook
                 hook_id=app.source_webhook_id or "",
                 receiver_url=target_url,
             )
-        if exc.code == "APP_INSTALLED":
-            # GitHub-App connections deliver via the App's own
-            # webhook — no per-repo install is needed. Persist a
-            # marker timestamp so the UI flips green and leave the
-            # hook id empty; the receiver routes by App installation.
+        if exc.code == "APP_DELIVERS":
+            # github_app_install and the App IS installed on this repo:
+            # its own org-level webhook already delivers pushes. There is
+            # no per-repo hook, so we DON'T fabricate a hook_id — the
+            # empty value is the truth. Persist the marker timestamp so
+            # the UI flips green; the receiver routes by App installation.
             now = timezone.now()
             with transaction.atomic():
                 app.source_webhook_installed_at = now
@@ -240,9 +263,18 @@ def install_astrolift_source_webhook(app: RegisteredApp) -> InstallSourceWebhook
                     ]
                 )
             return InstallSourceWebhookResult(
-                status="refreshed",
-                hook_id=app.source_webhook_id or "",
+                status="app_delivers",
+                hook_id="",
                 receiver_url=target_url,
+            )
+        if exc.code == "APP_NOT_INSTALLED":
+            # github_app_install but the App is NOT on this repo: nothing
+            # delivers pushes. Report the truth as a precondition failure
+            # and DON'T advance installed_at — the app isn't wired.
+            return InstallSourceWebhookResult(
+                status="not_installed",
+                receiver_url=target_url,
+                error=exc.message,
             )
         return InstallSourceWebhookResult(
             status="fetch_failed",

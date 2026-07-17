@@ -60,25 +60,6 @@ from astrolift_scm.models import SourceConnection
 log = logging.getLogger(__name__)
 
 
-# Mapping ``RegisteredApp.source_kind`` → set of acceptable
-# ``SourceConnection.kind`` values. We accept any connection that
-# can authenticate against the same host; preference order picks the
-# App-install token first when both an OAuth-user token and an
-# App-install token exist in the same org (App tokens don't expire
-# silently and are scoped per-installation).
-_KIND_PREFERENCE: dict[str, tuple[str, ...]] = {
-    "github": (
-        "github_app_install",
-        "github_oauth_user",
-        "github_pat",
-    ),
-    "gitlab": (
-        "gitlab_oauth_user",
-        "gitlab_pat",
-    ),
-}
-
-
 @dataclasses.dataclass(slots=True)
 class ResyncChanges:
     """Per-bucket diff between the repo manifest and the DB.
@@ -164,36 +145,59 @@ def _default_fetch(
     )
 
 
+# DOCUMENTED EXCEPTION to the "platform writes are App-only" rule.
+#
+# The strict-write pickers (CI secrets, workflow dispatch, workflow-file
+# write) resolve the org GitHub App and nothing else, via
+# ``connection_resolver.resolve_connection(purpose=PLATFORM_REPO_WRITE)``.
+# This picker deliberately keeps the App-first-then-OAuth-user-then-PAT
+# preference because manifest read + TOML write-back + repo scan + the
+# manifest-PR flow are all supported through an org-level ``github_pat``
+# OR ``github_oauth_user`` connection — a heavily-tested path
+# (test_resync_manifest / test_manifest_mutations / test_toml_writeback
+# scaffold PAT and OAuth-user connections). Forcing App-only here would
+# strand every org that onboarded without installing the GitHub App and
+# regress those flows to ``fetch_failed``. The bug this refactor fixed
+# was a *viewer-scoped personal* token used for a secret write, not an
+# org-level connection used for a manifest op; this picker was never
+# part of that defect. Tightening it to App-only is a separate,
+# behaviour-changing migration (update the PAT/OAuth fixtures + accept
+# that App-less orgs lose manifest sync) and is intentionally out of
+# scope here.
+_PLATFORM_OP_KINDS: dict[str, tuple[str, ...]] = {
+    "github": (
+        "github_app_install",
+        "github_oauth_user",
+        "github_pat",
+    ),
+    "gitlab": (
+        "gitlab_oauth_user",
+        "gitlab_pat",
+    ),
+}
+
+
 def _pick_source_connection(app: RegisteredApp) -> SourceConnection | None:
-    """Pick the best ``SourceConnection`` for ``app``.
-
-    Same org, not soft-deleted, not orphaned, active. Among matches,
-    prefer the most specific credential kind for the source host
-    (App-install > OAuth-user > PAT for GitHub; OAuth-user > PAT
-    for GitLab). Returns None when no usable connection exists —
-    the caller surfaces that as ``fetch_failed``.
-    """
-    accepted_kinds = _KIND_PREFERENCE.get(app.source_kind, ())
-    if not accepted_kinds:
+    """Pick the org's connection for a manifest operation on ``app``'s
+    source host (see the exception note above). App-first, then
+    OAuth-user, then PAT; None when no usable row exists, which callers
+    surface as ``fetch_failed``."""
+    accepted = _PLATFORM_OP_KINDS.get(app.source_kind, ())
+    if not accepted:
         return None
-
-    qs = SourceConnection.objects.filter(
-        organization_id=app.organization_id,
-        kind__in=accepted_kinds,
-        is_active=True,
-        is_orphaned=False,
-        deleted_at__isnull=True,
+    rows = list(
+        SourceConnection.objects.filter(
+            organization_id=app.organization_id,
+            kind__in=accepted,
+            is_active=True,
+            is_orphaned=False,
+            deleted_at__isnull=True,
+        )
     )
-
-    # Stable selection: rank by preference order, then by oldest
-    # (lowest pk) so re-runs against the same app pick the same
-    # connection.
-    rows = list(qs)
     if not rows:
         return None
-
-    rank = {kind: i for i, kind in enumerate(accepted_kinds)}
-    rows.sort(key=lambda r: (rank.get(r.kind, len(accepted_kinds)), r.pk))
+    rank = {k: i for i, k in enumerate(accepted)}
+    rows.sort(key=lambda r: (rank.get(r.kind, len(accepted)), r.pk))
     return rows[0]
 
 

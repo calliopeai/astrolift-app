@@ -228,6 +228,75 @@ def list_github_repos(
     return out
 
 
+def github_installation_includes_repo(connection, *, repo_full_name: str) -> bool:
+    """Return True iff ``repo_full_name`` is in the App installation's repo set.
+
+    The org GitHub App only delivers push events for the repos the
+    operator selected at install time on GitHub, so before the webhook
+    step can HONESTLY claim the App covers a repo it has to check the
+    installation's actual repository set (``/installation/repositories``,
+    Bearer installation token). Paginates until the repo is found or the
+    listing is exhausted so the answer is truthful for large
+    installations, not just the first 100 repos.
+
+    Only meaningful for ``github_app_install`` connections — other kinds
+    have no installation repo set and raise ``UNSUPPORTED``.
+    """
+    if connection.kind != "github_app_install":
+        raise GithubProviderError(
+            "UNSUPPORTED",
+            "installation repo membership only applies to github_app_install connections",
+        )
+    token = _token(connection)
+    base = _api_base(connection)
+    target = (repo_full_name or "").lower()
+
+    page = 1
+    while True:
+        qs = urllib.parse.urlencode({"per_page": "100", "page": str(page)})
+        url = f"{base}/installation/repositories?{qs}"
+        req = urllib.request.Request(
+            url,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+                "User-Agent": "astrolift",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            if exc.code in (401, 403):
+                raise GithubProviderError(
+                    "AUTH_FAILED",
+                    f"GitHub rejected the token ({exc.code}). Reconnect or rotate.",
+                    recoverable=True,
+                ) from exc
+            raise GithubProviderError("API_ERROR", f"GitHub returned {exc.code}") from exc
+        except urllib.error.URLError as exc:
+            raise GithubProviderError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
+
+        if not isinstance(payload, dict) or not isinstance(payload.get("repositories"), list):
+            raise GithubProviderError(
+                "UNEXPECTED_SHAPE",
+                "GitHub returned an unexpected payload for /installation/repositories",
+            )
+        repos = payload["repositories"]
+        for raw in repos:
+            if (raw.get("full_name") or "").lower() == target:
+                return True
+        # A short page means we've reached the end of the listing.
+        if len(repos) < 100:
+            return False
+        page += 1
+        # Safety cap: 100 pages == 10k repos. Beyond that we stop
+        # rather than loop unbounded on a pathological installation.
+        if page > 100:
+            return False
+
+
 def fetch_github_file(
     connection,
     *,
