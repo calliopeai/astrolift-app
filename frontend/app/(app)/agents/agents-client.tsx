@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useQuery } from "@apollo/client/react";
 import {
   BarChart3Icon,
   BotIcon,
@@ -8,7 +8,6 @@ import {
   ClockIcon,
   ExternalLinkIcon,
   GitBranchIcon,
-  Loader2Icon,
   MonitorPlayIcon,
   ScrollIcon,
   ShieldCheckIcon,
@@ -17,7 +16,6 @@ import {
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
-import { toast } from "sonner";
 
 import { EmptyState } from "@/components/EmptyState";
 import { ListControls, SortableHeader } from "@/components/ListControls";
@@ -25,7 +23,7 @@ import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -50,10 +48,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import { AgentTheatre } from "@/components/observability/AgentTheatre";
 import { VncViewer } from "@/components/observability/VncViewer";
-import { RUN_AGENT } from "@/graphql/agents/agents.mutations";
 import {
   LIST_AGENT_FLEET,
   LIST_AGENT_LIVE_STATUS,
@@ -65,9 +61,8 @@ import type {
   AstroliftAgentLiveStatus,
 } from "@/graphql/agents/agents.types";
 import { LIST_PROJECTS } from "@/graphql/identity/identity.queries";
-import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
-import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
+import { DispatchTab } from "./dispatch-tab";
 import { useModules } from "@/graphql/user/user.hooks";
 import { FEATURE_FLAG_ZENTINELLE, useFeatureFlag } from "@/graphql/server/server.hooks";
 import { formatRelativeAge } from "@/lib/format";
@@ -87,14 +82,6 @@ type AgentTask = {
 
 type AgentTasksData = {
   agentTasks: AgentTask[];
-};
-
-type RunAgentData = {
-  runAstroliftAgent: {
-    ok: boolean;
-    errors: { code: string; message: string; field: string | null }[];
-    data: { id: string; status: string; createdAt: string } | null;
-  };
 };
 
 type AgentTab =
@@ -153,10 +140,6 @@ const ZENTINELLE_TABS = new Set<AgentTab>([
   "token-usage",
   "compliance",
 ]);
-
-interface WorkloadResp {
-  astroliftWorkloads: AstroliftWorkload[];
-}
 
 // ---------------------------------------------------------------------------
 // Active tab — running agent tasks
@@ -217,7 +200,14 @@ function ActiveTab({ orgId }: { orgId: string }) {
           <TableBody>
             {tasks.map((t) => (
               <TableRow key={t.id}>
-                <TableCell className="font-mono text-xs">{t.id}</TableCell>
+                <TableCell className="font-mono text-xs">
+                  <Link
+                    href={`/agents/runs/${encodeURIComponent(t.id)}`}
+                    className="hover:text-[var(--brand-primary)] hover:underline"
+                  >
+                    {t.id}
+                  </Link>
+                </TableCell>
                 <TableCell><Badge variant="default">{t.status}</Badge></TableCell>
                 <TableCell className="text-muted-foreground text-sm">{t.startedAt ?? "—"}</TableCell>
                 <TableCell className="text-right">
@@ -249,134 +239,6 @@ function ActiveTab({ orgId }: { orgId: string }) {
           {watching && <VncViewer vncPath={watching.vncUrl} />}
         </DialogContent>
       </Dialog>
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Dispatch tab — trigger a new agent run
-// ---------------------------------------------------------------------------
-
-interface DispatchTabProps {
-  agentWorkloads: AstroliftWorkload[];
-  workloadsLoading: boolean;
-}
-
-function DispatchTab({ agentWorkloads, workloadsLoading }: DispatchTabProps) {
-  const [selectedWorkload, setSelectedWorkload] = React.useState<string>("");
-  const [inputJson, setInputJson] = React.useState<string>("");
-  const [jsonError, setJsonError] = React.useState<string | null>(null);
-
-  // Refetch the fleet runs list on success so the new run shows on the Active
-  // tab without a reload (the per-agent Run tab does its own scoped refetch).
-  const [runAgent, { loading: dispatching }] = useMutation<RunAgentData>(RUN_AGENT, {
-    refetchQueries: [LIST_AGENT_TASKS],
-  });
-
-  function validateJson(value: string): boolean {
-    if (!value.trim()) {
-      setJsonError(null);
-      return true;
-    }
-    try {
-      JSON.parse(value);
-      setJsonError(null);
-      return true;
-    } catch {
-      setJsonError("Invalid JSON — check syntax");
-      return false;
-    }
-  }
-
-  async function handleDispatch() {
-    if (!selectedWorkload) return;
-    if (!validateJson(inputJson)) return;
-
-    const selectedName =
-      agentWorkloads.find((w) => w.slug === selectedWorkload)?.name ?? selectedWorkload;
-    try {
-      const { data } = await runAgent({
-        variables: {
-          input: {
-            agentSlug: selectedWorkload,
-            triggerPayload: inputJson.trim() ? JSON.parse(inputJson) : null,
-          },
-        },
-      });
-      const result = data?.runAstroliftAgent;
-      if (!result?.ok) {
-        throw new Error(result?.errors?.[0]?.message ?? "Dispatch failed");
-      }
-      toast.success(`Dispatched ${selectedName}`);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      toast.error(`Couldn't dispatch ${selectedName}`, { description: message });
-    }
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Dispatch agent run</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="dispatch-workload">Agent workload</Label>
-          {workloadsLoading ? (
-            <Skeleton className="h-9 w-full max-w-xs" />
-          ) : agentWorkloads.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              No agent workloads registered. Declare a workload with{" "}
-              <span className="font-mono">kind: agent</span> in your app manifest.
-            </p>
-          ) : (
-            <Select value={selectedWorkload} onValueChange={setSelectedWorkload}>
-              <SelectTrigger id="dispatch-workload" className="max-w-xs">
-                <SelectValue placeholder="Select workload…" />
-              </SelectTrigger>
-              <SelectContent>
-                {agentWorkloads.map((w) => (
-                  <SelectItem key={w.id} value={w.slug}>
-                    {w.name} <span className="text-muted-foreground">({w.registeredAppSlug})</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="dispatch-input">Input (JSON, optional)</Label>
-          <Textarea
-            id="dispatch-input"
-            placeholder='{"key": "value"}'
-            value={inputJson}
-            onChange={(e) => {
-              setInputJson(e.target.value);
-              if (jsonError) validateJson(e.target.value);
-            }}
-            onBlur={() => validateJson(inputJson)}
-            className="font-mono text-sm"
-            rows={5}
-          />
-          {jsonError && <p className="text-destructive text-xs">{jsonError}</p>}
-        </div>
-
-        <div className="pt-1">
-          <Button
-            disabled={!selectedWorkload || dispatching || agentWorkloads.length === 0}
-            onClick={handleDispatch}
-          >
-            {dispatching && <Loader2Icon className="size-4 animate-spin" />}
-            <ZapIcon className="size-4" />
-            Dispatch run
-          </Button>
-          <p className="text-muted-foreground mt-2 text-xs">
-            Dispatches the agent for a single run. Track it on the Active tab, or open the
-            agent&rsquo;s Run tab for its full execution history.
-          </p>
-        </div>
-      </CardContent>
     </Card>
   );
 }
@@ -437,7 +299,14 @@ function HistoryTab({ orgId }: { orgId: string }) {
           <TableBody>
             {tasks.map((t) => (
               <TableRow key={t.id}>
-                <TableCell className="font-mono text-xs">{t.id}</TableCell>
+                <TableCell className="font-mono text-xs">
+                  <Link
+                    href={`/agents/runs/${encodeURIComponent(t.id)}`}
+                    className="hover:text-[var(--brand-primary)] hover:underline"
+                  >
+                    {t.id}
+                  </Link>
+                </TableCell>
                 <TableCell>
                   <Badge variant={t.status === "completed" ? "default" : "destructive"}>
                     {t.status}
@@ -946,18 +815,6 @@ export function AgentsClient() {
   const { org } = useActiveOrg();
   const orgId = org?.id ?? "";
 
-  // Workloads are loaded here for the Dispatch tab's workload picker.
-  // (The Registry tab has its own project-scoped agent queries — PR-7.)
-  const { data: workloadsData, loading: workloadsLoading } = useQuery<WorkloadResp>(
-    LIST_WORKLOADS,
-    { variables: {} }
-  );
-
-  const agentWorkloads = React.useMemo(
-    () => (workloadsData?.astroliftWorkloads ?? []).filter((w) => w.kind === "agent"),
-    [workloadsData?.astroliftWorkloads]
-  );
-
   return (
     <PageShell
       title="Agents"
@@ -997,9 +854,7 @@ export function AgentsClient() {
       </div>
 
       {tab === "active" && <ActiveTab orgId={orgId} />}
-      {tab === "dispatch" && (
-        <DispatchTab agentWorkloads={agentWorkloads} workloadsLoading={workloadsLoading} />
-      )}
+      {tab === "dispatch" && <DispatchTab orgId={orgId} />}
       {tab === "history" && <HistoryTab orgId={orgId} />}
       {tab === "registry" && <RegistryTab orgId={orgId} />}
       {tab === "theatre" && <AgentTheatre />}
