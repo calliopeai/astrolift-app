@@ -47,6 +47,7 @@ from astrolift_scm.providers.github import (
     fetch_github_file,
     fetch_github_zipball,
     github_installation_includes_repo,
+    github_webhook_exists,
     install_github_webhook,
     list_github_repos,
     open_github_pull_request,
@@ -636,4 +637,36 @@ def delete_webhook(
     raise ProviderError(
         "UNSUPPORTED",
         f"webhook delete for {connection.kind!r} not implemented yet",
+    )
+
+
+def webhook_exists(
+    connection: SourceConnection,
+    *,
+    repo_full_name: str,
+    hook_id: str,
+) -> bool:
+    """Return True iff per-repo hook ``hook_id`` still lives on the host.
+
+    Backs phantom-webhook reconciliation (#1108). GitHub-App-install
+    connections raise UNSUPPORTED — they never own a per-repo hook (the
+    App's org webhook delivers), so the caller checks installation
+    coverage via ``github_installation_includes_repo`` instead. Only
+    GitHub is implemented today (the reported phantom is GitHub-only);
+    other hosts raise UNSUPPORTED so the caller can fall back to leaving
+    a hook_id-bearing marker untouched rather than clearing it blindly.
+    """
+    if connection.kind in _GITHUB_KINDS:
+        try:
+            return github_webhook_exists(
+                connection,
+                repo_full_name=repo_full_name,
+                hook_id=hook_id,
+            )
+        except GithubProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    raise ProviderError(
+        "UNSUPPORTED",
+        f"webhook existence check for {connection.kind!r} not implemented yet",
     )

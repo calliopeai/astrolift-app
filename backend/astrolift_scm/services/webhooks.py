@@ -35,6 +35,11 @@ from django.utils import timezone
 from astrolift_registry.models import RegisteredApp
 from astrolift_scm.models import SourceConnection
 from astrolift_scm.providers import ProviderError, install_webhook
+from astrolift_scm.providers import webhook_exists as provider_webhook_exists
+from astrolift_scm.providers.github import (
+    GithubProviderError,
+    github_installation_includes_repo,
+)
 from core.secrets import encrypt_at_rest
 
 # ---------------------------------------------------------------------------
@@ -300,6 +305,104 @@ def install_astrolift_source_webhook(app: RegisteredApp) -> InstallSourceWebhook
         hook_id=result.hook_id,
         receiver_url=target_url,
     )
+
+
+# ---------------------------------------------------------------------------
+# Phantom-webhook reconciliation (#1108)
+# ---------------------------------------------------------------------------
+
+
+def _clear_webhook_markers(app: RegisteredApp) -> None:
+    """Reset the app's source-webhook markers to the honest "unwired" state."""
+    app.source_webhook_id = ""
+    app.source_webhook_installed_at = None
+    with transaction.atomic():
+        app.save(
+            update_fields=[
+                "source_webhook_id",
+                "source_webhook_installed_at",
+                "updated_at",
+                "version",
+            ]
+        )
+
+
+def reconcile_source_webhook_state(app: RegisteredApp) -> str:
+    """Detect + repair a phantom source-webhook marker (#1108).
+
+    "Phantom" := ``source_webhook_installed_at`` is set but nothing on the
+    host actually delivers pushes. Found live on pickup-windows-tool:
+    ``installed_at`` set, ``source_webhook_id`` empty, the repo had zero
+    webhooks and the App wasn't installed — a legacy failed install that
+    advanced the timestamp anyway, silently disabling auto-deploy.
+
+    The truth is checked against the host, keyed on the connection that
+    OWNS the app's webhook (same picker the install path uses):
+
+    * ``github_app_install`` — honest only if the App actually covers the
+      repo. Coverage is verified against the installation's repo set; if
+      the App doesn't cover it, the marker is a lie.
+    * per-repo connection (OAuth/PAT) — honest only if a real hook id is on
+      record AND that hook still exists on the host. An empty id, or a
+      recorded id whose hook was deleted, is a phantom.
+
+    Repair only CLEARS the markers so the caller's install step re-wires and
+    lands truthful state (or leaves the app honestly unwired). Verification
+    failures are conservative: a recorded hook id that we can't check (e.g.
+    GitLab has no checker, or a transient blip) is LEFT untouched — we don't
+    destroy a real hook on a hiccup — while an empty-id marker, which the
+    reported bug shows is almost always a lie, is cleared so the idempotent
+    install step can re-establish it.
+
+    Returns a short status token for logging/tests: ``no_marker`` / ``live``
+    / ``app_delivers`` / ``repaired_missing`` / ``repaired_phantom`` /
+    ``unverifiable``.
+    """
+    if app.source_webhook_installed_at is None:
+        return "no_marker"
+
+    connection = _pick_source_connection(app)
+    if connection is None:
+        # A marker with no connection behind it cannot be delivering.
+        _clear_webhook_markers(app)
+        return "repaired_phantom"
+
+    if connection.kind == "github_app_install":
+        try:
+            covered = github_installation_includes_repo(connection, repo_full_name=app.source_repo)
+        except GithubProviderError:
+            # Coverage unverifiable + empty id is more likely phantom than
+            # not (the reported bug); the install step re-verifies and
+            # re-marks app_delivers if the App genuinely covers the repo.
+            _clear_webhook_markers(app)
+            return "repaired_phantom"
+        if covered:
+            return "app_delivers"
+        _clear_webhook_markers(app)
+        return "repaired_phantom"
+
+    # Per-repo-hook connection: the honest state is a live hook id.
+    if not app.source_webhook_id:
+        # installed_at set with no id under a per-repo connection is a
+        # failed install that advanced the timestamp anyway — the exact
+        # phantom the issue reports.
+        _clear_webhook_markers(app)
+        return "repaired_phantom"
+
+    try:
+        still_there = provider_webhook_exists(
+            connection,
+            repo_full_name=app.source_repo,
+            hook_id=app.source_webhook_id,
+        )
+    except ProviderError:
+        # Host has no existence checker (GitLab today) or a transient
+        # failure — leave the recorded hook alone rather than nuke a real one.
+        return "unverifiable"
+    if still_there:
+        return "live"
+    _clear_webhook_markers(app)
+    return "repaired_missing"
 
 
 def _persist_secret(connection: SourceConnection, plaintext: str) -> None:

@@ -568,6 +568,60 @@ def delete_github_webhook(
         raise GithubProviderError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
 
 
+def github_webhook_exists(connection, *, repo_full_name: str, hook_id: str) -> bool:
+    """Return True iff hook ``hook_id`` still exists on ``repo_full_name``.
+
+    The truthful check behind phantom-webhook reconciliation (#1108): a
+    RegisteredApp can carry a recorded ``source_webhook_id`` whose hook was
+    later deleted on GitHub (or never really created), leaving the app
+    marked "installed" while nothing delivers pushes. ``GET
+    /repos/{owner}/{repo}/hooks/{id}`` answers it directly — 200 means the
+    hook is live, 404 means it's gone and the marker is stale.
+
+    ``github_app_install`` connections never own a per-repo hook (the App's
+    org webhook delivers instead), so calling this for one is a programmer
+    error — raise ``UNSUPPORTED`` rather than returning a misleading answer.
+    """
+    if connection.kind == "github_app_install":
+        raise GithubProviderError(
+            "UNSUPPORTED",
+            "github_app_install connections have no per-repo hook to check",
+        )
+    if not hook_id:
+        raise GithubProviderError("VALIDATION", "hook_id is required to check a webhook")
+
+    token = _token(connection)
+    base = _api_base(connection)
+    safe_repo = "/".join(urllib.parse.quote(p, safe="") for p in repo_full_name.split("/", 1))
+    safe_hook = urllib.parse.quote(str(hook_id), safe="")
+    url = f"{base}/repos/{safe_repo}/hooks/{safe_hook}"
+
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        urllib.request.urlopen(req, timeout=10)
+        return True
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return False
+        if exc.code in (401, 403):
+            raise GithubProviderError(
+                "AUTH_FAILED",
+                f"GitHub rejected the token ({exc.code}). Reconnect or rotate.",
+                recoverable=True,
+            ) from exc
+        raise GithubProviderError("API_ERROR", f"GitHub returned {exc.code}") from exc
+    except urllib.error.URLError as exc:
+        raise GithubProviderError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
+
+
 def _github_contents_url(base: str, repo_full_name: str, path: str) -> str:
     safe_repo = "/".join(urllib.parse.quote(p, safe="") for p in repo_full_name.split("/", 1))
     safe_path = "/".join(urllib.parse.quote(p, safe="") for p in path.split("/"))
