@@ -47,6 +47,7 @@ Security:
 from __future__ import annotations
 
 import json
+import logging
 import re
 import secrets
 import urllib.error
@@ -57,6 +58,7 @@ from typing import Any
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.db.models import Q
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.utils import timezone
 from django.utils.html import escape
@@ -65,9 +67,23 @@ from django.views.decorators.http import require_GET
 
 from astrolift_identity.models import Member
 from astrolift_scm.models import SourceConnection
-from core.secrets import encrypt_at_rest
+from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
+
+logger = logging.getLogger(__name__)
 
 GITHUB_API_DEFAULT = "https://api.github.com"
+
+# Prefix for the ``display_name`` we stamp on a fully-created GitHub-App
+# connection ("GitHub App: <slug>"). The App's URL slug is only persisted
+# inside ``display_name`` — there's no dedicated column — so the reuse
+# path recovers it from here (see ``_app_slug_from_connection``). Kept as
+# one constant so the set-site (callback) and parse-site can't drift.
+_APP_DISPLAY_PREFIX = "GitHub App: "
+
+# GITHUB_APP_CONNECTION_SCOPE values. per_org: one App per org. per_install:
+# one App shared across every org in the install. Anything else → per_org.
+_CONNECTION_SCOPES = frozenset({"per_org", "per_install"})
+_DEFAULT_CONNECTION_SCOPE = "per_org"
 
 # GitHub org/user slug rule: alphanumeric + hyphen, no consecutive
 # hyphens, max 39 chars. We only enforce the character class + length
@@ -225,6 +241,196 @@ def _validate_gh_slug(slug: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# App reuse (dedup) — reuse an existing GitHub App instead of minting a
+# brand-new one on every "Connect GitHub" click, so an install stops
+# accumulating duplicate Apps. Scope (GITHUB_APP_CONNECTION_SCOPE) decides
+# how wide "existing" is: per-org or shared across the whole install.
+# ---------------------------------------------------------------------------
+
+
+def _connection_scope() -> str:
+    """Resolve GITHUB_APP_CONNECTION_SCOPE, normalising unknown values to
+    ``per_org`` (with a warning) so a typo in the install config can never
+    silently widen App sharing to the whole install."""
+    raw = (getattr(settings, "GITHUB_APP_CONNECTION_SCOPE", _DEFAULT_CONNECTION_SCOPE) or "").strip().lower()
+    if raw not in _CONNECTION_SCOPES:
+        if raw:
+            logger.warning(
+                "Unknown GITHUB_APP_CONNECTION_SCOPE %r; defaulting to %s",
+                raw,
+                _DEFAULT_CONNECTION_SCOPE,
+            )
+        return _DEFAULT_CONNECTION_SCOPE
+    return raw
+
+
+def _app_slug_from_connection(connection: SourceConnection) -> str:
+    """Recover the GitHub App URL slug from a connection's display_name.
+
+    The slug lives only inside ``display_name`` (``GitHub App: <slug>``);
+    there's no dedicated column. Returns "" when the operator has renamed
+    the connection away from that shape — callers treat that as "can't
+    reuse" and fall back to the App-create flow rather than build a broken
+    install URL."""
+    name = connection.display_name or ""
+    if not name.startswith(_APP_DISPLAY_PREFIX):
+        return ""
+    return name[len(_APP_DISPLAY_PREFIX) :].strip()
+
+
+def _find_canonical_app(org_id: int, scope: str) -> SourceConnection | None:
+    """Oldest reusable ``github_app_install`` connection in scope.
+
+    Reusable = active, not orphaned, not soft-deleted (default manager),
+    carrying real App credentials (numeric App ID + PEM) — i.e. an App that
+    finished the manifest CREATE exchange, not an abandoned pending row.
+    ``per_install`` searches the whole install; anything else scopes to the
+    current org. When several match (the duplicate state we're converging
+    away from) the oldest wins, deterministically."""
+    qs = SourceConnection.objects.filter(
+        kind="github_app_install",
+        is_active=True,
+        is_orphaned=False,
+    ).exclude(oauth_client_id="")
+    if scope != "per_install":
+        qs = qs.filter(organization_id=org_id)
+    # Oldest first; a stale pending row (blank App ID) is already excluded,
+    # and we additionally require a stored PEM so a half-written row can't
+    # be picked as canonical.
+    for candidate in qs.order_by("created_at", "pk"):
+        if bytes(candidate.secret_ciphertext):
+            return candidate
+    return None
+
+
+def _current_org_installed_app(org_id: int, canonical: SourceConnection) -> SourceConnection | None:
+    """The current org's own active, fully-installed App connection that
+    corresponds to ``canonical`` — matched by numeric App ID, or by App
+    owner login. The unique constraint already forbids two app_installs per
+    (org, owner), so an active connection to the same owner *is* this org's
+    App. Returns None when the org hasn't installed the App yet."""
+    match = Q(oauth_client_id=canonical.oauth_client_id)
+    owner = canonical.account_login
+    if owner:
+        match |= Q(account_login=owner)
+    return (
+        SourceConnection.objects.filter(
+            organization_id=org_id,
+            kind="github_app_install",
+            is_active=True,
+            is_orphaned=False,
+        )
+        .exclude(installation_id="")
+        .filter(match)
+        .order_by("created_at", "pk")
+        .first()
+    )
+
+
+def _decrypt_optional(backend_kind: str, ciphertext: Any) -> bytes:
+    """Decrypt a stored secret, tolerating the empty/unset case."""
+    raw = bytes(ciphertext or b"")
+    if not raw or not backend_kind:
+        return b""
+    return decrypt(EncryptedSecret(backend_kind=backend_kind, backend_ref=raw))
+
+
+def _copied_app_secrets(canonical: SourceConnection) -> dict[str, Any]:
+    """Re-encrypt the canonical App's secret material for a reuse copy.
+
+    Every secret an App holds is App-level (identical across installations),
+    so a faithful copy carries them all: the PEM signs installation tokens,
+    the OAuth client_secret is required by request_oauth_on_install's
+    install-time OAuth callback, and the webhook_secret verifies inbound
+    payloads. We decrypt with the flow's own helpers and re-encrypt with the
+    CURRENT backend (matches the manifest callback's storage; survives a key
+    rotation). Never logged or returned in plaintext."""
+    from astrolift_scm.providers.github_app import _decrypt_pem
+
+    secrets_map = {
+        ("secret_backend_kind", "secret_ciphertext"): _decrypt_pem(canonical),
+        ("oauth_client_secret_backend_kind", "oauth_client_secret_ciphertext"): _decrypt_optional(
+            canonical.oauth_client_secret_backend_kind,
+            canonical.oauth_client_secret_ciphertext,
+        ),
+        ("webhook_secret_backend_kind", "webhook_secret_ciphertext"): _decrypt_optional(
+            canonical.webhook_secret_backend_kind,
+            canonical.webhook_secret_ciphertext,
+        ),
+    }
+    out: dict[str, Any] = {}
+    for (kind_field, ct_field), plaintext in secrets_map.items():
+        if plaintext:
+            enc = encrypt_at_rest(plaintext)
+            out[kind_field] = enc.backend_kind
+            out[ct_field] = enc.backend_ref
+    return out
+
+
+def _start_reuse_install(
+    request: HttpRequest,
+    canonical: SourceConnection,
+    *,
+    org_id: int,
+    return_to: str,
+) -> HttpResponseRedirect | None:
+    """Case (b): the App exists elsewhere in the install but not on this
+    org. Create a pending connection that copies the canonical App's
+    credentials and bounce the operator to GitHub's install page for the
+    EXISTING App. The existing install/setup callback then attaches this
+    org's ``installation_id`` to the pending row (anchored via the
+    ``scm_github_install_state`` we prime here). Returns None (→ caller
+    falls back to the create flow) when we can't recover the App slug to
+    build the install URL."""
+    slug = _app_slug_from_connection(canonical)
+    if not _validate_gh_slug(slug):
+        logger.warning(
+            "Cannot recover a GitHub App slug from connection %s; falling back to the create flow",
+            canonical.guid,
+        )
+        return None
+
+    owner = canonical.account_login
+    # Clear any never-installed pending row for this org that would collide
+    # with the copy's unique key (organization, kind, account_login) — same
+    # spirit as the create-path cleanup below.
+    SourceConnection.objects.filter(
+        organization_id=org_id,
+        kind="github_app_install",
+        is_active=False,
+        installation_id="",
+    ).filter(Q(account_login="") | Q(account_login=owner)).update(deleted_at=timezone.now())
+
+    pending = SourceConnection.objects.create(
+        organization_id=org_id,
+        guid=uuid.uuid4(),
+        kind="github_app_install",
+        is_active=False,
+        display_name=canonical.display_name,
+        account_login=owner,
+        api_base_url=canonical.api_base_url,
+        oauth_client_id=canonical.oauth_client_id,  # numeric App ID
+        app_client_id=canonical.app_client_id,  # OAuth Client ID
+        oauth_redirect_uri=canonical.oauth_redirect_uri,
+        **_copied_app_secrets(canonical),
+    )
+
+    install_state = secrets.token_urlsafe(24)
+    request.session["scm_github_install_state"] = {
+        "state": install_state,
+        "connection_guid": str(pending.guid),
+        "return_to": return_to,
+    }
+    request.session.save()
+
+    install_url = (
+        f"https://github.com/apps/{urllib.parse.quote(slug)}/installations/new"
+        f"?state={urllib.parse.quote(install_state)}"
+    )
+    return HttpResponseRedirect(install_url)
+
+
+# ---------------------------------------------------------------------------
 # Views
 # ---------------------------------------------------------------------------
 
@@ -249,6 +455,24 @@ def github_app_manifest_start(request: HttpRequest) -> Any:
     org_id = _active_org_id(request)
     if org_id is None:
         return _redirect_with_error(return_to, "no_org")
+
+    # Dedup: before minting a brand-new App, look for a reusable one in
+    # scope. Resolved here — ahead of the pending-row + manifest render —
+    # so we never run the App-CREATE path when a reusable App exists.
+    # Also ahead of the localhost guard below: cases (a)/(b) don't embed a
+    # webhook URL, so they don't need APP_BASE_URL to be publicly reachable.
+    canonical = _find_canonical_app(org_id, _connection_scope())
+    if canonical is not None:
+        existing = _current_org_installed_app(org_id, canonical)
+        if existing is not None:
+            # (a) This org already has the App installed — nothing to do.
+            return _redirect_with_ok(return_to, existing.display_name or "GitHub App")
+        # (b) The App exists elsewhere in the install but not on this org —
+        # install the EXISTING App here instead of creating a duplicate.
+        reused = _start_reuse_install(request, canonical, org_id=org_id, return_to=return_to)
+        if reused is not None:
+            return reused
+        # Slug unrecoverable → fall through to the create flow (c).
 
     # github.com must be able to reach the webhook URL we embed in the
     # manifest. Refuse the flow early if the base URL is loopback —
@@ -428,7 +652,7 @@ def github_app_manifest_callback(request: HttpRequest) -> Any:
         "oauth_client_id": app_id,  # numeric App ID — webhook payload lookups
         "app_client_id": client_id,  # OAuth Client ID — /authorize + JWT iss
         "account_login": owner_login,
-        "display_name": f"GitHub App: {app_slug}",
+        "display_name": f"{_APP_DISPLAY_PREFIX}{app_slug}",
         "secret_backend_kind": pem_encrypted.backend_kind,
         "secret_ciphertext": pem_encrypted.backend_ref,
     }

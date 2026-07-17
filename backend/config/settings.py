@@ -199,6 +199,20 @@ SES_EVENTS_SNS_TOPIC_ARN = env_str("ASTROLIFT_SES_EVENTS_SNS_TOPIC_ARN", "")
 # public Internet (localhost)".
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "").rstrip("/")
 
+# GitHub-App connection reuse scope. Controls whether the "Connect
+# GitHub" manifest flow mints a brand-new GitHub App on every connect
+# or reuses an existing one so an install stops accumulating duplicate
+# Apps (astrolift-<x>, <x>-astrolift, …).
+#   per_org (default): one App per Astrolift org — the first connect in
+#     an org creates the App, later connects in that org reuse it.
+#   per_install: one App for the whole Astrolift install — the first org
+#     to connect creates the App; every other org installs that same App
+#     instead of creating a duplicate.
+# Install-level config (not per-request), so a plain env-driven setting
+# rather than a runtime constance flag. Unknown values normalise to
+# per_org at read time (see auth1.scm_app_manifest._connection_scope).
+GITHUB_APP_CONNECTION_SCOPE = env_str("GITHUB_APP_CONNECTION_SCOPE", "per_org")
+
 # Mobile universal-link / app-link well-known manifest values (#541).
 # The two strings below feed the JSON payload served at
 # /.well-known/apple-app-site-association and /.well-known/assetlinks.json
