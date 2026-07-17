@@ -268,6 +268,20 @@ class RegisteredApp(NamedBaseCoreModel):
     source_webhook_id = models.CharField(max_length=128, blank=True, default="")
     source_webhook_installed_at = models.DateTimeField(null=True, blank=True)
 
+    # Autowire outcome snapshot (#1108). Registration chains the three
+    # repo-wiring steps (CI workflow → source webhook → CI secrets); this
+    # sparse blob records the last verified per-step result so the app
+    # detail page can render an "autowire incomplete" banner without
+    # re-hitting the host on every read. Shape (keys omitted until a step
+    # runs): ``{"ci_workflow": "ok"|"error", "webhook": "ok"|"error",
+    # "secrets": "ok"|"error", "checked_at": <iso8601>, "errors": {step:
+    # message}}``. Empty dict means "autowire never ran" — the read path
+    # then derives status from the columns (a legacy app registered before
+    # the chain landed reads as unwired, which is the truth). The phantom
+    # webhook state (installed_at set + id empty, App not covering the
+    # repo) is derived, not stored, so it self-heals on the next run.
+    autowire_state = models.JSONField(default=dict, blank=True)
+
     default_tenant_cluster = models.ForeignKey(
         "astrolift_clusters.TenantCluster",
         related_name="registered_apps",

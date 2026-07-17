@@ -110,6 +110,23 @@ export type AstroliftAppReprovisionState = Omit<GeneratedAppReprovisionState, "s
 export type AstroliftAppConfigDrift = GeneratedAppConfigDrift;
 
 /**
+ * Autowire completeness rollup surfaced on the app overview (#1108).
+ * `connected` is the "connect for auto-deploy" gate; the three per-step
+ * fields are `ok` | `missing` | `error` (and `phantom` for `webhook`).
+ * `detail` concatenates any step error messages. Manual entry until
+ * `make codegen` regenerates the generated TypeScript types from the
+ * updated schema.graphql.
+ */
+export interface AstroliftAppAutowireStatus {
+  connected: boolean;
+  ciWorkflow: string;
+  webhook: string;
+  secrets: string;
+  checkedAt: string | null;
+  detail: string;
+}
+
+/**
  * Per-section "Modified N ago" timestamps for the Settings landing
  * card grid (#454). One field per LINK_SECTIONS card; each is the
  * ``max(updated_at)`` across the section's primary resource scoped
@@ -163,6 +180,13 @@ export type AstroliftRegisteredApp = Omit<
   reprovision: AstroliftAppReprovisionState;
   configDrift: AstroliftAppConfigDrift | null;
   settingsLastModified: AstroliftAppSettingsLastModified | null;
+  /**
+   * Autowire completeness rollup (#1108). Populated only on the
+   * single-app detail resolver; null on list queries. Manual entry
+   * until `make codegen` regenerates the generated TypeScript types
+   * from the updated schema.graphql.
+   */
+  autowire?: AstroliftAppAutowireStatus | null;
   /**
    * Count of currently-live preview environments for this app
    * (#730). Manual entry until `make codegen` regenerates the

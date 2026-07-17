@@ -37,6 +37,7 @@ from astrolift_registry.schema.types import (
     app_team_access_to_type,
     app_to_type,
     build_app_freshness,
+    build_autowire_status,
     build_config_drift,
     build_settings_last_modified,
     container_to_type,
@@ -1129,9 +1130,12 @@ class RegistryQuery:
         # landing card grid (#454). Computed only on the detail path —
         # the list resolvers leave the wrapper None.
         settings_last_modified = build_settings_last_modified(app)
+        # Autowire completeness rollup (#1108) — detail-only, DB-cheap.
+        autowire = build_autowire_status(app)
         return app_to_type(
             app,
             drift=drift,
+            autowire=autowire,
             settings_last_modified=settings_last_modified,
             include_retention_policies=True,
         )

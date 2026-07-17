@@ -35,6 +35,7 @@ import type {
 
 import { ActivityTimeline } from "./components/activity-timeline";
 import { AppTabs } from "./components/app-tabs";
+import { AutowireStatusBanner } from "./components/autowire-status-banner";
 import { ConfigDriftBanner } from "./components/config-drift-banner";
 import { ControlsSection } from "./components/controls-section";
 import { DeployActivityStrip } from "./components/deploy-activity-strip";
@@ -140,10 +141,7 @@ export function AppDetailClient({ slug }: { slug: string }) {
   const publicCount = wlList.filter((w) => w.isPublic).length;
   // Use the backend-computed managed hostname (e.g. my-app.astrolift.example.com).
   // Fall back to the short subdomain only when no managed domain is configured.
-  const primaryHost =
-    publicCount > 0
-      ? (a.managedHostname || a.subdomain || null)
-      : null;
+  const primaryHost = publicCount > 0 ? a.managedHostname || a.subdomain || null : null;
 
   const sourceLabel = SOURCE_KIND_LABEL[a.sourceKind] ?? a.sourceKind;
 
@@ -251,6 +249,16 @@ export function AppDetailClient({ slug }: { slug: string }) {
       ) : null}
 
       <GithubConnectCallout sourceKind={a.sourceKind} />
+
+      {/* Autowire completeness (#1108): "connect for auto-deploy" when
+          unwired, or an "autowire incomplete" repair banner when a step
+          (CI workflow / webhook / deploy secret) didn't land. */}
+      <AutowireStatusBanner
+        appSlug={a.slug}
+        sourceKind={a.sourceKind}
+        sourceRepo={a.sourceRepo}
+        autowire={a.autowire}
+      />
 
       {/* Primary object: the app's public URL / access surface. */}
       <UrlCard
