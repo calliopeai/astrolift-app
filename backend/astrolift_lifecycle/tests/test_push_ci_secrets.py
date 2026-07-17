@@ -79,20 +79,29 @@ def app_with_repo(app):
 
 
 @pytest.fixture
-def personal_github_connection(org, actor):
-    """Per-user OAuth connection (#395). The push-secrets path requires
-    the viewer's own connection; an org-level PAT shouldn't satisfy."""
-    encrypted = encrypt_at_rest(b"gho_personal_test_token")
-    return SourceConnection.objects.create(
+def github_app_connection(org, monkeypatch):
+    """Org GitHub App installation — the platform-write identity CI
+    secrets now authenticate as (superseding the old per-user OAuth
+    picker). ``user`` is NULL: this is an org-level credential, not a
+    human's. ``installation_token`` is stubbed so no real JWT signing
+    runs against the fake PEM bytes."""
+    encrypted = encrypt_at_rest(b"fake-app-pem-bytes")
+    conn = SourceConnection.objects.create(
         organization=org,
-        user=actor,
-        kind=SourceConnection.Kind.GITHUB_OAUTH_USER,
-        display_name="GitHub: actor",
-        account_login="actor",
+        user=None,
+        kind=SourceConnection.Kind.GITHUB_APP_INSTALL,
+        display_name="GitHub App: acme",
+        account_login="acme",
+        installation_id="424242",
         secret_backend_kind=encrypted.backend_kind,
         secret_ciphertext=encrypted.backend_ref,
         is_active=True,
     )
+    monkeypatch.setattr(
+        "astrolift_scm.providers.github_app.installation_token",
+        lambda connection: "ghs_fake_installation_token",
+    )
+    return conn
 
 
 @pytest.fixture
@@ -172,7 +181,7 @@ def test_push_secrets_rotates_token_and_pushes_all_five(
     org,
     actor,
     app_with_repo,
-    personal_github_connection,
+    github_app_connection,
     github_keypair,
 ):
     """End-to-end success: every secret PUT lands, the deploy token
@@ -239,7 +248,7 @@ def test_push_secrets_sealed_values_round_trip(
     org,
     actor,
     app_with_repo,
-    personal_github_connection,
+    github_app_connection,
     github_keypair,
 ):
     """The PUT body's ``encrypted_value`` is a libsodium sealed box of
@@ -289,7 +298,7 @@ def test_push_secrets_mints_token_when_none_exists(
     org,
     actor,
     app_with_repo,
-    personal_github_connection,
+    github_app_connection,
     github_keypair,
 ):
     """No existing deploy-token rows → mint a fresh one (don't NPE on
@@ -321,36 +330,38 @@ def test_push_secrets_mints_token_when_none_exists(
 # ---------------------------------------------------------------------------
 
 
-def test_push_secrets_no_personal_connection_returns_precondition(
+def test_push_secrets_no_app_install_returns_precondition(
     monkeypatch,
     permission_resolver,
     org,
     actor,
     app_with_repo,
 ):
-    """No personal SourceConnection for the viewer → PRECONDITION,
-    guidance to connect via the Account drawer. Org-level rows must
-    not satisfy this gate."""
+    """No org GitHub App installation → PRECONDITION about registering
+    the App. A stale/present *personal* OAuth connection must NOT
+    satisfy the platform-write path — that swap was the original bug
+    (a human's expiring token authenticating a platform secret write).
+    """
     permission_resolver.grant(Permission.APP_UPDATE)
 
-    # Make sure we never hit the network when the gate trips.
+    # Never hit the network when the gate trips.
     def boom(*_args, **_kw):
-        raise AssertionError("must not reach GitHub without personal connection")
+        raise AssertionError("must not reach GitHub without an App installation")
 
     monkeypatch.setattr(
         "astrolift_scm.services.secrets.urllib.request.urlopen",
         boom,
     )
 
-    # Seed an *org-level* (user=NULL) connection to prove the picker
-    # ignores it for the push-secrets path.
-    encrypted = encrypt_at_rest(b"org_pat_should_be_ignored")
+    # Seed a viewer-owned github_oauth_user row — the connection the old
+    # code would have (mis)used for the write. It must be ignored now.
+    encrypted = encrypt_at_rest(b"gho_stale_user_token")
     SourceConnection.objects.create(
         organization=org,
-        user=None,
-        kind=SourceConnection.Kind.GITHUB_PAT,
-        display_name="Org PAT",
-        account_login="org",
+        user=actor,
+        kind=SourceConnection.Kind.GITHUB_OAUTH_USER,
+        display_name="GitHub: actor",
+        account_login="actor",
         secret_backend_kind=encrypted.backend_kind,
         secret_ciphertext=encrypted.backend_ref,
         is_active=True,
@@ -365,7 +376,7 @@ def test_push_secrets_no_personal_connection_returns_precondition(
     assert not result.ok
     assert result.errors[0].code == "PRECONDITION"
     msg = result.errors[0].message.lower()
-    assert "github" in msg and "connect" in msg
+    assert "github app" in msg and "not installed" in msg
 
 
 def test_push_secrets_permission_denied_without_app_update(
@@ -374,7 +385,7 @@ def test_push_secrets_permission_denied_without_app_update(
     org,
     actor,
     app_with_repo,
-    personal_github_connection,
+    github_app_connection,
 ):
     """APP_READ alone is not enough; the mutation requires APP_UPDATE.
     No APP_UPDATE grant → PERMISSION_DENIED, never touches GitHub."""
@@ -407,7 +418,7 @@ def test_push_secrets_public_key_fetch_failure_returns_precondition(
     org,
     actor,
     app_with_repo,
-    personal_github_connection,
+    github_app_connection,
 ):
     """If the repo's public-key endpoint 404s, the push aborts cleanly
     before any PUTs or token rotation."""
@@ -536,7 +547,7 @@ def test_push_secrets_bitbucket_source_returns_precondition(
     org,
     actor,
     app_with_repo,
-    personal_github_connection,
+    github_app_connection,
 ):
     """A Bitbucket-sourced app surfaces a clean PRECONDITION envelope
     until the Bitbucket driver lands. Sibling of the old GitLab gap

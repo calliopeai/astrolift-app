@@ -62,28 +62,6 @@ GITLAB_WORKFLOW_PATH: Final = ".gitlab-ci.yml"
 BITBUCKET_WORKFLOW_PATH: Final = "bitbucket-pipelines.yml"
 GITEA_WORKFLOW_PATH: Final = ".gitea/workflows/astrolift-ci.yml"
 
-# Connection-kind preference order — same shape as #387 so a single
-# active connection drives both the dispatch and the push.
-_KIND_PREFERENCE: dict[str, tuple[str, ...]] = {
-    "github": (
-        "github_app_install",
-        "github_oauth_user",
-        "github_pat",
-    ),
-    "gitlab": (
-        "gitlab_oauth_user",
-        "gitlab_pat",
-    ),
-    "bitbucket": (
-        "bitbucket_oauth_user",
-        "bitbucket_pat",
-    ),
-    "gitea": (
-        "gitea_oauth_user",
-        "gitea_pat",
-    ),
-}
-
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class WorkflowSyncResult:
@@ -364,33 +342,30 @@ def render_astrolift_gitlab_ci_workflow(app: RegisteredApp) -> str:
 
 
 def _pick_source_connection(app: RegisteredApp) -> SourceConnection | None:
-    """Same selection as :func:`astrolift_scm.services.workflows._pick_source_connection`.
+    """Resolve the org-level connection for ``app``'s source host.
 
-    Documented choice: org-wide preference order (app-install >
-    oauth-user > pat). We deliberately don't filter to the viewer's
-    personal connection because writing a workflow file is a
-    platform-side bookkeeping action — any org-active GitHub identity
-    can land it, and gating on the viewer's personal connection would
-    block operators who connected the repo via a teammate's PAT.
+    Writing a workflow file is a platform-side action that goes out under
+    an org identity — never a viewer's personal token — but it is not a
+    secrets write, so it uses ``purpose=ORG_REPO_WRITE``: the GitHub App
+    is preferred, then an org-level OAuth-user, then a PAT, so an App-less
+    org that connected via OAuth/PAT can still land the workflow file.
+    Returns None (not raising) so the caller keeps its existing
+    no-connection handling.
     """
-    accepted = _KIND_PREFERENCE.get(app.source_kind, ())
-    if not accepted:
-        return None
-
-    rows = list(
-        SourceConnection.objects.filter(
-            organization_id=app.organization_id,
-            kind__in=accepted,
-            is_active=True,
-            is_orphaned=False,
-            deleted_at__isnull=True,
-        )
+    from astrolift_scm.services.connection_resolver import (
+        ORG_REPO_WRITE,
+        ConnectionResolutionError,
+        resolve_connection,
     )
-    if not rows:
+
+    try:
+        return resolve_connection(
+            app.organization_id,
+            purpose=ORG_REPO_WRITE,
+            source_kind=app.source_kind,
+        )
+    except ConnectionResolutionError:
         return None
-    rank = {k: i for i, k in enumerate(accepted)}
-    rows.sort(key=lambda r: (rank.get(r.kind, len(accepted)), r.pk))
-    return rows[0]
 
 
 # ---------------------------------------------------------------------------

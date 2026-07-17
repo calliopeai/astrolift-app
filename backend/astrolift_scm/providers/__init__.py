@@ -46,6 +46,7 @@ from astrolift_scm.providers.github import (
     delete_github_webhook,
     fetch_github_file,
     fetch_github_zipball,
+    github_installation_includes_repo,
     install_github_webhook,
     list_github_repos,
     open_github_pull_request,
@@ -374,17 +375,36 @@ def install_webhook(
 ) -> InstallWebhookResult:
     """Install a webhook on the host repo through ``connection``.
 
-    GitHub-App-install connections raise ProviderError("APP_INSTALLED")
-    so the resolver can short-circuit (those connections already
-    receive deliveries via the App's own webhook). The caller should
-    surface that case to the UI as "already installed via App" — no
-    actual hook is created.
+    GitHub-App-install connections never create a per-repo hook — the
+    App's own org-level webhook delivers, but *only* for the repos the
+    operator selected at install time. So rather than blindly claiming
+    success, this VERIFIES the target repo is in the installation's repo
+    set and raises a truthful signal for the caller:
+
+    * ``APP_DELIVERS`` (recoverable) — the App is installed on the repo;
+      its webhook already covers pushes. No per-repo hook is needed and
+      none exists; the caller must not fabricate a ``hook_id``.
+    * ``APP_NOT_INSTALLED`` (recoverable) — the App is NOT installed on
+      the target repo, so nothing delivers pushes. This is a real
+      precondition failure the operator has to fix (install the App on
+      that repo), not a silent no-op success.
     """
     if connection.kind == "github_app_install":
+        try:
+            covered = github_installation_includes_repo(connection, repo_full_name=repo_full_name)
+        except GithubProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+        if covered:
+            raise ProviderError(
+                "APP_DELIVERS",
+                f"the GitHub App already delivers push events for {repo_full_name}; "
+                "no per-repo webhook is needed",
+                recoverable=True,
+            )
         raise ProviderError(
-            "APP_INSTALLED",
-            "github_app_install connections already deliver webhooks via the GitHub App; "
-            "no per-repo install is required",
+            "APP_NOT_INSTALLED",
+            f"the GitHub App is not installed on {repo_full_name}; install it on that "
+            "repo so the platform hears pushes",
             recoverable=True,
         )
 

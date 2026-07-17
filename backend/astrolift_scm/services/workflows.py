@@ -103,57 +103,34 @@ class WorkflowDispatchError(Exception):
 
 
 # ---------------------------------------------------------------------------
-# Connection picker (mirrors astrolift_registry.services.manifest_sync)
+# Connection picker
 # ---------------------------------------------------------------------------
 
 
-# App-install first (no silent token expiry, scoped per-installation),
-# then OAuth-user, then PAT. Matches the resync service's policy so
-# the same connection drives manifest reads + workflow dispatches.
-_KIND_PREFERENCE: dict[str, tuple[str, ...]] = {
-    "github": (
-        "github_app_install",
-        "github_oauth_user",
-        "github_pat",
-    ),
-    "gitlab": (
-        "gitlab_oauth_user",
-        "gitlab_pat",
-    ),
-    "bitbucket": (
-        "bitbucket_oauth_user",
-        "bitbucket_pat",
-    ),
-    "gitea": (
-        "gitea_oauth_user",
-        "gitea_pat",
-    ),
-}
-
-
 def _pick_source_connection(app: RegisteredApp) -> SourceConnection | None:
-    """Pick the highest-ranked active, non-orphaned connection in the
-    app's org whose kind matches the app's source host. Returns None
-    when no usable row exists — caller surfaces this as a
-    PRECONDITION at the resolver layer."""
-    accepted = _KIND_PREFERENCE.get(app.source_kind, ())
-    if not accepted:
-        return None
+    """Resolve the org-level connection for ``app``'s source host.
 
-    rows = list(
-        SourceConnection.objects.filter(
-            organization_id=app.organization_id,
-            kind__in=accepted,
-            is_active=True,
-            is_orphaned=False,
-            deleted_at__isnull=True,
-        )
+    Dispatching a workflow is an autonomous platform action that runs
+    under an org identity, but it is NOT a secrets write, so it uses
+    ``purpose=ORG_REPO_WRITE``: the GitHub App is preferred, then an
+    org-level OAuth-user, then a PAT (an App-less org that onboarded via
+    OAuth/PAT still dispatches). The selection is org-scoped, never the
+    requesting viewer's personal token. Returns None (not raising) so the
+    caller surfaces the miss as a PRECONDITION at the resolver layer."""
+    from astrolift_scm.services.connection_resolver import (
+        ORG_REPO_WRITE,
+        ConnectionResolutionError,
+        resolve_connection,
     )
-    if not rows:
+
+    try:
+        return resolve_connection(
+            app.organization_id,
+            purpose=ORG_REPO_WRITE,
+            source_kind=app.source_kind,
+        )
+    except ConnectionResolutionError:
         return None
-    rank = {k: i for i, k in enumerate(accepted)}
-    rows.sort(key=lambda r: (rank.get(r.kind, len(accepted)), r.pk))
-    return rows[0]
 
 
 # ---------------------------------------------------------------------------

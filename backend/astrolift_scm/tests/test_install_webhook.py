@@ -216,6 +216,70 @@ def test_install_webhook_short_circuits_for_github_app_install(
     assert row.provider_short_circuited is True
 
 
+def test_installation_includes_repo_paginates_until_found(github_app_connection, monkeypatch):
+    """``github_installation_includes_repo`` walks every page of
+    ``/installation/repositories`` before answering — a repo on page 2
+    must be found, so the webhook step's "App delivers" claim is honest
+    even for installations with >100 repos."""
+    from astrolift_scm.providers.github import github_installation_includes_repo
+
+    monkeypatch.setattr(
+        "astrolift_scm.providers.github_app.installation_token",
+        lambda connection: "ghs_fake",
+    )
+
+    # Page 1: a full page (100) of non-matching repos → forces a page 2.
+    # Page 2: a short page that contains the target.
+    page1 = [{"full_name": f"acme/repo-{i}"} for i in range(100)]
+    page2 = [{"full_name": "acme/target"}, {"full_name": "acme/tail"}]
+    pages = iter([page1, page2])
+    seen_pages: list[str] = []
+
+    def fake_urlopen(req, timeout=10):
+        seen_pages.append(req.full_url)
+        repos = next(pages)
+        return _FakeResponse({"total_count": 102, "repositories": repos}, status=200)
+
+    monkeypatch.setattr(
+        "astrolift_scm.providers.github.urllib.request.urlopen",
+        fake_urlopen,
+    )
+
+    assert github_installation_includes_repo(github_app_connection, repo_full_name="acme/target") is True
+    assert len(seen_pages) == 2
+    assert "page=2" in seen_pages[1]
+
+
+def test_installation_includes_repo_false_on_short_page_without_extra_call(
+    github_app_connection, monkeypatch
+):
+    """A single short page that excludes the target answers False without
+    fetching a second page — the App is not installed on that repo."""
+    from astrolift_scm.providers.github import github_installation_includes_repo
+
+    monkeypatch.setattr(
+        "astrolift_scm.providers.github_app.installation_token",
+        lambda connection: "ghs_fake",
+    )
+
+    calls: list[str] = []
+
+    def fake_urlopen(req, timeout=10):
+        calls.append(req.full_url)
+        return _FakeResponse(
+            {"total_count": 1, "repositories": [{"full_name": "acme/other"}]},
+            status=200,
+        )
+
+    monkeypatch.setattr(
+        "astrolift_scm.providers.github.urllib.request.urlopen",
+        fake_urlopen,
+    )
+
+    assert github_installation_includes_repo(github_app_connection, repo_full_name="acme/target") is False
+    assert len(calls) == 1
+
+
 def test_install_gitlab_webhook_posts_to_projects_hooks(
     org, gitlab_pat_connection, monkeypatch, permission_resolver, settings
 ):

@@ -1,7 +1,7 @@
 """Tests for ``validateAstroliftCiSecrets`` (#693).
 
 Read-only counterpart to ``pushAstroliftCiSecretsToRepo`` (#383). Same
-auth path (personal GitHub OAuth connection per #395) but hits the
+auth path (the org GitHub App installation) but hits the
 ``GET /repos/{owner}/{repo}/actions/secrets`` endpoint and reports a
 per-secret presence map back to the FE.
 
@@ -59,18 +59,27 @@ def app_with_repo(app):
 
 
 @pytest.fixture
-def personal_github_connection(org, actor):
-    encrypted = encrypt_at_rest(b"gho_personal_test_token")
-    return SourceConnection.objects.create(
+def github_app_connection(org, monkeypatch):
+    """Org GitHub App installation — validate now reads under the same
+    platform identity the push side writes with. ``installation_token``
+    is stubbed so no real JWT signing runs against the fake PEM."""
+    encrypted = encrypt_at_rest(b"fake-app-pem-bytes")
+    conn = SourceConnection.objects.create(
         organization=org,
-        user=actor,
-        kind=SourceConnection.Kind.GITHUB_OAUTH_USER,
-        display_name="GitHub: actor",
-        account_login="actor",
+        user=None,
+        kind=SourceConnection.Kind.GITHUB_APP_INSTALL,
+        display_name="GitHub App: acme",
+        account_login="acme",
+        installation_id="424242",
         secret_backend_kind=encrypted.backend_kind,
         secret_ciphertext=encrypted.backend_ref,
         is_active=True,
     )
+    monkeypatch.setattr(
+        "astrolift_scm.providers.github_app.installation_token",
+        lambda connection: "ghs_fake_installation_token",
+    )
+    return conn
 
 
 class _Headers(dict):
@@ -120,7 +129,7 @@ def _install_fake_list(monkeypatch, *, secrets: list[dict]):
 
 
 def test_validate_returns_all_five_when_all_set(
-    monkeypatch, permission_resolver, org, app_with_repo, actor, personal_github_connection
+    monkeypatch, permission_resolver, org, app_with_repo, actor, github_app_connection
 ):
     permission_resolver.grant(Permission.APP_READ)
     _install_fake_list(
@@ -142,7 +151,7 @@ def test_validate_returns_all_five_when_all_set(
 
 
 def test_validate_returns_missing_rows_for_unset_secrets(
-    monkeypatch, permission_resolver, org, app_with_repo, actor, personal_github_connection
+    monkeypatch, permission_resolver, org, app_with_repo, actor, github_app_connection
 ):
     permission_resolver.grant(Permission.APP_READ)
     _install_fake_list(
@@ -179,9 +188,10 @@ def test_validate_unknown_app_returns_not_found(permission_resolver, org, actor)
     assert result.errors[0].code == "NOT_FOUND"
 
 
-def test_validate_no_personal_connection_returns_precondition(permission_resolver, org, app_with_repo, actor):
-    """No SourceConnection row for the viewer = PRECONDITION with the
-    explicit NO_PERSONAL_CONNECTION-derived message."""
+def test_validate_no_app_install_returns_precondition(permission_resolver, org, app_with_repo, actor):
+    """No org GitHub App installation = PRECONDITION about registering
+    the App. Validate reads under the platform identity now, so a
+    missing App (not a missing personal connection) is the gate."""
     permission_resolver.grant(Permission.APP_READ)
     with _ctx(org):
         result = LifecycleMutation().validate_astrolift_ci_secrets(
@@ -190,10 +200,8 @@ def test_validate_no_personal_connection_returns_precondition(permission_resolve
         )
     assert not result.ok
     assert result.errors[0].code == "PRECONDITION"
-    assert (
-        "personal GitHub" in result.errors[0].message.lower()
-        or "connect github" in result.errors[0].message.lower()
-    )
+    msg = result.errors[0].message.lower()
+    assert "github app" in msg and "not installed" in msg
 
 
 def test_validate_unsupported_source_returns_precondition(permission_resolver, org, app, actor):
@@ -226,7 +234,7 @@ def test_validate_no_repo_returns_precondition(permission_resolver, org, app, ac
 
 
 def test_validate_github_auth_failure_returns_precondition(
-    monkeypatch, permission_resolver, org, app_with_repo, actor, personal_github_connection
+    monkeypatch, permission_resolver, org, app_with_repo, actor, github_app_connection
 ):
     """A 401 from GitHub should bubble as PRECONDITION with the AUTH_FAILED
     message text — caller can re-prompt the operator to reconnect."""
@@ -248,7 +256,7 @@ def test_validate_github_auth_failure_returns_precondition(
     assert result.errors[0].code == "PRECONDITION"
 
 
-def test_validate_requires_app_read(monkeypatch, org, app_with_repo, actor, personal_github_connection):
+def test_validate_requires_app_read(monkeypatch, org, app_with_repo, actor, github_app_connection):
     """Permission gate denies without app.read."""
     with _ctx(org):
         result = LifecycleMutation().validate_astrolift_ci_secrets(

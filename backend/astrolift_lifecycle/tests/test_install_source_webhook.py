@@ -98,7 +98,7 @@ def _http_error(code: int, body: bytes = b"", url: str = "https://example") -> u
 # ---------------------------------------------------------------------------
 
 
-def test_install_creates_hook_and_persists_app_state(
+def test_install_github_org_oauth_user_creates_hook(
     monkeypatch,
     permission_resolver,
     org,
@@ -106,9 +106,16 @@ def test_install_creates_hook_and_persists_app_state(
     github_connection,
     settings,
 ):
-    """Happy path: POST /hooks 201s → mutation returns ``status=created``
-    + the host-side id, and the RegisteredApp row is updated with the
-    hook id and ``installed_at`` timestamp."""
+    """Webhook install is the documented exception to "platform writes are
+    App-only": it uses the broad org-level picker (App > OAuth-user > PAT)
+    because the webhook-secret lifecycle is a closed loop over ONE
+    connection (install mints the secret on the picked row; ingest re-picks
+    it to HMAC-verify; teardown re-picks it to delete). The picker is
+    ORG-scoped — it never filters to the requesting viewer — so an
+    org-level ``github_oauth_user`` connection legitimately drives the
+    install and lands a real per-repo hook (``status=created``). The
+    invariant this respects is "no VIEWER-scoped personal token drives a
+    platform write"; an org connection is not viewer-scoped."""
     permission_resolver.grant(Permission.APP_UPDATE)
     settings.PLATFORM_API_URL = "https://api.astrolift.example.com"
 
@@ -134,59 +141,56 @@ def test_install_creates_hook_and_persists_app_state(
     assert result.ok, result.errors
     assert result.data.status == "created"
     assert result.data.hook_id == "4242"
-    # Receiver URL is keyed off the app's GUID so deliveries route
-    # without grepping the payload.
-    expected_url = f"https://api.astrolift.example.com/api/webhooks/github/{app_with_repo.guid}/"
-    assert result.data.receiver_url == expected_url
-
-    # POSTed to the right endpoint with the right config shape.
+    # POSTed to the repo hooks endpoint under the org oauth-user token.
     assert captured["method"] == "POST"
     assert captured["url"].endswith("/repos/acme/api/hooks")
-    assert captured["body"]["config"]["url"] == expected_url
-    assert captured["body"]["config"]["content_type"] == "json"
-    assert "push" in captured["body"]["events"]
-    assert "pull_request" in captured["body"]["events"]
     assert captured["body"]["config"]["secret"]  # non-empty HMAC secret
 
-    # Persistence: app row now carries the hook id + timestamp.
+    # Persistence: app row now carries the real hook id + timestamp.
     app_with_repo.refresh_from_db()
     assert app_with_repo.source_webhook_id == "4242"
     assert app_with_repo.source_webhook_installed_at is not None
 
 
 # ---------------------------------------------------------------------------
-# Refresh path
+# Real per-repo-hook create + persistence (GitLab: the hosts with no
+# App-install analogue still create an actual hook and return a real
+# hook_id, unlike the GitHub App path which only ever verifies coverage).
 # ---------------------------------------------------------------------------
 
 
-def test_install_refresh_path_rotates_secret_when_hook_exists(
+def test_install_creates_real_hook_and_persists_app_state(
     monkeypatch,
     permission_resolver,
     org,
     app_with_repo,
-    github_connection,
     settings,
 ):
-    """GitHub 422 with "Hook already exists" → mutation returns
-    ``status=refreshed``, rotates the connection's stored secret,
-    and advances the app's ``installed_at`` timestamp."""
+    """A host that genuinely creates a per-repo hook (GitLab here) returns
+    ``status=created`` with the real host-side id, and the RegisteredApp
+    row is updated with that id + the ``installed_at`` timestamp. This is
+    the path that must keep a truthful, non-empty ``hook_id`` — distinct
+    from the GitHub App ``app_delivers`` path where no hook exists."""
     permission_resolver.grant(Permission.APP_UPDATE)
     settings.PLATFORM_API_URL = "https://api.astrolift.example.com"
 
-    # Pre-seed: imagine a prior install left a hook id on the row.
-    app_with_repo.source_webhook_id = "1111"
-    app_with_repo.save(update_fields=["source_webhook_id", "updated_at", "version"])
+    app_with_repo.source_kind = "gitlab"
+    app_with_repo.save(update_fields=["source_kind", "updated_at", "version"])
 
-    def fake_urlopen(req, timeout=15):
-        raise _http_error(
-            422,
-            b'{"message":"Validation Failed","errors":[{"message":"Hook already exists on this repository"}]}',
-            req.full_url,
-        )
+    encrypted = encrypt_at_rest(b"glpat_test_token")
+    SourceConnection.objects.create(
+        organization=org,
+        kind=SourceConnection.Kind.GITLAB_PAT,
+        display_name="GitLab PAT",
+        account_login="acme",
+        secret_backend_kind=encrypted.backend_kind,
+        secret_ciphertext=encrypted.backend_ref,
+        is_active=True,
+    )
 
     monkeypatch.setattr(
-        "astrolift_scm.providers.github.urllib.request.urlopen",
-        fake_urlopen,
+        "astrolift_scm.providers.gitlab.urllib.request.urlopen",
+        lambda req, timeout=15: _GitlabCreate(req),
     )
 
     with _ctx(org):
@@ -196,16 +200,26 @@ def test_install_refresh_path_rotates_secret_when_hook_exists(
         )
 
     assert result.ok, result.errors
-    assert result.data.status == "refreshed"
-    assert result.data.hook_id == "1111"  # prior id preserved
+    assert result.data.status == "created"
+    assert result.data.hook_id == "4242"  # a REAL, non-empty hook id
 
-    # The connection now carries a freshly-minted webhook secret.
-    github_connection.refresh_from_db()
-    assert github_connection.webhook_secret_ciphertext
-
-    # ``installed_at`` advanced.
+    # Persistence: app row now carries the real hook id + timestamp.
     app_with_repo.refresh_from_db()
+    assert app_with_repo.source_webhook_id == "4242"
     assert app_with_repo.source_webhook_installed_at is not None
+
+
+class _GitlabCreate:
+    """urlopen success shape for POST /projects/:id/hooks (201 + id)."""
+
+    def __init__(self, req):
+        self._body = json.dumps({"id": 4242, "url": req.full_url, "active": True}).encode("utf-8")
+
+    def __enter__(self):
+        return SimpleNamespace(read=lambda: self._body, status=201)
+
+    def __exit__(self, *_):
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -352,6 +366,147 @@ def test_install_bitbucket_source_returns_precondition(
     assert not result.ok
     assert result.errors[0].code == "PRECONDITION"
     assert "bitbucket" in result.errors[0].message.lower()
+
+
+# ---------------------------------------------------------------------------
+# GitHub-App-install branch: the App's own webhook delivers, but only
+# for the repos the operator installed it on. The step must tell the
+# truth instead of returning a fake success with an empty hook id.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def github_app_connection(org):
+    """An org-level GitHub App install connection (user FK NULL). Ranks
+    ahead of any OAuth-user connection in the picker."""
+    encrypted = encrypt_at_rest(b"fake-pem-bytes")
+    return SourceConnection.objects.create(
+        organization=org,
+        kind=SourceConnection.Kind.GITHUB_APP_INSTALL,
+        display_name="GitHub App: acme",
+        account_login="acme",
+        installation_id="987",
+        secret_backend_kind=encrypted.backend_kind,
+        secret_ciphertext=encrypted.backend_ref,
+        is_active=True,
+    )
+
+
+class _InstallationReposResponse:
+    """Mimics urlopen's success shape for GET /installation/repositories:
+    ``{ total_count, repositories: [...] }``."""
+
+    def __init__(self, full_names: list[str]):
+        repos = [{"full_name": fn, "name": fn.split("/")[-1]} for fn in full_names]
+        self._body = json.dumps({"total_count": len(repos), "repositories": repos}).encode("utf-8")
+
+    def __enter__(self):
+        return SimpleNamespace(read=lambda: self._body, status=200)
+
+    def __exit__(self, *_):
+        return False
+
+
+def test_install_app_delivers_when_repo_in_installation_set(
+    monkeypatch,
+    permission_resolver,
+    org,
+    app_with_repo,
+    github_app_connection,
+    settings,
+):
+    """github_app_install + the App IS installed on the target repo →
+    ``status=app_delivers`` with an EMPTY hook_id (honest: no per-repo
+    hook exists), and ``installed_at`` is recorded."""
+    permission_resolver.grant(Permission.APP_UPDATE)
+    settings.PLATFORM_API_URL = "https://api.astrolift.example.com"
+
+    # Short-circuit the App-JWT → installation-token exchange so the
+    # membership check reaches the (mocked) /installation/repositories
+    # call with a usable Bearer token.
+    monkeypatch.setattr(
+        "astrolift_scm.providers.github_app.installation_token",
+        lambda connection: "ghs_fake_installation_token",
+    )
+
+    captured: dict = {}
+
+    def fake_urlopen(req, timeout=10):
+        captured["url"] = req.full_url
+        captured["auth"] = req.headers.get("Authorization")
+        # The App is installed on acme/api → membership confirmed.
+        return _InstallationReposResponse(["acme/api", "acme/other"])
+
+    monkeypatch.setattr(
+        "astrolift_scm.providers.github.urllib.request.urlopen",
+        fake_urlopen,
+    )
+
+    with _ctx(org):
+        result = LifecycleMutation().install_astrolift_source_webhook(
+            _info(),
+            input=InstallSourceWebhookInput(app_slug=app_with_repo.slug),
+        )
+
+    assert result.ok, result.errors
+    assert result.data.status == "app_delivers"
+    # The empty hook_id is the truth — the App's org webhook delivers,
+    # no per-repo hook was created. It must NOT masquerade as a hook.
+    assert result.data.hook_id == ""
+    # Membership was verified against the installation's repo set with
+    # the App's Bearer installation token (not a user "token" header).
+    assert "/installation/repositories" in captured["url"]
+    assert captured["auth"] == "Bearer ghs_fake_installation_token"
+
+    # The app is genuinely wired → installed_at recorded, and no fake
+    # per-repo hook id was persisted.
+    app_with_repo.refresh_from_db()
+    assert app_with_repo.source_webhook_installed_at is not None
+    assert app_with_repo.source_webhook_id in ("", None)
+
+
+def test_install_app_not_installed_returns_precondition(
+    monkeypatch,
+    permission_resolver,
+    org,
+    app_with_repo,
+    github_app_connection,
+    settings,
+):
+    """github_app_install but the App is NOT installed on the target repo
+    → a real PRECONDITION failure (not a fake success), and the app's
+    ``installed_at`` is left untouched."""
+    permission_resolver.grant(Permission.APP_UPDATE)
+    settings.PLATFORM_API_URL = "https://api.astrolift.example.com"
+
+    monkeypatch.setattr(
+        "astrolift_scm.providers.github_app.installation_token",
+        lambda connection: "ghs_fake_installation_token",
+    )
+
+    def fake_urlopen(req, timeout=10):
+        # The installation covers other repos, but NOT acme/api.
+        return _InstallationReposResponse(["acme/other", "acme/unrelated"])
+
+    monkeypatch.setattr(
+        "astrolift_scm.providers.github.urllib.request.urlopen",
+        fake_urlopen,
+    )
+
+    with _ctx(org):
+        result = LifecycleMutation().install_astrolift_source_webhook(
+            _info(),
+            input=InstallSourceWebhookInput(app_slug=app_with_repo.slug),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "PRECONDITION"
+    assert "not installed" in result.errors[0].message.lower()
+
+    # No fake success side effects: the app was NOT marked installed.
+    app_with_repo.refresh_from_db()
+    assert app_with_repo.source_webhook_installed_at is None
+    assert app_with_repo.source_webhook_id in ("", None)
 
 
 # ---------------------------------------------------------------------------
