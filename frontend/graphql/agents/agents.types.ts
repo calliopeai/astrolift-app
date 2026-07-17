@@ -3,6 +3,7 @@ import type {
   AgentRunMode as GeneratedAgentRunMode,
   AgentRunSpecInput as GeneratedAgentRunSpecInput,
   AstroliftAgentDetail as GeneratedAgentDetail,
+  AstroliftAgentEnvironmentSpec as GeneratedAgentEnvironmentSpec,
   AstroliftAgentListItem as GeneratedAgentListItem,
   AstroliftAgentLiveStatus as GeneratedAgentLiveStatus,
   AstroliftAgentRunSpec as GeneratedAgentRunSpec,
@@ -84,9 +85,31 @@ export type AstroliftAgentDetail = Pick<
   skills: AstroliftAgentSkill[];
 };
 
+// One AgentTask (a run). Carries the VNC coordinates (`vncEnabled` / `vncUrl` /
+// `snapshotUrl`) alongside the status/timestamps so the run detail view can
+// render the "watch live" affordance. NOTE the read type exposes no run-mode or
+// trigger-payload field — those live on the agent Workload, not the task — so
+// the detail surface shows only what the task actually carries.
 export type AstroliftAgentTask = Pick<
   GeneratedAgentTask,
-  "id" | "status" | "callbackUrl" | "result" | "createdAt" | "startedAt" | "finishedAt"
+  | "id"
+  | "status"
+  | "callbackUrl"
+  | "result"
+  | "createdAt"
+  | "startedAt"
+  | "finishedAt"
+  | "vncEnabled"
+  | "vncUrl"
+  | "snapshotUrl"
+>;
+
+// A reusable agent container-environment recipe (org-scoped), as offered in the
+// Dispatch command center's Advanced section for the `environmentSpecId`
+// override. `runtime` / `imageTag` describe the base image the recipe resolves.
+export type AstroliftAgentEnvironmentSpec = Pick<
+  GeneratedAgentEnvironmentSpec,
+  "id" | "slug" | "name" | "runtime" | "imageTag" | "agentType" | "vncEnabled"
 >;
 
 // Registry list row (PR-7). The full row as returned by `agentWorkloads` /

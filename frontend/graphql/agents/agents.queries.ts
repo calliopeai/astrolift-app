@@ -128,6 +128,25 @@ export const AGENT_TASK_LOGS = gql`
   }
 `;
 
+// Org-scoped AgentEnvironmentSpecs — the reusable container-environment recipes
+// (image/runtime/tool-preset/VNC) an agent task can launch into. The Dispatch
+// command center's Advanced section offers these as the `environmentSpecId`
+// override on `runAstroliftAgent` (the recipe is where image + tools come from;
+// the dispatch mutation accepts no ad-hoc image/skill/sizing fields).
+export const LIST_AGENT_ENVIRONMENT_SPECS = gql`
+  query ListAgentEnvironmentSpecs($orgId: ID!) {
+    agentEnvironmentSpecs(orgId: $orgId) {
+      id
+      slug
+      name
+      runtime
+      imageTag
+      agentType
+      vncEnabled
+    }
+  }
+`;
+
 // ---------------------------------------------------------------------------
 // Registry list (PR-7) — registered AGENTS (not runs), project-scoped or
 // fleet-wide. `agentWorkloads` is the per-project list; `agentFleet` is the
