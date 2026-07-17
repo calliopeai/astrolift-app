@@ -34,6 +34,10 @@ import {
   YAxis,
 } from "recharts";
 
+import {
+  type ObservabilityPanelReason,
+  panelEmptyState,
+} from "@/components/observability/panel-reason";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GET_POD_RESOURCE_USAGE } from "@/graphql/observability/observability.queries";
@@ -43,7 +47,9 @@ import type {
 } from "@/graphql/__generated__/schema";
 
 interface UsageResp {
-  astroliftPodResourceUsage: AstroliftPodResourceUsage | null;
+  astroliftPodResourceUsage:
+    | (AstroliftPodResourceUsage & { reason: ObservabilityPanelReason })
+    | null;
 }
 
 export interface PodExpanderProps {
@@ -87,6 +93,11 @@ export function PodExpander({
   const data = q.data?.astroliftPodResourceUsage ?? null;
   const samples = data?.samples ?? [];
   const restartCount = data?.restartCount ?? fallbackRestartCount;
+  const podEmpty = panelEmptyState(data?.reason ?? "NOT_CONFIGURED", {
+    thing: "pod metrics",
+    notConfigured: "Prometheus endpoint isn't wired for this cluster.",
+    provider: "this cloud",
+  });
   const lastRestartAt = data?.lastRestartAt ?? null;
   const isLoading = q.loading && !q.data;
   const hasSamples = samples.length > 0;
@@ -131,16 +142,21 @@ export function PodExpander({
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-32 w-full" />
         </div>
-      ) : !data ? (
-        <p className="text-muted-foreground py-6 text-center text-xs">
-          Per-pod metrics are not flowing — either the cluster&apos;s Prometheus endpoint isn&apos;t
-          configured, or cAdvisor has dropped this pod&apos;s series.
-        </p>
-      ) : !hasSamples ? (
-        <p className="text-muted-foreground py-6 text-center text-xs">
-          No samples in the last hour — the pod may have just started, or its series may
-          have been dropped from Prometheus.
-        </p>
+      ) : !data || !hasSamples ? (
+        <div className="text-muted-foreground py-6 text-center text-xs">
+          <p className="font-medium">{podEmpty.title}</p>
+          <p className="mt-1">{podEmpty.description}</p>
+          {data?.reason === "ERROR" && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-3"
+              onClick={() => void q.refetch()}
+            >
+              Try again
+            </Button>
+          )}
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <MiniChart

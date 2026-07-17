@@ -28,12 +28,15 @@ export const GET_APP_GOLDEN_SIGNALS = gql`
       workloadSlug: $workloadSlug
       rangeSeconds: $rangeSeconds
     ) {
-      name
-      rangeSeconds
-      unit
-      promql
-      samples {
-        ${TIME_SERIES_POINT_FIELDS}
+      reason
+      signals {
+        name
+        rangeSeconds
+        unit
+        promql
+        samples {
+          ${TIME_SERIES_POINT_FIELDS}
+        }
       }
     }
   }
@@ -52,6 +55,7 @@ export const GET_APP_STATUS_CODE_BREAKDOWN = gql`
       workloadSlug: $workloadSlug
       rangeSeconds: $rangeSeconds
     ) {
+      reason
       rangeSeconds
       promql
       series {
@@ -119,6 +123,7 @@ export const GET_POD_RESOURCE_USAGE = gql`
       environmentName: $environmentName
       rangeSeconds: $rangeSeconds
     ) {
+      reason
       podName
       rangeSeconds
       restartCount
@@ -358,6 +363,7 @@ export const GET_APP_LOGS = gql`
       limit: $limit
       cursor: $cursor
     ) {
+      reason
       nextCursor
       reachedRetention
       historicalAvailable

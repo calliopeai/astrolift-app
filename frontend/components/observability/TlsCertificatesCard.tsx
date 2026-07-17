@@ -15,6 +15,10 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
+import {
+  type ObservabilityPanelReason,
+  panelEmptyState,
+} from "@/components/observability/panel-reason";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,7 +38,10 @@ import type {
 } from "@/graphql/lifecycle/lifecycle.types";
 
 interface Resp {
-  astroliftAppCertificates: AstroliftAppCertificate[];
+  astroliftAppCertificates: {
+    reason: ObservabilityPanelReason;
+    certificates: AstroliftAppCertificate[];
+  };
 }
 
 const RENEWAL_TONE: Record<
@@ -90,8 +97,16 @@ export function TlsCertificatesCard({ appSlug, environmentName }: TlsCertificate
     notifyOnNetworkStatusChange: true,
   });
 
-  const certs = data?.astroliftAppCertificates ?? [];
+  const certs = data?.astroliftAppCertificates?.certificates ?? [];
+  const reason = data?.astroliftAppCertificates?.reason;
   const isEmptyAfterLoad = !loading && certs.length === 0;
+  const empty = panelEmptyState(reason ?? "NO_DATA_YET", {
+    thing: "TLS certificates",
+    notConfigured:
+      "No public hostname or TLS driver is wired for this app. Set up a managed domain to issue a cert.",
+    provider: "this cloud",
+  });
+  const showIssueAction = reason === "NOT_CONFIGURED" || reason === "NO_DATA_YET" || reason == null;
 
   return (
     <Card>
@@ -146,10 +161,17 @@ export function TlsCertificatesCard({ appSlug, environmentName }: TlsCertificate
           <div className="p-6">
             <EmptyState
               icon={<ShieldCheckIcon className="size-5" />}
-              title="No TLS certificates yet"
-              description="Either no cert is issued for this app, or this cluster's provider plugin doesn't yet implement live cert reads. Issue a cert to get started."
-              actionHref={`/apps/${appSlug}/domains`}
-              actionLabel="Issue cert"
+              title={empty.title}
+              description={empty.description}
+              actionHref={showIssueAction ? `/apps/${appSlug}/domains` : undefined}
+              actionLabel={showIssueAction ? "Issue cert" : undefined}
+              secondary={
+                reason === "ERROR" ? (
+                  <Button size="sm" variant="outline" onClick={() => void refetch()}>
+                    Try again
+                  </Button>
+                ) : undefined
+              }
             />
           </div>
         ) : (

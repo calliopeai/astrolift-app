@@ -35,6 +35,10 @@ import {
 } from "recharts";
 
 import { EmptyState } from "@/components/EmptyState";
+import {
+  type ObservabilityPanelReason,
+  panelEmptyState,
+} from "@/components/observability/panel-reason";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -61,11 +65,18 @@ import {
 } from "./golden-signals-types";
 
 interface GoldenSignalsResp {
-  astroliftAppGoldenSignals: AstroliftAppGoldenSignal[];
+  astroliftAppGoldenSignals: {
+    reason: ObservabilityPanelReason;
+    signals: AstroliftAppGoldenSignal[];
+  };
 }
 
+type StatusBreakdownWithReason = AstroliftStatusCodeBreakdown & {
+  reason: ObservabilityPanelReason;
+};
+
 interface StatusBreakdownResp {
-  astroliftAppStatusCodeBreakdown: AstroliftStatusCodeBreakdown | null;
+  astroliftAppStatusCodeBreakdown: StatusBreakdownWithReason | null;
 }
 
 export interface GoldenSignalsPanelProps {
@@ -113,13 +124,29 @@ export function GoldenSignalsPanel({
   // p50 + p90 + p99 into one card with a stacked line.
   const signalsByKind = React.useMemo(() => {
     const out: Partial<Record<GoldenSignalKind, AstroliftAppGoldenSignal>> = {};
-    for (const s of signals.data?.astroliftAppGoldenSignals ?? []) {
+    for (const s of signals.data?.astroliftAppGoldenSignals?.signals ?? []) {
       out[s.name] = s;
     }
     return out;
   }, [signals.data]);
 
   const isLoading = signals.loading && !signals.data;
+  const signalsReason = signals.data?.astroliftAppGoldenSignals?.reason;
+  // When the panel can't produce metrics for a structural reason (no
+  // Prometheus endpoint, or a load error), render ONE honest message
+  // instead of a wall of empty cards. OK / NO_DATA_YET fall through to
+  // the card grid — the per-card "no data in window" is the right
+  // granularity there.
+  const showPanelEmpty =
+    !isLoading &&
+    (signalsReason === "NOT_CONFIGURED" ||
+      signalsReason === "NOT_SUPPORTED_BY_PROVIDER" ||
+      signalsReason === "ERROR");
+  const panelEmpty = panelEmptyState(signalsReason ?? "NO_DATA_YET", {
+    thing: "metrics",
+    notConfigured: "Prometheus endpoint isn't wired for this cluster.",
+    provider: "this cloud",
+  });
 
   return (
     <div className="space-y-4">
@@ -134,54 +161,65 @@ export function GoldenSignalsPanel({
         <TimeRangePicker value={range} onChange={setRange} />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <SignalCard
-          title="Traffic"
-          description="Requests per second (sum across all replicas)."
-          signal={signalsByKind.TRAFFIC}
-          loading={isLoading}
-          lineColor="var(--chart-2)"
+      {showPanelEmpty ? (
+        <NoMetricsCallout
+          title={panelEmpty.title}
+          description={panelEmpty.description}
+          onRetry={signalsReason === "ERROR" ? () => void signals.refetch() : undefined}
         />
-        <SignalCard
-          title="Errors"
-          description="5xx rate divided by total request rate."
-          signal={signalsByKind.ERRORS}
-          loading={isLoading}
-          lineColor="var(--chart-1)"
-        />
-        {/* Latency #640 — renders p50 / p95 / p99 by default; p90 stays
-            on the wire for legacy consumers but moves to the PromQL
-            disclosure to keep the chart legible. */}
-        <LatencyCard
-          p50={signalsByKind.LATENCY_P50}
-          p95={signalsByKind.LATENCY_P95}
-          p99={signalsByKind.LATENCY_P99}
-          p90={signalsByKind.LATENCY_P90}
-          loading={isLoading}
-        />
-        <SignalCard
-          title="Saturation (CPU)"
-          description="Container CPU usage ÷ requested limit. >100% means throttling."
-          signal={signalsByKind.SATURATION_CPU}
-          loading={isLoading}
-          lineColor="var(--chart-4)"
-        />
-        {/* #642 — memory saturation completes the saturation pair.
-            Working-set bytes vs the memory limit; > 100% means an OOM
-            kill is imminent. */}
-        <SignalCard
-          title="Saturation (memory)"
-          description="Working-set memory ÷ requested limit. >100% means OOM is imminent."
-          signal={signalsByKind.SATURATION_MEMORY}
-          loading={isLoading}
-          lineColor="var(--chart-5)"
-        />
-      </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <SignalCard
+              title="Traffic"
+              description="Requests per second (sum across all replicas)."
+              signal={signalsByKind.TRAFFIC}
+              loading={isLoading}
+              lineColor="var(--chart-2)"
+            />
+            <SignalCard
+              title="Errors"
+              description="5xx rate divided by total request rate."
+              signal={signalsByKind.ERRORS}
+              loading={isLoading}
+              lineColor="var(--chart-1)"
+            />
+            {/* Latency #640 — renders p50 / p95 / p99 by default; p90 stays
+                on the wire for legacy consumers but moves to the PromQL
+                disclosure to keep the chart legible. */}
+            <LatencyCard
+              p50={signalsByKind.LATENCY_P50}
+              p95={signalsByKind.LATENCY_P95}
+              p99={signalsByKind.LATENCY_P99}
+              p90={signalsByKind.LATENCY_P90}
+              loading={isLoading}
+            />
+            <SignalCard
+              title="Saturation (CPU)"
+              description="Container CPU usage ÷ requested limit. >100% means throttling."
+              signal={signalsByKind.SATURATION_CPU}
+              loading={isLoading}
+              lineColor="var(--chart-4)"
+            />
+            {/* #642 — memory saturation completes the saturation pair.
+                Working-set bytes vs the memory limit; > 100% means an OOM
+                kill is imminent. */}
+            <SignalCard
+              title="Saturation (memory)"
+              description="Working-set memory ÷ requested limit. >100% means OOM is imminent."
+              signal={signalsByKind.SATURATION_MEMORY}
+              loading={isLoading}
+              lineColor="var(--chart-5)"
+            />
+          </div>
 
-      <StatusCodeCard
-        breakdown={statusBreakdown.data?.astroliftAppStatusCodeBreakdown ?? null}
-        loading={statusBreakdown.loading && !statusBreakdown.data}
-      />
+          <StatusCodeCard
+            breakdown={statusBreakdown.data?.astroliftAppStatusCodeBreakdown ?? null}
+            loading={statusBreakdown.loading && !statusBreakdown.data}
+            onRetry={() => void statusBreakdown.refetch()}
+          />
+        </>
+      )}
     </div>
   );
 }
@@ -382,13 +420,23 @@ function LatencyCard({ p50, p95, p99, p90, loading }: LatencyCardProps) {
 // ----------------------------------------------------------------------
 
 interface StatusCodeCardProps {
-  breakdown: AstroliftStatusCodeBreakdown | null;
+  breakdown: StatusBreakdownWithReason | null;
   loading: boolean;
+  onRetry?: () => void;
 }
 
-function StatusCodeCard({ breakdown, loading }: StatusCodeCardProps) {
+function StatusCodeCard({ breakdown, loading, onRetry }: StatusCodeCardProps) {
   const series = breakdown?.series ?? [];
   const promql = breakdown?.promql ?? "";
+  // `null` is reserved for "no such app"; a populated breakdown carries
+  // a reason (#1111). Fall back to NOT_CONFIGURED when the whole object
+  // is absent so the copy stays honest rather than hedged.
+  const reason: ObservabilityPanelReason = breakdown?.reason ?? "NOT_CONFIGURED";
+  const empty = panelEmptyState(reason, {
+    thing: "traffic",
+    notConfigured: "Prometheus endpoint isn't wired for this cluster.",
+    provider: "this cloud",
+  });
   // Pre-sort series into the canonical 2xx/3xx/4xx/5xx/other order so
   // the stacked-area legend reads top-to-bottom by severity.
   const orderedSeries = React.useMemo(() => {
@@ -421,15 +469,11 @@ function StatusCodeCard({ breakdown, loading }: StatusCodeCardProps) {
       <CardContent>
         {loading ? (
           <Skeleton className="h-56 w-full" />
-        ) : !breakdown ? (
+        ) : !breakdown || rows.length === 0 ? (
           <NoMetricsCallout
-            title="Status-code metrics unavailable"
-            description="This app doesn't expose HTTP-shaped metrics, or the cluster's Prometheus endpoint isn't reachable."
-          />
-        ) : rows.length === 0 ? (
-          <NoMetricsCallout
-            title="No traffic in this window"
-            description="HTTP metrics are flowing, but no requests landed inside the selected time range."
+            title={empty.title}
+            description={empty.description}
+            onRetry={reason === "ERROR" ? onRetry : undefined}
           />
         ) : (
           <div className="h-56">
@@ -577,11 +621,13 @@ function PromQLDisclosure({ promql }: PromQLDisclosureProps) {
 // ----------------------------------------------------------------------
 
 function NoMetricsCallout({
-  title = "Metrics not yet flowing",
-  description = "Either the cluster's Prometheus endpoint isn't configured, or the app hasn't emitted any data points yet.",
+  title = "No data in this window",
+  description = "No data points landed inside the selected time range.",
+  onRetry,
 }: {
   title?: string;
   description?: string;
+  onRetry?: () => void;
 }) {
   return (
     <div className="flex h-40 flex-col items-center justify-center gap-2 text-center">
@@ -589,6 +635,13 @@ function NoMetricsCallout({
         icon={<AlertTriangleIcon className="size-5" />}
         title={title}
         description={description}
+        secondary={
+          onRetry ? (
+            <Button size="sm" variant="outline" onClick={onRetry}>
+              Try again
+            </Button>
+          ) : undefined
+        }
       />
       <Link href={PROMETHEUS_DOC_LINK} className="text-xs underline">
         See the docs

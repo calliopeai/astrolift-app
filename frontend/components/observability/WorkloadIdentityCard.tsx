@@ -6,9 +6,9 @@
  * subroute (#377).
  *
  * Shows the role ARN (or principal), the trust-policy summary line,
- * and the cloud's last-used timestamp when available. Empty state
- * covers both "no binding" and "this cloud doesn't yet implement
- * the read" with the same UX.
+ * and the cloud's last-used timestamp when available. The empty state
+ * is keyed off the resolver's `reason` (#1111) so "not configured",
+ * "not available on this cloud", and "no binding yet" read distinctly.
  */
 
 import { useQuery } from "@apollo/client/react";
@@ -18,6 +18,10 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
+import {
+  type ObservabilityPanelReason,
+  panelEmptyState,
+} from "@/components/observability/panel-reason";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +33,10 @@ import type {
 } from "@/graphql/lifecycle/lifecycle.types";
 
 interface Resp {
-  astroliftAppIdentityBinding: AstroliftAppIdentityBinding | null;
+  astroliftAppIdentityBinding: {
+    reason: ObservabilityPanelReason;
+    binding: AstroliftAppIdentityBinding | null;
+  };
 }
 
 const KIND_LABEL: Record<IdentityBindingKind, string> = {
@@ -58,8 +65,17 @@ export function WorkloadIdentityCard({ appSlug, environmentName }: WorkloadIdent
     notifyOnNetworkStatusChange: true,
   });
 
-  const binding = data?.astroliftAppIdentityBinding ?? null;
+  const binding = data?.astroliftAppIdentityBinding?.binding ?? null;
+  const reason = data?.astroliftAppIdentityBinding?.reason;
   const isEmptyAfterLoad = !loading && binding === null;
+  const empty = panelEmptyState(reason ?? "NO_DATA_YET", {
+    thing: "workload identity binding",
+    notConfigured:
+      "No cloud-IAM role is provisioned for this app. Configure workload identity to grant pods credentials.",
+    provider: "this cloud",
+  });
+  const showConfigureAction =
+    reason === "NOT_CONFIGURED" || reason === "NO_DATA_YET" || reason == null;
 
   return (
     <Card>
@@ -117,10 +133,17 @@ export function WorkloadIdentityCard({ appSlug, environmentName }: WorkloadIdent
         ) : isEmptyAfterLoad ? (
           <EmptyState
             icon={<KeyRoundIcon className="size-5" />}
-            title="No workload identity binding yet"
-            description="Either no role is provisioned for this app, or this cluster's provider plugin doesn't yet implement live identity reads. Configure WI to grant pods cloud-IAM credentials."
-            actionHref={`/apps/${appSlug}/security`}
-            actionLabel="Configure workload identity"
+            title={empty.title}
+            description={empty.description}
+            actionHref={showConfigureAction ? `/apps/${appSlug}/security` : undefined}
+            actionLabel={showConfigureAction ? "Configure workload identity" : undefined}
+            secondary={
+              reason === "ERROR" ? (
+                <Button size="sm" variant="outline" onClick={() => void refetch()}>
+                  Try again
+                </Button>
+              ) : undefined
+            }
           />
         ) : binding ? (
           <dl className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
