@@ -55,22 +55,22 @@ def github_auth_error_message(
 
     if status_code == 401:
         return (
-            "GitHub rejected the credentials (401) — the token is invalid "
+            "GitHub rejected the credentials (401). The token is invalid "
             "or expired. Reconnect the GitHub connection."
         )
 
     # 403: the credential is valid but lacks permission for ``op``.
     if connection_kind == GITHUB_APP_INSTALL_KIND:
-        grant = f"the **{permission}**" if permission else "the required"
+        grant = f"the '{permission}'" if permission else "the required"
         return (
-            f"GitHub returned 403 — the App is installed but not permitted to "
+            f"GitHub returned 403. The App is installed but not permitted to "
             f"{op}. An org admin must grant the GitHub App {grant} permission "
-            f"and re-approve the installation (reconnecting won't help; the "
-            f"permission lives on the App)."
+            f"and re-approve the installation; reconnecting won't help, the "
+            f"permission lives on the App."
         )
 
-    scope = f"the **{permission}**" if permission else "the required"
+    scope = f"the '{permission}'" if permission else "the required"
     return (
-        f"GitHub returned 403 — the connected token lacks the scope to {op}. "
+        f"GitHub returned 403. The connected token lacks the scope to {op}. "
         f"Reconnect with a token that has {scope} permission."
     )

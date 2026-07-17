@@ -113,7 +113,7 @@ def test_403_app_install_names_permission_and_reapprove():
         permission="Secrets: write",
     )
     assert "403" in msg
-    assert "**Secrets: write**" in msg
+    assert "'Secrets: write'" in msg
     assert "write Actions secrets" in msg
     assert "admin must grant" in msg
     assert "re-approve" in msg
@@ -138,7 +138,7 @@ def test_403_user_token_points_at_scope_not_reapproval(kind):
     msg = github_auth_error_message(403, kind, operation="write Actions secrets", permission="Secrets: write")
     assert "403" in msg
     assert "scope" in msg
-    assert "**Secrets: write**" in msg
+    assert "'Secrets: write'" in msg
     assert "Reconnect with a token" in msg
     # A user token is not an App installation — no admin re-approval story.
     assert "re-approve" not in msg
@@ -292,7 +292,7 @@ def test_put_repo_secret_app_install_403_names_secrets_write(monkeypatch):
             connection_kind="github_app_install",
         )
     assert exc.value.code == "AUTH_FAILED"
-    assert "**Secrets: write**" in exc.value.message
+    assert "'Secrets: write'" in exc.value.message
     assert "ASTROLIFT_DEPLOY_TOKEN" in exc.value.message
     assert "admin must grant" in exc.value.message
     assert "re-approve" in exc.value.message
@@ -340,7 +340,7 @@ def test_fetch_repo_public_key_app_install_403_names_secrets_write(monkeypatch):
             token_scheme="Bearer",
             connection_kind="github_app_install",
         )
-    assert "**Secrets: write**" in exc.value.message
+    assert "'Secrets: write'" in exc.value.message
     assert "re-approve" in exc.value.message
     assert OLD_MISLEADING not in exc.value.message
 
@@ -365,7 +365,7 @@ def test_put_repo_secret_user_token_403_points_at_scope(monkeypatch):
             connection_kind="github_pat",
         )
     assert "scope" in exc.value.message
-    assert "**Secrets: write**" in exc.value.message
+    assert "'Secrets: write'" in exc.value.message
     assert "re-approve" not in exc.value.message
 
 
