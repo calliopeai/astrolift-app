@@ -28,6 +28,7 @@ from __future__ import annotations
 import dataclasses
 import datetime as dt
 import logging
+import uuid
 from collections.abc import Callable
 from typing import Any
 
@@ -35,6 +36,48 @@ from core.request_context import get_request_id, get_trace_context
 from core.tenancy import get_current_tenant
 
 log = logging.getLogger("core.events")
+
+# Resource kinds whose ``resource_id`` names a RegisteredApp — used to
+# backfill ``registered_app_id`` when an app-scoped emit site didn't
+# pass the FK explicitly (#1111). Kept narrow so a non-app resource
+# with a colliding slug can't be mis-linked.
+_APP_RESOURCE_KINDS = frozenset({"app", "registered_app"})
+
+
+def _resolve_registered_app_id(
+    resource_kind: str,
+    resource_id: str,
+    organization_id: int | None,
+) -> int | None:
+    """Best-effort lookup of the RegisteredApp PK an app-scoped event
+    refers to, so the per-app events feed (which filters on the FK) is
+    populated even when the emit site stamped only ``resource_kind`` +
+    ``resource_id`` (#1111).
+
+    ``resource_id`` is a slug at some emit sites and a guid at others,
+    so both are tried; the org scope keeps a slug collision across
+    tenants from mis-linking. Returns ``None`` (never raises) when the
+    resource isn't an app or no row matches — the caller leaves the FK
+    unset. Callers wrap this so an event write is never blocked on the
+    lookup."""
+    if organization_id is None or not resource_id:
+        return None
+    if (resource_kind or "").lower() not in _APP_RESOURCE_KINDS:
+        return None
+
+    from astrolift_registry.models import RegisteredApp
+
+    qs = RegisteredApp.objects.filter(organization_id=organization_id, deleted_at__isnull=True)
+    app_id = qs.filter(slug=resource_id).values_list("id", flat=True).first()
+    if app_id is not None:
+        return app_id
+    # Only probe the guid column when the id parses as a UUID — the
+    # field would otherwise raise on a slug string.
+    try:
+        uuid.UUID(str(resource_id))
+    except (ValueError, TypeError, AttributeError):
+        return None
+    return qs.filter(guid=resource_id).values_list("id", flat=True).first()
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
@@ -281,16 +324,31 @@ class Event:
             trace = get_trace_context()
             trace_id = trace.trace_id if trace is not None else ""
 
+        org_id = organization_id or (tenant.organization_id if tenant else None)
+        resource_kind = resource_kind or ""
+        resource_id_str = str(resource_id) if resource_id is not None else ""
+
+        # Backfill the app FK from the resource context when the emit
+        # site didn't pass one (#1111). Without this an app-scoped event
+        # (resource_kind=app, resource_id=<slug|guid>) never surfaces in
+        # the per-app feed, which filters on ``registered_app_id``. The
+        # lookup is best-effort — an event write must never fail on it.
+        if registered_app_id is None:
+            try:
+                registered_app_id = _resolve_registered_app_id(resource_kind, resource_id_str, org_id)
+            except Exception:  # noqa: BLE001 — never block an emit on the lookup
+                log.warning("event app-fk backfill failed", exc_info=True)
+
         envelope = EventEnvelope(
             event_type=event_type,
             payload=payload or {},
-            organization_id=organization_id or (tenant.organization_id if tenant else None),
+            organization_id=org_id,
             team_id=team_id or (tenant.team_id if tenant else None),
             project_id=project_id or (tenant.project_id if tenant else None),
             registered_app_id=registered_app_id,
             actor_user_id=actor_user_id or (tenant.actor_user_id if tenant else None),
-            resource_kind=resource_kind or "",
-            resource_id=str(resource_id) if resource_id is not None else "",
+            resource_kind=resource_kind,
+            resource_id=resource_id_str,
             request_id=request_id or "",
             trace_id=trace_id or "",
             severity=infer_event_severity(event_type, payload),

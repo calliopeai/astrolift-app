@@ -237,6 +237,9 @@ def _emit_legacy_prefix_accepted(row) -> None:
             },
             resource_kind="deploy_token",
             resource_id=str(getattr(row, "guid", "")),
+            # The token row already carries the app FK — thread it so
+            # the event lands on the per-app feed (#1111).
+            registered_app_id=getattr(row, "registered_app_id", None),
         )
     except Exception:
         # Audit pipeline outages must not break deploy-token auth.

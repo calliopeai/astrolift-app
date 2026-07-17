@@ -23,6 +23,8 @@ from astrolift_lifecycle.schema.mutations import (
     LifecycleMutation,
     StartDeploymentInput,
 )
+from astrolift_operations.models import Event
+from astrolift_operations.schema.queries import OperationsQuery
 from astrolift_workflows.client import WorkflowHandle
 from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
@@ -129,3 +131,47 @@ def test_rollback_defers_workflow_until_commit(
         fn()
 
     assert [s[0] for s in starts] == ["RollbackDeploymentWorkflow"]
+
+
+def test_deploy_dispatch_emits_app_scoped_event(
+    org, app, env, actor, fake_info, permission_resolver, deferred_temporal
+):
+    """#1111 — every deploy dispatch emits a ``deploy.started`` event
+    carrying the ``registered_app`` FK, so the per-app events feed (which
+    filters on that FK) actually reflects deploys. Before this the deploy
+    path wrote a Deployment + WorkflowRun row but no Event, leaving the
+    app feed empty even though a deploy had run."""
+    starts, callbacks = deferred_temporal
+    _grant_all(permission_resolver)
+    permission_resolver.grant(Permission.AUDIT_LOG_READ)
+    mut = LifecycleMutation()
+
+    with _tenant_for(org, actor):
+        result = mut.start_deployment(
+            fake_info,
+            input=StartDeploymentInput(
+                app_slug=app.slug,
+                environment_name=env.name,
+                image_tag="v1",
+            ),
+        )
+    assert result.ok, result.errors
+    deployment_guid = str(result.data.id)
+
+    # No event before the post-commit callbacks fire — the emit rides
+    # the same on_commit hook as the workflow start.
+    assert not Event.objects.filter(event_type="deploy.started").exists()
+
+    for fn in callbacks:
+        fn()
+
+    row = Event.objects.get(event_type="deploy.started")
+    assert row.registered_app_id == app.id
+    assert row.organization_id == org.id
+    assert row.payload["deployment_guid"] == deployment_guid
+
+    # And the canonical per-app feed returns it (filters on the FK).
+    info = type("I", (), {"context": type("C", (), {"user": None})()})()
+    with _tenant_for(org, actor):
+        feed = OperationsQuery().astrolift_events_page(info, app_slug=app.slug)
+    assert any(e.event_type == "deploy.started" for e in feed.items)
