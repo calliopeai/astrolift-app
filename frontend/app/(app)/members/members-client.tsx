@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangleIcon,
   InfoIcon,
@@ -135,6 +136,7 @@ export function MembersClient() {
   // hammer the resolver.
   const [searchInput, setSearchInput] = React.useState("");
   const debouncedSearch = useDebounce(searchInput, 200);
+  const router = useRouter();
   const searchVariable: MembersVars = debouncedSearch.trim()
     ? { search: debouncedSearch.trim() }
     : {};
@@ -392,7 +394,21 @@ export function MembersClient() {
                   const userBindings = bindingsByUser.get(m.user.id) ?? [];
                   const alreadyAnonymized = m.lifecycle === "anonymized";
                   return (
-                    <TableRow key={m.id} id={`u-${m.user.id}`}>
+                    <TableRow
+                      key={m.id}
+                      id={`u-${m.user.id}`}
+                      tabIndex={0}
+                      role="link"
+                      aria-label={`Open member ${m.user.username}`}
+                      onClick={() => router.push(`/administration/members/${m.id}`)}
+                      onKeyDown={(ev) => {
+                        if (ev.key === "Enter" || ev.key === " ") {
+                          ev.preventDefault();
+                          router.push(`/administration/members/${m.id}`);
+                        }
+                      }}
+                      className="hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
+                    >
                       <TableCell>
                         <div className="font-medium">{m.user.username}</div>
                         <div className="text-muted-foreground text-xs">{m.user.email}</div>
@@ -422,7 +438,7 @@ export function MembersClient() {
                       <TableCell className="text-muted-foreground text-sm">
                         {m.joinedAt ? fmt.formatDate(m.joinedAt) : fmt.formatDate(m.createdAt)}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           <Can permission="org.manage_members">
                             <Tooltip>
