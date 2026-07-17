@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from aws._errors import NotFoundError
-from aws.tls_acm import ACMConfig, ACMDriver
+from aws.tls_acm import ACMConfig, ACMDriver, _cert_covers_host
 
 
 @pytest.fixture
@@ -89,3 +89,55 @@ def test_validation_cnames_returned(driver: ACMDriver) -> None:
     assert len(cnames) >= 1
     name, value = cnames[0]
     assert name and value
+
+
+# ---- filter_hostname wildcard / SAN matching (#1111) ---------------
+
+
+def test_cert_covers_host_wildcard_matches_subdomain() -> None:
+    """A ``*.foo.net`` wildcard covers a direct subdomain host —
+    the case the old ``filter_hostname in name`` substring test got
+    backwards (query host longer than the wildcard name)."""
+    assert _cert_covers_host("bar.foo.net", ["*.foo.net"]) is True
+
+
+def test_cert_covers_host_wildcard_rejects_unrelated_and_nested() -> None:
+    # Unrelated zone must not match.
+    assert _cert_covers_host("bar.other.net", ["*.foo.net"]) is False
+    # Wildcards cover exactly one label (RFC 6125) — a nested host
+    # is NOT covered by ``*.foo.net``.
+    assert _cert_covers_host("a.bar.foo.net", ["*.foo.net"]) is False
+    # The apex itself is not covered by its own wildcard.
+    assert _cert_covers_host("foo.net", ["*.foo.net"]) is False
+
+
+def test_cert_covers_host_exact_and_san() -> None:
+    assert _cert_covers_host("api.foo.net", ["api.foo.net"]) is True
+    # Matches when the host is any SAN, not just the primary DomainName.
+    assert _cert_covers_host("api.foo.net", ["www.foo.net", "api.foo.net"]) is True
+    # Case / trailing-dot tolerant.
+    assert _cert_covers_host("API.Foo.Net.", ["*.foo.net"]) is True
+
+
+def test_list_certificates_wildcard_matches_app_host(driver: ACMDriver) -> None:
+    """End-to-end through ACM: a wildcard cert is returned when the
+    filter hostname is a subdomain of the wildcard zone, and an
+    unrelated hostname filters it out."""
+    driver.ensure_certificate(domain="*.acme.platform.example")
+
+    matched = driver.list_certificates(filter_hostname="api.acme.platform.example")
+    assert any(c.hostname == "*.acme.platform.example" for c in matched)
+
+    unmatched = driver.list_certificates(filter_hostname="api.unrelated.example")
+    assert all(c.hostname != "*.acme.platform.example" for c in unmatched)
+
+
+def test_list_certificates_san_matches_app_host(driver: ACMDriver) -> None:
+    """A SAN cert (primary + alternate names) matches on any of its
+    names, not just the primary DomainName."""
+    driver.ensure_certificate(
+        domain="acme.platform.example",
+        sans=["api.acme.platform.example"],
+    )
+    matched = driver.list_certificates(filter_hostname="api.acme.platform.example")
+    assert any("api.acme.platform.example" in [c.hostname] or c.hostname == "acme.platform.example" for c in matched)

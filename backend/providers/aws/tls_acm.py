@@ -127,12 +127,17 @@ class ACMDriver(TlsDriver):
         ACM's ``list_certificates`` returns minimal headers; we have to
         ``describe_certificate`` per id to pick up ``NotAfter`` +
         ``Issuer`` + ``RenewalSummary``. ``filter_hostname`` is matched
-        against ``DomainName`` and ``SubjectAlternativeNames``
-        (substring) so an operator who passes ``"acme.platform"`` gets
-        wildcard-covered subdomains too. ``days_until_expiry`` is
-        clamped to 0 when ``NotAfter`` is in the past — the UI flags
-        anything < 30 days as red so an expired cert renders as "0d
-        red" rather than a confusing negative number."""
+        against ``DomainName`` and every ``SubjectAlternativeNames``
+        entry with DNS semantics (:func:`_cert_covers_host`): an exact
+        host match, or a wildcard cert (``*.zone``) covering the host as
+        a direct subdomain. That means an app on ``api.zone`` is matched
+        by a ``*.zone`` wildcard or a SAN cert that lists ``api.zone``,
+        which the previous ``filter_hostname in name`` substring test
+        missed (wrong direction — the query host is longer than the
+        wildcard name). ``days_until_expiry`` is clamped to 0 when
+        ``NotAfter`` is in the past — the UI flags anything < 30 days as
+        red so an expired cert renders as "0d red" rather than a
+        confusing negative number."""
         try:
             paginator = self._acm.get_paginator("list_certificates")
             ids: list[str] = []
@@ -158,10 +163,8 @@ class ACMDriver(TlsDriver):
             cert = response["Certificate"]
             domain = cert.get("DomainName", "")
             sans = cert.get("SubjectAlternativeNames", []) or []
-            if filter_hostname is not None:
-                hay = [domain, *sans]
-                if not any(filter_hostname in h for h in hay):
-                    continue
+            if filter_hostname is not None and not _cert_covers_host(filter_hostname, [domain, *sans]):
+                continue
 
             not_after_dt = cert.get("NotAfter")
             not_after_iso = _iso_or_none(not_after_dt) or ""
@@ -204,6 +207,35 @@ class ACMDriver(TlsDriver):
             if record:
                 out.append((record["Name"], record["Value"]))
         return out
+
+
+def _cert_covers_host(host: str, cert_names: list[str]) -> bool:
+    """Return True when any of ``cert_names`` covers ``host`` under DNS
+    cert-matching semantics (RFC 6125 wildcard rules, simplified).
+
+    ``cert_names`` is the cert's ``DomainName`` plus its
+    ``SubjectAlternativeNames``. A name matches when it equals ``host``
+    exactly, or when it is a left-most wildcard (``*.parent``) and
+    ``host`` is a *direct* subdomain of ``parent`` (exactly one extra
+    label — ``*.foo.net`` matches ``bar.foo.net`` but not
+    ``a.bar.foo.net`` or ``foo.net`` itself). Comparison is
+    case-insensitive and tolerant of a trailing dot."""
+    h = host.strip().lower().rstrip(".")
+    if not h:
+        return False
+    for raw in cert_names:
+        name = (raw or "").strip().lower().rstrip(".")
+        if not name:
+            continue
+        if name == h:
+            return True
+        if name.startswith("*."):
+            parent = name[2:]
+            if parent and h.endswith("." + parent):
+                label = h[: -(len(parent) + 1)]
+                if label and "." not in label:
+                    return True
+    return False
 
 
 def _iso_or_none(value: Any) -> str | None:
