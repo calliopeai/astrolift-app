@@ -471,6 +471,11 @@ type AstroliftAppCertificate {
   renewalStatus: String!
 }
 
+type AstroliftAppCertificatesResult {
+  reason: AstroliftObservabilityPanelReason!
+  certificates: [AstroliftAppCertificate!]!
+}
+
 type AstroliftAppConfigDrift {
   hasDrift: Boolean!
   fields: [String!]!
@@ -496,6 +501,11 @@ type AstroliftAppDnsRecord {
   value: String!
   ttl: Int!
   propagationStatus: String!
+}
+
+type AstroliftAppDnsRecordsResult {
+  reason: AstroliftObservabilityPanelReason!
+  records: [AstroliftAppDnsRecord!]!
 }
 
 type AstroliftAppDomain {
@@ -580,6 +590,11 @@ type AstroliftAppGoldenSignal {
   unit: String!
 }
 
+type AstroliftAppGoldenSignalsResult {
+  reason: AstroliftObservabilityPanelReason!
+  signals: [AstroliftAppGoldenSignal!]!
+}
+
 type AstroliftAppHealthPulse {
   status: AstroliftAppHealthPulseStatus!
   ageSeconds: Int
@@ -608,6 +623,11 @@ type AstroliftAppIdentityBinding {
   roleArnOrPrincipal: String!
   trustPolicySummary: String!
   lastUsedAt: String
+}
+
+type AstroliftAppIdentityBindingResult {
+  reason: AstroliftObservabilityPanelReason!
+  binding: AstroliftAppIdentityBinding
 }
 
 enum AstroliftAppListStatusFilter {
@@ -652,6 +672,7 @@ type AstroliftAppLogPage {
   reachedRetention: Boolean!
   historicalAvailable: Boolean!
   totalCount: Int!
+  reason: AstroliftObservabilityPanelReason!
 }
 
 type AstroliftAppLogQueryLine {
@@ -1734,6 +1755,7 @@ type AstroliftEvent {
 type AstroliftEventPage {
   items: [AstroliftEvent!]!
   nextCursor: String
+  reason: AstroliftObservabilityPanelReason!
 }
 
 type AstroliftExecutePromqlResult {
@@ -2196,6 +2218,14 @@ type AstroliftNotificationPreferenceMutationResult {
   data: AstroliftNotificationPreference
 }
 
+enum AstroliftObservabilityPanelReason {
+  OK
+  NOT_CONFIGURED
+  NOT_SUPPORTED_BY_PROVIDER
+  NO_DATA_YET
+  ERROR
+}
+
 type AstroliftOrgSkillRepo {
   id: GUID!
   alias: String!
@@ -2291,6 +2321,7 @@ type AstroliftPipelineRunMutationResult {
 }
 
 type AstroliftPodResourceUsage {
+  reason: AstroliftObservabilityPanelReason!
   podName: String!
   rangeSeconds: Int!
   samples: [AstroliftPodResourceUsagePoint!]!
@@ -2997,6 +3028,7 @@ type AstroliftSshDeployKeyMutationResult {
 }
 
 type AstroliftStatusCodeBreakdown {
+  reason: AstroliftObservabilityPanelReason!
   rangeSeconds: Int!
   series: [AstroliftStatusCodeSeries!]!
   promql: String!
@@ -5039,9 +5071,9 @@ type Query {
   astroliftAppPods(appSlug: String!, environmentName: String = null): [AstroliftAppPod!]!
   astroliftWorkloadPodStatusBreakdown(appSlug: String!, workloadSlug: String!, environmentName: String = null): [AstroliftWorkloadPodStatusBucket!]!
   astroliftAppDeployTokens(appSlug: String!): [AstroliftDeployToken!]!
-  astroliftAppDnsRecords(appSlug: String!, environmentName: String = null): [AstroliftAppDnsRecord!]!
-  astroliftAppCertificates(appSlug: String!, environmentName: String = null): [AstroliftAppCertificate!]!
-  astroliftAppIdentityBinding(appSlug: String!, environmentName: String = null): AstroliftAppIdentityBinding
+  astroliftAppDnsRecords(appSlug: String!, environmentName: String = null): AstroliftAppDnsRecordsResult!
+  astroliftAppCertificates(appSlug: String!, environmentName: String = null): AstroliftAppCertificatesResult!
+  astroliftAppIdentityBinding(appSlug: String!, environmentName: String = null): AstroliftAppIdentityBindingResult!
   previewAstroliftDeregister(appSlug: String!): AstroliftDeregisterPreview
   previewAstroliftForceRedeploy(appSlug: String!, environmentName: String = null): AstroliftForceRedeployPreview
   astroliftTaskRuns(appSlug: String = null, workloadSlug: String = null, status: String = null, limit: Int! = 100): [AstroliftTaskRun!]!
@@ -5092,7 +5124,7 @@ type Query {
   astroliftSecretChangeProposal(id: GUID!): AstroliftSecretChangeProposal
   PostgresMetrics: [[String!]!]!
   ObjectStoreMetrics: [[String!]!]!
-  astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): [AstroliftAppGoldenSignal!]!
+  astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftAppGoldenSignalsResult!
   astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftStatusCodeBreakdown
   astroliftWorkloadResourceUsage(appSlug: String!, workloadSlug: String!, environmentName: String = null): AstroliftWorkloadResourceUsage
   astroliftAppUrlHealth(appSlug: String!, url: String!, forceRefresh: Boolean! = false): AstroliftAppUrlHealth

@@ -8,6 +8,8 @@ import enum
 
 import strawberry
 
+from core.schema.enums import ObservabilityPanelReason
+
 
 @strawberry.type(name="AstroliftTimeSeriesPoint")
 class TimeSeriesPoint:
@@ -64,6 +66,23 @@ class AppGoldenSignal:
     ``"seconds"``, ``"percent"``."""
 
 
+@strawberry.type(name="AstroliftAppGoldenSignalsResult")
+class AppGoldenSignalsResult:
+    """Reason-discriminated envelope for the golden-signals panel (#1111).
+
+    The panel used to return a bare list, collapsing "no Prometheus
+    endpoint", "Prometheus errored", and "no samples in window" into an
+    indistinguishable ``[]``. ``reason`` labels the branch so the FE
+    renders one honest message. Golden signals are Prometheus-derived
+    (cloud-agnostic), so ``NOT_SUPPORTED_BY_PROVIDER`` never applies
+    here — the reason is one of OK / NOT_CONFIGURED / NO_DATA_YET /
+    ERROR.
+    """
+
+    reason: ObservabilityPanelReason
+    signals: list[AppGoldenSignal]
+
+
 @strawberry.type(name="AstroliftStatusCodeSeries")
 class StatusCodeSeries:
     """One row of the status-code breakdown matrix.
@@ -81,8 +100,15 @@ class StatusCodeSeries:
 
 @strawberry.type(name="AstroliftStatusCodeBreakdown")
 class StatusCodeBreakdown:
-    """Per-status-code stacked time-series for one app/env."""
+    """Per-status-code stacked time-series for one app/env.
 
+    ``reason`` (#1111) discriminates the empty state: NOT_CONFIGURED
+    (no Prometheus endpoint), NO_DATA_YET (endpoint live, no traffic in
+    window), ERROR (Prometheus errored), or OK. Golden-signals-family
+    panel ⇒ ``NOT_SUPPORTED_BY_PROVIDER`` never applies.
+    """
+
+    reason: ObservabilityPanelReason
     range_seconds: int
     series: list[StatusCodeSeries]
     promql: str
@@ -193,6 +219,12 @@ class AppLogPage:
     return -1; the FE treats negative as "unknown" and shows the
     page-size count instead. Loki returns -1 today; CloudWatch /
     Stackdriver can hand back exact counts when their query APIs do.
+
+    ``reason`` (#1111) subsumes ``historical_available`` with a fuller
+    discriminator: NOT_CONFIGURED (no cluster / no log aggregator wired
+    — the historical_available=false case), NO_DATA_YET (aggregator
+    live, no lines in window), ERROR (aggregator query raised), or OK.
+    ``historical_available`` is kept for wire back-compat.
     """
 
     items: list[AppLogLine]
@@ -200,6 +232,7 @@ class AppLogPage:
     reached_retention: bool
     historical_available: bool
     total_count: int
+    reason: ObservabilityPanelReason
 
 
 @strawberry.type(name="AstroliftManagedServiceMetricSeries")
@@ -283,8 +316,13 @@ class PodResourceUsage:
     expander surfaces it alongside the last-restart timestamp so an
     operator scanning a CrashLoopBackOff row sees both "how often" and
     "when" at a glance.
+
+    ``reason`` (#1111) discriminates the empty state: NOT_CONFIGURED
+    (no Prometheus endpoint), NO_DATA_YET (no samples for the pod), or
+    OK.
     """
 
+    reason: ObservabilityPanelReason
     pod_name: str
     range_seconds: int
     samples: list[PodResourceUsagePoint]

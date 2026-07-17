@@ -6,10 +6,10 @@
  * sourced from the cluster's DnsDriver, with a propagation status
  * dot per row.
  *
- * Empty state covers two scenarios with the same UX: no records yet
- * AND "this cloud doesn't implement list_records yet" — the backend
- * resolver degrades both to an empty list, so the card surfaces the
- * deep-link to "Set up DNS" rather than splitting the UI.
+ * Empty state is keyed off the resolver's `reason` (#1111) so the card
+ * renders one honest message — "Not configured", "Not available on this
+ * cloud", "No DNS records yet", or "Couldn't load" — instead of the old
+ * hedged "either/or" copy.
  */
 
 import { useQuery } from "@apollo/client/react";
@@ -19,6 +19,10 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
+import {
+  type ObservabilityPanelReason,
+  panelEmptyState,
+} from "@/components/observability/panel-reason";
 import { StatusDot } from "@/components/StatusDot";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,7 +42,10 @@ import type {
 } from "@/graphql/lifecycle/lifecycle.types";
 
 interface Resp {
-  astroliftAppDnsRecords: AstroliftAppDnsRecord[];
+  astroliftAppDnsRecords: {
+    reason: ObservabilityPanelReason;
+    records: AstroliftAppDnsRecord[];
+  };
 }
 
 const PROPAGATION_DOT: Record<DnsPropagationStatus, "ok" | "warn" | "muted"> = {
@@ -66,8 +73,19 @@ export function DnsRecordsCard({ appSlug, environmentName }: DnsRecordsCardProps
     notifyOnNetworkStatusChange: true,
   });
 
-  const records = data?.astroliftAppDnsRecords ?? [];
+  const records = data?.astroliftAppDnsRecords?.records ?? [];
+  const reason = data?.astroliftAppDnsRecords?.reason;
   const isEmptyAfterLoad = !loading && records.length === 0;
+  const empty = panelEmptyState(reason ?? "NO_DATA_YET", {
+    thing: "DNS records",
+    notConfigured:
+      "No DNS provider is wired for this cluster. Set up a managed domain to publish records.",
+    provider: "this cloud",
+  });
+  // A deep-link to fix it only makes sense when the operator can act
+  // (not-configured / no-data). NOT_SUPPORTED is informational; ERROR
+  // is transient.
+  const showSetupAction = reason === "NOT_CONFIGURED" || reason === "NO_DATA_YET" || reason == null;
 
   return (
     <Card>
@@ -124,10 +142,17 @@ export function DnsRecordsCard({ appSlug, environmentName }: DnsRecordsCardProps
           <div className="p-6">
             <EmptyState
               icon={<GlobeIcon className="size-5" />}
-              title="No DNS records for this app yet"
-              description="Either DNS isn't configured, or this cluster's provider plugin doesn't yet implement live record reads. Either way, set up DNS to get started."
-              actionHref={`/apps/${appSlug}/domains`}
-              actionLabel="Set up DNS"
+              title={empty.title}
+              description={empty.description}
+              actionHref={showSetupAction ? `/apps/${appSlug}/domains` : undefined}
+              actionLabel={showSetupAction ? "Set up DNS" : undefined}
+              secondary={
+                reason === "ERROR" ? (
+                  <Button size="sm" variant="outline" onClick={() => void refetch()}>
+                    Try again
+                  </Button>
+                ) : undefined
+              }
             />
           </div>
         ) : (

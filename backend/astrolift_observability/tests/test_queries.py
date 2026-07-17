@@ -34,6 +34,7 @@ from astrolift_observability.schema.types import GoldenSignalKind
 from astrolift_operations.prometheus_client import PrometheusUnavailable
 from astrolift_registry.models import RegisteredApp
 from core.permissions import Permission, PermissionDenied
+from core.schema.enums import ObservabilityPanelReason
 from core.tenancy import TenantContext, tenant_context
 
 pytestmark = pytest.mark.django_db
@@ -122,23 +123,26 @@ def _tenant(org):
 # ----------------------------------------------------------------------
 
 
-def test_unknown_app_returns_empty_list(permission_resolver):
-    """Soft-empty when the app slug doesn't resolve for the tenant."""
+def test_unknown_app_returns_not_configured(permission_resolver):
+    """Unknown app for the tenant → NOT_CONFIGURED envelope, empty
+    signals (#1111)."""
     org, _ = _scaffold(prometheus_endpoint="http://prom:9090")
     permission_resolver.grant(Permission.APP_READ)
     with _tenant(org):
         result = GoldenSignalsQuery().astrolift_app_golden_signals(_info(), app_slug="does-not-exist")
-    assert result == []
+    assert result.reason == ObservabilityPanelReason.NOT_CONFIGURED
+    assert result.signals == []
 
 
-def test_app_without_prometheus_endpoint_returns_empty_list(permission_resolver):
-    """No ``prometheus_endpoint`` on the cluster → empty state, NOT a
-    raise — the FE shows the "metrics not yet flowing" callout."""
+def test_app_without_prometheus_endpoint_reports_not_configured(permission_resolver):
+    """No ``prometheus_endpoint`` on the cluster → NOT_CONFIGURED, NOT a
+    raise — the FE shows "Prometheus endpoint isn't wired"."""
     org, app = _scaffold(prometheus_endpoint=None)
     permission_resolver.grant(Permission.APP_READ)
     with _tenant(org):
         result = GoldenSignalsQuery().astrolift_app_golden_signals(_info(), app_slug=app.slug)
-    assert result == []
+    assert result.reason == ObservabilityPanelReason.NOT_CONFIGURED
+    assert result.signals == []
 
 
 def test_happy_path_returns_eight_signals(permission_resolver):
@@ -173,8 +177,9 @@ def test_happy_path_returns_eight_signals(permission_resolver):
                 range_seconds=60 * 60,
             )
 
-    assert len(result) == 8
-    kinds = [r.name for r in result]
+    assert result.reason == ObservabilityPanelReason.OK
+    assert len(result.signals) == 8
+    kinds = [r.name for r in result.signals]
     assert kinds == [
         GoldenSignalKind.TRAFFIC,
         GoldenSignalKind.ERRORS,
@@ -185,7 +190,7 @@ def test_happy_path_returns_eight_signals(permission_resolver):
         GoldenSignalKind.SATURATION_CPU,
         GoldenSignalKind.SATURATION_MEMORY,
     ]
-    for row in result:
+    for row in result.signals:
         assert row.range_seconds == 60 * 60
         assert len(row.samples) == 2
         assert row.samples[0].value == 1.5
@@ -207,7 +212,7 @@ def test_p95_promql_carries_quantile_value(permission_resolver):
                 app_slug=app.slug,
             )
 
-    p95 = next(r for r in result if r.name == GoldenSignalKind.LATENCY_P95)
+    p95 = next(r for r in result.signals if r.name == GoldenSignalKind.LATENCY_P95)
     assert "histogram_quantile(0.95" in p95.promql
 
 
@@ -225,7 +230,7 @@ def test_memory_saturation_uses_working_set_bytes(permission_resolver):
                 app_slug=app.slug,
             )
 
-    mem = next(r for r in result if r.name == GoldenSignalKind.SATURATION_MEMORY)
+    mem = next(r for r in result.signals if r.name == GoldenSignalKind.SATURATION_MEMORY)
     assert "container_memory_working_set_bytes" in mem.promql
     assert 'resource="memory"' in mem.promql
 
@@ -243,7 +248,7 @@ def test_signal_promql_disclosure_includes_app_label(permission_resolver):
         with _tenant(org):
             result = GoldenSignalsQuery().astrolift_app_golden_signals(_info(), app_slug=app.slug)
     namespace_scoped = {GoldenSignalKind.SATURATION_CPU, GoldenSignalKind.SATURATION_MEMORY}
-    for row in result:
+    for row in result.signals:
         if row.name in namespace_scoped:
             assert f'namespace="{app.k8s_namespace}"' in row.promql, row.promql
             assert f'app="{app.slug}"' not in row.promql, row.promql
@@ -251,9 +256,10 @@ def test_signal_promql_disclosure_includes_app_label(permission_resolver):
             assert f'app="{app.slug}"' in row.promql, row.promql
 
 
-def test_prometheus_error_returns_empty_list(permission_resolver):
-    """Any Prometheus failure mid-fan-out → empty state. The FE
-    should NEVER see a half-built signal list."""
+def test_prometheus_error_reports_error(permission_resolver):
+    """Any Prometheus failure mid-fan-out → ERROR reason, empty signals.
+    The FE should NEVER see a half-built signal list, and the reason is
+    distinct from "no data" so the FE can offer a retry."""
     org, app = _scaffold(prometheus_endpoint="http://prom:9090")
     permission_resolver.grant(Permission.APP_READ)
 
@@ -263,7 +269,8 @@ def test_prometheus_error_returns_empty_list(permission_resolver):
     with patch.object(prom_client, "query_range_series", side_effect=fake_raise):
         with _tenant(org):
             result = GoldenSignalsQuery().astrolift_app_golden_signals(_info(), app_slug=app.slug)
-    assert result == []
+    assert result.reason == ObservabilityPanelReason.ERROR
+    assert result.signals == []
 
 
 def test_permission_denied_raises(permission_resolver):
@@ -288,8 +295,12 @@ def test_range_seconds_clamped_to_ceiling(permission_resolver):
                 app_slug=app.slug,
                 range_seconds=365 * 86400,
             )
-    assert result, "expected populated list (with empty samples) for clamped range"
-    for row in result:
+    # Empty samples across the board → NO_DATA_YET, but every signal
+    # row is still present (with the clamped range) so the FE can show
+    # the card skeleton.
+    assert result.reason == ObservabilityPanelReason.NO_DATA_YET
+    assert result.signals, "expected populated list (with empty samples) for clamped range"
+    for row in result.signals:
         assert row.range_seconds == 31 * 86400
 
 
@@ -325,6 +336,7 @@ def test_status_code_breakdown_groups_into_class_buckets(permission_resolver):
                 range_seconds=60 * 60,
             )
     assert result is not None
+    assert result.reason == ObservabilityPanelReason.OK
     classes = {s.code_class for s in result.series}
     assert classes == {"2xx", "5xx", "other"}
 
@@ -340,14 +352,18 @@ def test_status_code_breakdown_groups_into_class_buckets(permission_resolver):
     assert fivexx.top_codes == ["500", "502"]
 
 
-def test_status_code_breakdown_returns_none_without_endpoint(permission_resolver):
-    """No prometheus_endpoint → null (FE omits the card entirely
-    rather than rendering an empty stacked chart)."""
+def test_status_code_breakdown_not_configured_without_endpoint(permission_resolver):
+    """No prometheus_endpoint → an object carrying NOT_CONFIGURED and
+    empty series (#1111), so the FE renders "Prometheus endpoint isn't
+    wired" instead of silently omitting the card. ``null`` is now
+    reserved for "no such app"."""
     org, app = _scaffold(prometheus_endpoint=None)
     permission_resolver.grant(Permission.APP_READ)
     with _tenant(org):
         result = GoldenSignalsQuery().astrolift_app_status_code_breakdown(_info(), app_slug=app.slug)
-    assert result is None
+    assert result is not None
+    assert result.reason == ObservabilityPanelReason.NOT_CONFIGURED
+    assert result.series == []
 
 
 def test_status_code_breakdown_returns_none_for_unknown_app(permission_resolver):
@@ -358,7 +374,7 @@ def test_status_code_breakdown_returns_none_for_unknown_app(permission_resolver)
     assert result is None
 
 
-def test_status_code_breakdown_returns_none_on_prometheus_error(permission_resolver):
+def test_status_code_breakdown_reports_error_on_prometheus_error(permission_resolver):
     org, app = _scaffold(prometheus_endpoint="http://prom:9090")
     permission_resolver.grant(Permission.APP_READ)
 
@@ -368,7 +384,9 @@ def test_status_code_breakdown_returns_none_on_prometheus_error(permission_resol
     with patch.object(prom_client, "query_range_series", side_effect=fake_raise):
         with _tenant(org):
             result = GoldenSignalsQuery().astrolift_app_status_code_breakdown(_info(), app_slug=app.slug)
-    assert result is None
+    assert result is not None
+    assert result.reason == ObservabilityPanelReason.ERROR
+    assert result.series == []
 
 
 # ----------------------------------------------------------------------
@@ -396,9 +414,9 @@ def test_golden_signals_workload_slug_threads_into_promql(permission_resolver):
                 range_seconds=60 * 60,
             )
 
-    assert result, "expected one row per signal kind even when samples are empty"
+    assert result.signals, "expected one row per signal kind even when samples are empty"
     namespace_scoped = {GoldenSignalKind.SATURATION_CPU, GoldenSignalKind.SATURATION_MEMORY}
-    for row in result:
+    for row in result.signals:
         if row.name in namespace_scoped:
             assert 'workload="api"' not in row.promql, row.promql
             assert f'namespace="{app.k8s_namespace}"' in row.promql, row.promql
@@ -422,8 +440,8 @@ def test_golden_signals_without_workload_slug_omits_label(permission_resolver):
                 range_seconds=60 * 60,
             )
 
-    assert result
-    for row in result:
+    assert result.signals
+    for row in result.signals:
         assert "workload=" not in row.promql, row.promql
 
 
@@ -767,6 +785,7 @@ def test_pod_resource_usage_returns_paired_cpu_memory_samples(permission_resolve
             )
 
     assert result is not None
+    assert result.reason == ObservabilityPanelReason.OK
     assert samples_by_metric == {"cpu": True, "mem": True}
     assert len(result.samples) == 2
     assert result.samples[0].cpu_cores == 0.25
@@ -775,9 +794,10 @@ def test_pod_resource_usage_returns_paired_cpu_memory_samples(permission_resolve
     assert result.samples[1].memory_bytes == 2048.0
 
 
-def test_pod_resource_usage_no_endpoint_returns_none(permission_resolver):
-    """No Prometheus endpoint on the cluster → null (FE renders the
-    empty-state callout in the expander)."""
+def test_pod_resource_usage_no_endpoint_reports_not_configured(permission_resolver):
+    """No Prometheus endpoint on the cluster → NOT_CONFIGURED envelope
+    with empty samples (#1111), so the expander says why rather than
+    showing a stale 0%."""
     org, app = _scaffold(prometheus_endpoint=None)
     permission_resolver.grant(Permission.APP_READ)
 
@@ -788,7 +808,9 @@ def test_pod_resource_usage_no_endpoint_returns_none(permission_resolver):
             pod_name="hello-obs-api-0",
         )
 
-    assert result is None
+    assert result is not None
+    assert result.reason == ObservabilityPanelReason.NOT_CONFIGURED
+    assert result.samples == []
 
 
 def test_pod_resource_usage_unknown_app_returns_none(permission_resolver):

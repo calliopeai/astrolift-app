@@ -40,6 +40,7 @@ import {
   TraceExplorerPanel,
   WorkloadIdentityCard,
 } from "@/components/observability";
+import type { ObservabilityPanelReason } from "@/components/observability/panel-reason";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
@@ -128,7 +129,9 @@ interface LogsResp {
 
 // #482 — historical page query. `historicalAvailable: false` means the
 // cluster has no log-aggregator wired — the UI shows the "live tail
-// only" empty state in that case.
+// only" empty state in that case. `reason` (#1111) is the fuller
+// discriminator that subsumes it (NOT_CONFIGURED / NO_DATA_YET /
+// ERROR / OK); `historicalAvailable` is kept for the existing badge.
 interface HistoricalLogsResp {
   astroliftAppLogs: {
     items: AstroliftAppLogLine[];
@@ -136,6 +139,7 @@ interface HistoricalLogsResp {
     reachedRetention: boolean;
     historicalAvailable: boolean;
     totalCount: number;
+    reason: ObservabilityPanelReason;
   };
 }
 

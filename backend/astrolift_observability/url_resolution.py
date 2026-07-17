@@ -87,6 +87,27 @@ def normalize_url(url: str) -> str | None:
     return _normalize(url)
 
 
+def resolved_public_host(app) -> str | None:
+    """The app's canonical public FQDN (host only, no scheme/path).
+
+    Used by the TLS-certificate resolver to look up the cert covering
+    the app: passing the app *slug* never matched a real cert (a
+    ``*.zone`` wildcard or a ``zone``-suffixed SAN covers the host
+    ``<subdomain>.<zone>``, not the bare slug). Returns the host of the
+    first URL :func:`app_urls` resolves — the managed-domain host
+    ``<subdomain>.<zone>`` when no explicit env URL is set, which is
+    exactly what a platform-issued wildcard/SAN cert is minted for.
+
+    ``None`` when the app has no resolvable public URL (no env URL and
+    no managed subdomain) — the caller treats that as "not configured"
+    rather than guessing a hostname."""
+    for url in app_urls(app):
+        parts = urlsplit(url)
+        if parts.netloc:
+            return parts.netloc.lower()
+    return None
+
+
 def _normalize(url: str) -> str | None:
     """Strip trailing whitespace, default ``/`` path, lowercase scheme
     + host. Returns ``None`` on a URL we can't parse (no scheme, no

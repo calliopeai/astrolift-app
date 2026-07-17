@@ -28,6 +28,7 @@ from core import cluster_log_query
 from core.cluster_observability import namespace_for_app
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
+from core.schema.enums import ObservabilityPanelReason
 
 logger = logging.getLogger(__name__)
 
@@ -85,13 +86,14 @@ def _classify_level(message: str, structured_level: str | None) -> str:
     return "other"
 
 
-def _empty_page(historical_available: bool) -> AppLogPage:
+def _empty_page(historical_available: bool, reason: ObservabilityPanelReason) -> AppLogPage:
     return AppLogPage(
         items=[],
         next_cursor="",
         reached_retention=False,
         historical_available=historical_available,
         total_count=0,
+        reason=reason,
     )
 
 
@@ -220,11 +222,17 @@ class LogHistoryQuery:
             .first()
         )
         if app is None:
-            return _empty_page(historical_available=False)
+            return _empty_page(
+                historical_available=False,
+                reason=ObservabilityPanelReason.NOT_CONFIGURED,
+            )
 
         cluster = _resolve_cluster(app=app, environment_name=environment_name)
         if cluster is None or not getattr(cluster, "is_active", True):
-            return _empty_page(historical_available=False)
+            return _empty_page(
+                historical_available=False,
+                reason=ObservabilityPanelReason.NOT_CONFIGURED,
+            )
 
         since, until = _normalize_window(since, until)
         bounded_limit = _clamp_limit(limit)
@@ -251,10 +259,16 @@ class LogHistoryQuery:
                 "astrolift_app_logs: aggregator query raised for app %s",
                 app.slug,
             )
-            return _empty_page(historical_available=True)
+            return _empty_page(
+                historical_available=True,
+                reason=ObservabilityPanelReason.ERROR,
+            )
 
         if page is None:
-            return _empty_page(historical_available=False)
+            return _empty_page(
+                historical_available=False,
+                reason=ObservabilityPanelReason.NOT_CONFIGURED,
+            )
 
         items: list[AppLogLine] = []
         for raw in page.items:
@@ -278,10 +292,12 @@ class LogHistoryQuery:
                 )
             )
 
+        reason = ObservabilityPanelReason.OK if items else ObservabilityPanelReason.NO_DATA_YET
         return AppLogPage(
             items=items,
             next_cursor=page.next_cursor,
             reached_retention=page.reached_retention,
             historical_available=True,
             total_count=len(items),
+            reason=reason,
         )

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 
 import strawberry
@@ -23,12 +24,12 @@ from astrolift_lifecycle.models import (
 )
 from astrolift_lifecycle.schema.types import (
     AgentRunType,
-    AppCertificateType,
-    AppDnsRecordType,
+    AppCertificatesResult,
+    AppDnsRecordsResult,
     AppDomainType,
     AppEnvironmentType,
     AppHealthSummaryType,
-    AppIdentityBindingType,
+    AppIdentityBindingResult,
     AppPodEventType,
     AppPodType,
     CommandRunType,
@@ -71,7 +72,10 @@ from core.cluster_observability import (
 )
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
+from core.schema.enums import ObservabilityPanelReason
 from core.tenancy import get_current_tenant
+
+log = logging.getLogger(__name__)
 
 # Audit-log ``action`` values that make up the approval timeline for a
 # deployment (#419). Kept here (rather than scraping all
@@ -935,19 +939,30 @@ class LifecycleQuery:
         )
         return [deploy_token_to_type(t) for t in qs]
 
-    # ---- #377 observability cards (DNS / TLS / Workload identity) ----
+    # ---- #377 / #1111 observability cards (DNS / TLS / Workload identity) ----
     #
     # The three resolvers below back the operator-facing cards on the
     # app detail page. Each one resolves the app + cluster (same shape
     # as ``astrolift_app_pods`` above), then dispatches to the cluster's
-    # provider plugin via ``driver_for_capability``. Drivers that don't
-    # implement the read method (the SDK default raises
-    # ``NotImplementedError``) degrade to an empty list / null —
-    # the FE renders that as the "not yet supported on this cloud"
-    # empty state with a deep-link to set things up. Per the workspace
-    # convention queries don't return MutationResult envelopes, so
-    # NotImplementedError + driver-side errors are swallowed in the
-    # resolver rather than translated to ``gql_failure``.
+    # provider plugin via ``driver_for_capability``. Rather than
+    # collapsing every empty outcome to ``[]`` / ``null`` (which forced
+    # the FE to hedge "either not configured OR unsupported OR no
+    # data"), each returns a reason-discriminated envelope
+    # (:class:`ObservabilityPanelReason`) labelling the exact branch:
+    #
+    #   * NOT_CONFIGURED           — no cluster, or the capability driver
+    #                                isn't wired on this cluster's plugin.
+    #   * NOT_SUPPORTED_BY_PROVIDER — the driver raised
+    #                                NotImplementedError /
+    #                                UnsupportedOperationError (a read
+    #                                only some clouds implement).
+    #   * NO_DATA_YET              — the read succeeded, returned nothing.
+    #   * ERROR                    — an unexpected driver-side failure
+    #                                (logged; the FE offers a retry).
+    #   * OK                       — non-empty data.
+    #
+    # ``UnsupportedOperationError`` subclasses ``NotImplementedError``,
+    # so the single ``except NotImplementedError`` catches both.
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
@@ -957,23 +972,26 @@ class LifecycleQuery:
         info: Info,
         app_slug: str,
         environment_name: str | None = None,
-    ) -> list[AppDnsRecordType]:
+    ) -> AppDnsRecordsResult:
         from core.app_deploy import AppDeployError, driver_for_capability
 
         cluster = _resolve_app_cluster(app_slug=app_slug, environment_name=environment_name)
         if cluster is None:
-            return []
+            return AppDnsRecordsResult(reason=ObservabilityPanelReason.NOT_CONFIGURED, records=[])
         try:
             driver = driver_for_capability(cluster, "dns")
         except AppDeployError:
-            return []
+            return AppDnsRecordsResult(reason=ObservabilityPanelReason.NOT_CONFIGURED, records=[])
         try:
             records = driver.list_records_for_app(app_slug)
         except NotImplementedError:
-            return []
-        except Exception:  # noqa: BLE001 — driver-side errors degrade
-            return []
-        return [dns_record_to_type(r) for r in records]
+            return AppDnsRecordsResult(reason=ObservabilityPanelReason.NOT_SUPPORTED_BY_PROVIDER, records=[])
+        except Exception:  # noqa: BLE001 — unexpected driver failure
+            log.exception("astrolift_app_dns_records: driver read failed for app %s", app_slug)
+            return AppDnsRecordsResult(reason=ObservabilityPanelReason.ERROR, records=[])
+        out = [dns_record_to_type(r) for r in records]
+        reason = ObservabilityPanelReason.OK if out else ObservabilityPanelReason.NO_DATA_YET
+        return AppDnsRecordsResult(reason=reason, records=out)
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
@@ -983,23 +1001,44 @@ class LifecycleQuery:
         info: Info,
         app_slug: str,
         environment_name: str | None = None,
-    ) -> list[AppCertificateType]:
+    ) -> AppCertificatesResult:
+        from astrolift_observability.url_resolution import resolved_public_host
         from core.app_deploy import AppDeployError, driver_for_capability
 
         cluster = _resolve_app_cluster(app_slug=app_slug, environment_name=environment_name)
         if cluster is None:
-            return []
+            return AppCertificatesResult(reason=ObservabilityPanelReason.NOT_CONFIGURED, certificates=[])
+
+        # Match the cert against the app's real public FQDN, not its
+        # slug (#1111). The slug never matched a wildcard/SAN cert:
+        # a ``*.<zone>`` cert covers the host ``<subdomain>.<zone>``,
+        # which is what ``resolved_public_host`` returns. No host ⇒ the
+        # app has no public URL to hold a cert ⇒ not configured.
+        app = (
+            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+            .select_related("organization")
+            .first()
+        )
+        host = resolved_public_host(app) if app is not None else None
+        if host is None:
+            return AppCertificatesResult(reason=ObservabilityPanelReason.NOT_CONFIGURED, certificates=[])
+
         try:
             driver = driver_for_capability(cluster, "tls")
         except AppDeployError:
-            return []
+            return AppCertificatesResult(reason=ObservabilityPanelReason.NOT_CONFIGURED, certificates=[])
         try:
-            certs = driver.list_certificates(filter_hostname=app_slug)
+            certs = driver.list_certificates(filter_hostname=host)
         except NotImplementedError:
-            return []
-        except Exception:  # noqa: BLE001 — driver-side errors degrade
-            return []
-        return [certificate_info_to_type(c) for c in certs]
+            return AppCertificatesResult(
+                reason=ObservabilityPanelReason.NOT_SUPPORTED_BY_PROVIDER, certificates=[]
+            )
+        except Exception:  # noqa: BLE001 — unexpected driver failure
+            log.exception("astrolift_app_certificates: driver read failed for app %s", app_slug)
+            return AppCertificatesResult(reason=ObservabilityPanelReason.ERROR, certificates=[])
+        out = [certificate_info_to_type(c) for c in certs]
+        reason = ObservabilityPanelReason.OK if out else ObservabilityPanelReason.NO_DATA_YET
+        return AppCertificatesResult(reason=reason, certificates=out)
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
@@ -1009,25 +1048,31 @@ class LifecycleQuery:
         info: Info,
         app_slug: str,
         environment_name: str | None = None,
-    ) -> AppIdentityBindingType | None:
+    ) -> AppIdentityBindingResult:
         from core.app_deploy import AppDeployError, driver_for_capability
 
         cluster = _resolve_app_cluster(app_slug=app_slug, environment_name=environment_name)
         if cluster is None:
-            return None
+            return AppIdentityBindingResult(reason=ObservabilityPanelReason.NOT_CONFIGURED, binding=None)
         try:
             driver = driver_for_capability(cluster, "identity")
         except AppDeployError:
-            return None
+            return AppIdentityBindingResult(reason=ObservabilityPanelReason.NOT_CONFIGURED, binding=None)
         try:
             binding = driver.describe_identity(app_slug)
         except NotImplementedError:
-            return None
-        except Exception:  # noqa: BLE001 — driver-side errors degrade
-            return None
+            return AppIdentityBindingResult(
+                reason=ObservabilityPanelReason.NOT_SUPPORTED_BY_PROVIDER, binding=None
+            )
+        except Exception:  # noqa: BLE001 — unexpected driver failure
+            log.exception("astrolift_app_identity_binding: driver read failed for app %s", app_slug)
+            return AppIdentityBindingResult(reason=ObservabilityPanelReason.ERROR, binding=None)
         if binding is None:
-            return None
-        return identity_binding_to_type(binding)
+            return AppIdentityBindingResult(reason=ObservabilityPanelReason.NO_DATA_YET, binding=None)
+        return AppIdentityBindingResult(
+            reason=ObservabilityPanelReason.OK,
+            binding=identity_binding_to_type(binding),
+        )
 
     # ----------------------------------------------------------------
     # #436 A — blast-radius preview for the deregister modal.

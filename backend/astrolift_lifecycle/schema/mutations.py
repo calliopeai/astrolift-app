@@ -777,6 +777,29 @@ def _start_deploy_workflow_on_commit(
             deployment.workflow_run = run
             deployment.save(update_fields=["workflow_run", "updated_at", "version"])
 
+            # Emit the app-scoped deploy event so the per-app events
+            # feed (which filters on ``registered_app_id``) reflects the
+            # deploy (#1111). This is the single funnel every deploy
+            # dispatch runs through, so one emit here covers the deploy
+            # mutation, approval-quorum start, cron, and force-redeploy
+            # paths. Best-effort — the event write is swallowed on
+            # failure and must not break the dispatch.
+            from core.events import Event
+
+            Event.emit(
+                "deploy.started",
+                payload={
+                    "deployment_guid": str(deployment.guid),
+                    "workflow_kind": workflow_kind,
+                    "workflow_id": handle.workflow_id,
+                    "trigger_kind": deployment.trigger_kind,
+                },
+                resource_kind="deployment",
+                resource_id=str(deployment.guid),
+                organization_id=organization_id,
+                registered_app_id=registered_app_id,
+            )
+
     transaction.on_commit(_start)
 
 

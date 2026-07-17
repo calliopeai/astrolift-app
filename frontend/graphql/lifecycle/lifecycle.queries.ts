@@ -427,11 +427,14 @@ export const GET_WORKLOAD_POD_STATUS_BREAKDOWN = gql`
 export const LIST_APP_DNS_RECORDS = gql`
   query ListAppDnsRecords($appSlug: String!, $environmentName: String) {
     astroliftAppDnsRecords(appSlug: $appSlug, environmentName: $environmentName) {
-      name
-      type
-      value
-      ttl
-      propagationStatus
+      reason
+      records {
+        name
+        type
+        value
+        ttl
+        propagationStatus
+      }
     }
   }
 `;
@@ -439,12 +442,15 @@ export const LIST_APP_DNS_RECORDS = gql`
 export const LIST_APP_CERTIFICATES = gql`
   query ListAppCertificates($appSlug: String!, $environmentName: String) {
     astroliftAppCertificates(appSlug: $appSlug, environmentName: $environmentName) {
-      id
-      hostname
-      issuer
-      notAfter
-      daysUntilExpiry
-      renewalStatus
+      reason
+      certificates {
+        id
+        hostname
+        issuer
+        notAfter
+        daysUntilExpiry
+        renewalStatus
+      }
     }
   }
 `;
@@ -452,10 +458,13 @@ export const LIST_APP_CERTIFICATES = gql`
 export const GET_APP_IDENTITY_BINDING = gql`
   query GetAppIdentityBinding($appSlug: String!, $environmentName: String) {
     astroliftAppIdentityBinding(appSlug: $appSlug, environmentName: $environmentName) {
-      kind
-      roleArnOrPrincipal
-      trustPolicySummary
-      lastUsedAt
+      reason
+      binding {
+        kind
+        roleArnOrPrincipal
+        trustPolicySummary
+        lastUsedAt
+      }
     }
   }
 `;

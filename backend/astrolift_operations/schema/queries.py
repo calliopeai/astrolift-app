@@ -64,6 +64,7 @@ from astrolift_operations.schema.types import (
 )
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
+from core.schema.enums import ObservabilityPanelReason
 from core.tenancy import get_current_tenant
 
 _TIME_RANGE_SECONDS = {
@@ -290,9 +291,18 @@ class OperationsQuery:
             if len(rows) > page_size and items
             else None
         )
+        if items:
+            reason = ObservabilityPanelReason.OK
+        elif after:
+            # A continuation that ran off the end of the stream isn't
+            # "no data ever" — the first page already had rows.
+            reason = ObservabilityPanelReason.OK
+        else:
+            reason = ObservabilityPanelReason.NO_DATA_YET
         return EventPageType(
             items=[event_to_type(e) for e in items],
             next_cursor=next_cursor,
+            reason=reason,
         )
 
     @strawberry.field

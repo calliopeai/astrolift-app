@@ -110,11 +110,40 @@ def resolve_log_query_driver(cluster: TenantCluster) -> Any | None:
             )
         )
 
-    # Other aggregator drivers (cloudwatch_logs, stackdriver,
-    # azure_monitor_logs, otlp_http) plug in here as their SDK shims
-    # land. Returning None for unknown drivers preserves the
-    # "historical unavailable" UI state rather than crashing the
-    # resolver — the operator still sees live tail.
+    if driver_kind == "cloudwatch_logs":
+        try:
+            from _sdk.observability.cloudwatch_logs import (
+                CloudWatchLogsConfig,
+                CloudWatchLogsQueryDriver,
+            )
+        except ImportError:
+            logger.exception(
+                "cluster %s requests log_driver=cloudwatch_logs but SDK is unavailable",
+                cluster.slug,
+            )
+            return None
+        log_group = (log_config.get("log_group") or "").strip()
+        region = (log_config.get("region") or "").strip()
+        if not log_group or not region:
+            logger.warning(
+                "cluster %s log_driver=cloudwatch_logs missing log_group/region; skipping",
+                cluster.slug,
+            )
+            return None
+        return CloudWatchLogsQueryDriver(
+            config=CloudWatchLogsConfig(
+                log_group=log_group,
+                region=region,
+                log_stream_name_prefix=(log_config.get("log_stream_name_prefix") or None),
+                role_arn=(log_config.get("role_arn") or None),
+            )
+        )
+
+    # Other aggregator drivers (stackdriver, azure_monitor_logs,
+    # otlp_http) plug in here as their SDK shims land. Returning None
+    # for unknown drivers preserves the "historical unavailable" UI
+    # state rather than crashing the resolver — the operator still sees
+    # live tail.
     logger.info(
         "cluster %s log_driver=%s has no SDK driver wired yet; returning None",
         cluster.slug,
