@@ -272,6 +272,8 @@ def put_file(
     branch: str,
     content: str,
     commit_message: str,
+    operation: str | None = None,
+    permission: str | None = None,
 ) -> PutFileResult:
     """Create or update ``path`` on ``branch`` of ``repo_full_name``.
 
@@ -279,7 +281,13 @@ def put_file(
     tokens (PAT / OAuth-user) commit-attribute to the underlying user
     on the SCM host; App-installation tokens attribute to the App's
     bot identity. Existing files are updated in-place (the GitHub
-    driver looks up the blob SHA first, GitLab picks PUT vs POST)."""
+    driver looks up the blob SHA first, GitLab picks PUT vs POST).
+
+    ``operation`` / ``permission`` are optional GitHub-flavored hints a
+    caller passes when it knows what it is writing; they only sharpen a
+    403 message for an under-permitted GitHub App (see
+    :func:`astrolift_scm.auth_errors.github_auth_error_message`) and are
+    forwarded only to the GitHub driver."""
     if connection.kind in _GITHUB_KINDS:
         try:
             result = put_github_file(
@@ -289,6 +297,8 @@ def put_file(
                 branch=branch,
                 content=content,
                 commit_message=commit_message,
+                operation=operation,
+                permission=permission,
             )
             return PutFileResult(
                 commit_sha=result.commit_sha,
