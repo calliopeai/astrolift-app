@@ -175,6 +175,16 @@ class Deployment(BaseCoreModel):
     # the comparison query falls back to an empty dict.
     rendered_manifest_snapshot = models.JSONField(null=True, blank=True)
 
+    # GitHub Deployments API reflection (#1124). The numeric id GitHub
+    # assigns when we mirror this rollout into its Environments UI; stored
+    # so the later success/failure deployment-status POST targets the same
+    # GitHub deployment (idempotent). Unlike the append-only provenance
+    # block above, this is written by the platform *during* the deploy.
+    # Null when the app has no GitHub source repo, the org hasn't installed
+    # the App, or the deploy predates this integration — reflection is
+    # best-effort and never required for a deploy to succeed.
+    github_deployment_id = models.BigIntegerField(null=True, blank=True, default=None)
+
     started_at = models.DateTimeField(null=True, blank=True)
     succeeded_at = models.DateTimeField(null=True, blank=True)
     failed_at = models.DateTimeField(null=True, blank=True)
