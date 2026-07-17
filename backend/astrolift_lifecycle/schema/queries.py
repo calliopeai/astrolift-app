@@ -405,8 +405,15 @@ class LifecycleQuery:
         environment_name: str | None = None,
         limit: int = 50,
     ) -> list[DeploymentType]:
-        qs = Deployment.objects.select_related("registered_app", "app_environment", "workload").order_by(
-            "-created_at"
+        qs = (
+            Deployment.objects.select_related("registered_app", "app_environment", "workload")
+            # Deregistered / torn-down apps are soft-deleted; their
+            # deployment rows aren't, so without this they'd keep showing
+            # in the list. Single-deployment + approval-history queries are
+            # id-scoped (a direct link the operator already has), so they
+            # intentionally stay fetchable and don't need this filter.
+            .filter(registered_app__deleted_at__isnull=True)
+            .order_by("-created_at")
         )
         if app_slug:
             qs = qs.filter(registered_app__slug=app_slug)
@@ -532,17 +539,21 @@ class LifecycleQuery:
         app = deployment.registered_app
         env = deployment.app_environment
 
+        # The diff base is the most-recent PRIOR deploy that was live.
+        # A prior live deploy is now flipped to SUPERSEDED when a newer
+        # one reaches running (#1103), so filtering on RUNNING alone found
+        # nothing and broke release notes — include SUPERSEDED too.
         prior = (
             Deployment.objects.filter(
                 registered_app=app,
                 app_environment=env,
-                status=Deployment.Status.RUNNING,
+                status__in=[Deployment.Status.RUNNING, Deployment.Status.SUPERSEDED],
                 commit_sha__gt="",
                 succeeded_at__lt=deployment.created_at,
                 deleted_at__isnull=True,
             )
             .exclude(guid=deployment.guid)
-            .order_by("-succeeded_at")
+            .order_by("-created_at")
             .values_list("commit_sha", flat=True)
             .first()
         )

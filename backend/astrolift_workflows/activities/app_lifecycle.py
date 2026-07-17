@@ -1173,10 +1173,50 @@ async def health_check(deployment_id: int) -> bool:
 
 
 def _mark_running_sync(deployment_id: int) -> None:
+    from django.db import transaction
+
     from astrolift_lifecycle.models import Deployment
 
-    d = Deployment.all_objects.get(pk=deployment_id)
-    d.transition_to(Deployment.Status.RUNNING)
+    # Temporal activities are at-least-once, so this must be atomic AND
+    # idempotent. A newly-live deploy supersedes the prior live one for
+    # the same (app, env): RUNNING means "successfully live", not "in
+    # progress", so leaving old running rows in place floods the Active
+    # tab with every historical deploy.
+    #
+    # The supersede scan and the self-transition run inside one
+    # transaction with select_for_update on the target AND the sibling
+    # running rows, so two deploys racing to running contend on the prior
+    # live row instead of both ending RUNNING. Net guarantee: after this
+    # activity exactly one RUNNING deploy exists for (app, env) — the
+    # target — regardless of retries or races.
+    with transaction.atomic():
+        d = Deployment.all_objects.select_for_update().get(pk=deployment_id)
+
+        # Lock + re-scan the sibling running rows inside the same
+        # transaction so a concurrent deploy serializes on the prior-live
+        # row rather than both superseding a stale snapshot.
+        prior_running = (
+            Deployment.all_objects.select_for_update()
+            .filter(
+                registered_app_id=d.registered_app_id,
+                app_environment_id=d.app_environment_id,
+                status=Deployment.Status.RUNNING.value,
+            )
+            .exclude(pk=d.pk)
+        )
+        for prior in prior_running:
+            # Guard: only supersede rows still RUNNING. The filter already
+            # restricts to RUNNING, but stay defensive so an already-
+            # terminal / already-superseded sibling is skipped, never
+            # re-transitioned (SUPERSEDED has no outgoing transitions).
+            if prior.status == Deployment.Status.RUNNING.value:
+                prior.transition_to(Deployment.Status.SUPERSEDED)
+
+        # Idempotent no-op on a retry: RUNNING is not a legal
+        # self-transition, so only advance a row that isn't already live.
+        # The supersede invariant above still holds on the re-run.
+        if d.status != Deployment.Status.RUNNING.value:
+            d.transition_to(Deployment.Status.RUNNING)
 
 
 @activity.defn(name="astrolift.deploy.mark_running")
