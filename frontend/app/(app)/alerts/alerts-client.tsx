@@ -11,6 +11,7 @@ import {
   VolumeOffIcon,
   Volume2Icon,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
@@ -68,8 +69,12 @@ import {
   UNMUTE_ALERT_RULE,
 } from "@/graphql/operations/alerts.queries";
 import { useFormatters } from "@/lib/i18n/formatters";
+import { cn } from "@/lib/utils";
 import { ListControls, SortableHeader } from "@/components/ListControls";
 import { useListControls } from "@/hooks/use-list-controls";
+
+const ROW_NAV_CLASS =
+  "hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]";
 
 interface AlertMute {
   id: string;
@@ -133,6 +138,7 @@ const SEVERITIES = ["info", "warn", "critical"];
 export function AlertsClient() {
   const t = useTranslations("lists.alerts");
   const fmt = useFormatters();
+  const router = useRouter();
   const [createOpen, setCreateOpen] = React.useState(false);
   const rules = useQuery<RulesResp>(LIST_ALERT_RULES, {
     variables: { activeOnly: false },
@@ -437,7 +443,20 @@ export function AlertsClient() {
               </TableHeader>
               <TableBody>
                 {rulesCtrl.rows.map((r) => (
-                  <TableRow key={r.id} className={r.activeMute ? "opacity-70" : undefined}>
+                  <TableRow
+                    key={r.id}
+                    tabIndex={0}
+                    role="link"
+                    aria-label={`Open alert rule ${r.name}`}
+                    onClick={() => router.push(`/alerts/rules/${r.id}`)}
+                    onKeyDown={(ev) => {
+                      if (ev.key === "Enter" || ev.key === " ") {
+                        ev.preventDefault();
+                        router.push(`/alerts/rules/${r.id}`);
+                      }
+                    }}
+                    className={cn(ROW_NAV_CLASS, r.activeMute && "opacity-70")}
+                  >
                     <TableCell className="w-8">
                       {r.activeMute ? (
                         <VolumeOffIcon className="text-muted-foreground size-4" />
@@ -473,7 +492,7 @@ export function AlertsClient() {
                     <TableCell className="text-muted-foreground text-xs">
                       {fmt.formatDate(r.createdAt)}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         <Can permission="org.update">
                           <DropdownMenu>
@@ -609,7 +628,20 @@ export function AlertsClient() {
               </TableHeader>
               <TableBody>
                 {eventsCtrl.rows.map((e) => (
-                  <TableRow key={e.id}>
+                  <TableRow
+                    key={e.id}
+                    tabIndex={0}
+                    role="link"
+                    aria-label={`Open alert event ${e.id.slice(0, 8)}`}
+                    onClick={() => router.push(`/alerts/events/${e.id}`)}
+                    onKeyDown={(ev) => {
+                      if (ev.key === "Enter" || ev.key === " ") {
+                        ev.preventDefault();
+                        router.push(`/alerts/events/${e.id}`);
+                      }
+                    }}
+                    className={ROW_NAV_CLASS}
+                  >
                     <TableCell className="w-8">
                       <StatusDot status={SEVERITY_TONE[e.severity] ?? "muted"} />
                     </TableCell>
@@ -633,7 +665,7 @@ export function AlertsClient() {
                         <Badge variant="destructive">{t("events.firing")}</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
                       {!e.resolvedAt && !e.acknowledgedAt && (
                         <Can permission="org.update">
                           <Button
