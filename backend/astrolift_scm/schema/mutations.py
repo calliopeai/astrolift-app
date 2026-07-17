@@ -690,6 +690,10 @@ class ScmMutation:
             render_workflow_for,
         )
         from astrolift_scm.providers import ProviderError, put_file
+        from astrolift_scm.services.workflow_sync import (
+            CI_WORKFLOW_WRITE_OPERATION,
+            CI_WORKFLOW_WRITE_PERMISSION,
+        )
 
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
@@ -787,6 +791,8 @@ class ScmMutation:
                 branch=branch,
                 content=content,
                 commit_message=commit_message,
+                operation=CI_WORKFLOW_WRITE_OPERATION,
+                permission=CI_WORKFLOW_WRITE_PERMISSION,
             )
         except ProviderError as exc:
             return gql_failure(

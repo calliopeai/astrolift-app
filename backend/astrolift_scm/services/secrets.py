@@ -49,6 +49,7 @@ from astrolift_lifecycle.deploy_tokens import (
 )
 from astrolift_lifecycle.models import DeployToken
 from astrolift_registry.models import RegisteredApp
+from astrolift_scm.auth_errors import github_auth_error_message
 from astrolift_scm.models import SourceConnection
 from astrolift_scm.providers.github import (
     GITHUB_API_DEFAULT,
@@ -205,6 +206,7 @@ def _fetch_repo_public_key(
     base: str,
     repo_full_name: str,
     token_scheme: str = "token",
+    connection_kind: str = "",
 ) -> tuple[str, str]:
     """GET /repos/{owner}/{repo}/actions/secrets/public-key.
 
@@ -235,7 +237,12 @@ def _fetch_repo_public_key(
         if exc.code in (401, 403):
             raise GithubProviderError(
                 "AUTH_FAILED",
-                f"GitHub rejected the token ({exc.code}). Reconnect or rotate.",
+                github_auth_error_message(
+                    exc.code,
+                    connection_kind,
+                    operation="write Actions secrets",
+                    permission="Secrets: write",
+                ),
                 recoverable=True,
             ) from exc
         if exc.code == 404:
@@ -270,6 +277,7 @@ def _put_repo_secret(
     sealed_b64: str,
     key_id: str,
     token_scheme: str = "token",
+    connection_kind: str = "",
 ) -> None:
     """PUT /repos/{owner}/{repo}/actions/secrets/{name}.
 
@@ -308,7 +316,12 @@ def _put_repo_secret(
         if exc.code in (401, 403):
             raise GithubProviderError(
                 "AUTH_FAILED",
-                f"GitHub rejected the token ({exc.code}) writing {name!r}. Reconnect or rotate.",
+                github_auth_error_message(
+                    exc.code,
+                    connection_kind,
+                    operation=f"write the {name!r} Actions secret",
+                    permission="Secrets: write",
+                ),
                 recoverable=True,
             ) from exc
         if exc.code == 404:
@@ -380,6 +393,7 @@ def _list_github_repo_secret_names(
     base: str,
     repo_full_name: str,
     token_scheme: str = "token",
+    connection_kind: str = "",
 ) -> dict[str, str]:
     """GET /repos/{owner}/{repo}/actions/secrets — return a name → updated_at
     mapping for every Actions secret on the repo.
@@ -414,7 +428,12 @@ def _list_github_repo_secret_names(
             if exc.code in (401, 403):
                 raise GithubProviderError(
                     "AUTH_FAILED",
-                    f"GitHub rejected the token ({exc.code}). Reconnect or rotate.",
+                    github_auth_error_message(
+                        exc.code,
+                        connection_kind,
+                        operation="read Actions secrets",
+                        permission="Secrets: read",
+                    ),
                     recoverable=True,
                 ) from exc
             if exc.code == 404:
@@ -530,6 +549,7 @@ def validate_astrolift_ci_secrets(
             base=base,
             repo_full_name=app.source_repo,
             token_scheme=_github_auth_scheme(connection),
+            connection_kind=connection.kind,
         )
     except GithubProviderError as exc:
         return ValidateCiSecretsResult(
@@ -720,6 +740,7 @@ def push_astrolift_ci_secrets(
             base=base,
             repo_full_name=app.source_repo,
             token_scheme=token_scheme,
+            connection_kind=connection.kind,
         )
     except GithubProviderError as exc:
         return PushSecretsResult(
@@ -755,6 +776,7 @@ def push_astrolift_ci_secrets(
                 sealed_b64=sealed,
                 key_id=key_id,
                 token_scheme=token_scheme,
+                connection_kind=connection.kind,
             )
         except GithubProviderError as exc:
             return PushSecretsResult(
