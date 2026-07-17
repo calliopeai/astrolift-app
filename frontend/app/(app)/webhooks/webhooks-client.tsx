@@ -402,7 +402,18 @@ export function WebhooksClient({
                           )}
                         </Button>
                       </TableCell>
-                      <TableCell className="max-w-xs truncate font-mono text-xs">{s.url}</TableCell>
+                      <TableCell className="max-w-xs truncate font-mono text-xs">
+                        {appSlug ? (
+                          s.url
+                        ) : (
+                          <Link
+                            href={`/webhooks/${s.id}`}
+                            className="hover:text-[var(--brand-primary)] hover:underline"
+                          >
+                            {s.url}
+                          </Link>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {s.events.slice(0, 3).map((e) => (

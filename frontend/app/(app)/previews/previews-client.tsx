@@ -6,6 +6,7 @@ import {
   GitPullRequestIcon,
   TrashIcon,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
@@ -58,6 +59,7 @@ const statusToDot: Record<
 export function PreviewsClient() {
   const t = useTranslations("lists.previews");
   const fmt = useFormatters();
+  const router = useRouter();
   const { can } = useMyPermissions();
   const formatTime = (iso: string | null | undefined): string =>
     iso ? fmt.formatDateTime(iso) : "—";
@@ -114,7 +116,20 @@ export function PreviewsClient() {
               </TableHeader>
               <TableBody>
                 {list.map((p) => (
-                  <TableRow key={p.id}>
+                  <TableRow
+                    key={p.id}
+                    tabIndex={0}
+                    role="link"
+                    aria-label={`Open preview PR #${p.prNumber}`}
+                    onClick={() => router.push(`/previews/${p.id}`)}
+                    onKeyDown={(ev) => {
+                      if (ev.key === "Enter" || ev.key === " ") {
+                        ev.preventDefault();
+                        router.push(`/previews/${p.id}`);
+                      }
+                    }}
+                    className="hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
+                  >
                     <TableCell className="w-8">
                       <StatusDot status={statusToDot[p.status]} />
                     </TableCell>
@@ -141,6 +156,7 @@ export function PreviewsClient() {
                           href={`https://${p.hostname}`}
                           target="_blank"
                           rel="noreferrer"
+                          onClick={(ev) => ev.stopPropagation()}
                           className="inline-flex items-center gap-1 text-sm hover:underline"
                         >
                           {p.hostname}
@@ -160,7 +176,7 @@ export function PreviewsClient() {
                         {p.status.replace(/_/g, " ")}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
                       {p.status !== "torn_down" && can("app.deploy") && (
                         <Can permission="app.deploy">
                           <Button

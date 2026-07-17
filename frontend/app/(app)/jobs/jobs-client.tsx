@@ -3,8 +3,6 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import {
   CalendarClockIcon,
-  ChevronDownIcon,
-  ChevronRightIcon,
   ClockIcon,
   HistoryIcon,
   Loader2Icon,
@@ -13,13 +11,13 @@ import {
   TerminalIcon,
   XCircleIcon,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
 import { ConcurrencyBadge } from "@/components/jobs/ConcurrencyBadge";
 import { CronSchedulePreview } from "@/components/jobs/CronSchedulePreview";
-import { RunOutputPanel } from "@/components/jobs/RunOutputPanel";
 import { RunStatusBadge, commandRunStatus } from "@/components/jobs/RunStatusBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { ListControls, SortableHeader } from "@/components/ListControls";
@@ -58,7 +56,6 @@ import type {
 import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
 import { useListControls, type ListControlsResult, type SortState } from "@/hooks/use-list-controls";
 import { useFormatters } from "@/lib/i18n/formatters";
-import { cn } from "@/lib/utils";
 
 interface JobResp {
   astroliftScheduledJobRuns: AstroliftScheduledJobRun[];
@@ -135,24 +132,6 @@ function JobRunsSummary({ runs }: { runs: AstroliftScheduledJobRun[] }) {
       </div>
     </div>
   );
-}
-
-function consoleHrefForJobRun(run: AstroliftScheduledJobRun): string {
-  // Deep-link into the per-app logs surface so the operator can
-  // grab the full tail when the inline 200-line view runs out.
-  // The logs page understands ``?workload=`` + ``?run=`` so the
-  // selection lands pre-filtered when the user clicks through.
-  const params = new URLSearchParams({
-    workload: run.workloadSlug,
-    run: run.k8sJobName || run.id,
-  });
-  return `/apps/${run.registeredAppSlug}/logs?${params.toString()}`;
-}
-
-function consoleHrefForCommandRun(run: AstroliftCommandRun): string {
-  const params = new URLSearchParams({ command: run.id });
-  if (run.workloadSlug) params.set("workload", run.workloadSlug);
-  return `/apps/${run.registeredAppSlug}/logs?${params.toString()}`;
 }
 
 function jobRunSortFn(a: AstroliftScheduledJobRun, b: AstroliftScheduledJobRun, sort: SortState): number {
@@ -646,23 +625,13 @@ function ScheduledJobRunsTable({
 }) {
   const t = useTranslations("jobs.scheduled");
   const fmt = useFormatters();
+  const router = useRouter();
   const formatTime = (iso: string | null | undefined) => (iso ? fmt.formatDateTime(iso) : "—");
-  const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
-
-  function toggle(id: string) {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
 
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead className="w-8" />
           <TableHead>
             <SortableHeader sortKey="app" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
               {t("columns.app")}
@@ -687,58 +656,44 @@ function ScheduledJobRunsTable({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {jobs.map((j) => {
-          const isOpen = expanded.has(j.id);
-          return (
-            <React.Fragment key={j.id}>
-              <TableRow
-                className={cn("cursor-pointer", isOpen && "bg-muted/30")}
-                onClick={() => toggle(j.id)}
-              >
-                <TableCell className="w-8">
-                  {isOpen ? (
-                    <ChevronDownIcon className="size-4" />
-                  ) : (
-                    <ChevronRightIcon className="size-4" />
-                  )}
-                </TableCell>
-                <TableCell>
-                  <div className="font-medium">{j.registeredAppSlug}</div>
-                  <div className="text-muted-foreground text-xs">
-                    {t("envLabel")} <span className="font-mono">{j.environmentName}</span>
-                    {" · "}
-                    {t("workloadLabel")} <span className="font-mono">{j.workloadSlug}</span>
-                  </div>
-                </TableCell>
-                <TableCell className="font-mono text-xs">{j.k8sJobName || "—"}</TableCell>
-                <TableCell>
-                  <RunStatusBadge status={j.status} exitCode={j.exitCode} />
-                </TableCell>
-                <TableCell className="font-mono text-xs">
-                  <span className="inline-flex items-center gap-1">
-                    <ClockIcon className="size-3" />
-                    {formatDuration(j.durationSeconds)}
-                  </span>
-                </TableCell>
-                <TableCell className="text-muted-foreground text-sm">
-                  {formatTime(j.startedAt)}
-                </TableCell>
-              </TableRow>
-              {isOpen ? (
-                <TableRow className="bg-muted/30 hover:bg-muted/30">
-                  <TableCell />
-                  <TableCell colSpan={5} className="py-3">
-                    <RunOutputPanel
-                      output={j.output ?? ""}
-                      consoleHref={consoleHrefForJobRun(j)}
-                      caption={j.k8sJobName || j.workloadSlug}
-                    />
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </React.Fragment>
-          );
-        })}
+        {jobs.map((j) => (
+          <TableRow
+            key={j.id}
+            tabIndex={0}
+            role="link"
+            aria-label={`Open job run ${j.id.slice(0, 8)}`}
+            onClick={() => router.push(`/jobs/runs/${j.id}`)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                router.push(`/jobs/runs/${j.id}`);
+              }
+            }}
+            className="hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
+          >
+            <TableCell>
+              <div className="font-medium">{j.registeredAppSlug}</div>
+              <div className="text-muted-foreground text-xs">
+                {t("envLabel")} <span className="font-mono">{j.environmentName}</span>
+                {" · "}
+                {t("workloadLabel")} <span className="font-mono">{j.workloadSlug}</span>
+              </div>
+            </TableCell>
+            <TableCell className="font-mono text-xs">{j.k8sJobName || "—"}</TableCell>
+            <TableCell>
+              <RunStatusBadge status={j.status} exitCode={j.exitCode} />
+            </TableCell>
+            <TableCell className="font-mono text-xs">
+              <span className="inline-flex items-center gap-1">
+                <ClockIcon className="size-3" />
+                {formatDuration(j.durationSeconds)}
+              </span>
+            </TableCell>
+            <TableCell className="text-muted-foreground text-sm">
+              {formatTime(j.startedAt)}
+            </TableCell>
+          </TableRow>
+        ))}
       </TableBody>
     </Table>
   );
@@ -753,23 +708,13 @@ function CommandRunsTable({
 }) {
   const t = useTranslations("jobs.commands");
   const fmt = useFormatters();
+  const router = useRouter();
   const formatTime = (iso: string | null | undefined) => (iso ? fmt.formatDateTime(iso) : "—");
-  const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
-
-  function toggle(id: string) {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
 
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead className="w-8" />
           <TableHead>
             <SortableHeader sortKey="app" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
               {t("columns.app")}
@@ -795,60 +740,46 @@ function CommandRunsTable({
       </TableHeader>
       <TableBody>
         {cmds.map((c) => {
-          const isOpen = expanded.has(c.id);
           const status = commandRunStatus({
             endedAt: c.endedAt,
             exitCode: c.exitCode,
           });
           return (
-            <React.Fragment key={c.id}>
-              <TableRow
-                className={cn("cursor-pointer", isOpen && "bg-muted/30")}
-                onClick={() => toggle(c.id)}
-              >
-                <TableCell className="w-8">
-                  {isOpen ? (
-                    <ChevronDownIcon className="size-4" />
-                  ) : (
-                    <ChevronRightIcon className="size-4" />
-                  )}
-                </TableCell>
-                <TableCell>
-                  <div className="font-medium">{c.registeredAppSlug}</div>
-                  {c.workloadSlug ? (
-                    <div className="text-muted-foreground text-xs">
-                      {t("workloadLabel")} <span className="font-mono">{c.workloadSlug}</span>
-                    </div>
-                  ) : null}
-                </TableCell>
-                <TableCell className="font-mono text-xs">
-                  {Array.isArray(c.command)
-                    ? (c.command as string[]).join(" ")
-                    : JSON.stringify(c.command)}
-                </TableCell>
-                <TableCell>
-                  <RunStatusBadge status={status} exitCode={c.exitCode} />
-                </TableCell>
-                <TableCell className="text-sm">{c.invokedByUsername ?? "—"}</TableCell>
-                <TableCell className="text-muted-foreground text-sm">
-                  {formatTime(c.startedAt)}
-                </TableCell>
-              </TableRow>
-              {isOpen ? (
-                <TableRow className="bg-muted/30 hover:bg-muted/30">
-                  <TableCell />
-                  <TableCell colSpan={5} className="py-3">
-                    <RunOutputPanel
-                      output={c.output ?? ""}
-                      consoleHref={consoleHrefForCommandRun(c)}
-                      caption={
-                        Array.isArray(c.command) ? (c.command as string[]).join(" ") : undefined
-                      }
-                    />
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </React.Fragment>
+            <TableRow
+              key={c.id}
+              tabIndex={0}
+              role="link"
+              aria-label={`Open command run ${c.id.slice(0, 8)}`}
+              onClick={() => router.push(`/jobs/commands/${c.id}`)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  router.push(`/jobs/commands/${c.id}`);
+                }
+              }}
+              className="hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
+            >
+              <TableCell>
+                <div className="font-medium">{c.registeredAppSlug}</div>
+                {c.workloadSlug ? (
+                  <div className="text-muted-foreground text-xs">
+                    {t("workloadLabel")} <span className="font-mono">{c.workloadSlug}</span>
+                  </div>
+                ) : null}
+              </TableCell>
+              <TableCell className="font-mono text-xs">
+                {Array.isArray(c.command)
+                  ? (c.command as string[]).join(" ")
+                  : JSON.stringify(c.command)}
+              </TableCell>
+              <TableCell>
+                <RunStatusBadge status={status} exitCode={c.exitCode} />
+              </TableCell>
+              <TableCell className="text-sm">{c.invokedByUsername ?? "—"}</TableCell>
+              <TableCell className="text-muted-foreground text-sm">
+                {formatTime(c.startedAt)}
+              </TableCell>
+            </TableRow>
           );
         })}
       </TableBody>

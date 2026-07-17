@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import { GlobeIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -59,6 +60,7 @@ const defaultForBadge: Record<string, string> = {
 
 export function DomainsClient() {
   const fmt = useFormatters();
+  const router = useRouter();
   const { data, loading } = useQuery<Resp>(LIST_MANAGED_DOMAINS);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<AstroliftManagedDomain | null>(null);
@@ -162,7 +164,20 @@ export function DomainsClient() {
               </TableHeader>
               <TableBody>
                 {list.map((d) => (
-                  <TableRow key={d.id}>
+                  <TableRow
+                    key={d.id}
+                    tabIndex={0}
+                    role="link"
+                    aria-label={`Open managed domain ${d.zone}`}
+                    onClick={() => router.push(`/domains/${d.id}`)}
+                    onKeyDown={(ev) => {
+                      if (ev.key === "Enter" || ev.key === " ") {
+                        ev.preventDefault();
+                        router.push(`/domains/${d.id}`);
+                      }
+                    }}
+                    className="hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
+                  >
                     <TableCell className="font-mono">{d.zone}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{d.dnsDriver}</Badge>
@@ -176,7 +191,7 @@ export function DomainsClient() {
                     <TableCell className="text-muted-foreground text-sm">
                       {fmt.formatDate(d.createdAt)}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
                       <Button
                         size="sm"
                         variant="ghost"

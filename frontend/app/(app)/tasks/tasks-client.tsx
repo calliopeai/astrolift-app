@@ -501,6 +501,7 @@ interface RunsTabProps {
 }
 
 function RunsTab({ runs, loading, emptyTitle, emptyDescription, searchPlaceholder }: RunsTabProps) {
+  const router = useRouter();
   const ctrl = useListControls({
     data: runs,
     searchFn: (r) =>
@@ -588,7 +589,20 @@ function RunsTab({ runs, loading, emptyTitle, emptyDescription, searchPlaceholde
               </TableHeader>
               <TableBody>
                 {ctrl.rows.map((r) => (
-                  <TableRow key={r.id}>
+                  <TableRow
+                    key={r.id}
+                    tabIndex={0}
+                    role="link"
+                    aria-label={`Open task run ${r.id.slice(0, 8)}`}
+                    onClick={() => router.push(`/tasks/runs/${r.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        router.push(`/tasks/runs/${r.id}`);
+                      }
+                    }}
+                    className="hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
+                  >
                     <TableCell className="font-medium">{r.registeredAppSlug}</TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">
                       {r.workloadSlug}

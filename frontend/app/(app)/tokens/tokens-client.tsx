@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangleIcon,
   CheckCircle2Icon,
@@ -157,6 +158,7 @@ export function TokensClient() {
     toast.success("Copied to clipboard");
   }
 
+  const router = useRouter();
   const list = tokens.data?.astroliftApiTokens ?? [];
 
   const ctrl = useListControls({
@@ -275,7 +277,20 @@ export function TokensClient() {
                 </TableHeader>
                 <TableBody>
                   {ctrl.rows.map((t) => (
-                    <TableRow key={t.id}>
+                    <TableRow
+                      key={t.id}
+                      tabIndex={0}
+                      role="link"
+                      aria-label={`Open API token ${t.name}`}
+                      onClick={() => router.push(`/tokens/${t.id}`)}
+                      onKeyDown={(ev) => {
+                        if (ev.key === "Enter" || ev.key === " ") {
+                          ev.preventDefault();
+                          router.push(`/tokens/${t.id}`);
+                        }
+                      }}
+                      className="hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
+                    >
                       <TableCell className="font-medium">{t.name}</TableCell>
                       <TableCell className="font-mono text-xs">…{t.tokenLast4}</TableCell>
                       <TableCell>
@@ -310,7 +325,7 @@ export function TokensClient() {
                           <Badge variant="secondary">active</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
                         <Can permission="api_token.revoke">
                           <Button
                             size="sm"

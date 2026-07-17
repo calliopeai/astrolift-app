@@ -4,7 +4,11 @@ import { useQuery } from "@apollo/client/react";
 import { ActivityIcon, ChevronDownIcon, ChevronRightIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import NextLink from "next/link";
+import { useRouter } from "next/navigation";
 import * as React from "react";
+
+const EVENT_ROW_NAV_CLASS =
+  "hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]";
 
 import { EmptyState } from "@/components/EmptyState";
 import { ListControls, SortableHeader } from "@/components/ListControls";
@@ -373,6 +377,7 @@ function BucketMembers({
   resourceId: string;
 }) {
   const fmt = useFormatters();
+  const router = useRouter();
   const { data, loading } = useQuery<RawResp>(LIST_EVENTS, {
     variables: { limit: 200, eventType },
     fetchPolicy: "cache-and-network",
@@ -393,7 +398,20 @@ function BucketMembers({
   return (
     <ul className="bg-muted/30 mt-3 divide-y rounded-md border">
       {list.map((e) => (
-        <li key={e.id} className="p-3">
+        <li
+          key={e.id}
+          tabIndex={0}
+          role="link"
+          aria-label={`Open event ${e.eventType}`}
+          onClick={() => router.push(`/events/${e.id}`)}
+          onKeyDown={(ev) => {
+            if (ev.key === "Enter" || ev.key === " ") {
+              ev.preventDefault();
+              router.push(`/events/${e.id}`);
+            }
+          }}
+          className={`p-3 ${EVENT_ROW_NAV_CLASS}`}
+        >
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="font-mono text-xs">
               {e.eventType}
@@ -415,8 +433,21 @@ function BucketMembers({
 
 function EventRow({ event }: { event: AstroliftEvent }) {
   const fmt = useFormatters();
+  const router = useRouter();
   return (
-    <li className="flex items-start gap-4 p-4">
+    <li
+      tabIndex={0}
+      role="link"
+      aria-label={`Open event ${event.eventType}`}
+      onClick={() => router.push(`/events/${event.id}`)}
+      onKeyDown={(ev) => {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          router.push(`/events/${event.id}`);
+        }
+      }}
+      className={`flex items-start gap-4 p-4 ${EVENT_ROW_NAV_CLASS}`}
+    >
       <div className="bg-primary/10 text-primary mt-0.5 rounded-md p-2">
         <ActivityIcon className="size-4" />
       </div>
@@ -484,6 +515,7 @@ function SourceBadge({
   return (
     <NextLink
       href={href}
+      onClick={(ev) => ev.stopPropagation()}
       className="inline-flex items-center"
       aria-label={`${t("sourceLabel")}: ${display}`}
     >
