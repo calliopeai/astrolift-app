@@ -734,3 +734,29 @@ def test_start_multiple_canonical_picks_oldest(settings):
     assert resp["Location"].startswith("https://github.com/apps/astrolift-older/installations/new")
     pending_c = SourceConnection.objects.get(organization=org_c, kind="github_app_install")
     assert pending_c.oauth_client_id == "222"
+
+
+def test_start_reuse_falls_back_to_create_when_slug_unrecoverable(settings):
+    """If the canonical's display_name was renamed away from the
+    ``GitHub App: <slug>`` shape, the App slug can't be recovered to build
+    an install URL — rather than strand the operator on a broken redirect,
+    start falls through to the CREATE flow (200 manifest form)."""
+    settings.APP_BASE_URL = "https://astrolift.test"
+    settings.GITHUB_APP_CONNECTION_SCOPE = "per_install"
+    user = User.objects.create_user(username="rename-b", email="rb@x.example", password="x")
+    org_a = Organization.objects.create(name="Org A", slug="rename-a")
+    org_b = _org_with_member(user, name="Org B", slug="rename-b")
+    canonical = _make_installed_app(org_a, slug="astrolift-canonical", app_id="900900", owner="acme-corp")
+    # Operator renamed it (update_source_connection allows this) — the slug
+    # no longer lives behind the "GitHub App: " prefix.
+    canonical.display_name = "My Renamed Connection"
+    canonical.save()
+
+    client = Client()
+    _login(client, user)
+    resp = client.get("/app/auth1/scm/github/app-manifest/start")
+
+    assert resp.status_code == 200
+    assert 'name="manifest"' in resp.content.decode()
+    pending_b = SourceConnection.objects.get(organization=org_b, kind="github_app_install")
+    assert pending_b.oauth_client_id == ""  # a fresh pending, not a copy
