@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import os
 import re
 import time
 import urllib.error
@@ -110,15 +111,88 @@ def clear_cache_for_tests() -> None:
     _cache.clear()
 
 
+# --- AWS SigV4 signing (Amazon Managed Prometheus) --------------------
+#
+# Amazon Managed Prometheus (AMP) rejects unsigned reads with 403: the
+# ``aps-workspaces.<region>.amazonaws.com`` query API requires SigV4 with
+# the ``aps`` service (``aps:QueryMetrics``). A self-hosted Prometheus
+# wants a plain GET, so we sign ONLY when the endpoint is an AWS host, or
+# when the operator forces it with ``prometheus_auth="sigv4"`` (e.g. AMP
+# reached through a non-``amazonaws.com`` name). Credentials come from the
+# ambient botocore chain — the control-plane task role via IRSA / instance
+# role — and are never hardcoded.
+
+_AWS_HOST_SUFFIX = ".amazonaws.com"
+
+
+def _endpoint_host(url: str) -> str:
+    return (urllib.parse.urlsplit(url).hostname or "").lower()
+
+
+def _should_sign_sigv4(host: str, auth: str | None) -> bool:
+    """Sign when the operator explicitly asked for SigV4, or the endpoint
+    is an AWS host (AMP). Any other host keeps the unauthenticated path."""
+    if auth == "sigv4":
+        return True
+    return host.endswith(_AWS_HOST_SUFFIX)
+
+
+def _amp_region_from_host(host: str) -> str:
+    """Parse the AWS region out of an AMP endpoint host.
+
+    AMP endpoints are ``aps-workspaces.<region>.amazonaws.com`` — like any
+    AWS regional service host ``<service>.<region>.amazonaws.com`` — so the
+    region is the label before ``amazonaws.com``. For a non-standard host
+    the operator flagged ``sigv4`` on, fall back to the ambient
+    ``AWS_REGION`` / ``AWS_DEFAULT_REGION``.
+    """
+    parts = host.split(".")
+    if len(parts) >= 4 and parts[-2] == "amazonaws" and parts[-1] == "com":
+        return parts[-3]
+    region = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
+    if region:
+        return region
+    raise PrometheusUnavailable(f"can't determine AWS region for SigV4 signing from host {host!r}")
+
+
+def _sign_request_sigv4(req: urllib.request.Request, *, host: str) -> None:
+    """Add SigV4 auth headers to ``req`` in place for the ``aps`` service.
+
+    Signs the request as-built (method + full URL incl. query string +
+    body), so both the current GET (query in the URL) and a future POST
+    (query in the body) sign correctly. A missing credential chain maps to
+    PrometheusUnavailable so the resolver degrades to the empty state
+    instead of raising an unhandled error.
+    """
+    from botocore.auth import SigV4Auth
+    from botocore.awsrequest import AWSRequest
+    from botocore.session import Session
+
+    credentials = Session().get_credentials()
+    if credentials is None:
+        raise PrometheusUnavailable(
+            "no AWS credentials available to sign the Amazon Managed Prometheus request"
+        )
+    region = _amp_region_from_host(host)
+    aws_request = AWSRequest(method=req.get_method(), url=req.full_url, data=req.data)
+    SigV4Auth(credentials, "aps", region).add_auth(aws_request)
+    for header, value in aws_request.headers.items():
+        req.add_unredirected_header(header, value)
+
+
 # --- HTTP -------------------------------------------------------------
 
 
-def _request_json(url: str, *, timeout: float) -> Mapping:
+def _request_json(url: str, *, timeout: float, auth: str | None = None) -> Mapping:
     """Issue a GET, parse the body as JSON, return the decoded payload.
 
     HTTP error codes map to PrometheusQueryError (4xx) or
     PrometheusUnavailable (5xx + network failures) so the resolver
     can branch on whether to retry vs fall back.
+
+    ``auth`` gates SigV4 signing alongside host detection (see
+    :func:`_should_sign_sigv4`): AMP hosts are signed automatically, and a
+    caller may force it with ``auth="sigv4"``.
     """
     req = urllib.request.Request(
         url,
@@ -127,6 +201,9 @@ def _request_json(url: str, *, timeout: float) -> Mapping:
             "User-Agent": "astrolift-metrics",
         },
     )
+    host = _endpoint_host(url)
+    if _should_sign_sigv4(host, auth):
+        _sign_request_sigv4(req, host=host)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             raw = resp.read()
@@ -174,12 +251,16 @@ def query_instant(
     endpoint: str,
     query: str,
     timeout: float = 5.0,
+    auth: str | None = None,
 ) -> float:
     """``GET /api/v1/query?query=<expr>`` — returns the scalar value
     or the sum of the result vector. Raises on no result.
 
     Used for the scalar fields on AppMetricsType (request_rate
-    average, error_rate, latency percentiles)."""
+    average, error_rate, latency percentiles).
+
+    ``auth`` forwards to the transport for SigV4 gating (AMP endpoints
+    are signed automatically; pass ``"sigv4"`` to force it)."""
     base = endpoint.rstrip("/")
     qs = urllib.parse.urlencode({"query": query})
     url = f"{base}/api/v1/query?{qs}"
@@ -187,7 +268,7 @@ def query_instant(
     if cached is not None:
         return float(cached)  # type: ignore[arg-type]
 
-    payload = _request_json(url, timeout=timeout)
+    payload = _request_json(url, timeout=timeout, auth=auth)
     data = payload.get("data") or {}
     result = data.get("result") or []
     result_type = data.get("resultType")
@@ -225,8 +306,12 @@ def query_range(
     end_unix: int,
     step_seconds: int,
     timeout: float = 5.0,
+    auth: str | None = None,
 ) -> tuple[RangeQueryResult, ...]:
-    """``GET /api/v1/query_range`` over (start, end, step)."""
+    """``GET /api/v1/query_range`` over (start, end, step).
+
+    ``auth`` forwards to the transport for SigV4 gating (see
+    :func:`query_instant`)."""
     if step_seconds <= 0:
         raise PrometheusQueryError("step_seconds must be positive")
     if end_unix <= start_unix:
@@ -247,7 +332,7 @@ def query_range(
     if cached is not None:
         return cached  # type: ignore[return-value]
 
-    payload = _request_json(url, timeout=timeout)
+    payload = _request_json(url, timeout=timeout, auth=auth)
     data = payload.get("data") or {}
     result_type = data.get("resultType")
     if result_type != "matrix":

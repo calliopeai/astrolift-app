@@ -262,3 +262,161 @@ def test_sanitize_rejects_quote():
 def test_sanitize_allows_normal_slugs():
     assert prometheus_client.sanitize_label_value("hello-app") == "hello-app"
     assert prometheus_client.sanitize_label_value("ns_v1.2.3") == "ns_v1.2.3"
+
+
+# ---- SigV4 signing for Amazon Managed Prometheus (AMP) --------------
+
+
+def _fake_credentials():
+    from botocore.credentials import Credentials
+
+    return Credentials("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/EXAMPLEKEY")
+
+
+def _captured_headers(req) -> dict[str, str]:
+    """Case-insensitive view of the headers urllib would actually send."""
+    return {k.lower(): v for k, v in req.header_items()}
+
+
+def test_amp_host_is_signed_with_sigv4(monkeypatch):
+    """An ``*.amazonaws.com`` (AMP) endpoint gets a SigV4 Authorization
+    header without any explicit flag — host detection is enough."""
+    monkeypatch.setattr(
+        "botocore.session.Session.get_credentials",
+        lambda self: _fake_credentials(),
+    )
+    payload = {"status": "success", "data": {"resultType": "scalar", "result": [1, "3"]}}
+    captured: dict = {}
+
+    def fake_urlopen(req, timeout=5.0):
+        captured["headers"] = _captured_headers(req)
+        captured["url"] = req.full_url
+        return _FakeResp(payload)
+
+    monkeypatch.setattr(
+        "astrolift_operations.prometheus_client.urllib.request.urlopen",
+        fake_urlopen,
+    )
+    value = prometheus_client.query_instant(
+        endpoint="https://aps-workspaces.us-west-2.amazonaws.com/workspaces/ws-abc123",
+        query="up",
+    )
+    assert value == 3.0
+    headers = captured["headers"]
+    assert headers["authorization"].startswith("AWS4-HMAC-SHA256 ")
+    # Region + service are baked into the credential scope.
+    assert "/us-west-2/aps/aws4_request" in headers["authorization"]
+    assert "x-amz-date" in headers
+    # The workspace path is preserved verbatim under the AMP base URL.
+    assert "/workspaces/ws-abc123/api/v1/query?" in captured["url"]
+
+
+def test_plain_host_is_not_signed(monkeypatch):
+    """A self-hosted Prometheus (non-AWS host) keeps the unauthenticated
+    GET — no Authorization header, and no credential lookup at all."""
+
+    def _boom(self):  # pragma: no cover - must never be called
+        raise AssertionError("credentials must not be resolved for a plain host")
+
+    monkeypatch.setattr("botocore.session.Session.get_credentials", _boom)
+    payload = {"status": "success", "data": {"resultType": "scalar", "result": [1, "1"]}}
+    captured: dict = {}
+
+    def fake_urlopen(req, timeout=5.0):
+        captured["headers"] = _captured_headers(req)
+        return _FakeResp(payload)
+
+    monkeypatch.setattr(
+        "astrolift_operations.prometheus_client.urllib.request.urlopen",
+        fake_urlopen,
+    )
+    prometheus_client.query_instant(endpoint="http://prometheus.monitoring:9090", query="up")
+    assert "authorization" not in captured["headers"]
+
+
+def test_explicit_sigv4_flag_signs_non_amazonaws_host(monkeypatch):
+    """``auth="sigv4"`` forces signing even for a host that isn't an
+    ``amazonaws.com`` name (AMP reached through a private/proxy DNS name)."""
+    monkeypatch.setattr(
+        "botocore.session.Session.get_credentials",
+        lambda self: _fake_credentials(),
+    )
+    monkeypatch.setenv("AWS_REGION", "eu-central-1")
+    payload = {"status": "success", "data": {"resultType": "scalar", "result": [1, "1"]}}
+    captured: dict = {}
+
+    def fake_urlopen(req, timeout=5.0):
+        captured["headers"] = _captured_headers(req)
+        return _FakeResp(payload)
+
+    monkeypatch.setattr(
+        "astrolift_operations.prometheus_client.urllib.request.urlopen",
+        fake_urlopen,
+    )
+    prometheus_client.query_instant(
+        endpoint="https://prom.internal.example/amp",
+        query="up",
+        auth="sigv4",
+    )
+    auth_header = captured["headers"]["authorization"]
+    assert auth_header.startswith("AWS4-HMAC-SHA256 ")
+    assert "/eu-central-1/aps/aws4_request" in auth_header
+
+
+def test_query_range_signs_amp_endpoint(monkeypatch):
+    """The range path signs too — golden signals / status codes read AMP
+    through ``query_range``."""
+    monkeypatch.setattr(
+        "botocore.session.Session.get_credentials",
+        lambda self: _fake_credentials(),
+    )
+    payload = {"status": "success", "data": {"resultType": "matrix", "result": []}}
+    captured: dict = {}
+
+    def fake_urlopen(req, timeout=5.0):
+        captured["headers"] = _captured_headers(req)
+        return _FakeResp(payload)
+
+    monkeypatch.setattr(
+        "astrolift_operations.prometheus_client.urllib.request.urlopen",
+        fake_urlopen,
+    )
+    prometheus_client.query_range(
+        endpoint="https://aps-workspaces.us-east-1.amazonaws.com/workspaces/ws-xyz",
+        query="up",
+        start_unix=1_700_000_000,
+        end_unix=1_700_003_600,
+        step_seconds=300,
+    )
+    assert captured["headers"]["authorization"].startswith("AWS4-HMAC-SHA256 ")
+
+
+def test_sign_without_credentials_maps_to_unavailable(monkeypatch):
+    """A signable host with no resolvable credential chain degrades to
+    PrometheusUnavailable (resolver falls back to the empty state) rather
+    than raising an unhandled error."""
+    monkeypatch.setattr("botocore.session.Session.get_credentials", lambda self: None)
+
+    def _should_not_open(req, timeout=5.0):  # pragma: no cover - must not run
+        raise AssertionError("urlopen must not be reached when signing fails")
+
+    monkeypatch.setattr(
+        "astrolift_operations.prometheus_client.urllib.request.urlopen",
+        _should_not_open,
+    )
+    with pytest.raises(prometheus_client.PrometheusUnavailable):
+        prometheus_client.query_instant(
+            endpoint="https://aps-workspaces.us-west-2.amazonaws.com/workspaces/ws-abc",
+            query="up",
+        )
+
+
+def test_amp_region_parsed_from_host():
+    assert prometheus_client._amp_region_from_host("aps-workspaces.eu-west-1.amazonaws.com") == "eu-west-1"
+    assert prometheus_client._amp_region_from_host("aps-workspaces.us-west-2.amazonaws.com") == "us-west-2"
+
+
+def test_should_sign_gate():
+    assert prometheus_client._should_sign_sigv4("aps-workspaces.us-west-2.amazonaws.com", None) is True
+    assert prometheus_client._should_sign_sigv4("prometheus.monitoring", None) is False
+    assert prometheus_client._should_sign_sigv4("prometheus.monitoring", "sigv4") is True
