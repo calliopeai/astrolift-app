@@ -193,6 +193,53 @@ def test_returns_release_notes_when_prior_deploy_exists(
     assert "compare" in result.compare_url
 
 
+def test_resolves_base_against_superseded_prior_deploy(
+    org,
+    gh_connection,
+    app_with_repo,
+    env,
+    head_deployment,
+    fake_info,
+    allow_all,
+    monkeypatch,
+):
+    """The diff base is the most-recent prior *live* deploy — including one
+    already flipped to SUPERSEDED when head reached running (#1103).
+    Filtering the base lookup on RUNNING alone regressed release notes to
+    None once prior live deploys stopped staying RUNNING."""
+    # head_deployment's prior (from the prior_deployment fixture) went
+    # live and is now superseded — exactly the post-#1103 shape.
+    prior = Deployment.objects.get(commit_sha="abc123sha")
+    prior.transition_to(Deployment.Status.SUPERSEDED)
+    assert prior.status == Deployment.Status.SUPERSEDED.value
+
+    commits_payload = [
+        {
+            "sha": "def456sha",
+            "commit": {"message": "feat: add widget\n", "author": {"name": "Alice"}},
+            "author": {"login": "alice"},
+            "pull_requests": [],
+        }
+    ]
+    fake_resp = _make_github_compare_response(commits_payload)
+    monkeypatch.setattr(
+        "astrolift_scm.providers.release_notes.urllib.request.urlopen",
+        _fake_urlopen(fake_resp),
+    )
+    from django.core.cache import cache as django_cache
+
+    django_cache.clear()
+
+    tc = TenantContext(organization_id=org.pk)
+    with tenant_context(tc):
+        q = LifecycleQuery()
+        result = q.astrolift_deployment_release_notes(fake_info, deployment_id=str(head_deployment.guid))
+
+    assert result is not None
+    assert result.base_sha == "abc123sha"
+    assert result.head_sha == "def456sha"
+
+
 def test_returns_none_when_no_prior_deploy(
     org,
     gh_connection,

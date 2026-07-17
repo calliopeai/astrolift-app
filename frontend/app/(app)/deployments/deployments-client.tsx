@@ -175,8 +175,12 @@ function isPreview(d: AstroliftDeployment): boolean {
 function tabMatches(tab: DeploymentTab, d: AstroliftDeployment): boolean {
   switch (tab) {
     case "active":
-      // Everything currently moving or live, excluding the approval
-      // queue (its own tab) and previews (their own tab).
+      // Everything currently moving (in-flight) or live (``running``),
+      // excluding the approval queue (its own tab) and previews (their
+      // own tab). ``running`` means successfully-live, not deploying;
+      // the lifecycle supersedes the prior live deploy when a newer one
+      // reaches ``running``, so this set holds at most one live row per
+      // app+environment plus whatever is mid-rollout.
       return (
         !isPreview(d) &&
         d.status !== "pending_approval" &&
@@ -592,6 +596,17 @@ export function DeploymentsClient() {
           );
         })}
       </div>
+
+      {tab === "active" && (
+        // Clarify that Active is the live + in-flight set, not a
+        // deploy-progress queue, and point operators at History for the
+        // rows the supersede transition retires. Hardcoded copy mirrors
+        // the signal-tab strings above (#892).
+        <p className="text-muted-foreground text-xs">
+          Active shows the current live and in-progress rollouts, one live deployment per app and
+          environment. Superseded, failed, and rolled-back rollouts move to History.
+        </p>
+      )}
 
       {signal ? (
         // Gateway placeholder ported from /observe/deployments (#892).
