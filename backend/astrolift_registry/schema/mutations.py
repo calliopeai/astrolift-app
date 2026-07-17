@@ -1176,6 +1176,27 @@ class RegistryMutation:
                 )
 
         _bootstrap_app_environments(app, [])
+
+        # Complete the autowire straight from registration (#1108): push the
+        # CI workflow, install the source webhook, and push the deploy-token
+        # secret so a git push auto-deploys with zero extra clicks. Fully
+        # best-effort — a wiring failure (or no org connection yet) must never
+        # fail the registration; ``run_autowire`` records a per-step outcome
+        # on ``app.autowire_state`` and the app detail page surfaces which
+        # step, if any, still needs attention. When no org source connection
+        # exists this no-ops into the "connect for auto-deploy" state.
+        try:
+            from astrolift_scm.services.autowire import run_autowire
+
+            request = getattr(info.context, "request", None)
+            actor = getattr(request, "user", None) if request else None
+            run_autowire(app, actor=actor)
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "register_app: autowire orchestration failed for %s",
+                app.slug,
+            )
+
         return gql_success(app_to_type(app))
 
     @strawberry.field

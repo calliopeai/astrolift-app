@@ -197,6 +197,40 @@ class AppReprovisionStateType:
     elapsed_seconds: int | None
 
 
+@strawberry.type(name="AstroliftAppAutowireStatus")
+class AppAutowireStatusType:
+    """Autowire completeness for an app (#1108).
+
+    Registration chains three repo-wiring steps; this rolls their last
+    verified outcome up for the app detail page so an operator can see, at a
+    glance, whether a git push will actually auto-deploy.
+
+    ``connected`` — an org-level source connection capable of repo ops exists
+    (App, or org OAuth/PAT). False is the "registered but not wired — connect
+    for auto-deploy" state.
+
+    ``ci_workflow`` / ``webhook`` / ``secrets`` — per-step status:
+      * ``ok``       — the step is wired.
+      * ``missing``  — the step never ran (autowire hasn't completed yet).
+      * ``error``    — the step ran and failed (see ``detail``).
+      * ``phantom``  — webhook-only: ``installed_at`` is set but nothing on
+        the host actually delivers (the failed-install marker the issue
+        reports). Repaired by re-running autowire.
+
+    ``checked_at`` is when autowire last verified the app; null until it has
+    run. ``detail`` is a human one-liner concatenating any step errors, empty
+    when everything is ``ok``. Computed DB-only (no host round-trip) so it's
+    cheap enough for the detail resolver.
+    """
+
+    connected: bool
+    ci_workflow: str
+    webhook: str
+    secrets: str
+    checked_at: dt.datetime | None
+    detail: str
+
+
 @strawberry.type(name="AstroliftSecurityPolicy")
 class SecurityPolicyType:
     """Resolved supply-chain policy for an app (#313).
@@ -438,6 +472,12 @@ class RegisteredAppType:
     # Left None on the list resolvers and on detail when the arg is
     # False; populated by ``astroliftApp(slug, includeDrift: true)``.
     config_drift: AppConfigDriftType | None
+
+    # Autowire completeness (#1108). Populated only on the single-app detail
+    # resolver ``astroliftApp(slug)``; list resolvers leave this None so the
+    # cheap list path stays cheap. Drives the "connect for auto-deploy" /
+    # "autowire incomplete" banner on the app overview.
+    autowire: AppAutowireStatusType | None
 
     # Per-section "Modified N ago" timestamps for the Settings landing
     # cards (#454). Populated only on the single-app detail resolver
@@ -797,6 +837,7 @@ def app_to_type(
     *,
     freshness: AppFreshness | None = None,
     drift: AppConfigDriftType | None = None,
+    autowire: AppAutowireStatusType | None = None,
     settings_last_modified: AppSettingsLastModifiedType | None = None,
     viewer_permissions: Iterable[str] | None = None,
     active_preview_count: int | None = None,
@@ -891,6 +932,7 @@ def app_to_type(
         health_pulse=(freshness.pulse if freshness else None),
         reprovision=reprovision,
         config_drift=drift,
+        autowire=autowire,
         settings_last_modified=settings_last_modified,
         viewer_permissions=sorted(viewer_permissions) if viewer_permissions is not None else [],
         active_preview_count=(
@@ -1124,6 +1166,81 @@ def build_config_drift(app, *, now: dt.datetime | None = None) -> AppConfigDrift
         fields=fields,
         environment_name=env_name,
         last_checked=when,
+    )
+
+
+def _autowire_org_connection_available(app) -> bool:
+    """DB-only: does an org connection capable of repo ops exist? (#1108)"""
+    from astrolift_scm.services.connection_resolver import (
+        ORG_REPO_WRITE,
+        ConnectionResolutionError,
+        resolve_connection,
+    )
+
+    try:
+        resolve_connection(app.organization_id, purpose=ORG_REPO_WRITE, source_kind=app.source_kind)
+        return True
+    except ConnectionResolutionError:
+        return False
+
+
+def _autowire_webhook_status(app, state: dict) -> str:
+    """Webhook sub-status for the autowire rollup (#1108).
+
+    Prefer the last verified verdict: after an autowire run the webhook is
+    never left "phantom" — the reconcile either repaired it to a real hook /
+    app_delivers (``ok``) or the install honestly failed (``error``). Fall
+    back to deriving from the columns for a legacy app that never ran the
+    chain: a recorded ``source_webhook_id`` reads ``ok``; ``installed_at``
+    set with an EMPTY id is the phantom the issue reports (a failed install
+    that advanced the timestamp) — surface it as ``phantom`` so the banner
+    prompts a repair. A legacy App-delivers app (empty id, genuinely covered)
+    also lands here as ``phantom``; that's the conservative call — a retry
+    re-verifies coverage and flips it to ``ok`` — rather than trusting an
+    unverified empty marker.
+    """
+    from astrolift_scm.services.autowire import MISSING
+
+    verdict = state.get("webhook")
+    if verdict:
+        return verdict
+    if app.source_webhook_id:
+        return "ok"
+    if app.source_webhook_installed_at is not None:
+        return "phantom"
+    return MISSING
+
+
+def build_autowire_status(app) -> AppAutowireStatusType:
+    """Roll up the app's autowire completeness for the detail page (#1108).
+
+    DB-only — reads the persisted ``autowire_state`` snapshot plus the webhook
+    columns; never hits the host. ``connected`` is a live ORM check so the
+    "connect for auto-deploy" callout reflects the org's current connections
+    even if autowire hasn't re-run since one was added.
+    """
+    from astrolift_scm.services.autowire import MISSING
+
+    state = app.autowire_state or {}
+    errors = state.get("errors") or {}
+
+    checked_raw = state.get("checked_at")
+    checked_at = None
+    if checked_raw:
+        try:
+            checked_at = dt.datetime.fromisoformat(checked_raw)
+        except (TypeError, ValueError):
+            checked_at = None
+
+    detail = "; ".join(f"{step.replace('_', ' ')}: {msg}" for step, msg in errors.items())
+
+    return AppAutowireStatusType(
+        connected=_autowire_org_connection_available(app),
+        ci_workflow=state.get("ci_workflow") or MISSING,
+        webhook=_autowire_webhook_status(app, state),
+        secrets=state.get("secrets") or MISSING,
+        checked_at=checked_at,
+        detail=detail,
     )
 
 

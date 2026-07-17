@@ -462,6 +462,15 @@ type AstroliftApiTokenPlaintextMutationResult {
   data: AstroliftApiTokenPlaintext
 }
 
+type AstroliftAppAutowireStatus {
+  connected: Boolean!
+  ciWorkflow: String!
+  webhook: String!
+  secrets: String!
+  checkedAt: DateTime
+  detail: String!
+}
+
 type AstroliftAppCertificate {
   id: String!
   hostname: String!
@@ -2587,6 +2596,7 @@ type AstroliftRegisteredApp {
   healthPulse: AstroliftAppHealthPulse
   reprovision: AstroliftAppReprovisionState!
   configDrift: AstroliftAppConfigDrift
+  autowire: AstroliftAppAutowireStatus
   settingsLastModified: AstroliftAppSettingsLastModified
   viewerPermissions: [String!]!
   activePreviewCount: Int!
@@ -2689,6 +2699,21 @@ type AstroliftRetentionPolicyMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftRetentionPolicy
+}
+
+type AstroliftRetryAutowirePayload {
+  connected: Boolean!
+  allOk: Boolean!
+  ciWorkflow: String!
+  webhook: String!
+  secrets: String!
+  detail: String!
+}
+
+type AstroliftRetryAutowirePayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftRetryAutowirePayload
 }
 
 type AstroliftRevealedSecret {
@@ -4590,6 +4615,7 @@ type Mutation {
   pushAstroliftCiSecretsToRepo(input: PushCiSecretsToRepoInput!): AstroliftPushCiSecretsPayloadMutationResult!
   validateAstroliftCiSecrets(input: ValidateAstroliftCiSecretsInput!): AstroliftValidateCiSecretsPayloadMutationResult!
   pushAstroliftCiWorkflowToRepo(input: PushCiWorkflowToRepoInput!): AstroliftPushCiWorkflowPayloadMutationResult!
+  retryAstroliftAutowire(input: RetryAstroliftAutowireInput!): AstroliftRetryAutowirePayloadMutationResult!
   deregisterAstroliftApp(input: DeregisterAppInput!): AstroliftDeregisterAppPayloadMutationResult!
   cancelAstroliftDeregister(input: CancelDeregisterInput!): AstroliftCancelDeregisterPayloadMutationResult!
   forceAstroliftRedeploy(input: ForceRedeployInput!): AstroliftForceRedeployPayloadMutationResult!
@@ -5421,6 +5447,10 @@ type ResyncManifestPayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: ResyncManifestPayload
+}
+
+input RetryAstroliftAutowireInput {
+  appSlug: String!
 }
 
 type RevalidateManagedDomainPayload {

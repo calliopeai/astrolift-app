@@ -4050,6 +4050,66 @@ class LifecycleMutation:
         )
 
     # ----------------------------------------------------------------
+    # #1108 — retry the whole autowire chain from the detail page
+    # ----------------------------------------------------------------
+    #
+    # Register runs this same ``run_autowire`` at onboarding; this
+    # mutation re-runs it (and repairs a phantom webhook) so an app that
+    # landed half-wired — no CI file, phantom webhook, no deploy secret —
+    # can be completed with one click. ``app.update`` is the gate:
+    # repo-config-touching, not a deploy. The service resolves org-level
+    # connections by purpose (never the viewer's personal token) exactly
+    # as the individual steps do.
+
+    @strawberry.field
+    @mutation_audit(action="app.ci.retry_autowire")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def retry_astrolift_autowire(
+        self,
+        info: Info,
+        input: RetryAstroliftAutowireInput,
+    ) -> MutationResultType[RetryAstroliftAutowirePayload]:
+        """Re-run the full autowire chain for ``app_slug`` (#1108).
+
+        Resilient + idempotent: a failed step is recorded on
+        ``autowire_state`` and surfaced in ``detail``, never fatal, and a
+        re-run against an already-wired app doesn't duplicate hooks or
+        workflow commits. Always returns success — the payload's per-step
+        statuses (and ``connected=false`` for the "connect for auto-deploy"
+        state) carry the outcome.
+        """
+        from astrolift_scm.services.autowire import run_autowire
+
+        app = (
+            RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True)
+            .select_related("organization")
+            .first()
+        )
+        if app is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"app {input.app_slug!r} not found",
+                field="appSlug",
+            )
+
+        request = getattr(info.context, "request", None)
+        actor = getattr(request, "user", None) if request else None
+
+        outcome = run_autowire(app, actor=actor)
+        detail = "; ".join(f"{step.replace('_', ' ')}: {msg}" for step, msg in outcome.errors.items())
+        return gql_success(
+            RetryAstroliftAutowirePayload(
+                connected=outcome.connected,
+                all_ok=outcome.all_ok,
+                ci_workflow=outcome.steps.get("ci_workflow", "missing"),
+                webhook=outcome.steps.get("webhook", "missing"),
+                secrets=outcome.steps.get("secrets", "missing"),
+                detail=detail,
+            ),
+        )
+
+    # ----------------------------------------------------------------
     # Danger-zone hard deregister (#392)
     # ----------------------------------------------------------------
     #
@@ -4860,6 +4920,43 @@ class PushCiWorkflowPayload:
     status: str
     commit_sha: str | None
     pr_url: str | None
+
+
+# ---------------------------------------------------------------------------
+# #1108 input / payload types — retry autowire. Re-runs the full
+# CI-workflow → webhook → secrets chain (the same ``run_autowire``
+# registration uses) and repairs a phantom webhook, so an app that
+# onboarded half-wired can be completed from the detail page.
+# ---------------------------------------------------------------------------
+
+
+@strawberry.input
+class RetryAstroliftAutowireInput:
+    """Re-run the autowire chain for ``app_slug`` (#1108).
+
+    Slug rather than guid so the detail-page "Retry autowire" button calls
+    the mutation without an extra lookup — same shape as the per-step CI
+    mutations it supersedes."""
+
+    app_slug: str
+
+
+@strawberry.type(name="AstroliftRetryAutowirePayload")
+class RetryAstroliftAutowirePayload:
+    """Read-back for a retried autowire run (#1108).
+
+    ``connected`` is False for the "no org connection — connect for
+    auto-deploy" state (no steps ran). Otherwise each of ``ci_workflow`` /
+    ``webhook`` / ``secrets`` is ``ok`` or ``error``; ``detail`` concatenates
+    any step error messages so the toast can show what still needs fixing.
+    ``all_ok`` is the single boolean the button uses to flip the banner."""
+
+    connected: bool
+    all_ok: bool
+    ci_workflow: str
+    webhook: str
+    secrets: str
+    detail: str
 
 
 # ---------------------------------------------------------------------------
