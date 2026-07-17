@@ -429,6 +429,10 @@ CONSTANCE_CONFIG = {
     "GET_PRESIGNED_URL_EXPIRATION": (3600, "Time to live in seconds of presigned urls for downloading."),
     "AUTH0_REGISTER_NEW_USER": (False, "Register new users in Auth0"),
     "EMAIL_NOTIFICATIONS": (False, "Enables the platform to send Email Notifications"),
+    "ZENTINELLE_ENABLED": (
+        False,
+        "Enable Zentinelle governance surfaces (agent Activity/Reasoning/Token-Usage/Compliance tabs)",
+    ),
     "TEMPORAL_ENABLED": (
         ASTROLIFT_TEMPORAL_ENABLED,
         "Enable the durable-workflow runtime. When False the client returns synthetic handles "
@@ -629,6 +633,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
     },
     "Auth0": {"fields": ("AUTH0_REGISTER_NEW_USER",), "collapse": False},
     "Notifications": {"fields": ("EMAIL_NOTIFICATIONS",), "collapse": False},
+    "Zentinelle": {"fields": ("ZENTINELLE_ENABLED",), "collapse": False},
     "Workflows": {
         "fields": ("TEMPORAL_ENABLED", "DEPLOY_PIPELINE_ENABLED", "ALLOW_SELF_APPROVE_DEPLOYS"),
         "collapse": False,

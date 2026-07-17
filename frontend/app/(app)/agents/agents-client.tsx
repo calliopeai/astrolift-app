@@ -69,6 +69,7 @@ import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import { useModules } from "@/graphql/user/user.hooks";
+import { FEATURE_FLAG_ZENTINELLE, useFeatureFlag } from "@/graphql/server/server.hooks";
 import { formatRelativeAge } from "@/lib/format";
 import { useListControls, type SortState } from "@/hooks/use-list-controls";
 
@@ -908,8 +909,22 @@ export function AgentsClient() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  // Zentinelle governance surfaces (Activity / Reasoning / Token-Usage /
+  // Compliance) ship in the codebase but stay hidden unless the install
+  // enables them via the `zentinelle.enabled` server-info flag (#1104).
+  const zentinelleEnabled = useFeatureFlag(FEATURE_FLAG_ZENTINELLE);
+  const visibleTabs = React.useMemo(
+    () =>
+      zentinelleEnabled
+        ? AGENT_TABS
+        : AGENT_TABS.filter((tabKey) => !ZENTINELLE_TABS.has(tabKey)),
+    [zentinelleEnabled],
+  );
+
   const rawTab = searchParams.get("tab") as AgentTab | null;
-  const tab: AgentTab = rawTab && AGENT_TABS.includes(rawTab) ? rawTab : "active";
+  // A ?tab=compliance deep-link while Zentinelle is disabled falls back
+  // to the default tab rather than rendering a dead / gated surface.
+  const tab: AgentTab = rawTab && visibleTabs.includes(rawTab) ? rawTab : "active";
 
   function setTab(next: AgentTab) {
     const params = new URLSearchParams(searchParams.toString());
@@ -955,7 +970,7 @@ export function AgentsClient() {
         aria-label="Agent fleet tabs"
         className="bg-muted/40 inline-flex flex-wrap rounded-md border p-1"
       >
-        {AGENT_TABS.map((tabKey) => {
+        {visibleTabs.map((tabKey) => {
           const active = tab === tabKey;
           return (
             <button

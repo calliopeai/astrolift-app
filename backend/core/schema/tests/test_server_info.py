@@ -165,6 +165,7 @@ class AstroliftServerInfoTest(TestCase):
             TEMPORAL_ENABLED = True
             DEPLOY_PIPELINE_ENABLED = True
             EMAIL_NOTIFICATIONS = False
+            ZENTINELLE_ENABLED = False
             ALLOW_SELF_APPROVE_DEPLOYS = False
             DEPLOY_TOKEN_LEGACY_PREFIX_ACCEPTED = True
 
@@ -178,11 +179,14 @@ class AstroliftServerInfoTest(TestCase):
             self.assertTrue(flags["deploys.pipeline_enabled"])
             self.assertTrue(flags["workflows.temporal_enabled"])
             self.assertFalse(flags["notifications.email_enabled"])
+            # Zentinelle governance surfaces default OFF (#1104).
+            self.assertFalse(flags["zentinelle.enabled"])
 
         # Flip deploy pipeline OFF — handshake must reflect it.
         class _FakeConstanceOff(_FakeConstance):
             DEPLOY_PIPELINE_ENABLED = False
             EMAIL_NOTIFICATIONS = True
+            ZENTINELLE_ENABLED = True
 
         with mock.patch.dict(
             "sys.modules",
@@ -192,6 +196,8 @@ class AstroliftServerInfoTest(TestCase):
             flags = {f["key"]: f["enabled"] for f in info["featureFlags"]}
             self.assertFalse(flags["deploys.pipeline_enabled"])
             self.assertTrue(flags["notifications.email_enabled"])
+            # Enabling the Constance flag surfaces the Zentinelle tabs.
+            self.assertTrue(flags["zentinelle.enabled"])
 
         # Every entry in the public allow-list must be reported, in a
         # stable order across calls so client diffing is deterministic.
