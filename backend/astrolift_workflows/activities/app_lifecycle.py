@@ -368,8 +368,19 @@ async def pre_flight(deployment_id: int) -> None:
 def _mark_deploying_sync(deployment_id: int) -> None:
     from astrolift_lifecycle.models import Deployment
 
-    d = Deployment.all_objects.get(pk=deployment_id)
+    d = Deployment.all_objects.select_related("registered_app__organization", "app_environment").get(
+        pk=deployment_id
+    )
     d.transition_to(Deployment.Status.DEPLOYING)
+    # Best-effort GitHub reflection AFTER the transition commits (#1124).
+    # reflect_* already swallows every error; the extra guard here means a
+    # bug in the reflection path can still never fail the deploy activity.
+    try:
+        from astrolift_lifecycle.github_reflection import reflect_deploy_started
+
+        reflect_deploy_started(d)
+    except Exception:  # noqa: BLE001
+        log.warning("github reflect_deploy_started errored for deploy %s", deployment_id, exc_info=True)
 
 
 @activity.defn(name="astrolift.deploy.mark_deploying")
@@ -1218,6 +1229,15 @@ def _mark_running_sync(deployment_id: int) -> None:
         if d.status != Deployment.Status.RUNNING.value:
             d.transition_to(Deployment.Status.RUNNING)
 
+    # Best-effort GitHub reflection, OUTSIDE the transaction so a slow
+    # GitHub API never holds the select_for_update row locks (#1124).
+    try:
+        from astrolift_lifecycle.github_reflection import reflect_deploy_succeeded
+
+        reflect_deploy_succeeded(d)
+    except Exception:  # noqa: BLE001
+        log.warning("github reflect_deploy_succeeded errored for deploy %s", deployment_id, exc_info=True)
+
 
 @activity.defn(name="astrolift.deploy.mark_running")
 async def mark_running(deployment_id: int) -> None:
@@ -1244,6 +1264,13 @@ def _mark_failed_sync(deployment_id: int, reason: str) -> None:
         d.aborted_reason = reason
         d.save(update_fields=["aborted_reason", "updated_at", "version"])
     d.transition_to(Deployment.Status.FAILED)
+    # Best-effort GitHub reflection AFTER the transition commits (#1124).
+    try:
+        from astrolift_lifecycle.github_reflection import reflect_deploy_failed
+
+        reflect_deploy_failed(d, reason)
+    except Exception:  # noqa: BLE001
+        log.warning("github reflect_deploy_failed errored for deploy %s", deployment_id, exc_info=True)
 
 
 @activity.defn(name="astrolift.deploy.mark_failed")
