@@ -57,6 +57,13 @@ def _looks_like_github_client_id(value: str) -> bool:
     return bool(_GITHUB_CLIENT_ID_NEW.match(value) or _GITHUB_CLIENT_ID_LEGACY.match(value))
 
 
+# Must match auth1.scm_app_manifest._APP_DISPLAY_PREFIX so the #1122 dedup's
+# slug recovery (_app_slug_from_connection) treats a BYO-adopted App the same
+# as a Bootstrap-created one. Kept as a literal here (not imported) to avoid an
+# astrolift_scm → auth1 import cycle.
+_APP_DISPLAY_PREFIX = "GitHub App: "
+
+
 @strawberry.input
 class ConnectSourceInput:
     """Configure a host (OAuth-app config) or paste a PAT.
@@ -95,6 +102,30 @@ class UpdateSourceConnectionInput:
     # without rotating credentials — the prod-blocker recovery path
     # for connections that pre-date the column.
     app_client_id: str | None = None
+
+
+@strawberry.input
+class ConnectExistingGithubAppInput:
+    """Adopt an EXISTING GitHub App (BYO).
+
+    The operator already created the App on GitHub and installed it on their
+    org; they paste its numeric App ID + private-key PEM here (plus, if the
+    App is used for the user-to-server OAuth dance, the Client ID / secret /
+    webhook secret). Distinct from the manifest **Bootstrap** flow
+    (auth1.scm_app_manifest) which *creates* a brand-new App.
+
+    ``org_login`` is optional: when the App has a single installation we adopt
+    it unambiguously, otherwise we need the login to pick which installation
+    belongs to this org.
+    """
+
+    app_id: str
+    private_key_pem: str
+    client_id: str | None = None
+    client_secret: str | None = None
+    webhook_secret: str | None = None
+    api_base_url: str | None = None
+    org_login: str | None = None
 
 
 @strawberry.input
@@ -237,6 +268,66 @@ def _validate_connect(input: ConnectSourceInput):
     return None
 
 
+def _derive_org_login(org_id: int) -> str:
+    """Best-effort org GitHub login from an existing active github
+    connection. Used only as a hint to disambiguate which installation to
+    adopt when the App is installed on more than one account and the operator
+    didn't pass ``org_login`` — never authoritative (the persisted
+    ``account_login`` always comes from the matched installation itself)."""
+    row = (
+        SourceConnection.objects.filter(
+            organization_id=org_id,
+            kind__startswith="github",
+            is_active=True,
+            deleted_at__isnull=True,
+        )
+        .exclude(account_login="")
+        .order_by("created_at", "pk")
+        .first()
+    )
+    return row.account_login if row else ""
+
+
+def _match_installation(installations: list[dict], login: str) -> dict | None:
+    """The installation whose ``account.login`` equals ``login`` (case-insensitive)."""
+    want = login.strip().lower()
+    if not want:
+        return None
+    for inst in installations:
+        account = inst.get("account") or {}
+        if (account.get("login") or "").strip().lower() == want:
+            return inst
+    return None
+
+
+def _get_or_create_app_install(org, *, app_id: str, account_login: str) -> SourceConnection:
+    """Idempotent target row for the BYO adopt flow. Re-adopt targets, in order:
+
+      1. the same App (matched by numeric App ID) already on this org, else
+      2. any existing ``github_app_install`` on the same GitHub ``account_login``
+         — e.g. the dead auto-created App connection from the manifest flow;
+         adopting the real App reuses that row and clears its orphan state,
+         which is exactly #1126's "auto-clear the dead connection".
+
+    The ``(org, kind, account_login)`` unique constraint permits at most one
+    App row per account, so reusing it is the only non-colliding option. Falls
+    through to a fresh (unsaved) row when neither exists."""
+    base = SourceConnection.objects.filter(
+        organization=org,
+        kind=SourceConnection.Kind.GITHUB_APP_INSTALL.value,
+        deleted_at__isnull=True,
+    )
+    conn = base.filter(oauth_client_id=app_id).order_by("created_at", "pk").first()
+    if conn is None and account_login:
+        conn = base.filter(account_login=account_login).order_by("created_at", "pk").first()
+    if conn is None:
+        conn = SourceConnection(
+            organization=org,
+            kind=SourceConnection.Kind.GITHUB_APP_INSTALL.value,
+        )
+    return conn
+
+
 # ---------------------------------------------------------------------------
 # Root mutation
 # ---------------------------------------------------------------------------
@@ -282,6 +373,189 @@ class ScmMutation:
                 secret_ciphertext=encrypted.backend_ref,
                 is_active=True,
             )
+        return gql_success(source_connection_to_type(conn))
+
+    @strawberry.field
+    @mutation_audit(action="scm.connect_existing_github_app")
+    @require_permission(Permission.SCM_CONNECT)
+    @tenant_scoped()
+    def connect_existing_github_app(
+        self, info: Info, input: ConnectExistingGithubAppInput
+    ) -> MutationResultType[SourceConnectionType]:
+        """Adopt an existing GitHub App (BYO).
+
+        Validates the creds end-to-end BEFORE persisting: mint an App JWT from
+        the PEM → discover the org's installation of the App → mint a real
+        installation access token to prove the creds work. Only then do we
+        store an encrypted ``github_app_install`` connection. Idempotent per
+        (org, app_id): re-running re-adopts / rotates the creds on the existing
+        row instead of duplicating. Never logs or returns the PEM / secrets.
+        """
+        from django.db import IntegrityError
+
+        from astrolift_scm.providers import github_app as gh_app
+
+        app_id = (input.app_id or "").strip()
+        if not app_id.isdigit():
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "appId must be the numeric GitHub App ID (e.g. 3705068)",
+                field="appId",
+            )
+
+        client_id = (input.client_id or "").strip()
+        if client_id and not _looks_like_github_client_id(client_id):
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "clientId doesn't look like a GitHub App Client ID "
+                "(expected Iv… for new Apps or 20-char hex for legacy OAuth Apps)",
+                field="clientId",
+            )
+
+        pem = (input.private_key_pem or "").strip()
+        if not pem:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "privateKeyPem is required",
+                field="privateKeyPem",
+            )
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no organization")
+        org = Organization.objects.filter(pk=org_id).first()
+        if org is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "organization not found")
+
+        # GitHub accepts either the numeric App ID or the OAuth Client ID as
+        # the JWT `iss`; prefer the Client ID when supplied (matches the
+        # provider's own issuer preference on persisted rows).
+        issuer = client_id or app_id
+        pem_bytes = pem.encode("utf-8")
+        try:
+            jwt_token = gh_app._mint_jwt(issuer, pem_bytes)
+        except Exception:
+            # Any failure loading/signing with the PEM (malformed, encrypted,
+            # non-RSA) is operator paste-error — return a clean VALIDATION
+            # result, never a 500. The PEM is never logged.
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "privateKeyPem is not a valid RSA private key",
+                field="privateKeyPem",
+            )
+
+        api_base = (input.api_base_url or "").strip().rstrip("/") or gh_app.GITHUB_API_DEFAULT
+
+        installations, err = gh_app.list_app_installations(api_base, jwt_token)
+        if err is not None:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"couldn't list installations for App {app_id}: {err.message}",
+                field="appId",
+            )
+        logins = [x for x in ((i.get("account") or {}).get("login", "") for i in installations) if x]
+
+        explicit_login = (input.org_login or "").strip()
+        # A derived login is only a hint (see _derive_org_login); an explicit
+        # one is authoritative. So an explicit login that matches nothing is a
+        # hard error — we never silently adopt a different install — whereas a
+        # non-matching derived login falls through to single-install / ambiguity
+        # handling below.
+        target_login = explicit_login or _derive_org_login(org_id)
+        matched = _match_installation(installations, target_login) if target_login else None
+        if matched is None:
+            if explicit_login:
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    f"GitHub App {app_id} is not installed on {explicit_login!r} "
+                    f"(installed on: {', '.join(logins) or 'nothing'})",
+                    field="orgLogin",
+                )
+            if not installations:
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    f"GitHub App {app_id} has no installations — install it on your "
+                    "org on GitHub, then connect it here",
+                    field="appId",
+                )
+            if len(installations) == 1:
+                # Unambiguous: the App is installed exactly once.
+                matched = installations[0]
+            else:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"GitHub App {app_id} is installed on multiple accounts "
+                    f"({', '.join(logins)}); pass orgLogin to pick one",
+                    field="orgLogin",
+                )
+
+        installation_id = str(matched.get("id") or "").strip()
+        account = matched.get("account") or {}
+        account_login = (account.get("login") or "").strip()
+        if not installation_id:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"GitHub returned an installation with no id for App {app_id}",
+                field="appId",
+            )
+
+        # Prove the creds end-to-end before persisting: mint a real
+        # installation access token. A failure here means we never store a
+        # broken connection.
+        try:
+            gh_app._exchange_for_installation_token(api_base, jwt_token, installation_id)
+        except gh_app.GithubAppError as exc:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"couldn't authenticate as App {app_id} on "
+                f"{account_login or 'the installation'}: {exc.message}",
+                field="privateKeyPem",
+            )
+
+        # Human-friendly name from the App slug (best-effort — a metadata blip
+        # shouldn't fail an otherwise-valid adopt).
+        app_meta, _meta_err = gh_app.fetch_app_metadata(api_base, jwt_token)
+        app_slug = (app_meta.get("slug") or "").strip() if app_meta else ""
+        display_name = f"{_APP_DISPLAY_PREFIX}{app_slug or app_id}"
+
+        pem_enc = encrypt_at_rest(pem_bytes)
+        try:
+            with transaction.atomic():
+                conn = _get_or_create_app_install(org, app_id=app_id, account_login=account_login)
+                conn.oauth_client_id = app_id  # numeric App ID — webhook-payload lookups
+                if client_id:
+                    conn.app_client_id = client_id[:64]  # OAuth Client ID — /authorize + JWT iss
+                conn.installation_id = installation_id[:64]
+                conn.account_login = account_login[:200]
+                if input.api_base_url:
+                    conn.api_base_url = api_base
+                conn.display_name = display_name[:200]
+                conn.secret_backend_kind = pem_enc.backend_kind
+                conn.secret_ciphertext = pem_enc.backend_ref
+                if input.client_secret:
+                    cs_enc = encrypt_at_rest(input.client_secret.encode("utf-8"))
+                    conn.oauth_client_secret_backend_kind = cs_enc.backend_kind
+                    conn.oauth_client_secret_ciphertext = cs_enc.backend_ref
+                if input.webhook_secret:
+                    ws_enc = encrypt_at_rest(input.webhook_secret.encode("utf-8"))
+                    conn.webhook_secret_backend_kind = ws_enc.backend_kind
+                    conn.webhook_secret_ciphertext = ws_enc.backend_ref
+                conn.is_active = True
+                # We just proved the creds live — clear any stale orphan /
+                # reauth state so a re-adopt heals a previously-dead row.
+                conn.is_orphaned = False
+                conn.orphaned_at = None
+                conn.orphaned_reason = ""
+                conn.reauth_required = False
+                conn.save()
+        except IntegrityError:
+            return gql_failure(
+                ErrorCode.CONFLICT.value,
+                f"a different GitHub App connection already exists for {account_login!r} in this org",
+                field="appId",
+            )
+
         return gql_success(source_connection_to_type(conn))
 
     @strawberry.field
