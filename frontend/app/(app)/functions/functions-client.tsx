@@ -39,6 +39,7 @@ const TAB_ICONS: Record<FunctionTab, React.ReactNode> = {
 };
 
 function FleetTab() {
+  const router = useRouter();
   const { data, loading } = useQuery<{ astroliftWorkloads: AstroliftWorkload[] }>(LIST_WORKLOADS, {
     variables: {},
     fetchPolicy: "cache-and-network",
@@ -97,9 +98,26 @@ function FleetTab() {
         </TableHeader>
         <TableBody>
           {ctrl.rows.map((w) => (
-            <TableRow key={w.id}>
+            <TableRow
+              key={w.id}
+              tabIndex={0}
+              role="link"
+              aria-label={`Open function workload ${w.name}`}
+              onClick={() => router.push(`/apps/${w.registeredAppSlug}/workloads/${w.slug}`)}
+              onKeyDown={(ev) => {
+                if (ev.key === "Enter" || ev.key === " ") {
+                  ev.preventDefault();
+                  router.push(`/apps/${w.registeredAppSlug}/workloads/${w.slug}`);
+                }
+              }}
+              className="hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
+            >
               <TableCell className="font-medium">
-                <Link href={`/apps/${w.registeredAppSlug}/workloads`} className="hover:underline">
+                <Link
+                  href={`/apps/${w.registeredAppSlug}/workloads/${w.slug}`}
+                  onClick={(ev) => ev.stopPropagation()}
+                  className="hover:underline"
+                >
                   {w.name}
                 </Link>
               </TableCell>
