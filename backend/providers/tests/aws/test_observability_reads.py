@@ -284,16 +284,53 @@ def test_list_certificates_empty(acm_driver: ACMDriver) -> None:
 
 
 def test_list_certificates_filter_hostname(acm_driver: ACMDriver) -> None:
-    """Filter is substring match against domain + SANs so a wildcard
-    cert lands in a query for the bare hostname."""
+    """filter_hostname matches with DNS cert semantics (_cert_covers_host),
+    not the old substring test (#1111): the resolver passes the app's full
+    resolved FQDN, so an exact host matches its cert, a direct subdomain
+    matches a ``*.parent`` wildcard SAN, an unrelated host doesn't match,
+    and a truncated PARENT string does NOT match (substring matching is
+    gone)."""
     acm_driver.ensure_certificate(
         domain="acme.platform.example",
         sans=["*.acme.platform.example"],
     )
     acm_driver.ensure_certificate(domain="other.unrelated.example")
-    matches = acm_driver.list_certificates(filter_hostname="acme.platform")
-    assert len(matches) == 1
-    assert matches[0].hostname == "acme.platform.example"
+
+    # Exact host → the acme cert.
+    exact = acm_driver.list_certificates(filter_hostname="acme.platform.example")
+    assert [c.hostname for c in exact] == ["acme.platform.example"]
+
+    # Direct subdomain → covered by the *.acme.platform.example wildcard SAN.
+    subdomain = acm_driver.list_certificates(filter_hostname="api.acme.platform.example")
+    assert [c.hostname for c in subdomain] == ["acme.platform.example"]
+
+    # Unrelated host → matches neither cert.
+    assert acm_driver.list_certificates(filter_hostname="www.example.org") == []
+
+    # Truncated PARENT string must NOT match — proves substring is gone
+    # (the query host is shorter than the wildcard/exact names).
+    assert acm_driver.list_certificates(filter_hostname="acme.platform") == []
+
+
+def test_cert_covers_host_dns_semantics() -> None:
+    """Unit truth table for the RFC-6125-simplified matcher, covering the
+    wildcard boundary rules the moto integration path can't easily probe:
+    ``*.parent`` covers a *single* extra label only — not a deep subdomain,
+    not the apex."""
+    from aws.tls_acm import _cert_covers_host
+
+    names = ["acme.platform.example", "*.acme.platform.example"]
+    # Exact + direct-subdomain-via-wildcard, case- and trailing-dot-tolerant.
+    assert _cert_covers_host("acme.platform.example", names)
+    assert _cert_covers_host("api.acme.platform.example", names)
+    assert _cert_covers_host("API.acme.platform.example.", names)
+    # Wildcard is a single label: no deep subdomain, no apex self-match.
+    assert not _cert_covers_host("a.b.acme.platform.example", ["*.acme.platform.example"])
+    assert not _cert_covers_host("acme.platform.example", ["*.acme.platform.example"])
+    # Truncated parent substring + unrelated host + empty never match.
+    assert not _cert_covers_host("acme.platform", names)
+    assert not _cert_covers_host("other.example.org", names)
+    assert not _cert_covers_host("", names)
 
 
 def test_list_certificates_skips_deleted_between_list_and_describe(
