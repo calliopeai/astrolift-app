@@ -7,6 +7,7 @@ import {
   PauseIcon,
   PlayIcon,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
@@ -53,7 +54,32 @@ export function EnvironmentsClient({
 }: { appSlug?: string; tabs?: React.ReactNode } = {}) {
   const t = useTranslations("lists.environments");
   const { can } = useMyPermissions();
+  const router = useRouter();
   const variables = { appSlug: appSlug ?? null };
+
+  // Row → detail navigation, but only from the global /environments list. On
+  // the per-app environments tab the row stays inert: drilling into a global
+  // environment detail would break out of the app shell + its sub-nav.
+  function rowInteractiveProps(
+    e: AstroliftAppEnvironment
+  ): React.HTMLAttributes<HTMLTableRowElement> {
+    if (appSlug) return {};
+    const open = () => router.push(`/environments/${e.id}`);
+    return {
+      tabIndex: 0,
+      role: "link",
+      "aria-label": `Open environment ${e.registeredAppSlug} · ${e.name}`,
+      onClick: open,
+      onKeyDown: (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          open();
+        }
+      },
+      className:
+        "hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]",
+    };
+  }
   const { data, loading } = useQuery<Resp>(LIST_ENVIRONMENTS, {
     variables,
     pollInterval: 30000,
@@ -133,7 +159,7 @@ export function EnvironmentsClient({
               </TableHeader>
               <TableBody>
                 {list.map((e) => (
-                  <TableRow key={e.id}>
+                  <TableRow key={e.id} {...rowInteractiveProps(e)}>
                     <TableCell>
                       <div className="font-medium">{e.registeredAppSlug}</div>
                       <div className="text-muted-foreground text-xs">
@@ -148,6 +174,7 @@ export function EnvironmentsClient({
                           href={e.url}
                           target="_blank"
                           rel="noreferrer"
+                          onClick={(ev) => ev.stopPropagation()}
                           className="inline-flex items-center gap-1 text-sm hover:underline"
                         >
                           {e.url} <ExternalLinkIcon className="size-3" />
@@ -173,7 +200,7 @@ export function EnvironmentsClient({
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
                       {canPause &&
                         (e.deploysPaused ? (
                           <Can permission="app.deploy">

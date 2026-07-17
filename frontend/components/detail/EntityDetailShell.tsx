@@ -26,7 +26,7 @@ import { formatRelativeAge } from "@/lib/format";
  * loaded layout otherwise.
  */
 
-type Dot = "ok" | "warn" | "error" | "muted" | "pending";
+export type Dot = "ok" | "warn" | "error" | "muted" | "pending";
 
 // Union of the run/resource status vocabularies across the platform (job runs,
 // task runs, command runs, preview environments). Unknown values degrade to a
@@ -65,8 +65,11 @@ export function titleCase(value: string): string {
     .join(" ");
 }
 
-export function DetailStatusBadge({ status }: { status: string }) {
-  const dot = STATUS_DOT[status.toLowerCase()] ?? "muted";
+export function DetailStatusBadge({ status, tone }: { status: string; tone?: Dot }) {
+  // `tone` lets a caller pin the dot colour when the shared vocabulary map is
+  // wrong for that entity — e.g. a preview env's "running" is healthy (ok),
+  // not in-flight (pending) as it means for a job run.
+  const dot = tone ?? STATUS_DOT[status.toLowerCase()] ?? "muted";
   return (
     <Badge variant={dot === "error" ? "destructive" : "secondary"} className="gap-1.5">
       <StatusDot status={dot} />
@@ -92,6 +95,8 @@ export interface EntityDetailShellProps {
   /** Raw status string → status badge in the subtitle. Omit when the entity
    *  has no single status axis (e.g. an environment). */
   status?: string | null;
+  /** Explicit dot tone override for the status badge (see DetailStatusBadge). */
+  statusTone?: Dot;
   /** Shown as "created <relative age>" in the subtitle when present. */
   createdAt?: string | null;
   /** Right-aligned page actions. */
@@ -110,6 +115,7 @@ export function EntityDetailShell({
   breadcrumb,
   heading,
   status,
+  statusTone,
   createdAt,
   actions,
   notFoundLabel,
@@ -152,7 +158,7 @@ export function EntityDetailShell({
       description={
         status || createdAt ? (
           <span className="flex flex-wrap items-center gap-2">
-            {status ? <DetailStatusBadge status={status} /> : null}
+            {status ? <DetailStatusBadge status={status} tone={statusTone} /> : null}
             {createdAt ? (
               <span className="text-muted-foreground text-xs">
                 created <DetailTimestamp iso={createdAt} />
