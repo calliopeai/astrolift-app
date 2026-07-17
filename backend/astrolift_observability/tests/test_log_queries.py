@@ -50,6 +50,7 @@ from core.cluster_observability import (
     set_pod_backend_for_tests,
 )
 from core.permissions import Permission, PermissionDenied
+from core.schema.enums import ObservabilityPanelReason
 from core.tenancy import TenantContext, tenant_context
 
 
@@ -604,6 +605,8 @@ def test_historical_query_passes_level_and_search_through(permission_resolver):
     # filters.
     assert [item.message for item in result.items] == ["ERROR database down"]
     assert result.items[0].level == "error"
+    # Page carries lines ⇒ OK reason (#1111).
+    assert result.reason == ObservabilityPanelReason.OK
 
 
 @pytest.mark.django_db
@@ -671,6 +674,38 @@ def test_historical_query_reports_unavailable_without_driver(permission_resolver
         )
     assert result.items == []
     assert result.historical_available is False
+    # No aggregator wired ⇒ NOT_CONFIGURED, the reason that used to be
+    # conflated with "no lines in window" (#1111).
+    assert result.reason == ObservabilityPanelReason.NOT_CONFIGURED
+
+
+@pytest.mark.django_db
+def test_historical_query_no_data_yet_when_page_empty(permission_resolver):
+    """Aggregator is wired and the query succeeds but returns zero
+    lines — the benign NO_DATA_YET state, distinct from "no aggregator
+    wired" (NOT_CONFIGURED) (#1111)."""
+    org, app, _cluster = _scaffold(
+        log_driver="loki",
+        log_config={"endpoint": "http://loki:3100"},
+    )
+    permission_resolver.grant(Permission.APP_READ_LOGS)
+
+    driver = _FakeLogQueryDriver(LogPage(items=[], next_cursor=""))
+    set_log_query_driver_for_tests(driver)
+    try:
+        with _tenant(org):
+            result = LogHistoryQuery().astrolift_app_logs(
+                _info(),
+                app_slug=app.slug,
+                since=dt.datetime.now(UTC) - dt.timedelta(minutes=30),
+                until=dt.datetime.now(UTC),
+            )
+    finally:
+        reset_log_query_driver_for_tests()
+
+    assert result.items == []
+    assert result.historical_available is True
+    assert result.reason == ObservabilityPanelReason.NO_DATA_YET
 
 
 @pytest.mark.django_db

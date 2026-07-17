@@ -8,6 +8,7 @@ import datetime as dt
 import strawberry
 
 from astrolift_graphql import GUID
+from core.schema.enums import ObservabilityPanelReason
 
 JSON = strawberry.scalars.JSON
 
@@ -1517,6 +1518,31 @@ def identity_binding_to_type(b) -> AppIdentityBindingType:
         trust_policy_summary=b.trust_policy_summary,
         last_used_at=b.last_used_at,
     )
+
+
+# ---- #1111 — reason-discriminated envelopes for the DNS / TLS /
+# workload-identity cards. Each card used to return a bare list / null,
+# collapsing "not configured", "provider doesn't implement it", "no
+# data yet", and "error" into one indistinguishable empty state. The
+# envelope carries ``reason`` so the FE renders one honest message.
+
+
+@strawberry.type(name="AstroliftAppDnsRecordsResult")
+class AppDnsRecordsResult:
+    reason: ObservabilityPanelReason
+    records: list[AppDnsRecordType]
+
+
+@strawberry.type(name="AstroliftAppCertificatesResult")
+class AppCertificatesResult:
+    reason: ObservabilityPanelReason
+    certificates: list[AppCertificateType]
+
+
+@strawberry.type(name="AstroliftAppIdentityBindingResult")
+class AppIdentityBindingResult:
+    reason: ObservabilityPanelReason
+    binding: AppIdentityBindingType | None
 
 
 # ---------------------------------------------------------------------------

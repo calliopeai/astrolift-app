@@ -39,6 +39,7 @@ from astrolift_observability import prom_client, prom_queries, url_probe, url_re
 from astrolift_observability.schema.types import (
     AppEndpointMetric,
     AppGoldenSignal,
+    AppGoldenSignalsResult,
     AppTrace,
     AppUrlHealth,
     ExecutePromqlResult,
@@ -62,6 +63,7 @@ from astrolift_services.models.managed_service import ManagedService
 from core.cluster_observability import namespace_for_app
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
+from core.schema.enums import ObservabilityPanelReason
 
 log = logging.getLogger(__name__)
 
@@ -315,7 +317,7 @@ class GoldenSignalsQuery:
         environment_name: str | None = None,
         range_seconds: int | None = None,
         workload_slug: str | None = None,
-    ) -> list[AppGoldenSignal]:
+    ) -> AppGoldenSignalsResult:
         """Return the four golden signals (traffic / errors / latency /
         saturation) over ``range_seconds`` for ``app_slug`` (+ env +
         optional workload).
@@ -327,8 +329,10 @@ class GoldenSignalsQuery:
         (``api`` / ``worker`` / ``scheduler`` / ...). Omit to roll up
         every workload under the app (pre-#422 behavior).
 
-        Empty list when the app doesn't exist for the current tenant,
-        the cluster has no Prometheus endpoint, or Prometheus errors.
+        Returns a reason-discriminated envelope (#1111):
+        NOT_CONFIGURED when the app/cluster has no Prometheus endpoint,
+        ERROR when Prometheus errors, NO_DATA_YET when every signal
+        came back empty, OK otherwise.
         """
         seconds = _clamp_range(range_seconds or _DEFAULT_RANGE_SECONDS)
         app = (
@@ -338,11 +342,11 @@ class GoldenSignalsQuery:
             .first()
         )
         if app is None:
-            return []
+            return AppGoldenSignalsResult(reason=ObservabilityPanelReason.NOT_CONFIGURED, signals=[])
 
         endpoint = prom_client.resolve_prometheus_endpoint(app=app, environment_name=environment_name)
         if endpoint is None:
-            return []
+            return AppGoldenSignalsResult(reason=ObservabilityPanelReason.NOT_CONFIGURED, signals=[])
 
         now = _now_utc()
         end_unix = int(now.timestamp())
@@ -430,9 +434,15 @@ class GoldenSignalsQuery:
                     step_seconds=step,
                 )
             except PrometheusError:
-                # Any single signal failing kills the panel — the FE
-                # treats an empty list as "metrics not yet flowing".
-                return []
+                # Any single signal failing kills the panel. A live
+                # endpoint that errors on query is an unexpected fault
+                # (bad PromQL, Prometheus down) — ERROR, not "no data".
+                log.warning(
+                    "golden_signals: prometheus query failed for app %s (%s)",
+                    app.slug,
+                    kind,
+                )
+                return AppGoldenSignalsResult(reason=ObservabilityPanelReason.ERROR, signals=[])
 
             # Aggregate queries return at most one row. If Prometheus
             # returns zero rows the signal is empty but present so the
@@ -482,7 +492,11 @@ class GoldenSignalsQuery:
                 seconds=seconds,
             )
 
-        return out
+        # Endpoint is live and every query succeeded; if no signal
+        # carries a sample the app just isn't emitting metrics yet.
+        has_data = any(s.samples for s in out)
+        reason = ObservabilityPanelReason.OK if has_data else ObservabilityPanelReason.NO_DATA_YET
+        return AppGoldenSignalsResult(reason=reason, signals=out)
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
@@ -503,9 +517,10 @@ class GoldenSignalsQuery:
         (mirrors :func:`astrolift_app_golden_signals`); omit to roll
         every workload up.
 
-        The FE distinguishes ``null`` ("HTTP metrics unavailable —
-        omit the card") from a populated breakdown with zero series
-        ("HTTP metrics available, but no traffic in this window")."""
+        ``reason`` (#1111) makes the empty state explicit: NOT_CONFIGURED
+        (no Prometheus endpoint), NO_DATA_YET (endpoint live, no traffic
+        in window), ERROR (Prometheus errored), or OK. ``null`` is
+        reserved for "no such app for this tenant"."""
         seconds = _clamp_range(range_seconds or _DEFAULT_RANGE_SECONDS)
         app = RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True).only("id", "slug").first()
         if app is None:
@@ -513,7 +528,12 @@ class GoldenSignalsQuery:
 
         endpoint = prom_client.resolve_prometheus_endpoint(app=app, environment_name=environment_name)
         if endpoint is None:
-            return None
+            return StatusCodeBreakdown(
+                reason=ObservabilityPanelReason.NOT_CONFIGURED,
+                range_seconds=seconds,
+                series=[],
+                promql="",
+            )
 
         end_unix = int(_now_utc().timestamp())
         start_unix = end_unix - seconds
@@ -535,7 +555,13 @@ class GoldenSignalsQuery:
                 label_key="code",
             )
         except PrometheusError:
-            return None
+            log.warning("status_code_breakdown: prometheus query failed for app %s", app.slug)
+            return StatusCodeBreakdown(
+                reason=ObservabilityPanelReason.ERROR,
+                range_seconds=seconds,
+                series=[],
+                promql=plan.promql,
+            )
 
         # Aggregate per-code samples into 2xx/3xx/4xx/5xx/other buckets
         # and track per-class total volume so we can pick the top-5
@@ -571,7 +597,9 @@ class GoldenSignalsQuery:
                 )
             )
 
+        reason = ObservabilityPanelReason.OK if series_out else ObservabilityPanelReason.NO_DATA_YET
         return StatusCodeBreakdown(
+            reason=reason,
             range_seconds=seconds,
             series=series_out,
             promql=plan.promql,
@@ -959,7 +987,14 @@ class GoldenSignalsQuery:
 
         endpoint = prom_client.resolve_prometheus_endpoint(app=app, environment_name=environment_name)
         if endpoint is None:
-            return None
+            return PodResourceUsage(
+                reason=ObservabilityPanelReason.NOT_CONFIGURED,
+                pod_name=pod_name,
+                range_seconds=seconds,
+                samples=[],
+                restart_count=0,
+                last_restart_at=None,
+            )
 
         end_unix = int(_now_utc().timestamp())
         start_unix = end_unix - seconds
@@ -1060,7 +1095,9 @@ class GoldenSignalsQuery:
             # metric sparkline on a cluster outage.
             pass
 
+        reason = ObservabilityPanelReason.OK if samples else ObservabilityPanelReason.NO_DATA_YET
         return PodResourceUsage(
+            reason=reason,
             pod_name=pod_name,
             range_seconds=seconds,
             samples=samples,

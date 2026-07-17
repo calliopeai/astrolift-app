@@ -8,6 +8,7 @@ from typing import Any
 import strawberry
 
 from astrolift_graphql import GUID
+from core.schema.enums import ObservabilityPanelReason
 
 # Strawberry needs a concrete scalar for arbitrary JSON; we re-use
 # the standard JSONScalar shipped with strawberry.
@@ -46,10 +47,17 @@ class EventType:
 @strawberry.type(name="AstroliftEventPage")
 class EventPageType:
     """Cursor-paginated event slice. ``next_cursor`` is null when the
-    caller has reached the end of the stream."""
+    caller has reached the end of the stream.
+
+    ``reason`` (#1111) lets the per-app events panel distinguish "no
+    activity for this app yet" (``NO_DATA_YET``) from a populated feed
+    (``OK``). Platform events have no provider/config dimension, so
+    only those two values are used; ``reason`` is set on the first
+    page (``after`` unset) — cursor continuations report ``OK``."""
 
     items: list[EventType]
     next_cursor: str | None
+    reason: ObservabilityPanelReason
 
 
 @strawberry.type(name="AstroliftAggregatedEvent")
