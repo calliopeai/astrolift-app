@@ -3,8 +3,10 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
+  CodeIcon,
   ExternalLinkIcon,
   GitPullRequestIcon,
+  LayoutIcon,
   RefreshCwIcon,
   SaveIcon,
 } from "lucide-react";
@@ -43,6 +45,7 @@ import type {
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import { AppTabs } from "../components/app-tabs";
+import { ManifestFormPane } from "./manifest-form-pane";
 
 interface AppResp {
   astroliftApp: AstroliftRegisteredApp | null;
@@ -208,6 +211,9 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
   const [draft, setDraft] = React.useState<string>(initialDraft);
   const [draftLoaded, setDraftLoaded] = React.useState(false);
   const [activePill, setActivePill] = React.useState<string | null>(null);
+  // Form (visual builder) vs Code (raw TOML editor). The visual builder is the
+  // default surface; the raw editor stays a strict superset (#1110).
+  const [view, setView] = React.useState<"form" | "code">("form");
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   // Snapshot of the server's "effective" manifest at the moment the
@@ -427,6 +433,26 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
       }
       actions={
         <>
+          <div className="flex items-center gap-1 rounded-md border p-0.5">
+            <Button
+              variant={view === "form" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 px-2.5"
+              onClick={() => setView("form")}
+            >
+              <LayoutIcon className="size-3.5" />
+              {t("view.form")}
+            </Button>
+            <Button
+              variant={view === "code" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 px-2.5"
+              onClick={() => setView("code")}
+            >
+              <CodeIcon className="size-3.5" />
+              {t("view.code")}
+            </Button>
+          </div>
           <Button
             variant="outline"
             onClick={() => setConfirmSync(true)}
@@ -472,6 +498,14 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
         </Card>
       )}
 
+      {view === "form" ? (
+        <ManifestFormPane
+          draft={draft}
+          onDraftChange={setDraft}
+          onSwitchToCode={() => setView("code")}
+        />
+      ) : (
+        <>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <PillToggleGroup onSelect={scrollToSection} active={activePill} />
         <p className="text-muted-foreground text-xs">{t("pills.jumpHint")}</p>
@@ -537,6 +571,8 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
           </CardContent>
         </Card>
       </div>
+        </>
+      )}
 
       {a.sourceUrl && (
         <Card className="border-dashed">
