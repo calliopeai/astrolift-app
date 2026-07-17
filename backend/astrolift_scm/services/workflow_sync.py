@@ -62,6 +62,15 @@ GITLAB_WORKFLOW_PATH: Final = ".gitlab-ci.yml"
 BITBUCKET_WORKFLOW_PATH: Final = "bitbucket-pipelines.yml"
 GITEA_WORKFLOW_PATH: Final = ".gitea/workflows/astrolift-ci.yml"
 
+# GitHub App permission hint for the CI-workflow write. The workflow file
+# lives under .github/workflows/, so a GitHub App needs the Workflows
+# permission on top of Contents: write — naming both makes a 403 on an
+# under-permitted App actionable instead of a misleading "reconnect".
+# Threaded into put_file → put_github_file; see
+# astrolift_scm.auth_errors.github_auth_error_message.
+CI_WORKFLOW_WRITE_OPERATION: Final = "write the CI workflow file"
+CI_WORKFLOW_WRITE_PERMISSION: Final = "Contents: write and Workflows: write"
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class WorkflowSyncResult:
@@ -900,6 +909,8 @@ def _sync_github(app: RegisteredApp) -> WorkflowSyncResult:
                 branch=side_branch,
                 content=rendered,
                 commit_message=commit_message,
+                operation=CI_WORKFLOW_WRITE_OPERATION,
+                permission=CI_WORKFLOW_WRITE_PERMISSION,
             )
             pr_url = _github_open_pull_request(
                 connection,
@@ -937,6 +948,8 @@ def _sync_github(app: RegisteredApp) -> WorkflowSyncResult:
             branch=deploy_branch,
             content=rendered,
             commit_message=commit_message,
+            operation=CI_WORKFLOW_WRITE_OPERATION,
+            permission=CI_WORKFLOW_WRITE_PERMISSION,
         )
     except ProviderError as exc:
         return WorkflowSyncResult(

@@ -29,6 +29,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from astrolift_scm.auth_errors import github_auth_error_message
 from core.secrets import EncryptedSecret, decrypt
 
 GITHUB_API_DEFAULT = "https://api.github.com"
@@ -158,7 +159,7 @@ def list_github_repos(
         if exc.code in (401, 403):
             raise GithubProviderError(
                 "AUTH_FAILED",
-                f"GitHub rejected the token ({exc.code}). Reconnect or rotate.",
+                github_auth_error_message(exc.code, connection.kind),
                 recoverable=True,
             ) from exc
         raise GithubProviderError(
@@ -271,7 +272,7 @@ def github_installation_includes_repo(connection, *, repo_full_name: str) -> boo
             if exc.code in (401, 403):
                 raise GithubProviderError(
                     "AUTH_FAILED",
-                    f"GitHub rejected the token ({exc.code}). Reconnect or rotate.",
+                    github_auth_error_message(exc.code, connection.kind),
                     recoverable=True,
                 ) from exc
             raise GithubProviderError("API_ERROR", f"GitHub returned {exc.code}") from exc
@@ -337,7 +338,7 @@ def fetch_github_file(
         if exc.code in (401, 403):
             raise GithubProviderError(
                 "AUTH_FAILED",
-                f"GitHub rejected the token ({exc.code}). Reconnect or rotate.",
+                github_auth_error_message(exc.code, connection.kind),
                 recoverable=True,
             ) from exc
         raise GithubProviderError("API_ERROR", f"GitHub returned {exc.code}") from exc
@@ -379,7 +380,7 @@ def fetch_github_zipball(
         if exc.code in (401, 403):
             raise GithubProviderError(
                 "AUTH_FAILED",
-                f"GitHub rejected the token ({exc.code}). Reconnect or rotate.",
+                github_auth_error_message(exc.code, connection.kind),
                 recoverable=True,
             ) from exc
         raise GithubProviderError("API_ERROR", f"GitHub returned {exc.code}") from exc
@@ -474,7 +475,12 @@ def install_github_webhook(
         if exc.code in (401, 403):
             raise GithubProviderError(
                 "AUTH_FAILED",
-                f"GitHub rejected the token ({exc.code}). Reconnect or rotate.",
+                github_auth_error_message(
+                    exc.code,
+                    connection.kind,
+                    operation="install the repo webhook",
+                    permission="Webhooks (repository_hooks): write",
+                ),
                 recoverable=True,
             ) from exc
         if exc.code == 404:
@@ -557,7 +563,7 @@ def delete_github_webhook(
         if exc.code in (401, 403):
             raise GithubProviderError(
                 "AUTH_FAILED",
-                f"GitHub rejected the token ({exc.code}). Reconnect or rotate.",
+                github_auth_error_message(exc.code, connection.kind),
                 recoverable=True,
             ) from exc
         raise GithubProviderError(
@@ -614,7 +620,7 @@ def github_webhook_exists(connection, *, repo_full_name: str, hook_id: str) -> b
         if exc.code in (401, 403):
             raise GithubProviderError(
                 "AUTH_FAILED",
-                f"GitHub rejected the token ({exc.code}). Reconnect or rotate.",
+                github_auth_error_message(exc.code, connection.kind),
                 recoverable=True,
             ) from exc
         raise GithubProviderError("API_ERROR", f"GitHub returned {exc.code}") from exc
@@ -635,12 +641,20 @@ def _github_existing_sha(
     repo_full_name: str,
     path: str,
     branch: str,
+    connection_kind: str = "",
+    operation: str | None = None,
+    permission: str | None = None,
 ) -> str | None:
     """Discover the blob SHA of an existing file on ``branch`` so we can
     PUT an update instead of failing 422. Returns None when the file
     doesn't exist yet (the create path). Bubbles auth failures as
     GithubProviderError so the caller sees the same envelope shape it
-    would on any other API call."""
+    would on any other API call.
+
+    ``connection_kind`` / ``operation`` / ``permission`` are threaded
+    through from :func:`put_github_file` so a 403 on the pre-flight GET
+    (the App lacks ``Contents: read``) names the same missing permission
+    the PUT would."""
     url = f"{_github_contents_url(base, repo_full_name, path)}?ref={urllib.parse.quote(branch)}"
     req = urllib.request.Request(
         url,
@@ -660,7 +674,9 @@ def _github_existing_sha(
         if exc.code in (401, 403):
             raise GithubProviderError(
                 "AUTH_FAILED",
-                f"GitHub rejected the token ({exc.code}). Reconnect or rotate.",
+                github_auth_error_message(
+                    exc.code, connection_kind, operation=operation, permission=permission
+                ),
                 recoverable=True,
             ) from exc
         raise GithubProviderError("API_ERROR", f"GitHub returned {exc.code}") from exc
@@ -683,9 +699,18 @@ def put_github_file(
     branch: str,
     content: str,
     commit_message: str,
+    operation: str | None = None,
+    permission: str | None = None,
 ) -> PutFileResult:
     """Create or update a file at ``path`` on ``branch`` via the
     GitHub Contents API.
+
+    ``operation`` / ``permission`` are optional hints the caller passes
+    when it knows what it is writing (e.g. the CI-workflow sync knows it
+    needs ``Contents: write`` plus ``Workflows: write``). They only
+    shape the 403 message so an under-permitted GitHub App gets
+    actionable guidance instead of a misleading "reconnect"; the write
+    itself is unchanged.
 
     GitHub's PUT /repos/{owner}/{repo}/contents/{path} is the same
     endpoint for create and update; the difference is whether you
@@ -710,6 +735,9 @@ def put_github_file(
         repo_full_name=repo_full_name,
         path=path,
         branch=branch,
+        connection_kind=connection.kind,
+        operation=operation,
+        permission=permission,
     )
 
     body: dict[str, str] = {
@@ -745,7 +773,9 @@ def put_github_file(
         if exc.code in (401, 403):
             raise GithubProviderError(
                 "AUTH_FAILED",
-                f"GitHub rejected the token ({exc.code}). Reconnect or rotate.",
+                github_auth_error_message(
+                    exc.code, connection.kind, operation=operation, permission=permission
+                ),
                 recoverable=True,
             ) from exc
         if exc.code == 404:
@@ -860,7 +890,7 @@ def open_github_pull_request(
         if exc.code in (401, 403):
             raise GithubProviderError(
                 "AUTH_FAILED",
-                f"GitHub rejected the token ({exc.code}). Reconnect or rotate.",
+                github_auth_error_message(exc.code, connection.kind),
                 recoverable=True,
             ) from exc
         if exc.code == 404:
