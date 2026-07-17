@@ -106,7 +106,7 @@ def test_dns_records_returns_converted_shape(
     _bind_default_cluster(app, env)
 
     fake = SimpleNamespace(
-        list_records_for_app=lambda zone_or_app: [
+        list_records_for_app=lambda zone_or_app, app_host=None: [
             SimpleNamespace(
                 name="api",
                 type="A",
@@ -148,7 +148,7 @@ def test_dns_records_no_data_yet_when_driver_returns_empty(
     NO_DATA_YET state, distinct from "not configured"/"not supported"."""
     _grant_read(permission_resolver)
     _bind_default_cluster(app, env)
-    patch_driver("dns", SimpleNamespace(list_records_for_app=lambda zone_or_app: []))
+    patch_driver("dns", SimpleNamespace(list_records_for_app=lambda zone_or_app, app_host=None: []))
 
     q = LifecycleQuery()
     with _tenant_for(org, actor):
@@ -189,7 +189,7 @@ def test_dns_records_not_supported_on_not_implemented(
     _grant_read(permission_resolver)
     _bind_default_cluster(app, env)
 
-    def _not_impl(zone_or_app):
+    def _not_impl(zone_or_app, app_host=None):
         raise NotImplementedError("not implemented for this driver")
 
     patch_driver("dns", SimpleNamespace(list_records_for_app=_not_impl))
@@ -215,7 +215,7 @@ def test_dns_records_error_on_driver_exception(
     _grant_read(permission_resolver)
     _bind_default_cluster(app, env)
 
-    def _explode(zone_or_app):
+    def _explode(zone_or_app, app_host=None):
         raise RuntimeError("connection refused")
 
     patch_driver("dns", SimpleNamespace(list_records_for_app=_explode))
@@ -281,7 +281,7 @@ def test_dns_records_uses_environment_cluster_when_given(
 
     saw: dict[str, object] = {}
 
-    def _list(zone_or_app):
+    def _list(zone_or_app, app_host=None):
         saw["zone_or_app"] = zone_or_app
         return []
 
@@ -295,6 +295,40 @@ def test_dns_records_uses_environment_cluster_when_given(
             environment_name=env_requires_approval.name,
         )
     assert saw["zone_or_app"] == app.slug
+
+
+def test_dns_records_scopes_to_resolved_host(
+    org,
+    app,
+    env,
+    actor,
+    fake_info,
+    permission_resolver,
+    patch_driver,
+):
+    """#1114: the resolver passes the app's resolved public host to the
+    driver so a shared hosted zone is scoped to this app. The slug alone
+    names no zone (and can't be tagged per-app) in a multi-app install,
+    so without the host the card would error or leak every app's records.
+    Host comes from the ``env`` fixture URL (``hello.example.com``)."""
+    _grant_read(permission_resolver)
+    _bind_default_cluster(app, env)
+
+    saw: dict[str, object] = {}
+
+    def _list(zone_or_app, app_host=None):
+        saw["zone_or_app"] = zone_or_app
+        saw["app_host"] = app_host
+        return []
+
+    patch_driver("dns", SimpleNamespace(list_records_for_app=_list))
+
+    q = LifecycleQuery()
+    with _tenant_for(org, actor):
+        q.astrolift_app_dns_records(fake_info, app_slug=app.slug)
+    assert saw["zone_or_app"] == app.slug
+    assert saw["app_host"] == "hello.example.com"
+    assert saw["app_host"] != app.slug
 
 
 # ---------------------------------------------------------------------------

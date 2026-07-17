@@ -25,6 +25,26 @@ class Route53Config:
     """Route53 is a global service but boto3 still wants a region."""
 
 
+def _record_scoped_to_host(record: DnsRecord, app_host: str) -> bool:
+    """Whether ``record`` is part of ``app_host``'s DNS surface.
+
+    Kept: the host itself (``pickup.zone``), its wildcard (``*.pickup.zone``),
+    and any subdomain (``api.pickup.zone``). The leading-dot suffix test is
+    a label-boundary match, so a sibling app that merely shares a prefix
+    (``pickup-staging.zone``) is *not* pulled in. A CNAME elsewhere in the
+    zone that targets the app's host (a vanity alias) counts too, since it
+    resolves to the app."""
+    host = app_host.rstrip(".").lower()
+    name = record.name.rstrip(".").lower()
+    if name == host or name == f"*.{host}" or name.endswith(f".{host}"):
+        return True
+    if record.type == "CNAME":
+        target = record.value.rstrip(".").lower()
+        if target == host or target.endswith(f".{host}"):
+            return True
+    return False
+
+
 class Route53Driver(DnsDriver):
     def __init__(
         self,
@@ -253,13 +273,23 @@ class Route53Driver(DnsDriver):
     # ---- observability reads (#377) -------------------------------
 
     @driver_op(cloud="aws", driver="dns")
-    def list_records_for_app(self, zone_or_app: str) -> list[DnsRecord]:
-        """Return the operator-facing record snapshot for a zone.
+    def list_records_for_app(self, zone_or_app: str, *, app_host: str | None = None) -> list[DnsRecord]:
+        """Return the operator-facing record snapshot for an app.
 
-        ``zone_or_app`` is interpreted as a DNS zone name first; if no
-        such hosted zone exists, fall back to a tag-based lookup that
-        treats the input as an app slug and finds the zone tagged
-        ``astrolift.io/app-slug=<slug>``.
+        Zone resolution handles both install topologies:
+
+        * Dedicated-per-app zone: ``zone_or_app`` names the hosted zone,
+          or matches the ``astrolift.io/app-slug=<slug>`` tag on it. The
+          whole zone is the app's, so the ``app_host`` filter is a no-op.
+        * Shared zone: many apps live in one zone (``astrolift.smdinfra.net``
+          holds ``pickup``, ``faasprobe``, ...), so a slug names no zone and
+          no per-app tag exists. We resolve the zone *containing* the app's
+          FQDN and then scope records to that host (#1114) so one app's
+          records don't leak into another app's DNS card.
+
+        When ``app_host`` is given, only records at or under it are
+        returned (see :func:`_record_scoped_to_host`); ``None`` returns the
+        whole zone (dedicated-zone behavior, unchanged).
 
         Propagation status is reported as ``"propagated"`` for any
         record whose change-set status is ``INSYNC`` per
@@ -270,15 +300,15 @@ class Route53Driver(DnsDriver):
         the actual state. Anything we can't resolve is ``"unknown"``,
         not ``"pending"``, so the operator UI doesn't dot it amber
         for a zone that's actually fine."""
-        zone = self._resolve_zone_or_app(zone_or_app)
+        zone = self._resolve_zone_for_records(zone_or_app, app_host)
         try:
             paginator = self._r53.get_paginator(
                 "list_resource_record_sets",
             )
             zone_id = self._zone_cache.get(zone.rstrip(".") + ".")
             if zone_id is None:
-                # _resolve_zone_or_app already populated the cache; if
-                # not, resolve again to seed it.
+                # zone resolution already populated the cache; if not,
+                # resolve again to seed it.
                 zone_id = self._resolve_zone(zone)
             propagation = self._latest_change_propagation(zone_id)
             out: list[DnsRecord] = []
@@ -288,15 +318,18 @@ class Route53Driver(DnsDriver):
                     rtype = rs.get("Type", "")
                     ttl = rs.get("TTL", 0)
                     for r in rs.get("ResourceRecords", []) or []:
-                        out.append(
-                            DnsRecord(
-                                name=name,
-                                type=rtype,
-                                value=r.get("Value", ""),
-                                ttl=ttl,
-                                propagation_status=propagation,
-                            )
+                        record = DnsRecord(
+                            name=name,
+                            type=rtype,
+                            value=r.get("Value", ""),
+                            ttl=ttl,
+                            propagation_status=propagation,
                         )
+                        # Shared-zone installs hold many apps in one zone;
+                        # keep only this app's host + subdomains (#1114).
+                        if app_host and not _record_scoped_to_host(record, app_host):
+                            continue
+                        out.append(record)
             return out
         except NotFoundError:
             raise
@@ -435,6 +468,42 @@ class Route53Driver(DnsDriver):
         raise NotFoundError(
             f"no hosted zone matches {zone_or_app!r} by name or app-slug tag",
         )
+
+    def _resolve_zone_for_records(self, zone_or_app: str, app_host: str | None) -> str:
+        """Resolve the hosted zone whose records the app-DNS card reads.
+
+        Dedicated-zone installs resolve through ``_resolve_zone_or_app``
+        (zone name or ``app-slug`` tag). Shared-zone installs have neither
+        (the slug names no zone, and one zone can't carry a per-app tag),
+        so fall back to the zone *containing* the app's FQDN. Without an
+        ``app_host`` there's nothing to fall back to, so the original
+        NotFoundError propagates (unchanged behavior)."""
+        try:
+            return self._resolve_zone_or_app(zone_or_app)
+        except NotFoundError:
+            if app_host:
+                return self._resolve_containing_zone(app_host)
+            raise
+
+    def _resolve_containing_zone(self, host: str) -> str:
+        """Return the hosted-zone name that contains ``host`` by walking up
+        its parent domains.
+
+        ``api.pickup.astrolift.smdinfra.net`` tries itself, then
+        ``pickup.astrolift.smdinfra.net``, ``astrolift.smdinfra.net``, ...
+        and returns the first that resolves to a hosted zone. Reuses
+        ``_resolve_zone`` so the zone-id cache the record read relies on is
+        seeded as a side effect. The TLD is never a hosted zone we manage,
+        so the walk stops before the last label."""
+        labels = host.rstrip(".").split(".")
+        for i in range(len(labels) - 1):
+            candidate = ".".join(labels[i:])
+            try:
+                self._resolve_zone(candidate)
+                return candidate
+            except NotFoundError:
+                continue
+        raise NotFoundError(f"no hosted zone contains host {host!r}")
 
     def _latest_change_propagation(self, zone_id: str) -> str:
         """Return ``"propagated"`` / ``"pending"`` / ``"unknown"`` based
