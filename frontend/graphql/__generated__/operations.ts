@@ -8360,6 +8360,13 @@ export type ListScheduledJobRunsQueryVariables = Exact<{
 
 export type ListScheduledJobRunsQuery = { astroliftScheduledJobRuns: Array<{ id: string, registeredAppSlug: string, environmentName: string, workloadSlug: string, k8sJobName: string, status: string, startedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, exitCode?: number | null, logExcerpt: string, output: string, createdAt: string }> };
 
+export type GetScheduledJobRunQueryVariables = Exact<{
+  id: Scalars['String']['input'];
+}>;
+
+
+export type GetScheduledJobRunQuery = { astroliftScheduledJobRun?: { id: string, registeredAppSlug: string, environmentName: string, workloadSlug: string, k8sJobName: string, status: string, startedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, exitCode?: number | null, logExcerpt: string, output: string, createdAt: string } | null };
+
 export type ListCommandRunsQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -8367,6 +8374,13 @@ export type ListCommandRunsQueryVariables = Exact<{
 
 
 export type ListCommandRunsQuery = { astroliftCommandRuns: Array<{ id: string, registeredAppSlug: string, workloadSlug?: string | null, invokedByUsername?: string | null, command: Record<string, unknown>, startedAt?: string | null, endedAt?: string | null, exitCode?: number | null, logExcerpt: string, output: string, createdAt: string }> };
+
+export type GetCommandRunQueryVariables = Exact<{
+  id: Scalars['String']['input'];
+}>;
+
+
+export type GetCommandRunQuery = { astroliftCommandRun?: { id: string, registeredAppSlug: string, workloadSlug?: string | null, invokedByUsername?: string | null, command: Record<string, unknown>, startedAt?: string | null, endedAt?: string | null, exitCode?: number | null, logExcerpt: string, output: string, createdAt: string } | null };
 
 export type ListAppHealthSummaryQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -8472,6 +8486,13 @@ export type ListTaskRunsQueryVariables = Exact<{
 
 
 export type ListTaskRunsQuery = { astroliftTaskRuns: Array<{ id: string, registeredAppSlug: string, workloadSlug: string, triggerKind: string, triggeredByUsername?: string | null, command: Record<string, unknown>, status: string, exitCode?: number | null, startedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, k8sJobName: string, createdAt: string }> };
+
+export type GetTaskRunQueryVariables = Exact<{
+  id: Scalars['String']['input'];
+}>;
+
+
+export type GetTaskRunQuery = { astroliftTaskRun?: { id: string, registeredAppSlug: string, workloadSlug: string, triggerKind: string, triggeredByUsername?: string | null, command: Record<string, unknown>, status: string, exitCode?: number | null, startedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, k8sJobName: string, createdAt: string } | null };
 
 export type DeploymentLifecycleStreamSubscriptionVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
+import { useApolloClient, useQuery } from "@apollo/client/react";
 import Link from "next/link";
 import * as React from "react";
 
@@ -8,29 +8,40 @@ import { DetailStatusBadge, DetailTimestamp, EntityDetailShell } from "@/compone
 import { RunOutputPanel } from "@/components/jobs/RunOutputPanel";
 import { commandRunStatus } from "@/components/jobs/RunStatusBadge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { LIST_COMMAND_RUNS } from "@/graphql/lifecycle/lifecycle.queries";
+import { GET_COMMAND_RUN, LIST_COMMAND_RUNS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftCommandRun } from "@/graphql/lifecycle/lifecycle.types";
 
 interface CommandRunResp {
+  astroliftCommandRun: AstroliftCommandRun | null;
+}
+
+interface CommandRunListResp {
   astroliftCommandRuns: AstroliftCommandRun[];
 }
 
 /**
- * Command (one-off exec) run detail (#1106). Command runs carry no explicit
- * status string — it's derived from exit code + ended-at, same as the /jobs
- * Commands table. No singular query exists, so this reuses the global
- * LIST_COMMAND_RUNS window.
+ * Command (one-off exec) run detail (#1106, #1118). Command runs carry no
+ * explicit status string — it's derived from exit code + ended-at, same as the
+ * /jobs Commands table. Prefers the singular `astroliftCommandRun(id)` query so
+ * a cold deep-link to a run outside the 100-row window still resolves, falling
+ * back to the row in the cached global LIST_COMMAND_RUNS window.
  */
 export function CommandRunDetailClient({ id }: { id: string }) {
-  const { data, loading } = useQuery<CommandRunResp>(LIST_COMMAND_RUNS, {
-    variables: { limit: 100 },
+  const client = useApolloClient();
+  const { data, loading } = useQuery<CommandRunResp>(GET_COMMAND_RUN, {
+    variables: { id },
     fetchPolicy: "cache-and-network",
   });
 
-  const run = React.useMemo(
-    () => (data?.astroliftCommandRuns ?? []).find((r) => r.id === id) ?? null,
-    [data, id]
-  );
+  const cachedFromList = React.useMemo(() => {
+    const listed = client.readQuery<CommandRunListResp>({
+      query: LIST_COMMAND_RUNS,
+      variables: { limit: 100 },
+    });
+    return listed?.astroliftCommandRuns.find((r) => r.id === id) ?? null;
+  }, [client, id]);
+
+  const run = data?.astroliftCommandRun ?? cachedFromList;
 
   const command = run
     ? Array.isArray(run.command)
