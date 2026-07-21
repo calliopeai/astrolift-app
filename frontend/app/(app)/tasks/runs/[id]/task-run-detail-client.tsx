@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
+import { useApolloClient, useQuery } from "@apollo/client/react";
 import { ScrollIcon } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
@@ -8,10 +8,14 @@ import * as React from "react";
 import { DetailStatusBadge, DetailTimestamp, EntityDetailShell } from "@/components/detail/EntityDetailShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { LIST_TASK_RUNS } from "@/graphql/lifecycle/lifecycle.queries";
+import { GET_TASK_RUN, LIST_TASK_RUNS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftTaskRun } from "@/graphql/lifecycle/lifecycle.types";
 
 interface TaskRunResp {
+  astroliftTaskRun: AstroliftTaskRun | null;
+}
+
+interface TaskRunListResp {
   astroliftTaskRuns: AstroliftTaskRun[];
 }
 
@@ -24,25 +28,28 @@ function formatDuration(seconds: number | null | undefined): string {
 }
 
 /**
- * Task run detail (#1106). No singular `astroliftTaskRun(id)` query exists, so
- * this reuses the same `LIST_TASK_RUNS` query the /tasks list uses (identical
- * variables ⇒ an Apollo cache hit when navigated from the list; a background
- * refetch otherwise). A run older than the 100-row window won't resolve on a
- * cold deep-link — it renders the shell's not-found state. `errorPolicy:
- * "ignore"` mirrors the list so a not-yet-wired backend field degrades to
- * not-found rather than throwing.
+ * Task run detail (#1106, #1118). Prefers the singular `astroliftTaskRun(id)`
+ * query so a cold deep-link to a run outside the 100-row list window still
+ * resolves. Falls back to the row already in the cached LIST_TASK_RUNS window
+ * for an instant paint when navigated from /tasks (cache hit); the by-id fetch
+ * refreshes in the background and is the source of truth otherwise.
  */
 export function TaskRunDetailClient({ id }: { id: string }) {
-  const { data, loading } = useQuery<TaskRunResp>(LIST_TASK_RUNS, {
-    variables: { limit: 100 },
+  const client = useApolloClient();
+  const { data, loading } = useQuery<TaskRunResp>(GET_TASK_RUN, {
+    variables: { id },
     fetchPolicy: "cache-and-network",
-    errorPolicy: "ignore",
   });
 
-  const run = React.useMemo(
-    () => (data?.astroliftTaskRuns ?? []).find((r) => r.id === id) ?? null,
-    [data, id]
-  );
+  const cachedFromList = React.useMemo(() => {
+    const listed = client.readQuery<TaskRunListResp>({
+      query: LIST_TASK_RUNS,
+      variables: { limit: 100 },
+    });
+    return listed?.astroliftTaskRuns.find((r) => r.id === id) ?? null;
+  }, [client, id]);
+
+  const run = data?.astroliftTaskRun ?? cachedFromList;
 
   const command = run
     ? Array.isArray(run.command)

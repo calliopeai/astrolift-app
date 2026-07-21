@@ -1,16 +1,20 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
+import { useApolloClient, useQuery } from "@apollo/client/react";
 import Link from "next/link";
 import * as React from "react";
 
 import { DetailStatusBadge, DetailTimestamp, EntityDetailShell } from "@/components/detail/EntityDetailShell";
 import { RunOutputPanel } from "@/components/jobs/RunOutputPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { LIST_SCHEDULED_JOB_RUNS } from "@/graphql/lifecycle/lifecycle.queries";
+import { GET_SCHEDULED_JOB_RUN, LIST_SCHEDULED_JOB_RUNS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftScheduledJobRun } from "@/graphql/lifecycle/lifecycle.types";
 
 interface JobRunResp {
+  astroliftScheduledJobRun: AstroliftScheduledJobRun | null;
+}
+
+interface JobRunListResp {
   astroliftScheduledJobRuns: AstroliftScheduledJobRun[];
 }
 
@@ -23,21 +27,29 @@ function formatDuration(seconds: number | null | undefined): string {
 }
 
 /**
- * Scheduled job run detail (#1106). No singular query exists, so this reuses
- * the global LIST_SCHEDULED_JOB_RUNS window (same variables ⇒ cache hit from
- * the list). Carries the same inline `output` the /jobs run row expanded, now
+ * Scheduled job run detail (#1106, #1118). Prefers the singular
+ * `astroliftScheduledJobRun(id)` query so a cold deep-link to a run outside the
+ * 100-row list window still resolves. Falls back to the row in the cached
+ * global LIST_SCHEDULED_JOB_RUNS window for an instant paint when navigated
+ * from /jobs. Carries the same inline `output` the /jobs run row expanded, now
  * on a linkable page alongside the full field grid.
  */
 export function JobRunDetailClient({ id }: { id: string }) {
-  const { data, loading } = useQuery<JobRunResp>(LIST_SCHEDULED_JOB_RUNS, {
-    variables: { limit: 100 },
+  const client = useApolloClient();
+  const { data, loading } = useQuery<JobRunResp>(GET_SCHEDULED_JOB_RUN, {
+    variables: { id },
     fetchPolicy: "cache-and-network",
   });
 
-  const run = React.useMemo(
-    () => (data?.astroliftScheduledJobRuns ?? []).find((r) => r.id === id) ?? null,
-    [data, id]
-  );
+  const cachedFromList = React.useMemo(() => {
+    const listed = client.readQuery<JobRunListResp>({
+      query: LIST_SCHEDULED_JOB_RUNS,
+      variables: { limit: 100 },
+    });
+    return listed?.astroliftScheduledJobRuns.find((r) => r.id === id) ?? null;
+  }, [client, id]);
+
+  const run = data?.astroliftScheduledJobRun ?? cachedFromList;
 
   const consoleHref = run
     ? `/apps/${run.registeredAppSlug}/logs?${new URLSearchParams({

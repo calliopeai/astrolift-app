@@ -6053,6 +6053,7 @@ export type Query = {
   astroliftClusters: Array<AstroliftTenantCluster>;
   astroliftCognitoUserPoolClients: Array<AstroliftCognitoUserPoolClient>;
   astroliftCognitoUserPools: Array<AstroliftCognitoUserPool>;
+  astroliftCommandRun?: Maybe<AstroliftCommandRun>;
   astroliftCommandRuns: Array<AstroliftCommandRun>;
   astroliftCompareDeployments?: Maybe<AstroliftDeploymentComparison>;
   astroliftContainers: Array<AstroliftContainer>;
@@ -6120,6 +6121,7 @@ export type Query = {
   astroliftRoleBindings: Array<AstroliftRoleBinding>;
   astroliftRoles: Array<AstroliftRole>;
   astroliftRolesICanGrant: Array<AstroliftRole>;
+  astroliftScheduledJobRun?: Maybe<AstroliftScheduledJobRun>;
   astroliftScheduledJobRuns: Array<AstroliftScheduledJobRun>;
   astroliftSearchableUsers: Array<AstroliftSearchableUser>;
   astroliftSecretBundles: Array<AstroliftSecretBundle>;
@@ -6130,6 +6132,7 @@ export type Query = {
   astroliftSourceConnections: Array<AstroliftSourceConnection>;
   astroliftSourceFile: AstroliftSourceFile;
   astroliftSshDeployKeys: Array<AstroliftSshDeployKey>;
+  astroliftTaskRun?: Maybe<AstroliftTaskRun>;
   astroliftTaskRuns: Array<AstroliftTaskRun>;
   astroliftTeamMembers: Array<AstroliftMember>;
   astroliftTeams: Array<AstroliftTeam>;

@@ -217,9 +217,51 @@ export const LIST_SCHEDULED_JOB_RUNS = gql`
   }
 `;
 
+// Single scheduled-job run by id — backs a cold detail deep-link (#1118)
+// when the run has aged out of the LIST_SCHEDULED_JOB_RUNS window. Same
+// field set so the normalized cache entry is complete either way.
+export const GET_SCHEDULED_JOB_RUN = gql`
+  query GetScheduledJobRun($id: String!) {
+    astroliftScheduledJobRun(id: $id) {
+      id
+      registeredAppSlug
+      environmentName
+      workloadSlug
+      k8sJobName
+      status
+      startedAt
+      endedAt
+      durationSeconds
+      exitCode
+      logExcerpt
+      output
+      createdAt
+    }
+  }
+`;
+
 export const LIST_COMMAND_RUNS = gql`
   query ListCommandRuns($appSlug: String, $limit: Int) {
     astroliftCommandRuns(appSlug: $appSlug, limit: $limit) {
+      id
+      registeredAppSlug
+      workloadSlug
+      invokedByUsername
+      command
+      startedAt
+      endedAt
+      exitCode
+      logExcerpt
+      output
+      createdAt
+    }
+  }
+`;
+
+// Single command (one-off exec) run by id — cold detail deep-link (#1118).
+export const GET_COMMAND_RUN = gql`
+  query GetCommandRun($id: String!) {
+    astroliftCommandRun(id: $id) {
       id
       registeredAppSlug
       workloadSlug
@@ -591,6 +633,28 @@ export const LIST_MY_ALERT_SUBSCRIPTIONS = gql`
 export const LIST_TASK_RUNS = gql`
   query ListTaskRuns($appSlug: String, $limit: Int) {
     astroliftTaskRuns(appSlug: $appSlug, limit: $limit) {
+      id
+      registeredAppSlug
+      workloadSlug
+      triggerKind
+      triggeredByUsername
+      command
+      status
+      exitCode
+      startedAt
+      endedAt
+      durationSeconds
+      k8sJobName
+      createdAt
+    }
+  }
+`;
+
+// Single task run by id — cold detail deep-link (#1118) for runs aged out
+// of the LIST_TASK_RUNS window.
+export const GET_TASK_RUN = gql`
+  query GetTaskRun($id: String!) {
+    astroliftTaskRun(id: $id) {
       id
       registeredAppSlug
       workloadSlug

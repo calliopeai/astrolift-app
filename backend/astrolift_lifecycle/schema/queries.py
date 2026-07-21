@@ -430,10 +430,25 @@ class LifecycleQuery:
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_deployment(self, info: Info, id: str) -> DeploymentType | None:
-        """Single deployment by guid. Tenant-scoped via the manager."""
+        """Single deployment by guid, scoped to the caller's org (#1118).
+
+        Deployment has no organization FK of its own (it reaches the
+        tenant through ``registered_app``) and its default manager is not
+        tenant-aware, so an unscoped ``filter(guid=id)`` would return
+        another org's deployment — guids are globally unique. The join
+        filter is what enforces tenancy here (``@tenant_scoped`` only
+        asserts a tenant exists); it fails closed to ``None`` on a
+        sibling-org or unknown id. Deregistered (soft-deleted) apps' rows
+        stay fetchable by direct link — the join reads the joined row
+        regardless of the app's ``deleted_at``.
+        """
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return None
         d = (
             Deployment.objects.select_related("registered_app", "app_environment", "workload")
-            .filter(guid=id)
+            .filter(guid=id, registered_app__organization_id=org_id)
             .first()
         )
         return deployment_to_type(d, viewer_user_id=_viewer_user_id(info)) if d else None
@@ -466,8 +481,14 @@ class LifecycleQuery:
 
         from astrolift_operations.models import AuditEvent
 
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return []
         deployment = (
-            Deployment.objects.filter(guid=deployment_id, deleted_at__isnull=True)
+            Deployment.objects.filter(
+                guid=deployment_id, deleted_at__isnull=True, registered_app__organization_id=org_id
+            )
             .only("id", "guid", "aborted_reason")
             .first()
         )
@@ -527,13 +548,17 @@ class LifecycleQuery:
         - the app has no usable source connection
         - the SCM call fails (logged; caller falls back to commitMessage)
         """
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return None
         deployment = (
             Deployment.objects.select_related(
                 "registered_app",
                 "registered_app__organization",
                 "app_environment",
             )
-            .filter(guid=deployment_id, deleted_at__isnull=True)
+            .filter(guid=deployment_id, deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
         if deployment is None or not deployment.commit_sha:
@@ -656,8 +681,17 @@ class LifecycleQuery:
     @require_permission(Permission.APP_READ_LOGS)
     @tenant_scoped()
     def astrolift_deployment_log(self, info: Info, deployment_id: str) -> list[DeploymentLogEntryType]:
-        # Look up the deployment by guid then return its log entries.
-        deployment = Deployment.objects.filter(guid=deployment_id).first()
+        # Look up the deployment by guid, scoped to the caller's org (the
+        # default manager is not tenant-aware, so an unscoped guid lookup
+        # would expose another org's deploy log; #1118), then return its
+        # log entries.
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return []
+        deployment = Deployment.objects.filter(
+            guid=deployment_id, registered_app__organization_id=org_id
+        ).first()
         if deployment is None:
             return []
         qs = DeploymentLog.objects.filter(deployment=deployment).order_by("occurred_at")
@@ -673,14 +707,45 @@ class LifecycleQuery:
         environment_name: str | None = None,
         limit: int = 100,
     ) -> list[ScheduledJobRunType]:
+        # Org-scope to the active tenant. ScheduledJobRun has no org FK of
+        # its own (it hangs off workload → registered_app) and its default
+        # manager is not tenant-aware, so without this a caller could read
+        # another org's runs via a known app slug — slugs are unique only
+        # within a tenant. Mirrors astrolift_task_runs (#801, #1118).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         qs = ScheduledJobRun.objects.select_related(
             "workload", "workload__registered_app", "app_environment"
         ).order_by("-created_at")
+        if org_id is not None:
+            qs = qs.filter(workload__registered_app__organization_id=org_id)
         if app_slug:
             qs = qs.filter(workload__registered_app__slug=app_slug)
         if environment_name:
             qs = qs.filter(app_environment__name=environment_name)
         return [scheduled_job_run_to_type(r) for r in qs[: max(1, min(limit, 500))]]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ_LOGS)
+    @tenant_scoped()
+    def astrolift_scheduled_job_run(self, info: Info, id: str) -> ScheduledJobRunType | None:
+        """Single scheduled-job run by guid, for cold detail deep-links (#1118).
+
+        Org-scoped through ``workload → registered_app`` — the join filter
+        (not the model manager) is what enforces tenancy; it fails closed
+        to ``None`` on a sibling-org or unknown id. See
+        ``astrolift_scheduled_job_runs`` for the full rationale.
+        """
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return None
+        r = (
+            ScheduledJobRun.objects.select_related("workload", "workload__registered_app", "app_environment")
+            .filter(guid=id, workload__registered_app__organization_id=org_id)
+            .first()
+        )
+        return scheduled_job_run_to_type(r) if r else None
 
     @strawberry.field
     @require_permission(Permission.APP_READ_LOGS)
@@ -691,12 +756,38 @@ class LifecycleQuery:
         app_slug: str | None = None,
         limit: int = 100,
     ) -> list[CommandRunType]:
+        # Org-scope to the active tenant — CommandRun's default manager is
+        # not tenant-aware and its registered_app slug is unique only
+        # within a tenant, so an unscoped query would leak other orgs' runs
+        # (#1118). Reaches org via the direct registered_app FK.
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         qs = CommandRun.objects.select_related("registered_app", "workload", "invoked_by").order_by(
             "-created_at"
         )
+        if org_id is not None:
+            qs = qs.filter(registered_app__organization_id=org_id)
         if app_slug:
             qs = qs.filter(registered_app__slug=app_slug)
         return [command_run_to_type(r) for r in qs[: max(1, min(limit, 500))]]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ_LOGS)
+    @tenant_scoped()
+    def astrolift_command_run(self, info: Info, id: str) -> CommandRunType | None:
+        """Single command (one-off exec) run by guid, for cold detail
+        deep-links (#1118). Org-scoped via the direct ``registered_app`` FK;
+        fails closed to ``None`` on a sibling-org or unknown id."""
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return None
+        r = (
+            CommandRun.objects.select_related("registered_app", "workload", "invoked_by")
+            .filter(guid=id, registered_app__organization_id=org_id)
+            .first()
+        )
+        return command_run_to_type(r) if r else None
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
@@ -1463,6 +1554,34 @@ class LifecycleQuery:
         if status:
             qs = qs.filter(status=status)
         return [task_run_to_type(r) for r in qs[: max(1, min(limit, 500))]]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ_LOGS)
+    @tenant_scoped()
+    def astrolift_task_run(self, info: Info, id: str) -> TaskRunType | None:
+        """Single task run by guid, for cold detail deep-links (#1118).
+
+        Org-scoped through ``workload → registered_app`` — TaskRun has no
+        org FK of its own and its default manager is not tenant-aware, so
+        an unscoped ``filter(guid=id)`` would return another org's run
+        (guids are globally unique). Mirrors ``astrolift_task_runs``
+        scoping and fails closed to ``None`` on a sibling-org or unknown id.
+        """
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return None
+        r = (
+            TaskRun.objects.select_related(
+                "workload",
+                "workload__registered_app",
+                "app_environment",
+                "triggered_by_user",
+            )
+            .filter(guid=id, workload__registered_app__organization_id=org_id)
+            .first()
+        )
+        return task_run_to_type(r) if r else None
 
     @strawberry.field
     @require_permission(Permission.APP_READ)

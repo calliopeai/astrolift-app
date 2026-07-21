@@ -5100,7 +5100,9 @@ type Query {
   astroliftCompareDeployments(idA: String!, idB: String!): AstroliftDeploymentComparison
   astroliftDeploymentLog(deploymentId: String!): [AstroliftDeploymentLogEntry!]!
   astroliftScheduledJobRuns(appSlug: String = null, environmentName: String = null, limit: Int! = 100): [AstroliftScheduledJobRun!]!
+  astroliftScheduledJobRun(id: String!): AstroliftScheduledJobRun
   astroliftCommandRuns(appSlug: String = null, limit: Int! = 100): [AstroliftCommandRun!]!
+  astroliftCommandRun(id: String!): AstroliftCommandRun
   astroliftPreviewEnvironments(appSlug: String = null): [AstroliftPreviewEnvironment!]!
   astroliftDeploymentMetrics(windowDays: Int! = 30): AstroliftDeploymentMetrics!
   astroliftAppHealthSummary: [AstroliftAppHealthSummary!]!
@@ -5114,6 +5116,7 @@ type Query {
   previewAstroliftDeregister(appSlug: String!): AstroliftDeregisterPreview
   previewAstroliftForceRedeploy(appSlug: String!, environmentName: String = null): AstroliftForceRedeployPreview
   astroliftTaskRuns(appSlug: String = null, workloadSlug: String = null, status: String = null, limit: Int! = 100): [AstroliftTaskRun!]!
+  astroliftTaskRun(id: String!): AstroliftTaskRun
   astroliftAgentRuns(appSlug: String = null, workloadSlug: String = null, projectSlug: String = null, status: String = null, limit: Int! = 100): [AstroliftAgentRun!]!
   astroliftClusters: [AstroliftTenantCluster!]!
   astroliftClusterCount: Int!
