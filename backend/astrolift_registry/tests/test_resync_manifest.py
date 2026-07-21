@@ -87,6 +87,22 @@ replicas = 1
   port = 0
 """
 
+# An agent config-repo library (astrolift_version + [skills.*]/[tools.*], no
+# name / no [[workloads]]). It can never parse as an app manifest — used to
+# assert the resync path gives an actionable "wrong schema" error (#1172).
+_AGENT_CONFIG_TOML = """\
+astrolift_version = 1
+
+[skills.pr_review]
+name = "PR Review"
+content = "You are a meticulous reviewer."
+
+[tools.post_comment]
+skill = "pr_review"
+name = "Post comment"
+adapter = "python_fn"
+"""
+
 
 # --- helpers ----------------------------------------------------------
 
@@ -318,6 +334,29 @@ def test_repo_bad_toml_is_fetch_failed_not_a_crash():
 
     assert result.status == "fetch_failed"
     assert "failed to parse" in (result.error or "")
+    app.refresh_from_db()
+    assert app.manifest_hash == pre_hash
+
+
+def test_repo_agent_config_schema_gives_actionable_error():
+    """A repo whose astrolift.toml is the agent config-repo library schema
+    (astrolift_version + [skills.*]/[tools.*], no name/workloads) can never
+    parse as an app manifest. The resync error must point at agent onboarding
+    / skill import rather than dumping a raw "required string 'name' is
+    missing" parse error (#1172)."""
+    _org, app = _scaffold(manifest_raw=_BASE_TOML)
+    pre_hash = app.manifest_hash
+
+    result = resync_app_manifest_from_repo(app, fetch=_stub_fetch(_AGENT_CONFIG_TOML))
+
+    assert result.status == "fetch_failed"
+    error = result.error or ""
+    # Names the actual schema and routes to the right onboarding path.
+    assert "agent config" in error.lower()
+    assert "skills" in error.lower()
+    # Not the generic parse-error message the operator can't act on.
+    assert "failed to parse" not in error
+    # DB untouched — never applied garbage.
     app.refresh_from_db()
     assert app.manifest_hash == pre_hash
 

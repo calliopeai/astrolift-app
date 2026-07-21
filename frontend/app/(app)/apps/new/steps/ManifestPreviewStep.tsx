@@ -3,12 +3,14 @@
 import { useLazyQuery } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
+  BotIcon,
   CheckCircle2Icon,
   FileTextIcon,
   FileXIcon,
   PencilIcon,
   RefreshCwIcon,
 } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -70,6 +72,27 @@ function validateManifest(raw: string): {
     errors.push("At least one `[[workloads]]` block is required.");
   }
   return { ok: errors.length === 0, errors };
+}
+
+/**
+ * Client-side mirror of the backend ``detect_toml_schema`` agent-config check
+ * (#1172): an agent config repo carries ``astrolift_version`` plus a
+ * ``[skills.*]`` / ``[tools.*]`` table and has neither a top-level ``name``
+ * nor a ``[[workloads]]`` block. Regex-grade, same posture as
+ * ``validateManifest`` — the backend is authoritative; this only decides
+ * whether to surface the "wrong wizard" callout. These two schemas share the
+ * ``astrolift.toml`` filename, so the manifest step would otherwise validate
+ * an agent library as a broken app manifest.
+ */
+function looksLikeAgentConfig(raw: string): boolean {
+  const trimmed = raw.trim();
+  if (!trimmed) return false;
+  const hasVersion = /^astrolift_version\s*=/m.test(trimmed);
+  const hasSkillOrToolTable = /^\s*\[\s*(?:skills|tools)\s*\./m.test(trimmed);
+  const hasWorkloads = /^\s*\[\[\s*workloads\s*\]\]/m.test(trimmed);
+  const beforeFirstSection = trimmed.split(/\n\[/)[0];
+  const hasName = /^name\s*=\s*["'][^"'\n]+["']/m.test(beforeFirstSection);
+  return hasVersion && hasSkillOrToolTable && !hasWorkloads && !hasName;
 }
 
 interface Props {
@@ -175,10 +198,14 @@ export function ManifestPreviewStep({ state, setState, setValid }: Props) {
         ? s
         : { ...s, manifestValid: ok, manifestErrors: errors }
     );
-    setValid(ok);
-  }, [state.manifestRaw, setState, setValid]);
+    // "Set up manifest later" lets the step advance without a valid manifest
+    // (#1172); we still track manifestValid/errors above so the review step
+    // reflects reality and toggling the option back off restores the gate.
+    setValid(state.manifestLater || ok);
+  }, [state.manifestRaw, state.manifestLater, setState, setValid]);
 
-  const isReadOnly = fetchState === "found" && !editing;
+  const agentConfigDetected = looksLikeAgentConfig(state.manifestRaw);
+  const isReadOnly = (fetchState === "found" && !editing) || state.manifestLater;
 
   return (
     <div className="flex flex-col gap-4">
@@ -193,8 +220,8 @@ export function ManifestPreviewStep({ state, setState, setValid }: Props) {
           />
           <p className="text-muted-foreground text-xs">
             Where <code className="font-mono">astrolift.toml</code> lives in the repo. Defaults to
-            the repository root. Monorepos can host multiple apps — point each registration at
-            its own path (e.g. <code className="font-mono">services/api/astrolift.toml</code>).
+            the repository root. Monorepos can host multiple apps — point each registration at its
+            own path (e.g. <code className="font-mono">services/api/astrolift.toml</code>).
           </p>
         </div>
         <div className="space-y-2">
@@ -210,7 +237,25 @@ export function ManifestPreviewStep({ state, setState, setValid }: Props) {
 
       <FetchBanner state={fetchState} error={fetchError} onRetry={auto} />
 
-      <div className="space-y-2">
+      <label className="flex items-start gap-3 rounded-md border p-4">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={state.manifestLater}
+          onChange={(e) => setState((s) => ({ ...s, manifestLater: e.target.checked }))}
+        />
+        <div className="flex-1">
+          <span className="font-medium">Set up manifest later</span>
+          <p className="text-muted-foreground mt-1 text-xs">
+            Register the app now without a manifest. We&apos;ll land you on the app&apos;s{" "}
+            <span className="font-medium">Manifest</span> tab, where you can add or sync{" "}
+            <code className="font-mono">astrolift.toml</code> when you&apos;re ready. Useful for an
+            empty repo, or an agent config repo whose schema isn&apos;t an app manifest.
+          </p>
+        </div>
+      </label>
+
+      <div className={cn("space-y-2", state.manifestLater && "opacity-60")}>
         <div className="flex items-center justify-between">
           <Label htmlFor="manifest-raw">Manifest</Label>
           <div className="flex items-center gap-1">
@@ -250,6 +295,34 @@ export function ManifestPreviewStep({ state, setState, setValid }: Props) {
           className={cn("font-mono text-xs", isReadOnly && "bg-muted/40 cursor-default")}
           placeholder="Paste an astrolift.toml manifest here."
         />
+        {agentConfigDetected && !state.manifestLater && (
+          <div className="border-info-border bg-info/10 flex flex-col gap-2 rounded-md border p-3 text-sm">
+            <div className="flex items-center gap-2">
+              <BotIcon className="text-info-fg size-4" />
+              <span className="font-medium">This looks like an agent config repo</span>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              It declares <code className="font-mono">astrolift_version</code> with{" "}
+              <code className="font-mono">[skills.*]</code>/
+              <code className="font-mono">[tools.*]</code> tables and no{" "}
+              <code className="font-mono">[[workloads]]</code> — that&apos;s the agent library
+              schema, not an app manifest. Onboard it as an agent fleet or import its skills and
+              tools instead:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm" variant="outline">
+                <Link href="/agents/new">Onboard an agent fleet</Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/agents/skills/import">Import skills / tools</Link>
+              </Button>
+            </div>
+            <p className="text-muted-foreground text-2xs">
+              Or tick <span className="font-medium">Set up manifest later</span> above to register
+              this repo without a manifest.
+            </p>
+          </div>
+        )}
         {state.manifestErrors.length > 0 && (
           <ul className="text-destructive list-inside list-disc space-y-1 text-xs">
             {state.manifestErrors.map((err, i) => (
@@ -258,13 +331,20 @@ export function ManifestPreviewStep({ state, setState, setValid }: Props) {
           </ul>
         )}
         {state.manifestValid && (
-          <p className="inline-flex items-center gap-1 text-xs text-success-fg">
+          <p className="text-success-fg inline-flex items-center gap-1 text-xs">
             <CheckCircle2Icon className="size-3.5" />
             Manifest looks structurally valid (top-level <code className="font-mono">name</code> +
             at least one <code className="font-mono">[[workloads]]</code> block).
           </p>
         )}
       </div>
+      {state.manifestLater && (
+        <p className="text-muted-foreground inline-flex items-center gap-1 text-xs">
+          <CheckCircle2Icon className="text-info-fg size-3.5" />
+          Manifest step skipped — the app registers without a manifest. Add or sync it on the
+          app&apos;s Manifest tab after onboarding.
+        </p>
+      )}
     </div>
   );
 }
@@ -281,8 +361,8 @@ function FetchBanner({
   if (state === "idle" || state === "fetching") return null;
   if (state === "found") {
     return (
-      <div className="flex items-center gap-2 rounded-md border border-success-border bg-success/10 p-3 text-sm">
-        <CheckCircle2Icon className="size-4 text-success-fg" />
+      <div className="border-success-border bg-success/10 flex items-center gap-2 rounded-md border p-3 text-sm">
+        <CheckCircle2Icon className="text-success-fg size-4" />
         <span className="flex-1">Loaded manifest from the repo.</span>
         <Badge variant="secondary" className="gap-1">
           <FileTextIcon className="size-3" /> from repo
@@ -292,8 +372,8 @@ function FetchBanner({
   }
   if (state === "missing") {
     return (
-      <div className="flex items-center gap-2 rounded-md border border-warning-border bg-warning/10 p-3 text-sm">
-        <FileXIcon className="size-4 text-warning-fg" />
+      <div className="border-warning-border bg-warning/10 flex items-center gap-2 rounded-md border p-3 text-sm">
+        <FileXIcon className="text-warning-fg size-4" />
         <span className="flex-1">
           No manifest at that path. We&apos;ve seeded a minimal template — edit it below or paste
           your own.
