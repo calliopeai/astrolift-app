@@ -727,7 +727,11 @@ class LifecycleQuery:
         duration yet.
         """
         window_days = max(1, min(int(window_days), 365))
-        since = timezone.now() - timedelta(days=window_days)
+        # One ``now`` for both the window cutoff and the day bucketing so the
+        # per-day arrays partition exactly the same [since, now) span the
+        # aggregates scan.
+        now = timezone.now()
+        since = now - timedelta(days=window_days)
 
         qs = Deployment.objects.filter(created_at__gte=since, deleted_at__isnull=True)
 
@@ -741,16 +745,17 @@ class LifecycleQuery:
         terminal_failed = {Deployment.Status.FAILED.value}
         terminal_rollback = {Deployment.Status.ROLLED_BACK.value}
 
-        # Single pass over the queryset; we need both counts and
-        # duration samples so a values_list is the right shape.
-        rows = list(qs.values_list("status", "duration_seconds"))
+        # Single pass over the queryset; we need counts, duration samples, and
+        # each row's day bucket, so a values_list carrying created_at is the
+        # right shape — one query backs every field below.
+        rows = list(qs.values_list("status", "duration_seconds", "created_at"))
         total = len(rows)
-        succeeded = sum(1 for s, _ in rows if s in terminal_succeeded)
-        failed = sum(1 for s, _ in rows if s in terminal_failed)
-        rolled_back = sum(1 for s, _ in rows if s in terminal_rollback)
-        in_flight = sum(1 for s, _ in rows if s in in_flight_statuses)
+        succeeded = sum(1 for s, _, _ in rows if s in terminal_succeeded)
+        failed = sum(1 for s, _, _ in rows if s in terminal_failed)
+        rolled_back = sum(1 for s, _, _ in rows if s in terminal_rollback)
+        in_flight = sum(1 for s, _, _ in rows if s in in_flight_statuses)
 
-        durations = [d for s, d in rows if d is not None and d >= 0]
+        durations = [d for s, d, _ in rows if d is not None and d >= 0]
         mean_duration = sum(durations) / len(durations) if durations else None
         p95_duration: float | None = None
         if len(durations) >= 5:
@@ -766,6 +771,30 @@ class LifecycleQuery:
         else:
             success_rate = succeeded / total
 
+        # Per-day buckets, oldest → newest. Bucket i spans
+        # [since + i*day, since + (i+1)*day); created_at maps to
+        # int((created_at - since)/day). created_at >= since (the filter), so
+        # the index is never negative; clamp the created_at==now edge into the
+        # last bucket so every counted row lands in exactly one.
+        day = timedelta(days=1)
+        daily_succeeded = [0] * window_days
+        daily_failed = [0] * window_days
+        daily_duration_sum = [0.0] * window_days
+        daily_duration_count = [0] * window_days
+        for status, duration, created_at in rows:
+            bucket = min(int((created_at - since) / day), window_days - 1)
+            if status in terminal_succeeded:
+                daily_succeeded[bucket] += 1
+            elif status in terminal_failed:
+                daily_failed[bucket] += 1
+            if duration is not None and duration >= 0:
+                daily_duration_sum[bucket] += duration
+                daily_duration_count[bucket] += 1
+        daily_mean_duration_seconds = [
+            (daily_duration_sum[i] / daily_duration_count[i]) if daily_duration_count[i] else None
+            for i in range(window_days)
+        ]
+
         return DeploymentMetricsType(
             window_days=window_days,
             total=total,
@@ -776,6 +805,9 @@ class LifecycleQuery:
             success_rate=success_rate,
             mean_duration_seconds=mean_duration,
             p95_duration_seconds=p95_duration,
+            daily_succeeded=daily_succeeded,
+            daily_failed=daily_failed,
+            daily_mean_duration_seconds=daily_mean_duration_seconds,
         )
 
     @strawberry.field

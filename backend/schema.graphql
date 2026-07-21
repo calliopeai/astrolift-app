@@ -1440,6 +1440,9 @@ type AstroliftDeploymentMetrics {
   successRate: Float!
   meanDurationSeconds: Float
   p95DurationSeconds: Float
+  dailySucceeded: [Int!]!
+  dailyFailed: [Int!]!
+  dailyMeanDurationSeconds: [Float]!
 }
 
 type AstroliftDeploymentMutationResult {

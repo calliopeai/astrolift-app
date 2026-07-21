@@ -1367,6 +1367,9 @@ export type AstroliftDeploymentLogEntry = {
 };
 
 export type AstroliftDeploymentMetrics = {
+  dailyFailed: Array<Scalars['Int']['output']>;
+  dailyMeanDurationSeconds: Array<Maybe<Scalars['Float']['output']>>;
+  dailySucceeded: Array<Scalars['Int']['output']>;
   failed: Scalars['Int']['output'];
   inFlight: Scalars['Int']['output'];
   meanDurationSeconds?: Maybe<Scalars['Float']['output']>;

@@ -27,7 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { RadialGauge } from "@/components/viz";
+import { MiniBar, RadialGauge, Sparkline } from "@/components/viz";
 import {
   GET_DEPLOYMENT_METRICS,
   LIST_APP_HEALTH_SUMMARY,
@@ -38,6 +38,7 @@ import type {
   DeploymentStatus,
 } from "@/graphql/lifecycle/lifecycle.types";
 import { useFormatters } from "@/lib/i18n/formatters";
+import { cn } from "@/lib/utils";
 
 interface MetricsResp {
   astroliftDeploymentMetrics: AstroliftDeploymentMetrics;
@@ -73,16 +74,40 @@ function formatPercent(rate: number): string {
   return `${(rate * 100).toFixed(1)}%`;
 }
 
+// Per-day success rate for the trend line — only days that saw a rollout
+// (the rate is undefined on a zero-deploy day), oldest → newest.
+function successRateSeries(succeeded: number[], failed: number[]): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < succeeded.length; i++) {
+    const n = succeeded[i] + failed[i];
+    if (n > 0) out.push(succeeded[i] / n);
+  }
+  return out;
+}
+
+// Duration trend — drop days with no rollout (null mean) so the line tracks
+// real durations instead of dipping to zero on quiet days.
+function durationTrendSeries(daily: (number | null)[]): number[] {
+  return daily.filter((d): d is number => d != null);
+}
+
+// Total terminal rollouts per day (succeeded + failed) for the volume bars.
+function rolloutsPerDaySeries(succeeded: number[], failed: number[]): number[] {
+  return succeeded.map((s, i) => s + (failed[i] ?? 0));
+}
+
 function MetricCard({
   icon,
   label,
   value,
   hint,
+  trend,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   hint?: string;
+  trend?: number[];
 }) {
   return (
     <Card>
@@ -93,7 +118,17 @@ function MetricCard({
         <span className="text-muted-foreground">{icon}</span>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-semibold tabular-nums">{value}</div>
+        <div className="flex items-end justify-between gap-3">
+          <div className="text-2xl font-semibold tabular-nums">{value}</div>
+          {trend && trend.length > 1 && (
+            <Sparkline
+              data={trend}
+              variant="area"
+              className="text-chart-1 shrink-0"
+              ariaLabel={`${label} trend`}
+            />
+          )}
+        </div>
         {hint && (
           <p className="text-muted-foreground mt-1 text-xs">{hint}</p>
         )}
@@ -108,10 +143,12 @@ function SuccessRateCard({
   rate,
   label,
   hint,
+  trend,
 }: {
   rate: number;
   label: string;
   hint?: string;
+  trend?: number[];
 }) {
   const known = rate >= 0;
   const tone = !known
@@ -129,15 +166,25 @@ function SuccessRateCard({
         </CardTitle>
         <CheckCircle2Icon className="text-muted-foreground size-4" />
       </CardHeader>
-      <CardContent className="flex items-center gap-3">
-        <RadialGauge
-          value={known ? rate : 0}
-          size={56}
-          label={known ? label : "—"}
-          className={tone}
-          ariaLabel="Deployment success rate"
-        />
-        {hint && <p className="text-muted-foreground min-w-0 text-xs">{hint}</p>}
+      <CardContent>
+        <div className="flex items-center gap-3">
+          <RadialGauge
+            value={known ? rate : 0}
+            size={56}
+            label={known ? label : "—"}
+            className={tone}
+            ariaLabel="Deployment success rate"
+          />
+          {trend && trend.length > 1 && (
+            <Sparkline
+              data={trend}
+              variant="area"
+              className={cn("ml-auto shrink-0", tone)}
+              ariaLabel="Deployment success-rate trend"
+            />
+          )}
+        </div>
+        {hint && <p className="text-muted-foreground mt-2 min-w-0 text-xs">{hint}</p>}
       </CardContent>
     </Card>
   );
@@ -158,6 +205,16 @@ export function MetricsClient() {
 
   const metrics = metricsData?.astroliftDeploymentMetrics;
   const apps = healthData?.astroliftAppHealthSummary ?? [];
+
+  const rateTrend = metrics
+    ? successRateSeries(metrics.dailySucceeded, metrics.dailyFailed)
+    : [];
+  const durationTrend = metrics
+    ? durationTrendSeries(metrics.dailyMeanDurationSeconds)
+    : [];
+  const rolloutsTrend = metrics
+    ? rolloutsPerDaySeries(metrics.dailySucceeded, metrics.dailyFailed)
+    : [];
 
   const successRateLabel = metrics
     ? formatPercent(metrics.successRate)
@@ -185,6 +242,7 @@ export function MetricsClient() {
               rate={metrics?.successRate ?? -1}
               label={successRateLabel}
               hint={successRateHint}
+              trend={rateTrend}
             />
             <MetricCard
               icon={<ActivityIcon className="size-4" />}
@@ -197,6 +255,7 @@ export function MetricsClient() {
               label="Mean rollout"
               value={formatDuration(metrics?.meanDurationSeconds ?? null)}
               hint="Average across terminal-state deploys in window"
+              trend={durationTrend}
             />
             <MetricCard
               icon={<GaugeIcon className="size-4" />}
@@ -214,21 +273,37 @@ export function MetricsClient() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Outcomes ({windowDays}d)</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            <Badge variant="secondary" className="gap-1">
-              <CheckCircle2Icon className="size-3 text-success-fg" />
-              succeeded {metrics.succeeded}
-            </Badge>
-            <Badge variant="secondary" className="gap-1">
-              <FlameIcon className="size-3 text-danger-fg" />
-              failed {metrics.failed}
-            </Badge>
-            <Badge variant="secondary" className="gap-1">
-              <AlertTriangleIcon className="size-3 text-warning-fg" />
-              rolled back {metrics.rolledBack}
-            </Badge>
-            <Badge variant="outline">in flight {metrics.inFlight}</Badge>
-            <Badge variant="outline">total {metrics.total}</Badge>
+          <CardContent className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="secondary" className="gap-1">
+                <CheckCircle2Icon className="size-3 text-success-fg" />
+                succeeded {metrics.succeeded}
+              </Badge>
+              <Badge variant="secondary" className="gap-1">
+                <FlameIcon className="size-3 text-danger-fg" />
+                failed {metrics.failed}
+              </Badge>
+              <Badge variant="secondary" className="gap-1">
+                <AlertTriangleIcon className="size-3 text-warning-fg" />
+                rolled back {metrics.rolledBack}
+              </Badge>
+              <Badge variant="outline">in flight {metrics.inFlight}</Badge>
+              <Badge variant="outline">total {metrics.total}</Badge>
+            </div>
+            {rolloutsTrend.some((n) => n > 0) && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground text-2xs uppercase tracking-wide">
+                  {windowDays}-day rollouts
+                </span>
+                <MiniBar
+                  data={rolloutsTrend}
+                  width={180}
+                  height={32}
+                  className="text-chart-1"
+                  ariaLabel="Rollouts per day"
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
