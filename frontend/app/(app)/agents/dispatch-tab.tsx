@@ -7,6 +7,7 @@ import {
   ChevronDownIcon,
   ClockIcon,
   InfoIcon,
+  KeyRoundIcon,
   Loader2Icon,
   RepeatIcon,
   SettingsIcon,
@@ -17,6 +18,7 @@ import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { AgentSecretsDialog } from "@/app/(app)/agents/agent-secrets-dialog";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -514,6 +516,13 @@ function OnceForm({
   // Sentinel for the "Agent default" option — the Select primitive can't hold
   // an empty-string value, so map it to "" in the parent's state.
   const ENV_DEFAULT = "__default__";
+  const [secretsDialogOpen, setSecretsDialogOpen] = React.useState<boolean>(false);
+  const selectedSpec = envSpecs.find((s) => s.id === envSpecId) ?? null;
+  // secretRefs is the JSON ref list ([{uri, env_var}]); its length badges the
+  // Manage-secrets button without opening the status dialog.
+  const selectedSpecSecretCount = Array.isArray(selectedSpec?.secretRefs)
+    ? (selectedSpec.secretRefs as unknown[]).length
+    : 0;
   return (
     <div className="space-y-4">
       {/* Inputs — a prompt string or a raw JSON object (trigger_payload). */}
@@ -597,25 +606,40 @@ function OnceForm({
         <CollapsibleContent className="space-y-4 pt-3">
           <div className="space-y-1.5">
             <Label htmlFor="dispatch-env-spec">Environment spec</Label>
-            <Select
-              value={envSpecId || ENV_DEFAULT}
-              onValueChange={(v) => onEnvSpecChange(v === ENV_DEFAULT ? "" : v)}
-            >
-              <SelectTrigger id="dispatch-env-spec" className="max-w-md">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ENV_DEFAULT}>Agent default</SelectItem>
-                {envSpecs.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}{" "}
-                    <span className="text-muted-foreground">
-                      ({s.runtime || s.imageTag || s.agentType})
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <Select
+                value={envSpecId || ENV_DEFAULT}
+                onValueChange={(v) => onEnvSpecChange(v === ENV_DEFAULT ? "" : v)}
+              >
+                <SelectTrigger id="dispatch-env-spec" className="max-w-md">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ENV_DEFAULT}>Agent default</SelectItem>
+                  {envSpecs.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}{" "}
+                      <span className="text-muted-foreground">
+                        ({s.runtime || s.imageTag || s.agentType})
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                disabled={!selectedSpec}
+                onClick={() => setSecretsDialogOpen(true)}
+                title="Manage the secret values this spec's refs point at"
+              >
+                <KeyRoundIcon className="size-4" />
+                Secrets
+                {selectedSpecSecretCount > 0 ? ` (${selectedSpecSecretCount})` : ""}
+              </Button>
+            </div>
             <p className="text-muted-foreground text-xs">
               Pins the container-environment recipe (image, runtime, tools, VNC) the run launches
               into. Leave as <span className="font-medium">Agent default</span> to use the
@@ -664,6 +688,15 @@ function OnceForm({
           Dispatch run
         </Button>
       </div>
+
+      {selectedSpec && (
+        <AgentSecretsDialog
+          envSpecSlug={selectedSpec.slug}
+          envSpecName={selectedSpec.name}
+          open={secretsDialogOpen}
+          onOpenChange={setSecretsDialogOpen}
+        />
+      )}
     </div>
   );
 }
