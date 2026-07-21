@@ -699,6 +699,13 @@ class DeploymentMetricsType:
     success_rate: float  # 0.0–1.0; -1 when total==0
     mean_duration_seconds: float | None
     p95_duration_seconds: float | None
+    # Per-day series over the window, oldest → newest, length == window_days.
+    # Rollout counts zero-fill empty days; the duration mean is null on a day
+    # with no rollouts (0.0 would read as an instant deploy). Buckets share the
+    # aggregates' UTC cutoff, so sum(daily_succeeded) == succeeded, etc.
+    daily_succeeded: list[int]
+    daily_failed: list[int]
+    daily_mean_duration_seconds: list[float | None]
 
 
 @strawberry.type(name="AstroliftAppHealthSummary")

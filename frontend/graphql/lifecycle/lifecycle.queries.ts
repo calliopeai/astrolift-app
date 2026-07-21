@@ -193,6 +193,9 @@ export const GET_DEPLOYMENT_METRICS = gql`
       successRate
       meanDurationSeconds
       p95DurationSeconds
+      dailySucceeded
+      dailyFailed
+      dailyMeanDurationSeconds
     }
   }
 `;
