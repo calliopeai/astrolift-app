@@ -99,6 +99,12 @@ export interface PipelineDagProps {
   onStageClick?: (stage: PipelineDagStage) => void;
   /** Visual treatment — forwarded to `FlowGraph` (#1055). */
   variant?: "default" | "telemetry";
+  /**
+   * Mark edges flowing into a `running` stage as `animated` so the telemetry
+   * scope lights them with the live teal flow (#1090). Off by default, so
+   * static run graphs (deployment/pipeline) are unaffected.
+   */
+  animateActiveEdges?: boolean;
 }
 
 /**
@@ -110,7 +116,7 @@ export interface PipelineDagProps {
  * by dependency depth. Remount via a `key` (e.g. the run id) to re-flow when a
  * different run is selected.
  */
-export function PipelineDag({ stages, height = 320, className, onStageClick, variant }: PipelineDagProps) {
+export function PipelineDag({ stages, height = 320, className, onStageClick, variant, animateActiveEdges }: PipelineDagProps) {
   const nodes = React.useMemo<Node<PipelineDagStage>[]>(() => {
     const ids = stages.map((s) => s.id);
     const edges = stages.flatMap((s) => (s.needs ?? []).map((dep) => ({ source: dep, target: s.id })));
@@ -129,7 +135,12 @@ export function PipelineDag({ stages, height = 320, className, onStageClick, var
       stages.flatMap((s) =>
         (s.needs ?? [])
           .filter((dep) => stages.some((t) => t.id === dep))
-          .map((dep) => ({ id: `${dep}->${s.id}`, source: dep, target: s.id })),
+          .map((dep) => ({
+            id: `${dep}->${s.id}`,
+            source: dep,
+            target: s.id,
+            animated: !!animateActiveEdges && toneFor(s.status) === "running",
+          })),
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],

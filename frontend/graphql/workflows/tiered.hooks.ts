@@ -191,18 +191,26 @@ export const useReorderWorkflowStages = () =>
 
 // ─── Tier 3 — runs ───────────────────────────────────────────────────────
 
+// Exposes startPolling/stopPolling so a caller can gate polling on the query's
+// own output — the live workflow DAG (#1090) polls while its focus run is
+// non-terminal and stops once it settles.
 export const useWorkflowRuns = (workflowId: string | null, orgId?: string | null) => {
-  const { data, loading, error, refetch } = useQuery<TieredWorkflowRunsData>(LIST_WORKFLOW_RUNS, {
-    variables: { workflowId: workflowId ?? "", orgId: orgId ?? null },
-    fetchPolicy: "cache-and-network",
-    skip: !workflowId,
-  });
-  return { runs: data?.workflowRuns ?? [], loading, error, refetch };
+  const { data, loading, error, refetch, startPolling, stopPolling } =
+    useQuery<TieredWorkflowRunsData>(LIST_WORKFLOW_RUNS, {
+      variables: { workflowId: workflowId ?? "", orgId: orgId ?? null },
+      fetchPolicy: "cache-and-network",
+      skip: !workflowId,
+    });
+  return { runs: data?.workflowRuns ?? [], loading, error, refetch, startPolling, stopPolling };
 };
 
+// `pollInterval` is passed straight to Apollo, which treats it reactively: a
+// non-zero value polls at that cadence, switching back to 0 stops. The live
+// DAG (#1090) drives it from run terminality (0 once the run settles).
 export const useWorkflowStageExecutions = (params: {
   workflowId: string | null;
   runId: string | null;
+  pollInterval?: number;
 }) => {
   const { data, loading, error, refetch } = useQuery<TieredWorkflowStageExecutionsData>(
     LIST_WORKFLOW_STAGE_EXECUTIONS,
@@ -210,6 +218,7 @@ export const useWorkflowStageExecutions = (params: {
       variables: { workflowId: params.workflowId ?? "", runId: params.runId ?? "" },
       fetchPolicy: "cache-and-network",
       skip: !params.workflowId || !params.runId,
+      pollInterval: params.pollInterval ?? 0,
     }
   );
   return { executions: data?.workflowStageExecutions ?? [], loading, error, refetch };
