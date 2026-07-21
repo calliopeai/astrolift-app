@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronRightIcon, ClockIcon, Loader2Icon, RefreshCwIcon, XIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,11 @@ import type { ConfiguredWorkflowWithRuns, TieredWorkflowRun } from "@/graphql/wo
 import { useWorkflowInstanceDetail } from "@/graphql/workflows/workflows.hooks";
 import { useFormatters } from "@/lib/i18n/formatters";
 
-import { RunStateBadge } from "./run-content";
+import { isRunTerminal, RunStateBadge } from "./run-content";
+import { WorkflowRunDag } from "./workflow-run-dag";
+
+// Run-list poll cadence while a run is live — inside the 3–5s window (#1090).
+const RUNS_POLL_MS = 4000;
 
 /**
  * Observe pillar — the workflow's run history (tier-3 `workflowRuns`), with a
@@ -21,14 +25,29 @@ import { RunStateBadge } from "./run-content";
  */
 export function ObserveContent({ workflow }: { workflow: ConfiguredWorkflowWithRuns }) {
   const fmt = useFormatters();
-  const { runs, loading, error, refetch } = useWorkflowRuns(
+  const { runs, loading, error, refetch, startPolling, stopPolling } = useWorkflowRuns(
     workflow.guid,
     workflow.organizationGuid
   );
   const [selectedGuid, setSelectedGuid] = useState<string | null>(null);
 
   const sorted = [...runs].sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1));
-  const selected = sorted.find((r) => r.guid === selectedGuid) ?? null;
+  // Default the drill-down to the newest run so the live flow shows on load.
+  const focusGuid = selectedGuid ?? sorted[0]?.guid ?? null;
+  const selected = sorted.find((r) => r.guid === focusGuid) ?? null;
+  const focusTerminal = isRunTerminal(selected);
+
+  // Poll the run list while the focused run is non-terminal — this keeps its
+  // state live and produces the stop signal for the stage-execution poll below;
+  // stop once the run settles.
+  useEffect(() => {
+    if (focusTerminal) {
+      stopPolling();
+      return;
+    }
+    startPolling(RUNS_POLL_MS);
+    return () => stopPolling();
+  }, [focusTerminal, startPolling, stopPolling]);
 
   return (
     <Section
@@ -69,7 +88,7 @@ export function ObserveContent({ workflow }: { workflow: ConfiguredWorkflowWithR
                   type="button"
                   onClick={() => setSelectedGuid(run.guid)}
                   className={`hover:bg-accent flex w-full items-center justify-between gap-2 rounded-md border p-3 text-left transition-colors ${
-                    selectedGuid === run.guid ? "bg-accent" : ""
+                    focusGuid === run.guid ? "bg-accent" : ""
                   }`}
                 >
                   <div className="min-w-0 flex-1">
@@ -90,7 +109,12 @@ export function ObserveContent({ workflow }: { workflow: ConfiguredWorkflowWithR
             ))}
           </ul>
 
-          <RunTimelinePanel run={selected} onClose={() => setSelectedGuid(null)} />
+          <RunTimelinePanel
+            run={selected}
+            definitionSlug={workflow.definitionSlug}
+            isTerminal={focusTerminal}
+            onClose={() => setSelectedGuid(null)}
+          />
         </div>
       )}
     </Section>
@@ -99,9 +123,13 @@ export function ObserveContent({ workflow }: { workflow: ConfiguredWorkflowWithR
 
 function RunTimelinePanel({
   run,
+  definitionSlug,
+  isTerminal,
   onClose,
 }: {
   run: TieredWorkflowRun | null;
+  definitionSlug: string;
+  isTerminal: boolean;
   onClose: () => void;
 }) {
   const fmt = useFormatters();
@@ -136,6 +164,18 @@ function RunTimelinePanel({
           <XIcon className="size-4" />
         </Button>
       </div>
+
+      <WorkflowRunDag
+        key={run.guid}
+        workflowId={detail?.instance.workflowId ?? null}
+        runId={detail?.instance.runId ?? null}
+        definitionSlug={definitionSlug}
+        isTerminal={isTerminal}
+      />
+
+      <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
+        Engine timeline
+      </p>
 
       {!run.temporalWorkflowId && (
         <div className="text-muted-foreground rounded-md border border-dashed p-4 text-center text-xs">
