@@ -34,6 +34,7 @@ from astrolift_agents.schema.types import (
     AgentListItemType,
     AgentLiveStatusType,
     AgentRuntimeType,
+    AgentSecretStatusType,
     AgentTaskType,
     AgentTriggerType,
     BriefType,
@@ -45,6 +46,7 @@ from astrolift_agents.schema.types import (
     ToolDefType,
     agent_detail_to_type,
     agent_env_spec_to_type,
+    agent_secret_status_to_type,
     agent_task_to_type,
     agent_trigger_to_type,
     brief_to_type,
@@ -616,6 +618,40 @@ class AgentsQuery:
             slug=slug, organization_id=org_pk, deleted_at__isnull=True
         ).first()
         return agent_env_spec_to_type(row) if row is not None else None
+
+    @strawberry.field
+    @require_permission(Permission.SECRET_READ, Permission.SECRET_LIST)
+    @tenant_scoped()
+    def agent_environment_spec_secret_status(self, info: Info, slug: str) -> list[AgentSecretStatusType]:
+        """Per-ref presence status for a spec's ``secret_refs`` — metadata
+        only (env var, uri, exists), never values.
+
+        Scoped to the caller's org. A ref whose store read fails reports
+        ``exists=false`` with a short ``error`` string rather than failing
+        the whole query (mirrors the bundle-key swallow-and-report). A spec
+        in another org (or absent) resolves to ``[]``.
+        """
+        from astrolift_agents.services.agent_cluster import (
+            NoAgentClusterError,
+            resolve_agent_cluster,
+        )
+        from astrolift_dispatch.agent_secrets import probe_ref_statuses
+
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        spec = (
+            AgentEnvironmentSpec.objects.select_related("organization")
+            .filter(slug=slug, organization_id=org_pk, deleted_at__isnull=True)
+            .first()
+        )
+        if spec is None:
+            return []
+        try:
+            cluster = resolve_agent_cluster(spec.organization)
+        except NoAgentClusterError:
+            cluster = None
+        rows = probe_ref_statuses(cluster=cluster, refs=spec.secret_refs)
+        return [agent_secret_status_to_type(r) for r in rows]
 
     # ----------------------------------------------------------------
     # Agent list + live status (spec 33 PR-2)

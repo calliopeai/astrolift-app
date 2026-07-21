@@ -245,6 +245,48 @@ export const UPDATE_AGENT_RUN_SPEC = gql`
   }
 `;
 
+// Agent secret VALUE management (#1173). These write/delete the VALUE behind a
+// spec's secret ref THROUGH to the install's secret store; the control plane
+// never persists or returns the plaintext. `data` echoes only presence
+// metadata (envVar/uri/exists), never the value. Both gate on `secret.write`
+// server-side. The Manage-secrets dialog refetches
+// `AgentEnvironmentSpecSecretStatus` after either.
+export const SET_AGENT_SECRET_VALUE = gql`
+  mutation SetAgentSecretValue($slug: String!, $envVar: String!, $value: String!) {
+    setAgentSecretValue(envSpecSlug: $slug, envVar: $envVar, value: $value) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        envVar
+        uri
+        exists
+      }
+    }
+  }
+`;
+
+export const DELETE_AGENT_SECRET_VALUE = gql`
+  mutation DeleteAgentSecretValue($slug: String!, $envVar: String!) {
+    deleteAgentSecretValue(envSpecSlug: $slug, envVar: $envVar) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        envVar
+        uri
+        exists
+      }
+    }
+  }
+`;
+
 export const IMPORT_SKILLS_FROM_REPO = gql`
   mutation ImportSkillsFromRepo($repoUrl: String!, $branch: String) {
     importSkillsFromRepo(repoUrl: $repoUrl, branch: $branch) {

@@ -78,38 +78,16 @@ def _skill_org_or_global_q(organization: Any):
 
 
 def _resolve_managed_cluster(organization: Any) -> Any:
-    """Return the org's ``managed`` TenantCluster (preferring an org-owned one,
-    falling back to a shared platform cluster), or raise.
+    """Return the org's ``managed`` TenantCluster for agent dispatch, or raise.
 
-    Agent stages are org-scoped (not app-scoped), so they run on the org's
-    default managed cluster. A cluster may be org-owned (``organization`` set)
-    or a shared platform cluster the install registered with ``organization``
-    NULL — the same EKS the org's apps already deploy onto via
-    ``AppEnvironment.tenant_cluster``. We match both (mirroring the
-    org-or-global skill lookup) and prefer the org-owned row so an org with
-    its own cluster isn't shadowed by a shared one.
-    ``registered``/``error``/``decommissioned`` rows are not deploy targets
-    and are skipped.
+    Delegates to :func:`astrolift_agents.services.agent_cluster.resolve_agent_cluster`
+    so the spawn path, the secret-value mutations, and the secret-status
+    query all resolve the *same* cluster (and therefore the same secret
+    store) for a given org — the write/read symmetry #1173 depends on.
     """
-    from django.db.models import F, Q
+    from astrolift_agents.services.agent_cluster import resolve_agent_cluster
 
-    from astrolift_clusters.models import TenantCluster
-
-    cluster = (
-        TenantCluster.objects.filter(
-            Q(organization=organization) | Q(organization__isnull=True),
-            deleted_at__isnull=True,
-            lifecycle=TenantCluster.Lifecycle.MANAGED.value,
-        )
-        .order_by(F("organization_id").asc(nulls_last=True), "created_at")
-        .first()
-    )
-    if cluster is None:
-        raise RuntimeError(
-            f"organization {organization.slug!r} has no managed cluster — "
-            f"agent stage cannot be dispatched"
-        )
-    return cluster
+    return resolve_agent_cluster(organization)
 
 
 def _create_agent_task_sync(params: dict[str, Any]) -> int:

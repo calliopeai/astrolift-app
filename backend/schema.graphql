@@ -318,6 +318,19 @@ type AstroliftAgentScaleResult {
   readyReplicas: Int
 }
 
+type AstroliftAgentSecretStatus {
+  envVar: String!
+  uri: String!
+  exists: Boolean!
+  error: String
+}
+
+type AstroliftAgentSecretStatusMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAgentSecretStatus
+}
+
 type AstroliftAgentSkill {
   position: Int!
   skill: AstroliftSkill!
@@ -4697,6 +4710,8 @@ type Mutation {
   createAgentEnvironmentSpec(input: CreateAgentEnvironmentSpecInput!, orgId: ID!): AstroliftAgentEnvironmentSpecMutationResult!
   updateAgentEnvironmentSpec(slug: String!, input: UpdateAgentEnvironmentSpecInput!): AstroliftAgentEnvironmentSpecMutationResult!
   deleteAgentEnvironmentSpec(slug: String!): AstroliftAgentEnvironmentSpecMutationResult!
+  setAgentSecretValue(envSpecSlug: String!, envVar: String!, value: String!): AstroliftAgentSecretStatusMutationResult!
+  deleteAgentSecretValue(envSpecSlug: String!, envVar: String!): AstroliftAgentSecretStatusMutationResult!
   assembleBrief(skillIds: [ID!]!, orgId: ID!, config: JSON = null): AstroliftAssembleBriefResultMutationResult!
   launchTask(briefId: ID!, orgId: ID!, callbackUrl: String = null): AstroliftLaunchTaskResultMutationResult!
   cancelTask(id: ID!): NoneTypeMutationResult!
@@ -5200,6 +5215,7 @@ type Query {
   agentTaskLogs(id: ID!, tail: Int! = 200): [String!]!
   agentEnvironmentSpecs(orgId: ID!): [AstroliftAgentEnvironmentSpec!]!
   agentEnvironmentSpec(slug: String!): AstroliftAgentEnvironmentSpec
+  agentEnvironmentSpecSecretStatus(slug: String!): [AstroliftAgentSecretStatus!]!
   agentWorkloads(orgId: ID!, projectSlug: String = null): [AstroliftAgentListItem!]!
   agentFleet(orgId: ID!): [AstroliftAgentListItem!]!
   agent(orgId: ID!, slug: String!): AstroliftAgentDetail

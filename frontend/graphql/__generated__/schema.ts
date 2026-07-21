@@ -322,6 +322,13 @@ export type AstroliftAgentRuntime = {
   name: Scalars['String']['output'];
 };
 
+export type AstroliftAgentSecretStatus = {
+  envVar: Scalars['String']['output'];
+  error?: Maybe<Scalars['String']['output']>;
+  exists: Scalars['Boolean']['output'];
+  uri: Scalars['String']['output'];
+};
+
 export type AstroliftAgentSkill = {
   position: Scalars['Int']['output'];
   skill: AstroliftSkill;

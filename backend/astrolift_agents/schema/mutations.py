@@ -36,6 +36,7 @@ from astrolift_agents.schema.types import (
     AgentRunFamily,
     AgentRunMode,
     AgentRunSpecType,
+    AgentSecretStatusType,
     AgentTaskType,
     OrgSkillRepoType,
     SkillType,
@@ -385,6 +386,91 @@ class ImportSkillsResult:
     source_ref: str
 
 
+# ---------------------------------------------------------------------------
+# Agent secret VALUE management (#1173)
+# ---------------------------------------------------------------------------
+
+
+def _agent_secret_target(*args, **kwargs):
+    """``@mutation_audit`` target hook for agent secret writes.
+
+    Records ``('AgentSecret', '<spec-slug>:<env-var>')`` so the audit row
+    identifies which ref was touched — never the value. Returns ``None`` to
+    skip targeting when invoked without the expected args (test scaffolding).
+    """
+    env_spec_slug = kwargs.get("env_spec_slug")
+    env_var = kwargs.get("env_var")
+    if env_spec_slug is None and len(args) >= 3:
+        env_spec_slug = args[2]
+    if env_var is None and len(args) >= 4:
+        env_var = args[3]
+    if not env_spec_slug or not env_var:
+        return None
+    return "AgentSecret", f"{env_spec_slug}:{env_var}"
+
+
+def _load_spec_and_ref(env_spec_slug: str, env_var: str):
+    """Resolve ``(spec, ref, None)`` for a tenant-scoped spec + the
+    ``secret_refs`` entry bound to ``env_var``, or ``(None, None, failure)``.
+
+    Org-scoped to the caller's active tenant (a spec in another org is
+    NOT_FOUND, no leak). ``ref`` is the normalized ``{"uri", "env_var"}``.
+    """
+    from astrolift_dispatch.agent_secrets import normalize_secret_refs
+
+    tenant = get_current_tenant()
+    org_pk = tenant.organization_id if tenant else None
+    spec = (
+        AgentEnvironmentSpec.objects.select_related("organization")
+        .filter(slug=env_spec_slug, organization_id=org_pk, deleted_at__isnull=True)
+        .first()
+    )
+    if spec is None:
+        return None, None, gql_failure(ErrorCode.NOT_FOUND.value, "environment spec not found")
+    ref = next(
+        (r for r in normalize_secret_refs(spec.secret_refs) if r["env_var"] == env_var),
+        None,
+    )
+    if ref is None:
+        return (
+            None,
+            None,
+            gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"no secret ref bound to env var {env_var!r} on spec {env_spec_slug!r}",
+                field="envVar",
+            ),
+        )
+    return spec, ref, None
+
+
+def _agent_secrets_backend(spec):
+    """Resolve ``(backend, None)`` for the spec's org secret store, or
+    ``(None, failure)``.
+
+    Uses the SAME cluster resolution the dispatcher spawns onto
+    (:func:`resolve_agent_cluster`) so a value written here lands in the
+    exact store the pod reads at launch.
+    """
+    from astrolift_agents.services.agent_cluster import (
+        NoAgentClusterError,
+        resolve_agent_cluster,
+    )
+    from astrolift_dispatch.agent_secrets import resolve_secrets_backend
+
+    try:
+        cluster = resolve_agent_cluster(spec.organization)
+    except NoAgentClusterError as exc:
+        return None, gql_failure(ErrorCode.PRECONDITION.value, str(exc))
+    try:
+        return resolve_secrets_backend(cluster), None
+    except Exception as exc:  # noqa: BLE001 — no secrets driver ⇒ precondition, not 500
+        return None, gql_failure(
+            ErrorCode.PRECONDITION.value,
+            f"no secret store available for this org: {exc}",
+        )
+
+
 @strawberry.type
 class AgentsMutation:
     @strawberry.field
@@ -663,6 +749,75 @@ class AgentsMutation:
             return gql_failure(ErrorCode.NOT_FOUND.value, "environment spec not found")
         spec.soft_delete()
         return gql_success(agent_env_spec_to_type(spec))
+
+    # ---- Agent secret VALUE management (#1173) --------------------
+    #
+    # The env-spec row carries secret *references* only; these mutations
+    # write/rotate/delete the referenced VALUES through to the install's
+    # secret store via the per-cluster SecretsBackend driver. The value is
+    # never persisted in the control plane, never logged, and never placed
+    # in an audit row.
+
+    @strawberry.field
+    @mutation_audit(action="agents.secret.set", target=_agent_secret_target)
+    @require_permission(Permission.SECRET_WRITE)
+    @tenant_scoped()
+    def set_agent_secret_value(
+        self, info: Info, env_spec_slug: str, env_var: str, value: str
+    ) -> MutationResultType[AgentSecretStatusType]:
+        """Write-through (create or rotate) the VALUE for one of a spec's
+        ``secret_refs``, keyed by its ``env_var``.
+
+        ``upsert`` covers create + rotate identically. Errors surface in the
+        MutationResult envelope; the resolver never raises and never echoes
+        the value.
+        """
+        from astrolift_dispatch.agent_secrets import write_secret_value
+
+        spec, ref, err = _load_spec_and_ref(env_spec_slug, env_var)
+        if err is not None:
+            return err
+        backend, berr = _agent_secrets_backend(spec)
+        if berr is not None:
+            return berr
+        try:
+            write_secret_value(backend, ref["uri"], value)
+        except Exception as exc:  # noqa: BLE001 — driver error surfaces value-free
+            return gql_failure(ErrorCode.INTERNAL.value, f"secret store write failed: {exc}")
+        return gql_success(AgentSecretStatusType(env_var=env_var, uri=ref["uri"], exists=True, error=None))
+
+    @strawberry.field
+    @mutation_audit(action="agents.secret.delete", target=_agent_secret_target)
+    @require_permission(Permission.SECRET_WRITE)
+    @tenant_scoped()
+    def delete_agent_secret_value(
+        self, info: Info, env_spec_slug: str, env_var: str
+    ) -> MutationResultType[AgentSecretStatusType]:
+        """Delete the stored VALUE for one of a spec's ``secret_refs``.
+
+        Idempotent from the operator's view: a ref whose value is already
+        absent returns success (desired end-state holds). The env-spec's
+        reference itself is untouched — only the store value is removed.
+        """
+        from astrolift_dispatch.agent_secrets import delete_secret_value, read_secret_value
+
+        spec, ref, err = _load_spec_and_ref(env_spec_slug, env_var)
+        if err is not None:
+            return err
+        backend, berr = _agent_secrets_backend(spec)
+        if berr is not None:
+            return berr
+        absent = AgentSecretStatusType(env_var=env_var, uri=ref["uri"], exists=False, error=None)
+        try:
+            # Probe-then-delete keeps "delete of an already-absent value"
+            # a clean success without coupling to a provider-specific
+            # not-found exception type.
+            if read_secret_value(backend, ref["uri"]) is None:
+                return gql_success(absent)
+            delete_secret_value(backend, ref["uri"])
+        except Exception as exc:  # noqa: BLE001 — driver error surfaces value-free
+            return gql_failure(ErrorCode.INTERNAL.value, f"secret store delete failed: {exc}")
+        return gql_success(absent)
 
     @strawberry.field
     @mutation_audit(action="agents.brief.assemble")

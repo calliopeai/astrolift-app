@@ -59,6 +59,34 @@ class K8sJobSpawner(ContainerSpawner):
         # non-VNC tasks and when no blob store is configured).
         job_manifest = inject_snapshot_into_job_spec(job_manifest, task)
 
+        # Resolve the spec's secret_refs to live values from the install's
+        # secret store (the SAME store setAgentSecretValue writes into, via
+        # self._cluster) and materialize them as a per-task K8s Secret the
+        # pod mounts via secretKeyRef (#1173). Preflight fails the spawn with
+        # one readable error listing every missing/empty ref rather than
+        # letting the pod crash-loop on an unresolvable reference.
+        from astrolift_dispatch.agent_secrets import (
+            AgentSecretResolutionError,
+            resolve_task_secret_manifest,
+            task_secret_name,
+        )
+
+        try:
+            secret_manifest = resolve_task_secret_manifest(
+                cluster=self._cluster,
+                spec=getattr(task, "environment_spec", None),
+                secret_name=task_secret_name(job_name),
+                namespace=self._namespace,
+                task_guid=str(task.guid),
+            )
+        except AgentSecretResolutionError as exc:
+            logger.warning("k8s_job_spawner: secret preflight failed for Job %s: %s", job_name, exc)
+            return SpawnResult(external_id=job_name, ok=False, error=str(exc))
+
+        # Secret before Job so it exists when the pod starts. Non-secret
+        # specs apply the Job alone (unchanged path).
+        manifests = [secret_manifest, job_manifest] if secret_manifest else [job_manifest]
+
         try:
             driver = _driver_for_cluster(self._cluster)
             ctx = _context_for_cluster(self._cluster)
@@ -74,7 +102,7 @@ class K8sJobSpawner(ContainerSpawner):
                     {"astrolift.io/managed-by": "platform", "astrolift.io/component": "agents"},
                     {},
                 )
-            result = driver.apply_manifests(ctx.slug, self._namespace, [job_manifest])
+            result = driver.apply_manifests(ctx.slug, self._namespace, manifests)
             if not getattr(result, "ok", False):
                 error = result.summary() if hasattr(result, "summary") else "apply failed"
                 logger.warning("k8s_job_spawner: apply failed for Job %s: %s", job_name, error)
@@ -111,19 +139,32 @@ class K8sJobSpawner(ContainerSpawner):
             return TaskStatus(failed=True, error_message=str(exc))
 
     def stop(self, external_id: str) -> None:
-        """Delete the K8s Job (and its pod) for a running task."""
+        """Delete the K8s Job (and its pod) for a running task, plus the
+        per-task secret Secret if one was materialized (#1173).
+
+        The Secret is deleted by its deterministic name; for a task that
+        declared no secret_refs it simply isn't found (delete_manifests
+        records it under ``not_found`` — a harmless no-op)."""
+        from astrolift_dispatch.agent_secrets import task_secret_name
         from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
-        job_ref = {
-            "apiVersion": "batch/v1",
-            "kind": "Job",
-            "metadata": {"name": external_id, "namespace": self._namespace},
-        }
+        refs = [
+            {
+                "apiVersion": "batch/v1",
+                "kind": "Job",
+                "metadata": {"name": external_id, "namespace": self._namespace},
+            },
+            {
+                "apiVersion": "v1",
+                "kind": "Secret",
+                "metadata": {"name": task_secret_name(external_id), "namespace": self._namespace},
+            },
+        ]
         try:
             driver = _driver_for_cluster(self._cluster)
             ctx = _context_for_cluster(self._cluster)
-            driver.delete_manifests(ctx.slug, self._namespace, [job_ref])
-            logger.info("k8s_job_spawner: deleted Job %s", external_id)
+            driver.delete_manifests(ctx.slug, self._namespace, refs)
+            logger.info("k8s_job_spawner: deleted Job %s (+ secret)", external_id)
         except Exception:  # noqa: BLE001
             logger.exception("k8s_job_spawner: failed to delete Job %s", external_id)
 
@@ -195,11 +236,19 @@ def _resolve_base_image(workload, spec) -> str:
 
 def _render_agent_job(*, job_name: str, workload, namespace: str, task) -> dict:
     """Build a minimal batch/v1 Job manifest for an agent workload."""
+    from astrolift_dispatch.agent_secrets import agent_container_env, task_secret_name
+
     primary_container = workload.containers.filter(is_primary=True).first()
     port = primary_container.port if primary_container else 0
 
     spec = getattr(task, "environment_spec", None)
     image = _resolve_base_image(workload, spec)
+
+    # The spec's non-secret env vars go on the pod as plain env; its
+    # secret_refs become secretKeyRef entries pointing at the per-task
+    # Secret the spawner materializes (see K8sJobSpawner.spawn / #1173).
+    # Values never touch this manifest.
+    container_env = agent_container_env(spec, task_secret_name(job_name))
 
     # VNC-capable runs swap to the -vnc image variant and expose the
     # raw RFB port (5900) so the ASGI relay can port-forward into it.
@@ -255,7 +304,7 @@ def _render_agent_job(*, job_name: str, workload, namespace: str, task) -> dict:
                         {
                             "name": "agent",
                             "image": image,
-                            "env": [],
+                            "env": container_env,
                             **({"command": command} if command else {}),
                             **({"args": args} if args else {}),
                             **({"ports": ports} if ports else {}),

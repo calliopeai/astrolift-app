@@ -143,6 +143,22 @@ export const LIST_AGENT_ENVIRONMENT_SPECS = gql`
       imageTag
       agentType
       vncEnabled
+      secretRefs
+    }
+  }
+`;
+
+// Per-ref presence status for a spec's secret refs (#1173) — metadata only
+// (envVar, uri, exists), never the value. The Manage-secrets dialog reads this
+// to render Set / Missing chips and refetches it after a set/rotate/delete. A
+// ref whose store read failed comes back exists=false with a short `error`.
+export const AGENT_ENV_SPEC_SECRET_STATUS = gql`
+  query AgentEnvironmentSpecSecretStatus($slug: String!) {
+    agentEnvironmentSpecSecretStatus(slug: $slug) {
+      envVar
+      uri
+      exists
+      error
     }
   }
 `;

@@ -149,6 +149,21 @@ class AgentEnvironmentSpecType:
     updated_at: dt.datetime
 
 
+@strawberry.type(name="AstroliftAgentSecretStatus")
+class AgentSecretStatusType:
+    """Presence metadata for one AgentEnvironmentSpec secret ref — never the
+    value. ``exists`` is true when the install's secret store holds a
+    non-empty value at the ref's ``uri``. ``error`` carries a short
+    driver/backend message when the presence check couldn't complete (and
+    ``exists`` is then false) so the surface degrades instead of failing.
+    """
+
+    env_var: str
+    uri: str
+    exists: bool
+    error: str | None
+
+
 @strawberry.type(name="AstroliftOrgSkillRepo")
 class OrgSkillRepoType:
     """A per-org registered skill repo (spec 39d).
@@ -674,6 +689,15 @@ def org_skill_repo_to_type(r) -> OrgSkillRepoType:
         source_connection_id=(GUID(str(r.source_connection.guid)) if r.source_connection_id else None),
         created_at=r.created_at,
         updated_at=r.updated_at,
+    )
+
+
+def agent_secret_status_to_type(row: dict) -> AgentSecretStatusType:
+    return AgentSecretStatusType(
+        env_var=row["env_var"],
+        uri=row["uri"],
+        exists=bool(row["exists"]),
+        error=row.get("error"),
     )
 
 

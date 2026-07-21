@@ -7,6 +7,7 @@ import type {
   AstroliftAgentListItem as GeneratedAgentListItem,
   AstroliftAgentLiveStatus as GeneratedAgentLiveStatus,
   AstroliftAgentRunSpec as GeneratedAgentRunSpec,
+  AstroliftAgentSecretStatus as GeneratedAgentSecretStatus,
   AstroliftAgentSkill as GeneratedAgentSkill,
   AstroliftAgentTask as GeneratedAgentTask,
   AstroliftBrief as GeneratedBrief,
@@ -109,7 +110,16 @@ export type AstroliftAgentTask = Pick<
 // override. `runtime` / `imageTag` describe the base image the recipe resolves.
 export type AstroliftAgentEnvironmentSpec = Pick<
   GeneratedAgentEnvironmentSpec,
-  "id" | "slug" | "name" | "runtime" | "imageTag" | "agentType" | "vncEnabled"
+  "id" | "slug" | "name" | "runtime" | "imageTag" | "agentType" | "vncEnabled" | "secretRefs"
+>;
+
+// Per-ref secret presence status (#1173) as returned by
+// `agentEnvironmentSpecSecretStatus`. Metadata only — `exists` is the store
+// presence, `error` a short driver message when the check couldn't complete.
+// The VALUE is never on this type.
+export type AstroliftAgentSecretStatus = Pick<
+  GeneratedAgentSecretStatus,
+  "envVar" | "uri" | "exists" | "error"
 >;
 
 // Registry list row (PR-7). The full row as returned by `agentWorkloads` /
