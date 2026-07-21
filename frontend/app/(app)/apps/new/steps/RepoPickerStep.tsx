@@ -16,6 +16,7 @@ import Link from "next/link";
 import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
+import { ScmEmptyConnectAction, ScmReauthAction } from "@/components/ScmConnectPrompt";
 import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
@@ -242,14 +243,7 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
           Connect a Git host (GitHub App, GitLab OAuth, or a personal-access token) so the platform
           can list your repositories and watch them for pushes.
         </p>
-        <Link
-          href="/providers#source"
-          target="_blank"
-          rel="noreferrer"
-          className="text-primary text-sm underline-offset-4 hover:underline"
-        >
-          Set up a source provider →
-        </Link>
+        <ScmEmptyConnectAction />
       </div>
     );
   }
@@ -320,22 +314,12 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
           {repos.loading && !repos.data ? (
             <Skeleton className="h-10 w-full" />
           ) : repoList?.errorCode ? (
-            <p className="text-destructive text-xs">
-              {repoList.errorMessage ?? repoList.errorCode}
+            <div className="text-destructive flex flex-col items-start gap-1 text-xs">
+              <span>{repoList.errorMessage ?? repoList.errorCode}</span>
               {repoList.recoverable && (
-                <>
-                  {" — "}
-                  <Link
-                    href="/providers#source"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline"
-                  >
-                    reconnect
-                  </Link>
-                </>
+                <ScmReauthAction connectionKind={pickedConnection?.kind ?? ""} />
               )}
-            </p>
+            </div>
           ) : repoList && repoList.repos.length > 0 ? (
             <>
               <Combobox

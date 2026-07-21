@@ -252,6 +252,69 @@ def test_connect_returns_authorize_url_with_config_id(org, viewer):
     assert f"config_id={gh.guid}" in payload.authorization_url
 
 
+def _return_to_of(url: str) -> str:
+    from urllib.parse import parse_qs, urlsplit
+
+    return parse_qs(urlsplit(url).query)["return_to"][0]
+
+
+def test_connect_default_return_to_is_root(org, viewer):
+    """No return_to supplied → the dance lands back on "/" (the
+    historical default)."""
+    gh = _github_oauth_app(org, client_id="real-client-id")
+    m = MyConnectedAccountsMutation()
+    with _ctx(org):
+        result = m.astrolift_connect_user_source_provider(
+            _info(viewer),
+            input=ConnectUserSourceProviderInput(provider_config_id=str(gh.guid)),
+        )
+    assert result.ok, result.errors
+    assert _return_to_of(result.data.authorization_url) == "/"
+
+
+def test_connect_carries_same_origin_return_to(org, viewer):
+    """A same-origin wizard path is carried through so the OAuth dance
+    bounces the operator back into onboarding (#1171)."""
+    gh = _github_oauth_app(org, client_id="real-client-id")
+    m = MyConnectedAccountsMutation()
+    with _ctx(org):
+        result = m.astrolift_connect_user_source_provider(
+            _info(viewer),
+            input=ConnectUserSourceProviderInput(provider_config_id=str(gh.guid), return_to="/apps/new"),
+        )
+    assert result.ok, result.errors
+    assert _return_to_of(result.data.authorization_url) == "/apps/new"
+
+
+def test_connect_rejects_external_return_to(org, viewer):
+    """An absolute/external URL can't hijack the post-dance redirect —
+    it falls back to "/"."""
+    gh = _github_oauth_app(org, client_id="real-client-id")
+    m = MyConnectedAccountsMutation()
+    with _ctx(org):
+        result = m.astrolift_connect_user_source_provider(
+            _info(viewer),
+            input=ConnectUserSourceProviderInput(
+                provider_config_id=str(gh.guid), return_to="https://evil.example/x"
+            ),
+        )
+    assert result.ok, result.errors
+    assert _return_to_of(result.data.authorization_url) == "/"
+
+
+def test_connect_rejects_protocol_relative_return_to(org, viewer):
+    """A protocol-relative ``//host`` is external too — rejected to "/"."""
+    gh = _github_oauth_app(org, client_id="real-client-id")
+    m = MyConnectedAccountsMutation()
+    with _ctx(org):
+        result = m.astrolift_connect_user_source_provider(
+            _info(viewer),
+            input=ConnectUserSourceProviderInput(provider_config_id=str(gh.guid), return_to="//evil.example"),
+        )
+    assert result.ok, result.errors
+    assert _return_to_of(result.data.authorization_url) == "/"
+
+
 def test_connect_rejects_unknown_config(org, viewer):
     m = MyConnectedAccountsMutation()
     with _ctx(org):

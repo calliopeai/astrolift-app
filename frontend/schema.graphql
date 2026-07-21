@@ -3695,6 +3695,7 @@ input ConnectSourceInput {
 
 input ConnectUserSourceProviderInput {
   providerConfigId: GUID!
+  returnTo: String = null
 }
 
 enum CostWindow {
