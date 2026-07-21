@@ -21,6 +21,27 @@ from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
 
+def _flag_reauth_on_user_token(conn: SourceConnection, exc: ProviderError) -> None:
+    """A recoverable ``AUTH_FAILED`` reached through a per-user OAuth
+    token means that token expired or was revoked. Flip
+    ``reauth_required`` so the account drawer + repo picker surface the
+    amber "Re-authorize" affordance and the operator can mint a fresh
+    token in place; the OAuth callback clears it on a successful
+    reconnect. Org-level rows (PATs, App installs) aren't reconnectable
+    via the per-user dance, so they're left untouched — a 403 on those
+    is a permission fix, not a token refresh."""
+    if (
+        exc.code != "AUTH_FAILED"
+        or not exc.recoverable
+        or conn.user_id is None
+        or not conn.kind.endswith("_oauth_user")
+        or conn.reauth_required
+    ):
+        return
+    conn.reauth_required = True
+    conn.save(update_fields=["reauth_required", "updated_at", "version"])
+
+
 @strawberry.type
 class ScmQuery:
     @strawberry.field
@@ -112,6 +133,7 @@ class ScmQuery:
         try:
             rows = list_repos(conn, search=search, limit=limit)
         except ProviderError as exc:
+            _flag_reauth_on_user_token(conn, exc)
             return RemoteRepoListType(
                 repos=[],
                 error_code=exc.code,
@@ -184,6 +206,7 @@ class ScmQuery:
                 ref=ref,
             )
         except ProviderError as exc:
+            _flag_reauth_on_user_token(conn, exc)
             return SourceFileType(
                 repo_full_name=repo_full_name,
                 path=path,

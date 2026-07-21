@@ -3499,6 +3499,7 @@ export type ConnectSourceInput = {
 
 export type ConnectUserSourceProviderInput = {
   providerConfigId: Scalars['GUID']['input'];
+  returnTo: InputMaybe<Scalars['String']['input']>;
 };
 
 export type CostWindow =

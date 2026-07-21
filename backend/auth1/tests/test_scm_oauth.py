@@ -245,6 +245,84 @@ def test_github_callback_persists_user_token(org_user_member):
     assert plain == "gho_TestToken"
 
 
+def test_github_callback_heals_reauth_and_orphan_state(org_user_member):
+    """Reconnecting reuses the SAME per-user row (apps referencing it
+    keep working) and clears any stale reauth / orphan state a prior 401
+    or upstream uninstall left behind (#1171)."""
+    from django.utils import timezone
+
+    org, user = org_user_member
+    config = _make_oauth_app(org, "github_oauth_app")
+
+    # A previously-dead row: the token 401'd (reauth flagged) and the
+    # upstream was uninstalled (orphaned), leaving it inactive.
+    stale = SourceConnection.objects.create(
+        organization=org,
+        user=user,
+        parent_oauth_app=config,
+        kind="github_oauth_user",
+        display_name="GitHub: alice",
+        account_login="alice",
+        is_active=False,
+        reauth_required=True,
+        is_orphaned=True,
+        orphaned_at=timezone.now(),
+        orphaned_reason="token revoked upstream",
+    )
+
+    client = Client()
+    _login(client, user)
+    client.get("/app/auth1/scm/github/start", {"config_id": str(config.guid)})
+    state = client.session["scm_oauth_state"]["state"]
+
+    with (
+        patch("auth1.scm_oauth._resolve_user_token_via_post", return_value=("gho_Fresh", None)),
+        patch("auth1.scm_oauth._resolve_github_login", return_value="alice"),
+    ):
+        resp = client.get(
+            "/app/auth1/scm/github/callback",
+            {"state": state, "code": "the-code"},
+        )
+    assert resp.status_code == 302
+
+    # Healed in place — exactly one row, same PK, no second row minted.
+    rows = SourceConnection.objects.filter(
+        organization=org, user=user, kind="github_oauth_user", parent_oauth_app=config
+    )
+    assert rows.count() == 1
+    healed = rows.get()
+    assert healed.pk == stale.pk
+    assert healed.is_active is True
+    assert healed.reauth_required is False
+    assert healed.is_orphaned is False
+    assert healed.orphaned_at is None
+    assert healed.orphaned_reason == ""
+    plain = decrypt(
+        EncryptedSecret(
+            backend_kind=healed.secret_backend_kind,
+            backend_ref=bytes(healed.secret_ciphertext),
+        )
+    ).decode()
+    assert plain == "gho_Fresh"
+
+
+def test_safe_return_to_rules():
+    """Same-origin gate: rooted paths pass; missing / external /
+    protocol-relative values fall back to ``default`` (#1171 added the
+    ``default`` arg + the ``//host`` rejection)."""
+    from auth1.scm_oauth import _safe_return_to
+
+    assert _safe_return_to("/apps/new") == "/apps/new"
+    assert _safe_return_to(None) == "/settings/source-providers"
+    assert _safe_return_to("") == "/settings/source-providers"
+    assert _safe_return_to("https://evil.example/x") == "/settings/source-providers"
+    assert _safe_return_to("//evil.example") == "/settings/source-providers"
+    # Caller-supplied default (the connect mutation lands on "/").
+    assert _safe_return_to(None, default="/") == "/"
+    assert _safe_return_to("//evil.example", default="/") == "/"
+    assert _safe_return_to("/agents/new", default="/") == "/agents/new"
+
+
 def test_resolve_client_secret_per_kind(org_user_member):
     """The dispatcher reads the OAuth client_secret out of different
     columns depending on the row's kind:

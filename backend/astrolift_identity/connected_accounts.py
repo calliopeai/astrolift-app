@@ -41,6 +41,7 @@ from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_scm.models import SourceConnection
+from auth1.scm_oauth import _safe_return_to
 from core.mutations import ErrorCode, mutation_audit
 from core.tenancy import get_current_tenant
 
@@ -116,6 +117,11 @@ class ConnectUserSourceProviderInput:
     """Kick off the per-user OAuth dance for ``provider_config_id``."""
 
     provider_config_id: GUID
+    # Same-origin path to bounce back to once the dance completes — e.g.
+    # the onboarding wizard the user hit a 401 in. Validated against the
+    # OAuth start view's same-origin gate; anything external falls back
+    # to "/". Null keeps the historical "/" landing.
+    return_to: str | None = None
 
 
 @strawberry.input
@@ -322,7 +328,7 @@ class MyConnectedAccountsMutation:
         query = urllib.parse.urlencode(
             {
                 "config_id": str(cfg.guid),
-                "return_to": "/",
+                "return_to": _safe_return_to(input.return_to, default="/"),
                 "n": nonce,
             }
         )

@@ -71,11 +71,17 @@ GITHUB_DEFAULT_SCOPE = "read:user repo"
 # ---------------------------------------------------------------------------
 
 
-def _safe_return_to(raw: str | None) -> str:
+def _safe_return_to(raw: str | None, default: str = "/settings/source-providers") -> str:
     """Limit ``return_to`` to same-origin paths so an attacker can't
-    bounce a victim through our OAuth dance to a third-party URL."""
-    if not raw or not raw.startswith("/"):
-        return "/settings/source-providers"
+    bounce a victim through our OAuth dance to a third-party URL.
+
+    A value must be a rooted path (single leading ``/``); a
+    protocol-relative ``//host`` is an external URL and is rejected.
+    ``default`` is the fallback when ``raw`` is missing or not a
+    same-origin path (callers that reconnect from a specific surface,
+    e.g. the onboarding wizard, pass their own)."""
+    if not raw or not raw.startswith("/") or raw.startswith("//"):
+        return default
     return raw
 
 
@@ -635,5 +641,14 @@ def _upsert_user_connection(
             "secret_ciphertext": encrypted.backend_ref,
             "is_active": True,
             "api_base_url": api_base_url or "",
+            # A successful OAuth dance minted a fresh token, so heal any
+            # stale "this token is dead" state a prior 401/uninstall left
+            # on the row — reconnecting reuses the same row so apps that
+            # reference it keep working. Mirrors the App-adopt heal in
+            # astrolift_scm.schema.mutations.
+            "reauth_required": False,
+            "is_orphaned": False,
+            "orphaned_at": None,
+            "orphaned_reason": "",
         },
     )
