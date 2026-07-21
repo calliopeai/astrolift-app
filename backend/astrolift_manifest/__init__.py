@@ -19,6 +19,7 @@ See ``specs/05-manifest-schema.md``.
 from astrolift_manifest.brief import BriefError, load_brief
 from astrolift_manifest.normalize import normalize
 from astrolift_manifest.parser import ManifestError, parse_raw
+from astrolift_manifest.schema_detect import detect_toml_schema
 from astrolift_manifest.skills import SkillError, load_skill
 from astrolift_manifest.types import (
     BriefRef,
@@ -39,6 +40,7 @@ __all__ = [
     "RawManifest",
     "SkillError",
     "SkillRef",
+    "detect_toml_schema",
     "load_brief",
     "load_skill",
     "normalize",

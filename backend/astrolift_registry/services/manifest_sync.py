@@ -49,6 +49,7 @@ from astrolift_manifest.discover import (
 from astrolift_manifest.normalize import NormalizationDefaults, manifest_hash, normalize
 from astrolift_manifest.parser import ManifestError, parse_raw
 from astrolift_manifest.persist import persist_manifest
+from astrolift_manifest.schema_detect import detect_toml_schema
 from astrolift_manifest.types import (
     ManagedServiceManifest,
     NormalizedManifest,
@@ -456,6 +457,22 @@ def resync_app_manifest_from_repo(
         repo_raw_manifest = parse_raw(repo_text)
         repo_manifest = _normalize_text(repo_text)
     except ManifestError as exc:
+        # An agent config-repo library (astrolift_version + [skills.*]/
+        # [tools.*], no name/workloads) can never parse as an app manifest.
+        # Give the operator the actionable path instead of a raw parse error
+        # about a missing top-level name (#1172).
+        if detect_toml_schema(repo_text) == "agent_config":
+            return ResyncResult(
+                status="fetch_failed",
+                changes=ResyncChanges(),
+                error=(
+                    f"{manifest_path!r} on {deploy_branch!r} is an agent "
+                    "config-repo schema (astrolift_version + [skills.*]/"
+                    "[tools.*]), not an app manifest. Onboard it from Agents "
+                    "-> Register agent repo, or import its skills from "
+                    "Agents -> Import skills."
+                ),
+            )
         return ResyncResult(
             status="fetch_failed",
             changes=ResyncChanges(),

@@ -78,6 +78,12 @@ export interface WizardState {
   manifestFromRepo: boolean; // false => either missing-on-repo or edited locally
   manifestValid: boolean;
   manifestErrors: string[];
+  // Register without a manifest and add it later on the app's Manifest tab
+  // (#1172). Lets an empty repo — or an agent config repo whose astrolift.toml
+  // isn't an app manifest — finish onboarding instead of dead-ending on the
+  // manifest gate. When set, the manifest step is always valid and submit
+  // sends manifestRaw: null.
+  manifestLater: boolean;
 
   // Step 3
   name: string;
@@ -119,6 +125,7 @@ export function initialWizardState(): WizardState {
     manifestFromRepo: false,
     manifestValid: false,
     manifestErrors: [],
+    manifestLater: false,
     name: "",
     slug: "",
     slugTouched: false,
@@ -311,7 +318,11 @@ export function WizardClient() {
             sourceRepo: state.sourceRepo.trim(),
             sourceUrl: state.sourceUrl.trim() || null,
             manifestPath: state.manifestPath.trim() || "astrolift.toml",
-            manifestRaw: state.manifestRaw.trim() || null,
+            // "Set up manifest later" registers the app with no manifest —
+            // send an explicit null rather than relying on the empty-string
+            // coalesce (#1172). The app page surfaces the missing manifest and
+            // the Manifest tab is where the operator adds it.
+            manifestRaw: state.manifestLater ? null : state.manifestRaw.trim() || null,
             defaultBranch: state.defaultBranch.trim() || "main",
             deployBranch: state.deployBranch.trim() || "main",
             // "skip" timing forces manual trigger so the app registers
@@ -374,13 +385,19 @@ export function WizardClient() {
         }
       }
 
-      // "skip" registers a non-deploying app (manual trigger, no first
-      // deploy). Land the operator on Settings — where they finish deploy
-      // config — instead of an Overview that will never show a deploy (#901).
+      // Land the operator where the next action is:
+      //   - manifest-later (#1172): the Manifest tab, to add/sync the
+      //     astrolift.toml they deferred — takes precedence since a missing
+      //     manifest is the more fundamental gap;
+      //   - deploy "skip" (#901): Settings, to finish deploy config, instead
+      //     of an Overview that will never show a deploy;
+      //   - otherwise: the app Overview.
       router.push(
-        state.deployTiming === "skip"
-          ? `/apps/${result.data.slug}/settings`
-          : `/apps/${result.data.slug}`,
+        state.manifestLater
+          ? `/apps/${result.data.slug}/manifest`
+          : state.deployTiming === "skip"
+            ? `/apps/${result.data.slug}/settings`
+            : `/apps/${result.data.slug}`
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Register failed";
