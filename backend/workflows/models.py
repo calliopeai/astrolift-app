@@ -197,6 +197,10 @@ class WorkflowInstance(Tracking):
 
     # Temporal integration (future)
     temporal_workflow_id = models.CharField(max_length=200, null=True, blank=True)
+    # Temporal run_id captured at start (#1180). A historical run's stage
+    # executions can then overlay the run DAG without a live Temporal describe,
+    # which returns null once Temporal GCs the run's history.
+    temporal_run_id = models.CharField(max_length=200, null=True, blank=True)
 
     class Meta:
         indexes = [
@@ -214,6 +218,7 @@ class WorkflowInstance(Tracking):
         *,
         configured_workflow: "Workflow | None" = None,
         temporal_workflow_id: str | None = None,
+        temporal_run_id: str | None = None,
     ) -> 'WorkflowInstance':
         """Start a new workflow instance.
 
@@ -231,6 +236,7 @@ class WorkflowInstance(Tracking):
                 workflow=configured_workflow.definition,
                 current_state="running",
                 temporal_workflow_id=temporal_workflow_id,
+                temporal_run_id=temporal_run_id,
                 created_by=user,
                 updated_by=user,
             )

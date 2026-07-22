@@ -483,10 +483,13 @@ class WorkflowsMutation:
         )
 
         # Tier-3 run record linked to the Workflow (denormalized org, §2.3).
+        # Persist the Temporal run_id so a historical run's DAG overlays without
+        # a live Temporal describe (#1180).
         instance = WorkflowInstance.start(
             configured_workflow=wf,
             user=user,
             temporal_workflow_id=temporal_workflow_id,
+            temporal_run_id=run.run_id or None,
         )
 
         return RunWorkflowResult(

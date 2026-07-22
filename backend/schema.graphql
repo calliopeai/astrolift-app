@@ -6173,6 +6173,7 @@ type WorkflowRun {
   guid: String!
   currentState: String!
   temporalWorkflowId: String
+  temporalRunId: String
   startedAt: DateTime!
   completedAt: DateTime
   isCompleted: Boolean!

@@ -57,6 +57,7 @@ export type TieredWorkflowRun = {
   guid: string;
   currentState: string;
   temporalWorkflowId: string | null;
+  temporalRunId: string | null;
   startedAt: string;
   completedAt: string | null;
   isCompleted: boolean;
