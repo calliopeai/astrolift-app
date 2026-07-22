@@ -72,12 +72,25 @@ class TenantClusterType:
         by the cluster detail page's "Last bootstrap" card (#319)."""
         # Local import to keep this module free of model imports at
         # parse time — the rest of the module is pure type wiring.
+        from django.db.models import Q
+
         from astrolift_clusters.models import (
             ClusterBootstrapRun,
             TenantCluster,
         )
+        from core.tenancy import get_current_tenant
 
-        cluster = TenantCluster.objects.filter(guid=str(self.id)).first()
+        # Re-scope by caller org (#1183). This field inherits the parent
+        # cluster's scoping, but a leaked parent must not widen access to
+        # another org's bootstrap history. Not @tenant_scoped, so a None
+        # tenant collapses org_id to None and matches only platform-shared
+        # rows — never another tenant's.
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        cluster = TenantCluster.objects.filter(
+            Q(organization_id=org_id) | Q(organization_id__isnull=True),
+            guid=str(self.id),
+        ).first()
         if cluster is None:
             return None
         run = (
@@ -95,13 +108,22 @@ class TenantClusterType:
         """History of bootstrap runs against this cluster, newest first
         (#319). Bounded to ``limit`` rows (default 10, max 100) so the
         cluster detail card stays predictable."""
+        from django.db.models import Q
+
         from astrolift_clusters.models import (
             ClusterBootstrapRun,
             TenantCluster,
         )
+        from core.tenancy import get_current_tenant
 
         capped = max(1, min(int(limit or 10), 100))
-        cluster = TenantCluster.objects.filter(guid=str(self.id)).first()
+        # Re-scope by caller org (#1183) — see last_bootstrap_run.
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        cluster = TenantCluster.objects.filter(
+            Q(organization_id=org_id) | Q(organization_id__isnull=True),
+            guid=str(self.id),
+        ).first()
         if cluster is None:
             return []
         qs = (

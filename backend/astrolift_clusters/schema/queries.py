@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 import strawberry
+from django.db.models import Q
 from strawberry.types import Info
 
 from astrolift_clusters.models import (
@@ -53,7 +54,14 @@ class ClustersQuery:
     @require_permission(Permission.CLUSTER_REGISTER)
     @tenant_scoped()
     def astrolift_clusters(self, info: Info) -> list[TenantClusterType]:
-        qs = TenantCluster.objects.select_related("organization", "provider_plugin").order_by("slug")[:200]
+        tenant = get_current_tenant()
+        qs = (
+            TenantCluster.objects.filter(
+                Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+            )
+            .select_related("organization", "provider_plugin")
+            .order_by("slug")[:200]
+        )
         return [cluster_to_type(c) for c in qs]
 
     @strawberry.field
@@ -78,7 +86,6 @@ class ClustersQuery:
             return 0
         # Platform-level clusters (organization=None) are available to all
         # orgs. Org-scoped clusters are only available to their own org.
-        from django.db.models import Q
 
         return TenantCluster.objects.filter(
             Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
@@ -91,7 +98,14 @@ class ClustersQuery:
     @require_permission(Permission.PROVIDER_PLUGIN_READ)
     @tenant_scoped()
     def astrolift_managed_domains(self, info: Info) -> list[ManagedDomainType]:
-        qs = ManagedDomain.objects.select_related("organization").order_by("zone")[:200]
+        tenant = get_current_tenant()
+        qs = (
+            ManagedDomain.objects.filter(
+                Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+            )
+            .select_related("organization")
+            .order_by("zone")[:200]
+        )
         return [domain_to_type(d) for d in qs]
 
     @strawberry.field
@@ -160,9 +174,12 @@ class ClustersQuery:
         cluster, in what order, by whom" — the workhorse for the
         cluster-detail Status tab's lifecycle timeline card.
         """
+
         from core.schema.audit import MutationAuditLog
 
+        tenant = get_current_tenant()
         cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
             guid=str(cluster_id),
             deleted_at__isnull=True,
         ).first()
@@ -247,9 +264,12 @@ class ClustersQuery:
         when the visibility query fails — the UI's empty-state copy
         is identical to "no runs yet" in either case.
         """
+
         from astrolift_workflows.client import list_workflows_for_cluster
 
+        tenant = get_current_tenant()
         cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
             guid=str(cluster_id),
             deleted_at__isnull=True,
         ).first()
@@ -279,10 +299,13 @@ class ClustersQuery:
         targets it (either binding mechanism counts). Tenant-scoped;
         soft-deleted rows excluded.
         """
+
         from astrolift_lifecycle.models import AppEnvironment
         from astrolift_registry.models import RegisteredApp
 
+        tenant = get_current_tenant()
         cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
             guid=str(cluster_id),
             deleted_at__isnull=True,
         ).first()
@@ -320,13 +343,16 @@ class ClustersQuery:
         reach the apiserver (no creds, unreachable). The UI surfaces
         that case as "no health data available" without erroring.
         """
+
         from core.cluster_management import (
             ClusterManagementError,
             cluster_health_dispatch,
         )
 
+        tenant = get_current_tenant()
         cluster = (
             TenantCluster.objects.filter(
+                Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
                 guid=str(cluster_id),
                 deleted_at__isnull=True,
             )
@@ -385,7 +411,6 @@ class ClustersQuery:
         'cluster offline' empty-state. Returns ``None`` when the cluster
         row is missing or is outside the caller's tenant scope.
         """
-        from django.db.models import Q
 
         tenant = get_current_tenant()
         # Platform-level clusters (organization=None) are visible to all
@@ -426,13 +451,19 @@ class ClustersQuery:
         so the picker degrades to free-entry rather than erroring the
         card.
         """
+
         from core.cluster_management import (
             ClusterManagementError,
             cognito_user_pools_dispatch,
         )
 
+        tenant = get_current_tenant()
         cluster = (
-            TenantCluster.objects.filter(guid=str(cluster_id), deleted_at__isnull=True)
+            TenantCluster.objects.filter(
+                Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+                guid=str(cluster_id),
+                deleted_at__isnull=True,
+            )
             .select_related("provider_plugin")
             .first()
         )
@@ -469,13 +500,19 @@ class ClustersQuery:
         a pool. Same permission gate, credential path, and
         degrade-to-empty contract as ``astroliftCognitoUserPools``.
         """
+
         from core.cluster_management import (
             ClusterManagementError,
             cognito_user_pool_clients_dispatch,
         )
 
+        tenant = get_current_tenant()
         cluster = (
-            TenantCluster.objects.filter(guid=str(cluster_id), deleted_at__isnull=True)
+            TenantCluster.objects.filter(
+                Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+                guid=str(cluster_id),
+                deleted_at__isnull=True,
+            )
             .select_related("provider_plugin")
             .first()
         )
@@ -507,13 +544,19 @@ class ClustersQuery:
         interactive checklist and feeds the operator's selections to
         ``installClusterPrereqs``.
         """
+
         from core.cluster_management import (
             ClusterManagementError,
             bootstrap_components_dispatch,
         )
 
+        tenant = get_current_tenant()
         cluster = (
-            TenantCluster.objects.filter(guid=str(cluster_id), deleted_at__isnull=True)
+            TenantCluster.objects.filter(
+                Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+                guid=str(cluster_id),
+                deleted_at__isnull=True,
+            )
             .select_related("provider_plugin")
             .first()
         )
@@ -548,6 +591,7 @@ class ClustersQuery:
         Queries are cached 30s by the existing prometheus_client TTL
         cache so repeated tab opens don't hammer Prometheus.
         """
+
         from astrolift_operations.prometheus_client import (
             PrometheusError,
             query_instant,
@@ -563,7 +607,9 @@ class ClustersQuery:
             deployment_ready_ratio=None,
         )
 
+        tenant = get_current_tenant()
         cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
             guid=str(cluster_id),
             deleted_at__isnull=True,
         ).first()
@@ -675,7 +721,9 @@ class ClustersQuery:
             query_range,
         )
 
+        tenant = get_current_tenant()
         cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
             guid=str(cluster_id),
             deleted_at__isnull=True,
         ).first()
@@ -874,13 +922,16 @@ class ClustersQuery:
         already protects access, but mirroring the cluster_health
         contract keeps the resolver layer symmetric).
         """
+
         from core.cluster_management import (
             ClusterManagementError,
             cluster_workload_health_dispatch,
         )
 
+        tenant = get_current_tenant()
         cluster = (
             TenantCluster.objects.filter(
+                Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
                 guid=str(cluster_id),
                 deleted_at__isnull=True,
             )
@@ -954,13 +1005,16 @@ class ClustersQuery:
         also yield ``supported=False`` rather than erroring, so the form
         degrades gracefully.
         """
+
         from core.cluster_management import (
             ClusterManagementError,
             cluster_certificates_dispatch,
         )
 
+        tenant = get_current_tenant()
         cluster = (
             TenantCluster.objects.filter(
+                Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
                 guid=str(cluster_id),
                 deleted_at__isnull=True,
             )
