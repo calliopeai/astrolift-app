@@ -192,7 +192,6 @@ def ci_deploy(request: HttpRequest, app_slug: str) -> JsonResponse:
     from astrolift_lifecycle.models import AppEnvironment, Deployment
     from astrolift_manifest.parser import ManifestError, parse_raw
     from astrolift_operations.models import WorkflowRun  # noqa: PLC0415
-    from astrolift_registry.models import RegisteredApp
     from astrolift_workflows.client import start_workflow
     from astrolift_workflows.inputs import Actor, DeployAppInput
 
@@ -207,12 +206,12 @@ def ci_deploy(request: HttpRequest, app_slug: str) -> JsonResponse:
         return JsonResponse({"detail": f"invalid JSON: {exc}"}, status=400)
 
     # Load the app so we can derive declared workloads + environments.
-    app = (
-        RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
-        .select_related("organization", "approver_team")
-        .first()
-    )
-    if app is None:
+    # The deploy token is already bound to its app (verified in
+    # _resolve_deploy_token), so use that row directly rather than
+    # re-fetching by slug — slugs are unique only within an org, so a
+    # sibling org's app sharing the slug could otherwise be picked (#1183).
+    app = token.registered_app
+    if app.deleted_at is not None:
         return JsonResponse({"detail": f"app {app_slug!r} not found"}, status=404)
 
     # Derive declared workloads from the stored manifest for tag validation.

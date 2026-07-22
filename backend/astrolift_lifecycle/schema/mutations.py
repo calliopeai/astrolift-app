@@ -803,9 +803,15 @@ def _start_deploy_workflow_on_commit(
     transaction.on_commit(_start)
 
 
-def _resolve_app_env(app_slug: str, environment_name: str) -> tuple[RegisteredApp, AppEnvironment] | None:
+def _resolve_app_env(
+    app_slug: str, environment_name: str, *, org_id: int | None
+) -> tuple[RegisteredApp, AppEnvironment] | None:
+    # Org-scope the app lookup to the caller's tenant — slugs are unique
+    # only within an org, so an unscoped fetch lets a caller drive a deploy
+    # against a sibling org's app. Fails closed (None) when org_id is None,
+    # since organization_id is a non-null FK (#1183).
     app = (
-        RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+        RegisteredApp.objects.filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
         .select_related("approver_team")
         .first()
     )
@@ -1016,9 +1022,12 @@ def _process_bulk_approve_one(
     from core.mutations import AuditEntry, emit_audit
     from core.mutations import ErrorCode as CoreErrorCode
 
+    # Org-scope the by-guid lookup to the caller's tenant (already resolved
+    # by the bulk resolver). Fails closed (NOT_FOUND) when organization_id
+    # is None (#1183).
     deployment = (
         Deployment.objects.select_related("registered_app", "app_environment", "workload")
-        .filter(guid=deployment_id, deleted_at__isnull=True)
+        .filter(guid=deployment_id, deleted_at__isnull=True, registered_app__organization_id=organization_id)
         .first()
     )
     if deployment is None:
@@ -1101,6 +1110,7 @@ def _process_bulk_reject_one(
     reason: str,
     actor: Actor,
     viewer_user_id: int | None,
+    organization_id: int | None,
 ) -> BulkDeploymentResultItem:
     """Single-id reject path, callable from the bulk resolver.
 
@@ -1110,9 +1120,12 @@ def _process_bulk_reject_one(
     from core.mutations import AuditEntry, emit_audit
     from core.mutations import ErrorCode as CoreErrorCode
 
+    # Org-scope the by-guid lookup to the caller's tenant (already resolved
+    # by the bulk resolver). Fails closed (NOT_FOUND) when organization_id
+    # is None (#1183).
     deployment = (
         Deployment.objects.select_related("registered_app", "app_environment", "workload")
-        .filter(guid=deployment_id, deleted_at__isnull=True)
+        .filter(guid=deployment_id, deleted_at__isnull=True, registered_app__organization_id=organization_id)
         .first()
     )
     if deployment is None:
@@ -1140,7 +1153,6 @@ def _process_bulk_reject_one(
             "you are not in this app's approver set",
         )
 
-    organization_id = deployment.registered_app.organization_id
     try:
         with transaction.atomic():
             deployment.aborted_reason = reason
@@ -1308,7 +1320,12 @@ class LifecycleMutation:
                 field="imageTag",
             )
 
-        resolved = _resolve_app_env(input.app_slug, input.environment_name)
+        # Resolve the caller's tenant up front — this mutation creates a
+        # Deployment and fires a workflow, so the org gate must precede any
+        # side effect. Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        resolved = _resolve_app_env(input.app_slug, input.environment_name, org_id=org_id)
         if resolved is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -1351,7 +1368,6 @@ class LifecycleMutation:
             )
 
         actor = _actor_from_request(info)
-        tenant = get_current_tenant()
 
         with transaction.atomic():
             approvals_required = _required_approvals_for(app, env)
@@ -1461,9 +1477,15 @@ class LifecycleMutation:
     def approve_deployment(
         self, info: Info, input: DeploymentByIdInput
     ) -> MutationResultType[DeploymentType]:
+        # Org-scope the by-guid lookup to the caller's tenant before the
+        # approval side effect (which starts the deploy workflow). Deployment
+        # reaches the org via registered_app; @tenant_scoped only asserts a
+        # tenant. Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         deployment = (
             Deployment.objects.select_related("registered_app", "app_environment", "workload")
-            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
         if deployment is None:
@@ -1475,7 +1497,6 @@ class LifecycleMutation:
             )
 
         actor = _actor_from_request(info)
-        tenant = get_current_tenant()
         if actor.user_id and deployment.triggered_by_user_id == actor.user_id and not _self_approve_allowed():
             # Self-approval blocked (#419). The FE primarily hides the
             # approve CTA based on the Deployment.triggered_by_me flag
@@ -1534,9 +1555,14 @@ class LifecycleMutation:
                 "reason is required",
                 field="reason",
             )
+        # Org-scope the by-guid lookup to the caller's tenant before the
+        # reject side effect (which terminates the deploy workflow).
+        # Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         deployment = (
             Deployment.objects.select_related("registered_app", "app_environment", "workload")
-            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
         if deployment is None:
@@ -1658,6 +1684,8 @@ class LifecycleMutation:
             )
 
         actor = _actor_from_request(info)
+        tenant = get_current_tenant()
+        organization_id = tenant.organization_id if tenant else None
 
         results: list[BulkDeploymentResultItem] = []
         succeeded = 0
@@ -1668,6 +1696,7 @@ class LifecycleMutation:
                 reason=reason,
                 actor=actor,
                 viewer_user_id=actor.user_id,
+                organization_id=organization_id,
             )
             results.append(item)
             if item.ok:
@@ -1780,9 +1809,14 @@ class LifecycleMutation:
                 field="reason",
             )
 
+        # Org-scope the by-guid lookup to the caller's tenant before the
+        # abort side effect (which terminates the deploy workflow).
+        # Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         deployment = (
             Deployment.objects.select_related("registered_app", "app_environment")
-            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
         if deployment is None:
@@ -1851,9 +1885,14 @@ class LifecycleMutation:
           k8s resources here — that's a separate teardown workflow; this
           mutation only retires the record from the active rollout slot.
         """
+        # Org-scope the by-guid lookup to the caller's tenant before the
+        # supersede / soft-delete side effect. Fails closed (NOT_FOUND) when
+        # org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         deployment = (
             Deployment.objects.select_related("registered_app", "app_environment")
-            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
         if deployment is None:
@@ -1900,9 +1939,14 @@ class LifecycleMutation:
     ) -> MutationResultType[DeploymentType]:
         if _deploy_pipeline_disabled():
             return gql_failure(ErrorCode.PRECONDITION.value, _DEPLOY_PIPELINE_DISABLED_MSG)
+        # Org-scope the by-guid lookup to the caller's tenant before the
+        # rollback side effect (which creates a new deploy + fires a
+        # workflow). Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         deployment = (
             Deployment.objects.select_related("registered_app", "app_environment")
-            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
         if deployment is None:
@@ -1930,7 +1974,6 @@ class LifecycleMutation:
             )
 
         actor = _actor_from_request(info)
-        tenant = get_current_tenant()
 
         with transaction.atomic():
             deployment.transition_to(Deployment.Status.ROLLED_BACK)
@@ -1975,16 +2018,20 @@ class LifecycleMutation:
     @require_permission(Permission.APP_DEPLOY)
     @tenant_scoped()
     def redeploy_app(self, info: Info, input: DeploymentByIdInput) -> MutationResultType[DeploymentType]:
+        # Org-scope the by-guid lookup to the caller's tenant before the
+        # redeploy side effect (creates a new deploy + fires a workflow).
+        # Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         source = (
             Deployment.objects.select_related("registered_app", "app_environment")
-            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
         if source is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "deployment not found")
 
         actor = _actor_from_request(info)
-        tenant = get_current_tenant()
         env = source.app_environment
 
         if env.deploys_paused:
@@ -2209,9 +2256,13 @@ class LifecycleMutation:
         misconfigured or under maintenance and we don't want CI or
         push triggers to land deploys mid-investigation.
         """
+        # Org-scope the by-guid lookup: AppEnvironment reaches the org via
+        # registered_app. Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         env = (
             AppEnvironment.objects.select_related("registered_app", "tenant_cluster", "managed_domain")
-            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
         if env is None:
@@ -2231,9 +2282,13 @@ class LifecycleMutation:
         """Lift the pause flag — does NOT replay queued deploys; the
         next CI/push trigger or manual ``startDeployment`` proceeds
         as usual."""
+        # Org-scope the by-guid lookup: AppEnvironment reaches the org via
+        # registered_app. Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         env = (
             AppEnvironment.objects.select_related("registered_app", "tenant_cluster", "managed_domain")
-            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
         if env is None:
@@ -2262,9 +2317,13 @@ class LifecycleMutation:
         deploy render — re-deploy or wait for the next CI push for it
         to take effect cluster-side.
         """
+        # Org-scope the by-guid lookup: AppEnvironment reaches the org via
+        # registered_app. Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         env = (
             AppEnvironment.objects.select_related("registered_app", "tenant_cluster", "managed_domain")
-            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
         if env is None:
@@ -2284,9 +2343,13 @@ class LifecycleMutation:
         """Lift the ingress-pause flag — restores normal routing on
         the next render. As with ``pause_app_ingress``, the change is
         picked up by the next deploy."""
+        # Org-scope the by-guid lookup: AppEnvironment reaches the org via
+        # registered_app. Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         env = (
             AppEnvironment.objects.select_related("registered_app", "tenant_cluster", "managed_domain")
-            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
         if env is None:
@@ -2305,16 +2368,21 @@ class LifecycleMutation:
     ) -> MutationResultType[DeploymentType]:
         if _deploy_pipeline_disabled():
             return gql_failure(ErrorCode.PRECONDITION.value, _DEPLOY_PIPELINE_DISABLED_MSG)
+        # Org-scope the by-guid lookup to the caller's tenant before the
+        # teardown workflow side effect. PreviewEnvironment reaches the org
+        # via registered_app. Fails closed (NOT_FOUND) when org_id is
+        # None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         preview = (
             PreviewEnvironment.objects.select_related("registered_app")
-            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
         if preview is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "preview environment not found")
 
         actor = _actor_from_request(info)
-        tenant = get_current_tenant()
 
         handle = start_workflow(
             "TearDownPreviewWorkflow",
@@ -2379,6 +2447,10 @@ class LifecycleMutation:
                 ErrorCode.VALIDATION.value,
                 f"days must be one of {list(PREVIEW_TTL_EXTEND_DAYS)}; got {input.days}",
             )
+        # Org-scope the by-guid lookup: PreviewEnvironment reaches the org via
+        # registered_app. Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         preview = (
             PreviewEnvironment.objects.select_related(
                 "registered_app",
@@ -2386,7 +2458,7 @@ class LifecycleMutation:
                 "registered_app__default_tenant_cluster",
                 "app_environment__tenant_cluster",
             )
-            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
         if preview is None:
@@ -2441,8 +2513,14 @@ class LifecycleMutation:
         if _deploy_pipeline_disabled():
             return gql_failure(ErrorCode.PRECONDITION.value, _DEPLOY_PIPELINE_DISABLED_MSG)
 
+        # Org-scope the app lookup to the caller's tenant before the
+        # preview-build side effect (creates env + preview rows, fires
+        # BuildPreviewWorkflow). Slugs are unique only within an org.
+        # Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True)
+            RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization", "default_tenant_cluster")
             .first()
         )
@@ -2534,7 +2612,6 @@ class LifecycleMutation:
             )
 
         actor = _actor_from_request(info)
-        tenant = get_current_tenant()
         handle = start_workflow(
             "BuildPreviewWorkflow",
             args=[
@@ -2582,9 +2659,21 @@ class LifecycleMutation:
 
         from astrolift_clusters.models import TenantCluster
 
+        # Org-scope the app-environment lookup to the caller's tenant before
+        # the migration workflow side effect. AppEnvironment reaches the org
+        # via registered_app. Fails closed (NOT_FOUND) when org_id is
+        # None (#1183). (The target cluster is validated as MANAGED below;
+        # tenant clusters are install-level infra owned by astrolift_clusters,
+        # so their scoping is out of this module's remit.)
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         env = (
             AppEnvironment.objects.select_related("registered_app", "tenant_cluster")
-            .filter(guid=str(input.app_environment_id), deleted_at__isnull=True)
+            .filter(
+                guid=str(input.app_environment_id),
+                deleted_at__isnull=True,
+                registered_app__organization_id=org_id,
+            )
             .first()
         )
         if env is None:
@@ -2625,7 +2714,6 @@ class LifecycleMutation:
             )
 
         actor = _actor_from_request(info)
-        tenant = get_current_tenant()
         handle = start_workflow(
             "MigrateAppWorkflow",
             args=[
@@ -2663,7 +2751,13 @@ class LifecycleMutation:
         info: Info,
         input: AddAppDomainInput,
     ) -> MutationResultType[AppDomainType]:
-        app = RegisteredApp.objects.filter(slug=input.app_slug).first()
+        # Org-scope the app lookup to the caller's tenant before creating a
+        # CustomDomain + firing the validation workflow. Slugs are unique
+        # only within an org. Fails closed (NOT_FOUND) when org_id is
+        # None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         host = (input.hostname or "").strip().lower()
@@ -2775,7 +2869,13 @@ class LifecycleMutation:
         ``addAppDomain``). A row bound to a different app returns
         CONFLICT — wildcard ownership is exclusive per apex.
         """
-        app = RegisteredApp.objects.filter(slug=input.app_slug).first()
+        # Org-scope the app lookup to the caller's tenant before creating a
+        # CustomDomain + firing the validation workflow. Slugs are unique
+        # only within an org. Fails closed (NOT_FOUND) when org_id is
+        # None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
 
@@ -2897,7 +2997,14 @@ class LifecycleMutation:
         info: Info,
         input: RemoveAppDomainInput,
     ) -> MutationResultType[_AppDomainRemovedPayload]:
-        domain = CustomDomain.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
+        # Org-scope the by-guid lookup before the soft-delete side effect:
+        # CustomDomain reaches the org via registered_app. Fails closed
+        # (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        domain = CustomDomain.objects.filter(
+            guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id
+        ).first()
         if domain is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -2928,9 +3035,15 @@ class LifecycleMutation:
         state on ``required_dns_records``, and transitions
         ``validation_status`` to ``validated`` or ``failed``.
         """
+        # Org-scope the by-guid lookup before firing the validation
+        # workflow: CustomDomain reaches the org via registered_app. Fails
+        # closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         domain = CustomDomain.objects.filter(
             guid=str(input.id),
             deleted_at__isnull=True,
+            registered_app__organization_id=org_id,
         ).first()
         if domain is None:
             return gql_failure(
@@ -2963,9 +3076,15 @@ class LifecycleMutation:
         """
         from datetime import datetime as _dt
 
+        # Org-scope the by-guid lookup before writing the BYO cert bundle:
+        # CustomDomain reaches the org via registered_app. Fails closed
+        # (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         domain = CustomDomain.objects.filter(
             guid=str(input.id),
             deleted_at__isnull=True,
+            registered_app__organization_id=org_id,
         ).first()
         if domain is None:
             return gql_failure(
@@ -3199,7 +3318,13 @@ class LifecycleMutation:
 
         from astrolift_lifecycle.deploy_tokens import PLAINTEXT_PREFIX
 
-        app = RegisteredApp.objects.filter(slug=input.app_slug).first()
+        # Org-scope the app lookup to the caller's tenant BEFORE minting the
+        # deploy token — an unscoped slug lookup would let a caller mint a
+        # working secret against a sibling org's app. Slugs are unique only
+        # within an org. Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         # #449: mint with the canonical ``alft_dt_`` prefix so
@@ -3256,7 +3381,14 @@ class LifecycleMutation:
             rotation_grace_seconds_from_constance,
         )
 
-        token = DeployToken.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
+        # Org-scope the by-guid lookup BEFORE rotating (mints a new secret):
+        # DeployToken reaches the org via registered_app. Fails closed
+        # (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        token = DeployToken.objects.filter(
+            guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id
+        ).first()
         if token is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -3310,7 +3442,14 @@ class LifecycleMutation:
         info: Info,
         input: RevokeDeployTokenInput,
     ) -> MutationResultType[_DeployTokenRevokedPayload]:
-        token = DeployToken.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
+        # Org-scope the by-guid lookup before revoking: DeployToken reaches
+        # the org via registered_app. Fails closed (NOT_FOUND) when org_id
+        # is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        token = DeployToken.objects.filter(
+            guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id
+        ).first()
         if token is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -3356,7 +3495,13 @@ class LifecycleMutation:
             _deprovision_dns_record_sync,
         )
 
-        app = RegisteredApp.objects.filter(guid=str(input.app_id), deleted_at__isnull=True).first()
+        # Org-scope the by-guid lookup before the cloud DNS deprovision side
+        # effect. Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        app = RegisteredApp.objects.filter(
+            guid=str(input.app_id), organization_id=org_id, deleted_at__isnull=True
+        ).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         host = (input.hostname or "").strip()
@@ -3405,9 +3550,15 @@ class LifecycleMutation:
             _deprovision_certificate_sync,
         )
 
+        # Org-scope the by-guid lookup before the cloud cert-revoke side
+        # effect: CustomDomain reaches the org via registered_app. Fails
+        # closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         domain = CustomDomain.objects.filter(
             guid=str(input.custom_domain_id),
             deleted_at__isnull=True,
+            registered_app__organization_id=org_id,
         ).first()
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "custom domain not found")
@@ -3452,7 +3603,13 @@ class LifecycleMutation:
             _deprovision_identity_role_sync,
         )
 
-        app = RegisteredApp.objects.filter(guid=str(input.app_id), deleted_at__isnull=True).first()
+        # Org-scope the by-guid lookup before the cloud IAM-role delete side
+        # effect. Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        app = RegisteredApp.objects.filter(
+            guid=str(input.app_id), organization_id=org_id, deleted_at__isnull=True
+        ).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         try:
@@ -3489,7 +3646,13 @@ class LifecycleMutation:
             _deprovision_registry_repo_sync,
         )
 
-        app = RegisteredApp.objects.filter(guid=str(input.app_id), deleted_at__isnull=True).first()
+        # Org-scope the by-guid lookup before the registry-archive side
+        # effect. Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        app = RegisteredApp.objects.filter(
+            guid=str(input.app_id), organization_id=org_id, deleted_at__isnull=True
+        ).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         try:
@@ -3532,7 +3695,13 @@ class LifecycleMutation:
             _deprovision_ingress_sync,
         )
 
-        app = RegisteredApp.objects.filter(guid=str(input.app_id), deleted_at__isnull=True).first()
+        # Org-scope the by-guid lookup before the cloud ingress-delete side
+        # effect. Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        app = RegisteredApp.objects.filter(
+            guid=str(input.app_id), organization_id=org_id, deleted_at__isnull=True
+        ).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         host = (input.hostname or "").strip() or None
@@ -3586,8 +3755,13 @@ class LifecycleMutation:
             dispatch_astrolift_ci_workflow,
         )
 
+        # Org-scope the app lookup to the caller's tenant before dispatching
+        # the CI workflow (external SCM call). Slugs are unique only within
+        # an org. Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True)
+            RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -3678,10 +3852,16 @@ class LifecycleMutation:
         )
         from astrolift_registry.models import Workload
 
+        # Org-scope the by-guid lookup before the cluster restart side
+        # effect: Workload reaches the org via registered_app. Fails closed
+        # (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         workload = (
             Workload.objects.filter(
                 guid=str(input.workload_id),
                 deleted_at__isnull=True,
+                registered_app__organization_id=org_id,
             )
             .select_related("registered_app")
             .first()
@@ -3724,10 +3904,16 @@ class LifecycleMutation:
         )
         from astrolift_registry.models import Workload
 
+        # Org-scope the by-guid lookup before the cluster scale side effect:
+        # Workload reaches the org via registered_app. Fails closed
+        # (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         workload = (
             Workload.objects.filter(
                 guid=str(input.workload_id),
                 deleted_at__isnull=True,
+                registered_app__organization_id=org_id,
             )
             .select_related("registered_app")
             .first()
@@ -3792,8 +3978,14 @@ class LifecycleMutation:
             install_astrolift_source_webhook as install_webhook_service,
         )
 
+        # Org-scope the app lookup to the caller's tenant before the webhook
+        # install side effect (SCM call, rotates the HMAC secret). Slugs are
+        # unique only within an org. Fails closed (NOT_FOUND) when org_id is
+        # None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True)
+            RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -3873,8 +4065,14 @@ class LifecycleMutation:
             push_astrolift_ci_secrets,
         )
 
+        # Org-scope the app lookup to the caller's tenant before pushing CI
+        # secrets + rotating the deploy token (SCM write + secret mint).
+        # Slugs are unique only within an org. Fails closed (NOT_FOUND) when
+        # org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True)
+            RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -3946,8 +4144,14 @@ class LifecycleMutation:
         """
         from astrolift_scm.services.secrets import validate_astrolift_ci_secrets
 
+        # Org-scope the app lookup to the caller's tenant — even though this
+        # probe is read-only, an unscoped slug lookup lets a caller inspect
+        # a sibling org's repo CI-secret state via the app's SCM connection.
+        # Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True)
+            RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -4013,8 +4217,14 @@ class LifecycleMutation:
             sync_workflow_file_to_repo,
         )
 
+        # Org-scope the app lookup to the caller's tenant before committing
+        # the CI workflow file to the repo (SCM write). Slugs are unique
+        # only within an org. Fails closed (NOT_FOUND) when org_id is
+        # None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True)
+            RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -4081,8 +4291,14 @@ class LifecycleMutation:
         """
         from astrolift_scm.services.autowire import run_autowire
 
+        # Org-scope the app lookup to the caller's tenant before re-running
+        # the autowire chain (SCM writes: webhook, CI file, deploy secret).
+        # Slugs are unique only within an org. Fails closed (NOT_FOUND) when
+        # org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True)
+            RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -4163,8 +4379,15 @@ class LifecycleMutation:
                 field="appSlug",
             )
 
+        # Org-scope the app lookup to the caller's tenant BEFORE kicking the
+        # deregister workflow — this is the most destructive op on the
+        # platform (tears down every per-app cloud resource). Slugs are
+        # unique only within an org. Fails closed (NOT_FOUND) when org_id is
+        # None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=slug, deleted_at__isnull=True)
+            RegisteredApp.objects.filter(slug=slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -4249,20 +4472,28 @@ class LifecycleMutation:
                 field="workflowId",
             )
         # Defence-in-depth: the deterministic deregister workflow id
-        # carries the app guid; tenant scoping on the resolver entry
-        # would catch a cross-org request, but pin the id shape here so
-        # an operator can't accidentally cancel an unrelated workflow.
+        # carries the app guid; pin the id shape here so an operator
+        # can't accidentally cancel an unrelated workflow.
         if not wf_id.startswith("DeregisterAppWorkflow-"):
             return gql_failure(
                 ErrorCode.VALIDATION.value,
                 "workflow_id must reference a DeregisterAppWorkflow run",
                 field="workflowId",
             )
-        # Resolve + scope-check the app guid embedded in the workflow id.
-        # The mutation surface is tenant-scoped, so a sibling-org guid
-        # short-circuits to NOT_FOUND rather than leaking row counts.
+        # Resolve + org-scope the app guid embedded in the workflow id.
+        # ``@tenant_scoped`` only asserts a tenant exists — it does NOT
+        # filter — so the explicit ``organization_id`` clause below is what
+        # makes a sibling-org guid short-circuit to NOT_FOUND rather than
+        # signalling another org's teardown workflow. Fails closed when
+        # org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         app_guid = wf_id[len("DeregisterAppWorkflow-") :]
-        app = RegisteredApp.objects.filter(guid=app_guid).select_related("organization").first()
+        app = (
+            RegisteredApp.objects.filter(guid=app_guid, organization_id=org_id)
+            .select_related("organization")
+            .first()
+        )
         if app is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -4338,8 +4569,14 @@ class LifecycleMutation:
             _redispatch_ci_workflow_sync,
         )
 
+        # Org-scope the app lookup to the caller's tenant BEFORE the
+        # destructive recovery (cancels deploys, deletes k8s objects,
+        # re-dispatches CI). Slugs are unique only within an org. Fails
+        # closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True)
+            RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -4436,8 +4673,13 @@ class LifecycleMutation:
                 field="environmentName",
             )
 
+        # Org-scope the app lookup to the caller's tenant before applying a
+        # one-shot Job to the cluster. Slugs are unique only within an org.
+        # Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True)
+            RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -4596,8 +4838,13 @@ class LifecycleMutation:
                 field="workloadSlug",
             )
 
+        # Org-scope the app lookup to the caller's tenant before creating the
+        # TaskRun (which dispatches a one-shot Job). Slugs are unique only
+        # within an org. Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+            RegisteredApp.objects.filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )

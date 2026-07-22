@@ -136,7 +136,7 @@ def _event_to_type(ev) -> AppPodEventType | None:
     )
 
 
-def _list_pods_for_app(app_slug: str, *, environment_name: str | None = None) -> list:
+def _list_pods_for_app(app_slug: str, *, org_id: int | None, environment_name: str | None = None) -> list:
     """Resolve cluster + namespace for an app and ask the driver for
     live pods.
 
@@ -148,7 +148,7 @@ def _list_pods_for_app(app_slug: str, *, environment_name: str | None = None) ->
     """
     app = (
         RegisteredApp.objects.select_related("organization", "default_tenant_cluster")
-        .filter(slug=app_slug, deleted_at__isnull=True)
+        .filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
         .first()
     )
     if app is None:
@@ -191,6 +191,7 @@ def _list_pods_for_app(app_slug: str, *, environment_name: str | None = None) ->
 def _recent_pod_warnings_for_app(
     app_slug: str,
     *,
+    org_id: int | None,
     environment_name: str | None = None,
 ) -> dict[str, object]:
     """Build a ``pod_name → most-recent Warning event`` map for an app
@@ -207,7 +208,7 @@ def _recent_pod_warnings_for_app(
     """
     app = (
         RegisteredApp.objects.select_related("organization", "default_tenant_cluster")
-        .filter(slug=app_slug, deleted_at__isnull=True)
+        .filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
         .first()
     )
     if app is None:
@@ -388,11 +389,18 @@ class LifecycleQuery:
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_environments(self, info: Info, app_slug: str | None = None) -> list[AppEnvironmentType]:
+        # Org-scope to the caller's tenant: AppEnvironment reaches the org
+        # through registered_app, and @tenant_scoped only asserts a tenant
+        # exists — it does not filter. Fails closed (empty) when org_id is
+        # None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         qs = (
             AppEnvironment.objects.select_related(
                 "registered_app", "tenant_cluster", "tenant_cluster__provider_plugin", "managed_domain"
             )
             .prefetch_related("settings")
+            .filter(registered_app__organization_id=org_id)
             .order_by("registered_app__slug", "name")
         )
         if app_slug:
@@ -409,6 +417,11 @@ class LifecycleQuery:
         environment_name: str | None = None,
         limit: int = 50,
     ) -> list[DeploymentType]:
+        # Org-scope to the caller's tenant (Deployment reaches the org via
+        # registered_app; the default manager is not tenant-aware).
+        # Fails closed (empty) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         qs = (
             Deployment.objects.select_related("registered_app", "app_environment", "workload")
             # Deregistered / torn-down apps are soft-deleted; their
@@ -416,7 +429,7 @@ class LifecycleQuery:
             # in the list. Single-deployment + approval-history queries are
             # id-scoped (a direct link the operator already has), so they
             # intentionally stay fetchable and don't need this filter.
-            .filter(registered_app__deleted_at__isnull=True)
+            .filter(registered_app__deleted_at__isnull=True, registered_app__organization_id=org_id)
             .order_by("-created_at")
         )
         if app_slug:
@@ -795,12 +808,20 @@ class LifecycleQuery:
     def astrolift_preview_environments(
         self, info: Info, app_slug: str | None = None
     ) -> list[PreviewEnvironmentType]:
-        qs = PreviewEnvironment.objects.select_related(
-            "registered_app",
-            "registered_app__organization",
-            "registered_app__default_tenant_cluster",
-            "app_environment__tenant_cluster",
-        ).order_by("-created_at")
+        # Org-scope to the caller's tenant (PreviewEnvironment reaches the
+        # org via registered_app). Fails closed when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        qs = (
+            PreviewEnvironment.objects.select_related(
+                "registered_app",
+                "registered_app__organization",
+                "registered_app__default_tenant_cluster",
+                "app_environment__tenant_cluster",
+            )
+            .filter(registered_app__organization_id=org_id)
+            .order_by("-created_at")
+        )
         if app_slug:
             qs = qs.filter(registered_app__slug=app_slug)
         rows = list(qs[:200])
@@ -824,7 +845,16 @@ class LifecycleQuery:
         now = timezone.now()
         since = now - timedelta(days=window_days)
 
-        qs = Deployment.objects.filter(created_at__gte=since, deleted_at__isnull=True)
+        # Org-scope the aggregate to the caller's tenant — without this the
+        # rollout-health numbers pool every org's deployments. Fails closed
+        # (empty aggregate) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        qs = Deployment.objects.filter(
+            created_at__gte=since,
+            deleted_at__isnull=True,
+            registered_app__organization_id=org_id,
+        )
 
         in_flight_statuses = {
             Deployment.Status.PENDING_APPROVAL.value,
@@ -915,7 +945,12 @@ class LifecycleQuery:
         """
         recent_window = timezone.now() - timedelta(days=7)
         out: list[AppHealthSummaryType] = []
-        apps = RegisteredApp.objects.filter(deleted_at__isnull=True).order_by("slug")
+        # Org-scope the per-app rollup to the caller's tenant — without this
+        # it scans every org's apps. Fails closed (empty) when org_id is
+        # None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        apps = RegisteredApp.objects.filter(deleted_at__isnull=True, organization_id=org_id).order_by("slug")
         for app in apps[:300]:
             env_count = AppEnvironment.objects.filter(registered_app=app, deleted_at__isnull=True).count()
             latest = (
@@ -953,10 +988,16 @@ class LifecycleQuery:
         info: Info,
         app_slug: str,
     ) -> list[AppDomainType]:
+        # Org-scope to the caller's tenant (CustomDomain reaches the org via
+        # registered_app; slugs are unique only within an org). Fails closed
+        # when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         qs = (
             CustomDomain.objects.select_related("registered_app")
             .filter(
                 registered_app__slug=app_slug,
+                registered_app__organization_id=org_id,
                 deleted_at__isnull=True,
             )
             .order_by("-created_at")[:100]
@@ -967,7 +1008,7 @@ class LifecycleQuery:
         # gated on a cloud round-trip for every read.  Errors swallow:
         # operators see the previously-cached value (or no chip on
         # first refresh failure).
-        _refresh_cert_metadata_if_stale(domains, app_slug=app_slug)
+        _refresh_cert_metadata_if_stale(domains, app_slug=app_slug, org_id=org_id)
         return [app_domain_to_type(d) for d in domains]
 
     @strawberry.field
@@ -999,12 +1040,14 @@ class LifecycleQuery:
         to break the page over it. Cluster outages surface via
         platform-event alerts instead.
         """
-        pods = _list_pods_for_app(app_slug, environment_name=environment_name)
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        pods = _list_pods_for_app(app_slug, org_id=org_id, environment_name=environment_name)
         # #666 — surface most-recent Warning event per pod for inline
         # ImagePullBackOff / CrashLoopBackOff / OOMKilled triage.  The
         # event lookup is best-effort: empty dict on driver failure
         # means the rows render without chips.
-        warnings = _recent_pod_warnings_for_app(app_slug, environment_name=environment_name)
+        warnings = _recent_pod_warnings_for_app(app_slug, org_id=org_id, environment_name=environment_name)
         return [pod_info_to_type(p, recent_error_event=_event_to_type(warnings.get(p.name))) for p in pods]
 
     @strawberry.field
@@ -1040,7 +1083,9 @@ class LifecycleQuery:
         with read-only access to deploys (but not logs) doesn't see
         pod names they couldn't tail anyway.
         """
-        pods = _list_pods_for_app(app_slug, environment_name=environment_name)
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        pods = _list_pods_for_app(app_slug, org_id=org_id, environment_name=environment_name)
         scoped = [p for p in pods if (p.workload or "") == workload_slug]
         return _bucket_pods_by_status(scoped)
 
@@ -1052,10 +1097,16 @@ class LifecycleQuery:
         info: Info,
         app_slug: str,
     ) -> list[DeployTokenType]:
+        # Org-scope to the caller's tenant (DeployToken reaches the org via
+        # registered_app; slugs are unique only within an org). Fails closed
+        # when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         qs = (
             DeployToken.objects.select_related("registered_app")
             .filter(
                 registered_app__slug=app_slug,
+                registered_app__organization_id=org_id,
                 deleted_at__isnull=True,
             )
             .order_by("-created_at")[:100]
@@ -1098,7 +1149,13 @@ class LifecycleQuery:
     ) -> AppDnsRecordsResult:
         from core.app_deploy import AppDeployError, driver_for_capability
 
-        cluster = _resolve_app_cluster(app_slug=app_slug, environment_name=environment_name)
+        # Org-scope to the caller's tenant: cluster resolution and the app
+        # re-fetch below must be constrained to the caller's org, else a
+        # known sibling-org slug would drive a live cloud read against that
+        # org's app. Fails closed (NOT_CONFIGURED) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        cluster = _resolve_app_cluster(app_slug=app_slug, org_id=org_id, environment_name=environment_name)
         if cluster is None:
             return AppDnsRecordsResult(reason=ObservabilityPanelReason.NOT_CONFIGURED, records=[])
         try:
@@ -1113,7 +1170,9 @@ class LifecycleQuery:
         # the driver returns the whole resolved zone (unchanged behavior).
         from astrolift_observability.url_resolution import resolved_public_host
 
-        app = RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True).first()
+        app = RegisteredApp.objects.filter(
+            slug=app_slug, organization_id=org_id, deleted_at__isnull=True
+        ).first()
         app_host = resolved_public_host(app) if app is not None else None
         try:
             records = driver.list_records_for_app(app_slug, app_host=app_host)
@@ -1138,7 +1197,13 @@ class LifecycleQuery:
         from astrolift_observability.url_resolution import resolved_public_host
         from core.app_deploy import AppDeployError, driver_for_capability
 
-        cluster = _resolve_app_cluster(app_slug=app_slug, environment_name=environment_name)
+        # Org-scope to the caller's tenant: cluster resolution and the app
+        # re-fetch below must be constrained to the caller's org, else a
+        # known sibling-org slug would drive a live cloud read against that
+        # org's app. Fails closed (NOT_CONFIGURED) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        cluster = _resolve_app_cluster(app_slug=app_slug, org_id=org_id, environment_name=environment_name)
         if cluster is None:
             return AppCertificatesResult(reason=ObservabilityPanelReason.NOT_CONFIGURED, certificates=[])
 
@@ -1148,7 +1213,7 @@ class LifecycleQuery:
         # which is what ``resolved_public_host`` returns. No host ⇒ the
         # app has no public URL to hold a cert ⇒ not configured.
         app = (
-            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+            RegisteredApp.objects.filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -1184,7 +1249,13 @@ class LifecycleQuery:
     ) -> AppIdentityBindingResult:
         from core.app_deploy import AppDeployError, driver_for_capability
 
-        cluster = _resolve_app_cluster(app_slug=app_slug, environment_name=environment_name)
+        # Org-scope to the caller's tenant: cluster resolution must be
+        # constrained to the caller's org, else a known sibling-org slug
+        # would drive a live cloud read against that org's app. Fails closed
+        # (NOT_CONFIGURED) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        cluster = _resolve_app_cluster(app_slug=app_slug, org_id=org_id, environment_name=environment_name)
         if cluster is None:
             return AppIdentityBindingResult(reason=ObservabilityPanelReason.NOT_CONFIGURED, binding=None)
         try:
@@ -1255,8 +1326,14 @@ class LifecycleQuery:
         from astrolift_services.models import AppSecretBundleRef, ManagedService
         from core.app_deploy import namespace_for_app
 
+        # Org-scope the lookup to the caller's tenant — slugs are unique only
+        # within an org, so an unscoped fetch would leak a sibling org's
+        # teardown blast-radius. Fails closed to None when org_id is None
+        # (#1183); this is what makes the docstring's tenant-scoping claim true.
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+            RegisteredApp.objects.filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -1488,8 +1565,13 @@ class LifecycleQuery:
             _IN_FLIGHT_STATUSES,
         )
 
+        # Org-scope the lookup to the caller's tenant — slugs are unique only
+        # within an org, so an unscoped fetch would leak a sibling org's
+        # in-flight deployments. Fails closed to None when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+            RegisteredApp.objects.filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -1730,7 +1812,7 @@ def _preview_with_cost(p) -> PreviewEnvironmentType:
 _CERT_METADATA_TTL_SECONDS = 60 * 60  # 1h cache, per #731 acceptance
 
 
-def _refresh_cert_metadata_if_stale(domains: list, *, app_slug: str) -> None:
+def _refresh_cert_metadata_if_stale(domains: list, *, app_slug: str, org_id: int | None) -> None:
     """Best-effort lazy refresh of cached TLS cert metadata (#731).
 
     Walks ``domains`` and, for any row whose ``cert_metadata_refreshed_at``
@@ -1775,7 +1857,7 @@ def _refresh_cert_metadata_if_stale(domains: list, *, app_slug: str) -> None:
             continue
         cluster = cluster_cache.get(app.pk)
         if cluster is None:
-            cluster = _resolve_app_cluster(app_slug=app.slug, environment_name=None)
+            cluster = _resolve_app_cluster(app_slug=app.slug, org_id=org_id, environment_name=None)
             cluster_cache[app.pk] = cluster
         if cluster is None:
             continue
@@ -1836,7 +1918,7 @@ def _refresh_cert_metadata_if_stale(domains: list, *, app_slug: str) -> None:
             d.save(update_fields=["cert_metadata_refreshed_at", "updated_at", "version"])
 
 
-def _resolve_app_cluster(*, app_slug: str, environment_name: str | None):
+def _resolve_app_cluster(*, app_slug: str, org_id: int | None, environment_name: str | None):
     """Return the TenantCluster the observability cards should query.
 
     Mirrors the resolution shape of ``astrolift_app_pods``:
@@ -1850,7 +1932,7 @@ def _resolve_app_cluster(*, app_slug: str, environment_name: str | None):
     Info object."""
     app = (
         RegisteredApp.objects.select_related("organization", "default_tenant_cluster")
-        .filter(slug=app_slug, deleted_at__isnull=True)
+        .filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
         .first()
     )
     if app is None:
