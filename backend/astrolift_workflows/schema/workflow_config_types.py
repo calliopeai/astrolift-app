@@ -42,6 +42,7 @@ class WorkflowRunType:
     guid: str
     current_state: str
     temporal_workflow_id: str | None
+    temporal_run_id: str | None
     started_at: datetime
     completed_at: datetime | None
     is_completed: bool
@@ -93,6 +94,7 @@ def run_to_type(instance) -> WorkflowRunType:
         guid=str(instance.pk),
         current_state=instance.current_state,
         temporal_workflow_id=instance.temporal_workflow_id or None,
+        temporal_run_id=instance.temporal_run_id or None,
         started_at=instance.started_at,
         completed_at=instance.completed_at,
         is_completed=instance.completed_at is not None,

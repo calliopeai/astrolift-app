@@ -27,6 +27,7 @@ const WORKFLOW_RUN_FIELDS = `
   guid
   currentState
   temporalWorkflowId
+  temporalRunId
   startedAt
   completedAt
   isCompleted

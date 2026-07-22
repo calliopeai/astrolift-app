@@ -167,8 +167,8 @@ function RunTimelinePanel({
 
       <WorkflowRunDag
         key={run.guid}
-        workflowId={detail?.instance.workflowId ?? null}
-        runId={detail?.instance.runId ?? null}
+        workflowId={run.temporalWorkflowId ?? detail?.instance.workflowId ?? null}
+        runId={run.temporalRunId ?? detail?.instance.runId ?? null}
         definitionSlug={definitionSlug}
         isTerminal={isTerminal}
       />

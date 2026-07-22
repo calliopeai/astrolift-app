@@ -329,6 +329,81 @@ def test_run_workflow_rejects_unbound_bindings(
     assert patched_start == []  # engine NOT started
 
 
+def test_run_workflow_persists_temporal_run_id(
+    member, org, agent_workload, permission_resolver, patched_start
+):
+    """#1180: the Temporal run_id is captured on the tier-3 WorkflowInstance at
+    start (mirroring the sibling WorkflowRun the stage executor keys on), so a
+    historical run's DAG overlays without a live Temporal describe."""
+    from astrolift_operations.models import WorkflowRun
+
+    permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
+    d = _make_def("cw-runid", organization=org)
+    wf = Workflow.objects.create(
+        organization=org,
+        definition=d,
+        name="RunId WF",
+        slug="runid-wf",
+        stage_bindings={"0": {"agent_workload_id": str(agent_workload.guid)}},
+    )
+    m = WorkflowsMutation()
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        res = m.run_workflow(_info(member), workflow_id=str(wf.guid))
+    assert res.ok, res.errors
+
+    inst = WorkflowInstance.objects.get(configured_workflow=wf)
+    # patched_start's fake handle returns run_id="test-run-id".
+    assert inst.temporal_run_id == "test-run-id"
+    # …and it equals the run_id on the sibling WorkflowRun mirror (the row
+    # workflowStageExecutions resolves against by workflow_id + run_id).
+    run = WorkflowRun.objects.get(workflow_id=inst.temporal_workflow_id)
+    assert run.run_id == inst.temporal_run_id
+
+
+def test_workflow_runs_query_exposes_temporal_run_id(
+    member, org, agent_workload, permission_resolver, patched_start
+):
+    """#1180: the tiered WorkflowRun type surfaces the persisted run_id so the
+    live-flow DAG can key workflowStageExecutions off the DB mirror instead of
+    a live describe that returns null once Temporal GCs the run."""
+    permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
+    permission_resolver.grant(Permission.WORKFLOW_READ)
+    d = _make_def("cw-runid-q", organization=org)
+    wf = Workflow.objects.create(
+        organization=org,
+        definition=d,
+        name="RunId Q WF",
+        slug="runid-q-wf",
+        stage_bindings={"0": {"agent_workload_id": str(agent_workload.guid)}},
+    )
+    m = WorkflowsMutation()
+    q = WorkflowsQuery()
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        res = m.run_workflow(_info(member), workflow_id=str(wf.guid))
+        runs = q.workflow_runs(_info(member), workflow_id=str(wf.guid))
+    assert len(runs) == 1
+    assert runs[0].temporal_run_id == "test-run-id"
+    assert runs[0].temporal_workflow_id == res.run_id
+
+
+def test_workflow_runs_back_compat_null_run_id(member, org, permission_resolver):
+    """#1180 back-compat: a run started before this field (temporal_run_id never
+    captured) still resolves through the tiered query — run_id is None and the
+    frontend falls back to the live Temporal describe, exactly as today."""
+    permission_resolver.grant(Permission.WORKFLOW_READ)
+    d = _make_def("cw-legacy", organization=org)
+    wf = Workflow(organization=org, definition=d, name="Legacy WF", slug="legacy-wf")
+    wf.save(skip_binding_validation=True)
+    # A pre-#1180 run: temporal_workflow_id set, run_id left null.
+    WorkflowInstance.start(configured_workflow=wf, user=member, temporal_workflow_id="wf-legacy")
+    q = WorkflowsQuery()
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        runs = q.workflow_runs(_info(member), workflow_id=str(wf.guid))
+    assert len(runs) == 1
+    assert runs[0].temporal_workflow_id == "wf-legacy"
+    assert runs[0].temporal_run_id is None
+
+
 # ---------------------------------------------------------------------------
 # Schedule trigger — create / update / delete one Temporal Schedule (§3)
 # ---------------------------------------------------------------------------

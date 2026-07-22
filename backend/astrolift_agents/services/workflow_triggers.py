@@ -530,9 +530,11 @@ def _enqueue_temporal(
             trigger_payload=input_data,
             actor=Actor(kind="system", user_id=None, display=trigger_kind),
         )
-        # Store the Temporal workflow_id on the instance for observability.
+        # Store the Temporal workflow_id + run_id on the instance — the latter
+        # lets a historical run's DAG overlay without a live describe (#1180).
         instance.temporal_workflow_id = workflow_id
-        instance.save(update_fields=["temporal_workflow_id", "updated_at"])
+        instance.temporal_run_id = _run.run_id or None
+        instance.save(update_fields=["temporal_workflow_id", "temporal_run_id", "updated_at"])
     except Exception:
         log.exception("failed to enqueue Temporal workflow for instance %s", instance.pk)
 
