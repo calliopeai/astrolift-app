@@ -95,6 +95,27 @@ class BriefType:
     created_at: dt.datetime
 
 
+@strawberry.type(name="AstroliftAgentTaskDispatcher")
+class AgentTaskDispatcherType:
+    """The dispatcher an AgentTask was routed to, projected for the fleet
+    map (#1091).
+
+    A lightweight reference — routing identity plus the cluster the
+    dispatcher spawns onto — never the endpoint or ``api_key_hash``.
+    ``cluster_id`` is the co-located :class:`TenantCluster`'s GUID, which
+    the map correlates with cluster heartbeat liveness to colour the
+    cluster layer; it is null when the dispatcher runs standalone.
+    """
+
+    id: GUID
+    name: str
+    slug: str
+    cloud: str
+    region: str
+    cluster_id: GUID | None
+    cluster_name: str
+
+
 @strawberry.type(name="AstroliftAgentTask")
 class AgentTaskType:
     id: GUID
@@ -104,6 +125,13 @@ class AgentTaskType:
     # state with a result (or on a failure-only outcome).
     result: JSON | None
     created_at: dt.datetime
+    # Lifecycle cursor for the fleet map (#1091): ``transition_to`` bumps
+    # ``updated_at`` on every state change, so it is the incremental cursor
+    # the live map polls on — there is no separate transition-log model.
+    updated_at: dt.datetime
+    # Pre-run pipeline stamps (null until the task reaches that state).
+    queued_at: dt.datetime | None
+    provisioning_at: dt.datetime | None
     started_at: dt.datetime | None
     # Maps to the model's ``ended_at`` (any terminal transition stamps it).
     finished_at: dt.datetime | None
@@ -119,6 +147,13 @@ class AgentTaskType:
     # The gallery polls this to render snapshot tiles before exploding into
     # the live VncViewer session at ``vnc_url``.
     snapshot_url: str | None
+    # Node-layer projection for the fleet dispatch map (#1091): the pod the
+    # task runs as, the namespace it landed in, and the dispatcher that
+    # routed it (with the cluster it spawned onto). ``dispatcher`` is null
+    # until the Controller selects one at PROVISIONING.
+    pod_name: str
+    namespace: str
+    dispatcher: AgentTaskDispatcherType | None
 
 
 @strawberry.type(name="AstroliftAgentEnvironmentSpec")
@@ -323,6 +358,26 @@ def _resolve_snapshot_url(t) -> str | None:
         return None
 
 
+def _agent_task_dispatcher_to_type(d) -> AgentTaskDispatcherType | None:
+    """Project an AgentTask's :class:`DispatcherInstance` (+ its co-located
+    cluster) for the fleet map. ``None`` when the task has no dispatcher yet
+    (draft/queued, before the Controller routes it at PROVISIONING). Reads
+    only fields the resolver ``select_related``s (``dispatcher`` and
+    ``dispatcher__tenant_cluster``), so it adds no query per task."""
+    if d is None:
+        return None
+    cluster = d.tenant_cluster
+    return AgentTaskDispatcherType(
+        id=GUID(str(d.guid)),
+        name=d.name or "",
+        slug=d.slug or "",
+        cloud=d.cloud or "",
+        region=d.region or "",
+        cluster_id=GUID(str(cluster.guid)) if cluster is not None else None,
+        cluster_name=(cluster.name or "") if cluster is not None else "",
+    )
+
+
 def agent_task_to_type(t) -> AgentTaskType:
     return AgentTaskType(
         id=GUID(str(t.guid)),
@@ -330,11 +385,17 @@ def agent_task_to_type(t) -> AgentTaskType:
         callback_url=t.callback_url or "",
         result=t.result,
         created_at=t.created_at,
+        updated_at=t.updated_at,
+        queued_at=t.queued_at,
+        provisioning_at=t.provisioning_at,
         started_at=t.started_at,
         finished_at=t.ended_at,
         vnc_enabled=t.vnc_enabled,
         vnc_url=t.vnc_url or "",
         snapshot_url=_resolve_snapshot_url(t),
+        pod_name=t.pod_name or "",
+        namespace=t.namespace or "",
+        dispatcher=_agent_task_dispatcher_to_type(t.dispatcher),
     )
 
 
