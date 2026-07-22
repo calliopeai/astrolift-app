@@ -29,6 +29,7 @@ from core.cluster_observability import namespace_for_app
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.schema.enums import ObservabilityPanelReason
+from core.tenancy import get_current_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +199,10 @@ class LogHistoryQuery:
         ``[since, until]``.
 
         Backend dispatch:
-          1. Look up the app for the current tenant.
+          1. Look up the app scoped to the caller's organization. A
+             slug is unique per-org only, so the ``organization_id``
+             constraint is what keeps this from reading another org's
+             logs (PII); an unknown/foreign slug returns an empty page.
           2. Pick the cluster (env-named, falling back to the app
              default — same as the live-tail subscription).
           3. Resolve the cluster's log-aggregator driver via
@@ -212,9 +216,11 @@ class LogHistoryQuery:
         path (a broken backend yields an empty stream, not a GraphQL
         error).
         """
+        tenant = get_current_tenant()
         app = (
             RegisteredApp.objects.filter(
                 slug=app_slug,
+                organization_id=tenant.organization_id,
                 deleted_at__isnull=True,
             )
             .only("id", "slug", "k8s_namespace", "organization", "default_tenant_cluster")

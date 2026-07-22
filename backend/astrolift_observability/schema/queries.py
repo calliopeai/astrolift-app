@@ -64,6 +64,7 @@ from core.cluster_observability import namespace_for_app
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.schema.enums import ObservabilityPanelReason
+from core.tenancy import get_current_tenant
 
 log = logging.getLogger(__name__)
 
@@ -335,8 +336,13 @@ class GoldenSignalsQuery:
         came back empty, OK otherwise.
         """
         seconds = _clamp_range(range_seconds or _DEFAULT_RANGE_SECONDS)
+        tenant = get_current_tenant()
         app = (
-            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+            RegisteredApp.objects.filter(
+                slug=app_slug,
+                organization_id=tenant.organization_id,
+                deleted_at__isnull=True,
+            )
             .select_related("organization")
             .only("id", "slug", "k8s_namespace", "organization__slug")
             .first()
@@ -522,7 +528,16 @@ class GoldenSignalsQuery:
         in window), ERROR (Prometheus errored), or OK. ``null`` is
         reserved for "no such app for this tenant"."""
         seconds = _clamp_range(range_seconds or _DEFAULT_RANGE_SECONDS)
-        app = RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True).only("id", "slug").first()
+        tenant = get_current_tenant()
+        app = (
+            RegisteredApp.objects.filter(
+                slug=app_slug,
+                organization_id=tenant.organization_id,
+                deleted_at__isnull=True,
+            )
+            .only("id", "slug")
+            .first()
+        )
         if app is None:
             return None
 
@@ -643,7 +658,16 @@ class GoldenSignalsQuery:
         or every query errored — the FE treats null as the empty-state
         signal.
         """
-        app = RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True).only("id", "slug").first()
+        tenant = get_current_tenant()
+        app = (
+            RegisteredApp.objects.filter(
+                slug=app_slug,
+                organization_id=tenant.organization_id,
+                deleted_at__isnull=True,
+            )
+            .only("id", "slug")
+            .first()
+        )
         if app is None:
             return None
 
@@ -739,8 +763,13 @@ class GoldenSignalsQuery:
         reserved for the FE's pre-first-probe pill; a live probe
         always lands on ``ok`` / ``degraded`` / ``down``.
         """
+        tenant = get_current_tenant()
         app = (
-            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+            RegisteredApp.objects.filter(
+                slug=app_slug,
+                organization_id=tenant.organization_id,
+                deleted_at__isnull=True,
+            )
             .only("id", "guid", "slug", "subdomain")
             .first()
         )
@@ -789,8 +818,13 @@ class GoldenSignalsQuery:
         Persistence is its own ticket if/when operators ask for
         cross-restart probe history.
         """
+        tenant = get_current_tenant()
         app = (
-            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+            RegisteredApp.objects.filter(
+                slug=app_slug,
+                organization_id=tenant.organization_id,
+                deleted_at__isnull=True,
+            )
             .only("id", "guid", "slug", "subdomain")
             .first()
         )
@@ -872,9 +906,14 @@ class GoldenSignalsQuery:
         same shape as the golden-signals empty state.
         """
         seconds = _clamp_range(range_seconds or _DEFAULT_RANGE_SECONDS)
+        tenant = get_current_tenant()
         svc = (
             ManagedService.objects.select_related("registered_app", "app_environment")
-            .filter(guid=str(managed_service_id), deleted_at__isnull=True)
+            .filter(
+                guid=str(managed_service_id),
+                registered_app__organization_id=tenant.organization_id,
+                deleted_at__isnull=True,
+            )
             .first()
         )
         if svc is None:
@@ -981,7 +1020,16 @@ class GoldenSignalsQuery:
         cAdvisor dropped its series).
         """
         seconds = _clamp_range(range_seconds or _DEFAULT_RANGE_SECONDS)
-        app = RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True).only("id", "slug").first()
+        tenant = get_current_tenant()
+        app = (
+            RegisteredApp.objects.filter(
+                slug=app_slug,
+                organization_id=tenant.organization_id,
+                deleted_at__isnull=True,
+            )
+            .only("id", "slug")
+            .first()
+        )
         if app is None:
             return None
 
@@ -1144,7 +1192,16 @@ class GoldenSignalsQuery:
         if end_unix <= start_unix:
             return ExecutePromqlResult(ok=False, error="end_unix must be greater than start_unix", series=[])
 
-        app = RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True).only("id", "slug").first()
+        tenant = get_current_tenant()
+        app = (
+            RegisteredApp.objects.filter(
+                slug=app_slug,
+                organization_id=tenant.organization_id,
+                deleted_at__isnull=True,
+            )
+            .only("id", "slug")
+            .first()
+        )
         if app is None:
             return ExecutePromqlResult(ok=False, error="app not found", series=[])
 
@@ -1215,7 +1272,16 @@ class GoldenSignalsQuery:
         """
         from astrolift_observability import trace_client
 
-        app = RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True).only("id", "slug").first()
+        tenant = get_current_tenant()
+        app = (
+            RegisteredApp.objects.filter(
+                slug=app_slug,
+                organization_id=tenant.organization_id,
+                deleted_at__isnull=True,
+            )
+            .only("id", "slug")
+            .first()
+        )
         if app is None:
             return []
 
@@ -1267,7 +1333,16 @@ class GoldenSignalsQuery:
         """
         from astrolift_observability import trace_client
 
-        app = RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True).only("id", "slug").first()
+        tenant = get_current_tenant()
+        app = (
+            RegisteredApp.objects.filter(
+                slug=app_slug,
+                organization_id=tenant.organization_id,
+                deleted_at__isnull=True,
+            )
+            .only("id", "slug")
+            .first()
+        )
         if app is None:
             return []
 
@@ -1323,7 +1398,16 @@ class GoldenSignalsQuery:
         observability resolvers.
         """
         seconds = _clamp_range(range_seconds or _DEFAULT_RANGE_SECONDS)
-        app = RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True).only("id", "slug").first()
+        tenant = get_current_tenant()
+        app = (
+            RegisteredApp.objects.filter(
+                slug=app_slug,
+                organization_id=tenant.organization_id,
+                deleted_at__isnull=True,
+            )
+            .only("id", "slug")
+            .first()
+        )
         if app is None:
             return []
 
