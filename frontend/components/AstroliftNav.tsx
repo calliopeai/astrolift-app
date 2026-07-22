@@ -22,6 +22,7 @@ import {
   KeyRoundIcon,
   LayersIcon,
   LockIcon,
+  NetworkIcon,
   RocketIcon,
   ScrollTextIcon,
   ShieldCheckIcon,
@@ -273,6 +274,7 @@ const modules: ModuleEntry[] = [
     moduleKey: "agents",
     icon: <BoxIcon />,
     href: "/agents",
+    items: [{ label: "Fleet Map", href: "/fleet/map", icon: <NetworkIcon /> }],
   },
   {
     label: "Workflows",

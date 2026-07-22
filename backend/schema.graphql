@@ -343,11 +343,27 @@ type AstroliftAgentTask {
   callbackUrl: String!
   result: JSON
   createdAt: DateTime!
+  updatedAt: DateTime!
+  queuedAt: DateTime
+  provisioningAt: DateTime
   startedAt: DateTime
   finishedAt: DateTime
   vncEnabled: Boolean!
   vncUrl: String!
   snapshotUrl: String
+  podName: String!
+  namespace: String!
+  dispatcher: AstroliftAgentTaskDispatcher
+}
+
+type AstroliftAgentTaskDispatcher {
+  id: GUID!
+  name: String!
+  slug: String!
+  cloud: String!
+  region: String!
+  clusterId: GUID
+  clusterName: String!
 }
 
 type AstroliftAgentTaskMutationResult {
@@ -5215,6 +5231,7 @@ type Query {
   agentTasks(orgId: ID!, status: String = null, workloadId: ID = null): [AstroliftAgentTask!]!
   agentGallery(orgId: ID!): [AstroliftAgentTask!]!
   agentTask(id: ID!): AstroliftAgentTask
+  agentTaskTransitionsSince(orgId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentTask!]!
   agentTaskLogs(id: ID!, tail: Int! = 200): [String!]!
   agentEnvironmentSpecs(orgId: ID!): [AstroliftAgentEnvironmentSpec!]!
   agentEnvironmentSpec(slug: String!): AstroliftAgentEnvironmentSpec

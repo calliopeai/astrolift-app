@@ -13,6 +13,7 @@ active tenant (a non-superuser may not read another org's rows).
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 import strawberry
@@ -102,6 +103,12 @@ def _caller_org_id(info: Info, org_id: strawberry.ID) -> int:
 # can't issue an unbounded scan. Mirrors the 200-row soft cap the sibling
 # agent resolvers (agent_tasks, skills, ...) already use.
 _AGENT_LIST_CAP = 200
+
+# Upper bound on the fleet-map transition feed (#1091). The client passes
+# ``limit=200`` and drains forward across polls via the ``since`` cursor, so
+# this only bounds a caller that requests a larger page — a busy fleet still
+# converges to live over a few polls rather than issuing one unbounded scan.
+_AGENT_TRANSITIONS_CAP = 500
 
 # How far ahead ``_next_cron_fire`` scans for the next firing. A valid
 # 5-field cron with a day-of-month + month constraint can be up to ~13
@@ -437,10 +444,12 @@ class AgentsQuery:
             if wl is None:
                 return []
             qs = qs.filter(agent_definition_id=wl)
-        # select_related the org so snapshot_url presigning (per RUNNING vnc
-        # row) doesn't fire a query per task — the org is the only related
-        # object agent_task_to_type touches.
-        qs = qs.select_related("organization").order_by("-created_at")[:200]
+        # select_related the org (snapshot_url presigning) plus the dispatcher
+        # + its cluster, which the node-layer projection (#1091) reads — so the
+        # list stays a bounded number of queries with no per-task N+1.
+        qs = qs.select_related("organization", "dispatcher", "dispatcher__tenant_cluster").order_by(
+            "-created_at"
+        )[:200]
         return [agent_task_to_type(t) for t in qs]
 
     @strawberry.field
@@ -467,7 +476,7 @@ class AgentsQuery:
                 deleted_at__isnull=True,
             )
             .exclude(vnc_url="")
-            .select_related("organization")
+            .select_related("organization", "dispatcher", "dispatcher__tenant_cluster")
             .order_by("-started_at", "-created_at")[:200]
         )
         return [agent_task_to_type(t) for t in qs]
@@ -481,10 +490,53 @@ class AgentsQuery:
         org_pk = tenant.organization_id if tenant else None
         row = (
             AgentTask.objects.filter(guid=str(id), organization_id=org_pk, deleted_at__isnull=True)
-            .select_related("organization")
+            .select_related("organization", "dispatcher", "dispatcher__tenant_cluster")
             .first()
         )
         return agent_task_to_type(row) if row is not None else None
+
+    @strawberry.field
+    @require_permission(Permission.AGENT_READ)
+    @tenant_scoped()
+    def agent_task_transitions_since(
+        self,
+        info: Info,
+        org_id: strawberry.ID,
+        since: datetime | None = None,
+        limit: int = 200,
+    ) -> list[AgentTaskType]:
+        """The caller-org's AgentTasks whose state changed after ``since``,
+        oldest change first — the live feed behind /fleet/map (#1091).
+
+        The fleet map polls this with a moving ``since`` cursor (the
+        high-water ``updated_at`` of the previous batch) and merges each
+        batch into the map, so an edge pulses whenever a task advances
+        state. ``AgentTask.transition_to`` bumps ``updated_at`` on every
+        transition, so ``updated_at`` is the transition cursor — there is no
+        separate transition-log model. With ``since`` omitted the feed
+        returns the oldest ``limit`` tasks in the org; the client seeds the
+        cursor with a recent lookback so the first frame shows the live
+        fleet rather than ancient history.
+
+        Org-scoped exactly like :meth:`agent_tasks`: ``org_id`` must match
+        the caller's active tenant (superusers excepted, via
+        ``_caller_org_id``) and the queryset is filtered to that org, so a
+        cross-org call never sees another tenant's tasks. Ordered ascending
+        by ``updated_at`` and capped (:data:`_AGENT_TRANSITIONS_CAP`) so a
+        busy fleet drains forward across polls instead of returning an
+        unbounded scan. ``dispatcher`` (and its ``tenant_cluster``) is
+        selected so the map's dispatcher/cluster layers project without an
+        N+1.
+        """
+        org_pk = _caller_org_id(info, org_id)
+        capped = max(1, min(limit, _AGENT_TRANSITIONS_CAP))
+        qs = AgentTask.objects.filter(organization_id=org_pk, deleted_at__isnull=True)
+        if since is not None:
+            qs = qs.filter(updated_at__gt=since)
+        qs = qs.select_related("organization", "dispatcher", "dispatcher__tenant_cluster").order_by(
+            "updated_at"
+        )[:capped]
+        return [agent_task_to_type(t) for t in qs]
 
     @strawberry.field
     @require_permission(Permission.AGENT_READ)
