@@ -25,7 +25,7 @@ from constance.test import override_config
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from astrolift_identity.models import Organization, Role, RoleBinding, Team
+from astrolift_identity.models import Member, Organization, Role, RoleBinding, Team
 from astrolift_identity.schema.mutations import (
     BulkRevokeRoleBindingsInput,
     CreateTeamInput,
@@ -355,6 +355,15 @@ def test_sensitive_mutation_with_elevation_runs_resolver(permission_resolver):
     )
     admin = _admin_user(password="pw")
     target = _admin_user(email="grantee@astrolift.dev")
+    # #1183: grant_role now requires the target to already be a member of
+    # the caller's org.
+    Member.objects.create(
+        user=target,
+        scope_kind=Member.ScopeKind.ORG,
+        scope_id=org.id,
+        is_active=True,
+        lifecycle=Member.Lifecycle.ACTIVE,
+    )
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
     session = _FakeSession()
     elevate(session, method=METHOD_PASSWORD, ttl_seconds=300)

@@ -246,17 +246,29 @@ def test_role_binding_source_scope_label_org_team_project_app(actor, info, permi
 
 
 def test_role_binding_source_scope_label_falls_back_on_missing_scope(actor, info, permission_resolver):
-    """If the referenced scope row vanished (soft-deleted, migrated away),
-    the label still resolves to a non-empty fallback so the FE never
-    sees an empty string."""
+    """If the referenced scope row was soft-deleted, the label still
+    resolves to a non-empty fallback so the FE never sees an empty
+    string.
+
+    The binding must still surface after #1183 org-scoping: a
+    soft-deleted team is enumerated via ``all_objects`` in the org-scope
+    filter (the team was org-owned), while the label resolver uses the
+    default manager and so can't resolve the vanished row — hence the
+    ``"team"`` fallback. (A binding to a team id that never existed in
+    *any* org is correctly excluded now — it can't be attributed to the
+    caller's tenant — so this test uses a real, then soft-deleted, team.)
+    """
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
     org = Organization.objects.create(name="Acme", slug="acme-417-missing")
     user = _add_member(org, username="orphan417", email="orphan@acme.test")
     role = Role.objects.create(
         slug="r417-orphan", name="orphan-role", scope_level="TEAM", permissions=["team.read"]
     )
-    # Bind to a non-existent team id
-    RoleBinding.objects.create(user=user, role=role, scope_kind="TEAM", scope_id=999_999)
+    # Bind to a real team of this org, then soft-delete the team so the
+    # binding is a genuine same-org orphan.
+    vanished_team = Team.objects.create(organization=org, slug="vanished", name="Vanished")
+    RoleBinding.objects.create(user=user, role=role, scope_kind="TEAM", scope_id=vanished_team.id)
+    vanished_team.soft_delete()
 
     with tenant_context(TenantContext(organization_id=org.id, actor_user_id=actor.id)):
         bindings = IdentityQuery().astrolift_role_bindings(info)
