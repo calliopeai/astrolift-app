@@ -67,6 +67,20 @@ from core.permissions import Permission, require_permission
 from core.schema.enums import ObservabilityPanelReason
 from core.tenancy import get_current_tenant
 
+
+def _caller_org_id() -> int | None:
+    """Current tenant's organization id, or None when there's no tenant
+    context. Read resolvers over org-owned rows MUST treat None as
+    deny-by-default ("no rows"), never as "all rows" (#1042 / #1183).
+
+    ``@tenant_scoped()`` only asserts a tenant context exists; it does
+    NOT filter any queryset. Every resolver has to add the org
+    constraint itself or it leaks cross-org.
+    """
+    tenant = get_current_tenant()
+    return tenant.organization_id if tenant is not None else None
+
+
 _TIME_RANGE_SECONDS = {
     "5m": 5 * 60,
     "1h": 60 * 60,
@@ -171,7 +185,14 @@ class OperationsQuery:
         severity: str | None = None,
         app_slug: str | None = None,
     ) -> list[EventType]:
-        qs = Event.objects.order_by("-occurred_at")
+        # Scope the BASE queryset to the caller's org (#1183): without
+        # this, the unfiltered Event stream leaked every org's events —
+        # the app_slug path scoped its own JOIN but the default view did
+        # not. org_id None → deny-by-default (empty).
+        org_id = _caller_org_id()
+        if org_id is None:
+            return []
+        qs = Event.objects.filter(organization_id=org_id).order_by("-occurred_at")
         if event_type:
             qs = qs.filter(event_type=event_type)
         if severity:
@@ -215,7 +236,11 @@ class OperationsQuery:
         # raw rows to fill ``capped_limit`` buckets even when most events
         # collapse 10:1.
         scan_cap = min(capped_limit * 50, 10_000)
-        qs = Event.objects.order_by("-occurred_at")
+        # Scope the base stream to the caller's org (#1183).
+        org_id = _caller_org_id()
+        if org_id is None:
+            return []
+        qs = Event.objects.filter(organization_id=org_id).order_by("-occurred_at")
         if event_type:
             qs = qs.filter(event_type=event_type)
         if severity:
@@ -267,7 +292,15 @@ class OperationsQuery:
         decorator on the resolver.
         """
         page_size = max(1, min(limit, 500))
-        qs = Event.objects.order_by("-occurred_at", "-guid")
+        # Scope the base stream to the caller's org (#1183).
+        org_id = _caller_org_id()
+        if org_id is None:
+            return EventPageType(
+                items=[],
+                next_cursor=None,
+                reason=ObservabilityPanelReason.NO_DATA_YET,
+            )
+        qs = Event.objects.filter(organization_id=org_id).order_by("-occurred_at", "-guid")
         if event_type:
             qs = qs.filter(event_type=event_type)
         if severity:
@@ -340,9 +373,15 @@ class OperationsQuery:
         hot path.
         """
         page_size = max(1, min(limit, 100))
+        # Scope to the caller's org (#1183) — the activity feed is a
+        # filtered view over the same Event stream, so the org clause
+        # rides alongside the lifecycle-prefix filter.
+        org_id = _caller_org_id()
+        if org_id is None:
+            return ActivityPageType(items=[], next_cursor=None)
         qs = (
             Event.objects.select_related("actor_user", "registered_app")
-            .filter(_lifecycle_event_filter())
+            .filter(_lifecycle_event_filter(), organization_id=org_id)
             .order_by("-occurred_at", "-guid")
         )
         if cursor:
@@ -386,7 +425,16 @@ class OperationsQuery:
         Filters: ``action`` (exact), ``decision`` (ALLOW/DENY/UNKNOWN),
         ``actor_id`` (exact), and inclusive ``occurred_at`` bounds.
         Caps at 500 rows per call regardless of ``limit``."""
-        qs = AuditEvent.objects.order_by("-occurred_at")
+        # Scope to the caller's org (#1183): AuditEvent rows carry PII
+        # (actor, IP, user-agent, target). Without the org clause this
+        # legacy list leaked every tenant's audit trail. org_id None →
+        # deny-by-default (empty). NULL-org rows (platform/system events
+        # written without a tenant context) are intentionally excluded
+        # from every tenant's view.
+        org_id = _caller_org_id()
+        if org_id is None:
+            return []
+        qs = AuditEvent.objects.filter(organization_id=org_id).order_by("-occurred_at")
         if action:
             qs = qs.filter(action=action)
         if decision:
@@ -422,7 +470,18 @@ class OperationsQuery:
         narrow filters but a full-range count is expensive, so the
         caller opts in."""
         page_size = max(1, min(limit, 500))
-        qs = AuditEvent.objects.order_by("-occurred_at", "-guid")
+        # Scope to the caller's org (#1183) before the count + page so
+        # both the returned rows and include_total reflect only the
+        # caller's tenant. See astrolift_audit_events for the PII
+        # rationale. org_id None → deny-by-default (empty page).
+        org_id = _caller_org_id()
+        if org_id is None:
+            return AuditEventPageType(
+                items=[],
+                next_cursor=None,
+                total_count=0 if include_total else None,
+            )
+        qs = AuditEvent.objects.filter(organization_id=org_id).order_by("-occurred_at", "-guid")
         if action:
             qs = qs.filter(action=action)
         if decision:
@@ -485,7 +544,17 @@ class OperationsQuery:
         info: Info,
         limit: int = 50,
     ) -> list[WorkflowRunType]:
-        qs = WorkflowRun.objects.order_by("-started_at")[: max(1, min(limit, 200))]
+        # Scope to the caller's org (#1183). WorkflowRun carries a
+        # nullable ``organization`` FK stamped from the tenant context
+        # at reconcile time; org_id None → deny-by-default (empty), and
+        # NULL-org platform runs stay out of every tenant's view. The
+        # (organization, -started_at) index backs this directly.
+        org_id = _caller_org_id()
+        if org_id is None:
+            return []
+        qs = WorkflowRun.objects.filter(organization_id=org_id).order_by("-started_at")[
+            : max(1, min(limit, 200))
+        ]
         return [workflow_run_to_type(w) for w in qs]
 
     @strawberry.field
@@ -501,7 +570,14 @@ class OperationsQuery:
         Without ``app_slug``: org-wide subscriptions (those not bound
         to any app). Pass ``app_slug`` to list per-app subscriptions
         scoped to that app's UI page (#281)."""
-        qs = WebhookSubscription.objects.order_by("-created_at")
+        # Scope to the caller's org (#1183): WebhookSubscription owns an
+        # organization FK. Without it, the app_slug branch matched a
+        # same-slug app in any tenant and the org-wide branch listed
+        # every tenant's global hooks. org_id None → deny-by-default.
+        org_id = _caller_org_id()
+        if org_id is None:
+            return []
+        qs = WebhookSubscription.objects.filter(organization_id=org_id).order_by("-created_at")
         if app_slug:
             qs = qs.filter(registered_app__slug=app_slug)
         else:
@@ -717,7 +793,13 @@ class OperationsQuery:
         Without ``target``: every rule visible to the tenant. Pass
         ``target=app|env|workload|global`` (and optionally
         ``target_id``) to scope to one target."""
-        qs = AlertRule.objects.select_related("organization")
+        # Scope to the caller's org (#1183): AlertRule owns a non-null
+        # organization FK. Without it, every tenant's rules (predicates,
+        # notify channels) were listed to all. org_id None → deny-by-default.
+        org_id = _caller_org_id()
+        if org_id is None:
+            return []
+        qs = AlertRule.objects.select_related("organization").filter(organization_id=org_id)
         if active_only:
             qs = qs.filter(is_active=True)
         if target:
@@ -768,8 +850,15 @@ class OperationsQuery:
             valid = ", ".join(sorted(_TIME_RANGE_SECONDS.keys()))
             raise ValueError(f"time_range must be one of {valid}")
 
+        # Scope to the caller's org (#1183): slugs are unique per-org,
+        # not global, so an unscoped slug lookup surfaced a same-slug
+        # app (and its golden-signal metrics) from another tenant.
+        # org_id None → deny-by-default (None / not-found).
+        org_id = _caller_org_id()
+        if org_id is None:
+            return None
         app = (
-            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+            RegisteredApp.objects.filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
             .only("id", "guid", "slug", "k8s_namespace")
             .first()
         )
@@ -827,7 +916,15 @@ class OperationsQuery:
         unresolved_only: bool = False,
         limit: int = 100,
     ) -> list[AlertEventType]:
-        qs = AlertEvent.objects.select_related("rule")
+        # Scope to the caller's org (#1183): without it, any tenant's
+        # firing history (summaries + detail payloads) was visible to
+        # all. Scope through the owning rule's org — consistent with the
+        # existing rule__guid filter — so an event surfaces only when
+        # its rule belongs to the caller. org_id None → deny-by-default.
+        org_id = _caller_org_id()
+        if org_id is None:
+            return []
+        qs = AlertEvent.objects.select_related("rule").filter(rule__organization_id=org_id)
         if rule_id is not None:
             qs = qs.filter(rule__guid=str(rule_id))
         if unresolved_only:

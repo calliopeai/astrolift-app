@@ -58,6 +58,19 @@ from core.tenancy import get_current_tenant
 log = logging.getLogger(__name__)
 
 
+def _caller_org_id() -> int | None:
+    """Current tenant's organization id, or None when there's no tenant
+    context. Mutations over org-owned rows MUST treat None as
+    deny-by-default (not-found), never as "all rows" (#1042 / #1183).
+
+    ``@tenant_scoped()`` only asserts a tenant context exists; it does
+    NOT filter any queryset. Every mutation that fetches by slug or guid
+    has to add the org constraint itself or it reads/writes cross-org.
+    """
+    tenant = get_current_tenant()
+    return tenant.organization_id if tenant is not None else None
+
+
 @strawberry.input
 class TestWebhookInput:
     """Trigger a synchronous test delivery against an existing
@@ -582,7 +595,10 @@ class OperationsMutation:
     def update_webhook_subscription(
         self, info: Info, input: UpdateWebhookSubscriptionInput
     ) -> MutationResultType[WebhookSubscriptionType]:
-        sub = WebhookSubscription.objects.filter(guid=str(input.id)).first()
+        # Scope to the caller's org (#1183): a bare guid lookup let any
+        # tenant edit another tenant's webhook (retarget the URL, flip
+        # active). org_id None → deny-by-default (not-found).
+        sub = WebhookSubscription.objects.filter(guid=str(input.id), organization_id=_caller_org_id()).first()
         if sub is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "subscription not found")
         # #497 — optimistic-concurrency gate.
@@ -631,7 +647,10 @@ class OperationsMutation:
     def delete_webhook_subscription(
         self, info: Info, input: DeleteWebhookSubscriptionInput
     ) -> MutationResultType[_SoftDeletePayload]:
-        sub = WebhookSubscription.objects.filter(guid=str(input.id)).first()
+        # Scope to the caller's org (#1183): without it any tenant could
+        # soft-delete another tenant's webhook by guid. org_id None →
+        # deny-by-default (not-found).
+        sub = WebhookSubscription.objects.filter(guid=str(input.id), organization_id=_caller_org_id()).first()
         if sub is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "subscription not found")
         sub.soft_delete()
@@ -655,7 +674,13 @@ class OperationsMutation:
         """
         from datetime import datetime
 
-        sub = WebhookSubscription.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
+        # Scope to the caller's org (#1183): a test-fire POSTs a signed
+        # payload to the subscription's URL, so a cross-org guid would
+        # let a tenant probe another tenant's endpoint. org_id None →
+        # deny-by-default (not-found).
+        sub = WebhookSubscription.objects.filter(
+            guid=str(input.id), organization_id=_caller_org_id(), deleted_at__isnull=True
+        ).first()
         if sub is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "subscription not found", field="id")
         if not sub.is_active:
@@ -756,7 +781,13 @@ class OperationsMutation:
             plan_rotation,
         )
 
-        sub = WebhookSubscription.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
+        # Scope to the caller's org (#1183): this returns the new HMAC
+        # secret plaintext once. A cross-org guid would hand a tenant
+        # another tenant's fresh signing secret. org_id None →
+        # deny-by-default (not-found).
+        sub = WebhookSubscription.objects.filter(
+            guid=str(input.id), organization_id=_caller_org_id(), deleted_at__isnull=True
+        ).first()
         if sub is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -1178,7 +1209,12 @@ class OperationsMutation:
         info: Info,
         input: UpdateAlertRuleInput,
     ) -> MutationResultType[AlertRuleType]:
-        rule = AlertRule.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
+        # Scope to the caller's org (#1183): a bare guid let any tenant
+        # edit another tenant's alert rule (predicate, notify channels,
+        # active). org_id None → deny-by-default (not-found).
+        rule = AlertRule.objects.filter(
+            guid=str(input.id), organization_id=_caller_org_id(), deleted_at__isnull=True
+        ).first()
         if rule is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -1230,7 +1266,12 @@ class OperationsMutation:
         info: Info,
         input: DeleteAlertRuleInput,
     ) -> MutationResultType[_AlertRuleDeletedPayload]:
-        rule = AlertRule.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
+        # Scope to the caller's org (#1183): without it any tenant could
+        # soft-delete another tenant's alert rule by guid. org_id None →
+        # deny-by-default (not-found).
+        rule = AlertRule.objects.filter(
+            guid=str(input.id), organization_id=_caller_org_id(), deleted_at__isnull=True
+        ).first()
         if rule is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -1253,7 +1294,12 @@ class OperationsMutation:
         info: Info,
         input: AcknowledgeAlertEventInput,
     ) -> MutationResultType[AlertEventType]:
-        event = AlertEvent.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
+        # Scope through the owning rule's org (#1183): without it any
+        # tenant could acknowledge another tenant's firing by guid.
+        # org_id None → deny-by-default (not-found).
+        event = AlertEvent.objects.filter(
+            guid=str(input.id), rule__organization_id=_caller_org_id(), deleted_at__isnull=True
+        ).first()
         if event is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -1326,9 +1372,12 @@ class OperationsMutation:
                 field="durationSeconds",
             )
 
+        # Scope to the caller's org (#1183): muting is a cross-tenant
+        # denial-of-visibility if a bare guid lets one tenant silence
+        # another tenant's rule. org_id None → deny-by-default.
         rule = (
             AlertRule.objects.select_related("organization")
-            .filter(guid=str(input.rule_id), deleted_at__isnull=True)
+            .filter(guid=str(input.rule_id), organization_id=_caller_org_id(), deleted_at__isnull=True)
             .first()
         )
         if rule is None:
@@ -1369,9 +1418,12 @@ class OperationsMutation:
         *active* mutes are cleared."""
         from django.utils import timezone
 
+        # Scope to the caller's org (#1183): unmuting another tenant's
+        # rule would re-arm their alert fan-out. org_id None →
+        # deny-by-default (not-found).
         rule = (
             AlertRule.objects.select_related("organization")
-            .filter(guid=str(input.rule_id), deleted_at__isnull=True)
+            .filter(guid=str(input.rule_id), organization_id=_caller_org_id(), deleted_at__isnull=True)
             .first()
         )
         if rule is None:
@@ -1433,7 +1485,14 @@ class OperationsMutation:
         # Build the queryset under the exact same filter contract as
         # the page query. Order ascending so the export reads
         # naturally for an auditor (oldest -> newest).
-        qs = AuditEvent.objects.order_by("occurred_at", "guid")
+        #
+        # Scope the exported rows to the caller's org (#1183). The
+        # AuditExport row below stamps organization=org, but WITHOUT
+        # this clause on the source queryset the streamed artifact
+        # contained every tenant's audit trail (bulk cross-org PII
+        # exfil). org_id is non-None here (guarded above). Mirrors the
+        # org scope on astroliftAuditEventsPage.
+        qs = AuditEvent.objects.filter(organization_id=org_id).order_by("occurred_at", "guid")
         if input.action:
             qs = qs.filter(action=input.action)
         if input.decision:
@@ -1758,7 +1817,15 @@ class OperationsMutation:
                 field="channel",
             )
 
-        app = RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True).first()
+        # Scope the app lookup to the caller's org (#1183): slugs are
+        # unique per-org, so an unscoped lookup let a caller bind a
+        # subscription to (and confirm the existence of) a same-slug app
+        # in another tenant. tenant is non-None here (guarded above).
+        app = RegisteredApp.objects.filter(
+            slug=input.app_slug,
+            organization_id=tenant.organization_id,
+            deleted_at__isnull=True,
+        ).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, f"app '{input.app_slug}' not found")
 
@@ -1901,9 +1968,25 @@ class OperationsMutation:
         slugs = list(dict.fromkeys(input.app_slugs or []))[:_BULK_APP_CAP]
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
+        # Deny-by-default without a tenant context (#1183): every lookup
+        # below is org-scoped, so a None org must fail closed rather than
+        # match NULL-org / cross-org rows.
+        if org_id is None:
+            return BulkOperationResult(
+                ok_count=0,
+                failed_count=len(slugs),
+                per_app=[
+                    BulkAppResultItem(app_slug=s, ok=False, errors=["no active organization"]) for s in slugs
+                ],
+            )
 
+        # Scope the bundle to the caller's org (#1183): SecretBundle owns
+        # an organization FK. An unscoped slug lookup let a caller attach
+        # ANOTHER tenant's secret bundle to their own apps — cross-org
+        # secret injection on the next deploy / manifest reconcile.
         bundle = SecretBundle.objects.filter(
             slug=input.bundle_slug,
+            organization_id=org_id,
             deleted_at__isnull=True,
         ).first()
         if bundle is None:
@@ -1922,10 +2005,11 @@ class OperationsMutation:
 
         per_app: list[BulkAppResultItem] = []
         for slug in slugs:
-            app_qs = RegisteredApp.objects.filter(slug=slug, deleted_at__isnull=True)
-            if org_id is not None:
-                app_qs = app_qs.filter(organization_id=org_id)
-            app = app_qs.first()
+            app = RegisteredApp.objects.filter(
+                slug=slug,
+                organization_id=org_id,
+                deleted_at__isnull=True,
+            ).first()
             if app is None:
                 per_app.append(BulkAppResultItem(app_slug=slug, ok=False, errors=["app not found"]))
                 continue
