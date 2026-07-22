@@ -19,6 +19,7 @@ import secrets
 
 import strawberry
 from django.db import transaction
+from django.db.models import Q
 from strawberry.types import Info
 
 from astrolift_clusters.models import (
@@ -476,7 +477,6 @@ class ClustersMutation:
         credential for another tenant's cluster — an out-of-scope guid
         reads as NOT_FOUND, identical to a guid that doesn't exist.
         """
-        from django.db.models import Q
 
         tenant = get_current_tenant()
         cluster = TenantCluster.objects.filter(
@@ -548,7 +548,6 @@ class ClustersMutation:
         a platform-shared cluster), so an out-of-scope guid reads as
         NOT_FOUND, identical to a guid that doesn't exist.
         """
-        from django.db.models import Q
 
         from core.cluster_management import ClusterManagementError, deploy_agent_dispatch
 
@@ -606,7 +605,11 @@ class ClustersMutation:
     def update_tenant_cluster(
         self, info: Info, input: UpdateTenantClusterInput
     ) -> MutationResultType[TenantClusterType]:
-        cluster = TenantCluster.objects.filter(guid=str(input.id)).first()
+        tenant = get_current_tenant()
+        cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+            guid=str(input.id),
+        ).first()
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found")
         if input.is_active is not None:
@@ -669,7 +672,10 @@ class ClustersMutation:
         failures surface in ``errors`` without aborting the sweep; the
         envelope stays ``ok=true`` so the operator sees partial progress
         plus the specific namespaces that couldn't be reached."""
+
+        tenant = get_current_tenant()
         cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
             guid=str(input.cluster_id),
             deleted_at__isnull=True,
         ).first()
@@ -705,7 +711,13 @@ class ClustersMutation:
         so the UI can poll for completion. Idempotent — re-running
         against a managing/managed row no-ops the lifecycle flip and
         joins the in-flight workflow."""
-        cluster = TenantCluster.objects.filter(guid=str(input.cluster_id), deleted_at__isnull=True).first()
+
+        tenant = get_current_tenant()
+        cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+            guid=str(input.cluster_id),
+            deleted_at__isnull=True,
+        ).first()
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
         if not cluster.is_active:
@@ -743,7 +755,13 @@ class ClustersMutation:
 
         ``forcePreflight=true`` re-runs the Job; default false skips
         it for a fast probe + RBAC reconcile."""
-        cluster = TenantCluster.objects.filter(guid=str(input.cluster_id), deleted_at__isnull=True).first()
+
+        tenant = get_current_tenant()
+        cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+            guid=str(input.cluster_id),
+            deleted_at__isnull=True,
+        ).first()
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
         if not cluster.is_active:
@@ -781,7 +799,13 @@ class ClustersMutation:
         ``bringClusterIntoManagement`` against a fresh cluster row;
         decommissioned rows are kept for audit only.
         """
-        cluster = TenantCluster.objects.filter(guid=str(input.cluster_id), deleted_at__isnull=True).first()
+
+        tenant = get_current_tenant()
+        cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+            guid=str(input.cluster_id),
+            deleted_at__isnull=True,
+        ).first()
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
         if cluster.lifecycle == TenantCluster.Lifecycle.DECOMMISSIONED.value:
@@ -828,7 +852,10 @@ class ClustersMutation:
         state and individual HelmRelease ``status`` subresources flow
         into the cluster-status tab.
         """
+
+        tenant = get_current_tenant()
         cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
             guid=str(input.cluster_id),
             deleted_at__isnull=True,
         ).first()
@@ -941,7 +968,9 @@ class ClustersMutation:
                 field="endedAt",
             )
 
+        tenant = get_current_tenant()
         cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
             slug=input.cluster_slug,
             deleted_at__isnull=True,
         ).first()
@@ -1003,7 +1032,11 @@ class ClustersMutation:
     def unregister_tenant_cluster(
         self, info: Info, input: UnregisterTenantClusterInput
     ) -> MutationResultType[_SoftDeletePayload]:
-        cluster = TenantCluster.objects.filter(guid=str(input.id)).first()
+        tenant = get_current_tenant()
+        cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+            guid=str(input.id),
+        ).first()
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found")
 
@@ -1064,7 +1097,11 @@ class ClustersMutation:
     def update_managed_domain(
         self, info: Info, input: UpdateManagedDomainInput
     ) -> MutationResultType[ManagedDomainType]:
-        domain = ManagedDomain.objects.filter(guid=str(input.id)).first()
+        tenant = get_current_tenant()
+        domain = ManagedDomain.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+            guid=str(input.id),
+        ).first()
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found")
         if input.default_for is not None:
@@ -1083,7 +1120,11 @@ class ClustersMutation:
     def soft_delete_managed_domain(
         self, info: Info, input: SoftDeleteManagedDomainInput
     ) -> MutationResultType[_SoftDeletePayload]:
-        domain = ManagedDomain.objects.filter(guid=str(input.id)).first()
+        tenant = get_current_tenant()
+        domain = ManagedDomain.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+            guid=str(input.id),
+        ).first()
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found")
         domain.soft_delete()
@@ -1120,7 +1161,12 @@ class ClustersMutation:
                 field="zone",
             )
 
-        cluster = TenantCluster.objects.filter(guid=str(cluster_id), deleted_at__isnull=True).first()
+        tenant = get_current_tenant()
+        cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+            guid=str(cluster_id),
+            deleted_at__isnull=True,
+        ).first()
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
 
@@ -1171,7 +1217,12 @@ class ClustersMutation:
                 field="zone",
             )
 
-        cluster = TenantCluster.objects.filter(guid=str(cluster_id), deleted_at__isnull=True).first()
+        tenant = get_current_tenant()
+        cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+            guid=str(cluster_id),
+            deleted_at__isnull=True,
+        ).first()
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
 
@@ -1212,7 +1263,12 @@ class ClustersMutation:
                 field="zone",
             )
 
-        cluster = TenantCluster.objects.filter(guid=str(cluster_id), deleted_at__isnull=True).first()
+        tenant = get_current_tenant()
+        cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+            guid=str(cluster_id),
+            deleted_at__isnull=True,
+        ).first()
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
 
