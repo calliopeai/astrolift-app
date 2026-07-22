@@ -10,9 +10,10 @@ The default manager is the one Django wires for related-set traversal,
 so foreign-key joins also see only live rows. Admin and audit code paths
 that need to inspect deleted rows go through ``all_objects`` explicitly.
 
-Tenant scoping (``TenantScopedManager``) layers on top: it filters the
-already-soft-delete-filtered queryset by the request-bound organization,
-so accidental cross-tenant queries surface as empty results.
+``TenantScopedManager`` below WOULD layer org filtering on top — but it is
+wired on ZERO models today. The default ``objects`` manager therefore
+filters by soft-delete ONLY, never by organization. Do NOT assume any query
+is tenant-scoped by the manager layer; see its docstring (#1183).
 """
 
 from __future__ import annotations
@@ -51,11 +52,22 @@ class TenantScopedQuerySet(SoftDeleteQuerySet):
 
 
 class TenantScopedManager(SoftDeleteManager):
-    """Filters by the current tenant context's organization_id.
+    """Would filter by the current tenant context's ``organization_id``.
 
-    Models that opt into tenant scoping declare
-    ``objects = TenantScopedManager()`` and a ``tenant_org_field``
-    attribute pointing at the column reaching ``organization_id``
+    .. warning::
+       NOT WIRED ON ANY MODEL. No model declares
+       ``objects = TenantScopedManager()``, so this class is dormant and
+       provides ZERO isolation in practice. Do NOT rely on it — or on the
+       default ``objects`` manager — to scope by organization: a bare
+       ``Model.objects.get(pk=...)`` / ``.filter(guid=...)`` returns rows
+       from ANY org. Every resolver MUST add its own explicit
+       ``organization_id=`` constraint and fail closed on a missing tenant
+       context. Trusting this dormant manager to isolate is exactly what
+       produced the #1183 leak class.
+
+    If a model ever does opt in, it declares
+    ``objects = TenantScopedManager()`` and a ``tenant_org_field`` attribute
+    pointing at the column reaching ``organization_id``
     (default: ``organization_id``).
     """
 
