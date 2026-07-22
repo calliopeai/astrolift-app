@@ -69,7 +69,11 @@ def test_list_workflow_instances_returns_empty_page_when_disabled(permission_res
 
 def test_list_workflow_instances_passes_filters(permission_resolver, settings, monkeypatch):
     settings.ASTROLIFT_TEMPORAL_ENABLED = True
+    # The viewer list is org-scoped (#1183); this filter-passthrough test
+    # uses the fleet-wide elevated pair so the monkeypatched (unowned) row
+    # isn't filtered out — tenancy scoping is covered in test_viewer_tenancy_1183.
     permission_resolver.grant(Permission.AUDIT_LOG_READ)
+    permission_resolver.grant(Permission.ADMIN_ELEVATE)
     captured: dict = {}
 
     def _fake_list(*, workflow_type, status, limit):
@@ -119,7 +123,10 @@ def test_instance_detail_returns_none_for_empty_workflow_id(permission_resolver,
 
 def test_instance_detail_shapes_history(permission_resolver, settings, monkeypatch):
     settings.ASTROLIFT_TEMPORAL_ENABLED = True
+    # History-shaping test: use the fleet-wide elevated pair so the
+    # org-scoping gate (#1183) doesn't hide the monkeypatched (unowned) run.
     permission_resolver.grant(Permission.AUDIT_LOG_READ)
+    permission_resolver.grant(Permission.ADMIN_ELEVATE)
     monkeypatch.setattr(
         "astrolift_workflows.schema.queries.describe_workflow_instance",
         lambda wid: {
