@@ -1039,7 +1039,16 @@ class IdentityMutation:
         if team is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "team not found", field="teamId")
 
-        role = Role.objects.filter(guid=str(input.role_id), deleted_at__isnull=True).first()
+        # Restrict the role to the caller's own custom roles or a
+        # system/null-org role — another org's custom role reads as
+        # not-found. Without this a caller could attach a foreign org's
+        # custom role to their own team's members (same cross-tenant grant
+        # class grant_role guards against). Mirrors the grant_role fix (#1183).
+        role = (
+            Role.objects.filter(guid=str(input.role_id), deleted_at__isnull=True)
+            .filter(Q(organization_id=org_id) | Q(organization__isnull=True))
+            .first()
+        )
         if role is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "role not found", field="roleId")
 
