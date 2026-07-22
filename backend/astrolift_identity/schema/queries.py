@@ -15,6 +15,7 @@ from __future__ import annotations
 import datetime as dt
 
 import strawberry
+from django.db.models import Q
 from strawberry.types import Info
 
 from astrolift_graphql import GUID
@@ -159,8 +160,17 @@ class IdentityQuery:
     @require_permission(Permission.ORG_READ)
     @tenant_scoped()
     def astrolift_organization(self, info: Info, slug: str) -> OrganizationType | None:
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return None
+        # A slug belonging to any other org reads as not-found — the
+        # caller's tenant is a single org, so the only org they may
+        # read by slug is their own.
         org = Organization.objects.filter(slug=slug).first()
-        if org is None:
+        if org is None or org.id != org_id:
             return None
         return organization_to_type(org)
 
@@ -199,13 +209,26 @@ class IdentityQuery:
     @require_permission(Permission.TEAM_READ)
     @tenant_scoped()
     def astrolift_teams(self, info: Info) -> list[TeamType]:
-        return [team_to_type(t) for t in Team.objects.select_related("organization")[:200]]
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return []
+        qs = Team.objects.filter(organization_id=org_id).select_related("organization")[:200]
+        return [team_to_type(t) for t in qs]
 
     @strawberry.field
     @require_permission(Permission.PROJECT_READ)
     @tenant_scoped()
     def astrolift_projects(self, info: Info) -> list[ProjectType]:
-        qs = Project.objects.select_related("organization", "team")[:200]
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return []
+        qs = Project.objects.filter(organization_id=org_id).select_related("organization", "team")[:200]
         return [project_to_type(p) for p in qs]
 
     @strawberry.field
@@ -323,7 +346,15 @@ class IdentityQuery:
         from astrolift_operations.models.audit_event import AuditEvent
         from core.tenancy import get_current_tenant
 
-        qs = Member.objects.select_related("user").order_by("-created_at")
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return []
+
+        # Scope to members of the caller org's own scopes (PII): the org
+        # itself plus its teams / projects / apps. Without this the
+        # resolver returned every Member row across every tenant.
+        qs = Member.objects.select_related("user").filter(_org_scope_q(org_id)).order_by("-created_at")
         term = (search or "").strip()
         if term:
             qs = qs.filter(
@@ -336,11 +367,9 @@ class IdentityQuery:
         if not members:
             return []
 
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
         user_ids = [m.user_id for m in members if m.user_id is not None]
         last_active_by_user_id: dict[int, dt.datetime] = {}
-        if user_ids and org_id is not None:
+        if user_ids:
             actor_id_strs = [str(uid) for uid in user_ids]
             ae_rows = (
                 AuditEvent.objects.filter(
@@ -371,8 +400,16 @@ class IdentityQuery:
         GUID→pk hop server-side. Used by the team detail page's bulk
         role-assign panel (#416).
         """
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return []
+        # A team guid from another org reads as empty (PII) rather than
+        # exposing that org's team roster.
         team = Team.objects.filter(guid=str(team_id), deleted_at__isnull=True).first()
-        if team is None:
+        if team is None or team.organization_id != org_id:
             return []
         qs = (
             Member.objects.select_related("user")
@@ -492,7 +529,17 @@ class IdentityQuery:
     @require_permission(Permission.ORG_READ)
     @tenant_scoped()
     def astrolift_roles(self, info: Info) -> list[RoleType]:
-        qs = Role.objects.order_by("scope_level", "slug")[:200]
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return []
+        # System roles carry a null organization; custom roles are bound
+        # to the org. Another org's custom roles never surface.
+        qs = Role.objects.filter(Q(organization_id=org_id) | Q(organization__isnull=True)).order_by(
+            "scope_level", "slug"
+        )[:200]
         return [role_to_type(r) for r in qs]
 
     # ---- Invite-flow polish (#418) -------------------------------------
@@ -719,7 +766,17 @@ class IdentityQuery:
         one batch per kind to keep this O(scope-kinds) rather than
         O(bindings).
         """
-        qs = list(RoleBinding.objects.select_related("user", "role").order_by("-granted_at")[:500])
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return []
+        qs = list(
+            RoleBinding.objects.select_related("user", "role")
+            .filter(_org_scope_q(org_id))
+            .order_by("-granted_at")[:500]
+        )
         labels = _resolve_source_scope_labels(qs)
         return [
             role_binding_to_type(rb, source_scope_label=labels.get((rb.scope_kind, rb.scope_id), ""))
@@ -730,17 +787,37 @@ class IdentityQuery:
     @require_permission(Permission.API_TOKEN_CREATE)
     @tenant_scoped()
     def astrolift_api_tokens(self, info: Info) -> list[ApiTokenType]:
-        qs = ApiToken.objects.select_related("user", "team").order_by("-created_at")[:200]
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return []
+        qs = (
+            ApiToken.objects.filter(organization_id=org_id)
+            .select_related("user", "team")
+            .order_by("-created_at")[:200]
+        )
         return [api_token_to_type(t) for t in qs]
 
     @strawberry.field
     @require_permission(Permission.ORG_READ)
     @tenant_scoped()
     def astrolift_policies(self, info: Info) -> list[PolicyType]:
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return []
         # ``created_by`` / ``updated_by`` are FK columns on the Tracking
         # mixin; ``select_related`` keeps the per-row username lookup
         # inside the same query (no N+1 on the policies table — #466).
-        qs = Policy.objects.select_related("created_by", "updated_by").order_by("scope_level", "slug")[:200]
+        qs = (
+            Policy.objects.filter(organization_id=org_id)
+            .select_related("created_by", "updated_by")
+            .order_by("scope_level", "slug")[:200]
+        )
         return [policy_to_type(p) for p in qs]
 
     # ---- Domain allowlist --------------------------------------------
@@ -772,13 +849,21 @@ class IdentityQuery:
     @require_permission(Permission.ORG_READ)
     @tenant_scoped()
     def astrolift_identity_providers(self, info: Info) -> list[IdentityProviderType]:
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return []
         # Prefetch ``last_switched_by`` (FK on the IdP row) so the per-row
         # username lookup folds into the same query — the FE renders the
         # "by <operator>" caption on every active IdP, so a naive lookup
         # would fan out N+1 on the list (#467).
-        qs = IdentityProvider.objects.select_related("organization", "last_switched_by").order_by(
-            "-is_default", "kind"
-        )[:50]
+        qs = (
+            IdentityProvider.objects.filter(organization_id=org_id)
+            .select_related("organization", "last_switched_by")
+            .order_by("-is_default", "kind")[:50]
+        )
         active_id = _active_idp_pk()
         return [identity_provider_to_type(idp, is_active=(idp.pk == active_id)) for idp in qs]
 
@@ -940,6 +1025,35 @@ class IdentityQuery:
             method=status.method,
             required_for=gated,
         )
+
+
+def _org_scope_q(org_id: int | None) -> Q:
+    """Q over ``(scope_kind, scope_id)`` matching every scope owned by ``org_id``.
+
+    ``RoleBinding`` / ``Member`` rows key their scope with a generic
+    ``(scope_kind, scope_id)`` pair rather than an organization FK, so
+    constraining them to a caller's org means enumerating that org's own
+    scope rows at all four levels: the org itself, plus its teams,
+    projects, and apps.
+
+    Soft-deleted scope rows are included (``all_objects``) so a binding
+    whose team/project/app was later removed still resolves to *this*
+    org — the row is still org-owned, and the source-scope label
+    machinery already renders a fallback for a vanished scope. A ``None``
+    org_id (no resolved tenant) yields a Q that matches nothing, i.e.
+    fail closed.
+    """
+    from astrolift_registry.models import RegisteredApp
+
+    team_ids = list(Team.all_objects.filter(organization_id=org_id).values_list("pk", flat=True))
+    project_ids = list(Project.all_objects.filter(organization_id=org_id).values_list("pk", flat=True))
+    app_ids = list(RegisteredApp.all_objects.filter(organization_id=org_id).values_list("pk", flat=True))
+    return (
+        Q(scope_kind="ORG", scope_id=org_id)
+        | Q(scope_kind="TEAM", scope_id__in=team_ids)
+        | Q(scope_kind="PROJECT", scope_id__in=project_ids)
+        | Q(scope_kind="APP", scope_id__in=app_ids)
+    )
 
 
 def _active_idp_pk() -> int | None:

@@ -19,6 +19,7 @@ from __future__ import annotations
 import datetime as dt
 
 import strawberry
+from django.db.models import Q
 from strawberry.types import Info
 
 from astrolift_graphql import (
@@ -556,16 +557,27 @@ def _actor():
     return get_user_model().objects.filter(pk=actor_id).first()
 
 
-def _resolve_org(guid: GUID) -> Organization | None:
-    return Organization.objects.filter(guid=str(guid)).first()
+def _resolve_org(guid: GUID, org_id: int | None) -> Organization | None:
+    """Resolve an org by guid, but only when it is the caller's own org.
+
+    A guid for any other org — or a missing tenant (``org_id is None``)
+    — resolves to None so the caller can't reach across tenants.
+    """
+    return Organization.objects.filter(guid=str(guid), pk=org_id).first()
 
 
-def _resolve_team(guid: GUID) -> Team | None:
-    return Team.objects.filter(guid=str(guid)).first()
+def _resolve_team(guid: GUID, org_id: int | None) -> Team | None:
+    """Resolve a team by guid, scoped to the caller's org."""
+    return Team.objects.filter(guid=str(guid), organization_id=org_id).first()
 
 
-def _resolve_project(guid: GUID) -> Project | None:
-    return Project.objects.filter(guid=str(guid)).first()
+def _resolve_project(guid: GUID, org_id: int | None) -> Project | None:
+    """Resolve a project by guid, scoped to the caller's org.
+
+    ``organization_id`` is denormalized onto Project, so no team join is
+    needed to enforce the boundary.
+    """
+    return Project.objects.filter(guid=str(guid), organization_id=org_id).first()
 
 
 # ---- mutations -------------------------------------------------------
@@ -600,7 +612,9 @@ class IdentityMutation:
     def update_organization(
         self, info: Info, input: UpdateOrganizationInput
     ) -> MutationResultType[OrganizationType]:
-        org = _resolve_org(input.id)
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        org = _resolve_org(input.id, org_id)
         if org is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "organization not found")
 
@@ -621,7 +635,9 @@ class IdentityMutation:
     def soft_delete_organization(
         self, info: Info, input: SoftDeleteByGuidInput
     ) -> MutationResultType[_SoftDeletePayload]:
-        org = _resolve_org(input.id)
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        org = _resolve_org(input.id, org_id)
         if org is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "organization not found")
         org.soft_delete(by=_actor())
@@ -634,7 +650,11 @@ class IdentityMutation:
     @require_permission(Permission.TEAM_CREATE)
     @tenant_scoped()
     def create_team(self, info: Info, input: CreateTeamInput) -> MutationResultType[TeamType]:
-        org = _resolve_org(input.organization_id)
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        # A team may only be created inside the caller's own org — a
+        # foreign organizationId reads as not-found.
+        org = _resolve_org(input.organization_id, org_id)
         if org is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "organization not found", field="organizationId")
         if Team.objects.filter(organization=org, slug=input.slug).exists():
@@ -656,7 +676,9 @@ class IdentityMutation:
     @require_permission(Permission.TEAM_UPDATE)
     @tenant_scoped()
     def update_team(self, info: Info, input: UpdateTeamInput) -> MutationResultType[TeamType]:
-        team = _resolve_team(input.id)
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        team = _resolve_team(input.id, org_id)
         if team is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "team not found")
         if input.name is not None:
@@ -673,7 +695,9 @@ class IdentityMutation:
     def soft_delete_team(
         self, info: Info, input: SoftDeleteByGuidInput
     ) -> MutationResultType[_SoftDeletePayload]:
-        team = _resolve_team(input.id)
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        team = _resolve_team(input.id, org_id)
         if team is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "team not found")
         team.soft_delete(by=_actor())
@@ -686,7 +710,11 @@ class IdentityMutation:
     @require_permission(Permission.PROJECT_CREATE)
     @tenant_scoped()
     def create_project(self, info: Info, input: CreateProjectInput) -> MutationResultType[ProjectType]:
-        team = _resolve_team(input.team_id)
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        # The parent team must belong to the caller's org — a foreign
+        # teamId reads as not-found.
+        team = _resolve_team(input.team_id, org_id)
         if team is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "team not found", field="teamId")
         if Project.objects.filter(team=team, slug=input.slug).exists():
@@ -708,7 +736,9 @@ class IdentityMutation:
     @require_permission(Permission.PROJECT_UPDATE)
     @tenant_scoped()
     def update_project(self, info: Info, input: UpdateProjectInput) -> MutationResultType[ProjectType]:
-        project = _resolve_project(input.id)
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        project = _resolve_project(input.id, org_id)
         if project is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "project not found")
         if input.name is not None:
@@ -725,7 +755,9 @@ class IdentityMutation:
     def soft_delete_project(
         self, info: Info, input: SoftDeleteByGuidInput
     ) -> MutationResultType[_SoftDeletePayload]:
-        project = _resolve_project(input.id)
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        project = _resolve_project(input.id, org_id)
         if project is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "project not found")
         project.soft_delete(by=_actor())
@@ -741,22 +773,54 @@ class IdentityMutation:
     def grant_role(self, info: Info, input: GrantRoleInput) -> MutationResultType[RoleBindingType]:
         from django.contrib.auth import get_user_model
 
+        # #1183 privilege-escalation fix. Without a caller-org constraint
+        # on the scope, role, and target user, a caller who holds
+        # ORG_MANAGE_MEMBERS in their own org could grant any role, on any
+        # scope, to any user in any other org — cross-tenant account
+        # takeover. Every lookup below is bound to the caller's org and
+        # fails closed.
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "scope not found", field="scopeGuid")
+
         try:
             target_user_pk = int(input.user_id)
         except ValueError:
             return gql_failure(ErrorCode.VALIDATION.value, "userId must be a numeric pk", field="userId")
+
+        # The target must already be a member of the caller's org.
+        # Checking org membership (rather than global user existence)
+        # both enforces the tenant boundary and avoids leaking whether an
+        # arbitrary user pk exists anywhere on the install.
+        if not Member.objects.filter(
+            user_id=target_user_pk,
+            scope_kind=Member.ScopeKind.ORG,
+            scope_id=org_id,
+            deleted_at__isnull=True,
+        ).exists():
+            return gql_failure(ErrorCode.NOT_FOUND.value, "user not found", field="userId")
 
         User = get_user_model()
         user = User.objects.filter(pk=target_user_pk).first()
         if user is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "user not found", field="userId")
 
-        role = Role.objects.filter(guid=str(input.role_id)).first()
+        # Restrict the role to the caller's own custom roles or a
+        # system/null-org role — another org's custom role reads as
+        # not-found.
+        role = (
+            Role.objects.filter(guid=str(input.role_id))
+            .filter(Q(organization_id=org_id) | Q(organization__isnull=True))
+            .first()
+        )
         if role is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "role not found", field="roleId")
 
+        # Resolve the scope guid WITHIN the caller org — a scope owned by
+        # another org resolves to None and reads as not-found.
         scope_kind = input.scope_kind.upper()
-        scope_id = _resolve_scope_pk(scope_kind, str(input.scope_guid))
+        scope_id = _resolve_scope_pk_in_org(scope_kind, str(input.scope_guid), org_id)
         if scope_id is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "scope not found", field="scopeGuid")
 
@@ -801,7 +865,15 @@ class IdentityMutation:
     def revoke_role_binding(
         self, info: Info, input: RevokeRoleBindingInput
     ) -> MutationResultType[_SoftDeletePayload]:
-        binding = RoleBinding.objects.filter(guid=str(input.id)).first()
+        from astrolift_identity.schema.queries import _org_scope_q
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "role binding not found")
+        # Only bindings on the caller org's own scopes are revocable; a
+        # foreign-org binding guid reads as not-found.
+        binding = RoleBinding.objects.filter(guid=str(input.id)).filter(_org_scope_q(org_id)).first()
         if binding is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "role binding not found")
         binding.soft_delete(by=_actor())
@@ -856,20 +928,24 @@ class IdentityMutation:
             seen.add(gid_s)
             ordered_unique.append(gid_s)
 
-        # Pre-fetch in one query so a 500-id batch is one trip, not 500.
-        # Key by ``str(guid)`` because ``binding.guid`` is a ``UUID``
-        # instance, not a string — a dict lookup with the operator-
-        # supplied string would otherwise miss every row.
-        bindings_by_guid = {
-            str(b.guid): b
-            for b in RoleBinding.objects.select_related("user", "role").filter(
-                guid__in=ordered_unique, deleted_at__isnull=True
-            )
-        }
-
         actor = _actor()
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
+
+        from astrolift_identity.schema.queries import _org_scope_q
+
+        # Pre-fetch in one query so a 500-id batch is one trip, not 500.
+        # Key by ``str(guid)`` because ``binding.guid`` is a ``UUID``
+        # instance, not a string — a dict lookup with the operator-
+        # supplied string would otherwise miss every row. Scoped to the
+        # caller org's own scopes so a foreign-org binding guid reads as
+        # not-found (fail closed) instead of being revocable cross-tenant.
+        bindings_by_guid = {
+            str(b.guid): b
+            for b in RoleBinding.objects.select_related("user", "role")
+            .filter(guid__in=ordered_unique, deleted_at__isnull=True)
+            .filter(_org_scope_q(org_id))
+        }
 
         results: list[_BulkOpItemResult] = []
         revoked = 0
@@ -954,7 +1030,12 @@ class IdentityMutation:
                 field="memberIds",
             )
 
-        team = _resolve_team(input.team_id)
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        # The team must belong to the caller's org — a foreign team guid
+        # reads as not-found so a caller can't bulk-assign roles into
+        # another tenant's team.
+        team = _resolve_team(input.team_id, org_id)
         if team is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "team not found", field="teamId")
 
@@ -1009,8 +1090,6 @@ class IdentityMutation:
         )
 
         actor = _actor()
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
 
         results: list[_BulkOpItemResult] = []
         assigned = 0
@@ -1280,7 +1359,14 @@ class IdentityMutation:
 
         role = None
         if input.role_slug:
-            role = Role.objects.filter(slug=input.role_slug).first()
+            # Only the caller org's custom roles or a system/null-org role
+            # may be attached — a foreign org's custom role slug reads as
+            # not-found.
+            role = (
+                Role.objects.filter(slug=input.role_slug)
+                .filter(Q(organization_id=org_id) | Q(organization__isnull=True))
+                .first()
+            )
             if role is None:
                 return gql_failure(ErrorCode.NOT_FOUND.value, "role not found", field="roleSlug")
 
@@ -1470,7 +1556,14 @@ class IdentityMutation:
 
         role = None
         if input.default_role_slug:
-            role = Role.objects.filter(slug=input.default_role_slug).first()
+            # Only the caller org's custom roles or a system/null-org role
+            # may be the auto-join default — a foreign org's custom role
+            # slug reads as not-found.
+            role = (
+                Role.objects.filter(slug=input.default_role_slug)
+                .filter(Q(organization_id=org_id) | Q(organization__isnull=True))
+                .first()
+            )
             if role is None:
                 return gql_failure(
                     ErrorCode.NOT_FOUND.value,
@@ -1587,7 +1680,9 @@ class IdentityMutation:
     def revoke_api_token(
         self, info: Info, input: RevokeApiTokenInput
     ) -> MutationResultType[_SoftDeletePayload]:
-        token = ApiToken.objects.filter(guid=str(input.id)).first()
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        token = ApiToken.objects.filter(guid=str(input.id), organization_id=org_id).first()
         if token is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "api token not found")
         token.is_revoked = True
@@ -1745,7 +1840,9 @@ class IdentityMutation:
     @require_permission(Permission.ORG_UPDATE)
     @tenant_scoped()
     def update_policy(self, info: Info, input: UpdatePolicyInput) -> MutationResultType[PolicyType]:
-        policy = Policy.objects.filter(guid=str(input.id)).first()
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        policy = Policy.objects.filter(guid=str(input.id), organization_id=org_id).first()
         if policy is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "policy not found")
 
@@ -1781,7 +1878,9 @@ class IdentityMutation:
     def soft_delete_policy(
         self, info: Info, input: SoftDeleteByGuidInput
     ) -> MutationResultType[_SoftDeletePayload]:
-        policy = Policy.objects.filter(guid=str(input.id)).first()
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        policy = Policy.objects.filter(guid=str(input.id), organization_id=org_id).first()
         if policy is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "policy not found")
         policy.soft_delete(by=_actor())
@@ -1865,7 +1964,16 @@ class IdentityMutation:
     def update_identity_provider(
         self, info: Info, input: UpdateIdentityProviderInput
     ) -> MutationResultType[IdentityProviderType]:
-        idp = IdentityProvider.objects.select_related("organization").filter(guid=str(input.id)).first()
+        # #1183 SSO-hijack fix: this mutation overwrites client_id /
+        # client_secret_ref / discovery URL. Scoped to the caller org so
+        # a foreign IdP guid reads as not-found and can't be tampered.
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        idp = (
+            IdentityProvider.objects.select_related("organization")
+            .filter(guid=str(input.id), organization_id=org_id)
+            .first()
+        )
         if idp is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "identity provider not found")
 
@@ -1904,7 +2012,16 @@ class IdentityMutation:
         from django.db import transaction
         from django.utils import timezone
 
-        idp = IdentityProvider.objects.select_related("organization").filter(guid=str(input.id)).first()
+        # #1183: setting the active IdP flips the org's login provider.
+        # Scoped to the caller org so a foreign IdP guid reads as
+        # not-found and can't be used to hijack another org's SSO.
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        idp = (
+            IdentityProvider.objects.select_related("organization")
+            .filter(guid=str(input.id), organization_id=org_id)
+            .first()
+        )
         if idp is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "identity provider not found")
         org = idp.organization
@@ -1938,7 +2055,13 @@ class IdentityMutation:
     def soft_delete_identity_provider(
         self, info: Info, input: SoftDeleteByGuidInput
     ) -> MutationResultType[_SoftDeletePayload]:
-        idp = IdentityProvider.objects.select_related("organization").filter(guid=str(input.id)).first()
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        idp = (
+            IdentityProvider.objects.select_related("organization")
+            .filter(guid=str(input.id), organization_id=org_id)
+            .first()
+        )
         if idp is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "identity provider not found")
         # Refuse to delete the IdP that's currently active — the operator
@@ -2558,14 +2681,21 @@ def _validate_idp_config(input) -> MutationResultType | None:
     return None
 
 
-def _resolve_scope_pk(scope_kind: str, scope_guid: str) -> int | None:
-    """Map a (scope_kind, guid) pair to the corresponding integer PK."""
+def _resolve_scope_pk_in_org(scope_kind: str, scope_guid: str, org_id: int | None) -> int | None:
+    """Map a ``(scope_kind, guid)`` pair to its integer PK, but only when
+    the referenced row belongs to ``org_id``.
+
+    A scope owned by another org — or an unsupported scope kind (APP is
+    not grantable here, matching the prior behaviour) — resolves to None
+    so a caller can't grant a role into a foreign tenant. ORG resolves
+    only when the guid *is* the caller's own org.
+    """
     if scope_kind == "ORG":
-        row = Organization.objects.filter(guid=scope_guid).first()
+        row = Organization.objects.filter(guid=scope_guid, pk=org_id).first()
     elif scope_kind == "TEAM":
-        row = Team.objects.filter(guid=scope_guid).first()
+        row = Team.objects.filter(guid=scope_guid, organization_id=org_id).first()
     elif scope_kind == "PROJECT":
-        row = Project.objects.filter(guid=scope_guid).first()
+        row = Project.objects.filter(guid=scope_guid, organization_id=org_id).first()
     else:
         return None
     return row.pk if row else None

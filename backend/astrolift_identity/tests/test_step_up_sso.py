@@ -38,6 +38,7 @@ from django.utils import timezone
 
 from astrolift_identity.models import (
     LoginMethod,
+    Member,
     Organization,
     Role,
 )
@@ -304,6 +305,15 @@ def test_sso_elevation_satisfies_step_up_gate(permission_resolver):
     )
     admin = _admin_user()
     target = _admin_user(email="grantee-sso-elev@astrolift.dev")
+    # #1183: grant_role now requires the target to already be a member of
+    # the caller's org.
+    Member.objects.create(
+        user=target,
+        scope_kind=Member.ScopeKind.ORG,
+        scope_id=org.id,
+        is_active=True,
+        lifecycle=Member.Lifecycle.ACTIVE,
+    )
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
     session = _FakeSession()
     session[SESSION_LOGIN_METHOD_KEY] = "sso"
