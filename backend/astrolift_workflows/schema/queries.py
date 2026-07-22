@@ -55,19 +55,21 @@ def _org_pk_matches(org_id: str | None) -> tuple[int | None, bool]:
     return caller, True
 
 
-def _triggered_by_for(workflow_id: str) -> str:
+def _triggered_by_for(workflow_id: str, org_id: int | None = None) -> str:
     """Best-effort actor label from the WorkflowRun mirror.
 
     Temporal doesn't carry user identity in its visibility records, but
     the platform stamps a ``WorkflowRun`` row alongside each Temporal
     start with the triggering user. Falls back to a token-kind label
-    when a service token initiated the run, then empty for unknown."""
-    run = (
-        WorkflowRun.objects.filter(workflow_id=workflow_id)
-        .select_related("trigger_actor_user")
-        .order_by("-started_at")
-        .first()
-    )
+    when a service token initiated the run, then empty for unknown.
+
+    ``org_id`` scopes the mirror lookup so a per-org viewer can't read a
+    foreign org's actor identity (#1183); a fleet-wide (elevated) caller
+    passes ``None`` to resolve the label across orgs."""
+    qs = WorkflowRun.objects.filter(workflow_id=workflow_id)
+    if org_id is not None:
+        qs = qs.filter(organization_id=org_id)
+    run = qs.select_related("trigger_actor_user").order_by("-started_at").first()
     if run is None:
         return ""
     user = run.trigger_actor_user
@@ -86,6 +88,39 @@ def _triggered_by_for(workflow_id: str) -> str:
     return ""
 
 
+def _viewer_scope() -> tuple[bool, int | None]:
+    """Access scope for the Temporal viewer reads (#1183).
+
+    Mirrors the write gate in ``mutations._gate_instance_op``: the elevated
+    platform-operator pair (``AUDIT_LOG_READ`` + ``ADMIN_ELEVATE``) sees
+    every run fleet-wide; any other ``AUDIT_LOG_READ`` holder — a per-org
+    permission — is scoped to runs their own org owns. Returns
+    ``(elevated, caller_org_pk)``; ``caller_org_pk`` is ``None`` only for a
+    non-elevated caller with no resolved org (fail closed to no rows)."""
+    from astrolift_workflows.schema.mutations import _has_elevated_viewer_access
+
+    if _has_elevated_viewer_access():
+        return True, None
+    return False, _caller_org_pk()
+
+
+def _viewer_can_see(workflow_id: str, *, elevated: bool, caller: int | None) -> bool:
+    """Read-side ownership check paired with :func:`_viewer_scope`.
+
+    Reuses the write gate's ownership resolution
+    (``mutations._run_owner_org_id`` — tier-3 ``WorkflowInstance`` then the
+    ops ``WorkflowRun`` mirror) so reads and writes agree on who owns a run.
+    A legacy org-less run (no mirror org) is visible only to the elevated
+    pair; a scoped viewer sees nothing for it."""
+    if elevated:
+        return True
+    if caller is None:
+        return False
+    from astrolift_workflows.schema.mutations import _run_owner_org_id
+
+    return _run_owner_org_id(workflow_id) == caller
+
+
 @strawberry.type
 class TemporalWorkflowsQuery:
     @strawberry.field
@@ -102,21 +137,34 @@ class TemporalWorkflowsQuery:
         """List recent Temporal instances.
 
         Filters: ``workflow_type`` (e.g. ``DeployAppWorkflow``),
-        ``status`` (Temporal ExecutionStatus name). Defaults return
-        the most recent 50 across the namespace. ``after`` is reserved
+        ``status`` (Temporal ExecutionStatus name). ``after`` is reserved
         for future Temporal cursor support; today the resolver caps by
         limit and returns ``next_cursor = null``.
+
+        Scoped to the caller's org (#1183): a non-elevated
+        ``AUDIT_LOG_READ`` holder sees only runs their own org owns; the
+        elevated platform-operator pair sees the whole namespace. The
+        namespace list is fetched then filtered, so a scoped page can
+        return fewer than ``limit`` rows.
 
         Returns an empty page when Temporal is disabled — the UI's
         empty state copy handles "no temporal" and "no runs"
         indistinguishably."""
         del after  # reserved for future cursor wiring
+        elevated, caller = _viewer_scope()
+        if not elevated and caller is None:
+            return WorkflowInstancePageType(items=[], next_cursor=None)
         rows = list_workflow_instances(
             workflow_type=workflow_type,
             status=status,
             limit=limit,
         )
-        items = [instance_to_type(r, _triggered_by_for(r.get("workflow_id", "") or "")) for r in rows]
+        items = []
+        for r in rows:
+            wid = r.get("workflow_id", "") or ""
+            if not _viewer_can_see(wid, elevated=elevated, caller=caller):
+                continue
+            items.append(instance_to_type(r, _triggered_by_for(wid, None if elevated else caller)))
         return WorkflowInstancePageType(items=items, next_cursor=None)
 
     @strawberry.field
@@ -130,15 +178,23 @@ class TemporalWorkflowsQuery:
         """Full drill-down for one workflow execution — summary plus
         pre-shaped activity feed. ``None`` when the instance can't be
         found (typo, expired from Temporal's history window, or
-        Temporal disabled)."""
+        Temporal disabled).
+
+        Ownership-gated (#1183): a workflow the caller's org doesn't own
+        answers ``None`` — the same as a nonexistent id — so an
+        ``AUDIT_LOG_READ`` holder can't read another org's full Temporal
+        history payload. The elevated platform-operator pair sees any run."""
         if not workflow_id:
+            return None
+        elevated, caller = _viewer_scope()
+        if not _viewer_can_see(workflow_id, elevated=elevated, caller=caller):
             return None
         row = describe_workflow_instance(workflow_id)
         if row is None:
             return None
         history_rows = workflow_history(workflow_id)
         return WorkflowInstanceDetailType(
-            instance=instance_to_type(row, _triggered_by_for(workflow_id)),
+            instance=instance_to_type(row, _triggered_by_for(workflow_id, None if elevated else caller)),
             history=[history_event_to_type(h) for h in history_rows],
         )
 
@@ -152,13 +208,20 @@ class TemporalWorkflowsQuery:
     ) -> WorkflowInstanceType | None:
         """Single-instance summary without the history feed — cheap
         polling endpoint for the status pill on the drill-down sheet
-        while a long-running workflow is still in flight."""
+        while a long-running workflow is still in flight.
+
+        Ownership-gated (#1183) exactly like
+        :meth:`astrolift_workflow_instance_detail`: a run the caller's org
+        doesn't own answers ``None``; the elevated pair sees any run."""
         if not workflow_id:
+            return None
+        elevated, caller = _viewer_scope()
+        if not _viewer_can_see(workflow_id, elevated=elevated, caller=caller):
             return None
         row = describe_workflow_instance(workflow_id)
         if row is None:
             return None
-        return instance_to_type(row, _triggered_by_for(workflow_id))
+        return instance_to_type(row, _triggered_by_for(workflow_id, None if elevated else caller))
 
 
 @strawberry.type

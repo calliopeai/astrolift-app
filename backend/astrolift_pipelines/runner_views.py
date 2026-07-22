@@ -69,10 +69,16 @@ def runner_register(request: HttpRequest) -> JsonResponse:
     from django.conf import settings
 
     reg_token = getattr(settings, _REGISTRATION_TOKEN_SETTING, None)
-    if reg_token:
-        auth = request.headers.get("Authorization", "")
-        if auth != f"Bearer {reg_token}":
-            return JsonResponse({"error": "invalid registration token"}, status=401)
+    # Fail closed (#1183): registration mints a runner API key bound to the
+    # org named by the client's ``org_slug``. With no token configured the
+    # check used to be skipped entirely, letting any caller register a runner
+    # under any org's slug. An unset token now disables registration rather
+    # than opening it to everyone.
+    if not reg_token:
+        return JsonResponse({"error": "runner registration is not enabled"}, status=403)
+    auth = request.headers.get("Authorization", "")
+    if auth != f"Bearer {reg_token}":
+        return JsonResponse({"error": "invalid registration token"}, status=401)
 
     try:
         body = json.loads(request.body)
@@ -185,11 +191,16 @@ def runner_claim_job(request: HttpRequest) -> JsonResponse:
 
 
 def _find_matching_job_run(runner: Runner) -> JobRun | None:
-    """Find the oldest PENDING JobRun that matches this runner's capabilities."""
+    """Find the oldest PENDING JobRun that matches this runner's capabilities.
+
+    Constrained to the runner's own organization: a runner authenticates as
+    an org-scoped Runner record, so it must only ever claim (and thereby
+    receive the config/secrets of) jobs owned by that same org (#1183)."""
 
     pending = (
         JobRun.objects.filter(
             status="pending",
+            pipeline_run__pipeline__organization_id=runner.organization_id,
         )
         .select_related("job", "pipeline_run__pipeline")
         .order_by("created_at")
@@ -240,8 +251,16 @@ def runner_complete_job(request: HttpRequest, runner_guid: str, job_run_guid: st
     if str(runner.guid) != runner_guid:
         return JsonResponse({"error": "runner mismatch"}, status=403)
 
-    job_run = JobRun.objects.filter(guid=job_run_guid).first()
-    if not job_run:
+    # Scope to the runner's own org AND to the job it actually claimed: a
+    # runner may only complete the run it holds (current_job_run), never a
+    # foreign org's run or a sibling runner's in-flight job (#1183). Both a
+    # cross-org guid and an unclaimed same-org guid answer 404 identically so
+    # the response never confirms a foreign job's existence.
+    job_run = JobRun.objects.filter(
+        guid=job_run_guid,
+        pipeline_run__pipeline__organization_id=runner.organization_id,
+    ).first()
+    if not job_run or runner.current_job_run_id != job_run.pk:
         return JsonResponse({"error": "job run not found"}, status=404)
 
     try:
