@@ -3,8 +3,10 @@ Decorators that wire tenant scoping and permission checks into views and
 GraphQL resolvers.
 
 ``@tenant_scoped`` ensures the current request has a resolved tenant
-before the view body runs. It is the *minimum* gate; permission checks
-(``@require_permission``) come on top in P0.4.
+before the view body runs. It is the *minimum* gate — it asserts a tenant
+context EXISTS but does NOT filter any queryset; resolvers must still add
+an explicit ``organization_id=`` filter (see the decorator docstring).
+Permission checks (``@require_permission``) come on top in P0.4.
 """
 
 from __future__ import annotations
@@ -30,6 +32,12 @@ def tenant_scoped(
     Raises :class:`TenantRequired` (rather than returning a fake empty
     queryset) so callers can decide whether to translate to a 401, a
     GraphQL error, or a domain-specific response.
+
+    This decorator does NOT filter querysets. It only guarantees a tenant
+    context EXISTS; it does not scope any query written in the resolver
+    body. Resolvers MUST add their own explicit ``organization_id=``
+    constraint (and fail closed) — the presence of ``@tenant_scoped`` is
+    not isolation. That false assumption is the #1183 leak class.
     """
 
     def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
