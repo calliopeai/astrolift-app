@@ -27,6 +27,7 @@ from datetime import UTC
 
 import strawberry
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from strawberry.types import Info
 
@@ -2662,9 +2663,7 @@ class LifecycleMutation:
         # Org-scope the app-environment lookup to the caller's tenant before
         # the migration workflow side effect. AppEnvironment reaches the org
         # via registered_app. Fails closed (NOT_FOUND) when org_id is
-        # None (#1183). (The target cluster is validated as MANAGED below;
-        # tenant clusters are install-level infra owned by astrolift_clusters,
-        # so their scoping is out of this module's remit.)
+        # None (#1183). The target cluster is org-scoped separately below.
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         env = (
@@ -2678,7 +2677,13 @@ class LifecycleMutation:
         )
         if env is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app environment not found")
+        # Org-scope the TARGET cluster fetch to the caller's org (or a
+        # platform-shared null-org cluster). TenantCluster.organization is a
+        # NULLABLE FK, so a bare by-guid fetch would let a caller migrate an
+        # app onto another org's private cluster (#1183). Fails closed
+        # (NOT_FOUND) for out-of-scope guids, matching the clusters partition.
         target = TenantCluster.objects.filter(
+            Q(organization_id=org_id) | Q(organization_id__isnull=True),
             guid=str(input.target_cluster_id),
             deleted_at__isnull=True,
         ).first()
