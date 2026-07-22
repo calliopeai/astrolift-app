@@ -481,14 +481,24 @@ class BillingQuery:
     @require_permission(Permission.BILLING_READ)
     @tenant_scoped()
     def astrolift_quotas(self, info: Info) -> list[QuotaType]:
-        qs = Quota.objects.order_by("scope_kind", "resource")[:200]
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        qs = Quota.objects.filter(organization_id=tenant.organization_id).order_by("scope_kind", "resource")[
+            :200
+        ]
         return [quota_to_type(q) for q in qs]
 
     @strawberry.field
     @require_permission(Permission.BILLING_READ)
     @tenant_scoped()
     def astrolift_budgets(self, info: Info) -> list[BudgetType]:
-        qs = Budget.objects.order_by("-current_spend_cents")[:100]
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        qs = Budget.objects.filter(organization_id=tenant.organization_id).order_by("-current_spend_cents")[
+            :100
+        ]
         return [budget_to_type(b) for b in qs]
 
     @strawberry.field
