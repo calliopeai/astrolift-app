@@ -565,7 +565,13 @@ class ScmMutation:
     def update_source_connection(
         self, info: Info, input: UpdateSourceConnectionInput
     ) -> MutationResultType[SourceConnectionType]:
-        conn = SourceConnection.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no organization")
+        conn = SourceConnection.objects.filter(
+            guid=str(input.id), organization_id=org_id, deleted_at__isnull=True
+        ).first()
         if conn is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "connection not found")
 
@@ -612,7 +618,13 @@ class ScmMutation:
     def disconnect_source(
         self, info: Info, input: DisconnectSourceInput
     ) -> MutationResultType[SourceConnectionType]:
-        conn = SourceConnection.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no organization")
+        conn = SourceConnection.objects.filter(
+            guid=str(input.id), organization_id=org_id, deleted_at__isnull=True
+        ).first()
         if conn is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "connection not found")
         conn.soft_delete()
@@ -690,7 +702,13 @@ class ScmMutation:
         """
         import secrets
 
-        conn = SourceConnection.objects.filter(guid=str(input.connection_id), deleted_at__isnull=True).first()
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no organization")
+        conn = SourceConnection.objects.filter(
+            guid=str(input.connection_id), organization_id=org_id, deleted_at__isnull=True
+        ).first()
         if conn is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "connection not found")
         if not conn.kind.startswith(("github_", "gitlab_")):
@@ -937,7 +955,13 @@ class ScmMutation:
     def delete_ssh_deploy_key(
         self, info: Info, input: DeleteSshDeployKeyInput
     ) -> MutationResultType[SshDeployKeyType]:
-        row = SshDeployKey.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no organization")
+        row = SshDeployKey.objects.filter(
+            guid=str(input.id), organization_id=org_id, deleted_at__isnull=True
+        ).first()
         if row is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "key not found")
         row.soft_delete()
