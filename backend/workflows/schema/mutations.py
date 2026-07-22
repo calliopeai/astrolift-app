@@ -5,7 +5,7 @@ from typing import Optional
 import strawberry
 from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ValidationError
+from django.core.exceptions import FieldDoesNotExist, ValidationError
 from django.db import transaction
 from django.db.models import Q
 from graphql import GraphQLError
@@ -169,15 +169,42 @@ class Mutation:
         if not workflow or not workflow.is_enabled:
             raise GraphQLError(f'Workflow "{workflow_slug}" not found or disabled')
 
-        # Resolve the model. The GFK target is an arbitrary legacy model
-        # (forms) with no org FK, so no object-level org filter is possible —
-        # the permission + tenant gates above are the scoping.
+        # Resolve the GFK target model, then scope the object to the caller's
+        # org. @require_permission and @tenant_scoped above only assert a
+        # capability and that *a* tenant context exists — neither FILTERS
+        # (#1183). object_id is an arbitrary pk into an arbitrary model, so
+        # without an explicit org constraint a WORKFLOW_TRIGGER holder could
+        # start a workflow against another org's object.
         try:
             parts = model_label.split(".")
             model = apps.get_model(parts[0], parts[-1])
-            obj = model.objects.get(pk=object_id)
         except Exception as e:
             raise GraphQLError(f"Object not found: {model_label}:{object_id} — {e}")
+
+        # If the target model reaches an organization, require the row to be the
+        # caller's (or a platform-shared null-org row, matching
+        # transition_workflow). If it has no org linkage at all we cannot prove
+        # the object is the caller's, so fail closed rather than run against a
+        # possibly-foreign object. A refused / out-of-scope object is
+        # indistinguishable from a missing one (no cross-tenant existence
+        # oracle).
+        org_scoped = False
+        for _org_field in ("organization", "organization_id"):
+            try:
+                model._meta.get_field(_org_field)
+            except FieldDoesNotExist:
+                continue
+            org_scoped = True
+            break
+        if not org_scoped:
+            raise GraphQLError(f"Object not found: {model_label}:{object_id}")
+
+        obj = model.objects.filter(
+            Q(organization_id=_caller_org_pk()) | Q(organization_id__isnull=True),
+            pk=object_id,
+        ).first()
+        if obj is None:
+            raise GraphQLError(f"Object not found: {model_label}:{object_id}")
 
         try:
             instance = WorkflowInstance.start(workflow, obj, user)
