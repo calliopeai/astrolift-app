@@ -105,6 +105,53 @@ export type AstroliftAgentTask = Pick<
   | "snapshotUrl"
 >;
 
+// ── Fleet map (#1091 — LiveFlowMap P2): live dispatch feed ───────────────────
+// Hand-typed against schema.graphql (like the tiered-workflows types), not
+// faceted over __generated__: the fleet map is a self-contained poll surface
+// and these node-layer fields lag the committed codegen output. `dispatcher`
+// is null until the Controller routes the task at PROVISIONING.
+
+// The dispatcher an AgentTask was routed to, plus the cluster it spawns onto.
+// `clusterId` correlates the task to its cluster-layer node + heartbeat
+// liveness on the map; null when the dispatcher runs standalone.
+export type FleetTaskDispatcher = {
+  id: string;
+  name: string;
+  slug: string;
+  cloud: string;
+  region: string;
+  clusterId: string | null;
+  clusterName: string;
+};
+
+// One AgentTask as projected by `agentTaskTransitionsSince`. `updatedAt` is the
+// cursor the map advances across polls; the queued/provisioning/started/
+// finished stamps drive per-stage timing; `podName` / `namespace` label the
+// agent node.
+export type AgentTaskTransition = {
+  id: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  queuedAt: string | null;
+  provisioningAt: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  podName: string;
+  namespace: string;
+  dispatcher: FleetTaskDispatcher | null;
+};
+
+export type AgentTaskTransitionsSinceData = {
+  agentTaskTransitionsSince: AgentTaskTransition[];
+};
+
+export type AgentTaskTransitionsSinceVars = {
+  orgId: string;
+  since?: string | null;
+  limit?: number | null;
+};
+
 // A reusable agent container-environment recipe (org-scoped), as offered in the
 // Dispatch command center's Advanced section for the `environmentSpecId`
 // override. `runtime` / `imageTag` describe the base image the recipe resolves.

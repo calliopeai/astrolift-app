@@ -116,6 +116,39 @@ export const GET_AGENT_TASK = gql`
   }
 `;
 
+// Live fleet-map feed (#1091 — LiveFlowMap P2). Returns the org's AgentTasks
+// whose state changed after `since` (the `updatedAt` cursor), oldest change
+// first, capped. /fleet/map polls this with a moving high-water `since` and
+// merges each batch into the map, so the map accumulates the live fleet and
+// pulses an edge per transition. Carries the node-layer fields the map's
+// dispatcher / cluster / agent layers render: the routing `dispatcher` (+ the
+// cluster it spawns onto), the pod/namespace, and the lifecycle stamps.
+export const AGENT_TASK_TRANSITIONS_SINCE = gql`
+  query AgentTaskTransitionsSince($orgId: ID!, $since: DateTime, $limit: Int) {
+    agentTaskTransitionsSince(orgId: $orgId, since: $since, limit: $limit) {
+      id
+      status
+      createdAt
+      updatedAt
+      queuedAt
+      provisioningAt
+      startedAt
+      finishedAt
+      podName
+      namespace
+      dispatcher {
+        id
+        name
+        slug
+        cloud
+        region
+        clusterId
+        clusterName
+      }
+    }
+  }
+`;
+
 // Per-run log lines for a single agent task, newest `tail` lines. Keyed by
 // the AGENT TASK id (not workloadId) — the agent-detail Observe tab reads
 // these for the most-recent run. NOTE: `agentTaskLogs` returns an empty list
