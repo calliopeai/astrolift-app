@@ -984,10 +984,17 @@ class RegistryMutation:
     @require_permission(Permission.APP_CREATE)
     @tenant_scoped()
     def register_app(self, info: Info, input: RegisterAppInput) -> MutationResultType[RegisteredAppType]:
+        # Org-scope the project lookup to the caller's tenant. Everything
+        # downstream keys the new app's organization off ``project.organization``,
+        # so an unscoped project guid would let a caller create apps inside a
+        # sibling org's project. Fails closed (NOT_FOUND) when org_id is
+        # None or the project belongs to another org (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         project = (
             Project.objects.select_related("organization", "team").filter(guid=str(input.project_id)).first()
         )
-        if project is None:
+        if project is None or project.organization_id != org_id:
             return gql_failure(ErrorCode.NOT_FOUND.value, "project not found", field="projectId")
 
         # An app is a deployment target — without a managed cluster
@@ -1445,7 +1452,11 @@ class RegistryMutation:
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def update_app(self, info: Info, input: UpdateAppInput) -> MutationResultType[RegisteredAppType]:
-        app = RegisteredApp.objects.filter(guid=str(input.id)).first()
+        # Org-scope the by-guid lookup to the caller's tenant. Fails closed
+        # (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        app = RegisteredApp.objects.filter(guid=str(input.id), organization_id=org_id).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
 
@@ -1607,7 +1618,11 @@ class RegistryMutation:
         """
         from astrolift_manifest.hostname import validate_subdomain_label
 
-        app = RegisteredApp.objects.filter(guid=str(input.id)).first()
+        # Org-scope the by-guid lookup to the caller's tenant. Fails closed
+        # (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        app = RegisteredApp.objects.filter(guid=str(input.id), organization_id=org_id).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
 
@@ -1647,7 +1662,11 @@ class RegistryMutation:
     def soft_delete_app(
         self, info: Info, input: SoftDeleteAppInput
     ) -> MutationResultType[_SoftDeletePayload]:
-        app = RegisteredApp.objects.filter(guid=str(input.id)).first()
+        # Org-scope the by-guid lookup to the caller's tenant before the
+        # soft-delete. Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        app = RegisteredApp.objects.filter(guid=str(input.id), organization_id=org_id).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         app.soft_delete(by=_actor())
@@ -1675,8 +1694,14 @@ class RegistryMutation:
             TearDownAppInput as TearDownInput,
         )
 
+        # Org-scope the by-guid lookup to the caller's tenant before the
+        # teardown workflow (tears down every per-app cloud resource). Fails
+        # closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         app = RegisteredApp.objects.filter(
             guid=str(input.id),
+            organization_id=org_id,
             deleted_at__isnull=True,
         ).first()
         if app is None:
@@ -1728,9 +1753,16 @@ class RegistryMutation:
         """
         from astrolift_identity.models import Project, Team
 
+        # Org-scope the SOURCE app to the caller's tenant — the target
+        # team/project below are validated against ``app.organization_id``,
+        # so without scoping the source a cross-org caller could re-parent
+        # another org's app. Fails closed (NOT_FOUND) when org_id is
+        # None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         app = (
             RegisteredApp.objects.select_related("organization", "team", "project")
-            .filter(guid=str(input.app_id), deleted_at__isnull=True)
+            .filter(guid=str(input.app_id), organization_id=org_id, deleted_at__isnull=True)
             .first()
         )
         if app is None:
@@ -1830,7 +1862,12 @@ class RegistryMutation:
             classify_state,
         )
 
-        app = RegisteredApp.objects.filter(guid=str(input.id)).first()
+        # Org-scope the by-guid lookup to the caller's tenant before staging
+        # the manifest edit. Fails closed (NOT_FOUND) when org_id is
+        # None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        app = RegisteredApp.objects.filter(guid=str(input.id), organization_id=org_id).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
 
@@ -1906,7 +1943,12 @@ class RegistryMutation:
             resync_app_manifest_from_repo,
         )
 
-        app = RegisteredApp.objects.filter(guid=str(input.id)).first()
+        # Org-scope the by-guid lookup to the caller's tenant before the
+        # repo re-fetch + apply (SCM call). Fails closed (NOT_FOUND) when
+        # org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        app = RegisteredApp.objects.filter(guid=str(input.id), organization_id=org_id).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
 
@@ -1976,7 +2018,12 @@ class RegistryMutation:
             put_file,
         )
 
-        app = RegisteredApp.objects.filter(guid=str(input.id)).first()
+        # Org-scope the by-guid lookup to the caller's tenant before opening
+        # the PR (SCM write). Fails closed (NOT_FOUND) when org_id is
+        # None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        app = RegisteredApp.objects.filter(guid=str(input.id), organization_id=org_id).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
 
@@ -2068,9 +2115,15 @@ class RegistryMutation:
         operator can ``revokeTeamAccessFromApp`` explicitly later.
         """
 
+        # Org-scope the SOURCE app to the caller's tenant — the target team
+        # below is validated against ``app.organization_id``, so scoping the
+        # source binds the whole move to the caller's org. Fails closed
+        # (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         app = (
             RegisteredApp.objects.select_related("organization", "team", "project")
-            .filter(guid=str(input.app_id), deleted_at__isnull=True)
+            .filter(guid=str(input.app_id), organization_id=org_id, deleted_at__isnull=True)
             .first()
         )
         if app is None:
@@ -2144,9 +2197,15 @@ class RegistryMutation:
                 field="accessLevel",
             )
 
+        # Org-scope the SOURCE app to the caller's tenant — the target team
+        # below is validated against ``app.organization_id``, so scoping the
+        # source binds the grant to the caller's org. Fails closed
+        # (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         app = (
             RegisteredApp.objects.select_related("organization", "team")
-            .filter(guid=str(input.app_id), deleted_at__isnull=True)
+            .filter(guid=str(input.app_id), organization_id=org_id, deleted_at__isnull=True)
             .first()
         )
         if app is None:
@@ -2202,9 +2261,15 @@ class RegistryMutation:
         team first.
         """
 
+        # Org-scope the SOURCE app to the caller's tenant — the target team
+        # below is matched against ``app``, so scoping the source binds the
+        # revoke to the caller's org. Fails closed (NOT_FOUND) when org_id is
+        # None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         app = (
             RegisteredApp.objects.select_related("organization", "team")
-            .filter(guid=str(input.app_id), deleted_at__isnull=True)
+            .filter(guid=str(input.app_id), organization_id=org_id, deleted_at__isnull=True)
             .first()
         )
         if app is None:
@@ -2269,7 +2334,14 @@ class RegistryMutation:
             summarize_changes,
         )
 
-        app = RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True).first()
+        # Org-scope the app lookup to the caller's tenant before the repo
+        # re-fetch + reconcile (SCM call). Slugs are unique only within an
+        # org. Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        app = RegisteredApp.objects.filter(
+            slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True
+        ).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
 
@@ -2349,9 +2421,15 @@ class RegistryMutation:
         already handles "team has unassigned apps" as a first-class
         bucket.
         """
+        # Org-scope the SOURCE app to the caller's tenant — the target
+        # project below is validated against ``app.organization_id``, so
+        # scoping the source binds the assignment to the caller's org. Fails
+        # closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         app = (
             RegisteredApp.objects.select_related("organization", "team", "project")
-            .filter(slug=input.app_slug, deleted_at__isnull=True)
+            .filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
             .first()
         )
         if app is None:
@@ -2430,7 +2508,16 @@ class RegistryMutation:
         be >= 1. A threshold of 0 would block every image and is
         almost certainly an input error — refuse with VALIDATION.
         """
-        app = RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True).first()
+        # Org-scope the app lookup to the caller's tenant. This is the only
+        # sanctioned writer of the supply-chain gate the promote workflow
+        # enforces, so an unscoped slug lookup would let a caller loosen
+        # (or tighten) a sibling org's deploy gate. Fails closed (NOT_FOUND)
+        # when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        app = RegisteredApp.objects.filter(
+            slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True
+        ).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
 
@@ -2483,7 +2570,14 @@ class RegistryMutation:
         """
         from django.utils import timezone
 
-        app = RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True).first()
+        # Org-scope the app lookup to the caller's tenant before pausing
+        # webhook-fired deploys. Fails closed (NOT_FOUND) when org_id is
+        # None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        app = RegisteredApp.objects.filter(
+            slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True
+        ).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
 
@@ -2529,7 +2623,14 @@ class RegistryMutation:
 
         Idempotent on an already-resumed app.
         """
-        app = RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True).first()
+        # Org-scope the app lookup to the caller's tenant before resuming
+        # webhook-fired deploys. Fails closed (NOT_FOUND) when org_id is
+        # None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        app = RegisteredApp.objects.filter(
+            slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True
+        ).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
 
