@@ -54,6 +54,20 @@ from core.optimistic import check_version_match as _check_version_match
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
+
+def _caller_org_id() -> int | None:
+    """Current tenant's organization id, or None when there's no tenant
+    context. Mutations over org-owned rows MUST treat None as
+    deny-by-default (not-found), never as "all rows" (#1042 / #1183).
+
+    ``@tenant_scoped()`` only asserts a tenant context exists; it does
+    NOT filter any queryset. Every mutation that fetches by slug or guid
+    has to add the org constraint itself or it reads/writes cross-org.
+    """
+    tenant = get_current_tenant()
+    return tenant.organization_id if tenant is not None else None
+
+
 # ---------------------------------------------------------------------
 # Inputs
 
@@ -729,7 +743,15 @@ def _resolve_email_service(managed_service_id):
     Used by the email observability mutations so the resolver-entry
     code path can call into the cloud-specific driver without re-
     walking the FK chain. Returns None when the row is missing,
-    soft-deleted, or not an email kind."""
+    soft-deleted, or not an email kind.
+
+    Org-scoped (#1183): ManagedService has no direct org column, so we
+    scope through the owning app. A cross-org / no-tenant caller can't
+    resolve another tenant's email service by guessing its guid — org_id
+    None → IS NULL → no match (RegisteredApp.organization is non-null) →
+    deny-by-default. This single fix closes the cross-org path for every
+    email-observability mutation that routes through here (suppression
+    add/remove + template create/update/delete)."""
     svc = (
         ManagedService.objects.select_related(
             "app_environment",
@@ -737,7 +759,11 @@ def _resolve_email_service(managed_service_id):
             "app_environment__tenant_cluster__provider_plugin",
             "registered_app",
         )
-        .filter(guid=str(managed_service_id), deleted_at__isnull=True)
+        .filter(
+            guid=str(managed_service_id),
+            registered_app__organization_id=_caller_org_id(),
+            deleted_at__isnull=True,
+        )
         .first()
     )
     if svc is None or svc.kind != ManagedService.Kind.EMAIL:
@@ -822,7 +848,7 @@ class ServicesMutation:
                 validation_msg,
                 field="key",
             )
-        app = RegisteredApp.objects.filter(slug=input.app_slug).first()
+        app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         # #497 — optimistic-concurrency gate. Refuse to apply the
@@ -910,7 +936,7 @@ class ServicesMutation:
                 validation_msg,
                 field="key",
             )
-        app = RegisteredApp.objects.filter(slug=input.app_slug).first()
+        app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         mismatch = _check_version_match(app, if_match_version=input.if_match_version, kind="App")
@@ -969,7 +995,7 @@ class ServicesMutation:
         info: Info,
         input: DeleteAppSecretInput,
     ) -> MutationResultType[_AppSecretWritePayload]:
-        app = RegisteredApp.objects.filter(slug=input.app_slug).first()
+        app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         source = app.manifest_raw_staged or app.manifest_raw or ""
@@ -1051,7 +1077,7 @@ class ServicesMutation:
         msg = _validate_env_key(input.key)
         if msg:
             return gql_failure(ErrorCode.VALIDATION.value, msg, field="key")
-        app = RegisteredApp.objects.filter(slug=input.app_slug).first()
+        app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         if input.set_via is not None and input.set_via not in _VALID_SECRET_SOURCES:
@@ -1091,7 +1117,7 @@ class ServicesMutation:
         info: Info,
         input: BulkImportAppSecretsInput,
     ) -> MutationResultType[_BulkImportPayload]:
-        app = RegisteredApp.objects.filter(slug=input.app_slug).first()
+        app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         kvs = parse_dotenv(input.dotenv_text or "")
@@ -1200,7 +1226,7 @@ class ServicesMutation:
                 ),
                 field="secretId",
             )
-        app = RegisteredApp.objects.filter(slug=input.app_slug).first()
+        app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None or app.deleted_at is not None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
         env_exists = AppEnvironment.objects.filter(
@@ -1271,7 +1297,7 @@ class ServicesMutation:
         info: Info,
         input: AttachSecretBundleInput,
     ) -> MutationResultType[AppSecretBundleAttachmentType]:
-        app = RegisteredApp.objects.filter(slug=input.app_slug).first()
+        app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         env = AppEnvironment.objects.filter(
@@ -1285,7 +1311,11 @@ class ServicesMutation:
                 f"environment {input.environment_name!r} not found",
                 field="environmentName",
             )
-        bundle = SecretBundle.objects.filter(slug=input.bundle_slug, deleted_at__isnull=True).first()
+        bundle = SecretBundle.objects.filter(
+            slug=input.bundle_slug,
+            organization_id=_caller_org_id(),
+            deleted_at__isnull=True,
+        ).first()
         if bundle is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -1397,7 +1427,10 @@ class ServicesMutation:
                 "registered_app",
                 "app_environment",
             )
-            .filter(guid=str(input.attachment_id))
+            .filter(
+                guid=str(input.attachment_id),
+                registered_app__organization_id=_caller_org_id(),
+            )
             .first()
         )
         if ref is None or ref.deleted_at is not None:
@@ -1457,6 +1490,7 @@ class ServicesMutation:
 
         bundle = SecretBundle.objects.filter(
             guid=str(input.id),
+            organization_id=_caller_org_id(),
             deleted_at__isnull=True,
         ).first()
         if bundle is None:
@@ -1506,7 +1540,7 @@ class ServicesMutation:
         ``astrolift_workflows`` and reads from this row. The
         mutation creates the row in PENDING state; the workflow
         loop transitions it through PROVISIONING → ACTIVE."""
-        app = RegisteredApp.objects.filter(slug=input.app_slug).first()
+        app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         env = AppEnvironment.objects.filter(
@@ -1594,7 +1628,11 @@ class ServicesMutation:
                 "app_environment__tenant_cluster__provider_plugin",
                 "registered_app",
             )
-            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .filter(
+                guid=str(input.id),
+                registered_app__organization_id=_caller_org_id(),
+                deleted_at__isnull=True,
+            )
             .first()
         )
         if svc is None:
@@ -1662,7 +1700,11 @@ class ServicesMutation:
                 "app_environment__tenant_cluster__provider_plugin",
                 "registered_app",
             )
-            .filter(guid=str(input.managed_service_id), deleted_at__isnull=True)
+            .filter(
+                guid=str(input.managed_service_id),
+                registered_app__organization_id=_caller_org_id(),
+                deleted_at__isnull=True,
+            )
             .first()
         )
         if svc is None:
@@ -1736,7 +1778,11 @@ class ServicesMutation:
             DeprovisionManagedServiceInput as DeprovisionInput,
         )
 
-        svc = ManagedService.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
+        svc = ManagedService.objects.filter(
+            guid=str(input.id),
+            registered_app__organization_id=_caller_org_id(),
+            deleted_at__isnull=True,
+        ).first()
         if svc is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -1841,7 +1887,11 @@ class ServicesMutation:
 
         svc = (
             ManagedService.objects.select_related("app_environment", "registered_app")
-            .filter(guid=str(input.managed_service_id), deleted_at__isnull=True)
+            .filter(
+                guid=str(input.managed_service_id),
+                registered_app__organization_id=_caller_org_id(),
+                deleted_at__isnull=True,
+            )
             .first()
         )
         if svc is None:
@@ -1983,7 +2033,11 @@ class ServicesMutation:
 
         svc = (
             ManagedService.objects.select_related("app_environment", "registered_app")
-            .filter(guid=str(input.managed_service_id), deleted_at__isnull=True)
+            .filter(
+                guid=str(input.managed_service_id),
+                registered_app__organization_id=_caller_org_id(),
+                deleted_at__isnull=True,
+            )
             .first()
         )
         if svc is None:
@@ -2707,7 +2761,7 @@ class ServicesMutation:
                 f"op must be one of {sorted(valid_ops)}",
                 field="op",
             )
-        app = RegisteredApp.objects.filter(slug=input.app_slug).first()
+        app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -2759,6 +2813,7 @@ class ServicesMutation:
                 )
             bundle = SecretBundle.objects.filter(
                 slug=input.bundle_slug,
+                organization_id=_caller_org_id(),
                 deleted_at__isnull=True,
             ).first()
             if bundle is None:
@@ -2785,7 +2840,11 @@ class ServicesMutation:
                 )
             ref = (
                 AppSecretBundleRef.objects.select_related("app_environment")
-                .filter(guid=str(input.attachment_id), deleted_at__isnull=True)
+                .filter(
+                    guid=str(input.attachment_id),
+                    registered_app__organization_id=_caller_org_id(),
+                    deleted_at__isnull=True,
+                )
                 .first()
             )
             if ref is None:
@@ -2842,7 +2901,11 @@ class ServicesMutation:
     ) -> MutationResultType[SecretChangeProposalType]:
         proposal = (
             SecretChangeProposal.objects.select_related("registered_app")
-            .filter(guid=str(input.proposal_id), deleted_at__isnull=True)
+            .filter(
+                guid=str(input.proposal_id),
+                registered_app__organization_id=_caller_org_id(),
+                deleted_at__isnull=True,
+            )
             .first()
         )
         if proposal is None:
@@ -2941,7 +3004,11 @@ class ServicesMutation:
             )
         proposal = (
             SecretChangeProposal.objects.select_related("registered_app")
-            .filter(guid=str(input.proposal_id), deleted_at__isnull=True)
+            .filter(
+                guid=str(input.proposal_id),
+                registered_app__organization_id=_caller_org_id(),
+                deleted_at__isnull=True,
+            )
             .first()
         )
         if proposal is None:
@@ -3010,7 +3077,11 @@ class ServicesMutation:
         changed their mind' and 'approver said no'."""
         proposal = (
             SecretChangeProposal.objects.select_related("registered_app")
-            .filter(guid=str(input.proposal_id), deleted_at__isnull=True)
+            .filter(
+                guid=str(input.proposal_id),
+                registered_app__organization_id=_caller_org_id(),
+                deleted_at__isnull=True,
+            )
             .first()
         )
         if proposal is None:
