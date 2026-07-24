@@ -7,6 +7,7 @@ through the canonical ``astrolift_drivers.registry`` interface so
 workflow code stays free of Django + driver imports.
 """
 
+from astrolift_workflows.activities.alert_eval import evaluate_alerts_tick
 from astrolift_workflows.activities.app_deregister import (
     delete_app_source_webhook,
     list_app_secret_targets,
@@ -170,6 +171,7 @@ from astrolift_workflows.activities.workload_identity import (
 )
 
 __all__ = [
+    "evaluate_alerts_tick",
     "probe_uptime_tick",
     "abort_in_flight_deploys",
     "aggregate_fan_out",

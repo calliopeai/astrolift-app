@@ -542,6 +542,36 @@ def _template_alert_fired(envelope: EventEnvelope) -> NotificationTemplate | Non
     )
 
 
+def _template_alert_resolved(envelope: EventEnvelope) -> NotificationTemplate | None:
+    """Alert-rule resolved (firing → clear) fan-out. Symmetric to
+    :func:`_template_alert_fired` so on-call gets the all-clear through the
+    same path the firing page took. Payload keys match the fired template
+    (``rule_name`` / ``severity`` / ``summary`` / ``rule_guid``)."""
+    if envelope.organization_id is None:
+        return None
+    member_ids = _org_admin_user_ids(organization_id=envelope.organization_id)
+    if not member_ids:
+        return None
+    payload = envelope.payload or {}
+    rule_name = str(payload.get("rule_name", "") or "")
+    severity = str(payload.get("severity", "") or "").lower()
+    summary = str(payload.get("summary", "") or "")
+    title_bits = [bit for bit in ("Resolved", rule_name or None) if bit]
+    title = " · ".join(title_bits)
+    rule_guid = str(payload.get("rule_guid", "") or envelope.resource_id or "")
+    action_url = f"astrolift://alerts/{rule_guid}" if rule_guid else "astrolift://alerts"
+    return NotificationTemplate(
+        title=_truncate(title, PUSH_TITLE_MAX),
+        body=_truncate(summary or "An alert rule resolved.", PUSH_BODY_MAX),
+        action_url=_truncate(action_url, PUSH_DATA_VALUE_MAX),
+        recipient_user_ids=tuple(sorted(set(member_ids))),
+        extra_data={
+            "rule_guid": _truncate(rule_guid, PUSH_DATA_VALUE_MAX),
+            "severity": _truncate(severity, PUSH_DATA_VALUE_MAX),
+        },
+    )
+
+
 def _template_cluster_bootstrap_failed(envelope: EventEnvelope) -> NotificationTemplate | None:
     if envelope.organization_id is None:
         return None
@@ -700,6 +730,7 @@ NOTIFICATION_TEMPLATES = {
     "deploy.failed": lambda env: _template_deploy_event(env, "failed"),
     "secret.revealed": _template_secret_revealed,
     "alert.fired": _template_alert_fired,
+    "alert.resolved": _template_alert_resolved,
     "cluster.bootstrap_failed": _template_cluster_bootstrap_failed,
     "app.deregister_pending": _template_app_deregister_pending,
     "app.down": lambda env: _template_app_uptime_event(env, "down"),

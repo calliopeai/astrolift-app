@@ -47,6 +47,7 @@ from astrolift_workflows.activities import (
     ensure_static_dns,
     ensure_static_site_services,
     ensure_workload_identity,
+    evaluate_alerts_tick,
     expire_pending_approval_deployments,
     fetch_app_build_strategy,
     finalize_managed_service_deletion,
@@ -134,6 +135,7 @@ from astrolift_workflows.workflows import (
     AgentLoopTickWorkflow,
     AgentReconcileTickWorkflow,
     AgentScaleTickWorkflow,
+    AlertEvalTickWorkflow,
     BringClusterIntoManagementWorkflow,
     BuildPreviewWorkflow,
     CapturePlatformCostSnapshotWorkflow,
@@ -175,6 +177,7 @@ from astrolift_workflows.workflows import (
 WORKFLOWS = (
     AgentCronTickWorkflow,
     UptimeProbeTickWorkflow,
+    AlertEvalTickWorkflow,
     AgentLoopTickWorkflow,
     AgentReconcileTickWorkflow,
     AgentScaleTickWorkflow,
@@ -218,6 +221,7 @@ WORKFLOWS = (
 ACTIVITIES = (
     aggregate_fan_out,
     probe_uptime_tick,
+    evaluate_alerts_tick,
     apply_manifests,
     apply_platform_rbac,
     apply_to_target_cluster,

@@ -1221,6 +1221,24 @@ class RegistryMutation:
 
         _bootstrap_app_environments(app, [])
 
+        # Seed the default alert rule set (spec 08 §10.2) for the new app.
+        # There is no ``app.created`` platform Event to subscribe to, so we
+        # seed at the single-app registration completion point — the least
+        # invasive idempotent hook. ``seed_default_alert_rules`` is idempotent
+        # (skips rules whose org-unique name already exists) and best-effort:
+        # a seeding failure must never fail registration. Kept separate from
+        # ``_bootstrap_app_environments`` (which starts a Temporal workflow and
+        # is stubbed in tests) so seeding runs even when onboarding is stubbed.
+        try:
+            from astrolift_operations.alert_seed import seed_default_alert_rules
+
+            seed_default_alert_rules(app)
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "register_app: default alert-rule seeding failed for %s",
+                app.slug,
+            )
+
         # Complete the autowire straight from registration (#1108): push the
         # CI workflow, install the source webhook, and push the deploy-token
         # secret so a git push auto-deploys with zero extra clicks. Fully

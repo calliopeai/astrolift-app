@@ -137,6 +137,18 @@ class ScheduleKind(StrEnum):
     (#779, spec §06 §4.6). Prevents deployments from dangling
     in pending_approval forever after the approval window closes."""
 
+    ALERT_EVAL = "alert_eval"
+    """Every 60 s — evaluate active AlertRules and create/resolve AlertEvent
+    rows on breach, emitting alert.fired / alert.resolved through the same
+    notification dispatch path the uptime probe uses. Safe-by-default: a
+    predicate with no recognized ``kind`` (the seeded PromQL defaults), an
+    unresolvable driver, or an unconfigured metrics backend all resolve to
+    no-fire, so a fresh install with only default rules produces zero events;
+    fan-out no-ops without a NotificationProfile. Kept distinct from the
+    uptime probe (which observes edge reachability and emits app.down /
+    app.recovered): this tick reads AlertRule rows and emits alert.fired /
+    alert.resolved — a rule-predicate signal, not an HTTP probe."""
+
     AGENT_RECONCILE_TICK = "agent_reconcile_tick"
     """Every 5 min — re-applies the keep-alive agent manifests
     (Namespace + Deployment) to every eligible managed cluster via
@@ -341,6 +353,15 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.AGENT_RECONCILE_TICK,
         ),
         description="Re-apply keep-alive agent manifests to managed clusters (self-heal, #808)",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.ALERT_EVAL,
+        workflow_name="AlertEvalTickWorkflow",
+        interval_seconds=60,
+        schedule_id=schedule_id_for(
+            kind=ScheduleKind.ALERT_EVAL,
+        ),
+        description="Evaluate active AlertRules; fire/resolve AlertEvents",
     ),
 )
 

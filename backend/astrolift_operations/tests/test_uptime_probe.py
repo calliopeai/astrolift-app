@@ -96,9 +96,10 @@ def test_classify_up(responded, status, expected):
 # ---- probe_app: record + transition emission -----------------------
 
 
-def test_first_probe_down_records_but_does_not_alert():
-    # No prior state -> record only, no page (avoids a rollout alert storm
-    # where every already-down app fires on the first sweep).
+def test_first_probe_down_emits_app_down():
+    # No prior state + the app is already DOWN -> page. A never-healthy
+    # app is genuinely unreachable; the old "never on first observation"
+    # rule left it silent forever ("never-healthy = never alerts").
     app = _make_app()
     with (
         mock.patch.object(uptime_probe, "_probe_url_for", return_value="https://hello.example/healthz"),
@@ -111,7 +112,41 @@ def test_first_probe_down_records_but_does_not_alert():
     assert result.is_up is False
     assert result.status_code == 504
     assert AppUptimeResult.objects.filter(registered_app=app).count() == 1
+    assert cap.kinds().count("app.down") == 1
+    down = next(e for e in cap.events if e.event_type == "app.down")
+    assert down.registered_app_id == app.id
+    assert down.organization_id == app.organization_id
+
+
+def test_first_probe_down_does_not_refire_next_tick():
+    # After the first DOWN datapoint a prev row exists, so a second DOWN
+    # tick is not a transition and must NOT re-fire — idempotent paging.
+    app = _make_app()
+    with (
+        mock.patch.object(uptime_probe, "_probe_url_for", return_value="https://hello.example/healthz"),
+        mock.patch.object(uptime_probe.httpx, "get", return_value=_resp(504)),
+    ):
+        uptime_probe.probe_app(app)  # first DOWN observation
+        with _CaptureEvents() as cap:
+            uptime_probe.probe_app(app)  # second DOWN tick
+
     assert "app.down" not in cap.kinds()
+    assert AppUptimeResult.objects.filter(registered_app=app).count() == 2
+
+
+def test_first_probe_up_does_not_emit():
+    # A first observation that is UP has nothing to recover from -> silent.
+    app = _make_app()
+    with (
+        mock.patch.object(uptime_probe, "_probe_url_for", return_value="https://hello.example/healthz"),
+        mock.patch.object(uptime_probe.httpx, "get", return_value=_resp(200)),
+        _CaptureEvents() as cap,
+    ):
+        result = uptime_probe.probe_app(app)
+
+    assert result.is_up is True
+    assert "app.down" not in cap.kinds()
+    assert "app.recovered" not in cap.kinds()
 
 
 def test_down_transition_emits_app_down():
