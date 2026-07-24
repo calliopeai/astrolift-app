@@ -16,6 +16,7 @@ import type { AstroliftAgentListItem } from "@/graphql/agents/agents.types";
 import { formatRelativeAge } from "@/lib/format";
 
 import { AgentTabs } from "./agent-tabs";
+import { AppPlatformLinks } from "./app-platform-links";
 import { useAgent } from "./use-agent";
 
 // Run-family / run-mode label maps — kept in sync with the registry list
@@ -168,6 +169,12 @@ export function AgentDetailShell({ agentSlug, children }: AgentDetailShellProps)
       }
     >
       <AgentTabs agentSlug={agent.slug} />
+      {/* An agent IS a RegisteredApp — its platform submenus (config/CI-CD,
+          settings, security, secrets, tokens, deployments…) live at
+          /apps/<appSlug>/* and were otherwise unreachable from the agent
+          surface. Surface them as a flat secondary row (no redundant BROCS
+          pillars, which the agent already has above). */}
+      <AppPlatformLinks appSlug={agent.appSlug} />
       {children({ agent, orgId })}
     </PageShell>
   );
