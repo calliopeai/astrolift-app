@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
  *   Secure  — Zentinelle gate (deferred/enterprise placeholder)
  */
 
-type PillarKey = "build" | "run" | "observe" | "control" | "secure";
+type PillarKey = "overview" | "build" | "run" | "observe" | "control" | "secure";
 
 interface Pillar {
   key: PillarKey;
@@ -38,6 +38,7 @@ interface Pillar {
 }
 
 const PILLARS: readonly Pillar[] = [
+  { key: "overview", label: "Overview", segment: "overview" },
   { key: "build", label: "Build", segment: "build" },
   { key: "run", label: "Run", segment: "run" },
   { key: "observe", label: "Observe", segment: "observe" },
@@ -54,13 +55,13 @@ function isActive(pathname: string, agentSlug: string, segment: string): boolean
   return pathname === base || pathname.startsWith(`${base}/`);
 }
 
-/** Resolve the active pillar from the pathname, defaulting to Build (the
+/** Resolve the active pillar from the pathname, defaulting to Overview (the
  * landing tab). */
 function resolveActivePillar(pathname: string, agentSlug: string): PillarKey {
   for (const pillar of PILLARS) {
     if (isActive(pathname, agentSlug, pillar.segment)) return pillar.key;
   }
-  return "build";
+  return "overview";
 }
 
 interface AgentTabsProps {

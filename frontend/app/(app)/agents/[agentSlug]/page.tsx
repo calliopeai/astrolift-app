@@ -6,7 +6,7 @@ export default async function AgentDetailIndexPage({
   params: Promise<{ agentSlug: string }>;
 }) {
   // /agents/[agentSlug] is the detail shell, not a destination — land on
-  // Build, the default BROCS pillar (Run is stubbed until PR-10).
+  // Overview, the agent-native landing pillar.
   const { agentSlug } = await params;
-  redirect(`/agents/${encodeURIComponent(agentSlug)}/build`);
+  redirect(`/agents/${encodeURIComponent(agentSlug)}/overview`);
 }

@@ -15,6 +15,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { LIST_PROJECTS, LIST_TEAMS } from "@/graphql/identity/identity.queries";
 import type { AstroliftProject, AstroliftTeam } from "@/graphql/identity/identity.types";
+import { friendlyNameFromSlug, generateFriendlySlug } from "@/lib/friendly-name";
 import { cn } from "@/lib/utils";
 
 import type { WizardState } from "../wizard-client";
@@ -69,6 +70,22 @@ export function AppDetailsStep({ state, setState, setValid }: Props) {
       setState((s) => (s.projectId ? s : { ...s, projectId: allProjects[0].id }));
     }
   }, [allProjects, state.projectId, setState]);
+
+  // Pre-fill a friendly name so registration never starts nameless
+  // (`exciting-talkative-platypus`). Suggestion only — the operator can type
+  // over it, and we never clobber a name they've already entered. Generated in
+  // a mount effect (not initial state) to avoid an SSR/client hydration
+  // mismatch on the random value.
+  const prefilledName = React.useRef(false);
+  React.useEffect(() => {
+    if (prefilledName.current) return;
+    prefilledName.current = true;
+    setState((s) => {
+      if (s.name.trim() || s.slug.trim() || s.slugTouched) return s;
+      const slug = generateFriendlySlug();
+      return { ...s, name: friendlyNameFromSlug(slug), slug };
+    });
+  }, [setState]);
 
   const filteredProjects = teamId ? allProjects.filter((p) => p.team.id === teamId) : allProjects;
 

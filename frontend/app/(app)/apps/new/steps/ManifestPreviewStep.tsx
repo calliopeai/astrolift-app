@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { GET_SOURCE_FILE } from "@/graphql/scm/scm.queries";
 import type { AstroliftSourceFile } from "@/graphql/scm/scm.types";
+import { generateFriendlySlug } from "@/lib/friendly-name";
 import { cn } from "@/lib/utils";
 
 import type { WizardState } from "../wizard-client";
@@ -153,7 +154,8 @@ export function ManifestPreviewStep({ state, setState, setValid }: Props) {
         setState((s) => ({
           ...s,
           manifestRaw:
-            s.manifestRaw || TEMPLATE.replace(/REPLACE-ME/g, s.slug || s.name || "my-app"),
+            s.manifestRaw ||
+            TEMPLATE.replace(/REPLACE-ME/g, s.slug || s.name || generateFriendlySlug()),
           manifestFromRepo: false,
         }));
         if (manual) {
