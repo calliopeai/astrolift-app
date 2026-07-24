@@ -38,6 +38,9 @@ import { classifyPrimitive } from "@/lib/primitive";
 import { ActivityTimeline } from "./components/activity-timeline";
 import { AppTabs } from "./components/app-tabs";
 import { BundleHome } from "./components/homes/bundle-home";
+import { CronjobHome } from "./components/homes/cronjob-home";
+import { FunctionHome } from "./components/homes/function-home";
+import { TaskHome } from "./components/homes/task-home";
 import { AutowireStatusBanner } from "./components/autowire-status-banner";
 import { ConfigDriftBanner } from "./components/config-drift-banner";
 import { ControlsSection } from "./components/controls-section";
@@ -147,9 +150,26 @@ export function AppDetailClient({ slug }: { slug: string }) {
   // Agents/workflows route to their own paths; here we specialize the /apps
   // surface for bundles (mixed workloads) and the one-off/scheduled kinds.
   const primitive = classifyPrimitive(wlList.map((w) => w.kind));
+  const primaryWl = wlList[0];
   if (primitive === "bundle") {
     return (
       <BundleHome slug={slug} name={a.name} status={a.provisioningStatus} workloads={wlList} />
+    );
+  }
+  if (primitive === "cronjob" && primaryWl) {
+    return <CronjobHome slug={slug} name={a.name} workload={primaryWl} />;
+  }
+  if (primitive === "task" && primaryWl) {
+    return <TaskHome slug={slug} name={a.name} workload={primaryWl} />;
+  }
+  if (primitive === "function" && primaryWl) {
+    return (
+      <FunctionHome
+        slug={slug}
+        name={a.name}
+        workload={primaryWl}
+        host={a.managedHostname || a.subdomain || null}
+      />
     );
   }
 
