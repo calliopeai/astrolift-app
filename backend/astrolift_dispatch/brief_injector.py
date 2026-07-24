@@ -52,6 +52,16 @@ def brief_env_vars(task: AgentTask) -> list[dict[str, str]]:
     snapshot = brief.manifest_snapshot if isinstance(brief.manifest_snapshot, dict) else {}
     env.append({"name": "AGENT_SYSTEM", "value": snapshot.get("system_prompt", "") or ""})
     env.append({"name": "AGENT_PROMPT", "value": _kickoff_prompt(task)})
+
+    # Manifest [environment] non-secret config (assembled into
+    # manifest_snapshot["env_vars"] by the brief assembler) — the URLs, IDs, and
+    # limits the agent's tools read at runtime (e.g. EMR_SERVICE_BASE_URL). These
+    # are prepended, so an operator override on the env-spec (which lands later in
+    # the container's env list) still wins on any key collision.
+    manifest_env = snapshot.get("env_vars")
+    if isinstance(manifest_env, dict):
+        for key, value in manifest_env.items():
+            env.append({"name": str(key), "value": "" if value is None else str(value)})
     return env
 
 

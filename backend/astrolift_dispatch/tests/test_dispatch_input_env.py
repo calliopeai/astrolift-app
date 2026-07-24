@@ -166,17 +166,19 @@ def test_spawned_job_omits_env_for_unattended_dispatch(monkeypatch):
 
 
 class _Brief:
-    def __init__(self, system_prompt=""):
+    def __init__(self, system_prompt="", env_vars=None):
         self.guid = "brief-1"
         self.content_hash = "deadbeef"
         self.manifest_snapshot = {"system_prompt": system_prompt}
+        if env_vars is not None:
+            self.manifest_snapshot["env_vars"] = env_vars
 
 
 class _TaskWithBrief:
-    def __init__(self, system_prompt="", dispatch_input=None):
+    def __init__(self, system_prompt="", dispatch_input=None, env_vars=None):
         self.guid = "task-1"
         self.brief_id = "brief-1"
-        self.brief = _Brief(system_prompt=system_prompt)
+        self.brief = _Brief(system_prompt=system_prompt, env_vars=env_vars)
         self.dispatch_input = dispatch_input
 
 
@@ -198,3 +200,35 @@ def test_kickoff_prompt_threads_trigger_payload():
 
 def test_no_brief_no_env():
     assert brief_env_vars(_Task(dispatch_input=None, brief_id=None)) == []
+
+
+def test_manifest_environment_vars_are_emitted():
+    # The manifest [environment] non-secret keys (assembled into
+    # manifest_snapshot["env_vars"]) must reach the container — the agent's tools
+    # read them at runtime (e.g. EMR_SERVICE_BASE_URL). Without this the agent
+    # boots with its brief but no service config.
+    env = {
+        e["name"]: e["value"]
+        for e in brief_env_vars(
+            _TaskWithBrief(
+                system_prompt="triage",
+                env_vars={
+                    "EMR_SERVICE_BASE_URL": "https://emr-internal.example",
+                    "MAX_TICKETS_PER_RUN": 10,
+                    "UNSET": None,
+                },
+            )
+        )
+    }
+    assert env["EMR_SERVICE_BASE_URL"] == "https://emr-internal.example"
+    assert env["MAX_TICKETS_PER_RUN"] == "10"  # coerced to string for K8s
+    assert env["UNSET"] == ""  # None -> empty string, never the literal "None"
+    # identity + one-shot contract still intact alongside the config vars
+    assert env["AGENT_SYSTEM"] == "triage" and env["AGENT_PROMPT"]
+
+
+def test_no_manifest_env_vars_when_absent():
+    # A brief without an env_vars snapshot key emits only the identity + one-shot
+    # vars — no crash, no stray keys.
+    env = {e["name"]: e["value"] for e in brief_env_vars(_TaskWithBrief(system_prompt="x"))}
+    assert "AGENT_SYSTEM" in env and "ASTROLIFT_BRIEF_ID" in env
