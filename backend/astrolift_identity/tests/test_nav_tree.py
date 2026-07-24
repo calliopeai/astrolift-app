@@ -50,6 +50,34 @@ def test_nav_tree_returns_org_team_project_app():
     assert tree.teams[0].projects[0].apps[0].status == "ready"
 
 
+def test_nav_tree_flags_agent_backed_apps():
+    """An app with a kind=agent workload is flagged is_agent so the sidebar
+    renders it with a bot icon; a plain app stays is_agent=False."""
+    from astrolift_registry.models import Workload
+
+    org, team, project, app = _scaffold()  # "hello" — a plain app
+    agent_app = RegisteredApp.objects.create(
+        organization=org,
+        team=team,
+        project=project,
+        name="EMR Bug Triage",
+        slug="emr-bug-triage",
+        provisioning_status="ready",
+    )
+    Workload.objects.create(
+        registered_app=agent_app,
+        name="agent",
+        slug="agent",
+        kind=Workload.Kind.AGENT,
+    )
+
+    with tenant_context(TenantContext(organization_id=org.id)):
+        tree = IdentityQuery().astrolift_nav_tree(_info())
+
+    apps = {a.slug: a.is_agent for a in tree.teams[0].projects[0].apps}
+    assert apps == {"hello": False, "emr-bug-triage": True}
+
+
 def test_nav_tree_returns_none_when_org_missing():
     """Tenant context with no resolvable org row should yield None
     rather than fabricate an empty tree -- that lets the UI fall back
