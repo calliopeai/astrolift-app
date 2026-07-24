@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 
 from astrolift_dispatch.brief_injector import (
+    brief_env_vars,
     dispatch_input_env_vars,
     inject_brief_into_job_spec,
 )
@@ -153,3 +154,47 @@ def test_spawned_job_includes_trigger_payload_env(monkeypatch):
 def test_spawned_job_omits_env_for_unattended_dispatch(monkeypatch):
     env = _spawn_and_capture(monkeypatch, None)
     assert ENV_NAME not in env
+
+
+# ---- brief_env_vars: one-shot (pre-injected) wiring ------------------
+#
+# The in-pod astrolift_runner runs one-shot only when AGENT_PROMPT is set;
+# otherwise it idles in perpetual listener mode and the dispatched agent
+# never processes its batch. brief_env_vars must emit AGENT_SYSTEM (the
+# assembled brief system prompt) + a non-empty AGENT_PROMPT alongside the
+# existing ASTROLIFT_* identity vars.
+
+
+class _Brief:
+    def __init__(self, system_prompt=""):
+        self.guid = "brief-1"
+        self.content_hash = "deadbeef"
+        self.manifest_snapshot = {"system_prompt": system_prompt}
+
+
+class _TaskWithBrief:
+    def __init__(self, system_prompt="", dispatch_input=None):
+        self.guid = "task-1"
+        self.brief_id = "brief-1"
+        self.brief = _Brief(system_prompt=system_prompt)
+        self.dispatch_input = dispatch_input
+
+
+def test_brief_env_sets_oneshot_agent_prompt_and_system():
+    env = {e["name"]: e["value"] for e in brief_env_vars(_TaskWithBrief(system_prompt="You triage bugs."))}
+    assert env["AGENT_SYSTEM"] == "You triage bugs."
+    assert env["AGENT_PROMPT"]  # non-empty -> runner selects pre-injected one-shot
+    assert "ASTROLIFT_BRIEF_ID" in env  # existing identity contract preserved
+
+
+def test_kickoff_prompt_threads_trigger_payload():
+    env = {
+        e["name"]: e["value"]
+        for e in brief_env_vars(_TaskWithBrief(dispatch_input={"mode": "backfill", "batches": 3}))
+    }
+    assert "backfill" in env["AGENT_PROMPT"]
+    assert '"batches":3' in env["AGENT_PROMPT"]
+
+
+def test_no_brief_no_env():
+    assert brief_env_vars(_Task(dispatch_input=None, brief_id=None)) == []
