@@ -512,6 +512,9 @@ class AppSummaryType:
     slug: str
     name: str
     status: str
+    # True when the app is agent-backed (has a ``kind=agent`` workload). The
+    # sidebar renders agents with a bot icon rather than the app rocket.
+    is_agent: bool = False
 
 
 @strawberry.type(name="AstroliftNavTreeProject")
@@ -534,12 +537,13 @@ class NavTreeType:
     unassigned_apps: list[AppSummaryType]
 
 
-def app_to_summary(app) -> AppSummaryType:
+def app_to_summary(app, *, is_agent: bool = False) -> AppSummaryType:
     return AppSummaryType(
         id=GUID(str(app.guid)),
         slug=app.slug,
         name=app.name,
         status=app.provisioning_status,
+        is_agent=is_agent,
     )
 
 

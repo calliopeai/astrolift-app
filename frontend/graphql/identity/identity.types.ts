@@ -80,6 +80,9 @@ export type AstroliftAppStatus = "pending" | "provisioning" | "ready" | "failed"
 
 export type AstroliftAppSummary = Omit<GeneratedAppSummary, "status"> & {
   status: AstroliftAppStatus;
+  /** True when the app is agent-backed (has a kind=agent workload) — the
+   * sidebar renders it with a bot icon instead of the app rocket. */
+  isAgent: boolean;
 };
 
 export interface AstroliftNavTreeProjectNode {

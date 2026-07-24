@@ -3,6 +3,7 @@
 import { useQuery } from "@apollo/client/react";
 import {
   AlertCircleIcon,
+  BotIcon,
   Building2Icon,
   ChevronRightIcon,
   CircleDashedIcon,
@@ -510,7 +511,11 @@ function AppLeaf({ app, active }: AppLeafProps) {
           title={app.name}
         >
           {statusIcon(app.status)}
-          <RocketIcon className="size-3.5 shrink-0 text-sidebar-foreground/60 mt-0.5" />
+          {app.isAgent ? (
+            <BotIcon className="size-3.5 shrink-0 text-sidebar-foreground/60 mt-0.5" />
+          ) : (
+            <RocketIcon className="size-3.5 shrink-0 text-sidebar-foreground/60 mt-0.5" />
+          )}
           <span
             className={cn(
               "flex-1 min-w-0 break-words whitespace-normal leading-tight",

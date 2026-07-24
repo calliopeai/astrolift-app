@@ -285,6 +285,18 @@ class IdentityQuery:
             .order_by("name")
         )
 
+        # Which apps are agent-backed (have a kind=agent workload) — one query,
+        # so the sidebar can render agents with a bot icon instead of the app
+        # rocket. Set membership keeps app_to_summary O(1) per app.
+        from astrolift_registry.models import Workload
+
+        agent_app_ids = set(
+            Workload.objects.filter(
+                registered_app__organization_id=org_id,
+                kind=Workload.Kind.AGENT,
+            ).values_list("registered_app_id", flat=True)
+        )
+
         projects_by_team: dict[int, list] = {}
         for project in projects:
             projects_by_team.setdefault(project.team_id, []).append(project)
@@ -307,21 +319,21 @@ class IdentityQuery:
                 project_nodes.append(
                     NavTreeProjectType(
                         project=project_to_type(project),
-                        apps=[app_to_summary(a) for a in apps_by_project.get(project.id, [])],
+                        apps=[app_to_summary(a, is_agent=a.id in agent_app_ids) for a in apps_by_project.get(project.id, [])],
                     )
                 )
             team_nodes.append(
                 NavTreeTeamType(
                     team=team_to_type(team),
                     projects=project_nodes,
-                    unassigned_apps=[app_to_summary(a) for a in apps_by_team_no_project.get(team.id, [])],
+                    unassigned_apps=[app_to_summary(a, is_agent=a.id in agent_app_ids) for a in apps_by_team_no_project.get(team.id, [])],
                 )
             )
 
         return NavTreeType(
             organization=organization_to_type(org),
             teams=team_nodes,
-            unassigned_apps=[app_to_summary(a) for a in unassigned_org_apps],
+            unassigned_apps=[app_to_summary(a, is_agent=a.id in agent_app_ids) for a in unassigned_org_apps],
         )
 
     # ---- RBAC queries ------------------------------------------------
