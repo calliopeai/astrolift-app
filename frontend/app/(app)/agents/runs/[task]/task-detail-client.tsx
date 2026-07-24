@@ -16,7 +16,7 @@ import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { DefinitionList } from "@/components/ui/definition-list";
 import { AGENT_TASK_LOGS, GET_AGENT_TASK } from "@/graphql/agents/agents.queries";
 import type { AstroliftAgentTask } from "@/graphql/agents/agents.types";
@@ -151,6 +151,8 @@ export function AgentTaskDetail({ taskId }: { taskId: string }) {
 
   return (
     <PageShell
+      collapsibleHeader
+      headerStorageKey="agent-run-detail"
       title={
         <span className="flex items-center gap-2">
           <Link href="/agents?tab=history" className="text-muted-foreground hover:text-foreground">
@@ -185,13 +187,9 @@ export function AgentTaskDetail({ taskId }: { taskId: string }) {
       }
     >
       <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Overview</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <DefinitionList
-              items={[
+        <CollapsibleCard title="Overview" storageKey="agent-run-overview">
+          <DefinitionList
+            items={[
                 { term: "Status", description: <StatusBadge status={task.status} /> },
                 {
                   term: "Run ID",
@@ -227,48 +225,42 @@ export function AgentTaskDetail({ taskId }: { taskId: string }) {
                     <span className="text-muted-foreground">—</span>
                   ),
                 },
-              ]}
-            />
-          </CardContent>
-        </Card>
+            ]}
+          />
+        </CollapsibleCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Result</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {task.result != null ? (
-              <pre className="bg-muted/40 max-h-96 overflow-auto rounded-md border p-3 font-mono text-xs">
-                {prettyJson(task.result)}
-              </pre>
-            ) : (
-              <p className="text-muted-foreground text-sm">
-                No result yet. A terminal run records its output payload here.
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <CollapsibleCard title="Result" storageKey="agent-run-result">
+          {task.result != null ? (
+            <pre className="bg-muted/40 max-h-96 overflow-auto rounded-md border p-3 font-mono text-xs">
+              {prettyJson(task.result)}
+            </pre>
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              No result yet. A terminal run records its output payload here.
+            </p>
+          )}
+        </CollapsibleCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+        <CollapsibleCard
+          storageKey="agent-run-logs"
+          title={
+            <span className="flex items-center gap-2">
               <ScrollIcon className="size-4" />
               Logs
               <span className="text-muted-foreground text-xs font-normal">last 200 lines</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {logs.length > 0 ? (
-              <pre className="bg-muted/40 max-h-[28rem] overflow-auto rounded-md border p-3 font-mono text-xs whitespace-pre-wrap">
-                {logs.join("\n")}
-              </pre>
-            ) : (
-              <p className="text-muted-foreground text-sm">
-                No logs to show. Output appears here once the run&rsquo;s pod emits it.
-              </p>
-            )}
-          </CardContent>
-        </Card>
+            </span>
+          }
+        >
+          {logs.length > 0 ? (
+            <pre className="bg-muted/40 max-h-[28rem] overflow-auto rounded-md border p-3 font-mono text-xs whitespace-pre-wrap">
+              {logs.join("\n")}
+            </pre>
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              No logs to show. Output appears here once the run&rsquo;s pod emits it.
+            </p>
+          )}
+        </CollapsibleCard>
       </div>
     </PageShell>
   );

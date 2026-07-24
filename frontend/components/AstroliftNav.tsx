@@ -4,7 +4,7 @@ import {
   ActivityIcon,
   BellIcon,
   BoltIcon,
-  BoxIcon,
+  BotIcon,
   Building2Icon,
   ClipboardListIcon,
   LayoutDashboardIcon,
@@ -272,7 +272,7 @@ const modules: ModuleEntry[] = [
   {
     label: "Agents",
     moduleKey: "agents",
-    icon: <BoxIcon />,
+    icon: <BotIcon />,
     href: "/agents",
     items: [{ label: "Fleet Map", href: "/fleet/map", icon: <NetworkIcon /> }],
   },

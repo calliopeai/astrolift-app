@@ -26,6 +26,7 @@ from astrolift_registry.schema.types import (
     retention_policy_to_type,
 )
 from core.decorators import tenant_scoped
+from core.friendly_name import friendly_name_from_slug, generate_friendly_slug
 from core.mutations import ErrorCode, mutation_audit
 from core.optimistic import check_version_match as _check_version_match
 from core.permissions import Permission, require_permission
@@ -35,8 +36,13 @@ from core.tenancy import get_current_tenant
 @strawberry.input
 class RegisterAppInput:
     project_id: GUID
-    name: str
-    slug: str
+    # Both optional (#friendly-name): when a caller omits them — the wizard's
+    # "just register it" path, the CLI, repo-scan bootstrap — the resolver
+    # auto-fills a memorable name/slug (e.g. "exciting-talkative-platypus")
+    # instead of failing "name is required". A supplied slug is honored as-is
+    # and still conflict-checked.
+    name: str | None = None
+    slug: str | None = None
     description: str | None = None
     source_kind: str = "github"
     source_repo: str
@@ -706,6 +712,29 @@ def _normalize_build_args(raw):
     return out, None
 
 
+def _generate_unique_app_slug(organization) -> str:
+    """A friendly app slug that is free within ``organization``.
+
+    Tries fresh three-word slugs (huge namespace, so a first-try hit is the
+    common case); after a run of collisions it numeric-suffixes a base within
+    the 40-char slug limit rather than looping forever. Mirrors the per-org
+    active-slug uniqueness the create path already enforces.
+    """
+    for _ in range(20):
+        candidate = generate_friendly_slug()
+        if not RegisteredApp.objects.filter(organization=organization, slug=candidate).exists():
+            return candidate
+
+    base = generate_friendly_slug()
+    n = 2
+    candidate = base
+    while RegisteredApp.objects.filter(organization=organization, slug=candidate).exists():
+        suffix = f"-{n}"
+        candidate = base[: 40 - len(suffix)] + suffix
+        n += 1
+    return candidate
+
+
 @strawberry.input
 class AssignAppToProjectInput:
     """Re-assign an app to a project, or unassign it (#391).
@@ -997,6 +1026,14 @@ class RegistryMutation:
         if project is None or project.organization_id != org_id:
             return gql_failure(ErrorCode.NOT_FOUND.value, "project not found", field="projectId")
 
+        # Friendly-name default (#friendly-name): a caller-supplied slug is
+        # honored verbatim (and still conflict-checked below); a blank slug is
+        # auto-generated unique within the org. A blank name is derived from
+        # the effective slug so the app is never nameless.
+        raw_slug = (input.slug or "").strip()
+        eff_slug = raw_slug or _generate_unique_app_slug(project.organization)
+        eff_name = (input.name or "").strip() or friendly_name_from_slug(eff_slug)
+
         # An app is a deployment target — without a managed cluster
         # the platform has nowhere to roll the workload to and the
         # downstream deploy fails with an opaque "no cluster available"
@@ -1024,10 +1061,10 @@ class RegistryMutation:
                 field=None,
             )
 
-        if RegisteredApp.objects.filter(organization=project.organization, slug=input.slug).exists():
+        if RegisteredApp.objects.filter(organization=project.organization, slug=eff_slug).exists():
             return gql_failure(
                 ErrorCode.CONFLICT.value,
-                f"app with slug {input.slug!r} already exists in this organization",
+                f"app with slug {eff_slug!r} already exists in this organization",
                 field="slug",
             )
 
@@ -1102,8 +1139,8 @@ class RegistryMutation:
             organization=project.organization,
             team=project.team,
             project=project,
-            name=input.name.strip(),
-            slug=input.slug,
+            name=eff_name,
+            slug=eff_slug,
             description=input.description or "",
             source_kind=input.source_kind or "github",
             source_repo=input.source_repo or "",
@@ -1119,8 +1156,8 @@ class RegistryMutation:
             build_args=build_args,
             trigger_mode=trigger_mode,
             cron_expression=cron_expression,
-            k8s_namespace=f"{project.organization.slug}-{input.slug}",
-            subdomain=input.slug,
+            k8s_namespace=f"{project.organization.slug}-{eff_slug}",
+            subdomain=eff_slug,
             requires_approval=bool(approval["requires_approval"])
             if approval["requires_approval"] is not None
             else False,
