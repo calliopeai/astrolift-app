@@ -13,6 +13,7 @@ from astrolift_workflows.workflows.agent_cron_tick import AgentCronTickWorkflow
 from astrolift_workflows.workflows.agent_loop_tick import AgentLoopTickWorkflow
 from astrolift_workflows.workflows.agent_reconcile_tick import AgentReconcileTickWorkflow
 from astrolift_workflows.workflows.agent_scale_tick import AgentScaleTickWorkflow
+from astrolift_workflows.workflows.alert_eval_tick import AlertEvalTickWorkflow
 from astrolift_workflows.workflows.bring_cluster_into_management import (
     BringClusterIntoManagementWorkflow,
 )
@@ -75,6 +76,7 @@ from astrolift_workflows.workflows.workflow_definition_run import (
 __all__ = [
     "UptimeProbeTickWorkflow",
     "AgentCronTickWorkflow",
+    "AlertEvalTickWorkflow",
     "AgentLoopTickWorkflow",
     "AgentReconcileTickWorkflow",
     "AgentScaleTickWorkflow",

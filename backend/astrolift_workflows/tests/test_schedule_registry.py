@@ -100,9 +100,10 @@ def test_default_schedules_complete():
     expiry sweep; spec 33 PR-4 added the agent-cron dispatcher tick;
     spec 33 PR-5 added the scheduled-scaling tick; spec 33 PR-6 added the
     Loop-dispatch tick; #808 added the keep-alive agent reconcile tick;
-    the uptime-monitoring increment added the synthetic uptime probe.
+    the uptime-monitoring increment added the synthetic uptime probe; the
+    alerting-pipeline wire-up added the alert-rule evaluation tick.
     Lock the count so future additions stay visible in a diff."""
-    assert len(DEFAULT_SCHEDULES) == 16
+    assert len(DEFAULT_SCHEDULES) == 17
 
 
 def test_default_schedules_include_all_kinds():

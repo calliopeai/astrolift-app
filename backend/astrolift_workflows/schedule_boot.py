@@ -70,6 +70,13 @@ PHASE_3A_ACTIVE_KINDS: frozenset[ScheduleKind] = frozenset(
         # Synthetic uptime probing ships active — it's the outage detector,
         # of no value held. Safe: additive, self-guarded, read-only probes.
         ScheduleKind.UPTIME_PROBE,
+        # Alert-rule evaluation ships active — the sibling detector to uptime,
+        # of no value held. Safe-by-default: default-seeded rules are PromQL
+        # (no ``kind``) so evaluate() returns no-fire and a fresh install
+        # writes zero AlertEvents; only operator-created ``kind`` rules with a
+        # live bound driver can fire (a genuinely-wanted alert), and fan-out
+        # no-ops without a NotificationProfile.
+        ScheduleKind.ALERT_EVAL,
     }
 )
 

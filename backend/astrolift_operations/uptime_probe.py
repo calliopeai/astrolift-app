@@ -1,9 +1,12 @@
 """Synthetic uptime probing for deployed apps — the outage catcher.
 
 Periodically GETs each READY app's public health URL, records an
-``AppUptimeResult``, and on an up<->down *transition* emits an
-``app.down`` / ``app.recovered`` event so the notification pipeline
-alerts subscribers (push + in-app now; email hangs off the same event).
+``AppUptimeResult``, and on an up<->down *transition* — or a *first
+observation that is already down* — emits an ``app.down`` /
+``app.recovered`` event so the notification pipeline alerts subscribers
+(push + in-app now; email hangs off the same event). Firing on the first
+down observation closes the "never-healthy = never alerts" gap: an app
+that was never once seen up is genuinely unreachable and must page.
 
 Why the health path, not ``/``
 ------------------------------
@@ -139,13 +142,20 @@ def probe_app(app: RegisteredApp) -> AppUptimeResult | None:
         detail=detail,
     )
 
-    # Alert only on a genuine state change — never on the first observation.
-    # Otherwise a rollout (or a newly-registered app) pages once for every
-    # app that's already down, an alert storm. StatusCake/Pingdom semantics:
-    # alert on transitions. A never-up app is a deploy problem (surfaced in
-    # the OBSERVE UI + deploy status), not an uptime page.
+    # Alert on a genuine up<->down transition, AND on a first observation
+    # that is already DOWN. The old rule ("never on the first observation")
+    # meant an app that was never once seen healthy never alerted — a
+    # genuinely-down app stayed silent forever. A never-healthy-yet-down app
+    # is exactly the outage this probe exists to catch, so it pages.
+    #
+    # Still idempotent: after this first DOWN datapoint a ``prev`` row exists,
+    # so subsequent DOWN ticks are not transitions and never re-fire; only a
+    # real up<->down flip does. A first observation that is UP emits nothing
+    # (nothing to recover from), and the recovered path (down -> up) is
+    # unchanged.
     transitioned = prev is not None and prev.is_up != is_up
-    if transitioned:
+    first_seen_down = prev is None and not is_up
+    if transitioned or first_seen_down:
         _emit_transition(app, result)
     return result
 

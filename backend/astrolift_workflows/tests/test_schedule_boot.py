@@ -172,6 +172,10 @@ def test_default_allowlist_is_phase_3a_yes_set():
         # Uptime-monitoring increment: the synthetic probe joined the
         # default-on set alongside app.down/recovered alerting.
         ScheduleKind.UPTIME_PROBE,
+        # Alerting-pipeline wire-up: the alert-rule evaluation tick ships
+        # active as the sibling detector to uptime (safe-by-default —
+        # default rules are PromQL/no-fire; fan-out no-ops unconfigured).
+        ScheduleKind.ALERT_EVAL,
     }
     assert PHASE_3A_ACTIVE_KINDS == expected
     assert resolve_active_kinds(None) == frozenset(expected)
