@@ -1059,7 +1059,30 @@ class AgentsMutation:
                 # (mirrors execute_agent_stage._create_agent_task_sync).
                 vnc_enabled=bool(env_spec and env_spec.vnc_enabled),
             )
-            task.transition_to(AgentTask.Status.QUEUED)
+
+        # Assemble + link the Brief so the agent boots with its system prompt
+        # and the in-pod runner runs one-shot: the brief injector emits
+        # AGENT_SYSTEM/AGENT_PROMPT only when task.brief is set, and without
+        # those the runner idles in perpetual listener mode and never processes
+        # its batch. Mirrors execute_agent_stage; done outside the create txn
+        # since it fetches the config repo over the network. Only when the env
+        # spec names a config repo (else the workload's own image/runtime runs
+        # with no assembled brief, as before).
+        if env_spec is not None and env_spec.config_repo:
+            from astrolift_agents.services.brief_assembler import assemble_agent_brief
+
+            brief = assemble_agent_brief(
+                organization=org,
+                config_repo=env_spec.config_repo,
+                config_branch=env_spec.config_branch or "main",
+                manifest_path=env_spec.config_manifest_path or "",
+                context={"task_guid": str(task.guid)},
+                ttl_seconds=timeout_seconds,
+            )
+            task.brief = brief
+            task.save(update_fields=["brief", "updated_at", "version"])
+
+        task.transition_to(AgentTask.Status.QUEUED)
 
         # Enqueue the durable dispatch. Workflow id is keyed to the task guid
         # so a duplicate fire joins the in-flight run. When Temporal is
