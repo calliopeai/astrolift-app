@@ -34,12 +34,42 @@ def brief_env_vars(task: AgentTask) -> list[dict[str, str]]:
         return []
 
     brief = task.brief
-    return [
+    env = [
         {"name": "ASTROLIFT_BRIEF_ID", "value": str(brief.guid)},
         {"name": "ASTROLIFT_BRIEF_HASH", "value": brief.content_hash},
         {"name": "ASTROLIFT_TASK_ID", "value": str(task.guid)},
         {"name": "ASTROLIFT_CONTROLLER_URL", "value": _get_controller_url()},
     ]
+
+    # One-shot (pre-injected) execution for the in-pod astrolift_runner
+    # (DEVOPS-647). The runner selects one-shot mode only when AGENT_PROMPT is
+    # set — it then runs the driver once against the injected system + prompt
+    # and the pod exits (Job completion drives the task to terminal). Without
+    # AGENT_PROMPT the runner has no task signal and idles in perpetual
+    # listener mode, so a dispatched agent never processes its batch. The
+    # assembled system prompt is on the Brief snapshot; the kickoff prompt
+    # carries the per-dispatch trigger input.
+    snapshot = brief.manifest_snapshot if isinstance(brief.manifest_snapshot, dict) else {}
+    env.append({"name": "AGENT_SYSTEM", "value": snapshot.get("system_prompt", "") or ""})
+    env.append({"name": "AGENT_PROMPT", "value": _kickoff_prompt(task)})
+    return env
+
+
+def _kickoff_prompt(task: AgentTask) -> str:
+    """Build the one-shot kickoff prompt for the agent's user turn.
+
+    The system prompt carries the full task instructions; this just starts the
+    run and threads through the per-dispatch trigger input (batch size, backfill
+    mode, etc.) when one was supplied on ``runAstroliftAgent``.
+    """
+    base = (
+        "Begin your task now, following your system instructions. "
+        "Work it to completion, then stop."
+    )
+    payload = getattr(task, "dispatch_input", None)
+    if payload:
+        return f"{base} Trigger input (JSON): {json.dumps(payload, separators=(',', ':'))}"
+    return base
 
 
 def dispatch_input_env_vars(task: AgentTask) -> list[dict[str, str]]:
