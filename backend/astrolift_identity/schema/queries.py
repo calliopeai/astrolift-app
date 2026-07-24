@@ -285,17 +285,42 @@ class IdentityQuery:
             .order_by("name")
         )
 
-        # Which apps are agent-backed (have a kind=agent workload) — one query,
-        # so the sidebar can render agents with a bot icon instead of the app
-        # rocket. Set membership keeps app_to_summary O(1) per app.
+        # Classify each app into a nav primitive from its workloads (one query),
+        # so the sidebar picks the right icon + route: agent wins → single-kind
+        # → bundle. `primitive_by_app[app_id] = (kind, slug)`.
         from astrolift_registry.models import Workload
 
-        agent_app_ids = set(
-            Workload.objects.filter(
-                registered_app__organization_id=org_id,
-                kind=Workload.Kind.AGENT,
-            ).values_list("registered_app_id", flat=True)
-        )
+        _wl_by_app: dict[int, list[tuple[str, str]]] = {}
+        for _app_id, _kind, _wslug in Workload.objects.filter(
+            registered_app__organization_id=org_id
+        ).values_list("registered_app_id", "kind", "slug"):
+            _wl_by_app.setdefault(_app_id, []).append((_kind, _wslug))
+
+        # Single-kind workloads that map 1:1 to a nav primitive. Deployment /
+        # statefulset (and the empty/0-workload case) fall through to "app".
+        _SINGLE_KIND_PRIMITIVE = {
+            Workload.Kind.WORKFLOW.value: "workflow",
+            Workload.Kind.FUNCTION.value: "function",
+            Workload.Kind.CRONJOB.value: "cronjob",
+            Workload.Kind.TASK.value: "task",
+        }
+
+        def _nav_primitive(app) -> tuple[str, str]:
+            wls = _wl_by_app.get(app.id, [])
+            kinds = {k for k, _ in wls}
+            if Workload.Kind.AGENT.value in kinds:
+                agent_slug = next(
+                    (s for k, s in wls if k == Workload.Kind.AGENT.value), app.slug
+                )
+                return ("agent", agent_slug)
+            if len(kinds) > 1:
+                return ("bundle", app.slug)
+            only = next(iter(kinds), None)
+            return (_SINGLE_KIND_PRIMITIVE.get(only, "app"), app.slug)
+
+        def _summ(app):
+            kind, slug = _nav_primitive(app)
+            return app_to_summary(app, primitive_kind=kind, primitive_slug=slug)
 
         projects_by_team: dict[int, list] = {}
         for project in projects:
@@ -319,21 +344,21 @@ class IdentityQuery:
                 project_nodes.append(
                     NavTreeProjectType(
                         project=project_to_type(project),
-                        apps=[app_to_summary(a, is_agent=a.id in agent_app_ids) for a in apps_by_project.get(project.id, [])],
+                        apps=[_summ(a) for a in apps_by_project.get(project.id, [])],
                     )
                 )
             team_nodes.append(
                 NavTreeTeamType(
                     team=team_to_type(team),
                     projects=project_nodes,
-                    unassigned_apps=[app_to_summary(a, is_agent=a.id in agent_app_ids) for a in apps_by_team_no_project.get(team.id, [])],
+                    unassigned_apps=[_summ(a) for a in apps_by_team_no_project.get(team.id, [])],
                 )
             )
 
         return NavTreeType(
             organization=organization_to_type(org),
             teams=team_nodes,
-            unassigned_apps=[app_to_summary(a, is_agent=a.id in agent_app_ids) for a in unassigned_org_apps],
+            unassigned_apps=[_summ(a) for a in unassigned_org_apps],
         )
 
     # ---- RBAC queries ------------------------------------------------

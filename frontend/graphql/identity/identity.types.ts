@@ -80,9 +80,13 @@ export type AstroliftAppStatus = "pending" | "provisioning" | "ready" | "failed"
 
 export type AstroliftAppSummary = Omit<GeneratedAppSummary, "status"> & {
   status: AstroliftAppStatus;
-  /** True when the app is agent-backed (has a kind=agent workload) — the
-   * sidebar renders it with a bot icon instead of the app rocket. */
-  isAgent: boolean;
+  /** Nav primitive derived from the app's workloads (agent wins → single-kind
+   * → bundle): "app" | "agent" | "workflow" | "function" | "cronjob" | "task"
+   * | "bundle". Drives the sidebar icon + route prefix. */
+  primitiveKind: string;
+  /** Slug to link with under the primitive's route prefix (agent workload slug
+   * for agents, app slug otherwise). */
+  primitiveSlug: string;
 };
 
 export interface AstroliftNavTreeProjectNode {

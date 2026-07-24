@@ -3,14 +3,19 @@
 import { useQuery } from "@apollo/client/react";
 import {
   AlertCircleIcon,
+  BoltIcon,
   BotIcon,
+  BoxIcon,
   Building2Icon,
   ChevronRightIcon,
   CircleDashedIcon,
   FileBoxIcon,
+  ListChecksIcon,
   Loader2Icon,
   RocketIcon,
+  TimerIcon,
   UsersIcon,
+  WorkflowIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -496,7 +501,23 @@ interface AppLeafProps {
   active: boolean;
 }
 
+// Nav primitive → {icon, route prefix}. Agents/workflows/apps have real detail
+// routes; function/cronjob/task/bundle have no per-item route yet, so they land
+// on the app-detail view (which lists their workload) but keep a distinct icon.
+// cronjob = watch (timer), task = checklist, bundle = box (many-in-one).
+const PRIMITIVE_NAV: Record<string, { Icon: typeof RocketIcon; prefix: string }> = {
+  app: { Icon: RocketIcon, prefix: "/apps" },
+  agent: { Icon: BotIcon, prefix: "/agents" },
+  workflow: { Icon: WorkflowIcon, prefix: "/workflows" },
+  function: { Icon: BoltIcon, prefix: "/apps" },
+  cronjob: { Icon: TimerIcon, prefix: "/apps" },
+  task: { Icon: ListChecksIcon, prefix: "/apps" },
+  bundle: { Icon: BoxIcon, prefix: "/apps" },
+};
+
 function AppLeaf({ app, active }: AppLeafProps) {
+  const nav = PRIMITIVE_NAV[app.primitiveKind] ?? PRIMITIVE_NAV.app;
+  const PrimitiveIcon = nav.Icon;
   return (
     <SidebarMenuSubItem>
       <SidebarMenuSubButton
@@ -505,17 +526,13 @@ function AppLeaf({ app, active }: AppLeafProps) {
         className="!flex !w-full !max-w-none !h-auto !min-h-7 !overflow-visible !whitespace-normal py-1 [&>span:last-child]:!text-clip [&>span:last-child]:!overflow-visible [&>span:last-child]:!whitespace-normal"
       >
         <Link
-          href={`/apps/${app.slug}`}
+          href={`${nav.prefix}/${app.primitiveSlug}`}
           aria-current={active ? "page" : undefined}
           className="flex w-full min-w-0 items-start gap-2"
           title={app.name}
         >
           {statusIcon(app.status)}
-          {app.isAgent ? (
-            <BotIcon className="size-3.5 shrink-0 text-sidebar-foreground/60 mt-0.5" />
-          ) : (
-            <RocketIcon className="size-3.5 shrink-0 text-sidebar-foreground/60 mt-0.5" />
-          )}
+          <PrimitiveIcon className="size-3.5 shrink-0 text-sidebar-foreground/60 mt-0.5" />
           <span
             className={cn(
               "flex-1 min-w-0 break-words whitespace-normal leading-tight",

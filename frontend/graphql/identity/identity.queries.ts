@@ -94,7 +94,8 @@ export const LIST_NAV_TREE = gql`
             slug
             name
             status
-            isAgent
+            primitiveKind
+            primitiveSlug
           }
         }
         unassignedApps {
@@ -102,7 +103,8 @@ export const LIST_NAV_TREE = gql`
           slug
           name
           status
-          isAgent
+          primitiveKind
+          primitiveSlug
         }
       }
       unassignedApps {
@@ -110,7 +112,8 @@ export const LIST_NAV_TREE = gql`
         slug
         name
         status
-        isAgent
+        primitiveKind
+        primitiveSlug
       }
     }
   }
