@@ -33,8 +33,11 @@ import type {
   ProvisioningStatus,
 } from "@/graphql/registry/registry.types";
 
+import { classifyPrimitive } from "@/lib/primitive";
+
 import { ActivityTimeline } from "./components/activity-timeline";
 import { AppTabs } from "./components/app-tabs";
+import { BundleHome } from "./components/homes/bundle-home";
 import { AutowireStatusBanner } from "./components/autowire-status-banner";
 import { ConfigDriftBanner } from "./components/config-drift-banner";
 import { ControlsSection } from "./components/controls-section";
@@ -138,6 +141,18 @@ export function AppDetailClient({ slug }: { slug: string }) {
   }
 
   const wlList = workloads.data?.astroliftWorkloads ?? [];
+
+  // Primitive-native homes: an app that presents as a distinct primitive gets a
+  // landing screen shaped like that primitive rather than the generic app view.
+  // Agents/workflows route to their own paths; here we specialize the /apps
+  // surface for bundles (mixed workloads) and the one-off/scheduled kinds.
+  const primitive = classifyPrimitive(wlList.map((w) => w.kind));
+  if (primitive === "bundle") {
+    return (
+      <BundleHome slug={slug} name={a.name} status={a.provisioningStatus} workloads={wlList} />
+    );
+  }
+
   const publicCount = wlList.filter((w) => w.isPublic).length;
   // Use the backend-computed managed hostname (e.g. my-app.astrolift.example.com).
   // Fall back to the short subdomain only when no managed domain is configured.
