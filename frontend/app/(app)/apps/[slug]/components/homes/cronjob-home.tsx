@@ -7,6 +7,7 @@ import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
+import { AppTabs } from "../app-tabs";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -102,6 +103,7 @@ export function CronjobHome({ slug, name, workload }: CronjobHomeProps) {
         </span>
       }
     >
+      <AppTabs slug={slug} active="overview" />
       <div className="space-y-6">
         <Card>
           <CardHeader>
