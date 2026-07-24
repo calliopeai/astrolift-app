@@ -5,6 +5,7 @@ import Link from "next/link";
 import * as React from "react";
 
 import { PageShell } from "@/components/PageShell";
+import { AppTabs } from "../app-tabs";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -53,6 +54,7 @@ export function BundleHome({ slug, name, status, workloads }: BundleHomeProps) {
         </span>
       }
     >
+      <AppTabs slug={slug} active="overview" />
       <div className="space-y-3">
         <div className="text-muted-foreground flex items-center gap-2 text-sm">
           <LayersIcon className="size-4" />

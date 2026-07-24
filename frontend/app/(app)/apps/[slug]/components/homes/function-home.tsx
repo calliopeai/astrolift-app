@@ -5,6 +5,7 @@ import * as React from "react";
 
 import { GoldenSignalsPanel } from "@/components/observability/GoldenSignalsPanel";
 import { PageShell } from "@/components/PageShell";
+import { AppTabs } from "../app-tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
@@ -47,6 +48,7 @@ export function FunctionHome({ slug, name, workload, host, environmentName }: Fu
         </span>
       }
     >
+      <AppTabs slug={slug} active="overview" />
       <div className="space-y-6">
         <Card>
           <CardHeader>

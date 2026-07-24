@@ -6,6 +6,7 @@ import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
+import { AppTabs } from "../app-tabs";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -90,6 +91,7 @@ export function TaskHome({ slug, name, workload }: TaskHomeProps) {
       }
       description={<span className="text-muted-foreground text-xs">Runs once, on demand.</span>}
     >
+      <AppTabs slug={slug} active="overview" />
       <div className="space-y-6">
         <Card>
           <CardHeader>
