@@ -18,7 +18,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from _sdk.cluster import ClusterAuth, ClusterContext
+import pytest
+
+from _sdk.cluster import ClusterAuth, ClusterContext, JobStatus
 from k8s_native.cluster import K8sNativeClusterDriver, K8sNativeConfig
 from k8s_native.management import (
     ASTROLIFT_NAMESPACE,
@@ -27,6 +29,7 @@ from k8s_native.management import (
     PLATFORM_SA,
     platform_rbac_manifests,
     probe_cluster_capabilities,
+    read_cluster_job_status,
     run_bring_into_management,
 )
 
@@ -52,8 +55,12 @@ class FakeManagementBackend:
     preflight_result: tuple[bool, str] = (True, "preflight Job completed")
     preflight_raises: bool = False
 
+    job_status: JobStatus = field(default_factory=JobStatus)
+    job_status_raises: bool = False
+
     applied: list[dict[str, Any]] = field(default_factory=list)
     preflight_invocations: list[dict[str, Any]] = field(default_factory=list)
+    job_status_invocations: list[dict[str, Any]] = field(default_factory=list)
 
     def apply_manifest(self, *, auth: ClusterAuth, manifest: dict[str, Any]) -> str:
         kind = manifest.get("kind", "")
@@ -98,6 +105,18 @@ class FakeManagementBackend:
             }
         )
         return self.preflight_result
+
+    def read_job_status(
+        self,
+        *,
+        auth: ClusterAuth,
+        namespace: str,
+        job_name: str,
+    ) -> JobStatus:
+        if self.job_status_raises:
+            raise RuntimeError("apiserver unreachable")
+        self.job_status_invocations.append({"namespace": namespace, "job_name": job_name})
+        return self.job_status
 
 
 def _ctx(slug: str = "test-cluster", *, ingress_class: str = "nginx") -> ClusterContext:
@@ -440,3 +459,48 @@ def test_driver_delegates_bring_into_management_to_management_backend():
     assert report.success is True
     assert report.rbac_applied is True
     assert len(backend.applied) == 4
+
+
+# ---- read_job_status (run reconciler) -----------------------------
+
+
+def test_read_cluster_job_status_projects_backend_result():
+    """The orchestrator hands the backend the context's auth + the
+    namespace/job and returns its JobStatus verbatim."""
+    backend = FakeManagementBackend(
+        job_status=JobStatus(succeeded=1, conditions=("done",)),
+    )
+    js = read_cluster_job_status(
+        backend=backend,
+        cluster=_ctx(),
+        namespace="acme-app",
+        job_name="nightly-manual-abc",
+    )
+    assert js.succeeded == 1
+    assert js.conditions == ("done",)
+    assert backend.job_status_invocations == [
+        {"namespace": "acme-app", "job_name": "nightly-manual-abc"},
+    ]
+
+
+def test_driver_delegates_read_job_status_to_management_backend():
+    backend = FakeManagementBackend(job_status=JobStatus(failed=1))
+    driver = K8sNativeClusterDriver(
+        config=K8sNativeConfig(),
+        management_backend=backend,
+    )
+    js = driver.read_job_status(_ctx(), namespace="ns", job_name="job-1")
+    assert js.failed == 1
+    assert backend.job_status_invocations == [{"namespace": "ns", "job_name": "job-1"}]
+
+
+def test_read_job_status_propagates_backend_error():
+    """A read failure (unreachable apiserver / 404) propagates so the
+    reconciler's per-run guard can treat it as 'can't determine'."""
+    backend = FakeManagementBackend(job_status_raises=True)
+    driver = K8sNativeClusterDriver(
+        config=K8sNativeConfig(),
+        management_backend=backend,
+    )
+    with pytest.raises(RuntimeError, match="apiserver unreachable"):
+        driver.read_job_status(_ctx(), namespace="ns", job_name="job-1")

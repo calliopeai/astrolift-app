@@ -29,6 +29,7 @@ from _sdk.cluster import (
     ClusterEvent,
     DeleteResult,
     ExecResult,
+    JobStatus,
     ManagementReport,
     Namespace,
     NamespaceState,
@@ -48,6 +49,7 @@ from k8s_native.management import (
     ManagementBackend,
     default_management_backend,
     probe_cluster_capabilities,
+    read_cluster_job_status,
     run_bring_into_management,
 )
 from k8s_native.observability import (
@@ -530,6 +532,16 @@ class K8sNativeClusterDriver(ClusterDriver):
             backend=self._management_backend,
             cluster=cluster,
             run_preflight=run_preflight,
+        )
+
+    @driver_op(cloud="k8s_native", driver="cluster")
+    def read_job_status(self, cluster: ClusterContext, *, namespace: str, job_name: str) -> JobStatus:
+        """Read one Job's status (run-status reconciler). Read-only."""
+        return read_cluster_job_status(
+            backend=self._management_backend,
+            cluster=cluster,
+            namespace=namespace,
+            job_name=job_name,
         )
 
     # ---- bootstrap recipe ------------------------------------------

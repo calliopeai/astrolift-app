@@ -30,7 +30,7 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol
 
-from _sdk.cluster import ClusterContext, ManagementReport
+from _sdk.cluster import ClusterContext, JobStatus, ManagementReport
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -156,6 +156,18 @@ class ManagementBackend(Protocol):
 
         The driver creates a uniquely-named Job per run so re-creating
         is straightforward — implementations don't have to dedupe."""
+
+    def read_job_status(
+        self,
+        *,
+        auth: ClusterAuth,
+        namespace: str,
+        job_name: str,
+    ) -> JobStatus:
+        """Read one Job's ``status`` sub-resource. Read-only — never
+        creates, patches, or deletes. Raises on auth / network errors and
+        lets a not-found (404) propagate; the reconciler catches both and
+        treats them as "can't determine, leave the row as-is"."""
 
 
 # ---- Manifest builders --------------------------------------------
@@ -596,6 +608,27 @@ def probe_cluster_capabilities(
     }
 
 
+def read_cluster_job_status(
+    *,
+    backend: ManagementBackend,
+    cluster: ClusterContext,
+    namespace: str,
+    job_name: str,
+) -> JobStatus:
+    """Read one batch/v1 Job's status through ``backend``.
+
+    Mirrors :func:`probe_cluster_capabilities` — the driver hands us a
+    (per-cloud auth-resolved) ``ClusterContext`` and the shared backend;
+    we project it onto ``ClusterAuth`` and issue the single read-only
+    ``read_namespaced_job_status`` call. No mutation of any kind.
+    """
+    return backend.read_job_status(
+        auth=cluster.to_auth(),
+        namespace=namespace,
+        job_name=job_name,
+    )
+
+
 # ---- Bring-into-management orchestration --------------------------
 
 
@@ -898,6 +931,40 @@ class LiveManagementBackend:
                 return False, last_message or "preflight Job failed"
             time.sleep(2)
         return False, last_message or f"preflight Job did not complete within {timeout_seconds}s"
+
+    def read_job_status(
+        self,
+        *,
+        auth: ClusterAuth,
+        namespace: str,
+        job_name: str,
+    ) -> JobStatus:
+        """Single read-only ``read_namespaced_job_status`` call — the same
+        BatchV1Api verb ``run_preflight_job`` polls with, projected onto the
+        SDK's :class:`JobStatus`. Never creates/patches/deletes."""
+        try:
+            from kubernetes import client as k8s_client
+        except ImportError as exc:  # pragma: no cover
+            raise RuntimeError("kubernetes python client is not installed") from exc
+        from k8s_native.observability import build_api_client
+
+        api_client = build_api_client(auth)
+        batch_v1 = k8s_client.BatchV1Api(api_client)
+        job = batch_v1.read_namespaced_job_status(name=job_name, namespace=namespace)
+
+        status = getattr(job, "status", None)
+        if status is None:
+            return JobStatus()
+        conds = getattr(status, "conditions", None) or []
+        messages = tuple(msg for c in conds if (msg := (getattr(c, "message", "") or "").strip()))
+        return JobStatus(
+            active=int(getattr(status, "active", 0) or 0),
+            succeeded=int(getattr(status, "succeeded", 0) or 0),
+            failed=int(getattr(status, "failed", 0) or 0),
+            start_time=getattr(status, "start_time", None),
+            completion_time=getattr(status, "completion_time", None),
+            conditions=messages,
+        )
 
 
 def default_management_backend() -> ManagementBackend:

@@ -112,6 +112,16 @@ class _OverrideManagementDriver:
 
         return probe_cluster_capabilities(backend=self._backend, cluster=cluster)
 
+    def read_job_status(self, cluster: Any, *, namespace: str, job_name: str) -> Any:
+        from k8s_native.management import read_cluster_job_status
+
+        return read_cluster_job_status(
+            backend=self._backend,
+            cluster=cluster,
+            namespace=namespace,
+            job_name=job_name,
+        )
+
 
 def _driver_for_cluster(cluster: TenantCluster) -> Any:
     """Resolve the ``ClusterDriver`` for ``cluster.provider_plugin``.
