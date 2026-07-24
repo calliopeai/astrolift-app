@@ -47,6 +47,9 @@ from astrolift_workflows.workflows.provision_managed_service import (
 from astrolift_workflows.workflows.provision_namespace import NamespaceProvisionWorkflow
 from astrolift_workflows.workflows.provision_registry import RegistryProvisionWorkflow
 from astrolift_workflows.workflows.rollback_deployment import RollbackDeploymentWorkflow
+from astrolift_workflows.workflows.run_status_reconcile_tick import (
+    RunStatusReconcileTickWorkflow,
+)
 from astrolift_workflows.workflows.scheduled import (
     CapturePlatformCostSnapshotWorkflow,
     DriftDetectionWorkflow,
@@ -109,6 +112,7 @@ __all__ = [
     "RehealWebhookSubscriptionsWorkflow",
     "RollbackDeploymentWorkflow",
     "RotateSecretBundleWorkflow",
+    "RunStatusReconcileTickWorkflow",
     "SecretBundleScheduledRefreshWorkflow",
     "SyncDevEnvironmentFilesWorkflow",
     "TearDownAppWorkflow",

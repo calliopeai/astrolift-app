@@ -77,6 +77,12 @@ PHASE_3A_ACTIVE_KINDS: frozenset[ScheduleKind] = frozenset(
         # live bound driver can fire (a genuinely-wanted alert), and fan-out
         # no-ops without a NotificationProfile.
         ScheduleKind.ALERT_EVAL,
+        # Run-status reconcile ships active — it's the only thing that
+        # advances a finished Job's ScheduledJobRun/TaskRun row past
+        # RUNNING/PENDING, of no value held. Safe: read-only cluster reads
+        # with per-run try/except; an unreachable cluster or torn-down Job
+        # leaves the row as-is, and terminal rows are never re-touched.
+        ScheduleKind.RUN_STATUS_RECONCILE,
     }
 )
 

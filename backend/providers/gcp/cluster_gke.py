@@ -23,6 +23,7 @@ from _sdk.cluster import (
     ClusterContext,
     ClusterDriver,
     DeleteResult,
+    JobStatus,
     ManagementReport,
     Namespace,
     NamespaceState,
@@ -45,6 +46,7 @@ from k8s_native.management import (
     ManagementBackend,
     default_management_backend,
     probe_cluster_capabilities,
+    read_cluster_job_status,
     run_bring_into_management,
 )
 from k8s_native.observability import (
@@ -519,6 +521,17 @@ class GKEClusterDriver(ClusterDriver):
             backend=self._management_backend,
             cluster=self._materialize_gke_auth_context(cluster),
             run_preflight=run_preflight,
+        )
+
+    @driver_op(cloud="gcp", driver="cluster")
+    def read_job_status(self, cluster: ClusterContext, *, namespace: str, job_name: str) -> JobStatus:
+        """Read one Job's status (run-status reconciler). Read-only —
+        materializes the GKE exec-plugin auth to a kubeconfig context first."""
+        return read_cluster_job_status(
+            backend=self._management_backend,
+            cluster=self._materialize_gke_auth_context(cluster),
+            namespace=namespace,
+            job_name=job_name,
         )
 
     # ---- cluster teardown (#337) ---------------------------------

@@ -129,6 +129,7 @@ from astrolift_workflows.activities.provision_managed_domain import (
     reissue_cert,
     request_wildcard_cert_for_zone,
 )
+from astrolift_workflows.activities.run_status_reconcile import reconcile_runs_tick
 from astrolift_workflows.activities.scheduled import (
     capture_platform_cost_snapshot,
     detect_drift,
@@ -172,6 +173,7 @@ from astrolift_workflows.activities.workload_identity import (
 
 __all__ = [
     "evaluate_alerts_tick",
+    "reconcile_runs_tick",
     "probe_uptime_tick",
     "abort_in_flight_deploys",
     "aggregate_fan_out",

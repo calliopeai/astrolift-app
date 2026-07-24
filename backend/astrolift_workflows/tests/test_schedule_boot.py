@@ -176,6 +176,10 @@ def test_default_allowlist_is_phase_3a_yes_set():
         # active as the sibling detector to uptime (safe-by-default —
         # default rules are PromQL/no-fire; fan-out no-ops unconfigured).
         ScheduleKind.ALERT_EVAL,
+        # Run-status reconciler ships active — it's the only thing that
+        # advances a finished Job's run row past RUNNING/PENDING (read-only
+        # cluster reads, per-run try/except, terminal rows never re-touched).
+        ScheduleKind.RUN_STATUS_RECONCILE,
     }
     assert PHASE_3A_ACTIVE_KINDS == expected
     assert resolve_active_kinds(None) == frozenset(expected)

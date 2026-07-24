@@ -432,6 +432,30 @@ class ManagementReport:
 
 
 @dataclass(frozen=True)
+class JobStatus:
+    """Read-only snapshot of a batch/v1 Job's ``status`` sub-resource.
+
+    Projected from ``read_namespaced_job_status`` so a caller can decide
+    whether a Job is still running, succeeded, or failed without importing
+    the kubernetes client model types. All counts default to ``0`` and the
+    timestamps to ``None`` so a Job whose pod hasn't scheduled yet (empty
+    ``status``) reads as "nothing determined yet" rather than raising.
+
+    ``conditions`` carries the human-readable messages off the Job's
+    ``status.conditions`` (e.g. ``"Job has reached the specified backoff
+    limit"``) — the best diagnostic available from a pure status read,
+    since the container exit code lives on the pod, not the Job.
+    """
+
+    active: int = 0
+    succeeded: int = 0
+    failed: int = 0
+    start_time: datetime | None = None
+    completion_time: datetime | None = None
+    conditions: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class PodLogLine:
     """One log line streamed from a pod/container.
 
@@ -930,6 +954,24 @@ class ClusterDriver(Protocol):
         fresh probe + RBAC reconcile without paying the Job's
         60-second wall clock. The workflow flips this back to
         ``True`` when the resolver passes ``forcePreflight=true``.
+        """
+        ...
+
+    def read_job_status(
+        self,
+        cluster: ClusterContext,
+        *,
+        namespace: str,
+        job_name: str,
+    ) -> JobStatus:
+        """Read one batch/v1 Job's status. Read-only — never mutates the
+        cluster.
+
+        Used by the run-status reconciler to advance a non-terminal
+        ScheduledJobRun / TaskRun to its terminal outcome. Raises on auth /
+        reachability failure, and lets a not-found (404) propagate — the
+        reconciler treats any read failure as "can't determine, leave the
+        row as-is" so a torn-down or GC'd Job never crashes the sweep.
         """
         ...
 

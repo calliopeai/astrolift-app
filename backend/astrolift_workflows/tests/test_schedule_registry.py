@@ -101,9 +101,10 @@ def test_default_schedules_complete():
     spec 33 PR-5 added the scheduled-scaling tick; spec 33 PR-6 added the
     Loop-dispatch tick; #808 added the keep-alive agent reconcile tick;
     the uptime-monitoring increment added the synthetic uptime probe; the
-    alerting-pipeline wire-up added the alert-rule evaluation tick.
+    alerting-pipeline wire-up added the alert-rule evaluation tick; the
+    run-status reconciler added the ScheduledJobRun/TaskRun status sweep.
     Lock the count so future additions stay visible in a diff."""
-    assert len(DEFAULT_SCHEDULES) == 17
+    assert len(DEFAULT_SCHEDULES) == 18
 
 
 def test_default_schedules_include_all_kinds():

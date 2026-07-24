@@ -165,6 +165,19 @@ class ScheduleKind(StrEnum):
     each minute is needless load; 5 min is well inside the self-heal
     window for an image/manifest drift."""
 
+    RUN_STATUS_RECONCILE = "run_status_reconcile"
+    """Every 60 s — reconcile non-terminal ScheduledJobRun + TaskRun rows
+    against their k8s Job status, writing back status / started / ended /
+    duration / exit_code (+ log_excerpt for ScheduledJobRun). Closes the
+    gap where a Job that finished in the cluster left its platform run row
+    stuck RUNNING/PENDING forever. Safe-by-default: per-run try/except, an
+    unreachable cluster or a torn-down/GC'd Job resolves to "leave as-is",
+    and terminal rows are never touched again. Kept distinct from
+    POLL_SCHEDULED_JOB_RUNS (which *discovers* Jobs created by tenant
+    CronJobs): this tick *reconciles the status* of runs the platform
+    already recorded, and reaches the cluster read-only to do it (sibling
+    to UPTIME_PROBE among the cluster-touching sweeps)."""
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ScheduleDefinition:
@@ -362,6 +375,15 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.ALERT_EVAL,
         ),
         description="Evaluate active AlertRules; fire/resolve AlertEvents",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.RUN_STATUS_RECONCILE,
+        workflow_name="RunStatusReconcileTickWorkflow",
+        interval_seconds=60,
+        schedule_id=schedule_id_for(
+            kind=ScheduleKind.RUN_STATUS_RECONCILE,
+        ),
+        description="Reconcile ScheduledJobRun/TaskRun status from k8s Job status",
     ),
 )
 
