@@ -768,25 +768,66 @@ def _scan_repo_for_agents(
     # avoids duplicating the preference-ranking logic.
     probe = RegisteredApp(organization_id=organization_id, source_kind=source_kind)
     connection = _pick_source_connection(probe)
-    if connection is None:
-        return (
-            None,
-            {},
-            (
+
+    files: dict[str, str] = {}
+    conn_error: str | None = None
+    if connection is not None:
+        try:
+            files = tree_fn(connection, source_repo, ref)
+        except ProviderError as exc:
+            conn_error = f"{exc.code}: {exc.message}"
+        except Exception as exc:  # noqa: BLE001 — surface anything as fetch_failed
+            log.exception("agent-repo scan fetch crashed (repo=%s)", source_repo)
+            conn_error = str(exc) or exc.__class__.__name__
+
+    discovered = scan_agent_manifests(files) if files else []
+
+    # Fallback: when the per-org SourceConnection path yields no agent
+    # manifests — no connection, a fetch error, or an empty/inaccessible tree
+    # (e.g. a stale or under-scoped GitHub App install) — retry with the
+    # install-wide GITHUB_PAT, the same credential dispatch-time brief
+    # assembly uses. Only in the real fetch path (a test-injected ``tree``
+    # opts out) and only for GitHub, so registration and dispatch read the
+    # repo through the same working credential.
+    if not discovered and tree is None and source_kind == "github":
+        pat_files, pat_error = _pat_fallback_tree(source_repo, ref)
+        if pat_files:
+            pat_discovered = scan_agent_manifests(pat_files)
+            if pat_discovered:
+                return pat_discovered, pat_files, None
+        conn_error = conn_error or pat_error
+
+    if not discovered:
+        if connection is None and conn_error is None:
+            conn_error = (
                 "no active source connection found for this organization — "
                 "reconnect the source host under Settings -> Source connections"
-            ),
-        )
+            )
+        # A connection that fetched a tree with no agent manifests is not an
+        # error — fall through and return the empty discovery so the caller
+        # maps it to ``no_agents`` (unchanged). Only surface an error when the
+        # fetch failed or there was nothing to fetch.
+        if conn_error is not None:
+            return None, {}, conn_error
+
+    return discovered, files, None
+
+
+def _pat_fallback_tree(source_repo: str, ref: str) -> tuple[dict[str, str], str | None]:
+    """Best-effort ``settings.GITHUB_PAT`` repo-tree fetch for the register
+    scan fallback. Returns ``(files, error)``: ``files`` is the
+    ``{path: contents}`` tree (``{}`` when no PAT is configured or the fetch
+    failed), ``error`` a message on failure (``None`` otherwise). Never
+    raises — a fallback miss must not mask the primary connection outcome.
+    """
+    from astrolift_scm.providers.repo_tree import fetch_repo_tree_with_pat
 
     try:
-        files = tree_fn(connection, source_repo, ref)
-    except ProviderError as exc:
-        return None, {}, f"{exc.code}: {exc.message}"
-    except Exception as exc:  # noqa: BLE001 — surface anything as fetch_failed
-        log.exception("agent-repo scan fetch crashed (repo=%s)", source_repo)
-        return None, {}, str(exc) or exc.__class__.__name__
-
-    return scan_agent_manifests(files), files, None
+        files = fetch_repo_tree_with_pat(repo_full_name=source_repo, ref=ref)
+    except Exception as exc:  # noqa: BLE001 — fallback miss, not fatal
+        log.warning("agent-repo PAT fallback fetch failed (repo=%s): %s", source_repo, exc)
+        return {}, str(exc) or exc.__class__.__name__
+    return (files or {}), None
 
 
 def discover_agent_manifests(

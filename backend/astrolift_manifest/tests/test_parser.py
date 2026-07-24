@@ -1023,3 +1023,33 @@ def test_parse_skill_org_repo_deep_subpath():
     assert s.skill_subpath == "team/skills/pr-review"
     assert s.name == "pr-review"
     assert s.ref == "main"
+
+
+def test_parse_inline_brief_skills_table_is_ignored_not_rejected():
+    """An agent brief uses ``[skills.<slug>]`` inline tables (system_prompt +
+    tools), consumed by the brief assembler at dispatch — not the spec-38
+    top-level skill *reference* list. The workload/manifest parser must accept
+    such a manifest (skills empty) rather than raising 'skills must be a list',
+    so the agent still registers. Regression for agent-brief registration."""
+    toml = """
+name = "emr-bug-triage"
+
+[[workloads]]
+name = "emr-bug-triage"
+kind = "agent"
+
+  [[workloads.containers]]
+  name = "emr-bug-triage"
+  is_primary = true
+  image_ref = "ecr.example/agent:latest"
+
+[skills.emr-bug-triage]
+system_prompt = "You triage bugs."
+tools = ["jira-create"]
+"""
+    raw = parse_raw(toml)
+    assert raw.name == "emr-bug-triage"
+    assert len(raw.workloads) == 1
+    assert raw.workloads[0].kind == "agent"
+    # Inline brief tables are the brief assembler's concern — not manifest refs.
+    assert raw.skills == ()

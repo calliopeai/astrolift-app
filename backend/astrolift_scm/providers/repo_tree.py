@@ -146,3 +146,39 @@ def fetch_public_repo_tree(*, repo_full_name: str, ref: str) -> dict[str, str]:
     )
     resp.raise_for_status()
     return repo_tree_from_zipball_bytes(resp.content)
+
+
+def fetch_repo_tree_with_pat(*, repo_full_name: str, ref: str) -> dict[str, str] | None:
+    """Fetch a PRIVATE GitHub repo's file tree map using ``settings.GITHUB_PAT``.
+
+    The install-wide PAT is the same credential dispatch-time brief assembly
+    (:func:`astrolift_agents.services.brief_assembler._fetch_zipball`) uses, so
+    this is the fallback that keeps agent-repo *registration* consistent with
+    *dispatch*: a stale, under-scoped, or missing per-org ``SourceConnection``
+    can't strand a repo the PAT can otherwise read. Streams the authenticated
+    GitHub API zipball and reuses :func:`repo_tree_from_zipball_bytes`.
+
+    Returns ``None`` when no PAT is configured (nothing to fall back to).
+    Raises ``requests.HTTPError`` / ``requests.RequestException`` on a bad
+    response so the caller can treat it as a non-fatal fallback miss.
+    """
+    from django.conf import settings
+
+    pat = getattr(settings, "GITHUB_PAT", "") or ""
+    if not pat:
+        return None
+
+    owner_repo = repo_full_name.strip("/")
+    zipball_url = f"https://api.github.com/repos/{owner_repo}/zipball/{ref}"
+    resp = requests.get(
+        zipball_url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {pat}",
+            "User-Agent": "astrolift",
+        },
+        timeout=_GITHUB_ARCHIVE_TIMEOUT_SECONDS,
+        allow_redirects=True,
+    )
+    resp.raise_for_status()
+    return repo_tree_from_zipball_bytes(resp.content)

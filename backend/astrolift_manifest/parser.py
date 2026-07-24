@@ -196,6 +196,16 @@ def _parse_skills(raw_list: Any, path: str) -> tuple[SkillRef, ...]:
     Validated: a stray/empty ``@`` pin, an empty alias or skill path on an
     org-repo ref, an empty local path, and duplicate skill names.
     """
+    # Inline agent-brief skills — the ``[skills.<slug>]`` table form (each value
+    # a ``{system_prompt, tools}`` body) used by agent briefs. These are the
+    # brief's OWN skill definitions, assembled at dispatch by the brief
+    # assembler; they are NOT top-level manifest skill *references* (the spec-38
+    # list form below). The workload manifest carries no skill refs in that
+    # case, so treat it as empty and let the brief assembler own the tables —
+    # otherwise a valid agent brief fails to parse and never registers.
+    if isinstance(raw_list, dict):
+        return ()
+
     if not isinstance(raw_list, list):
         raise ManifestError("skills must be a list", path=path)
 
