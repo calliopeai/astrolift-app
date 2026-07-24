@@ -1,10 +1,9 @@
 "use client";
 
-import { ActivityIcon, BoltIcon, GlobeIcon, ZapIcon } from "lucide-react";
-import Link from "next/link";
+import { BoltIcon, GlobeIcon, ZapIcon } from "lucide-react";
 import * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
+import { GoldenSignalsPanel } from "@/components/observability/GoldenSignalsPanel";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +15,8 @@ interface FunctionHomeProps {
   workload: AstroliftWorkload;
   /** Public host when the function is HTTP-triggered; empty otherwise. */
   host: string | null;
+  /** Active environment for the golden-signals query. */
+  environmentName?: string | null;
 }
 
 /**
@@ -23,7 +24,7 @@ interface FunctionHomeProps {
  * (HTTP endpoint or event) up top, then invocation history. Scale-to-zero, no
  * long-running deploy chrome.
  */
-export function FunctionHome({ slug, name, workload, host }: FunctionHomeProps) {
+export function FunctionHome({ slug, name, workload, host, environmentName }: FunctionHomeProps) {
   const url = workload.isPublic && host ? `https://${host}` : null;
 
   return (
@@ -79,29 +80,14 @@ export function FunctionHome({ slug, name, workload, host }: FunctionHomeProps) 
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <ActivityIcon className="size-4" />
-              Invocations
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <EmptyState
-              icon={<BoltIcon className="size-5" />}
-              title="No invocations recorded yet"
-              description="Per-invocation count, latency, and errors appear here once the function metrics feed is wired. Open the workload for config + logs in the meantime."
-              secondary={
-                <Link
-                  href={`/apps/${slug}/workloads/${encodeURIComponent(workload.slug)}`}
-                  className="text-sm text-[var(--brand-primary)] hover:underline"
-                >
-                  Open workload
-                </Link>
-              }
-            />
-          </CardContent>
-        </Card>
+        {/* Invocations / latency / errors — the golden signals scoped to this
+            function's workload (traffic == invocation rate). Live from
+            Prometheus; each panel renders its own empty/NOT_CONFIGURED state. */}
+        <GoldenSignalsPanel
+          appSlug={slug}
+          workloadSlug={workload.slug}
+          environmentName={environmentName ?? null}
+        />
       </div>
     </PageShell>
   );

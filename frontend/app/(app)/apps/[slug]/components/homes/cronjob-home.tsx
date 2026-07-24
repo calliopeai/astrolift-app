@@ -1,16 +1,29 @@
 "use client";
 
+import { useQuery } from "@apollo/client/react";
 import cronstrue from "cronstrue";
-import { HistoryIcon, RepeatIcon, ScrollTextIcon, TimerIcon } from "lucide-react";
-import Link from "next/link";
+import { HistoryIcon, Loader2Icon, RepeatIcon, TimerIcon } from "lucide-react";
 import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
+import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { LIST_SCHEDULED_JOB_RUNS } from "@/graphql/lifecycle/lifecycle.queries";
+import type { AstroliftScheduledJobRun } from "@/graphql/lifecycle/lifecycle.types";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
 import { nextCronRun } from "@/lib/cron";
+import { formatRelativeAge } from "@/lib/format";
+import { formatDuration, runStatusDot, titleCaseStatus } from "./run-status";
 
 interface CronjobHomeProps {
   slug: string;
@@ -57,6 +70,16 @@ export function CronjobHome({ slug, name, workload }: CronjobHomeProps) {
   const next = React.useMemo(
     () => (schedule && now != null ? nextCronRun(schedule, new Date(now)) : null),
     [schedule, now]
+  );
+
+  // Real run history from ScheduledJobRun (DB-backed). Poll so a fresh run
+  // surfaces without a reload; scope to this workload.
+  const { data, loading } = useQuery<{ astroliftScheduledJobRuns: AstroliftScheduledJobRun[] }>(
+    LIST_SCHEDULED_JOB_RUNS,
+    { variables: { appSlug: slug, limit: 30 }, fetchPolicy: "cache-and-network", pollInterval: 15000 }
+  );
+  const runs = (data?.astroliftScheduledJobRuns ?? []).filter(
+    (r) => r.workloadSlug === workload.slug
   );
 
   return (
@@ -125,22 +148,64 @@ export function CronjobHome({ slug, name, workload }: CronjobHomeProps) {
             <CardTitle className="flex items-center gap-2 text-base">
               <HistoryIcon className="size-4" />
               Run history
+              {runs.length > 0 && (
+                <span className="text-muted-foreground text-xs font-normal">
+                  last {runs.length}
+                </span>
+              )}
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <EmptyState
-              icon={<ScrollTextIcon className="size-5" />}
-              title="No runs recorded yet"
-              description="Each scheduled execution will appear here. In the meantime, open the workload for its manifest, config, and pod logs."
-              secondary={
-                <Link
-                  href={`/apps/${slug}/workloads/${encodeURIComponent(workload.slug)}`}
-                  className="text-sm text-[var(--brand-primary)] hover:underline"
-                >
-                  Open workload
-                </Link>
-              }
-            />
+          <CardContent className={runs.length > 0 ? "p-0" : undefined}>
+            {loading && runs.length === 0 ? (
+              <div className="text-muted-foreground flex items-center gap-2 p-2 text-sm">
+                <Loader2Icon className="size-4 animate-spin" /> Loading runs…
+              </div>
+            ) : runs.length === 0 ? (
+              <EmptyState
+                icon={<HistoryIcon className="size-5" />}
+                title="No runs recorded yet"
+                description="Each scheduled execution will appear here once it fires."
+              />
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Started</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead className="text-right">Exit</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {runs.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell>
+                        <Badge
+                          variant={runStatusDot(r.status) === "error" ? "destructive" : "secondary"}
+                          className="gap-1.5"
+                        >
+                          <StatusDot status={runStatusDot(r.status)} />
+                          {titleCaseStatus(r.status)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {r.startedAt ? (
+                          <span title={r.startedAt}>{formatRelativeAge(r.startedAt)}</span>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm tabular-nums">
+                        {formatDuration(r.durationSeconds)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs">
+                        {r.exitCode == null ? "—" : r.exitCode}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </div>
