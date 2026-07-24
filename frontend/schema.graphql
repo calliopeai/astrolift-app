@@ -829,7 +829,8 @@ type AstroliftAppSummary {
   slug: String!
   name: String!
   status: String!
-  isAgent: Boolean!
+  primitiveKind: String!
+  primitiveSlug: String!
 }
 
 type AstroliftAppTeamAccess {

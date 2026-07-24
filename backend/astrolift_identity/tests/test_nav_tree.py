@@ -50,32 +50,49 @@ def test_nav_tree_returns_org_team_project_app():
     assert tree.teams[0].projects[0].apps[0].status == "ready"
 
 
-def test_nav_tree_flags_agent_backed_apps():
-    """An app with a kind=agent workload is flagged is_agent so the sidebar
-    renders it with a bot icon; a plain app stays is_agent=False."""
+def test_nav_tree_classifies_primitives():
+    """Each app is classified into a nav primitive from its workloads:
+    agent wins → single-kind → bundle. Agents link by their workload slug."""
     from astrolift_registry.models import Workload
 
-    org, team, project, app = _scaffold()  # "hello" — a plain app
+    org, team, project, app = _scaffold()  # "hello" — 0 workloads → app
+
     agent_app = RegisteredApp.objects.create(
-        organization=org,
-        team=team,
-        project=project,
-        name="EMR Bug Triage",
-        slug="emr-bug-triage",
-        provisioning_status="ready",
+        organization=org, team=team, project=project,
+        name="EMR Bug Triage", slug="agent-emr", provisioning_status="ready",
     )
     Workload.objects.create(
-        registered_app=agent_app,
-        name="agent",
-        slug="agent",
+        registered_app=agent_app, name="emr-bug-triage", slug="emr-bug-triage",
         kind=Workload.Kind.AGENT,
+    )
+
+    wf_app = RegisteredApp.objects.create(
+        organization=org, team=team, project=project,
+        name="Pipeline", slug="pipeline", provisioning_status="ready",
+    )
+    Workload.objects.create(
+        registered_app=wf_app, name="wf", slug="wf", kind=Workload.Kind.WORKFLOW,
+    )
+
+    bundle_app = RegisteredApp.objects.create(
+        organization=org, team=team, project=project,
+        name="Bundle", slug="bundle", provisioning_status="ready",
+    )
+    Workload.objects.create(
+        registered_app=bundle_app, name="web", slug="web", kind=Workload.Kind.DEPLOYMENT,
+    )
+    Workload.objects.create(
+        registered_app=bundle_app, name="cron", slug="cron", kind=Workload.Kind.CRONJOB,
     )
 
     with tenant_context(TenantContext(organization_id=org.id)):
         tree = IdentityQuery().astrolift_nav_tree(_info())
 
-    apps = {a.slug: a.is_agent for a in tree.teams[0].projects[0].apps}
-    assert apps == {"hello": False, "emr-bug-triage": True}
+    by_slug = {a.slug: (a.primitive_kind, a.primitive_slug) for a in tree.teams[0].projects[0].apps}
+    assert by_slug["hello"] == ("app", "hello")
+    assert by_slug["agent-emr"] == ("agent", "emr-bug-triage")  # links by workload slug
+    assert by_slug["pipeline"] == ("workflow", "pipeline")
+    assert by_slug["bundle"] == ("bundle", "bundle")
 
 
 def test_nav_tree_returns_none_when_org_missing():

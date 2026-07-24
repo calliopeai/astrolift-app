@@ -512,9 +512,15 @@ class AppSummaryType:
     slug: str
     name: str
     status: str
-    # True when the app is agent-backed (has a ``kind=agent`` workload). The
-    # sidebar renders agents with a bot icon rather than the app rocket.
-    is_agent: bool = False
+    # Which nav primitive this registration is, from its workloads (spec: agent
+    # wins → single-kind → bundle). One of: "app" | "agent" | "workflow" |
+    # "function" | "bundle". The sidebar picks the icon + route prefix from it
+    # (agent→/agents 🤖, workflow→/workflows, bundle→/apps 📦, app→/apps 🚀).
+    primitive_kind: str = "app"
+    # The slug the sidebar links with, under the primitive's route prefix. For
+    # agents this is the agent workload's slug (agent detail keys on it); for
+    # everything else the app slug.
+    primitive_slug: str = ""
 
 
 @strawberry.type(name="AstroliftNavTreeProject")
@@ -537,13 +543,16 @@ class NavTreeType:
     unassigned_apps: list[AppSummaryType]
 
 
-def app_to_summary(app, *, is_agent: bool = False) -> AppSummaryType:
+def app_to_summary(
+    app, *, primitive_kind: str = "app", primitive_slug: str | None = None
+) -> AppSummaryType:
     return AppSummaryType(
         id=GUID(str(app.guid)),
         slug=app.slug,
         name=app.name,
         status=app.provisioning_status,
-        is_agent=is_agent,
+        primitive_kind=primitive_kind,
+        primitive_slug=primitive_slug or app.slug,
     )
 
 
