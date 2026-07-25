@@ -54,6 +54,7 @@ import type { AstroliftContainer, AstroliftWorkload } from "@/graphql/registry/r
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 import { cn } from "@/lib/utils";
 
+import { appPath, useAppChrome } from "../../components/app-chrome-context";
 import { ManifestCard } from "./manifest-card";
 import { ResourceUsageGauges } from "./resource-usage-gauges";
 import { ScalingCard } from "./scaling-card";
@@ -160,6 +161,7 @@ export function WorkloadDetailClient({
   appSlug: string;
   workloadSlug: string;
 }) {
+  const chrome = useAppChrome();
   const t = useTranslations("apps.workloadDetail");
   const { can } = useMyPermissions();
   const canDeploy = can("app.deploy");
@@ -228,7 +230,7 @@ export function WorkloadDetailClient({
         <Card>
           <CardContent className="text-muted-foreground p-6 text-sm">
             Return to the{" "}
-            <a href={`/apps/${appSlug}`} className="underline">
+            <a href={appPath(chrome, appSlug)} className="underline">
               app overview
             </a>
             .
@@ -258,7 +260,7 @@ export function WorkloadDetailClient({
       description={`${w.kind} workload from the manifest. ${w.replicas} replica${w.replicas === 1 ? "" : "s"}.`}
       actions={
         <Button variant="outline" asChild>
-          <a href={`/apps/${appSlug}/manifest`}>
+          <a href={appPath(chrome, appSlug, "manifest")}>
             <GitBranchIcon className="size-4" />
             Manifest preview
           </a>
@@ -632,6 +634,7 @@ function PodStatusGridRow({
   bucketEmptyLabel: string;
   notReadyLabel: string;
 }) {
+  const chrome = useAppChrome();
   const [open, setOpen] = React.useState(false);
   return (
     <>
@@ -664,7 +667,7 @@ function PodStatusGridRow({
                 {bucket.pods.map((p) => (
                   <li key={p.name} className="flex items-center justify-between gap-3 text-xs">
                     <Link
-                      href={`/apps/${appSlug}/observability?pod=${encodeURIComponent(p.name)}`}
+                      href={`${appPath(chrome, appSlug, "observability")}?pod=${encodeURIComponent(p.name)}`}
                       className="font-mono hover:underline"
                     >
                       {p.name}
@@ -716,6 +719,7 @@ function PodHealthTableCard({
   loading: boolean;
   labels: PodHealthLabels;
 }) {
+  const chrome = useAppChrome();
   return (
     <Card>
       <CardHeader>
@@ -757,7 +761,7 @@ function PodHealthTableCard({
                     <TableRow key={p.name}>
                       <TableCell>
                         <Link
-                          href={`/apps/${appSlug}/observability?pod=${encodeURIComponent(p.name)}`}
+                          href={`${appPath(chrome, appSlug, "observability")}?pod=${encodeURIComponent(p.name)}`}
                           className="font-mono text-xs hover:underline"
                         >
                           {p.name}

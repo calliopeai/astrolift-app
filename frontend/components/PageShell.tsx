@@ -3,6 +3,7 @@
 import { ChevronDownIcon } from "lucide-react";
 import * as React from "react";
 
+import { useAppChrome } from "@/app/(app)/apps/[slug]/components/app-chrome-context";
 import {
   Collapsible,
   CollapsibleContent,
@@ -64,6 +65,15 @@ export function PageShell({
   headerStorageKey,
   defaultHeaderOpen = true,
 }: PageShellProps) {
+  const { agentShell } = useAppChrome();
+  // Inside the agent shell (AgentDetailShell) the page header + BROCS pillar
+  // tabs + platform-links row already frame the surface. Render this client's
+  // body content-only — drop its own header and outer padding (the shell owns
+  // the padding) — so there's a single page chrome, not stacked headers. Keep
+  // the content column's `gap-6` rhythm.
+  if (agentShell) {
+    return <div className="flex flex-1 flex-col gap-6">{children}</div>;
+  }
   if (!collapsibleHeader) {
     return (
       <div className="flex flex-1 flex-col gap-6 p-6">

@@ -25,6 +25,8 @@ import type { AstroliftDeployment, DeploymentStatus } from "@/graphql/lifecycle/
 import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";
 
+import { appPath, useAppChrome } from "./app-chrome-context";
+
 interface DeploymentsResp {
   astroliftDeployments: AstroliftDeployment[];
 }
@@ -51,6 +53,7 @@ const STATUS_TONE: Record<DeploymentStatus, string> = {
 };
 
 export function LatestDeploymentRow({ appSlug }: Props) {
+  const chrome = useAppChrome();
   const t = useTranslations("apps.detail.latestDeploy");
   const fmt = useFormatters();
   // limit=1: we only need the freshest row. The full count powers the
@@ -83,7 +86,7 @@ export function LatestDeploymentRow({ appSlug }: Props) {
 
   return (
     <Link
-      href={`/apps/${appSlug}/deployments?deployment=${latest.id}`}
+      href={`${appPath(chrome, appSlug, "deployments")}?deployment=${latest.id}`}
       className={cn(
         "group hover:border-primary/40 hover:bg-accent/30",
         "focus-visible:ring-ring/50 rounded-md border transition-colors outline-none focus-visible:ring-3"

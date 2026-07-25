@@ -93,6 +93,7 @@ import { GET_APP_LOGS } from "@/graphql/observability/observability.queries";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 
+import { appPath, useAppChrome } from "../components/app-chrome-context";
 import { AppTabs } from "../components/app-tabs";
 
 interface AppResp {
@@ -379,6 +380,7 @@ function formatRemaining(iso: string): string {
 }
 
 export function ObservabilityClient({ slug }: { slug: string }) {
+  const chrome = useAppChrome();
   const tCommon = useTranslations("apps.common");
   const t = useTranslations("apps.observability");
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
@@ -712,7 +714,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
                 icon={<BoxIcon className="size-5" />}
                 title={t("pods.emptyTitle")}
                 description={t("pods.emptyDescription")}
-                actionHref={`/apps/${a.slug}/deployments`}
+                actionHref={appPath(chrome, a.slug, "deployments")}
                 actionLabel={t("pods.emptyAction")}
               />
             </div>

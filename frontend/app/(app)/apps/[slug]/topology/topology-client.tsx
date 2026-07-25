@@ -17,6 +17,7 @@ import type {
 } from "@/graphql/registry/registry.types";
 import { LIST_MANAGED_SERVICES } from "@/graphql/services/services.queries";
 
+import { appPath, useAppChrome } from "../components/app-chrome-context";
 import { AppTabs } from "../components/app-tabs";
 
 interface AppResp {
@@ -45,6 +46,7 @@ interface ManagedServicesResp {
  * here for the full view.
  */
 export function TopologyClient({ slug }: { slug: string }) {
+  const chrome = useAppChrome();
   const tCommon = useTranslations("apps.common");
   const t = useTranslations("apps.topology");
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
@@ -113,7 +115,7 @@ export function TopologyClient({ slug }: { slug: string }) {
                 icon={<BoxIcon className="size-5" />}
                 title={t("emptyTitle")}
                 description={t("emptyDescription")}
-                actionHref={`/apps/${a.slug}/workloads`}
+                actionHref={appPath(chrome, a.slug, "workloads")}
                 actionLabel={t("emptyAction")}
               />
             </div>

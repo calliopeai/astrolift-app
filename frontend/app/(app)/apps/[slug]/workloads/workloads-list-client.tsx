@@ -55,6 +55,7 @@ import type {
   WorkloadKind,
 } from "@/graphql/registry/registry.types";
 
+import { appPath, useAppChrome } from "../components/app-chrome-context";
 import { AppTabs } from "../components/app-tabs";
 
 interface AppResp {
@@ -171,6 +172,7 @@ const KIND_LABEL: Record<WorkloadKind, string> = {
 };
 
 export function WorkloadsListClient({ slug }: { slug: string }) {
+  const chrome = useAppChrome();
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
   const workloads = useQuery<WorkloadsResp>(LIST_WORKLOADS, {
     variables: { appSlug: slug },
@@ -296,7 +298,7 @@ export function WorkloadsListClient({ slug }: { slug: string }) {
                 icon={<BoxIcon className="size-5" />}
                 title="No workloads declared"
                 description="Workloads are parsed from this app's manifest. Add a workload section to astrolift.yaml and push to repopulate this view."
-                actionHref={`/apps/${a.slug}/manifest`}
+                actionHref={appPath(chrome, a.slug, "manifest")}
                 actionLabel="Open manifest"
               />
             </div>
@@ -356,12 +358,12 @@ export function WorkloadsListClient({ slug }: { slug: string }) {
                       key={w.id}
                       className="hover:bg-accent/30 cursor-pointer"
                       onClick={() =>
-                        (window.location.href = `/apps/${a.slug}/workloads/${w.slug}`)
+                        (window.location.href = appPath(chrome, a.slug, "workloads", w.slug))
                       }
                     >
                       <TableCell>
                         <Link
-                          href={`/apps/${a.slug}/workloads/${w.slug}`}
+                          href={appPath(chrome, a.slug, "workloads", w.slug)}
                           className="flex items-center gap-2 hover:underline"
                           onClick={(e) => e.stopPropagation()}
                         >

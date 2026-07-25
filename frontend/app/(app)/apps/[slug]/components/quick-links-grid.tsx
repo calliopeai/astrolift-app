@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils";
 import { LIST_DEPLOYMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
 
+import { appPath, useAppChrome } from "./app-chrome-context";
+
 interface Props {
   appSlug: string;
 }
@@ -71,6 +73,7 @@ function QuickLinkCard({ href, icon: Icon, title, description, chip }: QuickLink
  * `LIST_DEPLOYMENTS` query.
  */
 export function QuickLinksGrid({ appSlug }: Props) {
+  const chrome = useAppChrome();
   // No environmentName / limit: we want the full count for this app.
   // The query is cached, so the deployments tab benefits from the
   // warmed cache when the operator clicks through.
@@ -89,20 +92,20 @@ export function QuickLinksGrid({ appSlug }: Props) {
   return (
     <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-3">
       <QuickLinkCard
-        href={`/apps/${appSlug}/observability`}
+        href={appPath(chrome, appSlug, "observability")}
         icon={ChartLineIcon}
         title="Observability"
         description="Metrics, logs, and traces for this app's workloads."
       />
       <QuickLinkCard
-        href={`/apps/${appSlug}/deployments`}
+        href={appPath(chrome, appSlug, "deployments")}
         icon={RocketIcon}
         title="Deployments"
         description="Recent deploys, in-flight rollouts, and rollback history."
         chip={chip ?? undefined}
       />
       <QuickLinkCard
-        href={`/apps/${appSlug}/settings`}
+        href={appPath(chrome, appSlug, "settings")}
         icon={SettingsIcon}
         title="Settings"
         description="Project assignment, deploy strategy, manifest, and teams."

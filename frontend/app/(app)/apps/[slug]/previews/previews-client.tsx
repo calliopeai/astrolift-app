@@ -58,6 +58,7 @@ import { GET_APP } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 import { cn } from "@/lib/utils";
 
+import { appPath, useAppChrome } from "../components/app-chrome-context";
 import { AppTabs } from "../components/app-tabs";
 
 interface AppResp {
@@ -233,6 +234,7 @@ function CreatePreviewSheet({ appSlug, disabled }: { appSlug: string; disabled: 
 }
 
 export function AppPreviewsClient({ slug }: { slug: string }) {
+  const chrome = useAppChrome();
   const tCommon = useTranslations("apps.common");
   const t = useTranslations("apps.previews");
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
@@ -496,7 +498,7 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
                 title={t("empty.title")}
                 description={a.previewEnabled ? t("empty.enabledHint") : t("empty.disabledHint")}
                 actionHref={
-                  a.previewEnabled ? (a.sourceUrl ?? undefined) : `/apps/${a.slug}/config`
+                  a.previewEnabled ? (a.sourceUrl ?? undefined) : appPath(chrome, a.slug, "config")
                 }
                 actionLabel={
                   a.previewEnabled ? (a.sourceUrl ? t("openRepo") : undefined) : t("enablePreviews")

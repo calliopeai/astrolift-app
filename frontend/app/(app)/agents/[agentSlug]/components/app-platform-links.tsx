@@ -21,12 +21,13 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-// The underlying RegisteredApp's platform submenus. An agent is an app, so
-// these pages physically live at /apps/<appSlug>/<seg>, but we link them under
-// /agents/<appSlug>/<seg> so the operator stays in agent context — a
-// next.config rewrite maps those URLs onto the /apps pages. Kept as a flat leaf
-// row (the agent already has the BROCS pillar bar above, so we don't repeat
-// pillars).
+// The underlying RegisteredApp's platform submenus. An agent IS an app, so
+// these are the shared /apps/<slug>/<seg> clients — but each is mounted at a
+// real /agents/<appSlug>/<seg> route (see agents/[agentSlug]/<seg>/page.tsx)
+// that renders the same client inside the agent shell via AgentAppSurface, so
+// the operator stays in agent context with no /apps template leakage. Kept as
+// a flat leaf row (the agent already has the BROCS pillar bar above, so we
+// don't repeat pillars).
 const LINKS: { seg: string; label: string; Icon: typeof RocketIcon }[] = [
   { seg: "config", label: "Config", Icon: SlidersHorizontalIcon },
   { seg: "manifest", label: "Manifest", Icon: FileCodeIcon },

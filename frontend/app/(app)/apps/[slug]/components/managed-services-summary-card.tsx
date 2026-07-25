@@ -71,6 +71,8 @@ import type {
 } from "@/graphql/services/services.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 
+import { appPath, useAppChrome } from "./app-chrome-context";
+
 interface Resp {
   astroliftManagedServices: AstroliftManagedService[];
 }
@@ -204,6 +206,7 @@ function lastActionLabel(t: ReturnType<typeof useTranslations>, kind: string): s
  * single-workload apps that don't ship any.
  */
 export function ManagedServicesSummaryCard({ appSlug }: { appSlug: string }) {
+  const chrome = useAppChrome();
   const t = useTranslations("apps.settings.managedServicesSummary");
   const { data, loading } = useQuery<Resp>(LIST_MANAGED_SERVICES, {
     variables: { appSlug, environmentName: null },
@@ -259,7 +262,7 @@ export function ManagedServicesSummaryCard({ appSlug }: { appSlug: string }) {
       description={t("description")}
       action={
         <Button asChild variant="outline" size="sm">
-          <Link href={`/apps/${appSlug}/managed-services`}>{t("openAll")}</Link>
+          <Link href={appPath(chrome, appSlug, "managed-services")}>{t("openAll")}</Link>
         </Button>
       }
     >
@@ -281,6 +284,7 @@ function ManagedServiceSummaryRow({
   svc: AstroliftManagedService;
   appSlug: string;
 }) {
+  const chrome = useAppChrome();
   const t = useTranslations("apps.settings.managedServicesSummary");
   const fmt = useFormatters();
   const KindIcon = KIND_ICON[svc.kind] ?? PlugIcon;
@@ -346,7 +350,7 @@ function ManagedServiceSummaryRow({
 
       <div className="flex shrink-0 items-center gap-1">
         <Button asChild variant="ghost" size="sm" className="text-xs">
-          <Link href={`/apps/${appSlug}/managed-services`}>
+          <Link href={appPath(chrome, appSlug, "managed-services")}>
             {t("viewDetail")}
             <ExternalLinkIcon className="size-3" />
           </Link>

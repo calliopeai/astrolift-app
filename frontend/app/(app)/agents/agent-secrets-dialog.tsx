@@ -28,14 +28,11 @@ import { Input } from "@/components/ui/input";
 import {
   DELETE_AGENT_SECRET_VALUE,
   SET_AGENT_SECRET_VALUE,
-  UPDATE_AGENT_ENVIRONMENT_SPEC,
 } from "@/graphql/agents/agents.mutations";
-import {
-  AGENT_ENV_SPEC_SECRET_STATUS,
-  LIST_AGENT_ENVIRONMENT_SPECS,
-} from "@/graphql/agents/agents.queries";
+import { AGENT_ENV_SPEC_SECRET_STATUS } from "@/graphql/agents/agents.queries";
 import type { AstroliftAgentSecretStatus } from "@/graphql/agents/agents.types";
-import { cn } from "@/lib/utils";
+
+import { ManagedModelSection } from "./managed-model-section";
 
 interface SecretStatusResp {
   agentEnvironmentSpecSecretStatus: AstroliftAgentSecretStatus[];
@@ -45,13 +42,6 @@ interface SecretMutationResp {
     ok: boolean;
     errors: { code: string; message: string; field: string | null }[];
     data: { envVar: string; uri: string; exists: boolean } | null;
-  };
-}
-interface UpdateEnvSpecResp {
-  updateAgentEnvironmentSpec: {
-    ok: boolean;
-    errors: { code: string; message: string; field: string | null }[];
-    data: { id: string; slug: string; managedModel: boolean } | null;
   };
 }
 
@@ -93,51 +83,6 @@ export function AgentSecretsDialog({
 
   const [setSecret] = useMutation<SecretMutationResp>(SET_AGENT_SECRET_VALUE);
   const [deleteSecret] = useMutation<SecretMutationResp>(DELETE_AGENT_SECRET_VALUE);
-
-  // Managed-model is a spec-level property (not a secret value): when ON, the
-  // spec's runs use the cluster's cloud-native model provider via workload
-  // identity instead of the ANTHROPIC_API_KEY secret below. Optimistic local
-  // state, reseeded from the loaded spec (and after a write refetch) so it
-  // reflects the persisted value.
-  const [managedOn, setManagedOn] = React.useState<boolean>(managedModel);
-  const [managedBusy, setManagedBusy] = React.useState<boolean>(false);
-  // Resync the optimistic local value when the loaded spec's stored value
-  // changes (a different spec, or a refetch after a write). React's "adjust
-  // state during render" pattern — avoids a setState-in-effect cascade.
-  const [loadedManaged, setLoadedManaged] = React.useState<boolean>(managedModel);
-  if (managedModel !== loadedManaged) {
-    setLoadedManaged(managedModel);
-    setManagedOn(managedModel);
-  }
-
-  const [updateSpec] = useMutation<UpdateEnvSpecResp>(UPDATE_AGENT_ENVIRONMENT_SPEC, {
-    refetchQueries: [LIST_AGENT_ENVIRONMENT_SPECS],
-  });
-
-  async function onToggleManagedModel() {
-    const next = !managedOn;
-    setManagedOn(next); // optimistic
-    setManagedBusy(true);
-    try {
-      const res = await updateSpec({
-        variables: { slug: envSpecSlug, input: { managedModel: next } },
-      });
-      const payload = res.data?.updateAgentEnvironmentSpec;
-      if (!payload?.ok) {
-        setManagedOn(!next);
-        toast.error(`Couldn't update model source: ${firstError(payload?.errors ?? [])}`);
-        return;
-      }
-      toast.success(next ? "Using cluster-native model" : "Using API key for model access");
-    } catch (err) {
-      setManagedOn(!next);
-      toast.error(
-        `Couldn't update model source: ${err instanceof Error ? err.message : String(err)}`
-      );
-    } finally {
-      setManagedBusy(false);
-    }
-  }
 
   // Drop any typed-but-unsaved values as the dialog closes so a plaintext
   // value never lingers in state between opens. Done in the close handler
@@ -229,31 +174,7 @@ export function AgentSecretsDialog({
           {/* Model source — a spec-level property, independent of the secret
               refs below. When ON, runs use the cluster's cloud model provider
               via workload identity, so no ANTHROPIC_API_KEY secret is needed. */}
-          <div className="flex items-start justify-between gap-4 rounded-md border p-3">
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Use cluster-native model (Bedrock / Vertex)</p>
-              <p className="text-muted-foreground text-xs">
-                Run this agent on the cluster&rsquo;s cloud model provider via workload identity
-                instead of an API key.
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <ManagedModelToggle
-                checked={managedOn}
-                onChange={onToggleManagedModel}
-                disabled={managedBusy}
-                label={managedOn ? "Disable cluster-native model" : "Enable cluster-native model"}
-              />
-              <span
-                className={cn(
-                  "text-xs font-medium",
-                  managedOn ? "text-foreground" : "text-muted-foreground"
-                )}
-              >
-                {managedOn ? "On" : "Off"}
-              </span>
-            </div>
-          </div>
+          <ManagedModelSection envSpecSlug={envSpecSlug} managedModel={managedModel} />
 
           {loading && rows.length === 0 ? (
             <div className="text-muted-foreground flex items-center gap-2 py-6 text-sm">
@@ -335,47 +256,5 @@ export function AgentSecretsDialog({
         </AlertDialogContent>
       </AlertDialog>
     </>
-  );
-}
-
-/**
- * Accessible on/off switch. The repo has no shadcn/radix Switch primitive, so
- * this is a small local toggle styled with the same Tailwind tokens the rest of
- * the surface uses (mirrors the cluster-settings AuthGateToggle) — not a new
- * shared component.
- */
-function ManagedModelToggle({
-  checked,
-  onChange,
-  disabled,
-  label,
-}: {
-  checked: boolean;
-  onChange: () => void;
-  disabled?: boolean;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={onChange}
-      className={cn(
-        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors",
-        "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
-        "disabled:cursor-not-allowed disabled:opacity-50",
-        checked ? "bg-primary" : "bg-muted-foreground/30"
-      )}
-    >
-      <span
-        className={cn(
-          "inline-block size-4 rounded-full bg-white shadow transition-transform",
-          checked ? "translate-x-4" : "translate-x-0.5"
-        )}
-      />
-    </button>
   );
 }

@@ -36,6 +36,7 @@ import type {
 import { classifyPrimitive } from "@/lib/primitive";
 
 import { ActivityTimeline } from "./components/activity-timeline";
+import { appPath, useAppChrome } from "./components/app-chrome-context";
 import { AppTabs } from "./components/app-tabs";
 import { BundleHome } from "./components/homes/bundle-home";
 import { CronjobHome } from "./components/homes/cronjob-home";
@@ -87,6 +88,7 @@ interface WorkloadsResp {
 // ─── component ────────────────────────────────────────────────────────────────
 
 export function AppDetailClient({ slug }: { slug: string }) {
+  const chrome = useAppChrome();
   const router = useRouter();
   const tCommon = useTranslations("apps.common");
   const tDetail = useTranslations("apps.detail");
@@ -230,13 +232,13 @@ export function AppDetailClient({ slug }: { slug: string }) {
             </Button>
           )}
           <Button asChild>
-            <a href={`/apps/${a.slug}/environments`}>
+            <a href={appPath(chrome, a.slug, "environments")}>
               <RocketIcon className="size-4" />
               {tDetail("actions.deploy")}
             </a>
           </Button>
           <Button asChild variant="outline">
-            <a href={`/apps/${a.slug}/config`}>
+            <a href={appPath(chrome, a.slug, "config")}>
               <FileCodeIcon className="size-4" />
               {tDetail("actions.config")}
             </a>

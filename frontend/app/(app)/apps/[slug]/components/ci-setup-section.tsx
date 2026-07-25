@@ -38,6 +38,8 @@ import {
 } from "@/graphql/lifecycle/lifecycle.mutations";
 import { GET_PLATFORM_API_URL } from "@/graphql/registry/registry.queries";
 
+import { appPath, useAppChrome } from "./app-chrome-context";
+
 /**
  * CI setup section on the consolidated Settings page (#382, #854).
  *
@@ -232,6 +234,7 @@ export function CiSetupSection({
   providerPluginSlug,
   sourceWebhookInstalledAt,
 }: Props) {
+  const chrome = useAppChrome();
   const { data, loading } = useQuery<PlatformUrlResp>(GET_PLATFORM_API_URL, {
     fetchPolicy: "cache-first",
   });
@@ -264,7 +267,7 @@ export function CiSetupSection({
       name: "ASTROLIFT_DEPLOY_TOKEN",
       value: null,
       hint: "App-scoped bearer token. Shown once at mint time on the deploy-tokens page.",
-      externalHref: `/apps/${appSlug}/tokens`,
+      externalHref: appPath(chrome, appSlug, "tokens"),
       externalLabel: "Manage deploy tokens",
     },
   ];

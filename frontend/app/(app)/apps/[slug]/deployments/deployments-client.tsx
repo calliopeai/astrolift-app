@@ -73,6 +73,7 @@ import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 import { cn } from "@/lib/utils";
 
+import { appPath, useAppChrome } from "../components/app-chrome-context";
 import { AppTabs } from "../components/app-tabs";
 
 interface AppResp {
@@ -177,6 +178,7 @@ function githubCommitUrl(repo: string, sha: string): string {
 }
 
 export function AppDeploymentsClient({ slug }: { slug: string }) {
+  const chrome = useAppChrome();
   const tCommon = useTranslations("apps.common");
   const t = useTranslations("apps.deployments");
   const router = useRouter();
@@ -466,7 +468,7 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
                 icon={<BoxIcon className="size-5" />}
                 title={t("emptyTitle")}
                 description={allDeployments.length === 0 ? t("emptyNever") : t("emptyTryAgain")}
-                actionHref={`/apps/${a.slug}/environments`}
+                actionHref={appPath(chrome, a.slug, "environments")}
                 actionLabel={allDeployments.length === 0 ? t("emptyStart") : undefined}
               />
             </div>
@@ -535,7 +537,10 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
 
       <p className="text-muted-foreground text-center text-xs">
         {t("footer", { count: allDeployments.length })}{" "}
-        <Link href={`/apps/${a.slug}/environments`} className="hover:text-foreground underline">
+        <Link
+          href={appPath(chrome, a.slug, "environments")}
+          className="hover:text-foreground underline"
+        >
           {t("rollNew")}
         </Link>
         .

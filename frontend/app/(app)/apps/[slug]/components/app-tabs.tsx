@@ -6,6 +6,8 @@ import { useTranslations } from "next-intl";
 
 import { cn } from "@/lib/utils";
 
+import { useAppChrome } from "./app-chrome-context";
+
 /**
  * Public override key. Callers pass `active` as one of these legacy tab
  * keys; we resolve each to its owning pillar + sub-tab so existing pages
@@ -28,13 +30,13 @@ type TabKey =
 
 type PillarKey = "build" | "run" | "observe" | "control" | "secure";
 
-/** A leaf sub-tab → a real flat route at `/apps/[slug]/<sub>`. */
+/** A leaf sub-tab → a real flat route at `<base>/[slug]/<sub>`. */
 interface SubTab {
   /** i18n key under `apps.tabs.*`. */
   label: string;
-  href: (slug: string) => string;
+  href: (base: string, slug: string) => string;
   /** True when this sub-tab owns the current pathname. */
-  match: (pathname: string, slug: string) => boolean;
+  match: (base: string, pathname: string, slug: string) => boolean;
   /** Legacy `active` keys that should resolve to this sub-tab. */
   legacy: TabKey[];
 }
@@ -46,24 +48,35 @@ interface Pillar {
   subs: SubTab[];
 }
 
-const at = (slug: string, sub: string) => `/apps/${slug}/${sub}`;
-const under = (sub: string) => (p: string, s: string) =>
-  p === at(s, sub) || p.startsWith(`${at(s, sub)}/`);
+const at = (base: string, slug: string, sub: string) => `${base}/${slug}/${sub}`;
+const under = (sub: string) => (base: string, p: string, s: string) =>
+  p === at(base, s, sub) || p.startsWith(`${at(base, s, sub)}/`);
 
 /**
  * The App detail's twelve+ flat routes folded into the five BROCS pillars
  * (Build · Run · Observe · Control · Secure). Routes stay flat at
- * `/apps/[slug]/<sub>`; this only adds a two-level tab identity over them.
- * Every existing sub-route lands in exactly one pillar.
+ * `<base>/[slug]/<sub>`; this only adds a two-level tab identity over them.
+ * `<base>` is `/apps` normally, `/agents` when the app is an agent (chrome
+ * context). Every existing sub-route lands in exactly one pillar.
  */
 const PILLARS: Pillar[] = [
   {
     key: "build",
     label: "build",
     subs: [
-      { label: "config", href: (s) => at(s, "config"), match: under("config"), legacy: [] },
-      { label: "manifest", href: (s) => at(s, "manifest"), match: under("manifest"), legacy: [] },
-      { label: "webhooks", href: (s) => at(s, "webhooks"), match: under("webhooks"), legacy: [] },
+      { label: "config", href: (b, s) => at(b, s, "config"), match: under("config"), legacy: [] },
+      {
+        label: "manifest",
+        href: (b, s) => at(b, s, "manifest"),
+        match: under("manifest"),
+        legacy: [],
+      },
+      {
+        label: "webhooks",
+        href: (b, s) => at(b, s, "webhooks"),
+        match: under("webhooks"),
+        legacy: [],
+      },
     ],
   },
   {
@@ -72,39 +85,44 @@ const PILLARS: Pillar[] = [
     subs: [
       {
         label: "overview",
-        href: (s) => `/apps/${s}`,
-        match: (p, s) => p === `/apps/${s}`,
+        href: (b, s) => `${b}/${s}`,
+        match: (b, p, s) => p === `${b}/${s}`,
         legacy: ["overview"],
       },
       {
         label: "deployments",
-        href: (s) => at(s, "deployments"),
+        href: (b, s) => at(b, s, "deployments"),
         match: under("deployments"),
         legacy: ["deployments"],
       },
       {
         label: "environments",
-        href: (s) => at(s, "environments"),
+        href: (b, s) => at(b, s, "environments"),
         match: under("environments"),
         legacy: [],
       },
-      { label: "jobs", href: (s) => at(s, "jobs"), match: under("jobs"), legacy: [] },
-      { label: "commands", href: (s) => at(s, "commands"), match: under("commands"), legacy: [] },
+      { label: "jobs", href: (b, s) => at(b, s, "jobs"), match: under("jobs"), legacy: [] },
+      {
+        label: "commands",
+        href: (b, s) => at(b, s, "commands"),
+        match: under("commands"),
+        legacy: [],
+      },
       {
         label: "workloads",
-        href: (s) => at(s, "workloads"),
+        href: (b, s) => at(b, s, "workloads"),
         match: under("workloads"),
         legacy: ["workloads"],
       },
       {
         label: "topology",
-        href: (s) => at(s, "topology"),
+        href: (b, s) => at(b, s, "topology"),
         match: under("topology"),
         legacy: ["topology"],
       },
       {
         label: "previews",
-        href: (s) => at(s, "previews"),
+        href: (b, s) => at(b, s, "previews"),
         match: under("previews"),
         legacy: ["previews"],
       },
@@ -116,13 +134,13 @@ const PILLARS: Pillar[] = [
     subs: [
       {
         label: "observability",
-        href: (s) => at(s, "observability"),
+        href: (b, s) => at(b, s, "observability"),
         match: under("observability"),
         legacy: ["observability"],
       },
       {
         label: "console",
-        href: (s) => at(s, "console"),
+        href: (b, s) => at(b, s, "console"),
         match: under("console"),
         legacy: ["console"],
       },
@@ -134,25 +152,25 @@ const PILLARS: Pillar[] = [
     subs: [
       {
         label: "domains",
-        href: (s) => at(s, "domains"),
+        href: (b, s) => at(b, s, "domains"),
         match: under("domains"),
         legacy: ["domains"],
       },
       {
         label: "managedServices",
-        href: (s) => at(s, "managed-services"),
+        href: (b, s) => at(b, s, "managed-services"),
         match: under("managed-services"),
         legacy: [],
       },
       {
         label: "settings",
-        href: (s) => at(s, "settings"),
+        href: (b, s) => at(b, s, "settings"),
         match: under("settings"),
         legacy: ["settings"],
       },
       {
         label: "members",
-        href: (s) => at(s, "members"),
+        href: (b, s) => at(b, s, "members"),
         match: under("members"),
         legacy: ["members"],
       },
@@ -164,17 +182,17 @@ const PILLARS: Pillar[] = [
     subs: [
       {
         label: "security",
-        href: (s) => at(s, "security"),
+        href: (b, s) => at(b, s, "security"),
         match: under("security"),
         legacy: ["security"],
       },
       {
         label: "secrets",
-        href: (s) => at(s, "secrets"),
+        href: (b, s) => at(b, s, "secrets"),
         match: under("secrets"),
         legacy: ["secrets"],
       },
-      { label: "tokens", href: (s) => at(s, "tokens"), match: under("tokens"), legacy: [] },
+      { label: "tokens", href: (b, s) => at(b, s, "tokens"), match: under("tokens"), legacy: [] },
     ],
   },
 ];
@@ -183,6 +201,7 @@ const PILLARS: Pillar[] = [
  * an explicit `active` key, and finally to Run › Overview (the default
  * landing for `/apps/[slug]`). */
 function resolveActive(
+  base: string,
   pathname: string,
   slug: string,
   active?: TabKey
@@ -190,7 +209,7 @@ function resolveActive(
   // 1. Pathname is the source of truth — keeps deep links correct.
   for (const pillar of PILLARS) {
     for (const sub of pillar.subs) {
-      if (sub.match(pathname, slug)) return { pillar: pillar.key, sub: sub.label };
+      if (sub.match(base, pathname, slug)) return { pillar: pillar.key, sub: sub.label };
     }
   }
   // 2. Explicit override from a page that knows its own section.
@@ -218,9 +237,17 @@ interface AppTabsProps {
  * own their pages; this only gives the page a tabbed top-level identity.
  */
 export function AppTabs({ slug, active }: AppTabsProps) {
+  const { basePath, agentShell } = useAppChrome();
   const t = useTranslations("apps.tabs");
   const pathname = usePathname() ?? "";
-  const { pillar: activePillar, sub: activeSub } = resolveActive(pathname, slug, active);
+
+  // In the agent shell the AgentDetailShell already renders the agent's BROCS
+  // pillar bar + the app-platform-links row; a second app-style tab bar would
+  // duplicate chrome. Suppress it — this is the single mechanism that hides
+  // AppTabs across all 13 shared clients without editing each one.
+  if (agentShell) return null;
+
+  const { pillar: activePillar, sub: activeSub } = resolveActive(basePath, pathname, slug, active);
 
   const current = PILLARS.find((p) => p.key === activePillar) ?? PILLARS[1];
 
@@ -234,7 +261,7 @@ export function AppTabs({ slug, active }: AppTabsProps) {
         {PILLARS.map((pillar) => {
           const isActive = pillar.key === activePillar;
           // Land on the pillar's first sub-tab; Run leads with Overview.
-          const href = pillar.subs[0].href(slug);
+          const href = pillar.subs[0].href(basePath, slug);
           return (
             <Link
               key={pillar.key}
@@ -265,7 +292,7 @@ export function AppTabs({ slug, active }: AppTabsProps) {
           return (
             <Link
               key={sub.label}
-              href={sub.href(slug)}
+              href={sub.href(basePath, slug)}
               aria-current={isActive ? "page" : undefined}
               className={cn(
                 "relative shrink-0 px-3 py-2 text-xs font-medium transition-colors",

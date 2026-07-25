@@ -117,6 +117,7 @@ import type { AstroliftManagedService } from "@/graphql/services/services.types"
 import { formatRelativeAge } from "@/lib/format";
 import { useFormatters } from "@/lib/i18n/formatters";
 
+import { appPath, useAppChrome, type AppChrome } from "../components/app-chrome-context";
 import { AppTabs } from "../components/app-tabs";
 import { AssignProjectCard } from "../components/assign-project-card";
 import { CiSetupSection } from "../components/ci-setup-section";
@@ -156,7 +157,7 @@ type SettingsSectionTimestampKey =
 interface LinkSection {
   key: string;
   i18nKey: string;
-  href: (slug: string) => string;
+  href: (chrome: AppChrome, slug: string) => string;
   icon: typeof KeyIcon;
   lastModifiedKey: SettingsSectionTimestampKey;
 }
@@ -176,56 +177,56 @@ const LINK_SECTIONS: LinkSection[] = [
   {
     key: "manifest",
     i18nKey: "manifestEditor",
-    href: (s) => `/apps/${s}/config`,
+    href: (c, s) => appPath(c, s, "config"),
     icon: FileCodeIcon,
     lastModifiedKey: "deployStrategy",
   },
   {
     key: "deploy-tokens",
     i18nKey: "deployTokens",
-    href: (s) => `/apps/${s}/tokens`,
+    href: (c, s) => appPath(c, s, "tokens"),
     icon: KeyIcon,
     lastModifiedKey: "deployTokens",
   },
   {
     key: "secrets",
     i18nKey: "secrets",
-    href: (s) => `/apps/${s}/secrets`,
+    href: (c, s) => appPath(c, s, "secrets"),
     icon: LockIcon,
     lastModifiedKey: "secrets",
   },
   {
     key: "managed-services",
     i18nKey: "managedServices",
-    href: (s) => `/apps/${s}/managed-services`,
+    href: (c, s) => appPath(c, s, "managed-services"),
     icon: PlugIcon,
     lastModifiedKey: "managedServices",
   },
   {
     key: "domains",
     i18nKey: "domains",
-    href: (s) => `/apps/${s}/domains`,
+    href: (c, s) => appPath(c, s, "domains"),
     icon: GlobeIcon,
     lastModifiedKey: "domains",
   },
   {
     key: "webhooks",
     i18nKey: "webhooks",
-    href: (s) => `/apps/${s}/webhooks`,
+    href: (c, s) => appPath(c, s, "webhooks"),
     icon: WebhookIcon,
     lastModifiedKey: "webhooks",
   },
   {
     key: "members",
     i18nKey: "members",
-    href: (s) => `/apps/${s}/members`,
+    href: (c, s) => appPath(c, s, "members"),
     icon: UsersIcon,
     lastModifiedKey: "members",
   },
   {
     key: "observability",
     i18nKey: "observability",
-    href: (s) => `/apps/${s}/observability`,
+    href: (c, s) => appPath(c, s, "observability"),
     icon: LineChartIcon,
     lastModifiedKey: "observability",
   },
@@ -872,10 +873,11 @@ function SettingsLinkCard({
   slug: string;
   lastModifiedAt?: string | null;
 }) {
+  const chrome = useAppChrome();
   const t = useTranslations("apps.settings.links");
   const Icon = section.icon;
   return (
-    <Link href={section.href(slug)} className="group block">
+    <Link href={section.href(chrome, slug)} className="group block">
       <Card className="hover:bg-accent/40 transition-colors">
         <CardContent className="flex items-center gap-4 p-5">
           <div className="bg-primary/10 text-primary shrink-0 rounded-md p-2.5">
@@ -1648,6 +1650,7 @@ interface RunJobOnceResp {
  * page where the run materializes once the cluster picks it up.
  */
 function RunScheduledJobCard({ appSlug }: { appSlug: string }) {
+  const chrome = useAppChrome();
   const t = useTranslations("apps.settings.runJob");
   const router = useRouter();
   const workloads = useQuery<WorkloadsResp>(LIST_WORKLOADS, {
@@ -1793,7 +1796,7 @@ function RunScheduledJobCard({ appSlug }: { appSlug: string }) {
         </div>
         <p className="text-muted-foreground mt-3 text-2xs">
           {t("footer")}{" "}
-          <Link href={`/apps/${appSlug}/jobs`} className="underline">
+          <Link href={appPath(chrome, appSlug, "jobs")} className="underline">
             {t("jobsPage")}
           </Link>
           .

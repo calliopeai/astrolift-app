@@ -6,6 +6,7 @@ import * as React from "react";
 
 import { PageShell } from "@/components/PageShell";
 import { AppTabs } from "../app-tabs";
+import { appPath, useAppChrome } from "../app-chrome-context";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +27,7 @@ interface BundleHomeProps {
  * Each card deep-links to that workload's detail.
  */
 export function BundleHome({ slug, name, status, workloads }: BundleHomeProps) {
+  const chrome = useAppChrome();
   const kinds = React.useMemo(
     () => Array.from(new Set(workloads.map((w) => w.kind))),
     [workloads]
@@ -67,7 +69,7 @@ export function BundleHome({ slug, name, status, workloads }: BundleHomeProps) {
             return (
               <Link
                 key={w.id}
-                href={`/apps/${slug}/workloads/${encodeURIComponent(w.slug)}`}
+                href={appPath(chrome, slug, "workloads", encodeURIComponent(w.slug))}
                 className="group"
               >
                 <Card className="hover:ring-foreground/20 h-full transition-shadow group-hover:shadow-sm">

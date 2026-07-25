@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
 import { LIST_DEPLOYMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftDeployment, DeploymentStatus } from "@/graphql/lifecycle/lifecycle.types";
 
+import { appPath, useAppChrome } from "./app-chrome-context";
+
 interface DeploymentsResp {
   astroliftDeployments: AstroliftDeployment[];
 }
@@ -59,6 +61,7 @@ interface Props {
  * without navigating to the full deployments list first.
  */
 export function DeployActivityStrip({ appSlug, limit = 20 }: Props) {
+  const chrome = useAppChrome();
   const fmt = useFormatters();
   const { data, loading } = useQuery<DeploymentsResp>(LIST_DEPLOYMENTS, {
     variables: { appSlug, limit },
@@ -91,7 +94,7 @@ export function DeployActivityStrip({ appSlug, limit = 20 }: Props) {
             </p>
           </div>
           <Link
-            href={`/apps/${appSlug}/environments`}
+            href={appPath(chrome, appSlug, "environments")}
             className="text-xs text-[var(--brand-primary)] hover:underline"
           >
             View all
@@ -131,6 +134,7 @@ function DeployTile({
   appSlug: string;
   relativeTime: string;
 }) {
+  const chrome = useAppChrome();
   const tone = TILE_TONE[dep.status] ?? TILE_TONE.superseded;
   const label = STATUS_LABEL[dep.status] ?? dep.status;
   const tag = dep.imageTag ? dep.imageTag.slice(0, 10) : dep.id.slice(0, 8);
@@ -140,7 +144,7 @@ function DeployTile({
 
   return (
     <Link
-      href={`/apps/${appSlug}/environments?deployment=${dep.id}`}
+      href={`${appPath(chrome, appSlug, "environments")}?deployment=${dep.id}`}
       title={tooltip}
       aria-label={tooltip}
       className={cn("size-6 shrink-0 rounded-sm border transition-all hover:scale-110", tone)}

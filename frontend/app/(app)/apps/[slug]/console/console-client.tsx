@@ -45,6 +45,7 @@ import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 import { UPLOAD_FILE } from "@/graphql/uploads/uploads.mutations";
 import type { FileUploadResult } from "@/graphql/__generated__/schema";
 
+import { appPath, useAppChrome } from "../components/app-chrome-context";
 import { AppTabs } from "../components/app-tabs";
 
 interface AppResp {
@@ -94,6 +95,7 @@ function pickDefaultContainer(
 }
 
 export function ConsoleClient({ slug }: { slug: string }) {
+  const chrome = useAppChrome();
   const tCommon = useTranslations("apps.common");
   const t = useTranslations("apps.console");
   const tObs = useTranslations("apps.observability");
@@ -458,7 +460,7 @@ export function ConsoleClient({ slug }: { slug: string }) {
               icon={<BoxIcon className="size-5" />}
               title={tObs("pods.emptyTitle")}
               description={tObs("pods.emptyDescription")}
-              actionHref={`/apps/${a.slug}/deployments`}
+              actionHref={appPath(chrome, a.slug, "deployments")}
               actionLabel={tObs("pods.emptyAction")}
             />
           ) : (
@@ -548,7 +550,7 @@ export function ConsoleClient({ slug }: { slug: string }) {
               </Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href={`/apps/${a.slug}/tokens`}>
+              <Link href={appPath(chrome, a.slug, "tokens")}>
                 <ExternalLinkIcon className="size-4" />
                 {t("terminal.manageTokens")}
               </Link>
