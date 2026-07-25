@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
-import { BookOpenIcon, PlusIcon, ScaleIcon, Trash2Icon } from "lucide-react";
+import { BookOpenIcon, InfoIcon, PlusIcon, ScaleIcon, Trash2Icon } from "lucide-react";
 import { ListControls } from "@/components/ListControls";
 import { useListControls } from "@/hooks/use-list-controls";
 import Link from "next/link";
@@ -99,6 +99,21 @@ export function PoliciesClient() {
         </>
       }
     >
+      <div className="border-info-border bg-info/10 flex flex-col gap-2 rounded-md border p-3">
+        <div className="flex items-center gap-2">
+          <InfoIcon className="text-info-fg size-4" />
+          <span className="text-sm font-medium">What ABAC policies do</span>
+        </div>
+        <p className="text-muted-foreground text-xs leading-relaxed">
+          Attribute-Based Access Control (ABAC) grants or denies an action by
+          evaluating attributes of the user, the resource, and the request
+          context — such as time of day, source IP, environment, or MFA
+          freshness — against policy rules. Policies here run{" "}
+          <span className="font-medium">after</span> role-based access (RBAC)
+          and can only deny: they narrow what a member&apos;s roles already
+          allow, never widen it. Use this page to create and review those rules.
+        </p>
+      </div>
       {allPolicies.length > 0 && (
         <ListControls controls={ctrl} searchPlaceholder="Search policies…" className="mb-3" />
       )}

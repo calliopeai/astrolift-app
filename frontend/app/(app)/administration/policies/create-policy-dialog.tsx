@@ -197,6 +197,13 @@ export function CreatePolicyDialog({ open, onOpenChange }: Props) {
               />
             </div>
           </div>
+          <p className="text-muted-foreground text-xs">
+            Scope sets how widely the rule applies. Effect is normally{" "}
+            <span className="font-mono">DENY</span> — ABAC narrows access, it
+            doesn&apos;t grant it. Action pattern is a permission glob like{" "}
+            <span className="font-mono">app.deploy</span> or{" "}
+            <span className="font-mono">*</span> for every action.
+          </p>
 
           <div className="space-y-2">
             <Label htmlFor="conditions">Conditions (JSON array)</Label>

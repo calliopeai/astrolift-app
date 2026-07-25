@@ -1,19 +1,22 @@
 "use client";
 
 import { useMutation } from "@apollo/client/react";
-import { SaveIcon } from "lucide-react";
+import { ClockIcon, InfoIcon, SaveIcon } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 
 import { PageShell } from "@/components/PageShell";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { DefinitionList } from "@/components/ui/definition-list";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -234,16 +237,34 @@ export function OrganizationSettingsClient() {
         <CardHeader>
           <CardTitle>Identity provider</CardTitle>
           <CardDescription>
-            OIDC / SAML / SCIM configuration for this organization. Lands as a
-            sub-route once the IdP picker is wired.
+            OIDC, SAML, and SCIM sign-in configuration for this organization.
           </CardDescription>
+          <CardAction>
+            <Badge variant="outline" className="gap-1">
+              <ClockIcon className="size-3" />
+              In-app setup coming soon
+            </Badge>
+          </CardAction>
         </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-sm">
-            Currently this dev environment uses the auth1 dev-login bypass and
-            Auth0 for staging/production. The /settings/organization/identity-provider
-            sub-route adds OIDC discovery, SAML metadata, and SCIM token rotation.
-          </p>
+        <CardContent className="grid gap-4">
+          <div className="space-y-2">
+            <p className="text-muted-foreground text-xs">
+              Currently active, by environment:
+            </p>
+            <DefinitionList
+              items={[
+                { term: "Development", description: "auth1 dev-login bypass" },
+                { term: "Staging & production", description: "Auth0" },
+              ]}
+            />
+          </div>
+          <div className="border-info-border bg-info/5 flex items-start gap-2 rounded-md border p-3">
+            <InfoIcon className="text-info-fg mt-0.5 size-3.5 shrink-0" />
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              A dedicated setup sub-route will add OIDC discovery, SAML metadata,
+              and SCIM token rotation once the in-app provider picker is wired.
+            </p>
+          </div>
         </CardContent>
       </Card>
     </PageShell>
