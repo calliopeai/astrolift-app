@@ -101,3 +101,15 @@ class Runner(NamedBaseCoreModel):
 
     def __str__(self) -> str:
         return f"{self.name} ({self.organization_id})"
+
+    def is_available(self) -> bool:
+        """True when this runner can claim a new job.
+
+        Only an ``IDLE`` runner is claimable: ``ACTIVE`` is already running a
+        job, ``OFFLINE`` isn't polling, and ``SUSPENDED`` is administratively
+        held. The claim path flips ``IDLE`` -> ``ACTIVE`` on success, so this
+        is the guard that keeps a runner from taking a second concurrent job.
+        (Heartbeat-staleness reaping — an IDLE runner that silently died — is a
+        separate concern handled by the runner reaper, not this check.)
+        """
+        return self.status == self.Status.IDLE

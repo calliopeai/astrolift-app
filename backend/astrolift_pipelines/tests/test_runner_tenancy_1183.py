@@ -134,3 +134,22 @@ def test_register_succeeds_with_correct_token(settings, org_a):
     resp = _register({"org_slug": org_a.slug, "name": "r1"}, auth="Bearer s3cret")
     assert resp.status_code == 201
     assert Runner.objects.filter(organization=org_a, name="r1").count() == 1
+
+
+# --- #1188: runner_claim_job calls runner.is_available() -------------------
+# The method was referenced by the claim view but defined nowhere, so every
+# job-claim raised AttributeError at runtime. Pin the contract: it exists and
+# is True only for an IDLE (claimable) runner.
+@pytest.mark.parametrize(
+    "status,expected",
+    [
+        (Runner.Status.IDLE, True),
+        (Runner.Status.ACTIVE, False),
+        (Runner.Status.OFFLINE, False),
+        (Runner.Status.SUSPENDED, False),
+    ],
+)
+def test_runner_is_available_only_when_idle(org_a, status, expected):
+    runner = _runner(org_a)
+    runner.status = status
+    assert runner.is_available() is expected
