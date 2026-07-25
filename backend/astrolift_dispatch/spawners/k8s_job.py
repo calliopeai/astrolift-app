@@ -45,12 +45,42 @@ class K8sJobSpawner(ContainerSpawner):
 
         job_name = f"agent-task-{str(task.guid).replace('-', '')[:12]}"
 
+        # Managed model: when the spec's ``managed_model`` switch is on, the
+        # pod uses the cluster's cloud-native model provider (AWS→Bedrock,
+        # GCP→Vertex) via a minted workload-identity ServiceAccount instead
+        # of an ANTHROPIC_API_KEY. Resolve the driver, mint / reuse the
+        # identity, and compute the model env BEFORE rendering so the SA
+        # name + model env land on the Job. A provider that doesn't support
+        # managed model (or missing identity config) fails the spawn with
+        # one actionable error rather than a silent skip that would leave
+        # the pod crash-looping on the missing key.
+        spec = getattr(task, "environment_spec", None)
+        model_service_account = ""
+        model_env: list[dict] | None = None
+        model_sa_manifest: dict | None = None
+        if spec is not None and getattr(spec, "managed_model", False):
+            from astrolift_dispatch.agent_model import (
+                ManagedModelError,
+                resolve_managed_model_wiring,
+            )
+
+            try:
+                wiring = resolve_managed_model_wiring(cluster=self._cluster, namespace=self._namespace)
+            except ManagedModelError as exc:
+                logger.warning("k8s_job_spawner: managed model wiring failed for Job %s: %s", job_name, exc)
+                return SpawnResult(external_id=job_name, ok=False, error=str(exc))
+            model_service_account = wiring.service_account
+            model_env = wiring.env
+            model_sa_manifest = wiring.service_account_manifest
+
         # Build a minimal Job manifest from the agent workload
         job_manifest = _render_agent_job(
             job_name=job_name,
             workload=workload,
             namespace=self._namespace,
             task=task,
+            service_account=model_service_account,
+            model_env=model_env,
         )
 
         # Inject Brief env vars
@@ -83,9 +113,16 @@ class K8sJobSpawner(ContainerSpawner):
             logger.warning("k8s_job_spawner: secret preflight failed for Job %s: %s", job_name, exc)
             return SpawnResult(external_id=job_name, ok=False, error=str(exc))
 
-        # Secret before Job so it exists when the pod starts. Non-secret
-        # specs apply the Job alone (unchanged path).
-        manifests = [secret_manifest, job_manifest] if secret_manifest else [job_manifest]
+        # Order: model SA (annotated with the cloud identity) first so it
+        # exists before the pod it binds, then the per-task Secret, then the
+        # Job. A non-managed / non-secret spec applies just the Job (the
+        # unchanged path).
+        manifests = []
+        if model_sa_manifest is not None:
+            manifests.append(model_sa_manifest)
+        if secret_manifest:
+            manifests.append(secret_manifest)
+        manifests.append(job_manifest)
 
         try:
             driver = _driver_for_cluster(self._cluster)
@@ -234,8 +271,24 @@ def _resolve_base_image(workload, spec) -> str:
     return "gcr.io/distroless/base"
 
 
-def _render_agent_job(*, job_name: str, workload, namespace: str, task) -> dict:
-    """Build a minimal batch/v1 Job manifest for an agent workload."""
+def _render_agent_job(
+    *,
+    job_name: str,
+    workload,
+    namespace: str,
+    task,
+    service_account: str = "",
+    model_env: list[dict] | None = None,
+) -> dict:
+    """Build a minimal batch/v1 Job manifest for an agent workload.
+
+    ``service_account`` sets ``serviceAccountName`` on the pod template
+    (managed-model tasks run under the annotated model SA; omitted → the
+    namespace ``default``, unchanged). ``model_env`` is the managed-model
+    provider env, prepended BEFORE the spec's own env so an explicit spec
+    override of the same name wins (k8s takes the later duplicate — the
+    same ordering ``agent_container_env`` relies on for plain-before-secret).
+    """
     from astrolift_dispatch.agent_secrets import agent_container_env, task_secret_name
 
     primary_container = workload.containers.filter(is_primary=True).first()
@@ -247,8 +300,9 @@ def _render_agent_job(*, job_name: str, workload, namespace: str, task) -> dict:
     # The spec's non-secret env vars go on the pod as plain env; its
     # secret_refs become secretKeyRef entries pointing at the per-task
     # Secret the spawner materializes (see K8sJobSpawner.spawn / #1173).
-    # Values never touch this manifest.
-    container_env = agent_container_env(spec, task_secret_name(job_name))
+    # Values never touch this manifest. Managed-model env goes first so a
+    # spec env/secret of the same name overrides the injected default.
+    container_env = list(model_env or []) + agent_container_env(spec, task_secret_name(job_name))
 
     # VNC-capable runs swap to the -vnc image variant and expose the
     # raw RFB port (5900) so the ASGI relay can port-forward into it.
@@ -300,6 +354,10 @@ def _render_agent_job(*, job_name: str, workload, namespace: str, task) -> dict:
                 },
                 "spec": {
                     "restartPolicy": "Never",
+                    # Managed-model tasks run under the annotated model SA so
+                    # the pod-identity webhook injects the cloud model
+                    # credential; omitted otherwise (the namespace default).
+                    **({"serviceAccountName": service_account} if service_account else {}),
                     "containers": [
                         {
                             "name": "agent",

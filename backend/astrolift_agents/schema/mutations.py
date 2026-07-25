@@ -105,6 +105,10 @@ class CreateAgentEnvironmentSpecInput:
     tool_preset: str = ""
     allow_install: bool = False
     vnc_enabled: bool = False
+    # When on, task pods use the cluster's cloud-native model provider
+    # (AWS→Bedrock, GCP→Vertex) via a minted workload identity instead of
+    # an ANTHROPIC_API_KEY. See the dispatcher's managed-model wiring.
+    managed_model: bool = False
     config_repo: str = ""
     config_branch: str = "main"
     config_manifest_path: str = ""
@@ -127,6 +131,7 @@ class UpdateAgentEnvironmentSpecInput:
     tool_preset: str | None = None
     allow_install: bool | None = None
     vnc_enabled: bool | None = None
+    managed_model: bool | None = None
     config_repo: str | None = None
     config_branch: str | None = None
     config_manifest_path: str | None = None
@@ -675,6 +680,7 @@ class AgentsMutation:
                 tool_preset=(input.tool_preset or "").strip()[:128],
                 allow_install=bool(input.allow_install),
                 vnc_enabled=bool(input.vnc_enabled),
+                managed_model=bool(input.managed_model),
                 config_repo=(input.config_repo or "").strip()[:512],
                 config_branch=(input.config_branch or "main").strip()[:128],
                 config_manifest_path=(input.config_manifest_path or "").strip()[:512],
@@ -720,6 +726,8 @@ class AgentsMutation:
             spec.allow_install = bool(input.allow_install)
         if input.vnc_enabled is not None:
             spec.vnc_enabled = bool(input.vnc_enabled)
+        if input.managed_model is not None:
+            spec.managed_model = bool(input.managed_model)
         if input.config_repo is not None:
             spec.config_repo = input.config_repo.strip()[:512]
         if input.config_branch is not None:

@@ -175,6 +175,10 @@ class AgentEnvironmentSpecType:
     tool_preset: str
     allow_install: bool
     vnc_enabled: bool
+    # When on, the task pod uses the cluster's cloud-native model provider
+    # (AWS→Bedrock, GCP→Vertex) via a workload-identity ServiceAccount
+    # instead of an ANTHROPIC_API_KEY (resolved by the dispatcher at spawn).
+    managed_model: bool
     secret_refs: JSON
     env_vars: JSON
     config_repo: str
@@ -773,6 +777,7 @@ def agent_env_spec_to_type(s) -> AgentEnvironmentSpecType:
         tool_preset=s.tool_preset or "",
         allow_install=s.allow_install,
         vnc_enabled=s.vnc_enabled,
+        managed_model=s.managed_model,
         secret_refs=s.secret_refs or [],
         env_vars=s.env_vars or {},
         config_repo=s.config_repo or "",

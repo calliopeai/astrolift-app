@@ -43,6 +43,11 @@ class AgentEnvironmentSpec(BaseCoreModel):
     tool_preset = models.CharField(max_length=128, blank=True, default="")
     allow_install = models.BooleanField(default=False)
     vnc_enabled = models.BooleanField(default=False)
+    # Managed model: when on, the task pod uses the cluster's cloud-native
+    # model provider (AWS→Bedrock, GCP→Vertex) via a workload-identity
+    # ServiceAccount instead of an ANTHROPIC_API_KEY. The dispatcher mints
+    # the cloud identity + injects the provider's model env at spawn time.
+    managed_model = models.BooleanField(default=False)
     # Secret URIs only — values resolved by the dispatcher at launch time.
     # Never store values.  Format:
     #   [{"uri": "arn:aws:secretsmanager:...", "env_var": "GITHUB_TOKEN"}]

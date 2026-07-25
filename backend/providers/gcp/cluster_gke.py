@@ -24,6 +24,7 @@ from _sdk.cluster import (
     ClusterDriver,
     DeleteResult,
     JobStatus,
+    ManagedModelNotSupportedError,
     ManagementReport,
     Namespace,
     NamespaceState,
@@ -72,6 +73,18 @@ if TYPE_CHECKING:
 # cache key is the (project, location, cluster_name) triple — one
 # entry per cluster the driver talks to.
 _WI_KUBECONFIG_TTL_SECONDS = 50 * 60
+
+
+# ---- Managed model (Vertex) defaults --------------------------------
+#
+# Default Vertex AI model ids injected on the managed-model agent path
+# (Claude Code on Vertex reads ANTHROPIC_MODEL / ANTHROPIC_SMALL_FAST_MODEL).
+# A Claude Sonnet + Claude Haiku pair in Vertex's ``model@version`` form.
+# Overridable per-cluster via ``provider_config["vertex_model_id"]`` /
+# ``["vertex_small_fast_model_id"]``; the operator must have Claude model
+# access enabled in the project + region.
+_DEFAULT_VERTEX_MODEL_ID = "claude-sonnet-4@20250514"
+_DEFAULT_VERTEX_SMALL_FAST_MODEL_ID = "claude-3-5-haiku@20241022"
 
 
 # Curated GCP regions for the cluster-register picker (#860). Live
@@ -781,6 +794,47 @@ class GKEClusterDriver(ClusterDriver):
         for a stable, scannable list.
         """
         return [RegionInfo(id=slug, label=label, continent=continent) for slug, label, continent in _GCP_REGIONS]
+
+    # ---- managed model (Vertex auto-wire) -------------------------
+
+    @driver_op(cloud="gcp", driver="cluster", heartbeat=False)
+    def agent_model_env(self, *, region: str, provider_config: dict[str, Any]) -> dict[str, str]:
+        """Vertex AI model env for the managed-model agent path.
+
+        Returns the env a Claude Code runner reads to target Vertex
+        instead of an ANTHROPIC_API_KEY: ``CLAUDE_CODE_USE_VERTEX=1`` +
+        ``CLOUD_ML_REGION`` + ``ANTHROPIC_VERTEX_PROJECT_ID`` + the Sonnet
+        / Haiku model ids. The project id comes from
+        ``provider_config["project_id"]`` (falling back to the driver's
+        configured project); model ids default to
+        :data:`_DEFAULT_VERTEX_MODEL_ID` / :data:`_DEFAULT_VERTEX_SMALL_FAST_MODEL_ID`
+        and are overridable via ``provider_config``. ``region`` falls back
+        to the driver's configured location. Pure — no cloud call.
+
+        Raises :class:`ManagedModelNotSupportedError` when no GCP project
+        can be resolved (Vertex is project-scoped — an empty project can't
+        target a model). NOTE: the Workload Identity *binding* the pod
+        needs is not yet minted here — GKE managed model fails fast at
+        ``ensure_agent_model_identity`` (the inherited default) until that
+        wiring lands; this method exists so the env contract is defined.
+        """
+        provider_config = provider_config or {}
+        project_id = str(provider_config.get("project_id") or self._config.project_id or "").strip()
+        if not project_id:
+            raise ManagedModelNotSupportedError(
+                "managed model on GCP requires a project id (set provider_config['project_id'] on the cluster)",
+            )
+        model_id = str(provider_config.get("vertex_model_id") or _DEFAULT_VERTEX_MODEL_ID)
+        small_fast = str(
+            provider_config.get("vertex_small_fast_model_id") or _DEFAULT_VERTEX_SMALL_FAST_MODEL_ID,
+        )
+        return {
+            "CLAUDE_CODE_USE_VERTEX": "1",
+            "CLOUD_ML_REGION": region or self._config.location,
+            "ANTHROPIC_VERTEX_PROJECT_ID": project_id,
+            "ANTHROPIC_MODEL": model_id,
+            "ANTHROPIC_SMALL_FAST_MODEL": small_fast,
+        }
 
     def _k8s(self, cluster: str) -> Any:
         if cluster in self._k8s_cache:

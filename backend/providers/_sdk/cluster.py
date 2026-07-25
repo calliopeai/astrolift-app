@@ -808,6 +808,19 @@ class CertificateInfo:
     status: str
 
 
+class ManagedModelNotSupportedError(Exception):
+    """A cluster provider can't satisfy the "managed model" agent auto-wire.
+
+    Raised by the base :meth:`ClusterDriver.agent_model_env` /
+    :meth:`ClusterDriver.ensure_agent_model_identity` defaults (a provider
+    that doesn't implement the cloud-native model path), and by concrete
+    drivers when the required wiring is absent (e.g. no GCP project on the
+    Vertex path, an unreadable EKS OIDC issuer). The dispatch layer surfaces
+    the message on the task so the operator sees an actionable reason rather
+    than a silent skip.
+    """
+
+
 class ClusterDriver(Protocol):
     """Protocol for applying, querying, and managing Kubernetes objects on a target cluster.
 
@@ -1034,6 +1047,56 @@ class ClusterDriver(Protocol):
         can pick from at install time (e.g. tls_issuer mode).
         """
         ...
+
+    # ---- Managed model (agent auto-wire) --------------------------
+    #
+    # When an agent's environment spec has the "managed model" switch on,
+    # its task pod talks to the CLUSTER'S cloud-native model provider
+    # (AWS→Bedrock, GCP→Vertex) instead of an ANTHROPIC_API_KEY. Two
+    # cloud-specific pieces: the env the runner reads to target the
+    # provider (``agent_model_env``), and the workload identity the pod
+    # assumes to call it (``ensure_agent_model_identity``). Both default
+    # to raising :class:`ManagedModelNotSupportedError` so a provider that
+    # hasn't wired the path fails fast with an actionable message rather
+    # than silently dropping the request.
+
+    def agent_model_env(self, *, region: str, provider_config: dict[str, Any]) -> dict[str, str]:
+        """Return the container env that points an agent runner at this
+        cluster's cloud-native model provider.
+
+        ``region`` is the cluster's region (the caller threads the
+        TenantCluster's ``region``); ``provider_config`` is the cluster's
+        ``provider_config`` JSON, from which a driver reads model-id /
+        project overrides. Returns a ``{name: value}`` env map (e.g.
+        ``CLAUDE_CODE_USE_BEDROCK=1`` + model ids on AWS).
+
+        The default raises — a provider without a managed-model path is
+        an explicit, surfaced failure, not a no-op.
+        """
+        raise ManagedModelNotSupportedError(
+            "managed model is not supported on this cluster provider",
+        )
+
+    def ensure_agent_model_identity(
+        self,
+        *,
+        namespace: str,
+        service_account: str,
+        provider_config: dict[str, Any],
+    ) -> str:
+        """Idempotently ensure a cloud identity the ``service_account`` in
+        ``namespace`` can assume to call the managed model, returning its
+        cloud identifier (e.g. an IAM role ARN on AWS).
+
+        Reuses / mints in place so a re-dispatch converges rather than
+        duplicating. When ``provider_config`` supplies an explicit,
+        operator-provisioned identifier the driver uses it verbatim
+        instead of minting. The default raises — workload identity is
+        cloud-specific and unimplemented providers must fail fast.
+        """
+        raise ManagedModelNotSupportedError(
+            "managed model workload identity is not configured for this cluster provider",
+        )
 
     # ---- Cluster teardown (#337) ----------------------------------
 

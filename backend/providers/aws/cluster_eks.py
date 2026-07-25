@@ -49,6 +49,7 @@ from _sdk.cluster import (
     DeleteResult,
     ExecResult,
     JobStatus,
+    ManagedModelNotSupportedError,
     ManagementReport,
     Namespace,
     NamespaceState,
@@ -87,6 +88,7 @@ from _sdk.k8s_dynamic_client import (
 from aws._eks_auth import mint_eks_token
 from aws._errors import NotFoundError, map_client_error
 from aws._knative import KNATIVE_OPERATOR_MANIFESTS
+from aws._naming import iam_role_name
 from k8s_native.management import (
     ManagementBackend,
     default_management_backend,
@@ -102,6 +104,20 @@ from k8s_native.observability import (
 )
 
 log = logging.getLogger("astrolift_providers.aws.cluster_eks")
+
+# ---- Managed model (Bedrock) defaults -------------------------------
+#
+# Default Bedrock model ids injected on the managed-model agent path
+# (Claude Code on Bedrock reads ANTHROPIC_MODEL / ANTHROPIC_SMALL_FAST_MODEL).
+# A Claude Sonnet + Claude Haiku pair, given as cross-region *inference
+# profile* ids (the ``us.`` geo prefix — Bedrock's on-demand Claude models
+# are only invokable through an inference profile, not the bare model id).
+# Overridable per-cluster via ``provider_config["bedrock_model_id"]`` /
+# ``["bedrock_small_fast_model_id"]`` — operators outside the US partition
+# repoint these to their ``eu.`` / ``apac.`` profiles (and must have model
+# access enabled in the account/region).
+_DEFAULT_BEDROCK_MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+_DEFAULT_BEDROCK_SMALL_FAST_MODEL_ID = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
 
 # ---- Knative Serving request-log template (#kind=function) ----------
 #
@@ -264,6 +280,7 @@ class EKSClusterDriver(ClusterDriver):
         ec2_client: Any | None = None,
         cognito_idp_client: Any | None = None,
         acm_client: Any | None = None,
+        iam_client: Any | None = None,
         k8s_client_factory: Callable[..., Any] | None = None,
         pod_backend: PodBackend | None = None,
         log_backend: LogBackend | None = None,
@@ -300,6 +317,11 @@ class EKSClusterDriver(ClusterDriver):
         # flows don't pay for a client they never use. Injectable for moto
         # tests, mirroring eks/sts/ec2 above.
         self._acm: Any | None = acm_client
+        # IAM client is built lazily on first ``ensure_agent_model_identity``
+        # call (the managed-model path) so the common apply / observability
+        # flows don't pay for a client they never touch. Injectable for moto
+        # tests, mirroring the ACM/Cognito lazy clients.
+        self._iam: Any | None = iam_client
         # Factory injection lets tests pass a stubbed kubernetes
         # client without contacting a real apiserver.
         self._k8s_factory = k8s_client_factory or _build_k8s_client
@@ -2016,6 +2038,154 @@ class EKSClusterDriver(ClusterDriver):
                 )
         return out
 
+    # ---- managed model (Bedrock auto-wire) ------------------------
+
+    @driver_op(cloud="aws", driver="cluster", heartbeat=False)
+    def agent_model_env(self, *, region: str, provider_config: dict[str, Any]) -> dict[str, str]:
+        """Bedrock model env for the managed-model agent path.
+
+        Returns the env a Claude Code runner reads to target Bedrock
+        instead of an ANTHROPIC_API_KEY: ``CLAUDE_CODE_USE_BEDROCK=1`` +
+        ``AWS_REGION`` + the Sonnet / Haiku model ids. The ids default to
+        a cross-region inference-profile pair (:data:`_DEFAULT_BEDROCK_MODEL_ID`
+        / :data:`_DEFAULT_BEDROCK_SMALL_FAST_MODEL_ID`) and are overridable
+        via ``provider_config["bedrock_model_id"]`` /
+        ``["bedrock_small_fast_model_id"]``. ``region`` falls back to the
+        driver's configured region. Pure — no cloud call.
+        """
+        provider_config = provider_config or {}
+        model_id = str(provider_config.get("bedrock_model_id") or _DEFAULT_BEDROCK_MODEL_ID)
+        small_fast = str(
+            provider_config.get("bedrock_small_fast_model_id") or _DEFAULT_BEDROCK_SMALL_FAST_MODEL_ID,
+        )
+        return {
+            "CLAUDE_CODE_USE_BEDROCK": "1",
+            "AWS_REGION": region or self._config.region,
+            "ANTHROPIC_MODEL": model_id,
+            "ANTHROPIC_SMALL_FAST_MODEL": small_fast,
+        }
+
+    @driver_op(cloud="aws", driver="cluster", audit=True, sensitive_kind="cluster.ensure_agent_model_identity")
+    def ensure_agent_model_identity(
+        self,
+        *,
+        namespace: str,
+        service_account: str,
+        provider_config: dict[str, Any],
+    ) -> str:
+        """Idempotently mint (or reuse) the IRSA role the managed-model
+        pod's ServiceAccount assumes to call ``bedrock:InvokeModel``.
+
+        Reuses the platform's proven IAM idempotency pattern (create →
+        EntityAlreadyExists → update trust + re-put inline policy). The
+        trust policy binds the cluster's EKS OIDC issuer to the
+        ``system:serviceaccount:<namespace>:<service_account>`` subject
+        with ``aud = sts.amazonaws.com``; the inline policy grants
+        ``bedrock:InvokeModel`` + ``bedrock:InvokeModelWithResponseStream``
+        (``Resource "*"`` by default, narrowable via
+        ``provider_config["bedrock_model_arns"]``). Returns the role ARN.
+
+        Operator override: when ``provider_config["agent_model_role_arn"]``
+        is set the driver uses that ARN verbatim and mints nothing — for
+        installs whose role is provisioned out-of-band (Terraform / the
+        control-plane task role can't ``iam:CreateRole``).
+        """
+        import json
+
+        provider_config = provider_config or {}
+        # Operator-provisioned override wins — skip minting entirely.
+        explicit = str(provider_config.get("agent_model_role_arn") or "").strip()
+        if explicit:
+            return explicit
+
+        issuer = self._oidc_issuer()
+        if not issuer:
+            raise ManagedModelNotSupportedError(
+                f"cluster {self._config.cluster_name!r}: could not resolve the EKS OIDC "
+                "issuer (DescribeCluster returned none); the cluster's IAM OIDC provider "
+                "must exist before a managed-model role can be minted",
+            )
+
+        account_id = str(provider_config.get("account_id") or "").strip()
+        if not account_id:
+            try:
+                account_id = self._sts.get_caller_identity()["Account"]
+            except Exception as exc:  # no account id ⇒ can't build the ARN
+                raise map_client_error(exc) from exc
+
+        role_name = iam_role_name("astrolift", "agent-model", self._config.cluster_name, namespace)
+        oidc_arn = f"arn:aws:iam::{account_id}:oidc-provider/{issuer}"
+        trust_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"Federated": oidc_arn},
+                    "Action": "sts:AssumeRoleWithWebIdentity",
+                    "Condition": {
+                        "StringEquals": {
+                            f"{issuer}:aud": "sts.amazonaws.com",
+                            f"{issuer}:sub": f"system:serviceaccount:{namespace}:{service_account}",
+                        },
+                    },
+                },
+            ],
+        }
+        # Least-privilege escape hatch: narrow the invoke Resource to
+        # specific foundation-model / inference-profile ARNs via
+        # provider_config; default "*" keeps the common case zero-config.
+        resources = provider_config.get("bedrock_model_arns") or "*"
+        invoke_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "bedrock:InvokeModel",
+                        "bedrock:InvokeModelWithResponseStream",
+                    ],
+                    "Resource": resources,
+                },
+            ],
+        }
+
+        iam = self._iam_client()
+        try:
+            response = iam.create_role(
+                RoleName=role_name,
+                AssumeRolePolicyDocument=json.dumps(trust_policy),
+                # ASCII-only Description — IAM rejects non-Latin-1 (#1026).
+                Description=(
+                    f"Astrolift managed-model (Bedrock) role for "
+                    f"{namespace}:{service_account} on {self._config.cluster_name}"
+                ),
+                # Tag like every platform-minted role so the orphan scan
+                # (#995) can reap it if a teardown is interrupted.
+                Tags=[{"Key": "astrolift.io/managed-by", "Value": "platform"}],
+            )
+            role_arn = response["Role"]["Arn"]
+        except iam.exceptions.EntityAlreadyExistsException:
+            # Idempotent: the role exists — reconcile its trust (the OIDC
+            # issuer or SA subject may have changed) and re-read the ARN.
+            # put_role_policy below is idempotent too.
+            iam.update_assume_role_policy(
+                RoleName=role_name,
+                PolicyDocument=json.dumps(trust_policy),
+            )
+            role_arn = iam.get_role(RoleName=role_name)["Role"]["Arn"]
+        except Exception as exc:  # surface a typed provider error
+            raise map_client_error(exc) from exc
+
+        try:
+            iam.put_role_policy(
+                RoleName=role_name,
+                PolicyName="bedrock-invoke",
+                PolicyDocument=json.dumps(invoke_policy),
+            )
+        except Exception as exc:  # surface a typed provider error
+            raise map_client_error(exc) from exc
+        return role_arn
+
     # ---- internals ------------------------------------------------
 
     def _acm_client(self) -> Any:
@@ -2027,6 +2197,40 @@ class EKSClusterDriver(ClusterDriver):
 
             self._acm = boto3.client("acm", region_name=self._config.region)
         return self._acm
+
+    def _iam_client(self) -> Any:
+        """Lazily build (and cache) the IAM boto3 client. IAM is a global
+        service; the region is cosmetic but kept consistent with the
+        cluster's other clients. Injectable via the ``iam_client`` ctor
+        kwarg for moto tests (mirrors ``_acm_client``)."""
+        if self._iam is None:
+            import boto3
+
+            self._iam = boto3.client("iam", region_name=self._config.region)
+        return self._iam
+
+    def _oidc_issuer(self) -> str:
+        """Resolve the cluster's EKS OIDC issuer (host + path, no scheme)
+        via DescribeCluster, or ``""`` when it can't be read.
+
+        The IAM ``oidc-provider/<issuer>`` principal + the ``<issuer>:sub``
+        / ``<issuer>:aud`` trust conditions are built from this, so an empty
+        value means "can't bind workload identity yet" — the caller raises
+        rather than mint a broken trust. Uses the driver's injected EKS
+        client so moto / fake-client tests resolve it without a live
+        cluster (mirrors ``aws.identity_irsa.discover_oidc_issuer`` but
+        reuses ``self._eks`` rather than a fresh boto3 client)."""
+        try:
+            cluster = self._eks.describe_cluster(name=self._config.cluster_name)["cluster"]
+        except Exception as exc:  # unreadable issuer ⇒ empty, caller decides
+            log.warning(
+                "agent_model_identity: DescribeCluster failed for %s: %s",
+                self._config.cluster_name,
+                exc,
+            )
+            return ""
+        issuer = (((cluster.get("identity") or {}).get("oidc") or {}).get("issuer")) or ""
+        return issuer.removeprefix("https://")
 
     def _k8s(self, cluster: str) -> Any:
         """Get / build the cached kubernetes client for the cluster.
