@@ -625,6 +625,37 @@ class BootstrapComponent:
     component depends on at install time (e.g. kube-prometheus-stack waiting
     for aws-load-balancer-controller's webhook to be live)."""
 
+    post_install_manifests: list[dict[str, Any]] = field(default_factory=list)
+    """Raw Kubernetes manifests applied (idempotent server-side apply)
+    *after* this component's HelmRelease is applied, in the same install
+    run. Use for objects the Helm chart itself does not create but that
+    complete the component — the canonical case is an *operator* chart:
+    the HelmRelease installs the operator + its CRDs, and these manifests
+    carry the Custom Resource that drives the operator to actually stand
+    the platform up (e.g. the ``knative-operator`` chart plus a
+    ``KnativeServing`` CR + its ``knative-serving`` Namespace).
+
+    Ordering:
+      - Across components, ``install_prereqs`` applies these in
+        ``depends_on`` order (a component's manifests land after the
+        components it depends on).
+      - Within a component, list order is honored *and* foundational
+        kinds (``Namespace``, ``CustomResourceDefinition``) are applied
+        first, so a CR that lands in a Namespace / uses a CRD declared in
+        the same list doesn't 404.
+
+    Failure handling is best-effort per component: a failure is logged +
+    surfaced (it never rolls back a sibling component's HelmRelease). When
+    a manifest targets a CRD the component's own chart *just* registered
+    — so the CRD may not exist yet on the first pass — the activity
+    tolerates the transient ``"no matches for kind"`` by letting Temporal
+    re-run the activity; the operator finishes reconciling and the
+    idempotent re-apply lands the CR. This is the same convergence path
+    the code already uses for Flux's own CRDs.
+
+    Empty (the default) means the component installs via its HelmRelease
+    alone — every existing component is unchanged."""
+
 
 @dataclass(frozen=True)
 class PodPhaseSummary:

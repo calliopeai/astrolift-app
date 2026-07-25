@@ -86,6 +86,7 @@ from _sdk.k8s_dynamic_client import (
 )
 from aws._eks_auth import mint_eks_token
 from aws._errors import NotFoundError, map_client_error
+from aws._knative import KNATIVE_OPERATOR_MANIFESTS
 from k8s_native.management import (
     ManagementBackend,
     default_management_backend,
@@ -101,6 +102,33 @@ from k8s_native.observability import (
 )
 
 log = logging.getLogger("astrolift_providers.aws.cluster_eks")
+
+# ---- Knative Serving request-log template (#kind=function) ----------
+#
+# A Go text/template evaluated by Knative's queue-proxy for every request
+# to a ``kind=function`` workload (a serving.knative.dev Service). Emitting
+# it as structured JSON on the pod's stdout pre-wires the *future* function
+# invocation pipeline: a log tailer can parse one line into a
+# ``FunctionInvocation`` row (method -> http_method, path -> http_path,
+# status -> http_status_code, latency -> duration_ms, revision.podName ->
+# k8s_pod_name). The template variable names below are Knative's documented
+# request-log fields (``.Request.Method`` / ``.Request.RequestURI`` /
+# ``.Response.Code`` / ``.Response.Latency`` / ``.Revision.*``) — the same
+# ones Knative's built-in default template uses, so they're known-valid.
+# ``{{js ...}}`` escapes user-controlled strings for safe JSON embedding.
+_KNATIVE_REQUEST_LOG_TEMPLATE = (
+    '{"httpRequest": {'
+    '"requestMethod": "{{.Request.Method}}", '
+    '"requestUrl": "{{js .Request.RequestURI}}", '
+    '"status": {{.Response.Code}}, '
+    '"latency": "{{.Response.Latency}}s", '
+    '"protocol": "{{.Request.Proto}}"}, '
+    '"revision": {'
+    '"name": "{{.Revision.Name}}", '
+    '"service": "{{.Revision.Service}}", '
+    '"namespace": "{{.Revision.Namespace}}", '
+    '"podName": "{{.Revision.PodName}}"}}'
+)
 
 # Region slug -> (display label, continent grouping) for the
 # cluster-register picker (#860). ec2:DescribeRegions returns only the
@@ -338,10 +366,21 @@ class EKSClusterDriver(ClusterDriver):
             # timeout otherwise (#595-#598).
             maybe_heartbeat(f"cluster.apply_manifests:{cluster}")
             kind = manifest.get("kind", "")
-            name = manifest.get("metadata", {}).get("name", "")
+            meta = manifest.get("metadata") or {}
+            name = meta.get("name", "")
+            # Honor each manifest's own metadata.namespace (kubectl-style) so a
+            # single call can carry a multi-namespace batch — e.g. the Knative
+            # post-install applies the vendored operator (knative-operator ns)
+            # alongside the KnativeServing CR (knative-serving ns). The passed
+            # ``namespace`` is the default for manifests that don't declare one;
+            # server-side apply puts the namespace in the request path, so a CR
+            # forced into the wrong namespace would be 422-rejected. The
+            # apiserver ignores namespace for cluster-scoped kinds (Namespace,
+            # CustomResourceDefinition, ClusterRole/Binding).
+            manifest_ns = meta.get("namespace") or namespace
             try:
                 outcome = client.server_side_apply(
-                    namespace=namespace,
+                    namespace=manifest_ns,
                     manifest=manifest,
                     dry_run=dry_run,
                 )
@@ -350,7 +389,7 @@ class EKSClusterDriver(ClusterDriver):
                     ApplyError(
                         kind=kind,
                         name=name,
-                        namespace=namespace,
+                        namespace=manifest_ns,
                         exception_type=type(exc).__name__,
                         exception_message=str(exc),
                         is_retryable=classify_apply_error(exc),
@@ -1128,6 +1167,56 @@ class EKSClusterDriver(ClusterDriver):
             # health on every Ingress reconcile (e.g. auth-gate toggle).
             alb_values["manageBackendSecurityGroupRules"] = False
 
+        # Knative Serving post-install objects (opt-in knative-serving
+        # component below). The component is chart-free: instead of a
+        # HelmRelease it applies the vendored official Knative Operator YAML
+        # (KNATIVE_OPERATOR_MANIFESTS — the operator + its operator.knative.dev
+        # CRDs) followed by these two objects, which drive the operator to
+        # stand Knative Serving up. The install path sorts foundational kinds
+        # (Namespace / CRD) first, so the operator's CRDs register before the
+        # KnativeServing CR lands. Static — no cluster-specific values — but
+        # built fresh per call so the frozen component never shares a mutable
+        # list across driver instances.
+        knative_serving_namespace = {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "name": "knative-serving",
+                "labels": {"astrolift.io/managed-by": "platform"},
+            },
+        }
+        knative_serving_cr = {
+            "apiVersion": "operator.knative.dev/v1beta1",
+            "kind": "KnativeServing",
+            "metadata": {
+                "name": "knative-serving",
+                "namespace": "knative-serving",
+                "labels": {"astrolift.io/managed-by": "platform"},
+            },
+            "spec": {
+                # Kourier is Knative's lightweight Envoy gateway — no Istio
+                # dependency. Selecting it here also requires pointing the
+                # default ingress class at Kourier (below), otherwise
+                # Knative keeps expecting Istio and Routes never program.
+                "ingress": {"kourier": {"enabled": True}},
+                "config": {
+                    "network": {
+                        "ingress-class": "kourier.ingress.networking.knative.dev",
+                    },
+                    # config-observability keys (the operator strips the
+                    # ``config-`` prefix, so the block name is
+                    # ``observability``). Pre-enable request logging for the
+                    # future invocation pipeline; the template emits one JSON
+                    # line per request capturing method/path/status/duration/
+                    # revision.
+                    "observability": {
+                        "logging.enable-request-log": "true",
+                        "logging.request-log-template": _KNATIVE_REQUEST_LOG_TEMPLATE,
+                    },
+                },
+            },
+        }
+
         return [
             BootstrapComponent(
                 key="aws-load-balancer-controller",
@@ -1348,6 +1437,55 @@ class EKSClusterDriver(ClusterDriver):
                 # Wait until the ALB controller is ready to avoid "no endpoints"
                 # failures on the webhook call.
                 depends_on=["aws-load-balancer-controller"],
+            ),
+            BootstrapComponent(
+                key="knative-serving",
+                title="Knative Serving (function / serverless workloads)",
+                default_enabled=False,
+                rationale=(
+                    "Applies the vendored official Knative Operator install "
+                    "manifests (v1.16.0) plus a KnativeServing instance so "
+                    "kind=function workloads — rendered as serving.knative.dev "
+                    "Services with scale-to-zero — can run. Chart-free: the "
+                    "operator's OCI Helm chart isn't publicly pullable, so the "
+                    "operator YAML ships as post-install manifests rather than a "
+                    "HelmRelease. Opt-in: Knative is heavyweight (operator + "
+                    "activator + autoscaler + Kourier ingress gateway), so "
+                    "enable it only on clusters that host functions; clusters "
+                    "without functions skip it. Kourier is the ingress (no Istio "
+                    "dependency) and request logging is pre-enabled so the "
+                    "invocation pipeline can record method/path/status/duration/"
+                    "revision per call. The operator's CRDs land before the "
+                    "KnativeServing CR via the install path's foundational-kinds-"
+                    "first ordering."
+                ),
+                helm_values={},
+                requires=[],
+                options=[],
+                # Chart-free component: no HelmRelease is emitted. The Knative
+                # Operator Helm chart is published only as an OCI artifact in the
+                # knative-releases Artifact Registry, which 403s unauthenticated
+                # pulls — so Flux can't install it. The operator is applied
+                # directly from the vendored official YAML in post_install below.
+                chart_name="",
+                chart_repo_url="",
+                chart_version="",
+                install_timeout="15m",
+                # Kourier's external gateway is a Service type=LoadBalancer; it
+                # needs the AWS LB controller present to get an NLB address, so
+                # gate the install on the controller being Ready (same rationale
+                # as kube-prometheus-stack / cert-manager).
+                depends_on=["aws-load-balancer-controller"],
+                # Vendored operator (Namespace + operator.knative.dev CRDs +
+                # Deployments/RBAC/webhooks) first, then the knative-serving
+                # Namespace + the KnativeServing CR. The install path sorts
+                # foundational kinds (Namespace / CRD) ahead of the CR, so the
+                # KnativeServing CRD is registered before the CR is applied.
+                post_install_manifests=[
+                    *KNATIVE_OPERATOR_MANIFESTS,
+                    knative_serving_namespace,
+                    knative_serving_cr,
+                ],
             ),
         ]
 

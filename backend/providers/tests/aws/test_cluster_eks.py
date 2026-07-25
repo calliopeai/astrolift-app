@@ -166,6 +166,35 @@ def test_apply_propagates_dry_run(
     )
 
 
+def test_apply_routes_each_manifest_to_its_own_namespace(
+    driver: EKSClusterDriver,
+    fake_k8s_client,
+) -> None:
+    """apply_manifests honors each manifest's own metadata.namespace
+    (kubectl-style), falling back to the passed namespace when a manifest
+    declares none. This lets one call carry a multi-namespace batch — the
+    Knative post-install applies the vendored operator (knative-operator ns)
+    alongside the KnativeServing CR (knative-serving ns) and a cluster-scoped
+    Namespace. Without this, server-side apply would push every object through
+    the single passed namespace and the apiserver would 422-reject the CR."""
+    driver.apply_manifests(
+        "aws-prod",
+        "fallback-ns",
+        [
+            {"kind": "Deployment", "metadata": {"name": "op", "namespace": "knative-operator"}},
+            {
+                "apiVersion": "operator.knative.dev/v1beta1",
+                "kind": "KnativeServing",
+                "metadata": {"name": "knative-serving", "namespace": "knative-serving"},
+            },
+            # Cluster-scoped, declares no namespace → falls back to the passed one.
+            {"kind": "Namespace", "metadata": {"name": "knative-serving"}},
+        ],
+    )
+    passed = [call.kwargs["namespace"] for call in fake_k8s_client.server_side_apply.call_args_list]
+    assert passed == ["knative-operator", "knative-serving", "fallback-ns"]
+
+
 # ---- delete_manifests --------------------------------------------
 
 
@@ -593,6 +622,139 @@ def test_discover_backend_sg_returns_empty_on_describe_error(fake_k8s_client) ->
         driver._ec2.describe_security_groups.side_effect = RuntimeError("boom")
 
         assert driver._discover_backend_sg(_CLUSTER) == ""
+
+
+# ---- bootstrap_components: Knative Serving (kind=function) ------------
+#
+# kind=function workloads render as serving.knative.dev Services but
+# nothing installed Knative. The knative-serving component is chart-free: the
+# Knative Operator's OCI Helm chart isn't publicly pullable, so instead of a
+# HelmRelease it carries the vendored official operator YAML plus the
+# KnativeServing CR + its namespace as post_install_manifests. It is opt-in
+# (Knative is heavyweight).
+
+
+def _knative_component(fake_k8s_client: Any):
+    driver = _mock_bootstrap_driver(fake_k8s_client)
+    ctx = ClusterContext(slug="aws-prod", auth_method="exec_plugin")
+    return _component(driver.bootstrap_components(ctx), "knative-serving")
+
+
+def test_bootstrap_includes_knative_serving_opt_in(fake_k8s_client) -> None:
+    """The EKS recipe ships a knative-serving component so kind=function
+    workloads can run, and it is opt-in (default_enabled=False) because
+    Knative is heavyweight. It is chart-free — the operator install ships as
+    vendored post_install manifests, not a HelmRelease (its OCI chart 403s)."""
+    component = _knative_component(fake_k8s_client)
+
+    assert component.default_enabled is False
+    # Chart-free: no HelmRelease is emitted for this component.
+    assert component.chart_name == ""
+    assert component.chart_repo_url == ""
+    assert component.chart_version == ""
+    # Gated behind the LB controller (Kourier's LoadBalancer needs it).
+    assert component.depends_on == ["aws-load-balancer-controller"]
+
+
+def test_bootstrap_knative_post_install_has_namespace_and_cr(fake_k8s_client) -> None:
+    """post_install_manifests must carry the knative-serving Namespace AND a
+    KnativeServing CR (operator.knative.dev/v1beta1) in the knative-serving
+    namespace — the objects that stand Knative up after the operator installs."""
+    component = _knative_component(fake_k8s_client)
+    manifests = component.post_install_manifests
+
+    ns = next(
+        m
+        for m in manifests
+        if m["kind"] == "Namespace" and m["metadata"]["name"] == "knative-serving"
+    )
+    assert ns["metadata"]["name"] == "knative-serving"
+
+    cr = next(m for m in manifests if m["kind"] == "KnativeServing")
+    assert cr["apiVersion"] == "operator.knative.dev/v1beta1"
+    assert cr["metadata"]["name"] == "knative-serving"
+    assert cr["metadata"]["namespace"] == "knative-serving"
+
+
+def test_bootstrap_knative_post_install_bundles_vendored_operator(fake_k8s_client) -> None:
+    """The chart-free component carries the vendored Knative Operator install:
+    the knative-operator Namespace and the operator.knative.dev CRDs ship in
+    post_install ahead of the KnativeServing CR, so applying the batch registers
+    the CRD before the CR (the install path sorts foundational kinds first)."""
+    component = _knative_component(fake_k8s_client)
+    manifests = component.post_install_manifests
+
+    # The vendored operator Namespace is present (distinct from knative-serving).
+    assert any(
+        m["kind"] == "Namespace" and m["metadata"]["name"] == "knative-operator"
+        for m in manifests
+    )
+    # The CRD that defines the KnativeServing CR is bundled (from the vendored
+    # YAML) so the CR has a registered type to bind to.
+    crd_names = {
+        m["metadata"]["name"]
+        for m in manifests
+        if m["kind"] == "CustomResourceDefinition"
+    }
+    assert "knativeservings.operator.knative.dev" in crd_names
+
+    # And that CRD is authored before the KnativeServing CR in the list, so the
+    # install path's foundational-first sort keeps it ahead of the CR.
+    def _index(pred):  # noqa: ANN001
+        return next(i for i, m in enumerate(manifests) if pred(m))
+
+    crd_i = _index(
+        lambda m: m["kind"] == "CustomResourceDefinition"
+        and m["metadata"]["name"] == "knativeservings.operator.knative.dev"
+    )
+    cr_i = _index(lambda m: m["kind"] == "KnativeServing")
+    assert crd_i < cr_i
+
+
+def test_bootstrap_knative_cr_uses_kourier_ingress(fake_k8s_client) -> None:
+    """Kourier is the ingress, and the default ingress-class is repointed to
+    Kourier (otherwise Knative keeps expecting Istio)."""
+    component = _knative_component(fake_k8s_client)
+    cr = next(m for m in component.post_install_manifests if m["kind"] == "KnativeServing")
+
+    assert cr["spec"]["ingress"]["kourier"]["enabled"] is True
+    assert (
+        cr["spec"]["config"]["network"]["ingress-class"]
+        == "kourier.ingress.networking.knative.dev"
+    )
+
+
+def test_bootstrap_knative_cr_pre_enables_request_logging(fake_k8s_client) -> None:
+    """Request logging is pre-enabled for the future invocation pipeline, and
+    the template captures method/path/status/duration/revision."""
+    component = _knative_component(fake_k8s_client)
+    cr = next(m for m in component.post_install_manifests if m["kind"] == "KnativeServing")
+    obs = cr["spec"]["config"]["observability"]
+
+    assert obs["logging.enable-request-log"] == "true"
+    template = obs["logging.request-log-template"]
+    for field_var in (
+        ".Request.Method",  # method
+        ".Request.RequestURI",  # path
+        ".Response.Code",  # status
+        ".Response.Latency",  # duration
+        ".Revision.Name",  # revision
+    ):
+        assert field_var in template
+
+
+def test_bootstrap_existing_components_have_no_post_install(fake_k8s_client) -> None:
+    """No regression: the pre-existing components install via their
+    HelmRelease alone (empty post_install_manifests). Only knative-serving
+    opts into the new post-install path."""
+    driver = _mock_bootstrap_driver(fake_k8s_client)
+    ctx = ClusterContext(slug="aws-prod", auth_method="exec_plugin")
+
+    for component in driver.bootstrap_components(ctx):
+        if component.key == "knative-serving":
+            assert component.post_install_manifests  # the one opt-in
+        else:
+            assert component.post_install_manifests == []
 
 
 # ---- list_certificates (#858) -------------------------------------

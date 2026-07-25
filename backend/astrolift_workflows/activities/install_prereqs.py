@@ -275,6 +275,141 @@ def _ensure_flux_installed(driver, ctx_slug: str) -> None:
     log.info("Flux bootstrap applied — caller should let Temporal retry for CRD registration")
 
 
+# Kinds applied first within a component's post_install_manifests: they
+# establish the scope (Namespace) or the type (CRD) that later manifests in
+# the same batch depend on, so a CR that lands in the Namespace / uses the
+# CRD doesn't 404 within one apply pass.
+_POST_INSTALL_FOUNDATIONAL_KINDS: frozenset[str] = frozenset(
+    {"Namespace", "CustomResourceDefinition"}
+)
+
+
+def _order_by_depends_on(components: list) -> list:
+    """Return ``components`` topologically ordered by ``depends_on``.
+
+    Each component appears after every component it depends on. Stable:
+    among independent components the original list order is preserved.
+    Missing deps (a key that isn't in this list) are ignored, and a
+    dependency cycle degrades gracefully to best-effort original order for
+    the offending nodes rather than raising — this ordering is an
+    optimization for apply sequencing, not a correctness gate (the applies
+    are individually idempotent + Temporal-retried).
+    """
+    by_key = {c.key: c for c in components}
+    ordered: list = []
+    placed: set[str] = set()
+    in_progress: set[str] = set()
+
+    def visit(component) -> None:  # noqa: ANN001
+        if component.key in placed or component.key in in_progress:
+            # Already placed, or a cycle led us back here — stop recursing.
+            return
+        in_progress.add(component.key)
+        for dep_key in component.depends_on:
+            dep = by_key.get(dep_key)
+            if dep is not None:
+                visit(dep)
+        in_progress.discard(component.key)
+        placed.add(component.key)
+        ordered.append(component)
+
+    for component in components:
+        visit(component)
+    return ordered
+
+
+def _post_install_namespace(manifests: list[dict[str, Any]], *, default: str) -> str:
+    """Namespace to pass to ``apply_manifests`` for a post-install batch.
+
+    The driver's server-side apply uses the *passed* namespace (not each
+    manifest's ``metadata.namespace``) for namespaced kinds, and ignores it
+    for cluster-scoped kinds (Namespace, CRD) — so one call can carry both
+    as long as the passed namespace matches the namespaced objects. We take
+    it from the first manifest that declares one (e.g. the KnativeServing CR
+    in ``knative-serving``); if every manifest is cluster-scoped we fall
+    back to ``default``.
+    """
+    for manifest in manifests:
+        ns = (manifest.get("metadata") or {}).get("namespace")
+        if ns:
+            return ns
+    return default
+
+
+def _apply_post_install_manifests(
+    driver: Any,
+    ctx_slug: str,
+    components: list,
+    selected_set: set[str],
+    target_namespace: str,
+) -> tuple[bool, list[str]]:
+    """Apply each selected component's ``post_install_manifests`` (idempotent
+    SSA) after its HelmRelease has been applied.
+
+    Ordering: components are visited in ``depends_on`` order; within a
+    component, foundational kinds (Namespace / CRD) apply before the rest.
+
+    Best-effort per component — a failure never rolls back a sibling's
+    HelmRelease. Returns ``(crd_not_ready, errors)``:
+
+      - ``crd_not_ready`` is True when a manifest failed only because its
+        CRD isn't registered yet (the component's operator chart was just
+        applied and Flux hasn't finished installing it). The caller raises a
+        retriable error so Temporal re-runs; by then the operator is up and
+        the idempotent re-apply lands the CR. This mirrors the Flux-own-CRD
+        convergence path (``_ensure_flux_installed`` + the retriable raise in
+        ``_install_cluster_prereqs_sync``).
+      - ``errors`` is the surfaced list of every per-manifest error string
+        (CRD-not-ready included) for the activity result + logs.
+    """
+    ordered_components = _order_by_depends_on(
+        [c for c in components if c.key in selected_set and c.post_install_manifests]
+    )
+    crd_not_ready = False
+    errors: list[str] = []
+
+    for component in ordered_components:
+        # Foundational kinds first (stable sort preserves author order within
+        # each group) so a CR doesn't 404 on a Namespace/CRD in the same batch.
+        manifests = sorted(
+            component.post_install_manifests,
+            key=lambda m: 0 if m.get("kind") in _POST_INSTALL_FOUNDATIONAL_KINDS else 1,
+        )
+        namespace = _post_install_namespace(manifests, default=target_namespace)
+        result = driver.apply_manifests(ctx_slug, namespace, manifests)
+
+        if result.ok:
+            log.info(
+                "install_cluster_prereqs: post-install %s applied "
+                "created=%d updated=%d unchanged=%d (ns=%s)",
+                component.key,
+                len(result.created),
+                len(result.updated),
+                len(result.unchanged),
+                namespace,
+            )
+            continue
+
+        if _flux_crd_missing(result.errors):
+            crd_not_ready = True
+            log.info(
+                "install_cluster_prereqs: post-install %s deferred — its "
+                "operator CRD isn't registered yet; Temporal will retry",
+                component.key,
+            )
+        for err in result.errors:
+            errors.append(str(err))
+            if not _flux_crd_missing([err]):
+                log.warning(
+                    "install_cluster_prereqs: post-install %s manifest error "
+                    "(non-fatal): %s",
+                    component.key,
+                    err,
+                )
+
+    return crd_not_ready, errors
+
+
 # Bootstrap-component key for the AWS EBS CSI driver (mirrors the key
 # EKSCluster.bootstrap_components emits). The component's IRSA role must be
 # minted by the platform before its controller can provision EBS volumes.
@@ -486,15 +621,32 @@ def _install_cluster_prereqs_sync(
             skipped.append(component.key)
             continue
         if not component.chart_repo_url:
-            # No chart for this component (e.g. cloud-native annotation-based
-            # TLS where ACM / GKE-managed / AppGW handles certs without an
-            # in-cluster controller). Record in applied so the UI reflects
-            # the operator's choice; no HelmRelease emitted.
-            log.info(
-                "install_cluster_prereqs: component %s has no chart — "
-                "skipping HelmRelease (cloud-native path)",
-                component.key,
-            )
+            # Chart-less component: emit NO HelmRelease. This branch only skips
+            # the HelmRelease render — it must NOT drop the component's
+            # post_install_manifests, which the post-install pass below applies
+            # (in depends_on order, foundational kinds first) regardless of
+            # whether the component had a chart. Two flavors:
+            #   - carries post_install_manifests (e.g. knative-serving: the
+            #     vendored Knative operator YAML + a KnativeServing CR) — those
+            #     stand the component up in place of a chart.
+            #   - no post_install_manifests — a true no-op (cloud-native
+            #     annotation-based TLS: ACM on EKS, GKE-managed certs, AppGW on
+            #     AKS handle certs without an in-cluster controller).
+            # Either way, record it in ``applied`` so the UI reflects the
+            # operator's choice.
+            if component.post_install_manifests:
+                log.info(
+                    "install_cluster_prereqs: component %s is chart-less — no "
+                    "HelmRelease; its %d post-install manifest(s) install it",
+                    component.key,
+                    len(component.post_install_manifests),
+                )
+            else:
+                log.info(
+                    "install_cluster_prereqs: component %s is chart-less with "
+                    "no post-install manifests — cloud-native no-op path",
+                    component.key,
+                )
             applied.append({"name": component.key, "version": ""})
             continue
 
@@ -667,6 +819,37 @@ def _install_cluster_prereqs_sync(
                 exc,
             )
 
+    # ---- Post-install manifests -----------------------------------------
+    # A component may ship raw k8s objects that complete its install once its
+    # HelmRelease is applied (e.g. the knative-operator chart installs the
+    # operator + CRDs; the KnativeServing CR + its namespace stand Knative up).
+    # Applied idempotently via SSA, in depends_on order. On the first run the
+    # operator chart Flux just started reconciling hasn't registered its CRDs
+    # yet, so the CR apply fails with "no matches for kind" — we treat that as
+    # transient and raise a retriable error so Temporal re-runs; the operator
+    # comes up and the idempotent re-apply lands the CR. Same convergence path
+    # the Flux-own-CRD bootstrap above uses.
+    post_install_crd_not_ready, post_install_errors = _apply_post_install_manifests(
+        driver,
+        ctx.slug,
+        components,
+        selected_set,
+        target_namespace,
+    )
+    if post_install_crd_not_ready:
+        from temporalio.exceptions import ApplicationError
+
+        log.info(
+            "install_cluster_prereqs: post-install CRs on cluster %s are waiting "
+            "for their operator's CRDs to register — Temporal will retry",
+            ctx.slug,
+        )
+        raise ApplicationError(
+            f"post-install custom resources on cluster {ctx.slug!r} are waiting "
+            "for their operator's CRDs to register — Temporal will retry",
+            non_retryable=False,
+        )
+
     return {
         "applied": applied,
         "skipped": skipped,
@@ -675,6 +858,7 @@ def _install_cluster_prereqs_sync(
         "created": list(result.created),
         "updated": list(result.updated),
         "unchanged": list(result.unchanged),
+        "post_install_errors": post_install_errors,
     }
 
 

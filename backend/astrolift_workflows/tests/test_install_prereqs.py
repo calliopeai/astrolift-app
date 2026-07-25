@@ -526,3 +526,419 @@ def test_provision_aws_controller_role_noop_on_non_aws(monkeypatch):
         )
         is None
     )
+
+
+# ---- post_install_manifests wiring (Knative Serving) -------------------
+#
+# A BootstrapComponent may carry raw k8s objects applied (idempotent SSA)
+# after its HelmRelease — the canonical case is the knative-operator chart
+# plus a KnativeServing CR + its namespace. These pin the ordering (depends_on
+# across components, foundational kinds first within one), the best-effort
+# failure surfacing, and the "operator CRD not ready yet → retry" signal.
+
+from _sdk.cluster import ApplyError, ApplyResult, BootstrapComponent, DeleteResult  # noqa: E402
+
+_KN_NS = {
+    "apiVersion": "v1",
+    "kind": "Namespace",
+    "metadata": {"name": "knative-serving"},
+}
+_KN_CR = {
+    "apiVersion": "operator.knative.dev/v1beta1",
+    "kind": "KnativeServing",
+    "metadata": {"name": "knative-serving", "namespace": "knative-serving"},
+}
+
+
+def _pi_component(key, manifests, depends_on=None):  # noqa: ANN001
+    """A BootstrapComponent carrying only the fields the post-install path
+    reads (key, depends_on, post_install_manifests)."""
+    return BootstrapComponent(
+        key=key,
+        title=key,
+        default_enabled=False,
+        rationale="",
+        post_install_manifests=manifests,
+        depends_on=depends_on or [],
+    )
+
+
+class _FakeDriver:
+    """Records apply_manifests calls and returns a canned/computed ApplyResult.
+
+    ``result_fn(namespace, manifests) -> ApplyResult`` lets a test simulate
+    partial failures (e.g. the CR fails while its Namespace succeeds)."""
+
+    def __init__(self, result_fn=None):  # noqa: ANN001
+        self.calls: list[tuple[str, str, list[dict]]] = []
+        self.deletes: list[tuple[str, str, list[dict]]] = []
+        self._result_fn = result_fn
+
+    def apply_manifests(self, ctx_slug, namespace, manifests, *, dry_run=False):  # noqa: ANN001
+        self.calls.append((ctx_slug, namespace, list(manifests)))
+        if self._result_fn is not None:
+            return self._result_fn(namespace, manifests)
+        return ApplyResult(
+            created=[f"{m['kind']}/{m['metadata']['name']}" for m in manifests],
+            updated=[],
+            unchanged=[],
+            errors=[],
+        )
+
+    def delete_manifests(self, ctx_slug, namespace, manifests):  # noqa: ANN001
+        """Records stale-cleanup deletes; reports everything not_found (nothing
+        to actually delete in the fake), which the sync flow treats as a no-op."""
+        self.deletes.append((ctx_slug, namespace, list(manifests)))
+        return DeleteResult(
+            deleted=[],
+            not_found=[f"{m['kind']}/{m['metadata']['name']}" for m in manifests],
+            errors=[],
+        )
+
+    @property
+    def applied_refs(self) -> list[tuple[str, str]]:
+        """(kind, name) in the order they were handed to the driver."""
+        refs: list[tuple[str, str]] = []
+        for _slug, _ns, manifests in self.calls:
+            for m in manifests:
+                refs.append((m["kind"], m["metadata"]["name"]))
+        return refs
+
+
+# ---- _order_by_depends_on ----------------------------------------------
+
+
+def test_order_by_depends_on_places_dependency_first():
+    from astrolift_workflows.activities.install_prereqs import _order_by_depends_on
+
+    a = _pi_component("a", [])
+    b = _pi_component("b", [], depends_on=["a"])
+    ordered = _order_by_depends_on([b, a])  # reversed input
+    assert [c.key for c in ordered] == ["a", "b"]
+
+
+def test_order_by_depends_on_tolerates_cycle():
+    """A dependency cycle degrades to best-effort order, not a crash."""
+    from astrolift_workflows.activities.install_prereqs import _order_by_depends_on
+
+    a = _pi_component("a", [], depends_on=["b"])
+    b = _pi_component("b", [], depends_on=["a"])
+    ordered = _order_by_depends_on([a, b])
+    assert {c.key for c in ordered} == {"a", "b"}
+
+
+def test_order_by_depends_on_ignores_missing_dep():
+    from astrolift_workflows.activities.install_prereqs import _order_by_depends_on
+
+    a = _pi_component("a", [], depends_on=["nonexistent"])
+    assert [c.key for c in _order_by_depends_on([a])] == ["a"]
+
+
+# ---- _post_install_namespace -------------------------------------------
+
+
+def test_post_install_namespace_prefers_declared_namespace():
+    from astrolift_workflows.activities.install_prereqs import _post_install_namespace
+
+    # NS is cluster-scoped (no metadata.namespace); the CR declares one.
+    assert _post_install_namespace([_KN_NS, _KN_CR], default="astrolift-system") == "knative-serving"
+
+
+def test_post_install_namespace_falls_back_when_all_cluster_scoped():
+    from astrolift_workflows.activities.install_prereqs import _post_install_namespace
+
+    assert _post_install_namespace([_KN_NS], default="astrolift-system") == "astrolift-system"
+
+
+# ---- _apply_post_install_manifests -------------------------------------
+
+
+def test_apply_post_install_applies_namespace_and_cr():
+    """The KnativeServing CR + its namespace flow through the driver, and the
+    Namespace is applied before the CR even if authored CR-first."""
+    from astrolift_workflows.activities.install_prereqs import _apply_post_install_manifests
+
+    driver = _FakeDriver()
+    comp = _pi_component("knative-serving", [_KN_CR, _KN_NS])  # deliberately CR-first
+
+    crd_not_ready, errors = _apply_post_install_manifests(
+        driver, "aws-prod", [comp], {"knative-serving"}, "astrolift-system"
+    )
+
+    assert crd_not_ready is False
+    assert errors == []
+    assert ("Namespace", "knative-serving") in driver.applied_refs
+    assert ("KnativeServing", "knative-serving") in driver.applied_refs
+    # Foundational-first: Namespace precedes the CR in the applied batch.
+    _slug, ns, manifests = driver.calls[0]
+    kinds = [m["kind"] for m in manifests]
+    assert kinds.index("Namespace") < kinds.index("KnativeServing")
+    # The namespaced CR drives the namespace passed to the driver.
+    assert ns == "knative-serving"
+
+
+def test_apply_post_install_orders_by_depends_on():
+    """Across components, a dependency's manifests are applied before its
+    dependent's, regardless of input order."""
+    from astrolift_workflows.activities.install_prereqs import _apply_post_install_manifests
+
+    driver = _FakeDriver()
+    a = _pi_component("a", [{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "a", "namespace": "x"}}])
+    b = _pi_component(
+        "b",
+        [{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "b", "namespace": "x"}}],
+        depends_on=["a"],
+    )
+
+    _apply_post_install_manifests(driver, "s", [b, a], {"a", "b"}, "astrolift-system")
+
+    names = [name for _kind, name in driver.applied_refs]
+    assert names.index("a") < names.index("b")
+
+
+def test_apply_post_install_empty_makes_no_apply_calls():
+    """No regression: a component with empty post_install_manifests never
+    reaches the driver."""
+    from astrolift_workflows.activities.install_prereqs import _apply_post_install_manifests
+
+    driver = _FakeDriver()
+    comp = _pi_component("metrics-server", [])
+
+    crd_not_ready, errors = _apply_post_install_manifests(
+        driver, "s", [comp], {"metrics-server"}, "astrolift-system"
+    )
+
+    assert crd_not_ready is False
+    assert errors == []
+    assert driver.calls == []
+
+
+def test_apply_post_install_skips_deselected_component():
+    """A component with post_install_manifests that the operator did NOT
+    select is not applied."""
+    from astrolift_workflows.activities.install_prereqs import _apply_post_install_manifests
+
+    driver = _FakeDriver()
+    comp = _pi_component("knative-serving", [_KN_NS, _KN_CR])
+
+    _apply_post_install_manifests(driver, "s", [comp], set(), "astrolift-system")
+
+    assert driver.calls == []
+
+
+def test_apply_post_install_crd_missing_signals_retry():
+    """When the CR's operator CRD isn't registered yet, the Namespace still
+    applies but the CR fails with 'no matches for kind' → crd_not_ready=True
+    (caller raises a retriable error) and the error is surfaced."""
+    from astrolift_workflows.activities.install_prereqs import _apply_post_install_manifests
+
+    def result_fn(namespace, manifests):  # noqa: ANN001
+        created: list[str] = []
+        errs: list[ApplyError] = []
+        for m in manifests:
+            if m["kind"] == "KnativeServing":
+                errs.append(
+                    ApplyError(
+                        kind="KnativeServing",
+                        name="knative-serving",
+                        namespace=namespace,
+                        exception_type="ResourceNotFoundError",
+                        exception_message="No matches found for operator.knative.dev/v1beta1/KnativeServing",
+                        is_retryable=False,
+                    )
+                )
+            else:
+                created.append(f"{m['kind']}/{m['metadata']['name']}")
+        return ApplyResult(created=created, updated=[], unchanged=[], errors=errs)
+
+    driver = _FakeDriver(result_fn)
+    comp = _pi_component("knative-serving", [_KN_NS, _KN_CR])
+
+    crd_not_ready, errors = _apply_post_install_manifests(
+        driver, "s", [comp], {"knative-serving"}, "astrolift-system"
+    )
+
+    assert crd_not_ready is True
+    assert any("No matches found" in e for e in errors)
+
+
+def test_apply_post_install_non_crd_error_is_best_effort():
+    """A genuine (non-CRD) error on one component is surfaced but does NOT
+    abort a sibling component's apply, and does not signal a retry."""
+    from astrolift_workflows.activities.install_prereqs import _apply_post_install_manifests
+
+    def result_fn(namespace, manifests):  # noqa: ANN001
+        if any(m["metadata"]["name"] == "bad" for m in manifests):
+            return ApplyResult(
+                created=[],
+                updated=[],
+                unchanged=[],
+                errors=[
+                    ApplyError(
+                        kind="ConfigMap",
+                        name="bad",
+                        namespace=namespace,
+                        exception_type="ValidationError",
+                        exception_message="invalid field xyz",
+                        is_retryable=False,
+                    )
+                ],
+            )
+        return ApplyResult(
+            created=[f"{m['kind']}/{m['metadata']['name']}" for m in manifests],
+            updated=[],
+            unchanged=[],
+            errors=[],
+        )
+
+    driver = _FakeDriver(result_fn)
+    bad = _pi_component("bad", [{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "bad", "namespace": "x"}}])
+    good = _pi_component("good", [{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "good", "namespace": "x"}}])
+
+    crd_not_ready, errors = _apply_post_install_manifests(
+        driver, "s", [bad, good], {"bad", "good"}, "astrolift-system"
+    )
+
+    assert crd_not_ready is False
+    assert any("invalid field xyz" in e for e in errors)
+    # best-effort: 'good' still applied despite 'bad' failing.
+    assert ("ConfigMap", "good") in driver.applied_refs
+
+
+# ---- _install_cluster_prereqs_sync: chart-less vs chart-based -----------
+#
+# A chart-less component (chart_repo_url == "") must emit NO HelmRelease, yet
+# still apply its post_install_manifests — the flavor the vendored Knative
+# operator install uses (the operator's OCI chart isn't pullable, so the
+# operator YAML ships as post_install instead of a HelmRelease). These drive
+# the whole sync activity with the DB + dispatch + driver mocked to prove the
+# render loop skips the HelmRelease but does not drop the post-install objects,
+# that a chart-less component with EMPTY post-install is a true no-op, and that
+# chart-based components are unaffected.
+
+
+def _chart_component(key, *, chart="thechart", repo="https://charts.example/", version="1.0.0"):  # noqa: ANN001
+    """A chart-based BootstrapComponent (emits a HelmRelease + HelmRepository)."""
+    return BootstrapComponent(
+        key=key,
+        title=key,
+        default_enabled=False,
+        rationale="",
+        chart_name=chart,
+        chart_repo_url=repo,
+        chart_version=version,
+    )
+
+
+def _run_install_sync(monkeypatch, components, driver, selected_keys, overrides=None):  # noqa: ANN001
+    """Drive ``_install_cluster_prereqs_sync`` with the DB row, dispatch, driver,
+    and context all mocked, returning its result dict. The IRSA-provision helpers
+    short-circuit because none of the test component keys are the AWS controller
+    keys, so no cloud calls are made."""
+    import astrolift_clusters.models as models
+    import core.cluster_management as cm
+    from astrolift_workflows.activities.install_prereqs import _install_cluster_prereqs_sync
+
+    fake_cluster = type(
+        "FakeCluster", (), {"provider_plugin": type("PP", (), {"slug": "test"})()}
+    )()
+
+    class _FakeManager:
+        def select_related(self, *a, **k):  # noqa: ANN002, ANN003
+            return self
+
+        def get(self, **k):  # noqa: ANN003
+            return fake_cluster
+
+    class _FakeTenantCluster:
+        objects = _FakeManager()
+
+    fake_ctx = type("Ctx", (), {"slug": "aws-prod"})()
+
+    monkeypatch.setattr(models, "TenantCluster", _FakeTenantCluster)
+    monkeypatch.setattr(cm, "_driver_for_cluster", lambda cluster: driver)  # noqa: ARG005
+    monkeypatch.setattr(cm, "_context_for_cluster", lambda cluster: fake_ctx)  # noqa: ARG005
+    monkeypatch.setattr(cm, "bootstrap_components_dispatch", lambda cluster: components)  # noqa: ARG005
+
+    return _install_cluster_prereqs_sync(1, list(selected_keys), overrides or {})
+
+
+def test_install_sync_chartless_with_post_install_applies_no_helmrelease(monkeypatch):
+    """A selected chart-less component emits NO HelmRelease/HelmRepository, but
+    its post_install_manifests still reach the driver (the Knative flavor)."""
+    pi_manifests = [
+        {"apiVersion": "v1", "kind": "Namespace", "metadata": {"name": "pi-ns"}},
+        {"apiVersion": "x.example/v1", "kind": "Widget", "metadata": {"name": "w", "namespace": "pi-ns"}},
+    ]
+    comp = _pi_component("chartless-pi", pi_manifests)
+    driver = _FakeDriver()
+
+    result = _run_install_sync(monkeypatch, [comp], driver, {"chartless-pi"})
+
+    # The HelmRelease batch (calls[0]) is empty — no chart means no release/repo.
+    _slug, first_ns, first_manifests = driver.calls[0]
+    assert first_ns == "astrolift-system"
+    assert first_manifests == []
+    # The post-install manifests DID land (a later apply call).
+    assert ("Namespace", "pi-ns") in driver.applied_refs
+    assert ("Widget", "w") in driver.applied_refs
+    # Recorded as applied so the UI reflects the operator's selection.
+    assert {"name": "chartless-pi", "version": ""} in result["applied"]
+
+
+def test_install_sync_chartless_empty_post_install_is_noop(monkeypatch):
+    """A selected chart-less component with EMPTY post_install is a full no-op:
+    no HelmRelease and no post-install apply — nothing lands on the cluster."""
+    comp = _pi_component("chartless-empty", [])
+    driver = _FakeDriver()
+
+    result = _run_install_sync(monkeypatch, [comp], driver, {"chartless-empty"})
+
+    # The only apply call is the (empty) HelmRelease batch; no manifests applied.
+    assert driver.applied_refs == []
+    assert all(manifests == [] for _slug, _ns, manifests in driver.calls)
+    # Still recorded as applied (the operator's choice is reflected in the UI).
+    assert {"name": "chartless-empty", "version": ""} in result["applied"]
+
+
+def test_install_sync_chartbased_emits_helmrelease(monkeypatch):
+    """Regression: a chart-based component still emits its HelmRepository +
+    HelmRelease and runs no post-install pass."""
+    comp = _chart_component("chartbased")
+    driver = _FakeDriver()
+
+    result = _run_install_sync(monkeypatch, [comp], driver, {"chartbased"})
+
+    # Exactly one apply call (no post-install) carrying the repo + release.
+    assert len(driver.calls) == 1
+    _slug, _ns, manifests = driver.calls[0]
+    kinds = [m["kind"] for m in manifests]
+    assert "HelmRepository" in kinds
+    assert "HelmRelease" in kinds
+    release = next(m for m in manifests if m["kind"] == "HelmRelease")
+    assert release["metadata"]["name"] == "astrolift-chartbased"
+    assert release["spec"]["chart"]["spec"]["chart"] == "thechart"
+    assert {"name": "chartbased", "version": "1.0.0"} in result["applied"]
+
+
+def test_install_sync_mixed_chartbased_and_chartless_pi(monkeypatch):
+    """Chart-based and chart-less-with-post-install coexist: the HelmRelease
+    batch carries only the chart component's release (never one for the
+    chart-less component), and the chart-less component's post-install still
+    lands."""
+    pi = _pi_component(
+        "chartless-pi",
+        [{"apiVersion": "v1", "kind": "Namespace", "metadata": {"name": "pi-ns"}}],
+    )
+    chart = _chart_component("chartbased")
+    driver = _FakeDriver()
+
+    result = _run_install_sync(monkeypatch, [chart, pi], driver, {"chartbased", "chartless-pi"})
+
+    _slug, _ns, batch = driver.calls[0]
+    release_names = [m["metadata"]["name"] for m in batch if m["kind"] == "HelmRelease"]
+    assert release_names == ["astrolift-chartbased"]  # no release for the chart-less one
+    # The chart-less component's post-install still lands (a later apply call).
+    assert ("Namespace", "pi-ns") in driver.applied_refs
+    assert {"name": "chartbased", "version": "1.0.0"} in result["applied"]
+    assert {"name": "chartless-pi", "version": ""} in result["applied"]
