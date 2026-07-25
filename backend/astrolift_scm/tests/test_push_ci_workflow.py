@@ -1,9 +1,14 @@
-"""Tests for ``pushCiWorkflow`` mutation + the underlying GitHub /
+"""Tests for the ``pushCiWorkflow`` mutation + the underlying GitHub /
 GitLab ``put_file`` provider helpers.
 
-The HTTP calls are stubbed at ``urllib.request.urlopen`` — we test
-the path-coverage matrix (create vs update, GitHub vs GitLab, auth
-failure mapping, permission gate) without hitting the network.
+Two layers:
+
+* the provider ``put_file`` create/update/auth matrix, stubbed at
+  ``urllib.request.urlopen`` (unchanged — this is the shared write plumbing);
+* the ``pushCiWorkflow`` mutation, which after #1212 DELEGATES to System B's
+  ``sync_workflow_file_to_repo``. The mutation tests assert that delegation and
+  the resulting single stamped System-B file per host (the collision fix), not
+  the retired System-A ``astrolift-deploy.yml`` render.
 """
 
 from __future__ import annotations
@@ -12,7 +17,6 @@ import io
 import json
 import urllib.error
 from types import SimpleNamespace
-from unittest.mock import patch
 
 import pytest
 
@@ -325,114 +329,84 @@ def test_gitlab_put_file_updates_when_present(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def _stub_github_put(monkeypatch, *, sha: str = "abcdef1234"):
-    """Install a happy-path GitHub HTTP stub: existence probe 404 +
-    successful PUT returning the supplied commit SHA. Returns the
-    list of recorded requests so assertions can inspect them."""
+def _capture_sync_put(monkeypatch, *, source_kind: str, existing=None):
+    """Stub the System-B sync's repo I/O (existing-file fetch + protection
+    probe + put_file) and capture the ``put_file`` kwargs so a test can assert
+    WHAT content lands at WHICH path — the proof System B (not legacy System A)
+    is what pushes now."""
+    captured: dict = {}
+    monkeypatch.setattr("astrolift_scm.services.workflow_sync.fetch_file", lambda *a, **kw: existing)
+    probe = {
+        "github": "astrolift_scm.services.workflow_sync._is_github_branch_protected",
+        "gitlab": "astrolift_scm.services.workflow_sync._is_gitlab_branch_protected",
+        "gitea": "astrolift_scm.services.workflow_sync._is_gitea_branch_protected",
+    }.get(source_kind)
+    if probe:
+        monkeypatch.setattr(probe, lambda *a, **kw: False)
 
-    calls: list = []
+    def _put(*a, **kw):
+        captured.update(kw)
+        return SimpleNamespace(commit_sha="new-commit", file_path=kw.get("path"), web_url="https://x")
 
-    def fake_urlopen(req, timeout=10):
-        calls.append(req)
-        if req.get_method() == "GET":
-            raise _http_404(req.full_url)
-        return _http_response(
-            {
-                "commit": {"sha": sha},
-                "content": {
-                    "path": ".github/workflows/astrolift-deploy.yml",
-                    "html_url": (
-                        "https://github.com/acme/api/blob/main/.github/workflows/astrolift-deploy.yml"
-                    ),
-                },
-            }
-        )
-
-    monkeypatch.setattr(
-        "astrolift_scm.providers.github.urllib.request.urlopen",
-        fake_urlopen,
-    )
-    return calls
+    monkeypatch.setattr("astrolift_scm.services.workflow_sync.put_file", _put)
+    return captured
 
 
-def test_push_ci_workflow_creates_file_and_returns_sha(
+def test_push_ci_workflow_routes_to_sync_workflow_file_to_repo(
     monkeypatch,
     permission_resolver,
 ):
-    org, app = _scaffold()
-    conn = _scaffold_github_oauth_user_conn(org)
-    permission_resolver.grant(Permission.APP_UPDATE)
-    calls = _stub_github_put(monkeypatch, sha="commitsha-NEW")
-
-    with _ctx(org):
-        result = ScmMutation().push_ci_workflow(
-            _info(),
-            input=PushCiWorkflowInput(
-                app_id=str(app.guid),
-                connection_id=str(conn.guid),
-            ),
-        )
-
-    assert result.ok, result.errors
-    assert result.data.commit_sha == "commitsha-NEW"
-    assert result.data.file_path == ".github/workflows/astrolift-deploy.yml"
-    assert result.data.repo_url.startswith("https://github.com/acme/api/")
-    # Validate the PUT body actually carried the rendered template.
-    put_req = next(r for r in calls if r.get_method() == "PUT")
-    put_body = json.loads(put_req.data.decode("utf-8"))
-    import base64
-
-    rendered = base64.b64decode(put_body["content"]).decode("utf-8")
-    assert "astrolift-deploy" in rendered.lower() or "astrolift deploy" in rendered.lower()
-    assert "hello-app" in rendered
-    assert "ASTROLIFT_DEPLOY_TOKEN" in rendered
-
-
-def test_push_ci_workflow_uses_existing_sha_on_update(
-    monkeypatch,
-    permission_resolver,
-):
-    """File-exists path: the mutation should still succeed, producing
-    a new commit SHA for the in-place update."""
+    """#1212 consolidation: the legacy System-A mutation now DELEGATES to
+    System B's ``sync_workflow_file_to_repo`` — it doesn't render/push itself."""
     org, app = _scaffold()
     conn = _scaffold_github_oauth_user_conn(org)
     permission_resolver.grant(Permission.APP_UPDATE)
 
-    captured_body: dict = {}
+    seen: dict = {}
 
-    def fake_urlopen(req, timeout=10):
-        if req.get_method() == "GET":
-            return _http_response({"sha": "old-blob-sha", "type": "file"})
-        captured_body.update(json.loads(req.data.decode("utf-8")))
-        return _http_response(
-            {
-                "commit": {"sha": "rotated-commit"},
-                "content": {
-                    "path": ".github/workflows/astrolift-deploy.yml",
-                    "html_url": "https://github.com/acme/api/blob/main/.github/workflows/astrolift-deploy.yml",
-                },
-            }
-        )
+    def _spy(a, viewer_user=None, *, force_pr=False):
+        seen["app_pk"] = a.pk
+        seen["force_pr"] = force_pr
+        return SimpleNamespace(status="created", commit_sha="deleg-sha", pr_url="", rendered_size=1, error="")
 
-    monkeypatch.setattr(
-        "astrolift_scm.providers.github.urllib.request.urlopen",
-        fake_urlopen,
-    )
+    monkeypatch.setattr("astrolift_scm.services.workflow_sync.sync_workflow_file_to_repo", _spy)
 
     with _ctx(org):
         result = ScmMutation().push_ci_workflow(
             _info(),
-            input=PushCiWorkflowInput(
-                app_id=str(app.guid),
-                connection_id=str(conn.guid),
-                commit_message="Re-push deploy workflow",
-            ),
+            input=PushCiWorkflowInput(app_id=str(app.guid), connection_id=str(conn.guid)),
         )
 
     assert result.ok, result.errors
-    assert result.data.commit_sha == "rotated-commit"
-    assert captured_body.get("sha") == "old-blob-sha"
-    assert captured_body.get("message") == "Re-push deploy workflow"
+    assert seen["app_pk"] == app.pk  # routed to System B with the app
+    assert seen["force_pr"] is False  # a wizard push is a normal sync, not a forced PR
+    assert result.data.commit_sha == "deleg-sha"
+    # Canonical System-B path (astrolift-ci.yml), NOT legacy astrolift-deploy.yml.
+    assert result.data.file_path == ".github/workflows/astrolift-ci.yml"
+
+
+def test_push_ci_workflow_writes_system_b_stamped_file_github(
+    monkeypatch,
+    permission_resolver,
+):
+    """End-to-end: the bytes that land are System B's STAMPED astrolift-ci.yml
+    at the canonical path — legacy System A never stamped and used a different
+    filename."""
+    org, app = _scaffold()
+    _scaffold_github_oauth_user_conn(org)
+    permission_resolver.grant(Permission.APP_UPDATE)
+    captured = _capture_sync_put(monkeypatch, source_kind="github", existing=None)
+
+    with _ctx(org):
+        result = ScmMutation().push_ci_workflow(
+            _info(),
+            input=PushCiWorkflowInput(app_id=str(app.guid), connection_id="ignored-now"),
+        )
+
+    assert result.ok, result.errors
+    assert captured["path"] == ".github/workflows/astrolift-ci.yml"
+    # The stamp line is System B's fingerprint — System A output carried none.
+    assert "# astrolift-managed:" in captured["content"]
 
 
 def test_push_ci_workflow_requires_permission(monkeypatch):
@@ -458,117 +432,54 @@ def test_push_ci_workflow_requires_permission(monkeypatch):
     assert result.errors[0].code == "PERMISSION_DENIED"
 
 
-def test_push_ci_workflow_rejects_oauth_app_config(
+def test_push_ci_workflow_gitlab_writes_single_system_b_file(
     monkeypatch,
     permission_resolver,
 ):
-    """OAuth-app config rows (no account_login) can't drive a write —
-    the OAuth dance hasn't produced a user token yet."""
-    org, app = _scaffold()
-    encrypted = encrypt_at_rest(b"client-secret-not-a-token")
-    conn = SourceConnection.objects.create(
-        organization=org,
-        kind=SourceConnection.Kind.GITHUB_OAUTH_APP,
-        display_name="GitHub OAuth app",
-        oauth_client_id="Iv1.abc",
-        oauth_redirect_uri="https://x/y",
-        secret_backend_kind=encrypted.backend_kind,
-        secret_ciphertext=encrypted.backend_ref,
-        is_active=True,
-    )
+    """#1212 collision fix: on GitLab, System A and System B both targeted
+    ``.gitlab-ci.yml``. After consolidation the delegating mutation writes
+    exactly ONE file — System B's stamped content — at that shared path, so the
+    two renderers can no longer clobber each other."""
+    org, app = _scaffold(source_kind="gitlab", source_repo="acme/api")
+    _scaffold_gitlab_oauth_user_conn(org)
     permission_resolver.grant(Permission.APP_UPDATE)
+    captured = _capture_sync_put(monkeypatch, source_kind="gitlab", existing=None)
 
     with _ctx(org):
         result = ScmMutation().push_ci_workflow(
             _info(),
-            input=PushCiWorkflowInput(
-                app_id=str(app.guid),
-                connection_id=str(conn.guid),
-            ),
+            input=PushCiWorkflowInput(app_id=str(app.guid), connection_id="ignored-now"),
+        )
+
+    assert result.ok, result.errors
+    assert captured["path"] == ".gitlab-ci.yml"
+    # System B's stamp — legacy System A's .gitlab-ci.yml was unstamped.
+    assert "# astrolift-managed:" in captured["content"]
+
+
+def test_push_ci_workflow_maps_fetch_failure_to_precondition(
+    monkeypatch,
+    permission_resolver,
+):
+    """A host error surfaces as System B's ``fetch_failed`` → a clean
+    PRECONDITION envelope rather than raising into the GraphQL error channel."""
+    org, app = _scaffold()
+    _scaffold_github_oauth_user_conn(org)
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    def _raise(*a, **kw):
+        raise ProviderError("AUTH_FAILED", "bad token")
+
+    monkeypatch.setattr("astrolift_scm.services.workflow_sync.fetch_file", _raise)
+
+    with _ctx(org):
+        result = ScmMutation().push_ci_workflow(
+            _info(),
+            input=PushCiWorkflowInput(app_id=str(app.guid), connection_id="ignored-now"),
         )
     assert not result.ok
     assert result.errors[0].code == "PRECONDITION"
-    assert "oauth" in result.errors[0].message.lower()
-
-
-def test_push_ci_workflow_rejects_host_mismatch(
-    monkeypatch,
-    permission_resolver,
-):
-    """A GitHub app paired with a GitLab connection fails fast at the
-    resolver — we don't even try to dispatch."""
-    org, app = _scaffold(source_kind="github", source_repo="acme/api")
-    conn = _scaffold_gitlab_oauth_user_conn(org)
-    permission_resolver.grant(Permission.APP_UPDATE)
-
-    with _ctx(org):
-        result = ScmMutation().push_ci_workflow(
-            _info(),
-            input=PushCiWorkflowInput(
-                app_id=str(app.guid),
-                connection_id=str(conn.guid),
-            ),
-        )
-    assert not result.ok
-    assert result.errors[0].code == "VALIDATION"
-    assert result.errors[0].field == "connectionId"
-
-
-def test_push_ci_workflow_rejects_orphaned_connection(
-    monkeypatch,
-    permission_resolver,
-):
-    """The upstream revoked / uninstalled this connection — we refuse
-    to mint or use a token against it."""
-    org, app = _scaffold()
-    conn = _scaffold_github_oauth_user_conn(org)
-    conn.is_orphaned = True
-    conn.save(update_fields=["is_orphaned"])
-    permission_resolver.grant(Permission.APP_UPDATE)
-
-    with _ctx(org):
-        result = ScmMutation().push_ci_workflow(
-            _info(),
-            input=PushCiWorkflowInput(
-                app_id=str(app.guid),
-                connection_id=str(conn.guid),
-            ),
-        )
-    assert not result.ok
-    assert result.errors[0].code == "PRECONDITION"
-    assert "orphan" in result.errors[0].message.lower()
-
-
-def test_push_ci_workflow_maps_github_auth_failure_to_envelope(
-    monkeypatch,
-    permission_resolver,
-):
-    """A 401 from GitHub becomes a clean AUTH_FAILED envelope on
-    ``connectionId`` rather than raising into the GraphQL error
-    channel."""
-    org, app = _scaffold()
-    conn = _scaffold_github_oauth_user_conn(org)
-    permission_resolver.grant(Permission.APP_UPDATE)
-
-    def fake_urlopen(req, timeout=10):
-        raise urllib.error.HTTPError(req.full_url, 401, "Unauthorized", {}, io.BytesIO(b"bad token"))
-
-    monkeypatch.setattr(
-        "astrolift_scm.providers.github.urllib.request.urlopen",
-        fake_urlopen,
-    )
-
-    with _ctx(org):
-        result = ScmMutation().push_ci_workflow(
-            _info(),
-            input=PushCiWorkflowInput(
-                app_id=str(app.guid),
-                connection_id=str(conn.guid),
-            ),
-        )
-    assert not result.ok
-    assert result.errors[0].code == "AUTH_FAILED"
-    assert result.errors[0].field == "connectionId"
+    assert "AUTH_FAILED" in result.errors[0].message
 
 
 def test_push_ci_workflow_app_not_found(monkeypatch, permission_resolver):
@@ -589,66 +500,33 @@ def test_push_ci_workflow_app_not_found(monkeypatch, permission_resolver):
     assert result.errors[0].field == "appId"
 
 
-def test_push_ci_workflow_renders_app_install_with_bearer(
+def test_push_ci_workflow_bitbucket_writes_single_system_b_file(
     monkeypatch,
     permission_resolver,
 ):
-    """github_app_install connections use Bearer auth (commit
-    attribution = the App's bot) rather than the user-token shape."""
-    org, app = _scaffold()
-    encrypted = encrypt_at_rest(b"-----BEGIN PRIVATE KEY-----\nfake\n-----END PRIVATE KEY-----\n")
-    conn = SourceConnection.objects.create(
+    """#1212 collision fix (Bitbucket): the shared ``bitbucket-pipelines.yml``
+    now carries only System B's stamped content — the legacy System-A renderer
+    that also wrote that path is retired."""
+    org, app = _scaffold(source_kind="bitbucket", source_repo="acme/api")
+    encrypted = encrypt_at_rest(b"bb-token-never-hits-network")
+    SourceConnection.objects.create(
         organization=org,
-        kind=SourceConnection.Kind.GITHUB_APP_INSTALL,
-        display_name="GitHub App: acme",
-        account_login="acme",
-        installation_id="12345",
+        kind=SourceConnection.Kind.BITBUCKET_OAUTH_USER,
+        display_name="Bitbucket: acme",
+        account_login="acme-workspace",
         secret_backend_kind=encrypted.backend_kind,
         secret_ciphertext=encrypted.backend_ref,
         is_active=True,
     )
     permission_resolver.grant(Permission.APP_UPDATE)
+    captured = _capture_sync_put(monkeypatch, source_kind="bitbucket", existing=None)
 
-    # Stub the App-installation token mint so we don't actually JWT-sign.
-    # The driver imports ``installation_token`` lazily from
-    # ``astrolift_scm.providers.github_app`` inside ``_token()``, so the
-    # patch target is the *source* module rather than ``github``.
-    with patch(
-        "astrolift_scm.providers.github_app.installation_token",
-        return_value="ghs_fake_install_token",
-    ):
-        captured_auth: list[str] = []
-
-        def fake_urlopen(req, timeout=10):
-            captured_auth.append(req.get_header("Authorization") or "")
-            if req.get_method() == "GET":
-                raise _http_404(req.full_url)
-            return _http_response(
-                {
-                    "commit": {"sha": "bot-commit"},
-                    "content": {
-                        "path": ".github/workflows/astrolift-deploy.yml",
-                        "html_url": "https://github.com/acme/api/blob/main/.github/workflows/astrolift-deploy.yml",
-                    },
-                }
-            )
-
-        monkeypatch.setattr(
-            "astrolift_scm.providers.github.urllib.request.urlopen",
-            fake_urlopen,
+    with _ctx(org):
+        result = ScmMutation().push_ci_workflow(
+            _info(),
+            input=PushCiWorkflowInput(app_id=str(app.guid), connection_id="ignored-now"),
         )
 
-        with _ctx(org):
-            result = ScmMutation().push_ci_workflow(
-                _info(),
-                input=PushCiWorkflowInput(
-                    app_id=str(app.guid),
-                    connection_id=str(conn.guid),
-                ),
-            )
-
     assert result.ok, result.errors
-    assert result.data.commit_sha == "bot-commit"
-    # The PUT call must use Bearer (App install), not "token" (user PAT).
-    put_auths = [a for a in captured_auth if a]
-    assert any(a.startswith("Bearer ") for a in put_auths)
+    assert captured["path"] == "bitbucket-pipelines.yml"
+    assert "# astrolift-managed:" in captured["content"]

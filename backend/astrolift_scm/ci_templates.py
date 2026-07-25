@@ -368,7 +368,18 @@ def render_workflow_for(
     app_slug: str,
     deploy_branch: str | None,
 ) -> str:
-    """Pick the right template body for the app's source host."""
+    """Pick the right (legacy System-A) deploy-workflow body for the host.
+
+    DEPRECATED (#1212): this and the four ``render_*_deploy_yml`` renderers
+    below are the legacy "System A" that produced the unstamped
+    ``astrolift-deploy.yml`` (and, on GitLab/Bitbucket, collided with System B
+    on the shared ``.gitlab-ci.yml`` / ``bitbucket-pipelines.yml`` path). The
+    ``pushCiWorkflow`` mutation that was their only production caller now
+    delegates to System B (``workflow_sync.sync_workflow_file_to_repo``), which
+    renders the stamped ``astrolift-ci.yml``. These are retained only so their
+    unit tests keep pinning the legacy shape; nothing pushes their output. Do
+    not wire new callers — use System B.
+    """
     if source_kind == "github":
         return render_github_actions_deploy_yml(
             app_slug=app_slug,

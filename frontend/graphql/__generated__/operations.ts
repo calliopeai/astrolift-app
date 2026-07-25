@@ -4624,6 +4624,7 @@ export type Mutation = {
   notification: MutationResult;
   /** Mark a notification as read. */
   notificationRead: Scalars['Boolean']['output'];
+  openCiWorkflowReconcilePr: AstroliftCiWorkflowSyncStatusMutationResult;
   organization: OrganizationMutationResult;
   organizationMemberStatus: MutationResult;
   /** Force a workflow instance to a specific state (admin override). */
@@ -5497,6 +5498,11 @@ export type MutationNotificationArgs = {
 
 export type MutationNotificationReadArgs = {
   gid: Scalars['ID']['input'];
+};
+
+
+export type MutationOpenCiWorkflowReconcilePrArgs = {
+  input: CiWorkflowSyncActionInput;
 };
 
 
@@ -9637,6 +9643,13 @@ export type RefreshCiWorkflowSyncStatusMutationVariables = Exact<{
 
 
 export type RefreshCiWorkflowSyncStatusMutation = { refreshCiWorkflowSyncStatus: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { state: string, syncedTemplateVersion?: number | null, currentTemplateVersion: number, syncedAt?: string | null, checkedAt?: string | null, path: string, prUrl: string, detail: string } | null } };
+
+export type OpenCiWorkflowReconcilePrMutationVariables = Exact<{
+  input: CiWorkflowSyncActionInput;
+}>;
+
+
+export type OpenCiWorkflowReconcilePrMutation = { openCiWorkflowReconcilePr: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { state: string, syncedTemplateVersion?: number | null, currentTemplateVersion: number, syncedAt?: string | null, checkedAt?: string | null, path: string, prUrl: string, detail: string } | null } };
 
 export type AstroliftServerInfoQueryVariables = Exact<{ [key: string]: never; }>;
 

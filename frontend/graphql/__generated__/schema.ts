@@ -4624,6 +4624,7 @@ export type Mutation = {
   notification: MutationResult;
   /** Mark a notification as read. */
   notificationRead: Scalars['Boolean']['output'];
+  openCiWorkflowReconcilePr: AstroliftCiWorkflowSyncStatusMutationResult;
   organization: OrganizationMutationResult;
   organizationMemberStatus: MutationResult;
   /** Force a workflow instance to a specific state (admin override). */
@@ -5497,6 +5498,11 @@ export type MutationNotificationArgs = {
 
 export type MutationNotificationReadArgs = {
   gid: Scalars['ID']['input'];
+};
+
+
+export type MutationOpenCiWorkflowReconcilePrArgs = {
+  input: CiWorkflowSyncActionInput;
 };
 
 

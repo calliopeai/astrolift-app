@@ -8,6 +8,7 @@ import {
   DownloadIcon,
   ExternalLinkIcon,
   FileCheck2Icon,
+  GitPullRequestIcon,
   KeyIcon,
   Loader2Icon,
   RefreshCwIcon,
@@ -42,6 +43,7 @@ import {
 import { GET_PLATFORM_API_URL } from "@/graphql/registry/registry.queries";
 import {
   ADOPT_REPO_CI_WORKFLOW,
+  OPEN_CI_WORKFLOW_RECONCILE_PR,
   REFRESH_CI_WORKFLOW_SYNC_STATUS,
   RESYNC_CI_WORKFLOW,
 } from "@/graphql/scm/scm.mutations";
@@ -399,6 +401,9 @@ interface AdoptResp {
 interface RefreshResp {
   refreshCiWorkflowSyncStatus: CiSyncMutationResult;
 }
+interface ReconcileResp {
+  openCiWorkflowReconcilePr: CiSyncMutationResult;
+}
 
 /** Badge presentation per drift state. Unknown states fall back to the
  *  neutral muted chip rather than blanking out. */
@@ -441,11 +446,17 @@ function WorkflowSyncStatusControl({
     REFRESH_CI_WORKFLOW_SYNC_STATUS,
     { refetchQueries: ["GetApp"], awaitRefetchQueries: true },
   );
+  const [openReconcile, { loading: reconciling }] = useMutation<ReconcileResp>(
+    OPEN_CI_WORKFLOW_RECONCILE_PR,
+    { refetchQueries: ["GetApp"], awaitRefetchQueries: true },
+  );
   const [confirmAdoptOpen, setConfirmAdoptOpen] = React.useState(false);
 
   const badge = DRIFT_BADGE[status.state] ?? DRIFT_BADGE.unknown;
   const hint = DRIFT_HINT[status.state] ?? DRIFT_HINT.unknown;
-  const busy = resyncing || adopting || refreshing;
+  const busy = resyncing || adopting || refreshing || reconciling;
+  // A reconcile PR only makes sense for a drifted (hand-edited) file.
+  const canReconcile = status.state === "repo_drift" || status.state === "conflict";
 
   async function handleRefresh() {
     try {
@@ -484,6 +495,31 @@ function WorkflowSyncStatusControl({
       toast.success("Resynced the managed workflow file to the current template.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't resync the workflow file.");
+    }
+  }
+
+  async function handleReconcile() {
+    try {
+      const { data } = await openReconcile({ variables: { input: { appId: appSlug } } });
+      const payload = data?.openCiWorkflowReconcilePr;
+      if (!payload?.ok || !payload.data) {
+        toast.error(payload?.errors?.[0]?.message ?? "Couldn't open the reconcile PR.");
+        return;
+      }
+      if (payload.data.prUrl) {
+        toast.success(
+          <span>
+            Opened a reconcile PR to overwrite the drifted file with the template.{" "}
+            <Link href={payload.data.prUrl} target="_blank" rel="noreferrer" className="underline">
+              View PR
+            </Link>
+          </span>,
+        );
+        return;
+      }
+      toast.success("Opened a reconcile PR to overwrite the drifted file with the template.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't open the reconcile PR.");
     }
   }
 
@@ -570,6 +606,22 @@ function WorkflowSyncStatusControl({
             )}
             Adopt repo copy
           </Button>
+          {canReconcile ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleReconcile}
+              disabled={busy}
+              className="gap-1.5"
+            >
+              {reconciling ? (
+                <Loader2Icon className="size-3.5 animate-spin" />
+              ) : (
+                <GitPullRequestIcon className="size-3.5" />
+              )}
+              Open reconcile PR
+            </Button>
+          ) : null}
         </div>
       </Can>
 

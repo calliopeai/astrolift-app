@@ -996,6 +996,8 @@ def _persist_ci_workflow_stamp(app: RegisteredApp, result: WorkflowSyncResult) -
 def sync_workflow_file_to_repo(
     app: RegisteredApp,
     viewer_user=None,  # noqa: ARG001 — accepted for API symmetry; org-level conn picker is used
+    *,
+    force_pr: bool = False,
 ) -> WorkflowSyncResult:
     """Render the CI workflow for ``app`` and reconcile it onto the
     deploy branch of the configured source repo.
@@ -1003,6 +1005,13 @@ def sync_workflow_file_to_repo(
     See module docstring for the protocol. ``viewer_user`` is accepted
     for parity with the resolver signature but is not consulted —
     selection runs against the app's organization, mirroring #387.
+
+    ``force_pr`` routes the change through the side-branch PR/MR flow even
+    when the deploy branch is unprotected — the reconcile-PR path (#1212):
+    a drifted (hand-edited) file must never be overwritten in place, so the
+    operator reviews the template overwrite in a PR and merges deliberately.
+    Bitbucket has no side-branch PR flow wired, so ``force_pr`` raises there
+    rather than silently direct-writing over the operator's edits.
 
     After a successful reconcile (created / updated / in_sync / pr_opened)
     the per-app sync record is persisted (#1209) so the platform knows which
@@ -1015,13 +1024,13 @@ def sync_workflow_file_to_repo(
             "app has no source repo configured; cannot push the CI workflow",
         )
     if app.source_kind == "github":
-        result = _sync_github(app)
+        result = _sync_github(app, force_pr=force_pr)
     elif app.source_kind == "gitlab":
-        result = _sync_gitlab(app)
+        result = _sync_gitlab(app, force_pr=force_pr)
     elif app.source_kind == "bitbucket":
-        result = _sync_bitbucket(app)
+        result = _sync_bitbucket(app, force_pr=force_pr)
     elif app.source_kind == "gitea":
-        result = _sync_gitea(app)
+        result = _sync_gitea(app, force_pr=force_pr)
     else:
         raise WorkflowSyncError(
             "UNSUPPORTED_SOURCE",
@@ -1034,7 +1043,7 @@ def sync_workflow_file_to_repo(
     return result
 
 
-def _sync_github(app: RegisteredApp) -> WorkflowSyncResult:
+def _sync_github(app: RegisteredApp, *, force_pr: bool = False) -> WorkflowSyncResult:
     connection = _pick_source_connection(app)
     if connection is None:
         raise WorkflowSyncError(
@@ -1064,7 +1073,10 @@ def _sync_github(app: RegisteredApp) -> WorkflowSyncResult:
     if existing is not None and existing == rendered:
         return WorkflowSyncResult(status="in_sync", rendered_size=rendered_size)
 
-    protected = _is_github_branch_protected(
+    # ``force_pr`` (reconcile) short-circuits the protection probe: the change
+    # always goes through a reviewable side-branch PR so the operator's edits
+    # aren't clobbered in place.
+    route_via_pr = force_pr or _is_github_branch_protected(
         connection,
         repo_full_name=app.source_repo,
         branch=deploy_branch,
@@ -1076,7 +1088,7 @@ def _sync_github(app: RegisteredApp) -> WorkflowSyncResult:
         else f"chore(astrolift): update CI workflow for {app.slug}"
     )
 
-    if protected:
+    if route_via_pr:
         side_branch = _side_branch_for(app.slug)
         try:
             head_sha = _github_get_branch_sha(
@@ -1153,7 +1165,7 @@ def _sync_github(app: RegisteredApp) -> WorkflowSyncResult:
     )
 
 
-def _sync_gitlab(app: RegisteredApp) -> WorkflowSyncResult:
+def _sync_gitlab(app: RegisteredApp, *, force_pr: bool = False) -> WorkflowSyncResult:
     """GitLab equivalent of ``_sync_github`` (#735).
 
     Probes ``/protected_branches`` instead of GitHub's branch-protection
@@ -1188,7 +1200,9 @@ def _sync_gitlab(app: RegisteredApp) -> WorkflowSyncResult:
     if existing is not None and existing == rendered:
         return WorkflowSyncResult(status="in_sync", rendered_size=rendered_size)
 
-    protected = _is_gitlab_branch_protected(
+    # ``force_pr`` (reconcile) short-circuits the protection probe — see
+    # ``_sync_github``.
+    route_via_pr = force_pr or _is_gitlab_branch_protected(
         connection,
         repo_full_name=app.source_repo,
         branch=deploy_branch,
@@ -1200,7 +1214,7 @@ def _sync_gitlab(app: RegisteredApp) -> WorkflowSyncResult:
         else f"chore(astrolift): update CI workflow for {app.slug}"
     )
 
-    if protected:
+    if route_via_pr:
         side_branch = _side_branch_for(app.slug)
         try:
             _gitlab_create_branch(
@@ -1272,7 +1286,7 @@ def _sync_gitlab(app: RegisteredApp) -> WorkflowSyncResult:
     )
 
 
-def _sync_bitbucket(app: RegisteredApp) -> WorkflowSyncResult:
+def _sync_bitbucket(app: RegisteredApp, *, force_pr: bool = False) -> WorkflowSyncResult:
     """Bitbucket equivalent of ``_sync_github``.
 
     Bitbucket's branch-restriction API is more complex than GitHub's /
@@ -1282,6 +1296,16 @@ def _sync_bitbucket(app: RegisteredApp) -> WorkflowSyncResult:
     ``fetch_failed`` result with the provider error code; the operator
     can then use the "Open PR" affordance on the UI.
     """
+    if force_pr:
+        # Bitbucket has no side-branch PR flow wired here (unlike github /
+        # gitlab / gitea), so a reconcile can't route through a review PR.
+        # Refuse rather than direct-write over the operator's hand-edits.
+        raise WorkflowSyncError(
+            "UNSUPPORTED_RECONCILE",
+            "opening a reconcile PR isn't supported for Bitbucket yet — no "
+            "side-branch PR flow is wired. Resolve the drift by editing the "
+            "file directly or adopting the repo copy as the baseline.",
+        )
     connection = _pick_source_connection(app)
     if connection is None:
         raise WorkflowSyncError(
@@ -1340,7 +1364,7 @@ def _sync_bitbucket(app: RegisteredApp) -> WorkflowSyncResult:
     )
 
 
-def _sync_gitea(app: RegisteredApp) -> WorkflowSyncResult:
+def _sync_gitea(app: RegisteredApp, *, force_pr: bool = False) -> WorkflowSyncResult:
     """Gitea equivalent of ``_sync_github``.
 
     Probes ``/api/v1/repos/{owner}/{repo}/branches/{branch}`` for the
@@ -1376,7 +1400,9 @@ def _sync_gitea(app: RegisteredApp) -> WorkflowSyncResult:
     if existing is not None and existing == rendered:
         return WorkflowSyncResult(status="in_sync", rendered_size=rendered_size)
 
-    protected = _is_gitea_branch_protected(
+    # ``force_pr`` (reconcile) short-circuits the protection probe — see
+    # ``_sync_github``.
+    route_via_pr = force_pr or _is_gitea_branch_protected(
         connection,
         repo_full_name=app.source_repo,
         branch=deploy_branch,
@@ -1388,7 +1414,7 @@ def _sync_gitea(app: RegisteredApp) -> WorkflowSyncResult:
         else f"chore(astrolift): update CI workflow for {app.slug}"
     )
 
-    if protected:
+    if route_via_pr:
         side_branch = _side_branch_for(app.slug)
         try:
             _gitea_create_branch_direct(

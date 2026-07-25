@@ -173,17 +173,14 @@ class InstallScmWebhookInput:
 
 @strawberry.input
 class PushCiWorkflowInput:
-    """Drop the canonical Astrolift deploy workflow into the source
-    repo via the named connection.
+    """Reconcile the managed Astrolift CI workflow into ``app_id``'s repo.
 
-    All fields except ``app_id`` and ``connection_id`` have defaults
-    derived from the registered app, so the wizard's checkbox needs
-    only the two GUIDs to call this mutation.
-
-    Commit attribution follows the connection kind:
-      * ``*_oauth_user`` / ``*_pat`` → the user / token owner on the
-        SCM host.
-      * ``github_app_install`` → the GitHub App's bot identity.
+    ``push_ci_workflow`` now delegates to System B
+    (``sync_workflow_file_to_repo``), which resolves the org-level write
+    connection, deploy branch, path and commit message from the app itself —
+    so only ``app_id`` is load-bearing. ``connection_id`` (and the
+    ``branch`` / ``commit_message`` / ``file_path`` overrides) are retained for
+    API/wizard compatibility but no longer consulted.
     """
 
     app_id: GUID
@@ -1022,23 +1019,26 @@ class ScmMutation:
     def push_ci_workflow(
         self, info: Info, input: PushCiWorkflowInput
     ) -> MutationResultType[PushCiWorkflowResult]:
-        """Render the Astrolift deploy workflow for ``app`` and PUT it
-        into the source repo via ``connection``.
+        """Reconcile the managed Astrolift CI workflow onto ``app``'s repo (#1212).
 
-        Commits to ``branch`` (defaulting to the app's
-        ``default_branch``). Re-running the mutation overwrites the
-        file in place — the GitHub driver discovers the existing blob
-        SHA before PUTing so the second call lands as an update,
-        not a 422.
+        DELEGATES to Phase 1's ``sync_workflow_file_to_repo`` (System B) — the
+        one canonical renderer/pusher — so the onboarding wizard writes the SAME
+        stamped ``astrolift-ci.yml`` (and shared ``.gitlab-ci.yml`` /
+        ``bitbucket-pipelines.yml``) that autowire and the drift mutations do.
+        This retires the legacy System-A ``astrolift-deploy.yml`` renderer,
+        whose GitLab/Bitbucket output collided with System B's on the shared
+        path — after consolidation each host emits exactly one managed file.
+
+        ``connection_id`` (and the ``branch`` / ``commit_message`` / ``file_path``
+        overrides) are retained for API compatibility but no longer consulted:
+        System B resolves the org-level write connection, deploy branch, path and
+        commit message itself. ``repo_url`` carries the review PR link when a
+        protected deploy branch routed the change through a PR.
         """
-        from astrolift_scm.ci_templates import (
-            default_workflow_path_for,
-            render_workflow_for,
-        )
-        from astrolift_scm.providers import ProviderError, put_file
         from astrolift_scm.services.workflow_sync import (
-            CI_WORKFLOW_WRITE_OPERATION,
-            CI_WORKFLOW_WRITE_PERMISSION,
+            WorkflowSyncError,
+            _render_and_path,
+            sync_workflow_file_to_repo,
         )
 
         tenant = get_current_tenant()
@@ -1058,100 +1058,25 @@ class ScmMutation:
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appId")
 
-        conn = SourceConnection.objects.filter(
-            guid=str(input.connection_id),
-            organization_id=org_id,
-            deleted_at__isnull=True,
-        ).first()
-        if conn is None:
-            return gql_failure(
-                ErrorCode.NOT_FOUND.value,
-                "connection not found",
-                field="connectionId",
-            )
-        if not conn.is_active:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                "connection is inactive; reconnect first",
-                field="connectionId",
-            )
-        if conn.is_orphaned:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                "connection is orphaned (upstream revoked or uninstalled)",
-                field="connectionId",
-            )
-        if conn.is_oauth_app_config:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                "this is an OAuth-app config row; complete the OAuth dance to create a token connection first",
-                field="connectionId",
-            )
-
-        # Source-host parity: a GitHub app can't push to a GitLab repo
-        # and vice versa. Bitbucket / Gitea have no CI template yet —
-        # surface that cleanly rather than crashing in render.
         try:
-            file_path = (input.file_path or default_workflow_path_for(app.source_kind)).lstrip("/")
-        except ValueError as exc:
+            result = sync_workflow_file_to_repo(app)
+        except WorkflowSyncError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, exc.message, field="appId")
+        if result.status == "fetch_failed":
             return gql_failure(
                 ErrorCode.PRECONDITION.value,
-                str(exc),
-                field="appId",
+                result.error or "couldn't sync CI workflow to repo",
             )
 
-        host_prefix = conn.kind.split("_", 1)[0]
-        if host_prefix != app.source_kind:
-            return gql_failure(
-                ErrorCode.VALIDATION.value,
-                f"connection host {host_prefix!r} doesn't match app source_kind {app.source_kind!r}",
-                field="connectionId",
-            )
-
-        if not app.source_repo:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                "app has no source repo configured",
-                field="appId",
-            )
-
-        branch = (input.branch or app.default_branch or "main").strip()
-        commit_message = (input.commit_message or "Add Astrolift deploy workflow").strip()
-        if not commit_message:
-            commit_message = "Add Astrolift deploy workflow"
-
-        try:
-            content = render_workflow_for(
-                source_kind=app.source_kind,
-                app_slug=app.slug,
-                deploy_branch=app.deploy_branch or None,
-            )
-        except ValueError as exc:
-            return gql_failure(ErrorCode.PRECONDITION.value, str(exc), field="appId")
-
-        try:
-            result = put_file(
-                conn,
-                repo_full_name=app.source_repo,
-                path=file_path,
-                branch=branch,
-                content=content,
-                commit_message=commit_message,
-                operation=CI_WORKFLOW_WRITE_OPERATION,
-                permission=CI_WORKFLOW_WRITE_PERMISSION,
-            )
-        except ProviderError as exc:
-            return gql_failure(
-                exc.code,
-                exc.message,
-                field="connectionId" if exc.code == "AUTH_FAILED" else None,
-            )
-
+        # ``WorkflowSyncResult`` doesn't carry the path; re-derive the canonical
+        # one for the (non-null) result field. ``_render_and_path`` is the single
+        # source of truth for the per-host managed path.
+        _body, file_path = _render_and_path(app)
         return gql_success(
             PushCiWorkflowResult(
                 commit_sha=result.commit_sha,
-                file_path=result.file_path,
-                repo_url=result.web_url,
+                file_path=file_path,
+                repo_url=result.pr_url,
             )
         )
 
@@ -1335,3 +1260,75 @@ class ScmMutation:
                 failed=summary.failed,
             )
         )
+
+    @strawberry.field
+    @mutation_audit(action="scm.ci_workflow.reconcile_pr")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def open_ci_workflow_reconcile_pr(
+        self, info: Info, input: CiWorkflowSyncActionInput
+    ) -> MutationResultType[AppCiWorkflowSyncStatusType]:
+        """Open a reviewable PR overwriting a drifted file with the template (#1212).
+
+        For an app in ``repo_drift`` / ``conflict`` — someone hand-edited the
+        managed workflow file. Rather than clobbering their edits in place (what
+        ``resync`` does on an unprotected branch), this renders the CURRENT
+        template and **reuses Phase 1's side-branch PR machinery**
+        (``sync_workflow_file_to_repo`` with ``force_pr=True``) so the operator
+        diffs their edits against the template and merges deliberately. That
+        machinery is idempotent — the side-branch name is deterministic and the
+        host's "a PR already exists" is treated as success — so re-calling
+        refreshes the existing PR instead of opening a duplicate.
+
+        Precondition-fails (never 500) when there's nothing to reconcile: no
+        source repo, no org connection, or the file is ``in_sync`` / ``absent``
+        / otherwise not drifted. Bitbucket has no side-branch PR flow wired, so
+        a reconcile there fails cleanly rather than direct-writing over edits.
+        """
+        from astrolift_scm.services.ci_workflow_drift import (
+            CiWorkflowFetchError,
+            SyncState,
+            evaluate_and_persist_sync_state,
+        )
+        from astrolift_scm.services.workflow_sync import (
+            WorkflowSyncError,
+            sync_workflow_file_to_repo,
+        )
+
+        app = self._ci_drift_app(input.app_id)
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appId")
+
+        # Authoritatively re-classify drift from the repo now (this also
+        # refreshes the badge). Surfaces "no source repo" / "no org connection"
+        # as a clean precondition rather than a later crash on the push path.
+        try:
+            state = evaluate_and_persist_sync_state(app)
+        except CiWorkflowFetchError as exc:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value, f"{exc.code}: {exc.message}", field="appId"
+            )
+
+        if state not in (SyncState.REPO_DRIFT, SyncState.CONFLICT):
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"nothing to reconcile: the managed workflow is '{state.value}'. "
+                "A reconcile PR is only for a drifted (repo_drift / conflict) file.",
+                field="appId",
+            )
+
+        # Reuse the Phase 1 PR-opening machinery (branch create + commit + open
+        # PR/MR), forced onto a side branch so the template overwrite lands as a
+        # reviewable PR instead of clobbering the operator's edits in place.
+        try:
+            result = sync_workflow_file_to_repo(app, force_pr=True)
+        except WorkflowSyncError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, exc.message, field="appId")
+        if result.status == "fetch_failed":
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                result.error or "couldn't open the reconcile PR",
+            )
+
+        app.refresh_from_db()
+        return gql_success(build_ci_workflow_sync_status(app))

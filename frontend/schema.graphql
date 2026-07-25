@@ -4748,6 +4748,7 @@ type Mutation {
   adoptRepoCiWorkflow(input: CiWorkflowSyncActionInput!): AstroliftCiWorkflowSyncStatusMutationResult!
   refreshCiWorkflowSyncStatus(input: CiWorkflowSyncActionInput!): AstroliftCiWorkflowSyncStatusMutationResult!
   resyncAllAstroliftCiWorkflows: AstroliftCiWorkflowResyncAllResultMutationResult!
+  openCiWorkflowReconcilePr(input: CiWorkflowSyncActionInput!): AstroliftCiWorkflowSyncStatusMutationResult!
   setAppSecret(input: SetAppSecretInput!): AppsecretwritepayloadMutationResult!
   rotateAppSecret(input: RotateAppSecretInput!): AppsecretwritepayloadMutationResult!
   deleteAppSecret(input: DeleteAppSecretInput!): AppsecretwritepayloadMutationResult!

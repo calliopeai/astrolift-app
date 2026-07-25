@@ -230,3 +230,30 @@ export const REFRESH_CI_WORKFLOW_SYNC_STATUS = gql`
     }
   }
 `;
+
+// Reconcile PR (#1212): for a repo_drift / conflict file, open a reviewable
+// side-branch PR that overwrites the drifted repo file with the current
+// template, so the operator diffs their hand-edits before merging. Returns
+// the refreshed AstroliftCiWorkflowSyncStatus (prUrl carries the review link).
+export const OPEN_CI_WORKFLOW_RECONCILE_PR = gql`
+  mutation OpenCiWorkflowReconcilePr($input: CiWorkflowSyncActionInput!) {
+    openCiWorkflowReconcilePr(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        state
+        syncedTemplateVersion
+        currentTemplateVersion
+        syncedAt
+        checkedAt
+        path
+        prUrl
+        detail
+      }
+    }
+  }
+`;
