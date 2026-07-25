@@ -64,6 +64,28 @@ def _api_base(connection) -> str:
     return (connection.api_base_url or GITHUB_API_DEFAULT).rstrip("/")
 
 
+def _is_rate_limited(exc: urllib.error.HTTPError) -> bool:
+    """True when a GitHub 403/429 is a rate limit, not a permission denial.
+
+    GitHub returns the primary rate limit as a 403 with
+    ``X-RateLimit-Remaining: 0``, and secondary (abuse) limits as a 403/429
+    carrying a ``Retry-After`` header. A genuine permission 403 carries
+    neither. Distinguishing them matters downstream: a rate limit is
+    transient and must not be reported as a hard ``AUTH_FAILED`` (which tells
+    the operator to reconnect a credential that is actually fine).
+
+    Header-only detection — the two signals above are always present on a
+    rate-limited response, so we never consume the (single-use) error body.
+    """
+    if exc.code not in (403, 429):
+        return False
+    headers = exc.headers or {}
+    remaining = headers.get("X-RateLimit-Remaining")
+    if remaining is not None and str(remaining).strip() == "0":
+        return True
+    return headers.get("Retry-After") is not None
+
+
 def _token(connection) -> str:
     if connection.kind in {"github_pat", "github_oauth_user"}:
         plaintext = decrypt(
@@ -335,6 +357,15 @@ def fetch_github_file(
     except urllib.error.HTTPError as exc:
         if exc.code == 404:
             return None
+        # A rate-limited 403/429 is transient — surface it distinctly so a
+        # caller (e.g. the drift check) doesn't treat it as a hard auth
+        # failure that tells the operator to reconnect a valid credential.
+        if _is_rate_limited(exc):
+            raise GithubProviderError(
+                "RATE_LIMITED",
+                "GitHub rate limit hit while reading the file; retry later.",
+                recoverable=True,
+            ) from exc
         if exc.code in (401, 403):
             raise GithubProviderError(
                 "AUTH_FAILED",

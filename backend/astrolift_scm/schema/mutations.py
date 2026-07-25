@@ -13,6 +13,10 @@ from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Organization
 from astrolift_registry.models import RegisteredApp
+from astrolift_registry.schema.types import (
+    AppCiWorkflowSyncStatusType,
+    build_ci_workflow_sync_status,
+)
 from astrolift_scm.keygen import generate_ed25519_keypair
 from astrolift_scm.models import ScmWebhookInstallation, SourceConnection, SshDeployKey
 from astrolift_scm.schema.types import (
@@ -194,6 +198,18 @@ class PushCiWorkflowResult:
     commit_sha: str
     file_path: str
     repo_url: str
+
+
+@strawberry.input
+class CiWorkflowSyncActionInput:
+    """Target an app for a managed-CI-workflow drift action (#1210).
+
+    Shared by the three manual drift mutations (resync / adopt / refresh);
+    each takes only the app's public guid — the connection and paths are
+    resolved from the app's persisted source config, same as Phase 1's push.
+    """
+
+    app_id: GUID
 
 
 @strawberry.type(name="AstroliftScmWebhookSecretReveal")
@@ -1106,3 +1122,143 @@ class ScmMutation:
                 repo_url=result.web_url,
             )
         )
+
+    # ----------------------------------------------------------------
+    # Managed CI-workflow drift actions (#1210, Phase 2)
+    #
+    # Three manual actions over the versioned-sync record, all gated
+    # the same as ``push_ci_workflow`` (app.update, tenant-scoped) and
+    # all returning the read-side ``AstroliftCiWorkflowSyncStatus`` so
+    # the UI can re-render the drift badge from the mutation response:
+    #
+    #   * resync  — re-render + push the current template (fixes
+    #               template_stale / absent). Reuses Phase 1's push.
+    #   * adopt   — accept the repo's current file as the new baseline
+    #               WITHOUT pushing (clears repo_drift / conflict).
+    #   * refresh — recompute drift now from the repo (manual check).
+    #
+    # None of these autonomously write back to a repo except ``resync``,
+    # which is an explicit operator-driven push (same call the Phase 1
+    # "Sync workflow file" button makes).
+    # ----------------------------------------------------------------
+
+    def _ci_drift_app(self, app_id) -> RegisteredApp | None:
+        """Org-scoped app lookup for the drift actions. Slugs/guids are
+        unique only within an org; fails closed (returns None) when the
+        tenant has no organization (#1183)."""
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return None
+        return (
+            RegisteredApp.objects.filter(
+                guid=str(app_id),
+                organization_id=org_id,
+                deleted_at__isnull=True,
+            )
+            .select_related("organization")
+            .first()
+        )
+
+    @strawberry.field
+    @mutation_audit(action="scm.ci_workflow.resync")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def resync_astrolift_ci_workflow(
+        self, info: Info, input: CiWorkflowSyncActionInput
+    ) -> MutationResultType[AppCiWorkflowSyncStatusType]:
+        """Re-render + push the current template onto the repo (#1210).
+
+        The manual "fix it now" for ``template_stale`` / ``absent``: reuses
+        Phase 1's ``sync_workflow_file_to_repo`` (idempotent, protected-branch
+        aware) which also re-stamps the sync record to ``in_sync``. Returns
+        the refreshed drift status.
+        """
+        from astrolift_scm.services.workflow_sync import (
+            WorkflowSyncError,
+            sync_workflow_file_to_repo,
+        )
+
+        app = self._ci_drift_app(input.app_id)
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appId")
+
+        try:
+            result = sync_workflow_file_to_repo(app)
+        except WorkflowSyncError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, exc.message, field="appId")
+        if result.status == "fetch_failed":
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                result.error or "couldn't sync CI workflow to repo",
+            )
+
+        app.refresh_from_db()
+        return gql_success(build_ci_workflow_sync_status(app))
+
+    @strawberry.field
+    @mutation_audit(action="scm.ci_workflow.adopt")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def adopt_repo_ci_workflow(
+        self, info: Info, input: CiWorkflowSyncActionInput
+    ) -> MutationResultType[AppCiWorkflowSyncStatusType]:
+        """Accept the repo's CURRENT workflow file as the new baseline (#1210).
+
+        Clears a ``repo_drift`` / ``conflict`` by declaring the repo
+        authoritative: re-points the sync record's digests + version at the
+        repo file and flags ``in_sync`` — WITHOUT pushing anything. Per the
+        epic caveat, this only re-baselines the stamp tracking; it does NOT
+        import the repo file's config.
+        """
+        from astrolift_scm.services.ci_workflow_drift import (
+            CiWorkflowAdoptError,
+            CiWorkflowFetchError,
+            adopt_repo_ci_workflow,
+        )
+
+        app = self._ci_drift_app(input.app_id)
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appId")
+
+        try:
+            adopt_repo_ci_workflow(app)
+        except CiWorkflowAdoptError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, exc.message, field="appId")
+        except CiWorkflowFetchError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, f"{exc.code}: {exc.message}")
+
+        app.refresh_from_db()
+        return gql_success(build_ci_workflow_sync_status(app))
+
+    @strawberry.field
+    @mutation_audit(action="scm.ci_workflow.refresh")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def refresh_ci_workflow_sync_status(
+        self, info: Info, input: CiWorkflowSyncActionInput
+    ) -> MutationResultType[AppCiWorkflowSyncStatusType]:
+        """Recompute drift now by reading the repo (#1210).
+
+        The manual "check now" action: fetch the repo file, classify via the
+        pure state machine, persist the result (+ ``checked_at``), and return
+        the refreshed status. A transient rate limit is recorded as
+        ``unknown`` (not a hard failure) so it never poisons the drift state
+        into a false auth error.
+        """
+        from astrolift_scm.services.ci_workflow_drift import (
+            CiWorkflowFetchError,
+            evaluate_and_persist_sync_state,
+        )
+
+        app = self._ci_drift_app(input.app_id)
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appId")
+
+        try:
+            evaluate_and_persist_sync_state(app)
+        except CiWorkflowFetchError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, f"{exc.code}: {exc.message}")
+
+        app.refresh_from_db()
+        return gql_success(build_ci_workflow_sync_status(app))

@@ -155,3 +155,78 @@ export const PUSH_CI_WORKFLOW = gql`
     }
   }
 `;
+
+// Managed CI-workflow drift actions (#1210). All three return the
+// AstroliftCiWorkflowSyncStatus so the caller can re-render the drift
+// badge straight from the mutation response. Fields are inlined (not
+// interpolated) so this file stays parseable by graphql-codegen's
+// document loader.
+
+export const RESYNC_CI_WORKFLOW = gql`
+  mutation ResyncAstroliftCiWorkflow($input: CiWorkflowSyncActionInput!) {
+    resyncAstroliftCiWorkflow(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        state
+        syncedTemplateVersion
+        currentTemplateVersion
+        syncedAt
+        checkedAt
+        path
+        prUrl
+        detail
+      }
+    }
+  }
+`;
+
+export const ADOPT_REPO_CI_WORKFLOW = gql`
+  mutation AdoptRepoCiWorkflow($input: CiWorkflowSyncActionInput!) {
+    adoptRepoCiWorkflow(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        state
+        syncedTemplateVersion
+        currentTemplateVersion
+        syncedAt
+        checkedAt
+        path
+        prUrl
+        detail
+      }
+    }
+  }
+`;
+
+export const REFRESH_CI_WORKFLOW_SYNC_STATUS = gql`
+  mutation RefreshCiWorkflowSyncStatus($input: CiWorkflowSyncActionInput!) {
+    refreshCiWorkflowSyncStatus(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        state
+        syncedTemplateVersion
+        currentTemplateVersion
+        syncedAt
+        checkedAt
+        path
+        prUrl
+        detail
+      }
+    }
+  }
+`;

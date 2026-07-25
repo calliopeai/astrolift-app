@@ -170,6 +170,16 @@ export const GET_APP = gql`
         checkedAt
         detail
       }
+      ciWorkflowSyncStatus {
+        state
+        syncedTemplateVersion
+        currentTemplateVersion
+        syncedAt
+        checkedAt
+        path
+        prUrl
+        detail
+      }
       settingsLastModified {
         deployStrategy
         deployTokens

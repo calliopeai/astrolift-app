@@ -1087,6 +1087,12 @@ type AstroliftCiWorkflowSyncStatus {
   detail: String!
 }
 
+type AstroliftCiWorkflowSyncStatusMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftCiWorkflowSyncStatus
+}
+
 type AstroliftClusterBootstrapComponent {
   key: String!
   title: String!
@@ -3666,6 +3672,10 @@ input CancelDeregisterInput {
   reason: String = null
 }
 
+input CiWorkflowSyncActionInput {
+  appId: GUID!
+}
+
 input ClearAlertSubscriptionInput {
   id: GUID!
 }
@@ -4717,6 +4727,9 @@ type Mutation {
   installScmWebhook(input: InstallScmWebhookInput!): AstroliftScmWebhookInstallationMutationResult!
   deleteSshDeployKey(input: DeleteSshDeployKeyInput!): AstroliftSshDeployKeyMutationResult!
   pushCiWorkflow(input: PushCiWorkflowInput!): AstroliftScmPushCiWorkflowResultMutationResult!
+  resyncAstroliftCiWorkflow(input: CiWorkflowSyncActionInput!): AstroliftCiWorkflowSyncStatusMutationResult!
+  adoptRepoCiWorkflow(input: CiWorkflowSyncActionInput!): AstroliftCiWorkflowSyncStatusMutationResult!
+  refreshCiWorkflowSyncStatus(input: CiWorkflowSyncActionInput!): AstroliftCiWorkflowSyncStatusMutationResult!
   setAppSecret(input: SetAppSecretInput!): AppsecretwritepayloadMutationResult!
   rotateAppSecret(input: RotateAppSecretInput!): AppsecretwritepayloadMutationResult!
   deleteAppSecret(input: DeleteAppSecretInput!): AppsecretwritepayloadMutationResult!

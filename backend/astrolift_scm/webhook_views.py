@@ -310,6 +310,36 @@ def _sync_workflow_dsl(app, connection, payload: dict) -> None:
         )
 
 
+def _reconcile_ci_workflow(app, payload: dict) -> None:
+    """Observe-only drift reconcile of the managed CI workflow file (#1210).
+
+    Reads the pushed branch + SHA off the GitHub push payload and hands them
+    to ``ci_workflow_drift.reconcile_ci_workflow_on_push``, which fetches the
+    managed file at that SHA (deploy branch only), classifies drift, and
+    flags the result onto the app. FLAG ONLY — it never writes to the repo.
+
+    All exceptions are swallowed: a drift check must never turn a 200 SCM ack
+    into a retry-triggering non-2xx, nor block the workflow-trigger fan-out.
+    """
+    try:
+        from astrolift_scm.services.ci_workflow_drift import (
+            reconcile_ci_workflow_on_push,
+        )
+
+        # GitHub push: ``ref`` is ``refs/heads/<branch>``; ``after`` is the
+        # new tip SHA. Branch-gating + the no-SHA fallback live in the
+        # reconcile helper so this receiver stays a thin projection.
+        ref = payload.get("ref") or ""
+        branch = ref.split("refs/heads/", 1)[-1] if ref.startswith("refs/heads/") else ""
+        pushed_sha = payload.get("after") or ""
+        reconcile_ci_workflow_on_push(app, branch=branch, pushed_sha=pushed_sha)
+    except Exception:
+        logger.exception(
+            "_reconcile_ci_workflow: unexpected error for app=%s",
+            getattr(app, "pk", "?"),
+        )
+
+
 @require_http_methods(["POST"])
 def pr_webhook(request: HttpRequest, app_guid: str) -> JsonResponse:
     """POST /api/webhooks/github/<app_guid>/ — GitHub push / PR receiver.
@@ -390,6 +420,10 @@ def pr_webhook(request: HttpRequest, app_guid: str) -> JsonResponse:
         # Best-effort DSL sync: fetch .astrolift/workflows.yaml from the
         # pushed ref and upsert WorkflowDefinitions. Never blocks the ack.
         _sync_workflow_dsl(app, connection, payload)
+        # Best-effort drift reconcile (#1210): re-read the managed CI
+        # workflow at the pushed SHA and flag its drift state. Observe-only —
+        # never writes to the repo. Never blocks the ack.
+        _reconcile_ci_workflow(app, payload)
         # Push has no preview-environment lifecycle; the workflow
         # dispatch above is the whole job. Ack so GitHub stops retrying.
         return JsonResponse(

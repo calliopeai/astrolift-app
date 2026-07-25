@@ -1108,6 +1108,12 @@ export type AstroliftCiWorkflowSyncStatus = {
   syncedTemplateVersion?: Maybe<Scalars['Int']['output']>;
 };
 
+export type AstroliftCiWorkflowSyncStatusMutationResult = {
+  data?: Maybe<AstroliftCiWorkflowSyncStatus>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftClusterBootstrapComponent = {
   defaultEnabled: Scalars['Boolean']['output'];
   helmValues: Scalars['JSON']['output'];
@@ -3686,6 +3692,10 @@ export type CancelDeregisterInput = {
   workflowId: Scalars['String']['input'];
 };
 
+export type CiWorkflowSyncActionInput = {
+  appId: Scalars['GUID']['input'];
+};
+
 export type ClearAlertSubscriptionInput = {
   id: Scalars['GUID']['input'];
 };
@@ -4450,6 +4460,7 @@ export type Mutation = {
   addEmailSuppressionEntry: EmailsuppressionaddpayloadMutationResult;
   addOrganizationAllowlistDomain: AstroliftOrganizationAllowlistedDomainMutationResult;
   addWildcardDomain: AstroliftAppDomainMutationResult;
+  adoptRepoCiWorkflow: AstroliftCiWorkflowSyncStatusMutationResult;
   approveDeployment: AstroliftDeploymentMutationResult;
   approveDeploymentByToken: AstroliftDeploymentMutationResult;
   approveSecretChange: AstroliftSecretChangeProposalMutationResult;
@@ -4635,6 +4646,7 @@ export type Mutation = {
   reconcileClusterIngresses: ReconcileClusterIngressesResultMutationResult;
   recordClusterBootstrapRun: BootstraprunrecordedpayloadMutationResult;
   redeployApp: AstroliftDeploymentMutationResult;
+  refreshCiWorkflowSyncStatus: AstroliftCiWorkflowSyncStatusMutationResult;
   refreshClusterManagement: AstroliftTenantClusterMutationResult;
   registerAgentRepo: AstroliftRegisterAgentRepoResultMutationResult;
   registerApp: AstroliftRegisteredAppMutationResult;
@@ -4661,6 +4673,7 @@ export type Mutation = {
   resumeAppIngress: AstroliftAppEnvironmentMutationResult;
   resumeAstroliftAppWebhookDeploys: AstroliftRegisteredAppMutationResult;
   resumeEnvironment: AstroliftAppEnvironmentMutationResult;
+  resyncAstroliftCiWorkflow: AstroliftCiWorkflowSyncStatusMutationResult;
   resyncAstroliftManifestFromRepo: ResyncManifestPayloadMutationResult;
   retryAstroliftAutowire: AstroliftRetryAutowirePayloadMutationResult;
   revalidateManagedDomain: RevalidateManagedDomainPayloadMutationResult;
@@ -4816,6 +4829,11 @@ export type MutationAddOrganizationAllowlistDomainArgs = {
 
 export type MutationAddWildcardDomainArgs = {
   input: AddWildcardDomainInput;
+};
+
+
+export type MutationAdoptRepoCiWorkflowArgs = {
+  input: CiWorkflowSyncActionInput;
 };
 
 
@@ -5626,6 +5644,11 @@ export type MutationRedeployAppArgs = {
 };
 
 
+export type MutationRefreshCiWorkflowSyncStatusArgs = {
+  input: CiWorkflowSyncActionInput;
+};
+
+
 export type MutationRefreshClusterManagementArgs = {
   input: RefreshClusterManagementInputType;
 };
@@ -5751,6 +5774,11 @@ export type MutationResumeAstroliftAppWebhookDeploysArgs = {
 
 export type MutationResumeEnvironmentArgs = {
   input: EnvironmentByIdInput;
+};
+
+
+export type MutationResyncAstroliftCiWorkflowArgs = {
+  input: CiWorkflowSyncActionInput;
 };
 
 

@@ -364,6 +364,7 @@ export function SettingsClient({ slug }: { slug: string }) {
                   pushCredentialRef={a.ecrPushRoleArn}
                   providerPluginSlug={a.providerPluginSlug}
                   sourceWebhookInstalledAt={a.sourceWebhookInstalledAt ?? null}
+                  ciWorkflowSyncStatus={a.ciWorkflowSyncStatus ?? null}
                 />
                 <ForceRedeploySection appSlug={a.slug} />
               </React.Fragment>
