@@ -9,6 +9,7 @@ import {
   ZapIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -162,6 +163,7 @@ export function RunContent({
   });
   // The task whose live session is open in the Watch-live dialog.
   const [watching, setWatching] = React.useState<AgentTask | null>(null);
+  const router = useRouter();
 
   const [runAgent, { loading: dispatching }] = useMutation<RunAgentResp>(RUN_AGENT);
 
@@ -287,7 +289,20 @@ export function RunContent({
                 </TableHeader>
                 <TableBody>
                   {rows.map((t) => (
-                    <TableRow key={t.id}>
+                    <TableRow
+                      key={t.id}
+                      tabIndex={0}
+                      role="link"
+                      aria-label={`Open run ${t.id.slice(0, 8)}`}
+                      onClick={() => router.push(`/agents/runs/${encodeURIComponent(t.id)}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          router.push(`/agents/runs/${encodeURIComponent(t.id)}`);
+                        }
+                      }}
+                      className="hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
+                    >
                       <TableCell className="font-mono text-xs">{t.id}</TableCell>
                       <TableCell>
                         <StatusCell task={t} />
@@ -306,7 +321,13 @@ export function RunContent({
                           "—"
                         )}
                       </TableCell>
-                      <TableCell className="text-right">
+                      {/* Actions cell — stopPropagation so the live-session
+                          controls don't also trigger the row's navigation to
+                          the run detail. */}
+                      <TableCell
+                        className="text-right"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {canWatch(t) && (
                           <div className="inline-flex items-center gap-2">
                             <Button

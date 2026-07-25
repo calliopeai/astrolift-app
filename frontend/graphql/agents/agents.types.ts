@@ -88,21 +88,28 @@ export type AstroliftAgentDetail = Pick<
 
 // One AgentTask (a run). Carries the VNC coordinates (`vncEnabled` / `vncUrl` /
 // `snapshotUrl`) alongside the status/timestamps so the run detail view can
-// render the "watch live" affordance. NOTE the read type exposes no run-mode or
-// trigger-payload field — those live on the agent Workload, not the task — so
-// the detail surface shows only what the task actually carries.
+// render the "watch live" affordance, plus the pod coordinates (`podName` /
+// `namespace`) and `failureMessage` — the human-readable spawn/dispatch failure
+// reason (null unless the run failed). A spawn-failed run never creates a pod,
+// so its `agentTaskLogs` is empty and `failureMessage` is the only debug signal.
+// NOTE the read type exposes no run-mode or trigger-payload field — those live
+// on the agent Workload, not the task — so the detail surface shows only what
+// the task actually carries.
 export type AstroliftAgentTask = Pick<
   GeneratedAgentTask,
   | "id"
   | "status"
   | "callbackUrl"
   | "result"
+  | "failureMessage"
   | "createdAt"
   | "startedAt"
   | "finishedAt"
   | "vncEnabled"
   | "vncUrl"
   | "snapshotUrl"
+  | "podName"
+  | "namespace"
 >;
 
 // ── Fleet map (#1091 — LiveFlowMap P2): live dispatch feed ───────────────────

@@ -7,6 +7,7 @@ import {
   Loader2Icon,
   MonitorPlayIcon,
   ScrollIcon,
+  XCircleIcon,
 } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
@@ -148,6 +149,10 @@ export function AgentTaskDetail({ taskId }: { taskId: string }) {
 
   const canWatch = task.status === "running" && task.vncEnabled && Boolean(task.vncUrl);
   const logs = logsData?.agentTaskLogs ?? [];
+  // The human-readable spawn/dispatch failure reason (null unless the run
+  // failed). A spawn-failed run never starts a pod, so its `agentTaskLogs` is
+  // empty and this is the only debug signal — surface it prominently.
+  const failureMessage = task.failureMessage?.trim() ? task.failureMessage : null;
 
   return (
     <PageShell
@@ -187,6 +192,24 @@ export function AgentTaskDetail({ taskId }: { taskId: string }) {
       }
     >
       <div className="space-y-6">
+        {/* Spawn/dispatch failure callout — the debug payload for a run that
+            failed before (or while) starting a pod. Rendered above everything
+            so it's the first thing an operator sees on a failed run. */}
+        {failureMessage && (
+          <div className="border-danger-border bg-danger/10 rounded-md border p-4">
+            <div className="text-danger-fg flex items-center gap-2 text-sm font-medium">
+              <XCircleIcon className="size-4" />
+              Run failed
+            </div>
+            <p className="text-muted-foreground mt-1 text-sm">
+              The dispatch pipeline reported an error for this run. Full reason below.
+            </p>
+            <pre className="text-danger-fg border-danger-border bg-danger/5 mt-3 max-h-60 overflow-auto rounded border p-3 font-mono text-xs break-words whitespace-pre-wrap">
+              {failureMessage}
+            </pre>
+          </div>
+        )}
+
         <CollapsibleCard title="Overview" storageKey="agent-run-overview">
           <DefinitionList
             items={[
@@ -198,6 +221,22 @@ export function AgentTaskDetail({ taskId }: { taskId: string }) {
                 { term: "Created", description: <Timestamp iso={task.createdAt} /> },
                 { term: "Started", description: <Timestamp iso={task.startedAt} /> },
                 { term: "Finished", description: <Timestamp iso={task.finishedAt} /> },
+                {
+                  term: "Pod",
+                  description: task.podName ? (
+                    <span className="font-mono text-xs break-all">{task.podName}</span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  ),
+                },
+                {
+                  term: "Namespace",
+                  description: task.namespace ? (
+                    <span className="font-mono text-xs break-all">{task.namespace}</span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  ),
+                },
                 {
                   term: "Callback URL",
                   description: task.callbackUrl ? (
@@ -255,6 +294,10 @@ export function AgentTaskDetail({ taskId }: { taskId: string }) {
             <pre className="bg-muted/40 max-h-[28rem] overflow-auto rounded-md border p-3 font-mono text-xs whitespace-pre-wrap">
               {logs.join("\n")}
             </pre>
+          ) : failureMessage ? (
+            <p className="text-muted-foreground text-sm">
+              No pod logs — the run failed before a pod started. See the failure above.
+            </p>
           ) : (
             <p className="text-muted-foreground text-sm">
               No logs to show. Output appears here once the run&rsquo;s pod emits it.

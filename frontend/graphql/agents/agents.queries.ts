@@ -89,6 +89,7 @@ export const LIST_AGENT_TASKS = gql`
       status
       callbackUrl
       result
+      failureMessage
       createdAt
       startedAt
       finishedAt
@@ -106,12 +107,15 @@ export const GET_AGENT_TASK = gql`
       status
       callbackUrl
       result
+      failureMessage
       createdAt
       startedAt
       finishedAt
       vncEnabled
       vncUrl
       snapshotUrl
+      podName
+      namespace
     }
   }
 `;

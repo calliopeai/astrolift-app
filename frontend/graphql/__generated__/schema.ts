@@ -339,8 +339,11 @@ export type AstroliftAgentSkill = {
 export type AstroliftAgentTask = {
   callbackUrl: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
+  failureMessage?: Maybe<Scalars['String']['output']>;
   finishedAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
+  namespace: Scalars['String']['output'];
+  podName: Scalars['String']['output'];
   result?: Maybe<Scalars['JSON']['output']>;
   snapshotUrl?: Maybe<Scalars['String']['output']>;
   startedAt?: Maybe<Scalars['DateTime']['output']>;

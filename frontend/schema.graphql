@@ -343,6 +343,7 @@ type AstroliftAgentTask {
   status: String!
   callbackUrl: String!
   result: JSON
+  failureMessage: String
   createdAt: DateTime!
   updatedAt: DateTime!
   queuedAt: DateTime
