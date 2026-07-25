@@ -124,6 +124,12 @@ class AgentTaskType:
     # Terminal output payload; null until the task reaches a terminal
     # state with a result (or on a failure-only outcome).
     result: JSON | None
+    # Human-readable failure reason for a terminal-failed task — the spawn /
+    # dispatch error message off the model's ``failure`` blob. Null unless the
+    # task failed. Crucial for debugging spawn failures, which never produce pod
+    # logs (the pod was never created), so ``agentTaskLogs`` is empty and this
+    # is the only signal.
+    failure_message: str | None
     created_at: dt.datetime
     # Lifecycle cursor for the fleet map (#1091): ``transition_to`` bumps
     # ``updated_at`` on every state change, so it is the incremental cursor
@@ -382,12 +388,28 @@ def _agent_task_dispatcher_to_type(d) -> AgentTaskDispatcherType | None:
     )
 
 
+def _agent_task_failure_message(failure) -> str | None:
+    """Pull the human-readable message out of the model's ``failure`` blob.
+
+    ``failure`` is a JSONField — a ``{"message": ...}`` dict for a spawn/
+    dispatch error, but tolerate a bare string or other shapes. Returns None
+    when there's no failure recorded.
+    """
+    if not failure:
+        return None
+    if isinstance(failure, dict):
+        msg = failure.get("message")
+        return str(msg) if msg else None
+    return str(failure)
+
+
 def agent_task_to_type(t) -> AgentTaskType:
     return AgentTaskType(
         id=GUID(str(t.guid)),
         status=t.status,
         callback_url=t.callback_url or "",
         result=t.result,
+        failure_message=_agent_task_failure_message(t.failure),
         created_at=t.created_at,
         updated_at=t.updated_at,
         queued_at=t.queued_at,
