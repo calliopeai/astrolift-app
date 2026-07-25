@@ -138,23 +138,53 @@ class _CoreSubscription:
     async def form_submission_received(self, info: Info, slug: str) -> AsyncGenerator[str, None]:
         """Subscribe to new submissions for a specific form.
 
-        Yields submission IDs as they arrive.
+        Yields submission IDs as they arrive. Scoped to the caller's
+        organization (#1193): ``FormSubmission`` is org-owned (it carries an
+        ``organization`` FK, mirroring how ``astrolift_forms`` resolves
+        submissions), so the stream is filtered by ``organization_id`` — a
+        caller cannot subscribe to another tenant's form submissions.
+
+        Tenant resolution mirrors ``astrolift_deployment_lifecycle_stream``
+        (the org-scoped sibling in this file): over WS the cookie-aware ASGI
+        handler stashes the resolved tenant on ``info.context._ws_tenant``;
+        we pin it on the contextvar and fail closed when no org resolves.
         """
-        from forms.models import FormSubmission
+        from asgiref.sync import sync_to_async
+
+        from astrolift_forms.models import FormSubmission
+        from core.tenancy import (
+            TenantContext,
+            get_current_tenant,
+            set_current_tenant,
+        )
+
+        ws_tenant: TenantContext | None = getattr(info.context, "_ws_tenant", None)
+        if ws_tenant is not None:
+            set_current_tenant(ws_tenant)
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return
+
+        def _fetch(after_id):
+            qs = FormSubmission.objects.filter(
+                form__slug=slug,
+                organization_id=org_id,
+            ).order_by("-submitted_at")
+            if after_id:
+                qs = qs.filter(pk__gt=after_id)
+            return list(qs[:10])
 
         last_id = None
-
-        latest = FormSubmission.objects.filter(form__slug=slug).order_by("-submitted_at").first()
+        latest = await sync_to_async(_fetch)(None)
         if latest:
-            last_id = latest.pk
+            last_id = latest[0].pk
 
         while True:
             await asyncio.sleep(2)
             try:
-                qs = FormSubmission.objects.filter(form__slug=slug).order_by("-submitted_at")
-                if last_id:
-                    qs = qs.filter(pk__gt=last_id)
-                for sub in qs[:10]:
+                for sub in await sync_to_async(_fetch)(last_id):
                     yield f"New submission #{sub.pk}"
                     last_id = max(last_id or 0, sub.pk) if isinstance(sub.pk, int) else sub.pk
             except Exception:

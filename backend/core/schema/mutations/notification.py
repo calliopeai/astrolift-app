@@ -32,6 +32,13 @@ class NotificationMutations:
             from core.models import Notification
             instance = Notification.objects.filter(guid=guid).first()
             if instance:
+                # Ownership check mirroring notification_read (#1193): a caller
+                # may only upsert their OWN notification. guids are globally
+                # unique, so without this any authenticated user could target
+                # (and overwrite) another user's notification by supplying its
+                # guid.
+                if instance.user != info.context.user:
+                    raise ValueError('Notification does not belong to user')
                 kwargs['instance'] = instance
 
         serializer = NotificationSerializer(**kwargs)

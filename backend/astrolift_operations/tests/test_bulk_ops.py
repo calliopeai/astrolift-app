@@ -3,6 +3,7 @@ bulkRollingRestart, bulkPushSecrets, bulkResyncManifest."""
 
 from __future__ import annotations
 
+import inspect
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -288,3 +289,91 @@ def test_bulk_resync_manifest_unknown_app(permission_resolver):
     assert result.ok_count == 0
     assert result.failed_count == 1
     assert "not found" in result.per_app[0].errors[0]
+
+
+# ---- #1192: fail-closed on null org, isolation across orgs --------
+#
+# ``@tenant_scoped`` blocks a null org before the body runs, so the
+# org_id=None branch is unreachable through the decorated resolver. We
+# unwrap to the raw body to prove it fails closed as defense-in-depth
+# (would fall through to an UNSCOPED by-slug fetch before #1192).
+
+
+def _raw(resolver_cls, name):
+    return inspect.unwrap(resolver_cls.__dict__[name])
+
+
+def test_bulk_rolling_restart_null_org_fails_closed(permission_resolver):
+    org, app, env, cluster, user = _scaffold("restart-nullorg")
+    Workload.objects.create(registered_app=app, name="web", slug="web", kind="deployment")
+    raw = _raw(OperationsMutation, "bulk_rolling_restart")
+    with (
+        tenant_context(TenantContext(organization_id=None, actor_user_id=user.id)),
+        patch("astrolift_lifecycle.services.k8s_ops.rollout_restart_workload") as mock_restart,
+    ):
+        result = raw(
+            OperationsMutation(),
+            info=_info(),
+            input=BulkRollingRestartInput(app_slugs=[app.slug]),
+        )
+    assert result.ok_count == 0
+    assert result.failed_count == 1
+    assert "no active organization" in result.per_app[0].errors[0]
+    # No restart issued despite the slug existing — the fail-closed guard
+    # returns before the (now org-scoped) fetch and the k8s side effect.
+    assert mock_restart.call_count == 0
+
+
+def test_bulk_rolling_restart_cross_org_not_found(permission_resolver):
+    org_a, _app_a, _env_a, _cl_a, user_a = _scaffold("restart-xorgA")
+    _org_b, app_b, _env_b, _cl_b, _user_b = _scaffold("restart-xorgB")
+    Workload.objects.create(registered_app=app_b, name="web", slug="web", kind="deployment")
+    _grant(permission_resolver)
+    with (
+        _tenant(org_a, user_a),
+        patch("astrolift_lifecycle.services.k8s_ops.rollout_restart_workload") as mock_restart,
+    ):
+        result = OperationsMutation().bulk_rolling_restart(
+            info=_info(),
+            input=BulkRollingRestartInput(app_slugs=[app_b.slug]),
+        )
+    assert result.ok_count == 0
+    assert result.failed_count == 1
+    assert "not found" in result.per_app[0].errors[0]
+    assert mock_restart.call_count == 0
+
+
+def test_bulk_resync_manifest_null_org_fails_closed(permission_resolver):
+    org, app, env, cluster, user = _scaffold("resync-nullorg")
+    raw = _raw(OperationsMutation, "bulk_resync_manifest")
+    with (
+        tenant_context(TenantContext(organization_id=None, actor_user_id=user.id)),
+        patch("astrolift_registry.services.manifest_sync.resync_app_manifest_from_repo") as mock_resync,
+    ):
+        result = raw(
+            OperationsMutation(),
+            info=_info(),
+            input=BulkResyncManifestInput(app_slugs=[app.slug]),
+        )
+    assert result.ok_count == 0
+    assert result.failed_count == 1
+    assert "no active organization" in result.per_app[0].errors[0]
+    assert mock_resync.call_count == 0
+
+
+def test_bulk_resync_manifest_cross_org_not_found(permission_resolver):
+    org_a, _app_a, _env_a, _cl_a, user_a = _scaffold("resync-xorgA")
+    _org_b, app_b, _env_b, _cl_b, _user_b = _scaffold("resync-xorgB")
+    _grant(permission_resolver)
+    with (
+        _tenant(org_a, user_a),
+        patch("astrolift_registry.services.manifest_sync.resync_app_manifest_from_repo") as mock_resync,
+    ):
+        result = OperationsMutation().bulk_resync_manifest(
+            info=_info(),
+            input=BulkResyncManifestInput(app_slugs=[app_b.slug]),
+        )
+    assert result.ok_count == 0
+    assert result.failed_count == 1
+    assert "not found" in result.per_app[0].errors[0]
+    assert mock_resync.call_count == 0

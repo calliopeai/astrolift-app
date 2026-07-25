@@ -3191,13 +3191,20 @@ class LifecycleMutation:
 
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        domain_qs = CustomDomain.objects.filter(
-            guid=str(input.domain_id),
-            deleted_at__isnull=True,
+        # Fail closed without a tenant org (#1192): the domain is org-owned
+        # via ``registered_app``, so a None org must not fall through to an
+        # unscoped by-guid fetch — mirror the uniformly fail-closed #1183 shape.
+        if org_id is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found")
+        domain = (
+            CustomDomain.objects.filter(
+                guid=str(input.domain_id),
+                registered_app__organization_id=org_id,
+                deleted_at__isnull=True,
+            )
+            .select_related("registered_app")
+            .first()
         )
-        if org_id is not None:
-            domain_qs = domain_qs.filter(registered_app__organization_id=org_id)
-        domain = domain_qs.select_related("registered_app").first()
         if domain is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -3272,13 +3279,20 @@ class LifecycleMutation:
 
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        domain_qs = CustomDomain.objects.filter(
-            guid=str(input.domain_id),
-            deleted_at__isnull=True,
+        # Fail closed without a tenant org (#1192): the domain is org-owned
+        # via ``registered_app``, so a None org must not fall through to an
+        # unscoped by-guid fetch — mirror the uniformly fail-closed #1183 shape.
+        if org_id is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found")
+        domain = (
+            CustomDomain.objects.filter(
+                guid=str(input.domain_id),
+                registered_app__organization_id=org_id,
+                deleted_at__isnull=True,
+            )
+            .select_related("registered_app")
+            .first()
         )
-        if org_id is not None:
-            domain_qs = domain_qs.filter(registered_app__organization_id=org_id)
-        domain = domain_qs.select_related("registered_app").first()
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found")
 

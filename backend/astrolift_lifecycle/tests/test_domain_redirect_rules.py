@@ -6,6 +6,8 @@ and tenant-scoped lookup."""
 
 from __future__ import annotations
 
+import inspect
+
 import pytest
 
 from astrolift_lifecycle.models import CustomDomain, DomainRedirectRule
@@ -364,6 +366,40 @@ def test_set_redirects_isolates_other_orgs(
         )
     assert result.ok is False
     assert result.errors[0].code == ErrorCode.NOT_FOUND.value
+
+
+@pytest.mark.django_db
+def test_set_redirects_null_org_fails_closed(custom_domain, fake_info, actor):
+    """#1192 defense-in-depth: ``@tenant_scoped`` already blocks a null org,
+    but the resolver body must ALSO fail closed if reached with org_id=None —
+    otherwise it falls through to an UNSCOPED by-guid fetch and rewrites rules.
+    Unwrap past the decorators to exercise that branch directly."""
+    pre_existing = DomainRedirectRule.objects.create(
+        custom_domain=custom_domain,
+        kind=DomainRedirectRule.Kind.WWW_TO_APEX.value,
+        priority=5,
+    )
+    raw = inspect.unwrap(LifecycleMutation.__dict__["set_domain_redirects"])
+    with tenant_context(TenantContext(organization_id=None, actor_user_id=actor.id)):
+        result = raw(
+            LifecycleMutation(),
+            info=fake_info,
+            input=SetDomainRedirectsInput(
+                domain_id=str(custom_domain.guid),
+                rules=[
+                    DomainRedirectRuleInput(
+                        kind=DomainRedirectRule.Kind.CUSTOM.value,
+                        destination_url="https://evil.example.com",
+                        priority=0,
+                    ),
+                ],
+            ),
+        )
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.NOT_FOUND.value
+    # No write: the pre-existing rule survives and no new rule was created.
+    live = list(DomainRedirectRule.objects.filter(custom_domain=custom_domain, deleted_at__isnull=True))
+    assert live == [pre_existing]
 
 
 @pytest.mark.django_db

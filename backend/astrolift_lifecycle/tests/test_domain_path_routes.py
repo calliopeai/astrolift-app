@@ -6,6 +6,8 @@ and tenant-scoped lookup."""
 
 from __future__ import annotations
 
+import inspect
+
 import pytest
 
 from astrolift_lifecycle.models import CustomDomain, DomainPathRoute
@@ -339,6 +341,43 @@ def test_set_path_routes_isolates_other_orgs(
         )
     assert result.ok is False
     assert result.errors[0].code == ErrorCode.NOT_FOUND.value
+
+
+@pytest.mark.django_db
+def test_set_path_routes_null_org_fails_closed(custom_domain, fake_info, actor):
+    """#1192 defense-in-depth: ``@tenant_scoped`` already blocks a null org,
+    but the resolver body must ALSO fail closed if reached with org_id=None —
+    otherwise it falls through to an UNSCOPED by-guid fetch and rewrites routes.
+    Unwrap past the decorators to exercise that branch directly."""
+    pre_existing = DomainPathRoute.objects.create(
+        custom_domain=custom_domain,
+        path_prefix="/keep",
+        target_workload_slug="keep",
+        target_port=8080,
+        priority=5,
+    )
+    raw = inspect.unwrap(LifecycleMutation.__dict__["set_domain_path_routes"])
+    with tenant_context(TenantContext(organization_id=None, actor_user_id=actor.id)):
+        result = raw(
+            LifecycleMutation(),
+            info=fake_info,
+            input=SetDomainPathRoutesInput(
+                domain_id=str(custom_domain.guid),
+                routes=[
+                    DomainPathRouteInput(
+                        path_prefix="/api",
+                        target_workload_slug="api-worker",
+                        target_port=8080,
+                        priority=0,
+                    ),
+                ],
+            ),
+        )
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.NOT_FOUND.value
+    # No write: the pre-existing route survives and no new route was created.
+    live = list(DomainPathRoute.objects.filter(custom_domain=custom_domain, deleted_at__isnull=True))
+    assert live == [pre_existing]
 
 
 @pytest.mark.django_db

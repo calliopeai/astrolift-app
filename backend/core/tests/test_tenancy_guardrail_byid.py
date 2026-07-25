@@ -306,30 +306,10 @@ EXEMPT: dict[str, str] = {
     #     (guid=..)`` then ``if org_id: qs = qs.filter(...__organization_id
     #     =org_id)``). The narrowing is a separate statement the per-call
     #     rule can't chain to.
-    "astrolift_lifecycle::LifecycleMutation.set_domain_redirects": (
-        "org-narrowed below: the domain qs is filtered by "
-        "``registered_app__organization_id=org_id`` in the following "
-        "``if org_id is not None`` statement."
-    ),
-    "astrolift_lifecycle::LifecycleMutation.set_domain_path_routes": (
-        "org-narrowed below: the domain qs is filtered by "
-        "``registered_app__organization_id=org_id`` in the following "
-        "``if org_id is not None`` statement."
-    ),
     "astrolift_lifecycle::LifecycleQuery.astrolift_compare_deployments": (
         "org-narrowed below: the nested ``_get_deploy`` helper filters by "
         "``registered_app__organization_id=org_id`` after the by-guid fetch "
         "when a tenant org is present."
-    ),
-    "astrolift_operations::OperationsMutation.bulk_rolling_restart": (
-        "org-narrowed below: each per-slug app qs is filtered by "
-        "``organization_id=org_id`` in the following ``if org_id is not "
-        "None`` statement."
-    ),
-    "astrolift_operations::OperationsMutation.bulk_resync_manifest": (
-        "org-narrowed below: each per-slug app qs is filtered by "
-        "``organization_id=org_id`` in the following ``if org_id is not "
-        "None`` statement."
     ),
     # --- Authorization gate on the resolved row (workflow ops).
     "astrolift_workflows::WorkflowsMutation.update_workflow_stage": (

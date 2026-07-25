@@ -1906,13 +1906,25 @@ class OperationsMutation:
         slugs = list(dict.fromkeys(input.app_slugs or []))[:_BULK_APP_CAP]
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
+        # Fail closed without a tenant org (#1192): the per-slug app lookup is
+        # org-scoped, so a None org must not fall through to an unscoped
+        # by-slug fetch. Mirrors the fail-closed bulk_push_secrets guard.
+        if org_id is None:
+            return BulkOperationResult(
+                ok_count=0,
+                failed_count=len(slugs),
+                per_app=[
+                    BulkAppResultItem(app_slug=s, ok=False, errors=["no active organization"]) for s in slugs
+                ],
+            )
 
         per_app: list[BulkAppResultItem] = []
         for slug in slugs:
-            app_qs = RegisteredApp.objects.filter(slug=slug, deleted_at__isnull=True)
-            if org_id is not None:
-                app_qs = app_qs.filter(organization_id=org_id)
-            app = app_qs.first()
+            app = RegisteredApp.objects.filter(
+                slug=slug,
+                organization_id=org_id,
+                deleted_at__isnull=True,
+            ).first()
             if app is None:
                 per_app.append(BulkAppResultItem(app_slug=slug, ok=False, errors=["app not found"]))
                 continue
@@ -2070,13 +2082,25 @@ class OperationsMutation:
         slugs = list(dict.fromkeys(input.app_slugs or []))[:_BULK_APP_CAP]
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
+        # Fail closed without a tenant org (#1192): the per-slug app lookup is
+        # org-scoped, so a None org must not fall through to an unscoped
+        # by-slug fetch. Mirrors the fail-closed bulk_push_secrets guard.
+        if org_id is None:
+            return BulkOperationResult(
+                ok_count=0,
+                failed_count=len(slugs),
+                per_app=[
+                    BulkAppResultItem(app_slug=s, ok=False, errors=["no active organization"]) for s in slugs
+                ],
+            )
 
         per_app: list[BulkAppResultItem] = []
         for slug in slugs:
-            app_qs = RegisteredApp.objects.filter(slug=slug, deleted_at__isnull=True)
-            if org_id is not None:
-                app_qs = app_qs.filter(organization_id=org_id)
-            app = app_qs.first()
+            app = RegisteredApp.objects.filter(
+                slug=slug,
+                organization_id=org_id,
+                deleted_at__isnull=True,
+            ).first()
             if app is None:
                 per_app.append(BulkAppResultItem(app_slug=slug, ok=False, errors=["app not found"]))
                 continue

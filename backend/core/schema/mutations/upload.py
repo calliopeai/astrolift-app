@@ -162,6 +162,40 @@ def create_upload(
     return upload
 
 
+def _assert_caller_owns_target(info, instance) -> None:
+    """Deny issuing a presigned URL / attaching an upload to a target the
+    caller does not own (#1193).
+
+    ``pre_signed_url_image_upload`` resolves an arbitrary ``(model, pk)`` from
+    a caller-supplied global id and — via ``owner_container_property`` — can
+    write an FK/M2M on that row. With no ownership check any authenticated
+    user could mint an upload against, and mutate, a row in another tenant.
+
+    The ownership boundary mirrors ``UploadQuerySet.with_view_permission`` /
+    ``scope_to_caller_org``: the target must resolve to the caller's active
+    organization, or be a row the caller owns / created. A target that
+    exposes no organization / owner signal is denied (fail-closed) rather
+    than left open. Superusers bypass, matching those queryset helpers.
+    """
+    user = getattr(info.context, "user", None)
+    if user is None or not getattr(user, "is_authenticated", False):
+        raise GraphQLError("Not authorized to upload to the requested target.")
+    if getattr(user, "is_superuser", False):
+        return
+
+    profile = getattr(user, "profile", None)
+    organization = profile.organization() if profile is not None else None
+    if organization is not None and getattr(instance, "organization_id", None) == organization.pk:
+        return
+
+    for owner_attr in ("user_id", "created_by_id"):
+        owner_id = getattr(instance, owner_attr, None)
+        if owner_id is not None and owner_id == user.id:
+            return
+
+    raise GraphQLError("Not authorized to upload to the requested target.")
+
+
 # ---------------------------------------------------------------------------
 # Mutations
 # ---------------------------------------------------------------------------
@@ -185,6 +219,13 @@ class UploadMutations:
         name: Optional[str] = None,
         owner_container_property: Optional[str] = None,
     ) -> PreSignedUrlUploadResult:
+        # Ownership gate (#1193): the target (model, pk) is resolved from a
+        # caller-supplied global id and — via owner_container_property — can be
+        # mutated below. Verify the caller owns the target BEFORE minting a
+        # presigned URL or attaching anything to it.
+        target = GlobalIDUtils.find_object_by_global_id(global_id, raise_not_found=True)
+        _assert_caller_owns_target(info, target)
+
         upload = create_upload(
             info,
             global_id,
@@ -418,6 +459,13 @@ class UploadMutations:
         model_name, pk = GlobalIDUtils.from_global_id(global_id)
         assert model_name != Profile._meta.model_name
         profile_original: Profile = Profile.objects.get(pk=pk)
+        # Ownership check (#1193): a profile-image upload is a self-service edit
+        # of the caller's OWN profile (avatar / signature). Without this gate any
+        # authenticated user could upload to — and, for whitelisted fields,
+        # overwrite the avatar/signature of — another user's profile by supplying
+        # its global id. Mirrors notification_read's owner check.
+        if profile_original.user_id != info.context.user.id:
+            raise GraphQLError("Profile does not belong to user")
         whitelist: List[str] = Profile.whitelist_fields()
 
         if field.value in whitelist:
