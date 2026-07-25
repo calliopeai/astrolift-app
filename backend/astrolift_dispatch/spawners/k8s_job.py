@@ -89,6 +89,19 @@ class K8sJobSpawner(ContainerSpawner):
         # non-VNC tasks and when no blob store is configured).
         job_manifest = inject_snapshot_into_job_spec(job_manifest, task)
 
+        # Final env dedupe (authoritative). The container env is assembled from
+        # several sources — managed-model provider env, the spec's env_vars +
+        # secret_refs, then the Brief prepends the manifest [environment] config
+        # (JIRA_BASE_URL, etc.) and dispatch input. Sources legitimately overlap
+        # (an agent config env var also bound as a secret_ref; a spec key the
+        # Bedrock env also sets). The pod manifest is applied server-side, and
+        # SSA REJECTS a container whose env has duplicate `name` keys with a 500
+        # ("duplicate entries for key") — it does not honour last-wins. Dedupe
+        # here, after every injection, keeping the LAST occurrence so the
+        # precedence the assembly order encodes (spec/operator override wins over
+        # the prepended Brief defaults) is preserved.
+        _dedupe_job_container_env(job_manifest)
+
         # Resolve the spec's secret_refs to live values from the install's
         # secret store (the SAME store setAgentSecretValue writes into, via
         # self._cluster) and materialize them as a per-task K8s Secret the
@@ -271,6 +284,36 @@ def _resolve_base_image(workload, spec) -> str:
     return "gcr.io/distroless/base"
 
 
+def _dedupe_job_container_env(job_manifest: dict) -> None:
+    """De-duplicate the primary container's env by name, keeping the LAST
+    occurrence, in place.
+
+    Server-side apply rejects a container whose ``env`` has duplicate ``name``
+    keys (a 500 "duplicate entries for key" that fails the whole Job POST), and
+    the env is assembled from overlapping sources (managed-model provider env,
+    the spec's env_vars + secret_refs, the Brief-prepended manifest
+    [environment] config, dispatch input). Keeping the last occurrence preserves
+    the precedence the assembly order encodes: the Brief prepends its defaults,
+    the spec's own env lands later, so the spec/operator value wins. No-op when
+    there are no duplicates, so a task with a clean env list is unchanged.
+    """
+    try:
+        containers = job_manifest["spec"]["template"]["spec"]["containers"]
+    except (KeyError, TypeError, IndexError):
+        return
+    if not containers:
+        return
+    env = containers[0].get("env")
+    if not env:
+        return
+    by_name: dict[str, dict] = {}
+    for entry in env:
+        name = entry.get("name")
+        if name is not None:
+            by_name[name] = entry
+    containers[0]["env"] = list(by_name.values())
+
+
 def _render_agent_job(
     *,
     job_name: str,
@@ -301,17 +344,11 @@ def _render_agent_job(
     # secret_refs become secretKeyRef entries pointing at the per-task
     # Secret the spawner materializes (see K8sJobSpawner.spawn / #1173).
     # Values never touch this manifest. Managed-model env goes first, then the
-    # spec's own env — and we DEDUPE by name keeping the last occurrence, so a
-    # spec env/secret of the same name overrides the injected default. Dedup is
-    # required (not just ordering): the manifest is applied server-side, and
-    # SSA rejects a container whose env list has duplicate `name` keys with a
-    # 500 ("duplicate entries for key"), which would fail the whole Job POST
-    # (e.g. the Bedrock env sets AWS_REGION and a spec that also sets it).
-    _merged_env = list(model_env or []) + agent_container_env(spec, task_secret_name(job_name))
-    _by_name: dict[str, dict] = {}
-    for _entry in _merged_env:
-        _by_name[_entry["name"]] = _entry
-    container_env = list(_by_name.values())
+    # spec's own env so a spec key overrides the injected default. Duplicate
+    # keys are collapsed by the authoritative dedupe in K8sJobSpawner.spawn,
+    # which runs after the Brief also prepends env (SSA rejects duplicate env
+    # keys, so the dedupe must see every source).
+    container_env = list(model_env or []) + agent_container_env(spec, task_secret_name(job_name))
 
     # VNC-capable runs swap to the -vnc image variant and expose the
     # raw RFB port (5900) so the ASGI relay can port-forward into it.
