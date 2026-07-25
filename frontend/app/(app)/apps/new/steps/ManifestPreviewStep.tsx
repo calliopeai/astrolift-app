@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { GET_SOURCE_FILE } from "@/graphql/scm/scm.queries";
 import type { AstroliftSourceFile } from "@/graphql/scm/scm.types";
 import { generateFriendlySlug } from "@/lib/friendly-name";
+import { detectTomlSchema } from "@/lib/manifest/schema-detect";
 import { cn } from "@/lib/utils";
 
 import type { WizardState } from "../wizard-client";
@@ -73,27 +74,6 @@ function validateManifest(raw: string): {
     errors.push("At least one `[[workloads]]` block is required.");
   }
   return { ok: errors.length === 0, errors };
-}
-
-/**
- * Client-side mirror of the backend ``detect_toml_schema`` agent-config check
- * (#1172): an agent config repo carries ``astrolift_version`` plus a
- * ``[skills.*]`` / ``[tools.*]`` table and has neither a top-level ``name``
- * nor a ``[[workloads]]`` block. Regex-grade, same posture as
- * ``validateManifest`` — the backend is authoritative; this only decides
- * whether to surface the "wrong wizard" callout. These two schemas share the
- * ``astrolift.toml`` filename, so the manifest step would otherwise validate
- * an agent library as a broken app manifest.
- */
-function looksLikeAgentConfig(raw: string): boolean {
-  const trimmed = raw.trim();
-  if (!trimmed) return false;
-  const hasVersion = /^astrolift_version\s*=/m.test(trimmed);
-  const hasSkillOrToolTable = /^\s*\[\s*(?:skills|tools)\s*\./m.test(trimmed);
-  const hasWorkloads = /^\s*\[\[\s*workloads\s*\]\]/m.test(trimmed);
-  const beforeFirstSection = trimmed.split(/\n\[/)[0];
-  const hasName = /^name\s*=\s*["'][^"'\n]+["']/m.test(beforeFirstSection);
-  return hasVersion && hasSkillOrToolTable && !hasWorkloads && !hasName;
 }
 
 interface Props {
@@ -206,7 +186,7 @@ export function ManifestPreviewStep({ state, setState, setValid }: Props) {
     setValid(state.manifestLater || ok);
   }, [state.manifestRaw, state.manifestLater, setState, setValid]);
 
-  const agentConfigDetected = looksLikeAgentConfig(state.manifestRaw);
+  const agentConfigDetected = detectTomlSchema(state.manifestRaw) === "agent_config";
   const isReadOnly = (fetchState === "found" && !editing) || state.manifestLater;
 
   return (

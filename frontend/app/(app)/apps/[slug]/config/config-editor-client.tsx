@@ -43,8 +43,10 @@ import type {
   ManifestSyncState,
 } from "@/graphql/registry/registry.types";
 import { useFormatters } from "@/lib/i18n/formatters";
+import { detectTomlSchema } from "@/lib/manifest/schema-detect";
 
 import { AppTabs } from "../components/app-tabs";
+import { AgentConfigFormPane } from "./agent-config-form-pane";
 import { ManifestFormPane } from "./manifest-form-pane";
 
 interface AppResp {
@@ -215,6 +217,12 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
   // default surface; the raw editor stays a strict superset (#1110).
   const [view, setView] = React.useState<"form" | "code">("form");
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+  // astrolift.toml carries two schemas: an app manifest or an agent config repo
+  // (#1172). The Form tab renders the matching builder; the Code tab, save,
+  // sync/push, and rendered panels are shared. Detection tracks the live draft
+  // so a Code-view edit that changes the schema swaps to the right builder.
+  const schemaFamily = React.useMemo(() => detectTomlSchema(draft), [draft]);
 
   // Snapshot of the server's "effective" manifest at the moment the
   // operator started editing. We compare against this on every refetch
@@ -499,11 +507,19 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
       )}
 
       {view === "form" ? (
-        <ManifestFormPane
-          draft={draft}
-          onDraftChange={setDraft}
-          onSwitchToCode={() => setView("code")}
-        />
+        schemaFamily === "agent_config" ? (
+          <AgentConfigFormPane
+            draft={draft}
+            onDraftChange={setDraft}
+            onSwitchToCode={() => setView("code")}
+          />
+        ) : (
+          <ManifestFormPane
+            draft={draft}
+            onDraftChange={setDraft}
+            onSwitchToCode={() => setView("code")}
+          />
+        )
       ) : (
         <>
       <div className="flex flex-wrap items-center justify-between gap-2">
