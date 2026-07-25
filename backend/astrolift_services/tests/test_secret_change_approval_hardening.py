@@ -743,3 +743,46 @@ def test_double_approve_same_user_does_not_reach_quorum(permission_resolver):
         ).count()
         == 1
     )
+
+
+# ---------------------------------------------------------------------
+# I. #1214 — reject after approve must flip the stale vote row, not skip it
+
+
+def test_reject_after_approve_flips_stale_vote_row_1214(permission_resolver):
+    """An approver who already voted APPROVED then rejects must have their
+    row flipped to REJECTED (single row, with the reason) — otherwise the
+    denormalized ApproverList shows them as 'approved' on a rejected proposal."""
+    org, app, _, _ = _scaffold(min_approvals=2)  # 2 so first approve stays pending
+    permission_resolver.grant(Permission.SECRET_APPROVE)
+    proposer = _make_user("flip-proposer")
+    approver = _make_user("flip-approver")
+    proposal = _make_proposal(app, proposer=proposer)
+
+    with _ctx(org, actor=approver):
+        appr = ServicesMutation().approve_secret_change(
+            _info(user=approver),
+            input=ApproveSecretChangeInput(proposal_id=str(proposal.guid)),
+        )
+    assert appr.ok
+    assert (
+        SecretChangeApproval.objects.get(proposal=proposal, approver=approver).decision
+        == SecretChangeApproval.Decision.APPROVED.value
+    )
+
+    with _ctx(org, actor=approver):
+        rej = ServicesMutation().reject_secret_change(
+            _info(user=approver),
+            input=RejectSecretChangeInput(proposal_id=str(proposal.guid), reason="changed mind"),
+        )
+    assert rej.ok
+    proposal.refresh_from_db()
+    assert proposal.status == "rejected"
+
+    rows = SecretChangeApproval.objects.filter(
+        proposal=proposal, approver=approver, deleted_at__isnull=True
+    )
+    assert rows.count() == 1  # flipped in place, not a duplicate row
+    row = rows.first()
+    assert row.decision == SecretChangeApproval.Decision.REJECTED.value
+    assert row.reason == "changed mind"

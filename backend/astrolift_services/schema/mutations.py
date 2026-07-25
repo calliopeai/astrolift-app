@@ -3053,6 +3053,27 @@ class ServicesMutation:
                     created_by=actor,
                     updated_by=actor,
                 )
+            else:
+                # #1214: the approver already had a vote row (typically
+                # APPROVED) and is now rejecting. Skipping it left the
+                # denormalized ApproverList showing them as 'approved' on a
+                # proposal that just went to rejected. Flip the row in place —
+                # update respects the unique-per-(proposal, approver)
+                # constraint that a second create would violate.
+                existing.decision = SecretChangeApproval.Decision.REJECTED.value
+                existing.reason = reason
+                existing.decided_at = timezone.now()
+                existing.updated_by = actor
+                existing.save(
+                    update_fields=[
+                        "decision",
+                        "reason",
+                        "decided_at",
+                        "updated_by",
+                        "updated_at",
+                        "version",
+                    ]
+                )
             # ANY rejection moves the proposal to rejected — one nay
             # kills the proposal, mirroring the deploy quorum policy.
             proposal.transition_to(SecretChangeProposal.Status.REJECTED)
