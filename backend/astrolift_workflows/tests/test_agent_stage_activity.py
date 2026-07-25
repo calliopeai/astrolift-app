@@ -303,6 +303,59 @@ def test_poll_fast_success_from_provisioning_steps_through_running(org, env_spec
     assert AgentTask.objects.get(pk=task_pk).status == AgentTask.Status.COMPLETED
 
 
+class _FakePod:
+    def __init__(self, status: str) -> None:
+        self.status = status
+
+
+def test_poll_fails_fast_on_imagepullbackoff(org, env_spec, cluster, patch_spawner, monkeypatch):
+    """A pod wedged in ImagePullBackOff never yields a Job Complete/Failed
+    condition, so the spawner reports running forever. The pod-health gate
+    must fail the task rather than leave it RUNNING indefinitely (the 31-min
+    hang from a missing -vnc image tag)."""
+    patch_spawner(
+        _FakeSpawner(
+            spawn_result=SpawnResult(external_id="agent-task-stuck"),
+            status_sequence=[TaskStatus(running=True)],
+        )
+    )
+    task_pk = agent_stage._create_agent_task_sync(_params(org, environment_spec_slug=env_spec.slug))
+    agent_stage._spawn_agent_task_sync(task_pk)
+
+    monkeypatch.setattr(
+        "core.cluster_observability.list_app_pods",
+        lambda **kwargs: [_FakePod("ImagePullBackOff")],
+    )
+
+    result = agent_stage._poll_agent_task_sync(task_pk)
+    assert result["terminal"] is True
+    task = AgentTask.objects.get(pk=task_pk)
+    assert task.status == AgentTask.Status.FAILED
+    assert "ImagePullBackOff" in (task.failure or {}).get("message", "")
+
+
+def test_poll_does_not_fail_on_transient_pod_state(org, env_spec, cluster, patch_spawner, monkeypatch):
+    """A benign startup state (ContainerCreating) is NOT fatal — the task
+    stays RUNNING and gets another poll, so a slow image pull isn't killed."""
+    patch_spawner(
+        _FakeSpawner(
+            spawn_result=SpawnResult(external_id="agent-task-boot"),
+            status_sequence=[TaskStatus(running=True)],
+        )
+    )
+    task_pk = agent_stage._create_agent_task_sync(_params(org, environment_spec_slug=env_spec.slug))
+    agent_stage._spawn_agent_task_sync(task_pk)
+
+    monkeypatch.setattr(
+        "core.cluster_observability.list_app_pods",
+        lambda **kwargs: [_FakePod("ContainerCreating")],
+    )
+
+    result = agent_stage._poll_agent_task_sync(task_pk)
+    assert result["terminal"] is False
+    assert AgentTask.objects.get(pk=task_pk).status == AgentTask.Status.RUNNING
+
+
 def test_poll_failure_marks_failed_with_details(org, env_spec, cluster, patch_spawner):
     patch_spawner(
         _FakeSpawner(

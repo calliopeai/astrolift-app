@@ -309,8 +309,66 @@ def _poll_agent_task_sync(task_pk: int) -> dict[str, Any]:
         _advance_to_terminal(task, AgentTask.Status.FAILED)
         return {"status": task.status, "terminal": True}
 
+    # A pod wedged in a fatal image/config waiting state never produces a Job
+    # Complete/Failed condition — its container never starts — so the Job-
+    # condition check above reports running=True indefinitely. Without this
+    # gate a missing/renamed image (ImagePullBackOff), a malformed ref
+    # (InvalidImageName), or a missing secret/configmap
+    # (CreateContainerConfigError) would leave the task RUNNING forever
+    # instead of failing. Only the reasons that never self-heal are fatal;
+    # transient startup states (ContainerCreating, a first-attempt
+    # ErrImagePull) fall through and get another poll.
+    fatal = _fatal_pod_wait_reason(cluster, namespace, str(task.guid))
+    if fatal:
+        if task.failure is None:
+            task.failure = {"message": f"container never started: {fatal}"}
+            task.save(update_fields=["failure", "updated_at", "version"])
+        _advance_to_terminal(task, AgentTask.Status.FAILED)
+        return {"status": task.status, "terminal": True}
+
     # Still running / not yet terminal.
     return {"status": task.status, "terminal": False}
+
+
+# Pod container-waiting reasons that never self-heal: the container will not
+# start no matter how long we wait, so the task should fail rather than hang.
+# Deliberately excludes ErrImagePull (a first-attempt pull that k8s retries —
+# it becomes ImagePullBackOff once genuinely stuck) and CrashLoopBackOff (the
+# container DID start and its exit is captured through the Job's Failed
+# condition / exit code path).
+_FATAL_POD_WAIT_REASONS = frozenset(
+    {"ImagePullBackOff", "InvalidImageName", "CreateContainerConfigError"}
+)
+
+
+def _fatal_pod_wait_reason(cluster: Any, namespace: str, task_guid: str) -> str:
+    """Return the task pod's fatal container-waiting reason, or ``""``.
+
+    Discovers the pod by its ``astrolift.dev/task-id`` label (the same lookup
+    the log + VNC paths use) and returns its rolled-up status when that status
+    is an unrecoverable image/config-pull state (see
+    :data:`_FATAL_POD_WAIT_REASONS`). Best-effort: any lookup failure returns
+    ``""`` so a transient probe error never fails a healthy task.
+    """
+    from core.cluster_observability import ClusterObservabilityError, list_app_pods
+
+    try:
+        pods = list_app_pods(
+            cluster=cluster,
+            namespace=namespace,
+            app_slug=task_guid,
+            task_id=task_guid,
+        )
+    except ClusterObservabilityError:
+        return ""
+    except Exception:  # noqa: BLE001 — a probe hiccup must not fail the task
+        logger.exception("agent poll: pod health probe failed for %s", task_guid)
+        return ""
+    for pod in pods:
+        status = (getattr(pod, "status", "") or "").strip()
+        if status in _FATAL_POD_WAIT_REASONS:
+            return status
+    return ""
 
 
 def _advance_to_terminal(task: Any, terminal_status: str) -> None:
