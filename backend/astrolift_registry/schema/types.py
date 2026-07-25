@@ -231,6 +231,42 @@ class AppAutowireStatusType:
     detail: str
 
 
+@strawberry.type(name="AstroliftCiWorkflowSyncStatus")
+class AppCiWorkflowSyncStatusType:
+    """Versioned-sync status for an app's managed CI workflow file (#1209).
+
+    DB-only rollup for the app detail page — reads the persisted
+    ``ci_workflow_state`` snapshot plus the ``ci_workflow_template_version``
+    column; never hits the source host.
+
+    ``state`` — where the managed file stands. Phase 1 records ``in_sync``
+    after a successful reconcile and defaults to ``absent`` when the app has
+    never been versioned-synced. (The wider drift vocabulary —
+    ``template_stale`` / ``repo_drift`` / ``conflict`` — arrives with the drift
+    state machine in a later phase.)
+
+    ``synced_template_version`` is the ``TEMPLATE_VERSION`` last stamped onto
+    the repo (null until the first sync); ``current_template_version`` is the
+    version the platform renders today — when they differ the app's file is
+    stale relative to the current template.
+
+    ``synced_at`` is when the platform last reconciled the file; ``checked_at``
+    is when it last verified the repo against the template (null in Phase 1 —
+    no inbound check runs yet). ``path`` is the workflow file path, ``pr_url``
+    the review link when the change landed in a PR/MR, and ``detail`` a human
+    one-liner (empty in Phase 1).
+    """
+
+    state: str
+    synced_template_version: int | None
+    current_template_version: int
+    synced_at: dt.datetime | None
+    checked_at: dt.datetime | None
+    path: str
+    pr_url: str
+    detail: str
+
+
 @strawberry.type(name="AstroliftSecurityPolicy")
 class SecurityPolicyType:
     """Resolved supply-chain policy for an app (#313).
@@ -478,6 +514,12 @@ class RegisteredAppType:
     # cheap list path stays cheap. Drives the "connect for auto-deploy" /
     # "autowire incomplete" banner on the app overview.
     autowire: AppAutowireStatusType | None
+
+    # Managed CI-workflow versioned-sync status (#1209). Populated only on
+    # the single-app detail resolver ``astroliftApp(slug)``; list resolvers
+    # leave it None so the cheap list path stays cheap. DB-only rollup — see
+    # ``AppCiWorkflowSyncStatusType``.
+    ci_workflow_sync_status: AppCiWorkflowSyncStatusType | None
 
     # Per-section "Modified N ago" timestamps for the Settings landing
     # cards (#454). Populated only on the single-app detail resolver
@@ -838,6 +880,7 @@ def app_to_type(
     freshness: AppFreshness | None = None,
     drift: AppConfigDriftType | None = None,
     autowire: AppAutowireStatusType | None = None,
+    ci_workflow_sync_status: AppCiWorkflowSyncStatusType | None = None,
     settings_last_modified: AppSettingsLastModifiedType | None = None,
     viewer_permissions: Iterable[str] | None = None,
     active_preview_count: int | None = None,
@@ -933,6 +976,7 @@ def app_to_type(
         reprovision=reprovision,
         config_drift=drift,
         autowire=autowire,
+        ci_workflow_sync_status=ci_workflow_sync_status,
         settings_last_modified=settings_last_modified,
         viewer_permissions=sorted(viewer_permissions) if viewer_permissions is not None else [],
         active_preview_count=(
@@ -1241,6 +1285,45 @@ def build_autowire_status(app) -> AppAutowireStatusType:
         secrets=state.get("secrets") or MISSING,
         checked_at=checked_at,
         detail=detail,
+    )
+
+
+# Never-synced default for the managed CI-workflow read status (#1209). The
+# fuller drift vocabulary (in_sync / template_stale / repo_drift / conflict)
+# lands with the drift state machine in a later phase; Phase 1 only ever
+# persists "in_sync", so an app with no sync record reads as "absent" — from
+# the DB's point of view the file was never versioned-synced.
+_CI_WORKFLOW_STATE_ABSENT = "absent"
+
+
+def build_ci_workflow_sync_status(app) -> AppCiWorkflowSyncStatusType:
+    """Roll up the managed CI-workflow versioned-sync status (#1209).
+
+    DB-only — reads the persisted ``ci_workflow_state`` blob and the
+    ``ci_workflow_template_version`` column; never hits the source host. Cheap
+    enough for the detail resolver (both are columns already loaded on ``app``).
+    """
+    from astrolift_scm.ci_templates import TEMPLATE_VERSION
+
+    state = app.ci_workflow_state or {}
+
+    def _iso_or_none(raw) -> dt.datetime | None:
+        if not raw:
+            return None
+        try:
+            return dt.datetime.fromisoformat(raw)
+        except (TypeError, ValueError):
+            return None
+
+    return AppCiWorkflowSyncStatusType(
+        state=state.get("state") or _CI_WORKFLOW_STATE_ABSENT,
+        synced_template_version=app.ci_workflow_template_version,
+        current_template_version=TEMPLATE_VERSION,
+        synced_at=_iso_or_none(state.get("synced_at")),
+        checked_at=_iso_or_none(state.get("checked_at")),
+        path=state.get("path") or "",
+        pr_url=state.get("pr_url") or "",
+        detail=state.get("detail") or "",
     )
 
 

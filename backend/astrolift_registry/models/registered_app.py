@@ -282,6 +282,20 @@ class RegisteredApp(NamedBaseCoreModel):
     # repo) is derived, not stored, so it self-heals on the next run.
     autowire_state = models.JSONField(default=dict, blank=True)
 
+    # Managed CI-workflow sync record (#1209). Part of the bidirectional
+    # versioned sync for the astrolift-ci workflow file.
+    # ``ci_workflow_template_version`` is the ``TEMPLATE_VERSION`` stamped into
+    # the file the platform last reconciled onto this app's repo — indexed so a
+    # later sweep can cheaply find apps whose file predates the current template
+    # (``template_stale``). Null until the app has been versioned-synced at
+    # least once. ``ci_workflow_state`` is a sparse blob written by
+    # ``sync_workflow_file_to_repo`` after a successful reconcile (keys omitted
+    # until they apply): ``{"synced_hash", "synced_blob_sha", "synced_at",
+    # "path", "state", "last_commit_sha"?, "pr_url"?}``. Empty dict means "never
+    # versioned-synced" — the DB-only read status then reports ``absent``.
+    ci_workflow_template_version = models.IntegerField(null=True, blank=True, db_index=True)
+    ci_workflow_state = models.JSONField(default=dict, blank=True)
+
     default_tenant_cluster = models.ForeignKey(
         "astrolift_clusters.TenantCluster",
         related_name="registered_apps",

@@ -38,6 +38,7 @@ from astrolift_registry.schema.types import (
     app_to_type,
     build_app_freshness,
     build_autowire_status,
+    build_ci_workflow_sync_status,
     build_config_drift,
     build_settings_last_modified,
     container_to_type,
@@ -1132,10 +1133,14 @@ class RegistryQuery:
         settings_last_modified = build_settings_last_modified(app)
         # Autowire completeness rollup (#1108) — detail-only, DB-cheap.
         autowire = build_autowire_status(app)
+        # Managed CI-workflow versioned-sync status (#1209) — detail-only,
+        # DB-only (reads columns already on ``app``, no host round-trip).
+        ci_workflow_sync = build_ci_workflow_sync_status(app)
         return app_to_type(
             app,
             drift=drift,
             autowire=autowire,
+            ci_workflow_sync_status=ci_workflow_sync,
             settings_last_modified=settings_last_modified,
             include_retention_policies=True,
         )

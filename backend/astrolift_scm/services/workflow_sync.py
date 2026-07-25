@@ -32,8 +32,15 @@ from pathlib import Path
 from typing import Final
 
 from django.conf import settings
+from django.utils import timezone
 
 from astrolift_registry.models import RegisteredApp
+from astrolift_scm.ci_templates import (
+    TEMPLATE_VERSION,
+    content_hash,
+    git_blob_sha,
+    stamp_workflow,
+)
 from astrolift_scm.models import SourceConnection
 from astrolift_scm.providers import ProviderError, fetch_file, open_pull_request, put_file
 from astrolift_scm.providers.gitea import (
@@ -168,7 +175,8 @@ def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
             return match.group(0)
         return values[name]
 
-    return _VAR_RE.sub(_replace, template)
+    rendered = _VAR_RE.sub(_replace, template)
+    return stamp_workflow(rendered, version=TEMPLATE_VERSION, digest=content_hash(rendered))
 
 
 def render_astrolift_bitbucket_pipeline(app: RegisteredApp) -> str:
@@ -187,7 +195,7 @@ def render_astrolift_bitbucket_pipeline(app: RegisteredApp) -> str:
     deploy_branch = (app.deploy_branch or "main").strip() or "main"
     slug_literal = json.dumps(app.slug)
     api_url_literal = json.dumps(api_url)
-    return (
+    body = (
         "# Managed by Astrolift — do not edit by hand."
         " Re-sync via Settings → CI setup → Sync workflow file.\n"
         "image: atlassian/default-image:4\n"
@@ -217,6 +225,7 @@ def render_astrolift_bitbucket_pipeline(app: RegisteredApp) -> str:
         '                -H "Content-Type: application/json" \\\n'
         f'                -d "{{\\"appSlug\\":{slug_literal},\\"image\\":\\"$ASTROLIFT_IMAGE\\",\\"commitSha\\":\\"$BITBUCKET_COMMIT\\"}}"\n'
     )
+    return stamp_workflow(body, version=TEMPLATE_VERSION, digest=content_hash(body))
 
 
 def render_astrolift_gitea_ci_workflow(app: RegisteredApp) -> str:
@@ -234,7 +243,7 @@ def render_astrolift_gitea_ci_workflow(app: RegisteredApp) -> str:
     deploy_branch = (app.deploy_branch or "main").strip() or "main"
     slug_literal = json.dumps(app.slug)
     api_url_literal = json.dumps(api_url)
-    return (
+    body = (
         "# Managed by Astrolift — do not edit by hand."
         " Re-sync via Settings → CI setup → Sync workflow file.\n"
         "name: Astrolift CI\n"
@@ -276,6 +285,7 @@ def render_astrolift_gitea_ci_workflow(app: RegisteredApp) -> str:
         '            -H "Content-Type: application/json" \\\n'
         f'            -d \'{{"appSlug":{slug_literal},"image":"{ecr_uri}:${{{{ github.sha }}}}","commitSha":"${{{{ github.sha }}}}"}}\'\n'
     )
+    return stamp_workflow(body, version=TEMPLATE_VERSION, digest=content_hash(body))
 
 
 def render_astrolift_gitlab_ci_workflow(app: RegisteredApp) -> str:
@@ -296,7 +306,7 @@ def render_astrolift_gitlab_ci_workflow(app: RegisteredApp) -> str:
     slug_literal = json.dumps(app.slug)
     api_url_literal = json.dumps(api_url)
     rules_line = f"    - if: '$CI_COMMIT_REF_NAME == \"{deploy_branch}\"'"
-    return (
+    body = (
         "# Managed by Astrolift — do not edit by hand."
         " Re-sync via Settings → CI setup → Sync workflow file.\n"
         "stages:\n"
@@ -343,6 +353,7 @@ def render_astrolift_gitlab_ci_workflow(app: RegisteredApp) -> str:
         '\\"image\\":\\"$ASTROLIFT_IMAGE\\",'
         '\\"commitSha\\":\\"$CI_COMMIT_SHA\\"}"\n'
     )
+    return stamp_workflow(body, version=TEMPLATE_VERSION, digest=content_hash(body))
 
 
 # ---------------------------------------------------------------------------
@@ -811,6 +822,71 @@ def _gitea_create_branch_direct(
 
 
 # ---------------------------------------------------------------------------
+# Per-app sync-record persistence (#1209)
+# ---------------------------------------------------------------------------
+
+# Statuses that mean "the managed workflow is reconciled onto the repo"
+# (either it landed on the deploy branch, already matched, or is sitting in
+# a review PR). ``fetch_failed`` is deliberately excluded — nothing landed.
+_PERSISTED_SYNC_STATUSES: Final = frozenset({"created", "updated", "in_sync", "pr_opened"})
+
+
+def _render_and_path(app: RegisteredApp) -> tuple[str, str]:
+    """Re-derive the (stamped body, workflow path) the sync just reconciled.
+
+    Rendering is a pure function of the app's persisted state, so this
+    reproduces byte-for-byte the body ``_sync_<host>`` created/compared —
+    it is used only to compute the per-app sync record's digests, never to
+    push again. Mirrors the host dispatch in
+    :func:`sync_workflow_file_to_repo`; only ever reached for a host that
+    dispatch already accepted.
+    """
+    if app.source_kind == "github":
+        return render_astrolift_ci_workflow(app), WORKFLOW_PATH
+    if app.source_kind == "gitlab":
+        return render_astrolift_gitlab_ci_workflow(app), GITLAB_WORKFLOW_PATH
+    if app.source_kind == "bitbucket":
+        return render_astrolift_bitbucket_pipeline(app), BITBUCKET_WORKFLOW_PATH
+    return render_astrolift_gitea_ci_workflow(app), GITEA_WORKFLOW_PATH
+
+
+def _persist_ci_workflow_stamp(app: RegisteredApp, result: WorkflowSyncResult) -> None:
+    """Record which template version + content landed for ``app`` (#1209).
+
+    DB-only bookkeeping run after a successful reconcile: it captures the
+    ``TEMPLATE_VERSION`` we synced, the content hash (stamp removed) and the
+    git blob SHA (full stamped file) so a later phase can spot template
+    staleness or repo drift WITHOUT re-fetching the file. It never touches
+    the repo and does not change anything ``_sync_<host>`` pushed.
+    """
+    body, path = _render_and_path(app)
+    state: dict = {
+        "synced_hash": content_hash(body),
+        "synced_blob_sha": git_blob_sha(body.encode("utf-8")),
+        "synced_at": timezone.now().isoformat(),
+        "path": path,
+        "state": "in_sync",
+    }
+    # A direct commit landed a base-branch SHA; in_sync / pr_opened did not.
+    if result.commit_sha:
+        state["last_commit_sha"] = result.commit_sha
+    # Protected-branch flow parked the change in a review PR/MR.
+    if result.pr_url:
+        state["pr_url"] = result.pr_url
+
+    app.ci_workflow_template_version = TEMPLATE_VERSION
+    app.ci_workflow_state = state
+    app.save(
+        update_fields=[
+            "ci_workflow_template_version",
+            "ci_workflow_state",
+            "updated_at",
+            "version",
+        ]
+    )
+
+
+# ---------------------------------------------------------------------------
 # Top-level sync
 # ---------------------------------------------------------------------------
 
@@ -825,6 +901,11 @@ def sync_workflow_file_to_repo(
     See module docstring for the protocol. ``viewer_user`` is accepted
     for parity with the resolver signature but is not consulted —
     selection runs against the app's organization, mirroring #387.
+
+    After a successful reconcile (created / updated / in_sync / pr_opened)
+    the per-app sync record is persisted (#1209) so the platform knows which
+    ``TEMPLATE_VERSION`` and content landed. This is pure bookkeeping — the
+    push/PR behaviour above is unchanged.
     """
     if not app.source_repo:
         raise WorkflowSyncError(
@@ -832,18 +913,23 @@ def sync_workflow_file_to_repo(
             "app has no source repo configured; cannot push the CI workflow",
         )
     if app.source_kind == "github":
-        return _sync_github(app)
-    if app.source_kind == "gitlab":
-        return _sync_gitlab(app)
-    if app.source_kind == "bitbucket":
-        return _sync_bitbucket(app)
-    if app.source_kind == "gitea":
-        return _sync_gitea(app)
-    raise WorkflowSyncError(
-        "UNSUPPORTED_SOURCE",
-        f"CI workflow push is not yet supported for source_kind={app.source_kind!r}; "
-        "supported hosts: github, gitlab, bitbucket, gitea.",
-    )
+        result = _sync_github(app)
+    elif app.source_kind == "gitlab":
+        result = _sync_gitlab(app)
+    elif app.source_kind == "bitbucket":
+        result = _sync_bitbucket(app)
+    elif app.source_kind == "gitea":
+        result = _sync_gitea(app)
+    else:
+        raise WorkflowSyncError(
+            "UNSUPPORTED_SOURCE",
+            f"CI workflow push is not yet supported for source_kind={app.source_kind!r}; "
+            "supported hosts: github, gitlab, bitbucket, gitea.",
+        )
+
+    if result.status in _PERSISTED_SYNC_STATUSES:
+        _persist_ci_workflow_stamp(app, result)
+    return result
 
 
 def _sync_github(app: RegisteredApp) -> WorkflowSyncResult:

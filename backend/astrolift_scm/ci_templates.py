@@ -24,7 +24,126 @@ The GitHub Actions workflow follows three constraints:
 
 from __future__ import annotations
 
+import dataclasses
+import hashlib
 import json
+import re
+
+# ---- template versioning (#1208) ------------------------------------
+#
+# TEMPLATE_VERSION is the single source of truth for "which generation
+# of the managed CI workflow does the platform currently render". It is
+# stamped into every workflow file we push (see ``stamp_workflow`` and
+# the ``render_astrolift_*`` renderers in
+# ``astrolift_scm.services.workflow_sync``) and persisted per-app on
+# ``RegisteredApp.ci_workflow_template_version`` so a later phase can tell
+# a repo whose file predates a template fix (``template_stale``) apart
+# from one that's current.
+#
+# INCREMENT THIS whenever ANY managed workflow body changes — that means
+# any edit to a ``render_astrolift_*`` output OR to
+# ``astrolift_lifecycle/templates/astrolift-ci.yml.j2``. The golden test
+# ``astrolift_scm/tests/test_ci_template_version.py`` pins the
+# ``content_hash`` of every host's rendered body to this version and goes
+# red on a body change with no bump, so the two can never drift apart.
+TEMPLATE_VERSION = 1
+
+# The stamp is a host-agnostic ``#`` comment so it's inert on GitHub
+# Actions / GitLab CI / Bitbucket Pipelines / Gitea alike — it never
+# changes what the pipeline does, only records provenance.
+_STAMP_PREFIX = "# astrolift-managed:"
+_STAMP_RE = re.compile(r"^#\s*astrolift-managed:\s*template-version=(\d+)\s+sha256=([0-9a-fA-F]+)\s*$")
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ParsedStamp:
+    """Result of :func:`parse_stamp`.
+
+    ``version`` / ``declared_sha`` are ``None`` when the file carries no
+    Astrolift stamp line (a hand-authored or pre-versioning file).
+    ``body_without_stamp`` is the file with the stamp line removed — for
+    an unstamped file it is the input unchanged, so hashing it is stable
+    whether or not a stamp is present.
+    """
+
+    version: int | None
+    declared_sha: str | None
+    body_without_stamp: str
+
+
+def parse_stamp(file_text: str) -> ParsedStamp:
+    """Extract the Astrolift stamp (if any) from a workflow file's text.
+
+    Removes the FIRST matching stamp line so the returned
+    ``body_without_stamp`` round-trips: stamping a body and then parsing
+    the stamp back off yields the original body byte-for-byte. Line
+    structure (including the trailing newline) is preserved because we
+    split/join on ``"\n"`` without touching any other line.
+    """
+    lines = file_text.split("\n")
+    for i, line in enumerate(lines):
+        m = _STAMP_RE.match(line)
+        if m:
+            del lines[i]
+            return ParsedStamp(
+                version=int(m.group(1)),
+                declared_sha=m.group(2).lower(),
+                body_without_stamp="\n".join(lines),
+            )
+    return ParsedStamp(version=None, declared_sha=None, body_without_stamp=file_text)
+
+
+def content_hash(body: str) -> str:
+    """SHA-256 hex of ``body`` with any existing stamp line removed.
+
+    Removing the stamp first makes the hash self-consistent: the digest
+    of a freshly rendered (unstamped) body equals the digest recomputed
+    from the same body AFTER it's been stamped and round-tripped back
+    through a repo. That's what lets a later drift check compare a
+    fetched file against the template without the stamp line perturbing
+    the comparison.
+    """
+    return hashlib.sha256(parse_stamp(body).body_without_stamp.encode("utf-8")).hexdigest()
+
+
+def stamp_workflow(body: str, *, version: int, digest: str) -> str:
+    """Insert the managed-provenance comment right after the human header.
+
+    The "human header" is the leading run of ``#`` comment lines every
+    ``render_astrolift_*`` body opens with. The stamp lands immediately
+    below it so it reads as part of the banner, e.g.::
+
+        # Managed by Astrolift — do not edit by hand. ...
+        # astrolift-managed: template-version=1 sha256=0123456789abcdef
+        name: Astrolift CI
+
+    ``digest`` is the full :func:`content_hash`; only its first 16 hex
+    chars go in the stamp (enough to spot a mismatch by eye, and the
+    authoritative comparison always recomputes the full hash anyway).
+    """
+    stamp = f"{_STAMP_PREFIX} template-version={version} sha256={digest[:16]}"
+    lines = body.split("\n")
+    insert_at = 0
+    for i, line in enumerate(lines):
+        if line.lstrip().startswith("#"):
+            insert_at = i + 1
+        else:
+            break
+    lines.insert(insert_at, stamp)
+    return "\n".join(lines)
+
+
+def git_blob_sha(full_file_bytes: bytes) -> str:
+    """The SHA-1 git stores for ``full_file_bytes`` as a blob.
+
+    Computed locally — ``sha1("blob <len>\\0" + data)`` — so the value can
+    be compared against the ``sha`` a host returns for a file (GitHub's
+    contents API, GitLab's, etc.) with no extra round-trip. This is git's
+    content-addressing scheme, not a security hash.
+    """
+    header = b"blob %d\0" % len(full_file_bytes)
+    return hashlib.sha1(header + full_file_bytes, usedforsecurity=False).hexdigest()
+
 
 # ---- branches -------------------------------------------------------
 
