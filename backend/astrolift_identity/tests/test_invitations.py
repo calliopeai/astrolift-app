@@ -27,6 +27,7 @@ from astrolift_identity.schema.mutations import (
     AcceptInvitationInput,
     CreateInvitationInput,
     IdentityMutation,
+    ResendInvitationInput,
     RevokeInvitationInput,
 )
 from core.permissions import Permission
@@ -192,6 +193,128 @@ def test_revoke_invitation_other_org_cannot_see(permission_resolver):
         )
     assert not r.ok
     assert r.errors[0].code == "NOT_FOUND"
+
+
+# ---- resend -----------------------------------------------------------
+
+
+def test_resend_invitation_rotates_token_and_refreshes_expiry(permission_resolver):
+    """Resend mints a fresh token (the old link dies) and pushes the
+    expiry out to a new window, returning the new plaintext exactly
+    once so the copy-link durable channel survives the resend."""
+    org = Organization.objects.create(name="X", slug="x")
+    permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        c = IdentityMutation().create_invitation(
+            _info(_admin_user()),
+            input=CreateInvitationInput(email="resend@astrolift.dev"),
+        )
+    original_plaintext = c.data.plaintext_token
+    inv = Invitation.objects.get()
+    old_hash = inv.token_hash
+
+    # Backdate expiry so the refresh is an observable strict increase and
+    # mirrors the real "resend a pending invite that's past its TTL" case.
+    Invitation.objects.filter(pk=inv.pk).update(expires_at=timezone.now() - dt.timedelta(hours=1))
+    old_expiry = Invitation.objects.get(pk=inv.pk).expires_at
+
+    with tenant_context(TenantContext(organization_id=org.id)):
+        r = IdentityMutation().resend_invitation(
+            _info(_admin_user()),
+            input=ResendInvitationInput(id=c.data.invitation.id),
+        )
+    assert r.ok, r.errors
+
+    # A fresh plaintext comes back exactly once (the durable copy-link).
+    new_plaintext = r.data.plaintext_token
+    assert new_plaintext.startswith("alft_")
+    assert new_plaintext != original_plaintext
+    assert r.data.accept_url_path == f"/auth/invitation/{new_plaintext}"
+
+    inv.refresh_from_db()
+    # Token rotated: hash changed, matches the new plaintext, and the
+    # original link no longer validates.
+    assert inv.token_hash != old_hash
+    assert inv.token_hash == hashlib.sha256(new_plaintext.encode()).hexdigest()
+    assert inv.token_hash != hashlib.sha256(original_plaintext.encode()).hexdigest()
+    # Expiry refreshed into the future.
+    assert inv.expires_at > old_expiry
+    assert inv.expires_at > timezone.now()
+    # Still a pending invitation.
+    assert inv.status == Invitation.Status.PENDING
+
+
+def test_resend_invitation_rejects_accepted(permission_resolver):
+    """An accepted invitation is terminal — resend must not revive it."""
+    org = Organization.objects.create(name="X", slug="x")
+    role = _invite_role()
+    permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        c = IdentityMutation().create_invitation(
+            _info(_admin_user()),
+            input=CreateInvitationInput(email="accepted@astrolift.dev", role_slug=role.slug),
+        )
+    accepting = User.objects.create_user(username="accepted", email="accepted@astrolift.dev")
+    accepted = IdentityMutation().accept_invitation(
+        _info(accepting), input=AcceptInvitationInput(token=c.data.plaintext_token)
+    )
+    assert accepted.ok
+
+    with tenant_context(TenantContext(organization_id=org.id)):
+        r = IdentityMutation().resend_invitation(
+            _info(_admin_user()),
+            input=ResendInvitationInput(id=c.data.invitation.id),
+        )
+    assert not r.ok
+    assert r.errors[0].code == "PRECONDITION"
+    # The accepted row is left untouched.
+    assert Invitation.objects.get().status == Invitation.Status.ACCEPTED
+
+
+def test_resend_invitation_other_org_cannot_see(permission_resolver):
+    """Cross-org isolation: resend can't reach into another org, and a
+    denied cross-tenant call must not rotate the target's token."""
+    org_a = Organization.objects.create(name="A", slug="org-a")
+    org_b = Organization.objects.create(name="B", slug="org-b")
+    permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
+
+    with tenant_context(TenantContext(organization_id=org_a.id)):
+        c = IdentityMutation().create_invitation(
+            _info(_admin_user("aa@astrolift.dev")),
+            input=CreateInvitationInput(email="xorg@astrolift.dev"),
+        )
+    a_hash = Invitation.objects.get().token_hash
+
+    with tenant_context(TenantContext(organization_id=org_b.id)):
+        r = IdentityMutation().resend_invitation(
+            _info(_admin_user("bb@astrolift.dev")),
+            input=ResendInvitationInput(id=c.data.invitation.id),
+        )
+    assert not r.ok
+    assert r.errors[0].code == "NOT_FOUND"
+    assert Invitation.objects.get().token_hash == a_hash
+
+
+def test_resend_invitation_requires_permission(permission_resolver):
+    """Without ORG_MANAGE_MEMBERS the resend fails closed and the token
+    is not rotated."""
+    org = Organization.objects.create(name="X", slug="x")
+    inv = Invitation.objects.create(
+        email="perm@astrolift.dev",
+        scope_kind=Invitation.ScopeKind.ORG,
+        scope_id=org.id,
+        token_hash="x" * 64,
+        status=Invitation.Status.PENDING,
+    )
+    # permission_resolver installed but no grant → deny-by-default.
+    with tenant_context(TenantContext(organization_id=org.id)):
+        r = IdentityMutation().resend_invitation(
+            _info(_admin_user()),
+            input=ResendInvitationInput(id=str(inv.guid)),
+        )
+    assert not r.ok
+    assert r.errors[0].code == "PERMISSION_DENIED"
+    assert Invitation.objects.get().token_hash == "x" * 64
 
 
 # ---- accept -----------------------------------------------------------

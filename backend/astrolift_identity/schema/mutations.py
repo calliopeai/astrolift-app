@@ -189,6 +189,11 @@ class RevokeInvitationInput:
 
 
 @strawberry.input
+class ResendInvitationInput:
+    id: GUID
+
+
+@strawberry.input
 class AcceptInvitationInput:
     token: str
 
@@ -623,7 +628,19 @@ class IdentityMutation:
         if input.website is not None:
             org.website = input.website
         if input.audit_log_retention_days is not None:
-            org.audit_log_retention_days = input.audit_log_retention_days
+            days = int(input.audit_log_retention_days)
+            # Sane bound (spec ceiling ~7 years). The DB column is a
+            # PositiveIntegerField, which still admits 0 and absurdly
+            # large values; both the /administration/organization and
+            # /administration/audit surfaces write this field, so guard
+            # it here rather than trusting client-side min/max alone.
+            if days < 1 or days > 2557:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "auditLogRetentionDays must be between 1 and 2557 (about 7 years)",
+                    field="auditLogRetentionDays",
+                )
+            org.audit_log_retention_days = days
         if input.allow_user_profile_edit is not None:
             org.allow_user_profile_edit = input.allow_user_profile_edit
         org.save()
@@ -1457,6 +1474,88 @@ class IdentityMutation:
         inv.status = Invitation.Status.REVOKED
         inv.save(update_fields=["status", "updated_at", "version"])
         return gql_success(invitation_to_type(inv))
+
+    @strawberry.field
+    @mutation_audit(action="invitation.resend")
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def resend_invitation(
+        self, info: Info, input: ResendInvitationInput
+    ) -> MutationResultType[InvitationCreatedType]:
+        """Re-send a pending invitation with a freshly-rotated token.
+
+        Only a PENDING invitation in the caller's own org can be
+        resent; an accepted / revoked / already-expired-status
+        invitation — or a guid owned by another org — reads as
+        not-found or precondition and never mutates.
+
+        The plaintext token is never persisted (only its SHA-256 hash
+        is), so the original link cannot be re-sent: resend *always*
+        mints a fresh token and refreshes ``expires_at`` to a new
+        window. That invalidates any previously-issued link for this
+        invitation, which is also the desired security property — a
+        resend supersedes the old link. The new plaintext + accept URL
+        come back in the ``InvitationCreatedType`` payload exactly
+        once, preserving the copy-link durable channel exactly as the
+        create path does. Email delivery stays best-effort and never
+        fails the mutation.
+        """
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from astrolift_identity.emails import (
+            build_invitation_accept_url,
+            send_invitation_email,
+        )
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        # Scope the lookup to the caller's own org — a foreign-org guid
+        # (or a missing tenant) resolves to None and reads as not-found,
+        # so a resend can never reach across tenants.
+        inv = Invitation.objects.filter(
+            guid=str(input.id),
+            scope_kind=Invitation.ScopeKind.ORG,
+            scope_id=org_id,
+            deleted_at__isnull=True,
+        ).first()
+        if inv is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "invitation not found")
+        if inv.status != Invitation.Status.PENDING:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"invitation is {inv.status}; only a pending invitation can be resent",
+            )
+
+        # Rotate the token (the old link dies) and refresh the window so
+        # the freshly-sent link is always valid.
+        plaintext, digest, _last4 = _make_token_secret()
+        expires_at = timezone.now() + timedelta(days=7)
+        inv.token_hash = digest
+        inv.expires_at = expires_at
+        inv.save(update_fields=["token_hash", "expires_at", "updated_at", "version"])
+
+        # Best-effort delivery. The accept_url_path returned in the
+        # payload is the durable copy-link affordance regardless of
+        # whether the email actually goes out.
+        org = Organization.objects.filter(pk=org_id).only("name").first()
+        org_name = org.name if org is not None else "Astrolift"
+        send_invitation_email(
+            to_email=inv.email,
+            org_name=org_name,
+            inviter=_actor(),
+            accept_url=build_invitation_accept_url(plaintext),
+            expires_at=expires_at,
+        )
+
+        return gql_success(
+            InvitationCreatedType(
+                invitation=invitation_to_type(inv),
+                plaintext_token=plaintext,
+                accept_url_path=f"/auth/invitation/{plaintext}",
+            )
+        )
 
     # By definition the accepting user has no tenant context yet at
     # the moment they click the link. The token *is* the auth check.
