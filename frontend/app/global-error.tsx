@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { captureException } from "@/lib/sentry";
+import { maybeReloadOnChunkError } from "@/lib/chunk-reload";
 
 // Raw hex + inline styles are intentional (astrolift/no-raw-design-values
 // escape-hatch case): this boundary replaces the root layout on hard
@@ -16,6 +17,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
+    if (maybeReloadOnChunkError(error)) return;
     captureException(error);
   }, [error]);
 

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { captureException } from "@/lib/sentry";
+import { maybeReloadOnChunkError } from "@/lib/chunk-reload";
 import { AlertCircleIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -13,6 +14,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
+    if (maybeReloadOnChunkError(error)) return;
     console.error(error);
     captureException(error);
   }, [error]);

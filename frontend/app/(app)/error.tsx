@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { captureException } from "@/lib/sentry";
+import { maybeReloadOnChunkError } from "@/lib/chunk-reload";
 import { AlertCircleIcon } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,9 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
+    // Recover transparently from a post-deploy stale-chunk failure; only report
+    // the error if we're NOT already reloading to fix it.
+    if (maybeReloadOnChunkError(error)) return;
     console.error(error);
     captureException(error);
   }, [error]);
