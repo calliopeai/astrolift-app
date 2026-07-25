@@ -77,15 +77,12 @@ def render_github_actions_deploy_yml(
         "  deploy:\n"
         "    runs-on: ubuntu-latest\n"
         "    steps:\n"
-        "      - name: Install astro CLI\n"
-        "        run: |\n"
-        "          curl -fsSL https://get.astrolift.dev | sh\n"
-        '          echo "$HOME/.astrolift/bin" >> "$GITHUB_PATH"\n'
         "      - name: Trigger Astrolift deploy\n"
         "        env:\n"
         "          ASTROLIFT_DEPLOY_TOKEN: ${{ secrets.ASTROLIFT_DEPLOY_TOKEN }}\n"
         "        run: |\n"
-        f"          astro app deploy --app={slug_literal} --image-tag=${{{{ github.sha }}}}\n"
+        "          docker run --rm -e ASTROLIFT_DEPLOY_TOKEN calliopeai/astrolift-cli:latest \\\n"
+        f"            app deploy --app={slug_literal} --image-tag=${{{{ github.sha }}}}\n"
     )
 
 
@@ -120,10 +117,7 @@ def render_gitlab_ci_deploy_yml(
         "  rules:\n"
         f"{rules}\n"
         "  script:\n"
-        "    - apt-get update && apt-get install -y curl ca-certificates\n"
-        "    - curl -fsSL https://get.astrolift.dev | sh\n"
-        '    - export PATH="$HOME/.astrolift/bin:$PATH"\n'
-        f"    - astro app deploy --app={slug_literal} --image-tag=$CI_COMMIT_SHA\n"
+        f"    - docker run --rm -e ASTROLIFT_DEPLOY_TOKEN calliopeai/astrolift-cli:latest app deploy --app={slug_literal} --image-tag=$CI_COMMIT_SHA\n"
         "  variables:\n"
         "    ASTROLIFT_DEPLOY_TOKEN: $ASTROLIFT_DEPLOY_TOKEN\n"
     )
@@ -206,15 +200,12 @@ def render_gitea_actions_deploy_yml(
         "  deploy:\n"
         "    runs-on: ubuntu-latest\n"
         "    steps:\n"
-        "      - name: Install astro CLI\n"
-        "        run: |\n"
-        "          curl -fsSL https://get.astrolift.dev | sh\n"
-        '          echo "$HOME/.astrolift/bin" >> "$GITHUB_PATH"\n'
         "      - name: Trigger Astrolift deploy\n"
         "        env:\n"
         "          ASTROLIFT_DEPLOY_TOKEN: ${{ secrets.ASTROLIFT_DEPLOY_TOKEN }}\n"
         "        run: |\n"
-        f"          astro app deploy --app={slug_literal} --image-tag=${{{{ github.sha }}}}\n"
+        "          docker run --rm -e ASTROLIFT_DEPLOY_TOKEN calliopeai/astrolift-cli:latest \\\n"
+        f"            app deploy --app={slug_literal} --image-tag=${{{{ github.sha }}}}\n"
     )
 
 
