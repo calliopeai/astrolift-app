@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation } from "@apollo/client/react";
-import { AlertTriangleIcon } from "lucide-react";
+import { GithubIcon } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -105,14 +105,16 @@ export function AddClientIdDialog({ connection, onClose }: Props) {
       <SheetContent className="flex flex-col">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
-            <AlertTriangleIcon className="size-4 text-warning-fg" />
-            Add GitHub App Client ID
+            <GithubIcon className="size-4" />
+            Add an OAuth Client ID
           </SheetTitle>
           <SheetDescription>
-            This connection is missing the user-to-server OAuth Client ID. The
-            &quot;Connect my GitHub&quot; flow will 404 at github.com until
-            it&apos;s set. The Client ID is distinct from the App ID — find it
-            on your GitHub App settings page (looks like{" "}
+            Optional — nothing here is broken. Cloning, autowiring and deploys
+            already run on this connection&apos;s App installation token. Adding
+            the GitHub App&apos;s OAuth Client ID additionally enables the
+            user-to-server &quot;Connect my GitHub&quot; flow, letting people
+            browse their own repositories. The Client ID is distinct from the
+            numeric App ID — find it on your GitHub App settings page (looks like{" "}
             <code>Iv23l…</code> for new GitHub Apps).
           </SheetDescription>
         </SheetHeader>

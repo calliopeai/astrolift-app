@@ -2,7 +2,6 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import {
-  AlertTriangleIcon,
   BookOpenIcon,
   CheckCircle2Icon,
   ChevronDownIcon,
@@ -10,6 +9,7 @@ import {
   GitBranchIcon,
   GithubIcon,
   GitlabIcon,
+  InfoIcon,
   KeyRoundIcon,
   PlusIcon,
   Trash2Icon,
@@ -262,29 +262,30 @@ export function SourceProvidersPanel() {
         }
       >
           {/*
-            Action-required banner — surfaces GitHub connections that
-            are missing the OAuth Client ID (post-#525 schema split).
-            Existing rows registered before the column was added carry
-            an empty app_client_id; clicking "Connect my GitHub" on
-            them would redirect to github.com with the numeric App ID
-            in the client_id query param and 404 there. The banner
-            walks the operator to a focused dialog that takes only the
-            Client ID and runs UpdateSourceConnection in place.
+            Optional-enhancement note — surfaces GitHub App connections
+            that don't yet carry an OAuth Client ID (post-#525 schema
+            split). These connections already work: cloning, autowiring
+            and deploys run on the App installation token. Supplying a
+            Client ID additionally enables the user-to-server "Connect
+            my GitHub" flow, so it's offered here as an optional recovery
+            action (focused dialog → UpdateSourceConnection in place),
+            not a failure state.
           */}
           {incompleteClientIdConnections.length > 0 && (
-            <div className="border-warning-border bg-warning/5 flex items-start gap-3 rounded-md border p-3 text-xs text-warning-fg">
-              <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
+            <div className="text-muted-foreground bg-muted/40 flex items-start gap-3 rounded-md border p-3 text-xs">
+              <InfoIcon className="mt-0.5 size-4 shrink-0" />
               <div className="flex-1 space-y-2">
-                <p className="font-medium">
-                  Action required: {incompleteClientIdConnections.length === 1
-                    ? "a GitHub connection needs"
-                    : `${incompleteClientIdConnections.length} GitHub connections need`}{" "}
-                  a Client ID
+                <p className="text-foreground font-medium">
+                  Optional: enable &quot;Connect my GitHub&quot; repo browsing
                 </p>
                 <p>
-                  The user-to-server OAuth flow (&quot;Connect my GitHub&quot;) will
-                  fail with a 404 at github.com until you add the GitHub App
-                  Client ID. Find it on your GitHub App settings page — it looks
+                  {incompleteClientIdConnections.length === 1
+                    ? "This GitHub App connection is"
+                    : `These ${incompleteClientIdConnections.length} GitHub App connections are`}{" "}
+                  ready to use — cloning, autowiring and deploys run on the App
+                  installation token. Adding an OAuth Client ID is optional; it
+                  turns on the user-to-server &quot;Connect my GitHub&quot; flow so
+                  people can browse their own repositories. The Client ID looks
                   like <code className="font-mono">Iv23l…</code> for new GitHub
                   Apps.
                 </p>
@@ -399,10 +400,10 @@ export function SourceProvidersPanel() {
                             <Can permission="scm.connect">
                               <Button
                                 size="sm"
-                                variant="outline"
+                                variant="ghost"
                                 onClick={() => setClientIdTarget(c)}
                               >
-                                <AlertTriangleIcon className="size-3.5 text-warning-fg" />
+                                <PlusIcon className="size-3.5" />
                                 Add Client ID
                               </Button>
                             </Can>
