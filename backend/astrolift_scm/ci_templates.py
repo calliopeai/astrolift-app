@@ -46,7 +46,13 @@ import re
 # ``astrolift_scm/tests/test_ci_template_version.py`` pins the
 # ``content_hash`` of every host's rendered body to this version and goes
 # red on a body change with no bump, so the two can never drift apart.
-TEMPLATE_VERSION = 1
+#
+# v2 (#emr-deploy-only): renderers gained a deploy-only mode for apps with
+# no platform-built image (blank ``registry_repo_uri``) — the ECR-login +
+# build/push steps are dropped and only the notify step runs. The
+# platform-built render path is byte-for-byte unchanged, so the golden
+# content hashes below are identical to v1; only the stamped version moves.
+TEMPLATE_VERSION = 2
 
 # The stamp is a host-agnostic ``#`` comment so it's inert on GitHub
 # Actions / GitLab CI / Bitbucket Pipelines / Gitea alike — it never

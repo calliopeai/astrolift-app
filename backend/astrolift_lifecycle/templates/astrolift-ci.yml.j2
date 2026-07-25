@@ -23,6 +23,7 @@ jobs:
           role-to-assume: {{ push_role_arn }}
           aws-region: us-west-2
           role-session-name: astrolift-${{ github.run_id }}
+{% if platform_built %}
 
       - name: Login to Amazon ECR
         id: ecr
@@ -34,13 +35,14 @@ jobs:
         run: |
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
+{% endif %}
 
       - name: Notify Astrolift
         env:
           API_URL: {{ api_url }}
           APP_SLUG: {{ app_slug }}
           TOKEN: ${{ secrets.ASTROLIFT_DEPLOY_TOKEN }}
-          IMAGE: {{ ecr_uri }}:${{ github.sha }}
+          IMAGE: {{ image_ref }}
         run: |
           curl --fail-with-body -sS -X POST "$API_URL/api/v1/deploys" \
             -H "Authorization: Bearer $TOKEN" \

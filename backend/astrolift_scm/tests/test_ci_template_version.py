@@ -72,10 +72,16 @@ _RENDERERS = {
 # The version these hashes belong to. Kept as its own constant (rather than
 # reading TEMPLATE_VERSION) so that bumping TEMPLATE_VERSION without refreshing
 # the pins trips ``test_template_version_matches_pins`` loudly.
-PINNED_TEMPLATE_VERSION = 1
+PINNED_TEMPLATE_VERSION = 2
 
 # content_hash (sha256, stamp removed) of each host's rendered body at
 # PINNED_TEMPLATE_VERSION, computed against GOLDEN_API_URL and _golden_app().
+#
+# _golden_app() is platform-built (non-blank registry_repo_uri), and the v2
+# deploy-only change left the platform-built render path byte-for-byte
+# identical to v1 — so these hashes are unchanged from v1. The deploy-only
+# render (blank registry_repo_uri) is covered by
+# ``test_deploy_only_workflow.py`` instead.
 PINNED_CONTENT_HASHES = {
     "github": "ecb3b5f953cb448b36fba02e960838122ad1e51ed4aaa4edee25ee4368724c86",
     "gitlab": "6a5b611916a74cf588acf09b705692119df846778935eac9fb0e92948ece6a1a",

@@ -134,9 +134,45 @@ _TEMPLATE_PATH = (
 # variable) is untouched.
 _VAR_RE = re.compile(r"\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}")
 
+# Matches a whole-line ``{% if flag %}`` … ``{% endif %}`` block (both
+# markers on their own line). ``{%``/``%}`` never collide with GitHub
+# Actions ``${{ … }}`` expressions, so this pass is safe to run before the
+# ``{{ var }}`` substitution above. Non-greedy + DOTALL so the innermost
+# block is captured and the marker lines (with their trailing newline) are
+# consumed cleanly — see :func:`_apply_blocks`.
+_BLOCK_RE = re.compile(
+    r"\{%\s*if\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*%\}\n(.*?)\{%\s*endif\s*%\}\n",
+    re.DOTALL,
+)
+
+# Literal GitHub Actions expression for the pushed commit SHA. Kept as a
+# plain constant (not an f-string) so deploy-only image refs — which have no
+# registry prefix — can reuse it without brace-doubling gymnastics.
+_GITHUB_SHA_EXPR = "${{ github.sha }}"
+
 
 def _load_template() -> str:
     return _TEMPLATE_PATH.read_text(encoding="utf-8")
+
+
+def _apply_blocks(template: str, flags: dict[str, bool]) -> str:
+    """Resolve ``{% if flag %}…{% endif %}`` blocks against ``flags``.
+
+    A truthy flag keeps the block's inner body (marker lines dropped, so the
+    output is byte-identical to a template that never carried the markers); a
+    falsy flag drops the whole block. An unknown flag leaves the block in
+    place — mirrors the conservative "leave unrecognized tokens alone" stance
+    of the ``{{ var }}`` substitution, so a sibling agent can add a block for
+    a flag this code doesn't know yet without it rendering broken.
+    """
+
+    def _sub(match: re.Match[str]) -> str:
+        name = match.group(1)
+        if name not in flags:
+            return match.group(0)
+        return match.group(2) if flags[name] else ""
+
+    return _BLOCK_RE.sub(_sub, template)
 
 
 def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
@@ -155,15 +191,33 @@ def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
     never sits in a file in the operator's repo. Same goes for the
     role ARN's session naming — the template uses
     ``${{ github.run_id }}`` directly.
+
+    **Deploy-only mode.** When the app has no platform-built image —
+    ``registry_repo_uri`` is empty/blank — the workflow is rendered
+    WITHOUT the ECR-login + build-and-push steps (the image is built by
+    a separate pipeline; there is nothing for this workflow to build).
+    Checkout, the OIDC credentials step and the Astrolift notify step are
+    kept: CI's only job is to tell the platform a new SHA exists. This
+    avoids the invalid ``:${{ github.sha }}`` blank tag an empty
+    ``ecr_uri`` would otherwise produce.
     """
     template = _load_template()
     api_url = (getattr(settings, "PLATFORM_API_URL", "") or "").rstrip("/")
+    ecr_uri = app.registry_repo_uri or ""
+    # A non-empty registry_repo_uri is the signal that the platform builds
+    # and pushes this app's image; empty ⇒ deploy-only (built elsewhere).
+    platform_built = bool(ecr_uri.strip())
+    # The image reference the notify step reports. Platform-built apps report
+    # the freshly-pushed ``<uri>:<sha>``; deploy-only apps report just the
+    # commit SHA (no registry prefix ⇒ no leading-colon blank tag).
+    image_ref = f"{ecr_uri}:{_GITHUB_SHA_EXPR}" if platform_built else _GITHUB_SHA_EXPR
     values = {
         "app_slug": app.slug,
         "deploy_branch": (app.deploy_branch or "main").strip() or "main",
-        "ecr_uri": app.registry_repo_uri or "",
+        "ecr_uri": ecr_uri,
         "push_role_arn": app.push_role_ref or "",
         "api_url": api_url,
+        "image_ref": image_ref,
     }
 
     def _replace(match: re.Match[str]) -> str:
@@ -175,6 +229,7 @@ def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
             return match.group(0)
         return values[name]
 
+    template = _apply_blocks(template, {"platform_built": platform_built})
     rendered = _VAR_RE.sub(_replace, template)
     return stamp_workflow(rendered, version=TEMPLATE_VERSION, digest=content_hash(rendered))
 
@@ -192,34 +247,54 @@ def render_astrolift_bitbucket_pipeline(app: RegisteredApp) -> str:
     api_url = (getattr(settings, "PLATFORM_API_URL", "") or "").rstrip("/")
     ecr_uri = app.registry_repo_uri or ""
     ecr_registry = ecr_uri.split("/")[0] if ecr_uri else ""
+    # Empty registry_repo_uri ⇒ image built by a separate pipeline; render
+    # deploy-only (no docker service, no ECR login, no build/push).
+    platform_built = bool(ecr_uri.strip())
     deploy_branch = (app.deploy_branch or "main").strip() or "main"
     slug_literal = json.dumps(app.slug)
     api_url_literal = json.dumps(api_url)
+
+    if platform_built:
+        definitions_block = (
+            "definitions:\n"
+            "  services:\n"
+            "    docker:\n"
+            "      type: docker\n"
+            "\n"
+        )
+        step_name = "Build, push, and notify Astrolift"
+        services_block = "          services:\n            - docker\n"
+        image_export = f'            - export ASTROLIFT_IMAGE="{ecr_uri}:$BITBUCKET_COMMIT"\n'
+        pre_curl = (
+            f'            - export ECR_REGISTRY="{ecr_registry}"\n'
+            "            - apt-get update -qq && apt-get install -y -qq awscli curl ca-certificates\n"
+            '            - aws ecr get-login-password --region "$ASTROLIFT_AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"\n'
+            '            - docker build -t "$ASTROLIFT_IMAGE" .\n'
+            '            - docker push "$ASTROLIFT_IMAGE"\n'
+        )
+    else:
+        definitions_block = ""
+        step_name = "Notify Astrolift"
+        services_block = ""
+        image_export = '            - export ASTROLIFT_IMAGE="$BITBUCKET_COMMIT"\n'
+        pre_curl = "            - apt-get update -qq && apt-get install -y -qq curl ca-certificates\n"
+
     body = (
         "# Managed by Astrolift — do not edit by hand."
         " Re-sync via Settings → CI setup → Sync workflow file.\n"
         "image: atlassian/default-image:4\n"
         "\n"
-        "definitions:\n"
-        "  services:\n"
-        "    docker:\n"
-        "      type: docker\n"
-        "\n"
-        "pipelines:\n"
+        + definitions_block
+        + "pipelines:\n"
         "  branches:\n"
         f"    {deploy_branch}:\n"
         "      - step:\n"
-        "          name: Build, push, and notify Astrolift\n"
-        "          services:\n"
-        "            - docker\n"
-        "          script:\n"
-        f'            - export ASTROLIFT_IMAGE="{ecr_uri}:$BITBUCKET_COMMIT"\n'
-        f'            - export ECR_REGISTRY="{ecr_registry}"\n'
-        "            - apt-get update -qq && apt-get install -y -qq awscli curl ca-certificates\n"
-        '            - aws ecr get-login-password --region "$ASTROLIFT_AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"\n'
-        '            - docker build -t "$ASTROLIFT_IMAGE" .\n'
-        '            - docker push "$ASTROLIFT_IMAGE"\n'
-        "            - |\n"
+        + f"          name: {step_name}\n"
+        + services_block
+        + "          script:\n"
+        + image_export
+        + pre_curl
+        + "            - |\n"
         f"              curl --fail-with-body -sS -X POST {api_url_literal}/api/v1/deploys \\\n"
         '                -H "Authorization: Bearer $ASTROLIFT_DEPLOY_TOKEN" \\\n'
         '                -H "Content-Type: application/json" \\\n'
@@ -240,9 +315,35 @@ def render_astrolift_gitea_ci_workflow(app: RegisteredApp) -> str:
     api_url = (getattr(settings, "PLATFORM_API_URL", "") or "").rstrip("/")
     ecr_uri = app.registry_repo_uri or ""
     ecr_registry = ecr_uri.split("/")[0] if ecr_uri else ""
+    # Empty registry_repo_uri ⇒ image built by a separate pipeline; render
+    # deploy-only (drop the AWS-cred + build/push steps, keep the notify).
+    platform_built = bool(ecr_uri.strip())
+    image_ref = f"{ecr_uri}:{_GITHUB_SHA_EXPR}" if platform_built else _GITHUB_SHA_EXPR
     deploy_branch = (app.deploy_branch or "main").strip() or "main"
     slug_literal = json.dumps(app.slug)
     api_url_literal = json.dumps(api_url)
+
+    if platform_built:
+        build_steps = (
+            "      - name: Configure AWS credentials\n"
+            "        env:\n"
+            "          AWS_ACCESS_KEY_ID: ${{ secrets.ASTROLIFT_AWS_ACCESS_KEY_ID }}\n"
+            "          AWS_SECRET_ACCESS_KEY: ${{ secrets.ASTROLIFT_AWS_SECRET_ACCESS_KEY }}\n"
+            "          AWS_DEFAULT_REGION: ${{ secrets.ASTROLIFT_AWS_DEFAULT_REGION }}\n"
+            "        run: aws --version\n"
+            "      - name: Build and push image to ECR\n"
+            "        env:\n"
+            "          AWS_ACCESS_KEY_ID: ${{ secrets.ASTROLIFT_AWS_ACCESS_KEY_ID }}\n"
+            "          AWS_SECRET_ACCESS_KEY: ${{ secrets.ASTROLIFT_AWS_SECRET_ACCESS_KEY }}\n"
+            "          AWS_DEFAULT_REGION: ${{ secrets.ASTROLIFT_AWS_DEFAULT_REGION }}\n"
+            "        run: |\n"
+            f'          aws ecr get-login-password | docker login --username AWS --password-stdin "{ecr_registry}"\n'
+            f'          docker build -t "{ecr_uri}:${{{{ github.sha }}}}" .\n'
+            f'          docker push "{ecr_uri}:${{{{ github.sha }}}}"\n'
+        )
+    else:
+        build_steps = ""
+
     body = (
         "# Managed by Astrolift — do not edit by hand."
         " Re-sync via Settings → CI setup → Sync workflow file.\n"
@@ -261,29 +362,15 @@ def render_astrolift_gitea_ci_workflow(app: RegisteredApp) -> str:
         "    runs-on: ubuntu-latest\n"
         "    steps:\n"
         "      - uses: actions/checkout@v4\n"
-        "      - name: Configure AWS credentials\n"
-        "        env:\n"
-        "          AWS_ACCESS_KEY_ID: ${{ secrets.ASTROLIFT_AWS_ACCESS_KEY_ID }}\n"
-        "          AWS_SECRET_ACCESS_KEY: ${{ secrets.ASTROLIFT_AWS_SECRET_ACCESS_KEY }}\n"
-        "          AWS_DEFAULT_REGION: ${{ secrets.ASTROLIFT_AWS_DEFAULT_REGION }}\n"
-        "        run: aws --version\n"
-        "      - name: Build and push image to ECR\n"
-        "        env:\n"
-        "          AWS_ACCESS_KEY_ID: ${{ secrets.ASTROLIFT_AWS_ACCESS_KEY_ID }}\n"
-        "          AWS_SECRET_ACCESS_KEY: ${{ secrets.ASTROLIFT_AWS_SECRET_ACCESS_KEY }}\n"
-        "          AWS_DEFAULT_REGION: ${{ secrets.ASTROLIFT_AWS_DEFAULT_REGION }}\n"
-        "        run: |\n"
-        f'          aws ecr get-login-password | docker login --username AWS --password-stdin "{ecr_registry}"\n'
-        f'          docker build -t "{ecr_uri}:${{{{ github.sha }}}}" .\n'
-        f'          docker push "{ecr_uri}:${{{{ github.sha }}}}"\n'
-        "      - name: Notify Astrolift\n"
+        + build_steps
+        + "      - name: Notify Astrolift\n"
         "        env:\n"
         "          ASTROLIFT_DEPLOY_TOKEN: ${{ secrets.ASTROLIFT_DEPLOY_TOKEN }}\n"
         "        run: |\n"
         f"          curl --fail-with-body -sS -X POST {api_url_literal}/api/v1/deploys \\\n"
         '            -H "Authorization: Bearer $ASTROLIFT_DEPLOY_TOKEN" \\\n'
         '            -H "Content-Type: application/json" \\\n'
-        f'            -d \'{{"appSlug":{slug_literal},"image":"{ecr_uri}:${{{{ github.sha }}}}","commitSha":"${{{{ github.sha }}}}"}}\'\n'
+        f'            -d \'{{"appSlug":{slug_literal},"image":"{image_ref}","commitSha":"${{{{ github.sha }}}}"}}\'\n'
     )
     return stamp_workflow(body, version=TEMPLATE_VERSION, digest=content_hash(body))
 
@@ -302,56 +389,71 @@ def render_astrolift_gitlab_ci_workflow(app: RegisteredApp) -> str:
     ecr_uri = app.registry_repo_uri or ""
     # ECR login endpoint is just the registry host, not the repo path.
     ecr_registry = ecr_uri.split("/")[0] if ecr_uri else ""
+    # Empty registry_repo_uri ⇒ image built by a separate pipeline; render
+    # deploy-only (no build stage) so we never push a ``:<sha>`` blank tag.
+    platform_built = bool(ecr_uri.strip())
     deploy_branch = (app.deploy_branch or "main").strip() or "main"
     slug_literal = json.dumps(app.slug)
     api_url_literal = json.dumps(api_url)
     rules_line = f"    - if: '$CI_COMMIT_REF_NAME == \"{deploy_branch}\"'"
+
+    if platform_built:
+        stages_block = "stages:\n  - build\n  - deploy\n"
+        image_var = f'  ASTROLIFT_IMAGE: "{ecr_uri}:$CI_COMMIT_SHA"\n'
+        build_job = (
+            "build-image:\n"
+            "  stage: build\n"
+            "  image: docker:24-dind\n"
+            "  services:\n"
+            "    - docker:24-dind\n"
+            "  variables:\n"
+            "    DOCKER_TLS_CERTDIR: /certs\n"
+            "    AWS_ACCESS_KEY_ID: $ASTROLIFT_AWS_ACCESS_KEY_ID\n"
+            "    AWS_SECRET_ACCESS_KEY: $ASTROLIFT_AWS_SECRET_ACCESS_KEY\n"
+            "    AWS_DEFAULT_REGION: $ASTROLIFT_AWS_DEFAULT_REGION\n"
+            "  rules:\n"
+            f"{rules_line}\n"
+            "  script:\n"
+            "    - apk add --no-cache aws-cli\n"
+            f'    - aws ecr get-login-password | docker login --username AWS --password-stdin "{ecr_registry}"\n'
+            '    - docker build -t "$ASTROLIFT_IMAGE" .\n'
+            '    - docker push "$ASTROLIFT_IMAGE"\n'
+            "\n"
+        )
+        needs_line = "  needs: [build-image]\n"
+    else:
+        stages_block = "stages:\n  - deploy\n"
+        image_var = '  ASTROLIFT_IMAGE: "$CI_COMMIT_SHA"\n'
+        build_job = ""
+        needs_line = ""
+
     body = (
         "# Managed by Astrolift — do not edit by hand."
         " Re-sync via Settings → CI setup → Sync workflow file.\n"
-        "stages:\n"
-        "  - build\n"
-        "  - deploy\n"
-        "\n"
-        "variables:\n"
-        f'  ASTROLIFT_IMAGE: "{ecr_uri}:$CI_COMMIT_SHA"\n'
-        "\n"
-        "build-image:\n"
-        "  stage: build\n"
-        "  image: docker:24-dind\n"
-        "  services:\n"
-        "    - docker:24-dind\n"
-        "  variables:\n"
-        "    DOCKER_TLS_CERTDIR: /certs\n"
-        "    AWS_ACCESS_KEY_ID: $ASTROLIFT_AWS_ACCESS_KEY_ID\n"
-        "    AWS_SECRET_ACCESS_KEY: $ASTROLIFT_AWS_SECRET_ACCESS_KEY\n"
-        "    AWS_DEFAULT_REGION: $ASTROLIFT_AWS_DEFAULT_REGION\n"
-        "  rules:\n"
-        f"{rules_line}\n"
-        "  script:\n"
-        "    - apk add --no-cache aws-cli\n"
-        f'    - aws ecr get-login-password | docker login --username AWS --password-stdin "{ecr_registry}"\n'
-        '    - docker build -t "$ASTROLIFT_IMAGE" .\n'
-        '    - docker push "$ASTROLIFT_IMAGE"\n'
-        "\n"
-        "notify-astrolift:\n"
-        "  stage: deploy\n"
-        "  image: ubuntu:24.04\n"
-        "  needs: [build-image]\n"
-        "  variables:\n"
-        f"    ASTROLIFT_API_URL: {api_url_literal}\n"
-        f"    ASTROLIFT_APP_SLUG: {slug_literal}\n"
-        "  rules:\n"
-        f"{rules_line}\n"
-        "  script:\n"
-        "    - apt-get update -qq && apt-get install -y -qq curl ca-certificates\n"
-        "    - |\n"
-        '      curl --fail-with-body -sS -X POST "$ASTROLIFT_API_URL/api/v1/deploys" \\\n'
-        '        -H "Authorization: Bearer $ASTROLIFT_DEPLOY_TOKEN" \\\n'
-        '        -H "Content-Type: application/json" \\\n'
-        '        -d "{\\"appSlug\\":\\"$ASTROLIFT_APP_SLUG\\",'
-        '\\"image\\":\\"$ASTROLIFT_IMAGE\\",'
-        '\\"commitSha\\":\\"$CI_COMMIT_SHA\\"}"\n'
+        + stages_block
+        + "\n"
+        + "variables:\n"
+        + image_var
+        + "\n"
+        + build_job
+        + "notify-astrolift:\n"
+        + "  stage: deploy\n"
+        + "  image: ubuntu:24.04\n"
+        + needs_line
+        + "  variables:\n"
+        + f"    ASTROLIFT_API_URL: {api_url_literal}\n"
+        + f"    ASTROLIFT_APP_SLUG: {slug_literal}\n"
+        + "  rules:\n"
+        + f"{rules_line}\n"
+        + "  script:\n"
+        + "    - apt-get update -qq && apt-get install -y -qq curl ca-certificates\n"
+        + "    - |\n"
+        + '      curl --fail-with-body -sS -X POST "$ASTROLIFT_API_URL/api/v1/deploys" \\\n'
+        + '        -H "Authorization: Bearer $ASTROLIFT_DEPLOY_TOKEN" \\\n'
+        + '        -H "Content-Type: application/json" \\\n'
+        + '        -d "{\\"appSlug\\":\\"$ASTROLIFT_APP_SLUG\\",'
+        + '\\"image\\":\\"$ASTROLIFT_IMAGE\\",'
+        + '\\"commitSha\\":\\"$CI_COMMIT_SHA\\"}"\n'
     )
     return stamp_workflow(body, version=TEMPLATE_VERSION, digest=content_hash(body))
 
