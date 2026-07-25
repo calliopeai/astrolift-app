@@ -115,8 +115,19 @@ def apply_proposal(
             ).first()
             if env is None:
                 return ApplyResult(ok=False, error=f"environment {env_name!r} not found")
+            # Org-scope the apply-time re-resolution (mirrors the
+            # propose/attach paths). SecretBundle.slug is unique only
+            # per (team, slug) — NOT per org — so an unscoped
+            # ``.filter(slug=...).first()`` can return another org's
+            # same-slug bundle (pk order), which then either trips the
+            # org-mismatch guard and fails a legitimate proposal, or —
+            # for a same-org/other-team collision — silently attaches
+            # the wrong bundle. Scoping to the app's org closes the
+            # cross-org hole and matches how the proposal was validated
+            # at propose time.
             bundle = SecretBundle.objects.filter(
                 slug=bundle_slug,
+                organization_id=app.organization_id,
                 deleted_at__isnull=True,
             ).first()
             if bundle is None:
@@ -160,7 +171,16 @@ def apply_proposal(
                     ok=False,
                     error="payload.attachment_id is required for detach_bundle",
                 )
-            ref = AppSecretBundleRef.objects.filter(guid=attachment_id).first()
+            # Org-scope the apply-time re-resolution so a proposal can
+            # only ever detach an attachment inside its own org, even if
+            # a guid from another tenant were somehow presented. A
+            # foreign / unknown guid resolves to None → treated as the
+            # idempotent "already gone" success below (never touches the
+            # other org's row).
+            ref = AppSecretBundleRef.objects.filter(
+                guid=attachment_id,
+                registered_app__organization_id=app.organization_id,
+            ).first()
             if ref is None or ref.deleted_at is not None:
                 # Idempotent: attachment was already gone — treat as
                 # success so re-runs don't surface spurious failures.
