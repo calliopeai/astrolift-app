@@ -61,16 +61,55 @@ def _resolve_vnc_runtime(*, task_guid: str) -> dict | None:
         return None
     if cluster is None:
         return None
+
+    namespace = _agent_namespace(task.organization.slug)
+
+    # ``task.pod_name`` is the *Job* name (``agent-task-<guid12>``), which the
+    # k8s port-forward API does NOT accept — it needs the exact *pod* name
+    # (``agent-task-<guid12>-<hash>``). Resolve the real pod by its
+    # ``astrolift.dev/task-id`` label, the same discovery the working log path
+    # uses (``core.cluster_observability.fetch_task_pod_logs``). Fall back to
+    # the frozen Job name only if discovery yields nothing (a best-effort last
+    # resort — it won't port-forward, but preserves the prior behaviour rather
+    # than hard-failing on a transient list_pods hiccup).
+    pod = _discover_task_pod(cluster=cluster, namespace=namespace, task_guid=task_guid)
+    if not pod:
+        pod = task.pod_name
+
     return {
         "cluster": cluster,
-        "namespace": _agent_namespace(task.organization.slug),
-        # NOTE: in the workflow spawn path pod_name is set to the Job
-        # name, which the kubelet also accepts as a pod selector for the
-        # single-pod Job (completions=1, backoffLimit=0). If a future
-        # multi-pod shape lands, resolve the pod via the
-        # ``astrolift.dev/task-id`` label here before forwarding.
-        "pod": task.pod_name,
+        "namespace": namespace,
+        "pod": pod,
     }
+
+
+def _discover_task_pod(*, cluster: Any, namespace: str, task_guid: str) -> str:
+    """Return the running agent pod's name for ``task_guid`` via its
+    ``astrolift.dev/task-id`` label, or ``""`` if none is found.
+
+    Mirrors the pod discovery in ``fetch_task_pod_logs`` — a Job spawns its
+    pod with a generated ``-<hash>`` suffix, so the pod name is only knowable
+    at read time by label, never from the frozen Job name.
+    """
+    from core.cluster_observability import ClusterObservabilityError, list_app_pods
+
+    try:
+        pods = list_app_pods(
+            cluster=cluster,
+            namespace=namespace,
+            app_slug=task_guid,
+            task_id=task_guid,
+        )
+    except ClusterObservabilityError:
+        return ""
+    except Exception:  # noqa: BLE001
+        logger.exception("cluster_vnc: pod discovery failed for task %s", task_guid)
+        return ""
+    for pod in pods:
+        name = getattr(pod, "name", "") or ""
+        if name:
+            return name
+    return ""
 
 
 def _driver_for(cluster: Any) -> Any:

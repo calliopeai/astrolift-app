@@ -4,7 +4,6 @@ import {
   ActivityIcon,
   BoxesIcon,
   FileCodeIcon,
-  GlobeIcon,
   KeyIcon,
   KeyRoundIcon,
   LayersIcon,
@@ -34,7 +33,8 @@ const LINKS: { seg: string; label: string; Icon: typeof RocketIcon }[] = [
   { seg: "webhooks", label: "CI / CD", Icon: WebhookIcon },
   { seg: "deployments", label: "Deployments", Icon: RocketIcon },
   { seg: "environments", label: "Environments", Icon: LayersIcon },
-  { seg: "domains", label: "Domains", Icon: GlobeIcon },
+  // Domains omitted: agents are task/serverless workloads, not HTTP services
+  // with custom domains — that submenu doesn't apply to an agent.
   { seg: "managed-services", label: "Services", Icon: BoxesIcon },
   { seg: "observability", label: "Observability", Icon: ActivityIcon },
   { seg: "settings", label: "Settings", Icon: SettingsIcon },

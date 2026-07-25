@@ -592,3 +592,73 @@ async def test_pod_eof_alone_closes_relay(monkeypatch, caplog) -> None:
     # Clean EOF teardown logs nothing; a pump that raised (and was
     # swallowed) would have logged a "relay pump failed" error.
     assert "relay pump failed" not in caplog.text
+
+
+# ---- cluster_vnc pod resolution (Job-name vs pod-name regression) ----
+#
+# Regression guard for the "Connection error" bug: the AgentTask's frozen
+# ``pod_name`` is the *Job* name (``agent-task-<guid12>``), which the k8s
+# port-forward API rejects — it needs the exact *pod* name
+# (``...-<hash>``). _resolve_vnc_runtime must therefore discover the pod by
+# its ``astrolift.dev/task-id`` label (like the log path) and only fall back
+# to the Job name when discovery yields nothing.
+
+
+class _FakePod:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
+@pytest.mark.django_db
+def test_resolve_vnc_runtime_uses_label_discovered_pod(monkeypatch) -> None:
+    """The port-forward target is the label-resolved pod, NOT the frozen
+    Job name — otherwise every live watch dies with a connection error."""
+    from core import cluster_vnc
+
+    org = _make_org("acme-runtime")
+    task = _make_running_vnc_task(org, pod_name="agent-task-abc123")  # Job name
+
+    monkeypatch.setattr(
+        "astrolift_workflows.activities.agent_stage._resolve_managed_cluster",
+        lambda organization: object(),  # non-None sentinel cluster
+    )
+    seen: dict = {}
+
+    def _fake_list_app_pods(*, cluster, namespace, app_slug, task_id):
+        seen["app_slug"] = app_slug
+        seen["task_id"] = task_id
+        return [_FakePod("agent-task-abc123-x9k2")]  # real pod (Job + hash)
+
+    monkeypatch.setattr(
+        "core.cluster_observability.list_app_pods", _fake_list_app_pods
+    )
+
+    resolved = cluster_vnc._resolve_vnc_runtime.func(task_guid=str(task.guid))
+    assert resolved is not None
+    assert resolved["pod"] == "agent-task-abc123-x9k2"
+    # Discovery keyed on the task guid (both selectors), mirroring the log path.
+    assert seen["task_id"] == str(task.guid)
+    assert seen["app_slug"] == str(task.guid)
+
+
+@pytest.mark.django_db
+def test_resolve_vnc_runtime_falls_back_to_job_name(monkeypatch) -> None:
+    """If pod discovery finds nothing, fall back to the frozen name rather
+    than hard-failing on a transient list_pods hiccup."""
+    from core import cluster_vnc
+
+    org = _make_org("acme-fallback")
+    task = _make_running_vnc_task(org, pod_name="agent-task-def456")
+
+    monkeypatch.setattr(
+        "astrolift_workflows.activities.agent_stage._resolve_managed_cluster",
+        lambda organization: object(),
+    )
+    monkeypatch.setattr(
+        "core.cluster_observability.list_app_pods",
+        lambda **kwargs: [],  # nothing discovered
+    )
+
+    resolved = cluster_vnc._resolve_vnc_runtime.func(task_guid=str(task.guid))
+    assert resolved is not None
+    assert resolved["pod"] == "agent-task-def456"

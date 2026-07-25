@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { VncViewer } from "@/components/observability/VncViewer";
 import { AGENT_GALLERY } from "@/graphql/agents/agents.queries";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
+import { cn } from "@/lib/utils";
 
 // Roster refresh cadence. Doubles as the snapshot-frame cadence: each poll
 // re-mints the presigned snapshot GET URL, so a fresh (signed) URL string
@@ -80,6 +81,20 @@ export function AgentTheatre() {
 
   // The task whose live session is exploded into the theatre modal.
   const [watching, setWatching] = React.useState<GalleryTask | null>(null);
+
+  // Manual refresh feedback. refetch() resolves fast and the roster often
+  // looks identical (same tasks, snapshot still pending), so without a
+  // spinner the button reads as dead ("doesn't do anything"). Drive the
+  // icon spin + disable off an explicit in-flight flag.
+  const [refreshing, setRefreshing] = React.useState(false);
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
   // Tick once a second so the "running for" labels advance between polls.
   const [, force] = React.useReducer((n: number) => n + 1, 0);
@@ -152,8 +167,8 @@ export function AgentTheatre() {
           {tasks.length} live {tasks.length === 1 ? "agent" : "agents"} · snapshots refresh every{" "}
           {POLL_MS / 1000}s
         </p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>
-          <RefreshCwIcon className="size-3.5" />
+        <Button variant="outline" size="sm" onClick={onRefresh} disabled={refreshing}>
+          <RefreshCwIcon className={cn("size-3.5", refreshing && "animate-spin")} />
           Refresh
         </Button>
       </div>
