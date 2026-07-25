@@ -69,6 +69,7 @@ from astrolift_identity.schema.types import (
     team_to_type,
 )
 from core.decorators import tenant_scoped
+from core.naming import PROJECT_SLUG, TEAM_SLUG, NamingViolation
 from core.permissions import Permission, module_entitlements, require_permission
 
 
@@ -230,6 +231,70 @@ class IdentityQuery:
             return []
         qs = Project.objects.filter(organization_id=org_id).select_related("organization", "team")[:200]
         return [project_to_type(p) for p in qs]
+
+    @strawberry.field
+    @require_permission(Permission.TEAM_UPDATE)
+    @tenant_scoped()
+    def astrolift_team_slug_available(self, info: Info, slug: str, exclude_id: GUID | None = None) -> bool:
+        """Live check backing the team-rename form (debounced as the
+        operator types). ``True`` only when ``slug`` is a syntactically
+        valid team slug AND free within the caller's org — i.e. the
+        rename mutation would accept it. A malformed slug returns
+        ``False`` (the mutation would reject it), so the FE treats
+        invalid as unavailable and surfaces its own format hint.
+
+        Uniqueness is per-org and scoped to live rows (the default
+        manager filters soft-deleted). ``exclude_id`` is the guid of the
+        team being edited so keeping its current slug reads as available.
+        """
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return False
+        try:
+            TEAM_SLUG.validate(slug)
+        except NamingViolation:
+            return False
+        qs = Team.objects.filter(organization_id=org_id, slug=slug)
+        if exclude_id is not None:
+            qs = qs.exclude(guid=str(exclude_id))
+        return not qs.exists()
+
+    @strawberry.field
+    @require_permission(Permission.PROJECT_UPDATE)
+    @tenant_scoped()
+    def astrolift_project_slug_available(
+        self, info: Info, team_id: GUID, slug: str, exclude_id: GUID | None = None
+    ) -> bool:
+        """Live check backing the project-rename form. ``True`` only when
+        ``slug`` is a valid project slug AND free within ``team_id`` — a
+        project slug is unique per team, not per org. The team must
+        belong to the caller's org; a foreign or unknown ``team_id``
+        returns ``False`` (fail closed), as does a malformed slug.
+
+        ``exclude_id`` is the guid of the project being edited so keeping
+        its current slug reads as available. Rows are scoped to live ones
+        by the default manager.
+        """
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return False
+        team = Team.objects.filter(guid=str(team_id), organization_id=org_id).first()
+        if team is None:
+            return False
+        try:
+            PROJECT_SLUG.validate(slug)
+        except NamingViolation:
+            return False
+        qs = Project.objects.filter(team_id=team.pk, slug=slug)
+        if exclude_id is not None:
+            qs = qs.exclude(guid=str(exclude_id))
+        return not qs.exists()
 
     @strawberry.field
     @tenant_scoped()

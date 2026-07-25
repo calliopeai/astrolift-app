@@ -74,6 +74,7 @@ from astrolift_identity.schema.types import (
 from astrolift_identity.step_up import requires_elevation
 from core.decorators import tenant_scoped
 from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
+from core.naming import PROJECT_SLUG, TEAM_SLUG, NamingViolation
 from core.optimistic import check_version_match as _check_version_match
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
@@ -109,6 +110,7 @@ class CreateTeamInput:
 class UpdateTeamInput:
     id: GUID
     name: str | None = None
+    slug: str | None = None
     description: str | None = None
 
 
@@ -124,6 +126,7 @@ class CreateProjectInput:
 class UpdateProjectInput:
     id: GUID
     name: str | None = None
+    slug: str | None = None
     description: str | None = None
 
 
@@ -698,6 +701,31 @@ class IdentityMutation:
         team = _resolve_team(input.id, org_id)
         if team is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "team not found")
+        if input.slug is not None:
+            # Validate the shape first, then uniqueness. A team slug is
+            # unique per organization, scoped to live rows (the default
+            # manager already filters soft-deleted). Exclude self so a
+            # no-op rename to the current slug isn't a self-collision.
+            try:
+                TEAM_SLUG.validate(input.slug)
+            except NamingViolation:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "slug must be lowercase letters, digits, and dashes, start "
+                    "with a letter, and be at most 40 characters",
+                    field="slug",
+                )
+            if (
+                Team.objects.filter(organization_id=team.organization_id, slug=input.slug)
+                .exclude(pk=team.pk)
+                .exists()
+            ):
+                return gql_failure(
+                    ErrorCode.CONFLICT.value,
+                    f"a team with slug {input.slug!r} already exists in this org",
+                    field="slug",
+                )
+            team.slug = input.slug
         if input.name is not None:
             team.name = input.name
         if input.description is not None:
@@ -758,6 +786,31 @@ class IdentityMutation:
         project = _resolve_project(input.id, org_id)
         if project is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "project not found")
+        if input.slug is not None:
+            # Validate the shape first, then uniqueness. A project slug is
+            # unique per team, scoped to live rows (the default manager
+            # already filters soft-deleted). Exclude self so a no-op
+            # rename to the current slug isn't a self-collision.
+            try:
+                PROJECT_SLUG.validate(input.slug)
+            except NamingViolation:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "slug must be lowercase letters, digits, and dashes, start "
+                    "with a letter, and be at most 40 characters",
+                    field="slug",
+                )
+            if (
+                Project.objects.filter(team_id=project.team_id, slug=input.slug)
+                .exclude(pk=project.pk)
+                .exists()
+            ):
+                return gql_failure(
+                    ErrorCode.CONFLICT.value,
+                    f"a project with slug {input.slug!r} already exists in this team",
+                    field="slug",
+                )
+            project.slug = input.slug
         if input.name is not None:
             project.name = input.name
         if input.description is not None:

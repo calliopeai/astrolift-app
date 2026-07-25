@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
-import { FileBoxIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { FileBoxIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import * as React from "react";
@@ -33,6 +33,7 @@ import type {
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import { CreateProjectDialog } from "./create-project-dialog";
+import { EditProjectDialog } from "./edit-project-dialog";
 
 interface Resp {
   astroliftProjects: AstroliftProject[];
@@ -44,6 +45,7 @@ interface TeamsResp {
 export function ProjectsClient() {
   const fmt = useFormatters();
   const [open, setOpen] = React.useState(false);
+  const [editTarget, setEditTarget] = React.useState<AstroliftProject | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<AstroliftProject | null>(null);
   const projects = useQuery<Resp>(LIST_PROJECTS);
   const teams = useQuery<TeamsResp>(LIST_TEAMS);
@@ -142,6 +144,16 @@ export function ProjectsClient() {
                       {fmt.formatDate(p.createdAt)}
                     </TableCell>
                     <TableCell className="text-right">
+                      <Can permission="project.update">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setEditTarget(p)}
+                        >
+                          <PencilIcon className="size-4" />
+                          <span className="sr-only">Edit</span>
+                        </Button>
+                      </Can>
                       <Can permission="project.delete">
                         <Button
                           size="sm"
@@ -166,6 +178,14 @@ export function ProjectsClient() {
         open={open}
         onOpenChange={setOpen}
         teams={teams.data?.astroliftTeams ?? []}
+      />
+
+      <EditProjectDialog
+        open={editTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setEditTarget(null);
+        }}
+        project={editTarget}
       />
 
       <ConfirmDialog

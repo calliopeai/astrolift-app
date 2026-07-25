@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
-import { PlusIcon, Trash2Icon, UsersIcon } from "lucide-react";
+import { PencilIcon, PlusIcon, Trash2Icon, UsersIcon } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
@@ -29,6 +29,7 @@ import { useListControls } from "@/hooks/use-list-controls";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import { CreateTeamDialog } from "./create-team-dialog";
+import { EditTeamDialog } from "./edit-team-dialog";
 
 interface TeamsResp {
   astroliftTeams: AstroliftTeam[];
@@ -37,6 +38,7 @@ interface TeamsResp {
 export function TeamsClient() {
   const fmt = useFormatters();
   const [open, setOpen] = React.useState(false);
+  const [editTarget, setEditTarget] = React.useState<AstroliftTeam | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<AstroliftTeam | null>(null);
   const teams = useQuery<TeamsResp>(LIST_TEAMS);
 
@@ -144,6 +146,16 @@ export function TeamsClient() {
                         {fmt.formatDate(team.createdAt)}
                       </TableCell>
                       <TableCell className="text-right">
+                        <Can permission="team.update">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setEditTarget(team)}
+                          >
+                            <PencilIcon className="size-4" />
+                            <span className="sr-only">Edit</span>
+                          </Button>
+                        </Can>
                         <Can permission="team.delete">
                           <Button
                             size="sm"
@@ -166,6 +178,14 @@ export function TeamsClient() {
       </Card>
 
       <CreateTeamDialog open={open} onOpenChange={setOpen} />
+
+      <EditTeamDialog
+        open={editTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setEditTarget(null);
+        }}
+        team={editTarget}
+      />
 
       <ConfirmDialog
         open={deleteTarget !== null}

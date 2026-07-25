@@ -75,6 +75,7 @@ export type AgentRunMode =
   | 'TRIGGER';
 
 export type AgentRunSpecInput = {
+  clearScheduledScaling: Scalars['Boolean']['input'];
   replicas: InputMaybe<Scalars['Int']['input']>;
   runCronExpression: InputMaybe<Scalars['String']['input']>;
   runFamily: InputMaybe<AgentRunFamily>;
@@ -211,10 +212,14 @@ export type AstroliftAgentDetail = {
   id: Scalars['GUID']['output'];
   imageRef: Scalars['String']['output'];
   name: Scalars['String']['output'];
+  replicas: Scalars['Int']['output'];
   runCronExpression: Scalars['String']['output'];
   runFamily: Scalars['String']['output'];
   runMode: Scalars['String']['output'];
   runPaused: Scalars['Boolean']['output'];
+  scaleDownCron: Scalars['String']['output'];
+  scaleUpCron: Scalars['String']['output'];
+  scheduledScaleTo?: Maybe<Scalars['Int']['output']>;
   skills: Array<AstroliftAgentSkill>;
   slug: Scalars['String']['output'];
   sourceRepo: Scalars['String']['output'];
@@ -253,11 +258,16 @@ export type AstroliftAgentListItem = {
   lastRunStatus?: Maybe<Scalars['String']['output']>;
   name: Scalars['String']['output'];
   projectSlug: Scalars['String']['output'];
+  replicas: Scalars['Int']['output'];
   runCronExpression: Scalars['String']['output'];
   runFamily: Scalars['String']['output'];
+  runMaxParallel?: Maybe<Scalars['Int']['output']>;
   runMode: Scalars['String']['output'];
   runPaused: Scalars['Boolean']['output'];
   runningCount: Scalars['Int']['output'];
+  scaleDownCron: Scalars['String']['output'];
+  scaleUpCron: Scalars['String']['output'];
+  scheduledScaleTo?: Maybe<Scalars['Int']['output']>;
   slug: Scalars['String']['output'];
   sourceRepo: Scalars['String']['output'];
   sourceUrl: Scalars['String']['output'];
@@ -265,11 +275,14 @@ export type AstroliftAgentListItem = {
 
 export type AstroliftAgentLiveStatus = {
   appSlug: Scalars['String']['output'];
+  deploymentReady?: Maybe<Scalars['Boolean']['output']>;
+  desiredReplicas?: Maybe<Scalars['Int']['output']>;
   isIdle: Scalars['Boolean']['output'];
   isPaused: Scalars['Boolean']['output'];
   lastRunAt?: Maybe<Scalars['DateTime']['output']>;
   lastRunStatus?: Maybe<Scalars['String']['output']>;
   nextScheduledAt?: Maybe<Scalars['DateTime']['output']>;
+  readyReplicas?: Maybe<Scalars['Int']['output']>;
   runFamily: Scalars['String']['output'];
   runMode: Scalars['String']['output'];
   runningCount: Scalars['Int']['output'];
@@ -323,11 +336,24 @@ export type AstroliftAgentRuntime = {
   name: Scalars['String']['output'];
 };
 
+export type AstroliftAgentScaleResult = {
+  desiredReplicas?: Maybe<Scalars['Int']['output']>;
+  message: Scalars['String']['output'];
+  ok: Scalars['Boolean']['output'];
+  readyReplicas?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AstroliftAgentSecretStatus = {
   envVar: Scalars['String']['output'];
   error?: Maybe<Scalars['String']['output']>;
   exists: Scalars['Boolean']['output'];
   uri: Scalars['String']['output'];
+};
+
+export type AstroliftAgentSecretStatusMutationResult = {
+  data?: Maybe<AstroliftAgentSecretStatus>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AstroliftAgentSkill = {
@@ -339,23 +365,56 @@ export type AstroliftAgentSkill = {
 export type AstroliftAgentTask = {
   callbackUrl: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
+  dispatcher?: Maybe<AstroliftAgentTaskDispatcher>;
   failureMessage?: Maybe<Scalars['String']['output']>;
   finishedAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
   namespace: Scalars['String']['output'];
   podName: Scalars['String']['output'];
+  provisioningAt?: Maybe<Scalars['DateTime']['output']>;
+  queuedAt?: Maybe<Scalars['DateTime']['output']>;
   result?: Maybe<Scalars['JSON']['output']>;
   snapshotUrl?: Maybe<Scalars['String']['output']>;
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
+  updatedAt: Scalars['DateTime']['output'];
   vncEnabled: Scalars['Boolean']['output'];
   vncUrl: Scalars['String']['output'];
+};
+
+export type AstroliftAgentTaskDispatcher = {
+  cloud: Scalars['String']['output'];
+  clusterId?: Maybe<Scalars['GUID']['output']>;
+  clusterName: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  region: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
 };
 
 export type AstroliftAgentTaskMutationResult = {
   data?: Maybe<AstroliftAgentTask>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftAgentTrigger = {
+  branchPattern: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  enabled: Scalars['Boolean']['output'];
+  endpoint: Scalars['String']['output'];
+  inputMapping: Scalars['JSON']['output'];
+  lastTriggeredAt?: Maybe<Scalars['DateTime']['output']>;
+  scmRepo: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
+};
+
+export type AstroliftAgentTriggerResult = {
+  endpoint?: Maybe<Scalars['String']['output']>;
+  message: Scalars['String']['output'];
+  ok: Scalars['Boolean']['output'];
+  signingSecret?: Maybe<Scalars['String']['output']>;
+  slug?: Maybe<Scalars['String']['output']>;
 };
 
 export type AstroliftAggregatedEvent = {
@@ -458,6 +517,15 @@ export type AstroliftApiTokenPlaintextMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftAppAutowireStatus = {
+  checkedAt?: Maybe<Scalars['DateTime']['output']>;
+  ciWorkflow: Scalars['String']['output'];
+  connected: Scalars['Boolean']['output'];
+  detail: Scalars['String']['output'];
+  secrets: Scalars['String']['output'];
+  webhook: Scalars['String']['output'];
+};
+
 export type AstroliftAppCertificate = {
   daysUntilExpiry: Scalars['Int']['output'];
   hostname: Scalars['String']['output'];
@@ -465,6 +533,11 @@ export type AstroliftAppCertificate = {
   issuer: Scalars['String']['output'];
   notAfter: Scalars['String']['output'];
   renewalStatus: Scalars['String']['output'];
+};
+
+export type AstroliftAppCertificatesResult = {
+  certificates: Array<AstroliftAppCertificate>;
+  reason: AstroliftObservabilityPanelReason;
 };
 
 export type AstroliftAppConfigDrift = {
@@ -492,6 +565,11 @@ export type AstroliftAppDnsRecord = {
   ttl: Scalars['Int']['output'];
   type: Scalars['String']['output'];
   value: Scalars['String']['output'];
+};
+
+export type AstroliftAppDnsRecordsResult = {
+  reason: AstroliftObservabilityPanelReason;
+  records: Array<AstroliftAppDnsRecord>;
 };
 
 export type AstroliftAppDomain = {
@@ -576,6 +654,11 @@ export type AstroliftAppGoldenSignal = {
   unit: Scalars['String']['output'];
 };
 
+export type AstroliftAppGoldenSignalsResult = {
+  reason: AstroliftObservabilityPanelReason;
+  signals: Array<AstroliftAppGoldenSignal>;
+};
+
 export type AstroliftAppHealthPulse = {
   ageSeconds?: Maybe<Scalars['Int']['output']>;
   message: Scalars['String']['output'];
@@ -603,6 +686,11 @@ export type AstroliftAppIdentityBinding = {
   lastUsedAt?: Maybe<Scalars['String']['output']>;
   roleArnOrPrincipal: Scalars['String']['output'];
   trustPolicySummary: Scalars['String']['output'];
+};
+
+export type AstroliftAppIdentityBindingResult = {
+  binding?: Maybe<AstroliftAppIdentityBinding>;
+  reason: AstroliftObservabilityPanelReason;
 };
 
 export type AstroliftAppListStatusFilter =
@@ -645,6 +733,7 @@ export type AstroliftAppLogPage = {
   items: Array<AstroliftAppLogQueryLine>;
   nextCursor: Scalars['String']['output'];
   reachedRetention: Scalars['Boolean']['output'];
+  reason: AstroliftObservabilityPanelReason;
   totalCount: Scalars['Int']['output'];
 };
 
@@ -761,6 +850,8 @@ export type AstroliftAppSourceKindFilter =
 export type AstroliftAppSummary = {
   id: Scalars['GUID']['output'];
   name: Scalars['String']['output'];
+  primitiveKind: Scalars['String']['output'];
+  primitiveSlug: Scalars['String']['output'];
   slug: Scalars['String']['output'];
   status: Scalars['String']['output'];
 };
@@ -791,6 +882,22 @@ export type AstroliftAppTrace = {
   spanCount: Scalars['Int']['output'];
   statusCode: Scalars['String']['output'];
   traceId: Scalars['String']['output'];
+};
+
+export type AstroliftAppUptime = {
+  isUp?: Maybe<Scalars['Boolean']['output']>;
+  lastCheckedAt?: Maybe<Scalars['DateTime']['output']>;
+  recent: Array<AstroliftAppUptimePoint>;
+  totalChecks: Scalars['Int']['output'];
+  uptimePct: Scalars['Float']['output'];
+  windowHours: Scalars['Int']['output'];
+};
+
+export type AstroliftAppUptimePoint = {
+  checkedAt: Scalars['DateTime']['output'];
+  isUp: Scalars['Boolean']['output'];
+  latencyMs: Scalars['Int']['output'];
+  statusCode?: Maybe<Scalars['Int']['output']>;
 };
 
 export type AstroliftAppUrlHealth = {
@@ -990,6 +1097,17 @@ export type AstroliftCiSecretValidation = {
   updatedAt: Scalars['String']['output'];
 };
 
+export type AstroliftCiWorkflowSyncStatus = {
+  checkedAt?: Maybe<Scalars['DateTime']['output']>;
+  currentTemplateVersion: Scalars['Int']['output'];
+  detail: Scalars['String']['output'];
+  path: Scalars['String']['output'];
+  prUrl: Scalars['String']['output'];
+  state: Scalars['String']['output'];
+  syncedAt?: Maybe<Scalars['DateTime']['output']>;
+  syncedTemplateVersion?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AstroliftClusterBootstrapComponent = {
   defaultEnabled: Scalars['Boolean']['output'];
   helmValues: Scalars['JSON']['output'];
@@ -1123,6 +1241,29 @@ export type AstroliftClusterPrometheusRangeSeries = {
   metric: Scalars['String']['output'];
   points: Array<AstroliftClusterPrometheusRangePoint>;
   unit: Scalars['String']['output'];
+};
+
+export type AstroliftClusterSystemMetricPoint = {
+  ts: Scalars['Float']['output'];
+  value: Scalars['Float']['output'];
+};
+
+export type AstroliftClusterSystemMetricSeries = {
+  current?: Maybe<Scalars['Float']['output']>;
+  label: Scalars['String']['output'];
+  metric: Scalars['String']['output'];
+  points: Array<AstroliftClusterSystemMetricPoint>;
+  unit: Scalars['String']['output'];
+};
+
+export type AstroliftClusterSystemMetrics = {
+  appNamespace: Scalars['String']['output'];
+  available: Scalars['Boolean']['output'];
+  rangeSeconds: Scalars['Int']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+  series: Array<AstroliftClusterSystemMetricSeries>;
+  source: Scalars['String']['output'];
+  stepSeconds: Scalars['Int']['output'];
 };
 
 export type AstroliftClusterWorkflowRun = {
@@ -1501,6 +1642,14 @@ export type AstroliftDiscoveredAgentManifest = {
   workloadKind: Scalars['String']['output'];
 };
 
+export type AstroliftDiscoveredAppManifest = {
+  alreadyRegistered: Scalars['Boolean']['output'];
+  buildContext: Scalars['String']['output'];
+  manifestPath: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  workloadCount: Scalars['Int']['output'];
+};
+
 export type AstroliftDispatcherInstance = {
   capabilities: Scalars['JSON']['output'];
   id: Scalars['GUID']['output'];
@@ -1706,6 +1855,7 @@ export type AstroliftEvent = {
 export type AstroliftEventPage = {
   items: Array<AstroliftEvent>;
   nextCursor?: Maybe<Scalars['String']['output']>;
+  reason: AstroliftObservabilityPanelReason;
 };
 
 export type AstroliftExecutePromqlResult = {
@@ -2168,6 +2318,33 @@ export type AstroliftNotificationPreferenceMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftObservabilityPanelReason =
+  | 'ERROR'
+  | 'NOT_CONFIGURED'
+  | 'NOT_SUPPORTED_BY_PROVIDER'
+  | 'NO_DATA_YET'
+  | 'OK';
+
+export type AstroliftOrgSkillRepo = {
+  alias: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  defaultRef: Scalars['String']['output'];
+  displayName: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  isActive: Scalars['Boolean']['output'];
+  isPrivate: Scalars['Boolean']['output'];
+  repoFullName: Scalars['String']['output'];
+  sourceConnectionId?: Maybe<Scalars['GUID']['output']>;
+  sourceKind: Scalars['String']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+};
+
+export type AstroliftOrgSkillRepoMutationResult = {
+  data?: Maybe<AstroliftOrgSkillRepo>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftOrganization = {
   allowUserProfileEdit: Scalars['Boolean']['output'];
   auditLogRetentionDays: Scalars['Int']['output'];
@@ -2246,6 +2423,7 @@ export type AstroliftPodResourceUsage = {
   lastRestartAt?: Maybe<Scalars['DateTime']['output']>;
   podName: Scalars['String']['output'];
   rangeSeconds: Scalars['Int']['output'];
+  reason: AstroliftObservabilityPanelReason;
   restartCount: Scalars['Int']['output'];
   samples: Array<AstroliftPodResourceUsagePoint>;
 };
@@ -2420,10 +2598,21 @@ export type AstroliftRegisterAgentRepoResultMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftRegisterAppRepoResult = {
+  apps: Array<AstroliftRegisteredAppEntry>;
+};
+
+export type AstroliftRegisterAppRepoResultMutationResult = {
+  data?: Maybe<AstroliftRegisterAppRepoResult>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftRegisteredAgent = {
   appId: Scalars['GUID']['output'];
   created: Scalars['Boolean']['output'];
   manifestPath: Scalars['String']['output'];
+  skillNotes: Array<Scalars['String']['output']>;
   slug: Scalars['String']['output'];
   workloadSlug: Scalars['String']['output'];
 };
@@ -2434,10 +2623,12 @@ export type AstroliftRegisteredApp = {
   approverUserIds: Array<Scalars['String']['output']>;
   archivedAt?: Maybe<Scalars['DateTime']['output']>;
   archivedByEmail?: Maybe<Scalars['String']['output']>;
+  autowire?: Maybe<AstroliftAppAutowireStatus>;
   buildArgs: Scalars['JSON']['output'];
   buildContext: Scalars['String']['output'];
   buildMode: Scalars['String']['output'];
   buildStrategy: Scalars['String']['output'];
+  ciWorkflowSyncStatus?: Maybe<AstroliftCiWorkflowSyncStatus>;
   configDrift?: Maybe<AstroliftAppConfigDrift>;
   createdAt: Scalars['DateTime']['output'];
   cronExpression: Scalars['String']['output'];
@@ -2502,6 +2693,14 @@ export type AstroliftRegisteredApp = {
   webhookDeploysPaused: Scalars['Boolean']['output'];
   webhookDeploysPausedAt?: Maybe<Scalars['DateTime']['output']>;
   webhookDeploysPausedByEmail?: Maybe<Scalars['String']['output']>;
+};
+
+export type AstroliftRegisteredAppEntry = {
+  appId: Scalars['GUID']['output'];
+  buildContext: Scalars['String']['output'];
+  created: Scalars['Boolean']['output'];
+  manifestPath: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
 };
 
 export type AstroliftRegisteredAppMutationResult = {
@@ -2593,6 +2792,21 @@ export type AstroliftRetentionPolicyMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftRetryAutowirePayload = {
+  allOk: Scalars['Boolean']['output'];
+  ciWorkflow: Scalars['String']['output'];
+  connected: Scalars['Boolean']['output'];
+  detail: Scalars['String']['output'];
+  secrets: Scalars['String']['output'];
+  webhook: Scalars['String']['output'];
+};
+
+export type AstroliftRetryAutowirePayloadMutationResult = {
+  data?: Maybe<AstroliftRetryAutowirePayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftRevealedSecret = {
   environmentName: Scalars['String']['output'];
   key: Scalars['String']['output'];
@@ -2667,6 +2881,12 @@ export type AstroliftRunJobOncePayloadMutationResult = {
 
 export type AstroliftScanAgentManifestsResult = {
   agents: Array<AstroliftDiscoveredAgentManifest>;
+  error?: Maybe<Scalars['String']['output']>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftScanAppManifestsResult = {
+  apps: Array<AstroliftDiscoveredAppManifest>;
   error?: Maybe<Scalars['String']['output']>;
   ok: Scalars['Boolean']['output'];
 };
@@ -2921,6 +3141,7 @@ export type AstroliftSshDeployKeyMutationResult = {
 export type AstroliftStatusCodeBreakdown = {
   promql: Scalars['String']['output'];
   rangeSeconds: Scalars['Int']['output'];
+  reason: AstroliftObservabilityPanelReason;
   series: Array<AstroliftStatusCodeSeries>;
 };
 
@@ -3474,6 +3695,29 @@ export type ClearEnvironmentSettingInput = {
   key: Scalars['String']['input'];
 };
 
+export type CloneWorkflowDefinitionResult = {
+  definition?: Maybe<WorkflowDefinitionType>;
+  errors: Array<ValidationError>;
+  ok: Scalars['Boolean']['output'];
+  slug?: Maybe<Scalars['String']['output']>;
+};
+
+export type CloudOrphanReportType = {
+  complete: Scalars['Boolean']['output'];
+  incompleteKinds: Array<Scalars['String']['output']>;
+  orphans: Array<CloudOrphanType>;
+  scannedKinds: Array<Scalars['String']['output']>;
+};
+
+export type CloudOrphanType = {
+  classification: Scalars['String']['output'];
+  clusterSlug: Scalars['String']['output'];
+  identifier: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  reapKey: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+};
+
 export type Clusteragentkeyissuedpayload = {
   agentKey: Scalars['String']['output'];
   clusterId: Scalars['GUID']['output'];
@@ -3494,8 +3738,37 @@ export type ConfigureProviderPluginInput = {
   pluginSlug: Scalars['String']['input'];
 };
 
+export type ConfiguredWorkflow = {
+  createdAt: Scalars['DateTime']['output'];
+  definitionName: Scalars['String']['output'];
+  definitionSlug: Scalars['String']['output'];
+  description: Scalars['String']['output'];
+  guid: Scalars['String']['output'];
+  inputs: Scalars['JSON']['output'];
+  isEnabled: Scalars['Boolean']['output'];
+  name: Scalars['String']['output'];
+  organizationGuid?: Maybe<Scalars['String']['output']>;
+  patternKind: Scalars['String']['output'];
+  runCount: Scalars['Int']['output'];
+  runs: Array<WorkflowRun>;
+  scheduleCron?: Maybe<Scalars['String']['output']>;
+  slug: Scalars['String']['output'];
+  stageBindings: Scalars['JSON']['output'];
+  triggerKind: Scalars['String']['output'];
+};
+
 export type ConfirmUploadResult = {
   ack: Scalars['Boolean']['output'];
+};
+
+export type ConnectExistingGithubAppInput = {
+  apiBaseUrl: InputMaybe<Scalars['String']['input']>;
+  appId: Scalars['String']['input'];
+  clientId: InputMaybe<Scalars['String']['input']>;
+  clientSecret: InputMaybe<Scalars['String']['input']>;
+  orgLogin: InputMaybe<Scalars['String']['input']>;
+  privateKeyPem: Scalars['String']['input'];
+  webhookSecret: InputMaybe<Scalars['String']['input']>;
 };
 
 export type ConnectSourceInput = {
@@ -3666,10 +3939,24 @@ export type CreateWebhookSubscriptionInput = {
   url: Scalars['String']['input'];
 };
 
+export type CreateWorkflowResult = {
+  errors: Array<ValidationError>;
+  ok: Scalars['Boolean']['output'];
+  workflow?: Maybe<ConfiguredWorkflow>;
+};
+
 export type CreateWorkflowStageResult = {
   errors: Array<ValidationError>;
   ok: Scalars['Boolean']['output'];
   stage?: Maybe<WorkflowStageType>;
+};
+
+export type CreateWorkflowTriggerResult = {
+  endpoint?: Maybe<Scalars['String']['output']>;
+  errors: Array<ValidationError>;
+  ok: Scalars['Boolean']['output'];
+  signingSecret?: Maybe<Scalars['String']['output']>;
+  slug?: Maybe<Scalars['String']['output']>;
 };
 
 export type DataImportUploadResult = {
@@ -3768,6 +4055,8 @@ export type DeprovisionManagedServiceInput = {
 export type DeregisterAppInput = {
   appSlug: Scalars['String']['input'];
   confirmName: Scalars['String']['input'];
+  deleteData: Scalars['Boolean']['input'];
+  forceDestroy: Scalars['Boolean']['input'];
 };
 
 export type DetachSecretBundleInput = {
@@ -4005,6 +4294,31 @@ export type GroupOperationInput = {
   userIds: Array<Scalars['ID']['input']>;
 };
 
+export type ImportGapType = {
+  code: Scalars['String']['output'];
+  message: Scalars['String']['output'];
+  nodeId?: Maybe<Scalars['String']['output']>;
+  nodeType?: Maybe<Scalars['String']['output']>;
+  severity: Scalars['String']['output'];
+};
+
+export type ImportWorkflowFlowResult = {
+  createdSlug?: Maybe<Scalars['String']['output']>;
+  definition?: Maybe<WorkflowManifestDefinitionType>;
+  errors: Array<ValidationError>;
+  gaps: Array<ImportGapType>;
+  ok: Scalars['Boolean']['output'];
+  preview: Scalars['Boolean']['output'];
+  stages: Array<WorkflowManifestStageType>;
+};
+
+export type ImportWorkflowManifestResult = {
+  createdSlug?: Maybe<Scalars['String']['output']>;
+  errors: Array<ValidationError>;
+  manifest?: Maybe<WorkflowManifestPreviewType>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type InstallClusterPrereqsInputType = {
   clusterId: Scalars['GUID']['input'];
   optionOverrides: Array<BootstrapOptionOverride>;
@@ -4165,11 +4479,15 @@ export type Mutation = {
   cancelWorkflowInstance: MutationResult;
   clearAlertSubscription: AstroliftUserAlertSubscriptionMutationResult;
   clearEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
+  /** Deep-copy a visible workflow definition + its stages into the caller's org as a new editable definition (spec 40 §2.1). New slug on collision; global stages copy with agent_definition cleared. */
+  cloneWorkflowDefinition: CloneWorkflowDefinitionResult;
   configureProviderPlugin: ProviderpluginconfigpayloadMutationResult;
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
   confirmPreSignedUrlImageUpload: ConfirmUploadResult;
+  connectExistingGithubApp: AstroliftSourceConnectionMutationResult;
   connectSource: AstroliftSourceConnectionMutationResult;
   createAgentEnvironmentSpec: AstroliftAgentEnvironmentSpecMutationResult;
+  createAgentTrigger: AstroliftAgentTriggerResult;
   createAlertRule: AstroliftAlertRuleMutationResult;
   createApiToken: AstroliftApiTokenPlaintextMutationResult;
   createDeployToken: DeployTokenSecretRevealMutationResult;
@@ -4189,15 +4507,20 @@ export type Mutation = {
   createToolDef: AstroliftToolDefMutationResult;
   createTrigger: AstroliftTriggerMutationResult;
   createWebhookSubscription: WebhookSecretRevealMutationResult;
+  /** Create a configured Workflow from a visible definition (spec 40 §2.2). */
+  createWorkflow: CreateWorkflowResult;
   /** Create a new workflow definition (staff only). */
   createWorkflowDefinition: MutationResult;
-  /** Add a stage to an agent workflow definition (staff only). */
+  /** Add a stage to a writable workflow definition. order=null appends after the definition's last stage. */
   createWorkflowStage: CreateWorkflowStageResult;
+  /** Create an inbound webhook trigger for a workflow definition (staff only). */
+  createWorkflowTrigger: CreateWorkflowTriggerResult;
   decommissionCluster: AstroliftTenantClusterMutationResult;
   deelevateAdminSession: AstroliftDeelevatePayloadMutationResult;
   /** Delete an object by its global ID (soft-delete via delete_check). */
   delete: Scalars['Boolean']['output'];
   deleteAgentEnvironmentSpec: AstroliftAgentEnvironmentSpecMutationResult;
+  deleteAgentSecretValue: AstroliftAgentSecretStatusMutationResult;
   deleteAlertRule: AlertruledeletedpayloadMutationResult;
   deleteAppDnsRecord: AstroliftCapabilityDeprovisionPayloadMutationResult;
   deleteAppIdentityRole: AstroliftCapabilityDeprovisionPayloadMutationResult;
@@ -4211,8 +4534,12 @@ export type Mutation = {
   deleteSshDeployKey: AstroliftSshDeployKeyMutationResult;
   deleteToolDef: AstroliftToolDefMutationResult;
   deleteWebhookSubscription: SoftdeletepayloadMutationResult;
-  /** Delete a workflow definition by slug (staff only). */
+  /** Soft-delete a configured Workflow and tear down its schedule. */
+  deleteWorkflow: MutationResult;
+  /** Soft-delete an org-owned workflow definition by slug. */
   deleteWorkflowDefinition: MutationResult;
+  /** Soft-delete a stage from a writable definition (spec 40 §6). */
+  deleteWorkflowStage: MutationResult;
   deployClusterAgent: AstroliftTenantClusterMutationResult;
   deprovisionManagedService: ManagedservicedeletedpayloadMutationResult;
   deregisterAstroliftApp: AstroliftDeregisterAppPayloadMutationResult;
@@ -4233,6 +4560,10 @@ export type Mutation = {
   grantTeamAccessToApp: AstroliftAppTeamAccessMutationResult;
   heartbeatSession: AstroliftHeartbeatSessionPayloadMutationResult;
   importSkillsFromRepo: AstroliftImportSkillsResultMutationResult;
+  /** Import a popular visual agent/workflow builder export (Langflow, Flowise, …) into an Astrolift WorkflowDefinition. preview=true (default) returns the mapped manifest + gap report without persisting; preview=false creates an org-scoped, disabled definition + stages. */
+  importWorkflowFlow: ImportWorkflowFlowResult;
+  /** Import a workflow manifest TOML. preview=true (default) returns the parsed shape without persisting; preview=false creates a disabled, org-scoped WorkflowDefinition + stages in the caller's org and returns the (possibly uniquified) slug. */
+  importWorkflowManifest: ImportWorkflowManifestResult;
   installAstroliftSourceWebhook: AstroliftInstallSourceWebhookPayloadMutationResult;
   installClusterPrereqs: AstroliftTenantClusterMutationResult;
   installScmWebhook: AstroliftScmWebhookInstallationMutationResult;
@@ -4290,6 +4621,7 @@ export type Mutation = {
   profileRequestDeleteUser: Scalars['Boolean']['output'];
   /** Request a password reset email. Requires PROFILE_CHANGE_RESET_PASSWORD_USERS permission to send to other users. */
   profileRequestPwdChange: Scalars['Boolean']['output'];
+  promoteDeployment: AstroliftDeploymentMutationResult;
   proposeSecretChange: AstroliftSecretChangeProposalMutationResult;
   provisionManagedDomain: ProvisionManagedDomainPayloadMutationResult;
   provisionManagedService: AstroliftManagedServiceMutationResult;
@@ -4298,6 +4630,7 @@ export type Mutation = {
   pushAstroliftCiWorkflowToRepo: AstroliftPushCiWorkflowPayloadMutationResult;
   pushCiWorkflow: AstroliftScmPushCiWorkflowResultMutationResult;
   pushManifestToRepo: ManifestpushpayloadMutationResult;
+  reapCloudOrphan: ReapCloudOrphanPayloadMutationResult;
   recheckDomainValidation: AstroliftAppDomainMutationResult;
   reconcileClusterIngresses: ReconcileClusterIngressesResultMutationResult;
   recordClusterBootstrapRun: BootstraprunrecordedpayloadMutationResult;
@@ -4305,7 +4638,9 @@ export type Mutation = {
   refreshClusterManagement: AstroliftTenantClusterMutationResult;
   registerAgentRepo: AstroliftRegisterAgentRepoResultMutationResult;
   registerApp: AstroliftRegisteredAppMutationResult;
+  registerAppRepo: AstroliftRegisterAppRepoResultMutationResult;
   registerMobileDevice: AstroliftDeviceRegistrationMutationResult;
+  registerOrgSkillRepo: AstroliftOrgSkillRepoMutationResult;
   registerTenantCluster: AstroliftTenantClusterMutationResult;
   reissueManagedDomainCert: ReissueManagedDomainCertPayloadMutationResult;
   rejectDeployment: AstroliftDeploymentMutationResult;
@@ -4313,7 +4648,10 @@ export type Mutation = {
   rejectSecretChange: AstroliftSecretChangeProposalMutationResult;
   removeAppDomain: AppdomainremovedpayloadMutationResult;
   removeEmailSuppressionEntry: EmailsuppressionremovepayloadMutationResult;
+  removeOrgSkillRepo: AstroliftOrgSkillRepoMutationResult;
   removeOrganizationAllowlistDomain: SoftdeletepayloadMutationResult;
+  /** Reorder a definition's stages (spec 40 §6). Pass stage guids in the new order. */
+  reorderWorkflowStages: MutationResult;
   reprovisionManagedService: AstroliftManagedServiceMutationResult;
   requestAttestationChallenge: AstroliftAttestationChallengePayloadMutationResult;
   requestQuotaIncrease: AstroliftQuotaIncreaseRequestMutationResult;
@@ -4324,6 +4662,7 @@ export type Mutation = {
   resumeAstroliftAppWebhookDeploys: AstroliftRegisteredAppMutationResult;
   resumeEnvironment: AstroliftAppEnvironmentMutationResult;
   resyncAstroliftManifestFromRepo: ResyncManifestPayloadMutationResult;
+  retryAstroliftAutowire: AstroliftRetryAutowirePayloadMutationResult;
   revalidateManagedDomain: RevalidateManagedDomainPayloadMutationResult;
   revealAppSecret: AstroliftRevealedSecretMutationResult;
   revealManagedServiceConnection: AstroliftManagedServiceConnectionMutationResult;
@@ -4344,11 +4683,15 @@ export type Mutation = {
   runAstroliftAgent: AstroliftAgentTaskMutationResult;
   runAstroliftJobOnce: AstroliftRunJobOncePayloadMutationResult;
   runTask: AstroliftTaskRunPayloadMutationResult;
+  /** Run a configured Workflow now via Temporal (spec 40 §3). */
+  runWorkflow: RunWorkflowResult;
   /** Run an agent WorkflowDefinition's stages durably via Temporal (WorkflowDefinitionRunWorkflow). Creates the WorkflowInstance + WorkflowRun mirror rows and enqueues the stage executor. */
   runWorkflowDefinition: RunWorkflowDefinitionResult;
   scaleAstroliftWorkload: AstroliftWorkloadOpPayloadMutationResult;
+  scaleServiceAgent: AstroliftAgentScaleResult;
   sendManagedServiceTestEmail: AstroliftManagedServiceTestEmailResultMutationResult;
   setActiveIdentityProvider: AstroliftIdentityProviderMutationResult;
+  setAgentSecretValue: AstroliftAgentSecretStatusMutationResult;
   setAlertSubscription: AstroliftUserAlertSubscriptionMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
   setAppSecretMetadata: AppsecretmetadatapayloadMutationResult;
@@ -4390,6 +4733,7 @@ export type Mutation = {
   transitionWorkflow: MutationResult;
   triggerAstroliftDeployWorkflow: AstroliftTriggerDeployWorkflowPayloadMutationResult;
   triggerPipelineRun: AstroliftPipelineRunMutationResult;
+  unbindAgentTrigger: AstroliftAgentTriggerResult;
   unmuteAlertRule: AstroliftAlertRuleMutationResult;
   unregisterTenantCluster: SoftdeletepayloadMutationResult;
   updateAgentEnvironmentSpec: AstroliftAgentEnvironmentSpecMutationResult;
@@ -4404,6 +4748,7 @@ export type Mutation = {
   updateManagedService: AstroliftManagedServiceMutationResult;
   updateManifest: ManifeststagepayloadMutationResult;
   updateMyProfile: AstroliftMyProfileMutationResult;
+  updateOrgSkillRepo: AstroliftOrgSkillRepoMutationResult;
   updateOrganization: AstroliftOrganizationMutationResult;
   updatePipeline: AstroliftPipelineMutationResult;
   updatePolicy: AstroliftPolicyMutationResult;
@@ -4416,8 +4761,12 @@ export type Mutation = {
   updateTenantCluster: AstroliftTenantClusterMutationResult;
   updateToolDef: AstroliftToolDefMutationResult;
   updateWebhookSubscription: AstroliftWebhookSubscriptionMutationResult;
-  /** Update an existing workflow definition (staff only). */
+  /** Update a configured Workflow (bindings / inputs / trigger / enabled). */
+  updateWorkflow: CreateWorkflowResult;
+  /** Update an org-owned workflow definition (globals are read-only). */
   updateWorkflowDefinition: MutationResult;
+  /** Update a stage's fields on a writable definition (spec 40 §6). */
+  updateWorkflowStage: MutationResult;
   uploadCustomDomainCertificate: AstroliftAppDomainMutationResult;
   /** Upload a data import file and get a pre-signed URL. */
   uploadTextFile: DataImportUploadResult;
@@ -4617,6 +4966,12 @@ export type MutationClearEnvironmentSettingArgs = {
 };
 
 
+export type MutationCloneWorkflowDefinitionArgs = {
+  orgId?: InputMaybe<Scalars['ID']['input']>;
+  slug: Scalars['String']['input'];
+};
+
+
 export type MutationConfigureProviderPluginArgs = {
   input: ConfigureProviderPluginInput;
 };
@@ -4631,6 +4986,11 @@ export type MutationConfirmPreSignedUrlImageUploadArgs = {
 };
 
 
+export type MutationConnectExistingGithubAppArgs = {
+  input: ConnectExistingGithubAppInput;
+};
+
+
 export type MutationConnectSourceArgs = {
   input: ConnectSourceInput;
 };
@@ -4639,6 +4999,14 @@ export type MutationConnectSourceArgs = {
 export type MutationCreateAgentEnvironmentSpecArgs = {
   input: CreateAgentEnvironmentSpecInput;
   orgId: Scalars['ID']['input'];
+};
+
+
+export type MutationCreateAgentTriggerArgs = {
+  agentSlug: Scalars['String']['input'];
+  branchPattern?: Scalars['String']['input'];
+  inputMapping?: InputMaybe<Scalars['JSON']['input']>;
+  scmRepo?: Scalars['String']['input'];
 };
 
 
@@ -4739,11 +5107,25 @@ export type MutationCreateWebhookSubscriptionArgs = {
 };
 
 
+export type MutationCreateWorkflowArgs = {
+  definitionSlug: Scalars['String']['input'];
+  description?: InputMaybe<Scalars['String']['input']>;
+  inputs?: InputMaybe<Scalars['JSON']['input']>;
+  name: Scalars['String']['input'];
+  orgId?: InputMaybe<Scalars['ID']['input']>;
+  scheduleCron?: InputMaybe<Scalars['String']['input']>;
+  slug?: InputMaybe<Scalars['String']['input']>;
+  stageBindings?: InputMaybe<Scalars['JSON']['input']>;
+  triggerKind?: Scalars['String']['input'];
+};
+
+
 export type MutationCreateWorkflowDefinitionArgs = {
   description?: InputMaybe<Scalars['String']['input']>;
   isEnabled?: Scalars['Boolean']['input'];
   modelLabel: Scalars['String']['input'];
   name: Scalars['String']['input'];
+  patternKind?: InputMaybe<Scalars['String']['input']>;
   slug: Scalars['String']['input'];
   states: Scalars['JSON']['input'];
   transitions: Scalars['JSON']['input'];
@@ -4752,12 +5134,20 @@ export type MutationCreateWorkflowDefinitionArgs = {
 
 export type MutationCreateWorkflowStageArgs = {
   agentDefinitionGuid?: InputMaybe<Scalars['String']['input']>;
+  approvers?: InputMaybe<Scalars['JSON']['input']>;
   fanOutCount?: InputMaybe<Scalars['Int']['input']>;
   kind: Scalars['String']['input'];
   onFailure?: Scalars['String']['input'];
-  order: Scalars['Int']['input'];
+  order?: InputMaybe<Scalars['Int']['input']>;
+  prompt?: InputMaybe<Scalars['String']['input']>;
+  role?: InputMaybe<Scalars['String']['input']>;
   skillRefs?: InputMaybe<Scalars['JSON']['input']>;
   timeoutSeconds?: Scalars['Int']['input'];
+  workflowSlug: Scalars['String']['input'];
+};
+
+
+export type MutationCreateWorkflowTriggerArgs = {
   workflowSlug: Scalars['String']['input'];
 };
 
@@ -4774,6 +5164,12 @@ export type MutationDeleteArgs = {
 
 export type MutationDeleteAgentEnvironmentSpecArgs = {
   slug: Scalars['String']['input'];
+};
+
+
+export type MutationDeleteAgentSecretValueArgs = {
+  envSpecSlug: Scalars['String']['input'];
+  envVar: Scalars['String']['input'];
 };
 
 
@@ -4842,8 +5238,19 @@ export type MutationDeleteWebhookSubscriptionArgs = {
 };
 
 
+export type MutationDeleteWorkflowArgs = {
+  orgId?: InputMaybe<Scalars['ID']['input']>;
+  slug: Scalars['String']['input'];
+};
+
+
 export type MutationDeleteWorkflowDefinitionArgs = {
   slug: Scalars['String']['input'];
+};
+
+
+export type MutationDeleteWorkflowStageArgs = {
+  stageGuid: Scalars['ID']['input'];
 };
 
 
@@ -4931,6 +5338,20 @@ export type MutationImportSkillsFromRepoArgs = {
   branch?: Scalars['String']['input'];
   manifestPath?: Scalars['String']['input'];
   repoUrl: Scalars['String']['input'];
+};
+
+
+export type MutationImportWorkflowFlowArgs = {
+  format: Scalars['String']['input'];
+  payload: Scalars['JSON']['input'];
+  preview?: Scalars['Boolean']['input'];
+};
+
+
+export type MutationImportWorkflowManifestArgs = {
+  orgId?: InputMaybe<Scalars['ID']['input']>;
+  preview?: Scalars['Boolean']['input'];
+  toml: Scalars['String']['input'];
 };
 
 
@@ -5133,6 +5554,11 @@ export type MutationProfileRequestPwdChangeArgs = {
 };
 
 
+export type MutationPromoteDeploymentArgs = {
+  input: PromoteDeploymentInput;
+};
+
+
 export type MutationProposeSecretChangeArgs = {
   input: ProposeSecretChangeInput;
 };
@@ -5175,6 +5601,11 @@ export type MutationPushManifestToRepoArgs = {
 };
 
 
+export type MutationReapCloudOrphanArgs = {
+  input: ReapCloudOrphanInput;
+};
+
+
 export type MutationRecheckDomainValidationArgs = {
   input: RecheckDomainValidationInput;
 };
@@ -5210,8 +5641,19 @@ export type MutationRegisterAppArgs = {
 };
 
 
+export type MutationRegisterAppRepoArgs = {
+  input: RegisterAppRepoInput;
+};
+
+
 export type MutationRegisterMobileDeviceArgs = {
   input: RegisterMobileDeviceInput;
+};
+
+
+export type MutationRegisterOrgSkillRepoArgs = {
+  input: RegisterOrgSkillRepoInput;
+  orgId: Scalars['ID']['input'];
 };
 
 
@@ -5251,8 +5693,19 @@ export type MutationRemoveEmailSuppressionEntryArgs = {
 };
 
 
+export type MutationRemoveOrgSkillRepoArgs = {
+  input: RemoveOrgSkillRepoInput;
+};
+
+
 export type MutationRemoveOrganizationAllowlistDomainArgs = {
   input: RemoveOrganizationAllowlistDomainInput;
+};
+
+
+export type MutationReorderWorkflowStagesArgs = {
+  definitionSlug: Scalars['String']['input'];
+  stageGuids: Array<Scalars['ID']['input']>;
 };
 
 
@@ -5274,6 +5727,7 @@ export type MutationRequestQuotaIncreaseArgs = {
 export type MutationResendInvitationArgs = {
   input: ResendInvitationInput;
 };
+
 
 export type MutationRestartAstroliftWorkloadArgs = {
   input: RestartWorkloadInput;
@@ -5302,6 +5756,11 @@ export type MutationResumeEnvironmentArgs = {
 
 export type MutationResyncAstroliftManifestFromRepoArgs = {
   input: ResyncManifestFromRepoInput;
+};
+
+
+export type MutationRetryAstroliftAutowireArgs = {
+  input: RetryAstroliftAutowireInput;
 };
 
 
@@ -5406,6 +5865,13 @@ export type MutationRunTaskArgs = {
 };
 
 
+export type MutationRunWorkflowArgs = {
+  inputs?: InputMaybe<Scalars['JSON']['input']>;
+  orgId?: InputMaybe<Scalars['ID']['input']>;
+  workflowId: Scalars['ID']['input'];
+};
+
+
 export type MutationRunWorkflowDefinitionArgs = {
   triggerPayload?: InputMaybe<Scalars['JSON']['input']>;
   workflowSlug: Scalars['String']['input'];
@@ -5417,6 +5883,12 @@ export type MutationScaleAstroliftWorkloadArgs = {
 };
 
 
+export type MutationScaleServiceAgentArgs = {
+  agentSlug: Scalars['String']['input'];
+  targetReplicas: Scalars['Int']['input'];
+};
+
+
 export type MutationSendManagedServiceTestEmailArgs = {
   input: SendManagedServiceTestEmailInput;
 };
@@ -5424,6 +5896,13 @@ export type MutationSendManagedServiceTestEmailArgs = {
 
 export type MutationSetActiveIdentityProviderArgs = {
   input: SetActiveIdentityProviderInput;
+};
+
+
+export type MutationSetAgentSecretValueArgs = {
+  envSpecSlug: Scalars['String']['input'];
+  envVar: Scalars['String']['input'];
+  value: Scalars['String']['input'];
 };
 
 
@@ -5613,6 +6092,11 @@ export type MutationTriggerPipelineRunArgs = {
 };
 
 
+export type MutationUnbindAgentTriggerArgs = {
+  slug: Scalars['String']['input'];
+};
+
+
 export type MutationUnmuteAlertRuleArgs = {
   input: UnmuteAlertRuleInput;
 };
@@ -5685,6 +6169,11 @@ export type MutationUpdateMyProfileArgs = {
 };
 
 
+export type MutationUpdateOrgSkillRepoArgs = {
+  input: UpdateOrgSkillRepoInput;
+};
+
+
 export type MutationUpdateOrganizationArgs = {
   input: UpdateOrganizationInput;
 };
@@ -5749,14 +6238,42 @@ export type MutationUpdateWebhookSubscriptionArgs = {
 };
 
 
+export type MutationUpdateWorkflowArgs = {
+  description?: InputMaybe<Scalars['String']['input']>;
+  inputs?: InputMaybe<Scalars['JSON']['input']>;
+  isEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+  orgId?: InputMaybe<Scalars['ID']['input']>;
+  scheduleCron?: InputMaybe<Scalars['String']['input']>;
+  slug: Scalars['String']['input'];
+  stageBindings?: InputMaybe<Scalars['JSON']['input']>;
+  triggerKind?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type MutationUpdateWorkflowDefinitionArgs = {
   description?: InputMaybe<Scalars['String']['input']>;
   isEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   modelLabel?: InputMaybe<Scalars['String']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
+  patternKind?: InputMaybe<Scalars['String']['input']>;
   slug: Scalars['String']['input'];
   states?: InputMaybe<Scalars['JSON']['input']>;
   transitions?: InputMaybe<Scalars['JSON']['input']>;
+};
+
+
+export type MutationUpdateWorkflowStageArgs = {
+  agentDefinitionGuid?: InputMaybe<Scalars['String']['input']>;
+  approvers?: InputMaybe<Scalars['JSON']['input']>;
+  fanOutCount?: InputMaybe<Scalars['Int']['input']>;
+  kind?: InputMaybe<Scalars['String']['input']>;
+  onFailure?: InputMaybe<Scalars['String']['input']>;
+  prompt?: InputMaybe<Scalars['String']['input']>;
+  role?: InputMaybe<Scalars['String']['input']>;
+  skillRefs?: InputMaybe<Scalars['JSON']['input']>;
+  stageGuid: Scalars['ID']['input'];
+  timeoutSeconds?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -5945,6 +6462,12 @@ export type ProfileType = {
   username?: Maybe<Scalars['String']['output']>;
 };
 
+export type PromoteDeploymentInput = {
+  appSlug: Scalars['String']['input'];
+  sourceEnvironmentName: Scalars['String']['input'];
+  targetEnvironmentName: Scalars['String']['input'];
+};
+
 export type ProposeSecretChangeInput = {
   appSlug: Scalars['String']['input'];
   attachmentId: InputMaybe<Scalars['GUID']['input']>;
@@ -6017,6 +6540,7 @@ export type Query = {
   PostgresMetrics: Array<Array<Scalars['String']['output']>>;
   agent?: Maybe<AstroliftAgentDetail>;
   agentEnvironmentSpec?: Maybe<AstroliftAgentEnvironmentSpec>;
+  agentEnvironmentSpecSecretStatus: Array<AstroliftAgentSecretStatus>;
   agentEnvironmentSpecs: Array<AstroliftAgentEnvironmentSpec>;
   agentFleet: Array<AstroliftAgentListItem>;
   agentGallery: Array<AstroliftAgentTask>;
@@ -6024,7 +6548,9 @@ export type Query = {
   agentRuntimes: Array<AstroliftAgentRuntime>;
   agentTask?: Maybe<AstroliftAgentTask>;
   agentTaskLogs: Array<Scalars['String']['output']>;
+  agentTaskTransitionsSince: Array<AstroliftAgentTask>;
   agentTasks: Array<AstroliftAgentTask>;
+  agentTriggers: Array<AstroliftAgentTrigger>;
   agentWorkloads: Array<AstroliftAgentListItem>;
   assignableAstroliftProjects: Array<AstroliftProject>;
   astroliftActiveIdentityProvider?: Maybe<AstroliftIdentityProvider>;
@@ -6034,15 +6560,15 @@ export type Query = {
   astroliftAlertRules: Array<AstroliftAlertRule>;
   astroliftApiTokens: Array<AstroliftApiToken>;
   astroliftApp?: Maybe<AstroliftRegisteredApp>;
-  astroliftAppCertificates: Array<AstroliftAppCertificate>;
+  astroliftAppCertificates: AstroliftAppCertificatesResult;
   astroliftAppCountForCluster: Scalars['Int']['output'];
   astroliftAppDeployTokens: Array<AstroliftDeployToken>;
-  astroliftAppDnsRecords: Array<AstroliftAppDnsRecord>;
+  astroliftAppDnsRecords: AstroliftAppDnsRecordsResult;
   astroliftAppDomains: Array<AstroliftAppDomain>;
   astroliftAppEndpointMetrics: Array<AstroliftAppEndpointMetric>;
-  astroliftAppGoldenSignals: Array<AstroliftAppGoldenSignal>;
+  astroliftAppGoldenSignals: AstroliftAppGoldenSignalsResult;
   astroliftAppHealthSummary: Array<AstroliftAppHealthSummary>;
-  astroliftAppIdentityBinding?: Maybe<AstroliftAppIdentityBinding>;
+  astroliftAppIdentityBinding: AstroliftAppIdentityBindingResult;
   astroliftAppLogs: AstroliftAppLogPage;
   astroliftAppManagedServiceMetrics?: Maybe<AstroliftManagedServiceMetrics>;
   astroliftAppMetrics?: Maybe<AstroliftAppMetrics>;
@@ -6053,6 +6579,7 @@ export type Query = {
   astroliftAppStatusCodeBreakdown?: Maybe<AstroliftStatusCodeBreakdown>;
   astroliftAppTeamAccesses: Array<AstroliftAppTeamAccess>;
   astroliftAppTraces: Array<AstroliftAppTrace>;
+  astroliftAppUptime?: Maybe<AstroliftAppUptime>;
   astroliftAppUrlHealth?: Maybe<AstroliftAppUrlHealth>;
   astroliftAppUrlProbeHistory: Array<AstroliftAppUrlHealth>;
   astroliftApps: Array<AstroliftRegisteredApp>;
@@ -6070,6 +6597,7 @@ export type Query = {
   astroliftClusterLiveState?: Maybe<AstroliftClusterLiveState>;
   astroliftClusterPrometheusMetrics: AstroliftClusterPrometheusMetrics;
   astroliftClusterPrometheusRangeMetrics: AstroliftClusterPrometheusRangeMetrics;
+  astroliftClusterSystemMetrics: AstroliftClusterSystemMetrics;
   astroliftClusterWorkloadHealth: Array<AstroliftClusterWorkloadHealth>;
   astroliftClusters: Array<AstroliftTenantCluster>;
   astroliftCognitoUserPoolClients: Array<AstroliftCognitoUserPoolClient>;
@@ -6132,6 +6660,7 @@ export type Query = {
   astroliftPodResourceUsage?: Maybe<AstroliftPodResourceUsage>;
   astroliftPolicies: Array<AstroliftPolicy>;
   astroliftPreviewEnvironments: Array<AstroliftPreviewEnvironment>;
+  astroliftProjectSlugAvailable: Scalars['Boolean']['output'];
   astroliftProjects: Array<AstroliftProject>;
   astroliftProviderPlugins: Array<AstroliftProviderPlugin>;
   astroliftProviderRegions: Array<AstroliftProviderRegion>;
@@ -6156,6 +6685,7 @@ export type Query = {
   astroliftTaskRun?: Maybe<AstroliftTaskRun>;
   astroliftTaskRuns: Array<AstroliftTaskRun>;
   astroliftTeamMembers: Array<AstroliftMember>;
+  astroliftTeamSlugAvailable: Scalars['Boolean']['output'];
   astroliftTeams: Array<AstroliftTeam>;
   astroliftTraceSpans: Array<AstroliftTraceSpan>;
   astroliftWebhookDeliveries: Array<AstroliftWebhookDelivery>;
@@ -6177,12 +6707,14 @@ export type Query = {
   /** List all effective permissions for a user, with the groups that grant each one. */
   effectivePermissions: Array<PermissionEntry>;
   employees: EmployeesConnection;
+  exportWorkflowManifest: WorkflowManifestExportType;
   formDefinition?: Maybe<AstroliftFormDefinition>;
   formDefinitions: Array<AstroliftFormDefinition>;
   formFieldTypes: Array<Scalars['String']['output']>;
   formSubmissions: Array<AstroliftFormSubmission>;
   me?: Maybe<AstroliftMe>;
   members: Array<OrganizationMemberType>;
+  orgSkillRepos: Array<AstroliftOrgSkillRepo>;
   orgToolDefs: Array<AstroliftToolDef>;
   organization?: Maybe<OrganizationType>;
   organizations: Array<OrganizationType>;
@@ -6192,22 +6724,31 @@ export type Query = {
   permissionDiagnose?: Maybe<PermissionDiagnosis>;
   previewAstroliftDeregister?: Maybe<AstroliftDeregisterPreview>;
   previewAstroliftForceRedeploy?: Maybe<AstroliftForceRedeployPreview>;
+  previewWorkflowManifest: WorkflowManifestPreviewType;
   scanAgentManifests: AstroliftScanAgentManifestsResult;
+  scanAppManifests: AstroliftScanAppManifestsResult;
+  scanCloudOrphans: CloudOrphanReportType;
   skill?: Maybe<AstroliftSkill>;
   skills: Array<AstroliftSkill>;
   toolDefs: Array<AstroliftToolDef>;
-  /** Get a workflow definition by slug. */
-  workflowDefinition?: Maybe<WorkflowDefinitionType>;
-  /** List all workflow definitions. */
-  workflowDefinitions: Array<WorkflowDefinitionType>;
+  /** One configured Workflow by slug, with its recent runs. */
+  workflow?: Maybe<ConfiguredWorkflow>;
+  /** One visible workflow definition by slug (prefers the org's over a global). */
+  workflowDefinition?: Maybe<WorkflowDefinitionSummary>;
+  /** Workflow definitions visible to the caller: their org's UNION all platform-global (spec 40 §2.1). */
+  workflowDefinitions: Array<WorkflowDefinitionSummary>;
   /** Get a workflow instance by ID. */
   workflowInstance?: Maybe<WorkflowInstanceType>;
   /** List workflow instances for a specific object. */
   workflowInstances: Array<WorkflowInstanceType>;
+  /** Runs (tier 3) of one configured Workflow, newest first. */
+  workflowRuns: Array<WorkflowRun>;
   /** List stage executions for a WorkflowRun (by workflow_id + run_id). */
   workflowStageExecutions: Array<WorkflowStageExecutionType>;
   /** List stages for a workflow definition by slug. */
   workflowStages: Array<WorkflowStageType>;
+  /** List the org's configured Workflows (tier 2). */
+  workflows: Array<ConfiguredWorkflow>;
 };
 
 
@@ -6218,6 +6759,11 @@ export type QueryAgentArgs = {
 
 
 export type QueryAgentEnvironmentSpecArgs = {
+  slug: Scalars['String']['input'];
+};
+
+
+export type QueryAgentEnvironmentSpecSecretStatusArgs = {
   slug: Scalars['String']['input'];
 };
 
@@ -6255,10 +6801,23 @@ export type QueryAgentTaskLogsArgs = {
 };
 
 
+export type QueryAgentTaskTransitionsSinceArgs = {
+  limit?: Scalars['Int']['input'];
+  orgId: Scalars['ID']['input'];
+  since?: InputMaybe<Scalars['DateTime']['input']>;
+};
+
+
 export type QueryAgentTasksArgs = {
   orgId: Scalars['ID']['input'];
   status?: InputMaybe<Scalars['String']['input']>;
   workloadId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+
+export type QueryAgentTriggersArgs = {
+  agentSlug: Scalars['String']['input'];
+  orgId: Scalars['ID']['input'];
 };
 
 
@@ -6421,6 +6980,12 @@ export type QueryAstroliftAppTracesArgs = {
 };
 
 
+export type QueryAstroliftAppUptimeArgs = {
+  appSlug: Scalars['String']['input'];
+  windowHours?: Scalars['Int']['input'];
+};
+
+
 export type QueryAstroliftAppUrlHealthArgs = {
   appSlug: Scalars['String']['input'];
   forceRefresh?: Scalars['Boolean']['input'];
@@ -6527,6 +7092,14 @@ export type QueryAstroliftClusterPrometheusRangeMetricsArgs = {
 };
 
 
+export type QueryAstroliftClusterSystemMetricsArgs = {
+  appNamespace?: InputMaybe<Scalars['String']['input']>;
+  clusterId: Scalars['GUID']['input'];
+  rangeSeconds?: Scalars['Int']['input'];
+  stepSeconds?: Scalars['Int']['input'];
+};
+
+
 export type QueryAstroliftClusterWorkloadHealthArgs = {
   clusterId: Scalars['GUID']['input'];
 };
@@ -6540,6 +7113,11 @@ export type QueryAstroliftCognitoUserPoolClientsArgs = {
 
 export type QueryAstroliftCognitoUserPoolsArgs = {
   clusterId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftCommandRunArgs = {
+  id: Scalars['String']['input'];
 };
 
 
@@ -6811,6 +7389,13 @@ export type QueryAstroliftPreviewEnvironmentsArgs = {
 };
 
 
+export type QueryAstroliftProjectSlugAvailableArgs = {
+  excludeId?: InputMaybe<Scalars['GUID']['input']>;
+  slug: Scalars['String']['input'];
+  teamId: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftProviderRegionsArgs = {
   providerPluginSlug: Scalars['String']['input'];
 };
@@ -6832,6 +7417,11 @@ export type QueryAstroliftRenderedManifestArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
   imageTag?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftScheduledJobRunArgs = {
+  id: Scalars['String']['input'];
 };
 
 
@@ -6871,6 +7461,11 @@ export type QueryAstroliftSshDeployKeysArgs = {
 };
 
 
+export type QueryAstroliftTaskRunArgs = {
+  id: Scalars['String']['input'];
+};
+
+
 export type QueryAstroliftTaskRunsArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
@@ -6881,6 +7476,12 @@ export type QueryAstroliftTaskRunsArgs = {
 
 export type QueryAstroliftTeamMembersArgs = {
   teamId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftTeamSlugAvailableArgs = {
+  excludeId?: InputMaybe<Scalars['GUID']['input']>;
+  slug: Scalars['String']['input'];
 };
 
 
@@ -6992,6 +7593,11 @@ export type QueryEmployeesArgs = {
 };
 
 
+export type QueryExportWorkflowManifestArgs = {
+  definitionSlug: Scalars['String']['input'];
+};
+
+
 export type QueryFormDefinitionArgs = {
   slug: Scalars['String']['input'];
 };
@@ -7005,6 +7611,11 @@ export type QueryFormDefinitionsArgs = {
 export type QueryFormSubmissionsArgs = {
   slug: Scalars['String']['input'];
   status?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryOrgSkillReposArgs = {
+  orgId: Scalars['ID']['input'];
 };
 
 
@@ -7046,8 +7657,20 @@ export type QueryPreviewAstroliftForceRedeployArgs = {
 };
 
 
+export type QueryPreviewWorkflowManifestArgs = {
+  toml: Scalars['String']['input'];
+};
+
+
 export type QueryScanAgentManifestsArgs = {
   orgId: Scalars['ID']['input'];
+  ref?: Scalars['String']['input'];
+  sourceKind?: Scalars['String']['input'];
+  sourceRepo: Scalars['String']['input'];
+};
+
+
+export type QueryScanAppManifestsArgs = {
   ref?: Scalars['String']['input'];
   sourceKind?: Scalars['String']['input'];
   sourceRepo: Scalars['String']['input'];
@@ -7070,14 +7693,20 @@ export type QueryToolDefsArgs = {
 };
 
 
+export type QueryWorkflowArgs = {
+  orgId?: InputMaybe<Scalars['ID']['input']>;
+  slug: Scalars['String']['input'];
+};
+
+
 export type QueryWorkflowDefinitionArgs = {
+  orgId?: InputMaybe<Scalars['ID']['input']>;
   slug: Scalars['String']['input'];
 };
 
 
 export type QueryWorkflowDefinitionsArgs = {
-  includeDisabled?: Scalars['Boolean']['input'];
-  modelLabel?: InputMaybe<Scalars['String']['input']>;
+  orgId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 
@@ -7092,6 +7721,12 @@ export type QueryWorkflowInstancesArgs = {
 };
 
 
+export type QueryWorkflowRunsArgs = {
+  orgId?: InputMaybe<Scalars['ID']['input']>;
+  workflowId: Scalars['ID']['input'];
+};
+
+
 export type QueryWorkflowStageExecutionsArgs = {
   runId: Scalars['String']['input'];
   workflowId: Scalars['String']['input'];
@@ -7100,6 +7735,32 @@ export type QueryWorkflowStageExecutionsArgs = {
 
 export type QueryWorkflowStagesArgs = {
   workflowSlug: Scalars['String']['input'];
+};
+
+
+export type QueryWorkflowsArgs = {
+  orgId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+export type ReapCloudOrphanInput = {
+  clusterSlug: InputMaybe<Scalars['String']['input']>;
+  forceDestroy: Scalars['Boolean']['input'];
+  kind: Scalars['String']['input'];
+  reapKey: Scalars['String']['input'];
+};
+
+export type ReapCloudOrphanPayload = {
+  alreadyGone: Scalars['Boolean']['output'];
+  identifier: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  message: Scalars['String']['output'];
+  reaped: Scalars['Boolean']['output'];
+};
+
+export type ReapCloudOrphanPayloadMutationResult = {
+  data?: Maybe<ReapCloudOrphanPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type RecheckDomainValidationInput = {
@@ -7142,6 +7803,7 @@ export type RefreshClusterManagementInputType = {
 export type RegisterAgentRepoInput = {
   defaultBranch: InputMaybe<Scalars['String']['input']>;
   deployBranch: InputMaybe<Scalars['String']['input']>;
+  manifestPaths: InputMaybe<Array<Scalars['String']['input']>>;
   projectId: Scalars['GUID']['input'];
   ref: Scalars['String']['input'];
   sourceKind: Scalars['String']['input'];
@@ -7164,20 +7826,39 @@ export type RegisterAppInput = {
   manifestPath: InputMaybe<Scalars['String']['input']>;
   manifestRaw: InputMaybe<Scalars['String']['input']>;
   minimumApprovals: InputMaybe<Scalars['Int']['input']>;
-  name: Scalars['String']['input'];
+  name: InputMaybe<Scalars['String']['input']>;
   projectId: Scalars['GUID']['input'];
   requiresApproval: InputMaybe<Scalars['Boolean']['input']>;
-  slug: Scalars['String']['input'];
+  slug: InputMaybe<Scalars['String']['input']>;
   sourceKind: Scalars['String']['input'];
   sourceRepo: Scalars['String']['input'];
   sourceUrl: InputMaybe<Scalars['String']['input']>;
   triggerMode: InputMaybe<Scalars['String']['input']>;
 };
 
+export type RegisterAppRepoInput = {
+  defaultBranch: InputMaybe<Scalars['String']['input']>;
+  deployBranch: InputMaybe<Scalars['String']['input']>;
+  projectId: Scalars['GUID']['input'];
+  ref: Scalars['String']['input'];
+  sourceKind: Scalars['String']['input'];
+  sourceRepo: Scalars['String']['input'];
+  sourceUrl: InputMaybe<Scalars['String']['input']>;
+};
+
 export type RegisterMobileDeviceInput = {
   deviceToken: Scalars['String']['input'];
   label: InputMaybe<Scalars['String']['input']>;
   platform: Scalars['String']['input'];
+};
+
+export type RegisterOrgSkillRepoInput = {
+  alias: Scalars['String']['input'];
+  defaultRef: Scalars['String']['input'];
+  displayName: InputMaybe<Scalars['String']['input']>;
+  repoFullName: Scalars['String']['input'];
+  sourceConnectionId: InputMaybe<Scalars['GUID']['input']>;
+  sourceKind: Scalars['String']['input'];
 };
 
 export type RegisterTenantClusterInput = {
@@ -7223,6 +7904,10 @@ export type RemoveAppDomainInput = {
 export type RemoveEmailSuppressionEntryInput = {
   address: Scalars['String']['input'];
   managedServiceId: Scalars['GUID']['input'];
+};
+
+export type RemoveOrgSkillRepoInput = {
+  id: Scalars['GUID']['input'];
 };
 
 export type RemoveOrganizationAllowlistDomainInput = {
@@ -7279,6 +7964,10 @@ export type ResyncManifestPayloadMutationResult = {
   data?: Maybe<ResyncManifestPayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type RetryAstroliftAutowireInput = {
+  appSlug: Scalars['String']['input'];
 };
 
 export type RevalidateManagedDomainPayload = {
@@ -7398,6 +8087,14 @@ export type RunWorkflowDefinitionResult = {
   ok: Scalars['Boolean']['output'];
   temporalWorkflowId?: Maybe<Scalars['String']['output']>;
   workflowRunId?: Maybe<Scalars['ID']['output']>;
+};
+
+export type RunWorkflowResult = {
+  errors: Array<ValidationError>;
+  instanceId?: Maybe<Scalars['String']['output']>;
+  ok: Scalars['Boolean']['output'];
+  runId?: Maybe<Scalars['String']['output']>;
+  workflowRunId?: Maybe<Scalars['String']['output']>;
 };
 
 export type ScaleWorkloadInput = {
@@ -7734,6 +8431,17 @@ export type UpdateMyProfileInput = {
   timezone: InputMaybe<Scalars['String']['input']>;
 };
 
+export type UpdateOrgSkillRepoInput = {
+  defaultRef: InputMaybe<Scalars['String']['input']>;
+  detachSourceConnection: Scalars['Boolean']['input'];
+  displayName: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['GUID']['input'];
+  isActive: InputMaybe<Scalars['Boolean']['input']>;
+  repoFullName: InputMaybe<Scalars['String']['input']>;
+  sourceConnectionId: InputMaybe<Scalars['GUID']['input']>;
+  sourceKind: InputMaybe<Scalars['String']['input']>;
+};
+
 export type UpdateOrganizationInput = {
   allowUserProfileEdit: InputMaybe<Scalars['Boolean']['input']>;
   auditLogRetentionDays: InputMaybe<Scalars['Int']['input']>;
@@ -7765,6 +8473,7 @@ export type UpdateProjectInput = {
   description: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
   name: InputMaybe<Scalars['String']['input']>;
+  slug: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UpdateRoleInput = {
@@ -7794,6 +8503,7 @@ export type UpdateTeamInput = {
   description: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
   name: InputMaybe<Scalars['String']['input']>;
+  slug: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UpdateTenantClusterInput = {
@@ -7893,6 +8603,19 @@ export type WithdrawSecretChangeInput = {
   proposalId: Scalars['GUID']['input'];
 };
 
+export type WorkflowDefinitionSummary = {
+  createdAt: Scalars['DateTime']['output'];
+  description: Scalars['String']['output'];
+  guid: Scalars['String']['output'];
+  isEnabled: Scalars['Boolean']['output'];
+  isGlobal: Scalars['Boolean']['output'];
+  name: Scalars['String']['output'];
+  organizationGuid?: Maybe<Scalars['String']['output']>;
+  patternKind: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
+  stageCount: Scalars['Int']['output'];
+};
+
 export type WorkflowDefinitionType = {
   activeInstanceCount: Scalars['Int']['output'];
   createdAt: Scalars['DateTime']['output'];
@@ -7901,6 +8624,7 @@ export type WorkflowDefinitionType = {
   isEnabled: Scalars['Boolean']['output'];
   modelLabel: Scalars['String']['output'];
   name: Scalars['String']['output'];
+  organizationGuid?: Maybe<Scalars['String']['output']>;
   patternKind: Scalars['String']['output'];
   slug: Scalars['String']['output'];
   states: Scalars['JSON']['output'];
@@ -7914,11 +8638,57 @@ export type WorkflowInstanceType = {
   currentState: Scalars['String']['output'];
   history: Array<TransitionLogEntry>;
   isCompleted: Scalars['Boolean']['output'];
-  objectId: Scalars['Int']['output'];
+  objectId?: Maybe<Scalars['Int']['output']>;
   startedAt: Scalars['DateTime']['output'];
   stateLabel: Scalars['String']['output'];
   workflowName: Scalars['String']['output'];
   workflowSlug: Scalars['String']['output'];
+};
+
+export type WorkflowManifestDefinitionType = {
+  description: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  pattern: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
+};
+
+export type WorkflowManifestExportType = {
+  error?: Maybe<Scalars['String']['output']>;
+  ok: Scalars['Boolean']['output'];
+  toml?: Maybe<Scalars['String']['output']>;
+};
+
+export type WorkflowManifestPreviewType = {
+  definition?: Maybe<WorkflowManifestDefinitionType>;
+  error?: Maybe<Scalars['String']['output']>;
+  errorColumn?: Maybe<Scalars['Int']['output']>;
+  errorLine?: Maybe<Scalars['Int']['output']>;
+  errorPath?: Maybe<Scalars['String']['output']>;
+  ok: Scalars['Boolean']['output'];
+  stages: Array<WorkflowManifestStageType>;
+};
+
+export type WorkflowManifestStageType = {
+  agent?: Maybe<Scalars['String']['output']>;
+  approvers: Array<Scalars['String']['output']>;
+  fanOut: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  onFailure: Scalars['String']['output'];
+  order: Scalars['Int']['output'];
+  prompt?: Maybe<Scalars['String']['output']>;
+  role: Scalars['String']['output'];
+  skills: Array<Scalars['String']['output']>;
+  timeout: Scalars['Int']['output'];
+};
+
+export type WorkflowRun = {
+  completedAt?: Maybe<Scalars['DateTime']['output']>;
+  currentState: Scalars['String']['output'];
+  guid: Scalars['String']['output'];
+  isCompleted: Scalars['Boolean']['output'];
+  startedAt: Scalars['DateTime']['output'];
+  temporalRunId?: Maybe<Scalars['String']['output']>;
+  temporalWorkflowId?: Maybe<Scalars['String']['output']>;
 };
 
 export type WorkflowStageExecutionType = {
@@ -7927,6 +8697,7 @@ export type WorkflowStageExecutionType = {
   createdAt: Scalars['DateTime']['output'];
   endedAt?: Maybe<Scalars['DateTime']['output']>;
   errorMessage: Scalars['String']['output'];
+  executionId: Scalars['String']['output'];
   failure?: Maybe<Scalars['JSON']['output']>;
   guid: Scalars['ID']['output'];
   output?: Maybe<Scalars['JSON']['output']>;
@@ -7940,12 +8711,15 @@ export type WorkflowStageExecutionType = {
 export type WorkflowStageType = {
   agentDefinitionGuid?: Maybe<Scalars['String']['output']>;
   agentDefinitionName?: Maybe<Scalars['String']['output']>;
+  approvers: Scalars['JSON']['output'];
   createdAt: Scalars['DateTime']['output'];
   fanOutCount?: Maybe<Scalars['Int']['output']>;
   guid: Scalars['ID']['output'];
   kind: Scalars['String']['output'];
   onFailure: Scalars['String']['output'];
   order: Scalars['Int']['output'];
+  prompt: Scalars['String']['output'];
+  role: Scalars['String']['output'];
   skillRefs: Scalars['JSON']['output'];
   timeoutSeconds: Scalars['Int']['output'];
 };

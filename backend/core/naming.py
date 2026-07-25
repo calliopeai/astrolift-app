@@ -108,6 +108,12 @@ ENV_NAME: Final = _rule(
     regex=rf"{_ALPHA_START}({_BASE_CHARS}*{_ALPHANUM_END})?",
     max_length=24,
 )
+TEAM_SLUG: Final = _rule(
+    name="team_slug",
+    description="lowercase alphanumeric + dashes; first char alpha",
+    regex=rf"{_ALPHA_START}({_BASE_CHARS}*{_ALPHANUM_END})?",
+    max_length=40,
+)
 PROJECT_SLUG: Final = _rule(
     name="project_slug",
     description="lowercase alphanumeric + dashes; first char alpha",
@@ -157,6 +163,7 @@ ALL_RULES: tuple[NamingRule, ...] = (
     ORG_SLUG,
     APP_NAME,
     ENV_NAME,
+    TEAM_SLUG,
     PROJECT_SLUG,
     K8S_NAMESPACE,
     K8S_RESOURCE,

@@ -57,6 +57,63 @@ export const CREATE_PROJECT = gql`
   }
 `;
 
+export const UPDATE_TEAM = gql`
+  mutation UpdateTeam($input: UpdateTeamInput!) {
+    updateTeam(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        name
+        organization {
+          id
+          slug
+          name
+        }
+        createdAt
+        updatedAt
+        deletedAt
+      }
+    }
+  }
+`;
+
+export const UPDATE_PROJECT = gql`
+  mutation UpdateProject($input: UpdateProjectInput!) {
+    updateProject(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        name
+        organization {
+          id
+          slug
+          name
+        }
+        team {
+          id
+          slug
+          name
+        }
+        createdAt
+        updatedAt
+        deletedAt
+      }
+    }
+  }
+`;
+
 export const SOFT_DELETE_TEAM = gql`
   mutation SoftDeleteTeam($input: SoftDeleteByGuidInput!) {
     softDeleteTeam(input: $input) {

@@ -69,6 +69,23 @@ export const LIST_PROJECTS = gql`
   }
 `;
 
+// Live slug-availability checks backing the team / project rename
+// forms. Return a bare Boolean: true only when the slug is a valid
+// slug AND free within its scope (team slugs are unique per org,
+// project slugs per team). ``excludeId`` is the guid of the row being
+// edited so keeping its current slug reads as available.
+export const TEAM_SLUG_AVAILABLE = gql`
+  query TeamSlugAvailable($slug: String!, $excludeId: GUID) {
+    astroliftTeamSlugAvailable(slug: $slug, excludeId: $excludeId)
+  }
+`;
+
+export const PROJECT_SLUG_AVAILABLE = gql`
+  query ProjectSlugAvailable($teamId: GUID!, $slug: String!, $excludeId: GUID) {
+    astroliftProjectSlugAvailable(teamId: $teamId, slug: $slug, excludeId: $excludeId)
+  }
+`;
+
 export const LIST_NAV_TREE = gql`
   query ListNavTree {
     astroliftNavTree {

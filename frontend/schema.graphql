@@ -211,9 +211,9 @@ type AstroliftAgentEnvironmentSpec {
   toolPreset: String!
   allowInstall: Boolean!
   vncEnabled: Boolean!
+  managedModel: Boolean!
   secretRefs: JSON!
   envVars: JSON!
-  managedModel: Boolean!
   configRepo: String!
   configBranch: String!
   configManifestPath: String!
@@ -3785,12 +3785,12 @@ input CreateAgentEnvironmentSpecInput {
   toolPreset: String! = ""
   allowInstall: Boolean! = false
   vncEnabled: Boolean! = false
+  managedModel: Boolean! = false
   configRepo: String! = ""
   configBranch: String! = "main"
   configManifestPath: String! = ""
   secretRefs: JSON = null
   envVars: JSON = null
-  managedModel: Boolean! = false
 }
 
 input CreateAlertRuleInput {
@@ -5115,6 +5115,8 @@ type Query {
   astroliftOrganizations: [AstroliftOrganization!]!
   astroliftTeams: [AstroliftTeam!]!
   astroliftProjects: [AstroliftProject!]!
+  astroliftTeamSlugAvailable(slug: String!, excludeId: GUID = null): Boolean!
+  astroliftProjectSlugAvailable(teamId: GUID!, slug: String!, excludeId: GUID = null): Boolean!
   astroliftNavTree: AstroliftNavTree
   astroliftMembers(search: String = null): [AstroliftMember!]!
   astroliftTeamMembers(teamId: GUID!): [AstroliftMember!]!
@@ -5393,8 +5395,8 @@ input RegisterAgentRepoInput {
 
 input RegisterAppInput {
   projectId: GUID!
-  name: String!
-  slug: String!
+  name: String = null
+  slug: String = null
   description: String = null
   sourceKind: String! = "github"
   sourceRepo: String!
@@ -5896,12 +5898,12 @@ input UpdateAgentEnvironmentSpecInput {
   toolPreset: String = null
   allowInstall: Boolean = null
   vncEnabled: Boolean = null
+  managedModel: Boolean = null
   configRepo: String = null
   configBranch: String = null
   configManifestPath: String = null
   secretRefs: JSON = null
   envVars: JSON = null
-  managedModel: Boolean = null
 }
 
 input UpdateAlertRuleInput {
@@ -6024,6 +6026,7 @@ input UpdatePolicyInput {
 input UpdateProjectInput {
   id: GUID!
   name: String = null
+  slug: String = null
   description: String = null
 }
 
@@ -6053,6 +6056,7 @@ input UpdateSourceConnectionInput {
 input UpdateTeamInput {
   id: GUID!
   name: String = null
+  slug: String = null
   description: String = null
 }
 

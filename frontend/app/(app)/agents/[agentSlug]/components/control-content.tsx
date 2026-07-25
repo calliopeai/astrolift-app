@@ -396,6 +396,10 @@ export function ControlContent({ agent }: { agent: AstroliftAgentListItem }) {
       scheduledScaleTo: null,
       scaleUpCron: null,
       scaleDownCron: null,
+      // Explicit "clear the scheduled-scaling triple" flag (#952); default
+      // false = leave scheduled scaling untouched. The scaling setters below
+      // never combine with it (backend rejects both at once).
+      clearScheduledScaling: false,
     };
     if (family === "SERVICE") {
       // Service: the replica baseline, plus the optional scheduled-scaling
