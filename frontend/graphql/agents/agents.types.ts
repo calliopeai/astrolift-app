@@ -157,7 +157,15 @@ export type AgentTaskTransitionsSinceVars = {
 // override. `runtime` / `imageTag` describe the base image the recipe resolves.
 export type AstroliftAgentEnvironmentSpec = Pick<
   GeneratedAgentEnvironmentSpec,
-  "id" | "slug" | "name" | "runtime" | "imageTag" | "agentType" | "vncEnabled" | "secretRefs"
+  | "id"
+  | "slug"
+  | "name"
+  | "runtime"
+  | "imageTag"
+  | "agentType"
+  | "vncEnabled"
+  | "secretRefs"
+  | "managedModel"
 >;
 
 // Per-ref secret presence status (#1173) as returned by

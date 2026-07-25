@@ -177,6 +177,7 @@ export const LIST_AGENT_ENVIRONMENT_SPECS = gql`
       agentType
       vncEnabled
       secretRefs
+      managedModel
     }
   }
 `;

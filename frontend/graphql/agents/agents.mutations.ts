@@ -287,6 +287,32 @@ export const DELETE_AGENT_SECRET_VALUE = gql`
   }
 `;
 
+// Partial update of an AgentEnvironmentSpec (only supplied fields are written; a
+// null/omitted field is left unchanged). The Manage-secrets dialog uses this to
+// flip `managedModel`: when ON, the spec's task pods use the cluster's
+// cloud-native model provider (AWS Bedrock / GCP Vertex) through a
+// workload-identity ServiceAccount instead of an ANTHROPIC_API_KEY secret.
+// Returns the persisted spec so the caller reads back the stored value. Gates on
+// `app.update` server-side (configuring a spec is a config write, distinct from
+// the `secret.write` the value mutations above require).
+export const UPDATE_AGENT_ENVIRONMENT_SPEC = gql`
+  mutation UpdateAgentEnvironmentSpec($slug: String!, $input: UpdateAgentEnvironmentSpecInput!) {
+    updateAgentEnvironmentSpec(slug: $slug, input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        managedModel
+      }
+    }
+  }
+`;
+
 export const IMPORT_SKILLS_FROM_REPO = gql`
   mutation ImportSkillsFromRepo($repoUrl: String!, $branch: String) {
     importSkillsFromRepo(repoUrl: $repoUrl, branch: $branch) {

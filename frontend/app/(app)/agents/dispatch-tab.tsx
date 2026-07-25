@@ -693,6 +693,7 @@ function OnceForm({
         <AgentSecretsDialog
           envSpecSlug={selectedSpec.slug}
           envSpecName={selectedSpec.name}
+          managedModel={selectedSpec.managedModel}
           open={secretsDialogOpen}
           onOpenChange={setSecretsDialogOpen}
         />

@@ -213,6 +213,7 @@ type AstroliftAgentEnvironmentSpec {
   vncEnabled: Boolean!
   secretRefs: JSON!
   envVars: JSON!
+  managedModel: Boolean!
   configRepo: String!
   configBranch: String!
   configManifestPath: String!
@@ -3751,6 +3752,7 @@ input CreateAgentEnvironmentSpecInput {
   configManifestPath: String! = ""
   secretRefs: JSON = null
   envVars: JSON = null
+  managedModel: Boolean! = false
 }
 
 input CreateAlertRuleInput {
@@ -5855,6 +5857,7 @@ input UpdateAgentEnvironmentSpecInput {
   configManifestPath: String = null
   secretRefs: JSON = null
   envVars: JSON = null
+  managedModel: Boolean = null
 }
 
 input UpdateAlertRuleInput {

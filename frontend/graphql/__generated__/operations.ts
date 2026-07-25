@@ -230,6 +230,7 @@ export type AstroliftAgentEnvironmentSpec = {
   envVars: Scalars['JSON']['output'];
   id: Scalars['GUID']['output'];
   imageTag: Scalars['String']['output'];
+  managedModel: Scalars['Boolean']['output'];
   name: Scalars['String']['output'];
   runtime: Scalars['String']['output'];
   secretRefs: Scalars['JSON']['output'];
@@ -3516,6 +3517,7 @@ export type CreateAgentEnvironmentSpecInput = {
   configRepo: Scalars['String']['input'];
   envVars: InputMaybe<Scalars['JSON']['input']>;
   imageTag: Scalars['String']['input'];
+  managedModel: Scalars['Boolean']['input'];
   name: Scalars['String']['input'];
   runtime: Scalars['String']['input'];
   secretRefs: InputMaybe<Scalars['JSON']['input']>;
@@ -7620,6 +7622,7 @@ export type UpdateAgentEnvironmentSpecInput = {
   configRepo: InputMaybe<Scalars['String']['input']>;
   envVars: InputMaybe<Scalars['JSON']['input']>;
   imageTag: InputMaybe<Scalars['String']['input']>;
+  managedModel: InputMaybe<Scalars['Boolean']['input']>;
   name: InputMaybe<Scalars['String']['input']>;
   runtime: InputMaybe<Scalars['String']['input']>;
   secretRefs: InputMaybe<Scalars['JSON']['input']>;
