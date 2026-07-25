@@ -1097,6 +1097,23 @@ export type AstroliftCiSecretValidation = {
   updatedAt: Scalars['String']['output'];
 };
 
+export type AstroliftCiWorkflowResyncAllResult = {
+  conflict: Scalars['Int']['output'];
+  failed: Scalars['Int']['output'];
+  inSync: Scalars['Int']['output'];
+  pushed: Scalars['Int']['output'];
+  repoDrift: Scalars['Int']['output'];
+  scanned: Scalars['Int']['output'];
+  skipped: Scalars['Int']['output'];
+  unknown: Scalars['Int']['output'];
+};
+
+export type AstroliftCiWorkflowResyncAllResultMutationResult = {
+  data?: Maybe<AstroliftCiWorkflowResyncAllResult>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftCiWorkflowSyncStatus = {
   checkedAt?: Maybe<Scalars['DateTime']['output']>;
   currentTemplateVersion: Scalars['Int']['output'];
@@ -4673,6 +4690,7 @@ export type Mutation = {
   resumeAppIngress: AstroliftAppEnvironmentMutationResult;
   resumeAstroliftAppWebhookDeploys: AstroliftRegisteredAppMutationResult;
   resumeEnvironment: AstroliftAppEnvironmentMutationResult;
+  resyncAllAstroliftCiWorkflows: AstroliftCiWorkflowResyncAllResultMutationResult;
   resyncAstroliftCiWorkflow: AstroliftCiWorkflowSyncStatusMutationResult;
   resyncAstroliftManifestFromRepo: ResyncManifestPayloadMutationResult;
   retryAstroliftAutowire: AstroliftRetryAutowirePayloadMutationResult;

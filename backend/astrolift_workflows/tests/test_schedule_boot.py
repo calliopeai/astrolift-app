@@ -195,6 +195,9 @@ def test_default_excludes_every_hold_kind():
         ScheduleKind.CAPTURE_PLATFORM_COST_SNAPSHOT,
         ScheduleKind.CRON_DEPLOY_TICK,
         ScheduleKind.POLL_SCHEDULED_JOB_RUNS,
+        # Outbound CI-workflow resync sweep ships HELD (#1211): it writes to
+        # tenant repos, so it's opt-in via env / the resyncAll admin mutation.
+        ScheduleKind.CI_WORKFLOW_RESYNC,
     }
     assert hold.isdisjoint(PHASE_3A_ACTIVE_KINDS)
     # Sanity: YES set + HOLD set together cover the whole enum.

@@ -58,6 +58,7 @@ from astrolift_workflows.activities.capability_deprovision import (
     deprovision_app_ingress,
     deprovision_app_registry_repo,
 )
+from astrolift_workflows.activities.ci_workflow_resync import resync_ci_workflows_tick
 from astrolift_workflows.activities.cluster_decommission_cleanup import (
     cleanup_cluster_acm_certs,
     cleanup_cluster_dns_records,
@@ -174,6 +175,7 @@ from astrolift_workflows.activities.workload_identity import (
 __all__ = [
     "evaluate_alerts_tick",
     "reconcile_runs_tick",
+    "resync_ci_workflows_tick",
     "probe_uptime_tick",
     "abort_in_flight_deploys",
     "aggregate_fan_out",

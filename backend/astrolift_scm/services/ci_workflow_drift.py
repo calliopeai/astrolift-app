@@ -21,9 +21,18 @@ Two layers, kept apart on purpose:
   into ``RegisteredApp.ci_workflow_state`` (drift lives in the JSON, no
   new column).
 
-Nothing in this module ever writes to a repo or opens a PR — it only
-observes and flags. The manual "fix it" actions (resync / adopt) live in
+The Phase 2 helpers here never write to a repo or open a PR — they only
+observe and flag. The manual "fix it" actions (resync / adopt) live in
 the GraphQL mutation layer.
+
+Phase 3 (#1211) adds the outbound fleet sweep at the bottom of this
+module (:func:`reconcile_one_ci_workflow` + :func:`sweep_ci_workflows`).
+It still does not write to a repo itself: it classifies each managed app
+with the same pure :func:`compute_sync_state`, and for the SAFE states
+only (``template_stale`` / ``absent``) DELEGATES the push to Phase 1's
+:func:`~astrolift_scm.services.workflow_sync.sync_workflow_file_to_repo`.
+Operator hand-edits (``repo_drift`` / ``conflict``) are recorded but never
+clobbered.
 """
 
 from __future__ import annotations
@@ -416,4 +425,202 @@ def adopt_repo_ci_workflow(app) -> AdoptResult:
         synced_hash=blob["synced_hash"],
         synced_blob_sha=blob["synced_blob_sha"],
         template_version=version,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 (#1211): outbound fleet resync sweep
+# ---------------------------------------------------------------------------
+#
+# A held (opt-in) sweep that recomputes drift for every MANAGED app and
+# auto-pushes ONLY the safe states. It reuses the exact Phase 1/2 pieces:
+#   * fetch    → :func:`fetch_repo_ci_workflow` (Phase 2 network read)
+#   * classify → :func:`compute_sync_state` (Phase 2 pure state machine)
+#   * observe  → :func:`_persist_observed_state` (Phase 2 flag-only persist)
+#   * push     → Phase 1's ``sync_workflow_file_to_repo`` (delegated, and it
+#                re-stamps the sync record itself)
+# No drift/fetch/push logic is re-implemented here.
+
+
+# The only hosts Phase 1 can render + push. An app can only carry a
+# non-null ``ci_workflow_template_version`` (the "managed" signal) if Phase 1
+# already synced it, which never happens for git_url / direct_upload — but we
+# filter defensively so the sweep never even fetches for an unpushable host.
+_SWEEPABLE_SOURCE_KINDS: tuple[str, ...] = ("github", "gitlab", "bitbucket", "gitea")
+
+
+class ReconcileOutcome(enum.StrEnum):
+    """What the per-app reconcile did this pass — one per app, mutually
+    exclusive, so the sweep summary is just a tally.
+
+    ``PUSHED`` — the app was ``template_stale`` / ``absent`` and the current
+    template was reconciled onto the repo (Phase 1 push landed / matched /
+    opened a PR). The remaining members mirror the observe-only
+    :class:`SyncState` values that are NEVER pushed (operator hand-edits are
+    recorded, not clobbered). ``SKIPPED`` — a fetch error / rate limit, or a
+    push that hit a transient host error: the prior state is left untouched.
+    ``FAILED`` — an unexpected error the sweep isolated to this app.
+    """
+
+    PUSHED = "pushed"
+    IN_SYNC = "in_sync"
+    REPO_DRIFT = "repo_drift"
+    CONFLICT = "conflict"
+    UNKNOWN = "unknown"
+    SKIPPED = "skipped"
+    FAILED = "failed"
+
+
+# The observe-only states → their outcome tally bucket. TEMPLATE_STALE /
+# ABSENT are handled separately (they push), so they are intentionally absent.
+_OUTCOME_BY_STATE: dict[SyncState, ReconcileOutcome] = {
+    SyncState.IN_SYNC: ReconcileOutcome.IN_SYNC,
+    SyncState.REPO_DRIFT: ReconcileOutcome.REPO_DRIFT,
+    SyncState.CONFLICT: ReconcileOutcome.CONFLICT,
+    SyncState.UNKNOWN: ReconcileOutcome.UNKNOWN,
+}
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class CiWorkflowResyncSummary:
+    """Per-sweep tally. ``scanned`` == sum of every other field (each app
+    lands in exactly one bucket). Returned by the sweep + surfaced by the
+    ``resyncAllAstroliftCiWorkflows`` mutation and the tick activity."""
+
+    scanned: int
+    pushed: int
+    in_sync: int
+    repo_drift: int
+    conflict: int
+    unknown: int
+    skipped: int
+    failed: int
+
+
+def reconcile_one_ci_workflow(app) -> ReconcileOutcome:
+    """Recompute drift for ONE managed app and auto-push only the safe states.
+
+    * Fetch the repo file (Phase 2). Any :class:`CiWorkflowFetchError`
+      (``RATE_LIMITED`` included) → :attr:`ReconcileOutcome.SKIPPED`: leave the
+      prior persisted state untouched, never raise.
+    * Classify with the pure :func:`compute_sync_state` (Phase 2).
+    * ``TEMPLATE_STALE`` / ``ABSENT`` → the file is safe to overwrite (repo
+      side untouched, only the template moved on / the file is missing), so
+      DELEGATE to Phase 1's ``sync_workflow_file_to_repo`` — which pushes and
+      re-stamps the sync record. A ``WorkflowSyncError`` (no connection /
+      unsupported host) or a ``fetch_failed`` push result → ``SKIPPED``.
+    * ``REPO_DRIFT`` / ``CONFLICT`` / ``IN_SYNC`` / ``UNKNOWN`` → NEVER push
+      (a blind push would clobber an operator hand-edit). Flag the observed
+      state via the Phase 2 observe-only persist and move on.
+    """
+    try:
+        repo_text = fetch_repo_ci_workflow(app)
+    except CiWorkflowFetchError as exc:
+        # Transient / expected host errors (rate limit, auth, network, no
+        # connection): skip harmlessly, leaving the prior reading in place.
+        logger.info(
+            "ci-workflow resync: skipping app=%s (%s): %s",
+            getattr(app, "pk", "?"),
+            exc.code,
+            exc.message,
+        )
+        return ReconcileOutcome.SKIPPED
+
+    state = compute_sync_state(
+        repo_file_text=repo_text,
+        persisted_state=_persisted_state_with_version(app),
+        current_template_version=TEMPLATE_VERSION,
+    )
+
+    if state in (SyncState.TEMPLATE_STALE, SyncState.ABSENT):
+        # SAFE to push: repo side is byte-for-byte what we synced (or the file
+        # is gone), so overwriting with the current template can't destroy an
+        # operator edit. Reuse Phase 1's push wholesale — it re-stamps too.
+        from astrolift_scm.services.workflow_sync import (
+            WorkflowSyncError,
+            sync_workflow_file_to_repo,
+        )
+
+        try:
+            result = sync_workflow_file_to_repo(app)
+        except WorkflowSyncError as exc:
+            logger.info(
+                "ci-workflow resync: push skipped for app=%s: %s",
+                getattr(app, "pk", "?"),
+                exc.message,
+            )
+            return ReconcileOutcome.SKIPPED
+        if result.status == "fetch_failed":
+            # Host was unreachable / token rejected mid-push — nothing landed.
+            # Treat as a harmless skip; the prior state stands.
+            logger.info(
+                "ci-workflow resync: push fetch_failed for app=%s: %s",
+                getattr(app, "pk", "?"),
+                result.error,
+            )
+            return ReconcileOutcome.SKIPPED
+        return ReconcileOutcome.PUSHED
+
+    # Observe-only states: record the reading, never touch the repo.
+    _persist_observed_state(app, state)
+    return _OUTCOME_BY_STATE[state]
+
+
+def managed_ci_workflow_apps():
+    """Queryset of apps with a MANAGED CI workflow: a pushable source repo and
+    a non-null ``ci_workflow_template_version`` (Phase 1 synced them at least
+    once). Soft-deleted rows are excluded by the default manager. Ordered by
+    ``pk`` for deterministic, bounded iteration."""
+    from astrolift_registry.models import RegisteredApp
+
+    return (
+        RegisteredApp.objects.filter(
+            ci_workflow_template_version__isnull=False,
+            source_kind__in=_SWEEPABLE_SOURCE_KINDS,
+        )
+        .exclude(source_repo="")
+        .order_by("pk")
+    )
+
+
+def sweep_ci_workflows(*, limit: int | None = None) -> CiWorkflowResyncSummary:
+    """Recompute drift for every managed app and auto-push the safe states.
+
+    Fans out over :func:`managed_ci_workflow_apps` (streamed with
+    ``.iterator()`` so a large fleet stays memory-bounded), calling
+    :func:`reconcile_one_ci_workflow` per app under a per-app ``try/except`` so
+    one app's unexpected failure is isolated to a ``failed`` tally and never
+    aborts the sweep. ``limit`` caps the number of apps processed this pass
+    (used by the on-demand mutation to bound a synchronous request; the
+    scheduled tick passes ``None`` to sweep the whole fleet).
+    """
+    qs = managed_ci_workflow_apps()
+    if limit is not None:
+        qs = qs[:limit]
+
+    tally: dict[ReconcileOutcome, int] = dict.fromkeys(ReconcileOutcome, 0)
+    scanned = 0
+    for app in qs.iterator():
+        scanned += 1
+        try:
+            outcome = reconcile_one_ci_workflow(app)
+        except Exception:  # noqa: BLE001 — isolate any per-app failure
+            logger.warning(
+                "ci-workflow resync: unexpected error for app=%s",
+                getattr(app, "pk", "?"),
+                exc_info=True,
+            )
+            tally[ReconcileOutcome.FAILED] += 1
+            continue
+        tally[outcome] += 1
+
+    return CiWorkflowResyncSummary(
+        scanned=scanned,
+        pushed=tally[ReconcileOutcome.PUSHED],
+        in_sync=tally[ReconcileOutcome.IN_SYNC],
+        repo_drift=tally[ReconcileOutcome.REPO_DRIFT],
+        conflict=tally[ReconcileOutcome.CONFLICT],
+        unknown=tally[ReconcileOutcome.UNKNOWN],
+        skipped=tally[ReconcileOutcome.SKIPPED],
+        failed=tally[ReconcileOutcome.FAILED],
     )

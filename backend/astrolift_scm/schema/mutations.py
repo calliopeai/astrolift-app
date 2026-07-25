@@ -212,6 +212,38 @@ class CiWorkflowSyncActionInput:
     app_id: GUID
 
 
+@strawberry.type(name="AstroliftCiWorkflowResyncAllResult")
+class CiWorkflowResyncAllResult:
+    """Fleet-wide resync sweep summary (#1211, Phase 3).
+
+    Counts by resulting state — each managed app lands in exactly one bucket,
+    so ``scanned`` equals the sum of the rest. ``pushed`` = apps whose file
+    was ``template_stale`` / ``absent`` and had the current template
+    reconciled onto the repo; ``skipped`` = apps a fetch error / rate limit /
+    transient push failure left untouched; ``failed`` = apps an unexpected
+    error isolated. ``in_sync`` / ``repo_drift`` / ``conflict`` / ``unknown``
+    mirror the observe-only drift states, which are recorded but NEVER pushed
+    (operator hand-edits are preserved).
+    """
+
+    scanned: int
+    pushed: int
+    in_sync: int
+    repo_drift: int
+    conflict: int
+    unknown: int
+    skipped: int
+    failed: int
+
+
+# Cap for the on-demand fleet resync (``resyncAllAstroliftCiWorkflows``). The
+# mutation sweeps inline (synchronously) so an admin gets counts back in one
+# call even while the ``CI_WORKFLOW_RESYNC`` schedule is held; the cap bounds
+# the request's fan-out. The opt-in Temporal schedule is the unbounded periodic
+# path once an operator enables it.
+RESYNC_ALL_INLINE_LIMIT = 250
+
+
 @strawberry.type(name="AstroliftScmWebhookSecretReveal")
 class WebhookSecretReveal:
     """Plaintext secret returned once on rotation; never re-fetchable.
@@ -1262,3 +1294,44 @@ class ScmMutation:
 
         app.refresh_from_db()
         return gql_success(build_ci_workflow_sync_status(app))
+
+    # ----------------------------------------------------------------
+    # Fleet-wide managed-CI-workflow resync (#1211, Phase 3)
+    #
+    # The platform-admin "run the outbound sweep now" trigger. Unlike the
+    # per-app Phase 2 actions above (org-scoped, ``app.update``), this is a
+    # FLEET-WIDE operator action gated on ``admin.elevate`` — the dedicated
+    # platform-admin grant (granted to no org role; superusers bypass in the
+    # resolver) — so it is deliberately NOT ``@tenant_scoped``. It reuses the
+    # same sweep the held ``CI_WORKFLOW_RESYNC`` schedule wraps.
+    # ----------------------------------------------------------------
+
+    @strawberry.field
+    @mutation_audit(action="scm.ci_workflow.resync_all")
+    @require_permission(Permission.ADMIN_ELEVATE)
+    def resync_all_astrolift_ci_workflows(self, info: Info) -> MutationResultType[CiWorkflowResyncAllResult]:
+        """Kick the outbound CI-workflow resync sweep across the WHOLE fleet.
+
+        Platform-admin only (``admin.elevate``, fleet-wide — NOT a per-org
+        permission). Runs the same sweep the held ``CI_WORKFLOW_RESYNC``
+        schedule wraps, but on demand and inline so it works while the schedule
+        is held: for every managed app it recomputes drift and auto-pushes ONLY
+        the safe states (``template_stale`` / ``absent``), never clobbering
+        ``repo_drift`` / ``conflict``. Bounded to ``RESYNC_ALL_INLINE_LIMIT``
+        apps per call; returns counts by resulting state.
+        """
+        from astrolift_scm.services.ci_workflow_drift import sweep_ci_workflows
+
+        summary = sweep_ci_workflows(limit=RESYNC_ALL_INLINE_LIMIT)
+        return gql_success(
+            CiWorkflowResyncAllResult(
+                scanned=summary.scanned,
+                pushed=summary.pushed,
+                in_sync=summary.in_sync,
+                repo_drift=summary.repo_drift,
+                conflict=summary.conflict,
+                unknown=summary.unknown,
+                skipped=summary.skipped,
+                failed=summary.failed,
+            )
+        )

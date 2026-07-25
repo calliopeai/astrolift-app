@@ -18,6 +18,9 @@ from astrolift_workflows.workflows.bring_cluster_into_management import (
     BringClusterIntoManagementWorkflow,
 )
 from astrolift_workflows.workflows.build_preview import BuildPreviewWorkflow
+from astrolift_workflows.workflows.ci_workflow_resync_tick import (
+    CiWorkflowResyncTickWorkflow,
+)
 from astrolift_workflows.workflows.cron_deploy_tick import CronDeployTickWorkflow
 from astrolift_workflows.workflows.decommission_cluster import (
     DecommissionClusterWorkflow,
@@ -86,6 +89,7 @@ __all__ = [
     "BringClusterIntoManagementWorkflow",
     "BuildPreviewWorkflow",
     "CapturePlatformCostSnapshotWorkflow",
+    "CiWorkflowResyncTickWorkflow",
     "CreateDevEnvironmentWorkflow",
     "CronDeployTickWorkflow",
     "DecommissionClusterWorkflow",

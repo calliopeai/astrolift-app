@@ -102,9 +102,10 @@ def test_default_schedules_complete():
     Loop-dispatch tick; #808 added the keep-alive agent reconcile tick;
     the uptime-monitoring increment added the synthetic uptime probe; the
     alerting-pipeline wire-up added the alert-rule evaluation tick; the
-    run-status reconciler added the ScheduledJobRun/TaskRun status sweep.
-    Lock the count so future additions stay visible in a diff."""
-    assert len(DEFAULT_SCHEDULES) == 18
+    run-status reconciler added the ScheduledJobRun/TaskRun status sweep;
+    the bidirectional CI-workflow sync (#1211) added the held CI-workflow
+    resync sweep. Lock the count so future additions stay visible in a diff."""
+    assert len(DEFAULT_SCHEDULES) == 19
 
 
 def test_default_schedules_include_all_kinds():

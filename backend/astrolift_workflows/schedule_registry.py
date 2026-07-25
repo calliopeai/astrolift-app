@@ -178,6 +178,20 @@ class ScheduleKind(StrEnum):
     already recorded, and reaches the cluster read-only to do it (sibling
     to UPTIME_PROBE among the cluster-touching sweeps)."""
 
+    CI_WORKFLOW_RESYNC = "ci_workflow_resync"
+    """Every 1 hr (HELD — opt-in) — recompute drift for every app with a
+    managed CI workflow file and auto-push ONLY the SAFE states
+    (``template_stale`` / ``absent``), never clobbering an operator hand-edit
+    (``repo_drift`` / ``conflict``, left recorded but untouched). The per-app
+    reconcile reuses the Phase 1 push + Phase 2 fetch/drift machinery; the
+    whole fleet is swept inside one activity (sequential, per-app try/except,
+    one app's failure never aborts the sweep) like the sibling reconcile
+    sweeps (#1211). Ships INERT: deliberately LEFT OUT of
+    ``PHASE_3A_ACTIVE_KINDS`` because it does outbound writes to tenant repos
+    — enabled later per-operator by adding it to ``ASTROLIFT_ACTIVE_SCHEDULES``
+    (a config change, no code) or fired on demand by the platform-admin
+    ``resyncAllAstroliftCiWorkflows`` mutation."""
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ScheduleDefinition:
@@ -384,6 +398,15 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.RUN_STATUS_RECONCILE,
         ),
         description="Reconcile ScheduledJobRun/TaskRun status from k8s Job status",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.CI_WORKFLOW_RESYNC,
+        workflow_name="CiWorkflowResyncTickWorkflow",
+        interval_seconds=60 * 60,
+        schedule_id=schedule_id_for(
+            kind=ScheduleKind.CI_WORKFLOW_RESYNC,
+        ),
+        description="Resync managed CI workflow files across the fleet (held; #1211)",
     ),
 )
 

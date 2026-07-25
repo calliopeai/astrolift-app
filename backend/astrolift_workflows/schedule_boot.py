@@ -83,6 +83,13 @@ PHASE_3A_ACTIVE_KINDS: frozenset[ScheduleKind] = frozenset(
         # with per-run try/except; an unreachable cluster or torn-down Job
         # leaves the row as-is, and terminal rows are never re-touched.
         ScheduleKind.RUN_STATUS_RECONCILE,
+        # NB: ScheduleKind.CI_WORKFLOW_RESYNC is INTENTIONALLY absent here
+        # (#1211, Phase 3). Unlike the read-mostly / idempotent-SSA kinds
+        # above, it does OUTBOUND writes to tenant source repos (pushes the
+        # current CI-workflow template onto template_stale / absent apps), so
+        # it ships INERT and is opted in per-operator via the
+        # ASTROLIFT_ACTIVE_SCHEDULES env (a config change, no code) or fired on
+        # demand by the platform-admin resyncAllAstroliftCiWorkflows mutation.
     }
 )
 

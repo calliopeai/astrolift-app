@@ -263,6 +263,16 @@ EXEMPT: dict[str, str] = {
         "reuses the same idempotent driver deprovision path teardown uses "
         "(#1034) — never a raw cloud API delete."
     ),
+    "ScmMutation.resync_all_astrolift_ci_workflows": (
+        "install-wide operator action (#1211, Phase 3): the outbound CI-workflow "
+        "resync sweeps EVERY org's managed apps by construction — a fleet-wide "
+        "reconcile, so there is no single tenant to scope on (@tenant_scoped "
+        "would have no org column to filter). Gated on ADMIN_ELEVATE — the "
+        "dedicated platform-admin grant, NOT a per-org permission — + "
+        "mutation_audit. Same category as the Temporal admin resolvers and "
+        "reap_cloud_orphan. Only pushes the safe drift states; never clobbers "
+        "operator hand-edits."
+    ),
     "LifecycleMutation.approve_deployment_by_token": (
         "public: approval magic-link token IS the auth proof; no tenant context at the point of click"
     ),

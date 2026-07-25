@@ -1076,6 +1076,23 @@ type AstroliftCiSecretValidation {
   updatedAt: String!
 }
 
+type AstroliftCiWorkflowResyncAllResult {
+  scanned: Int!
+  pushed: Int!
+  inSync: Int!
+  repoDrift: Int!
+  conflict: Int!
+  unknown: Int!
+  skipped: Int!
+  failed: Int!
+}
+
+type AstroliftCiWorkflowResyncAllResultMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftCiWorkflowResyncAllResult
+}
+
 type AstroliftCiWorkflowSyncStatus {
   state: String!
   syncedTemplateVersion: Int
@@ -4730,6 +4747,7 @@ type Mutation {
   resyncAstroliftCiWorkflow(input: CiWorkflowSyncActionInput!): AstroliftCiWorkflowSyncStatusMutationResult!
   adoptRepoCiWorkflow(input: CiWorkflowSyncActionInput!): AstroliftCiWorkflowSyncStatusMutationResult!
   refreshCiWorkflowSyncStatus(input: CiWorkflowSyncActionInput!): AstroliftCiWorkflowSyncStatusMutationResult!
+  resyncAllAstroliftCiWorkflows: AstroliftCiWorkflowResyncAllResultMutationResult!
   setAppSecret(input: SetAppSecretInput!): AppsecretwritepayloadMutationResult!
   rotateAppSecret(input: RotateAppSecretInput!): AppsecretwritepayloadMutationResult!
   deleteAppSecret(input: DeleteAppSecretInput!): AppsecretwritepayloadMutationResult!
