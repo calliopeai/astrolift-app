@@ -300,9 +300,18 @@ def _render_agent_job(
     # The spec's non-secret env vars go on the pod as plain env; its
     # secret_refs become secretKeyRef entries pointing at the per-task
     # Secret the spawner materializes (see K8sJobSpawner.spawn / #1173).
-    # Values never touch this manifest. Managed-model env goes first so a
-    # spec env/secret of the same name overrides the injected default.
-    container_env = list(model_env or []) + agent_container_env(spec, task_secret_name(job_name))
+    # Values never touch this manifest. Managed-model env goes first, then the
+    # spec's own env — and we DEDUPE by name keeping the last occurrence, so a
+    # spec env/secret of the same name overrides the injected default. Dedup is
+    # required (not just ordering): the manifest is applied server-side, and
+    # SSA rejects a container whose env list has duplicate `name` keys with a
+    # 500 ("duplicate entries for key"), which would fail the whole Job POST
+    # (e.g. the Bedrock env sets AWS_REGION and a spec that also sets it).
+    _merged_env = list(model_env or []) + agent_container_env(spec, task_secret_name(job_name))
+    _by_name: dict[str, dict] = {}
+    for _entry in _merged_env:
+        _by_name[_entry["name"]] = _entry
+    container_env = list(_by_name.values())
 
     # VNC-capable runs swap to the -vnc image variant and expose the
     # raw RFB port (5900) so the ASGI relay can port-forward into it.
