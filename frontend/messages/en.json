@@ -2439,6 +2439,19 @@
         "payloadSection": "Mutation context",
         "redactedNote": "Sensitive values (secrets, tokens, passwords) are redacted before display.",
         "requestIdSection": "Request ID"
+      },
+      "pageSizeLabel": "Rows per page",
+      "retention": {
+        "button": "Retention",
+        "title": "Audit retention",
+        "help": "How long audit events are kept for this organization before the retention sweeper is eligible to delete them.",
+        "fieldLabel": "Keep audit events for (days)",
+        "range": "Between {min} and {max} days (about 7 years).",
+        "cancel": "Cancel",
+        "save": "Save",
+        "saving": "Saving…",
+        "toastSuccess": "Retention updated to {days} days",
+        "toastFailure": "Couldn't update audit retention"
       }
     },
     "membersBulk": {

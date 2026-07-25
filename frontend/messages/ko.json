@@ -1976,6 +1976,19 @@
         "payloadSection": "뮤테이션 컨텍스트",
         "redactedNote": "민감한 값(비밀, 토큰, 비밀번호)은 표시 전에 마스킹됩니다.",
         "requestIdSection": "요청 ID"
+      },
+      "pageSizeLabel": "페이지당 행 수",
+      "retention": {
+        "button": "보존 기간",
+        "title": "감사 로그 보존 기간",
+        "help": "보존 스위퍼가 삭제할 수 있게 되기 전까지 이 조직의 감사 이벤트를 보관하는 기간입니다.",
+        "fieldLabel": "감사 이벤트 보존 일수",
+        "range": "{min}일에서 {max}일 사이(약 7년)로 설정합니다.",
+        "cancel": "취소",
+        "save": "저장",
+        "saving": "저장 중…",
+        "toastSuccess": "보존 기간을 {days}일로 업데이트했습니다",
+        "toastFailure": "감사 로그 보존 기간을 업데이트하지 못했습니다"
       }
     },
     "approval": {

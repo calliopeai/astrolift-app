@@ -169,31 +169,45 @@ def test_audit_page_without_total_count_is_null(permission_resolver):
         assert page.total_count is None
 
 
-def test_retention_query_defaults_to_90(permission_resolver):
+def test_retention_query_defaults_to_org_value(permission_resolver):
+    # A freshly-created org carries the model default (365 days). The
+    # retention query reflects the per-org column, not a global flag.
     org = _mkorg()
     permission_resolver.grant(Permission.AUDIT_LOG_READ)
     with tenant_context(TenantContext(organization_id=org.id)):
         q = OperationsQuery()
         out = q.astrolift_audit_retention(_info())
         assert out.days >= 1
-        assert out.days == 90
+        assert out.days == 365
 
 
-def test_retention_query_reflects_constance(permission_resolver):
-    from constance import config
-
-    org = _mkorg()
+def test_retention_query_reflects_org_field(permission_resolver):
+    # Editing Organization.audit_log_retention_days (what the settings
+    # page + updateOrganization write) is what the /audit subtitle reads.
+    org = Organization.objects.create(
+        name="RetentionOrg", slug="retention-org", audit_log_retention_days=120
+    )
     permission_resolver.grant(Permission.AUDIT_LOG_READ)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        q = OperationsQuery()
+        out = q.astrolift_audit_retention(_info())
+        assert out.days == 120
 
-    previous = config.AUDIT_RETENTION_DAYS
-    config.AUDIT_RETENTION_DAYS = 365
-    try:
-        with tenant_context(TenantContext(organization_id=org.id)):
-            q = OperationsQuery()
-            out = q.astrolift_audit_retention(_info())
-            assert out.days == 365
-    finally:
-        config.AUDIT_RETENTION_DAYS = previous
+
+def test_retention_query_scoped_to_caller_org(permission_resolver):
+    # Two orgs with distinct windows: the query returns only the
+    # caller-org value, never the sibling's (#1183).
+    org_a = Organization.objects.create(
+        name="OrgA", slug="org-a-retention", audit_log_retention_days=30
+    )
+    org_b = Organization.objects.create(
+        name="OrgB", slug="org-b-retention", audit_log_retention_days=400
+    )
+    permission_resolver.grant(Permission.AUDIT_LOG_READ)
+    with tenant_context(TenantContext(organization_id=org_a.id)):
+        assert OperationsQuery().astrolift_audit_retention(_info()).days == 30
+    with tenant_context(TenantContext(organization_id=org_b.id)):
+        assert OperationsQuery().astrolift_audit_retention(_info()).days == 400
 
 
 def test_audit_events_actor_filter(permission_resolver):

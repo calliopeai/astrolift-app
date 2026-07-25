@@ -5,7 +5,9 @@ import {
   CheckCircle2Icon,
   DownloadIcon,
   Loader2Icon,
+  SaveIcon,
   ScrollTextIcon,
+  Settings2Icon,
   XCircleIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -17,6 +19,16 @@ import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,6 +60,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
+import { UPDATE_ORGANIZATION } from "@/graphql/identity/identity.mutations";
+import type {
+  AstroliftOrganization,
+  MutationResult,
+} from "@/graphql/identity/identity.types";
 import { EXPORT_AUDIT_EVENTS } from "@/graphql/operations/operations.mutations";
 import {
   GET_AUDIT_RETENTION,
@@ -78,7 +96,13 @@ interface ExportResp {
   };
 }
 
-const PAGE_SIZE = 100;
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
+const DEFAULT_PAGE_SIZE = 100;
+
+// Server-side bound on Organization.audit_log_retention_days (spec
+// ceiling ~7 years); mirrors the guard in updateOrganization.
+const RETENTION_MIN_DAYS = 1;
+const RETENTION_MAX_DAYS = 2557;
 
 const decisionStyles: Record<string, { icon: React.ReactNode; cls: string }> = {
   ALLOW: {
@@ -126,10 +150,11 @@ export function AuditClient() {
   const [toDate, setToDate] = React.useState<string>("");
   const [activeRow, setActiveRow] = React.useState<AstroliftAuditEvent | null>(null);
   const [exporting, setExporting] = React.useState(false);
+  const [pageSize, setPageSize] = React.useState<number>(DEFAULT_PAGE_SIZE);
 
   const variables = React.useMemo(
     () => ({
-      limit: PAGE_SIZE,
+      limit: pageSize,
       after: null as string | null,
       action: actionFilter || null,
       decision: decisionFilter || null,
@@ -138,7 +163,7 @@ export function AuditClient() {
       createdAtLte: dateInputToIso(toDate, true),
       includeTotal: true,
     }),
-    [actionFilter, decisionFilter, fromDate, toDate]
+    [actionFilter, decisionFilter, fromDate, toDate, pageSize]
   );
 
   const { data, loading, fetchMore } = useQuery<PageResp>(LIST_AUDIT_EVENTS_PAGE, {
@@ -233,26 +258,29 @@ export function AuditClient() {
       title={t("title")}
       description={description}
       actions={
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" disabled={exporting}>
-              {exporting ? (
-                <Loader2Icon className="size-4 animate-spin" />
-              ) : (
-                <DownloadIcon className="size-4" />
-              )}
-              {t("export.button")}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => handleExport("csv")}>
-              {t("export.formatCsv")}
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => handleExport("ndjson")}>
-              {t("export.formatNdjson")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-2">
+          <RetentionDialog currentDays={retentionDays ?? null} />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" disabled={exporting}>
+                {exporting ? (
+                  <Loader2Icon className="size-4 animate-spin" />
+                ) : (
+                  <DownloadIcon className="size-4" />
+                )}
+                {t("export.button")}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => handleExport("csv")}>
+                {t("export.formatCsv")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => handleExport("ndjson")}>
+                {t("export.formatNdjson")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       }
     >
       <div className="flex flex-wrap items-end gap-3">
@@ -312,11 +340,30 @@ export function AuditClient() {
             className="w-44"
           />
         </div>
-        {totalCount != null && (
-          <div className="text-muted-foreground ml-auto text-xs">
-            {t("filters.totalCount", { count: totalCount })}
+        <div className="ml-auto flex items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="audit-page-size" className="text-xs">
+              {t("pageSizeLabel")}
+            </Label>
+            <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+              <SelectTrigger id="audit-page-size" className="w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    {n}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        )}
+          {totalCount != null && (
+            <div className="text-muted-foreground pb-2 text-xs">
+              {t("filters.totalCount", { count: totalCount })}
+            </div>
+          )}
+        </div>
       </div>
 
       <Card>
@@ -409,6 +456,110 @@ export function AuditClient() {
 
       <AuditDetailsSheet row={activeRow} onOpenChange={(open) => !open && setActiveRow(null)} />
     </PageShell>
+  );
+}
+
+/**
+ * Admin-only audit-retention editor. Reads the current window from the
+ * page's GET_AUDIT_RETENTION (now sourced from the per-org
+ * Organization.audit_log_retention_days column) and writes it through
+ * the existing `updateOrganization` mutation — the same field the
+ * /administration/organization settings page edits, so the two
+ * surfaces never disagree. The server enforces ORG_UPDATE and the
+ * 1..2557 range; the dialog mirrors the bound client-side and refetches
+ * the retention query so the subtitle updates in place.
+ */
+function RetentionDialog({ currentDays }: { currentDays: number | null }) {
+  const t = useTranslations("lists.audit");
+  const { org } = useActiveOrg();
+  const [open, setOpen] = React.useState(false);
+  const [days, setDays] = React.useState("");
+
+  // Seed the input from the current window when the dialog opens (an
+  // open event, not an effect) so an in-flight edit isn't clobbered by
+  // a background retention refetch, and so we never setState in effect.
+  const handleOpenChange = React.useCallback(
+    (next: boolean) => {
+      if (next) setDays(currentDays != null ? String(currentDays) : "");
+      setOpen(next);
+    },
+    [currentDays]
+  );
+
+  const [updateOrg, { loading: saving }] = useMutation<{
+    updateOrganization: MutationResult<AstroliftOrganization>;
+  }>(UPDATE_ORGANIZATION, {
+    refetchQueries: [{ query: GET_AUDIT_RETENTION }],
+    awaitRefetchQueries: true,
+  });
+
+  const parsed = Number.parseInt(days, 10);
+  const valid =
+    Number.isFinite(parsed) && parsed >= RETENTION_MIN_DAYS && parsed <= RETENTION_MAX_DAYS;
+
+  const handleSave = React.useCallback(async () => {
+    if (!org || !valid) return;
+    try {
+      const { data } = await updateOrg({
+        variables: { input: { id: org.id, auditLogRetentionDays: parsed } },
+      });
+      const payload = data?.updateOrganization;
+      if (payload?.ok) {
+        toast.success(t("retention.toastSuccess", { days: parsed }));
+        setOpen(false);
+      } else {
+        toast.error(payload?.errors?.[0]?.message ?? t("retention.toastFailure"));
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("retention.toastFailure"));
+    }
+  }, [org, valid, parsed, updateOrg, t]);
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Settings2Icon className="size-4" />
+          {t("retention.button")}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("retention.title")}</DialogTitle>
+          <DialogDescription>{t("retention.help")}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label htmlFor="audit-retention-days">{t("retention.fieldLabel")}</Label>
+          <Input
+            id="audit-retention-days"
+            type="number"
+            min={RETENTION_MIN_DAYS}
+            max={RETENTION_MAX_DAYS}
+            value={days}
+            onChange={(e) => setDays(e.target.value)}
+            className="w-40"
+          />
+          <p className="text-muted-foreground text-xs">
+            {t("retention.range", { min: RETENTION_MIN_DAYS, max: RETENTION_MAX_DAYS })}
+          </p>
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="ghost" size="sm" disabled={saving}>
+              {t("retention.cancel")}
+            </Button>
+          </DialogClose>
+          <Button size="sm" onClick={handleSave} disabled={saving || !valid || !org}>
+            {saving ? (
+              <Loader2Icon className="size-4 animate-spin" />
+            ) : (
+              <SaveIcon className="size-4" />
+            )}
+            {saving ? t("retention.saving") : t("retention.save")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

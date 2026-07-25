@@ -1976,6 +1976,19 @@
         "payloadSection": "Contexte de mutation",
         "redactedNote": "Les valeurs sensibles (secrets, tokens, mots de passe) sont masquées avant affichage.",
         "requestIdSection": "ID de requête"
+      },
+      "pageSizeLabel": "Lignes par page",
+      "retention": {
+        "button": "Rétention",
+        "title": "Rétention des audits",
+        "help": "Durée de conservation des événements d'audit de cette organisation avant que le nettoyage de rétention puisse les supprimer.",
+        "fieldLabel": "Conserver les événements d'audit pendant (jours)",
+        "range": "Entre {min} et {max} jours (environ 7 ans).",
+        "cancel": "Annuler",
+        "save": "Enregistrer",
+        "saving": "Enregistrement…",
+        "toastSuccess": "Rétention mise à jour à {days} jours",
+        "toastFailure": "Impossible de mettre à jour la rétention des audits"
       }
     },
     "approval": {

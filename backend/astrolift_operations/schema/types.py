@@ -206,8 +206,9 @@ class AuditRetentionType:
     UI subtitle as 'Audit events retained for N days per compliance
     policy' — required for SOC2 surface (#433 scope D).
 
-    Value sourced from the ``AUDIT_RETENTION_DAYS`` Constance flag so
-    operators can tune at runtime without a redeploy."""
+    Value sourced from the per-org ``Organization.audit_log_retention_days``
+    column — the same field the org-settings page edits — so the audit
+    and organization surfaces stay in agreement."""
 
     days: int
     """The retention window, in days. Always >= 1. Defaults to 90."""

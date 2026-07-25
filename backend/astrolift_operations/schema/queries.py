@@ -524,17 +524,26 @@ class OperationsQuery:
     @require_permission(Permission.AUDIT_LOG_READ)
     @tenant_scoped()
     def astrolift_audit_retention(self, info: Info) -> AuditRetentionType:
-        """Org-visible retention policy. Sourced from the
-        ``AUDIT_RETENTION_DAYS`` Constance flag so operators can tune
-        the visible window at runtime. Always returns a value >= 1."""
-        from constance import config as constance_config
+        """The caller org's audit-log retention window, in days.
 
-        raw = getattr(constance_config, "AUDIT_RETENTION_DAYS", 90)
-        try:
-            days = int(raw)
-        except (TypeError, ValueError):
-            days = 90
-        return AuditRetentionType(days=max(1, days))
+        Sourced from ``Organization.audit_log_retention_days`` — the
+        same per-org field the org-settings surface edits via
+        ``updateOrganization`` — so /administration/audit and
+        /administration/organization report (and change) one value
+        rather than two divergent ones (#433). Previously this read the
+        global ``AUDIT_RETENTION_DAYS`` Constance flag, which never
+        agreed with the per-org column the settings page wrote.
+
+        Scoped to the caller's org (#1183); org_id None → the model
+        default (365). Always returns a value >= 1."""
+        from astrolift_identity.models import Organization
+
+        org_id = _caller_org_id()
+        if org_id is None:
+            return AuditRetentionType(days=365)
+        org = Organization.objects.filter(pk=org_id).only("audit_log_retention_days").first()
+        days = org.audit_log_retention_days if org is not None else 365
+        return AuditRetentionType(days=max(1, int(days)))
 
     @strawberry.field
     @require_permission(Permission.AUDIT_LOG_READ)

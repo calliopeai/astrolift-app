@@ -1976,6 +1976,19 @@
         "payloadSection": "Contexto da mutação",
         "redactedNote": "Valores sensíveis (segredos, tokens, senhas) são ocultados antes da exibição.",
         "requestIdSection": "ID da requisição"
+      },
+      "pageSizeLabel": "Linhas por página",
+      "retention": {
+        "button": "Retenção",
+        "title": "Retenção de auditoria",
+        "help": "Por quanto tempo os eventos de auditoria desta organização são mantidos antes que a limpeza de retenção possa excluí-los.",
+        "fieldLabel": "Manter eventos de auditoria por (dias)",
+        "range": "Entre {min} e {max} dias (cerca de 7 anos).",
+        "cancel": "Cancelar",
+        "save": "Salvar",
+        "saving": "Salvando…",
+        "toastSuccess": "Retenção atualizada para {days} dias",
+        "toastFailure": "Não foi possível atualizar a retenção de auditoria"
       }
     },
     "approval": {

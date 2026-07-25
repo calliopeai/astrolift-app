@@ -1976,6 +1976,19 @@
         "payloadSection": "ミューテーション コンテキスト",
         "redactedNote": "機密情報 (シークレット、トークン、パスワード) は表示前にマスクされます。",
         "requestIdSection": "リクエスト ID"
+      },
+      "pageSizeLabel": "1ページあたりの行数",
+      "retention": {
+        "button": "保持期間",
+        "title": "監査ログの保持期間",
+        "help": "保持スイーパーが削除できるようになるまで、この組織の監査イベントを保持する期間です。",
+        "fieldLabel": "監査イベントの保持日数",
+        "range": "{min}〜{max}日（約7年）の範囲で指定します。",
+        "cancel": "キャンセル",
+        "save": "保存",
+        "saving": "保存中…",
+        "toastSuccess": "保持期間を{days}日に更新しました",
+        "toastFailure": "監査ログの保持期間を更新できませんでした"
       }
     },
     "approval": {

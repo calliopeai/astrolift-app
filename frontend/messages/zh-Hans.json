@@ -1976,6 +1976,19 @@
         "payloadSection": "操作上下文",
         "redactedNote": "敏感值（密钥、令牌、密码）在显示前已被遮蔽。",
         "requestIdSection": "请求 ID"
+      },
+      "pageSizeLabel": "每页行数",
+      "retention": {
+        "button": "保留期限",
+        "title": "审计保留期限",
+        "help": "在保留清理程序可以删除之前，本组织的审计事件保留的时长。",
+        "fieldLabel": "审计事件保留天数",
+        "range": "在 {min} 到 {max} 天之间（约 7 年）。",
+        "cancel": "取消",
+        "save": "保存",
+        "saving": "保存中…",
+        "toastSuccess": "保留期限已更新为 {days} 天",
+        "toastFailure": "无法更新审计保留期限"
       }
     },
     "approval": {

@@ -495,11 +495,11 @@ CONSTANCE_CONFIG = {
     ),
     "AUDIT_RETENTION_DAYS": (
         90,
-        "How long audit log entries are retained, in days, per compliance policy. Surfaces "
-        "as a subtitle on the /audit page so operators see the policy at a glance. The "
-        "retention sweeper honours this value; bumping it lengthens the visible history "
-        "without redeploy. Lower bound 1 day, upper bound 2557 days (~7 years, the spec "
-        "ceiling).",
+        "Platform-wide default audit-log retention, in days, for the retention sweeper. "
+        "The per-org window shown/edited on /administration/audit and "
+        "/administration/organization is the Organization.audit_log_retention_days column; "
+        "this flag is the fallback default only. Lower bound 1 day, upper bound 2557 days "
+        "(~7 years, the spec ceiling).",
     ),
     "AUDIT_EXPORT_DOWNLOAD_TTL_SECONDS": (
         3600,

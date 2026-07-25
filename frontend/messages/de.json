@@ -1976,6 +1976,19 @@
         "payloadSection": "Mutationskontext",
         "redactedNote": "Sensible Werte (Geheimnisse, Tokens, Passwörter) werden vor der Anzeige maskiert.",
         "requestIdSection": "Anfrage-ID"
+      },
+      "pageSizeLabel": "Zeilen pro Seite",
+      "retention": {
+        "button": "Aufbewahrung",
+        "title": "Audit-Aufbewahrung",
+        "help": "Wie lange Audit-Ereignisse für diese Organisation aufbewahrt werden, bevor sie vom Aufbewahrungs-Sweeper gelöscht werden dürfen.",
+        "fieldLabel": "Audit-Ereignisse aufbewahren für (Tage)",
+        "range": "Zwischen {min} und {max} Tagen (etwa 7 Jahre).",
+        "cancel": "Abbrechen",
+        "save": "Speichern",
+        "saving": "Wird gespeichert…",
+        "toastSuccess": "Aufbewahrung auf {days} Tage aktualisiert",
+        "toastFailure": "Audit-Aufbewahrung konnte nicht aktualisiert werden"
       }
     },
     "approval": {
