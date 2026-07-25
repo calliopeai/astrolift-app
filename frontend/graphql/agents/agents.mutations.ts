@@ -308,6 +308,7 @@ export const UPDATE_AGENT_ENVIRONMENT_SPEC = gql`
         id
         slug
         managedModel
+        vncEnabled
       }
     }
   }

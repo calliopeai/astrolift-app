@@ -694,6 +694,7 @@ function OnceForm({
           envSpecSlug={selectedSpec.slug}
           envSpecName={selectedSpec.name}
           managedModel={selectedSpec.managedModel}
+          vncEnabled={selectedSpec.vncEnabled}
           open={secretsDialogOpen}
           onOpenChange={setSecretsDialogOpen}
         />

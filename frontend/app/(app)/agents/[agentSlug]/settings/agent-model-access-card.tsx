@@ -9,6 +9,7 @@ import type { AstroliftAgentEnvironmentSpec } from "@/graphql/agents/agents.type
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 
 import { ManagedModelSection } from "../../managed-model-section";
+import { VncSessionSection } from "../../vnc-session-section";
 
 interface EnvSpecsResp {
   agentEnvironmentSpecs: AstroliftAgentEnvironmentSpec[];
@@ -23,6 +24,10 @@ interface EnvSpecsResp {
  * by the shared `/apps` settings client, so the plain app settings page never
  * gains this control. The toggle itself is the shared {@link ManagedModelSection},
  * identical in look + wiring to the one in the agent secrets dialog.
+ *
+ * A sibling "Live session" Section carries the {@link VncSessionSection} toggle
+ * (watchable VNC vs headless) for the same env spec — same resolution, same
+ * wiring pattern, just a second spec-level property.
  */
 export function AgentModelAccessCard({ agentSlug }: { agentSlug: string }) {
   // Reactive org id (matches useAgent): the cookie read races the post-render
@@ -38,16 +43,35 @@ export function AgentModelAccessCard({ agentSlug }: { agentSlug: string }) {
   const spec = data?.agentEnvironmentSpecs?.find((s) => s.slug === agentSlug) ?? null;
 
   return (
-    <Section title="Model access" description="How this agent authenticates to its model provider.">
-      {spec ? (
-        <ManagedModelSection envSpecSlug={spec.slug} managedModel={spec.managedModel} />
-      ) : loading || !orgId ? (
-        <Skeleton className="h-20 w-full" />
-      ) : (
-        <p className="text-muted-foreground text-sm italic">
-          No environment spec registered for this agent.
-        </p>
-      )}
-    </Section>
+    <>
+      <Section
+        title="Model access"
+        description="How this agent authenticates to its model provider."
+      >
+        {spec ? (
+          <ManagedModelSection envSpecSlug={spec.slug} managedModel={spec.managedModel} />
+        ) : loading || !orgId ? (
+          <Skeleton className="h-20 w-full" />
+        ) : (
+          <p className="text-muted-foreground text-sm italic">
+            No environment spec registered for this agent.
+          </p>
+        )}
+      </Section>
+      <Section
+        title="Live session"
+        description="Whether this agent runs on a watchable VNC desktop or headless."
+      >
+        {spec ? (
+          <VncSessionSection envSpecSlug={spec.slug} vncEnabled={spec.vncEnabled} />
+        ) : loading || !orgId ? (
+          <Skeleton className="h-20 w-full" />
+        ) : (
+          <p className="text-muted-foreground text-sm italic">
+            No environment spec registered for this agent.
+          </p>
+        )}
+      </Section>
+    </>
   );
 }

@@ -33,6 +33,7 @@ import { AGENT_ENV_SPEC_SECRET_STATUS } from "@/graphql/agents/agents.queries";
 import type { AstroliftAgentSecretStatus } from "@/graphql/agents/agents.types";
 
 import { ManagedModelSection } from "./managed-model-section";
+import { VncSessionSection } from "./vnc-session-section";
 
 interface SecretStatusResp {
   agentEnvironmentSpecSecretStatus: AstroliftAgentSecretStatus[];
@@ -60,12 +61,14 @@ export function AgentSecretsDialog({
   envSpecSlug,
   envSpecName,
   managedModel,
+  vncEnabled,
   open,
   onOpenChange,
 }: {
   envSpecSlug: string;
   envSpecName: string;
   managedModel: boolean;
+  vncEnabled: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -175,6 +178,11 @@ export function AgentSecretsDialog({
               refs below. When ON, runs use the cluster's cloud model provider
               via workload identity, so no ANTHROPIC_API_KEY secret is needed. */}
           <ManagedModelSection envSpecSlug={envSpecSlug} managedModel={managedModel} />
+
+          {/* Live session — another spec-level property. When ON, runs launch on
+              a watchable VNC image so operators can watch the live desktop
+              session; OFF is headless (logs only). */}
+          <VncSessionSection envSpecSlug={envSpecSlug} vncEnabled={vncEnabled} />
 
           {loading && rows.length === 0 ? (
             <div className="text-muted-foreground flex items-center gap-2 py-6 text-sm">
