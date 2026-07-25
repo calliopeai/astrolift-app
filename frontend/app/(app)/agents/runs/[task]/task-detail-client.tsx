@@ -15,6 +15,7 @@ import * as React from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
+import { LiveLogTerminal } from "@/components/observability/LiveLogTerminal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
@@ -148,6 +149,7 @@ export function AgentTaskDetail({ taskId }: { taskId: string }) {
   }
 
   const canWatch = task.status === "running" && task.vncEnabled && Boolean(task.vncUrl);
+  const running = task.status === "running";
   const logs = logsData?.agentTaskLogs ?? [];
   // The human-readable spawn/dispatch failure reason (null unless the run
   // failed). A spawn-failed run never starts a pod, so its `agentTaskLogs` is
@@ -290,10 +292,8 @@ export function AgentTaskDetail({ taskId }: { taskId: string }) {
             </span>
           }
         >
-          {logs.length > 0 ? (
-            <pre className="bg-muted/40 max-h-[28rem] overflow-auto rounded-md border p-3 font-mono text-xs whitespace-pre-wrap">
-              {logs.join("\n")}
-            </pre>
+          {running || logs.length > 0 ? (
+            <LiveLogTerminal taskId={taskId} running={running} tail={200} className="h-[28rem]" />
           ) : failureMessage ? (
             <p className="text-muted-foreground text-sm">
               No pod logs — the run failed before a pod started. See the failure above.

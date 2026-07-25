@@ -6,6 +6,7 @@ import {
   ListChecksIcon,
   Loader2Icon,
   MonitorPlayIcon,
+  TerminalIcon,
   ZapIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -34,6 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { LiveLogTerminal } from "@/components/observability/LiveLogTerminal";
 import { VncViewer } from "@/components/observability/VncViewer";
 import { RUN_AGENT } from "@/graphql/agents/agents.mutations";
 import { LIST_AGENT_TASKS } from "@/graphql/agents/agents.queries";
@@ -104,6 +106,13 @@ function canWatch(t: AgentTask): boolean {
   return t.status === "running" && t.vncEnabled && Boolean(t.vncUrl);
 }
 
+// Headless (terminal) agents have no VNC surface — a RUNNING non-VNC run is
+// watched live through its log tail instead. VNC-capable runs keep the VNC path
+// (even while their relay is still coming up), so the two are mutually exclusive.
+function canWatchLogs(t: AgentTask): boolean {
+  return isRunning(t) && !t.vncEnabled;
+}
+
 // Status cell: a live "running now" badge (animated pending dot) for in-flight
 // runs, otherwise the dot+badge for its terminal/queued state.
 function StatusCell({ task }: { task: AgentTask }) {
@@ -161,8 +170,10 @@ export function RunContent({
     pollInterval: 5000,
     fetchPolicy: "cache-and-network",
   });
-  // The task whose live session is open in the Watch-live dialog.
+  // The task whose live VNC session is open in the Watch-live dialog.
   const [watching, setWatching] = React.useState<AgentTask | null>(null);
+  // The (headless) task whose live log tail is open in the Watch-logs dialog.
+  const [watchingLogs, setWatchingLogs] = React.useState<AgentTask | null>(null);
   const router = useRouter();
 
   const [runAgent, { loading: dispatching }] = useMutation<RunAgentResp>(RUN_AGENT);
@@ -194,6 +205,15 @@ export function RunContent({
         (b.createdAt ?? "").localeCompare(a.createdAt ?? "")
       ),
     [data?.agentTasks]
+  );
+
+  // Keep the open log dialog's task fresh against the poll so it flips from
+  // live-tail to a single final fetch the moment the run finishes (mirrors the
+  // theatre's `watchingLive`). Falls back to the click-time snapshot if the run
+  // drops out of the list.
+  const watchingLogsLive = React.useMemo(
+    () => (watchingLogs ? (rows.find((r) => r.id === watchingLogs.id) ?? null) : null),
+    [watchingLogs, rows]
   );
 
   // Terminal-outcome rollup for the at-a-glance summary above the table.
@@ -328,7 +348,7 @@ export function RunContent({
                         className="text-right"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {canWatch(t) && (
+                        {canWatch(t) ? (
                           <div className="inline-flex items-center gap-2">
                             <Button
                               size="sm"
@@ -349,7 +369,12 @@ export function RunContent({
                               </Link>
                             </Button>
                           </div>
-                        )}
+                        ) : canWatchLogs(t) ? (
+                          <Button size="sm" variant="outline" onClick={() => setWatchingLogs(t)}>
+                            <TerminalIcon className="size-4" />
+                            Watch logs
+                          </Button>
+                        ) : null}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -371,6 +396,28 @@ export function RunContent({
             </DialogDescription>
           </DialogHeader>
           {watching && <VncViewer vncPath={watching.vncUrl} />}
+        </DialogContent>
+      </Dialog>
+
+      {/* Watch-logs dialog — the headless-agent counterpart to the VNC dialog:
+          a near-fullscreen live-tailing terminal (mirrors AgentTheatre sizing).
+          `running` tracks the live poll so the tail stops once the run ends. */}
+      <Dialog open={watchingLogs !== null} onOpenChange={(open) => !open && setWatchingLogs(null)}>
+        <DialogContent className="flex h-[92vh] w-[96vw] max-w-[96vw] flex-col gap-3 sm:max-w-[96vw]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <TerminalIcon className="size-4" />
+              Live agent logs
+            </DialogTitle>
+            <DialogDescription className="font-mono text-xs">{watchingLogs?.id}</DialogDescription>
+          </DialogHeader>
+          {watchingLogs && (
+            <LiveLogTerminal
+              taskId={watchingLogs.id}
+              running={watchingLogsLive ? isRunning(watchingLogsLive) : false}
+              className="min-h-0 flex-1"
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>
