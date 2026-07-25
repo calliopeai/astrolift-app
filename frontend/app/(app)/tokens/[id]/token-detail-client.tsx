@@ -47,7 +47,7 @@ export function TokenDetailClient({ id }: { id: string }) {
     <EntityDetailShell
       loading={loading}
       notFound={!tk}
-      breadcrumb={{ label: "API tokens", href: "/tokens" }}
+      breadcrumb={{ label: "API keys", href: "/tokens" }}
       heading={tk ? tk.name : `Token ${id.slice(0, 8)}`}
       status={state}
       statusTone={stateTone}

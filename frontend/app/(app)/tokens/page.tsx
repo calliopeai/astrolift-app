@@ -4,7 +4,7 @@ import { PreloadQuery } from "@/lib/apollo";
 import { AdministrationSubnav } from "../administration/administration-subnav";
 import { TokensClient } from "./tokens-client";
 
-export const metadata = { title: "API tokens · Astrolift" };
+export const metadata = { title: "API keys · Astrolift" };
 
 // /tokens is the canonical Tokens surface but lives at the top level rather
 // than under /administration (see administration-subnav.tsx, #893). Render the

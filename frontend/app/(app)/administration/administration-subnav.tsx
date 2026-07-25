@@ -3,11 +3,8 @@
 import {
   BarChart3Icon,
   BuildingIcon,
-  CoinsIcon,
   FileBoxIcon,
-  GaugeIcon,
   KeyIcon,
-  LockIcon,
   ScaleIcon,
   ScrollTextIcon,
   UsersIcon,
@@ -38,14 +35,15 @@ const GROUPS: SubnavLink[][] = [
     { href: "/administration/teams", label: "Teams", icon: <UsersRoundIcon className="size-4" /> },
     { href: "/administration/projects", label: "Projects", icon: <FileBoxIcon className="size-4" /> },
     { href: "/administration/policies", label: "Policies", icon: <ScaleIcon className="size-4" /> },
-    { href: "/administration/permissions", label: "Permissions", icon: <LockIcon className="size-4" /> },
+    // Permissions hidden pending a proper redesign (backlog). Route still
+    // exists but is unlinked so operators don't land on a non-actionable page.
   ],
   // Usage & Governance — spend, limits, usage, and the audit trail.
   [
-    { href: "/administration/cost", label: "Cost", icon: <CoinsIcon className="size-4" /> },
-    { href: "/administration/quotas", label: "Quotas", icon: <GaugeIcon className="size-4" /> },
+    // Cost + Quotas hidden pending real implementations (backlog). Routes
+    // remain but are unlinked until they surface real data/controls.
     { href: "/administration/metrics", label: "Metrics", icon: <BarChart3Icon className="size-4" /> },
-    { href: "/tokens", label: "Tokens", icon: <KeyIcon className="size-4" /> },
+    { href: "/tokens", label: "API Keys", icon: <KeyIcon className="size-4" /> },
     { href: "/administration/audit", label: "Audit", icon: <ScrollTextIcon className="size-4" /> },
   ],
 ];

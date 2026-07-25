@@ -188,7 +188,7 @@ export function TokensClient() {
   return (
     <TooltipProvider>
       <PageShell
-        title="API tokens"
+        title="API keys"
         description="Long-lived bearer credentials for CLIs, bots, and scripts. Tokens are hashed at rest — the plaintext is shown exactly once at creation."
         actions={
           <Can permission="api_token.create">
@@ -241,7 +241,7 @@ export function TokensClient() {
               <div className="p-6">
                 <EmptyState
                   icon={<KeyIcon className="size-5" />}
-                  title="No API tokens"
+                  title="No API keys"
                   description="Create one to authenticate the CLI, CI runs, or your own scripts against the platform."
                 />
               </div>
