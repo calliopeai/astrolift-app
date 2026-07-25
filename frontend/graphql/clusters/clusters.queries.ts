@@ -611,6 +611,46 @@ export const CLUSTER_PROMETHEUS_RANGE_METRICS = gql`
   }
 `;
 
+// Cloud-provider (CloudWatch ALB) system/ingress metrics for the
+// platform metrics dashboard's System metrics panel. AWS-only — non-AWS
+// providers return available=false / reason='not_supported'. Sources
+// request rate, error rate, and p95 latency from CloudWatch with no
+// in-app instrumentation. Omit appNamespace and the backend picks the
+// cluster's primary app namespace (falls back to astrolift-system),
+// echoing the resolved scope back.
+export const CLUSTER_SYSTEM_METRICS = gql`
+  query ClusterSystemMetrics(
+    $clusterId: GUID!
+    $appNamespace: String
+    $rangeSeconds: Int
+    $stepSeconds: Int
+  ) {
+    astroliftClusterSystemMetrics(
+      clusterId: $clusterId
+      appNamespace: $appNamespace
+      rangeSeconds: $rangeSeconds
+      stepSeconds: $stepSeconds
+    ) {
+      available
+      reason
+      source
+      appNamespace
+      rangeSeconds
+      stepSeconds
+      series {
+        metric
+        label
+        unit
+        current
+        points {
+          ts
+          value
+        }
+      }
+    }
+  }
+`;
+
 // Certificate picker for the SNI / custom-domain field (#858). Lists
 // the cluster provider's TLS certs (AWS → ACM via the EKS driver) so
 // the operator selects instead of pasting an ARN. `supported` is false

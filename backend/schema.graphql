@@ -1209,6 +1209,29 @@ type AstroliftClusterPrometheusRangeSeries {
   points: [AstroliftClusterPrometheusRangePoint!]!
 }
 
+type AstroliftClusterSystemMetricPoint {
+  ts: Float!
+  value: Float!
+}
+
+type AstroliftClusterSystemMetricSeries {
+  metric: String!
+  label: String!
+  unit: String!
+  current: Float
+  points: [AstroliftClusterSystemMetricPoint!]!
+}
+
+type AstroliftClusterSystemMetrics {
+  available: Boolean!
+  reason: String
+  source: String!
+  appNamespace: String!
+  rangeSeconds: Int!
+  stepSeconds: Int!
+  series: [AstroliftClusterSystemMetricSeries!]!
+}
+
 type AstroliftClusterWorkflowRun {
   workflowId: String!
   workflowType: String!
@@ -5171,6 +5194,7 @@ type Query {
   astroliftClusterBootstrapPlan(clusterId: GUID!): AstroliftClusterBootstrapPlan
   astroliftClusterPrometheusMetrics(clusterId: GUID!): AstroliftClusterPrometheusMetrics!
   astroliftClusterPrometheusRangeMetrics(clusterId: GUID!, rangeSeconds: Int! = 3600, stepSeconds: Int! = 60): AstroliftClusterPrometheusRangeMetrics!
+  astroliftClusterSystemMetrics(clusterId: GUID!, appNamespace: String = null, rangeSeconds: Int! = 3600, stepSeconds: Int! = 300): AstroliftClusterSystemMetrics!
   astroliftClusterWorkloadHealth(clusterId: GUID!): [AstroliftClusterWorkloadHealth!]!
   astroliftClusterCertificates(clusterId: GUID!): AstroliftClusterCertificates!
   astroliftDnsZones(dnsDriver: String!): AstroliftDnsZones!

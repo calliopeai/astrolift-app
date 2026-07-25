@@ -659,6 +659,73 @@ class ClusterPrometheusRangeMetricsType:
     series: list[ClusterPrometheusRangeSeriesType]
 
 
+# ---- Cloud system metrics (CloudWatch ALB) -------------------------
+
+
+@strawberry.type(name="AstroliftClusterSystemMetricPoint")
+class ClusterSystemMetricPointType:
+    """A single (unix timestamp, value) data point in a system-metric
+    series — same wire shape as the Prometheus range point."""
+
+    ts: float
+    value: float
+
+
+@strawberry.type(name="AstroliftClusterSystemMetricSeries")
+class ClusterSystemMetricSeriesType:
+    """One named cloud-provider metric time series (e.g. ALB request
+    rate) for the platform metrics dashboard."""
+
+    metric: str
+    """Machine key — 'request_rate' | 'error_rate' | 'latency_p95'."""
+
+    label: str
+    """Human-readable display label for the chart card header."""
+
+    unit: str
+    """'rps' | 'ratio' | 'seconds' — how the UI should format the value."""
+
+    current: float | None
+    """Last point's value; None when the provider returned no data."""
+
+    points: list[ClusterSystemMetricPointType]
+
+
+@strawberry.type(name="AstroliftClusterSystemMetrics")
+class ClusterSystemMetricsType:
+    """Cloud-provider system/ingress metrics for a cluster, powering the
+    platform metrics dashboard's "System metrics" panel.
+
+    Unlike the in-cluster Prometheus metrics, these come from the cloud
+    provider's own monitoring service (CloudWatch ALB metrics on AWS) and
+    need no in-app instrumentation — every managed app on AWS sits behind
+    an ALB that emits RequestCount / 5XX / TargetResponseTime
+    automatically. ``available`` is False with:
+
+    * reason='not_supported' — the cluster's provider has no cloud-metrics
+      driver wired (GCP / Azure / k8s_native today); the UI shows a
+      "not available for this provider" state.
+    * reason='unreachable' — the provider API call failed (no creds,
+      throttled).
+
+    When ``available`` is True the ``series`` are always present; an empty
+    ``points`` list inside a series is the "no traffic in this window"
+    state (the queried namespace may not front an internet-facing ALB)."""
+
+    available: bool
+    reason: str | None
+    source: str
+    """Provider metrics source — 'cloudwatch' when available, '' otherwise."""
+
+    app_namespace: str
+    """The Kubernetes namespace whose ingress ALB was measured. Echoed so
+    the UI can label the panel with the scope it actually reflects."""
+
+    range_seconds: int
+    step_seconds: int
+    series: list[ClusterSystemMetricSeriesType]
+
+
 # ---- Provider region picker (#860) ---------------------------------
 
 

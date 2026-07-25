@@ -23,6 +23,9 @@ from astrolift_clusters.schema.types import (
     ClusterPrometheusRangeMetricsType,
     ClusterPrometheusRangePointType,
     ClusterPrometheusRangeSeriesType,
+    ClusterSystemMetricPointType,
+    ClusterSystemMetricSeriesType,
+    ClusterSystemMetricsType,
     ClusterWorkflowRunType,
     ClusterWorkloadHealthType,
     CognitoUserPoolClientType,
@@ -46,6 +49,34 @@ from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
 log = logging.getLogger(__name__)
+
+
+def _primary_app_namespace(cluster) -> str:
+    """Alphabetically-first app namespace bound to *cluster*, or
+    ``astrolift-system`` when the cluster hosts no managed apps yet.
+
+    Lets ``astroliftClusterSystemMetrics`` default to a namespace that
+    actually fronts an ingress ALB (a deployed app) so the platform
+    metrics panel shows real traffic instead of the empty system
+    namespace. Mirrors the namespace collection
+    ``astroliftClusterWorkloadHealth`` already does."""
+    from astrolift_lifecycle.models.app_environment import AppEnvironment
+    from core.cluster_observability import namespace_for_app
+
+    envs = (
+        AppEnvironment.objects.filter(
+            tenant_cluster=cluster,
+            registered_app__deleted_at__isnull=True,
+        )
+        .select_related("registered_app__organization")
+        .only(
+            "registered_app__slug",
+            "registered_app__k8s_namespace",
+            "registered_app__organization__slug",
+        )
+    )
+    namespaces = sorted({namespace_for_app(ae.registered_app) for ae in envs})
+    return namespaces[0] if namespaces else "astrolift-system"
 
 
 @strawberry.type
@@ -899,6 +930,163 @@ class ClustersQuery:
             range_seconds=range_seconds,
             step_seconds=step_seconds,
             series=series,  # type: ignore[arg-type]
+        )
+
+    @strawberry.field
+    @require_permission(Permission.CLUSTER_REGISTER)
+    @tenant_scoped()
+    def astrolift_cluster_system_metrics(
+        self,
+        info: Info,
+        cluster_id: GUID,
+        app_namespace: str | None = None,
+        range_seconds: int = 3600,
+        step_seconds: int = 300,
+    ) -> ClusterSystemMetricsType:
+        """Cloud-provider system/ingress metrics for the platform metrics
+        dashboard's "System metrics" panel.
+
+        Sources request rate, error rate, and p95 latency from the cloud
+        provider's own monitoring service via the cluster driver's
+        ``get_alb_http_metrics`` — on AWS this is CloudWatch ALB metrics
+        (RequestCount / HTTPCode_Target_5XX_Count / TargetResponseTime),
+        which every managed app emits automatically with no in-app
+        instrumentation. This complements the in-cluster
+        ``astroliftClusterPrometheusMetrics`` with a source that works even
+        when Prometheus isn't scraping HTTP series yet.
+
+        AWS-only today: non-AWS providers (GCP / Azure / k8s_native) have
+        no cloud-metrics driver wired and return ``available=False`` with
+        ``reason='not_supported'`` so the UI degrades to a clear
+        "not available for this provider" state rather than a blank panel.
+        A driver-call failure yields ``reason='unreachable'``.
+
+        ``app_namespace`` selects which ingress ALB to measure; when
+        omitted the resolver picks the alphabetically-first app namespace
+        bound to the cluster (falling back to ``astrolift-system``) so the
+        default view reflects real ingress traffic. The resolved namespace
+        is echoed back so the UI can label the panel with the scope it
+        actually measured. Inputs are clamped (range 5m–7d, step 60s–3600s)
+        so a rogue caller can't ask CloudWatch for an absurd datapoint
+        count."""
+        import time as _time
+
+        from core.cluster_management import (
+            ClusterManagementError,
+            cluster_alb_http_metrics_dispatch,
+        )
+
+        tenant = get_current_tenant()
+        cluster = (
+            TenantCluster.objects.filter(
+                Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+                guid=str(cluster_id),
+                deleted_at__isnull=True,
+            )
+            .select_related("provider_plugin")
+            .first()
+        )
+        if cluster is None:
+            return ClusterSystemMetricsType(
+                available=False,
+                reason=None,
+                source="",
+                app_namespace="",
+                range_seconds=range_seconds,
+                step_seconds=step_seconds,
+                series=[],
+            )
+
+        provider_slug = (
+            cluster.provider_plugin.slug if cluster.provider_plugin_id and cluster.provider_plugin else ""
+        ).lower()
+        if provider_slug != "aws":
+            # Only the AWS/EKS driver implements get_alb_http_metrics today.
+            # GCP / Azure / k8s_native have no cloud-metrics driver wired —
+            # surface a clear not-supported state instead of an empty panel.
+            return ClusterSystemMetricsType(
+                available=False,
+                reason="not_supported",
+                source="",
+                app_namespace="",
+                range_seconds=range_seconds,
+                step_seconds=step_seconds,
+                series=[],
+            )
+
+        namespace = (app_namespace or "").strip() or _primary_app_namespace(cluster)
+
+        # Clamp: range 5m–7d, step 60s–3600s. CloudWatch bills per datapoint
+        # and rejects requests over its per-call datapoint ceiling.
+        range_seconds = max(300, min(int(range_seconds), 7 * 86400))
+        step_seconds = max(60, min(int(step_seconds), 3600))
+
+        end_unix = int(_time.time())
+        start_unix = end_unix - range_seconds
+
+        log.info(
+            "system_metrics: cluster=%s ns=%s range=%ss step=%ss",
+            cluster_id,
+            namespace,
+            range_seconds,
+            step_seconds,
+        )
+        try:
+            raw = cluster_alb_http_metrics_dispatch(
+                cluster=cluster,
+                app_namespace=namespace,
+                start_unix=start_unix,
+                end_unix=end_unix,
+                step_seconds=step_seconds,
+            )
+        except ClusterManagementError as exc:
+            log.warning(
+                "system_metrics: dispatch failed cluster=%s ns=%s err=%s",
+                cluster_id,
+                namespace,
+                exc,
+            )
+            return ClusterSystemMetricsType(
+                available=False,
+                reason="unreachable",
+                source="",
+                app_namespace=namespace,
+                range_seconds=range_seconds,
+                step_seconds=step_seconds,
+                series=[],
+            )
+
+        # (machine key, display label, unit, CloudWatch dispatch key). We
+        # surface p95 latency rather than every quantile the driver returns
+        # to keep the platform panel to three legible golden-signal charts;
+        # the per-app Observability tab carries the full latency spread.
+        _SPECS = (
+            ("request_rate", "Request rate", "rps", "rps"),
+            ("error_rate", "Error rate", "ratio", "error_rate"),
+            ("latency_p95", "Latency p95", "seconds", "latency_p95"),
+        )
+        series: list[ClusterSystemMetricSeriesType] = []
+        for metric, label, unit, cw_key in _SPECS:
+            pairs = raw.get(cw_key) or []
+            points = [ClusterSystemMetricPointType(ts=float(ts), value=float(val)) for ts, val in pairs]
+            series.append(
+                ClusterSystemMetricSeriesType(
+                    metric=metric,
+                    label=label,
+                    unit=unit,
+                    current=points[-1].value if points else None,
+                    points=points,
+                ),
+            )
+
+        return ClusterSystemMetricsType(
+            available=True,
+            reason=None,
+            source="cloudwatch",
+            app_namespace=namespace,
+            range_seconds=range_seconds,
+            step_seconds=step_seconds,
+            series=series,
         )
 
     @strawberry.field
