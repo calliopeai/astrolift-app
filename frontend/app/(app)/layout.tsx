@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
+import { CombinedGraphQLErrors } from "@apollo/client/errors";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { CommandPalette } from "@/components/CommandPalette";
@@ -18,6 +19,20 @@ import { LIST_ORGANIZATIONS } from "@/graphql/identity/identity.queries";
 import type { CurrentUser, MeQueryData, MeQueryVariables } from "@/graphql/user/user.types";
 import { PageHeader } from "@/components/PageHeader";
 
+// A caught SSR identity error is an auth failure (send to /auth/login) only
+// when it's a GraphQL UNAUTHENTICATED or an HTTP 401 — mirrors the client
+// errorLink. Anything else (network blip, 5xx) is transient and must NOT log
+// an authenticated operator out.
+function isUnauthenticated(err: unknown): boolean {
+  if (CombinedGraphQLErrors.is(err)) {
+    return err.errors.some((e) => e.extensions?.code === "UNAUTHENTICATED");
+  }
+  const status =
+    (err as { statusCode?: number })?.statusCode ??
+    (err as { networkError?: { statusCode?: number } })?.networkError?.statusCode;
+  return status === 401;
+}
+
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Check for auth token in cookies — if no token at all, redirect to login
   const cookieStore = await cookies();
@@ -28,6 +43,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   let ssrUser: CurrentUser | null = null;
+  let sessionInvalid = false;
 
   try {
     const client = await getClient();
@@ -44,9 +60,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       client.query({ query: LIST_ORGANIZATIONS }),
     ]);
     ssrUser = meResult.data?.me ?? null;
-  } catch {
-    // network error or invalid token — don't redirect here,
-    // let client-side Apollo errorLink handle UNAUTHENTICATED
+  } catch (err) {
+    // A stale/expired token cookie is still *present* (so the cookie check
+    // above passes), but the identity query comes back UNAUTHENTICATED. Treat
+    // that exactly like no token at all — redirect to /auth/login rather than
+    // rendering a broken dashboard. redirect() must run OUTSIDE this try (it
+    // throws a control-flow signal that the catch would otherwise swallow), so
+    // flag it and redirect below. Transient NETWORK errors are NOT auth
+    // failures — leave those to the client errorLink so a blip doesn't bounce
+    // an authenticated operator.
+    if (isUnauthenticated(err)) {
+      sessionInvalid = true;
+    }
+  }
+
+  if (sessionInvalid) {
+    redirect("/auth/login");
   }
 
   return (

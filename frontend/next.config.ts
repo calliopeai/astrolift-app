@@ -22,7 +22,26 @@ const nextConfig: NextConfig = {
   // /app/gql/config/ proxies cleanly to the backend.
   skipTrailingSlashRedirect: true,
   async rewrites() {
+    // An agent IS a RegisteredApp, so its platform pages (config, CI/CD,
+    // settings, security, secrets, tokens, deployments…) physically live under
+    // /apps/<slug>/*. We want operators to STAY in agent context — the URL
+    // should read /agents/<slug>/settings, not jump to /apps. These afterFiles
+    // rewrites map the 13 app-platform segments under /agents/* onto the
+    // existing /apps/* pages (the agent's own BROCS pillar routes —
+    // build/control/observe/overview/run/secure — are real files, so they win
+    // over these and are never shadowed). Agent slug == app slug for agents, so
+    // :slug carries straight through to the correct app.
+    const AGENT_APP_SEGMENTS =
+      "config|manifest|webhooks|deployments|environments|domains|managed-services|observability|settings|members|security|secrets|tokens";
     return [
+      {
+        source: `/agents/:slug/:seg(${AGENT_APP_SEGMENTS})`,
+        destination: "/apps/:slug/:seg",
+      },
+      {
+        source: `/agents/:slug/:seg(${AGENT_APP_SEGMENTS})/:rest*`,
+        destination: "/apps/:slug/:seg/:rest*",
+      },
       // Explicit rule for the GraphQL endpoint preserves the trailing
       // slash that Django requires (POST + APPEND_SLASH won't redirect).
       { source: "/app/gql/config/", destination: `${apiOrigin}/app/gql/config/` },

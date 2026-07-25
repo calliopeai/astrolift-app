@@ -22,9 +22,11 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 // The underlying RegisteredApp's platform submenus. An agent is an app, so
-// these pages already exist at /apps/<appSlug>/<seg>; the agent surface just
-// never linked to them. Kept as a flat leaf row (the agent already has the
-// BROCS pillar bar above, so we don't repeat pillars).
+// these pages physically live at /apps/<appSlug>/<seg>, but we link them under
+// /agents/<appSlug>/<seg> so the operator stays in agent context — a
+// next.config rewrite maps those URLs onto the /apps pages. Kept as a flat leaf
+// row (the agent already has the BROCS pillar bar above, so we don't repeat
+// pillars).
 const LINKS: { seg: string; label: string; Icon: typeof RocketIcon }[] = [
   { seg: "config", label: "Config", Icon: SlidersHorizontalIcon },
   { seg: "manifest", label: "Manifest", Icon: FileCodeIcon },
@@ -50,7 +52,7 @@ export function AppPlatformLinks({ appSlug }: { appSlug: string }) {
           App
         </span>
         {LINKS.map(({ seg, label, Icon }) => {
-          const href = `/apps/${appSlug}/${seg}`;
+          const href = `/agents/${appSlug}/${seg}`;
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link
