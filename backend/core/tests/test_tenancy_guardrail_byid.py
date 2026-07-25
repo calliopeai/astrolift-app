@@ -27,8 +27,15 @@ For every function in the scanned schema modules that is EITHER
 
 we AST-walk the body for ``.filter(...)`` / ``.get(...)`` calls and FLAG
 a call when it has a keyword argument whose name is exactly one of
-``{guid, slug, id, pk}`` (FK kwargs like ``registered_app=`` are NOT
-identifiers) AND the call carries no org-path constraint.
+``{guid, slug, id, pk}`` — or the bulk-by-global-id form ``guid__in`` /
+``slug__in`` (a plural fetch of globally-unique keys leaks across orgs
+the same way a single ``guid=`` does) — (FK kwargs like ``registered_app=``
+are NOT identifiers) AND the call carries no org-path constraint.
+
+``pk__in`` / ``id__in`` are deliberately NOT flagged: they address rows
+by internal integer pk and are dominated by safe batch-resolution of
+ids that were already org-scoped when gathered (dataloaders, label
+helpers), so flagging them would be pure noise.
 
 A flagged call is a *candidate leak* unless one of the escape hatches
 below holds. Each escape hatch mirrors a genuinely-safe pattern already
@@ -88,6 +95,14 @@ BACKEND = Path(__file__).resolve().parents[2]
 # (``registered_app=``) are deliberately excluded — filtering by a FK is
 # not a by-id fetch.
 ID_KWARGS: frozenset[str] = frozenset({"guid", "slug", "id", "pk"})
+
+# Bulk-by-global-id: a ``guid__in=`` / ``slug__in=`` fetch is the plural
+# form of the same cross-org leak (guids/slugs are globally unique, so a
+# caller-supplied id list reaches across orgs). ``pk__in`` / ``id__in``
+# are intentionally excluded — those address internal integer pks and are
+# dominated by safe batch-resolution of already-scoped ids (dataloaders,
+# label helpers), so flagging them would be noise, not signal.
+BULK_ID_KWARGS: frozenset[str] = frozenset({"guid__in", "slug__in"})
 
 # Parameter-name shapes that put a plain (non-resolver) function in scope.
 _ID_PARAM_EXACT: frozenset[str] = frozenset({"id", "guid", "slug", "pk"})
@@ -274,6 +289,14 @@ EXEMPT: dict[str, str] = {
         "``team`` was resolved org-scoped via _resolve_team(team_id, org_id) "
         "just above — a slug-uniqueness check within the caller's own team."
     ),
+    "astrolift_identity::IdentityMutation.bulk_assign_astrolift_team_member_roles": (
+        "parent-scoped bulk fetch: the ``Member.objects.filter(guid__in=...)`` "
+        "is constrained to ``scope_kind=TEAM, scope_id=team.pk`` where ``team`` "
+        "was resolved org-scoped via _resolve_team(team_id, org_id) above, so a "
+        "member guid from a sibling team/org simply doesn't match and reads as "
+        "not-found. The per-call rule can't see that ``scope_id=team.pk`` is an "
+        "org-bound scope (the value is an instance attr, not a caller-org var)."
+    ),
     "astrolift_lifecycle::LifecycleMutation.run_task": (
         "parent-scoped: ``Workload.objects.filter(slug=..., "
         "registered_app=app)`` where ``app`` was resolved org-scoped just "
@@ -458,7 +481,7 @@ def _flagged_calls(fn: ast.FunctionDef | ast.AsyncFunctionDef):
     for node in ast.walk(fn):
         if isinstance(node, ast.Call) and _call_name(node.func) in _FILTER_METHODS:
             for kw in node.keywords:
-                if kw.arg in ID_KWARGS:
+                if kw.arg in ID_KWARGS or kw.arg in BULK_ID_KWARGS:
                     yield node, kw
                     break
 
@@ -722,6 +745,31 @@ def test_ignores_function_with_no_id_param_and_no_decorator() -> None:
 def test_fk_kwarg_is_not_an_identifier() -> None:
     """``registered_app=`` is a FK, not a by-id identifier — not flagged."""
     src = "def f(app_id):\n    return Env.objects.filter(registered_app=app_id).first()\n"
+    assert _residuals(src) == []
+
+
+def test_flags_bulk_by_guid_in() -> None:
+    """A bare ``filter(guid__in=ids)`` is the plural form of the leak."""
+    src = "def _resolve(binding_id):\n    return list(Thing.objects.filter(guid__in=[binding_id]))\n"
+    assert [r[2] for r in _residuals(src)] == ["guid__in"]
+
+
+def test_bulk_pk_in_is_not_flagged() -> None:
+    """``pk__in`` / ``id__in`` address internal integer pks (safe batch
+    resolution of already-scoped ids) — deliberately out of scope so the
+    guard doesn't drown in dataloader/label-helper false positives."""
+    src = "def _resolve(user_id):\n    return list(User.objects.filter(pk__in=[user_id]))\n"
+    assert _residuals(src) == []
+
+
+def test_bulk_by_guid_in_cleared_by_org_scope_helper() -> None:
+    """The same escape hatches apply to the bulk form: a chained
+    ``_org_scope_q(org_id)`` clears a ``guid__in`` fetch."""
+    src = (
+        "def _resolve(binding_id, org_id):\n"
+        "    return list(RoleBinding.objects.filter(guid__in=[binding_id])"
+        ".filter(_org_scope_q(org_id)))\n"
+    )
     assert _residuals(src) == []
 
 
