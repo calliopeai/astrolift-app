@@ -291,7 +291,11 @@ class IdentityQuery:
             PROJECT_SLUG.validate(slug)
         except NamingViolation:
             return False
-        qs = Project.objects.filter(team_id=team.pk, slug=slug)
+        # Uniqueness is per-team; the explicit ``organization_id`` clause
+        # keeps the fetch fail-closed on the caller's org (denormalized and
+        # always equal to ``team.organization_id``) so the boundary is
+        # visible on the query itself, not only via the org-scoped team above.
+        qs = Project.objects.filter(team_id=team.pk, slug=slug, organization_id=org_id)
         if exclude_id is not None:
             qs = qs.exclude(guid=str(exclude_id))
         return not qs.exists()

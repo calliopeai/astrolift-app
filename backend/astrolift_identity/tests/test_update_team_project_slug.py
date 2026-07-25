@@ -258,6 +258,24 @@ def test_update_project_cross_tenant_returns_not_found(project, org, other_org, 
     assert project.slug == "api"
 
 
+def test_update_project_slug_same_across_orgs_is_allowed(project, org, other_org, permission_resolver):
+    # Another org owning the same project slug (under its own team) must NOT
+    # block this org's rename. Project slugs are unique per team, and the
+    # resolver's ``organization_id`` clause keeps the collision check inside
+    # the caller's tenant — a globally-unique-looking slug in another org
+    # must never surface as a phantom cross-org CONFLICT (#1183).
+    other_team = Team.objects.create(name="Platform", slug="platform", organization=other_org)
+    Project.objects.create(name="Gateway", slug="gateway", team=other_team)
+    permission_resolver.grant(Permission.PROJECT_UPDATE)
+    with _ctx(org):
+        result = IdentityMutation().update_project(
+            _info(), input=UpdateProjectInput(id=str(project.guid), slug="gateway")
+        )
+    assert result.ok is True
+    project.refresh_from_db()
+    assert project.slug == "gateway"
+
+
 # ---- astroliftTeamSlugAvailable ---------------------------------------
 
 
@@ -371,6 +389,23 @@ def test_project_slug_available_false_for_cross_tenant_team(
                 _info(), team_id=str(team.guid), slug="brand-new"
             )
             is False
+        )
+
+
+def test_project_slug_available_isolated_across_orgs(team, org, other_org, permission_resolver):
+    # A project slug taken only in ANOTHER org's team must read as available
+    # for the caller's own team. The resolver's ``organization_id`` clause
+    # keeps the per-team uniqueness check inside the caller's tenant so a
+    # same-named project in a foreign org never leaks as "taken" (#1183).
+    other_team = Team.objects.create(name="Engineering", slug="engineering", organization=other_org)
+    Project.objects.create(name="Gateway", slug="gateway", team=other_team)
+    permission_resolver.grant(Permission.PROJECT_UPDATE)
+    with _ctx(org):
+        assert (
+            IdentityQuery().astrolift_project_slug_available(
+                _info(), team_id=str(team.guid), slug="gateway"
+            )
+            is True
         )
 
 

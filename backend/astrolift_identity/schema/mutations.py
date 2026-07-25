@@ -800,8 +800,14 @@ class IdentityMutation:
                     "with a letter, and be at most 40 characters",
                     field="slug",
                 )
+            # Uniqueness is per-team; the explicit ``organization_id`` clause
+            # keeps the fetch fail-closed on the caller's org (denormalized
+            # and always equal to the team's org) so the tenant boundary is
+            # visible on the query, not only via the org-scoped project above.
             if (
-                Project.objects.filter(team_id=project.team_id, slug=input.slug)
+                Project.objects.filter(
+                    team_id=project.team_id, slug=input.slug, organization_id=org_id
+                )
                 .exclude(pk=project.pk)
                 .exists()
             ):
