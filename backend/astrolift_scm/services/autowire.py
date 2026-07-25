@@ -121,11 +121,60 @@ def run_autowire(app: RegisteredApp, *, actor=None) -> AutowireOutcome:
     return _persist(app, AutowireOutcome(connected=True, steps=steps, errors=errors))
 
 
+def _ensure_ci_push_role(app: RegisteredApp) -> str:
+    """Provision (or reuse) the OIDC CI push role and persist its ARN to
+    ``app.push_role_ref`` so the rendered workflow's
+    ``aws-actions/configure-aws-credentials`` step assumes a real role via
+    GitHub OIDC. Without this the field is blank and OIDC fails with
+    "Could not load credentials from any providers".
+
+    Idempotent (``ensure_ci_push_role`` reuses the role). Returns a non-empty
+    error string only on a genuine provisioning FAILURE — a no-op ("") when the
+    app has no bound cluster, no source repo, or the registry driver doesn't
+    support push roles (those are "unwired", not failures). Runs at the top of
+    the ci_workflow step so the very next render sees the populated ref; this is
+    what makes ``retryAstroliftAutowire`` self-heal an app whose provision-time
+    best-effort push-role step (app_lifecycle) had silently failed.
+    """
+    cluster = app.default_tenant_cluster
+    if cluster is None or not (app.source_repo or "").strip():
+        return ""
+    try:
+        from core.app_deploy import driver_for_capability
+
+        driver = driver_for_capability(cluster, "registry")
+    except Exception as exc:  # noqa: BLE001 — no registry driver here: leave as-is
+        logger.warning("autowire: registry driver unavailable for %s: %s", app.slug, exc)
+        return ""
+    if not hasattr(driver, "ensure_ci_push_role"):
+        return ""
+    try:
+        push_role = driver.ensure_ci_push_role(
+            repo=f"{app.organization.slug}/{app.slug}",
+            scm_provider=app.source_kind,
+            scm_repo_full_name=app.source_repo,
+        )
+    except Exception as exc:  # noqa: BLE001 — surface, don't swallow (the whole point)
+        logger.exception("autowire: ensure_ci_push_role failed for %s", app.slug)
+        return _msg(exc)
+    ref = (getattr(push_role, "role_ref", "") or "").strip()
+    if ref and ref != (app.push_role_ref or ""):
+        app.push_role_ref = ref
+        app.save(update_fields=["push_role_ref", "updated_at", "version"])
+    return ""
+
+
 def _step_workflow(app: RegisteredApp, *, actor) -> tuple[str, str]:
     from astrolift_scm.services.workflow_sync import (
         WorkflowSyncError,
         sync_workflow_file_to_repo,
     )
+
+    # Provision + persist the OIDC push role BEFORE rendering, so the generated
+    # workflow gets a real role-to-assume instead of a blank one.
+    role_err = _ensure_ci_push_role(app)
+    if role_err:
+        return ERROR, role_err
 
     try:
         result = sync_workflow_file_to_repo(app, viewer_user=actor)
