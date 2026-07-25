@@ -267,6 +267,17 @@ _SOFT_DELETED_RECORD_KINDS = frozenset(
         "DeployToken",
         "AppDomain",
         "PreviewEnvironment",
+        # #1213 — per-app-owned rows that were surviving deregister. The
+        # nullable-FK app-scoped ones (WebhookSubscription, SshDeployKey)
+        # soft-delete only rows where registered_app == the app; their
+        # org-scoped (null-FK) siblings are left alone.
+        "UserAlertSubscription",
+        "RetentionPolicy",
+        "AppSecretMetadata",
+        "SecretChangeProposal",
+        "AppTeamAccess",
+        "WebhookSubscription",
+        "SshDeployKey",
     }
 )
 
@@ -276,6 +287,22 @@ _RETAINED_RECORD_KINDS = frozenset(
         "EventLog",
         "DeploymentLog",
         "WorkflowHistory",
+        # Telemetry / history kept for audit + billing (#1213): Event and
+        # AppUptimeResult are append-only signal logs, WorkflowRun mirrors
+        # Temporal history, CostSnapshot is immutable billing.
+        "Event",
+        "AppUptimeResult",
+        "WorkflowRun",
+        "CostSnapshot",
+        # Org-owned rows that merely reference an app via a nullable SET_NULL
+        # FK — designed to outlive the app (Pipeline documents this on the
+        # field itself), so a deregister must not delete them.
+        "Pipeline",
+        "Brief",
+        # Row retained (audit-like, mirrors AuditExport); its live download
+        # credential is separately revoked on deregister since the model has
+        # no soft-delete field. See _soft_delete_app_records_sync.
+        "AppLogExport",
     }
 )
 

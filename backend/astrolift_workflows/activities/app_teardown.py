@@ -287,16 +287,50 @@ async def revoke_app_deploy_tokens(registered_app_id: int) -> int:
 
 
 def _soft_delete_app_records_sync(registered_app_id: int) -> dict[str, int]:
-    """Final soft-delete pass. Walks the SOFT_DELETE record kinds
-    catalog from the policy module and soft-deletes the app's
-    associated rows. The audit / event log kinds are intentionally
-    NOT touched (they're the record of what happened).
+    """Final soft-delete pass. Soft-deletes the app's per-app business
+    rows so none outlive the RegisteredApp. The audit / event / cost /
+    uptime log kinds are intentionally NOT touched (they're the record
+    of what happened), and org-owned rows that merely *reference* an app
+    via a nullable SET_NULL FK (Pipeline, Brief) are left to survive the
+    app per their model contract.
+
+    #1213: the original pass keyed cleanup off a handful of registered_app
+    FKs, so several per-app rows — some FK-linked, AlertRule slug-linked —
+    survived every deregister (a multi-tenant hygiene leak). This pass now
+    covers every per-app-owned kind. Two get special handling:
+
+    * ``WorkloadIdentityRole`` — only the DB binding row is soft-deleted
+      here; the CLOUD role is already deprovisioned by the earlier
+      ``identity_role`` workflow step (WorkloadIdentityDriver).
+    * ``AppLogExport`` — has no soft-delete field (plain Model), so instead
+      of soft-deleting the row its live download credential is revoked
+      (see below).
+
+    Best-effort + idempotent throughout: every queryset filters on
+    ``deleted_at__isnull=True`` (or ``status=READY`` for the export
+    revoke), so a re-run over an already-torn-down app is a clean no-op.
     """
     from datetime import UTC, datetime
 
     from astrolift_lifecycle.models import AppEnvironment, Deployment
-    from astrolift_registry.models import RegisteredApp, Workload
-    from astrolift_services.models import AppSecretBundleRef
+    from astrolift_operations.models import (
+        AppLogExport,
+        UserAlertSubscription,
+        WebhookSubscription,
+        WorkloadIdentityRole,
+    )
+    from astrolift_registry.models import (
+        AppTeamAccess,
+        RegisteredApp,
+        RetentionPolicy,
+        Workload,
+    )
+    from astrolift_scm.models import SshDeployKey
+    from astrolift_services.models import (
+        AppSecretBundleRef,
+        AppSecretMetadata,
+        SecretChangeProposal,
+    )
 
     now = datetime.now(UTC)
     summary: dict[str, int] = {}
@@ -346,6 +380,118 @@ def _soft_delete_app_records_sync(registered_app_id: int) -> dict[str, int]:
         "workloads",
     )
 
+    # --- Additional per-app rows tied by a registered_app FK (#1213) -------
+    # These per-app business rows all carry a registered_app FK but were NOT
+    # part of the original FK pass above, so they survived every deregister —
+    # the same leak that stranded AlertRule (fixed in f3606fc). Each is
+    # soft-deleted by the app FK so it dies with the app. The shared helper
+    # is best-effort + idempotent (the deleted_at__isnull filter empties on a
+    # re-run).
+
+    # Per-(user, app, alert-kind) notification prefs — meaningless once the
+    # app is gone.
+    _soft_delete_queryset(
+        UserAlertSubscription.objects.filter(
+            registered_app_id=registered_app_id,
+            deleted_at__isnull=True,
+        ),
+        "user_alert_subscriptions",
+    )
+    # Per-(app, signal) retention overrides.
+    _soft_delete_queryset(
+        RetentionPolicy.objects.filter(
+            registered_app_id=registered_app_id,
+            deleted_at__isnull=True,
+        ),
+        "retention_policies",
+    )
+    # Per-(app, env, key) secret-metadata sidecars. The manifest is the system
+    # of record and is torn down with the app; these annotations go with it.
+    _soft_delete_queryset(
+        AppSecretMetadata.objects.filter(
+            registered_app_id=registered_app_id,
+            deleted_at__isnull=True,
+        ),
+        "secret_metadata",
+    )
+    # Quorum-gated secret-change proposals. Soft-delete drops any PENDING row
+    # out of the approval queue for a gone app; the row itself persists under
+    # all_objects for the audit trail. (Child SecretChangeApproval rows are
+    # not cascaded on soft-delete — harmless, only reachable via the now-
+    # hidden proposal.)
+    _soft_delete_queryset(
+        SecretChangeProposal.objects.filter(
+            registered_app_id=registered_app_id,
+            deleted_at__isnull=True,
+        ),
+        "secret_change_proposals",
+    )
+    # Additional-team access grants to the app.
+    _soft_delete_queryset(
+        AppTeamAccess.objects.filter(
+            registered_app_id=registered_app_id,
+            deleted_at__isnull=True,
+        ),
+        "team_accesses",
+    )
+    # Bound workload-identity (IRSA/WI/FI) DB rows. The CLOUD role is
+    # deprovisioned earlier in the workflow (the `identity_role` step calls
+    # WorkloadIdentityDriver.delete_identity_role); only the DB binding row
+    # lingers, so soft-delete it here to match the cloud state.
+    _soft_delete_queryset(
+        WorkloadIdentityRole.objects.filter(
+            registered_app_id=registered_app_id,
+            deleted_at__isnull=True,
+        ),
+        "workload_identity_roles",
+    )
+    # App-scoped outbound webhook subscriptions. Filtering by the FK keeps
+    # org-wide subscriptions (registered_app IS NULL) untouched — only the
+    # subscriptions scoped to THIS app die with it. These are outbound event
+    # deliveries the platform SENDS (we hold no remote artifact to remove), so
+    # soft-delete simply stops the fan-out. (The inbound push webhook the
+    # platform installed on the source repo is a different resource, removed
+    # by the earlier `source_webhook` step.)
+    _soft_delete_queryset(
+        WebhookSubscription.objects.filter(
+            registered_app_id=registered_app_id,
+            deleted_at__isnull=True,
+        ),
+        "webhook_subscriptions",
+    )
+    # App-scoped SSH deploy keys (org-scoped keys — registered_app IS NULL —
+    # are left alone). Soft-delete revokes the platform's stored private-key
+    # material for the app's key.
+    # NOTE(follow-up, #1213): the matching PUBLIC key was pasted into the
+    # repo's deploy-key settings by the operator by hand — the platform never
+    # installed it through an API, so there is no handle to remove it remotely
+    # from here (unlike the source webhook). Removing the pasted key from the
+    # repo is the operator's step; there is no deprovision activity to build
+    # for a manually-installed key.
+    _soft_delete_queryset(
+        SshDeployKey.objects.filter(
+            registered_app_id=registered_app_id,
+            deleted_at__isnull=True,
+        ),
+        "ssh_deploy_keys",
+    )
+
+    # App-log exports (#483, #1213). Token-gated download artifacts for the
+    # app's container logs — a live credential + on-disk file, NOT a
+    # BaseCoreModel, so the table has no soft-delete field and the row can't
+    # join the pass above. A live export left behind is a dangling,
+    # still-downloadable URL to a deregistered app's logs. Revoke access by
+    # expiring every still-READY export (the download view gates purely on
+    # expires_at), mirroring the "revoke loud" deploy-token step. Idempotent:
+    # already-EXPIRED rows don't match the status filter on a re-run.
+    # NOTE(follow-up, #1213): the row itself is retained (audit-like, mirrors
+    # AuditExport). Full row soft-delete would require a migration to add a
+    # deleted_at field to AppLogExport — deliberately out of scope here.
+    summary["app_log_exports_expired"] = AppLogExport.objects.filter(
+        registered_app_id=registered_app_id,
+        status=AppLogExport.Status.READY,
+    ).update(status=AppLogExport.Status.EXPIRED, expires_at=now)
+
     # Load the app row once — needed both for the alert-rule ownership key
     # (org + slug) and for the final app-row soft-delete below.
     app = RegisteredApp.all_objects.get(pk=registered_app_id)
@@ -379,10 +525,16 @@ async def soft_delete_app_records(
 ) -> dict[str, int]:
     """Soft-delete the platform rows associated with the app.
 
-    Per the soft-delete invariant in the policy module: business-
-    record kinds (RegisteredApp, Deployment, AppEnvironment,
-    AppSecretBundleRef, Workload, AlertRule) are soft-deleted; audit +
-    event logs are retained.
+    Per the soft-delete invariant in the policy module, the app's
+    per-app-owned business rows are soft-deleted — RegisteredApp,
+    Deployment, AppEnvironment, AppSecretBundleRef, Workload, AlertRule,
+    UserAlertSubscription, RetentionPolicy, AppSecretMetadata,
+    SecretChangeProposal, AppTeamAccess, WorkloadIdentityRole (DB row),
+    and the app-scoped WebhookSubscription / SshDeployKey rows — while
+    app-log-export download credentials are revoked (the row lacks a
+    soft-delete field). Audit / event / cost / uptime logs and
+    org-owned rows that merely reference the app (Pipeline, Brief) are
+    retained (#1213).
     """
     from asgiref.sync import sync_to_async
 

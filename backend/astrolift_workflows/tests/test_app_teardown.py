@@ -198,6 +198,14 @@ def test_plan_preserves_binding_order():
         "AppEnvironment",
         "Workload",
         "AlertRule",
+        # #1213 — per-app-owned rows now soft-deleted on deregister.
+        "UserAlertSubscription",
+        "RetentionPolicy",
+        "AppSecretMetadata",
+        "SecretChangeProposal",
+        "AppTeamAccess",
+        "WebhookSubscription",
+        "SshDeployKey",
     ],
 )
 def test_business_records_soft_deleted(kind):
@@ -211,6 +219,16 @@ def test_business_records_soft_deleted(kind):
         "EventLog",
         "DeploymentLog",
         "WorkflowHistory",
+        # #1213 — telemetry/history + org-owned app-referencing rows that a
+        # deregister must NOT soft-delete. AppLogExport's row is retained too
+        # (its download credential is revoked separately).
+        "Event",
+        "AppUptimeResult",
+        "WorkflowRun",
+        "CostSnapshot",
+        "Pipeline",
+        "Brief",
+        "AppLogExport",
     ],
 )
 def test_audit_records_retained(kind):

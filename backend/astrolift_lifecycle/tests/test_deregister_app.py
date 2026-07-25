@@ -518,6 +518,294 @@ def test_soft_delete_records_soft_deletes_workloads(app):
     assert app.deleted_at is not None
 
 
+# ---------------------------------------------------------------------------
+# #1213 — deregister soft-delete pass covers every per-app-owned row
+#
+# The original pass keyed cleanup off a handful of registered_app FKs, so
+# per-app rows tied by a *different* FK (or, for AlertRule, a slug ref) were
+# left live on deregister — a multi-tenant hygiene leak. These tests assert
+# the pass now soft-deletes every per-app-owned kind, revokes the one kind
+# with no soft-delete field (AppLogExport), leaves audit/telemetry + org-owned
+# app-referencing rows alone, respects tenant + org scoping, and is idempotent.
+# ---------------------------------------------------------------------------
+
+_EXTRA_FK_LABELS = (
+    "user_alert_subscriptions",
+    "retention_policies",
+    "secret_metadata",
+    "secret_change_proposals",
+    "team_accesses",
+    "workload_identity_roles",
+    "webhook_subscriptions",
+    "ssh_deploy_keys",
+)
+
+
+def _make_app(org, project, team, *, slug):
+    from astrolift_registry.models import RegisteredApp
+
+    return RegisteredApp.objects.create(
+        organization=org,
+        project=project,
+        team=team,
+        name=slug.replace("-", " ").title(),
+        slug=slug,
+        provisioning_status="ready",
+    )
+
+
+def _seed_per_app_rows(*, org, app, actor, cluster):
+    """Create one live row of each newly-covered per-app kind for ``app``.
+
+    Returns ``{label: row}`` keyed by the summary label the teardown pass
+    reports, so callers can assert soft-delete + tenant scoping. Includes the
+    *app-scoped* variant of the two nullable-FK models (WebhookSubscription,
+    SshDeployKey) — their org-scoped (null-FK) siblings are seeded separately.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from astrolift_operations.models import (
+        UserAlertSubscription,
+        WebhookSubscription,
+        WorkloadIdentityRole,
+    )
+    from astrolift_registry.models import AppTeamAccess, RetentionPolicy
+    from astrolift_scm.models import SshDeployKey
+    from astrolift_services.models import AppSecretMetadata, SecretChangeProposal
+
+    return {
+        "user_alert_subscriptions": UserAlertSubscription.objects.create(
+            user=actor,
+            registered_app=app,
+            alert_kind=UserAlertSubscription.AlertKind.DEPLOY_FAILURE.value,
+        ),
+        "retention_policies": RetentionPolicy.objects.create(
+            registered_app=app,
+            signal=RetentionPolicy.Signal.LOGS.value,
+            retention_days=30,
+        ),
+        "secret_metadata": AppSecretMetadata.objects.create(
+            registered_app=app,
+            environment_name="prod",
+            key="API_KEY",
+        ),
+        "secret_change_proposals": SecretChangeProposal.objects.create(
+            registered_app=app,
+            op=SecretChangeProposal.Op.SET.value,
+            payload={"key": "API_KEY", "value": "x"},
+            status=SecretChangeProposal.Status.PENDING.value,
+            required_approver_count=1,
+            expires_at=datetime.now(UTC) + timedelta(days=7),
+        ),
+        "team_accesses": AppTeamAccess.objects.create(
+            registered_app=app,
+            team=app.team,
+            access_level=AppTeamAccess.AccessLevel.VIEWER.value,
+        ),
+        "workload_identity_roles": WorkloadIdentityRole.objects.create(
+            registered_app=app,
+            tenant_cluster=cluster,
+            role_arn="arn:aws:iam::123456789012:role/astrolift-x",
+            service_account=f"astrolift-{app.slug}",
+            namespace=f"{app.slug}-ns",
+        ),
+        "webhook_subscriptions": WebhookSubscription.objects.create(
+            organization=org,
+            registered_app=app,
+            url="https://hooks.example.com/app",
+            secret_hash="deadbeef",
+        ),
+        "ssh_deploy_keys": SshDeployKey.objects.create(
+            organization=org,
+            registered_app=app,
+            name=f"{app.slug}-key",
+            public_key="ssh-ed25519 AAAA...",
+            # (org, fingerprint) is unique per live row — keep it app-distinct.
+            fingerprint_sha256=f"ff:ee:{app.slug}",
+            private_key_ciphertext=b"ciphertext",
+        ),
+    }
+
+
+def _assert_soft_deleted(row):
+    """Row is gone from the default (soft-delete-filtering) manager AND its
+    ``deleted_at`` is stamped (soft, not hard)."""
+    cls = type(row)
+    assert not cls.objects.filter(pk=row.pk).exists()
+    assert cls.all_objects.get(pk=row.pk).deleted_at is not None
+
+
+def test_soft_delete_records_covers_every_per_app_owned_row(
+    app, org, project, team, actor, cluster
+):
+    """#1213: the final soft-delete pass soft-deletes EVERY per-app-owned row
+    (FK- and slug-linked), not just the original handful — while a second
+    app's identical rows and org-scoped (null-FK) rows are left untouched."""
+    from astrolift_operations.models import WebhookSubscription
+    from astrolift_scm.models import SshDeployKey
+    from astrolift_workflows.activities.app_teardown import (
+        _soft_delete_app_records_sync,
+    )
+
+    rows = _seed_per_app_rows(org=org, app=app, actor=actor, cluster=cluster)
+
+    # Control 1 — a second app in the same org with identical row shapes.
+    other = _make_app(org, project, team, slug="other-app")
+    other_rows = _seed_per_app_rows(org=org, app=other, actor=actor, cluster=cluster)
+
+    # Control 2 — org-scoped (registered_app IS NULL) nullable-FK rows: org-wide,
+    # so an app teardown must not touch them.
+    org_webhook = WebhookSubscription.objects.create(
+        organization=org,
+        registered_app=None,
+        url="https://hooks.example.com/org",
+        secret_hash="cafe",
+    )
+    org_key = SshDeployKey.objects.create(
+        organization=org,
+        registered_app=None,
+        name="org-key",
+        public_key="ssh-ed25519 ORG",
+        fingerprint_sha256="aa:bb:org",
+        private_key_ciphertext=b"org",
+    )
+
+    summary = _soft_delete_app_records_sync(app.pk)
+
+    # Every seeded row for THIS app is soft-deleted, and the summary counts it.
+    for label, row in rows.items():
+        _assert_soft_deleted(row)
+        assert summary.get(label) == 1, (label, summary)
+
+    # Controls survive: the other app's rows + the org-scoped null-FK rows.
+    for label, row in other_rows.items():
+        assert type(row).objects.filter(pk=row.pk).exists(), f"other app's {label}"
+    assert WebhookSubscription.objects.filter(pk=org_webhook.pk).exists()
+    assert SshDeployKey.objects.filter(pk=org_key.pk).exists()
+    # And the app itself is soft-deleted (tail of the pass).
+    app.refresh_from_db()
+    assert app.deleted_at is not None
+
+
+def test_soft_delete_records_expires_app_log_export_download(
+    app, org, project, team
+):
+    """#1213: AppLogExport has no soft-delete field, so the pass revokes its
+    live download credential (status→EXPIRED, expires_at→now, which the
+    download view treats as a 404) rather than soft-deleting the row. A second
+    app's export is untouched, and re-running is a clean no-op."""
+    from datetime import UTC, datetime, timedelta
+
+    from astrolift_operations.models import AppLogExport
+    from astrolift_workflows.activities.app_teardown import (
+        _soft_delete_app_records_sync,
+    )
+
+    def _mk(a):
+        return AppLogExport.objects.create(
+            organization=org,
+            registered_app=a,
+            format=AppLogExport.Format.NDJSON.value,
+            status=AppLogExport.Status.READY.value,
+            relative_path=f"app_log_exports/{a.slug}.ndjson",
+            token_hash="t" * 64,
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+        )
+
+    export = _mk(app)
+    other = _make_app(org, project, team, slug="other-app")
+    other_export = _mk(other)
+
+    summary = _soft_delete_app_records_sync(app.pk)
+
+    export.refresh_from_db()
+    assert export.status == AppLogExport.Status.EXPIRED
+    assert export.expires_at <= datetime.now(UTC)  # credential revoked
+    assert summary["app_log_exports_expired"] == 1
+
+    # The other app's export is still live + downloadable.
+    other_export.refresh_from_db()
+    assert other_export.status == AppLogExport.Status.READY
+    assert other_export.expires_at > datetime.now(UTC)
+
+    # Idempotent: a re-run finds no READY export for the app → 0, no change.
+    summary2 = _soft_delete_app_records_sync(app.pk)
+    assert summary2["app_log_exports_expired"] == 0
+    export.refresh_from_db()
+    assert export.status == AppLogExport.Status.EXPIRED
+
+
+def test_soft_delete_records_retains_audit_and_org_owned_rows(
+    app, org, project, team, cluster
+):
+    """#1213: telemetry/history rows (WorkflowRun, AppUptimeResult) and
+    org-owned rows that only *reference* the app via a nullable SET_NULL FK
+    (Pipeline, Brief) are NOT soft-deleted — they are designed to outlive the
+    app, so a deregister must leave them live."""
+    from datetime import UTC, datetime
+
+    from astrolift_agents.models import Brief
+    from astrolift_operations.models import AppUptimeResult, WorkflowRun
+    from astrolift_pipelines.models import Pipeline
+    from astrolift_workflows.activities.app_teardown import (
+        _soft_delete_app_records_sync,
+    )
+
+    retained = [
+        WorkflowRun.objects.create(
+            workflow_kind="DeployAppWorkflow",
+            workflow_id="wf-1",
+            run_id="run-1",
+            organization=org,
+            registered_app=app,
+            status=WorkflowRun.Status.COMPLETED.value,
+        ),
+        AppUptimeResult.objects.create(
+            registered_app=app,
+            checked_at=datetime.now(UTC),
+            target_url="https://hello.example.com",
+            is_up=True,
+            status_code=200,
+        ),
+        Pipeline.objects.create(organization=org, registered_app=app, name="ci"),
+        Brief.objects.create(organization=org, registered_app=app, content_hash="a" * 64),
+    ]
+
+    _soft_delete_app_records_sync(app.pk)
+
+    for row in retained:
+        assert type(row).objects.filter(pk=row.pk).exists(), type(row).__name__
+        row.refresh_from_db()
+        assert row.deleted_at is None, type(row).__name__
+
+
+def test_soft_delete_records_extra_rows_idempotent(app, org, actor, cluster):
+    """#1213: re-running the pass over an already-torn-down app is a clean
+    no-op — each new per-app cleanup reports 0 on the second pass and does not
+    re-write the already-soft-deleted rows (deleted_at + version unchanged)."""
+    from astrolift_workflows.activities.app_teardown import (
+        _soft_delete_app_records_sync,
+    )
+
+    rows = _seed_per_app_rows(org=org, app=app, actor=actor, cluster=cluster)
+
+    first = _soft_delete_app_records_sync(app.pk)
+    snap = {}
+    for label, row in rows.items():
+        assert first.get(label) == 1, (label, first)
+        fresh = type(row).all_objects.get(pk=row.pk)
+        snap[label] = (fresh.deleted_at, fresh.version)
+
+    second = _soft_delete_app_records_sync(app.pk)
+
+    for label in _EXTRA_FK_LABELS:
+        assert second.get(label) == 0, (label, second)
+    # No re-write on the second pass: deleted_at + version are unchanged.
+    for label, row in rows.items():
+        fresh = type(row).all_objects.get(pk=row.pk)
+        assert (fresh.deleted_at, fresh.version) == snap[label], label
+
+
 def test_workflow_partial_failure_keeps_app_live(app):
     """A managed-service deprovision failure marks ``managed_services``
     still live and gates the platform-row soft-delete so the app row
