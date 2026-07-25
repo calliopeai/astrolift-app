@@ -1,59 +1,43 @@
 "use client";
 
-import {
-  ActivityIcon,
-  BoxesIcon,
-  FileCodeIcon,
-  KeyIcon,
-  KeyRoundIcon,
-  LayersIcon,
-  RocketIcon,
-  SettingsIcon,
-  ShieldIcon,
-  SlidersHorizontalIcon,
-  UsersIcon,
-  WebhookIcon,
-} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-// The underlying RegisteredApp's platform submenus. An agent IS an app, so
-// these are the shared /apps/<slug>/<seg> clients — but each is mounted at a
-// real /agents/<appSlug>/<seg> route (see agents/[agentSlug]/<seg>/page.tsx)
-// that renders the same client inside the agent shell via AgentAppSurface, so
-// the operator stays in agent context with no /apps template leakage. Kept as
-// a flat leaf row (the agent already has the BROCS pillar bar above, so we
-// don't repeat pillars).
-const LINKS: { seg: string; label: string; Icon: typeof RocketIcon }[] = [
-  { seg: "config", label: "Config", Icon: SlidersHorizontalIcon },
-  { seg: "manifest", label: "Manifest", Icon: FileCodeIcon },
-  { seg: "webhooks", label: "CI / CD", Icon: WebhookIcon },
-  { seg: "deployments", label: "Deployments", Icon: RocketIcon },
-  { seg: "environments", label: "Environments", Icon: LayersIcon },
-  // Domains omitted: agents are task/serverless workloads, not HTTP services
-  // with custom domains — that submenu doesn't apply to an agent.
-  { seg: "managed-services", label: "Services", Icon: BoxesIcon },
-  { seg: "observability", label: "Observability", Icon: ActivityIcon },
-  { seg: "settings", label: "Settings", Icon: SettingsIcon },
-  { seg: "members", label: "Members", Icon: UsersIcon },
-  { seg: "security", label: "Security", Icon: ShieldIcon },
-  { seg: "secrets", label: "Secrets", Icon: KeyRoundIcon },
-  { seg: "tokens", label: "Tokens", Icon: KeyIcon },
-];
+import { AGENT_PILLARS, agentBasePath, resolveActivePillar } from "./agent-nav-model";
 
-export function AppPlatformLinks({ appSlug }: { appSlug: string }) {
+/**
+ * Secondary nav row for the agent shell: the ACTIVE pillar's platform
+ * sub-pages, sitting under the `AgentTabs` pillar bar.
+ *
+ * An agent IS a RegisteredApp, so these are the shared `/apps/<slug>/<seg>`
+ * clients, each mounted at a real `/agents/<agentSlug>/<seg>` route (see
+ * `agents/[agentSlug]/<seg>/page.tsx` → `AgentAppSurface`) so the operator stays
+ * in agent context with no `/apps` template leakage. They're grouped under the
+ * agent's BROCS pillars with the same seg→pillar mapping the app surface uses
+ * ({@link AGENT_PILLARS}) — so this row is scoped to the active pillar instead
+ * of one identical flat list under every tab. Pillars with no platform
+ * sub-pages (Overview) render nothing.
+ */
+export function AppPlatformLinks({ agentSlug }: { agentSlug: string }) {
   const pathname = usePathname() ?? "";
+  const activePillar = resolveActivePillar(pathname, agentSlug);
+  const pillar = AGENT_PILLARS.find((p) => p.key === activePillar);
+
+  // Overview (and any pillar without platform pages) has no secondary row.
+  if (!pillar || pillar.platform.length === 0) return null;
+
+  const base = agentBasePath(agentSlug);
+
   return (
     <div className="-mx-6 border-b">
       <div className="scrollbar-none flex items-center gap-1 overflow-x-auto px-6 py-1.5">
         <span className="text-muted-foreground/60 mr-1 shrink-0 text-2xs font-semibold uppercase tracking-wider">
           App
         </span>
-        {LINKS.map(({ seg, label, Icon }) => {
-          const href = `/agents/${appSlug}/${seg}`;
+        {pillar.platform.map(({ seg, label, Icon }) => {
+          const href = `${base}/${seg}`;
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link

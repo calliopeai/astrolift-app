@@ -169,12 +169,14 @@ export function AgentDetailShell({ agentSlug, children }: AgentDetailShellProps)
       }
     >
       <AgentTabs agentSlug={agent.slug} />
-      {/* An agent IS a RegisteredApp — its platform submenus (config/CI-CD,
+      {/* An agent IS a RegisteredApp — its platform sub-pages (config/CI-CD,
           settings, security, secrets, tokens, deployments…) live at
-          /apps/<appSlug>/* and were otherwise unreachable from the agent
-          surface. Surface them as a flat secondary row (no redundant BROCS
-          pillars, which the agent already has above). */}
-      <AppPlatformLinks appSlug={agent.appSlug} />
+          /apps/<slug>/* and were otherwise unreachable from the agent surface.
+          Surface them as a secondary row scoped to the active pillar (same
+          seg→pillar grouping as the app surface), beneath the BROCS pillar bar
+          above. Uses agent.slug — the [agentSlug] route param every agent page
+          resolves against — so the links stay on valid agent routes. */}
+      <AppPlatformLinks agentSlug={agent.slug} />
       {children({ agent, orgId })}
     </PageShell>
   );
