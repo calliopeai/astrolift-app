@@ -1076,6 +1076,17 @@ type AstroliftCiSecretValidation {
   updatedAt: String!
 }
 
+type AstroliftCiWorkflowSyncStatus {
+  state: String!
+  syncedTemplateVersion: Int
+  currentTemplateVersion: Int!
+  syncedAt: DateTime
+  checkedAt: DateTime
+  path: String!
+  prUrl: String!
+  detail: String!
+}
+
 type AstroliftClusterBootstrapComponent {
   key: String!
   title: String!
@@ -2656,6 +2667,7 @@ type AstroliftRegisteredApp {
   reprovision: AstroliftAppReprovisionState!
   configDrift: AstroliftAppConfigDrift
   autowire: AstroliftAppAutowireStatus
+  ciWorkflowSyncStatus: AstroliftCiWorkflowSyncStatus
   settingsLastModified: AstroliftAppSettingsLastModified
   viewerPermissions: [String!]!
   activePreviewCount: Int!
@@ -4557,6 +4569,7 @@ type Mutation {
   softDeleteRole(input: DeleteRoleInput!): SoftdeletepayloadMutationResult!
   createInvitation(input: CreateInvitationInput!): AstroliftInvitationCreatedMutationResult!
   revokeInvitation(input: RevokeInvitationInput!): AstroliftInvitationMutationResult!
+  resendInvitation(input: ResendInvitationInput!): AstroliftInvitationCreatedMutationResult!
   acceptInvitation(input: AcceptInvitationInput!): AstroliftInvitationMutationResult!
   addOrganizationAllowlistDomain(input: AddOrganizationAllowlistDomainInput!): AstroliftOrganizationAllowlistedDomainMutationResult!
   removeOrganizationAllowlistDomain(input: RemoveOrganizationAllowlistDomainInput!): SoftdeletepayloadMutationResult!
@@ -5493,6 +5506,10 @@ input RequestQuotaIncreaseInput {
   quotaId: GUID!
   factor: Float!
   reason: String!
+}
+
+input ResendInvitationInput {
+  id: GUID!
 }
 
 input RestartWorkloadInput {

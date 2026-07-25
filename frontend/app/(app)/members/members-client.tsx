@@ -7,6 +7,7 @@ import {
   InfoIcon,
   MailIcon,
   SearchIcon,
+  SendIcon,
   ShieldIcon,
   Trash2Icon,
   UserMinusIcon,
@@ -49,6 +50,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import {
   ANONYMIZE_USER,
   BULK_REVOKE_ROLE_BINDINGS,
+  RESEND_INVITATION,
   REVOKE_INVITATION,
   REVOKE_ROLE_BINDING,
 } from "@/graphql/identity/identity.mutations";
@@ -173,6 +175,16 @@ export function MembersClient() {
     refetchQueries: [{ query: LIST_INVITATIONS }],
     awaitRefetchQueries: true,
   });
+  const [resendInvite, { loading: resendingInvite }] = useMutation<{
+    resendInvitation: MutationResult<{
+      invitation: AstroliftInvitation;
+      plaintextToken: string;
+      acceptUrlPath: string;
+    }>;
+  }>(RESEND_INVITATION, {
+    refetchQueries: [{ query: LIST_INVITATIONS }],
+    awaitRefetchQueries: true,
+  });
   const [anonymizeUser] = useMutation<{
     astroliftAnonymizeUser: MutationResult<{
       anonymizedUserId: string;
@@ -194,6 +206,35 @@ export function MembersClient() {
       toast.success("Invitation revoked");
     } else {
       throw new Error(data?.revokeInvitation.errors?.[0]?.message ?? "Revoke failed");
+    }
+  }
+
+  async function handleResendInvite(inv: AstroliftInvitation) {
+    const { data } = await resendInvite({
+      variables: { input: { id: inv.id } },
+    });
+    const result = data?.resendInvitation;
+    if (result?.ok && result.data) {
+      // The token was rotated, so any previously-issued link is now
+      // dead. A fresh link was emailed (best-effort); surface a
+      // Copy-link action so the operator always retains the durable
+      // hand-off channel.
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const url = `${origin}${result.data.acceptUrlPath}`;
+      toast.success(`Invitation re-sent to ${inv.email}`, {
+        description: "The previous link is now invalid. Copy the fresh link as a backup channel.",
+        action: {
+          label: "Copy link",
+          onClick: () => {
+            navigator.clipboard
+              .writeText(url)
+              .then(() => toast.success("Accept link copied"))
+              .catch(() => toast.error("Copy failed"));
+          },
+        },
+      });
+    } else {
+      toast.error(result?.errors?.[0]?.message ?? "Resend failed");
     }
   }
 
@@ -669,20 +710,37 @@ export function MembersClient() {
                     <TableCell className="text-right">
                       {inv.status === "pending" && (
                         <Can permission="org.manage_members">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() =>
-                              setRevokeTarget({
-                                kind: "invitation",
-                                invitation: inv,
-                              })
-                            }
-                            disabled={revokingInvite}
-                          >
-                            <Trash2Icon className="size-4" />
-                            <span className="sr-only">Revoke</span>
-                          </Button>
+                          <div className="flex items-center justify-end gap-1">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => void handleResendInvite(inv)}
+                                  disabled={resendingInvite || revokingInvite}
+                                  aria-label={`Resend invitation to ${inv.email}`}
+                                >
+                                  <SendIcon className="size-4" />
+                                  <span className="sr-only">Resend</span>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Resend invitation</TooltipContent>
+                            </Tooltip>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() =>
+                                setRevokeTarget({
+                                  kind: "invitation",
+                                  invitation: inv,
+                                })
+                              }
+                              disabled={revokingInvite}
+                            >
+                              <Trash2Icon className="size-4" />
+                              <span className="sr-only">Revoke</span>
+                            </Button>
+                          </div>
                         </Can>
                       )}
                     </TableCell>

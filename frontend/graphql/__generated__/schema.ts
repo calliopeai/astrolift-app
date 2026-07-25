@@ -4317,6 +4317,7 @@ export type Mutation = {
   reprovisionManagedService: AstroliftManagedServiceMutationResult;
   requestAttestationChallenge: AstroliftAttestationChallengePayloadMutationResult;
   requestQuotaIncrease: AstroliftQuotaIncreaseRequestMutationResult;
+  resendInvitation: AstroliftInvitationCreatedMutationResult;
   restartAstroliftWorkload: AstroliftWorkloadOpPayloadMutationResult;
   restoreApp: AstroliftRegisteredAppMutationResult;
   resumeAppIngress: AstroliftAppEnvironmentMutationResult;
@@ -5269,6 +5270,10 @@ export type MutationRequestQuotaIncreaseArgs = {
   input: RequestQuotaIncreaseInput;
 };
 
+
+export type MutationResendInvitationArgs = {
+  input: ResendInvitationInput;
+};
 
 export type MutationRestartAstroliftWorkloadArgs = {
   input: RestartWorkloadInput;
@@ -7236,6 +7241,10 @@ export type RequestQuotaIncreaseInput = {
   factor: Scalars['Float']['input'];
   quotaId: Scalars['GUID']['input'];
   reason: Scalars['String']['input'];
+};
+
+export type ResendInvitationInput = {
+  id: Scalars['GUID']['input'];
 };
 
 export type RestartWorkloadInput = {

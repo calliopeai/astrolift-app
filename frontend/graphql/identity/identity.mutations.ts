@@ -542,6 +542,29 @@ export const REVOKE_INVITATION = gql`
   }
 `;
 
+// Resend rotates the token (the previous link dies) and refreshes the
+// expiry, returning the fresh plaintext + accept path exactly once —
+// same InvitationCreated payload as create, so the copy-link durable
+// channel survives the resend.
+export const RESEND_INVITATION = gql`
+  mutation ResendInvitation($input: ResendInvitationInput!) {
+    resendInvitation(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        invitation {
+          ${INVITATION_FIELDS}
+        }
+        plaintextToken
+        acceptUrlPath
+      }
+    }
+  }
+`;
+
 export const ADD_ORGANIZATION_ALLOWLIST_DOMAIN = gql`
   mutation AddOrganizationAllowlistDomain($input: AddOrganizationAllowlistDomainInput!) {
     addOrganizationAllowlistDomain(input: $input) {
