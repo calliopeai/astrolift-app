@@ -1030,8 +1030,8 @@ class AgentsMutation:
         if org is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "organization not found")
 
-        # Optional environment spec, org-scoped. A foreign-org spec id is
-        # NOT_FOUND for the same non-leak reason as the workload lookup.
+        # Environment spec, org-scoped. A foreign-org spec id is NOT_FOUND for
+        # the same non-leak reason as the workload lookup.
         env_spec = None
         if input.environment_spec_id is not None:
             env_spec = AgentEnvironmentSpec.objects.filter(
@@ -1045,6 +1045,18 @@ class AgentsMutation:
                     "environment spec not found",
                     field="environmentSpecId",
                 )
+        else:
+            # No spec pinned: default to the agent's own environment spec — the
+            # org-scoped spec whose slug matches the agent slug. That spec
+            # carries the agent's secrets AND the managed-model switch, so a
+            # plain run picks them up instead of dispatching a bare pod with no
+            # config (which crash-loops on a missing ANTHROPIC_API_KEY). Stays
+            # None when the agent has no matching spec — unchanged behavior.
+            env_spec = AgentEnvironmentSpec.objects.filter(
+                slug=slug,
+                organization_id=org_pk,
+                deleted_at__isnull=True,
+            ).first()
 
         timeout_seconds = (
             input.timeout_seconds if input.timeout_seconds and input.timeout_seconds > 0 else 300
