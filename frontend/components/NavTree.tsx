@@ -289,7 +289,12 @@ export function NavTree() {
                   className="ml-auto -mr-1 flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-sidebar-accent"
                   aria-label={`Toggle ${tree.organization.name}`}
                 >
-                  <ChevronRightIcon className="size-3.5 transition-transform group-data-[state=open]/org:rotate-90" />
+                  <ChevronRightIcon
+                    className={cn(
+                      "size-3.5 transition-transform",
+                      orgOpen && "rotate-90",
+                    )}
+                  />
                 </CollapsibleTrigger>
               </div>
             </SidebarMenuButton>
@@ -368,7 +373,12 @@ function TeamNode({ node, activeAppSlug, open, toggle }: TeamNodeProps) {
               className="-mr-1 translate-x-3.5 flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-sidebar-accent"
               aria-label={`Toggle ${node.team.name}`}
             >
-              <ChevronRightIcon className="size-3 transition-transform group-data-[state=open]/team:rotate-90" />
+              <ChevronRightIcon
+                className={cn(
+                  "size-3 transition-transform",
+                  isOpen && "rotate-90",
+                )}
+              />
             </CollapsibleTrigger>
           </div>
         </SidebarMenuSubButton>
@@ -468,7 +478,12 @@ function ProjectNode({
               className="-mr-1 translate-x-7 flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-sidebar-accent"
               aria-label={`Toggle ${node.project.name}`}
             >
-              <ChevronRightIcon className="size-3 transition-transform group-data-[state=open]/project:rotate-90" />
+              <ChevronRightIcon
+                className={cn(
+                  "size-3 transition-transform",
+                  isOpen && "rotate-90",
+                )}
+              />
             </CollapsibleTrigger>
           </div>
         </SidebarMenuSubButton>
