@@ -261,6 +261,7 @@ _SOFT_DELETED_RECORD_KINDS = frozenset(
         "Deployment",
         "AppEnvironment",
         "Workload",
+        "AlertRule",
         "ManagedServiceBinding",
         "WorkloadIdentityRole",
         "DeployToken",

@@ -346,8 +346,24 @@ def _soft_delete_app_records_sync(registered_app_id: int) -> dict[str, int]:
         "workloads",
     )
 
-    # Finally the app row itself.
+    # Load the app row once — needed both for the alert-rule ownership key
+    # (org + slug) and for the final app-row soft-delete below.
     app = RegisteredApp.all_objects.get(pk=registered_app_id)
+
+    # Alert rules. Seeded on registration (astrolift_operations.alert_seed)
+    # with target="app" / target_id=<slug> — NOT a registered_app FK — so
+    # they were invisible to this FK-driven soft-delete pass and survived
+    # every deregister, leaving the /alerts page listing alerts for a deleted
+    # app (reported for smd-fileportal). Soft-delete them by their (org, slug)
+    # ownership key so they die with the app. Best-effort + idempotent.
+    from astrolift_operations.alert_cleanup import soft_delete_app_alert_rules
+
+    summary["alert_rules"] = soft_delete_app_alert_rules(
+        organization_id=app.organization_id,
+        app_slug=app.slug,
+    )
+
+    # Finally the app row itself.
     if app.deleted_at is None:
         app.deleted_at = now
         app.save(update_fields=["deleted_at", "updated_at", "version"])
@@ -365,8 +381,8 @@ async def soft_delete_app_records(
 
     Per the soft-delete invariant in the policy module: business-
     record kinds (RegisteredApp, Deployment, AppEnvironment,
-    AppSecretBundleRef) are soft-deleted; audit + event logs are
-    retained.
+    AppSecretBundleRef, Workload, AlertRule) are soft-deleted; audit +
+    event logs are retained.
     """
     from asgiref.sync import sync_to_async
 
