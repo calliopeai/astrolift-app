@@ -269,6 +269,19 @@ def test_agent_unknown_slug_returns_null(permission_resolver, info, with_tenant_
     assert detail is None
 
 
+def test_agent_task_non_uuid_id_returns_null_not_500(permission_resolver, info, with_tenant_org):
+    """A non-UUID ``[task]`` route param (e.g. ``/agents/runs/overview``) must
+    resolve to None, not raise a UUIDField ValidationError -> HTTP 500
+    ("'overview' is not a valid UUID"). Regression for the broken run-detail page."""
+    org = _org("acme")
+    permission_resolver.grant(Permission.APP_READ)
+
+    with with_tenant_org(org):
+        result = AgentsQuery().agent_task(info(), id="overview")
+
+    assert result is None
+
+
 def test_agent_ignores_non_agent_workload(permission_resolver, info, with_tenant_org):
     """A deployment workload sharing the slug must not resolve as an
     agent — the query is scoped to ``kind: agent``."""

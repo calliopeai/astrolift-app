@@ -13,6 +13,7 @@ active tenant (a non-superuser may not read another org's rows).
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from typing import Any
 
@@ -60,6 +61,21 @@ from astrolift_graphql import GUID
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
+
+
+def _valid_guid(value) -> str | None:
+    """Return ``value`` as a canonical UUID string, or None if it isn't one.
+
+    Guards by-id resolvers reachable from user-controlled route params (e.g.
+    ``/agents/runs/<task>``): a non-UUID like ``"overview"`` would otherwise
+    reach a ``UUIDField`` filter and raise a ValidationError -> HTTP 500
+    ("'overview' is not a valid UUID") instead of resolving to a clean
+    not-found. Callers treat None as "no such row".
+    """
+    try:
+        return str(uuid.UUID(str(value)))
+    except (ValueError, AttributeError, TypeError):
+        return None
 
 
 def _caller_org_id(info: Info, org_id: strawberry.ID) -> int:
@@ -486,10 +502,13 @@ class AgentsQuery:
     @tenant_scoped()
     def agent_task(self, info: Info, id: strawberry.ID) -> AgentTaskType | None:
         """One AgentTask by GUID, scoped to the caller's org."""
+        guid = _valid_guid(id)
+        if guid is None:
+            return None
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
         row = (
-            AgentTask.objects.filter(guid=str(id), organization_id=org_pk, deleted_at__isnull=True)
+            AgentTask.objects.filter(guid=guid, organization_id=org_pk, deleted_at__isnull=True)
             .select_related("organization", "dispatcher", "dispatcher__tenant_cluster")
             .first()
         )
@@ -580,12 +599,16 @@ class AgentsQuery:
         if org_pk is None:
             return []
 
+        guid = _valid_guid(id)
+        if guid is None:
+            return []
+
         # Resolve the task + its dispatcher's cluster off the event loop
         # (Django ORM is sync). Returns the data the async log fetch
         # needs, or None when there is no readable pod to target.
         def _resolve() -> tuple[Any, str, str, str] | None:
             row = (
-                AgentTask.objects.filter(guid=str(id), organization_id=org_pk, deleted_at__isnull=True)
+                AgentTask.objects.filter(guid=guid, organization_id=org_pk, deleted_at__isnull=True)
                 .select_related("organization", "dispatcher", "dispatcher__tenant_cluster")
                 .first()
             )
