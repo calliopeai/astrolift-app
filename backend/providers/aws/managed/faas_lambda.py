@@ -12,14 +12,22 @@ build pipeline is a follow-up.
 
 A *public* faas workload (``faas_public``) gets a Lambda Function URL with
 ``AuthType=AWS_IAM`` (NOT public/``NONE`` — common org guardrails block
-public Function URLs, #1035). The function is reached only through a
-``cdn`` managed-service row whose CloudFront distribution fronts the
-Function URL via a Lambda Origin Access Control (sigv4-signed) — the secure
-proxy model. The Lambda grants ``lambda:InvokeFunctionUrl`` to the
-CloudFront service principal scoped to that one distribution's SourceArn
-(a post-cdn step: the distribution ARN doesn't exist until the cdn
-provisions). This mirrors how a static_site implies an object_store + cdn
-pair reached via an S3 OAC.
+public Function URLs, #1035). The shipped public invoke path is an **API
+Gateway HTTP API** (#987/#1035 pivot): a separate ``api_gateway``
+managed-service row (see ``api_gateway_http.py``) proxies to the function
+ARN via an ``AWS_PROXY`` integration (``lambda:InvokeFunction``); the
+Function URL itself is not on that path.
+
+The original design fronted the AWS_IAM Function URL through a ``cdn``
+managed-service row whose CloudFront distribution signed requests with a
+Lambda Origin Access Control (sigv4) — the secure proxy model, mirroring how
+a static_site implies an object_store + cdn pair reached via an S3 OAC. That
+path is a confirmed dead-end on the target account (a textbook OAC config
+still returns 403) and is **parked** pending #1039. Its plumbing is retained
+here but no longer called: ``allow_cloudfront_invoke`` (with
+``_CLOUDFRONT_INVOKE_STATEMENT_ID``) grants ``lambda:InvokeFunctionUrl`` to
+the CloudFront service principal scoped to one distribution's SourceArn, kept
+for a potential revival.
 
 The execution role is minted here with a **service trust**
 (``lambda.amazonaws.com``), not the OIDC web-identity trust IRSA uses for
