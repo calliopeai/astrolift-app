@@ -1,7 +1,9 @@
 "use client";
 
+import { Maximize2, Minimize2, Ratio, Scan } from "lucide-react";
 import * as React from "react";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type ConnectionState =
@@ -10,6 +12,16 @@ type ConnectionState =
   | "closed"
   | "denied"
   | "error";
+
+/**
+ * How the fixed-size agent framebuffer (1280x800, see images/vnc) is fitted
+ * into the viewer pane:
+ *  - "fit"    scales the framebuffer to the pane, aspect-preserved (default —
+ *             keeps the whole session visible on small/laptop viewports).
+ *  - "actual" renders 1:1 pixels; the pane scrolls if the framebuffer is
+ *             larger than the pane (crisp text at native resolution).
+ */
+type ViewMode = "fit" | "actual";
 
 export interface VncViewerProps {
   /**
@@ -31,9 +43,29 @@ export interface VncViewerProps {
  * cookie (4401/4403 close codes), so no credentials are forwarded.
  */
 export function VncViewer({ vncPath, className }: VncViewerProps) {
+  const wrapperRef = React.useRef<HTMLDivElement | null>(null);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const rfbRef = React.useRef<import("@novnc/novnc").default | null>(null);
   const [state, setState] = React.useState<ConnectionState>("connecting");
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [viewMode, setViewMode] = React.useState<ViewMode>("fit");
+  const [isFullscreen, setIsFullscreen] = React.useState(false);
+  // Read the current mode inside the connect effect without making that effect
+  // depend on it (a mode change must not tear down and reconnect the session).
+  const viewModeRef = React.useRef(viewMode);
+  React.useEffect(() => {
+    viewModeRef.current = viewMode;
+  }, [viewMode]);
+
+  // Push a view mode onto a live RFB client. "fit" scales the framebuffer to the
+  // pane; "actual" turns scaling off so noVNC draws native pixels and the pane
+  // (overflow-auto) scrolls.
+  const applyViewMode = React.useCallback(
+    (client: import("@novnc/novnc").default, mode: ViewMode) => {
+      client.scaleViewport = mode === "fit";
+    },
+    []
+  );
 
   const buildWsUrl = React.useCallback((): string => {
     const wsOrigin = process.env.NEXT_PUBLIC_WS_ORIGIN;
@@ -69,9 +101,10 @@ export function VncViewer({ vncPath, className }: VncViewerProps) {
         setErrorMessage(err instanceof Error ? err.message : String(err));
         return;
       }
-      client.scaleViewport = true;
+      applyViewMode(client, viewModeRef.current);
       client.background = "#0b0f17";
       rfb = client;
+      rfbRef.current = client;
 
       client.addEventListener("connect", () => {
         if (disposed) return;
@@ -104,12 +137,79 @@ export function VncViewer({ vncPath, className }: VncViewerProps) {
         }
         rfb = null;
       }
+      rfbRef.current = null;
     };
-  }, [vncPath, buildWsUrl]);
+  }, [vncPath, buildWsUrl, applyViewMode]);
+
+  // Live-apply a mode change to the running client (no reconnect).
+  React.useEffect(() => {
+    if (rfbRef.current) applyViewMode(rfbRef.current, viewMode);
+  }, [viewMode, applyViewMode]);
+
+  // Track fullscreen so the toggle button reflects the real document state
+  // (Esc exits fullscreen without going through our handler).
+  React.useEffect(() => {
+    const onChange = () =>
+      setIsFullscreen(document.fullscreenElement === wrapperRef.current);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  const toggleFullscreen = React.useCallback(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    if (document.fullscreenElement === el) {
+      void document.exitFullscreen?.();
+    } else {
+      void el.requestFullscreen?.().catch(() => {
+        // fullscreen can be blocked by permissions policy; leave state as-is
+      });
+    }
+  }, []);
+
+  const canControl = state === "connected";
 
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
-      <ConnectionBanner state={state} message={errorMessage} />
+    <div ref={wrapperRef} className={cn("flex flex-col gap-2 bg-inherit", className)}>
+      <div className="flex items-center justify-between gap-2">
+        <ConnectionBanner state={state} message={errorMessage} />
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          <Button
+            type="button"
+            size="icon-sm"
+            variant={viewMode === "fit" ? "secondary" : "ghost"}
+            aria-pressed={viewMode === "fit"}
+            disabled={!canControl}
+            title="Fit to window"
+            aria-label="Fit session to window"
+            onClick={() => setViewMode("fit")}
+          >
+            <Scan />
+          </Button>
+          <Button
+            type="button"
+            size="icon-sm"
+            variant={viewMode === "actual" ? "secondary" : "ghost"}
+            aria-pressed={viewMode === "actual"}
+            disabled={!canControl}
+            title="Actual size (1:1)"
+            aria-label="Show session at actual size"
+            onClick={() => setViewMode("actual")}
+          >
+            <Ratio />
+          </Button>
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="ghost"
+            title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+            aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            onClick={toggleFullscreen}
+          >
+            {isFullscreen ? <Minimize2 /> : <Maximize2 />}
+          </Button>
+        </div>
+      </div>
       <div
         ref={containerRef}
         role="region"
@@ -117,7 +217,11 @@ export function VncViewer({ vncPath, className }: VncViewerProps) {
         // exact VNC-canvas background — must match the noVNC client.background
         // literal set above; not tokenizable.
         // eslint-disable-next-line astrolift/no-raw-design-values
-        className="min-h-[24rem] flex-1 overflow-hidden rounded-md border bg-[#0b0f17]"
+        className={cn(
+          "min-h-[24rem] flex-1 rounded-md border bg-[#0b0f17]",
+          // actual size scrolls native pixels; fit scales within the pane.
+          viewMode === "actual" ? "overflow-auto" : "overflow-hidden"
+        )}
       />
     </div>
   );
