@@ -18,8 +18,17 @@ We:
          in constant time anyway).
   3. Parse the push payload, extract the repo full_name + branch +
      head commit.
-  4. Resolve the matching ``RegisteredApp`` by ``source_repo``
-     scoped to this connection's organization. If
+  4. Attribute the delivery to the owning org (#1123). A GitHub App
+     sends every installation's events to a SINGLE webhook URL, so
+     under ``GITHUB_APP_CONNECTION_SCOPE=per_install`` (one App shared
+     across orgs) the URL guid is the *creator* org's connection, not
+     necessarily the org whose repo pushed. When the (verified) payload
+     carries an ``installation.id`` we re-resolve the connection by that
+     id — the true owner — and fail closed (ack + ignore) on an
+     installation we don't recognise. Deliveries with no installation id
+     (a per-repo OAuth/PAT hook) keep using the URL-guid connection.
+  5. Resolve the matching ``RegisteredApp`` by ``source_repo`` scoped to
+     the resolved connection's organization. If
      ``trigger_mode==auto_on_push`` and the pushed branch matches
      ``deploy_branch``, fire ``DeployAppWorkflow`` with
      ``trigger_kind=push``.
@@ -28,9 +37,6 @@ What this *doesn't* do (filed for follow-up):
   - Replay protection beyond HMAC (no nonce/timestamp window). For
     a v1 OSS demo the secret + HMAC is enough; production
     deployments behind a CDN/WAF can layer rate-limiting.
-  - GitHub App webhook (X-GitHub-Hook-Installation-Target-ID) —
-    same handler shape but resolves the connection via
-    installation_id rather than the URL guid.
 """
 
 from __future__ import annotations
@@ -214,6 +220,52 @@ def _fire_deploy(app: RegisteredApp, branch: str, head_sha: str) -> Deployment |
     return deployment
 
 
+def _github_installation_id(body: bytes) -> str | None:
+    """The GitHub App installation id from a webhook body, or None.
+
+    App-delivered webhooks carry a top-level ``installation.id`` (the
+    per-org installation). Returns it as a string; None when the payload
+    has no installation object (a per-repo OAuth/PAT hook) or isn't JSON.
+    Best-effort: the signature is already verified by the caller, so an
+    unparseable body here just means "nothing to attribute by".
+    """
+    try:
+        payload = json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    installation = payload.get("installation")
+    if not isinstance(installation, dict):
+        return None
+    inst_id = installation.get("id")
+    if inst_id is None:
+        return None
+    return str(inst_id)
+
+
+def _connection_for_installation(installation_id: str) -> SourceConnection | None:
+    """The active ``github_app_install`` connection that owns a GitHub App
+    installation (#1123).
+
+    Under ``GITHUB_APP_CONNECTION_SCOPE=per_install`` a single shared App
+    serves many orgs from one webhook URL, so the installation id — not the
+    URL guid — identifies the owning org's connection. Deterministic
+    (oldest first) if an installation id somehow maps to more than one row.
+    """
+    return (
+        SourceConnection.objects.filter(
+            kind=SourceConnection.Kind.GITHUB_APP_INSTALL,
+            installation_id=installation_id,
+            is_active=True,
+            is_orphaned=False,
+            deleted_at__isnull=True,
+        )
+        .order_by("created_at", "pk")
+        .first()
+    )
+
+
 @csrf_exempt
 @require_POST
 def github_webhook(request: HttpRequest, connection_id: str) -> HttpResponse:
@@ -246,6 +298,34 @@ def _handle(
         # Don't tell the caller whether the signature was missing or
         # invalid — both leak the same useful info to a probe.
         return JsonResponse({"detail": "unauthorized"}, status=401)
+
+    # Per-org attribution for shared GitHub Apps (#1123). A GitHub App
+    # delivers every installation's events to a SINGLE webhook URL; under
+    # GITHUB_APP_CONNECTION_SCOPE=per_install that URL carries the canonical
+    # (creator) org's connection guid, so ``conn`` above is that org — not
+    # necessarily the org whose repo pushed. The installation id in the
+    # now-verified payload identifies the real owner; re-scope ``conn`` to
+    # it so every downstream step (app lookup, deploy, delivery dedup,
+    # WorkflowWebhook routing) runs against the right org. Fail closed: an
+    # installation with no matching connection is acked-and-ignored, never
+    # processed under the receiver-URL org. Deliveries with no installation
+    # id (a per-repo OAuth/PAT hook) keep the URL-guid connection.
+    if kind == "github":
+        installation_id = _github_installation_id(body)
+        if installation_id:
+            owner_conn = _connection_for_installation(installation_id)
+            if owner_conn is None:
+                logger.warning(
+                    "scm_webhook: GitHub App installation %s (delivered to "
+                    "connection %s) has no owning connection — ignoring",
+                    installation_id,
+                    connection_id,
+                )
+                return JsonResponse(
+                    {"ok": True, "ignored": "unknown_installation"},
+                    status=202,
+                )
+            conn = owner_conn
 
     parser = _PARSERS.get(kind)
     parsed = parser(body) if parser else None
