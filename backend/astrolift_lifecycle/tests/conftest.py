@@ -191,9 +191,21 @@ def temporal_recorder(monkeypatch, settings):
         rec.terminates.append((workflow_id, reason))
         return True
 
-    monkeypatch.setattr("astrolift_lifecycle.schema.mutations.start_workflow", _start)
-    monkeypatch.setattr("astrolift_lifecycle.schema.mutations.signal_workflow", _signal)
-    monkeypatch.setattr("astrolift_lifecycle.schema.mutations.terminate_workflow", _terminate)
+    # The control-plane mutations live in a per-feature mixin package; each
+    # submodule imports the Temporal client fns by name, so the recorder must
+    # be bound into every submodule that references them (patching a single
+    # module no longer reaches every resolver).
+    import importlib
+    import pkgutil
+
+    import astrolift_lifecycle.schema.mutations as _mutpkg
+
+    _wf = {"start_workflow": _start, "signal_workflow": _signal, "terminate_workflow": _terminate}
+    for _sub in pkgutil.iter_modules(_mutpkg.__path__):
+        _m = importlib.import_module(f"astrolift_lifecycle.schema.mutations.{_sub.name}")
+        for _name, _fn in _wf.items():
+            if hasattr(_m, _name):
+                monkeypatch.setattr(_m, _name, _fn)
 
     # Deploy starts are now registered via ``transaction.on_commit`` so the
     # worker never races an uncommitted deployment row (#1025). Under the

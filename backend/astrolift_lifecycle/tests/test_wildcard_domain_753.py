@@ -114,7 +114,7 @@ def _patch_handshake():
         is_platform_managed_zone=False,
     )
     validate_patch = patch(
-        "astrolift_lifecycle.schema.mutations._kick_validate_custom_domain",
+        "astrolift_lifecycle.schema.mutations.domains._kick_validate_custom_domain",
         return_value=MagicMock(),
     )
     build_patch = patch(

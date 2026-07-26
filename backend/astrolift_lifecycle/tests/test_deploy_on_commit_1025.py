@@ -53,7 +53,7 @@ def deferred_temporal(monkeypatch):
         starts.append((name, list(args), workflow_id))
         return WorkflowHandle(workflow_id=workflow_id, run_id=f"run-{len(starts)}", enqueued=True)
 
-    monkeypatch.setattr("astrolift_lifecycle.schema.mutations.start_workflow", _start)
+    monkeypatch.setattr("astrolift_lifecycle.schema.mutations.helpers.start_workflow", _start)
     monkeypatch.setattr(transaction, "on_commit", lambda fn, using=None: callbacks.append(fn))
     return starts, callbacks
 

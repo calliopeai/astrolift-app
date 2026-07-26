@@ -36,7 +36,7 @@ def _no_onboard_workflow(monkeypatch):
     which needs a live Temporal server. These tests exercise the naming logic
     only, so stub the post-create bootstrap to a no-op."""
     monkeypatch.setattr(
-        "astrolift_registry.schema.mutations._bootstrap_app_environments",
+        "astrolift_registry.schema.mutations.registration._bootstrap_app_environments",
         lambda *a, **k: None,
     )
 

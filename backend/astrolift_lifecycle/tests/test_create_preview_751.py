@@ -88,7 +88,7 @@ def _patch_workflow():
     handle = MagicMock()
     handle.enqueued = False  # skip _record_workflow_run branch
     return patch(
-        "astrolift_lifecycle.schema.mutations.start_workflow",
+        "astrolift_lifecycle.schema.mutations.previews.start_workflow",
         return_value=handle,
     )
 
@@ -262,7 +262,7 @@ def test_create_preview_workflow_dispatched(permission_resolver):
         handle = MagicMock()
         handle.enqueued = False
         with patch(
-            "astrolift_lifecycle.schema.mutations.start_workflow",
+            "astrolift_lifecycle.schema.mutations.previews.start_workflow",
             return_value=handle,
         ) as mock_start:
             LifecycleMutation().create_preview_environment(

@@ -332,7 +332,7 @@ def test_self_approval_allowed_when_constance_flag_on(
     # helper directly is cheaper than mounting the Constance backend
     # with an override; the resolver only depends on the return value.
     monkeypatch.setattr(
-        "astrolift_lifecycle.schema.mutations._self_approve_allowed",
+        "astrolift_lifecycle.schema.mutations.deployments._self_approve_allowed",
         lambda: True,
     )
 

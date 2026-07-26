@@ -194,9 +194,19 @@ def loop_recorder(monkeypatch, settings):
         return True
 
     monkeypatch.setattr("astrolift_workflows.client.start_workflow", _start)
-    monkeypatch.setattr("astrolift_lifecycle.schema.mutations.start_workflow", _start)
-    monkeypatch.setattr("astrolift_lifecycle.schema.mutations.signal_workflow", _signal)
-    monkeypatch.setattr("astrolift_lifecycle.schema.mutations.terminate_workflow", _terminate)
+    # Control-plane mutations were split into a mixin package; bind the fakes
+    # into every submodule that imports the Temporal client fns by name.
+    import importlib
+    import pkgutil
+
+    import astrolift_lifecycle.schema.mutations as _mutpkg
+
+    _wf = {"start_workflow": _start, "signal_workflow": _signal, "terminate_workflow": _terminate}
+    for _sub in pkgutil.iter_modules(_mutpkg.__path__):
+        _m = importlib.import_module(f"astrolift_lifecycle.schema.mutations.{_sub.name}")
+        for _name, _fn in _wf.items():
+            if hasattr(_m, _name):
+                monkeypatch.setattr(_m, _name, _fn)
     monkeypatch.setattr(transaction, "on_commit", lambda fn, using=None: fn())
 
     return SimpleNamespace(

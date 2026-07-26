@@ -629,7 +629,7 @@ def test_self_approve_allowed_when_flag_on(permission_resolver, monkeypatch):
     org, app, _, _ = _scaffold(min_approvals=1)
     permission_resolver.grant(Permission.SECRET_APPROVE)
     monkeypatch.setattr(
-        "astrolift_services.schema.mutations._self_approve_secrets_allowed",
+        "astrolift_services.schema.mutations.secret_changes._self_approve_secrets_allowed",
         lambda: True,
     )
     proposer = _make_user("sa-proposer")
