@@ -205,14 +205,14 @@ EXEMPT: dict[str, str] = {
     ),
     # --- Resolve-by-id then explicit ``!= org_id`` post-check
     #     (fail-closed). The org gate is the comparison a few lines down.
-    "astrolift_identity::IdentityMutation.update_role": (
+    "astrolift_identity::RoleMutations.update_role": (
         "post-check: ``if role.organization_id != org_id: NOT_FOUND`` "
         "immediately after the by-guid fetch (system roles handled first)."
     ),
-    "astrolift_identity::IdentityMutation.soft_delete_role": (
+    "astrolift_identity::RoleMutations.soft_delete_role": (
         "post-check: ``if role.organization_id != org_id: NOT_FOUND`` after " "the by-guid fetch."
     ),
-    "astrolift_identity::IdentityMutation.grant_role": (
+    "astrolift_identity::RoleBindingMutations.grant_role": (
         "the ``User.objects.filter(pk=target_user_pk)`` fetch is pre-gated "
         "by an org-scoped Member existence check (scope_id=org_id) directly "
         "above — the user is proven to be a member of the caller's org; the "
@@ -230,7 +230,7 @@ EXEMPT: dict[str, str] = {
         "post-check: ``if team.organization_id != org_id: return []`` after "
         "the by-guid fetch — a foreign team reads as empty."
     ),
-    "astrolift_operations::OperationsMutation.test_notification_channel": (
+    "astrolift_operations::NotificationMutations.test_notification_channel": (
         "post-check: ``if tenant.organization_id != org.id`` after the " "by-guid org fetch."
     ),
     "astrolift_registry::_resolve_approval_inputs": (
@@ -238,58 +238,58 @@ EXEMPT: dict[str, str] = {
         "match ``organization.id`` (the app's org) — cross-org team is a "
         "field-tagged PRECONDITION."
     ),
-    "astrolift_registry::RegistryMutation.register_app": (
+    "astrolift_registry::RegistrationMutations.register_app": (
         "post-check: ``if project.organization_id != org_id: NOT_FOUND`` — "
         "the new app inherits project.organization, so the project gate is "
         "the org boundary."
     ),
-    "astrolift_registry::RegistryMutation.register_agent_repo": (
+    "astrolift_registry::RegistrationMutations.register_agent_repo": (
         "post-check: ``if project.organization_id != active_org_id`` — same "
         "org boundary as register_app; the repo is fetched via the org's "
         "own source connection."
     ),
-    "astrolift_registry::RegistryMutation.register_app_repo": (
+    "astrolift_registry::RegistrationMutations.register_app_repo": (
         "post-check: project (and team) resolved by guid then required to "
         "belong to the caller's active org before any app is created."
     ),
-    "astrolift_registry::RegistryMutation.transfer_app": (
+    "astrolift_registry::AppMutations.transfer_app": (
         "source app is org-scoped (organization_id=org_id); the target "
         "team/project fetched by guid are then required to match "
         "``app.organization_id`` — cross-org transfer is refused."
     ),
-    "astrolift_registry::RegistryMutation.move_app_to_team": (
+    "astrolift_registry::TeamAccessMutations.move_app_to_team": (
         "source app is org-scoped (organization_id=org_id); the target team "
         "fetched by guid must match ``app.organization_id`` — cross-org "
         "move refused."
     ),
-    "astrolift_registry::RegistryMutation.grant_team_access_to_app": (
+    "astrolift_registry::TeamAccessMutations.grant_team_access_to_app": (
         "source app is org-scoped (organization_id=org_id); the team fetched "
         "by guid must match ``app.organization_id`` before the grant."
     ),
-    "astrolift_registry::RegistryMutation.revoke_team_access_from_app": (
+    "astrolift_registry::TeamAccessMutations.revoke_team_access_from_app": (
         "source app is org-scoped (organization_id=org_id); the team fetched "
         "by guid must match ``app.organization_id`` before the revoke."
     ),
-    "astrolift_registry::RegistryMutation.assign_astrolift_app_to_project": (
+    "astrolift_registry::AppSettingMutations.assign_astrolift_app_to_project": (
         "app + target project are org-checked against the caller's tenant "
         "before the reassignment (foreign guids read as not-found)."
     ),
-    "astrolift_lifecycle::LifecycleMutation.set_environment_setting": (
+    "astrolift_lifecycle::EnvironmentSettingMutations.set_environment_setting": (
         "post-check: ``if env.registered_app.organization_id != "
         "tenant.organization_id: NOT_FOUND`` after the by-guid env fetch."
     ),
-    "astrolift_lifecycle::LifecycleMutation.clear_environment_setting": (
+    "astrolift_lifecycle::EnvironmentSettingMutations.clear_environment_setting": (
         "post-check: ``if env.registered_app.organization_id != "
         "tenant.organization_id: NOT_FOUND`` after the by-guid env fetch."
     ),
     # --- Parent-scoped: the fetch is constrained by an already
     #     org-resolved parent object.
-    "astrolift_identity::IdentityMutation.create_project": (
+    "astrolift_identity::ProjectMutations.create_project": (
         "parent-scoped: ``Project.objects.filter(team=team, slug=...)`` where "
         "``team`` was resolved org-scoped via _resolve_team(team_id, org_id) "
         "just above — a slug-uniqueness check within the caller's own team."
     ),
-    "astrolift_identity::IdentityMutation.bulk_assign_astrolift_team_member_roles": (
+    "astrolift_identity::RoleBindingMutations.bulk_assign_astrolift_team_member_roles": (
         "parent-scoped bulk fetch: the ``Member.objects.filter(guid__in=...)`` "
         "is constrained to ``scope_kind=TEAM, scope_id=team.pk`` where ``team`` "
         "was resolved org-scoped via _resolve_team(team_id, org_id) above, so a "
@@ -297,7 +297,7 @@ EXEMPT: dict[str, str] = {
         "not-found. The per-call rule can't see that ``scope_id=team.pk`` is an "
         "org-bound scope (the value is an instance attr, not a caller-org var)."
     ),
-    "astrolift_lifecycle::LifecycleMutation.run_task": (
+    "astrolift_lifecycle::TaskMutations.run_task": (
         "parent-scoped: ``Workload.objects.filter(slug=..., "
         "registered_app=app)`` where ``app`` was resolved org-scoped just "
         "above — the workload is reachable only through the caller's app."
