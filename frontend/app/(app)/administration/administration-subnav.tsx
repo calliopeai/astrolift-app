@@ -4,6 +4,7 @@ import {
   BarChart3Icon,
   BuildingIcon,
   FileBoxIcon,
+  FlagIcon,
   KeyIcon,
   ScaleIcon,
   ScrollTextIcon,
@@ -45,6 +46,7 @@ const GROUPS: SubnavLink[][] = [
     { href: "/administration/metrics", label: "Metrics", icon: <BarChart3Icon className="size-4" /> },
     { href: "/tokens", label: "API Keys", icon: <KeyIcon className="size-4" /> },
     { href: "/administration/audit", label: "Audit", icon: <ScrollTextIcon className="size-4" /> },
+    { href: "/administration/features", label: "Features", icon: <FlagIcon className="size-4" /> },
   ],
 ];
 

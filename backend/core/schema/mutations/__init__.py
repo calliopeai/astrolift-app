@@ -8,6 +8,7 @@ from strawberry.types import Info
 
 from core.schema.common import MutationResult
 from core.schema.mutations.base import activate_mutation, delete_mutation
+from core.schema.mutations.feature_flags import FeatureFlagMutations
 from core.schema.mutations.library import LibraryMutations
 from core.schema.mutations.notification import NotificationMutations
 from core.schema.mutations.permissions import PermissionMutations
@@ -24,6 +25,7 @@ class Mutation(
     LibraryMutations,
     RocketchatMutations,
     UploadMutations,
+    FeatureFlagMutations,
 ):
     """Root mutation type for the core Strawberry schema.
 

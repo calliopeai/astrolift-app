@@ -80,6 +80,21 @@ _PUBLIC_FEATURE_FLAGS: tuple[tuple[str, str, str], ...] = (
         "deploy_tokens.legacy_prefix_accepted",
         "Pre-#449 ``alfdt_`` deploy-token prefix is still accepted alongside the canonical ``alft_dt_`` shape.",
     ),
+    (
+        "ADMIN_COST_ENABLED",
+        "admin.cost_enabled",
+        "Platform-admin Cost console (/administration/cost) is enabled.",
+    ),
+    (
+        "ADMIN_QUOTAS_ENABLED",
+        "admin.quotas_enabled",
+        "Platform-admin Quotas console (/administration/quotas) is enabled.",
+    ),
+    (
+        "ADMIN_PERMISSIONS_ENABLED",
+        "admin.permissions_enabled",
+        "Platform-admin Permissions console (/administration/permissions) is enabled.",
+    ),
 )
 
 
@@ -87,6 +102,42 @@ _PUBLIC_FEATURE_FLAGS: tuple[tuple[str, str, str], ...] = (
 class FeatureFlagInfo:
     key: str
     enabled: bool
+    description: str | None = None
+
+
+# ---------------------------------------------------------------------
+# Build-time (install-time) feature inventory.
+# ---------------------------------------------------------------------
+
+# Human-readable descriptions for the ``config.features.Feature`` enum.
+# These features gate app / schema LOADING at boot (they change
+# INSTALLED_APPS + which GraphQL modules assemble), so unlike the
+# Constance runtime flags above they are NOT live-toggleable — flipping
+# them requires a redeploy. Surfaced read-only so an operator sees the
+# full feature set and which env var controls each. Keyed by the enum
+# value (which doubles as the public dotted key).
+_BUILD_TIME_FEATURE_DESCRIPTIONS: dict[str, str] = {
+    "workflows": "Workflow-definition app + its GraphQL surface (visual-flow / TOML manifests).",
+    "temporal": "Durable-workflow runtime integration (Temporal client + activities).",
+    "opensearch": "OpenSearch-backed log history / search service.",
+    "file_uploads": "File-upload endpoints + presigned-URL flow.",
+    "deploy_pipeline": "App deploy pipeline apps/activities are loaded at boot.",
+    "agents": "Agents + dispatch apps and their GraphQL surface.",
+}
+
+
+@strawberry.type(
+    description=(
+        "Install-time (build-time) platform feature reported by "
+        "``astroliftServerInfo``. These gate app / schema loading at boot "
+        "and are NOT runtime-toggleable — changing one requires a "
+        "redeploy. ``envVar`` is the environment variable that controls it."
+    )
+)
+class BuildTimeFeatureInfo:
+    key: str
+    enabled: bool
+    env_var: str
     description: str | None = None
 
 
@@ -110,6 +161,13 @@ class AstroliftServerInfo:
     )
     capabilities: list[str] = strawberry.field(default_factory=list)
     feature_flags: list[FeatureFlagInfo] = strawberry.field(default_factory=list)
+    build_time_features: list[BuildTimeFeatureInfo] = strawberry.field(
+        default_factory=list,
+        description=(
+            "Install-time feature inventory (read-only). Requires a "
+            "redeploy to change; surfaced for operator awareness."
+        ),
+    )
     auth_methods: list[str] = strawberry.field(default_factory=list)
 
 
@@ -196,6 +254,39 @@ def _resolve_feature_flags() -> list[FeatureFlagInfo]:
     return out
 
 
+def _resolve_build_time_features() -> list[BuildTimeFeatureInfo]:
+    """Reflect the ``config.features.Feature`` enum out read-only.
+
+    These are env-var gated and evaluated at boot (they change
+    INSTALLED_APPS + schema assembly), so they are reported for operator
+    awareness only — the ``setFeatureFlag`` mutation cannot touch them.
+    Read defensively so a config edge case never takes down the
+    handshake.
+    """
+    try:
+        from config.features import FEATURE_DEFAULTS, Feature, is_enabled
+    except Exception:  # pragma: no cover — config.features always imports
+        logger.warning("astroliftServerInfo: config.features not importable", exc_info=True)
+        return []
+
+    out: list[BuildTimeFeatureInfo] = []
+    for feature in Feature:
+        env_var, _default = FEATURE_DEFAULTS[feature]
+        try:
+            enabled = bool(is_enabled(feature))
+        except Exception:
+            enabled = False
+        out.append(
+            BuildTimeFeatureInfo(
+                key=feature.value,
+                enabled=enabled,
+                env_var=env_var,
+                description=_BUILD_TIME_FEATURE_DESCRIPTIONS.get(feature.value),
+            )
+        )
+    return out
+
+
 def _resolve_auth_methods() -> list[str]:
     """Enumerate the auth methods the client may present to this install.
 
@@ -260,6 +351,7 @@ class AstroliftServerInfoQuery:
             server_time=timezone.now(),
             capabilities=shipped_capabilities(),
             feature_flags=_resolve_feature_flags(),
+            build_time_features=_resolve_build_time_features(),
             auth_methods=_resolve_auth_methods(),
         )
 
@@ -267,6 +359,7 @@ class AstroliftServerInfoQuery:
 __all__ = [
     "AstroliftServerInfo",
     "AstroliftServerInfoQuery",
+    "BuildTimeFeatureInfo",
     "FeatureFlagInfo",
     "allow_anonymous",
 ]

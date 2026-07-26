@@ -493,6 +493,26 @@ CONSTANCE_CONFIG = {
         "still want the deploy-approval audit trail without blocking on a second approver. "
         "Per-deployment auditability is unchanged either way.",
     ),
+    # ---- Admin console surfaces (feature flipper) ----
+    # Runtime gates for the platform-admin cost / quotas / permissions
+    # screens. Default OFF — the screens ship dark and each gates itself
+    # on its flag once the underlying implementation lands. Flip on from
+    # /administration/features (the in-app feature flipper) or here.
+    "ADMIN_COST_ENABLED": (
+        False,
+        "Enable the platform-admin Cost console (/administration/cost). Default OFF until the "
+        "cost aggregation surface is production-ready; toggle from the in-app feature flipper.",
+    ),
+    "ADMIN_QUOTAS_ENABLED": (
+        False,
+        "Enable the platform-admin Quotas console (/administration/quotas). Default OFF until "
+        "the quota-enforcement surface is production-ready; toggle from the feature flipper.",
+    ),
+    "ADMIN_PERMISSIONS_ENABLED": (
+        False,
+        "Enable the platform-admin Permissions console (/administration/permissions). Default "
+        "OFF until the permissions surface is production-ready; toggle from the feature flipper.",
+    ),
     "AUDIT_RETENTION_DAYS": (
         90,
         "Platform-wide default audit-log retention, in days, for the retention sweeper. "
@@ -648,6 +668,14 @@ CONSTANCE_CONFIG_FIELDSETS = {
     "Auth0": {"fields": ("AUTH0_REGISTER_NEW_USER",), "collapse": False},
     "Notifications": {"fields": ("EMAIL_NOTIFICATIONS",), "collapse": False},
     "Zentinelle": {"fields": ("ZENTINELLE_ENABLED",), "collapse": False},
+    "Admin screens": {
+        "fields": (
+            "ADMIN_COST_ENABLED",
+            "ADMIN_QUOTAS_ENABLED",
+            "ADMIN_PERMISSIONS_ENABLED",
+        ),
+        "collapse": False,
+    },
     "Workflows": {
         "fields": ("TEMPORAL_ENABLED", "DEPLOY_PIPELINE_ENABLED", "ALLOW_SELF_APPROVE_DEPLOYS"),
         "collapse": False,

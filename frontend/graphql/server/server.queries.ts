@@ -13,3 +13,25 @@ export const SERVER_INFO = gql`
     }
   }
 `;
+
+// Richer read for the admin feature-flipper screen
+// (/administration/features): the runtime flags WITH their descriptions
+// plus the read-only install-time (build-time) feature inventory. Kept
+// separate from SERVER_INFO so the hot-path nav gate query stays small.
+export const ADMIN_FEATURE_INVENTORY = gql`
+  query AdminFeatureInventory {
+    astroliftServerInfo {
+      featureFlags {
+        key
+        enabled
+        description
+      }
+      buildTimeFeatures {
+        key
+        enabled
+        envVar
+        description
+      }
+    }
+  }
+`;

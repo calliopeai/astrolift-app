@@ -3057,6 +3057,11 @@ type AstroliftServerInfo {
   serverTime: DateTime!
   capabilities: [String!]!
   featureFlags: [FeatureFlagInfo!]!
+
+  """
+  Install-time feature inventory (read-only). Requires a redeploy to change; surfaced for operator awareness.
+  """
+  buildTimeFeatures: [BuildTimeFeatureInfo!]!
   authMethods: [String!]!
 }
 
@@ -3618,6 +3623,16 @@ type BootstraprunrecordedpayloadMutationResult {
 
 input BringClusterIntoManagementInputType {
   clusterId: GUID!
+}
+
+"""
+Install-time (build-time) platform feature reported by ``astroliftServerInfo``. These gate app / schema loading at boot and are NOT runtime-toggleable — changing one requires a redeploy. ``envVar`` is the environment variable that controls it.
+"""
+type BuildTimeFeatureInfo {
+  key: String!
+  enabled: Boolean!
+  envVar: String!
+  description: String
 }
 
 type BulkAppResultItem {
@@ -4229,6 +4244,12 @@ type FeatureFlagInfo {
   description: String
 }
 
+type FeatureFlagInfoMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: FeatureFlagInfo
+}
+
 type FileUploadResult {
   preSignedUrl: String
   publicUrl: String
@@ -4569,6 +4590,11 @@ type Mutation {
   Upload an image for a specific profile image field (avatar, signature). Supports the approval request workflow for non-whitelisted fields.
   """
   profileImageFieldUpload(globalId: ID!, mimetype: String!, field: ProfileImageField = null, metadata: JSON = null): ProfileImageFieldUploadResult!
+
+  """
+  Toggle a public runtime feature flag (the admin 'feature flipper'). Platform-admin only. ``key`` is the public dotted key from ``astroliftServerInfo.featureFlags`` (e.g. ``zentinelle.enabled``); the backing Constance value is set and the updated flag is returned. Unknown / non-public keys are rejected with a VALIDATION error. Install-time features (``astroliftServerInfo.buildTimeFeatures``) are NOT settable here — they require a redeploy.
+  """
+  setFeatureFlag(key: String!, enabled: Boolean!): FeatureFlagInfoMutationResult!
 
   """Delete an object by its global ID (soft-delete via delete_check)."""
   delete(gid: ID!): Boolean!

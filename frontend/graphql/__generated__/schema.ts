@@ -3064,6 +3064,8 @@ export type AstroliftSecurityPolicy = {
 export type AstroliftServerInfo = {
   apiVersion: Scalars['String']['output'];
   authMethods: Array<Scalars['String']['output']>;
+  /** Install-time feature inventory (read-only). Requires a redeploy to change; surfaced for operator awareness. */
+  buildTimeFeatures: Array<BuildTimeFeatureInfo>;
   capabilities: Array<Scalars['String']['output']>;
   featureFlags: Array<FeatureFlagInfo>;
   installId: Scalars['String']['output'];
@@ -3638,6 +3640,14 @@ export type BootstraprunrecordedpayloadMutationResult = {
 
 export type BringClusterIntoManagementInputType = {
   clusterId: Scalars['GUID']['input'];
+};
+
+/** Install-time (build-time) platform feature reported by ``astroliftServerInfo``. These gate app / schema loading at boot and are NOT runtime-toggleable — changing one requires a redeploy. ``envVar`` is the environment variable that controls it. */
+export type BuildTimeFeatureInfo = {
+  description?: Maybe<Scalars['String']['output']>;
+  enabled: Scalars['Boolean']['output'];
+  envVar: Scalars['String']['output'];
+  key: Scalars['String']['output'];
 };
 
 export type BulkAppResultItem = {
@@ -4241,6 +4251,12 @@ export type FeatureFlagInfo = {
   key: Scalars['String']['output'];
 };
 
+export type FeatureFlagInfoMutationResult = {
+  data?: Maybe<FeatureFlagInfo>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type FileUploadResult = {
   id?: Maybe<Scalars['ID']['output']>;
   preSignedUrl?: Maybe<Scalars['String']['output']>;
@@ -4731,6 +4747,8 @@ export type Mutation = {
   setDomainPathRoutes: AstroliftAppDomainMutationResult;
   setDomainRedirects: AstroliftAppDomainMutationResult;
   setEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
+  /** Toggle a public runtime feature flag (the admin 'feature flipper'). Platform-admin only. ``key`` is the public dotted key from ``astroliftServerInfo.featureFlags`` (e.g. ``zentinelle.enabled``); the backing Constance value is set and the updated flag is returned. Unknown / non-public keys are rejected with a VALIDATION error. Install-time features (``astroliftServerInfo.buildTimeFeatures``) are NOT settable here — they require a redeploy. */
+  setFeatureFlag: FeatureFlagInfoMutationResult;
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
   setRetentionPolicy: AstroliftRetentionPolicyMutationResult;
   /** Cancel a sign request. Requires SIGNREQUEST_CHANGE_CANCEL permission. */
@@ -5990,6 +6008,12 @@ export type MutationSetDomainRedirectsArgs = {
 
 export type MutationSetEnvironmentSettingArgs = {
   input: SetEnvironmentSettingInput;
+};
+
+
+export type MutationSetFeatureFlagArgs = {
+  enabled: Scalars['Boolean']['input'];
+  key: Scalars['String']['input'];
 };
 
 
