@@ -153,6 +153,28 @@ export const AGENT_TASK_TRANSITIONS_SINCE = gql`
   }
 `;
 
+// Per-task interaction feed (#1092 — LiveFlowMap P3). Returns the control-plane-
+// observed interactions for a single AgentTask — control_api calls + tool
+// invocations today; gate/signal capture is deferred (#1217) — newest-relevant
+// first, capped. The agent-run interaction map polls this while the run is live
+// and rebuilds the graph on each fetch (P1-style full-set refetch, since=null),
+// pulsing an edge per recent interaction. Tenant-scoped via `orgId` like the
+// sibling fleet feed above. NOTE: this file is excluded from codegen operation
+// typing (it interpolates the plain `AGENT_LIST_ITEM_FIELDS` constant, which
+// graphql-tag-pluck can't resolve — see codegen.ts), so the Data/Vars shapes
+// are hand-typed in agents.types.ts, exactly as the P2 transition feed is.
+export const AGENT_TASK_INTERACTIONS = gql`
+  query AgentTaskInteractions($orgId: ID!, $taskId: ID!, $since: DateTime, $limit: Int! = 200) {
+    agentTaskInteractions(orgId: $orgId, taskId: $taskId, since: $since, limit: $limit) {
+      id
+      kind
+      name
+      status
+      occurredAt
+    }
+  }
+`;
+
 // Per-run log lines for a single agent task, newest `tail` lines. Keyed by
 // the AGENT TASK id (not workloadId) — the agent-detail Observe tab reads
 // these for the most-recent run. NOTE: `agentTaskLogs` returns an empty list

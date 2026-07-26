@@ -4,6 +4,7 @@ import type {
   AgentRunSpecInput as GeneratedAgentRunSpecInput,
   AstroliftAgentDetail as GeneratedAgentDetail,
   AstroliftAgentEnvironmentSpec as GeneratedAgentEnvironmentSpec,
+  AstroliftAgentInteraction as GeneratedAgentInteraction,
   AstroliftAgentListItem as GeneratedAgentListItem,
   AstroliftAgentLiveStatus as GeneratedAgentLiveStatus,
   AstroliftAgentRunSpec as GeneratedAgentRunSpec,
@@ -155,6 +156,31 @@ export type AgentTaskTransitionsSinceData = {
 
 export type AgentTaskTransitionsSinceVars = {
   orgId: string;
+  since?: string | null;
+  limit?: number | null;
+};
+
+// ── Agent interaction map (#1092 — LiveFlowMap P3): per-task interaction feed ─
+// Faceted over the committed generated type (the `agentTaskInteractions` SDL
+// landed in ccf13f4, so codegen is authoritative here — unlike the P2 transition
+// feed above, hand-typed because its node-layer fields lag codegen). One row per
+// control-plane-observed interaction on a single AgentTask: `kind` groups the
+// target (control_api | tool_call | signal | gate), `name` is the specific
+// endpoint/tool (e.g. "callback"/"checkin"/"meter"), `status` is ok/error, and
+// `occurredAt` drives the map's recency/pulse. gate + signal are not captured
+// yet (#1217) — the map renders those kinds as "capture pending" placeholders.
+export type AstroliftAgentInteraction = Pick<
+  GeneratedAgentInteraction,
+  "id" | "kind" | "name" | "status" | "occurredAt"
+>;
+
+export type AgentTaskInteractionsData = {
+  agentTaskInteractions: AstroliftAgentInteraction[];
+};
+
+export type AgentTaskInteractionsVars = {
+  orgId: string;
+  taskId: string;
   since?: string | null;
   limit?: number | null;
 };

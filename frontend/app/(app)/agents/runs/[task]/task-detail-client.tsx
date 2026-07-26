@@ -7,6 +7,7 @@ import {
   Loader2Icon,
   MonitorPlayIcon,
   ScrollIcon,
+  WaypointsIcon,
   XCircleIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -23,6 +24,8 @@ import { DefinitionList } from "@/components/ui/definition-list";
 import { AGENT_TASK_LOGS, GET_AGENT_TASK } from "@/graphql/agents/agents.queries";
 import type { AstroliftAgentTask } from "@/graphql/agents/agents.types";
 import { formatRelativeAge } from "@/lib/format";
+
+import { AgentInteractionMap } from "./agent-interaction-map";
 
 interface TaskResp {
   agentTask: AstroliftAgentTask | null;
@@ -268,6 +271,21 @@ export function AgentTaskDetail({ taskId }: { taskId: string }) {
                 },
             ]}
           />
+        </CollapsibleCard>
+
+        <CollapsibleCard
+          storageKey="agent-run-interactions"
+          title={
+            <span className="flex items-center gap-2">
+              <WaypointsIcon className="size-4" />
+              Interaction map
+              <span className="text-muted-foreground text-xs font-normal">
+                control-plane activity
+              </span>
+            </span>
+          }
+        >
+          <AgentInteractionMap taskId={task.id} taskStatus={task.status} />
         </CollapsibleCard>
 
         <CollapsibleCard title="Result" storageKey="agent-run-result">
