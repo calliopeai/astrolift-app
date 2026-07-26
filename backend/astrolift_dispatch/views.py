@@ -492,24 +492,17 @@ def _agent_task_for_run(run: AgentRun | None) -> AgentTask | None:
     """Best-effort resolve the AgentTask a fleet-history AgentRun dispatched.
 
     The logs/meter endpoints key off ``AgentRun.guid``, but interactions
-    attribute to the :class:`AgentTask`. The platform's own reconciler
-    (``astrolift_workflows...._poll_agent_run_status_sync``) bridges the two
-    by ``(workload, external_id == k8s_pod_name)`` — mirror that exactly.
-    Returns ``None`` when no task is linked yet (push-mode, pre-spawn, or a
-    run with no AgentTask) so capture is skipped rather than mis-attributed.
+    attribute to the :class:`AgentTask`. Delegates to the shared
+    :func:`~astrolift_agents.models.resolve_agent_task_for_run`, which is
+    FK-first (``AgentTask.agent_run``) and falls back to the historical
+    ``(workload, external_id == k8s_pod_name)`` join for rows that predate
+    the FK (#1217). Returns ``None`` when no task is linked yet (push-mode,
+    pre-spawn, or a run with no AgentTask) so capture is skipped rather than
+    mis-attributed.
     """
-    if run is None or not run.k8s_pod_name:
-        return None
-    return (
-        AgentTask.objects.filter(
-            agent_definition_id=run.workload_id,
-            external_id=run.k8s_pod_name,
-            deleted_at__isnull=True,
-        )
-        .exclude(external_id="")
-        .order_by("-created_at")
-        .first()
-    )
+    from astrolift_agents.models import resolve_agent_task_for_run
+
+    return resolve_agent_task_for_run(run)
 
 
 def _record_run_interaction(

@@ -80,6 +80,21 @@ class AgentTask(BaseCoreModel):
         blank=True,
         on_delete=models.SET_NULL,
     )
+    # Explicit link to the fleet-history AgentRun this task was dispatched
+    # for (#1217). Set at dispatch when both records exist (the workflow
+    # stage executor) and backfilled by the reconciler when the historical
+    # ``(workload, external_id == k8s_pod_name)`` join resolves. Nullable:
+    # push-mode / pre-spawn runs and non-workflow dispatch paths have no
+    # AgentRun, and rows created before this field just stay null until the
+    # next reconcile. Consumers must go through ``resolve_agent_task_for_run``
+    # so the historical fuzzy join keeps working while the FK backfills.
+    agent_run = models.OneToOneField(
+        "astrolift_lifecycle.AgentRun",
+        related_name="agent_task",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
     status = models.CharField(
         max_length=32,
         choices=Status.choices,
@@ -254,3 +269,39 @@ class AgentTask(BaseCoreModel):
 
     def __str__(self) -> str:
         return f"AgentTask {self.guid} ({self.status})"
+
+
+def resolve_agent_task_for_run(run) -> AgentTask | None:
+    """Resolve the :class:`AgentTask` a fleet-history ``AgentRun`` dispatched.
+
+    FK-first, fuzzy-fallback (#1217): returns the task explicitly linked via
+    the ``AgentTask.agent_run`` FK when set, otherwise falls back to the
+    historical ``(workload, external_id == k8s_pod_name)`` join the platform's
+    reconciler and dispatch bridge have always used. This keeps every existing
+    caller working while the FK backfills — rows dispatched before the FK
+    landed (or push-mode / pre-spawn runs) resolve through the fuzzy join
+    until the next reconcile stamps the FK.
+
+    Returns ``None`` when no task is linked yet (push-mode, pre-spawn, a run
+    with no AgentTask, or a run with no pod name) so callers skip rather than
+    mis-attribute. Read-only: it never writes the FK — population happens at
+    the sanctioned dispatch / reconcile points.
+    """
+    if run is None:
+        return None
+    linked = AgentTask.objects.filter(agent_run_id=run.pk, deleted_at__isnull=True).first()
+    if linked is not None:
+        return linked
+    pod_name = getattr(run, "k8s_pod_name", "")
+    if not pod_name:
+        return None
+    return (
+        AgentTask.objects.filter(
+            agent_definition_id=run.workload_id,
+            external_id=pod_name,
+            deleted_at__isnull=True,
+        )
+        .exclude(external_id="")
+        .order_by("-created_at")
+        .first()
+    )

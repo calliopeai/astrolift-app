@@ -1,6 +1,6 @@
 from astrolift_agents.models.agent_environment_spec import AgentEnvironmentSpec
 from astrolift_agents.models.agent_interaction import AgentInteraction, record_interaction
-from astrolift_agents.models.agent_task import AgentTask
+from astrolift_agents.models.agent_task import AgentTask, resolve_agent_task_for_run
 from astrolift_agents.models.brief import Brief
 from astrolift_agents.models.dispatcher_instance import DispatcherInstance
 from astrolift_agents.models.org_skill_repo import OrgSkillRepo
@@ -34,4 +34,5 @@ __all__ = [
     "WorkflowWebhook",
     "WorkloadToolDef",
     "record_interaction",
+    "resolve_agent_task_for_run",
 ]

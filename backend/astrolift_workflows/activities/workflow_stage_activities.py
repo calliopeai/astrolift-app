@@ -145,6 +145,14 @@ def _create_stage_execution_sync(
 
     run.current_stage_execution = execution
     run.save(update_fields=["current_stage_execution", "updated_at", "version"])
+
+    # A human gate opening RUNNING is the moment reviewers are notified — the
+    # live executor has no separate notify step (the legacy notify_human_gate
+    # service is a different, unused tier). Capture a pending GATE interaction
+    # so the P3 map shows the gate the instant it blocks (#1217). Defensive:
+    # never lets capture break stage creation.
+    if stage.kind == WorkflowStage.StageKind.HUMAN_GATE:
+        _capture_gate_interaction(execution, status="pending")
     return str(execution.pk)
 
 
@@ -267,6 +275,10 @@ def _dispatch_agent_for_stage_sync(
     task = AgentTask.objects.create(
         organization_id=organization_id,
         agent_definition=stage.agent_definition,
+        # Explicit AgentRun linkage (#1217): both records are created here,
+        # so link them directly rather than leaning on the reconciler's
+        # historical (workload, external_id == k8s_pod_name) fuzzy join.
+        agent_run=agent_run,
         status=AgentTask.Status.DRAFT,
         timeout_seconds=int(stage.timeout_seconds),
     )
@@ -339,7 +351,7 @@ def _poll_agent_run_status_sync(agent_run_id: str) -> str:
     """
     from django.utils import timezone
 
-    from astrolift_agents.models import AgentTask
+    from astrolift_agents.models import AgentTask, resolve_agent_task_for_run
     from astrolift_dispatch.spawners.registry import get_spawner
     from astrolift_lifecycle.models import AgentRun
 
@@ -352,20 +364,15 @@ def _poll_agent_run_status_sync(agent_run_id: str) -> str:
     if agent_run.status in terminal:
         return agent_run.status
 
-    # Find the dispatched task. Tasks are linked by the same workload +
-    # dispatch window; the stage's execution carries no direct FK to the
-    # task, so we locate the most recent non-terminal task for the run's
-    # workload that still has a live external_id.
-    task = (
-        AgentTask.objects.filter(
-            agent_definition=agent_run.workload,
-            external_id=agent_run.k8s_pod_name,
-            deleted_at__isnull=True,
-        )
-        .exclude(external_id="")
-        .order_by("-created_at")
-        .first()
-    )
+    # Find the dispatched task via the explicit FK, falling back to the
+    # historical (workload, external_id == k8s_pod_name) join for rows that
+    # predate the FK or push-mode runs (#1217). Backfill the FK once when the
+    # fuzzy join resolves so subsequent lookups (and the interaction bridge)
+    # go straight through the link.
+    task = resolve_agent_task_for_run(agent_run)
+    if task is not None and task.agent_run_id is None:
+        task.agent_run = agent_run
+        task.save(update_fields=["agent_run", "updated_at", "version"])
     if task is None or not task.external_id or task.dispatcher_id is None:
         # Nothing to poll (no dispatcher / push-mode only). Leave as-is.
         return agent_run.status
@@ -397,6 +404,100 @@ def _poll_agent_run_status_sync(agent_run_id: str) -> str:
         agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
     # else: still running — no change.
     return agent_run.status
+
+
+def _resolve_gate_agent_tasks_sync(execution) -> tuple[list, bool]:
+    """Resolve the AgentTask(s) a human-gate execution governs (#1217).
+
+    A gate has no agent dispatch of its own, so it is attributed to the
+    agent stage it gates: the AGENT_DISPATCH execution(s) in the same
+    ``WorkflowRun`` with the greatest stage ``order`` strictly *below* the
+    gate's order — the immediately-preceding agent stage (and every fan-out
+    branch of it, since fan-out branch executions share the parent run). When
+    no preceding agent stage resolves (e.g. a leading gate) it falls back to
+    every resolvable agent task in the run and flags the result ``ambiguous``
+    so the caller can note the imprecision.
+
+    Returns ``(tasks, ambiguous)`` with tasks de-duplicated by pk. Attribution
+    stays inside the gate's own WorkflowRun, so it can never cross tenants.
+    """
+    from astrolift_agents.models import resolve_agent_task_for_run
+    from workflows.models import WorkflowStage, WorkflowStageExecution
+
+    gate_order = execution.stage.order
+    agent_execs = list(
+        WorkflowStageExecution.objects.filter(
+            workflow_run_id=execution.workflow_run_id,
+            agent_run__isnull=False,
+            stage__kind=WorkflowStage.StageKind.AGENT_DISPATCH,
+        ).select_related("stage", "agent_run")
+    )
+    below = [(e.stage.order, e.agent_run) for e in agent_execs if e.stage.order < gate_order]
+    if below:
+        max_order = max(order for order, _ in below)
+        target_runs = [run for order, run in below if order == max_order]
+        ambiguous = False
+    else:
+        target_runs = [e.agent_run for e in agent_execs]
+        ambiguous = True
+
+    tasks: dict = {}
+    for run in target_runs:
+        task = resolve_agent_task_for_run(run)
+        if task is not None:
+            tasks[task.pk] = task
+    return list(tasks.values()), ambiguous
+
+
+def _capture_gate_interaction(
+    execution,
+    *,
+    status: str,
+    decided_by_user_id: int | None = None,
+    note: str = "",
+) -> None:
+    """Emit a GATE :class:`AgentInteraction` for a human-gate execution,
+    attributed to the agent task(s) the gate governs (#1217).
+
+    Fully defensive: capture is additive / side-effect-only, so any failure
+    here (attribution or write) is logged and swallowed and must never break
+    the gate-open / decision flow.
+    """
+    try:
+        from astrolift_agents.models import AgentInteraction, record_interaction
+
+        tasks, ambiguous = _resolve_gate_agent_tasks_sync(execution)
+        if not tasks:
+            return
+        stage = execution.stage
+        name = stage.name or stage.role or f"human_gate #{stage.order}"
+        detail = {
+            "execution_id": str(execution.pk),
+            "workflow_run_id": str(execution.workflow_run_id),
+            "stage_order": stage.order,
+            "attributed_task_count": len(tasks),
+        }
+        if ambiguous:
+            # No single preceding agent stage — attributed to every agent task
+            # in the run (see _resolve_gate_agent_tasks_sync).
+            detail["attribution"] = "all_agent_tasks_in_run"
+        if decided_by_user_id is not None:
+            detail["decided_by_user_id"] = decided_by_user_id
+        if note:
+            detail["note"] = note
+        for task in tasks:
+            record_interaction(
+                task,
+                kind=AgentInteraction.Kind.GATE,
+                name=name,
+                status=status,
+                detail=detail,
+            )
+    except Exception:  # noqa: BLE001 — capture must never break the gate flow
+        log.exception(
+            "failed to capture gate interaction for execution %s",
+            getattr(execution, "pk", None),
+        )
 
 
 def _record_human_gate_decision_sync(
@@ -452,6 +553,16 @@ def _record_human_gate_decision_sync(
             "updated_at",
             "version",
         ]
+    )
+
+    # Capture the gate outcome for the P3 interaction map, attributed to the
+    # agent task(s) the gate governs (#1217). Runs after the durable decision
+    # write so a capture failure can never undo the recorded decision.
+    _capture_gate_interaction(
+        execution,
+        status=decision,
+        decided_by_user_id=decided_by_user_id,
+        note=note or "",
     )
 
 

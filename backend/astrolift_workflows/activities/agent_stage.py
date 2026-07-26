@@ -425,6 +425,31 @@ def _load_task_outcome_sync(task_pk: int) -> dict[str, Any]:
     }
 
 
+def _capture_cancel_signal(task, *, ok: bool, from_status: str) -> None:
+    """Record the stop/cancel signal delivered to a running agent task (#1217).
+
+    The control plane telling an agent's container to stop is the one genuine
+    control-plane-visible *signal* to an AgentTask, so it feeds the P3
+    interaction map's Signals hub. Fully defensive: capture is additive /
+    side-effect-only and must never break cancellation.
+    """
+    try:
+        from astrolift_agents.models import AgentInteraction, record_interaction
+
+        record_interaction(
+            task,
+            kind=AgentInteraction.Kind.SIGNAL,
+            name="cancel",
+            status="ok" if ok else "error",
+            detail={"from_status": from_status, "external_id": task.external_id or ""},
+        )
+    except Exception:  # noqa: BLE001 — capture must never break cancellation
+        log.exception(
+            "cancel_agent_stage: failed to capture cancel signal for task %s",
+            getattr(task, "guid", None),
+        )
+
+
 def _cancel_agent_task_sync(task_guid: str) -> None:
     """Stop the container (best-effort) and move the task to CANCELLED.
 
@@ -451,17 +476,22 @@ def _cancel_agent_task_sync(task_guid: str) -> None:
     if task.status not in cancellable:
         return
 
+    from_status = task.status
+    stop_ok = True
     if task.external_id:
         try:
             cluster = _resolve_managed_cluster(task.organization)
             namespace = _agent_namespace(task.organization.slug)
             get_spawner("k8s_job", cluster=cluster, namespace=namespace).stop(task.external_id)
         except Exception:  # noqa: BLE001 — best-effort container teardown
+            stop_ok = False
             log.warning(
                 "cancel_agent_stage: container stop failed for task %s",
                 task_guid,
                 exc_info=True,
             )
+
+    _capture_cancel_signal(task, ok=stop_ok, from_status=from_status)
 
     # CANCELLED is not a legal transition straight from RUNNING (RUNNING only
     # goes to COMPLETED/FAILED/TIMED_OUT). Mark it failed-as-cancelled in that

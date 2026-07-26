@@ -20,6 +20,7 @@ from astrolift_workflows.activities.workflow_stage_activities import (
     _get_workflow_stages_sync,
     _mark_workflow_run_sync,
     _parent_run_pk,
+    _poll_agent_run_status_sync,
     _record_human_gate_decision_sync,
     _snapshot_checkpoint_sync,
     _update_stage_execution_sync,
@@ -489,3 +490,199 @@ def test_parent_run_pk_plain_and_fanout_child():
     assert _parent_run_pk("38") == 38
     assert _parent_run_pk("38:fanout:0:0") == 38
     assert _parent_run_pk("38:fanout:0:2") == 38
+
+
+# ---------------------------------------------------------------------------
+# AgentTask <-> AgentRun FK linkage (#1217)
+# ---------------------------------------------------------------------------
+
+
+def _dispatch_agent_stage(run, definition, order: int = 0):
+    """Dispatch the agent stage at ``order`` (no dispatcher) against ``run``,
+    returning the (agent_run, agent_task) it created and linked. The stage's
+    execution now carries an ``agent_run``, so a following gate resolves to
+    this task."""
+    from astrolift_agents.models import AgentTask
+    from astrolift_lifecycle.models import AgentRun
+
+    stage = _stage(definition, order)
+    execution_id = _create_stage_execution_sync(str(run.pk), str(stage.pk), 1)
+    agent_run_id = _dispatch_agent_for_stage_sync(str(stage.pk), execution_id, {})
+    agent_run = AgentRun.objects.get(pk=int(agent_run_id))
+    task = AgentTask.objects.get(agent_run_id=agent_run.pk)
+    return agent_run, task
+
+
+@pytest.mark.django_db
+def test_dispatch_links_agent_task_to_agent_run(run, definition):
+    """The dispatch path links the created AgentTask to its AgentRun via the
+    explicit FK — no reliance on the (workload, pod) fuzzy join."""
+    agent_run, task = _dispatch_agent_stage(run, definition, 0)
+
+    assert task.agent_run_id == agent_run.pk
+    # Reverse OneToOne accessor resolves back to the same task.
+    assert agent_run.agent_task == task
+
+
+@pytest.mark.django_db
+def test_poll_backfills_fk_from_fuzzy_join(run, definition):
+    """A pre-FK row linked only by the historical (workload, pod) join gets its
+    FK backfilled on the next reconcile (idempotent, only when unset)."""
+    from astrolift_agents.models import AgentTask
+    from astrolift_lifecycle.models import AgentRun
+
+    stage = _stage(definition, 0)
+    agent_run = AgentRun.objects.create(
+        workload=stage.agent_definition,
+        status=AgentRun.Status.RUNNING,
+        k8s_pod_name="pod-backfill-1",
+    )
+    # Linked only by the fuzzy join (no FK, no dispatcher → poll backfills the
+    # FK then returns early without needing the spawner).
+    task = AgentTask.objects.create(
+        organization=run.organization,
+        agent_definition=stage.agent_definition,
+        external_id="pod-backfill-1",
+    )
+    assert task.agent_run_id is None
+
+    _poll_agent_run_status_sync(str(agent_run.pk))
+
+    task.refresh_from_db()
+    assert task.agent_run_id == agent_run.pk
+
+
+# ---------------------------------------------------------------------------
+# Gate interaction capture (#1217)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_gate_open_records_pending_interaction_for_preceding_agent(run, definition):
+    """Opening a human-gate execution (reviewers notified) records a pending
+    GATE interaction attributed to the preceding agent stage's task."""
+    from astrolift_agents.models import AgentInteraction
+
+    _, task = _dispatch_agent_stage(run, definition, 0)
+    gate = _stage(definition, 1)
+
+    _create_stage_execution_sync(str(run.pk), str(gate.pk), 1)
+
+    row = AgentInteraction.objects.get(agent_task=task, kind=AgentInteraction.Kind.GATE)
+    assert row.status == "pending"
+    assert row.organization_id == run.organization_id
+    assert row.detail["stage_order"] == gate.order
+    assert row.detail["execution_id"]
+
+
+@pytest.mark.django_db
+def test_gate_approved_records_interaction_attributed_to_agent(run, definition):
+    """An approved gate decision records a GATE interaction (status=approved)
+    attributed to the preceding agent stage's task, carrying the decider."""
+    from astrolift_agents.models import AgentInteraction
+
+    _, task = _dispatch_agent_stage(run, definition, 0)
+    gate = _stage(definition, 1)
+    gate_exec = _create_stage_execution_sync(str(run.pk), str(gate.pk), 1)  # pending
+
+    user = get_user_model().objects.create(username="gatekeeper", email="gk@test")
+    _record_human_gate_decision_sync(gate_exec, "approved", user.pk, "ship it")
+
+    rows = list(
+        AgentInteraction.objects.filter(
+            agent_task=task, kind=AgentInteraction.Kind.GATE
+        ).order_by("id")
+    )
+    # gate-open (pending) then decision (approved).
+    assert [r.status for r in rows] == ["pending", "approved"]
+    decided = rows[-1]
+    assert decided.detail["decided_by_user_id"] == user.pk
+    assert decided.detail["note"] == "ship it"
+    assert decided.organization_id == run.organization_id
+
+
+@pytest.mark.django_db
+def test_gate_rejected_records_rejected_interaction(run, definition):
+    """A rejected decision (e.g. gate timeout) records a rejected GATE
+    interaction."""
+    from astrolift_agents.models import AgentInteraction
+
+    _, task = _dispatch_agent_stage(run, definition, 0)
+    gate = _stage(definition, 1)
+    gate_exec = _create_stage_execution_sync(str(run.pk), str(gate.pk), 1)
+
+    _record_human_gate_decision_sync(gate_exec, "rejected", None, "nope")
+
+    decided = AgentInteraction.objects.filter(
+        agent_task=task, kind=AgentInteraction.Kind.GATE, status="rejected"
+    ).first()
+    assert decided is not None
+    assert decided.detail["note"] == "nope"
+
+
+@pytest.mark.django_db
+def test_gate_attributes_to_nearest_preceding_agent_stage(run, agent_workload):
+    """With two agent stages before the gate, the gate attributes ONLY to the
+    nearest (highest-order) preceding agent stage — not an earlier one. This is
+    the core attribution rule (review-loop: gate reviews the stage just before)."""
+    from astrolift_agents.models import AgentInteraction
+
+    wd = WorkflowDefinition.objects.create(
+        name="Two Agents Gate",
+        slug="two-agents-gate",
+        model_label="workflows.workflowdefinition",
+        pattern_kind=WorkflowDefinition.PatternKind.CHAINED,
+        states=MINIMAL_STATES,
+        transitions=[],
+        is_enabled=True,
+    )
+    WorkflowStage.objects.create(
+        slug="tag-s0", definition=wd, order=0,
+        kind=WorkflowStage.StageKind.AGENT_DISPATCH,
+        agent_definition=agent_workload, timeout_seconds=120,
+    )
+    WorkflowStage.objects.create(
+        slug="tag-s1", definition=wd, order=1,
+        kind=WorkflowStage.StageKind.AGENT_DISPATCH,
+        agent_definition=agent_workload, timeout_seconds=120,
+    )
+    WorkflowStage.objects.create(
+        slug="tag-s2", definition=wd, order=2,
+        kind=WorkflowStage.StageKind.HUMAN_GATE, timeout_seconds=300,
+    )
+
+    _, task0 = _dispatch_agent_stage(run, wd, 0)
+    _, task1 = _dispatch_agent_stage(run, wd, 1)
+    assert task0.pk != task1.pk
+
+    gate = _stage(wd, 2)
+    _create_stage_execution_sync(str(run.pk), str(gate.pk), 1)
+
+    attributed = set(
+        AgentInteraction.objects.filter(kind=AgentInteraction.Kind.GATE).values_list(
+            "agent_task_id", flat=True
+        )
+    )
+    assert attributed == {task1.pk}
+
+
+@pytest.mark.django_db
+def test_gate_capture_failure_does_not_break_decision(run, definition, monkeypatch):
+    """Gate capture is defensive: a failure resolving/recording the interaction
+    must never stop the durable decision from being persisted."""
+    from astrolift_workflows.activities import workflow_stage_activities as wsa
+
+    _dispatch_agent_stage(run, definition, 0)
+    gate = _stage(definition, 1)
+    gate_exec = _create_stage_execution_sync(str(run.pk), str(gate.pk), 1)
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("attribution exploded")
+
+    monkeypatch.setattr(wsa, "_resolve_gate_agent_tasks_sync", _boom)
+
+    # Must not raise despite capture blowing up.
+    _record_human_gate_decision_sync(gate_exec, "approved", None, "")
+
+    execution = WorkflowStageExecution.objects.get(pk=int(gate_exec))
+    assert execution.status == "completed"  # decision still recorded

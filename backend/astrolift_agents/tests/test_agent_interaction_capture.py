@@ -352,6 +352,73 @@ def test_run_bridge_skips_when_no_linked_task(org):
 
 
 # ---------------------------------------------------------------------------
+# AgentRun -> AgentTask resolver: FK-first, fuzzy-join fallback (#1217)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db(transaction=True)
+def test_resolver_prefers_explicit_fk(org):
+    """The resolver returns the FK-linked task directly — even when the
+    historical (workload, external_id == k8s_pod_name) join could not match
+    (no pod name here), the explicit FK still resolves it."""
+    from astrolift_agents.models import resolve_agent_task_for_run
+
+    workload = _agent_workload(org, slug="fk-wl")
+    run = AgentRun.objects.create(workload=workload, status=AgentRun.Status.RUNNING, k8s_pod_name="")
+    task = AgentTask.objects.create(organization=org, agent_definition=workload, agent_run=run)
+
+    assert resolve_agent_task_for_run(run) == task
+
+
+@pytest.mark.django_db(transaction=True)
+def test_resolver_falls_back_to_fuzzy_join_when_fk_null(org):
+    """With no FK set, the resolver falls back to the historical
+    (workload, external_id == k8s_pod_name) join so pre-FK rows still resolve."""
+    from astrolift_agents.models import resolve_agent_task_for_run
+
+    workload = _agent_workload(org, slug="fuzzy-wl")
+    run = AgentRun.objects.create(
+        workload=workload, status=AgentRun.Status.RUNNING, k8s_pod_name="pod-fuzzy-1"
+    )
+    task = AgentTask.objects.create(organization=org, agent_definition=workload, external_id="pod-fuzzy-1")
+    assert task.agent_run_id is None  # not linked by FK yet
+
+    assert resolve_agent_task_for_run(run) == task
+
+
+@pytest.mark.django_db(transaction=True)
+def test_resolver_returns_none_for_no_run_and_no_match(org):
+    """None run, and a run with neither an FK nor a fuzzy match, resolve to
+    None so callers skip rather than mis-attribute."""
+    from astrolift_agents.models import resolve_agent_task_for_run
+
+    assert resolve_agent_task_for_run(None) is None
+    workload = _agent_workload(org, slug="nomatch-wl")
+    run = AgentRun.objects.create(workload=workload, status=AgentRun.Status.RUNNING, k8s_pod_name="ghost")
+    assert resolve_agent_task_for_run(run) is None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_meter_records_interaction_via_fk_link(org):
+    """The run-keyed bridge resolves the task through the explicit FK too — no
+    pod-name fuzzy match required once the FK is set."""
+    workload = _agent_workload(org, slug="fk-meter-wl")
+    run = AgentRun.objects.create(workload=workload, status=AgentRun.Status.RUNNING, k8s_pod_name="")
+    task = AgentTask.objects.create(organization=org, agent_definition=workload, agent_run=run)
+
+    resp = Client().post(
+        METER.format(run.guid),
+        data=json.dumps({"cpu_seconds": 2.0, "source": "wall_time_estimate"}),
+        content_type="application/json",
+    )
+    assert resp.status_code == 201, resp.content
+
+    row = AgentInteraction.objects.get(agent_task=task)
+    assert row.name == "meter"
+    assert row.organization_id == org.id
+
+
+# ---------------------------------------------------------------------------
 # Read surface: agentTaskInteractions
 # ---------------------------------------------------------------------------
 

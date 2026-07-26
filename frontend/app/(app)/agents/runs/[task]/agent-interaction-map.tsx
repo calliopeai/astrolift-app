@@ -49,13 +49,14 @@ const ERROR_STATUSES = new Set(["error", "errored", "failed", "failure", "timed_
 type IconType = React.ComponentType<{ className?: string }>;
 
 // The four interaction kinds, in a fixed left-to-right order so the map's shape
-// is stable and always complete. control_api + tool_call carry real data today;
-// gate + signal are not captured yet (#1217) and render as "capture pending".
-const KINDS: { key: string; label: string; icon: IconType; pending: boolean }[] = [
-  { key: "control_api", label: "Control API", icon: RadioTowerIcon, pending: false },
-  { key: "tool_call", label: "Tools", icon: WrenchIcon, pending: false },
-  { key: "gate", label: "Gates", icon: ShieldIcon, pending: true },
-  { key: "signal", label: "Signals", icon: RadioIcon, pending: true },
+// is stable and always complete. Each renders as a live hub when the run has
+// interactions of that kind and stays gracefully empty ("No calls yet")
+// otherwise — control_api / tool_call, gate, and signal are all captured now.
+const KINDS: { key: string; label: string; icon: IconType }[] = [
+  { key: "control_api", label: "Control API", icon: RadioTowerIcon },
+  { key: "tool_call", label: "Tools", icon: WrenchIcon },
+  { key: "gate", label: "Gates", icon: ShieldIcon },
+  { key: "signal", label: "Signals", icon: RadioIcon },
 ];
 
 // ─── node model ─────────────────────────────────────────────────────────────
@@ -70,8 +71,6 @@ interface InteractionNodeData extends Record<string, unknown> {
   tone: Tone;
   /** Live node — the status dot + incoming edge pulse. */
   pulse?: boolean;
-  /** Capture-pending placeholder (gate/signal) — visibly inactive. */
-  pending?: boolean;
   /** Upstream node ids (→ incoming edges). */
   needs: string[];
 }
@@ -101,8 +100,7 @@ function InteractionNode({ data }: NodeProps<Node<InteractionNodeData>>) {
     <div
       className={cn(
         "viz-node bg-background max-w-[220px] min-w-[168px] rounded-md border p-3 shadow-sm ring-1",
-        TONE_RING[data.tone],
-        data.pending && "border-dashed opacity-60"
+        TONE_RING[data.tone]
       )}
     >
       <Handle type="target" position={Position.Left} className="!bg-muted-foreground/30" />
@@ -117,9 +115,8 @@ function InteractionNode({ data }: NodeProps<Node<InteractionNodeData>>) {
               className={cn(
                 "size-1.5 shrink-0 rounded-full",
                 TONE_DOT[data.tone],
-                // The telemetry live-pulse keys off `.viz-node-dot`; omit it on
-                // capture-pending nodes so they stay visibly inactive.
-                !data.pending && "viz-node-dot",
+                // The telemetry live-pulse keys off `.viz-node-dot`.
+                "viz-node-dot",
                 data.pulse && "animate-pulse"
               )}
             />
@@ -186,9 +183,9 @@ function taskTone(status: string): { tone: Tone; pulse: boolean } {
  *
  * Each layer `needs` the previous, so `rankLayout` lays it out left-to-right by
  * depth (the same longest-path layout PipelineDag / the fleet map use). The four
- * kind hubs always render so the shape is complete; gate + signal are marked
- * `pending` (capture deferred, #1217). A hub/leaf is "live" (pulsing, with an
- * animated incoming edge) while the run is non-terminal and its most-recent
+ * kind hubs always render so the shape is complete; a kind with no interactions
+ * stays gracefully empty ("No calls yet"). A hub/leaf is "live" (pulsing, with
+ * an animated incoming edge) while the run is non-terminal and its most-recent
  * interaction is within the recency window.
  */
 function buildInteractionGraph(
@@ -222,20 +219,6 @@ function buildInteractionGraph(
   for (const kind of KINDS) {
     const hubId = `kind:${kind.key}`;
     const items = byKind.get(kind.key) ?? [];
-
-    if (kind.pending) {
-      // Capture pending (#1217): present but visibly inactive, never lit.
-      descriptors.push({
-        id: hubId,
-        icon: kind.icon,
-        label: kind.label,
-        sublabel: "Capture pending (#1217)",
-        tone: "muted",
-        pending: true,
-        needs: [TASK_ID],
-      });
-      continue;
-    }
 
     if (items.length === 0) {
       descriptors.push({
@@ -300,17 +283,13 @@ function buildInteractionGraph(
 
   const edges: Edge[] = rankEdges.map((e) => {
     const target = byId.get(e.target);
-    const pending = !!target?.pending;
     return {
       id: `${e.source}->${e.target}`,
       source: e.source,
       target: e.target,
-      // Live edges flow with the telemetry dash; capture-pending edges are
-      // dashed + dimmed and never animate.
-      animated: !pending && !!target?.pulse,
-      style: pending
-        ? { strokeWidth: 1.5, strokeDasharray: "5 4", opacity: 0.45 }
-        : { strokeWidth: 1.5 },
+      // Live edges flow with the telemetry dash.
+      animated: !!target?.pulse,
+      style: { strokeWidth: 1.5 },
     };
   });
 
@@ -329,8 +308,8 @@ function buildInteractionGraph(
 /**
  * Per-agent-task interaction map (#1092 — LiveFlowMap P3). Renders the control-
  * plane-observed interactions of a single AgentTask as a live nodes+edges graph:
- * the agent fans out to a hub per interaction kind, and each data-carrying kind
- * (control_api / tool_call) fans out to a leaf per endpoint/tool. Built on the
+ * the agent fans out to a hub per interaction kind, and each kind with activity
+ * fans out to a leaf per endpoint / tool / gate / signal. Built on the
  * shared telemetry `FlowGraph` substrate — the same one behind the workflow-run
  * DAG (P1) and the fleet map (P2).
  *
@@ -405,8 +384,7 @@ export function AgentInteractionMap({
         <WaypointsIcon className="text-muted-foreground mx-auto mb-2 size-5" />
         <p className="text-foreground mb-1 font-medium">No interactions recorded yet</p>
         <p>
-          Control API calls and tool invocations appear here as the run makes them. Gate and signal
-          capture is pending (#1217).
+          Control API calls, tool invocations, gates, and signals appear here as the run makes them.
         </p>
       </div>
     );

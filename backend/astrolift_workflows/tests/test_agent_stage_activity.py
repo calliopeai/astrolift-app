@@ -485,3 +485,67 @@ def test_cancel_unknown_task_is_noop(org, patch_spawner):
     patch_spawner(_FakeSpawner(spawn_result=SpawnResult(external_id="x"), status_sequence=[TaskStatus()]))
     # Must not raise.
     agent_stage._cancel_agent_task_sync("00000000-0000-0000-0000-000000000000")
+
+
+# ---- cancel signal capture (#1217) -------------------------------------
+
+
+def test_cancel_records_signal_interaction(org, env_spec, cluster, patch_spawner):
+    """Cancelling a live task records a SIGNAL 'cancel' interaction attributed
+    to the task — the P3 map's Signals hub source. The stop signal to the
+    agent's container is the one genuine control-plane signal to an AgentTask."""
+    from astrolift_agents.models import AgentInteraction
+
+    patch_spawner(
+        _FakeSpawner(
+            spawn_result=SpawnResult(external_id="agent-task-sig"),
+            status_sequence=[TaskStatus(running=True)],
+        )
+    )
+    task_pk = agent_stage._create_agent_task_sync(_params(org, environment_spec_slug=env_spec.slug))
+    agent_stage._spawn_agent_task_sync(task_pk)  # PROVISIONING + external_id set
+    task = AgentTask.objects.get(pk=task_pk)
+
+    agent_stage._cancel_agent_task_sync(str(task.guid))
+
+    row = AgentInteraction.objects.get(agent_task=task, kind=AgentInteraction.Kind.SIGNAL)
+    assert row.name == "cancel"
+    assert row.status == "ok"
+    assert row.organization_id == org.id
+    assert row.detail["external_id"] == "agent-task-sig"
+    assert row.detail["from_status"] == AgentTask.Status.PROVISIONING
+
+
+def test_cancel_signal_capture_failure_does_not_break_cancel(
+    org, env_spec, cluster, patch_spawner, monkeypatch
+):
+    """Signal capture is defensive: a failure recording the interaction must
+    never stop the cancellation from completing."""
+    from astrolift_agents import models as agent_models
+    from astrolift_agents.models import AgentInteraction
+
+    patch_spawner(
+        _FakeSpawner(
+            spawn_result=SpawnResult(external_id="agent-task-sigf"),
+            status_sequence=[TaskStatus(running=True)],
+        )
+    )
+    task_pk = agent_stage._create_agent_task_sync(_params(org, environment_spec_slug=env_spec.slug))
+    agent_stage._spawn_agent_task_sync(task_pk)
+    task = AgentTask.objects.get(pk=task_pk)
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("interaction store down")
+
+    monkeypatch.setattr(agent_models, "record_interaction", _boom)
+
+    agent_stage._cancel_agent_task_sync(str(task.guid))  # must not raise
+
+    task.refresh_from_db()
+    assert task.status == AgentTask.Status.CANCELLED
+    assert (
+        AgentInteraction.objects.filter(
+            agent_task=task, kind=AgentInteraction.Kind.SIGNAL
+        ).count()
+        == 0
+    )
