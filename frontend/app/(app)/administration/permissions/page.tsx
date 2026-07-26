@@ -1,7 +1,7 @@
-import { PermissionsDiagnosticsClient } from "./permissions-diagnostics-client";
+import { PermissionsClient } from "./permissions-client";
 
-export const metadata = { title: "Permissions diagnostics · Astrolift" };
+export const metadata = { title: "Permissions · Astrolift" };
 
-export default function PermissionsDiagnosticsPage() {
-  return <PermissionsDiagnosticsClient />;
+export default function PermissionsPage() {
+  return <PermissionsClient />;
 }

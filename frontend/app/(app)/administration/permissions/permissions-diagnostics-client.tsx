@@ -4,7 +4,6 @@ import { useQuery } from "@apollo/client/react";
 import { CheckCircle2Icon, XCircleIcon } from "lucide-react";
 import * as React from "react";
 
-import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DefinitionList } from "@/components/ui/definition-list";
@@ -42,7 +41,14 @@ const RESOURCE_TONE: Record<string, string> = {
   billing: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
 };
 
-export function PermissionsDiagnosticsClient() {
+/**
+ * Read-only "why do I have this access" body. Rendered as the
+ * Diagnostics tab of the Permissions screen (#1206), so it omits its
+ * own PageShell — the tabbed client owns the page chrome. Effective
+ * permissions come from `astroliftMyPermissions`; the role bindings
+ * behind them come from `astroliftRoleBindings`.
+ */
+export function PermissionsDiagnosticsContent() {
   const fmt = useFormatters();
   const me = useQuery<MeResp>(GET_ME);
   const perms = useQuery<MyPermsResp>(GET_MY_PERMISSIONS);
@@ -75,10 +81,12 @@ export function PermissionsDiagnosticsClient() {
     bindings.data?.astroliftRoleBindings.filter((b) => b.user?.id === me.data?.me?.id) ?? [];
 
   return (
-    <PageShell
-      title="Permissions diagnostics"
-      description="Your effective permissions in this organization, grouped by resource. Use this to figure out why a button is hidden or a mutation rejects."
-    >
+    <>
+      <p className="text-muted-foreground max-w-2xl text-sm">
+        Your effective permissions in this organization, grouped by resource. Use this to figure out
+        why a button is hidden or a mutation rejects.
+      </p>
+
       <div className="grid gap-4 sm:grid-cols-3">
         <StatTile label="Total permissions" value={allPerms.length} loading={perms.loading} />
         <StatTile
@@ -194,6 +202,6 @@ export function PermissionsDiagnosticsClient() {
           </div>
         )}
       </Section>
-    </PageShell>
+    </>
   );
 }

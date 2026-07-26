@@ -12,6 +12,7 @@ import { SERVER_INFO } from "./server.queries";
 export const FEATURE_FLAG_ZENTINELLE = "zentinelle.enabled";
 export const FEATURE_FLAG_ADMIN_COST = "admin.cost_enabled";
 export const FEATURE_FLAG_ADMIN_QUOTAS = "admin.quotas_enabled";
+export const FEATURE_FLAG_ADMIN_PERMISSIONS = "admin.permissions_enabled";
 
 type ServerInfoData = {
   astroliftServerInfo: {

@@ -10,6 +10,7 @@ import {
   KeyIcon,
   ScaleIcon,
   ScrollTextIcon,
+  ShieldCheckIcon,
   UsersIcon,
   UsersRoundIcon,
 } from "lucide-react";
@@ -19,6 +20,7 @@ import * as React from "react";
 
 import {
   FEATURE_FLAG_ADMIN_COST,
+  FEATURE_FLAG_ADMIN_PERMISSIONS,
   FEATURE_FLAG_ADMIN_QUOTAS,
   useFeatureFlag,
 } from "@/graphql/server/server.hooks";
@@ -36,6 +38,11 @@ interface SubnavLink {
 // here for those gates.
 const COST_HREF = "/administration/cost";
 const QUOTAS_HREF = "/administration/quotas";
+// Permissions ships behind the `admin.permissions_enabled` runtime flag
+// (#1206) — the actionable Roles / Assignments / Diagnostics screen. Lives
+// in the Organization group but filtered out below unless the install
+// enables the flag, so the href is named here for that gate.
+const PERMISSIONS_HREF = "/administration/permissions";
 
 // Mirrors the sidebar's four-group Admin IA (Organization ·
 // Infrastructure · Usage & Governance · Platform Signals) for the
@@ -50,8 +57,10 @@ const GROUPS: SubnavLink[][] = [
     { href: "/administration/teams", label: "Teams", icon: <UsersRoundIcon className="size-4" /> },
     { href: "/administration/projects", label: "Projects", icon: <FileBoxIcon className="size-4" /> },
     { href: "/administration/policies", label: "Policies", icon: <ScaleIcon className="size-4" /> },
-    // Permissions hidden pending a proper redesign (backlog). Route still
-    // exists but is unlinked so operators don't land on a non-actionable page.
+    // Permissions is the actionable Roles / Assignments / Diagnostics screen
+    // (#1206), gated behind `admin.permissions_enabled` — filtered out below
+    // unless the install turns it on in /administration/features.
+    { href: PERMISSIONS_HREF, label: "Permissions", icon: <ShieldCheckIcon className="size-4" /> },
   ],
   // Usage & Governance — spend, limits, usage, and the audit trail.
   [
@@ -77,16 +86,18 @@ export function AdministrationSubnav() {
   // before the answer arrives.
   const costEnabled = useFeatureFlag(FEATURE_FLAG_ADMIN_COST);
   const quotasEnabled = useFeatureFlag(FEATURE_FLAG_ADMIN_QUOTAS);
+  const permissionsEnabled = useFeatureFlag(FEATURE_FLAG_ADMIN_PERMISSIONS);
   const groups = React.useMemo(
     () =>
       GROUPS.map((group) =>
         group.filter(
           (link) =>
             (link.href !== COST_HREF || costEnabled) &&
-            (link.href !== QUOTAS_HREF || quotasEnabled),
+            (link.href !== QUOTAS_HREF || quotasEnabled) &&
+            (link.href !== PERMISSIONS_HREF || permissionsEnabled),
         ),
       ),
-    [costEnabled, quotasEnabled],
+    [costEnabled, quotasEnabled, permissionsEnabled],
   );
 
   return (

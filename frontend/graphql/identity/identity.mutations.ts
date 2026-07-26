@@ -452,6 +452,48 @@ export const REVOKE_API_TOKEN = gql`
   }
 `;
 
+const ROLE_FIELDS = `
+  id
+  slug
+  name
+  description
+  scopeLevel
+  permissions
+  isSystem
+`;
+
+export const CREATE_ROLE = gql`
+  mutation CreateRole($input: CreateRoleInput!) {
+    createRole(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ${ROLE_FIELDS}
+      }
+    }
+  }
+`;
+
+export const UPDATE_ROLE = gql`
+  mutation UpdateRole($input: UpdateRoleInput!) {
+    updateRole(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ${ROLE_FIELDS}
+      }
+    }
+  }
+`;
+
 export const GRANT_ROLE = gql`
   mutation GrantRole($input: GrantRoleInput!) {
     grantRole(input: $input) {
