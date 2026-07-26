@@ -52,6 +52,10 @@ import type {
   AstroliftCostTrendPoint,
   CostWindow,
 } from "@/graphql/billing/billing.types";
+import {
+  FEATURE_FLAG_ADMIN_COST,
+  useFeatureFlag,
+} from "@/graphql/server/server.hooks";
 
 interface BudgetsResp {
   astroliftBudgets: AstroliftBudget[];
@@ -99,25 +103,31 @@ function formatMoneyDetailed(cents: number, currency: string): string {
 
 export function CostClient() {
   const t = useTranslations("lists.cost");
+  const costEnabled = useFeatureFlag(FEATURE_FLAG_ADMIN_COST);
   const [window, setWindow] = React.useState<CostWindow>(DEFAULT_WINDOW);
 
   const budgets = useQuery<BudgetsResp>(LIST_BUDGETS, {
     fetchPolicy: "cache-and-network",
+    skip: !costEnabled,
   });
   const costs = useQuery<CostResp>(LIST_COST_SNAPSHOTS, {
     variables: { window, limit: 500 },
     fetchPolicy: "cache-and-network",
+    skip: !costEnabled,
   });
   const trend = useQuery<TrendResp>(GET_COST_TREND, {
     variables: { window },
     fetchPolicy: "cache-and-network",
+    skip: !costEnabled,
   });
   const forecast = useQuery<ForecastResp>(GET_COST_FORECAST, {
     fetchPolicy: "cache-and-network",
+    skip: !costEnabled,
   });
   const byBinding = useQuery<ByBindingResp>(GET_COST_BY_BINDING, {
     variables: { window },
     fetchPolicy: "cache-and-network",
+    skip: !costEnabled,
   });
 
   const budgetList = budgets.data?.astroliftBudgets ?? [];
@@ -136,6 +146,15 @@ export function CostClient() {
   }, [costList]);
 
   const totalCents = costList.reduce((sum, c) => sum + c.amountCents, 0);
+
+  // Screen gate: cost ships behind `admin.cost_enabled` (#1205). With the flag
+  // off the screen is hidden — the nav entry is filtered out and a direct hit
+  // renders nothing — mirroring the zentinelle.enabled surface gate. The flag
+  // reads false until the server-info handshake resolves, and every billing
+  // query above is skipped while gated so none fire.
+  if (!costEnabled) {
+    return null;
+  }
 
   return (
     <PageShell title={t("title")} description={t("description")}>
