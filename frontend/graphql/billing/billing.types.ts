@@ -14,6 +14,7 @@ import type {
   AstroliftCostTrendPoint as GeneratedCostTrendPoint,
   AstroliftQuota as GeneratedQuota,
   AstroliftQuotaIncreaseRequest as GeneratedQuotaIncreaseRequest,
+  AstroliftQuotaUsagePoint as GeneratedQuotaUsagePoint,
   CostWindow as GeneratedCostWindow,
   ForecastConfidence as GeneratedForecastConfidence,
 } from "@/graphql/__generated__/schema";
@@ -51,6 +52,8 @@ export type AstroliftQuota = Omit<
   resource: QuotaResource;
   pendingRequest: AstroliftQuotaIncreaseRequest | null;
 };
+
+export type AstroliftQuotaUsagePoint = GeneratedQuotaUsagePoint;
 
 export type AstroliftBudget = Omit<GeneratedBudget, "scopeKind" | "period"> & {
   scopeKind: BillingScopeKind;

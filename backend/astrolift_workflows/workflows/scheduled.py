@@ -26,6 +26,7 @@ from astrolift_workflows.inputs import WorkflowResult
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities.scheduled import (
         capture_platform_cost_snapshot,
+        capture_quota_usage_snapshot,
         detect_drift,
         expire_pending_approval_deployments,
         gc_stale_previews,
@@ -133,6 +134,19 @@ class CapturePlatformCostSnapshotWorkflow:
             start_to_close_timeout=_TIMEOUT,
         )
         return WorkflowResult(ok=True, message=f"snapshot captured for {n} org(s)")
+
+
+@workflow.defn(name="CaptureQuotaUsageSnapshotWorkflow")
+class CaptureQuotaUsageSnapshotWorkflow:
+    """Append a usage snapshot row per active quota, on a daily cadence (#1182)."""
+
+    @workflow.run
+    async def run(self) -> WorkflowResult:
+        n = await workflow.execute_activity(
+            capture_quota_usage_snapshot,
+            start_to_close_timeout=_TIMEOUT,
+        )
+        return WorkflowResult(ok=True, message=f"quota usage snapshot captured for {n} quota(s)")
 
 
 @workflow.defn(name="PruneStaleSessionsWorkflow")

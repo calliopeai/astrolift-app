@@ -2591,6 +2591,12 @@ type AstroliftQuotaIncreaseRequestMutationResult {
   data: AstroliftQuotaIncreaseRequest
 }
 
+type AstroliftQuotaUsagePoint {
+  date: Date!
+  used: Float!
+  limit: Float!
+}
+
 type AstroliftRegisterAgentRepoResult {
   agents: [AstroliftRegisteredAgent!]!
 }
@@ -5275,6 +5281,7 @@ type Query {
   astroliftDnsZones(dnsDriver: String!): AstroliftDnsZones!
   astroliftDnsCertificates(dnsDriver: String!): AstroliftClusterCertificates!
   astroliftQuotas: [AstroliftQuota!]!
+  astroliftQuotaUsageHistory(quotaId: GUID!, windowDays: Int! = 90): [AstroliftQuotaUsagePoint!]!
   astroliftBudgets: [AstroliftBudget!]!
   astroliftCostSnapshots(days: Int = null, window: CostWindow = null, limit: Int! = 200): [AstroliftCostSnapshot!]!
   astroliftCostTrend(window: CostWindow = null, days: Int = null): [AstroliftCostTrendPoint!]!

@@ -542,6 +542,76 @@ async def capture_platform_cost_snapshot() -> int:
     return await sync_to_async(_capture_platform_cost_snapshot_sync)()
 
 
+# ---- Quota usage snapshot (#1182) ---------------------------------
+
+
+# Retention window for append-only quota usage snapshots. Rows past this
+# age are pruned each pass so the history table stays bounded.
+_QUOTA_USAGE_RETENTION_DAYS = 90
+
+
+def _capture_quota_usage_snapshot_sync() -> int:
+    """Append one QuotaUsageSnapshot per active quota (#1182).
+
+    Mirrors the daily cost-snapshot collector: each pass records the
+    current ``(used, limit)`` reading for every active Quota so the quota
+    detail view can plot usage-vs-limit over time (``Quota.current_usage``
+    is otherwise a single scalar the reconciliation overwrites in place,
+    with no time dimension). Idempotent per calendar day via the model's
+    ``(quota, captured_at)`` unique constraint, so a same-day re-run
+    doesn't double-write. Snapshots older than the retention window are
+    pruned in the same pass.
+
+    Returns the count of snapshot rows created this pass. Returns 0
+    (no-op) when the billing app isn't installed, keeping the schedule
+    safe to register on environments without billing wired up.
+    """
+    try:
+        from astrolift_billing.models import Quota, QuotaUsageSnapshot
+    except ImportError:
+        return 0
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    today = timezone.now().date()
+
+    created = 0
+    for quota in Quota.objects.filter(deleted_at__isnull=True).select_related("organization").iterator():
+        try:
+            _, was_created = QuotaUsageSnapshot.objects.get_or_create(
+                quota=quota,
+                captured_at=today,
+                defaults={
+                    "organization_id": quota.organization_id,
+                    "used": quota.current_usage,
+                    "limit": quota.hard_limit,
+                },
+            )
+        except Exception as exc:  # noqa: BLE001
+            # One quota's failure never aborts the sweep.
+            log.warning("quota usage snapshot: quota=%s failed: %s", quota.guid, exc)
+            continue
+        if was_created:
+            created += 1
+
+    # Retention: hard-delete rows past the window. QuerySet.delete() is a
+    # bulk SQL delete that bypasses the per-instance append-only guard by
+    # design — retention is a data-lifecycle op, not an application UPDATE.
+    cutoff = today - timedelta(days=_QUOTA_USAGE_RETENTION_DAYS)
+    QuotaUsageSnapshot.objects.filter(captured_at__lt=cutoff).delete()
+
+    return created
+
+
+@activity.defn(name="astrolift.scheduled.capture_quota_usage_snapshot")
+async def capture_quota_usage_snapshot() -> int:
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    return await sync_to_async(_capture_quota_usage_snapshot_sync)()
+
+
 # ---- Stale-session prune (#498) -----------------------------------
 
 

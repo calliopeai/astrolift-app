@@ -2611,6 +2611,12 @@ export type AstroliftQuotaIncreaseRequestMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftQuotaUsagePoint = {
+  date: Scalars['Date']['output'];
+  limit: Scalars['Float']['output'];
+  used: Scalars['Float']['output'];
+};
+
 export type AstroliftRegisterAgentRepoResult = {
   agents: Array<AstroliftRegisteredAgent>;
 };
@@ -6740,6 +6746,7 @@ export type Query = {
   astroliftProjects: Array<AstroliftProject>;
   astroliftProviderPlugins: Array<AstroliftProviderPlugin>;
   astroliftProviderRegions: Array<AstroliftProviderRegion>;
+  astroliftQuotaUsageHistory: Array<AstroliftQuotaUsagePoint>;
   astroliftQuotas: Array<AstroliftQuota>;
   astroliftRecentActivity: AstroliftActivityPage;
   astroliftRecentClusterWorkflows: Array<AstroliftClusterWorkflowRun>;
@@ -7474,6 +7481,12 @@ export type QueryAstroliftProjectSlugAvailableArgs = {
 
 export type QueryAstroliftProviderRegionsArgs = {
   providerPluginSlug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftQuotaUsageHistoryArgs = {
+  quotaId: Scalars['GUID']['input'];
+  windowDays?: Scalars['Int']['input'];
 };
 
 
@@ -8930,6 +8943,14 @@ export type ListQuotasQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type ListQuotasQuery = { astroliftQuotas: Array<{ id: string, scopeKind: string, scopeId: string, resource: string, hardLimit: number, softLimit: number, currentUsage: number, pendingRequest?: { id: string, quotaId: string, requestedFactor: number, reason: string, status: string, requestedByDisplay: string, decidedByDisplay?: string | null, decidedAt?: string | null, decisionNote: string, createdAt: string } | null }> };
+
+export type QuotaUsageHistoryQueryVariables = Exact<{
+  quotaId: Scalars['GUID']['input'];
+  windowDays?: Scalars['Int']['input'];
+}>;
+
+
+export type QuotaUsageHistoryQuery = { astroliftQuotaUsageHistory: Array<{ date: any, used: number, limit: number }> };
 
 export type RequestQuotaIncreaseMutationVariables = Exact<{
   input: RequestQuotaIncreaseInput;

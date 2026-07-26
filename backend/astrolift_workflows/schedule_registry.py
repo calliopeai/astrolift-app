@@ -72,6 +72,12 @@ class ScheduleKind(StrEnum):
     CAPTURE_PLATFORM_COST_SNAPSHOT = "capture_platform_cost_snapshot"
     """Daily — platform-wide cost snapshot for billing reports."""
 
+    CAPTURE_QUOTA_USAGE_SNAPSHOT = "capture_quota_usage_snapshot"
+    """Daily — append-only per-quota usage snapshot so the quota detail
+    view can plot usage-vs-limit over time (#1182). Ships HELD (opt-in)
+    like the cost snapshot: only meaningful once quota reconciliation
+    populates ``current_usage``."""
+
     CRON_DEPLOY_TICK = "cron_deploy_tick"
     """Every 1 min — re-reads RegisteredApp rows with
     trigger_mode='cron' and fires a deploy for each whose
@@ -308,6 +314,15 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.CAPTURE_PLATFORM_COST_SNAPSHOT,
         ),
         description="Daily platform cost snapshot for billing",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.CAPTURE_QUOTA_USAGE_SNAPSHOT,
+        workflow_name="CaptureQuotaUsageSnapshotWorkflow",
+        interval_seconds=24 * 60 * 60,
+        schedule_id=schedule_id_for(
+            kind=ScheduleKind.CAPTURE_QUOTA_USAGE_SNAPSHOT,
+        ),
+        description="Daily per-quota usage snapshot for the quota detail view (#1182)",
     ),
     ScheduleDefinition(
         kind=ScheduleKind.CRON_DEPLOY_TICK,

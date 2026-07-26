@@ -36,7 +36,13 @@ from django.db.models import Sum
 from django.utils import timezone
 from strawberry.types import Info
 
-from astrolift_billing.models import Budget, CostSnapshot, Quota, QuotaIncreaseRequest
+from astrolift_billing.models import (
+    Budget,
+    CostSnapshot,
+    Quota,
+    QuotaIncreaseRequest,
+    QuotaUsageSnapshot,
+)
 from astrolift_graphql import GUID
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
@@ -99,6 +105,21 @@ class QuotaType:
     this quota, or ``null`` when none is in flight. Surfaces inline in
     the quotas table so the requester sees "request submitted, awaiting
     approval" without having to scan a separate queue."""
+
+
+@strawberry.type(name="AstroliftQuotaUsagePoint")
+class QuotaUsagePointType:
+    """One point in a quota's usage history (#1182).
+
+    ``used`` / ``limit`` are the values captured on ``date`` by the
+    append-only snapshot collector. The quota detail view plots ``used``
+    against ``limit`` as a sparkline so operators see pressure building
+    well before it hits the cap. Empty history means "no snapshots in the
+    window yet" and the UI degrades to an empty state."""
+
+    date: dt.date
+    used: float
+    limit: float
 
 
 @strawberry.type(name="AstroliftBudget")
@@ -488,6 +509,51 @@ class BillingQuery:
             :200
         ]
         return [quota_to_type(q) for q in qs]
+
+    @strawberry.field
+    @require_permission(Permission.BILLING_READ)
+    @tenant_scoped()
+    def astrolift_quota_usage_history(
+        self,
+        info: Info,
+        quota_id: GUID,
+        window_days: int = 90,
+    ) -> list[QuotaUsagePointType]:
+        """Point-in-time usage history for a single quota (#1182).
+
+        Fail-closed: an out-of-scope ``quota_id`` (or an absent tenant)
+        reads back as an empty history — indistinguishable from a quota
+        that simply has no snapshots yet, so cross-org existence never
+        leaks. The by-guid quota fetch carries the ``organization_id``
+        clause the ``@tenant_scoped`` decorator does NOT add on its own.
+        """
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return []
+
+        quota = Quota.objects.filter(
+            guid=str(quota_id),
+            organization_id=org_id,
+            deleted_at__isnull=True,
+        ).first()
+        if quota is None:
+            return []
+
+        days = max(1, min(window_days, _MAX_DAYS))
+        today = timezone.now().date()
+        start = today - dt.timedelta(days=days - 1)
+        rows = QuotaUsageSnapshot.objects.filter(
+            organization_id=org_id,
+            quota=quota,
+            captured_at__gte=start,
+            captured_at__lte=today,
+        ).order_by("captured_at")
+        return [
+            QuotaUsagePointType(date=r.captured_at, used=float(r.used), limit=float(r.limit)) for r in rows
+        ]
 
     @strawberry.field
     @require_permission(Permission.BILLING_READ)

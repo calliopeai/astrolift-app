@@ -133,6 +133,7 @@ from astrolift_workflows.activities.provision_managed_domain import (
 from astrolift_workflows.activities.run_status_reconcile import reconcile_runs_tick
 from astrolift_workflows.activities.scheduled import (
     capture_platform_cost_snapshot,
+    capture_quota_usage_snapshot,
     detect_drift,
     expire_pending_approval_deployments,
     gc_stale_previews,
@@ -185,6 +186,7 @@ __all__ = [
     "apply_to_target_cluster",
     "bounce_workloads_consuming_bundle",
     "capture_platform_cost_snapshot",
+    "capture_quota_usage_snapshot",
     "cleanup_cluster_acm_certs",
     "cleanup_cluster_dns_records",
     "cleanup_cluster_ecr_repos",

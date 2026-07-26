@@ -2163,7 +2163,21 @@
         "pendingBadge": "Pending {factor}x — {reason}"
       },
       "overviewTitle": "Utilization",
-      "overviewDescription": "Current usage against hard limits, most-utilized first."
+      "overviewDescription": "Current usage against hard limits, most-utilized first.",
+      "history": {
+        "button": "History",
+        "title": "{resource} usage history",
+        "description": "Point-in-time usage captured daily, plotted against the soft and hard limits.",
+        "windowLabel": "Window",
+        "windowOption": "Last {days} days",
+        "usedTrend": "Used over time",
+        "latestUsed": "Latest used",
+        "peakUsed": "Peak used",
+        "softLimit": "Soft limit",
+        "hardLimit": "Hard limit",
+        "emptyTitle": "No usage history yet",
+        "emptyDescription": "Usage snapshots are captured once a day. Check back after the collector has run at least once."
+      }
     },
     "alerts": {
       "mute": {

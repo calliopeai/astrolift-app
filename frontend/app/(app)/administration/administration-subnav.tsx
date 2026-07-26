@@ -5,6 +5,7 @@ import {
   BuildingIcon,
   FileBoxIcon,
   FlagIcon,
+  GaugeIcon,
   KeyIcon,
   ScaleIcon,
   ScrollTextIcon,
@@ -15,6 +16,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as React from "react";
 
+import {
+  FEATURE_FLAG_ADMIN_QUOTAS,
+  useFeatureFlag,
+} from "@/graphql/server/server.hooks";
 import { cn } from "@/lib/utils";
 
 interface SubnavLink {
@@ -22,6 +27,11 @@ interface SubnavLink {
   label: string;
   icon: React.ReactNode;
 }
+
+// Quotas ships behind the `admin.quotas_enabled` runtime flag (#1204). It
+// lives in GROUPS but is filtered out below unless the install has enabled
+// the flag, so the href is named here for that gate.
+const QUOTAS_HREF = "/administration/quotas";
 
 // Mirrors the sidebar's four-group Admin IA (Organization ·
 // Infrastructure · Usage & Governance · Platform Signals) for the
@@ -41,8 +51,11 @@ const GROUPS: SubnavLink[][] = [
   ],
   // Usage & Governance — spend, limits, usage, and the audit trail.
   [
-    // Cost + Quotas hidden pending real implementations (backlog). Routes
-    // remain but are unlinked until they surface real data/controls.
+    // Cost hidden pending a real implementation (backlog); its route remains
+    // but is unlinked. Quotas is implemented but gated behind the
+    // `admin.quotas_enabled` runtime flag — filtered out below unless the
+    // install turns it on in /administration/features.
+    { href: QUOTAS_HREF, label: "Quotas", icon: <GaugeIcon className="size-4" /> },
     { href: "/administration/metrics", label: "Metrics", icon: <BarChart3Icon className="size-4" /> },
     { href: "/tokens", label: "API Keys", icon: <KeyIcon className="size-4" /> },
     { href: "/administration/audit", label: "Audit", icon: <ScrollTextIcon className="size-4" /> },
@@ -53,12 +66,25 @@ const GROUPS: SubnavLink[][] = [
 export function AdministrationSubnav() {
   const pathname = usePathname();
 
+  // Quotas stays hidden until the install enables `admin.quotas_enabled`
+  // (#1204), mirroring the zentinelle.enabled surface gate. Until the
+  // server-info handshake resolves the flag reads false, so the entry never
+  // flickers in before the answer arrives.
+  const quotasEnabled = useFeatureFlag(FEATURE_FLAG_ADMIN_QUOTAS);
+  const groups = React.useMemo(
+    () =>
+      GROUPS.map((group) =>
+        group.filter((link) => link.href !== QUOTAS_HREF || quotasEnabled),
+      ),
+    [quotasEnabled],
+  );
+
   return (
     <nav
       aria-label="Administration sub-navigation"
       className="border-border bg-muted/30 sticky top-0 z-10 flex flex-wrap items-center gap-1 border-b px-4 py-2 backdrop-blur"
     >
-      {GROUPS.map((group, groupIdx) => (
+      {groups.map((group, groupIdx) => (
         <React.Fragment key={groupIdx}>
           {groupIdx > 0 && (
             <div aria-hidden className="bg-border mx-1 h-4 w-px" />

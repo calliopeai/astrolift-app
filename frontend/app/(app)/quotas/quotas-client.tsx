@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
-import { GaugeIcon, TrendingUpIcon } from "lucide-react";
+import { GaugeIcon, LineChartIcon, TrendingUpIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
@@ -39,16 +39,22 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { RadialGauge } from "@/components/viz";
+import { RadialGauge, Sparkline } from "@/components/viz";
 import {
   LIST_QUOTAS,
+  QUOTA_USAGE_HISTORY,
   REQUEST_QUOTA_INCREASE,
 } from "@/graphql/billing/billing.queries";
 import type {
   AstroliftQuota,
   AstroliftQuotaIncreaseRequest,
+  AstroliftQuotaUsagePoint,
 } from "@/graphql/billing/billing.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
+import {
+  FEATURE_FLAG_ADMIN_QUOTAS,
+  useFeatureFlag,
+} from "@/graphql/server/server.hooks";
 
 interface Resp {
   astroliftQuotas: AstroliftQuota[];
@@ -104,12 +110,17 @@ function QuotaGauge({ quota }: { quota: AstroliftQuota }) {
 
 export function QuotasClient() {
   const t = useTranslations("lists.quotas");
+  const quotasEnabled = useFeatureFlag(FEATURE_FLAG_ADMIN_QUOTAS);
   const { data, loading } = useQuery<Resp>(LIST_QUOTAS, {
     fetchPolicy: "cache-and-network",
+    skip: !quotasEnabled,
   });
   const list = data?.astroliftQuotas ?? [];
 
   const [requestTarget, setRequestTarget] = React.useState<AstroliftQuota | null>(
+    null,
+  );
+  const [historyTarget, setHistoryTarget] = React.useState<AstroliftQuota | null>(
     null,
   );
 
@@ -119,6 +130,15 @@ export function QuotasClient() {
     refetchQueries: [{ query: LIST_QUOTAS }],
     awaitRefetchQueries: true,
   });
+
+  // Screen gate: quotas ships behind `admin.quotas_enabled` (#1204). With the
+  // flag off the screen is hidden — the nav entry is filtered out and a direct
+  // hit renders nothing — mirroring the zentinelle.enabled surface gate. The
+  // flag reads false until the server-info handshake resolves, and LIST_QUOTAS
+  // is skipped while gated so no billing query fires.
+  if (!quotasEnabled) {
+    return null;
+  }
 
   async function handleSubmitRequest(
     target: AstroliftQuota,
@@ -219,32 +239,42 @@ export function QuotasClient() {
                         {q.softLimit} / {q.hardLimit}
                       </TableCell>
                       <TableCell className="text-right">
-                        {pending ? (
-                          <Badge
-                            variant="secondary"
-                            className="font-normal"
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setHistoryTarget(q)}
                           >
-                            {t("request.pendingBadge", {
-                              factor: pending.requestedFactor,
-                              reason:
-                                pending.reason.length > 32
-                                  ? `${pending.reason.slice(0, 32)}…`
-                                  : pending.reason,
-                            })}
-                          </Badge>
-                        ) : overSoft ? (
-                          <Can permission="billing.read">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setRequestTarget(q)}
-                              disabled={requestState.loading}
+                            <LineChartIcon className="size-3.5" />
+                            {t("history.button")}
+                          </Button>
+                          {pending ? (
+                            <Badge
+                              variant="secondary"
+                              className="font-normal"
                             >
-                              <TrendingUpIcon className="size-3.5" />
-                              {t("request.buttonRequest")}
-                            </Button>
-                          </Can>
-                        ) : null}
+                              {t("request.pendingBadge", {
+                                factor: pending.requestedFactor,
+                                reason:
+                                  pending.reason.length > 32
+                                    ? `${pending.reason.slice(0, 32)}…`
+                                    : pending.reason,
+                              })}
+                            </Badge>
+                          ) : overSoft ? (
+                            <Can permission="billing.read">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setRequestTarget(q)}
+                                disabled={requestState.loading}
+                              >
+                                <TrendingUpIcon className="size-3.5" />
+                                {t("request.buttonRequest")}
+                              </Button>
+                            </Can>
+                          ) : null}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -269,7 +299,124 @@ export function QuotasClient() {
         }}
         busy={requestState.loading}
       />
+
+      <QuotaHistorySheet
+        key={historyTarget?.id ?? "none-history"}
+        target={historyTarget}
+        onOpenChange={(next) => {
+          if (!next) setHistoryTarget(null);
+        }}
+      />
     </PageShell>
+  );
+}
+
+interface HistoryResp {
+  astroliftQuotaUsageHistory: AstroliftQuotaUsagePoint[];
+}
+
+const HISTORY_WINDOWS = ["30", "90"] as const;
+
+function QuotaHistorySheet({
+  target,
+  onOpenChange,
+}: {
+  target: AstroliftQuota | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const t = useTranslations("lists.quotas.history");
+  const [windowDays, setWindowDays] = React.useState<string>("90");
+
+  const { data, loading } = useQuery<HistoryResp>(QUOTA_USAGE_HISTORY, {
+    variables: { quotaId: target?.id ?? "", windowDays: Number(windowDays) },
+    skip: target === null,
+    fetchPolicy: "cache-and-network",
+  });
+
+  const points = data?.astroliftQuotaUsageHistory ?? [];
+  const usedSeries = points.map((p) => p.used);
+  const latest = points.length > 0 ? points[points.length - 1] : null;
+  const peakUsed = points.length > 0 ? Math.max(...usedSeries) : null;
+
+  return (
+    <Sheet open={target !== null} onOpenChange={onOpenChange}>
+      <SheetContent className="flex flex-col sm:max-w-lg">
+        <SheetHeader>
+          <SheetTitle>
+            {t("title", { resource: target?.resource ?? "" })}
+          </SheetTitle>
+          <SheetDescription>{t("description")}</SheetDescription>
+        </SheetHeader>
+
+        <div className="flex flex-1 flex-col gap-4 overflow-auto px-4 pb-4">
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="history-window">{t("windowLabel")}</Label>
+            <Select value={windowDays} onValueChange={setWindowDays}>
+              <SelectTrigger id="history-window" className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {HISTORY_WINDOWS.map((w) => (
+                  <SelectItem key={w} value={w}>
+                    {t("windowOption", { days: w })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {loading && points.length === 0 ? (
+            <Skeleton className="h-24 w-full" />
+          ) : points.length === 0 ? (
+            <EmptyState
+              icon={<LineChartIcon className="size-5" />}
+              title={t("emptyTitle")}
+              description={t("emptyDescription")}
+            />
+          ) : (
+            <>
+              <Card>
+                <CardContent className="space-y-2 p-4">
+                  <div className="text-muted-foreground text-xs font-medium">
+                    {t("usedTrend")}
+                  </div>
+                  <Sparkline
+                    data={usedSeries}
+                    width={520}
+                    height={72}
+                    variant="area"
+                    className="text-chart-1 h-20 w-full"
+                    ariaLabel={t("title", { resource: target?.resource ?? "" })}
+                  />
+                </CardContent>
+              </Card>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <HistoryStat label={t("latestUsed")} value={latest?.used ?? 0} />
+                <HistoryStat label={t("peakUsed")} value={peakUsed ?? 0} />
+                <HistoryStat
+                  label={t("softLimit")}
+                  value={target?.softLimit ?? 0}
+                />
+                <HistoryStat
+                  label={t("hardLimit")}
+                  value={target?.hardLimit ?? 0}
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function HistoryStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="bg-muted/40 rounded-md p-3">
+      <div className="text-muted-foreground text-2xs">{label}</div>
+      <div className="font-mono text-lg tabular-nums">{value}</div>
+    </div>
   );
 }
 

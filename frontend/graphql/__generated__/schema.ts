@@ -2611,6 +2611,12 @@ export type AstroliftQuotaIncreaseRequestMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftQuotaUsagePoint = {
+  date: Scalars['Date']['output'];
+  limit: Scalars['Float']['output'];
+  used: Scalars['Float']['output'];
+};
+
 export type AstroliftRegisterAgentRepoResult = {
   agents: Array<AstroliftRegisteredAgent>;
 };
@@ -6740,6 +6746,7 @@ export type Query = {
   astroliftProjects: Array<AstroliftProject>;
   astroliftProviderPlugins: Array<AstroliftProviderPlugin>;
   astroliftProviderRegions: Array<AstroliftProviderRegion>;
+  astroliftQuotaUsageHistory: Array<AstroliftQuotaUsagePoint>;
   astroliftQuotas: Array<AstroliftQuota>;
   astroliftRecentActivity: AstroliftActivityPage;
   astroliftRecentClusterWorkflows: Array<AstroliftClusterWorkflowRun>;
@@ -7474,6 +7481,12 @@ export type QueryAstroliftProjectSlugAvailableArgs = {
 
 export type QueryAstroliftProviderRegionsArgs = {
   providerPluginSlug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftQuotaUsageHistoryArgs = {
+  quotaId: Scalars['GUID']['input'];
+  windowDays?: Scalars['Int']['input'];
 };
 
 

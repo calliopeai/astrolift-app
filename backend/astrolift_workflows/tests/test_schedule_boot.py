@@ -198,6 +198,10 @@ def test_default_excludes_every_hold_kind():
         # Outbound CI-workflow resync sweep ships HELD (#1211): it writes to
         # tenant repos, so it's opt-in via env / the resyncAll admin mutation.
         ScheduleKind.CI_WORKFLOW_RESYNC,
+        # Per-quota usage snapshot ships HELD (#1182): only meaningful once
+        # quota reconciliation populates current_usage — sibling to the cost
+        # snapshot, opt-in via env.
+        ScheduleKind.CAPTURE_QUOTA_USAGE_SNAPSHOT,
     }
     assert hold.isdisjoint(PHASE_3A_ACTIVE_KINDS)
     # Sanity: YES set + HOLD set together cover the whole enum.

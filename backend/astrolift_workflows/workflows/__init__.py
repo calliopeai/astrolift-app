@@ -55,6 +55,7 @@ from astrolift_workflows.workflows.run_status_reconcile_tick import (
 )
 from astrolift_workflows.workflows.scheduled import (
     CapturePlatformCostSnapshotWorkflow,
+    CaptureQuotaUsageSnapshotWorkflow,
     DriftDetectionWorkflow,
     ExpirePendingApprovalDeploymentsWorkflow,
     PollScheduledJobRunsWorkflow,
@@ -89,6 +90,7 @@ __all__ = [
     "BringClusterIntoManagementWorkflow",
     "BuildPreviewWorkflow",
     "CapturePlatformCostSnapshotWorkflow",
+    "CaptureQuotaUsageSnapshotWorkflow",
     "CiWorkflowResyncTickWorkflow",
     "CreateDevEnvironmentWorkflow",
     "CronDeployTickWorkflow",

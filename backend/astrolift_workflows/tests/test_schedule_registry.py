@@ -104,8 +104,9 @@ def test_default_schedules_complete():
     alerting-pipeline wire-up added the alert-rule evaluation tick; the
     run-status reconciler added the ScheduledJobRun/TaskRun status sweep;
     the bidirectional CI-workflow sync (#1211) added the held CI-workflow
-    resync sweep. Lock the count so future additions stay visible in a diff."""
-    assert len(DEFAULT_SCHEDULES) == 19
+    resync sweep; #1182 added the held per-quota usage snapshot collector.
+    Lock the count so future additions stay visible in a diff."""
+    assert len(DEFAULT_SCHEDULES) == 20
 
 
 def test_default_schedules_include_all_kinds():
