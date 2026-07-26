@@ -162,6 +162,28 @@ class AgentTaskType:
     dispatcher: AgentTaskDispatcherType | None
 
 
+@strawberry.type(name="AstroliftAgentInteraction")
+class AgentInteractionType:
+    """One control-plane-observed interaction for an AgentTask (#1216).
+
+    The per-agent-task telemetry the LiveFlowMap P3 interaction map reads:
+    an authenticated agent->controller Control API call, a control-plane
+    tool call, a signal, or a gate stage. ``kind`` is the interaction class
+    (``control_api`` / ``tool_call`` / ``signal`` / ``gate``); ``name`` is a
+    stable label (endpoint / tool / signal / gate stage); ``status`` is the
+    coarse outcome (``ok`` / ``error`` / ``pending`` / ``approved`` /
+    ``rejected``); ``detail`` is a small structured payload (http method,
+    status code, new_status, ...).
+    """
+
+    id: GUID
+    kind: str
+    name: str
+    status: str
+    occurred_at: dt.datetime
+    detail: JSON
+
+
 @strawberry.type(name="AstroliftAgentEnvironmentSpec")
 class AgentEnvironmentSpecType:
     """A reusable, org-scoped recipe for the container environment an
@@ -422,6 +444,17 @@ def agent_task_to_type(t) -> AgentTaskType:
         pod_name=t.pod_name or "",
         namespace=t.namespace or "",
         dispatcher=_agent_task_dispatcher_to_type(t.dispatcher),
+    )
+
+
+def agent_interaction_to_type(ixn) -> AgentInteractionType:
+    return AgentInteractionType(
+        id=GUID(str(ixn.guid)),
+        kind=ixn.kind,
+        name=ixn.name,
+        status=ixn.status,
+        occurred_at=ixn.occurred_at,
+        detail=ixn.detail or {},
     )
 
 

@@ -227,6 +227,15 @@ type AstroliftAgentEnvironmentSpecMutationResult {
   data: AstroliftAgentEnvironmentSpec
 }
 
+type AstroliftAgentInteraction {
+  id: GUID!
+  kind: String!
+  name: String!
+  status: String!
+  occurredAt: DateTime!
+  detail: JSON!
+}
+
 type AstroliftAgentListItem {
   id: GUID!
   name: String!
@@ -5341,6 +5350,7 @@ type Query {
   agentGallery(orgId: ID!): [AstroliftAgentTask!]!
   agentTask(id: ID!): AstroliftAgentTask
   agentTaskTransitionsSince(orgId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentTask!]!
+  agentTaskInteractions(orgId: ID!, taskId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentInteraction!]!
   agentTaskLogs(id: ID!, tail: Int! = 200): [String!]!
   agentEnvironmentSpecs(orgId: ID!): [AstroliftAgentEnvironmentSpec!]!
   agentEnvironmentSpec(slug: String!): AstroliftAgentEnvironmentSpec

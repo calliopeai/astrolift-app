@@ -25,7 +25,12 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from astrolift_agents.models import AgentTask, DispatcherInstance
+from astrolift_agents.models import (
+    AgentInteraction,
+    AgentTask,
+    DispatcherInstance,
+    record_interaction,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -283,6 +288,14 @@ def update_task_status(request: HttpRequest, task_id: str) -> JsonResponse:
 
     task.save(update_fields=update_fields)
 
+    record_interaction(
+        task,
+        kind=AgentInteraction.Kind.CONTROL_API,
+        name="status",
+        status="error" if new_status == "failed" else "ok",
+        detail={"new_status": new_status},
+    )
+
     logger.info("dispatch.task_status: task %s → %s", task_id, new_status)
     return JsonResponse({"ok": True, "status": task.status})
 
@@ -384,6 +397,13 @@ def agent_checkin(request: HttpRequest, task_id: str) -> JsonResponse:
         "callback_url": task.callback_url or "",
     }
 
+    record_interaction(
+        task,
+        kind=AgentInteraction.Kind.CONTROL_API,
+        name="checkin",
+        detail={"status": task.status},
+    )
+
     logger.info("dispatch.agent_checkin: task %s checked in", task_id)
     return JsonResponse(packet)
 
@@ -447,6 +467,14 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
 
     # Heartbeat (any non-terminal status) is a no-op acknowledgement.
 
+    record_interaction(
+        task,
+        kind=AgentInteraction.Kind.CONTROL_API,
+        name="callback",
+        status="error" if new_status == "failed" else "ok",
+        detail={"new_status": new_status or "heartbeat"},
+    )
+
     return JsonResponse({"ok": True, "continue": task.status == AgentTask.Status.RUNNING})
 
 
@@ -458,6 +486,62 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
 from astrolift_agents.models.task_meter import TaskMeteringRecord  # noqa: E402
 from astrolift_dispatch.log_collector import store_agent_log_lines  # noqa: E402
 from astrolift_lifecycle.models import AgentRun  # noqa: E402
+
+
+def _agent_task_for_run(run: AgentRun | None) -> AgentTask | None:
+    """Best-effort resolve the AgentTask a fleet-history AgentRun dispatched.
+
+    The logs/meter endpoints key off ``AgentRun.guid``, but interactions
+    attribute to the :class:`AgentTask`. The platform's own reconciler
+    (``astrolift_workflows...._poll_agent_run_status_sync``) bridges the two
+    by ``(workload, external_id == k8s_pod_name)`` — mirror that exactly.
+    Returns ``None`` when no task is linked yet (push-mode, pre-spawn, or a
+    run with no AgentTask) so capture is skipped rather than mis-attributed.
+    """
+    if run is None or not run.k8s_pod_name:
+        return None
+    return (
+        AgentTask.objects.filter(
+            agent_definition_id=run.workload_id,
+            external_id=run.k8s_pod_name,
+            deleted_at__isnull=True,
+        )
+        .exclude(external_id="")
+        .order_by("-created_at")
+        .first()
+    )
+
+
+def _record_run_interaction(
+    task_id: str,
+    *,
+    name: str,
+    status: str = "ok",
+    detail: dict | None = None,
+    run: AgentRun | None = None,
+) -> None:
+    """Capture one Control API interaction for a run-keyed dispatch endpoint.
+
+    ``logs`` / ``meter`` resolve an :class:`AgentRun` (not an AgentTask), so
+    bridge to the owning task via :func:`_agent_task_for_run` and record only
+    when one is found. Fully defensive: capture is additive/side-effect-only,
+    so any failure here (including the bridge lookup) is swallowed and must
+    never break the endpoint.
+    """
+    try:
+        if run is None:
+            run = AgentRun.all_objects.filter(guid=task_id).first()
+        task = _agent_task_for_run(run)
+        if task is not None:
+            record_interaction(
+                task,
+                kind=AgentInteraction.Kind.CONTROL_API,
+                name=name,
+                status=status,
+                detail=detail,
+            )
+    except Exception:  # noqa: BLE001 — capture must never break the endpoint
+        logger.exception("failed to capture run interaction for task %s", task_id)
 
 
 @require_http_methods(["POST"])
@@ -488,6 +572,12 @@ def ingest_task_logs(request: HttpRequest, task_id: str) -> JsonResponse:
     except Exception as exc:
         logger.exception("log ingestion error for task %s", task_id)
         return JsonResponse({"error": str(exc)}, status=500)
+
+    _record_run_interaction(
+        task_id,
+        name="logs",
+        detail={"lines": len(lines), "stored": stored},
+    )
 
     return JsonResponse({"stored": stored})
 
@@ -539,5 +629,12 @@ def ingest_task_meter(request: HttpRequest, task_id: str) -> JsonResponse:
     except Exception as exc:
         logger.exception("metering write error for task %s", task_id)
         return JsonResponse({"error": str(exc)}, status=500)
+
+    _record_run_interaction(
+        task_id,
+        name="meter",
+        detail={"metering_source": source},
+        run=run,
+    )
 
     return JsonResponse({"id": str(record.pk), "task_id": task_id}, status=201)

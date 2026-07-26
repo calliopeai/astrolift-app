@@ -23,6 +23,7 @@ from strawberry.types import Info
 
 from astrolift_agents.models import (
     AgentEnvironmentSpec,
+    AgentInteraction,
     AgentTask,
     Brief,
     DispatcherInstance,
@@ -33,6 +34,7 @@ from astrolift_agents.models import (
 from astrolift_agents.schema.types import (
     AgentDetailType,
     AgentEnvironmentSpecType,
+    AgentInteractionType,
     AgentListItemType,
     AgentLiveStatusType,
     AgentRuntimeType,
@@ -48,6 +50,7 @@ from astrolift_agents.schema.types import (
     ToolDefType,
     agent_detail_to_type,
     agent_env_spec_to_type,
+    agent_interaction_to_type,
     agent_secret_status_to_type,
     agent_task_to_type,
     agent_trigger_to_type,
@@ -125,6 +128,11 @@ _AGENT_LIST_CAP = 200
 # this only bounds a caller that requests a larger page — a busy fleet still
 # converges to live over a few polls rather than issuing one unbounded scan.
 _AGENT_TRANSITIONS_CAP = 500
+
+# Upper bound on the per-task interaction feed (#1216). Like the transitions
+# feed, the client passes ``limit=200`` and drains forward across polls via
+# the ``since`` cursor, so this only bounds a caller that requests more.
+_AGENT_INTERACTIONS_CAP = 500
 
 # How far ahead ``_next_cron_fire`` scans for the next firing. A valid
 # 5-field cron with a day-of-month + month constraint can be up to ~13
@@ -556,6 +564,58 @@ class AgentsQuery:
             "updated_at"
         )[:capped]
         return [agent_task_to_type(t) for t in qs]
+
+    @strawberry.field
+    @require_permission(Permission.AGENT_READ)
+    @tenant_scoped()
+    def agent_task_interactions(
+        self,
+        info: Info,
+        org_id: strawberry.ID,
+        task_id: strawberry.ID,
+        since: datetime | None = None,
+        limit: int = 200,
+    ) -> list[AgentInteractionType]:
+        """Control-plane-observed interactions for one AgentTask (#1216).
+
+        The per-agent interaction feed behind the LiveFlowMap P3 map: every
+        captured Control API call / signal / gate for ``task_id``, oldest
+        change first. Polled with a moving ``since`` cursor (the high-water
+        ``occurred_at`` of the previous batch) exactly like
+        :meth:`agent_task_transitions_since`, and capped so a busy task
+        drains forward across polls rather than returning an unbounded scan.
+
+        Org-scoped and FAIL-CLOSED: ``org_id`` must match the caller's
+        active tenant (superusers excepted, via ``_caller_org_id``); the
+        interaction queryset is filtered to that org *explicitly*
+        (``organization_id=org_pk``) — never relying on the decorator alone,
+        which only asserts a tenant context exists. The task is resolved
+        within the caller's org first, so a foreign-org / unknown / non-UUID
+        ``task_id`` yields ``[]`` (never another tenant's rows, never a 500).
+        """
+        org_pk = _caller_org_id(info, org_id)
+        guid = _valid_guid(task_id)
+        if guid is None:
+            return []
+        # Resolve the task inside the caller's org so a foreign-org task id
+        # reads as empty rather than leaking task existence across tenants.
+        task_pk = (
+            AgentTask.objects.filter(
+                guid=guid,
+                organization_id=org_pk,
+                deleted_at__isnull=True,
+            )
+            .values_list("pk", flat=True)
+            .first()
+        )
+        if task_pk is None:
+            return []
+        capped = max(1, min(limit, _AGENT_INTERACTIONS_CAP))
+        qs = AgentInteraction.objects.filter(organization_id=org_pk, agent_task_id=task_pk)
+        if since is not None:
+            qs = qs.filter(occurred_at__gt=since)
+        qs = qs.order_by("occurred_at")[:capped]
+        return [agent_interaction_to_type(r) for r in qs]
 
     @strawberry.field
     @require_permission(Permission.AGENT_READ)

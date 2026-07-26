@@ -251,6 +251,15 @@ export type AstroliftAgentEnvironmentSpecMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftAgentInteraction = {
+  detail: Scalars['JSON']['output'];
+  id: Scalars['GUID']['output'];
+  kind: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  occurredAt: Scalars['DateTime']['output'];
+  status: Scalars['String']['output'];
+};
+
 export type AstroliftAgentListItem = {
   appSlug: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
@@ -6629,6 +6638,7 @@ export type Query = {
   agentLiveStatus: Array<AstroliftAgentLiveStatus>;
   agentRuntimes: Array<AstroliftAgentRuntime>;
   agentTask?: Maybe<AstroliftAgentTask>;
+  agentTaskInteractions: Array<AstroliftAgentInteraction>;
   agentTaskLogs: Array<Scalars['String']['output']>;
   agentTaskTransitionsSince: Array<AstroliftAgentTask>;
   agentTasks: Array<AstroliftAgentTask>;
@@ -6875,6 +6885,14 @@ export type QueryAgentLiveStatusArgs = {
 
 export type QueryAgentTaskArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type QueryAgentTaskInteractionsArgs = {
+  limit?: Scalars['Int']['input'];
+  orgId: Scalars['ID']['input'];
+  since?: InputMaybe<Scalars['DateTime']['input']>;
+  taskId: Scalars['ID']['input'];
 };
 
 
