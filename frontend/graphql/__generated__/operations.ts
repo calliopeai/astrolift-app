@@ -8957,6 +8957,23 @@ export type ImportSkillsFromRepoMutationVariables = Exact<{
 
 export type ImportSkillsFromRepoMutation = { importSkillsFromRepo: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { importedSkills: Array<string>, importedTools: Array<string>, sourceRef: string } | null } };
 
+export type CreateAgentTriggerMutationVariables = Exact<{
+  agentSlug: Scalars['String']['input'];
+  scmRepo: Scalars['String']['input'];
+  branchPattern: Scalars['String']['input'];
+  inputMapping?: InputMaybe<Scalars['JSON']['input']>;
+}>;
+
+
+export type CreateAgentTriggerMutation = { createAgentTrigger: { ok: boolean, message: string, slug?: string | null, endpoint?: string | null, signingSecret?: string | null } };
+
+export type UnbindAgentTriggerMutationVariables = Exact<{
+  slug: Scalars['String']['input'];
+}>;
+
+
+export type UnbindAgentTriggerMutation = { unbindAgentTrigger: { ok: boolean, message: string, slug?: string | null } };
+
 export type ListQuotasQueryVariables = Exact<{ [key: string]: never; }>;
 
 

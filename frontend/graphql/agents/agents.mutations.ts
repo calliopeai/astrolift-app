@@ -331,3 +331,46 @@ export const IMPORT_SKILLS_FROM_REPO = gql`
     }
   }
 `;
+
+// ---------------------------------------------------------------------------
+// Trigger-binding (spec 33 PR-6/PR-12; #951) — bind / unbind a WorkflowWebhook to
+// an agent so a matching SCM push dispatches it with mapped input. Unlike the
+// other agent mutations, both return an `AstroliftAgentTriggerResult`: a flat
+// `ok` + `message` envelope (NOT the `errors: [MutationError!]` list), plus the
+// one-time `endpoint` + `signingSecret` on a successful create (the secret is
+// shown once and never returned again, so the editor must surface it then). Gate
+// on `app.update` server-side (binding a trigger is an app-config write).
+// `inputMapping` is a JSON key → payload-path map (optional; null = raw payload).
+// ---------------------------------------------------------------------------
+
+export const CREATE_AGENT_TRIGGER = gql`
+  mutation CreateAgentTrigger(
+    $agentSlug: String!
+    $scmRepo: String!
+    $branchPattern: String!
+    $inputMapping: JSON
+  ) {
+    createAgentTrigger(
+      agentSlug: $agentSlug
+      scmRepo: $scmRepo
+      branchPattern: $branchPattern
+      inputMapping: $inputMapping
+    ) {
+      ok
+      message
+      slug
+      endpoint
+      signingSecret
+    }
+  }
+`;
+
+export const UNBIND_AGENT_TRIGGER = gql`
+  mutation UnbindAgentTrigger($slug: String!) {
+    unbindAgentTrigger(slug: $slug) {
+      ok
+      message
+      slug
+    }
+  }
+`;

@@ -11,6 +11,8 @@ import type {
   AstroliftAgentSecretStatus as GeneratedAgentSecretStatus,
   AstroliftAgentSkill as GeneratedAgentSkill,
   AstroliftAgentTask as GeneratedAgentTask,
+  AstroliftAgentTrigger as GeneratedAgentTrigger,
+  AstroliftAgentTriggerResult as GeneratedAgentTriggerResult,
   AstroliftBrief as GeneratedBrief,
   AstroliftDiscoveredAgentManifest as GeneratedDiscoveredAgentManifest,
   AstroliftDispatcherInstance as GeneratedDispatcherInstance,
@@ -309,3 +311,42 @@ export type AstroliftAgentRunSpec = Pick<
   | "scaleUpCron"
   | "scaleDownCron"
 >;
+
+// Trigger-binding editor (spec 33 PR-6/PR-12; #951). The Trigger run mode binds a
+// WorkflowWebhook to an agent: a push matching `scmRepo`/`branchPattern` dispatches
+// the agent with `inputMapping` applied to the payload (threading landed in #930).
+// `agentTriggers` lists the bindings; `createAgentTrigger` / `unbindAgentTrigger`
+// write them. One binding per bound webhook.
+export type AstroliftAgentTrigger = Pick<
+  GeneratedAgentTrigger,
+  | "slug"
+  | "endpoint"
+  | "scmRepo"
+  | "branchPattern"
+  | "inputMapping"
+  | "enabled"
+  | "lastTriggeredAt"
+  | "createdAt"
+>;
+
+// The create/unbind write envelope. NOTE this is a flat `ok` + `message` result
+// (NOT the `errors: [MutationError!]` list the other agent mutations return), so
+// the editor surfaces `message` on failure rather than a field-mapped error. On a
+// successful create it also carries the one-time `endpoint` + `signingSecret` —
+// the secret is shown once and never returned again.
+export type AstroliftAgentTriggerResult = Pick<
+  GeneratedAgentTriggerResult,
+  "ok" | "message" | "slug" | "endpoint" | "signingSecret"
+>;
+
+// `agentTriggers` Data/Vars — hand-typed because agents.queries.ts is excluded
+// from codegen operation typing (it interpolates the plain AGENT_LIST_ITEM_FIELDS
+// constant; see codegen.ts), exactly like the transition/interaction feeds above.
+export type AgentTriggersData = {
+  agentTriggers: AstroliftAgentTrigger[];
+};
+
+export type AgentTriggersVars = {
+  orgId: string;
+  agentSlug: string;
+};

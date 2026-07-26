@@ -381,3 +381,26 @@ export const AGENT_GALLERY = gql`
     }
   }
 `;
+
+// Trigger-binding editor (spec 33 PR-6/PR-12; #951). The webhook bindings that
+// make an agent dispatch on a matching SCM push — one row per bound
+// WorkflowWebhook. Each carries the delivery `endpoint`, the
+// `scmRepo`/`branchPattern` it fires on, the `inputMapping` applied to the
+// payload, plus `enabled` + `lastTriggeredAt` for the row's status. The Control
+// tab's Trigger section reads this and refetches it after a create/unbind.
+// Tenant-scoped via `orgId`. Hand-typed Data/Vars (AgentTriggersData/Vars) live
+// in agents.types.ts — this file is excluded from codegen (see codegen.ts).
+export const AGENT_TRIGGERS = gql`
+  query AgentTriggers($orgId: ID!, $agentSlug: String!) {
+    agentTriggers(orgId: $orgId, agentSlug: $agentSlug) {
+      slug
+      endpoint
+      scmRepo
+      branchPattern
+      inputMapping
+      enabled
+      lastTriggeredAt
+      createdAt
+    }
+  }
+`;

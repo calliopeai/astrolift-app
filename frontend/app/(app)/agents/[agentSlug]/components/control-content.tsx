@@ -14,7 +14,7 @@ import {
 import * as React from "react";
 import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
+import { TriggerBindingEditor } from "@/app/(app)/agents/[agentSlug]/components/trigger-binding-editor";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -45,11 +45,12 @@ import { cn } from "@/lib/utils";
 //     down-cron, written via `scaleUpCron` + `scheduledScaleTo` + `scaleDownCron`
 //     (PR-5 backend).
 //
-// Trigger remains OUT OF SCOPE: there is no GraphQL mutation to bind a
-// WorkflowWebhook to an agent (PR-6 added only the model FK + dispatch
-// fan-out), and the feature is gated on #930 (trigger payload not yet threaded
-// into the pod env). Its mode card therefore stays disabled with a "Coming
-// soon" badge — no controls, never written.
+// Trigger is now ENABLED (spec 33 PR-6/PR-12; #951): the bind/list/unbind
+// surface shipped (createAgentTrigger / unbindAgentTrigger / agentTriggers) and
+// payload threading landed (#930). Selecting Trigger writes runMode=TRIGGER
+// (+ runPaused) via the same Save below AND renders the TriggerBindingEditor for
+// the webhook binding (bind / list / unbind, with a one-time signing-secret
+// reveal). No mode card stays disabled anymore.
 //
 // Reuse (per the spec's reuse-heavy mandate):
 //   - the cron text input + `naturalCronHint` read-back + `CRON_FIELD` 5-field
@@ -170,18 +171,15 @@ const MAPPED_ERROR_FIELDS = new Set<string>([
   "scheduledScaleTo",
 ]);
 
-// The two families and the Task modes, in spec §4 order. `comingSoon` flags the
-// mode that still has no writable backend surface (Trigger): rendered disabled
-// rather than omitted so the operator sees the whole model and that the rest is
-// coming, mirroring DeployStrategyStep's own `comingSoon` affordance. PR-12
-// enables Loop (its `runMaxParallel` write landed in PR-6); only Trigger stays
-// flagged.
+// The two families and the Task modes, in spec §4 order. All four Task modes are
+// now writable: PR-12 enabled Loop (its `runMaxParallel` write landed in PR-6),
+// and #951 enabled Trigger (createAgentTrigger + payload threading via #930), so
+// none stay disabled — selecting any writes its run-spec via the Save below.
 type ModeOption = {
   value: AgentRunMode;
   label: string;
   description: string;
   icon: typeof PlayIcon;
-  comingSoon?: boolean;
 };
 
 const TASK_MODES: ModeOption[] = [
@@ -208,7 +206,6 @@ const TASK_MODES: ModeOption[] = [
     label: "Trigger",
     description: "Dispatches when a bound webhook or event fires.",
     icon: WebhookIcon,
-    comingSoon: true,
   },
 ];
 
@@ -325,11 +322,6 @@ export function ControlContent({ agent }: { agent: AstroliftAgentListItem }) {
     refetchQueries: orgId ? [{ query: LIST_AGENT_FLEET, variables: { orgId } }] : [],
   });
 
-  // Trigger remains unwritable (no bind mutation, gated on #930) → selecting it
-  // disables saving with an explanatory note rather than silently dropping
-  // fields. Loop is now writable (PR-12), so it is no longer coming-soon.
-  const isComingSoonMode = family === "TASK" && mode === "TRIGGER";
-
   // Loop concurrency cap validity: empty is valid (= leave at the backend
   // serial default). A supplied value must be a non-negative integer (0 =
   // soft-pause). `Number()` of a blank string is 0, so guard on length first.
@@ -354,12 +346,14 @@ export function ControlContent({ agent }: { agent: AstroliftAgentListItem }) {
   //   - Task + Loop      → cap empty or a non-negative integer
   //   - Service          → replicas in [REPLICA_MIN, REPLICA_MAX]; if scheduled
   //                        scaling is on, both crons valid + target >= 1
-  //   - Trigger          → not editable here (no backend bind)
+  //   - Trigger          → no run-spec field to validate (Save writes only the
+  //                        mode + paused; the webhook binding is written
+  //                        separately by the TriggerBindingEditor), so canSave
+  //                        falls through to the `true` default
   const cronValid = CRON_FIELD.test(cron.trim());
   const replicasValid = replicas >= REPLICA_MIN && replicas <= REPLICA_MAX;
   const canSave =
     !saving &&
-    !isComingSoonMode &&
     (family === "SERVICE"
       ? replicasValid && scalingValid
       : mode === "SCHEDULE"
@@ -379,7 +373,9 @@ export function ControlContent({ agent }: { agent: AstroliftAgentListItem }) {
   //
   // Coherence (PR-10b contract): the loop cap is task-only and the scaling
   // fields are service-only, so we only ever carry one family's PR-12 fields —
-  // matching the family we send in the same input. Trigger is never built here.
+  // matching the family we send in the same input. Trigger carries only its mode
+  // here (its webhook binding is written separately by the TriggerBindingEditor,
+  // not through this run-spec input).
   //
   // The backend judges family/mode coherence against the EFFECTIVE value
   // (supplied else stored), so a family switch MUST carry `runFamily` in the
@@ -421,11 +417,13 @@ export function ControlContent({ agent }: { agent: AstroliftAgentListItem }) {
       return { ...base, runFamily: "SERVICE", replicas };
     }
     // Task family. Carry the mode + the mode's owned field: the cron for
-    // Schedule, the concurrency cap for Loop. The backend ignores the cron
-    // otherwise and requires it for Schedule; the cap is task-only. An empty
-    // cap stays null (leave at the backend serial default); "0" is sent as 0
-    // (soft-pause). Switching back from Service carries runFamily so the
-    // effective family flips to TASK in the same write.
+    // Schedule, the concurrency cap for Loop. Once and Trigger have no owned
+    // run-spec field here (Trigger's binding is a separate mutation), so they
+    // send just the mode. The backend ignores the cron otherwise and requires it
+    // for Schedule; the cap is task-only. An empty cap stays null (leave at the
+    // backend serial default); "0" is sent as 0 (soft-pause). Switching back from
+    // Service carries runFamily so the effective family flips to TASK in the same
+    // write.
     return {
       ...base,
       runFamily: "TASK",
@@ -523,7 +521,7 @@ export function ControlContent({ agent }: { agent: AstroliftAgentListItem }) {
         </CardContent>
       </Card>
 
-      {/* Task modes — Once / Schedule / Loop (writable) + Trigger (disabled). */}
+      {/* Task modes — Once / Schedule / Loop / Trigger (all writable). */}
       {family === "TASK" && (
         <Card>
           <CardHeader>
@@ -538,7 +536,6 @@ export function ControlContent({ agent }: { agent: AstroliftAgentListItem }) {
                 <OptionCard
                   key={opt.value}
                   selected={mode === opt.value}
-                  disabled={opt.comingSoon}
                   onClick={() => {
                     clearError();
                     setMode(opt.value);
@@ -546,7 +543,6 @@ export function ControlContent({ agent }: { agent: AstroliftAgentListItem }) {
                   icon={opt.icon}
                   label={opt.label}
                   description={opt.description}
-                  badge={opt.comingSoon ? "Coming soon" : undefined}
                 />
               ))}
             </div>
@@ -624,16 +620,15 @@ export function ControlContent({ agent }: { agent: AstroliftAgentListItem }) {
               </section>
             )}
 
-            {/* Loop / Trigger explainer when one is selected. */}
-            {isComingSoonMode && (
-              <div className="bg-muted/30 text-muted-foreground flex items-start gap-2 rounded-md border border-dashed p-4 text-xs">
-                <InfoIcon className="mt-0.5 size-4 shrink-0" />
-                <span>
-                  Trigger configuration (the webhook/event binding) is coming soon — there&apos;s no
-                  way to bind a trigger to an agent yet. This mode can&apos;t be saved here — pick
-                  Once, Schedule, or Loop to save.
-                </span>
-              </div>
+            {/* Trigger config (#951) — the webhook binding editor. Save (below)
+                still writes runMode=TRIGGER + runPaused; this section manages the
+                bindings themselves (bind / list / unbind). */}
+            {mode === "TRIGGER" && (
+              <TriggerBindingEditor
+                agentSlug={agent.slug}
+                agentName={agent.name}
+                orgId={orgId}
+              />
             )}
           </CardContent>
         </Card>
@@ -874,8 +869,7 @@ export function ControlContent({ agent }: { agent: AstroliftAgentListItem }) {
 /**
  * Card-style selector, cloned from the inline `OptionCard` in
  * `apps/new/steps/DeployStrategyStep.tsx` (it is not a shared export there).
- * Extended with a `disabled` state for the PR-12 "coming soon" modes so they
- * render visibly-inert rather than being omitted from the model.
+ * Backs both the family selector (Task / Service) and the Task-mode selector.
  */
 function OptionCard({
   selected,
@@ -883,39 +877,26 @@ function OptionCard({
   icon: Icon,
   label,
   description,
-  badge,
-  disabled,
 }: {
   selected: boolean;
   onClick: () => void;
   icon: typeof PlayIcon;
   label: string;
   description: string;
-  badge?: string;
-  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
       aria-pressed={selected}
       className={cn(
         "flex flex-col items-start gap-2 rounded-md border p-4 text-left transition-colors",
         selected
           ? "border-primary bg-primary/5 ring-primary/20 ring-2"
-          : "hover:bg-muted/50 border-border",
-        disabled && "cursor-not-allowed opacity-60 hover:bg-transparent"
+          : "hover:bg-muted/50 border-border"
       )}
     >
-      <div className="flex w-full items-center justify-between">
-        <Icon className={cn("size-5", selected ? "text-primary" : "text-muted-foreground")} />
-        {badge && (
-          <Badge variant="outline" className="text-2xs">
-            {badge}
-          </Badge>
-        )}
-      </div>
+      <Icon className={cn("size-5", selected ? "text-primary" : "text-muted-foreground")} />
       <div>
         <p className="font-medium">{label}</p>
         <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{description}</p>
