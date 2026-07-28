@@ -53,3 +53,6 @@ credentials.json
 # kept untracked so different operators can pick non-colliding values.
 docker/.env
 .claude/worktrees/
+
+# Navegador graph DB
+.navegador/
