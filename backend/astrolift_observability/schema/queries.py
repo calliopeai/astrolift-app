@@ -221,8 +221,12 @@ def _classify_status_code(code: str) -> str:
     """Bucket an HTTP code string into one of 2xx / 3xx / 4xx / 5xx / other.
 
     Prometheus exposes the ``code`` label as a string; treat anything
-    that doesn't parse to a 3-digit number as ``other``.
+    that doesn't parse to a 3-digit number as ``other``. Edge variants
+    whose metrics are class-granular (CloudWatch ALB, #1225) emit the
+    class itself ("2xx" … "5xx") as the series key — pass those through.
     """
+    if code in ("2xx", "3xx", "4xx", "5xx"):
+        return code
     if not code or not code.isdigit() or len(code) != 3:
         return "other"
     bucket = code[0]

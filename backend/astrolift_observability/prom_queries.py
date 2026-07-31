@@ -494,10 +494,6 @@ def build_status_code_breakdown_query(
     """
     rate_window = pick_rate_window(range_seconds)
     if edge is not None and namespace and not workload_slug and edge.status_label:
-        # cloudwatch_gauge variants have no per-status-code label (5xx/4xx
-        # arrive as separate class-level metrics) — no breakdown; they take
-        # the legacy shape below, which returns empty for uninstrumented
-        # apps. Only per-code-labeled styles render the edge breakdown.
         labels = _edge_labels(edge, namespace)
         match = _edge_match(edge, namespace)
         expr = f"sum by ({edge.status_label}) (rate({edge.requests_total}{match}[{rate_window}]))"
@@ -506,6 +502,34 @@ def build_status_code_breakdown_query(
             labels=labels,
             rate_window=rate_window,
             group_label=edge.status_label,
+        )
+    if (
+        edge is not None
+        and namespace
+        and not workload_slug
+        and edge.style == "cloudwatch_gauge"
+        and edge.status_class_metric_prefix
+    ):
+        # Class-granular breakdown: CloudWatch has no per-code label, but it
+        # has one counter metric per status CLASS. Collapse the metric name
+        # into a synthetic ``code`` label ("2xx" … "5xx") so the resolver's
+        # class bucketing reads them like any other breakdown, and divide by
+        # the export period for a rate.
+        labels = _edge_labels(edge, namespace)
+        op = "=" if edge.namespace_value == "{ns}" else "=~"
+        sel_inner = ",".join(f'{k}{op}"{v}"' for k, v in sorted(labels.items()))
+        prefix = edge.status_class_metric_prefix
+        expr = (
+            "sum by (code) (label_replace("
+            f'{{__name__=~"{prefix}_[2345]_xx_count_sum",{sel_inner}}}, '
+            '"code", "${1}xx", "__name__", ".*_(.)_xx_count_sum"'
+            f")) / {edge.period_seconds}"
+        )
+        return QueryPlan(
+            promql=expr,
+            labels=labels,
+            rate_window=rate_window,
+            group_label="code",
         )
     labels = _build_labels(
         app_slug=app_slug,

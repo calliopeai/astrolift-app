@@ -71,6 +71,13 @@ class EdgeMetricsMapping:
     ALB controller's ``<namespace>/<ingress>`` stack tag) is matched with
     ``=~`` instead of ``=``."""
 
+    status_class_metric_prefix: str = ""
+    """cloudwatch_gauge only: metric-name prefix for the per-class status
+    counters — the exporter publishes ``<prefix>_2_xx_count_sum`` …
+    ``<prefix>_5_xx_count_sum``. The status breakdown renders class-level
+    series ("2xx" … "5xx") from these; empty means the variant has no
+    breakdown source."""
+
 
 # ingress-nginx controller metrics. The controller stamps the ingress
 # resource's namespace on every series; scraped through the
@@ -103,6 +110,7 @@ AWS_ALB_CONTROLLER = EdgeMetricsMapping(
     latency_stat_prefix="aws_applicationelb_target_response_time",
     period_seconds=60,
     namespace_value="{ns}/.*",
+    status_class_metric_prefix="aws_applicationelb_httpcode_target",
 )
 
 # variant slug -> mapping. Grows one entry per variant as its metrics

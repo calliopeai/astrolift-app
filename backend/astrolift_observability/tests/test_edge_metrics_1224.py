@@ -268,9 +268,10 @@ def test_alb_latency_selects_precomputed_statistic(quantile, suffix):
     )
 
 
-def test_alb_status_breakdown_falls_back_to_legacy():
-    """No per-status-code label on CloudWatch ALB metrics — the breakdown
-    keeps the legacy app-metric shape (empty for uninstrumented apps)."""
+def test_alb_status_breakdown_renders_class_level_series():
+    """CloudWatch has no per-code label but one counter per status CLASS —
+    the breakdown collapses the metric name into a synthetic ``code`` label
+    ("2xx" … "5xx") the resolver buckets directly (#1225)."""
     plan = prom_queries.build_status_code_breakdown_query(
         app_slug="hello-app",
         environment_name=None,
@@ -278,5 +279,19 @@ def test_alb_status_breakdown_falls_back_to_legacy():
         edge=AWS_ALB_CONTROLLER,
         namespace=_NS,
     )
-    assert "http_requests_total" in plan.promql
+    assert plan.promql == (
+        "sum by (code) (label_replace("
+        f'{{__name__=~"aws_applicationelb_httpcode_target_[2345]_xx_count_sum",tag_ingress_k8s_aws_stack=~"{_NS}/.*"}}, '
+        '"code", "${1}xx", "__name__", ".*_(.)_xx_count_sum")) / 60'
+    )
     assert plan.group_label == "code"
+    assert "http_requests_total" not in plan.promql
+
+
+def test_classify_status_code_passes_class_keys_through():
+    from astrolift_observability.schema.queries import _classify_status_code
+
+    assert _classify_status_code("2xx") == "2xx"
+    assert _classify_status_code("5xx") == "5xx"
+    assert _classify_status_code("503") == "5xx"
+    assert _classify_status_code("weird") == "other"
