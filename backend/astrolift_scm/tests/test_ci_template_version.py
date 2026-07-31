@@ -72,21 +72,21 @@ _RENDERERS = {
 # The version these hashes belong to. Kept as its own constant (rather than
 # reading TEMPLATE_VERSION) so that bumping TEMPLATE_VERSION without refreshing
 # the pins trips ``test_template_version_matches_pins`` loudly.
-PINNED_TEMPLATE_VERSION = 2
+PINNED_TEMPLATE_VERSION = 3
 
 # content_hash (sha256, stamp removed) of each host's rendered body at
 # PINNED_TEMPLATE_VERSION, computed against GOLDEN_API_URL and _golden_app().
 #
-# _golden_app() is platform-built (non-blank registry_repo_uri), and the v2
-# deploy-only change left the platform-built render path byte-for-byte
-# identical to v1 — so these hashes are unchanged from v1. The deploy-only
-# render (blank registry_repo_uri) is covered by
-# ``test_deploy_only_workflow.py`` instead.
+# v3 (#1220): every host's notify step moved to the real CI deploy endpoint
+# (``/api/cli/v1/apps/<slug>/deploy/``) with a wildcard ``image_tags`` body
+# and a 2xx status assertion; the GitHub template additionally gained the
+# skip-if-built ECR probe. The deploy-only render (blank registry_repo_uri)
+# is covered by ``test_deploy_only_workflow.py`` instead.
 PINNED_CONTENT_HASHES = {
-    "github": "ecb3b5f953cb448b36fba02e960838122ad1e51ed4aaa4edee25ee4368724c86",
-    "gitlab": "6a5b611916a74cf588acf09b705692119df846778935eac9fb0e92948ece6a1a",
-    "gitea": "7b657331f76fa07f7b2b638b356b7425686039153f1e10604b3588a5dac2c4c9",
-    "bitbucket": "100c976863570761c7bf798556ca2bd1859c2db31cd0a5d0f108209ca51fa933",
+    "github": "a0dd6df23916e3c55d7b096b5906185457f006f26412baf12aaf01307901cfd5",
+    "gitlab": "0d40fb007b9da85b6b6711770d54cb221cfcaf407dc4c4bb3bc76ec87cf30b6d",
+    "gitea": "27eab2d5b9cfa025384a6c3b807f361a662e963ea0bd8ad40fef32cc15058b50",
+    "bitbucket": "ac95dc3e66956ac4fac71f31415ffa8303990e6b635dd2343edcb0be25873377",
 }
 
 _BUMP_HINT = (

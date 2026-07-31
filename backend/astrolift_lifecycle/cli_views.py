@@ -216,15 +216,39 @@ def ci_deploy(request: HttpRequest, app_slug: str) -> JsonResponse:
 
     # Derive declared workloads from the stored manifest for tag validation.
     declared_workloads: tuple[str, ...] = ()
+    image_workloads: tuple[str, ...] = ()
     if app.manifest_raw and app.manifest_raw.strip():
         try:
             parsed_manifest = parse_raw(app.manifest_raw)
             declared_workloads = tuple(w.name for w in parsed_manifest.workloads)
+            image_workloads = tuple(w.name for w in parsed_manifest.workloads if w.kind != "static_site")
         except ManifestError:
             # Malformed manifest — proceed; validate_image_tags will
             # allow any workload slug and the deploy pre-flight will
             # catch the real error.
             declared_workloads = ()
+
+    # Wildcard expansion (#1220): the managed CI workflow templates are
+    # stateless — they can't know the app's workload names, and rendering
+    # them into the file would go stale on the next manifest edit. So CI
+    # sends ``image_tags: {"*": "<tag>"}`` and the server expands it here
+    # against the CURRENT manifest's image-carrying workloads.
+    raw_tags = body.get("image_tags") if isinstance(body, dict) else None
+    if isinstance(raw_tags, dict) and "*" in raw_tags:
+        if set(raw_tags) != {"*"}:
+            return JsonResponse(
+                {"detail": 'image_tags cannot mix the "*" wildcard with explicit workload keys'},
+                status=400,
+            )
+        if not image_workloads:
+            return JsonResponse(
+                {
+                    "detail": 'image_tags wildcard "*" requires a stored app manifest with '
+                    "at least one image-carrying workload"
+                },
+                status=400,
+            )
+        body["image_tags"] = {name: raw_tags["*"] for name in image_workloads}
 
     # If there's no declared workload list (missing or unparseable manifest),
     # relax the workload-tag validation so CI can still deliver (the deploy
@@ -238,6 +262,14 @@ def ci_deploy(request: HttpRequest, app_slug: str) -> JsonResponse:
             deleted_at__isnull=True,
         ).values_list("name", flat=True)
     )
+
+    # Environment default (#1220): the managed workflows don't render an
+    # environment name (it would go stale on rename). When the caller
+    # omits it and the app has exactly one active environment, that env
+    # is unambiguous — use it. Multi-env apps still get the explicit
+    # validate_environment error telling them to specify.
+    if not str(body.get("environment") or "").strip() and len(registered_envs) == 1:
+        body["environment"] = registered_envs[0]
 
     try:
         ci_req = parse_request(

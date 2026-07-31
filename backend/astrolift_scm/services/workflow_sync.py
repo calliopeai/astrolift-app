@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import logging
 import re
 import urllib.error
 import urllib.parse
@@ -62,6 +63,8 @@ from astrolift_scm.providers.gitlab import (
 from astrolift_scm.providers.gitlab import (
     _token as _gitlab_token,
 )
+
+logger = logging.getLogger(__name__)
 
 # Conventional CI workflow paths per host.
 WORKFLOW_PATH: Final = ".github/workflows/astrolift-ci.yml"
@@ -145,11 +148,6 @@ _BLOCK_RE = re.compile(
     re.DOTALL,
 )
 
-# Literal GitHub Actions expression for the pushed commit SHA. Kept as a
-# plain constant (not an f-string) so deploy-only image refs — which have no
-# registry prefix — can reuse it without brace-doubling gymnastics.
-_GITHUB_SHA_EXPR = "${{ github.sha }}"
-
 
 def _load_template() -> str:
     return _TEMPLATE_PATH.read_text(encoding="utf-8")
@@ -178,11 +176,13 @@ def _apply_blocks(template: str, flags: dict[str, bool]) -> str:
 def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
     """Render the workflow YAML for ``app`` against the file template.
 
-    The five variables are pulled from the app's persisted state:
+    The variables are pulled from the app's persisted state:
 
     * ``app_slug``      — ``RegisteredApp.slug``
     * ``deploy_branch`` — ``app.deploy_branch`` (fallback: ``main``)
     * ``ecr_uri``       — ``app.registry_repo_uri``
+    * ``ecr_repo_name`` — repo path within the registry (URI minus host),
+                          for the ``describe-images`` skip-if-built probe
     * ``push_role_arn`` — ``app.push_role_ref``
     * ``api_url``       — ``settings.PLATFORM_API_URL`` (trimmed)
 
@@ -192,14 +192,18 @@ def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
     role ARN's session naming — the template uses
     ``${{ github.run_id }}`` directly.
 
+    The notify step POSTs the real CI deploy endpoint
+    (``/api/cli/v1/apps/<slug>/deploy/``, #1220) with a wildcard
+    ``image_tags`` the server expands against the current manifest, and
+    asserts a 2xx status — a redirect from an auth layer in front of the
+    platform must fail the run, not masquerade as success.
+
     **Deploy-only mode.** When the app has no platform-built image —
     ``registry_repo_uri`` is empty/blank — the workflow is rendered
     WITHOUT the ECR-login + build-and-push steps (the image is built by
     a separate pipeline; there is nothing for this workflow to build).
     Checkout, the OIDC credentials step and the Astrolift notify step are
-    kept: CI's only job is to tell the platform a new SHA exists. This
-    avoids the invalid ``:${{ github.sha }}`` blank tag an empty
-    ``ecr_uri`` would otherwise produce.
+    kept: CI's only job is to tell the platform a new SHA exists.
     """
     template = _load_template()
     api_url = (getattr(settings, "PLATFORM_API_URL", "") or "").rstrip("/")
@@ -207,17 +211,13 @@ def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
     # A non-empty registry_repo_uri is the signal that the platform builds
     # and pushes this app's image; empty ⇒ deploy-only (built elsewhere).
     platform_built = bool(ecr_uri.strip())
-    # The image reference the notify step reports. Platform-built apps report
-    # the freshly-pushed ``<uri>:<sha>``; deploy-only apps report just the
-    # commit SHA (no registry prefix ⇒ no leading-colon blank tag).
-    image_ref = f"{ecr_uri}:{_GITHUB_SHA_EXPR}" if platform_built else _GITHUB_SHA_EXPR
     values = {
         "app_slug": app.slug,
         "deploy_branch": (app.deploy_branch or "main").strip() or "main",
         "ecr_uri": ecr_uri,
+        "ecr_repo_name": ecr_uri.split("/", 1)[1] if platform_built and "/" in ecr_uri else "",
         "push_role_arn": app.push_role_ref or "",
         "api_url": api_url,
-        "image_ref": image_ref,
     }
 
     def _replace(match: re.Match[str]) -> str:
@@ -251,17 +251,10 @@ def render_astrolift_bitbucket_pipeline(app: RegisteredApp) -> str:
     # deploy-only (no docker service, no ECR login, no build/push).
     platform_built = bool(ecr_uri.strip())
     deploy_branch = (app.deploy_branch or "main").strip() or "main"
-    slug_literal = json.dumps(app.slug)
     api_url_literal = json.dumps(api_url)
 
     if platform_built:
-        definitions_block = (
-            "definitions:\n"
-            "  services:\n"
-            "    docker:\n"
-            "      type: docker\n"
-            "\n"
-        )
+        definitions_block = "definitions:\n" "  services:\n" "    docker:\n" "      type: docker\n" "\n"
         step_name = "Build, push, and notify Astrolift"
         services_block = "          services:\n            - docker\n"
         image_export = f'            - export ASTROLIFT_IMAGE="{ecr_uri}:$BITBUCKET_COMMIT"\n'
@@ -276,16 +269,16 @@ def render_astrolift_bitbucket_pipeline(app: RegisteredApp) -> str:
         definitions_block = ""
         step_name = "Notify Astrolift"
         services_block = ""
-        image_export = '            - export ASTROLIFT_IMAGE="$BITBUCKET_COMMIT"\n'
+        # No image is built here and the notify body carries the commit SHA
+        # itself, so deploy-only has nothing to export.
+        image_export = ""
         pre_curl = "            - apt-get update -qq && apt-get install -y -qq curl ca-certificates\n"
 
     body = (
         "# Managed by Astrolift — do not edit by hand."
         " Re-sync via Settings → CI setup → Sync workflow file.\n"
         "image: atlassian/default-image:4\n"
-        "\n"
-        + definitions_block
-        + "pipelines:\n"
+        "\n" + definitions_block + "pipelines:\n"
         "  branches:\n"
         f"    {deploy_branch}:\n"
         "      - step:\n"
@@ -295,10 +288,12 @@ def render_astrolift_bitbucket_pipeline(app: RegisteredApp) -> str:
         + image_export
         + pre_curl
         + "            - |\n"
-        f"              curl --fail-with-body -sS -X POST {api_url_literal}/api/v1/deploys \\\n"
+        f"              code=$(curl -sS -o /tmp/astrolift-deploy-response.json -w '%{{http_code}}' -X POST {api_url_literal}/api/cli/v1/apps/{app.slug}/deploy/ \\\n"
         '                -H "Authorization: Bearer $ASTROLIFT_DEPLOY_TOKEN" \\\n'
         '                -H "Content-Type: application/json" \\\n'
-        f'                -d "{{\\"appSlug\\":{slug_literal},\\"image\\":\\"$ASTROLIFT_IMAGE\\",\\"commitSha\\":\\"$BITBUCKET_COMMIT\\"}}"\n'
+        '                -d "{\\"image_tags\\":{\\"*\\":\\"$BITBUCKET_COMMIT\\"},\\"commit_sha\\":\\"$BITBUCKET_COMMIT\\",\\"trigger_kind\\":\\"ci\\"}")\n'
+        "              cat /tmp/astrolift-deploy-response.json; echo\n"
+        '              case "$code" in 2*) ;; *) echo "Astrolift deploy notification FAILED (HTTP $code)"; exit 1;; esac\n'
     )
     return stamp_workflow(body, version=TEMPLATE_VERSION, digest=content_hash(body))
 
@@ -318,9 +313,7 @@ def render_astrolift_gitea_ci_workflow(app: RegisteredApp) -> str:
     # Empty registry_repo_uri ⇒ image built by a separate pipeline; render
     # deploy-only (drop the AWS-cred + build/push steps, keep the notify).
     platform_built = bool(ecr_uri.strip())
-    image_ref = f"{ecr_uri}:{_GITHUB_SHA_EXPR}" if platform_built else _GITHUB_SHA_EXPR
     deploy_branch = (app.deploy_branch or "main").strip() or "main"
-    slug_literal = json.dumps(app.slug)
     api_url_literal = json.dumps(api_url)
 
     if platform_built:
@@ -361,16 +354,16 @@ def render_astrolift_gitea_ci_workflow(app: RegisteredApp) -> str:
         "  build-and-deploy:\n"
         "    runs-on: ubuntu-latest\n"
         "    steps:\n"
-        "      - uses: actions/checkout@v4\n"
-        + build_steps
-        + "      - name: Notify Astrolift\n"
+        "      - uses: actions/checkout@v4\n" + build_steps + "      - name: Notify Astrolift\n"
         "        env:\n"
         "          ASTROLIFT_DEPLOY_TOKEN: ${{ secrets.ASTROLIFT_DEPLOY_TOKEN }}\n"
         "        run: |\n"
-        f"          curl --fail-with-body -sS -X POST {api_url_literal}/api/v1/deploys \\\n"
+        f"          code=$(curl -sS -o /tmp/astrolift-deploy-response.json -w '%{{http_code}}' -X POST {api_url_literal}/api/cli/v1/apps/{app.slug}/deploy/ \\\n"
         '            -H "Authorization: Bearer $ASTROLIFT_DEPLOY_TOKEN" \\\n'
         '            -H "Content-Type: application/json" \\\n'
-        f'            -d \'{{"appSlug":{slug_literal},"image":"{image_ref}","commitSha":"${{{{ github.sha }}}}"}}\'\n'
+        '            -d \'{"image_tags":{"*":"${{ github.sha }}"},"commit_sha":"${{ github.sha }}","trigger_kind":"ci"}\')\n'
+        "          cat /tmp/astrolift-deploy-response.json; echo\n"
+        '          case "$code" in 2*) ;; *) echo "Astrolift deploy notification FAILED (HTTP $code)"; exit 1;; esac\n'
     )
     return stamp_workflow(body, version=TEMPLATE_VERSION, digest=content_hash(body))
 
@@ -448,12 +441,14 @@ def render_astrolift_gitlab_ci_workflow(app: RegisteredApp) -> str:
         + "  script:\n"
         + "    - apt-get update -qq && apt-get install -y -qq curl ca-certificates\n"
         + "    - |\n"
-        + '      curl --fail-with-body -sS -X POST "$ASTROLIFT_API_URL/api/v1/deploys" \\\n'
+        + "      code=$(curl -sS -o /tmp/astrolift-deploy-response.json -w '%{http_code}' -X POST \"$ASTROLIFT_API_URL/api/cli/v1/apps/$ASTROLIFT_APP_SLUG/deploy/\" \\\n"
         + '        -H "Authorization: Bearer $ASTROLIFT_DEPLOY_TOKEN" \\\n'
         + '        -H "Content-Type: application/json" \\\n'
-        + '        -d "{\\"appSlug\\":\\"$ASTROLIFT_APP_SLUG\\",'
-        + '\\"image\\":\\"$ASTROLIFT_IMAGE\\",'
-        + '\\"commitSha\\":\\"$CI_COMMIT_SHA\\"}"\n'
+        + '        -d "{\\"image_tags\\":{\\"*\\":\\"$CI_COMMIT_SHA\\"},'
+        + '\\"commit_sha\\":\\"$CI_COMMIT_SHA\\",'
+        + '\\"trigger_kind\\":\\"ci\\"}")\n'
+        + "      cat /tmp/astrolift-deploy-response.json; echo\n"
+        + '      case "$code" in 2*) ;; *) echo "Astrolift deploy notification FAILED (HTTP $code)"; exit 1;; esac\n'
     )
     return stamp_workflow(body, version=TEMPLATE_VERSION, digest=content_hash(body))
 
@@ -993,6 +988,56 @@ def _persist_ci_workflow_stamp(app: RegisteredApp, result: WorkflowSyncResult) -
 # ---------------------------------------------------------------------------
 
 
+def ensure_ci_push_role(app: RegisteredApp) -> str:
+    """Provision (or reuse) the OIDC CI push role and persist its ARN to
+    ``app.push_role_ref`` so the rendered GitHub workflow's
+    ``aws-actions/configure-aws-credentials`` step assumes a real role.
+    Without this the field is blank and OIDC fails with "Could not load
+    credentials from any providers".
+
+    Lives here (not in autowire) so EVERY path that pushes the workflow
+    file — Settings "Sync workflow file", autowire, drift repair — heals a
+    blank ``push_role_ref`` before rendering (#1219). Idempotent
+    (``ensure_ci_push_role`` on the driver reuses the role).
+
+    Returns a non-empty error string only on a genuine provisioning
+    FAILURE — a no-op ("") when the app has no bound cluster, no source
+    repo, or the registry driver doesn't support push roles (those are
+    "unwired", not failures).
+    """
+    cluster = app.default_tenant_cluster
+    if cluster is None or not (app.source_repo or "").strip():
+        return ""
+    try:
+        from core.app_deploy import driver_for_capability
+
+        driver = driver_for_capability(cluster, "registry")
+    except Exception as exc:  # noqa: BLE001 — no registry driver here: leave as-is
+        logger.warning("push-role ensure: registry driver unavailable for %s: %s", app.slug, exc)
+        return ""
+    if not hasattr(driver, "ensure_ci_push_role"):
+        return ""
+    try:
+        push_role = driver.ensure_ci_push_role(
+            repo=f"{app.organization.slug}/{app.slug}",
+            scm_provider=app.source_kind,
+            scm_repo_full_name=app.source_repo,
+        )
+    except Exception as exc:  # noqa: BLE001 — surface, don't swallow (the whole point)
+        logger.exception("push-role ensure: ensure_ci_push_role failed for %s", app.slug)
+        return str(exc) or exc.__class__.__name__
+    ref = (getattr(push_role, "role_ref", "") or "").strip()
+    if not ref:
+        # A driver that supports push roles but returned nothing is a
+        # failure, not an unwired no-op — rendering would emit a blank
+        # role-to-assume, which is exactly the #1219 breakage.
+        return "registry driver returned an empty push-role ref"
+    if ref != (app.push_role_ref or ""):
+        app.push_role_ref = ref
+        app.save(update_fields=["push_role_ref", "updated_at", "version"])
+    return ""
+
+
 def sync_workflow_file_to_repo(
     app: RegisteredApp,
     viewer_user=None,  # noqa: ARG001 — accepted for API symmetry; org-level conn picker is used
@@ -1024,6 +1069,16 @@ def sync_workflow_file_to_repo(
             "app has no source repo configured; cannot push the CI workflow",
         )
     if app.source_kind == "github":
+        # The GitHub template authenticates via OIDC role assumption, so a
+        # blank ``push_role_ref`` renders a workflow that can never work.
+        # Heal it here — every push path funnels through this function
+        # (#1219) — and refuse to push when provisioning genuinely failed.
+        role_err = ensure_ci_push_role(app)
+        if role_err:
+            raise WorkflowSyncError(
+                "PUSH_ROLE_PROVISION_FAILED",
+                f"couldn't provision the CI push role: {role_err}",
+            )
         result = _sync_github(app, force_pr=force_pr)
     elif app.source_kind == "gitlab":
         result = _sync_gitlab(app, force_pr=force_pr)

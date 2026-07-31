@@ -52,7 +52,14 @@ import re
 # build/push steps are dropped and only the notify step runs. The
 # platform-built render path is byte-for-byte unchanged, so the golden
 # content hashes below are identical to v1; only the stamped version moves.
-TEMPLATE_VERSION = 2
+#
+# v3 (#1220): the notify step targets the real CI deploy endpoint
+# (``/api/cli/v1/apps/<slug>/deploy/``) with a wildcard ``image_tags``
+# body and an explicit 2xx status assertion (a 302 from an auth layer
+# used to count as success). The GitHub template additionally skips the
+# build/push when the commit's image already exists in the registry, so
+# re-runs on a built SHA no longer die on immutable tags.
+TEMPLATE_VERSION = 3
 
 # The stamp is a host-agnostic ``#`` comment so it's inert on GitHub
 # Actions / GitLab CI / Bitbucket Pipelines / Gitea alike — it never

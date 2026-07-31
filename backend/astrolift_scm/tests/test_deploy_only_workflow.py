@@ -49,6 +49,16 @@ _COLON_SHA_SUFFIX = {
 
 _PLATFORM_URI = "123456789012.dkr.ecr.us-west-2.amazonaws.com/emr-bug-triage"
 
+# What the notify step's deploy-endpoint path looks like per host: GitHub and
+# GitLab route through env-var indirection ($APP_SLUG); Gitea and Bitbucket
+# inline the slug literal.
+_NOTIFY_PATH = {
+    "github": "/api/cli/v1/apps/$APP_SLUG/deploy/",
+    "gitlab": "/api/cli/v1/apps/$ASTROLIFT_APP_SLUG/deploy/",
+    "gitea": "/api/cli/v1/apps/emr-bug-triage/deploy/",
+    "bitbucket": "/api/cli/v1/apps/emr-bug-triage/deploy/",
+}
+
 
 def _app(*, registry_repo_uri: str, source_kind: str) -> SimpleNamespace:
     """An app-shaped object; ``registry_repo_uri`` toggles build vs deploy-only."""
@@ -73,8 +83,9 @@ def test_platform_built_renders_build_and_push(host, settings):
     # The valid ``<uri>:<sha>`` tag: the registry prefix sits in front of the colon.
     assert _PLATFORM_URI in body
     assert _COLON_SHA_SUFFIX[host] in body
-    # Notify step is still present.
-    assert "/api/v1/deploys" in body
+    # Notify step targets the real CI deploy endpoint (#1220).
+    assert _NOTIFY_PATH[host] in body
+    assert "/api/v1/deploys" not in body
 
 
 @pytest.mark.parametrize("host", sorted(_RENDERERS))
@@ -89,7 +100,8 @@ def test_deploy_only_drops_build_keeps_notify(host, settings):
     # No blank ``:<sha>`` tag — this is the emr-bug-triage prod bug.
     assert _COLON_SHA_SUFFIX[host] not in body
     # Notify still present: CI's only job is to tell the platform to deploy.
-    assert "/api/v1/deploys" in body
+    assert _NOTIFY_PATH[host] in body
+    assert "/api/v1/deploys" not in body
 
 
 @pytest.mark.parametrize("host", sorted(_RENDERERS))
@@ -111,12 +123,12 @@ def test_github_deploy_only_keeps_checkout_and_oidc_drops_ecr(settings):
     assert "aws-actions/configure-aws-credentials@v4" in body
     assert "aws-actions/amazon-ecr-login" not in body  # only needed for the build
     assert "Build and push image" not in body
-    # Deploy-only reports the bare commit SHA as the image (no registry prefix).
-    assert "IMAGE: ${{ github.sha }}" in body
+    # Deploy-only notifies with the bare commit SHA as the wildcard tag.
+    assert '{\\"image_tags\\":{\\"*\\":\\"${{ github.sha }}\\"}' in body
     # Template block/var markers must all be resolved.
     assert "{%" not in body
-    assert "{{ image_ref }}" not in body
     assert "{{ ecr_uri }}" not in body
+    assert "{{ ecr_repo_name }}" not in body
 
 
 def test_github_build_render_still_has_every_build_step(settings):
@@ -127,8 +139,14 @@ def test_github_build_render_still_has_every_build_step(settings):
     assert "aws-actions/amazon-ecr-login@v2" in body
     assert "Build and push image" in body
     assert f"{_PLATFORM_URI}:${{{{ github.sha }}}}" in body
+    # Skip-if-built probe (#1220): re-runs on an already-built SHA must not
+    # die on the registry's immutable tags.
+    assert "Check for existing image" in body
+    assert "aws ecr describe-images" in body
+    assert "ECR_REPO: emr-bug-triage" in body
+    assert "if: steps.image_exists.outputs.exists != 'true'" in body
     assert "{%" not in body  # blocks resolved
-    assert "{{ image_ref }}" not in body
+    assert "{{ ecr_repo_name }}" not in body
 
 
 def test_gitlab_deploy_only_drops_build_stage(settings):
@@ -152,7 +170,9 @@ def test_bitbucket_deploy_only_drops_docker_service(settings):
     assert "definitions:" not in body
     assert "services:" not in body
     assert "get-login-password" not in body
-    assert 'export ASTROLIFT_IMAGE="$BITBUCKET_COMMIT"' in body  # bare commit, no blank tag
+    # The notify body carries the bare commit SHA — no export, no blank tag.
+    assert '\\"*\\":\\"$BITBUCKET_COMMIT\\"' in body
+    assert "export ASTROLIFT_IMAGE" not in body
     assert "name: Notify Astrolift" in body
 
 

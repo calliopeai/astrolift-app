@@ -29,7 +29,20 @@ jobs:
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Check for existing image
+        id: image_exists
+        env:
+          ECR_REPO: {{ ecr_repo_name }}
+        run: |
+          if aws ecr describe-images --repository-name "$ECR_REPO" --image-ids imageTag=${{ github.sha }} >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Image for ${{ github.sha }} already in the registry — skipping build (immutable tags reject re-pushes)."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build and push image
+        if: steps.image_exists.outputs.exists != 'true'
         env:
           IMAGE: {{ ecr_uri }}:${{ github.sha }}
         run: |
@@ -42,9 +55,13 @@ jobs:
           API_URL: {{ api_url }}
           APP_SLUG: {{ app_slug }}
           TOKEN: ${{ secrets.ASTROLIFT_DEPLOY_TOKEN }}
-          IMAGE: {{ image_ref }}
         run: |
-          curl --fail-with-body -sS -X POST "$API_URL/api/v1/deploys" \
+          code=$(curl -sS -o /tmp/astrolift-deploy-response.json -w '%{http_code}' -X POST "$API_URL/api/cli/v1/apps/$APP_SLUG/deploy/" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{\"appSlug\":\"$APP_SLUG\",\"image\":\"$IMAGE\",\"commitSha\":\"${{ github.sha }}\"}"
+            -d "{\"image_tags\":{\"*\":\"${{ github.sha }}\"},\"commit_sha\":\"${{ github.sha }}\",\"trigger_kind\":\"ci\"}")
+          cat /tmp/astrolift-deploy-response.json; echo
+          case "$code" in
+            2*) echo "Astrolift accepted the deploy (HTTP $code)." ;;
+            *) echo "Astrolift deploy notification FAILED (HTTP $code) — a redirect or auth layer counts as failure."; exit 1 ;;
+          esac

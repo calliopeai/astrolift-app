@@ -712,3 +712,127 @@ def test_ci_deploy_other_org_app_with_own_token_succeeds(provider_plugin, workfl
     )
     assert r.status_code == 201, r.content
     assert len(workflow_starts) == 1
+
+
+# ---- wildcard image_tags + environment default (#1220) ----------------
+#
+# The managed CI workflow templates are stateless: they can't know the
+# app's workload or environment names, and rendering either into the
+# pushed file would go stale on the next manifest edit. So CI sends
+# ``image_tags: {"*": tag}`` (expanded server-side against the CURRENT
+# manifest) and omits ``environment`` (defaulted when the app has exactly
+# one active env).
+
+_MANIFEST_WEB_AND_SITE = """
+name = "hello-app"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+
+  [[workloads.containers]]
+  name = "web"
+  is_primary = true
+
+[[workloads]]
+name = "site"
+kind = "static_site"
+"""
+
+
+def test_ci_deploy_wildcard_expands_to_declared_workloads(
+    app_with_manifest, env, auth_headers, workflow_starts
+):
+    client = Client()
+    r = _post_json(
+        client,
+        f"/api/cli/v1/apps/{app_with_manifest.slug}/deploy/",
+        _valid_body(image_tags={"*": "abc1234567890"}),
+        auth_headers,
+    )
+    assert r.status_code == 201, r.content
+    assert workflow_starts[0]["args"][0].image_tags == {"web": "abc1234567890"}
+
+
+def test_ci_deploy_wildcard_skips_static_site_workloads(
+    app_with_manifest, env, auth_headers, workflow_starts
+):
+    app_with_manifest.manifest_raw = _MANIFEST_WEB_AND_SITE
+    app_with_manifest.save(update_fields=["manifest_raw", "updated_at", "version"])
+    client = Client()
+    r = _post_json(
+        client,
+        f"/api/cli/v1/apps/{app_with_manifest.slug}/deploy/",
+        _valid_body(image_tags={"*": "abc1234567890"}),
+        auth_headers,
+    )
+    assert r.status_code == 201, r.content
+    # ``site`` carries no image — the wildcard must not tag it.
+    assert workflow_starts[0]["args"][0].image_tags == {"web": "abc1234567890"}
+
+
+def test_ci_deploy_wildcard_mixed_with_explicit_returns_400(
+    app_with_manifest, env, auth_headers, workflow_starts
+):
+    client = Client()
+    r = _post_json(
+        client,
+        f"/api/cli/v1/apps/{app_with_manifest.slug}/deploy/",
+        _valid_body(image_tags={"*": "abc1234567890", "web": "abc1234567890"}),
+        auth_headers,
+    )
+    assert r.status_code == 400
+    assert "wildcard" in r.json()["detail"]
+    assert workflow_starts == []
+
+
+def test_ci_deploy_wildcard_without_manifest_returns_400(app, env, auth_headers, workflow_starts):
+    # ``auth_headers`` mints its token via app_with_manifest (same row) —
+    # blank the manifest back out so the wildcard has nothing to expand
+    # against.
+    app.manifest_raw = ""
+    app.save(update_fields=["manifest_raw", "updated_at", "version"])
+    client = Client()
+    r = _post_json(
+        client,
+        f"/api/cli/v1/apps/{app.slug}/deploy/",
+        _valid_body(image_tags={"*": "abc1234567890"}),
+        auth_headers,
+    )
+    assert r.status_code == 400
+    assert "manifest" in r.json()["detail"]
+    assert workflow_starts == []
+
+
+def test_ci_deploy_omitted_environment_defaults_when_single_env(
+    app_with_manifest, env, auth_headers, workflow_starts
+):
+    body = _valid_body()
+    del body["environment"]
+    client = Client()
+    r = _post_json(
+        client,
+        f"/api/cli/v1/apps/{app_with_manifest.slug}/deploy/",
+        body,
+        auth_headers,
+    )
+    assert r.status_code == 201, r.content
+    deployment = Deployment.objects.get(guid=r.json()["deployment_id"])
+    assert deployment.app_environment_id == env.id
+
+
+def test_ci_deploy_omitted_environment_ambiguous_with_two_envs_returns_400(
+    app_with_manifest, env, env_requires_approval, auth_headers, workflow_starts
+):
+    body = _valid_body()
+    del body["environment"]
+    client = Client()
+    r = _post_json(
+        client,
+        f"/api/cli/v1/apps/{app_with_manifest.slug}/deploy/",
+        body,
+        auth_headers,
+    )
+    assert r.status_code == 400
+    assert "environment" in r.json()["detail"]
+    assert workflow_starts == []

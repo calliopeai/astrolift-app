@@ -162,7 +162,8 @@ def test_render_bitbucket_pipeline_basic():
     assert "$BITBUCKET_COMMIT" in out
     assert "atlassian/default-image:4" in out
     assert "ASTROLIFT_DEPLOY_TOKEN" in out
-    assert '"my-app"' in out
+    # The notify step targets the real CI deploy endpoint, slug in-path (#1220).
+    assert "/api/cli/v1/apps/my-app/deploy/" in out
     assert "    main:\n" in out
 
 
@@ -180,11 +181,9 @@ def test_render_bitbucket_pipeline_ecr_push_steps():
     assert "services:\n            - docker" in out
 
 
-def test_render_bitbucket_pipeline_slug_json_encoded():
-    import json
-
-    out = render_astrolift_bitbucket_pipeline(_fake_app(slug='needs"escape'))
-    assert json.dumps('needs"escape') in out
+def test_render_bitbucket_pipeline_slug_lands_in_deploy_path():
+    out = render_astrolift_bitbucket_pipeline(_fake_app(slug="custom-slug"))
+    assert "/api/cli/v1/apps/custom-slug/deploy/" in out
 
 
 # ---------------------------------------------------------------------------
@@ -197,7 +196,7 @@ def test_render_gitea_ci_workflow_basic():
     assert "${{ github.sha }}" in out
     assert "actions/checkout@v4" in out
     assert "ASTROLIFT_DEPLOY_TOKEN" in out
-    assert '"my-app"' in out
+    assert "/api/cli/v1/apps/my-app/deploy/" in out
     assert "concurrency" in out
 
 
@@ -207,14 +206,17 @@ def test_render_gitea_ci_workflow_deploy_branch():
     assert "branches: [main]" not in out
 
 
-def test_render_gitea_ci_workflow_no_stray_paren():
-    """Regression: earlier draft had a stray ) after the curl -d line."""
+def test_render_gitea_ci_workflow_curl_substitution_balanced():
+    """The curl runs inside ``code=$(...)`` so its status can be asserted;
+    the ``)`` on the -d line must close that substitution — exactly one
+    opener, exactly one closer, in order."""
     out = render_astrolift_gitea_ci_workflow(_fake_app(source_kind="gitea"))
     lines = out.splitlines()
-    curl_d_lines = [ln for ln in lines if "-d '" in ln]
-    assert curl_d_lines, "curl -d line should be present"
-    for line in curl_d_lines:
-        assert not line.rstrip().endswith(")"), f"stray ) on curl -d line: {line!r}"
+    open_lines = [i for i, ln in enumerate(lines) if "code=$(curl" in ln]
+    close_lines = [i for i, ln in enumerate(lines) if ln.rstrip().endswith("}')")]
+    assert len(open_lines) == 1, "expected one code=$(curl opener"
+    assert len(close_lines) == 1, "expected one closing ) on the -d line"
+    assert open_lines[0] < close_lines[0]
 
 
 def test_render_gitea_ci_workflow_ecr_steps():
