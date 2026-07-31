@@ -89,6 +89,14 @@ export type CursorTableController<TRow> = {
   /** Live input value — updates on every keystroke. */
   search: string;
   setSearch: (s: string) => void;
+  /**
+   * True whenever the rows on screen are not the answer to the question
+   * currently being asked — while a typed term is still debouncing, and
+   * while the request it triggered is in flight. The table keeps showing
+   * the previous page rather than blanking, so something has to say that
+   * those rows are stale.
+   */
+  isStale: boolean;
   /** True while a typed term has not yet reached the server. */
   isSearching: boolean;
   searchEnabled: boolean;
@@ -272,6 +280,7 @@ export function useCursorTable<TRow, TVars extends OperationVariables = Operatio
     setPageSize,
     search,
     setSearch,
+    isStale: (search !== debouncedSearch || loading) && rows.length > 0,
     isSearching: search !== debouncedSearch,
     searchEnabled,
     sort,

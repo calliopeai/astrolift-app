@@ -244,7 +244,15 @@ export function DataTable<TRow>({
         </div>
       )}
 
-      <div className="rounded-md border">
+      {/* Rows persist across a refetch rather than blanking, so fade them
+          while they are answering the previous question. */}
+      <div
+        className={cn(
+          "rounded-md border transition-opacity",
+          controller.isStale && "opacity-60"
+        )}
+        aria-busy={controller.isStale || undefined}
+      >
         <Table>
           <caption className="sr-only">{label}</caption>
           <TableHeader>

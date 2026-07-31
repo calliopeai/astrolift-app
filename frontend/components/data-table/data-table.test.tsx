@@ -50,6 +50,7 @@ function controller(overrides: Partial<CursorTableController<Row>> = {}) {
     setPageSize: vi.fn(),
     search: "",
     setSearch: vi.fn(),
+    isStale: false,
     isSearching: false,
     searchEnabled: false,
     sort: undefined,
@@ -129,6 +130,20 @@ describe("DataTable", () => {
     expect(screen.getByText("nope")).toBeInTheDocument();
     screen.getByRole("button", { name: /retry/i }).click();
     expect(retry).toHaveBeenCalled();
+  });
+
+  it("fades stale rows while a refetch is in flight", () => {
+    // Rows persist across a refetch rather than blanking, so something has
+    // to say they are answering the previous question.
+    const { container } = renderTable(controller({ rows, state: "ready", isStale: true }));
+    const shell = container.querySelector('[aria-busy="true"]');
+    expect(shell).toBeInTheDocument();
+    expect(shell).toHaveClass("opacity-60");
+  });
+
+  it("does not fade settled rows", () => {
+    const { container } = renderTable(controller({ rows, state: "ready" }));
+    expect(container.querySelector('[aria-busy="true"]')).not.toBeInTheDocument();
   });
 
   it("names the table for screen readers", () => {
