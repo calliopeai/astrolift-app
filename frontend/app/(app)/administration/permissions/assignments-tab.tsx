@@ -7,24 +7,25 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { EmptyState } from "@/components/EmptyState";
+import {
+  DataTable,
+  useCursorTable,
+  useRowSelection,
+  type Column,
+  type CursorPage,
+} from "@/components/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Section } from "@/components/ui/section";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   BULK_REVOKE_ROLE_BINDINGS,
   REVOKE_ROLE_BINDING,
 } from "@/graphql/identity/identity.mutations";
-import { LIST_ROLE_BINDINGS, LIST_ROLES } from "@/graphql/identity/identity.queries";
+import {
+  LIST_ROLE_BINDINGS,
+  LIST_ROLE_BINDINGS_PAGE,
+  LIST_ROLES,
+} from "@/graphql/identity/identity.queries";
 import type {
   AstroliftBulkRevokeRoleBindingsPayload,
   AstroliftRole,
@@ -36,8 +37,8 @@ import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import { GrantRoleDialog } from "@/app/(app)/members/grant-role-dialog";
 
-interface BindingsResp {
-  astroliftRoleBindings: AstroliftRoleBinding[];
+interface BindingsPageResp {
+  astroliftRoleBindingsPage: CursorPage<AstroliftRoleBinding>;
 }
 interface RolesResp {
   astroliftRoles: AstroliftRole[];
@@ -50,6 +51,14 @@ const SCOPE_TONE: Record<string, string> = {
   APP: "bg-warning/15 text-warning-fg",
 };
 
+/**
+ * Both revoke paths refresh two documents: this table's paginated one by
+ * operation name, so it re-runs with the cursor and search currently in
+ * effect, and the deprecated flat list that /members, the member detail
+ * page and the diagnostics tab still read from the cache.
+ */
+const REVOKE_REFETCH = ["ListRoleBindingsPage", { query: LIST_ROLE_BINDINGS }];
+
 function subjectLabel(b: AstroliftRoleBinding): string {
   return b.user?.username ?? `group:${b.groupExternalId}`;
 }
@@ -59,45 +68,36 @@ export function AssignmentsTab() {
   const perms = useMyPermissions();
   const canManage = perms.can("org.manage_members");
 
-  const bindings = useQuery<BindingsResp>(LIST_ROLE_BINDINGS, {
+  // `astroliftRoleBindingsPage` searches username, email, first / last
+  // name, group external id and role slug / name. It takes no sort
+  // argument, so no column declares a `sortKey`.
+  const table = useCursorTable<AstroliftRoleBinding>({
+    query: LIST_ROLE_BINDINGS_PAGE,
+    extract: (d) => (d as BindingsPageResp | undefined)?.astroliftRoleBindingsPage,
+    searchVariable: "search",
+    urlKey: "rb",
     fetchPolicy: "cache-and-network",
   });
+  const selection = useRowSelection();
+
   const roles = useQuery<RolesResp>(LIST_ROLES);
 
   const [grantOpen, setGrantOpen] = React.useState(false);
   const [revokeTarget, setRevokeTarget] = React.useState<AstroliftRoleBinding | null>(null);
-  const [selected, setSelected] = React.useState<Set<string>>(() => new Set());
   const [confirmBulk, setConfirmBulk] = React.useState(false);
 
   const [revokeBinding, { loading: revoking }] = useMutation<{
     revokeRoleBinding: MutationResult<{ id: string; deleted: boolean }>;
   }>(REVOKE_ROLE_BINDING, {
-    refetchQueries: [{ query: LIST_ROLE_BINDINGS }],
+    refetchQueries: REVOKE_REFETCH,
     awaitRefetchQueries: true,
   });
   const [bulkRevoke, { loading: bulkRevoking }] = useMutation<{
     bulkRevokeAstroliftRoleBindings: MutationResult<AstroliftBulkRevokeRoleBindingsPayload>;
   }>(BULK_REVOKE_ROLE_BINDINGS, {
-    refetchQueries: [{ query: LIST_ROLE_BINDINGS }],
+    refetchQueries: REVOKE_REFETCH,
     awaitRefetchQueries: true,
   });
-
-  const bindingList = bindings.data?.astroliftRoleBindings ?? [];
-
-  function toggle(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-  function toggleAll(ids: string[]) {
-    setSelected((prev) => {
-      const allOn = ids.length > 0 && ids.every((id) => prev.has(id));
-      return allOn ? new Set() : new Set(ids);
-    });
-  }
 
   async function handleRevoke(b: AstroliftRoleBinding) {
     const { data } = await revokeBinding({ variables: { input: { id: b.id } } });
@@ -109,7 +109,7 @@ export function AssignmentsTab() {
   }
 
   async function handleBulkRevoke() {
-    const ids = Array.from(selected);
+    const ids = selection.selectedIds;
     if (ids.length === 0) return;
     try {
       const { data } = await bulkRevoke({ variables: { input: { bindingIds: ids } } });
@@ -124,11 +124,78 @@ export function AssignmentsTab() {
       } else {
         toast.warning(`Revoked ${revokedCount}, ${failedCount} failed`);
       }
-      setSelected(new Set());
+      selection.clear();
     } finally {
       setConfirmBulk(false);
     }
   }
+
+  const columns: Column<AstroliftRoleBinding>[] = [
+    {
+      id: "user",
+      header: "User",
+      cell: (b) =>
+        b.user ? (
+          <>
+            <div className="font-medium">{b.user.username}</div>
+            <div className="text-muted-foreground text-xs">{b.user.email}</div>
+          </>
+        ) : (
+          <div className="font-mono text-xs">group:{b.groupExternalId}</div>
+        ),
+    },
+    {
+      id: "role",
+      header: "Role",
+      cell: (b) => (
+        <>
+          <div className="font-medium">{b.role.name}</div>
+          <div className="text-muted-foreground font-mono text-xs">{b.role.slug}</div>
+        </>
+      ),
+    },
+    {
+      id: "scope",
+      header: "Scope",
+      cell: (b) => (
+        <div className="flex flex-col items-start gap-1">
+          <Badge className={SCOPE_TONE[b.scopeKind]} variant="secondary">
+            {b.scopeKind}
+          </Badge>
+          {b.sourceScopeLabel && (
+            <span className="text-muted-foreground text-xs">{b.sourceScopeLabel}</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: "granted",
+      header: "Granted",
+      cellClassName: "text-muted-foreground text-sm",
+      cell: (b) => fmt.formatDate(b.grantedAt),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      align: "right",
+      width: "w-24",
+      cell: (b) => (
+        <Can permission="org.manage_members">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setRevokeTarget(b)}
+            disabled={revoking || bulkRevoking}
+          >
+            <Trash2Icon className="size-4" />
+            <span className="sr-only">
+              Revoke {b.role.slug} from {subjectLabel(b)}
+            </span>
+          </Button>
+        </Can>
+      ),
+    },
+  ];
 
   return (
     <>
@@ -136,152 +203,54 @@ export function AssignmentsTab() {
         title="Role bindings"
         description="Every role granted to a user (or IdP group) and the scope it applies to. Grant, revoke, or bulk-revoke access here."
         action={
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground text-xs">
-              {bindingList.length} binding{bindingList.length === 1 ? "" : "s"}
-            </span>
-            <Can permission="org.manage_members">
-              <Button size="sm" onClick={() => setGrantOpen(true)} disabled={roles.loading}>
-                <UserPlusIcon className="size-4" />
-                Grant role
-              </Button>
-            </Can>
-          </div>
+          <Can permission="org.manage_members">
+            <Button size="sm" onClick={() => setGrantOpen(true)} disabled={roles.loading}>
+              <UserPlusIcon className="size-4" />
+              Grant role
+            </Button>
+          </Can>
         }
       >
-        {bindings.loading && bindingList.length === 0 ? (
-          <div className="space-y-2">
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-          </div>
-        ) : bindingList.length === 0 ? (
-          <EmptyState
-            icon={<ShieldIcon className="size-5" />}
-            title="No role bindings"
-            description="Grant a role to a user to give them access to the platform."
-          />
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {canManage && (
-                  <TableHead className="w-10">
-                    <input
-                      type="checkbox"
-                      aria-label="Select all bindings"
-                      checked={
-                        bindingList.length > 0 && bindingList.every((b) => selected.has(b.id))
-                      }
-                      onChange={() => toggleAll(bindingList.map((b) => b.id))}
-                      className="size-4"
-                      disabled={bulkRevoking}
-                    />
-                  </TableHead>
-                )}
-                <TableHead>User</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Scope</TableHead>
-                <TableHead>Granted</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {bindingList.map((b) => (
-                <TableRow key={b.id}>
-                  {canManage && (
-                    <TableCell>
-                      <input
-                        type="checkbox"
-                        aria-label={`Select ${b.role.slug} for ${subjectLabel(b)}`}
-                        checked={selected.has(b.id)}
-                        onChange={() => toggle(b.id)}
-                        className="size-4"
-                        disabled={bulkRevoking}
-                      />
-                    </TableCell>
-                  )}
-                  <TableCell>
-                    {b.user ? (
-                      <>
-                        <div className="font-medium">{b.user.username}</div>
-                        <div className="text-muted-foreground text-xs">{b.user.email}</div>
-                      </>
-                    ) : (
-                      <div className="font-mono text-xs">group:{b.groupExternalId}</div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-medium">{b.role.name}</div>
-                    <div className="text-muted-foreground font-mono text-xs">{b.role.slug}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col items-start gap-1">
-                      <Badge className={SCOPE_TONE[b.scopeKind]} variant="secondary">
-                        {b.scopeKind}
-                      </Badge>
-                      {b.sourceScopeLabel && (
-                        <span className="text-muted-foreground text-xs">{b.sourceScopeLabel}</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {fmt.formatDate(b.grantedAt)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Can permission="org.manage_members">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setRevokeTarget(b)}
-                        disabled={revoking || bulkRevoking}
-                      >
-                        <Trash2Icon className="size-4" />
-                        <span className="sr-only">Revoke</span>
-                      </Button>
-                    </Can>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+        <DataTable
+          label="Role bindings"
+          controller={table}
+          columns={columns}
+          getRowId={(b) => b.id}
+          selection={canManage ? selection : undefined}
+          bulkActions={
+            canManage
+              ? (sel) => (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setConfirmBulk(true)}
+                    disabled={bulkRevoking}
+                  >
+                    <Trash2Icon className="size-4" />
+                    Revoke {sel.selectedCount}
+                  </Button>
+                )
+              : undefined
+          }
+          searchPlaceholder="Search by user, group, or role…"
+          empty={{
+            icon: <ShieldIcon className="size-5" />,
+            title: "No role bindings",
+            description: "Grant a role to a user to give them access to the platform.",
+          }}
+          emptyFiltered={{
+            title: "No matching bindings",
+            description: "No binding matches this search. Try another user, group, or role.",
+          }}
+        />
       </Section>
-
-      {canManage && selected.size > 0 && (
-        <div className="bg-background pointer-events-auto fixed inset-x-0 bottom-0 z-30 border-t shadow-lg">
-          <div className="mx-auto flex max-w-5xl flex-col items-stretch gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm font-medium">
-              {selected.size} binding{selected.size === 1 ? "" : "s"} selected
-            </p>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Button
-                variant="ghost"
-                onClick={() => setSelected(new Set())}
-                disabled={bulkRevoking}
-                className="min-h-11 w-full sm:w-auto"
-              >
-                Clear
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => setConfirmBulk(true)}
-                disabled={bulkRevoking}
-                className="min-h-11 w-full sm:w-auto"
-              >
-                <Trash2Icon className="size-4" />
-                Revoke {selected.size}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <ConfirmDialog
         open={confirmBulk}
         onOpenChange={setConfirmBulk}
-        title={`Revoke ${selected.size} role binding${selected.size === 1 ? "" : "s"}?`}
+        title={`Revoke ${selection.selectedCount} role binding${selection.selectedCount === 1 ? "" : "s"}?`}
         description="The selected users lose the permissions these roles granted. Any other bindings they hold stay in effect."
-        confirmLabel={`Revoke ${selected.size}`}
+        confirmLabel={`Revoke ${selection.selectedCount}`}
         destructive
         onConfirm={handleBulkRevoke}
       />
@@ -306,7 +275,14 @@ export function AssignmentsTab() {
 
       <GrantRoleDialog
         open={grantOpen}
-        onOpenChange={setGrantOpen}
+        onOpenChange={(next) => {
+          setGrantOpen(next);
+          // GrantRoleDialog refetches the deprecated flat list and exposes
+          // no onGranted hook, so pull this table's page again when it
+          // closes; otherwise a new binding would not appear until the
+          // next fetch.
+          if (!next) table.refetch();
+        }}
         roles={roles.data?.astroliftRoles ?? []}
       />
     </>

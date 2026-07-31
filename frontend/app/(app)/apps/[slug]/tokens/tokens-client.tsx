@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useMutation } from "@apollo/client/react";
 import { CopyIcon, KeyRoundIcon, PlusIcon, RefreshCwIcon, ShieldOffIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
@@ -8,9 +8,8 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { EmptyState } from "@/components/EmptyState";
-import { ListControls, SortableHeader } from "@/components/ListControls";
 import { PageShell } from "@/components/PageShell";
+import { DataTable, useCursorTable, type Column } from "@/components/data-table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,7 +21,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -33,25 +31,14 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   CREATE_DEPLOY_TOKEN,
   REVOKE_DEPLOY_TOKEN,
   ROTATE_DEPLOY_TOKEN,
 } from "@/graphql/lifecycle/lifecycle.mutations";
-import { LIST_APP_DEPLOY_TOKENS } from "@/graphql/lifecycle/lifecycle.queries";
+import { LIST_APP_DEPLOY_TOKENS_PAGE } from "@/graphql/lifecycle/lifecycle.queries";
 import type { MutationResult } from "@/graphql/identity/identity.types";
-import { useListControls } from "@/hooks/use-list-controls";
-import type { SortState } from "@/hooks/use-list-controls";
 
 import { AppTabs } from "../components/app-tabs";
 
@@ -89,7 +76,11 @@ interface DeployTokenSecretReveal {
 const ROTATION_GRACE_DEFAULT_SECONDS = 86400;
 
 interface Resp {
-  astroliftAppDeployTokens: DeployToken[];
+  astroliftAppDeployTokensPage: {
+    items: DeployToken[];
+    nextCursor?: string | null;
+    totalCount?: number | null;
+  };
 }
 
 export function AppDeployTokensClient({ slug }: { slug: string }) {
@@ -99,13 +90,18 @@ export function AppDeployTokensClient({ slug }: { slug: string }) {
   const [rotateTarget, setRotateTarget] = React.useState<DeployToken | null>(null);
   const [revokeTarget, setRevokeTarget] = React.useState<DeployToken | null>(null);
 
-  const variables = { appSlug: slug };
-  const tokens = useQuery<Resp>(LIST_APP_DEPLOY_TOKENS, {
-    variables,
-    fetchPolicy: "cache-and-network",
+  const table = useCursorTable<DeployToken>({
+    query: LIST_APP_DEPLOY_TOKENS_PAGE,
+    variables: { appSlug: slug },
+    extract: (d) => (d as Resp | undefined)?.astroliftAppDeployTokensPage,
+    searchVariable: "search",
+    urlKey: "tok",
   });
 
-  const refetch = [{ query: LIST_APP_DEPLOY_TOKENS, variables }];
+  // Refetched by operation name, not by document: the walk's cursor, page
+  // size and search term live in the controller, so only the active query
+  // knows the variables of the page the operator is looking at.
+  const refetch = ["ListAppDeployTokensPage"];
 
   const [createToken, createState] = useMutation<{
     createDeployToken: MutationResult<DeployTokenSecretReveal>;
@@ -118,29 +114,92 @@ export function AppDeployTokensClient({ slug }: { slug: string }) {
   }>(REVOKE_DEPLOY_TOKEN, { refetchQueries: refetch, awaitRefetchQueries: true });
 
   const busy = createState.loading || rotateState.loading || revokeState.loading;
-  const list = tokens.data?.astroliftAppDeployTokens ?? [];
 
-  const ctrl = useListControls({
-    data: list,
-    searchFn: (token) =>
-      [token.name, token.last4, token.scopes.join(" ")].join(" "),
-    initialPageSize: 25,
-    sortFn: (a, b, sort: SortState) => {
-      const dir = sort.dir === "asc" ? 1 : -1;
-      if (sort.key === "name") {
-        return a.name.localeCompare(b.name) * dir;
-      }
-      if (sort.key === "createdAt") {
-        return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * dir;
-      }
-      if (sort.key === "lastUsedAt") {
-        const aTime = a.lastUsedAt ? new Date(a.lastUsedAt).getTime() : 0;
-        const bTime = b.lastUsedAt ? new Date(b.lastUsedAt).getTime() : 0;
-        return (aTime - bTime) * dir;
-      }
-      return 0;
+  const columns: Column<DeployToken>[] = [
+    {
+      id: "name",
+      header: tr("columns.name"),
+      cellClassName: "font-medium",
+      cell: (token) => token.name,
     },
-  });
+    {
+      id: "last4",
+      header: tr("columns.last4"),
+      width: "w-24",
+      cellClassName: "text-muted-foreground font-mono text-xs",
+      cell: (token) => `…${token.last4}`,
+    },
+    {
+      id: "scopes",
+      header: tr("columns.scopes"),
+      cell: (token) => (
+        <div className="flex flex-wrap gap-1">
+          {token.scopes.map((s) => (
+            <Badge key={s} variant="outline" className="font-mono text-2xs">
+              {s}
+            </Badge>
+          ))}
+          {token.scopes.length === 0 && (
+            <span className="text-muted-foreground text-xs">{tr("allScopes")}</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: "lastUsed",
+      header: tr("columns.lastUsed"),
+      cellClassName: "text-muted-foreground text-xs",
+      cell: (token) => <LastUsedCell token={token} />,
+    },
+    {
+      id: "expires",
+      header: tr("columns.expires"),
+      width: "w-28",
+      cellClassName: "text-muted-foreground text-xs",
+      cell: (token) =>
+        token.expiresAt ? new Date(token.expiresAt).toLocaleDateString() : tr("never"),
+    },
+    {
+      id: "state",
+      header: tr("columns.state"),
+      width: "w-24",
+      cell: (token) =>
+        token.isRevoked ? (
+          <Badge variant="destructive">{tr("status.revoked")}</Badge>
+        ) : (
+          <Badge variant="secondary">{tr("status.active")}</Badge>
+        ),
+    },
+    {
+      id: "actions",
+      header: tr("columns.actions"),
+      align: "right",
+      width: "w-48",
+      cell: (token) =>
+        token.isRevoked ? null : (
+          <Can permission="app.deploy">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setRotateTarget(token)}
+              disabled={busy}
+            >
+              <RefreshCwIcon className="size-3.5" />
+              {tr("rotate")}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setRevokeTarget(token)}
+              disabled={busy}
+            >
+              <ShieldOffIcon className="size-3.5" />
+              {tr("revoke")}
+            </Button>
+          </Can>
+        ),
+    },
+  ];
 
   async function handleRotate(t: DeployToken) {
     const { data } = await rotateToken({ variables: { input: { id: t.id } } });
@@ -179,109 +238,24 @@ export function AppDeployTokensClient({ slug }: { slug: string }) {
       }
     >
       <AppTabs slug={slug} active="secrets" />
-      <ListControls controls={ctrl} searchPlaceholder={tr("searchPlaceholder")} />
       <TooltipProvider>
-        <Card>
-          <CardContent className="p-0">
-            {tokens.loading && list.length === 0 ? (
-              <div className="space-y-2 p-6">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-              </div>
-            ) : list.length === 0 ? (
-              <div className="p-6">
-                <EmptyState
-                  icon={<KeyRoundIcon className="size-5" />}
-                  title={tr("emptyTitle")}
-                  description={tr("emptyDescription")}
-                />
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>
-                      <SortableHeader sortKey="name" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                        {tr("columns.name")}
-                      </SortableHeader>
-                    </TableHead>
-                    <TableHead>{tr("columns.last4")}</TableHead>
-                    <TableHead>{tr("columns.scopes")}</TableHead>
-                    <TableHead>
-                      <SortableHeader sortKey="lastUsedAt" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                        {tr("columns.lastUsed")}
-                      </SortableHeader>
-                    </TableHead>
-                    <TableHead>{tr("columns.expires")}</TableHead>
-                    <TableHead>{tr("columns.state")}</TableHead>
-                    <TableHead className="text-right">{tr("columns.actions")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {ctrl.rows.map((token) => (
-                    <TableRow key={token.id}>
-                      <TableCell className="font-medium">{token.name}</TableCell>
-                      <TableCell className="text-muted-foreground font-mono text-xs">
-                        …{token.last4}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {token.scopes.map((s) => (
-                            <Badge key={s} variant="outline" className="font-mono text-2xs">
-                              {s}
-                            </Badge>
-                          ))}
-                          {token.scopes.length === 0 && (
-                            <span className="text-muted-foreground text-xs">{tr("allScopes")}</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        <LastUsedCell token={token} />
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        {token.expiresAt
-                          ? new Date(token.expiresAt).toLocaleDateString()
-                          : tr("never")}
-                      </TableCell>
-                      <TableCell>
-                        {token.isRevoked ? (
-                          <Badge variant="destructive">{tr("status.revoked")}</Badge>
-                        ) : (
-                          <Badge variant="secondary">{tr("status.active")}</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {!token.isRevoked && (
-                          <Can permission="app.deploy">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setRotateTarget(token)}
-                              disabled={busy}
-                            >
-                              <RefreshCwIcon className="size-3.5" />
-                              {tr("rotate")}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setRevokeTarget(token)}
-                              disabled={busy}
-                            >
-                              <ShieldOffIcon className="size-3.5" />
-                              {tr("revoke")}
-                            </Button>
-                          </Can>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        <DataTable
+          label={tr("title")}
+          controller={table}
+          columns={columns}
+          getRowId={(token) => token.id}
+          searchPlaceholder={tr("searchPlaceholder")}
+          empty={{
+            icon: <KeyRoundIcon className="size-5" />,
+            title: tr("emptyTitle"),
+            description: tr("emptyDescription"),
+          }}
+          emptyFiltered={{
+            title: "No matching deploy tokens",
+            description:
+              "No token matches that name, last 4, IP, or user agent. Clear the search to see every token for this app.",
+          }}
+        />
       </TooltipProvider>
 
       <CreateTokenSheet

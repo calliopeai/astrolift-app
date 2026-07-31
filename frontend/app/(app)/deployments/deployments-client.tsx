@@ -1,5 +1,6 @@
 "use client";
 
+import { gql } from "@apollo/client";
 import { useMutation, useQuery, useSubscription } from "@apollo/client/react";
 import {
   BarChart3Icon,
@@ -16,6 +17,7 @@ import {
   StopCircleIcon,
   UndoIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import * as React from "react";
@@ -23,34 +25,21 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { ListControls, SortableHeader } from "@/components/ListControls";
-import { useListControls } from "@/hooks/use-list-controls";
 import { ConfirmDialogWithReason } from "@/components/ConfirmDialogWithReason";
+import { DataTable, useCursorTable, useRowSelection } from "@/components/data-table";
+import type { Column } from "@/components/data-table";
 import { DeploymentStatusPill } from "@/components/DeploymentStatusPill";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
-import { ViewToggle } from "@/components/ViewToggle";
-import { useViewToggle } from "@/hooks/use-view-toggle";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   ABORT_DEPLOYMENT,
@@ -58,7 +47,7 @@ import {
   REDEPLOY_APP,
   ROLLBACK_DEPLOYMENT,
 } from "@/graphql/lifecycle/lifecycle.mutations";
-import { LIST_DEPLOYMENTS } from "@/graphql/lifecycle/lifecycle.queries";
+import { LIST_DEPLOYMENTS_PAGE } from "@/graphql/lifecycle/lifecycle.queries";
 import { DEPLOYMENT_LIFECYCLE_STREAM } from "@/graphql/lifecycle/lifecycle.subscriptions";
 import type { AstroliftDeployment, DeploymentStatus } from "@/graphql/lifecycle/lifecycle.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
@@ -71,8 +60,12 @@ interface MutationResultLite<T> {
   data: T | null;
 }
 
-interface Resp {
-  astroliftDeployments: AstroliftDeployment[];
+interface DeploymentsPageResp {
+  astroliftDeploymentsPage: {
+    items: AstroliftDeployment[];
+    nextCursor: string | null;
+    totalCount: number | null;
+  };
 }
 
 const statusToDot: Record<DeploymentStatus, "ok" | "warn" | "error" | "muted" | "pending"> = {
@@ -94,9 +87,9 @@ function formatDuration(seconds: number | null | undefined): string {
   return `${m}m ${s}s`;
 }
 
-// Status taxonomy used by the pill row + bulk-action gating. "Active"
-// is a virtual alias for the in-flight set so triage-focused operators
-// can clear the "what's currently moving" bucket in one click.
+// Status taxonomy used by the bulk-action gating: cancel applies only to
+// a uniformly in-flight selection, redeploy only to a uniformly terminal
+// one. (The tab split is a server-side filter now — see TAB_FILTERS.)
 const IN_FLIGHT: ReadonlySet<DeploymentStatus> = new Set([
   "pending_approval",
   "pending",
@@ -111,7 +104,14 @@ const TERMINAL: ReadonlySet<DeploymentStatus> = new Set(["failed", "rolled_back"
 // they live as tabs here rather than as top-level nav entries. The tab
 // replaces the older status-filter pills — the pills were themselves a
 // status axis, so stacking both would be redundant.
-type DeploymentTab = "active" | "previews" | "pending" | "history" | SignalTab;
+type FleetTab = "active" | "previews" | "pending" | "history";
+
+// Observe signal surfaces folded into the fleet tabs (#892). They are
+// gateway placeholders into the fleet-wide explorers — they render an
+// EmptyState instead of deployment rows, so they carry no badge count.
+type SignalTab = "metrics" | "logs" | "traces";
+
+type DeploymentTab = FleetTab | SignalTab;
 
 const DEPLOYMENT_TABS: readonly DeploymentTab[] = [
   "active",
@@ -123,10 +123,86 @@ const DEPLOYMENT_TABS: readonly DeploymentTab[] = [
   "traces",
 ];
 
-// Observe signal surfaces folded into the fleet tabs (#892). They are
-// gateway placeholders into the fleet-wide explorers — they render an
-// EmptyState instead of deployment rows, so they carry no badge count.
-type SignalTab = "metrics" | "logs" | "traces";
+/**
+ * What each fleet tab asks the server for (#1235).
+ *
+ * This replaces the old client-side `tabMatches` predicate, which ran
+ * over a `limit: 100` fetch: the 101st deployment did not exist as far
+ * as this page was concerned, and every badge count was wrong past 100.
+ * `astroliftDeploymentsPage` takes the status *group* and the preview
+ * split directly, so the tabs are now four different queries rather
+ * than four filters over one capped page.
+ *
+ * Membership is unchanged from `tabMatches`:
+ *   active   in-flight (minus the approval queue) + the live row, no previews
+ *   previews anything raised from a pull request, any status
+ *   pending  the approval queue
+ *   history  the terminal states
+ */
+type TabFilter = { statuses?: readonly DeploymentStatus[]; isPreview?: boolean };
+
+const TAB_FILTERS: Record<FleetTab, TabFilter> = {
+  active: {
+    statuses: ["pending", "deploying", "redeploying", "running"],
+    isPreview: false,
+  },
+  previews: { isPreview: true },
+  pending: { statuses: ["pending_approval"] },
+  history: { statuses: ["failed", "rolled_back", "superseded"] },
+};
+
+/**
+ * Tab badge counts, one `totalCount` per fleet tab (#1235).
+ *
+ * Aliased into a single round trip and asked for `limit: 1`, because
+ * the badge wants the size of the result set and none of its rows. The
+ * counts deliberately ignore the search box — a badge is the size of
+ * the tab, not of the current filter, which is what the old
+ * `allDeployments.reduce(...)` intended before the 100-row cap made it
+ * a lie.
+ */
+const DEPLOYMENT_TAB_COUNTS = gql`
+  query DeploymentTabCounts(
+    $activeStatuses: [String!]
+    $activeIsPreview: Boolean
+    $previewsIsPreview: Boolean
+    $pendingStatuses: [String!]
+    $historyStatuses: [String!]
+  ) {
+    active: astroliftDeploymentsPage(
+      statuses: $activeStatuses
+      isPreview: $activeIsPreview
+      limit: 1
+    ) {
+      totalCount
+    }
+    previews: astroliftDeploymentsPage(isPreview: $previewsIsPreview, limit: 1) {
+      totalCount
+    }
+    pending: astroliftDeploymentsPage(statuses: $pendingStatuses, limit: 1) {
+      totalCount
+    }
+    history: astroliftDeploymentsPage(statuses: $historyStatuses, limit: 1) {
+      totalCount
+    }
+  }
+`;
+
+type TabCountsResp = Record<FleetTab, { totalCount: number | null } | null>;
+
+const TAB_COUNT_VARIABLES = {
+  activeStatuses: TAB_FILTERS.active.statuses,
+  activeIsPreview: TAB_FILTERS.active.isPreview,
+  previewsIsPreview: TAB_FILTERS.previews.isPreview,
+  pendingStatuses: TAB_FILTERS.pending.statuses,
+  historyStatuses: TAB_FILTERS.history.statuses,
+};
+
+// Mutations refetch by operation name rather than by document +
+// variables: the list's variables now carry the tab filter, the page
+// cursor and the search term, so no literal variables object names the
+// query the operator is actually looking at.
+const REFETCH_LIST = ["ListDeploymentsPage", "DeploymentTabCounts"];
 
 const SIGNAL_COPY: Record<
   SignalTab,
@@ -159,46 +235,14 @@ function signalTab(tab: DeploymentTab): SignalTab | null {
   return tab === "metrics" || tab === "logs" || tab === "traces" ? tab : null;
 }
 
-interface TabCount {
-  tab: DeploymentTab;
-  count: number;
-  labelKey: string;
-}
-
-// A preview deployment is bound to a pull request. ``prNumber`` is a
-// non-null Int that defaults to 0 when there's no PR, so the test is
-// ``> 0`` — never ``!= null`` (which would match every row).
-function isPreview(d: AstroliftDeployment): boolean {
-  return d.prNumber > 0;
-}
-
-function tabMatches(tab: DeploymentTab, d: AstroliftDeployment): boolean {
-  switch (tab) {
-    case "active":
-      // Everything currently moving (in-flight) or live (``running``),
-      // excluding the approval queue (its own tab) and previews (their
-      // own tab). ``running`` means successfully-live, not deploying;
-      // the lifecycle supersedes the prior live deploy when a newer one
-      // reaches ``running``, so this set holds at most one live row per
-      // app+environment plus whatever is mid-rollout.
-      return (
-        !isPreview(d) &&
-        d.status !== "pending_approval" &&
-        (IN_FLIGHT.has(d.status) || d.status === "running")
-      );
-    case "previews":
-      return isPreview(d);
-    case "pending":
-      return d.status === "pending_approval";
-    case "history":
-      return TERMINAL.has(d.status);
-    case "metrics":
-    case "logs":
-    case "traces":
-      // Signal tabs render a gateway placeholder, not deployment rows.
-      return false;
-  }
-}
+// DataTable stretches the row's link across the whole row (an ::after on
+// the first cell), and that overlay paints above the un-positioned cells
+// beside it. The selection checkbox and the action buttons have to be
+// lifted back on top of it or the only thing a click in those cells can
+// do is navigate.
+const INTERACTIVE_CELLS =
+  "[&>td:has([role=checkbox])]:relative [&>td:has([role=checkbox])]:z-10 " +
+  "[&>td:last-child]:relative [&>td:last-child]:z-10";
 
 type ActionKind = "approve" | "abort" | "rollback" | "redeploy";
 
@@ -218,89 +262,78 @@ export function DeploymentsClient() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [openCreate, setOpenCreate] = React.useState(false);
-  const [viewMode, setViewMode] = useViewToggle("astrolift_view_deployments", "list");
 
-  // Filters synced to URL so refresh / back-button preserves the view.
+  // Tab synced to URL so refresh / back-button preserves the view. The
+  // search term and page size are the controller's business (?dep-q=,
+  // ?dep-size=); the cursor deliberately stays out of the URL.
   const rawTab = searchParams.get("tab") as DeploymentTab | null;
-  const tab: DeploymentTab =
-    rawTab && DEPLOYMENT_TABS.includes(rawTab) ? rawTab : "active";
+  const tab: DeploymentTab = rawTab && DEPLOYMENT_TABS.includes(rawTab) ? rawTab : "active";
   const signal = signalTab(tab);
-  const [appFilter, setAppFilter] = React.useState<string>(
-    () => searchParams.get("app") ?? ""
-  );
 
-  function updateFilter(key: string, value: string, defaultValue = "") {
+  // ``active`` is the default tab, so omit it from the URL to keep the
+  // canonical /deployments link clean.
+  function setTab(value: DeploymentTab) {
     const params = new URLSearchParams(searchParams.toString());
-    if (value && value !== defaultValue) {
-      params.set(key, value);
+    if (value !== "active") {
+      params.set("tab", value);
     } else {
-      params.delete(key);
+      params.delete("tab");
     }
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }
 
-  // ``active`` is the default tab, so omit it from the URL to keep the
-  // canonical /deployments link clean.
-  const setTab = (v: DeploymentTab) => updateFilter("tab", v, "active");
-
-  React.useEffect(() => {
-    const id = setTimeout(() => updateFilter("app", appFilter), 300);
-    return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appFilter]);
-  const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const { can } = useMyPermissions();
-  const {
-    data,
-    loading,
-    refetch: refetchList,
-  } = useQuery<Resp>(LIST_DEPLOYMENTS, {
-    variables: { limit: 100 },
+  const selection = useRowSelection();
+  const { clear: clearSelection } = selection;
+
+  const variables = React.useMemo<TabFilter>(
+    () => (signal ? {} : TAB_FILTERS[tab as FleetTab]),
+    [tab, signal]
+  );
+
+  const table = useCursorTable<AstroliftDeployment>({
+    query: LIST_DEPLOYMENTS_PAGE,
+    variables,
+    extract: (d) => (d as DeploymentsPageResp | undefined)?.astroliftDeploymentsPage,
+    searchVariable: "search",
+    urlKey: "dep",
     // Live push covers freshness; keep a slow safety-net poll in case
     // the WS drops and we miss reconnect.
     pollInterval: 30000,
+    // Signal tabs render a gateway placeholder, not deployment rows.
+    skip: Boolean(signal),
   });
-  const allDeployments = React.useMemo(
-    () => data?.astroliftDeployments ?? [],
-    [data?.astroliftDeployments]
+
+  const { data: countsData, refetch: refetchCounts } = useQuery<TabCountsResp>(
+    DEPLOYMENT_TAB_COUNTS,
+    {
+      variables: TAB_COUNT_VARIABLES,
+      fetchPolicy: "cache-and-network",
+      pollInterval: 30000,
+    }
   );
 
-  const list = React.useMemo(() => {
-    return allDeployments.filter((d) => {
-      if (!tabMatches(tab, d)) return false;
-      if (appFilter && !d.registeredAppSlug.toLowerCase().includes(appFilter.toLowerCase())) {
-        return false;
-      }
-      return true;
-    });
-  }, [allDeployments, tab, appFilter]);
-
-  // Pagination + sort layered on top of the tab/app-filter result.
-  const ctrl = useListControls({
-    data: list,
-    // Search already handled by appFilter above; we add sort + pagination only.
-    initialPageSize: 25,
-    sortFn: (a, b, s) => {
-      const dir = s.dir === "asc" ? 1 : -1;
-      if (s.key === "app") return a.registeredAppSlug.localeCompare(b.registeredAppSlug) * dir;
-      if (s.key === "status") return a.status.localeCompare(b.status) * dir;
-      if (s.key === "started")
-        return ((a.startedAt ?? "").localeCompare(b.startedAt ?? "")) * dir;
-      return 0;
-    },
-  });
+  const { refetch: refetchList } = table;
 
   // Live push: any status transition for any deployment in the org
-  // triggers a list refetch. The backend dedupes per-row, and refetch
-  // is cheap because the page is bounded to 100 rows.
+  // refetches the visible page and the badge counts. The backend
+  // dedupes per-row, and both queries are one page wide.
   useSubscription(DEPLOYMENT_LIFECYCLE_STREAM, {
     onData: () => {
-      refetchList().catch(() => {
+      refetchList();
+      refetchCounts().catch(() => {
         // swallowed: a failed refetch is recovered by the next push or
         // by the safety-net poll above.
       });
     },
   });
+
+  // A selection is scoped to the tab it was made in — the bulk actions
+  // are status-uniform by construction, so carrying ids across a tab
+  // switch could only produce a batch the operator cannot see.
+  React.useEffect(() => {
+    clearSelection();
+  }, [tab, clearSelection]);
 
   // Pre-compute action allowance once to avoid re-checks in render.
   const canDeploy = can("app.deploy");
@@ -308,40 +341,42 @@ export function DeploymentsClient() {
   const canRollback = can("app.rollback");
   const hasAnyAction = canDeploy || canApprove || canRollback;
 
-  // Drop selections for rows that disappeared from the queue between
-  // polls (got resolved by someone else) or got filtered out. Computed
-  // at render time over the *filtered* list — same pattern as the
-  // approvals queue.
+  // useRowSelection keeps ids across pages, so the bulk bar has to be
+  // able to resolve a row that is no longer on screen: both the
+  // in-flight/terminal gating and the environment summary read the
+  // deployment, not just its id. Every page walked past folds into this
+  // index, and a re-fetched row overwrites its older copy.
+  const [rowIndex, setRowIndex] = React.useState<ReadonlyMap<string, AstroliftDeployment>>(
+    () => new Map()
+  );
+  React.useEffect(() => {
+    if (table.rows.length === 0) return;
+    setRowIndex((prev) => {
+      const next = new Map(prev);
+      for (const d of table.rows) next.set(d.id, d);
+      return next;
+    });
+  }, [table.rows]);
+
+  const selectedIds = selection.selectedIds;
   const selectedDeploys = React.useMemo(
-    () => list.filter((d) => selected.has(d.id)),
-    [list, selected]
+    () =>
+      selectedIds.map((id) => rowIndex.get(id)).filter((d): d is AstroliftDeployment => Boolean(d)),
+    [selectedIds, rowIndex]
   );
 
-  // Tab badge counts pull from the unfiltered ``allDeployments`` so each
-  // tab shows its true total regardless of the active app filter. The
-  // Pending badge doubles as the live approval-queue size — kept fresh
-  // by the lifecycle subscription refetch below.
-  const counts = React.useMemo<TabCount[]>(() => {
-    return DEPLOYMENT_TABS.map((tabKey) => ({
-      tab: tabKey,
-      count: allDeployments.reduce((acc, d) => (tabMatches(tabKey, d) ? acc + 1 : acc), 0),
-      labelKey: `tabs.${tabKey}`,
-    }));
-  }, [allDeployments]);
-
-  const refetch = [{ query: LIST_DEPLOYMENTS, variables: { limit: 100 } }];
   const [approve, approveState] = useMutation<{
     approveDeployment: MutationResultLite<AstroliftDeployment>;
-  }>(APPROVE_DEPLOYMENT, { refetchQueries: refetch });
+  }>(APPROVE_DEPLOYMENT, { refetchQueries: REFETCH_LIST });
   const [abort, abortState] = useMutation<{
     abortDeployment: MutationResultLite<AstroliftDeployment>;
-  }>(ABORT_DEPLOYMENT, { refetchQueries: refetch });
+  }>(ABORT_DEPLOYMENT, { refetchQueries: REFETCH_LIST });
   const [rollback, rollbackState] = useMutation<{
     rollbackDeployment: MutationResultLite<AstroliftDeployment>;
-  }>(ROLLBACK_DEPLOYMENT, { refetchQueries: refetch });
+  }>(ROLLBACK_DEPLOYMENT, { refetchQueries: REFETCH_LIST });
   const [redeploy, redeployState] = useMutation<{
     redeployApp: MutationResultLite<AstroliftDeployment>;
-  }>(REDEPLOY_APP, { refetchQueries: refetch });
+  }>(REDEPLOY_APP, { refetchQueries: REFETCH_LIST });
 
   const busy =
     approveState.loading || abortState.loading || rollbackState.loading || redeployState.loading;
@@ -430,8 +465,9 @@ export function DeploymentsClient() {
       } else {
         toast.warning(t("bulk.toasts.partial", { label: t(labelKey), succeeded, failed }));
       }
-      setSelected(new Set());
-      refetchList().catch(() => {});
+      clearSelection();
+      refetchList();
+      refetchCounts().catch(() => {});
     } finally {
       setBulkRunning(false);
     }
@@ -485,30 +521,6 @@ export function DeploymentsClient() {
     },
   };
 
-  function toggleRow(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }
-
-  function toggleAllVisible() {
-    setSelected((prev) => {
-      // If everything in the filtered view is already selected, clear
-      // the selection. Otherwise select the full filtered set.
-      const allSelected = list.length > 0 && list.every((d) => prev.has(d.id));
-      if (allSelected) return new Set();
-      const next = new Set(prev);
-      for (const d of list) next.add(d.id);
-      return next;
-    });
-  }
-
   const allInFlight =
     selectedDeploys.length > 0 && selectedDeploys.every((d) => IN_FLIGHT.has(d.status));
   const allTerminal =
@@ -523,50 +535,124 @@ export function DeploymentsClient() {
     new Set(selectedDeploys.map((d) => `${d.registeredAppSlug}/${d.environmentName}`))
   ).join(", ");
 
-  function navigateToDeployment(id: string) {
-    router.push(`/deployments/${id}`);
-  }
-
-  function onRowKeyDown(event: React.KeyboardEvent<HTMLTableRowElement>, id: string) {
-    if (event.target !== event.currentTarget) return;
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      navigateToDeployment(id);
-    }
-  }
-
-  const allVisibleSelected = list.length > 0 && list.every((d) => selected.has(d.id));
-  const someVisibleSelected = !allVisibleSelected && list.some((d) => selected.has(d.id));
+  // No sort controls: `astroliftDeploymentsPage` has no sort argument
+  // (its seek key is `-created_at, -guid`), and sorting the page in hand
+  // while the rest of the result set sits on the server is wrong at
+  // every page boundary.
+  const columns: Column<AstroliftDeployment>[] = [
+    {
+      id: "app",
+      header: t("columns.appEnv"),
+      cell: (d) => (
+        <span className="flex items-start gap-2">
+          <StatusDot status={statusToDot[d.status]} className="mt-1.5 shrink-0" />
+          <span className="block">
+            <span className="block font-medium">{d.registeredAppSlug}</span>
+            <span className="text-muted-foreground block text-xs">
+              env <span className="font-mono">{d.environmentName}</span>
+              {d.workloadSlug && (
+                <>
+                  {" "}
+                  · workload <span className="font-mono">{d.workloadSlug}</span>
+                </>
+              )}
+            </span>
+          </span>
+        </span>
+      ),
+    },
+    {
+      id: "image",
+      header: t("columns.image"),
+      cellClassName: "font-mono text-xs",
+      cell: (d) => d.imageTag || "—",
+    },
+    {
+      id: "trigger",
+      header: t("columns.trigger"),
+      cell: (d) => <Badge variant="outline">{d.triggerKind}</Badge>,
+    },
+    {
+      id: "status",
+      header: t("columns.status"),
+      cell: (d) => (
+        <>
+          <DeploymentStatusPill status={d.status} label={t(`statusOptions.${d.status}`)} />
+          {d.approvalsRequired > 0 && (
+            <div className="text-muted-foreground mt-1 text-xs">
+              {t("approvalsCount", {
+                received: d.approvalsReceived,
+                required: d.approvalsRequired,
+              })}
+            </div>
+          )}
+        </>
+      ),
+    },
+    {
+      id: "duration",
+      header: t("columns.duration"),
+      cellClassName: "font-mono text-xs",
+      cell: (d) => (
+        <span className="inline-flex items-center gap-1">
+          <ClockIcon className="size-3" />
+          {formatDuration(d.durationSeconds)}
+        </span>
+      ),
+    },
+    {
+      id: "started",
+      header: t("columns.started"),
+      cellClassName: "text-muted-foreground text-sm",
+      cell: (d) =>
+        d.startedAt ? new Date(d.startedAt).toLocaleString() : new Date(d.createdAt).toLocaleString(),
+    },
+    {
+      id: "actions",
+      header: t("columns.actions"),
+      width: "w-44",
+      align: "right",
+      cell: (d) => (
+        <DeploymentRowActions
+          deployment={d}
+          canDeploy={canDeploy}
+          canApprove={canApprove}
+          canRollback={canRollback}
+          busy={busy || bulkRunning}
+          onAction={(kind) => setPendingAction({ kind, deployment: d })}
+        />
+      ),
+    },
+  ];
 
   return (
     <PageShell
       title={t("title")}
       description={t("description")}
       actions={
-        <div className="flex items-center gap-2">
-          <ViewToggle mode={viewMode} onChange={setViewMode} />
-          <Can permission="app.deploy">
-            <Button onClick={() => setOpenCreate(true)}>
-              <PlusIcon className="size-4" />
-              {t("start")}
-            </Button>
-          </Can>
-        </div>
+        <Can permission="app.deploy">
+          <Button onClick={() => setOpenCreate(true)}>
+            <PlusIcon className="size-4" />
+            {t("start")}
+          </Button>
+        </Can>
       }
     >
       {/* Sub-navigation: Active | Previews | Pending | History (#797),
           plus the Metrics | Logs | Traces signal gateways (#892).
-          Sits directly under the page header, above the filter row.
-          Each fleet tab carries a live count badge; Pending's badge is
-          the approval-queue size. Signal tabs carry no badge. */}
+          Sits directly under the page header, above the table. Each
+          fleet tab carries a live count badge sourced from the server's
+          own totalCount; Pending's badge is the approval-queue size.
+          Signal tabs carry no badge. */}
       <div
         role="tablist"
         aria-label={t("tabs.ariaLabel")}
         className="bg-muted/40 inline-flex flex-wrap rounded-md border p-1"
       >
-        {counts.map(({ tab: tabKey, count, labelKey }) => {
+        {DEPLOYMENT_TABS.map((tabKey) => {
           const active = tab === tabKey;
           const sig = signalTab(tabKey);
+          const count = sig ? null : (countsData?.[tabKey as FleetTab]?.totalCount ?? null);
           return (
             <button
               key={tabKey}
@@ -581,8 +667,8 @@ export function DeploymentsClient() {
                   : "text-muted-foreground hover:text-foreground")
               }
             >
-              <span>{sig ? SIGNAL_COPY[sig].label : t(labelKey)}</span>
-              {count > 0 && (
+              <span>{sig ? SIGNAL_COPY[sig].label : t(`tabs.${tabKey}`)}</span>
+              {count !== null && count > 0 && (
                 <span
                   className={
                     "inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs tabular-nums " +
@@ -618,143 +704,68 @@ export function DeploymentsClient() {
           actionLabel={`Open ${SIGNAL_COPY[signal].label} explorer`}
         />
       ) : (
-        <>
-          <div className="flex flex-wrap items-center gap-2">
-            <Input
-              placeholder={t("filterApp")}
-              value={appFilter}
-              onChange={(e) => setAppFilter(e.target.value)}
-              className="max-w-xs"
-            />
-            <ListControls controls={ctrl} hideSearch className="ml-auto" />
-          </div>
-
-          <Card>
-            <CardContent className="p-0">
-              {loading && list.length === 0 ? (
-                <div className="space-y-2 p-6">
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                </div>
-              ) : list.length === 0 ? (
-                <div className="p-6">
-                  <EmptyState
-                    icon={<BoxIcon className="size-5" />}
-                    title={t("emptyTitle")}
-                    description={t("emptyDescription")}
-                    actionHref="/apps"
-                    actionLabel={t("openApps")}
-                  />
-                </div>
-              ) : (
-                <TooltipProvider delayDuration={300}>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-10">
-                          {hasAnyAction && (
-                            <input
-                              type="checkbox"
-                              aria-label={t("bulk.selectAllLabel")}
-                              checked={allVisibleSelected}
-                              ref={(el) => {
-                                if (el) el.indeterminate = someVisibleSelected;
-                              }}
-                              onChange={toggleAllVisible}
-                              className="size-4"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          )}
-                        </TableHead>
-                        <TableHead className="w-6"></TableHead>
-                        <TableHead><SortableHeader sortKey="app" sort={ctrl.sort} onToggle={ctrl.toggleSort}>{t("columns.appEnv")}</SortableHeader></TableHead>
-                        <TableHead>{t("columns.image")}</TableHead>
-                        <TableHead>{t("columns.trigger")}</TableHead>
-                        <TableHead><SortableHeader sortKey="status" sort={ctrl.sort} onToggle={ctrl.toggleSort}>{t("columns.status")}</SortableHeader></TableHead>
-                        <TableHead>{t("columns.duration")}</TableHead>
-                        <TableHead><SortableHeader sortKey="started" sort={ctrl.sort} onToggle={ctrl.toggleSort}>{t("columns.started")}</SortableHeader></TableHead>
-                        <TableHead className="w-44 text-right">{t("columns.actions")}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {ctrl.rows.map((d) => (
-                        <DeploymentRow
-                          key={d.id}
-                          deployment={d}
-                          checked={selected.has(d.id)}
-                          hasAnyAction={hasAnyAction}
-                          canDeploy={canDeploy}
-                          canApprove={canApprove}
-                          canRollback={canRollback}
-                          busy={busy || bulkRunning}
-                          onToggle={() => toggleRow(d.id)}
-                          onNavigate={() => navigateToDeployment(d.id)}
-                          onKeyDown={(e) => onRowKeyDown(e, d.id)}
-                          onAction={(kind) => setPendingAction({ kind, deployment: d })}
-                        />
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TooltipProvider>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
-
-      {/* Scope 2 — sticky bulk action bar. Appears only when at least
-          one row is checked. Mixed-state selections get an inline
-          warning instead of a fired-but-half-skipped batch. */}
-      {selectedDeploys.length > 0 && (
-        <div className="bg-background pointer-events-auto fixed inset-x-0 bottom-0 z-30 border-t shadow-lg">
-          <div className="mx-auto flex max-w-6xl flex-col items-stretch gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-sm">
-              <p className="font-medium">{t("bulk.selected", { count: selectedDeploys.length })}</p>
-              {mixedSelection ? (
-                <p className="text-destructive mt-0.5 text-xs">{t("bulk.mixedWarning")}</p>
-              ) : (
-                <p className="text-muted-foreground mt-0.5 text-xs">
-                  {t("bulk.summary", { envs: summaryEnvs })}
-                </p>
-              )}
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Button
-                variant="ghost"
-                onClick={() => setSelected(new Set())}
-                disabled={bulkRunning}
-                className="min-h-11 w-full sm:w-auto"
-              >
-                {t("bulk.clear")}
-              </Button>
-              <Button
-                variant="destructive"
-                disabled={!allInFlight || bulkRunning || !canDeploy}
-                onClick={() => setPendingBulk({ kind: "abort", deployments: selectedDeploys })}
-                className="min-h-11 w-full sm:w-auto"
-              >
-                {bulkRunning ? (
-                  <Loader2Icon className="size-4 animate-spin" />
+        <TooltipProvider delayDuration={300}>
+          <DataTable
+            label="Deployments"
+            controller={table}
+            columns={columns}
+            getRowId={(d) => d.id}
+            rowHref={(d) => `/deployments/${d.id}`}
+            rowClassName={() => INTERACTIVE_CELLS}
+            searchPlaceholder={t("filterApp")}
+            // Selection drives the bulk bar, which has nothing to offer
+            // an operator who holds none of the deploy permissions.
+            selection={hasAnyAction ? selection : undefined}
+            bulkActions={() => (
+              <>
+                {mixedSelection ? (
+                  <span className="text-destructive text-xs">{t("bulk.mixedWarning")}</span>
                 ) : (
-                  <StopCircleIcon className="size-4" />
+                  <span className="text-muted-foreground text-xs">
+                    {t("bulk.summary", { envs: summaryEnvs })}
+                  </span>
                 )}
-                {t("bulk.cancelButton", { count: selectedDeploys.length })}
-              </Button>
-              <Button
-                disabled={!allTerminal || bulkRunning || !canDeploy}
-                onClick={() => setPendingBulk({ kind: "redeploy", deployments: selectedDeploys })}
-                className="min-h-11 w-full sm:w-auto"
-              >
-                {bulkRunning ? (
-                  <Loader2Icon className="size-4 animate-spin" />
-                ) : (
-                  <RotateCcwIcon className="size-4" />
-                )}
-                {t("bulk.redeployButton", { count: selectedDeploys.length })}
-              </Button>
-            </div>
-          </div>
-        </div>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={!allInFlight || bulkRunning || !canDeploy}
+                  onClick={() => setPendingBulk({ kind: "abort", deployments: selectedDeploys })}
+                >
+                  {bulkRunning ? (
+                    <Loader2Icon className="size-4 animate-spin" />
+                  ) : (
+                    <StopCircleIcon className="size-4" />
+                  )}
+                  {t("bulk.cancelButton", { count: selectedDeploys.length })}
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={!allTerminal || bulkRunning || !canDeploy}
+                  onClick={() => setPendingBulk({ kind: "redeploy", deployments: selectedDeploys })}
+                >
+                  {bulkRunning ? (
+                    <Loader2Icon className="size-4 animate-spin" />
+                  ) : (
+                    <RotateCcwIcon className="size-4" />
+                  )}
+                  {t("bulk.redeployButton", { count: selectedDeploys.length })}
+                </Button>
+              </>
+            )}
+            empty={{
+              icon: <BoxIcon className="size-5" />,
+              title: t("emptyTitle"),
+              description: t("emptyDescription"),
+              actionHref: "/apps",
+              actionLabel: t("openApps"),
+            }}
+            emptyFiltered={{
+              title: "No matching deployments",
+              description:
+                "No deployment in this tab matches that search. It looks at the app, environment, branch, image tag, and commit — try another term, or clear the search to see the whole tab.",
+            }}
+          />
+        </TooltipProvider>
       )}
 
       <StartDeploymentDialog open={openCreate} onOpenChange={setOpenCreate} />
@@ -871,36 +882,26 @@ export function DeploymentsClient() {
   );
 }
 
-// Row component is broken out so the inline tooltip / icon-button row
-// doesn't blow up the parent's render. ``onAction`` hoists state up
+// The action cluster is broken out so the inline tooltip / icon-button
+// row doesn't blow up the parent's render. ``onAction`` hoists state up
 // to the parent so the confirm dialogs stay singletons.
-interface DeploymentRowProps {
+interface DeploymentRowActionsProps {
   deployment: AstroliftDeployment;
-  checked: boolean;
-  hasAnyAction: boolean;
   canDeploy: boolean;
   canApprove: boolean;
   canRollback: boolean;
   busy: boolean;
-  onToggle: () => void;
-  onNavigate: () => void;
-  onKeyDown: (event: React.KeyboardEvent<HTMLTableRowElement>) => void;
   onAction: (kind: ActionKind) => void;
 }
 
-function DeploymentRow({
+function DeploymentRowActions({
   deployment: d,
-  checked,
-  hasAnyAction,
   canDeploy,
   canApprove,
   canRollback,
   busy,
-  onToggle,
-  onNavigate,
-  onKeyDown,
   onAction,
-}: DeploymentRowProps) {
+}: DeploymentRowActionsProps) {
   const t = useTranslations("lists.deployments");
 
   const inFlight = IN_FLIGHT.has(d.status);
@@ -910,227 +911,131 @@ function DeploymentRow({
   const canRedeployThis = !inFlight && d.status !== "running" && canDeploy;
   const hasCommitLink = Boolean(d.repoUrl && d.commitSha);
 
-  // Scope 4 — row-click navigation. Avoids global ``onClick`` on
-  // interactive descendants by guarding ``event.target ===
-  // event.currentTarget`` is fragile; instead, child interactive
-  // elements call ``stopPropagation`` themselves below.
   return (
-    <TableRow
-      tabIndex={0}
-      role="link"
-      aria-label={t("rowAriaLabel", {
-        app: d.registeredAppSlug,
-        env: d.environmentName,
-      })}
-      onClick={onNavigate}
-      onKeyDown={onKeyDown}
-      className="hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
-    >
-      <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
-        {hasAnyAction && (
-          <input
-            type="checkbox"
-            aria-label={t("bulk.selectRowLabel", {
-              app: d.registeredAppSlug,
-              env: d.environmentName,
-            })}
-            checked={checked}
-            onChange={onToggle}
-            className="size-4"
-            onClick={(e) => e.stopPropagation()}
-          />
-        )}
-      </TableCell>
-      <TableCell className="w-6">
-        <StatusDot status={statusToDot[d.status]} />
-      </TableCell>
-      <TableCell>
-        <div className="font-medium">{d.registeredAppSlug}</div>
-        <div className="text-muted-foreground text-xs">
-          env <span className="font-mono">{d.environmentName}</span>
-          {d.workloadSlug && (
-            <>
-              {" "}
-              · workload <span className="font-mono">{d.workloadSlug}</span>
-            </>
+    <div className="inline-flex items-center justify-end gap-1">
+      {canApproveThis && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              disabled={busy}
+              onClick={() => onAction("approve")}
+              aria-label={t("actions.approve")}
+            >
+              <CheckIcon className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t("actions.approve")}</TooltipContent>
+        </Tooltip>
+      )}
+      {canAbortThis && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-destructive hover:text-destructive size-8"
+              disabled={busy}
+              onClick={() => onAction("abort")}
+              aria-label={t("actions.abort")}
+            >
+              <StopCircleIcon className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t("actions.abort")}</TooltipContent>
+        </Tooltip>
+      )}
+      {canRollbackThis && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              disabled={busy}
+              onClick={() => onAction("rollback")}
+              aria-label={t("actions.rollback")}
+            >
+              <UndoIcon className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t("actions.rollback")}</TooltipContent>
+        </Tooltip>
+      )}
+      {canRedeployThis && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              disabled={busy}
+              onClick={() => onAction("redeploy")}
+              aria-label={t("actions.redeploy")}
+            >
+              <RotateCcwIcon className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t("actions.redeploy")}</TooltipContent>
+        </Tooltip>
+      )}
+      {/* The whole row links here too; the explicit button keeps the
+          affordance discoverable and keyboard-reachable from the action
+          cluster. */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" size="icon" className="size-8" asChild>
+            <Link href={`/deployments/${d.id}`} aria-label={t("actions.viewLogs")}>
+              <ExternalLinkIcon className="size-4" />
+            </Link>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{t("actions.viewLogs")}</TooltipContent>
+      </Tooltip>
+      {/* Overflow kebab: rare actions stay one click deep so the row's
+          inline-action row doesn't grow as we add things. */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8"
+            disabled={busy}
+            aria-label={t("actions.more")}
+          >
+            <MoreHorizontalIcon className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {hasCommitLink && (
+            <DropdownMenuItem
+              onClick={() => {
+                window.open(
+                  `${d.repoUrl.replace(/\/$/, "")}/commit/${d.commitSha}`,
+                  "_blank",
+                  "noopener,noreferrer"
+                );
+              }}
+            >
+              <ExternalLinkIcon className="size-4" />
+              {t("actions.viewCommit")}
+            </DropdownMenuItem>
           )}
-        </div>
-      </TableCell>
-      <TableCell className="font-mono text-xs">{d.imageTag || "—"}</TableCell>
-      <TableCell>
-        <Badge variant="outline">{d.triggerKind}</Badge>
-      </TableCell>
-      <TableCell>
-        <DeploymentStatusPill status={d.status} label={t(`statusOptions.${d.status}`)} />
-        {d.approvalsRequired > 0 && (
-          <div className="text-muted-foreground mt-1 text-xs">
-            {t("approvalsCount", {
-              received: d.approvalsReceived,
-              required: d.approvalsRequired,
-            })}
-          </div>
-        )}
-      </TableCell>
-      <TableCell className="font-mono text-xs">
-        <span className="inline-flex items-center gap-1">
-          <ClockIcon className="size-3" />
-          {formatDuration(d.durationSeconds)}
-        </span>
-      </TableCell>
-      <TableCell className="text-muted-foreground text-sm">
-        {d.startedAt
-          ? new Date(d.startedAt).toLocaleString()
-          : new Date(d.createdAt).toLocaleString()}
-      </TableCell>
-      {/* Scope 3 — per-row inline action buttons. The kebab survives
-          as overflow for less-common actions (view commit / copy guid)
-          so the row doesn't grow indefinitely. */}
-      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-        <div className="inline-flex items-center justify-end gap-1">
-          {canApproveThis && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8"
-                  disabled={busy}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAction("approve");
-                  }}
-                  aria-label={t("actions.approve")}
-                >
-                  <CheckIcon className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{t("actions.approve")}</TooltipContent>
-            </Tooltip>
-          )}
-          {canAbortThis && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-destructive hover:text-destructive size-8"
-                  disabled={busy}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAction("abort");
-                  }}
-                  aria-label={t("actions.abort")}
-                >
-                  <StopCircleIcon className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{t("actions.abort")}</TooltipContent>
-            </Tooltip>
-          )}
-          {canRollbackThis && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8"
-                  disabled={busy}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAction("rollback");
-                  }}
-                  aria-label={t("actions.rollback")}
-                >
-                  <UndoIcon className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{t("actions.rollback")}</TooltipContent>
-            </Tooltip>
-          )}
-          {canRedeployThis && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8"
-                  disabled={busy}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAction("redeploy");
-                  }}
-                  aria-label={t("actions.redeploy")}
-                >
-                  <RotateCcwIcon className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{t("actions.redeploy")}</TooltipContent>
-            </Tooltip>
-          )}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onNavigate();
-                }}
-                aria-label={t("actions.viewLogs")}
-              >
-                <ExternalLinkIcon className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{t("actions.viewLogs")}</TooltipContent>
-          </Tooltip>
-          {/* Overflow kebab: rare actions stay one click deep so the
-              row's inline-action row doesn't grow as we add things. */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                disabled={busy}
-                onClick={(e) => e.stopPropagation()}
-                aria-label={t("actions.more")}
-              >
-                <MoreHorizontalIcon className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-              {hasCommitLink && (
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    window.open(
-                      `${d.repoUrl.replace(/\/$/, "")}/commit/${d.commitSha}`,
-                      "_blank",
-                      "noopener,noreferrer"
-                    );
-                  }}
-                >
-                  <ExternalLinkIcon className="size-4" />
-                  {t("actions.viewCommit")}
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigator.clipboard
-                    .writeText(d.id)
-                    .then(() => toast.success(t("actions.copyOk")))
-                    .catch(() => toast.error(t("actions.copyFail")));
-                }}
-              >
-                <BoxIcon className="size-4" />
-                {t("actions.copyGuid")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </TableCell>
-    </TableRow>
+          <DropdownMenuItem
+            onClick={() => {
+              navigator.clipboard
+                .writeText(d.id)
+                .then(() => toast.success(t("actions.copyOk")))
+                .catch(() => toast.error(t("actions.copyFail")));
+            }}
+          >
+            <BoxIcon className="size-4" />
+            {t("actions.copyGuid")}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }

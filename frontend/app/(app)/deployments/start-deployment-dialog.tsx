@@ -24,10 +24,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { START_DEPLOYMENT } from "@/graphql/lifecycle/lifecycle.mutations";
-import {
-  LIST_DEPLOYMENTS,
-  LIST_ENVIRONMENTS,
-} from "@/graphql/lifecycle/lifecycle.queries";
+import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type {
   AstroliftAppEnvironment,
   AstroliftDeployment,
@@ -92,7 +89,11 @@ export function StartDeploymentDialog({ open, onOpenChange }: Props) {
   }, [appSlug]);
 
   const [start, { loading }] = useMutation<MutationResp>(START_DEPLOYMENT, {
-    refetchQueries: [{ query: LIST_DEPLOYMENTS, variables: { limit: 100 } }],
+    // By operation name: the list this dialog feeds is cursor-paginated
+    // now, so its variables carry the tab filter, page cursor and search
+    // term and no literal variables object would match the query the
+    // operator is looking at.
+    refetchQueries: ["ListDeploymentsPage", "DeploymentTabCounts"],
     awaitRefetchQueries: true,
   });
 

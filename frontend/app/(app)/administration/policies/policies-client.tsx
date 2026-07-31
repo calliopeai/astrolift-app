@@ -1,39 +1,32 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useMutation } from "@apollo/client/react";
 import { BookOpenIcon, InfoIcon, PlusIcon, ScaleIcon, Trash2Icon } from "lucide-react";
-import { ListControls } from "@/components/ListControls";
-import { useListControls } from "@/hooks/use-list-controls";
 import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
+import {
+  DataTable,
+  useCursorTable,
+  type Column,
+  type CursorPage,
+} from "@/components/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { SOFT_DELETE_POLICY } from "@/graphql/identity/identity.mutations";
-import { LIST_POLICIES } from "@/graphql/identity/identity.queries";
+import { LIST_POLICIES, LIST_POLICIES_PAGE } from "@/graphql/identity/identity.queries";
 import { DOC_LINKS } from "@/lib/docs/urls";
 import type { AstroliftPolicy, MutationResult } from "@/graphql/identity/identity.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import { CreatePolicyDialog } from "./create-policy-dialog";
 
-interface Resp {
-  astroliftPolicies: AstroliftPolicy[];
+interface PoliciesPageResp {
+  astroliftPoliciesPage: CursorPage<AstroliftPolicy>;
 }
 
 const effectStyles: Record<string, string> = {
@@ -43,13 +36,24 @@ const effectStyles: Record<string, string> = {
 
 export function PoliciesClient() {
   const [open, setOpen] = React.useState(false);
-  const policies = useQuery<Resp>(LIST_POLICIES);
   const fmt = useFormatters();
+
+  // `astroliftPoliciesPage` takes `search`, `limit` and `after` only — it has
+  // no sort argument, so no column declares a `sortKey`.
+  const table = useCursorTable<AstroliftPolicy>({
+    query: LIST_POLICIES_PAGE,
+    extract: (d) => (d as PoliciesPageResp | undefined)?.astroliftPoliciesPage,
+    searchVariable: "search",
+    urlKey: "pol",
+  });
 
   const [softDelete, { loading: deleting }] = useMutation<{
     softDeletePolicy: MutationResult<{ id: string; deleted: boolean }>;
   }>(SOFT_DELETE_POLICY, {
-    refetchQueries: [{ query: LIST_POLICIES }],
+    // LIST_POLICIES still backs the other policy surface; "ListPoliciesPage"
+    // is this table's own walk, which is a different root field and would
+    // otherwise keep showing the deleted row.
+    refetchQueries: [{ query: LIST_POLICIES }, "ListPoliciesPage"],
     awaitRefetchQueries: true,
   });
 
@@ -64,19 +68,85 @@ export function PoliciesClient() {
     }
   }
 
-  const allPolicies = policies.data?.astroliftPolicies ?? [];
-  const ctrl = useListControls({
-    data: allPolicies,
-    searchFn: (p) => [p.name, p.scopeLevel, p.effect, p.description].join(" "),
-    initialPageSize: 25,
-    sortFn: (a, b, s) => {
-      const dir = s.dir === "asc" ? 1 : -1;
-      if (s.key === "name") return a.name.localeCompare(b.name) * dir;
-      if (s.key === "scope") return a.scopeLevel.localeCompare(b.scopeLevel) * dir;
-      return 0;
+  // The create sheet refetches LIST_POLICIES, which is a different root field
+  // from the page this table walks, so a newly created policy would not appear
+  // until a navigation. Refetch the walk when the sheet closes.
+  function handleCreateOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) table.refetch();
+  }
+
+  const columns: Column<AstroliftPolicy>[] = [
+    {
+      id: "policy",
+      header: "Policy",
+      cell: (p) => (
+        <>
+          <div className="font-medium">{p.name}</div>
+          <div className="text-muted-foreground font-mono text-xs">{p.slug}</div>
+        </>
+      ),
     },
-  });
-  const list = ctrl.rows;
+    {
+      id: "scope",
+      header: "Scope",
+      cell: (p) => <Badge variant="outline">{p.scopeLevel}</Badge>,
+    },
+    {
+      id: "effect",
+      header: "Effect",
+      cell: (p) => (
+        <Badge className={effectStyles[p.effect]} variant="secondary">
+          {p.effect}
+        </Badge>
+      ),
+    },
+    {
+      id: "action",
+      header: "Action",
+      cellClassName: "font-mono text-xs",
+      cell: (p) => p.actionPattern,
+    },
+    {
+      id: "conditions",
+      header: "Conditions",
+      cellClassName: "text-muted-foreground text-xs",
+      cell: (p) =>
+        Array.isArray(p.conditions) && p.conditions.length > 0
+          ? `${p.conditions.length} condition${p.conditions.length === 1 ? "" : "s"}`
+          : "—",
+    },
+    {
+      id: "createdBy",
+      header: "Created by",
+      cellClassName: "text-muted-foreground text-xs",
+      cell: (p) => p.createdByUsername ?? "—",
+    },
+    {
+      id: "createdAt",
+      header: "Created at",
+      cellClassName: "text-muted-foreground text-xs",
+      cell: (p) => (p.createdAt ? fmt.formatDate(p.createdAt) : "—"),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      align: "right",
+      cell: (p) => (
+        <Can permission="org.update">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setDeleteTarget(p)}
+            disabled={deleting}
+          >
+            <Trash2Icon className="size-4" />
+            <span className="sr-only">Delete</span>
+          </Button>
+        </Can>
+      ),
+    },
+  ];
 
   return (
     <PageShell
@@ -114,96 +184,33 @@ export function PoliciesClient() {
           allow, never widen it. Use this page to create and review those rules.
         </p>
       </div>
-      {allPolicies.length > 0 && (
-        <ListControls controls={ctrl} searchPlaceholder="Search policies…" className="mb-3" />
-      )}
-      <Card>
-        <CardContent className="p-0">
-          {policies.loading ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : list.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<ScaleIcon className="size-5" />}
-                title="No policies yet"
-                description="ABAC policies layer on top of RBAC. They can deny based on time, IP, env, MFA freshness — never grant beyond what the role binding already permits."
-              />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Policy</TableHead>
-                  <TableHead>Scope</TableHead>
-                  <TableHead>Effect</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Conditions</TableHead>
-                  <TableHead>Created by</TableHead>
-                  <TableHead>Created at</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {list.map((p) => {
-                  const isDeny = p.effect === "DENY";
-                  // DENY rows get a flush left border in destructive
-                  // tone so the danger-zone read is obvious at a
-                  // glance — a DENY can lock operators out even when
-                  // role bindings would otherwise permit the call.
-                  return (
-                    <TableRow
-                      key={p.id}
-                      className={isDeny ? "border-l-destructive/70 border-l-2" : undefined}
-                    >
-                      <TableCell>
-                        <div className="font-medium">{p.name}</div>
-                        <div className="text-muted-foreground font-mono text-xs">{p.slug}</div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{p.scopeLevel}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={effectStyles[p.effect]} variant="secondary">
-                          {p.effect}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{p.actionPattern}</TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        {Array.isArray(p.conditions) && p.conditions.length > 0
-                          ? `${p.conditions.length} condition${p.conditions.length === 1 ? "" : "s"}`
-                          : "—"}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        {p.createdByUsername ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        {p.createdAt ? fmt.formatDate(p.createdAt) : "—"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Can permission="org.update">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setDeleteTarget(p)}
-                            disabled={deleting}
-                          >
-                            <Trash2Icon className="size-4" />
-                            <span className="sr-only">Delete</span>
-                          </Button>
-                        </Can>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
 
-      <CreatePolicyDialog open={open} onOpenChange={setOpen} />
+      <DataTable
+        label="Policies"
+        controller={table}
+        columns={columns}
+        getRowId={(p) => p.id}
+        searchPlaceholder="Search policies…"
+        // DENY rows get a flush left border in destructive tone so the
+        // danger-zone read is obvious at a glance — a DENY can lock operators
+        // out even when role bindings would otherwise permit the call.
+        rowClassName={(p) =>
+          p.effect === "DENY" ? "border-l-destructive/70 border-l-2" : undefined
+        }
+        empty={{
+          icon: <ScaleIcon className="size-5" />,
+          title: "No policies yet",
+          description:
+            "ABAC policies layer on top of RBAC. They can deny based on time, IP, env, MFA freshness — never grant beyond what the role binding already permits.",
+        }}
+        emptyFiltered={{
+          title: "No matching policies",
+          description:
+            "No policy matches that search. The server matches name, slug, description and action pattern — scope and effect are not searchable.",
+        }}
+      />
+
+      <CreatePolicyDialog open={open} onOpenChange={handleCreateOpenChange} />
 
       <ConfirmDialog
         open={deleteTarget !== null}

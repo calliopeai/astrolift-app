@@ -1,12 +1,10 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
-import { useRouter } from "next/navigation";
 import {
   AlertTriangleIcon,
   InfoIcon,
   MailIcon,
-  SearchIcon,
   SendIcon,
   ShieldIcon,
   Trash2Icon,
@@ -20,8 +18,15 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
+import {
+  DataTable,
+  useCursorTable,
+  useRowSelection,
+  type Column,
+  type CursorPage,
+  type CursorTableController,
+} from "@/components/data-table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,17 +40,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Section } from "@/components/ui/section";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   ANONYMIZE_USER,
@@ -56,10 +51,10 @@ import {
   REVOKE_ROLE_BINDING,
 } from "@/graphql/identity/identity.mutations";
 import {
-  LIST_INVITATIONS,
-  LIST_MEMBERS,
+  LIST_INVITATIONS_PAGE,
+  LIST_MEMBERS_PAGE,
   LIST_PROJECTS,
-  LIST_ROLE_BINDINGS,
+  LIST_ROLE_BINDINGS_PAGE,
   LIST_ROLES,
   LIST_TEAMS,
 } from "@/graphql/identity/identity.queries";
@@ -71,9 +66,9 @@ import type {
   AstroliftRole,
   AstroliftRoleBinding,
   AstroliftTeam,
+  InvitationStatus,
   MutationResult,
 } from "@/graphql/identity/identity.types";
-import { useDebounce } from "@/hooks/use-debounce";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
@@ -81,20 +76,17 @@ import { GrantRoleDialog } from "./grant-role-dialog";
 import { InvitationExpiryBadge } from "./invitation-expiry";
 import { InviteDialog } from "./invite-dialog";
 
-interface MembersResp {
-  astroliftMembers: AstroliftMember[];
+interface MembersPageResp {
+  astroliftMembersPage: CursorPage<AstroliftMember>;
 }
-interface MembersVars {
-  search?: string | null;
-}
-interface RoleBindingsResp {
-  astroliftRoleBindings: AstroliftRoleBinding[];
+interface RoleBindingsPageResp {
+  astroliftRoleBindingsPage: CursorPage<AstroliftRoleBinding>;
 }
 interface RolesResp {
   astroliftRoles: AstroliftRole[];
 }
-interface InvitationsResp {
-  astroliftInvitations: AstroliftInvitation[];
+interface InvitationsPageResp {
+  astroliftInvitationsPage: CursorPage<AstroliftInvitation>;
 }
 
 const scopeBadge: Record<string, string> = {
@@ -108,7 +100,32 @@ type RevokeTarget =
   | { kind: "invitation"; invitation: AstroliftInvitation }
   | { kind: "binding"; binding: AstroliftRoleBinding };
 
+/**
+ * One People row per USER (#1229) — a user can hold several Member rows
+ * (ORG plus per-APP rows auto-created by app-scope grants) and rendering
+ * one row per membership reads as a duplicate account.
+ */
+type MemberGroup = { rows: AstroliftMember[]; primary: AstroliftMember };
+
 const STALE_THRESHOLD_DAYS = 90;
+
+/**
+ * The People row's role pills and its APP-scope labels are a *lookup*,
+ * not a table: they answer "which roles does this person hold" for the
+ * users on the current People page. There is no per-user binding field
+ * on ``AstroliftMember``, so the index is one bounded read of the
+ * binding list at the server's ``MAX_PAGE_LIMIT``. Bindings older than
+ * the 200 most recent grants fall outside it — the Role bindings table
+ * below is the complete, paginated, searchable source of truth.
+ */
+const BINDING_INDEX_LIMIT = 200;
+
+/**
+ * Cells that own their own pointer affordances (hover tooltips, action
+ * buttons) have to sit above ``rowHref``'s stretched row link, which is
+ * an absolutely-positioned overlay across the whole row.
+ */
+const ABOVE_ROW_LINK = "relative z-10";
 
 export function MembersClient() {
   const t = useTranslations("orgMembers");
@@ -128,33 +145,47 @@ export function MembersClient() {
   // The dialog calls onOpenChange(false) on submit/cancel, which clears
   // this back to null via the wrapper handler below.
   const [grantForMember, setGrantForMember] = React.useState<AstroliftMember | null>(null);
-  // Resolved (revoked/accepted/expired) invitations are hidden by default
-  // and deletable — pending ones keep the resend/revoke pair.
-  const [showResolvedInvites, setShowResolvedInvites] = React.useState(false);
-  const [deleteInviteTarget, setDeleteInviteTarget] = React.useState<AstroliftInvitation | null>(null);
-
-  // Bulk-revoke selection state (#416). A Set of binding GUIDs the
-  // operator has checked; cleared on success so the footer disappears.
-  const [selectedBindings, setSelectedBindings] = React.useState<Set<string>>(() => new Set());
+  // Resolved (revoked/accepted/expired) invitations are hidden by
+  // default and deletable — pending ones keep the resend/revoke pair.
+  // `null` means "every status"; the filter is a query variable, so the
+  // server does the narrowing and the cursor walk resets when it flips.
+  const [inviteStatus, setInviteStatus] = React.useState<InvitationStatus | null>("pending");
+  const [deleteInviteTarget, setDeleteInviteTarget] = React.useState<AstroliftInvitation | null>(
+    null
+  );
+  // Re-sending rotates the invitation token, which kills any link the
+  // operator already handed out — confirmed rather than fired on click.
+  const [resendTarget, setResendTarget] = React.useState<AstroliftInvitation | null>(null);
   const [confirmBulkRevoke, setConfirmBulkRevoke] = React.useState(false);
 
-  // A. Search affordance. 200ms debounce matches the issue spec; the
-  // debounced value is what the query keys off, so typing fast doesn't
-  // hammer the resolver.
-  const [searchInput, setSearchInput] = React.useState("");
-  const debouncedSearch = useDebounce(searchInput, 200);
-  const router = useRouter();
-  const searchVariable: MembersVars = debouncedSearch.trim()
-    ? { search: debouncedSearch.trim() }
-    : {};
+  const membersTable = useCursorTable<AstroliftMember>({
+    query: LIST_MEMBERS_PAGE,
+    extract: (d) => (d as MembersPageResp | undefined)?.astroliftMembersPage,
+    searchVariable: "search",
+    urlKey: "ppl",
+  });
 
-  const members = useQuery<MembersResp, MembersVars>(LIST_MEMBERS, {
-    variables: searchVariable,
+  const bindingsTable = useCursorTable<AstroliftRoleBinding>({
+    query: LIST_ROLE_BINDINGS_PAGE,
+    extract: (d) => (d as RoleBindingsPageResp | undefined)?.astroliftRoleBindingsPage,
+    searchVariable: "search",
+    urlKey: "rb",
+  });
+  const bindingSelection = useRowSelection();
+
+  const invitationsTable = useCursorTable<AstroliftInvitation>({
+    query: LIST_INVITATIONS_PAGE,
+    variables: { status: inviteStatus },
+    extract: (d) => (d as InvitationsPageResp | undefined)?.astroliftInvitationsPage,
+    searchVariable: "search",
+    urlKey: "inv",
+  });
+
+  const bindingIndex = useQuery<RoleBindingsPageResp>(LIST_ROLE_BINDINGS_PAGE, {
+    variables: { limit: BINDING_INDEX_LIMIT },
     fetchPolicy: "cache-and-network",
   });
-  const bindings = useQuery<RoleBindingsResp>(LIST_ROLE_BINDINGS);
   const roles = useQuery<RolesResp>(LIST_ROLES);
-  const invitations = useQuery<InvitationsResp>(LIST_INVITATIONS);
   // Loaded so the Scope column can resolve `(scopeKind=TEAM, scopeId=N)`
   // into a human-readable team / project name instead of the bare
   // "TEAM" badge that previously made it ambiguous whether the column
@@ -162,28 +193,32 @@ export function MembersClient() {
   const teams = useQuery<{ astroliftTeams: AstroliftTeam[] }>(LIST_TEAMS);
   const projects = useQuery<{ astroliftProjects: AstroliftProject[] }>(LIST_PROJECTS);
 
+  // Refetch by operation name: both the Role bindings table and the
+  // People-row pill index run `ListRoleBindingsPage` under different
+  // variables, and a name refetches every active instance of the query
+  // rather than one variable set.
   const [revokeBinding, { loading: revoking }] = useMutation<{
     revokeRoleBinding: MutationResult<{ id: string; deleted: boolean }>;
   }>(REVOKE_ROLE_BINDING, {
-    refetchQueries: [{ query: LIST_ROLE_BINDINGS }],
+    refetchQueries: ["ListRoleBindingsPage"],
     awaitRefetchQueries: true,
   });
   const [bulkRevoke, { loading: bulkRevoking }] = useMutation<{
     bulkRevokeAstroliftRoleBindings: MutationResult<AstroliftBulkRevokeRoleBindingsPayload>;
   }>(BULK_REVOKE_ROLE_BINDINGS, {
-    refetchQueries: [{ query: LIST_ROLE_BINDINGS }, { query: LIST_MEMBERS }],
+    refetchQueries: ["ListRoleBindingsPage", "ListMembersPage"],
     awaitRefetchQueries: true,
   });
   const [revokeInvite, { loading: revokingInvite }] = useMutation<{
     revokeInvitation: MutationResult<AstroliftInvitation>;
   }>(REVOKE_INVITATION, {
-    refetchQueries: [{ query: LIST_INVITATIONS }],
+    refetchQueries: ["ListInvitationsPage"],
     awaitRefetchQueries: true,
   });
   const [deleteInvite, { loading: deletingInvite }] = useMutation<{
     deleteInvitation: MutationResult<AstroliftInvitation>;
   }>(DELETE_INVITATION, {
-    refetchQueries: [{ query: LIST_INVITATIONS }],
+    refetchQueries: ["ListInvitationsPage"],
     awaitRefetchQueries: true,
   });
   const [resendInvite, { loading: resendingInvite }] = useMutation<{
@@ -193,7 +228,7 @@ export function MembersClient() {
       acceptUrlPath: string;
     }>;
   }>(RESEND_INVITATION, {
-    refetchQueries: [{ query: LIST_INVITATIONS }],
+    refetchQueries: ["ListInvitationsPage"],
     awaitRefetchQueries: true,
   });
   const [anonymizeUser] = useMutation<{
@@ -205,7 +240,7 @@ export function MembersClient() {
       anonymizedAt: string;
     }>;
   }>(ANONYMIZE_USER, {
-    refetchQueries: [{ query: LIST_MEMBERS }],
+    refetchQueries: ["ListMembersPage"],
     awaitRefetchQueries: true,
   });
 
@@ -225,28 +260,27 @@ export function MembersClient() {
       variables: { input: { id: inv.id } },
     });
     const result = data?.resendInvitation;
-    if (result?.ok && result.data) {
-      // The token was rotated, so any previously-issued link is now
-      // dead. A fresh link was emailed (best-effort); surface a
-      // Copy-link action so the operator always retains the durable
-      // hand-off channel.
-      const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const url = `${origin}${result.data.acceptUrlPath}`;
-      toast.success(`Invitation re-sent to ${inv.email}`, {
-        description: "The previous link is now invalid. Copy the fresh link as a backup channel.",
-        action: {
-          label: "Copy link",
-          onClick: () => {
-            navigator.clipboard
-              .writeText(url)
-              .then(() => toast.success("Accept link copied"))
-              .catch(() => toast.error("Copy failed"));
-          },
-        },
-      });
-    } else {
-      toast.error(result?.errors?.[0]?.message ?? "Resend failed");
+    if (!result?.ok || !result.data) {
+      throw new Error(result?.errors?.[0]?.message ?? "Resend failed");
     }
+    // The token was rotated, so any previously-issued link is now
+    // dead. A fresh link was emailed (best-effort); surface a
+    // Copy-link action so the operator always retains the durable
+    // hand-off channel.
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const url = `${origin}${result.data.acceptUrlPath}`;
+    toast.success(`Invitation re-sent to ${inv.email}`, {
+      description: "The previous link is now invalid. Copy the fresh link as a backup channel.",
+      action: {
+        label: "Copy link",
+        onClick: () => {
+          navigator.clipboard
+            .writeText(url)
+            .then(() => toast.success("Accept link copied"))
+            .catch(() => toast.error("Copy failed"));
+        },
+      },
+    });
   }
 
   async function handleRevoke(rb: AstroliftRoleBinding) {
@@ -258,25 +292,8 @@ export function MembersClient() {
     }
   }
 
-  function toggleBinding(id: string) {
-    setSelectedBindings((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleAllBindings(visibleIds: string[]) {
-    setSelectedBindings((prev) => {
-      const allSelected = visibleIds.length > 0 && visibleIds.every((id) => prev.has(id));
-      if (allSelected) return new Set();
-      return new Set(visibleIds);
-    });
-  }
-
   async function handleBulkRevoke() {
-    const ids = Array.from(selectedBindings);
+    const ids = bindingSelection.selectedIds;
     if (ids.length === 0) return;
     try {
       const { data } = await bulkRevoke({
@@ -302,17 +319,14 @@ export function MembersClient() {
           })
         );
       }
-      setSelectedBindings(new Set());
+      bindingSelection.clear();
     } finally {
       setConfirmBulkRevoke(false);
     }
   }
 
   // Right-to-delete (GDPR) — anonymize a user's PII while preserving
-  // audit-log structural records. The backend mutation tracked in #312
-  // is not on main yet; the affordance ships gated + disabled so the
-  // permission gate, copy, and double-confirm flow are reviewable. The
-  // `coming soon` banner inside the dialog makes the gap explicit.
+  // audit-log structural records.
   const ANONYMIZE_BACKEND_READY = true;
   const [anonymizeTarget, setAnonymizeTarget] = React.useState<AstroliftMember | null>(null);
   const [anonymizeAcknowledged, setAnonymizeAcknowledged] = React.useState(false);
@@ -332,8 +346,10 @@ export function MembersClient() {
     toast.success("User data anonymized.");
   }
 
-  const memberList = members.data?.astroliftMembers ?? [];
-  const bindingList = bindings.data?.astroliftRoleBindings ?? [];
+  const bindingIndexRows = React.useMemo(
+    () => bindingIndex.data?.astroliftRoleBindingsPage.items ?? [],
+    [bindingIndex.data]
+  );
   const teamList = teams.data?.astroliftTeams ?? [];
   const projectList = projects.data?.astroliftProjects ?? [];
 
@@ -346,7 +362,7 @@ export function MembersClient() {
   // APP-scope labels come from the bindings' server-resolved
   // sourceScopeLabel (the client doesn't load the app list here).
   const appScopeLabels = new Map<string, string>();
-  for (const b of bindingList) {
+  for (const b of bindingIndexRows) {
     if (b.scopeKind === "APP" && b.sourceScopeLabel) {
       appScopeLabels.set(String(b.scopeId), b.sourceScopeLabel);
     }
@@ -370,22 +386,20 @@ export function MembersClient() {
 
   // Group bindings by user for the People-row role pills.
   const bindingsByUser = new Map<string, AstroliftRoleBinding[]>();
-  for (const b of bindingList) {
+  for (const b of bindingIndexRows) {
     if (!b.user) continue;
     const arr = bindingsByUser.get(b.user.id) ?? [];
     arr.push(b);
     bindingsByUser.set(b.user.id, arr);
   }
 
-  // One People row per USER (#1229). A user can hold several Member rows
-  // (ORG plus per-APP rows auto-created by app-scope grants); rendering
-  // one row per membership reads as a duplicate account. Group them:
-  // scopes aggregate into the Scope cell, the ORG row (or the first row)
-  // is the primary for row-click navigation and the row actions, and the
-  // per-scope detail stays visible in the Role bindings table below.
-  const memberGroups = React.useMemo(() => {
+  // Collapse the page's Member rows to one row per user (#1229). The
+  // grouping is per page: the member walk is ordered by creation time,
+  // so a user's ORG row and a later APP row can land on either side of
+  // a page boundary and show up once on each.
+  const memberGroups = React.useMemo<MemberGroup[]>(() => {
     const byUser = new Map<string, AstroliftMember[]>();
-    for (const m of memberList) {
+    for (const m of membersTable.rows) {
       const arr = byUser.get(m.user.id) ?? [];
       arr.push(m);
       byUser.set(m.user.id, arr);
@@ -394,14 +408,302 @@ export function MembersClient() {
       rows,
       primary: rows.find((r) => r.scopeKind === "ORG") ?? rows[0],
     }));
-  }, [memberList]);
+  }, [membersTable.rows]);
 
-  const hasActiveSearch = debouncedSearch.trim().length > 0;
-  const invitationList = invitations.data?.astroliftInvitations ?? [];
-  const resolvedInviteCount = invitationList.filter((i) => i.status !== "pending").length;
-  const visibleInvitations = showResolvedInvites
-    ? invitationList
-    : invitationList.filter((i) => i.status === "pending");
+  // Same controller, grouped rows: paging, search and state all still
+  // come from the server-side walk.
+  const peopleController: CursorTableController<MemberGroup> = {
+    ...membersTable,
+    rows: memberGroups,
+  };
+
+  const peopleColumns: Column<MemberGroup>[] = [
+    {
+      id: "user",
+      header: "User",
+      cell: ({ primary }) => (
+        // The id is the anchor InviterCell deep-links to (`#u-<userId>`).
+        <div id={`u-${primary.user.id}`}>
+          <div className="font-medium">{primary.user.username}</div>
+          <div className="text-muted-foreground text-xs">{primary.user.email}</div>
+        </div>
+      ),
+    },
+    {
+      id: "scope",
+      header: "Scope",
+      cell: ({ rows }) => (
+        <div className="flex flex-col items-start gap-1">
+          {rows.map((r) => (
+            <div key={r.id} className="flex items-center gap-1.5">
+              <Badge className={scopeBadge[r.scopeKind]} variant="secondary">
+                {r.scopeKind}
+              </Badge>
+              <span className="text-muted-foreground text-xs">{scopeLabel(r)}</span>
+            </div>
+          ))}
+        </div>
+      ),
+    },
+    {
+      id: "roles",
+      header: "Roles",
+      cellClassName: ABOVE_ROW_LINK,
+      cell: ({ primary }) => {
+        const userBindings = bindingsByUser.get(primary.user.id) ?? [];
+        if (userBindings.length === 0) {
+          return <span className="text-muted-foreground text-xs">—</span>;
+        }
+        return (
+          <div className="flex flex-wrap gap-1">
+            {userBindings.map((b) => (
+              <RoleSourcePill key={b.id} binding={b} />
+            ))}
+          </div>
+        );
+      },
+    },
+    {
+      id: "lastActive",
+      header: t("lastActiveColumn"),
+      cellClassName: ABOVE_ROW_LINK,
+      cell: ({ primary }) => <LastActiveCell value={primary.lastActiveAt} />,
+    },
+    {
+      id: "joined",
+      header: "Joined",
+      cellClassName: "text-muted-foreground text-sm",
+      cell: ({ primary }) =>
+        primary.joinedAt ? fmt.formatDate(primary.joinedAt) : fmt.formatDate(primary.createdAt),
+    },
+    {
+      id: "actions",
+      header: t("actionsColumn"),
+      align: "right",
+      width: "w-24",
+      cellClassName: ABOVE_ROW_LINK,
+      cell: ({ rows, primary }) => {
+        const alreadyAnonymized = rows.some((r) => r.lifecycle === "anonymized");
+        return (
+          <div className="flex items-center justify-end gap-1">
+            <Can permission="org.manage_members">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setGrantForMember(primary)}
+                    aria-label={t("grantRoleRowLabel", { name: primary.user.username })}
+                  >
+                    <UserPlusIcon className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {t("grantRoleRowTooltip", { name: primary.user.username })}
+                </TooltipContent>
+              </Tooltip>
+            </Can>
+            <Can permission="org.manage_members">
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={alreadyAnonymized}
+                onClick={() => openAnonymizeDialog(primary)}
+                aria-label={`Anonymize ${primary.user.username}`}
+                title={
+                  alreadyAnonymized
+                    ? "Already anonymized"
+                    : "Anonymize user data (GDPR right-to-delete)"
+                }
+              >
+                <UserMinusIcon className="size-4" />
+              </Button>
+            </Can>
+          </div>
+        );
+      },
+    },
+  ];
+
+  const bindingColumns: Column<AstroliftRoleBinding>[] = [
+    {
+      id: "subject",
+      header: "Subject",
+      cell: (b) =>
+        b.user ? (
+          <>
+            <div className="font-medium">{b.user.username}</div>
+            <div className="text-muted-foreground text-xs">{b.user.email}</div>
+          </>
+        ) : (
+          <div className="font-mono text-xs">group:{b.groupExternalId}</div>
+        ),
+    },
+    {
+      id: "role",
+      header: "Role",
+      cell: (b) => (
+        <>
+          <div className="font-medium">{b.role.name}</div>
+          <div className="text-muted-foreground font-mono text-xs">{b.role.slug}</div>
+        </>
+      ),
+    },
+    {
+      id: "source",
+      header: t("sourceColumn"),
+      cell: (b) => (
+        <div className="flex items-center gap-1.5">
+          <Badge className={scopeBadge[b.scopeKind]} variant="secondary">
+            {b.scopeKind}
+          </Badge>
+          {b.sourceScopeLabel && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground inline-flex"
+                  aria-label={t("sourceTooltipAria", { scope: b.sourceScopeLabel })}
+                >
+                  <InfoIcon className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {t("rolePillTooltipPrefix", { scope: b.sourceScopeLabel })}
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: "granted",
+      header: "Granted",
+      cellClassName: "text-muted-foreground text-sm",
+      cell: (b) => fmt.formatDate(b.grantedAt),
+    },
+    {
+      id: "actions",
+      header: t("actionsColumn"),
+      align: "right",
+      width: "w-16",
+      cell: (b) => (
+        <Can permission="org.manage_members">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setRevokeTarget({ kind: "binding", binding: b })}
+            disabled={revoking || bulkRevoking}
+          >
+            <Trash2Icon className="size-4" />
+            <span className="sr-only">Revoke</span>
+          </Button>
+        </Can>
+      ),
+    },
+  ];
+
+  const invitationColumns: Column<AstroliftInvitation>[] = [
+    {
+      id: "email",
+      header: "Email",
+      cellClassName: "font-medium",
+      cell: (inv) => inv.email,
+    },
+    {
+      id: "role",
+      header: "Role",
+      cell: (inv) =>
+        inv.roleSlug ? (
+          <Badge variant="outline" className="font-mono text-xs">
+            {inv.roleSlug}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground text-xs">—</span>
+        ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: (inv) => (
+        <Badge variant={inv.status === "pending" ? "default" : "secondary"} className="capitalize">
+          {inv.status}
+        </Badge>
+      ),
+    },
+    {
+      id: "expires",
+      header: "Expires",
+      cell: (inv) =>
+        inv.status === "pending" ? (
+          <InvitationExpiryBadge expiresAt={inv.expiresAt} />
+        ) : (
+          <span className="text-muted-foreground text-sm">{fmt.formatDate(inv.expiresAt)}</span>
+        ),
+    },
+    {
+      id: "invitedBy",
+      header: "Invited by",
+      cell: (inv) => <InviterCell invitation={inv} />,
+    },
+    {
+      id: "actions",
+      header: <span className="sr-only">{t("actionsColumn")}</span>,
+      align: "right",
+      width: "w-24",
+      cell: (inv) =>
+        inv.status === "pending" ? (
+          <Can permission="org.manage_members">
+            <div className="flex items-center justify-end gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setResendTarget(inv)}
+                    disabled={resendingInvite || revokingInvite}
+                    aria-label={`Resend invitation to ${inv.email}`}
+                  >
+                    <SendIcon className="size-4" />
+                    <span className="sr-only">Resend</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Resend invitation</TooltipContent>
+              </Tooltip>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setRevokeTarget({ kind: "invitation", invitation: inv })}
+                disabled={revokingInvite}
+              >
+                <Trash2Icon className="size-4" />
+                <span className="sr-only">Revoke</span>
+              </Button>
+            </div>
+          </Can>
+        ) : (
+          <Can permission="org.manage_members">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setDeleteInviteTarget(inv)}
+                  disabled={deletingInvite}
+                  aria-label={`Delete resolved invitation for ${inv.email}`}
+                >
+                  <Trash2Icon className="size-4" />
+                  <span className="sr-only">Delete</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Delete this resolved invitation</TooltipContent>
+            </Tooltip>
+          </Can>
+        ),
+    },
+  ];
+
+  const showingPendingOnly = inviteStatus === "pending";
 
   return (
     <TooltipProvider>
@@ -425,458 +727,94 @@ export function MembersClient() {
           </div>
         }
       >
-        <Section
-          title="People"
-          action={
-            <div className="relative w-full sm:w-72">
-              <SearchIcon
-                className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
-                aria-hidden="true"
-              />
-              <Input
-                type="search"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder={t("searchPlaceholder")}
-                aria-label={t("searchLabel")}
-                className="pl-8"
-              />
-            </div>
-          }
-        >
-          {members.loading && memberList.length === 0 ? (
-            <div className="space-y-2">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : memberList.length === 0 ? (
-            hasActiveSearch ? (
-              <EmptyState
-                icon={<SearchIcon className="size-5" />}
-                title={t("noMatchTitle")}
-                description={t("noMatchDescription", { term: debouncedSearch.trim() })}
-              />
-            ) : (
-              <EmptyState
-                icon={<UsersIcon className="size-5" />}
-                title="No members"
-                description="Members appear here once role bindings are granted to users."
-              />
-            )
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Scope</TableHead>
-                  <TableHead>Roles</TableHead>
-                  <TableHead>{t("lastActiveColumn")}</TableHead>
-                  <TableHead>Joined</TableHead>
-                  <TableHead className="w-12 text-right">{t("actionsColumn")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {memberGroups.map(({ rows, primary }) => {
-                  const m = primary;
-                  const userBindings = bindingsByUser.get(m.user.id) ?? [];
-                  const alreadyAnonymized = rows.some((r) => r.lifecycle === "anonymized");
-                  return (
-                    <TableRow
-                      key={m.user.id}
-                      id={`u-${m.user.id}`}
-                      tabIndex={0}
-                      role="link"
-                      aria-label={`Open member ${m.user.username}`}
-                      onClick={() => router.push(`/administration/members/${m.id}`)}
-                      onKeyDown={(ev) => {
-                        if (ev.key === "Enter" || ev.key === " ") {
-                          ev.preventDefault();
-                          router.push(`/administration/members/${m.id}`);
-                        }
-                      }}
-                      className="hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
-                    >
-                      <TableCell>
-                        <div className="font-medium">{m.user.username}</div>
-                        <div className="text-muted-foreground text-xs">{m.user.email}</div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col items-start gap-1">
-                          {rows.map((r) => (
-                            <div key={r.id} className="flex items-center gap-1.5">
-                              <Badge className={scopeBadge[r.scopeKind]} variant="secondary">
-                                {r.scopeKind}
-                              </Badge>
-                              <span className="text-muted-foreground text-xs">{scopeLabel(r)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {userBindings.length === 0 ? (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        ) : (
-                          <div className="flex flex-wrap gap-1">
-                            {userBindings.map((b) => (
-                              <RoleSourcePill key={b.id} binding={b} />
-                            ))}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <LastActiveCell value={m.lastActiveAt} />
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {m.joinedAt ? fmt.formatDate(m.joinedAt) : fmt.formatDate(m.createdAt)}
-                      </TableCell>
-                      <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1">
-                          <Can permission="org.manage_members">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => setGrantForMember(m)}
-                                  aria-label={t("grantRoleRowLabel", {
-                                    name: m.user.username,
-                                  })}
-                                >
-                                  <UserPlusIcon className="size-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {t("grantRoleRowTooltip", { name: m.user.username })}
-                              </TooltipContent>
-                            </Tooltip>
-                          </Can>
-                          <Can permission="org.manage_members">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              disabled={alreadyAnonymized}
-                              onClick={() => openAnonymizeDialog(m)}
-                              aria-label={`Anonymize ${m.user.username}`}
-                              title={
-                                alreadyAnonymized
-                                  ? "Already anonymized"
-                                  : "Anonymize user data (GDPR right-to-delete)"
-                              }
-                            >
-                              <UserMinusIcon className="size-4" />
-                            </Button>
-                          </Can>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
+        <Section title="People">
+          <DataTable
+            label="People"
+            controller={peopleController}
+            columns={peopleColumns}
+            getRowId={(g) => g.primary.user.id}
+            rowHref={(g) => `/administration/members/${g.primary.id}`}
+            searchPlaceholder={t("searchPlaceholder")}
+            empty={{
+              icon: <UsersIcon className="size-5" />,
+              title: "No members",
+              description: "Members appear here once role bindings are granted to users.",
+            }}
+            emptyFiltered={{
+              title: t("noMatchTitle"),
+              description: t("noMatchDescription", { term: membersTable.search.trim() }),
+            }}
+          />
         </Section>
 
-        <Section
-          title="Role bindings"
-          action={
-            <span className="text-muted-foreground text-xs">
-              {bindingList.length} binding{bindingList.length === 1 ? "" : "s"}
-            </span>
-          }
-        >
-          {bindings.loading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : bindingList.length === 0 ? (
-            <EmptyState
-              icon={<ShieldIcon className="size-5" />}
-              title="No role bindings"
-              description="Grant a system role to a user to give them access to the platform."
-            />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {canManageMembers && (
-                    <TableHead className="w-10">
-                      <input
-                        type="checkbox"
-                        aria-label={tBulk("selectAllLabel")}
-                        checked={
-                          bindingList.length > 0 &&
-                          bindingList.every((b) => selectedBindings.has(b.id))
-                        }
-                        onChange={() => toggleAllBindings(bindingList.map((b) => b.id))}
-                        className="size-4"
-                        disabled={bulkRevoking}
-                      />
-                    </TableHead>
-                  )}
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>{t("sourceColumn")}</TableHead>
-                  <TableHead>Granted</TableHead>
-                  <TableHead className="text-right">{t("actionsColumn")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {bindingList.map((b) => (
-                  <TableRow key={b.id}>
-                    {canManageMembers && (
-                      <TableCell>
-                        <input
-                          type="checkbox"
-                          aria-label={tBulk("selectRowLabel", {
-                            role: b.role.slug,
-                            subject: b.user?.username ?? `group:${b.groupExternalId}`,
-                          })}
-                          checked={selectedBindings.has(b.id)}
-                          onChange={() => toggleBinding(b.id)}
-                          className="size-4"
-                          disabled={bulkRevoking}
-                        />
-                      </TableCell>
-                    )}
-                    <TableCell>
-                      {b.user ? (
-                        <>
-                          <div className="font-medium">{b.user.username}</div>
-                          <div className="text-muted-foreground text-xs">{b.user.email}</div>
-                        </>
-                      ) : (
-                        <div className="font-mono text-xs">group:{b.groupExternalId}</div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">{b.role.name}</div>
-                      <div className="text-muted-foreground font-mono text-xs">{b.role.slug}</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1.5">
-                        <Badge className={scopeBadge[b.scopeKind]} variant="secondary">
-                          {b.scopeKind}
-                        </Badge>
-                        {b.sourceScopeLabel && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                className="text-muted-foreground hover:text-foreground inline-flex"
-                                aria-label={t("sourceTooltipAria", {
-                                  scope: b.sourceScopeLabel,
-                                })}
-                              >
-                                <InfoIcon className="size-3.5" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {t("rolePillTooltipPrefix", { scope: b.sourceScopeLabel })}
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {fmt.formatDate(b.grantedAt)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Can permission="org.manage_members">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setRevokeTarget({ kind: "binding", binding: b })}
-                          disabled={revoking || bulkRevoking}
-                        >
-                          <Trash2Icon className="size-4" />
-                          <span className="sr-only">Revoke</span>
-                        </Button>
-                      </Can>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+        <Section title="Role bindings">
+          <DataTable
+            label="Role bindings"
+            controller={bindingsTable}
+            columns={bindingColumns}
+            getRowId={(b) => b.id}
+            selection={canManageMembers ? bindingSelection : undefined}
+            bulkActions={(selection) => (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setConfirmBulkRevoke(true)}
+                disabled={bulkRevoking}
+              >
+                <Trash2Icon className="size-4" />
+                {tBulk("revokeButton", { count: selection.selectedCount })}
+              </Button>
+            )}
+            searchPlaceholder="Search by user, group, or role…"
+            empty={{
+              icon: <ShieldIcon className="size-5" />,
+              title: "No role bindings",
+              description: "Grant a system role to a user to give them access to the platform.",
+            }}
+            emptyFiltered={{
+              title: "No matching role bindings",
+              description:
+                "No binding matches this search. Try a username, an SSO group, or a role slug.",
+            }}
+          />
         </Section>
 
-        <Section
-          title="Invitations"
-          action={
-            resolvedInviteCount > 0 ? (
+        <Section title="Invitations">
+          <DataTable
+            label="Invitations"
+            controller={invitationsTable}
+            columns={invitationColumns}
+            getRowId={(inv) => inv.id}
+            toolbar={
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowResolvedInvites((v) => !v)}
+                onClick={() => setInviteStatus(showingPendingOnly ? null : "pending")}
               >
-                {showResolvedInvites
-                  ? "Hide resolved"
-                  : `Show resolved (${resolvedInviteCount})`}
+                {showingPendingOnly ? "Show resolved" : "Hide resolved"}
               </Button>
-            ) : undefined
-          }
-        >
-          {invitations.loading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : visibleInvitations.length === 0 ? (
-            <EmptyState
-              icon={<MailIcon className="size-5" />}
-              title={resolvedInviteCount > 0 ? "No pending invitations" : "No invitations"}
-              description={
-                resolvedInviteCount > 0
-                  ? "Resolved invitations are hidden — use Show resolved to review or delete them."
-                  : "Use Invite to send a one-time accept link. Tokens are hashed at rest; the plaintext is shown once at creation."
-              }
-            />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Expires</TableHead>
-                  <TableHead>Invited by</TableHead>
-                  <TableHead className="w-12"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {visibleInvitations.map((inv) => (
-                  <TableRow key={inv.id}>
-                    <TableCell className="font-medium">{inv.email}</TableCell>
-                    <TableCell>
-                      {inv.roleSlug ? (
-                        <Badge variant="outline" className="font-mono text-xs">
-                          {inv.roleSlug}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={inv.status === "pending" ? "default" : "secondary"}
-                        className="capitalize"
-                      >
-                        {inv.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {inv.status === "pending" ? (
-                        <InvitationExpiryBadge expiresAt={inv.expiresAt} />
-                      ) : (
-                        <span className="text-muted-foreground text-sm">
-                          {fmt.formatDate(inv.expiresAt)}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <InviterCell invitation={inv} />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {inv.status !== "pending" && (
-                        <Can permission="org.manage_members">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setDeleteInviteTarget(inv)}
-                                disabled={deletingInvite}
-                                aria-label={`Delete resolved invitation for ${inv.email}`}
-                              >
-                                <Trash2Icon className="size-4" />
-                                <span className="sr-only">Delete</span>
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Delete this resolved invitation</TooltipContent>
-                          </Tooltip>
-                        </Can>
-                      )}
-                      {inv.status === "pending" && (
-                        <Can permission="org.manage_members">
-                          <div className="flex items-center justify-end gap-1">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => void handleResendInvite(inv)}
-                                  disabled={resendingInvite || revokingInvite}
-                                  aria-label={`Resend invitation to ${inv.email}`}
-                                >
-                                  <SendIcon className="size-4" />
-                                  <span className="sr-only">Resend</span>
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Resend invitation</TooltipContent>
-                            </Tooltip>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() =>
-                                setRevokeTarget({
-                                  kind: "invitation",
-                                  invitation: inv,
-                                })
-                              }
-                              disabled={revokingInvite}
-                            >
-                              <Trash2Icon className="size-4" />
-                              <span className="sr-only">Revoke</span>
-                            </Button>
-                          </div>
-                        </Can>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+            }
+            searchPlaceholder="Search by email, role, or inviter…"
+            empty={{
+              icon: <MailIcon className="size-5" />,
+              title: showingPendingOnly ? "No pending invitations" : "No invitations",
+              description: showingPendingOnly
+                ? "Resolved invitations are hidden — use Show resolved to review or delete them."
+                : "Use Invite to send a one-time accept link. Tokens are hashed at rest; the plaintext is shown once at creation.",
+            }}
+            emptyFiltered={{
+              title: "No matching invitations",
+              description: "No invitation matches this search under the current status filter.",
+            }}
+          />
         </Section>
-
-        {canManageMembers && selectedBindings.size > 0 && (
-          // Sticky bulk action bar — surfaces only while a selection is
-          // live. Mirrors the approvals-queue footer so the muscle memory
-          // ("checkbox → sticky bar → confirm") transfers across pages.
-          <div className="bg-background pointer-events-auto fixed inset-x-0 bottom-0 z-30 border-t shadow-lg">
-            <div className="mx-auto flex max-w-5xl flex-col items-stretch gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm font-medium">
-                {tBulk("selected", { count: selectedBindings.size })}
-              </p>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <Button
-                  variant="ghost"
-                  onClick={() => setSelectedBindings(new Set())}
-                  disabled={bulkRevoking}
-                  className="min-h-11 w-full sm:w-auto"
-                >
-                  {tBulk("clear")}
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => setConfirmBulkRevoke(true)}
-                  disabled={bulkRevoking}
-                  className="min-h-11 w-full sm:w-auto"
-                >
-                  <Trash2Icon className="size-4" />
-                  {tBulk("revokeButton", { count: selectedBindings.size })}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
 
         <ConfirmDialog
           open={confirmBulkRevoke}
           onOpenChange={setConfirmBulkRevoke}
-          title={tBulk("confirm.title", { count: selectedBindings.size })}
+          title={tBulk("confirm.title", { count: bindingSelection.selectedCount })}
           description={tBulk("confirm.description")}
-          confirmLabel={tBulk("confirm.confirmLabel", { count: selectedBindings.size })}
+          confirmLabel={tBulk("confirm.confirmLabel", { count: bindingSelection.selectedCount })}
           destructive
           onConfirm={handleBulkRevoke}
         />
@@ -892,6 +830,20 @@ export function MembersClient() {
           initialUserLabel={grantForMember?.user.username ?? null}
         />
         <InviteDialog open={inviteOpen} onOpenChange={setInviteOpen} />
+
+        <ConfirmDialog
+          open={resendTarget !== null}
+          onOpenChange={(next) => {
+            if (!next) setResendTarget(null);
+          }}
+          title={`Re-send invitation to ${resendTarget?.email ?? ""}?`}
+          description="A fresh one-time link is generated and emailed. The link this person already has stops working immediately, so re-send only if the original was lost or never arrived."
+          confirmLabel="Re-send invitation"
+          onConfirm={async () => {
+            if (!resendTarget) return;
+            await handleResendInvite(resendTarget);
+          }}
+        />
 
         <ConfirmDialog
           open={deleteInviteTarget !== null}

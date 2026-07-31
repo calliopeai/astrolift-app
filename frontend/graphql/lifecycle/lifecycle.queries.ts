@@ -78,6 +78,110 @@ export const LIST_DEPLOYMENTS = gql`
   }
 `;
 
+/**
+ * Cursor-paginated companion to ``LIST_DEPLOYMENTS`` (#1230).
+ *
+ * Speaks the platform page envelope — ``{ items, nextCursor, totalCount }``
+ * out, ``limit`` + ``after`` in — so ``useCursorTable`` walks the whole
+ * result set on the server instead of the surface fetching a capped slice
+ * and paginating it in the browser, which is how deployment 101 became
+ * unreachable from ``/deployments``.
+ *
+ * Filters compose intersectionally and are passed as static controller
+ * variables, so changing one restarts the walk at page one. ``statuses``
+ * is the plural filter (the field also takes a single ``status``);
+ * ``isPreview`` splits preview-environment deployments from the rest.
+ * The field takes no sort argument, so its table declares no
+ * ``sortVariable`` and no ``Column.sortKey``.
+ *
+ * The row selection is a spreadable fragment rather than a plain
+ * template-literal constant because this file IS in the codegen document
+ * set — ``graphql-tag-pluck`` cannot resolve a bare ``${FIELDS}``
+ * interpolation and (with ``noSilentErrors``) would fail the run.
+ * ``LIST_DEPLOYMENTS`` keeps its inline copy until its last consumer is
+ * migrated, then goes away with it.
+ */
+const DEPLOYMENT_FIELDS = gql`
+  fragment DeploymentFields on AstroliftDeployment {
+    id
+    registeredAppSlug
+    environmentName
+    workloadSlug
+    triggerKind
+    strategy
+    status
+    imageTag
+    imageDigest
+    clusterRevision
+    approvalsRequired
+    approvalsReceived
+    requiredApproverCount
+    startedAt
+    succeededAt
+    failedAt
+    endedAt
+    durationSeconds
+    createdAt
+    commitSha
+    commitMessage
+    commitAuthor
+    commitAuthorAvatarUrl
+    branch
+    prNumber
+    prUrl
+    ciActorKind
+    ciProvider
+    ciRunUrl
+    repoUrl
+    abortedReason
+    triggeredByUserId
+    triggeredByMe
+    approvedBy {
+      userId
+      displayName
+      email
+      approvedAt
+      mailtoUrl
+    }
+    awaitingApprovers {
+      userId
+      displayName
+      email
+      approvedAt
+      mailtoUrl
+    }
+  }
+`;
+
+export const LIST_DEPLOYMENTS_PAGE = gql`
+  ${DEPLOYMENT_FIELDS}
+  query ListDeploymentsPage(
+    $appSlug: String
+    $environmentName: String
+    $statuses: [String!]
+    $isPreview: Boolean
+    $search: String
+    $limit: Int
+    $after: String
+  ) {
+    astroliftDeploymentsPage(
+      appSlug: $appSlug
+      environmentName: $environmentName
+      statuses: $statuses
+      isPreview: $isPreview
+      search: $search
+      limit: $limit
+      after: $after
+    ) {
+      items {
+        ...DeploymentFields
+      }
+      nextCursor
+      totalCount
+    }
+  }
+`;
+
 export const GET_DEPLOYMENT = gql`
   query GetDeployment($id: String!) {
     astroliftDeployment(id: $id) {
@@ -362,6 +466,38 @@ export const LIST_APP_DEPLOY_TOKENS = gql`
       isRevoked
       lastRotatedAt
       createdAt
+    }
+  }
+`;
+
+const DEPLOY_TOKEN_FIELDS = gql`
+  fragment DeployTokenFields on AstroliftDeployToken {
+    id
+    name
+    last4
+    scopes
+    expiresAt
+    lastUsedAt
+    lastUsedIp
+    lastUsedAgent
+    isRevoked
+    lastRotatedAt
+    createdAt
+  }
+`;
+
+// Cursor-paginated companion to ``LIST_APP_DEPLOY_TOKENS`` (#1230).
+// ``appSlug`` stays required — a deploy token only exists in the context
+// of one app, so there is no all-apps page to fall back to.
+export const LIST_APP_DEPLOY_TOKENS_PAGE = gql`
+  ${DEPLOY_TOKEN_FIELDS}
+  query ListAppDeployTokensPage($appSlug: String!, $search: String, $limit: Int, $after: String) {
+    astroliftAppDeployTokensPage(appSlug: $appSlug, search: $search, limit: $limit, after: $after) {
+      items {
+        ...DeployTokenFields
+      }
+      nextCursor
+      totalCount
     }
   }
 `;

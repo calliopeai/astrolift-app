@@ -1,7 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
-import { useRouter } from "next/navigation";
+import { useMutation } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
   CheckCircle2Icon,
@@ -15,9 +14,8 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { EmptyState } from "@/components/EmptyState";
-import { ListControls, SortableHeader } from "@/components/ListControls";
 import { PageShell } from "@/components/PageShell";
+import { DataTable, useCursorTable, type Column } from "@/components/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -31,20 +29,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { useListControls } from "@/hooks/use-list-controls";
 import { CREATE_API_TOKEN, REVOKE_API_TOKEN } from "@/graphql/identity/identity.mutations";
-import { LIST_API_TOKENS } from "@/graphql/identity/identity.queries";
+import { LIST_API_TOKENS_PAGE } from "@/graphql/identity/identity.queries";
 import type {
   AstroliftApiToken,
   AstroliftApiTokenPlaintext,
@@ -52,7 +40,11 @@ import type {
 } from "@/graphql/identity/identity.types";
 
 interface Resp {
-  astroliftApiTokens: AstroliftApiToken[];
+  astroliftApiTokensPage: {
+    items: AstroliftApiToken[];
+    nextCursor?: string | null;
+    totalCount?: number | null;
+  };
 }
 
 // Mirror of backend ALLOWED_SCOPES (astrolift_identity/api_tokens.py).
@@ -91,19 +83,29 @@ export function TokensClient() {
   const [createdToken, setCreatedToken] = React.useState<AstroliftApiTokenPlaintext | null>(null);
   const [revokeTarget, setRevokeTarget] = React.useState<AstroliftApiToken | null>(null);
 
-  const tokens = useQuery<Resp>(LIST_API_TOKENS, { fetchPolicy: "cache-and-network" });
+  const table = useCursorTable<AstroliftApiToken>({
+    query: LIST_API_TOKENS_PAGE,
+    extract: (d) => (d as Resp | undefined)?.astroliftApiTokensPage,
+    searchVariable: "search",
+    urlKey: "tok",
+  });
+
+  // Refetched by operation name, not by document: the walk's cursor, page
+  // size and search term live in the controller, so only the active query
+  // knows the variables of the page the operator is looking at.
+  const refetchPage = ["ListApiTokensPage"];
 
   const [createToken, { loading: creating }] = useMutation<{
     createApiToken: MutationResult<AstroliftApiTokenPlaintext>;
   }>(CREATE_API_TOKEN, {
-    refetchQueries: [{ query: LIST_API_TOKENS }],
+    refetchQueries: refetchPage,
     awaitRefetchQueries: true,
   });
 
   const [revokeToken, { loading: revoking }] = useMutation<{
     revokeApiToken: MutationResult<{ id: string; deleted: boolean }>;
   }>(REVOKE_API_TOKEN, {
-    refetchQueries: [{ query: LIST_API_TOKENS }],
+    refetchQueries: refetchPage,
     awaitRefetchQueries: true,
   });
 
@@ -158,32 +160,95 @@ export function TokensClient() {
     toast.success("Copied to clipboard");
   }
 
-  const router = useRouter();
-  const list = tokens.data?.astroliftApiTokens ?? [];
-
-  const ctrl = useListControls({
-    data: list,
-    searchFn: (t) => [t.name, t.tokenLast4, ...t.scopes].join(" "),
-    initialPageSize: 25,
-    initialSort: { key: "createdAt", dir: "desc" },
-    sortFn: (a, b, sort) => {
-      if (sort.key === "name") {
-        const cmp = a.name.localeCompare(b.name);
-        return sort.dir === "asc" ? cmp : -cmp;
-      }
-      if (sort.key === "createdAt") {
-        const cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        return sort.dir === "asc" ? cmp : -cmp;
-      }
-      if (sort.key === "lastUsedAt") {
-        const at = a.lastUsedAt ? new Date(a.lastUsedAt).getTime() : 0;
-        const bt = b.lastUsedAt ? new Date(b.lastUsedAt).getTime() : 0;
-        const cmp = at - bt;
-        return sort.dir === "asc" ? cmp : -cmp;
-      }
-      return 0;
+  const columns: Column<AstroliftApiToken>[] = [
+    {
+      id: "name",
+      header: "Name",
+      cellClassName: "font-medium",
+      cell: (t) => t.name,
     },
-  });
+    {
+      id: "suffix",
+      header: "Suffix",
+      width: "w-28",
+      cellClassName: "font-mono text-xs",
+      cell: (t) => `…${t.tokenLast4}`,
+    },
+    {
+      id: "scopes",
+      header: "Scopes",
+      cell: (t) => (
+        <div className="flex flex-wrap gap-1">
+          {t.scopes.length === 0 ? (
+            <span className="text-muted-foreground text-xs">none</span>
+          ) : (
+            t.scopes.map((s) => (
+              <Badge key={s} variant="outline" className="font-mono text-2xs">
+                {s}
+              </Badge>
+            ))
+          )}
+        </div>
+      ),
+    },
+    {
+      id: "lastUsed",
+      header: "Last used",
+      cellClassName: "text-muted-foreground text-xs",
+      cell: (t) => <LastUsedCell token={t} />,
+    },
+    {
+      id: "created",
+      header: "Created",
+      width: "w-28",
+      cellClassName: "text-muted-foreground text-sm",
+      cell: (t) => new Date(t.createdAt).toLocaleDateString(),
+    },
+    {
+      id: "expires",
+      header: "Expires",
+      width: "w-28",
+      cellClassName: "text-muted-foreground text-sm",
+      cell: (t) => (t.expiresAt ? new Date(t.expiresAt).toLocaleDateString() : "never"),
+    },
+    {
+      id: "status",
+      header: "Status",
+      width: "w-28",
+      cell: (t) =>
+        t.isRevoked ? (
+          <Badge variant="destructive" className="gap-1">
+            <AlertTriangleIcon className="size-3" />
+            revoked
+          </Badge>
+        ) : (
+          <Badge variant="secondary">active</Badge>
+        ),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      align: "right",
+      width: "w-24",
+      // The row is a stretched link (`rowHref`), whose ::after covers the
+      // whole row — the button has to sit above it to stay clickable.
+      cell: (t) => (
+        <div className="relative z-10 flex justify-end">
+          <Can permission="api_token.revoke">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setRevokeTarget(t)}
+              disabled={revoking || t.isRevoked}
+            >
+              <Trash2Icon className="size-4" />
+              <span className="sr-only">Revoke</span>
+            </Button>
+          </Can>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <TooltipProvider>
@@ -230,122 +295,25 @@ export function TokensClient() {
           </Card>
         )}
 
-        <Card>
-          <CardContent className="p-0">
-            {tokens.loading && list.length === 0 ? (
-              <div className="space-y-2 p-6">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-              </div>
-            ) : list.length === 0 ? (
-              <div className="p-6">
-                <EmptyState
-                  icon={<KeyIcon className="size-5" />}
-                  title="No API keys"
-                  description="Create one to authenticate the CLI, CI runs, or your own scripts against the platform."
-                />
-              </div>
-            ) : (
-              <>
-                <div className="border-b px-4 py-2">
-                  <ListControls controls={ctrl} searchPlaceholder="Search tokens…" />
-                </div>
-                <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>
-                      <SortableHeader sortKey="name" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                        Name
-                      </SortableHeader>
-                    </TableHead>
-                    <TableHead>Suffix</TableHead>
-                    <TableHead>Scopes</TableHead>
-                    <TableHead>
-                      <SortableHeader sortKey="lastUsedAt" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                        Last used
-                      </SortableHeader>
-                    </TableHead>
-                    <TableHead>
-                      <SortableHeader sortKey="createdAt" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                        Created
-                      </SortableHeader>
-                    </TableHead>
-                    <TableHead>Expires</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {ctrl.rows.map((t) => (
-                    <TableRow
-                      key={t.id}
-                      tabIndex={0}
-                      role="link"
-                      aria-label={`Open API token ${t.name}`}
-                      onClick={() => router.push(`/tokens/${t.id}`)}
-                      onKeyDown={(ev) => {
-                        if (ev.key === "Enter" || ev.key === " ") {
-                          ev.preventDefault();
-                          router.push(`/tokens/${t.id}`);
-                        }
-                      }}
-                      className="hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
-                    >
-                      <TableCell className="font-medium">{t.name}</TableCell>
-                      <TableCell className="font-mono text-xs">…{t.tokenLast4}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {t.scopes.length === 0 ? (
-                            <span className="text-muted-foreground text-xs">none</span>
-                          ) : (
-                            t.scopes.map((s) => (
-                              <Badge key={s} variant="outline" className="font-mono text-2xs">
-                                {s}
-                              </Badge>
-                            ))
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        <LastUsedCell token={t} />
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {new Date(t.createdAt).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {t.expiresAt ? new Date(t.expiresAt).toLocaleDateString() : "never"}
-                      </TableCell>
-                      <TableCell>
-                        {t.isRevoked ? (
-                          <Badge variant="destructive" className="gap-1">
-                            <AlertTriangleIcon className="size-3" />
-                            revoked
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary">active</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
-                        <Can permission="api_token.revoke">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setRevokeTarget(t)}
-                            disabled={revoking || t.isRevoked}
-                          >
-                            <Trash2Icon className="size-4" />
-                            <span className="sr-only">Revoke</span>
-                          </Button>
-                        </Can>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        <DataTable
+          label="API keys"
+          controller={table}
+          columns={columns}
+          getRowId={(t) => t.id}
+          rowHref={(t) => `/tokens/${t.id}`}
+          searchPlaceholder="Search tokens…"
+          empty={{
+            icon: <KeyIcon className="size-5" />,
+            title: "No API keys",
+            description:
+              "Create one to authenticate the CLI, CI runs, or your own scripts against the platform.",
+          }}
+          emptyFiltered={{
+            title: "No matching API keys",
+            description:
+              "No token matches that name, owner, team, or last-4 suffix. Clear the search to see every key.",
+          }}
+        />
 
         <Sheet
           open={open}
@@ -473,8 +441,12 @@ function LastUsedCell({ token }: { token: AstroliftApiToken }) {
   }
   return (
     <Tooltip>
+      {/* Above the row's stretched link, or the overlay eats the hover and
+          the IP / user-agent forensics never open. */}
       <TooltipTrigger asChild>
-        <span className="cursor-help underline decoration-dotted underline-offset-2">{ts}</span>
+        <span className="relative z-10 cursor-help underline decoration-dotted underline-offset-2">
+          {ts}
+        </span>
       </TooltipTrigger>
       <TooltipContent className="max-w-sm">
         <p className="font-mono text-2xs">IP: {token.lastUsedIp ?? "—"}</p>

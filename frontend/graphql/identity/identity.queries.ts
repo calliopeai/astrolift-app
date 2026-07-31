@@ -46,6 +46,55 @@ export const LIST_TEAMS = gql`
   }
 `;
 
+/**
+ * Cursor-paginated companions to the ``LIST_*`` documents above (#1230).
+ *
+ * Every one of them speaks the platform page envelope — ``{ items,
+ * nextCursor, totalCount }`` in, ``limit`` + ``after`` in — which is the
+ * shape ``useCursorTable`` consumes, so a table never has to fetch a
+ * capped list and slice it in the browser. The unpaginated siblings stay
+ * exported while the surfaces that still read them are migrated; delete
+ * each one with its last consumer and the row fragment stops being
+ * duplicated.
+ *
+ * Row selections are named fragments rather than plain template-literal
+ * constants on purpose: ``graphql-tag-pluck`` cannot resolve a bare
+ * ``${FIELDS}`` interpolation, which is why this whole file is excluded
+ * from codegen today (see ``codegen.ts``). Spreadable fragments are the
+ * documented way back in.
+ *
+ * None of these fields takes a sort argument, so their tables declare no
+ * ``sortVariable`` and no ``Column.sortKey``.
+ */
+const TEAM_FIELDS = gql`
+  fragment TeamFields on AstroliftTeam {
+    id
+    slug
+    name
+    organization {
+      id
+      slug
+      name
+    }
+    createdAt
+    updatedAt
+    deletedAt
+  }
+`;
+
+export const LIST_TEAMS_PAGE = gql`
+  ${TEAM_FIELDS}
+  query ListTeamsPage($search: String, $limit: Int, $after: String) {
+    astroliftTeamsPage(search: $search, limit: $limit, after: $after) {
+      items {
+        ...TeamFields
+      }
+      nextCursor
+      totalCount
+    }
+  }
+`;
+
 export const LIST_PROJECTS = gql`
   query ListProjects {
     astroliftProjects {
@@ -65,6 +114,40 @@ export const LIST_PROJECTS = gql`
       createdAt
       updatedAt
       deletedAt
+    }
+  }
+`;
+
+const PROJECT_FIELDS = gql`
+  fragment ProjectFields on AstroliftProject {
+    id
+    slug
+    name
+    organization {
+      id
+      slug
+      name
+    }
+    team {
+      id
+      slug
+      name
+    }
+    createdAt
+    updatedAt
+    deletedAt
+  }
+`;
+
+export const LIST_PROJECTS_PAGE = gql`
+  ${PROJECT_FIELDS}
+  query ListProjectsPage($search: String, $limit: Int, $after: String) {
+    astroliftProjectsPage(search: $search, limit: $limit, after: $after) {
+      items {
+        ...ProjectFields
+      }
+      nextCursor
+      totalCount
     }
   }
 `;
@@ -192,6 +275,31 @@ export const LIST_ROLES = gql`
   }
 `;
 
+const ROLE_FIELDS = gql`
+  fragment RoleFields on AstroliftRole {
+    id
+    slug
+    name
+    description
+    scopeLevel
+    permissions
+    isSystem
+  }
+`;
+
+export const LIST_ROLES_PAGE = gql`
+  ${ROLE_FIELDS}
+  query ListRolesPage($search: String, $limit: Int, $after: String) {
+    astroliftRolesPage(search: $search, limit: $limit, after: $after) {
+      items {
+        ...RoleFields
+      }
+      nextCursor
+      totalCount
+    }
+  }
+`;
+
 export const LIST_MEMBERS = gql`
   query ListMembers($search: String) {
     astroliftMembers(search: $search) {
@@ -211,6 +319,40 @@ export const LIST_MEMBERS = gql`
       lastActiveAt
       createdAt
       deletedAt
+    }
+  }
+`;
+
+const MEMBER_FIELDS = gql`
+  fragment MemberFields on AstroliftMember {
+    id
+    user {
+      id
+      username
+      email
+      isActive
+    }
+    scopeKind
+    scopeId
+    isActive
+    lifecycle
+    joinedAt
+    lastSeenAt
+    lastActiveAt
+    createdAt
+    deletedAt
+  }
+`;
+
+export const LIST_MEMBERS_PAGE = gql`
+  ${MEMBER_FIELDS}
+  query ListMembersPage($search: String, $limit: Int, $after: String) {
+    astroliftMembersPage(search: $search, limit: $limit, after: $after) {
+      items {
+        ...MemberFields
+      }
+      nextCursor
+      totalCount
     }
   }
 `;
@@ -263,6 +405,43 @@ export const LIST_ROLE_BINDINGS = gql`
   }
 `;
 
+const ROLE_BINDING_FIELDS = gql`
+  fragment RoleBindingFields on AstroliftRoleBinding {
+    id
+    user {
+      id
+      username
+      email
+    }
+    groupExternalId
+    role {
+      id
+      slug
+      name
+      scopeLevel
+    }
+    scopeKind
+    scopeId
+    sourceScopeLabel
+    grantedAt
+    expiresAt
+    inherits
+  }
+`;
+
+export const LIST_ROLE_BINDINGS_PAGE = gql`
+  ${ROLE_BINDING_FIELDS}
+  query ListRoleBindingsPage($search: String, $limit: Int, $after: String) {
+    astroliftRoleBindingsPage(search: $search, limit: $limit, after: $after) {
+      items {
+        ...RoleBindingFields
+      }
+      nextCursor
+      totalCount
+    }
+  }
+`;
+
 export const LIST_POLICIES = gql`
   query ListPolicies {
     astroliftPolicies {
@@ -283,6 +462,41 @@ export const LIST_POLICIES = gql`
       createdByUsername
       updatedByUsername
       version
+    }
+  }
+`;
+
+const POLICY_FIELDS = gql`
+  fragment PolicyFields on AstroliftPolicy {
+    id
+    slug
+    name
+    description
+    scopeLevel
+    scopeId
+    effect
+    actionPattern
+    resourcePattern
+    conditions
+    actorPattern
+    createdAt
+    updatedAt
+    deletedAt
+    createdByUsername
+    updatedByUsername
+    version
+  }
+`;
+
+export const LIST_POLICIES_PAGE = gql`
+  ${POLICY_FIELDS}
+  query ListPoliciesPage($search: String, $limit: Int, $after: String) {
+    astroliftPoliciesPage(search: $search, limit: $limit, after: $after) {
+      items {
+        ...PolicyFields
+      }
+      nextCursor
+      totalCount
     }
   }
 `;
@@ -360,6 +574,40 @@ export const LIST_API_TOKENS = gql`
   }
 `;
 
+const API_TOKEN_FIELDS = gql`
+  fragment ApiTokenFields on AstroliftApiToken {
+    id
+    name
+    user {
+      id
+      username
+      email
+    }
+    teamSlug
+    tokenLast4
+    scopes
+    expiresAt
+    lastUsedAt
+    lastUsedIp
+    lastUsedAgent
+    isRevoked
+    createdAt
+  }
+`;
+
+export const LIST_API_TOKENS_PAGE = gql`
+  ${API_TOKEN_FIELDS}
+  query ListApiTokensPage($search: String, $limit: Int, $after: String) {
+    astroliftApiTokensPage(search: $search, limit: $limit, after: $after) {
+      items {
+        ...ApiTokenFields
+      }
+      nextCursor
+      totalCount
+    }
+  }
+`;
+
 export const GET_MY_PROFILE = gql`
   query GetMyProfile {
     astroliftMyProfile {
@@ -405,6 +653,41 @@ export const LIST_INVITATIONS = gql`
       invitedByEmail
       invitedByAvatarUrl
       createdAt
+    }
+  }
+`;
+
+const INVITATION_FIELDS = gql`
+  fragment InvitationFields on AstroliftInvitation {
+    id
+    email
+    scopeKind
+    scopeId
+    roleSlug
+    status
+    expiresAt
+    acceptedAt
+    invitedByUsername
+    invitedByUserId
+    invitedByDisplayName
+    invitedByEmail
+    invitedByAvatarUrl
+    createdAt
+  }
+`;
+
+// ``status`` is the same single-value filter ``LIST_INVITATIONS`` takes
+// (pending / accepted / …), kept as a static variable so a status tab
+// resets the cursor walk rather than paging through a stale question.
+export const LIST_INVITATIONS_PAGE = gql`
+  ${INVITATION_FIELDS}
+  query ListInvitationsPage($status: String, $search: String, $limit: Int, $after: String) {
+    astroliftInvitationsPage(status: $status, search: $search, limit: $limit, after: $after) {
+      items {
+        ...InvitationFields
+      }
+      nextCursor
+      totalCount
     }
   }
 `;
