@@ -101,17 +101,28 @@ def _resolve_scope_pk_in_org(scope_kind: str, scope_guid: str, org_id: int | Non
     """Map a ``(scope_kind, guid)`` pair to its integer PK, but only when
     the referenced row belongs to ``org_id``.
 
-    A scope owned by another org — or an unsupported scope kind (APP is
-    not grantable here, matching the prior behaviour) — resolves to None
-    so a caller can't grant a role into a foreign tenant. ORG resolves
-    only when the guid *is* the caller's own org.
+    A scope owned by another org — or an unknown scope kind — resolves to
+    None so a caller can't grant a role into a foreign tenant. ORG
+    resolves only when the guid *is* the caller's own org. APP grants
+    (#1227) resolve the org-scoped RegisteredApp: the permission resolver
+    already honors APP-scope bindings, so this is the only gate between
+    the app_* roles and actually assigning them.
     """
-    if scope_kind == "ORG":
+    kind = (scope_kind or "").upper()
+    if kind == "ORG":
         row = Organization.objects.filter(guid=scope_guid, pk=org_id).first()
-    elif scope_kind == "TEAM":
+    elif kind == "TEAM":
         row = Team.objects.filter(guid=scope_guid, organization_id=org_id).first()
-    elif scope_kind == "PROJECT":
+    elif kind == "PROJECT":
         row = Project.objects.filter(guid=scope_guid, organization_id=org_id).first()
+    elif kind == "APP":
+        from astrolift_registry.models import RegisteredApp
+
+        row = RegisteredApp.objects.filter(
+            guid=scope_guid,
+            organization_id=org_id,
+            deleted_at__isnull=True,
+        ).first()
     else:
         return None
     return row.pk if row else None

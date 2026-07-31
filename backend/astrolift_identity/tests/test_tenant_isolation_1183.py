@@ -265,6 +265,78 @@ def test_grant_role_same_org_succeeds(permission_resolver):
     assert RoleBinding.objects.filter(user=target, role=role, scope_kind="ORG", scope_id=org.id).exists()
 
 
+def _app(org: Organization):
+    from astrolift_identity.models import Project, Team
+    from astrolift_registry.models import RegisteredApp
+
+    team = Team.objects.create(organization=org, name="Eng", slug=f"eng-{uuid.uuid4().hex[:6]}")
+    project = Project.objects.create(organization=org, team=team, name="P", slug=f"p-{uuid.uuid4().hex[:6]}")
+    return RegisteredApp.objects.create(
+        organization=org,
+        team=team,
+        project=project,
+        name="App",
+        slug=f"app-{uuid.uuid4().hex[:6]}",
+    )
+
+
+def test_grant_role_app_scope_succeeds_in_org(permission_resolver):
+    """App-scope grants resolve the org's own RegisteredApp (#1227) — the
+    permission resolver honors APP bindings, so denying the grant made the
+    app_* roles unassignable."""
+    org = _org("app-grant")
+    admin = _user()
+    target = _user()
+    _org_member(org, target)
+    app = _app(org)
+    role = _null_org_role("app-dev-1227")
+    permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
+
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=admin.id)):
+        result = IdentityMutation().grant_role(
+            _info(admin),
+            input=GrantRoleInput(
+                user_id=str(target.id),
+                role_id=GUID(str(role.guid)),
+                scope_kind="app",  # lowercase from a client normalizes fine
+                scope_guid=GUID(str(app.guid)),
+            ),
+        )
+
+    assert result.ok is True, result.errors
+    assert RoleBinding.objects.filter(user=target, role=role, scope_kind="APP", scope_id=app.id).exists()
+    # The auto-added Member row at APP scope lets middleware resolve tenant.
+    assert Member.objects.filter(user=target, scope_kind="APP", scope_id=app.id).exists()
+
+
+def test_grant_role_cannot_grant_on_another_orgs_app_scope(permission_resolver):
+    """Cross-tenant guard extends to APP scopes: a foreign org's app guid
+    reads as scope-not-found."""
+    victim = _org("victim-app")
+    victim_app = _app(victim)
+    caller = _org("attacker-app")
+    admin = _user()
+    target = _user()
+    _org_member(caller, target)
+    role = _null_org_role("app-dev-1227-x")
+    permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
+
+    with tenant_context(TenantContext(organization_id=caller.id, actor_user_id=admin.id)):
+        result = IdentityMutation().grant_role(
+            _info(admin),
+            input=GrantRoleInput(
+                user_id=str(target.id),
+                role_id=GUID(str(role.guid)),
+                scope_kind="APP",
+                scope_guid=GUID(str(victim_app.guid)),
+            ),
+        )
+
+    assert result.ok is False
+    assert result.errors[0].code == "NOT_FOUND"
+    assert not RoleBinding.objects.filter(user=target, scope_kind="APP").exists()
+
+
 # =====================================================================
 # Identity provider — SSO hijack (flagged CRITICAL)
 # =====================================================================
