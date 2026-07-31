@@ -42,6 +42,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from django.utils import timezone
+
 from astrolift_lifecycle.deploy_tokens import (
     DEFAULT_TTL_DAYS,
     issue_token,
@@ -559,9 +561,11 @@ def validate_astrolift_ci_secrets(
         )
 
     # 'current' = secret's updated_at is newer than the app's most recent
-    # CI-secrets push.  We track that via ``RegisteredApp.ci_secrets_pushed_at``
-    # when present; absent we surface None per CiSecretValidation contract.
-    pushed_at = getattr(app, "ci_secrets_pushed_at", None)
+    # CI-secrets push, tracked via ``RegisteredApp.ci_secrets_pushed_at``
+    # (stamped by the push path just before the PUTs land, #1221). Null
+    # marker (never pushed, or pushed before the field existed) surfaces
+    # None per CiSecretValidation contract.
+    pushed_at = app.ci_secrets_pushed_at
     out: list[CiSecretValidation] = []
     for name in _GITHUB_SECRET_NAMES:
         updated_at = present.get(name, "")
@@ -572,12 +576,14 @@ def validate_astrolift_ci_secrets(
         elif pushed_at is None or not updated_at:
             is_current = None
         else:
-            # GitHub returns ISO-8601 strings; tolerate Z suffix.
+            # GitHub returns ISO-8601 strings; tolerate Z suffix. GitHub's
+            # updated_at is second-granularity, so allow a small skew window
+            # rather than flagging a same-second push as stale.
             try:
                 import datetime as _dt
 
                 parsed = _dt.datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
-                is_current = parsed >= pushed_at
+                is_current = parsed >= pushed_at - _dt.timedelta(seconds=5)
             except (ValueError, TypeError):
                 is_current = None
         out.append(
@@ -765,6 +771,10 @@ def push_astrolift_ci_secrets(
         "ASTROLIFT_DEPLOY_TOKEN": new_token_plaintext,
     }
 
+    # Freshness marker for the validate path (#1221) — captured BEFORE the
+    # PUTs so the host-side ``updated_at`` of every pushed secret is ≥ it.
+    push_started_at = timezone.now()
+
     for name in _GITHUB_SECRET_NAMES:
         sealed = seal_secret_for_repo(public_key_b64, values[name])
         try:
@@ -784,6 +794,9 @@ def push_astrolift_ci_secrets(
                 error_code="SECRET_PUT_FAILED",
                 error_message=exc.message,
             )
+
+    app.ci_secrets_pushed_at = push_started_at
+    app.save(update_fields=["ci_secrets_pushed_at", "updated_at", "version"])
 
     return PushSecretsResult(
         ok=True,
@@ -922,6 +935,10 @@ def _push_gitlab_ci_variables(
         "ASTROLIFT_DEPLOY_TOKEN": new_token_plaintext,
     }
 
+    # Freshness marker for the validate path (#1221) — captured BEFORE the
+    # variable writes so any host-side update timestamp is ≥ it.
+    push_started_at = timezone.now()
+
     for name in _GITLAB_VARIABLE_NAMES:
         try:
             put_gitlab_project_variable(
@@ -938,6 +955,9 @@ def _push_gitlab_ci_variables(
                 error_code="SECRET_PUT_FAILED",
                 error_message=f"{name}: {exc.message}",
             )
+
+    app.ci_secrets_pushed_at = push_started_at
+    app.save(update_fields=["ci_secrets_pushed_at", "updated_at", "version"])
 
     return PushSecretsResult(
         ok=True,

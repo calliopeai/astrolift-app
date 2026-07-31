@@ -240,6 +240,12 @@ def test_push_secrets_rotates_token_and_pushes_all_five(
         "ASTROLIFT_DEPLOY_TOKEN",
     }
 
+    # Freshness marker stamped (#1221) — validate compares GitHub's
+    # per-secret updated_at against this; without it every validate
+    # reported 0/N healthy forever.
+    app_with_repo.refresh_from_db()
+    assert app_with_repo.ci_secrets_pushed_at is not None
+
 
 def test_push_secrets_sealed_values_round_trip(
     monkeypatch,

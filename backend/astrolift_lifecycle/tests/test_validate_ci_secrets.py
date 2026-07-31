@@ -264,3 +264,67 @@ def test_validate_requires_app_read(monkeypatch, org, app_with_repo, actor, gith
             input=ValidateAstroliftCiSecretsInput(app_slug=app_with_repo.slug),
         )
     assert not result.ok
+
+
+# ---- freshness against ci_secrets_pushed_at (#1221) ----------------
+
+
+def _validate(org, actor, app):
+    with _ctx(org):
+        return LifecycleMutation().validate_astrolift_ci_secrets(
+            _info(actor),
+            input=ValidateAstroliftCiSecretsInput(app_slug=app.slug),
+        )
+
+
+def test_validate_is_current_true_when_pushed_before_update(
+    monkeypatch, permission_resolver, org, app_with_repo, actor, github_app_connection
+):
+    import datetime as dt
+
+    permission_resolver.grant(Permission.APP_READ)
+    app_with_repo.ci_secrets_pushed_at = dt.datetime(2026, 5, 9, 23, 59, 0, tzinfo=dt.UTC)
+    app_with_repo.save(update_fields=["ci_secrets_pushed_at", "updated_at", "version"])
+    _install_fake_list(
+        monkeypatch,
+        secrets=[{"name": name, "updated_at": "2026-05-10T00:00:00Z"} for name in _FIVE],
+    )
+    result = _validate(org, actor, app_with_repo)
+    assert result.ok, result.errors
+    assert all(r.is_current is True for r in result.data.results)
+
+
+def test_validate_is_current_true_within_same_second_tolerance(
+    monkeypatch, permission_resolver, org, app_with_repo, actor, github_app_connection
+):
+    """GitHub's updated_at is second-granularity — a push stamped a moment
+    AFTER the second-truncated updated_at must still read as current."""
+    import datetime as dt
+
+    permission_resolver.grant(Permission.APP_READ)
+    app_with_repo.ci_secrets_pushed_at = dt.datetime(2026, 5, 10, 0, 0, 0, 900000, tzinfo=dt.UTC)
+    app_with_repo.save(update_fields=["ci_secrets_pushed_at", "updated_at", "version"])
+    _install_fake_list(
+        monkeypatch,
+        secrets=[{"name": name, "updated_at": "2026-05-10T00:00:00Z"} for name in _FIVE],
+    )
+    result = _validate(org, actor, app_with_repo)
+    assert result.ok, result.errors
+    assert all(r.is_current is True for r in result.data.results)
+
+
+def test_validate_is_current_false_when_secret_predates_push(
+    monkeypatch, permission_resolver, org, app_with_repo, actor, github_app_connection
+):
+    import datetime as dt
+
+    permission_resolver.grant(Permission.APP_READ)
+    app_with_repo.ci_secrets_pushed_at = dt.datetime(2026, 5, 10, 12, 0, 0, tzinfo=dt.UTC)
+    app_with_repo.save(update_fields=["ci_secrets_pushed_at", "updated_at", "version"])
+    _install_fake_list(
+        monkeypatch,
+        secrets=[{"name": name, "updated_at": "2026-05-10T00:00:00Z"} for name in _FIVE],
+    )
+    result = _validate(org, actor, app_with_repo)
+    assert result.ok, result.errors
+    assert all(r.is_current is False for r in result.data.results)

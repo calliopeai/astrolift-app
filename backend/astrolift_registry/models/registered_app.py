@@ -296,6 +296,14 @@ class RegisteredApp(NamedBaseCoreModel):
     ci_workflow_template_version = models.IntegerField(null=True, blank=True, db_index=True)
     ci_workflow_state = models.JSONField(default=dict, blank=True)
 
+    # When the platform last pushed the CI secrets bundle to the app's repo
+    # (#1221). Captured just BEFORE the secret PUTs land so the host-side
+    # ``updated_at`` of every pushed secret is ≥ it; the validate path compares
+    # against this to report per-secret freshness (``is_current``). Null means
+    # "never pushed (or pushed before this field existed)" — validate then
+    # reports freshness as unknown, not stale.
+    ci_secrets_pushed_at = models.DateTimeField(null=True, blank=True)
+
     default_tenant_cluster = models.ForeignKey(
         "astrolift_clusters.TenantCluster",
         related_name="registered_apps",
