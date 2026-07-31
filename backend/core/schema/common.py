@@ -17,6 +17,7 @@ from strawberry.types import Info
 # Validation / mutation result types
 # ---------------------------------------------------------------------------
 
+
 @strawberry.type(description="A field-level validation error.")
 class ValidationError:
     field: str
@@ -42,8 +43,7 @@ class MutationResult:
     def from_form_errors(cls, errors: dict) -> MutationResult:
         """Convert Django form errors dict to MutationResult."""
         flat_errors = [
-            ValidationError(field=field, messages=[str(m) for m in msgs])
-            for field, msgs in errors.items()
+            ValidationError(field=field, messages=[str(m) for m in msgs]) for field, msgs in errors.items()
         ]
         return cls(ok=False, errors=flat_errors)
 
@@ -63,6 +63,7 @@ def unpack_nested_errors(errors: dict, prefix: str | None = None) -> list[Valida
 # ---------------------------------------------------------------------------
 # Global ID utilities
 # ---------------------------------------------------------------------------
+
 
 class GlobalIDUtils:
     """Utility methods for working with relay Global IDs in Strawberry."""
@@ -107,23 +108,25 @@ class GlobalIDUtils:
         Falls back to Django's ContentType framework to resolve the model.
         """
         from django.apps import apps
+
         type_name, pk = GlobalIDUtils.from_global_id(global_id)
 
         # Try to find the model by iterating registered models
         for model in apps.get_models():
-            if model.__name__ == type_name or f'{model.__name__}Type' == type_name:
+            if model.__name__ == type_name or f"{model.__name__}Type" == type_name:
                 instance = model.objects.filter(pk=pk).first()
                 if instance:
                     return instance
 
         if raise_not_found:
-            raise GraphQLError(f'Object {global_id} not found')
+            raise GraphQLError(f"Object {global_id} not found")
         return None
 
 
 # ---------------------------------------------------------------------------
 # Permission-filtered queryset helper
 # ---------------------------------------------------------------------------
+
 
 def permission_filtered_queryset(queryset: QuerySet, info: Info) -> QuerySet:
     """Apply the model's permission-based queryset filtering.
@@ -133,7 +136,7 @@ def permission_filtered_queryset(queryset: QuerySet, info: Info) -> QuerySet:
         def get_queryset(cls, queryset, user) -> QuerySet
     """
     model = queryset.model
-    if hasattr(model, 'get_queryset'):
+    if hasattr(model, "get_queryset"):
         return model.get_queryset(queryset, info.context.user)
     return queryset
 
@@ -170,6 +173,7 @@ def scope_to_caller_org(queryset: QuerySet, info: Info, *, fk_path: str) -> Quer
 # Case-insensitive ordering filter (for django-filter integration)
 # ---------------------------------------------------------------------------
 
+
 class CaseInsensitiveOrderingFilter(django_filters.OrderingFilter):
     """Ordering filter that sorts case-insensitively."""
 
@@ -177,8 +181,9 @@ class CaseInsensitiveOrderingFilter(django_filters.OrderingFilter):
         if value in EMPTY_VALUES:
             return qs
         from django.db.models.functions import Lower
+
         for param in value:
-            if param.startswith('-'):
+            if param.startswith("-"):
                 qs = qs.order_by(Lower(param[1:])).reverse()
             else:
                 qs = qs.order_by(Lower(param))
@@ -188,6 +193,7 @@ class CaseInsensitiveOrderingFilter(django_filters.OrderingFilter):
 # ---------------------------------------------------------------------------
 # Simple standalone types (no Django model backing)
 # ---------------------------------------------------------------------------
+
 
 @strawberry.type(description="A named counter.")
 class CounterType:

@@ -227,44 +227,75 @@ class TemporalWorkflowsQuery:
         return instance_to_type(row, _triggered_by_for(workflow_id, None if elevated else caller))
 
 
+def _workflows_qs(*, org_pk: int | None, search: str | None = None):
+    """Filtered, unordered tier-2 ``Workflow`` stream for one org.
+
+    Shared by the list field and its paginated sibling so the two can
+    never disagree about what a Workflow row is. Ordering is
+    deliberately not applied here — ``keyset_page`` imposes it from
+    the seek key.
+
+    ``org_pk`` is the caller's own org pk (already confirmed against a
+    supplied ``org_id`` guid by :func:`_org_pk_matches`). ``None``
+    matches no rows: ``Workflow.organization`` is a non-null FK, so
+    ``organization_id=None`` is an ``IS NULL`` that can never hit
+    (#1042 deny-by-default).
+    """
+    from workflows.models import Workflow
+
+    qs = Workflow.objects.filter(organization_id=org_pk, deleted_at__isnull=True).select_related(
+        "definition", "organization"
+    )
+    if search:
+        qs = qs.filter(
+            search_q(
+                search,
+                "name",
+                "slug",
+                "description",
+                "definition__name",
+                "definition__slug",
+            )
+        )
+    return qs
+
+
+def _workflow_definitions_qs(*, org_pk: int | None, search: str | None = None):
+    """Filtered, unordered tier-1 definition catalogue for one org.
+
+    The read scope is spec 40 §2.1: the org's own definitions UNION
+    every platform-global (null-org) template, via the blessed
+    ``visible_to_org`` base. Shared by the list field and its
+    paginated sibling; ordering is left to the caller / to
+    ``keyset_page``.
+
+    ``org_pk`` is the caller's own org pk (already confirmed against a
+    supplied ``org_id`` guid by :func:`_org_pk_matches`). ``None``
+    matches nothing — note this one cannot rely on an ``IS NULL``
+    never hitting: ``visible_to_org(None)`` would return every
+    platform-global template, so the empty case is explicit (#1042
+    deny-by-default).
+    """
+    from workflows.models import WorkflowDefinition
+
+    if org_pk is None:
+        return WorkflowDefinition.objects.none()
+    qs = (
+        WorkflowDefinition.visible_to_org(org_pk)
+        .filter(deleted_at__isnull=True)
+        .select_related("organization")
+    )
+    if search:
+        qs = qs.filter(search_q(search, "name", "slug", "description"))
+    return qs
+
+
 @strawberry.type
 class WorkflowsQuery:
     """Configured-Workflow read surface (spec 40 §6). Every resolver is
     ``WORKFLOW_READ``-gated + ``@tenant_scoped`` and applies the caller's
     org filter in the body (#1042 — the decorator only asserts a context
     exists; the org match is the actual scoping)."""
-
-    def _workflows_qs(self, *, org_pk: int | None, search: str | None = None):
-        """Filtered, unordered tier-2 ``Workflow`` stream for one org.
-
-        Shared by the list field and its paginated sibling so the two can
-        never disagree about what a Workflow row is. Ordering is
-        deliberately not applied here — ``keyset_page`` imposes it from
-        the seek key.
-
-        ``org_pk`` is the caller's own org pk (already confirmed against a
-        supplied ``org_id`` guid by :func:`_org_pk_matches`). ``None``
-        matches no rows: ``Workflow.organization`` is a non-null FK, so
-        ``organization_id=None`` is an ``IS NULL`` that can never hit
-        (#1042 deny-by-default).
-        """
-        from workflows.models import Workflow
-
-        qs = Workflow.objects.filter(organization_id=org_pk, deleted_at__isnull=True).select_related(
-            "definition", "organization"
-        )
-        if search:
-            qs = qs.filter(
-                search_q(
-                    search,
-                    "name",
-                    "slug",
-                    "description",
-                    "definition__name",
-                    "definition__slug",
-                )
-            )
-        return qs
 
     @strawberry.field(
         description="List the org's configured Workflows (tier 2).",
@@ -278,7 +309,7 @@ class WorkflowsQuery:
         caller, ok = _org_pk_matches(org_id)
         if not ok:
             return []
-        qs = self._workflows_qs(org_pk=caller).order_by("-created_at")
+        qs = _workflows_qs(org_pk=caller).order_by("-created_at")
         return [workflow_to_type(w) for w in qs]
 
     @strawberry.field(description="Cursor-paginated page of the org's configured Workflows (tier 2).")
@@ -304,7 +335,7 @@ class WorkflowsQuery:
         if not ok:
             return KeysetPage.empty().map(workflow_to_type)
         page = keyset_page(
-            self._workflows_qs(org_pk=caller, search=search),
+            _workflows_qs(org_pk=caller, search=search),
             cursor=after,
             limit=limit,
         )
@@ -330,35 +361,6 @@ class WorkflowsQuery:
             return None
         return workflow_to_type(wf, with_runs=True)
 
-    def _workflow_definitions_qs(self, *, org_pk: int | None, search: str | None = None):
-        """Filtered, unordered tier-1 definition catalogue for one org.
-
-        The read scope is spec 40 §2.1: the org's own definitions UNION
-        every platform-global (null-org) template, via the blessed
-        ``visible_to_org`` base. Shared by the list field and its
-        paginated sibling; ordering is left to the caller / to
-        ``keyset_page``.
-
-        ``org_pk`` is the caller's own org pk (already confirmed against a
-        supplied ``org_id`` guid by :func:`_org_pk_matches`). ``None``
-        matches nothing — note this one cannot rely on an ``IS NULL``
-        never hitting: ``visible_to_org(None)`` would return every
-        platform-global template, so the empty case is explicit (#1042
-        deny-by-default).
-        """
-        from workflows.models import WorkflowDefinition
-
-        if org_pk is None:
-            return WorkflowDefinition.objects.none()
-        qs = (
-            WorkflowDefinition.visible_to_org(org_pk)
-            .filter(deleted_at__isnull=True)
-            .select_related("organization")
-        )
-        if search:
-            qs = qs.filter(search_q(search, "name", "slug", "description"))
-        return qs
-
     @strawberry.field(
         description="Workflow definitions visible to the caller: their org's UNION all platform-global (spec 40 §2.1).",
         deprecation_reason=(
@@ -373,7 +375,7 @@ class WorkflowsQuery:
         caller, ok = _org_pk_matches(org_id)
         if not ok:
             return []
-        qs = self._workflow_definitions_qs(org_pk=caller).order_by("organization_id", "name")
+        qs = _workflow_definitions_qs(org_pk=caller).order_by("organization_id", "name")
         return [definition_summary(d) for d in qs]
 
     @strawberry.field(
@@ -409,7 +411,7 @@ class WorkflowsQuery:
         if not ok:
             return KeysetPage.empty().map(definition_summary)
         page = keyset_page(
-            self._workflow_definitions_qs(org_pk=caller, search=search).annotate(
+            _workflow_definitions_qs(org_pk=caller, search=search).annotate(
                 sort_name=Coalesce("name", Value(""))
             ),
             cursor=after,

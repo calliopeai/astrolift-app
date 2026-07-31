@@ -41,6 +41,16 @@ def _info(user):
     return SimpleNamespace(context=SimpleNamespace(user=user, request=None))
 
 
+class _FakeRequest:
+    """Minimal request stand-in for ``StrawberryContext`` (mirrors
+    ``core/tests/test_tenant_isolation.py``)."""
+
+    def __init__(self, user):
+        self.user = user
+        self.session = {}
+        self.headers = {}
+
+
 @pytest.fixture
 def caller(db):
     return User.objects.create(username="caller-1235", email="caller-1235@example.test")
@@ -72,9 +82,7 @@ def _db_org_slugs(**filters) -> list[str]:
     contractually required to reproduce.
     """
     return list(
-        Organization.objects.filter(**filters)
-        .order_by("-created_at", "-pk")
-        .values_list("slug", flat=True)
+        Organization.objects.filter(**filters).order_by("-created_at", "-pk").values_list("slug", flat=True)
     )
 
 
@@ -249,6 +257,75 @@ def test_organizations_list_and_page_agree_on_what_a_row_is(caller):
     paged = [o.slug for o in OrgQuery().organizations_page(_info(caller), search="Widgets").items]
     assert listed == paged
     assert "widgets-inc" not in paged
+
+
+def test_pages_resolve_through_the_schema_and_not_only_under_direct_call(caller):
+    """Every other test here constructs ``OrgQuery()``. A real request
+    does not: Strawberry passes the *root value* as ``self`` to a root
+    Query resolver and the view never sets one, so ``self`` is ``None``
+    over HTTP. A resolver reaching its queryset builder through
+    ``self._organizations_qs(...)`` raises ``AttributeError`` on every
+    real call while passing this whole module — that is why the builders
+    are module-level, and this is what pins it.
+
+    It also exercises the other thing direct invocation skips: these two
+    Page types carry raw Django model instances (``OrganizationType`` is
+    a ``strawberry_django`` type), so field resolution off the model is
+    only proven through the schema.
+    """
+    from config.schema import schema
+    from core.schema.context import StrawberryContext
+
+    alpha = _org("Alpha Co")
+    _join(alpha, caller)
+    _join(_org("Beta Co"), caller)
+
+    orgs = schema.execute_sync(
+        "{ organizationsPage(limit: 5) { items { name slug guid createdAt } totalCount nextCursor } }",
+        context_value=StrawberryContext(_FakeRequest(caller)),
+    )
+    assert orgs.errors is None, orgs.errors
+    page = orgs.data["organizationsPage"]
+    assert page["totalCount"] == 2
+    assert {o["slug"] for o in page["items"]} == {"alpha-co", "beta-co"}
+    assert all(o["guid"] and o["createdAt"] for o in page["items"]), "model fields did not resolve"
+    assert page["nextCursor"] is None
+
+    members = schema.execute_sync(
+        "{ membersPage(limit: 5) { items { isActive createdAt version } totalCount } }",
+        context_value=StrawberryContext(_FakeRequest(caller)),
+    )
+    assert members.errors is None, members.errors
+    assert members.data["membersPage"]["totalCount"] == 2
+    assert all(m["createdAt"] for m in members.data["membersPage"]["items"])
+
+
+def test_organizations_cursor_round_trips_through_the_schema(caller):
+    """The cursor a client receives has to be usable as an ``after``
+    variable on the next request — the whole contract of the field."""
+    from config.schema import schema
+    from core.schema.context import StrawberryContext
+
+    for n in range(5):
+        _join(_org(f"Round Trip {n}"), caller)
+
+    first = schema.execute_sync(
+        "{ organizationsPage(limit: 2) { items { slug } nextCursor } }",
+        context_value=StrawberryContext(_FakeRequest(caller)),
+    )
+    assert first.errors is None, first.errors
+    cursor = first.data["organizationsPage"]["nextCursor"]
+    assert cursor
+
+    second = schema.execute_sync(
+        "query($a: String) { organizationsPage(limit: 2, after: $a) { items { slug } } }",
+        variable_values={"a": cursor},
+        context_value=StrawberryContext(_FakeRequest(caller)),
+    )
+    assert second.errors is None, second.errors
+    seen = [o["slug"] for o in first.data["organizationsPage"]["items"]]
+    seen += [o["slug"] for o in second.data["organizationsPage"]["items"]]
+    assert seen == _db_org_slugs()[:4]
 
 
 # ===========================================================================

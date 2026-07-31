@@ -79,48 +79,49 @@ def _primary_app_namespace(cluster) -> str:
     return namespaces[0] if namespaces else "astrolift-system"
 
 
+def _clusters_qs(*, search: str | None = None):
+    """Filtered, unordered cluster inventory visible to the caller.
+
+    Shared by the list field and its paginated sibling so the two can
+    never disagree about which clusters exist. Platform-level rows
+    (``organization`` null) are readable by every org; org-owned rows
+    only by their own org — the same union ``astroliftClusterCount``
+    and the per-cluster resolvers apply. Ordering is deliberately not
+    applied here; ``keyset_page`` imposes it from the seek key.
+    """
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    if org_id is None:
+        # Fail closed (#1183). Defence in depth behind @tenant_scoped:
+        # with a null org the union below would degrade to "every
+        # platform-level cluster" rather than to nothing.
+        return TenantCluster.objects.none()
+    qs = TenantCluster.objects.filter(
+        Q(organization_id=org_id) | Q(organization_id__isnull=True),
+    ).select_related("organization", "provider_plugin")
+    if search:
+        qs = qs.filter(
+            search_q(
+                search,
+                "name",
+                "slug",
+                "endpoint",
+                "region",
+                "provider_plugin__slug",
+            )
+        )
+    return qs
+
+
 @strawberry.type
 class ClustersQuery:
-    def _clusters_qs(self, *, search: str | None = None):
-        """Filtered, unordered cluster inventory visible to the caller.
-
-        Shared by the list field and its paginated sibling so the two can
-        never disagree about which clusters exist. Platform-level rows
-        (``organization`` null) are readable by every org; org-owned rows
-        only by their own org — the same union ``astroliftClusterCount``
-        and the per-cluster resolvers apply. Ordering is deliberately not
-        applied here; ``keyset_page`` imposes it from the seek key.
-        """
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        if org_id is None:
-            # Fail closed (#1183). Defence in depth behind @tenant_scoped:
-            # with a null org the union below would degrade to "every
-            # platform-level cluster" rather than to nothing.
-            return TenantCluster.objects.none()
-        qs = TenantCluster.objects.filter(
-            Q(organization_id=org_id) | Q(organization_id__isnull=True),
-        ).select_related("organization", "provider_plugin")
-        if search:
-            qs = qs.filter(
-                search_q(
-                    search,
-                    "name",
-                    "slug",
-                    "endpoint",
-                    "region",
-                    "provider_plugin__slug",
-                )
-            )
-        return qs
-
     @strawberry.field(
         deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftClustersPage."
     )
     @require_permission(Permission.CLUSTER_REGISTER)
     @tenant_scoped()
     def astrolift_clusters(self, info: Info) -> list[TenantClusterType]:
-        qs = self._clusters_qs().order_by("slug")[:200]
+        qs = _clusters_qs().order_by("slug")[:200]
         return [cluster_to_type(c) for c in qs]
 
     @strawberry.field
@@ -152,7 +153,7 @@ class ClustersQuery:
         plugin's slug.
         """
         page = keyset_page(
-            self._clusters_qs(search=search),
+            _clusters_qs(search=search),
             cursor=after,
             limit=limit,
             sort_field="slug",

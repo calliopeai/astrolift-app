@@ -140,6 +140,193 @@ class MeType:
         ]
 
 
+def _teams_qs(*, search: str | None = None):
+    """Filtered, unordered team list for the caller's org.
+
+    Shared by the list field and its paginated sibling so the two
+    can't drift on what a visible team is. No ``order_by`` here —
+    ``keyset_page`` imposes the ordering from its seek key.
+    """
+    from core.tenancy import get_current_tenant
+
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    if org_id is None:
+        return Team.objects.none()
+    qs = Team.objects.filter(organization_id=org_id).select_related("organization")
+    term = (search or "").strip()
+    if term:
+        qs = qs.filter(search_q(term, "slug", "name", "description"))
+    return qs
+
+
+def _projects_qs(*, search: str | None = None):
+    """Filtered, unordered project list for the caller's org.
+
+    Shared by the list field and its paginated sibling; ordering is
+    left to ``keyset_page``.
+    """
+    from core.tenancy import get_current_tenant
+
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    if org_id is None:
+        return Project.objects.none()
+    qs = Project.objects.filter(organization_id=org_id).select_related("organization", "team")
+    term = (search or "").strip()
+    if term:
+        qs = qs.filter(search_q(term, "slug", "name", "description", "team__slug", "team__name"))
+    return qs
+
+
+def _members_qs(*, search: str | None = None):
+    """Filtered, unordered member list for the caller's org.
+
+    Shared by the list field and its paginated sibling so the two
+    can never disagree about which Member rows the caller may see.
+    Ordering is deliberately not applied — ``keyset_page`` imposes
+    it from the seek key.
+
+    ``search`` filters case-insensitively across username, email,
+    first_name, and last_name. The filter runs at the DB layer so
+    big orgs don't pull 500 rows just to grep them client-side.
+    """
+    from core.tenancy import get_current_tenant
+
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    if org_id is None:
+        return Member.objects.none()
+
+    # Scope to members of the caller org's own scopes (PII): the org
+    # itself plus its teams / projects / apps. Without this the
+    # resolver returned every Member row across every tenant.
+    qs = Member.objects.select_related("user").filter(_org_scope_q(org_id))
+    term = (search or "").strip()
+    if term:
+        qs = qs.filter(search_q(term, "user__username", "user__email", "user__first_name", "user__last_name"))
+    return qs
+
+
+def _invitations_qs(*, status: str | None = None, search: str | None = None):
+    """Filtered, unordered invitation list for the caller's org.
+
+    Shared by the list field and its paginated sibling; ordering is
+    left to ``keyset_page``. A ``None`` org id yields an empty
+    queryset rather than ``scope_id IS NULL`` — same (no) rows, but
+    the deny-by-default is stated rather than incidental (#1183).
+    """
+    from core.tenancy import get_current_tenant
+
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    if org_id is None:
+        return Invitation.objects.none()
+    qs = Invitation.objects.filter(
+        scope_kind=Invitation.ScopeKind.ORG,
+        scope_id=org_id,
+        deleted_at__isnull=True,
+    ).select_related("role", "invited_by")
+    if status:
+        qs = qs.filter(status=status)
+    term = (search or "").strip()
+    if term:
+        qs = qs.filter(
+            search_q(
+                term,
+                "email",
+                "role__slug",
+                "role__name",
+                "invited_by__username",
+                "invited_by__email",
+            )
+        )
+    return qs
+
+
+def _roles_qs(*, search: str | None = None):
+    """Roles visible to the caller: this org's custom roles plus the
+    system catalog. Unordered — ``keyset_page`` orders the page.
+    """
+    from core.tenancy import get_current_tenant
+
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    if org_id is None:
+        return Role.objects.none()
+    # System roles carry a null organization; custom roles are bound
+    # to the org. Another org's custom roles never surface.
+    qs = Role.objects.filter(Q(organization_id=org_id) | Q(organization__isnull=True))
+    term = (search or "").strip()
+    if term:
+        qs = qs.filter(search_q(term, "slug", "name", "description"))
+    return qs
+
+
+def _role_bindings_qs(*, search: str | None = None):
+    """Org-wide role bindings, filtered and unordered.
+
+    Shared by the list field and its paginated sibling. Ordering is
+    left to ``keyset_page`` — note the seek column is ``granted_at``
+    (the grant's own clock), not ``created_at``.
+    """
+    from core.tenancy import get_current_tenant
+
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    if org_id is None:
+        return RoleBinding.objects.none()
+    qs = RoleBinding.objects.select_related("user", "role").filter(_org_scope_q(org_id))
+    term = (search or "").strip()
+    if term:
+        qs = qs.filter(
+            search_q(
+                term,
+                "user__username",
+                "user__email",
+                "user__first_name",
+                "user__last_name",
+                "group_external_id",
+                "role__slug",
+                "role__name",
+            )
+        )
+    return qs
+
+
+def _api_tokens_qs(*, search: str | None = None):
+    """The caller org's API tokens, filtered and unordered."""
+    from core.tenancy import get_current_tenant
+
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    if org_id is None:
+        return ApiToken.objects.none()
+    qs = ApiToken.objects.filter(organization_id=org_id).select_related("user", "team")
+    term = (search or "").strip()
+    if term:
+        qs = qs.filter(search_q(term, "name", "user__username", "user__email", "team__slug", "token_last_4"))
+    return qs
+
+
+def _policies_qs(*, search: str | None = None):
+    """The caller org's ABAC policies, filtered and unordered."""
+    from core.tenancy import get_current_tenant
+
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    if org_id is None:
+        return Policy.objects.none()
+    # ``created_by`` / ``updated_by`` are FK columns on the Tracking
+    # mixin; ``select_related`` keeps the per-row username lookup
+    # inside the same query (no N+1 on the policies table — #466).
+    qs = Policy.objects.filter(organization_id=org_id).select_related("created_by", "updated_by")
+    term = (search or "").strip()
+    if term:
+        qs = qs.filter(search_q(term, "slug", "name", "description", "action_pattern"))
+    return qs
+
+
 @strawberry.type
 class IdentityQuery:
     @strawberry.field
@@ -206,32 +393,13 @@ class IdentityQuery:
             )[:100]
         return [organization_to_type(o) for o in orgs]
 
-    def _teams_qs(self, *, search: str | None = None):
-        """Filtered, unordered team list for the caller's org.
-
-        Shared by the list field and its paginated sibling so the two
-        can't drift on what a visible team is. No ``order_by`` here —
-        ``keyset_page`` imposes the ordering from its seek key.
-        """
-        from core.tenancy import get_current_tenant
-
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        if org_id is None:
-            return Team.objects.none()
-        qs = Team.objects.filter(organization_id=org_id).select_related("organization")
-        term = (search or "").strip()
-        if term:
-            qs = qs.filter(search_q(term, "slug", "name", "description"))
-        return qs
-
     @strawberry.field(
         deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftTeamsPage."
     )
     @require_permission(Permission.TEAM_READ)
     @tenant_scoped()
     def astrolift_teams(self, info: Info) -> list[TeamType]:
-        return [team_to_type(t) for t in self._teams_qs()[:200]]
+        return [team_to_type(t) for t in _teams_qs()[:200]]
 
     @strawberry.field
     @require_permission(Permission.TEAM_READ)
@@ -251,26 +419,8 @@ class IdentityQuery:
         unordered, so newest-first is the first stable order this
         surface has had. ``search`` matches slug, name, description.
         """
-        page = keyset_page(self._teams_qs(search=search), cursor=after, limit=limit)
+        page = keyset_page(_teams_qs(search=search), cursor=after, limit=limit)
         return page.map(team_to_type)
-
-    def _projects_qs(self, *, search: str | None = None):
-        """Filtered, unordered project list for the caller's org.
-
-        Shared by the list field and its paginated sibling; ordering is
-        left to ``keyset_page``.
-        """
-        from core.tenancy import get_current_tenant
-
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        if org_id is None:
-            return Project.objects.none()
-        qs = Project.objects.filter(organization_id=org_id).select_related("organization", "team")
-        term = (search or "").strip()
-        if term:
-            qs = qs.filter(search_q(term, "slug", "name", "description", "team__slug", "team__name"))
-        return qs
 
     @strawberry.field(
         deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftProjectsPage."
@@ -278,7 +428,7 @@ class IdentityQuery:
     @require_permission(Permission.PROJECT_READ)
     @tenant_scoped()
     def astrolift_projects(self, info: Info) -> list[ProjectType]:
-        return [project_to_type(p) for p in self._projects_qs()[:200]]
+        return [project_to_type(p) for p in _projects_qs()[:200]]
 
     @strawberry.field
     @require_permission(Permission.PROJECT_READ)
@@ -297,7 +447,7 @@ class IdentityQuery:
         project's own slug / name / description plus the owning team's
         slug and name, because operators navigate projects by team.
         """
-        page = keyset_page(self._projects_qs(search=search), cursor=after, limit=limit)
+        page = keyset_page(_projects_qs(search=search), cursor=after, limit=limit)
         return page.map(project_to_type)
 
     @strawberry.field
@@ -498,36 +648,6 @@ class IdentityQuery:
 
     # ---- RBAC queries ------------------------------------------------
 
-    def _members_qs(self, *, search: str | None = None):
-        """Filtered, unordered member list for the caller's org.
-
-        Shared by the list field and its paginated sibling so the two
-        can never disagree about which Member rows the caller may see.
-        Ordering is deliberately not applied — ``keyset_page`` imposes
-        it from the seek key.
-
-        ``search`` filters case-insensitively across username, email,
-        first_name, and last_name. The filter runs at the DB layer so
-        big orgs don't pull 500 rows just to grep them client-side.
-        """
-        from core.tenancy import get_current_tenant
-
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        if org_id is None:
-            return Member.objects.none()
-
-        # Scope to members of the caller org's own scopes (PII): the org
-        # itself plus its teams / projects / apps. Without this the
-        # resolver returned every Member row across every tenant.
-        qs = Member.objects.select_related("user").filter(_org_scope_q(org_id))
-        term = (search or "").strip()
-        if term:
-            qs = qs.filter(
-                search_q(term, "user__username", "user__email", "user__first_name", "user__last_name")
-            )
-        return qs
-
     @strawberry.field(
         deprecation_reason="Caps at 500 rows with no way to reach the 501st. Use astroliftMembersPage."
     )
@@ -544,7 +664,7 @@ class IdentityQuery:
         user, scoped to the current organization. Resolved in one
         aggregate query so the field doesn't fan out N+1 on member count.
         """
-        members = list(self._members_qs(search=search).order_by("-created_at")[:500])
+        members = list(_members_qs(search=search).order_by("-created_at")[:500])
         last_active = _last_active_by_user_id(members)
         return [member_to_type(m, last_active_at=last_active.get(m.user_id)) for m in members]
 
@@ -569,7 +689,7 @@ class IdentityQuery:
         — resolving it across the whole filtered set would scan the
         org's entire audit stream to render fifty rows.
         """
-        page = keyset_page(self._members_qs(search=search), cursor=after, limit=limit)
+        page = keyset_page(_members_qs(search=search), cursor=after, limit=limit)
         last_active = _last_active_by_user_id(page.rows)
         return page.map(lambda m: member_to_type(m, last_active_at=last_active.get(m.user_id)))
 
@@ -671,41 +791,6 @@ class IdentityQuery:
 
         return [approver_user_to_type(u, userinfo=userinfo_by_user_id.get(u.pk)) for u in users]
 
-    def _invitations_qs(self, *, status: str | None = None, search: str | None = None):
-        """Filtered, unordered invitation list for the caller's org.
-
-        Shared by the list field and its paginated sibling; ordering is
-        left to ``keyset_page``. A ``None`` org id yields an empty
-        queryset rather than ``scope_id IS NULL`` — same (no) rows, but
-        the deny-by-default is stated rather than incidental (#1183).
-        """
-        from core.tenancy import get_current_tenant
-
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        if org_id is None:
-            return Invitation.objects.none()
-        qs = Invitation.objects.filter(
-            scope_kind=Invitation.ScopeKind.ORG,
-            scope_id=org_id,
-            deleted_at__isnull=True,
-        ).select_related("role", "invited_by")
-        if status:
-            qs = qs.filter(status=status)
-        term = (search or "").strip()
-        if term:
-            qs = qs.filter(
-                search_q(
-                    term,
-                    "email",
-                    "role__slug",
-                    "role__name",
-                    "invited_by__username",
-                    "invited_by__email",
-                )
-            )
-        return qs
-
     @strawberry.field(
         deprecation_reason="Caps at 500 rows with no way to reach the 501st. Use astroliftInvitationsPage."
     )
@@ -720,7 +805,7 @@ class IdentityQuery:
         in one query so the invitation row can render the inviter's
         avatar URL (#418) without a per-row lookup.
         """
-        rows = list(self._invitations_qs(status=status).order_by("-created_at")[:500])
+        rows = list(_invitations_qs(status=status).order_by("-created_at")[:500])
         userinfo_by_user_id = _userinfo_by_inviter_id(rows)
         return [invitation_to_type(r, userinfo_by_user_id=userinfo_by_user_id) for r in rows]
 
@@ -748,27 +833,9 @@ class IdentityQuery:
         only, so it stays one small query per page instead of one over
         every invitation the org has ever sent.
         """
-        page = keyset_page(self._invitations_qs(status=status, search=search), cursor=after, limit=limit)
+        page = keyset_page(_invitations_qs(status=status, search=search), cursor=after, limit=limit)
         userinfo_by_user_id = _userinfo_by_inviter_id(page.rows)
         return page.map(lambda r: invitation_to_type(r, userinfo_by_user_id=userinfo_by_user_id))
-
-    def _roles_qs(self, *, search: str | None = None):
-        """Roles visible to the caller: this org's custom roles plus the
-        system catalog. Unordered — ``keyset_page`` orders the page.
-        """
-        from core.tenancy import get_current_tenant
-
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        if org_id is None:
-            return Role.objects.none()
-        # System roles carry a null organization; custom roles are bound
-        # to the org. Another org's custom roles never surface.
-        qs = Role.objects.filter(Q(organization_id=org_id) | Q(organization__isnull=True))
-        term = (search or "").strip()
-        if term:
-            qs = qs.filter(search_q(term, "slug", "name", "description"))
-        return qs
 
     @strawberry.field(
         deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftRolesPage."
@@ -776,7 +843,7 @@ class IdentityQuery:
     @require_permission(Permission.ORG_READ)
     @tenant_scoped()
     def astrolift_roles(self, info: Info) -> list[RoleType]:
-        return [role_to_type(r) for r in self._roles_qs().order_by("scope_level", "slug")[:200]]
+        return [role_to_type(r) for r in _roles_qs().order_by("scope_level", "slug")[:200]]
 
     @strawberry.field
     @require_permission(Permission.ORG_READ)
@@ -797,7 +864,7 @@ class IdentityQuery:
         the seeded system catalog. ``search`` matches slug, name,
         description — sort by name client-side if the table wants it.
         """
-        page = keyset_page(self._roles_qs(search=search), cursor=after, limit=limit)
+        page = keyset_page(_roles_qs(search=search), cursor=after, limit=limit)
         return page.map(role_to_type)
 
     # ---- Invite-flow polish (#418) -------------------------------------
@@ -1011,36 +1078,6 @@ class IdentityQuery:
                 grantable.append(r)
         return [role_to_type(r) for r in grantable]
 
-    def _role_bindings_qs(self, *, search: str | None = None):
-        """Org-wide role bindings, filtered and unordered.
-
-        Shared by the list field and its paginated sibling. Ordering is
-        left to ``keyset_page`` — note the seek column is ``granted_at``
-        (the grant's own clock), not ``created_at``.
-        """
-        from core.tenancy import get_current_tenant
-
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        if org_id is None:
-            return RoleBinding.objects.none()
-        qs = RoleBinding.objects.select_related("user", "role").filter(_org_scope_q(org_id))
-        term = (search or "").strip()
-        if term:
-            qs = qs.filter(
-                search_q(
-                    term,
-                    "user__username",
-                    "user__email",
-                    "user__first_name",
-                    "user__last_name",
-                    "group_external_id",
-                    "role__slug",
-                    "role__name",
-                )
-            )
-        return qs
-
     @strawberry.field(
         deprecation_reason="Caps at 500 rows with no way to reach the 501st. Use astroliftRoleBindingsPage."
     )
@@ -1056,7 +1093,7 @@ class IdentityQuery:
         one batch per kind to keep this O(scope-kinds) rather than
         O(bindings).
         """
-        qs = list(self._role_bindings_qs().order_by("-granted_at")[:500])
+        qs = list(_role_bindings_qs().order_by("-granted_at")[:500])
         labels = _resolve_source_scope_labels(qs)
         return [
             role_binding_to_type(rb, source_scope_label=labels.get((rb.scope_kind, rb.scope_id), ""))
@@ -1089,7 +1126,7 @@ class IdentityQuery:
         pagination it is decorating.
         """
         page = keyset_page(
-            self._role_bindings_qs(search=search),
+            _role_bindings_qs(search=search),
             cursor=after,
             limit=limit,
             sort_field="granted_at",
@@ -1101,29 +1138,13 @@ class IdentityQuery:
             )
         )
 
-    def _api_tokens_qs(self, *, search: str | None = None):
-        """The caller org's API tokens, filtered and unordered."""
-        from core.tenancy import get_current_tenant
-
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        if org_id is None:
-            return ApiToken.objects.none()
-        qs = ApiToken.objects.filter(organization_id=org_id).select_related("user", "team")
-        term = (search or "").strip()
-        if term:
-            qs = qs.filter(
-                search_q(term, "name", "user__username", "user__email", "team__slug", "token_last_4")
-            )
-        return qs
-
     @strawberry.field(
         deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftApiTokensPage."
     )
     @require_permission(Permission.API_TOKEN_CREATE)
     @tenant_scoped()
     def astrolift_api_tokens(self, info: Info) -> list[ApiTokenType]:
-        return [api_token_to_type(t) for t in self._api_tokens_qs().order_by("-created_at")[:200]]
+        return [api_token_to_type(t) for t in _api_tokens_qs().order_by("-created_at")[:200]]
 
     @strawberry.field
     @require_permission(Permission.API_TOKEN_CREATE)
@@ -1142,25 +1163,8 @@ class IdentityQuery:
         owner, its team, and ``token_last_4`` — the last four is what an
         operator has in hand when chasing a token seen in an audit log.
         """
-        page = keyset_page(self._api_tokens_qs(search=search), cursor=after, limit=limit)
+        page = keyset_page(_api_tokens_qs(search=search), cursor=after, limit=limit)
         return page.map(api_token_to_type)
-
-    def _policies_qs(self, *, search: str | None = None):
-        """The caller org's ABAC policies, filtered and unordered."""
-        from core.tenancy import get_current_tenant
-
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        if org_id is None:
-            return Policy.objects.none()
-        # ``created_by`` / ``updated_by`` are FK columns on the Tracking
-        # mixin; ``select_related`` keeps the per-row username lookup
-        # inside the same query (no N+1 on the policies table — #466).
-        qs = Policy.objects.filter(organization_id=org_id).select_related("created_by", "updated_by")
-        term = (search or "").strip()
-        if term:
-            qs = qs.filter(search_q(term, "slug", "name", "description", "action_pattern"))
-        return qs
 
     @strawberry.field(
         deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftPoliciesPage."
@@ -1168,7 +1172,7 @@ class IdentityQuery:
     @require_permission(Permission.ORG_READ)
     @tenant_scoped()
     def astrolift_policies(self, info: Info) -> list[PolicyType]:
-        return [policy_to_type(p) for p in self._policies_qs().order_by("scope_level", "slug")[:200]]
+        return [policy_to_type(p) for p in _policies_qs().order_by("scope_level", "slug")[:200]]
 
     @strawberry.field
     @require_permission(Permission.ORG_READ)
@@ -1189,7 +1193,7 @@ class IdentityQuery:
         policy an operator just wrote at the top. ``search`` matches
         slug, name, description, and ``action_pattern``.
         """
-        page = keyset_page(self._policies_qs(search=search), cursor=after, limit=limit)
+        page = keyset_page(_policies_qs(search=search), cursor=after, limit=limit)
         return page.map(policy_to_type)
 
     # ---- Domain allowlist --------------------------------------------

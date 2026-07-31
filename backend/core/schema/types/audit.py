@@ -58,40 +58,45 @@ def _audit_log_to_type(log) -> AuditLogEntry:
     )
 
 
+def _audit_logs_qs(
+    *,
+    operation: str | None = None,
+    user_id: str | None = None,
+    search: str | None = None,
+):
+    """Filtered, unordered mutation-audit stream.
+
+    Cross-tenant by design — ``MutationAuditLog`` carries no
+    organization column and the surface is superuser-only (see
+    ``_require_superuser``). Shared by the list field and its paginated
+    sibling so the two can never disagree about what an audit row is.
+    Ordering is deliberately not applied here — ``keyset_page`` imposes
+    it from the seek key.
+
+    Module-level rather than a method on ``AuditLogQuery``: Strawberry
+    passes the *root value* as ``self`` to a root Query resolver, and
+    the view never sets one, so ``self`` is ``None`` in every real
+    request. ``self._audit_logs_qs(...)`` raises ``AttributeError`` the
+    moment the field is served over HTTP — it only appears to work under
+    direct invocation in a test, where the caller constructs the class.
+    """
+    from core.schema.audit import MutationAuditLog
+
+    qs = MutationAuditLog.objects.select_related("user")
+    if operation:
+        qs = qs.filter(operation__icontains=operation)
+    if user_id:
+        qs = qs.filter(user_id=user_id)
+    if search:
+        qs = qs.filter(search_q(search, "operation", "user__username", "user__email"))
+    return qs
+
+
 @strawberry.type
 class AuditLogQuery:
-    def _audit_logs_qs(
-        self,
-        *,
-        operation: str | None = None,
-        user_id: str | None = None,
-        search: str | None = None,
-    ):
-        """Filtered, unordered mutation-audit stream.
-
-        Cross-tenant by design — ``MutationAuditLog`` carries no
-        organization column and the surface is superuser-only (see
-        ``_require_superuser``). Shared by the list field and its
-        paginated sibling so the two can never disagree about what an
-        audit row is. Ordering is deliberately not applied here —
-        ``keyset_page`` imposes it from the seek key.
-        """
-        from core.schema.audit import MutationAuditLog
-
-        qs = MutationAuditLog.objects.select_related("user")
-        if operation:
-            qs = qs.filter(operation__icontains=operation)
-        if user_id:
-            qs = qs.filter(user_id=user_id)
-        if search:
-            qs = qs.filter(search_q(search, "operation", "user__username", "user__email"))
-        return qs
-
     @strawberry.field(
         description="Query mutation audit logs. Superuser only.",
-        deprecation_reason=(
-            "Caps at 200 rows with no way to reach the 201st. Use auditLogsPage."
-        ),
+        deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use auditLogsPage.",
     )
     def audit_logs(
         self,
@@ -106,7 +111,7 @@ class AuditLogQuery:
         # ``limit: 999999999`` served the whole table in one response
         # (#1235). ``clamp_limit`` bounds it at 200; ``auditLogsPage``
         # is how a caller reaches past that now.
-        qs = self._audit_logs_qs(operation=operation, user_id=user_id).order_by("-timestamp", "-pk")
+        qs = _audit_logs_qs(operation=operation, user_id=user_id).order_by("-timestamp", "-pk")
         return [_audit_log_to_type(log) for log in qs[: clamp_limit(limit)]]
 
     @strawberry.field(description="Cursor-paginated mutation audit log. Superuser only.")
@@ -136,7 +141,7 @@ class AuditLogQuery:
         _require_superuser(info)
 
         page = keyset_page(
-            self._audit_logs_qs(operation=operation, user_id=user_id, search=search),
+            _audit_logs_qs(operation=operation, user_id=user_id, search=search),
             cursor=after,
             limit=limit,
             sort_field="timestamp",

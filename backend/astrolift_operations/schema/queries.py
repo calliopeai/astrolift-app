@@ -116,6 +116,160 @@ class AstroliftAppUptime:
     recent: list[AstroliftAppUptimePoint]
 
 
+def _events_qs(
+    *,
+    event_type: str | None = None,
+    severity: str | None = None,
+    app_slug: str | None = None,
+    search: str | None = None,
+):
+    """Filtered, unordered platform-event stream for the caller's org.
+
+    Shared by the raw list field, the aggregator, and both paginated
+    siblings so none of them can disagree about what an event row
+    is. Ordering is deliberately not applied — ``keyset_page``
+    imposes it from the seek key, and the two list callers apply
+    ``-occurred_at`` themselves.
+
+    Scopes the BASE queryset to the caller's org (#1183): without
+    this, the unfiltered Event stream leaked every org's events —
+    the app_slug path scoped its own JOIN but the default view did
+    not. org_id None → deny-by-default (matches nothing).
+    """
+    org_id = _caller_org_id()
+    if org_id is None:
+        return Event.objects.none()
+    qs = Event.objects.filter(organization_id=org_id)
+    if event_type:
+        qs = qs.filter(event_type=event_type)
+    if severity:
+        qs = qs.filter(severity=severity)
+    if app_slug:
+        qs = _filter_by_app_slug(qs, app_slug)
+    if search:
+        qs = qs.filter(
+            search_q(
+                search,
+                "event_type",
+                "resource_kind",
+                "resource_id",
+                "registered_app__slug",
+            )
+        )
+    return qs
+
+
+def _webhook_subscriptions_qs(*, app_slug: str | None, search: str | None = None):
+    """Filtered, unordered webhook subscriptions for the caller's org.
+
+    Shared by the list field and its paginated sibling so the two
+    can never disagree about which hooks are visible. Ordering is
+    left to the caller / ``keyset_page``.
+
+    Scope to the caller's org (#1183): WebhookSubscription owns an
+    organization FK. Without it, the app_slug branch matched a
+    same-slug app in any tenant and the org-wide branch listed
+    every tenant's global hooks. org_id None → deny-by-default.
+    """
+    org_id = _caller_org_id()
+    if org_id is None:
+        return WebhookSubscription.objects.none()
+    qs = WebhookSubscription.objects.filter(organization_id=org_id)
+    if app_slug:
+        qs = qs.filter(registered_app__slug=app_slug)
+    else:
+        qs = qs.filter(registered_app__isnull=True)
+    if search:
+        qs = qs.filter(search_q(search, "url"))
+    return qs
+
+
+def _webhook_deliveries_qs(*, subscription_id: GUID, search: str | None = None):
+    """Filtered, unordered delivery attempts for one subscription.
+
+    Tenant scoping rides on the subscription lookup — the org
+    clause on that fetch is what makes a sibling-org
+    ``subscription_id`` read as "no deliveries" rather than leaking
+    another tenant's fan-out history. org_id None → deny-by-default.
+    """
+    org_id = _caller_org_id()
+    if org_id is None:
+        return WebhookDelivery.objects.none()
+    sub = WebhookSubscription.objects.filter(
+        guid=str(subscription_id),
+        organization_id=org_id,
+        deleted_at__isnull=True,
+    ).first()
+    if sub is None:
+        return WebhookDelivery.objects.none()
+    qs = WebhookDelivery.objects.filter(subscription=sub).select_related("subscription")
+    if search:
+        qs = qs.filter(search_q(search, "event_type", "delivery_id", "error"))
+    return qs
+
+
+def _alert_rules_qs(
+    *,
+    target: str | None,
+    target_id: str | None,
+    active_only: bool,
+    search: str | None = None,
+):
+    """Filtered, unordered alert rules for the caller's org.
+
+    Shared by the list field and its paginated sibling. Ordering is
+    left to the caller / ``keyset_page``.
+
+    Scope to the caller's org (#1183): AlertRule owns a non-null
+    organization FK. Without it, every tenant's rules (predicates,
+    notify channels) were listed to all. org_id None →
+    deny-by-default.
+    """
+    org_id = _caller_org_id()
+    if org_id is None:
+        return AlertRule.objects.none()
+    qs = AlertRule.objects.select_related("organization").filter(organization_id=org_id)
+    if active_only:
+        qs = qs.filter(is_active=True)
+    if target:
+        qs = qs.filter(target=target)
+    if target_id:
+        qs = qs.filter(target_id=target_id)
+    if search:
+        qs = qs.filter(search_q(search, "name", "target_id"))
+    return qs
+
+
+def _alert_events_qs(
+    *,
+    rule_id: GUID | None,
+    unresolved_only: bool,
+    search: str | None = None,
+):
+    """Filtered, unordered alert-firing history for the caller's org.
+
+    Shared by the list field and its paginated sibling. Ordering is
+    left to the caller / ``keyset_page``.
+
+    Scope to the caller's org (#1183): without it, any tenant's
+    firing history (summaries + detail payloads) was visible to
+    all. Scope through the owning rule's org — consistent with the
+    existing rule__guid filter — so an event surfaces only when its
+    rule belongs to the caller. org_id None → deny-by-default.
+    """
+    org_id = _caller_org_id()
+    if org_id is None:
+        return AlertEvent.objects.none()
+    qs = AlertEvent.objects.select_related("rule").filter(rule__organization_id=org_id)
+    if rule_id is not None:
+        qs = qs.filter(rule__guid=str(rule_id))
+    if unresolved_only:
+        qs = qs.filter(resolved_at__isnull=True)
+    if search:
+        qs = qs.filter(search_q(search, "summary", "rule__name"))
+    return qs
+
+
 @strawberry.type
 class OperationsQuery:
     @strawberry.field
@@ -171,49 +325,6 @@ class OperationsQuery:
             ],
         )
 
-    def _events_qs(
-        self,
-        *,
-        event_type: str | None = None,
-        severity: str | None = None,
-        app_slug: str | None = None,
-        search: str | None = None,
-    ):
-        """Filtered, unordered platform-event stream for the caller's org.
-
-        Shared by the raw list field, the aggregator, and both paginated
-        siblings so none of them can disagree about what an event row
-        is. Ordering is deliberately not applied — ``keyset_page``
-        imposes it from the seek key, and the two list callers apply
-        ``-occurred_at`` themselves.
-
-        Scopes the BASE queryset to the caller's org (#1183): without
-        this, the unfiltered Event stream leaked every org's events —
-        the app_slug path scoped its own JOIN but the default view did
-        not. org_id None → deny-by-default (matches nothing).
-        """
-        org_id = _caller_org_id()
-        if org_id is None:
-            return Event.objects.none()
-        qs = Event.objects.filter(organization_id=org_id)
-        if event_type:
-            qs = qs.filter(event_type=event_type)
-        if severity:
-            qs = qs.filter(severity=severity)
-        if app_slug:
-            qs = _filter_by_app_slug(qs, app_slug)
-        if search:
-            qs = qs.filter(
-                search_q(
-                    search,
-                    "event_type",
-                    "resource_kind",
-                    "resource_id",
-                    "registered_app__slug",
-                )
-            )
-        return qs
-
     @strawberry.field(
         deprecation_reason=("Caps at 500 rows with no way to reach the 501st. Use astroliftEventsPage.")
     )
@@ -227,7 +338,7 @@ class OperationsQuery:
         severity: str | None = None,
         app_slug: str | None = None,
     ) -> list[EventType]:
-        qs = self._events_qs(
+        qs = _events_qs(
             event_type=event_type,
             severity=severity,
             app_slug=app_slug,
@@ -275,7 +386,7 @@ class OperationsQuery:
         # raw rows to fill ``capped_limit`` buckets even when most events
         # collapse 10:1.
         scan_cap = min(capped_limit * 50, 10_000)
-        qs = self._events_qs(
+        qs = _events_qs(
             event_type=event_type,
             severity=severity,
             app_slug=app_slug,
@@ -332,7 +443,7 @@ class OperationsQuery:
         scan_cap = min(page_size * 50, 10_000)
         window = max(1, aggregate_window_seconds)
         raw = keyset_page(
-            self._events_qs(
+            _events_qs(
                 event_type=event_type,
                 severity=severity,
                 app_slug=app_slug,
@@ -392,7 +503,7 @@ class OperationsQuery:
         ``search`` (#1235) is a free-text narrowing over event type,
         resource kind/id, and app slug — the same filter box the
         deprecated ``astroliftEvents`` list forced clients to apply
-        over a 200-row window.
+        client-side, over whatever fits under its 500-row cap.
 
         ``severity`` (``info`` | ``warn`` | ``error``) is an optional
         server-side filter (#540); it rides the composite
@@ -425,7 +536,7 @@ class OperationsQuery:
                 reason=ObservabilityPanelReason.NO_DATA_YET,
             )
         page = keyset_page(
-            self._events_qs(
+            _events_qs(
                 event_type=event_type,
                 severity=severity,
                 app_slug=app_slug,
@@ -663,30 +774,6 @@ class OperationsQuery:
         ]
         return [workflow_run_to_type(w) for w in qs]
 
-    def _webhook_subscriptions_qs(self, *, app_slug: str | None, search: str | None = None):
-        """Filtered, unordered webhook subscriptions for the caller's org.
-
-        Shared by the list field and its paginated sibling so the two
-        can never disagree about which hooks are visible. Ordering is
-        left to the caller / ``keyset_page``.
-
-        Scope to the caller's org (#1183): WebhookSubscription owns an
-        organization FK. Without it, the app_slug branch matched a
-        same-slug app in any tenant and the org-wide branch listed
-        every tenant's global hooks. org_id None → deny-by-default.
-        """
-        org_id = _caller_org_id()
-        if org_id is None:
-            return WebhookSubscription.objects.none()
-        qs = WebhookSubscription.objects.filter(organization_id=org_id)
-        if app_slug:
-            qs = qs.filter(registered_app__slug=app_slug)
-        else:
-            qs = qs.filter(registered_app__isnull=True)
-        if search:
-            qs = qs.filter(search_q(search, "url"))
-        return qs
-
     @strawberry.field(
         deprecation_reason=(
             "Caps at 200 rows with no way to reach the 201st. " "Use astroliftWebhookSubscriptionsPage."
@@ -704,7 +791,7 @@ class OperationsQuery:
         Without ``app_slug``: org-wide subscriptions (those not bound
         to any app). Pass ``app_slug`` to list per-app subscriptions
         scoped to that app's UI page (#281)."""
-        qs = self._webhook_subscriptions_qs(app_slug=app_slug).order_by("-created_at")
+        qs = _webhook_subscriptions_qs(app_slug=app_slug).order_by("-created_at")
         return [webhook_to_type(w) for w in qs[:200]]
 
     @strawberry.field
@@ -726,34 +813,11 @@ class OperationsQuery:
         subscription carries.
         """
         page = keyset_page(
-            self._webhook_subscriptions_qs(app_slug=app_slug, search=search),
+            _webhook_subscriptions_qs(app_slug=app_slug, search=search),
             cursor=after,
             limit=limit,
         )
         return page.map(webhook_to_type)
-
-    def _webhook_deliveries_qs(self, *, subscription_id: GUID, search: str | None = None):
-        """Filtered, unordered delivery attempts for one subscription.
-
-        Tenant scoping rides on the subscription lookup — the org
-        clause on that fetch is what makes a sibling-org
-        ``subscription_id`` read as "no deliveries" rather than leaking
-        another tenant's fan-out history. org_id None → deny-by-default.
-        """
-        org_id = _caller_org_id()
-        if org_id is None:
-            return WebhookDelivery.objects.none()
-        sub = WebhookSubscription.objects.filter(
-            guid=str(subscription_id),
-            organization_id=org_id,
-            deleted_at__isnull=True,
-        ).first()
-        if sub is None:
-            return WebhookDelivery.objects.none()
-        qs = WebhookDelivery.objects.filter(subscription=sub).select_related("subscription")
-        if search:
-            qs = qs.filter(search_q(search, "event_type", "delivery_id", "error"))
-        return qs
 
     @strawberry.field(
         deprecation_reason=(
@@ -776,7 +840,7 @@ class OperationsQuery:
         for a sibling-org subscription returns an empty list rather
         than leaking row counts."""
         capped = max(1, min(int(limit or 10), 100))
-        qs = self._webhook_deliveries_qs(subscription_id=subscription_id).order_by("-delivered_at")[:capped]
+        qs = _webhook_deliveries_qs(subscription_id=subscription_id).order_by("-delivered_at")[:capped]
         return [webhook_delivery_to_type(d) for d in qs]
 
     @strawberry.field
@@ -804,7 +868,7 @@ class OperationsQuery:
         the captured error text.
         """
         page = keyset_page(
-            self._webhook_deliveries_qs(subscription_id=subscription_id, search=search),
+            _webhook_deliveries_qs(subscription_id=subscription_id, search=search),
             cursor=after,
             limit=limit,
             sort_field="delivered_at",
@@ -970,38 +1034,6 @@ class OperationsQuery:
             qs = qs.filter(registered_app__slug=app_slug)
         return [user_alert_subscription_to_type(s) for s in qs]
 
-    def _alert_rules_qs(
-        self,
-        *,
-        target: str | None,
-        target_id: str | None,
-        active_only: bool,
-        search: str | None = None,
-    ):
-        """Filtered, unordered alert rules for the caller's org.
-
-        Shared by the list field and its paginated sibling. Ordering is
-        left to the caller / ``keyset_page``.
-
-        Scope to the caller's org (#1183): AlertRule owns a non-null
-        organization FK. Without it, every tenant's rules (predicates,
-        notify channels) were listed to all. org_id None →
-        deny-by-default.
-        """
-        org_id = _caller_org_id()
-        if org_id is None:
-            return AlertRule.objects.none()
-        qs = AlertRule.objects.select_related("organization").filter(organization_id=org_id)
-        if active_only:
-            qs = qs.filter(is_active=True)
-        if target:
-            qs = qs.filter(target=target)
-        if target_id:
-            qs = qs.filter(target_id=target_id)
-        if search:
-            qs = qs.filter(search_q(search, "name", "target_id"))
-        return qs
-
     @strawberry.field(
         deprecation_reason=("Caps at 200 rows with no way to reach the 201st. Use astroliftAlertRulesPage.")
     )
@@ -1019,7 +1051,7 @@ class OperationsQuery:
         Without ``target``: every rule visible to the tenant. Pass
         ``target=app|env|workload|global`` (and optionally
         ``target_id``) to scope to one target."""
-        qs = self._alert_rules_qs(
+        qs = _alert_rules_qs(
             target=target,
             target_id=target_id,
             active_only=active_only,
@@ -1050,7 +1082,7 @@ class OperationsQuery:
         field — an operator auditing muted/retired rules has to ask.
         """
         page = keyset_page(
-            self._alert_rules_qs(
+            _alert_rules_qs(
                 target=target,
                 target_id=target_id,
                 active_only=active_only,
@@ -1158,36 +1190,6 @@ class OperationsQuery:
             deploy_count=deploy_count,
         )
 
-    def _alert_events_qs(
-        self,
-        *,
-        rule_id: GUID | None,
-        unresolved_only: bool,
-        search: str | None = None,
-    ):
-        """Filtered, unordered alert-firing history for the caller's org.
-
-        Shared by the list field and its paginated sibling. Ordering is
-        left to the caller / ``keyset_page``.
-
-        Scope to the caller's org (#1183): without it, any tenant's
-        firing history (summaries + detail payloads) was visible to
-        all. Scope through the owning rule's org — consistent with the
-        existing rule__guid filter — so an event surfaces only when its
-        rule belongs to the caller. org_id None → deny-by-default.
-        """
-        org_id = _caller_org_id()
-        if org_id is None:
-            return AlertEvent.objects.none()
-        qs = AlertEvent.objects.select_related("rule").filter(rule__organization_id=org_id)
-        if rule_id is not None:
-            qs = qs.filter(rule__guid=str(rule_id))
-        if unresolved_only:
-            qs = qs.filter(resolved_at__isnull=True)
-        if search:
-            qs = qs.filter(search_q(search, "summary", "rule__name"))
-        return qs
-
     @strawberry.field(
         deprecation_reason=("Caps at 500 rows with no way to reach the 501st. Use astroliftAlertEventsPage.")
     )
@@ -1200,7 +1202,7 @@ class OperationsQuery:
         unresolved_only: bool = False,
         limit: int = 100,
     ) -> list[AlertEventType]:
-        qs = self._alert_events_qs(rule_id=rule_id, unresolved_only=unresolved_only).order_by("-fired_at")
+        qs = _alert_events_qs(rule_id=rule_id, unresolved_only=unresolved_only).order_by("-fired_at")
         return [alert_event_to_type(e) for e in qs[: max(1, min(limit, 500))]]
 
     @strawberry.field
@@ -1227,7 +1229,7 @@ class OperationsQuery:
         event summary and the owning rule's name.
         """
         page = keyset_page(
-            self._alert_events_qs(
+            _alert_events_qs(
                 rule_id=rule_id,
                 unresolved_only=unresolved_only,
                 search=search,

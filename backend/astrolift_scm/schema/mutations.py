@@ -378,6 +378,25 @@ def _get_or_create_app_install(org, *, app_id: str, account_login: str) -> Sourc
 # ---------------------------------------------------------------------------
 
 
+def _ci_drift_app(app_id) -> RegisteredApp | None:
+    """Org-scoped app lookup for the drift actions. Slugs/guids are
+    unique only within an org; fails closed (returns None) when the
+    tenant has no organization (#1183)."""
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    if org_id is None:
+        return None
+    return (
+        RegisteredApp.objects.filter(
+            guid=str(app_id),
+            organization_id=org_id,
+            deleted_at__isnull=True,
+        )
+        .select_related("organization")
+        .first()
+    )
+
+
 @strawberry.type
 class ScmMutation:
     @strawberry.field
@@ -1099,24 +1118,6 @@ class ScmMutation:
     # "Sync workflow file" button makes).
     # ----------------------------------------------------------------
 
-    def _ci_drift_app(self, app_id) -> RegisteredApp | None:
-        """Org-scoped app lookup for the drift actions. Slugs/guids are
-        unique only within an org; fails closed (returns None) when the
-        tenant has no organization (#1183)."""
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        if org_id is None:
-            return None
-        return (
-            RegisteredApp.objects.filter(
-                guid=str(app_id),
-                organization_id=org_id,
-                deleted_at__isnull=True,
-            )
-            .select_related("organization")
-            .first()
-        )
-
     @strawberry.field
     @mutation_audit(action="scm.ci_workflow.resync")
     @require_permission(Permission.APP_UPDATE)
@@ -1136,7 +1137,7 @@ class ScmMutation:
             sync_workflow_file_to_repo,
         )
 
-        app = self._ci_drift_app(input.app_id)
+        app = _ci_drift_app(input.app_id)
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appId")
 
@@ -1174,7 +1175,7 @@ class ScmMutation:
             adopt_repo_ci_workflow,
         )
 
-        app = self._ci_drift_app(input.app_id)
+        app = _ci_drift_app(input.app_id)
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appId")
 
@@ -1208,7 +1209,7 @@ class ScmMutation:
             evaluate_and_persist_sync_state,
         )
 
-        app = self._ci_drift_app(input.app_id)
+        app = _ci_drift_app(input.app_id)
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appId")
 
@@ -1295,7 +1296,7 @@ class ScmMutation:
             sync_workflow_file_to_repo,
         )
 
-        app = self._ci_drift_app(input.app_id)
+        app = _ci_drift_app(input.app_id)
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appId")
 
@@ -1305,9 +1306,7 @@ class ScmMutation:
         try:
             state = evaluate_and_persist_sync_state(app)
         except CiWorkflowFetchError as exc:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value, f"{exc.code}: {exc.message}", field="appId"
-            )
+            return gql_failure(ErrorCode.PRECONDITION.value, f"{exc.code}: {exc.message}", field="appId")
 
         if state not in (SyncState.REPO_DRIFT, SyncState.CONFLICT):
             return gql_failure(

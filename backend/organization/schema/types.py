@@ -50,7 +50,7 @@ class OrganizationMemberType:
     @strawberry_django.field
     async def member(self, info: Info) -> Optional[strawberry.scalars.JSON]:
         """Resolve member via the batch_load_users dataloader."""
-        loader = info.context.get_loader('load_user_by_id', batch_load_users)
+        loader = info.context.get_loader("load_user_by_id", batch_load_users)
         return await loader.load(self.member_id)
 
     @classmethod

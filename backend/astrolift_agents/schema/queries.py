@@ -896,7 +896,8 @@ class AgentsQuery:
 
     @strawberry.field(
         deprecation_reason=(
-            "Unbounded: returns every trigger bound to the agent in one response. " "Use agentTriggersPage."
+            "Unbounded: returns every trigger bound to the agent in one response. "
+            "Use agentTriggersPage instead."
         )
     )
     @require_permission(Permission.AGENT_READ)

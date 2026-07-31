@@ -761,6 +761,60 @@ def _caller_org_id() -> int | None:
     return tenant.organization_id if tenant is not None else None
 
 
+def _app_team_accesses_qs(*, app_slug: str, search: str | None = None):
+    """Filtered, unordered team-access rows for one app in the caller's org.
+
+    Shared by the list field and its paginated sibling so the two
+    can never disagree about which grants exist. Ordering is
+    deliberately not applied here — ``keyset_page`` imposes it from
+    the seek key.
+
+    The pre-#1235 resolver fetched the app first (org-scoped, live
+    only) and returned ``[]`` when it was missing; joining through
+    ``registered_app`` selects exactly that row set in one query and
+    keeps the org constraint on the query itself. ``AppTeamAccess``
+    has no organization FK of its own, so this join IS the tenant
+    boundary — ``@tenant_scoped`` only asserts a tenant exists.
+    Deny-by-default: no tenant context matches no rows (#1042/#1183).
+    """
+    org_id = _caller_org_id()
+    if org_id is None:
+        return AppTeamAccess.objects.none()
+    qs = AppTeamAccess.objects.select_related("registered_app", "team").filter(
+        registered_app__slug=app_slug,
+        registered_app__organization_id=org_id,
+        registered_app__deleted_at__isnull=True,
+        deleted_at__isnull=True,
+    )
+    if search:
+        qs = qs.filter(search_q(search, "team__slug", "team__name"))
+    return qs
+
+
+def _workloads_qs(*, app_slug: str | None, search: str | None = None):
+    """Filtered, unordered workload rows for the caller's org.
+
+    Shared by the list field and its paginated sibling so the two
+    can never disagree about what a workload row is. Ordering is
+    deliberately not applied here — ``keyset_page`` imposes it from
+    the seek key.
+
+    ``Workload`` has no organization FK of its own; it reaches the
+    tenant through ``registered_app``, and the default manager is
+    not tenant-aware — this filter IS the tenant boundary. Deny-by-
+    default: no tenant context matches no rows (#1042 / #1183).
+    """
+    org_id = _caller_org_id()
+    if org_id is None:
+        return Workload.objects.none()
+    qs = Workload.objects.select_related("registered_app").filter(registered_app__organization_id=org_id)
+    if app_slug:
+        qs = qs.filter(registered_app__slug=app_slug)
+    if search:
+        qs = qs.filter(search_q(search, "name", "slug", "kind", "registered_app__slug"))
+    return qs
+
+
 @strawberry.type
 class RegistryQuery:
     @strawberry.field
@@ -1146,35 +1200,6 @@ class RegistryQuery:
             include_retention_policies=True,
         )
 
-    def _app_team_accesses_qs(self, *, app_slug: str, search: str | None = None):
-        """Filtered, unordered team-access rows for one app in the caller's org.
-
-        Shared by the list field and its paginated sibling so the two
-        can never disagree about which grants exist. Ordering is
-        deliberately not applied here — ``keyset_page`` imposes it from
-        the seek key.
-
-        The pre-#1235 resolver fetched the app first (org-scoped, live
-        only) and returned ``[]`` when it was missing; joining through
-        ``registered_app`` selects exactly that row set in one query and
-        keeps the org constraint on the query itself. ``AppTeamAccess``
-        has no organization FK of its own, so this join IS the tenant
-        boundary — ``@tenant_scoped`` only asserts a tenant exists.
-        Deny-by-default: no tenant context matches no rows (#1042/#1183).
-        """
-        org_id = _caller_org_id()
-        if org_id is None:
-            return AppTeamAccess.objects.none()
-        qs = AppTeamAccess.objects.select_related("registered_app", "team").filter(
-            registered_app__slug=app_slug,
-            registered_app__organization_id=org_id,
-            registered_app__deleted_at__isnull=True,
-            deleted_at__isnull=True,
-        )
-        if search:
-            qs = qs.filter(search_q(search, "team__slug", "team__name"))
-        return qs
-
     @strawberry.field(
         deprecation_reason=(
             "Returns every grant in one unbounded response. " "Use astroliftAppTeamAccessesPage."
@@ -1190,7 +1215,7 @@ class RegistryQuery:
         Backfilled deployments will show exactly one row (the home
         team at ``OWNER``) until the operator grants more teams.
         """
-        rows = self._app_team_accesses_qs(app_slug=app_slug).order_by("team__slug")
+        rows = _app_team_accesses_qs(app_slug=app_slug).order_by("team__slug")
         # Every row in the set belongs to the one app the filter names,
         # so the app's home team comes off the select_related row rather
         # than a second fetch.
@@ -1225,7 +1250,7 @@ class RegistryQuery:
         FK and ``Team.slug`` a non-nullable slug field.
         """
         page = keyset_page(
-            self._app_team_accesses_qs(app_slug=app_slug, search=search),
+            _app_team_accesses_qs(app_slug=app_slug, search=search),
             cursor=after,
             limit=limit,
             sort_field="team__slug",
@@ -1233,29 +1258,6 @@ class RegistryQuery:
             descending=False,
         )
         return page.map(lambda r: app_team_access_to_type(r, home_team_id=r.registered_app.team_id))
-
-    def _workloads_qs(self, *, app_slug: str | None, search: str | None = None):
-        """Filtered, unordered workload rows for the caller's org.
-
-        Shared by the list field and its paginated sibling so the two
-        can never disagree about what a workload row is. Ordering is
-        deliberately not applied here — ``keyset_page`` imposes it from
-        the seek key.
-
-        ``Workload`` has no organization FK of its own; it reaches the
-        tenant through ``registered_app``, and the default manager is
-        not tenant-aware — this filter IS the tenant boundary. Deny-by-
-        default: no tenant context matches no rows (#1042 / #1183).
-        """
-        org_id = _caller_org_id()
-        if org_id is None:
-            return Workload.objects.none()
-        qs = Workload.objects.select_related("registered_app").filter(registered_app__organization_id=org_id)
-        if app_slug:
-            qs = qs.filter(registered_app__slug=app_slug)
-        if search:
-            qs = qs.filter(search_q(search, "name", "slug", "kind", "registered_app__slug"))
-        return qs
 
     @strawberry.field(
         deprecation_reason=("Caps at 200 rows with no way to reach the 201st. " "Use astroliftWorkloadsPage.")
@@ -1269,7 +1271,7 @@ class RegistryQuery:
         # Imposing one now would visibly reshuffle every one of them, so
         # the deprecated field keeps its exact behaviour; the page field
         # below defines its own (newest-first).
-        return [workload_to_type(w) for w in self._workloads_qs(app_slug=app_slug)[:200]]
+        return [workload_to_type(w) for w in _workloads_qs(app_slug=app_slug)[:200]]
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
@@ -1296,7 +1298,7 @@ class RegistryQuery:
         second round-trip.
         """
         page = keyset_page(
-            self._workloads_qs(app_slug=app_slug, search=search),
+            _workloads_qs(app_slug=app_slug, search=search),
             cursor=after,
             limit=limit,
         )

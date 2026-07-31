@@ -299,7 +299,12 @@ def test_task_runs_other_orgs_runs_are_invisible(app, task_workload, org, rival,
 
 def test_task_runs_page_and_deprecated_list_field_agree(app, task_workload, org, permission_resolver):
     """Both fields build on ``_task_runs_qs``; this pins that they cannot
-    drift into disagreeing about what a run row is."""
+    drift into disagreeing about *which rows* are a task run.
+
+    Row SETS, not sequences: the deprecated field orders on ``-created_at``
+    alone, so rows sharing a timestamp come back in an arbitrary order
+    there while the page walk breaks the tie on guid.
+    """
     permission_resolver.grant(Permission.APP_READ_LOGS)
     for n in range(6):
         _task_run(task_workload, status=TaskRun.Status.FAILED.value if n % 2 else "succeeded")
@@ -309,7 +314,8 @@ def test_task_runs_page_and_deprecated_list_field_agree(app, task_workload, org,
         listed = query.astrolift_task_runs(_info(), status=TaskRun.Status.FAILED.value, limit=100)
     walked = _walk(query.astrolift_task_runs_page, org, limit=2, status=TaskRun.Status.FAILED.value)
 
-    assert [str(r.id) for r in listed] == walked
+    assert len(walked) == 3
+    assert {str(r.id) for r in listed} == set(walked)
 
 
 # ---------------------------------------------------------------------------

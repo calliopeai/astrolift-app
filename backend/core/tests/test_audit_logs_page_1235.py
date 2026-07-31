@@ -34,6 +34,16 @@ def _info(user):
     return SimpleNamespace(context=SimpleNamespace(user=user, request=None))
 
 
+class _FakeRequest:
+    """Minimal request stand-in for ``StrawberryContext`` (mirrors
+    ``core/tests/test_tenant_isolation.py``)."""
+
+    def __init__(self, user):
+        self.user = user
+        self.session = {}
+        self.headers = {}
+
+
 @pytest.fixture
 def operator(db):
     """The install operator: the only identity that may read this log."""
@@ -116,6 +126,61 @@ def test_page_field_clamps_an_absurd_limit_too(operator):
     assert len(page.items) == MAX_PAGE_LIMIT
     assert page.total_count == 205
     assert page.next_cursor is not None, "205 rows do not fit in one clamped page"
+
+
+def test_page_resolves_through_the_schema_and_not_only_under_direct_call(operator):
+    """Every other test here constructs ``AuditLogQuery()``. A real
+    request does not: Strawberry passes the *root value* as ``self`` to a
+    root Query resolver and the view never sets one, so ``self`` is
+    ``None`` over HTTP. A resolver reaching its queryset builder through
+    ``self._audit_logs_qs(...)`` raises ``AttributeError`` on every real
+    call while passing this whole module — that is why the builder is
+    module-level, and this is what pins it.
+    """
+    from config.schema import schema
+    from core.schema.context import StrawberryContext
+
+    _log("app.deploy")
+    _log("cluster.teardown")
+
+    result = schema.execute_sync(
+        "{ auditLogsPage(limit: 5) { items { operation } totalCount nextCursor } }",
+        context_value=StrawberryContext(_FakeRequest(operator)),
+    )
+    assert result.errors is None, result.errors
+    page = result.data["auditLogsPage"]
+    assert page["totalCount"] == 2
+    assert {i["operation"] for i in page["items"]} == {"app.deploy", "cluster.teardown"}
+    assert page["nextCursor"] is None
+
+
+def test_cursor_round_trips_through_the_schema(operator):
+    """The cursor a client receives has to be usable as an ``after``
+    variable on the next request — the whole contract of the field."""
+    from config.schema import schema
+    from core.schema.context import StrawberryContext
+
+    for n in range(5):
+        _log(f"op.{n}")
+    context = StrawberryContext(_FakeRequest(operator))
+
+    first = schema.execute_sync(
+        "{ auditLogsPage(limit: 2) { items { operation } nextCursor } }",
+        context_value=context,
+    )
+    assert first.errors is None, first.errors
+    cursor = first.data["auditLogsPage"]["nextCursor"]
+    assert cursor
+
+    second = schema.execute_sync(
+        "query($a: String) { auditLogsPage(limit: 2, after: $a) { items { operation } } }",
+        variable_values={"a": cursor},
+        context_value=StrawberryContext(_FakeRequest(operator)),
+    )
+    assert second.errors is None, second.errors
+    seen = [i["operation"] for i in first.data["auditLogsPage"]["items"]]
+    seen += [i["operation"] for i in second.data["auditLogsPage"]["items"]]
+    assert seen == _db_order()[:4]
 
 
 # ---------------------------------------------------------------------------
@@ -265,7 +330,7 @@ def test_page_carries_the_full_entry_payload(operator):
 # ---------------------------------------------------------------------------
 
 
-def test_anonymous_is_refused(two_tenants):
+def test_anonymous_is_refused():
     from django.contrib.auth.models import AnonymousUser
 
     _log("app.deploy")

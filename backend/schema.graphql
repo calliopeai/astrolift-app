@@ -295,6 +295,17 @@ type AstroliftAgentRun {
   createdAt: DateTime!
 }
 
+"""One page of a cursor-paginated list."""
+type AstroliftAgentRunPage {
+  items: [AstroliftAgentRun!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+}
+
 type AstroliftAgentRunSpec {
   id: GUID!
   slug: String!
@@ -394,6 +405,17 @@ type AstroliftAgentTrigger {
   createdAt: DateTime!
 }
 
+"""One page of a cursor-paginated list."""
+type AstroliftAgentTriggerPage {
+  items: [AstroliftAgentTrigger!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+}
+
 type AstroliftAgentTriggerResult {
   ok: Boolean!
   message: String!
@@ -412,6 +434,17 @@ type AstroliftAggregatedEvent {
   resourceId: String!
 }
 
+"""One page of a cursor-paginated list."""
+type AstroliftAggregatedEventPage {
+  items: [AstroliftAggregatedEvent!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+}
+
 type AstroliftAlertEvent {
   id: GUID!
   ruleId: GUID!
@@ -427,6 +460,17 @@ type AstroliftAlertEventMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftAlertEvent
+}
+
+"""One page of a cursor-paginated list."""
+type AstroliftAlertEventPage {
+  items: [AstroliftAlertEvent!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
 }
 
 type AstroliftAlertMute {
@@ -456,6 +500,17 @@ type AstroliftAlertRuleMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftAlertRule
+}
+
+"""One page of a cursor-paginated list."""
+type AstroliftAlertRulePage {
+  items: [AstroliftAlertRule!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
 }
 
 input AstroliftAnonymizeUserInput {
@@ -489,6 +544,17 @@ type AstroliftApiToken {
   lastUsedAgent: String
   isRevoked: Boolean!
   createdAt: DateTime!
+}
+
+"""One page of a cursor-paginated list."""
+type AstroliftApiTokenPage {
+  items: [AstroliftApiToken!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
 }
 
 type AstroliftApiTokenPlaintext {
@@ -861,6 +927,17 @@ type AstroliftAppTeamAccessMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftAppTeamAccess
+}
+
+"""One page of a cursor-paginated list."""
+type AstroliftAppTeamAccessPage {
+  items: [AstroliftAppTeamAccess!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
 }
 
 type AstroliftAppTrace {
@@ -1322,6 +1399,17 @@ type AstroliftCommandRun {
   createdAt: DateTime!
 }
 
+"""One page of a cursor-paginated list."""
+type AstroliftCommandRunPage {
+  items: [AstroliftCommandRun!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+}
+
 type AstroliftConnectUserSourceProviderPayload {
   providerConfigId: GUID!
   authorizationUrl: String!
@@ -1443,6 +1531,17 @@ type AstroliftDeployToken {
   lastRotatedAt: DateTime
   registeredAppSlug: String!
   createdAt: DateTime!
+}
+
+"""One page of a cursor-paginated list."""
+type AstroliftDeployTokenPage {
+  items: [AstroliftDeployToken!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
 }
 
 type AstroliftDeployment {
@@ -2062,6 +2161,17 @@ type AstroliftInvitationMutationResult {
   data: AstroliftInvitation
 }
 
+"""One page of a cursor-paginated list."""
+type AstroliftInvitationPage {
+  items: [AstroliftInvitation!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+}
+
 type AstroliftJob {
   id: GUID!
   pipelineId: GUID!
@@ -2196,6 +2306,17 @@ type AstroliftManagedServiceObjects {
   cacheAgeSeconds: Int
 }
 
+"""One page of a cursor-paginated list."""
+type AstroliftManagedServicePage {
+  items: [AstroliftManagedService!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+}
+
 type AstroliftManagedServiceQueueDepth {
   managedServiceId: GUID!
   kind: String!
@@ -2255,6 +2376,17 @@ type AstroliftMember {
   lastActiveAt: DateTime
   createdAt: DateTime!
   deletedAt: DateTime
+}
+
+"""One page of a cursor-paginated list."""
+type AstroliftMemberPage {
+  items: [AstroliftMember!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
 }
 
 type AstroliftModuleEntitlement {
@@ -2423,6 +2555,17 @@ type AstroliftPipelineMutationResult {
   data: AstroliftPipeline
 }
 
+"""One page of a cursor-paginated list."""
+type AstroliftPipelinePage {
+  items: [AstroliftPipeline!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+}
+
 type AstroliftPipelineRun {
   id: GUID!
   runNumber: Int!
@@ -2440,6 +2583,17 @@ type AstroliftPipelineRunMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftPipelineRun
+}
+
+"""One page of a cursor-paginated list."""
+type AstroliftPipelineRunPage {
+  items: [AstroliftPipelineRun!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
 }
 
 type AstroliftPodResourceUsage {
@@ -2483,6 +2637,17 @@ type AstroliftPolicyMutationResult {
   data: AstroliftPolicy
 }
 
+"""One page of a cursor-paginated list."""
+type AstroliftPolicyPage {
+  items: [AstroliftPolicy!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+}
+
 type AstroliftPreviewAggregateResources {
   cpuCores: Float!
   memoryBytes: Float!
@@ -2514,6 +2679,17 @@ type AstroliftPreviewEnvironmentMutationResult {
   data: AstroliftPreviewEnvironment
 }
 
+"""One page of a cursor-paginated list."""
+type AstroliftPreviewEnvironmentPage {
+  items: [AstroliftPreviewEnvironment!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+}
+
 type AstroliftProject {
   id: GUID!
   slug: String!
@@ -2529,6 +2705,17 @@ type AstroliftProjectMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftProject
+}
+
+"""One page of a cursor-paginated list."""
+type AstroliftProjectPage {
+  items: [AstroliftProject!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
 }
 
 type AstroliftPromqlSeries {
@@ -2890,10 +3077,32 @@ type AstroliftRoleBindingMutationResult {
   data: AstroliftRoleBinding
 }
 
+"""One page of a cursor-paginated list."""
+type AstroliftRoleBindingPage {
+  items: [AstroliftRoleBinding!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+}
+
 type AstroliftRoleMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftRole
+}
+
+"""One page of a cursor-paginated list."""
+type AstroliftRolePage {
+  items: [AstroliftRole!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
 }
 
 type AstroliftRunJobOncePayload {
@@ -2934,6 +3143,17 @@ type AstroliftScheduledJobRun {
   logExcerpt: String!
   output: String!
   createdAt: DateTime!
+}
+
+"""One page of a cursor-paginated list."""
+type AstroliftScheduledJobRunPage {
+  items: [AstroliftScheduledJobRun!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
 }
 
 type AstroliftScmPushCiWorkflowResult {
@@ -3140,6 +3360,17 @@ type AstroliftSourceConnectionMutationResult {
   data: AstroliftSourceConnection
 }
 
+"""One page of a cursor-paginated list."""
+type AstroliftSourceConnectionPage {
+  items: [AstroliftSourceConnection!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+}
+
 type AstroliftSourceFile {
   repoFullName: String!
   path: String!
@@ -3175,6 +3406,17 @@ type AstroliftSshDeployKeyMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftSshDeployKey
+}
+
+"""One page of a cursor-paginated list."""
+type AstroliftSshDeployKeyPage {
+  items: [AstroliftSshDeployKey!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
 }
 
 type AstroliftStatusCodeBreakdown {
@@ -3228,6 +3470,17 @@ type AstroliftTaskRun {
   createdAt: DateTime!
 }
 
+"""One page of a cursor-paginated list."""
+type AstroliftTaskRunPage {
+  items: [AstroliftTaskRun!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+}
+
 type AstroliftTaskRunPayload {
   id: GUID!
   registeredAppSlug: String!
@@ -3256,6 +3509,17 @@ type AstroliftTeamMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftTeam
+}
+
+"""One page of a cursor-paginated list."""
+type AstroliftTeamPage {
+  items: [AstroliftTeam!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
 }
 
 type AstroliftTemplateSendStatPoint {
@@ -3298,6 +3562,17 @@ type AstroliftTenantClusterMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftTenantCluster
+}
+
+"""One page of a cursor-paginated list."""
+type AstroliftTenantClusterPage {
+  items: [AstroliftTenantCluster!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
 }
 
 type AstroliftTimeSeriesPoint {
@@ -3413,6 +3688,17 @@ type AstroliftWebhookDelivery {
   deliveredAt: DateTime!
 }
 
+"""One page of a cursor-paginated list."""
+type AstroliftWebhookDeliveryPage {
+  items: [AstroliftWebhookDelivery!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+}
+
 type AstroliftWebhookSubscription {
   id: GUID!
   url: String!
@@ -3431,6 +3717,17 @@ type AstroliftWebhookSubscriptionMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftWebhookSubscription
+}
+
+"""One page of a cursor-paginated list."""
+type AstroliftWebhookSubscriptionPage {
+  items: [AstroliftWebhookSubscription!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
 }
 
 type AstroliftWebhookTestResult {
@@ -3546,6 +3843,17 @@ type AstroliftWorkloadOpPayloadMutationResult {
   data: AstroliftWorkloadOpPayload
 }
 
+"""One page of a cursor-paginated list."""
+type AstroliftWorkloadPage {
+  items: [AstroliftWorkload!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+}
+
 type AstroliftWorkloadPodStatusBucket {
   status: String!
   count: Int!
@@ -3622,6 +3930,17 @@ type AuditLogEntry {
   ipAddress: String
   timestamp: DateTime!
   username: String
+}
+
+"""One page of a cursor-paginated list."""
+type AuditLogEntryPage {
+  items: [AuditLogEntry!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
 }
 
 type AvailableTransition {
@@ -3803,6 +4122,17 @@ type ConfiguredWorkflow {
   runCount: Int!
   createdAt: DateTime!
   runs: [WorkflowRun!]!
+}
+
+"""One page of a cursor-paginated list."""
+type ConfiguredWorkflowPage {
+  items: [ConfiguredWorkflow!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
 }
 
 type ConfirmUploadResult {
@@ -4181,47 +4511,6 @@ type EmailtemplatedeletedpayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: Emailtemplatedeletedpayload
-}
-
-type EmployeeAvatarType {
-  publicPermanentUrl: String
-}
-
-type EmployeeEdge {
-  cursor: String!
-  node: EmployeeNode!
-}
-
-type EmployeeNode {
-  id: ID!
-  user: EmployeeUserType!
-}
-
-type EmployeeProfileType {
-  id: ID!
-  displayName: String
-  firstName: String
-  lastName: String
-  avatar: EmployeeAvatarType
-}
-
-type EmployeeUserType {
-  id: ID!
-  firstName: String!
-  lastName: String!
-  email: String!
-  isActive: Boolean!
-  profile: EmployeeProfileType
-}
-
-type EmployeesConnection {
-  totalCount: Int!
-  edges: [EmployeeEdge!]!
-  pageInfo: EmployeesPageInfo!
-}
-
-type EmployeesPageInfo {
-  hasNextPage: Boolean!
 }
 
 enum EntityType {
@@ -4991,6 +5280,17 @@ type OrganizationMemberType {
   member: JSON
 }
 
+"""One page of a cursor-paginated list."""
+type OrganizationMemberTypePage {
+  items: [OrganizationMemberType!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+}
+
 type OrganizationMutationResult {
   ok: Boolean!
   errors: [ValidationError!]!
@@ -5007,6 +5307,17 @@ type OrganizationType {
   createdAt: DateTime!
   updatedAt: DateTime!
   deletedAt: DateTime
+}
+
+"""One page of a cursor-paginated list."""
+type OrganizationTypePage {
+  items: [OrganizationType!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
 }
 
 input PauseAppWebhookDeploysInput {
@@ -5185,34 +5496,50 @@ type Query {
   permissionCompare(userIdA: ID!, userIdB: ID!): PermissionComparison
 
   """Query mutation audit logs. Superuser only."""
-  auditLogs(operation: String = null, userId: String = null, limit: Int! = 50): [AuditLogEntry!]!
+  auditLogs(operation: String = null, userId: String = null, limit: Int! = 50): [AuditLogEntry!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use auditLogsPage.")
+
+  """Cursor-paginated mutation audit log. Superuser only."""
+  auditLogsPage(operation: String = null, userId: String = null, search: String = null, limit: Int! = 50, after: String = null): AuditLogEntryPage!
 
   """
   Multi-install handshake. Returns version, capabilities, feature flags, install identity, and server time so a mobile / CLI / SDK client can decide which UI to render before logging in.
   """
   astroliftServerInfo: AstroliftServerInfo!
   organization(id: ID!): OrganizationType
-  organizations(query: String = null): [OrganizationType!]!
-  members: [OrganizationMemberType!]!
-  employees(first: Int = 10, offset: Int = 0, search: String = null, showDeactivated: Boolean = null, departmentsDepartmentNameIcontains: String = null, departmentsPositionNameIcontains: String = null): EmployeesConnection!
+  organizations(query: String = null): [OrganizationType!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use organizationsPage.")
+
+  """Cursor-paginated list of the caller's organizations."""
+  organizationsPage(search: String = null, limit: Int! = 50, after: String = null): OrganizationTypePage!
+  members: [OrganizationMemberType!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use membersPage.")
+
+  """Cursor-paginated list of members in the caller's organizations."""
+  membersPage(search: String = null, limit: Int! = 50, after: String = null): OrganizationMemberTypePage!
   me: AstroliftMe
   astroliftOrganization(slug: String!): AstroliftOrganization
   astroliftOrganizations: [AstroliftOrganization!]!
-  astroliftTeams: [AstroliftTeam!]!
-  astroliftProjects: [AstroliftProject!]!
+  astroliftTeams: [AstroliftTeam!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftTeamsPage.")
+  astroliftTeamsPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftTeamPage!
+  astroliftProjects: [AstroliftProject!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftProjectsPage.")
+  astroliftProjectsPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftProjectPage!
   astroliftTeamSlugAvailable(slug: String!, excludeId: GUID = null): Boolean!
   astroliftProjectSlugAvailable(teamId: GUID!, slug: String!, excludeId: GUID = null): Boolean!
   astroliftNavTree: AstroliftNavTree
-  astroliftMembers(search: String = null): [AstroliftMember!]!
+  astroliftMembers(search: String = null): [AstroliftMember!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftMembersPage.")
+  astroliftMembersPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftMemberPage!
   astroliftTeamMembers(teamId: GUID!): [AstroliftMember!]!
   astroliftOrgMembersForApprovalPicker(orgSlug: String!): [AstroliftApproverUser!]!
-  astroliftInvitations(status: String = null): [AstroliftInvitation!]!
-  astroliftRoles: [AstroliftRole!]!
+  astroliftInvitations(status: String = null): [AstroliftInvitation!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftInvitationsPage.")
+  astroliftInvitationsPage(status: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftInvitationPage!
+  astroliftRoles: [AstroliftRole!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftRolesPage.")
+  astroliftRolesPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftRolePage!
   astroliftSearchableUsers(query: String!): [AstroliftSearchableUser!]!
   astroliftRolesICanGrant: [AstroliftRole!]!
-  astroliftRoleBindings: [AstroliftRoleBinding!]!
-  astroliftApiTokens: [AstroliftApiToken!]!
-  astroliftPolicies: [AstroliftPolicy!]!
+  astroliftRoleBindings: [AstroliftRoleBinding!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftRoleBindingsPage.")
+  astroliftRoleBindingsPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftRoleBindingPage!
+  astroliftApiTokens: [AstroliftApiToken!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftApiTokensPage.")
+  astroliftApiTokensPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftApiTokenPage!
+  astroliftPolicies: [AstroliftPolicy!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftPoliciesPage.")
+  astroliftPoliciesPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftPolicyPage!
   astroliftOrganizationAllowlistDomains: [AstroliftOrganizationAllowlistedDomain!]!
   astroliftIdentityProviders: [AstroliftIdentityProvider!]!
   astroliftMyProfile: AstroliftMyProfile
@@ -5221,32 +5548,39 @@ type Query {
   astroliftActiveSessions: [AstroliftActiveSession!]!
   astroliftElevationStatus: AstroliftElevationStatus!
   astroliftAppUptime(appSlug: String!, windowHours: Int! = 24): AstroliftAppUptime
-  astroliftEvents(limit: Int! = 100, eventType: String = null, severity: String = null, appSlug: String = null): [AstroliftEvent!]!
-  astroliftEventsAggregated(limit: Int! = 100, eventType: String = null, severity: String = null, appSlug: String = null, aggregateWindowSeconds: Int! = 300): [AstroliftAggregatedEvent!]!
-  astroliftEventsPage(limit: Int! = 100, after: String = null, eventType: String = null, severity: String = null, appSlug: String = null): AstroliftEventPage!
+  astroliftEvents(limit: Int! = 100, eventType: String = null, severity: String = null, appSlug: String = null): [AstroliftEvent!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftEventsPage.")
+  astroliftEventsAggregated(limit: Int! = 100, eventType: String = null, severity: String = null, appSlug: String = null, aggregateWindowSeconds: Int! = 300): [AstroliftAggregatedEvent!]! @deprecated(reason: "Caps at 500 buckets folded from a bounded 10k-row scan, so activity older than the scan window is unreachable. Use astroliftEventsAggregatedPage.")
+  astroliftEventsAggregatedPage(limit: Int! = 50, after: String = null, eventType: String = null, severity: String = null, appSlug: String = null, search: String = null, aggregateWindowSeconds: Int! = 300): AstroliftAggregatedEventPage!
+  astroliftEventsPage(limit: Int! = 100, after: String = null, eventType: String = null, severity: String = null, appSlug: String = null, search: String = null): AstroliftEventPage!
   astroliftRecentActivity(limit: Int! = 20, cursor: String = null): AstroliftActivityPage!
   astroliftAuditEvents(limit: Int! = 100, action: String = null, decision: String = null, actorId: String = null, createdAtGte: DateTime = null, createdAtLte: DateTime = null): [AstroliftAuditEvent!]!
   astroliftAuditEventsPage(limit: Int! = 100, after: String = null, action: String = null, decision: String = null, actorId: String = null, createdAtGte: DateTime = null, createdAtLte: DateTime = null, includeTotal: Boolean! = false): AstroliftAuditEventPage!
   astroliftAuditRetention: AstroliftAuditRetention!
   astroliftWorkflowRuns(limit: Int! = 50): [AstroliftWorkflowRun!]!
-  astroliftWebhookSubscriptions(appSlug: String = null): [AstroliftWebhookSubscription!]!
-  astroliftWebhookDeliveries(subscriptionId: GUID!, limit: Int! = 10): [AstroliftWebhookDelivery!]!
+  astroliftWebhookSubscriptions(appSlug: String = null): [AstroliftWebhookSubscription!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftWebhookSubscriptionsPage.")
+  astroliftWebhookSubscriptionsPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftWebhookSubscriptionPage!
+  astroliftWebhookDeliveries(subscriptionId: GUID!, limit: Int! = 10): [AstroliftWebhookDelivery!]! @deprecated(reason: "Caps at 100 attempts with no way to reach the 101st. Use astroliftWebhookDeliveriesPage.")
+  astroliftWebhookDeliveriesPage(subscriptionId: GUID!, search: String = null, limit: Int! = 50, after: String = null): AstroliftWebhookDeliveryPage!
   astroliftMyNotifications(unreadOnly: Boolean! = false, limit: Int! = 50): [AstroliftNotification!]!
   astroliftMyMobileDevices: [AstroliftDeviceRegistration!]!
   astroliftMyNotificationPreferences(channel: String = null): [AstroliftNotificationPreference!]!
   astroliftMyDevices: [AstroliftDeviceRegistration!]!
   astroliftMyAlertSubscriptions(appSlug: String = null): [AstroliftUserAlertSubscription!]!
-  astroliftAlertRules(target: String = null, targetId: String = null, activeOnly: Boolean! = true): [AstroliftAlertRule!]!
+  astroliftAlertRules(target: String = null, targetId: String = null, activeOnly: Boolean! = true): [AstroliftAlertRule!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftAlertRulesPage.")
+  astroliftAlertRulesPage(target: String = null, targetId: String = null, activeOnly: Boolean! = true, search: String = null, limit: Int! = 50, after: String = null): AstroliftAlertRulePage!
   astroliftAppMetrics(appSlug: String!, timeRange: String! = "1h"): AstroliftAppMetrics
-  astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100): [AstroliftAlertEvent!]!
+  astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100): [AstroliftAlertEvent!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftAlertEventsPage.")
+  astroliftAlertEventsPage(ruleId: GUID = null, unresolvedOnly: Boolean! = false, search: String = null, limit: Int! = 50, after: String = null): AstroliftAlertEventPage!
   astroliftPlatformApiUrl: String!
   astroliftApps(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null): [AstroliftRegisteredApp!]!
   astroliftAppsPage(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null, sortBy: AppsListSortKey! = CREATED_DESC, cursor: String = null, limit: Int! = 50, includeArchived: Boolean! = false): AstroliftRegisteredAppPage!
   astroliftMyApps(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null): [AstroliftRegisteredApp!]!
   astroliftMyAppsPage(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null, sortBy: AppsListSortKey! = CREATED_DESC, cursor: String = null, limit: Int! = 50, includeArchived: Boolean! = false): AstroliftRegisteredAppPage!
   astroliftApp(slug: String!, includeDrift: Boolean! = false): AstroliftRegisteredApp
-  astroliftAppTeamAccesses(appSlug: String!): [AstroliftAppTeamAccess!]!
-  astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]!
+  astroliftAppTeamAccesses(appSlug: String!): [AstroliftAppTeamAccess!]! @deprecated(reason: "Returns every grant in one unbounded response. Use astroliftAppTeamAccessesPage.")
+  astroliftAppTeamAccessesPage(appSlug: String!, search: String = null, limit: Int! = 50, after: String = null): AstroliftAppTeamAccessPage!
+  astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftWorkloadsPage.")
+  astroliftWorkloadsPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftWorkloadPage!
   astroliftWorkload(appSlug: String!, slug: String!): AstroliftWorkload
   astroliftWorkloadScalingStatus(appSlug: String!, workloadSlug: String!, environmentName: String = null): AstroliftWorkloadScalingStatus
   astroliftContainers(workloadSlug: String = null): [AstroliftContainer!]!
@@ -5263,26 +5597,33 @@ type Query {
   astroliftDeploymentReleaseNotes(deploymentId: String!): AstroliftReleaseNotes
   astroliftCompareDeployments(idA: String!, idB: String!): AstroliftDeploymentComparison
   astroliftDeploymentLog(deploymentId: String!): [AstroliftDeploymentLogEntry!]!
-  astroliftScheduledJobRuns(appSlug: String = null, environmentName: String = null, limit: Int! = 100): [AstroliftScheduledJobRun!]!
+  astroliftScheduledJobRuns(appSlug: String = null, environmentName: String = null, limit: Int! = 100): [AstroliftScheduledJobRun!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftScheduledJobRunsPage.")
+  astroliftScheduledJobRunsPage(appSlug: String = null, environmentName: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftScheduledJobRunPage!
   astroliftScheduledJobRun(id: String!): AstroliftScheduledJobRun
-  astroliftCommandRuns(appSlug: String = null, limit: Int! = 100): [AstroliftCommandRun!]!
+  astroliftCommandRuns(appSlug: String = null, limit: Int! = 100): [AstroliftCommandRun!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftCommandRunsPage.")
+  astroliftCommandRunsPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftCommandRunPage!
   astroliftCommandRun(id: String!): AstroliftCommandRun
-  astroliftPreviewEnvironments(appSlug: String = null): [AstroliftPreviewEnvironment!]!
+  astroliftPreviewEnvironments(appSlug: String = null): [AstroliftPreviewEnvironment!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st, and prices every one of them on read. Use astroliftPreviewEnvironmentsPage.")
+  astroliftPreviewEnvironmentsPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftPreviewEnvironmentPage!
   astroliftDeploymentMetrics(windowDays: Int! = 30): AstroliftDeploymentMetrics!
   astroliftAppHealthSummary: [AstroliftAppHealthSummary!]!
   astroliftAppDomains(appSlug: String!): [AstroliftAppDomain!]!
   astroliftAppPods(appSlug: String!, environmentName: String = null): [AstroliftAppPod!]!
   astroliftWorkloadPodStatusBreakdown(appSlug: String!, workloadSlug: String!, environmentName: String = null): [AstroliftWorkloadPodStatusBucket!]!
-  astroliftAppDeployTokens(appSlug: String!): [AstroliftDeployToken!]!
+  astroliftAppDeployTokens(appSlug: String!): [AstroliftDeployToken!]! @deprecated(reason: "Caps at 100 rows with no way to reach the 101st. Use astroliftAppDeployTokensPage.")
+  astroliftAppDeployTokensPage(appSlug: String!, search: String = null, limit: Int! = 50, after: String = null): AstroliftDeployTokenPage!
   astroliftAppDnsRecords(appSlug: String!, environmentName: String = null): AstroliftAppDnsRecordsResult!
   astroliftAppCertificates(appSlug: String!, environmentName: String = null): AstroliftAppCertificatesResult!
   astroliftAppIdentityBinding(appSlug: String!, environmentName: String = null): AstroliftAppIdentityBindingResult!
   previewAstroliftDeregister(appSlug: String!): AstroliftDeregisterPreview
   previewAstroliftForceRedeploy(appSlug: String!, environmentName: String = null): AstroliftForceRedeployPreview
-  astroliftTaskRuns(appSlug: String = null, workloadSlug: String = null, status: String = null, limit: Int! = 100): [AstroliftTaskRun!]!
+  astroliftTaskRuns(appSlug: String = null, workloadSlug: String = null, status: String = null, limit: Int! = 100): [AstroliftTaskRun!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftTaskRunsPage.")
+  astroliftTaskRunsPage(appSlug: String = null, workloadSlug: String = null, status: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftTaskRunPage!
   astroliftTaskRun(id: String!): AstroliftTaskRun
-  astroliftAgentRuns(appSlug: String = null, workloadSlug: String = null, projectSlug: String = null, status: String = null, limit: Int! = 100): [AstroliftAgentRun!]!
-  astroliftClusters: [AstroliftTenantCluster!]!
+  astroliftAgentRuns(appSlug: String = null, workloadSlug: String = null, projectSlug: String = null, status: String = null, limit: Int! = 100): [AstroliftAgentRun!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftAgentRunsPage.")
+  astroliftAgentRunsPage(appSlug: String = null, workloadSlug: String = null, projectSlug: String = null, status: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftAgentRunPage!
+  astroliftClusters: [AstroliftTenantCluster!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftClustersPage.")
+  astroliftClustersPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftTenantClusterPage!
   astroliftClusterCount: Int!
   astroliftManagedDomains: [AstroliftManagedDomain!]!
   astroliftProviderPlugins: [AstroliftProviderPlugin!]!
@@ -5309,15 +5650,18 @@ type Query {
   astroliftCostTrend(window: CostWindow = null, days: Int = null): [AstroliftCostTrendPoint!]!
   astroliftCostForecast: AstroliftCostForecast!
   astroliftCostByBinding(window: CostWindow = null, days: Int = null, registeredAppSlug: String = null): AstroliftCostAttribution!
-  astroliftSourceConnections: [AstroliftSourceConnection!]!
-  astroliftSshDeployKeys(appSlug: String = null): [AstroliftSshDeployKey!]!
+  astroliftSourceConnections: [AstroliftSourceConnection!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftSourceConnectionsPage.")
+  astroliftSourceConnectionsPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftSourceConnectionPage!
+  astroliftSshDeployKeys(appSlug: String = null): [AstroliftSshDeployKey!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftSshDeployKeysPage.")
+  astroliftSshDeployKeysPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftSshDeployKeyPage!
   astroliftAvailableRepos(connectionId: String!, search: String = null, limit: Int! = 100): AstroliftRemoteRepoList!
   astroliftSourceFile(connectionId: String!, repoFullName: String!, path: String!, ref: String!): AstroliftSourceFile!
   astroliftAppSecrets(appSlug: String!, environmentName: String = null): [AstroliftAppSecret!]!
   astroliftAppSecretHistory(appSlug: String!, key: String!): [AstroliftSecretHistoryEntry!]!
   astroliftSecretBundles: [AstroliftSecretBundle!]!
   astroliftAppSecretBundleAttachments(appSlug: String!, environmentName: String = null): [AstroliftAppSecretBundleAttachment!]!
-  astroliftManagedServices(appSlug: String!, environmentName: String = null): [AstroliftManagedService!]!
+  astroliftManagedServices(appSlug: String!, environmentName: String = null): [AstroliftManagedService!]! @deprecated(reason: "Unbounded, and applies no ordering at all — row order is whatever Postgres returns. Use astroliftManagedServicesPage.")
+  astroliftManagedServicesPage(appSlug: String!, environmentName: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftManagedServicePage!
   astroliftManagedServiceObjects(managedServiceId: GUID!, limit: Int! = 10): AstroliftManagedServiceObjects
   astroliftManagedServiceQueueDepth(managedServiceId: GUID!): AstroliftManagedServiceQueueDepth
   astroliftEmailServiceDetail(managedServiceId: GUID!): AstroliftEmailServiceDetail
@@ -5349,9 +5693,11 @@ type Query {
   formDefinition(slug: String!): AstroliftFormDefinition
   formSubmissions(slug: String!, status: String = null): [AstroliftFormSubmission!]!
   formFieldTypes: [String!]!
-  astroliftPipelines(limit: Int! = 100): [AstroliftPipeline!]!
+  astroliftPipelines(limit: Int! = 100): [AstroliftPipeline!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftPipelinesPage.")
+  astroliftPipelinesPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftPipelinePage!
   astroliftPipeline(id: String!): AstroliftPipeline
-  astroliftPipelineRuns(pipelineId: String!, limit: Int! = 50): [AstroliftPipelineRun!]!
+  astroliftPipelineRuns(pipelineId: String!, limit: Int! = 50): [AstroliftPipelineRun!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftPipelineRunsPage.")
+  astroliftPipelineRunsPage(pipelineId: String!, search: String = null, limit: Int! = 50, after: String = null): AstroliftPipelineRunPage!
   astroliftPipelineRun(id: String!): AstroliftPipelineRun
   skills(orgId: ID!, isGlobal: Boolean! = false): [AstroliftSkill!]!
   skill(id: ID!): AstroliftSkill
@@ -5371,7 +5717,8 @@ type Query {
   agentWorkloads(orgId: ID!, projectSlug: String = null): [AstroliftAgentListItem!]!
   agentFleet(orgId: ID!): [AstroliftAgentListItem!]!
   agent(orgId: ID!, slug: String!): AstroliftAgentDetail
-  agentTriggers(orgId: ID!, agentSlug: String!): [AstroliftAgentTrigger!]!
+  agentTriggers(orgId: ID!, agentSlug: String!): [AstroliftAgentTrigger!]! @deprecated(reason: "Unbounded: returns every trigger bound to the agent in one response. Use agentTriggersPage instead.")
+  agentTriggersPage(orgId: ID!, agentSlug: String!, search: String = null, limit: Int! = 50, after: String = null): AstroliftAgentTriggerPage!
   scanAgentManifests(orgId: ID!, sourceRepo: String!, sourceKind: String! = "github", ref: String! = "main"): AstroliftScanAgentManifestsResult!
   agentLiveStatus(orgId: ID!, projectSlug: String = null, workloadId: ID = null): [AstroliftAgentLiveStatus!]!
   agentRuntimes: [AstroliftAgentRuntime!]!
@@ -5392,7 +5739,10 @@ type Query {
   exportWorkflowManifest(definitionSlug: String!): WorkflowManifestExportType!
 
   """List the org's configured Workflows (tier 2)."""
-  workflows(orgId: ID = null): [ConfiguredWorkflow!]!
+  workflows(orgId: ID = null): [ConfiguredWorkflow!]! @deprecated(reason: "Unbounded — returns every Workflow the org owns in one response. Use workflowsPage.")
+
+  """Cursor-paginated page of the org's configured Workflows (tier 2)."""
+  workflowsPage(orgId: ID = null, search: String = null, limit: Int! = 50, after: String = null): ConfiguredWorkflowPage!
 
   """One configured Workflow by slug, with its recent runs."""
   workflow(slug: String!, orgId: ID = null): ConfiguredWorkflow
@@ -5400,7 +5750,12 @@ type Query {
   """
   Workflow definitions visible to the caller: their org's UNION all platform-global (spec 40 §2.1).
   """
-  workflowDefinitions(orgId: ID = null): [WorkflowDefinitionSummary!]!
+  workflowDefinitions(orgId: ID = null): [WorkflowDefinitionSummary!]! @deprecated(reason: "Unbounded — returns every visible definition in one response. Use workflowDefinitionsPage.")
+
+  """
+  Cursor-paginated page of the workflow definitions visible to the caller, by name (A→Z).
+  """
+  workflowDefinitionsPage(orgId: ID = null, search: String = null, limit: Int! = 50, after: String = null): WorkflowDefinitionSummaryPage!
 
   """
   One visible workflow definition by slug (prefers the org's over a global).
@@ -6258,6 +6613,17 @@ type WorkflowDefinitionSummary {
   organizationGuid: String
   stageCount: Int!
   createdAt: DateTime!
+}
+
+"""One page of a cursor-paginated list."""
+type WorkflowDefinitionSummaryPage {
+  items: [WorkflowDefinitionSummary!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
 }
 
 type WorkflowDefinitionType {

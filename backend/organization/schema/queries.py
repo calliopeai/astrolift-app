@@ -47,6 +47,70 @@ def _require_authenticated(info: Info) -> None:
         raise GraphQLError("Authentication required")
 
 
+def _organizations_qs(info: Info, *, search: Optional[str] = None):
+    """Filtered, unordered org list scoped to the caller's memberships.
+
+    Shared by the list field and its paginated sibling so the two can
+    never disagree about which orgs a caller may see. Ordering is
+    deliberately not applied here — ``keyset_page`` imposes it from the
+    seek key.
+
+    ``_caller_org_ids`` returns ``[]`` for anonymous / membership-less
+    callers, so ``id__in=[]`` fails closed to zero rows; ``None`` is the
+    superuser's cross-tenant bypass (#537).
+
+    Module-level rather than a method on ``Query``: Strawberry passes the
+    *root value* as ``self`` to a root Query resolver and the view never
+    sets one, so ``self`` is ``None`` in every real request. A resolver
+    that reaches this through ``self._organizations_qs(...)`` raises
+    ``AttributeError`` over HTTP while still passing a test that
+    constructs ``Query()`` by hand.
+    """
+    allowed = _caller_org_ids(info)
+    if allowed is None:
+        qs = Organization.objects.all()
+    else:
+        qs = Organization.objects.filter(id__in=allowed)
+    if search:
+        # ``Organization.search`` is the denormalised "name slug website"
+        # column maintained in ``save()``. Terms are ANDed, matching the
+        # ``query`` arg this shares with the deprecated list field.
+        for term in (t for t in search.split(" ") if t):
+            qs = qs.filter(search__icontains=term)
+    return qs
+
+
+def _members_qs(info: Info, *, search: Optional[str] = None):
+    """Filtered, unordered membership rows for the caller's orgs.
+
+    Shared by the list field and its paginated sibling. Soft-deleted
+    memberships are deliberately NOT filtered out: the list field has
+    always included them and both fields must agree on what a row is.
+
+    ``_caller_org_ids`` returns ``[]`` for anonymous / membership-less
+    callers, so ``organization_id__in=[]`` fails closed; ``None`` is the
+    superuser's cross-tenant bypass (#537).
+    """
+    allowed = _caller_org_ids(info)
+    if allowed is None:
+        qs = OrganizationMember.objects.all()
+    else:
+        qs = OrganizationMember.objects.filter(organization_id__in=allowed)
+    if search:
+        qs = qs.filter(
+            search_q(
+                search,
+                "member__username",
+                "member__email",
+                "member__first_name",
+                "member__last_name",
+                "organization__name",
+                "organization__slug",
+            )
+        )
+    return qs
+
+
 @strawberry.type
 class Query:
     @strawberry_django.field
@@ -67,36 +131,8 @@ class Query:
             return None
         return info.context._organization_cache.get(int(pk))
 
-    def _organizations_qs(self, info: Info, *, search: Optional[str] = None):
-        """Filtered, unordered org list scoped to the caller's memberships.
-
-        Shared by the list field and its paginated sibling so the two can
-        never disagree about which orgs a caller may see. Ordering is
-        deliberately not applied here — ``keyset_page`` imposes it from
-        the seek key.
-
-        ``_caller_org_ids`` returns ``[]`` for anonymous / membership-less
-        callers, so ``id__in=[]`` fails closed to zero rows; ``None`` is
-        the superuser's cross-tenant bypass (#537).
-        """
-        allowed = _caller_org_ids(info)
-        if allowed is None:
-            qs = Organization.objects.all()
-        else:
-            qs = Organization.objects.filter(id__in=allowed)
-        if search:
-            # ``Organization.search`` is the denormalised
-            # "name slug website" column maintained in ``save()``.
-            # Terms are ANDed, matching the ``query`` arg this shares
-            # with the deprecated list field.
-            for term in (t for t in search.split(" ") if t):
-                qs = qs.filter(search__icontains=term)
-        return qs
-
     @strawberry.field(
-        deprecation_reason=(
-            "Caps at 200 rows with no way to reach the 201st. Use organizationsPage."
-        )
+        deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use organizationsPage."
     )
     def organizations(self, info: Info, query: Optional[str] = None) -> list[OrganizationType]:
         """List organizations the caller is a member of.
@@ -109,9 +145,7 @@ class Query:
         capped; ``organizationsPage`` walks past the cap.
         """
         _require_authenticated(info)
-        return self._organizations_qs(info, search=query).order_by("-created_at", "-pk")[
-            :MAX_PAGE_LIMIT
-        ]
+        return _organizations_qs(info, search=query).order_by("-created_at", "-pk")[:MAX_PAGE_LIMIT]
 
     @strawberry.field(description="Cursor-paginated list of the caller's organizations.")
     def organizations_page(
@@ -135,7 +169,7 @@ class Query:
         """
         _require_authenticated(info)
         page = keyset_page(
-            self._organizations_qs(info, search=search),
+            _organizations_qs(info, search=search),
             cursor=after,
             limit=limit,
             sort_field="created_at",
@@ -146,39 +180,7 @@ class Query:
         # objects — the same instances the list field hands back.
         return page.map(lambda org: org)
 
-    def _members_qs(self, info: Info, *, search: Optional[str] = None):
-        """Filtered, unordered membership rows for the caller's orgs.
-
-        Shared by the list field and its paginated sibling. Soft-deleted
-        memberships are deliberately NOT filtered out: the list field has
-        always included them and both fields must agree on what a row is.
-
-        ``_caller_org_ids`` returns ``[]`` for anonymous / membership-less
-        callers, so ``organization_id__in=[]`` fails closed; ``None`` is
-        the superuser's cross-tenant bypass (#537).
-        """
-        allowed = _caller_org_ids(info)
-        if allowed is None:
-            qs = OrganizationMember.objects.all()
-        else:
-            qs = OrganizationMember.objects.filter(organization_id__in=allowed)
-        if search:
-            qs = qs.filter(
-                search_q(
-                    search,
-                    "member__username",
-                    "member__email",
-                    "member__first_name",
-                    "member__last_name",
-                    "organization__name",
-                    "organization__slug",
-                )
-            )
-        return qs
-
-    @strawberry.field(
-        deprecation_reason=("Caps at 200 rows with no way to reach the 201st. Use membersPage.")
-    )
+    @strawberry.field(deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use membersPage.")
     def members(self, info: Info) -> list[OrganizationMemberType]:
         """List members of organizations the caller belongs to.
 
@@ -190,7 +192,7 @@ class Query:
         newest-first and capped; ``membersPage`` walks past the cap.
         """
         _require_authenticated(info)
-        return self._members_qs(info).order_by("-created_at", "-pk")[:MAX_PAGE_LIMIT]
+        return _members_qs(info).order_by("-created_at", "-pk")[:MAX_PAGE_LIMIT]
 
     @strawberry.field(description="Cursor-paginated list of members in the caller's organizations.")
     def members_page(
@@ -213,7 +215,7 @@ class Query:
         """
         _require_authenticated(info)
         page = keyset_page(
-            self._members_qs(info, search=search),
+            _members_qs(info, search=search),
             cursor=after,
             limit=limit,
             sort_field="created_at",

@@ -495,9 +495,7 @@ def test_page_without_tenant_context_is_refused_outright(spec, org, info, permis
 # ---------------------------------------------------------------------
 
 
-def test_members_page_resolves_last_active_at_on_every_page(
-    org, other_org, actor, info, permission_resolver
-):
+def test_members_page_resolves_last_active_at_on_every_page(org, other_org, actor, info, permission_resolver):
     """The aggregate has to run over the page's rows. Computing it once
     for page one (or over the whole filtered set) is the easy mistake:
     the first leaves later pages blank, the second scans the org's entire
@@ -568,9 +566,7 @@ def test_role_bindings_page_seeks_on_granted_at_not_created_at(org, actor, info,
     # created_at; .update() bypasses that and forces the two apart.
     base = timezone.now() - timezone.timedelta(days=10)
     for binding, day in zip(bindings, [3, 0, 4, 1, 2], strict=True):
-        RoleBinding.objects.filter(pk=binding.pk).update(
-            granted_at=base + timezone.timedelta(days=day)
-        )
+        RoleBinding.objects.filter(pk=binding.pk).update(granted_at=base + timezone.timedelta(days=day))
 
     visible = RoleBinding.objects.filter(scope_kind="ORG", scope_id=org.id)
     by_granted = _expected_ids(visible, sort_field="granted_at")
@@ -585,9 +581,7 @@ def test_role_bindings_page_seeks_on_granted_at_not_created_at(org, actor, info,
     assert listed == by_granted, "the list field's order is the one the page must reproduce"
 
 
-def test_role_bindings_page_labels_the_scope_of_rows_past_page_one(
-    org, actor, info, permission_resolver
-):
+def test_role_bindings_page_labels_the_scope_of_rows_past_page_one(org, actor, info, permission_resolver):
     """The ``(scope_kind, scope_id)`` → label batch has to run over the
     page's rows; resolving it for every binding in the org would defeat
     the pagination it decorates, and running it only for page one would
@@ -627,18 +621,14 @@ def test_invitations_page_status_filter_narrows_items_and_count(org, actor, info
 
     with tenant_context(TenantContext(organization_id=org.id, actor_user_id=actor.id)):
         every_status = _page("astrolift_invitations_page", info, limit=50)
-        only_pending = _page(
-            "astrolift_invitations_page", info, status=Invitation.Status.PENDING, limit=50
-        )
+        only_pending = _page("astrolift_invitations_page", info, status=Invitation.Status.PENDING, limit=50)
 
     assert every_status.total_count == 5
     assert only_pending.total_count == 3
     assert {str(i.id) for i in only_pending.items} == {str(inv.guid) for inv in pending}
 
 
-def test_invitations_page_prefetches_the_inviter_avatar_for_every_page(
-    org, actor, info, permission_resolver
-):
+def test_invitations_page_prefetches_the_inviter_avatar_for_every_page(org, actor, info, permission_resolver):
     """The ``UserInfo`` batch has to run over the page's rows — over the
     whole stream it would load every inviter the org has ever had to
     render one page (#418 + #1235)."""
@@ -691,9 +681,7 @@ def test_invitations_page_search_matches_email_and_inviter(org, actor, info, per
 
     with tenant_context(TenantContext(organization_id=org.id, actor_user_id=actor.id)):
         by_inviter = _page("astrolift_invitations_page", info, search="kim-1235", limit=50)
-        by_email = _page(
-            "astrolift_invitations_page", info, search=hunted.email.split("@")[0], limit=50
-        )
+        by_email = _page("astrolift_invitations_page", info, search=hunted.email.split("@")[0], limit=50)
 
     assert [str(i.id) for i in by_inviter.items] == [str(by_kim.guid)]
     assert by_inviter.total_count == 1
@@ -714,19 +702,23 @@ def test_roles_page_shows_the_system_catalog_and_only_this_orgs_custom_roles(
     permission_resolver.grant(Permission.ORG_READ)
     mine = _role(org, 0)
     theirs = _role(other_org, 1)
-    system_slugs = set(
-        Role.objects.filter(organization__isnull=True).values_list("slug", flat=True)
-    )
+    system_slugs = set(Role.objects.filter(organization__isnull=True).values_list("slug", flat=True))
     assert system_slugs, "precondition: the system role catalog is seeded"
 
-    walked = set(_walk("astrolift_roles_page", org, actor, info, limit=5))
-    seen_slugs = set(
-        Role.objects.filter(guid__in=walked).values_list("slug", flat=True)  # tenancy: guids just served
-    )
+    slug_by_id: dict[str, str] = {}
+    cursor: str | None = None
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=actor.id)):
+        for _ in range(_WALK_BOUND):
+            page = _page("astrolift_roles_page", info, limit=5, after=cursor)
+            for item in page.items:
+                slug_by_id[str(item.id)] = item.slug
+            cursor = page.next_cursor
+            if cursor is None:
+                break
 
-    assert str(mine.guid) in walked
-    assert str(theirs.guid) not in walked
-    assert system_slugs <= seen_slugs
+    assert str(mine.guid) in slug_by_id
+    assert str(theirs.guid) not in slug_by_id, "another org's custom role leaked"
+    assert system_slugs <= set(slug_by_id.values())
 
 
 def test_api_tokens_page_search_matches_the_last_four(org, actor, info, permission_resolver):
@@ -751,9 +743,7 @@ def test_projects_page_search_matches_the_owning_team(org, actor, info, permissi
     are part of the project search surface."""
     permission_resolver.grant(Permission.PROJECT_READ)
     payments = Team.objects.create(organization=org, slug="payments", name="Payments")
-    on_payments = Project.objects.create(
-        organization=org, team=payments, slug="ledger", name="Ledger"
-    )
+    on_payments = Project.objects.create(organization=org, team=payments, slug="ledger", name="Ledger")
     _project(org, 0)
     _project(org, 1)
 

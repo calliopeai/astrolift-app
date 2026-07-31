@@ -58,39 +58,64 @@ def _viewer_user_id(info: Info) -> int | None:
     return None
 
 
+def _source_connections_qs(*, viewer_pk: int | None, search: str | None = None):
+    """Filtered, unordered connections visible to this viewer.
+
+    Org-level rows (``user IS NULL``) plus the viewer's OWN personal
+    connections; another operator's personal token never surfaces.
+
+    Shared by the list field and its paginated sibling so the two can
+    never disagree about which rows exist. Ordering is deliberately
+    not applied here — ``keyset_page`` imposes it from the seek key.
+
+    Fails closed when there is no tenant org: ``organization_id=None``
+    matches no row on a non-null FK (#1183).
+    """
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+
+    scope = Q(user__isnull=True)
+    if viewer_pk is not None:
+        scope = scope | Q(user_id=viewer_pk)
+
+    qs = (
+        SourceConnection.objects.filter(organization_id=org_id, deleted_at__isnull=True)
+        .filter(scope)
+        .select_related("user", "parent_oauth_app")
+    )
+    if search:
+        # Same four fields the settings table filtered client-side,
+        # so moving the box server-side doesn't change what matches.
+        qs = qs.filter(search_q(search, "kind", "api_base_url", "account_login", "display_name"))
+    return qs
+
+
+def _ssh_deploy_keys_qs(*, app_slug: str | None, search: str | None = None):
+    """Filtered, unordered deploy keys for the caller's org.
+
+    Shared by the list field and its paginated sibling. ``app_slug``
+    is tri-state: None = every key in the org, ``""`` = org-scoped
+    keys only, a slug = that app's keys. Ordering is deliberately not
+    applied here — ``keyset_page`` imposes it from the seek key.
+
+    Fails closed when there is no tenant org (#1183).
+    """
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    qs = SshDeployKey.objects.filter(organization_id=org_id).select_related("registered_app")
+    if app_slug == "":
+        # Caller asked for org-scoped only.
+        qs = qs.filter(registered_app__isnull=True)
+    elif app_slug:
+        qs = qs.filter(registered_app__slug=app_slug)
+    if search:
+        # Mirrors the settings table's client-side filter.
+        qs = qs.filter(search_q(search, "name", "fingerprint_sha256", "registered_app__slug"))
+    return qs
+
+
 @strawberry.type
 class ScmQuery:
-    def _source_connections_qs(self, *, viewer_pk: int | None, search: str | None = None):
-        """Filtered, unordered connections visible to this viewer.
-
-        Org-level rows (``user IS NULL``) plus the viewer's OWN personal
-        connections; another operator's personal token never surfaces.
-
-        Shared by the list field and its paginated sibling so the two can
-        never disagree about which rows exist. Ordering is deliberately
-        not applied here — ``keyset_page`` imposes it from the seek key.
-
-        Fails closed when there is no tenant org: ``organization_id=None``
-        matches no row on a non-null FK (#1183).
-        """
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-
-        scope = Q(user__isnull=True)
-        if viewer_pk is not None:
-            scope = scope | Q(user_id=viewer_pk)
-
-        qs = (
-            SourceConnection.objects.filter(organization_id=org_id, deleted_at__isnull=True)
-            .filter(scope)
-            .select_related("user", "parent_oauth_app")
-        )
-        if search:
-            # Same four fields the settings table filtered client-side,
-            # so moving the box server-side doesn't change what matches.
-            qs = qs.filter(search_q(search, "kind", "api_base_url", "account_login", "display_name"))
-        return qs
-
     @strawberry.field(
         deprecation_reason=(
             "Caps at 200 rows with no way to reach the 201st. Use astroliftSourceConnectionsPage."
@@ -102,7 +127,7 @@ class ScmQuery:
         """Org-level connections + the current viewer's own personal
         connections. Other users' personal tokens never surface — a
         token belongs to the user that minted it, period."""
-        qs = self._source_connections_qs(viewer_pk=_viewer_user_id(info)).order_by(
+        qs = _source_connections_qs(viewer_pk=_viewer_user_id(info)).order_by(
             "user_id", "-is_active", "kind", "account_login"
         )
         return [source_connection_to_type(c) for c in qs[:200]]
@@ -130,34 +155,11 @@ class ScmQuery:
         so neither is a usable sort key. Newest-first is the trade.
         """
         page = keyset_page(
-            self._source_connections_qs(viewer_pk=_viewer_user_id(info), search=search),
+            _source_connections_qs(viewer_pk=_viewer_user_id(info), search=search),
             cursor=after,
             limit=limit,
         )
         return page.map(source_connection_to_type)
-
-    def _ssh_deploy_keys_qs(self, *, app_slug: str | None, search: str | None = None):
-        """Filtered, unordered deploy keys for the caller's org.
-
-        Shared by the list field and its paginated sibling. ``app_slug``
-        is tri-state: None = every key in the org, ``""`` = org-scoped
-        keys only, a slug = that app's keys. Ordering is deliberately not
-        applied here — ``keyset_page`` imposes it from the seek key.
-
-        Fails closed when there is no tenant org (#1183).
-        """
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        qs = SshDeployKey.objects.filter(organization_id=org_id).select_related("registered_app")
-        if app_slug == "":
-            # Caller asked for org-scoped only.
-            qs = qs.filter(registered_app__isnull=True)
-        elif app_slug:
-            qs = qs.filter(registered_app__slug=app_slug)
-        if search:
-            # Mirrors the settings table's client-side filter.
-            qs = qs.filter(search_q(search, "name", "fingerprint_sha256", "registered_app__slug"))
-        return qs
 
     @strawberry.field(
         deprecation_reason=(
@@ -167,7 +169,7 @@ class ScmQuery:
     @require_permission(Permission.SCM_READ)
     @tenant_scoped()
     def astrolift_ssh_deploy_keys(self, info: Info, app_slug: str | None = None) -> list[SshDeployKeyType]:
-        qs = self._ssh_deploy_keys_qs(app_slug=app_slug).order_by("registered_app__slug", "name")
+        qs = _ssh_deploy_keys_qs(app_slug=app_slug).order_by("registered_app__slug", "name")
         return [ssh_key_to_type(k) for k in qs[:200]]
 
     @strawberry.field
@@ -192,7 +194,7 @@ class ScmQuery:
         org-scoped keys, and a NULL sort column truncates a keyset walk.
         """
         page = keyset_page(
-            self._ssh_deploy_keys_qs(app_slug=app_slug, search=search),
+            _ssh_deploy_keys_qs(app_slug=app_slug, search=search),
             cursor=after,
             limit=limit,
         )

@@ -356,6 +356,296 @@ class CloudOrphanReportType:
     complete: bool
 
 
+def _deployments_qs(
+    *,
+    app_slug: str | None,
+    environment_name: str | None,
+    status: str | None = None,
+    search: str | None = None,
+):
+    """Filtered, unordered deployment stream for the caller's org.
+
+    Shared by the list field and its paginated sibling so the two can
+    never disagree about what a deployment row is. Ordering is
+    deliberately not applied here — ``keyset_page`` imposes it from
+    the seek key.
+    """
+    # Org-scope to the caller's tenant (Deployment reaches the org via
+    # registered_app; the default manager is not tenant-aware).
+    # Fails closed (empty) when org_id is None (#1183).
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    qs = Deployment.objects.select_related("registered_app", "app_environment", "workload").filter(
+        # Deregistered / torn-down apps are soft-deleted; their
+        # deployment rows aren't, so without this they'd keep showing
+        # in the list. Single-deployment + approval-history queries are
+        # id-scoped (a direct link the operator already has), so they
+        # intentionally stay fetchable and don't need this filter.
+        registered_app__deleted_at__isnull=True,
+        registered_app__organization_id=org_id,
+    )
+    if app_slug:
+        qs = qs.filter(registered_app__slug=app_slug)
+    if environment_name:
+        qs = qs.filter(app_environment__name=environment_name)
+    if status:
+        qs = qs.filter(status=status)
+    if search:
+        qs = qs.filter(
+            search_q(
+                search,
+                "registered_app__slug",
+                "registered_app__name",
+                "app_environment__name",
+                "commit_sha",
+                "commit_message",
+                "branch",
+                "image_tag",
+            )
+        )
+    return qs
+
+
+def _scheduled_job_runs_qs(
+    *,
+    app_slug: str | None,
+    environment_name: str | None,
+    search: str | None = None,
+):
+    """Filtered, unordered cron-run stream for the caller's org.
+
+    Shared by the list field and its paginated sibling so the two can
+    never disagree about what a run row is. Ordering is deliberately
+    not applied here — ``keyset_page`` imposes it from the seek key.
+    """
+    # Org-scope to the active tenant. ScheduledJobRun has no org FK of
+    # its own (it hangs off workload → registered_app) and its default
+    # manager is not tenant-aware, so without this a caller could read
+    # another org's runs via a known app slug — slugs are unique only
+    # within a tenant. Applied unconditionally so a null org matches
+    # nothing (#1183 deny-by-default). Mirrors astrolift_task_runs
+    # (#801, #1118).
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    qs = ScheduledJobRun.objects.select_related(
+        "workload", "workload__registered_app", "app_environment"
+    ).filter(workload__registered_app__organization_id=org_id)
+    if app_slug:
+        qs = qs.filter(workload__registered_app__slug=app_slug)
+    if environment_name:
+        qs = qs.filter(app_environment__name=environment_name)
+    if search:
+        qs = qs.filter(
+            search_q(
+                search,
+                "workload__registered_app__slug",
+                "workload__registered_app__name",
+                "workload__slug",
+                "app_environment__name",
+                "status",
+                "k8s_job_name",
+            )
+        )
+    return qs
+
+
+def _command_runs_qs(*, app_slug: str | None, search: str | None = None):
+    """Filtered, unordered one-off-exec stream for the caller's org.
+
+    Shared by the list field and its paginated sibling; ordering is
+    left to ``keyset_page``.
+    """
+    # Org-scope to the active tenant — CommandRun's default manager is
+    # not tenant-aware and its registered_app slug is unique only
+    # within a tenant, so an unscoped query would leak other orgs' runs
+    # (#1118). Reaches org via the direct registered_app FK; applied
+    # unconditionally so a null org matches nothing (#1183).
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    qs = CommandRun.objects.select_related("registered_app", "workload", "invoked_by").filter(
+        registered_app__organization_id=org_id
+    )
+    if app_slug:
+        qs = qs.filter(registered_app__slug=app_slug)
+    if search:
+        qs = qs.filter(
+            search_q(
+                search,
+                "registered_app__slug",
+                "registered_app__name",
+                "workload__slug",
+                "invoked_by__username",
+            )
+        )
+    return qs
+
+
+def _preview_environments_qs(*, app_slug: str | None, search: str | None = None):
+    """Filtered, unordered preview stream for the caller's org.
+
+    Shared by the list field and its paginated sibling; ordering is
+    left to ``keyset_page``. Cost enrichment (``_preview_with_cost``)
+    deliberately happens on the *sliced* rows, never here — it makes
+    a live cluster call per row.
+    """
+    # Org-scope to the caller's tenant (PreviewEnvironment reaches the
+    # org via registered_app). Fails closed when org_id is None (#1183).
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    qs = PreviewEnvironment.objects.select_related(
+        "registered_app",
+        "registered_app__organization",
+        "registered_app__default_tenant_cluster",
+        "app_environment__tenant_cluster",
+    ).filter(registered_app__organization_id=org_id)
+    if app_slug:
+        qs = qs.filter(registered_app__slug=app_slug)
+    if search:
+        qs = qs.filter(
+            search_q(
+                search,
+                "registered_app__slug",
+                "registered_app__name",
+                "branch",
+                "hostname",
+                "commit_sha",
+                "status",
+            )
+        )
+    return qs
+
+
+def _app_deploy_tokens_qs(*, app_slug: str, search: str | None = None):
+    """Filtered, unordered deploy-token list for one app in the
+    caller's org.
+
+    Shared by the list field and its paginated sibling; ordering is
+    left to ``keyset_page``.
+    """
+    # Org-scope to the caller's tenant (DeployToken reaches the org via
+    # registered_app; slugs are unique only within an org). Fails closed
+    # when org_id is None (#1183).
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    qs = DeployToken.objects.select_related("registered_app").filter(
+        registered_app__slug=app_slug,
+        registered_app__organization_id=org_id,
+        deleted_at__isnull=True,
+    )
+    if search:
+        qs = qs.filter(
+            search_q(
+                search,
+                "name",
+                "token_last_4",
+                "last_used_ip",
+                "last_used_agent",
+            )
+        )
+    return qs
+
+
+def _task_runs_qs(
+    *,
+    app_slug: str | None,
+    workload_slug: str | None,
+    status: str | None = None,
+    search: str | None = None,
+):
+    """Filtered, unordered task-run stream for the caller's org.
+
+    Shared by the list field and its paginated sibling so the two can
+    never disagree about what a run row is. Ordering is deliberately
+    not applied here — ``keyset_page`` imposes it from the seek key.
+    """
+    # Org-scope to the active tenant. TaskRun has no organization FK
+    # of its own (it hangs off workload → registered_app), and
+    # @tenant_scoped only asserts a tenant exists — it does not filter.
+    # Without this a caller could read another org's runs by passing a
+    # known app/workload slug (mirrors astrolift_agent_runs #798).
+    # Applied unconditionally so a null org matches nothing (#1183).
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    qs = TaskRun.objects.select_related(
+        "workload",
+        "workload__registered_app",
+        "app_environment",
+        "triggered_by_user",
+    ).filter(workload__registered_app__organization_id=org_id)
+    if app_slug:
+        qs = qs.filter(workload__registered_app__slug=app_slug)
+    if workload_slug:
+        qs = qs.filter(workload__slug=workload_slug)
+    if status:
+        qs = qs.filter(status=status)
+    if search:
+        qs = qs.filter(
+            search_q(
+                search,
+                "workload__registered_app__slug",
+                "workload__registered_app__name",
+                "workload__slug",
+                "status",
+                "k8s_job_name",
+                "triggered_by_user__username",
+            )
+        )
+    return qs
+
+
+def _agent_runs_qs(
+    *,
+    app_slug: str | None,
+    workload_slug: str | None,
+    project_slug: str | None,
+    status: str | None = None,
+    search: str | None = None,
+):
+    """Filtered, unordered agent-run stream for the caller's org.
+
+    Shared by the list field and its paginated sibling; ordering is
+    left to ``keyset_page``.
+
+    Org-scoped: AgentRun has no organization FK of its own (it hangs
+    off ``workload → registered_app``), so the queryset is filtered
+    to the caller's active tenant via ``registered_app__organization``.
+    Without it the ``app_slug`` / ``project_slug`` filters would leak
+    across orgs — both slugs are only unique *within* a tenant, so a
+    caller could read another org's runs by passing a known slug
+    (``@tenant_scoped`` asserts a tenant exists but does not filter).
+    The clause is unconditional, so a null org matches nothing (#1183).
+    """
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    qs = AgentRun.objects.select_related(
+        "workload",
+        "workload__registered_app",
+        "app_environment",
+        "triggered_by_user",
+    ).filter(workload__registered_app__organization_id=org_id)
+    if app_slug:
+        qs = qs.filter(workload__registered_app__slug=app_slug)
+    if workload_slug:
+        qs = qs.filter(workload__slug=workload_slug)
+    if project_slug:
+        qs = qs.filter(workload__registered_app__project__slug=project_slug)
+    if status:
+        qs = qs.filter(status=status)
+    if search:
+        qs = qs.filter(
+            search_q(
+                search,
+                "workload__registered_app__slug",
+                "workload__registered_app__name",
+                "workload__slug",
+                "status",
+                "k8s_pod_name",
+                "triggered_by_user__username",
+            )
+        )
+    return qs
+
+
 @strawberry.type
 class LifecycleQuery:
     @strawberry.field
@@ -407,56 +697,6 @@ class LifecycleQuery:
             qs = qs.filter(registered_app__slug=app_slug)
         return [app_env_to_type(e) for e in qs[:300]]
 
-    def _deployments_qs(
-        self,
-        *,
-        app_slug: str | None,
-        environment_name: str | None,
-        status: str | None = None,
-        search: str | None = None,
-    ):
-        """Filtered, unordered deployment stream for the caller's org.
-
-        Shared by the list field and its paginated sibling so the two can
-        never disagree about what a deployment row is. Ordering is
-        deliberately not applied here — ``keyset_page`` imposes it from
-        the seek key.
-        """
-        # Org-scope to the caller's tenant (Deployment reaches the org via
-        # registered_app; the default manager is not tenant-aware).
-        # Fails closed (empty) when org_id is None (#1183).
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        qs = Deployment.objects.select_related("registered_app", "app_environment", "workload").filter(
-            # Deregistered / torn-down apps are soft-deleted; their
-            # deployment rows aren't, so without this they'd keep showing
-            # in the list. Single-deployment + approval-history queries are
-            # id-scoped (a direct link the operator already has), so they
-            # intentionally stay fetchable and don't need this filter.
-            registered_app__deleted_at__isnull=True,
-            registered_app__organization_id=org_id,
-        )
-        if app_slug:
-            qs = qs.filter(registered_app__slug=app_slug)
-        if environment_name:
-            qs = qs.filter(app_environment__name=environment_name)
-        if status:
-            qs = qs.filter(status=status)
-        if search:
-            qs = qs.filter(
-                search_q(
-                    search,
-                    "registered_app__slug",
-                    "registered_app__name",
-                    "app_environment__name",
-                    "commit_sha",
-                    "commit_message",
-                    "branch",
-                    "image_tag",
-                )
-            )
-        return qs
-
     @strawberry.field(
         deprecation_reason=(
             "Caps at 200 rows with no way to reach the 201st. " "Use astroliftDeploymentsPage."
@@ -471,9 +711,7 @@ class LifecycleQuery:
         environment_name: str | None = None,
         limit: int = 50,
     ) -> list[DeploymentType]:
-        qs = self._deployments_qs(app_slug=app_slug, environment_name=environment_name).order_by(
-            "-created_at"
-        )
+        qs = _deployments_qs(app_slug=app_slug, environment_name=environment_name).order_by("-created_at")
         viewer = _viewer_user_id(info)
         return [deployment_to_type(d, viewer_user_id=viewer) for d in qs[: max(1, min(limit, 200))]]
 
@@ -501,7 +739,7 @@ class LifecycleQuery:
         likely to be hunting for.
         """
         page = keyset_page(
-            self._deployments_qs(
+            _deployments_qs(
                 app_slug=app_slug,
                 environment_name=environment_name,
                 status=status,
@@ -784,49 +1022,6 @@ class LifecycleQuery:
         qs = DeploymentLog.objects.filter(deployment=deployment).order_by("occurred_at")
         return [deployment_log_to_type(e) for e in qs[:1000]]
 
-    def _scheduled_job_runs_qs(
-        self,
-        *,
-        app_slug: str | None,
-        environment_name: str | None,
-        search: str | None = None,
-    ):
-        """Filtered, unordered cron-run stream for the caller's org.
-
-        Shared by the list field and its paginated sibling so the two can
-        never disagree about what a run row is. Ordering is deliberately
-        not applied here — ``keyset_page`` imposes it from the seek key.
-        """
-        # Org-scope to the active tenant. ScheduledJobRun has no org FK of
-        # its own (it hangs off workload → registered_app) and its default
-        # manager is not tenant-aware, so without this a caller could read
-        # another org's runs via a known app slug — slugs are unique only
-        # within a tenant. Applied unconditionally so a null org matches
-        # nothing (#1183 deny-by-default). Mirrors astrolift_task_runs
-        # (#801, #1118).
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        qs = ScheduledJobRun.objects.select_related(
-            "workload", "workload__registered_app", "app_environment"
-        ).filter(workload__registered_app__organization_id=org_id)
-        if app_slug:
-            qs = qs.filter(workload__registered_app__slug=app_slug)
-        if environment_name:
-            qs = qs.filter(app_environment__name=environment_name)
-        if search:
-            qs = qs.filter(
-                search_q(
-                    search,
-                    "workload__registered_app__slug",
-                    "workload__registered_app__name",
-                    "workload__slug",
-                    "app_environment__name",
-                    "status",
-                    "k8s_job_name",
-                )
-            )
-        return qs
-
     @strawberry.field(
         deprecation_reason=(
             "Caps at 500 rows with no way to reach the 501st. Use astroliftScheduledJobRunsPage."
@@ -841,7 +1036,7 @@ class LifecycleQuery:
         environment_name: str | None = None,
         limit: int = 100,
     ) -> list[ScheduledJobRunType]:
-        qs = self._scheduled_job_runs_qs(app_slug=app_slug, environment_name=environment_name).order_by(
+        qs = _scheduled_job_runs_qs(app_slug=app_slug, environment_name=environment_name).order_by(
             "-created_at"
         )
         return [scheduled_job_run_to_type(r) for r in qs[: max(1, min(limit, 500))]]
@@ -868,7 +1063,7 @@ class LifecycleQuery:
         operator reads off ``kubectl``.
         """
         page = keyset_page(
-            self._scheduled_job_runs_qs(
+            _scheduled_job_runs_qs(
                 app_slug=app_slug,
                 environment_name=environment_name,
                 search=search,
@@ -900,36 +1095,6 @@ class LifecycleQuery:
         )
         return scheduled_job_run_to_type(r) if r else None
 
-    def _command_runs_qs(self, *, app_slug: str | None, search: str | None = None):
-        """Filtered, unordered one-off-exec stream for the caller's org.
-
-        Shared by the list field and its paginated sibling; ordering is
-        left to ``keyset_page``.
-        """
-        # Org-scope to the active tenant — CommandRun's default manager is
-        # not tenant-aware and its registered_app slug is unique only
-        # within a tenant, so an unscoped query would leak other orgs' runs
-        # (#1118). Reaches org via the direct registered_app FK; applied
-        # unconditionally so a null org matches nothing (#1183).
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        qs = CommandRun.objects.select_related("registered_app", "workload", "invoked_by").filter(
-            registered_app__organization_id=org_id
-        )
-        if app_slug:
-            qs = qs.filter(registered_app__slug=app_slug)
-        if search:
-            qs = qs.filter(
-                search_q(
-                    search,
-                    "registered_app__slug",
-                    "registered_app__name",
-                    "workload__slug",
-                    "invoked_by__username",
-                )
-            )
-        return qs
-
     @strawberry.field(
         deprecation_reason=("Caps at 500 rows with no way to reach the 501st. Use astroliftCommandRunsPage.")
     )
@@ -941,7 +1106,7 @@ class LifecycleQuery:
         app_slug: str | None = None,
         limit: int = 100,
     ) -> list[CommandRunType]:
-        qs = self._command_runs_qs(app_slug=app_slug).order_by("-created_at")
+        qs = _command_runs_qs(app_slug=app_slug).order_by("-created_at")
         return [command_run_to_type(r) for r in qs[: max(1, min(limit, 500))]]
 
     @strawberry.field
@@ -966,7 +1131,7 @@ class LifecycleQuery:
         workload, and the operator who invoked the command.
         """
         page = keyset_page(
-            self._command_runs_qs(app_slug=app_slug, search=search),
+            _command_runs_qs(app_slug=app_slug, search=search),
             cursor=after,
             limit=limit,
         )
@@ -990,40 +1155,6 @@ class LifecycleQuery:
         )
         return command_run_to_type(r) if r else None
 
-    def _preview_environments_qs(self, *, app_slug: str | None, search: str | None = None):
-        """Filtered, unordered preview stream for the caller's org.
-
-        Shared by the list field and its paginated sibling; ordering is
-        left to ``keyset_page``. Cost enrichment (``_preview_with_cost``)
-        deliberately happens on the *sliced* rows, never here — it makes
-        a live cluster call per row.
-        """
-        # Org-scope to the caller's tenant (PreviewEnvironment reaches the
-        # org via registered_app). Fails closed when org_id is None (#1183).
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        qs = PreviewEnvironment.objects.select_related(
-            "registered_app",
-            "registered_app__organization",
-            "registered_app__default_tenant_cluster",
-            "app_environment__tenant_cluster",
-        ).filter(registered_app__organization_id=org_id)
-        if app_slug:
-            qs = qs.filter(registered_app__slug=app_slug)
-        if search:
-            qs = qs.filter(
-                search_q(
-                    search,
-                    "registered_app__slug",
-                    "registered_app__name",
-                    "branch",
-                    "hostname",
-                    "commit_sha",
-                    "status",
-                )
-            )
-        return qs
-
     @strawberry.field(
         deprecation_reason=(
             "Caps at 200 rows with no way to reach the 201st, and prices "
@@ -1035,7 +1166,7 @@ class LifecycleQuery:
     def astrolift_preview_environments(
         self, info: Info, app_slug: str | None = None
     ) -> list[PreviewEnvironmentType]:
-        qs = self._preview_environments_qs(app_slug=app_slug).order_by("-created_at")
+        qs = _preview_environments_qs(app_slug=app_slug).order_by("-created_at")
         rows = list(qs[:200])
         return [_preview_with_cost(p) for p in rows]
 
@@ -1062,7 +1193,7 @@ class LifecycleQuery:
         branch, hostname, commit, and status.
         """
         page = keyset_page(
-            self._preview_environments_qs(app_slug=app_slug, search=search),
+            _preview_environments_qs(app_slug=app_slug, search=search),
             cursor=after,
             limit=limit,
         )
@@ -1330,35 +1461,6 @@ class LifecycleQuery:
         scoped = [p for p in pods if (p.workload or "") == workload_slug]
         return _bucket_pods_by_status(scoped)
 
-    def _app_deploy_tokens_qs(self, *, app_slug: str, search: str | None = None):
-        """Filtered, unordered deploy-token list for one app in the
-        caller's org.
-
-        Shared by the list field and its paginated sibling; ordering is
-        left to ``keyset_page``.
-        """
-        # Org-scope to the caller's tenant (DeployToken reaches the org via
-        # registered_app; slugs are unique only within an org). Fails closed
-        # when org_id is None (#1183).
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        qs = DeployToken.objects.select_related("registered_app").filter(
-            registered_app__slug=app_slug,
-            registered_app__organization_id=org_id,
-            deleted_at__isnull=True,
-        )
-        if search:
-            qs = qs.filter(
-                search_q(
-                    search,
-                    "name",
-                    "token_last_4",
-                    "last_used_ip",
-                    "last_used_agent",
-                )
-            )
-        return qs
-
     @strawberry.field(
         deprecation_reason=(
             "Caps at 100 rows with no way to reach the 101st. Use astroliftAppDeployTokensPage."
@@ -1371,7 +1473,7 @@ class LifecycleQuery:
         info: Info,
         app_slug: str,
     ) -> list[DeployTokenType]:
-        qs = self._app_deploy_tokens_qs(app_slug=app_slug).order_by("-created_at")[:100]
+        qs = _app_deploy_tokens_qs(app_slug=app_slug).order_by("-created_at")[:100]
         return [deploy_token_to_type(t) for t in qs]
 
     @strawberry.field
@@ -1397,7 +1499,7 @@ class LifecycleQuery:
         an operator uses to trace a token back to the runner that used it.
         """
         page = keyset_page(
-            self._app_deploy_tokens_qs(app_slug=app_slug, search=search),
+            _app_deploy_tokens_qs(app_slug=app_slug, search=search),
             cursor=after,
             limit=limit,
         )
@@ -1919,54 +2021,6 @@ class LifecycleQuery:
     # TaskRun + AgentRun fleet queries (#801, #798)
     # ----------------------------------------------------------------
 
-    def _task_runs_qs(
-        self,
-        *,
-        app_slug: str | None,
-        workload_slug: str | None,
-        status: str | None = None,
-        search: str | None = None,
-    ):
-        """Filtered, unordered task-run stream for the caller's org.
-
-        Shared by the list field and its paginated sibling so the two can
-        never disagree about what a run row is. Ordering is deliberately
-        not applied here — ``keyset_page`` imposes it from the seek key.
-        """
-        # Org-scope to the active tenant. TaskRun has no organization FK
-        # of its own (it hangs off workload → registered_app), and
-        # @tenant_scoped only asserts a tenant exists — it does not filter.
-        # Without this a caller could read another org's runs by passing a
-        # known app/workload slug (mirrors astrolift_agent_runs #798).
-        # Applied unconditionally so a null org matches nothing (#1183).
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        qs = TaskRun.objects.select_related(
-            "workload",
-            "workload__registered_app",
-            "app_environment",
-            "triggered_by_user",
-        ).filter(workload__registered_app__organization_id=org_id)
-        if app_slug:
-            qs = qs.filter(workload__registered_app__slug=app_slug)
-        if workload_slug:
-            qs = qs.filter(workload__slug=workload_slug)
-        if status:
-            qs = qs.filter(status=status)
-        if search:
-            qs = qs.filter(
-                search_q(
-                    search,
-                    "workload__registered_app__slug",
-                    "workload__registered_app__name",
-                    "workload__slug",
-                    "status",
-                    "k8s_job_name",
-                    "triggered_by_user__username",
-                )
-            )
-        return qs
-
     @strawberry.field(
         deprecation_reason=("Caps at 500 rows with no way to reach the 501st. Use astroliftTaskRunsPage.")
     )
@@ -1985,7 +2039,7 @@ class LifecycleQuery:
         Filtered by app, workload, and/or status. Capped at 500 to keep
         the response bounded.
         """
-        qs = self._task_runs_qs(app_slug=app_slug, workload_slug=workload_slug, status=status).order_by(
+        qs = _task_runs_qs(app_slug=app_slug, workload_slug=workload_slug, status=status).order_by(
             "-created_at"
         )
         return [task_run_to_type(r) for r in qs[: max(1, min(limit, 500))]]
@@ -2016,7 +2070,7 @@ class LifecycleQuery:
         triggered the run.
         """
         page = keyset_page(
-            self._task_runs_qs(
+            _task_runs_qs(
                 app_slug=app_slug,
                 workload_slug=workload_slug,
                 status=status,
@@ -2055,59 +2109,6 @@ class LifecycleQuery:
         )
         return task_run_to_type(r) if r else None
 
-    def _agent_runs_qs(
-        self,
-        *,
-        app_slug: str | None,
-        workload_slug: str | None,
-        project_slug: str | None,
-        status: str | None = None,
-        search: str | None = None,
-    ):
-        """Filtered, unordered agent-run stream for the caller's org.
-
-        Shared by the list field and its paginated sibling; ordering is
-        left to ``keyset_page``.
-
-        Org-scoped: AgentRun has no organization FK of its own (it hangs
-        off ``workload → registered_app``), so the queryset is filtered
-        to the caller's active tenant via ``registered_app__organization``.
-        Without it the ``app_slug`` / ``project_slug`` filters would leak
-        across orgs — both slugs are only unique *within* a tenant, so a
-        caller could read another org's runs by passing a known slug
-        (``@tenant_scoped`` asserts a tenant exists but does not filter).
-        The clause is unconditional, so a null org matches nothing (#1183).
-        """
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        qs = AgentRun.objects.select_related(
-            "workload",
-            "workload__registered_app",
-            "app_environment",
-            "triggered_by_user",
-        ).filter(workload__registered_app__organization_id=org_id)
-        if app_slug:
-            qs = qs.filter(workload__registered_app__slug=app_slug)
-        if workload_slug:
-            qs = qs.filter(workload__slug=workload_slug)
-        if project_slug:
-            qs = qs.filter(workload__registered_app__project__slug=project_slug)
-        if status:
-            qs = qs.filter(status=status)
-        if search:
-            qs = qs.filter(
-                search_q(
-                    search,
-                    "workload__registered_app__slug",
-                    "workload__registered_app__name",
-                    "workload__slug",
-                    "status",
-                    "k8s_pod_name",
-                    "triggered_by_user__username",
-                )
-            )
-        return qs
-
     @strawberry.field(
         deprecation_reason=("Caps at 500 rows with no way to reach the 501st. Use astroliftAgentRunsPage.")
     )
@@ -2130,7 +2131,7 @@ class LifecycleQuery:
         to runs whose agent workload belongs to that project — the
         per-project Agents detail surface uses it.
         """
-        qs = self._agent_runs_qs(
+        qs = _agent_runs_qs(
             app_slug=app_slug,
             workload_slug=workload_slug,
             project_slug=project_slug,
@@ -2163,7 +2164,7 @@ class LifecycleQuery:
         triggered the run.
         """
         page = keyset_page(
-            self._agent_runs_qs(
+            _agent_runs_qs(
                 app_slug=app_slug,
                 workload_slug=workload_slug,
                 project_slug=project_slug,
