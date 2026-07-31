@@ -49,6 +49,13 @@ export type CursorTableOptions<TRow, TVars extends OperationVariables> = {
    * is what client-side filtering over one fetched page amounted to.
    */
   searchVariable?: string;
+  /**
+   * Name of the query's cursor argument. The schema grew two spellings
+   * before this hook existed — `after` on the events and audit pages,
+   * `cursor` on the apps and activity pages — and renaming a shipped
+   * argument is a breaking change for the CLI, so the hook adapts instead.
+   */
+  cursorVariable?: string;
   /** Name of the query's server-side sort argument, if it has one. */
   sortVariable?: string;
   initialSort?: SortState;
@@ -110,6 +117,7 @@ export function useCursorTable<TRow, TVars extends OperationVariables = Operatio
   extract,
   pageSize: initialPageSize = DEFAULT_PAGE_SIZE,
   searchVariable,
+  cursorVariable = "after",
   sortVariable,
   initialSort,
   urlKey,
@@ -170,12 +178,21 @@ export function useCursorTable<TRow, TVars extends OperationVariables = Operatio
 
   const queryVariables = React.useMemo(() => {
     const vars: Record<string, unknown> = { ...variables, limit: pageSize };
-    if (cursor) vars.after = cursor;
+    if (cursor) vars[cursorVariable] = cursor;
     if (searchVariable) vars[searchVariable] = debouncedSearch || null;
     if (sortVariable && sort) vars[sortVariable] = `${sort.key}:${sort.dir}`;
     return vars;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterKey, cursor, searchVariable, sortVariable, debouncedSearch, sort, pageSize]);
+  }, [
+    filterKey,
+    cursor,
+    cursorVariable,
+    searchVariable,
+    sortVariable,
+    debouncedSearch,
+    sort,
+    pageSize,
+  ]);
 
   const { data, previousData, loading, error, refetch } = useQuery(query, {
     variables: queryVariables,

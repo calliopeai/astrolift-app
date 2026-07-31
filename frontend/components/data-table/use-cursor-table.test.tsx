@@ -134,6 +134,20 @@ describe("useCursorTable", () => {
     expect(result.current.hasPrev).toBe(false);
   });
 
+  it("honours a query whose cursor argument is spelled differently", () => {
+    // `astroliftAppsPage` says `cursor` where the events pages say `after`.
+    apollo.respond = (vars) =>
+      pagedSource(9, 3)({ ...vars, after: vars.cursor as string | undefined });
+    const { result } = renderHook(() =>
+      useCursorTable<Row>({ query: QUERY, extract, pageSize: 3, cursorVariable: "cursor" })
+    );
+
+    act(() => result.current.next());
+    expect(lastCall().cursor).toBe("3");
+    expect(lastCall().after).toBeUndefined();
+    expect(result.current.rows.map((r) => r.id)).toEqual(["row-3", "row-4", "row-5"]);
+  });
+
   it("never pages past the end", () => {
     apollo.respond = pagedSource(2, 5);
     const { result } = renderHook(() =>
