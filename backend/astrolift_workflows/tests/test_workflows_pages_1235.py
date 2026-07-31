@@ -17,7 +17,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
-from django.db.models import Value
+from django.db.models import Q, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
@@ -296,12 +296,22 @@ def test_workflows_page_refuses_a_foreign_org_id_argument(org, other_org, permis
 # ---------------------------------------------------------------------------
 
 
-def _db_definition_order(org):
+def _db_definition_order(org, *, search=None):
+    """The order the page must reproduce.
+
+    ``search`` mirrors the resolver's own filter so a test can scope both
+    sides to the rows it created — migration 0006 seeds a platform-global
+    catalogue into every test database, and ``visible_to_org`` returns
+    those too.
+    """
+    qs = WorkflowDefinition.visible_to_org(org.id).filter(deleted_at__isnull=True)
+    if search:
+        qs = qs.filter(
+            Q(name__icontains=search) | Q(slug__icontains=search) | Q(description__icontains=search)
+        )
     return [
         str(g)
-        for g in WorkflowDefinition.visible_to_org(org.id)
-        .filter(deleted_at__isnull=True)
-        .annotate(sort_name=Coalesce("name", Value("")))
+        for g in qs.annotate(sort_name=Coalesce("name", Value("")))
         .order_by("sort_name", "guid")
         .values_list("guid", flat=True)
     ]
@@ -317,11 +327,11 @@ def test_definitions_walk_is_name_ascending_and_covers_every_row(org, permission
     _make_def("defpage-shared-own", organization=org, name="Shared Name")
     _make_def("defpage-shared-global", organization=None, name="Shared Name")
 
-    guids = _walk_definitions(WorkflowsQuery(), org, limit=2)
+    guids = _walk_definitions(WorkflowsQuery(), org, limit=2, search="defpage-")
 
     assert len(guids) == 11
     assert len(set(guids)) == 11, "a definition was served on two pages"
-    assert guids == _db_definition_order(org)
+    assert guids == _db_definition_order(org, search="defpage-")
 
 
 def test_definitions_walk_includes_platform_globals(org, permission_resolver):
@@ -332,11 +342,11 @@ def test_definitions_walk_includes_platform_globals(org, permission_resolver):
     mine = _make_def("defpage-mine", organization=org, name="Mine")
     theirs_global = _make_def("defpage-global", organization=None, name="Global Template")
 
-    guids = _walk_definitions(WorkflowsQuery(), org, limit=1)
+    guids = _walk_definitions(WorkflowsQuery(), org, limit=1, search="defpage-")
 
     assert set(guids) == {str(mine.guid), str(theirs_global.guid)}
     with tenant_context(TenantContext(organization_id=org.id)):
-        page = WorkflowsQuery().workflow_definitions_page(_info(), limit=50)
+        page = WorkflowsQuery().workflow_definitions_page(_info(), limit=50, search="defpage-")
     globals_seen = [i.guid for i in page.items if i.is_global]
     assert globals_seen == [str(theirs_global.guid)]
     assert page.total_count == 2
@@ -350,7 +360,7 @@ def test_definitions_total_count_is_the_whole_result_set(org, permission_resolve
         _make_def(f"defpage-total-g-{n:02d}", organization=None, name=f"Global {n:02d}")
 
     with tenant_context(TenantContext(organization_id=org.id)):
-        page = WorkflowsQuery().workflow_definitions_page(_info(), limit=4)
+        page = WorkflowsQuery().workflow_definitions_page(_info(), limit=4, search="defpage-total")
 
     assert len(page.items) == 4
     assert page.total_count == 10
@@ -366,8 +376,10 @@ def test_definitions_page_serves_the_same_rows_as_the_deprecated_list_field(org,
 
     query = WorkflowsQuery()
     with tenant_context(TenantContext(organization_id=org.id)):
-        listed = {d.guid for d in query.workflow_definitions(_info())}
-    walked = set(_walk_definitions(query, org, limit=2))
+        # The list field has no search argument, so narrow its result
+        # to this test's rows on the way out instead.
+        listed = {d.guid for d in query.workflow_definitions(_info()) if d.slug.startswith("defpage-parity")}
+    walked = set(_walk_definitions(query, org, limit=2, search="defpage-parity"))
 
     assert walked == listed
     assert len(listed) == 6
@@ -380,7 +392,7 @@ def test_definitions_page_excludes_soft_deleted_rows(org, permission_resolver):
     WorkflowDefinition.objects.filter(pk=gone.pk).update(deleted_at=timezone.now())
 
     with tenant_context(TenantContext(organization_id=org.id)):
-        page = WorkflowsQuery().workflow_definitions_page(_info(), limit=50)
+        page = WorkflowsQuery().workflow_definitions_page(_info(), limit=50, search="defpage-")
 
     assert [i.guid for i in page.items] == [str(live.guid)]
     assert page.total_count == 1
@@ -397,9 +409,9 @@ def test_definitions_of_another_org_are_invisible(org, other_org, permission_res
         _make_def(f"defpage-x-theirs-{n}", organization=other_org, name=f"Theirs {n}") for n in range(4)
     ]
 
-    guids = _walk_definitions(WorkflowsQuery(), org, limit=1)
+    guids = _walk_definitions(WorkflowsQuery(), org, limit=1, search="defpage-x-")
     with tenant_context(TenantContext(organization_id=org.id)):
-        page = WorkflowsQuery().workflow_definitions_page(_info(), limit=50)
+        page = WorkflowsQuery().workflow_definitions_page(_info(), limit=50, search="defpage-x-")
 
     assert set(guids) == {str(mine.guid), str(shared.guid)}
     assert not {str(d.guid) for d in theirs} & set(guids)

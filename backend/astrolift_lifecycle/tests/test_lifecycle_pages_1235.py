@@ -42,6 +42,7 @@ from astrolift_lifecycle.models import (
     ScheduledJobRun,
     TaskRun,
 )
+from astrolift_lifecycle.schema import queries
 from astrolift_lifecycle.schema.queries import LifecycleQuery
 from astrolift_registry.models import RegisteredApp, Workload
 from core.cluster_observability import (
@@ -756,7 +757,10 @@ def test_queryset_builders_match_nothing_without_a_tenant(builder, kwargs, one_r
     so this is defence in depth, but it is the half that has to hold if the
     builder is ever called from a non-resolver path.
     """
-    qs = getattr(LifecycleQuery(), builder)(**kwargs)
+    # Module-level functions, not methods: Strawberry binds a root
+    # resolver's ``self`` to the (None) root value, so a builder reached
+    # through ``self`` raises AttributeError on every real request.
+    qs = getattr(queries, builder)(**kwargs)
     assert qs.count() == 0
 
 
