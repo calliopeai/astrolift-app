@@ -599,3 +599,41 @@ def test_push_secrets_app_not_found(
     assert not result.ok
     assert result.errors[0].code == "NOT_FOUND"
     assert result.errors[0].field == "appSlug"
+
+
+def test_push_secrets_rotation_normalizes_legacy_scope(
+    monkeypatch,
+    settings,
+    permission_resolver,
+    org,
+    actor,
+    app_with_repo,
+    github_app_connection,
+    github_keypair,
+):
+    """A legacy-scoped (``deploy``) token must come out of the CI push
+    carrying ``app.deploy`` (#1222) — otherwise the rotated token the
+    workflow just received keeps failing ci_deploy's scope check."""
+    permission_resolver.grant(Permission.APP_UPDATE)
+    settings.PLATFORM_API_URL = "https://api.astrolift.example.com/"
+
+    token_row, _ = issue_token(
+        app=app_with_repo,
+        name="default",
+        scopes=["deploy"],
+        by_user_id=actor.pk,
+    )
+
+    captured: dict = {}
+    _install_fake_github(monkeypatch, github_keypair, captured=captured)
+
+    with _ctx(org):
+        result = LifecycleMutation().push_astrolift_ci_secrets_to_repo(
+            _info(actor),
+            input=PushCiSecretsToRepoInput(app_slug=app_with_repo.slug),
+        )
+
+    assert result.ok, result.errors
+    token_row.refresh_from_db()
+    assert "app.deploy" in token_row.scopes
+    assert "deploy" in token_row.scopes  # legacy grant preserved, not replaced

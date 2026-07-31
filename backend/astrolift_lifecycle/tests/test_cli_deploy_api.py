@@ -836,3 +836,18 @@ def test_ci_deploy_omitted_environment_ambiguous_with_two_envs_returns_400(
     assert r.status_code == 400
     assert "environment" in r.json()["detail"]
     assert workflow_starts == []
+
+
+def test_ci_deploy_accepts_legacy_deploy_scope(app_with_manifest, env, workflow_starts):
+    """Rows minted before the scope rename carry ``deploy`` — they must keep
+    deploying (#1222); rotation converges them on ``app.deploy``."""
+    _, plaintext = issue_token(app=app_with_manifest, name="legacy", scopes=["deploy"])
+    client = Client()
+    r = _post_json(
+        client,
+        f"/api/cli/v1/apps/{app_with_manifest.slug}/deploy/",
+        _valid_body(),
+        {"HTTP_AUTHORIZATION": f"Bearer {plaintext}"},
+    )
+    assert r.status_code == 201, r.content
+    assert len(workflow_starts) == 1

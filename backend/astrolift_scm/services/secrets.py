@@ -628,7 +628,13 @@ def _rotate_or_issue_deploy_token(app: RegisteredApp, *, by_user_id: int | None)
         .first()
     )
     if token is not None:
-        _row, plaintext = rotate_token(token, immediate=True)
+        row, plaintext = rotate_token(token, immediate=True)
+        # Normalize legacy scopes (#1222): rows minted before the scope
+        # rename carry ``deploy``; the CI push exists to produce a token
+        # that can deploy, so converge on the canonical ``app.deploy``.
+        if "app.deploy" not in (row.scopes or []):
+            row.scopes = [*(row.scopes or []), "app.deploy"]
+            row.save(update_fields=["scopes", "updated_at", "version"])
         return plaintext
     _row, plaintext = issue_token(
         app=app,

@@ -123,8 +123,11 @@ def _resolve_deploy_token(request: HttpRequest, app_slug: str):
             status=403,
         )
 
-    # Scope check — token must carry the deploy permission.
-    if token.scopes and "app.deploy" not in token.scopes:
+    # Scope check — token must carry the deploy permission. Legacy rows
+    # minted before the scope rename carry ``deploy``; accept it as the
+    # same grant so pre-rename tokens keep deploying (#1222) — rotation
+    # normalizes them to ``app.deploy``.
+    if token.scopes and not {"app.deploy", "deploy"} & set(token.scopes):
         return None, JsonResponse(
             {"detail": "token scope does not include app.deploy"},
             status=403,
