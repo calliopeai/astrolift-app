@@ -211,13 +211,14 @@ export function GoldenSignalsPanel({
               loading={isLoading}
               lineColor="var(--chart-5)"
             />
+            {/* Sixth grid cell — fills the slot beside Saturation (memory)
+                instead of a lonely full-width row below. */}
+            <StatusCodeCard
+              breakdown={statusBreakdown.data?.astroliftAppStatusCodeBreakdown ?? null}
+              loading={statusBreakdown.loading && !statusBreakdown.data}
+              onRetry={() => void statusBreakdown.refetch()}
+            />
           </div>
-
-          <StatusCodeCard
-            breakdown={statusBreakdown.data?.astroliftAppStatusCodeBreakdown ?? null}
-            loading={statusBreakdown.loading && !statusBreakdown.data}
-            onRetry={() => void statusBreakdown.refetch()}
-          />
         </>
       )}
     </div>
