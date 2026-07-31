@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { ROLLBACK_DEPLOYMENT } from "@/graphql/lifecycle/lifecycle.mutations";
 import { LIST_DEPLOYMENTS } from "@/graphql/lifecycle/lifecycle.queries";
@@ -123,21 +124,17 @@ export function DeploymentPanel({ appSlug }: Props) {
     awaitRefetchQueries: true,
   });
 
+  const [confirmRollback, setConfirmRollback] = React.useState(false);
+
+  // Throws on a failed mutation so ConfirmDialog holds the dialog open and
+  // reports the reason, rather than closing on a rollback that never ran.
   async function handleRollback() {
     if (!lastGood) return;
-    if (
-      !confirm(
-        `Roll back to ${(lastGood.imageTag ?? lastGood.id).slice(0, 10)}? ` +
-          "This starts a new deployment using the previous image and supersedes the failed one."
-      )
-    ) {
-      return;
-    }
     const { data } = await rollback({ variables: { input: { id: lastGood.id } } });
     if (data?.rollbackDeployment.ok) {
       toast.success("Rollback started.");
     } else {
-      toast.error(data?.rollbackDeployment.errors?.[0]?.message ?? "Rollback failed.");
+      throw new Error(data?.rollbackDeployment.errors?.[0]?.message ?? "Rollback failed.");
     }
   }
 
@@ -221,7 +218,12 @@ export function DeploymentPanel({ appSlug }: Props) {
             </Button>
             {current.status === "failed" && lastGood && (
               <Can permission="app.rollback">
-                <Button onClick={handleRollback} disabled={rolling} size="sm" variant="default">
+                <Button
+                  onClick={() => setConfirmRollback(true)}
+                  disabled={rolling}
+                  size="sm"
+                  variant="default"
+                >
                   {rolling ? (
                     <Loader2Icon className="size-3.5 animate-spin" />
                   ) : (
@@ -250,6 +252,20 @@ export function DeploymentPanel({ appSlug }: Props) {
           </div>
         )}
       </CardContent>
+
+      <ConfirmDialog
+        open={confirmRollback}
+        onOpenChange={setConfirmRollback}
+        title={
+          lastGood
+            ? `Roll back to ${(lastGood.imageTag ?? lastGood.id).slice(0, 10)}?`
+            : "Roll back?"
+        }
+        description="This starts a new deployment using the previous image and supersedes the failed one."
+        confirmLabel="Roll back"
+        destructive
+        onConfirm={handleRollback}
+      />
     </Card>
   );
 }

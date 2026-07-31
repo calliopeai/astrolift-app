@@ -17,6 +17,7 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -281,6 +282,8 @@ export default function SkillBuilderPage() {
   const [showAddTool, setShowAddTool] = useState(false);
   const [aiAssisting, setAiAssisting] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [confirmDeleteSkill, setConfirmDeleteSkill] = useState(false);
+  const [toolToRemove, setToolToRemove] = useState<ToolDef | null>(null);
 
   // ── data ────────────────────────────────────────────────────────────────────
   const { data: skillData, loading: skillLoading, error: skillError } = useQuery<SkillData>(
@@ -348,22 +351,23 @@ export default function SkillBuilderPage() {
     }
   }
 
+  // Both destructive handlers throw on failure: ConfirmDialog keeps the
+  // dialog open and surfaces the message as a toast, so a failed delete
+  // stays correctable instead of dismissing itself.
   async function handleDelete() {
-    if (!window.confirm(`Delete skill "${skill?.name}"? This cannot be undone.`)) return;
     const { data } = await deleteSkill({ variables: { id } });
     if (data?.deleteSkill?.ok) {
       toast.success("Skill deleted");
       router.push("/agents/skills");
     } else {
-      toast.error("Failed to delete skill");
+      throw new Error("Failed to delete skill");
     }
   }
 
-  async function handleDeleteTool(toolId: string, toolName: string) {
-    if (!window.confirm(`Remove tool "${toolName}"?`)) return;
+  async function handleDeleteTool(toolId: string) {
     const { data } = await deleteToolDef({ variables: { id: toolId } });
     if (!data?.deleteToolDef?.ok) {
-      toast.error("Failed to remove tool");
+      throw new Error("Failed to remove tool");
     }
   }
 
@@ -453,7 +457,7 @@ export default function SkillBuilderPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={handleDelete}
+          onClick={() => setConfirmDeleteSkill(true)}
           disabled={deleting}
           className="text-destructive hover:text-destructive"
         >
@@ -611,7 +615,7 @@ export default function SkillBuilderPage() {
                 </Link>
                 <button
                   type="button"
-                  onClick={() => handleDeleteTool(tool.id, tool.name)}
+                  onClick={() => setToolToRemove(tool)}
                   disabled={deletingTool}
                   className="text-muted-foreground hover:text-destructive ml-1 shrink-0"
                   aria-label={`Remove ${tool.name}`}
@@ -623,6 +627,30 @@ export default function SkillBuilderPage() {
           </div>
         )}
       </section>
+
+      <ConfirmDialog
+        open={confirmDeleteSkill}
+        onOpenChange={setConfirmDeleteSkill}
+        title={`Delete skill "${skill.name}"?`}
+        description="This cannot be undone. Agents that reference this skill lose it on their next run, and its tool definitions go with it."
+        confirmLabel="Delete skill"
+        destructive
+        onConfirm={handleDelete}
+      />
+
+      <ConfirmDialog
+        open={toolToRemove !== null}
+        onOpenChange={(next) => {
+          if (!next) setToolToRemove(null);
+        }}
+        title={toolToRemove ? `Remove tool "${toolToRemove.name}"?` : "Remove tool?"}
+        description="The tool definition is deleted from this skill. Agents lose the capability on their next run."
+        confirmLabel="Remove tool"
+        destructive
+        onConfirm={async () => {
+          if (toolToRemove) await handleDeleteTool(toolToRemove.id);
+        }}
+      />
     </PageShell>
   );
 }

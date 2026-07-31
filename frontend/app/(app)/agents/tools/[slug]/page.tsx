@@ -15,6 +15,7 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -123,6 +124,7 @@ export default function ToolDetailPage() {
   const [outputSchemaText, setOutputSchemaText] = useState("{}");
   const [schemaError, setSchemaError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const { data, loading, error } = useQuery<OrgToolDefsData>(GET_TOOL_DEF, {
     variables: { orgId, id },
@@ -201,14 +203,15 @@ export default function ToolDetailPage() {
     }
   }
 
+  // Throws on failure so ConfirmDialog holds the dialog open and toasts
+  // the message, instead of closing on a delete that never happened.
   async function handleDelete() {
-    if (!window.confirm(`Delete tool "${tool?.name}"? This cannot be undone.`)) return;
     const { data: mutData } = await deleteToolDef({ variables: { id } });
     if (mutData?.deleteToolDef?.ok) {
       toast.success("Tool deleted");
       router.push("/agents/tools");
     } else {
-      toast.error("Failed to delete tool");
+      throw new Error("Failed to delete tool");
     }
   }
 
@@ -263,7 +266,7 @@ export default function ToolDetailPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={handleDelete}
+          onClick={() => setConfirmDelete(true)}
           disabled={deleting}
           className="text-destructive hover:text-destructive"
         >
@@ -380,6 +383,16 @@ export default function ToolDetailPage() {
           )}
         </div>
       </form>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title={`Delete tool "${tool.name}"?`}
+        description="This cannot be undone. Skills and agents that call this tool lose the capability on their next run."
+        confirmLabel="Delete tool"
+        destructive
+        onConfirm={handleDelete}
+      />
     </PageShell>
   );
 }

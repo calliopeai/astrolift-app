@@ -5,6 +5,7 @@ import { FlagIcon, Loader2Icon, LockIcon } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -153,10 +154,15 @@ export function FeaturesClient() {
     SetFeatureFlagMutationVariables
   >(SET_FEATURE_FLAG);
   const [pendingKey, setPendingKey] = React.useState<string | null>(null);
+  // A runtime flag is install-wide and takes effect for everyone the moment
+  // it flips, so the switch stages the change here and the dialog commits it.
+  const [confirmFlag, setConfirmFlag] = React.useState<RuntimeFlag | null>(null);
 
   const runtimeFlags = data?.astroliftServerInfo?.featureFlags ?? [];
   const buildTimeFeatures = data?.astroliftServerInfo?.buildTimeFeatures ?? [];
 
+  // Throws on failure so ConfirmDialog keeps the dialog open and toasts the
+  // reason, rather than closing on a flag that never moved.
   async function handleToggle(flag: RuntimeFlag) {
     const next = !flag.enabled;
     setPendingKey(flag.key);
@@ -173,17 +179,12 @@ export function FeaturesClient() {
         awaitRefetchQueries: true,
       });
       const result = res.data?.setFeatureFlag;
-      if (result?.ok) {
-        toast.success(
-          `${humanizeKey(flag.key)} ${next ? "enabled" : "disabled"}`,
-        );
-      } else {
-        toast.error(
+      if (!result?.ok) {
+        throw new Error(
           result?.errors?.[0]?.message ?? "Could not update the feature flag.",
         );
       }
-    } catch {
-      toast.error("Could not update the feature flag.");
+      toast.success(`${humanizeKey(flag.key)} ${next ? "enabled" : "disabled"}`);
     } finally {
       setPendingKey(null);
     }
@@ -225,7 +226,7 @@ export function FeaturesClient() {
                         checked={flag.enabled}
                         pending={pendingKey === flag.key}
                         disabled={pendingKey !== null && pendingKey !== flag.key}
-                        onToggle={() => handleToggle(flag)}
+                        onToggle={() => setConfirmFlag(flag)}
                         label={`Toggle ${flag.key}`}
                       />
                     }
@@ -286,6 +287,28 @@ export function FeaturesClient() {
           </Card>
         </div>
       </TooltipProvider>
+
+      <ConfirmDialog
+        open={confirmFlag !== null}
+        onOpenChange={(next) => {
+          if (!next) setConfirmFlag(null);
+        }}
+        title={
+          confirmFlag
+            ? `${confirmFlag.enabled ? "Disable" : "Enable"} ${humanizeKey(confirmFlag.key)}?`
+            : "Change feature flag?"
+        }
+        description={
+          confirmFlag?.enabled
+            ? "This takes effect immediately for everyone on this install. Turning the flag off can hide whole surfaces and remove entries from the sidebar. You can turn it back on here."
+            : "This takes effect immediately for everyone on this install. Turning the flag on can expose new surfaces and add entries to the sidebar. You can turn it back off here."
+        }
+        confirmLabel={confirmFlag?.enabled ? "Disable flag" : "Enable flag"}
+        destructive={confirmFlag?.enabled === true}
+        onConfirm={async () => {
+          if (confirmFlag) await handleToggle(confirmFlag);
+        }}
+      />
     </PageShell>
   );
 }

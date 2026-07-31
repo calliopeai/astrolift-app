@@ -48,7 +48,7 @@ import { formatTriggerKind } from "./[slug]/components/workflow-detail-shell";
 import { latestRun, RunStateBadge } from "./[slug]/components/run-content";
 import { LIST_WORKFLOW_RUNS } from "@/graphql/operations/operations.queries";
 import type { AstroliftWorkflowRun } from "@/graphql/operations/operations.types";
-import { ListControls, SortableHeader } from "@/components/ListControls";
+import { ListControls } from "@/components/ListControls";
 import { useListControls } from "@/hooks/use-list-controls";
 
 interface WorkflowRunsResp {
@@ -215,20 +215,13 @@ export default function WorkflowsPage() {
     }
   };
 
+  // No sort: the definitions grid renders cards, not table rows, and a
+  // sort control detached from a column header is a control with nothing
+  // to point at.
   const defsCtrl = useListControls<WorkflowDefinitionSummary>({
     data: definitions,
     searchFn: (wf) => [wf.name, wf.description ?? "", wf.patternKind ?? ""].join(" "),
     initialPageSize: 25,
-    sortFn: (a, b, sort) => {
-      let cmp = 0;
-      if (sort.key === "name") cmp = a.name.localeCompare(b.name);
-      else if (sort.key === "status") {
-        const av = a.isEnabled ? 1 : 0;
-        const bv = b.isEnabled ? 1 : 0;
-        cmp = av - bv;
-      }
-      return sort.dir === "asc" ? cmp : -cmp;
-    },
   });
 
   const { data: runsData, loading: runsLoading } = useQuery<WorkflowRunsResp>(LIST_WORKFLOW_RUNS, {
@@ -452,17 +445,7 @@ export default function WorkflowsPage() {
             />
           )}
           {definitions.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <ListControls controls={defsCtrl} searchPlaceholder="Search workflows…" />
-              <div className="flex items-center gap-2 ml-auto shrink-0">
-                <SortableHeader sortKey="name" sort={defsCtrl.sort} onToggle={defsCtrl.toggleSort}>
-                  Name
-                </SortableHeader>
-                <SortableHeader sortKey="status" sort={defsCtrl.sort} onToggle={defsCtrl.toggleSort}>
-                  Status
-                </SortableHeader>
-              </div>
-            </div>
+            <ListControls controls={defsCtrl} searchPlaceholder="Search workflows…" />
           )}
           <div className="grid gap-4">
             {defsCtrl.rows.map((wf) => (
