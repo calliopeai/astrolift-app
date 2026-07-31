@@ -9,7 +9,7 @@ import strawberry
 from django.utils import timezone
 from strawberry.types import Info
 
-from astrolift_graphql import GUID
+from astrolift_graphql import GUID, PageType, keyset_page, search_q
 from astrolift_lifecycle.models import (
     AgentRun,
     AppEnvironment,
@@ -407,7 +407,61 @@ class LifecycleQuery:
             qs = qs.filter(registered_app__slug=app_slug)
         return [app_env_to_type(e) for e in qs[:300]]
 
-    @strawberry.field
+    def _deployments_qs(
+        self,
+        *,
+        app_slug: str | None,
+        environment_name: str | None,
+        status: str | None = None,
+        search: str | None = None,
+    ):
+        """Filtered, unordered deployment stream for the caller's org.
+
+        Shared by the list field and its paginated sibling so the two can
+        never disagree about what a deployment row is. Ordering is
+        deliberately not applied here — ``keyset_page`` imposes it from
+        the seek key.
+        """
+        # Org-scope to the caller's tenant (Deployment reaches the org via
+        # registered_app; the default manager is not tenant-aware).
+        # Fails closed (empty) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        qs = Deployment.objects.select_related("registered_app", "app_environment", "workload").filter(
+            # Deregistered / torn-down apps are soft-deleted; their
+            # deployment rows aren't, so without this they'd keep showing
+            # in the list. Single-deployment + approval-history queries are
+            # id-scoped (a direct link the operator already has), so they
+            # intentionally stay fetchable and don't need this filter.
+            registered_app__deleted_at__isnull=True,
+            registered_app__organization_id=org_id,
+        )
+        if app_slug:
+            qs = qs.filter(registered_app__slug=app_slug)
+        if environment_name:
+            qs = qs.filter(app_environment__name=environment_name)
+        if status:
+            qs = qs.filter(status=status)
+        if search:
+            qs = qs.filter(
+                search_q(
+                    search,
+                    "registered_app__slug",
+                    "registered_app__name",
+                    "app_environment__name",
+                    "commit_sha",
+                    "commit_message",
+                    "branch",
+                    "image_tag",
+                )
+            )
+        return qs
+
+    @strawberry.field(
+        deprecation_reason=(
+            "Caps at 200 rows with no way to reach the 201st. " "Use astroliftDeploymentsPage."
+        )
+    )
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_deployments(
@@ -417,27 +471,47 @@ class LifecycleQuery:
         environment_name: str | None = None,
         limit: int = 50,
     ) -> list[DeploymentType]:
-        # Org-scope to the caller's tenant (Deployment reaches the org via
-        # registered_app; the default manager is not tenant-aware).
-        # Fails closed (empty) when org_id is None (#1183).
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        qs = (
-            Deployment.objects.select_related("registered_app", "app_environment", "workload")
-            # Deregistered / torn-down apps are soft-deleted; their
-            # deployment rows aren't, so without this they'd keep showing
-            # in the list. Single-deployment + approval-history queries are
-            # id-scoped (a direct link the operator already has), so they
-            # intentionally stay fetchable and don't need this filter.
-            .filter(registered_app__deleted_at__isnull=True, registered_app__organization_id=org_id)
-            .order_by("-created_at")
+        qs = self._deployments_qs(app_slug=app_slug, environment_name=environment_name).order_by(
+            "-created_at"
         )
-        if app_slug:
-            qs = qs.filter(registered_app__slug=app_slug)
-        if environment_name:
-            qs = qs.filter(app_environment__name=environment_name)
         viewer = _viewer_user_id(info)
         return [deployment_to_type(d, viewer_user_id=viewer) for d in qs[: max(1, min(limit, 200))]]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_deployments_page(
+        self,
+        info: Info,
+        app_slug: str | None = None,
+        environment_name: str | None = None,
+        status: str | None = None,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[DeploymentType]:
+        """Cursor-paginated deployment history (#1235).
+
+        Replaces ``astroliftDeployments``, whose 200-row cap made the
+        201st deployment unreachable from the UI rather than merely
+        slow to reach — the operator-visible bug that motivated #1230.
+
+        Seek key is ``(-created_at, -guid)``; ``search`` matches the app,
+        environment, branch, image tag, and commit the operator is most
+        likely to be hunting for.
+        """
+        page = keyset_page(
+            self._deployments_qs(
+                app_slug=app_slug,
+                environment_name=environment_name,
+                status=status,
+                search=search,
+            ),
+            cursor=after,
+            limit=limit,
+        )
+        viewer = _viewer_user_id(info)
+        return page.map(lambda d: deployment_to_type(d, viewer_user_id=viewer))
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
