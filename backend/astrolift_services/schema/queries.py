@@ -5,7 +5,7 @@ from __future__ import annotations
 import strawberry
 from strawberry.types import Info
 
-from astrolift_graphql import GUID
+from astrolift_graphql import GUID, PageType, keyset_page, search_q
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_lifecycle.models.preview_environment import PreviewEnvironment
 from astrolift_manifest.env_edit import read_app_env
@@ -446,6 +446,53 @@ def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
     return out
 
 
+def _managed_services_qs(
+    *,
+    app_slug: str,
+    environment_name: str | None,
+    search: str | None = None,
+):
+    """Filtered, unordered managed-service stream for one app.
+
+    Shared by ``astrolift_managed_services`` and its paginated sibling so
+    the two can never disagree about what a row is. Ordering is
+    deliberately not applied here — ``keyset_page`` imposes it from the
+    seek key.
+
+    Module-level rather than a method on ``ServicesQuery``: Strawberry
+    binds ``self`` on a ROOT field resolver to the schema's root value,
+    and the Django view leaves that ``None`` — ``self._helper()`` inside
+    a root resolver raises ``AttributeError`` at execution time. Same
+    trap ``_agent_list_rows`` documents in ``astrolift_agents``.
+
+    ManagedService carries no org column of its own; it reaches the
+    tenant through the owning app. A ``None`` org id yields ``.none()``
+    rather than an unscoped queryset — deny-by-default (#1042 / #1183).
+    """
+    org_id = _caller_org_id()
+    if org_id is None:
+        return ManagedService.objects.none()
+    qs = ManagedService.objects.select_related("registered_app", "app_environment").filter(
+        registered_app__slug=app_slug,
+        registered_app__organization_id=org_id,
+        deleted_at__isnull=True,
+    )
+    if environment_name:
+        qs = qs.filter(app_environment__name=environment_name)
+    if search:
+        qs = qs.filter(
+            search_q(
+                search,
+                "name",
+                "kind",
+                "variant",
+                "status",
+                "app_environment__name",
+            )
+        )
+    return qs
+
+
 @strawberry.type
 class ServicesQuery:
     @strawberry.field
@@ -655,7 +702,12 @@ class ServicesQuery:
             )
         return out
 
-    @strawberry.field
+    @strawberry.field(
+        deprecation_reason=(
+            "Unbounded, and applies no ordering at all — row order is whatever "
+            "Postgres returns. Use astroliftManagedServicesPage."
+        )
+    )
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_managed_services(
@@ -664,17 +716,44 @@ class ServicesQuery:
         app_slug: str,
         environment_name: str | None = None,
     ) -> list[ManagedServiceType]:
-        org_id = _caller_org_id()
-        if org_id is None:
-            return []
-        qs = ManagedService.objects.select_related("registered_app", "app_environment").filter(
-            registered_app__slug=app_slug,
-            registered_app__organization_id=org_id,
-            deleted_at__isnull=True,
+        qs = _managed_services_qs(app_slug=app_slug, environment_name=environment_name).order_by(
+            "-created_at", "-guid"
         )
-        if environment_name:
-            qs = qs.filter(app_environment__name=environment_name)
         return [managed_service_to_type(s) for s in qs]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_managed_services_page(
+        self,
+        info: Info,
+        app_slug: str,
+        environment_name: str | None = None,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[ManagedServiceType]:
+        """Cursor-paginated managed services for one app (#1235).
+
+        ``astroliftManagedServices`` returns every service the app owns in
+        one response and never orders them, so a long-lived app hands the
+        UI an unbounded, unstably-ordered list. This walks the same rows
+        newest-first on a ``(-created_at, -guid)`` seek key.
+
+        ``search`` matches the name, kind, variant, status, and
+        environment — the columns the services table renders, which is
+        what an operator types when hunting one binding.
+        """
+        page = keyset_page(
+            _managed_services_qs(
+                app_slug=app_slug,
+                environment_name=environment_name,
+                search=search,
+            ),
+            cursor=after,
+            limit=limit,
+        )
+        return page.map(managed_service_to_type)
 
     @strawberry.field
     @require_permission(Permission.APP_READ)

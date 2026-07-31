@@ -1,21 +1,26 @@
-"""Tests for Event cursor pagination (#43)."""
+"""Tests for Event cursor pagination (#43).
+
+The codec these used to exercise (``_encode_event_cursor`` /
+``_decode_event_cursor``) was deleted in #1235 when this resolver moved
+onto the shared ``astrolift_graphql.pagination`` walk; its round-trip
+and garbage-token behaviour is covered by that module's own tests. What
+stays here is the surface-level contract: the resolver still pages the
+Event stream without drift, and the tokens it hands out still carry the
+documented ``(occurred_at, guid)`` position.
+"""
 
 from __future__ import annotations
 
 import datetime as dt
-import uuid
 from types import SimpleNamespace
 
 import pytest
 from django.utils import timezone
 
+from astrolift_graphql.pagination import decode_cursor
 from astrolift_identity.models import Organization
 from astrolift_operations.models import Event
-from astrolift_operations.schema.queries import (
-    OperationsQuery,
-    _decode_event_cursor,
-    _encode_event_cursor,
-)
+from astrolift_operations.schema.queries import OperationsQuery
 from core.tenancy import TenantContext, tenant_context
 
 pytestmark = pytest.mark.django_db
@@ -51,19 +56,29 @@ def _mkevent(org: Organization, n: int) -> Event:
     )[0]
 
 
-def test_cursor_round_trips_through_decode():
-    now = timezone.now()
-    guid = str(uuid.uuid4())
-    token = _encode_event_cursor(now, guid)
-    decoded = _decode_event_cursor(token)
-    assert decoded is not None
-    assert decoded[0].isoformat() == now.isoformat()
-    assert decoded[1] == guid
+def test_page_cursor_carries_the_last_returned_rows_position(permission_resolver):
+    """The wire contract clients bookmark: ``next_cursor`` decodes to
+    the last returned row's ``(occurred_at, guid)``.
 
+    Nothing outside the backend parses the token, but a cursor minted
+    before #1235 moved this walk onto the shared helper has to keep
+    resolving to the same place — a format or seek-key change would
+    silently restart an in-flight "load more" at the top of the stream.
+    """
+    org = _mkorg()
+    from core.permissions import Permission
 
-def test_decode_returns_none_for_garbage():
-    assert _decode_event_cursor("not-base64!!!") is None
-    assert _decode_event_cursor("") is None
+    permission_resolver.grant(Permission.AUDIT_LOG_READ)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        for n in range(1, 4):
+            _mkevent(org, n)
+
+        page = OperationsQuery().astrolift_events_page(_info(), limit=2)
+        last = Event.objects.get(guid=str(page.items[-1].id))
+        assert decode_cursor(page.next_cursor) == (
+            last.occurred_at.isoformat(),
+            str(last.guid),
+        )
 
 
 def test_pagination_walks_all_events_with_no_overlap(permission_resolver):

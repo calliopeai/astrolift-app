@@ -4,8 +4,11 @@ Workflow surface (spec 40 §6, #968)."""
 from __future__ import annotations
 
 import strawberry
+from django.db.models import Value
+from django.db.models.functions import Coalesce
 from strawberry.types import Info
 
+from astrolift_graphql import KeysetPage, PageType, keyset_page, search_q
 from astrolift_operations.models import WorkflowRun
 from astrolift_workflows.client import (
     describe_workflow_instance,
@@ -231,21 +234,81 @@ class WorkflowsQuery:
     org filter in the body (#1042 — the decorator only asserts a context
     exists; the org match is the actual scoping)."""
 
-    @strawberry.field(description="List the org's configured Workflows (tier 2).")
+    def _workflows_qs(self, *, org_pk: int | None, search: str | None = None):
+        """Filtered, unordered tier-2 ``Workflow`` stream for one org.
+
+        Shared by the list field and its paginated sibling so the two can
+        never disagree about what a Workflow row is. Ordering is
+        deliberately not applied here — ``keyset_page`` imposes it from
+        the seek key.
+
+        ``org_pk`` is the caller's own org pk (already confirmed against a
+        supplied ``org_id`` guid by :func:`_org_pk_matches`). ``None``
+        matches no rows: ``Workflow.organization`` is a non-null FK, so
+        ``organization_id=None`` is an ``IS NULL`` that can never hit
+        (#1042 deny-by-default).
+        """
+        from workflows.models import Workflow
+
+        qs = Workflow.objects.filter(organization_id=org_pk, deleted_at__isnull=True).select_related(
+            "definition", "organization"
+        )
+        if search:
+            qs = qs.filter(
+                search_q(
+                    search,
+                    "name",
+                    "slug",
+                    "description",
+                    "definition__name",
+                    "definition__slug",
+                )
+            )
+        return qs
+
+    @strawberry.field(
+        description="List the org's configured Workflows (tier 2).",
+        deprecation_reason=(
+            "Unbounded — returns every Workflow the org owns in one response. Use workflowsPage."
+        ),
+    )
     @require_permission(Permission.WORKFLOW_READ)
     @tenant_scoped()
     def workflows(self, info: Info, org_id: strawberry.ID | None = None) -> list[ConfiguredWorkflowType]:
         caller, ok = _org_pk_matches(org_id)
         if not ok:
             return []
-        from workflows.models import Workflow
-
-        qs = (
-            Workflow.objects.filter(organization_id=caller, deleted_at__isnull=True)
-            .select_related("definition", "organization")
-            .order_by("-created_at")
-        )
+        qs = self._workflows_qs(org_pk=caller).order_by("-created_at")
         return [workflow_to_type(w) for w in qs]
+
+    @strawberry.field(description="Cursor-paginated page of the org's configured Workflows (tier 2).")
+    @require_permission(Permission.WORKFLOW_READ)
+    @tenant_scoped()
+    def workflows_page(
+        self,
+        info: Info,
+        org_id: strawberry.ID | None = None,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[ConfiguredWorkflowType]:
+        """Cursor-paginated ``workflows`` (#1235).
+
+        Seek key is ``(-created_at, -guid)`` — newest first, same order
+        the list field served. ``search`` matches the Workflow's own name /
+        slug / description and the name / slug of the definition it
+        applies, which is how an operator hunts a workflow they only half
+        remember.
+        """
+        caller, ok = _org_pk_matches(org_id)
+        if not ok:
+            return KeysetPage.empty().map(workflow_to_type)
+        page = keyset_page(
+            self._workflows_qs(org_pk=caller, search=search),
+            cursor=after,
+            limit=limit,
+        )
+        return page.map(workflow_to_type)
 
     @strawberry.field(description="One configured Workflow by slug, with its recent runs.")
     @require_permission(Permission.WORKFLOW_READ)
@@ -267,8 +330,40 @@ class WorkflowsQuery:
             return None
         return workflow_to_type(wf, with_runs=True)
 
+    def _workflow_definitions_qs(self, *, org_pk: int | None, search: str | None = None):
+        """Filtered, unordered tier-1 definition catalogue for one org.
+
+        The read scope is spec 40 §2.1: the org's own definitions UNION
+        every platform-global (null-org) template, via the blessed
+        ``visible_to_org`` base. Shared by the list field and its
+        paginated sibling; ordering is left to the caller / to
+        ``keyset_page``.
+
+        ``org_pk`` is the caller's own org pk (already confirmed against a
+        supplied ``org_id`` guid by :func:`_org_pk_matches`). ``None``
+        matches nothing — note this one cannot rely on an ``IS NULL``
+        never hitting: ``visible_to_org(None)`` would return every
+        platform-global template, so the empty case is explicit (#1042
+        deny-by-default).
+        """
+        from workflows.models import WorkflowDefinition
+
+        if org_pk is None:
+            return WorkflowDefinition.objects.none()
+        qs = (
+            WorkflowDefinition.visible_to_org(org_pk)
+            .filter(deleted_at__isnull=True)
+            .select_related("organization")
+        )
+        if search:
+            qs = qs.filter(search_q(search, "name", "slug", "description"))
+        return qs
+
     @strawberry.field(
-        description="Workflow definitions visible to the caller: their org's UNION all platform-global (spec 40 §2.1)."
+        description="Workflow definitions visible to the caller: their org's UNION all platform-global (spec 40 §2.1).",
+        deprecation_reason=(
+            "Unbounded — returns every visible definition in one response. Use workflowDefinitionsPage."
+        ),
     )
     @require_permission(Permission.WORKFLOW_READ)
     @tenant_scoped()
@@ -278,15 +373,52 @@ class WorkflowsQuery:
         caller, ok = _org_pk_matches(org_id)
         if not ok:
             return []
-        from workflows.models import WorkflowDefinition
-
-        qs = (
-            WorkflowDefinition.visible_to_org(caller)
-            .filter(deleted_at__isnull=True)
-            .select_related("organization")
-            .order_by("organization_id", "name")
-        )
+        qs = self._workflow_definitions_qs(org_pk=caller).order_by("organization_id", "name")
         return [definition_summary(d) for d in qs]
+
+    @strawberry.field(
+        description=(
+            "Cursor-paginated page of the workflow definitions visible to the caller, by name (A→Z)."
+        )
+    )
+    @require_permission(Permission.WORKFLOW_READ)
+    @tenant_scoped()
+    def workflow_definitions_page(
+        self,
+        info: Info,
+        org_id: strawberry.ID | None = None,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[WorkflowDefinitionSummaryType]:
+        """Cursor-paginated ``workflowDefinitions`` (#1235).
+
+        Seek key is ``(name, guid)`` ascending, which is a deliberate
+        ordering change from the list field's ``(organization_id, name)``:
+        ``organization_id`` is NULL on every platform-global template, and
+        a NULL in the sort key makes the rows behind it unreachable — the
+        walk stops there. Name-ascending is also what a catalogue wants,
+        and it drops the list field's org/global grouping (``is_global``
+        is on every row, so the client can still group).
+
+        ``name`` itself is nullable on this model, so the walk sorts on a
+        coalesced copy rather than the column: an unnamed definition sorts
+        first instead of falling off the end of the walk.
+        """
+        caller, ok = _org_pk_matches(org_id)
+        if not ok:
+            return KeysetPage.empty().map(definition_summary)
+        page = keyset_page(
+            self._workflow_definitions_qs(org_pk=caller, search=search).annotate(
+                sort_name=Coalesce("name", Value(""))
+            ),
+            cursor=after,
+            limit=limit,
+            sort_field="sort_name",
+            tiebreak_field="guid",
+            descending=False,
+        )
+        return page.map(definition_summary)
 
     @strawberry.field(
         description="One visible workflow definition by slug (prefers the org's over a global)."

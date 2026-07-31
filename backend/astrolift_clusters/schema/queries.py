@@ -43,7 +43,7 @@ from astrolift_clusters.schema.types import (
     domain_to_type,
     plugin_to_type,
 )
-from astrolift_graphql import GUID
+from astrolift_graphql import GUID, PageType, keyset_page, search_q
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
@@ -81,19 +81,85 @@ def _primary_app_namespace(cluster) -> str:
 
 @strawberry.type
 class ClustersQuery:
-    @strawberry.field
+    def _clusters_qs(self, *, search: str | None = None):
+        """Filtered, unordered cluster inventory visible to the caller.
+
+        Shared by the list field and its paginated sibling so the two can
+        never disagree about which clusters exist. Platform-level rows
+        (``organization`` null) are readable by every org; org-owned rows
+        only by their own org — the same union ``astroliftClusterCount``
+        and the per-cluster resolvers apply. Ordering is deliberately not
+        applied here; ``keyset_page`` imposes it from the seek key.
+        """
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            # Fail closed (#1183). Defence in depth behind @tenant_scoped:
+            # with a null org the union below would degrade to "every
+            # platform-level cluster" rather than to nothing.
+            return TenantCluster.objects.none()
+        qs = TenantCluster.objects.filter(
+            Q(organization_id=org_id) | Q(organization_id__isnull=True),
+        ).select_related("organization", "provider_plugin")
+        if search:
+            qs = qs.filter(
+                search_q(
+                    search,
+                    "name",
+                    "slug",
+                    "endpoint",
+                    "region",
+                    "provider_plugin__slug",
+                )
+            )
+        return qs
+
+    @strawberry.field(
+        deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftClustersPage."
+    )
     @require_permission(Permission.CLUSTER_REGISTER)
     @tenant_scoped()
     def astrolift_clusters(self, info: Info) -> list[TenantClusterType]:
-        tenant = get_current_tenant()
-        qs = (
-            TenantCluster.objects.filter(
-                Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
-            )
-            .select_related("organization", "provider_plugin")
-            .order_by("slug")[:200]
-        )
+        qs = self._clusters_qs().order_by("slug")[:200]
         return [cluster_to_type(c) for c in qs]
+
+    @strawberry.field
+    @require_permission(Permission.CLUSTER_REGISTER)
+    @tenant_scoped()
+    def astrolift_clusters_page(
+        self,
+        info: Info,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[TenantClusterType]:
+        """Cursor-paginated cluster inventory (#1235).
+
+        Replaces ``astroliftClusters``, whose 200-row cap makes the 201st
+        cluster unreachable from /clusters rather than merely slow to
+        reach — the operator-visible bug behind #1230.
+
+        Seek key is ``(slug, guid)`` ASCENDING, not the default
+        ``(-created_at, -guid)``: the list field serves clusters
+        alphabetically and /clusters is an inventory an operator scans by
+        name, so the surface's ordering survives the cutover. ``slug``
+        carries a partial unique index over live rows and the default
+        manager hides soft-deleted ones, so the key is unique across the
+        whole walk; ``guid`` is the tiebreak of record regardless.
+
+        ``search`` matches what an operator types into the /clusters
+        search box — name, slug, endpoint, region, and the provider
+        plugin's slug.
+        """
+        page = keyset_page(
+            self._clusters_qs(search=search),
+            cursor=after,
+            limit=limit,
+            sort_field="slug",
+            tiebreak_field="guid",
+            descending=False,
+        )
+        return page.map(cluster_to_type)
 
     @strawberry.field
     @require_permission(Permission.APP_CREATE)

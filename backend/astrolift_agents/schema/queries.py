@@ -60,7 +60,7 @@ from astrolift_agents.schema.types import (
     skill_to_type,
     tool_def_to_type,
 )
-from astrolift_graphql import GUID
+from astrolift_graphql import GUID, PageType, keyset_page, search_q
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
@@ -272,6 +272,35 @@ def _agent_workload_qs(org_pk: int, *, project_slug: str | None = None):
     if project_slug:
         qs = qs.filter(registered_app__project__slug=project_slug)
     return qs.order_by("-created_at")
+
+
+def _agent_triggers_qs(org_pk: int, *, agent_slug: str, search: str | None = None):
+    """Filtered, unordered ``WorkflowWebhook`` stream bound to one agent.
+
+    Shared by ``agent_triggers`` and its paginated sibling so the two can
+    never disagree about what a trigger row is. Ordering is deliberately
+    not applied here — ``keyset_page`` imposes it from the seek key.
+
+    Module-level for the same reason ``_agent_list_rows`` is: Strawberry
+    binds ``self`` on a root field resolver to the schema's root value,
+    which the Django view leaves as ``None``.
+
+    The agent is resolved through ``_agent_workload_qs(org_pk)``, so a
+    slug belonging to another org (or to no agent at all) yields a
+    queryset that matches nothing rather than another tenant's bindings.
+    """
+    from astrolift_agents.models.workflow_trigger import WorkflowWebhook
+
+    workload = _agent_workload_qs(org_pk).filter(slug=agent_slug).first()
+    if workload is None:
+        return WorkflowWebhook.objects.none()
+    qs = WorkflowWebhook.objects.filter(
+        agent_definition=workload,
+        organization_id=org_pk,
+    ).select_related("organization")
+    if search:
+        qs = qs.filter(search_q(search, "slug", "scm_repo", "branch_pattern"))
+    return qs
 
 
 def _agent_list_rows(info: Info, org_id: strawberry.ID, project_slug: str | None) -> list[AgentListItemType]:
@@ -865,7 +894,11 @@ class AgentsQuery:
         )
         return agent_detail_to_type(w) if w is not None else None
 
-    @strawberry.field
+    @strawberry.field(
+        deprecation_reason=(
+            "Unbounded: returns every trigger bound to the agent in one response. " "Use agentTriggersPage."
+        )
+    )
     @require_permission(Permission.AGENT_READ)
     @tenant_scoped()
     def agent_triggers(self, info: Info, org_id: strawberry.ID, agent_slug: str) -> list[AgentTriggerType]:
@@ -879,21 +912,47 @@ class AgentsQuery:
         foreign / unknown slug yields an empty list rather than another
         tenant's bindings.
         """
-        from astrolift_agents.models.workflow_trigger import WorkflowWebhook
-
         org_pk = _caller_org_id(info, org_id)
-        workload = _agent_workload_qs(org_pk).filter(slug=agent_slug).first()
-        if workload is None:
-            return []
-        hooks = (
-            WorkflowWebhook.objects.filter(
-                agent_definition=workload,
-                organization_id=org_pk,
-            )
-            .select_related("organization")
-            .order_by("-created_at")
-        )
+        hooks = _agent_triggers_qs(org_pk, agent_slug=agent_slug).order_by("-created_at", "-slug")
         return [agent_trigger_to_type(h) for h in hooks]
+
+    @strawberry.field
+    @require_permission(Permission.AGENT_READ)
+    @tenant_scoped()
+    def agent_triggers_page(
+        self,
+        info: Info,
+        org_id: strawberry.ID,
+        agent_slug: str,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[AgentTriggerType]:
+        """Cursor-paginated inbound triggers for one agent (#1235).
+
+        ``agentTriggers`` hands back every binding an agent has ever had in
+        one response; a repo-wide SCM fan-out accumulates them faster than
+        the Trigger card can render.
+
+        Seek key is ``(-created_at, -slug)``: ``WorkflowWebhook`` is a plain
+        ``models.Model`` with no ``guid`` column, and its ``slug`` is
+        ``unique=True`` + NOT NULL — which is exactly what a keyset tiebreak
+        needs. ``search`` matches the slug plus the SCM ``scm_repo`` /
+        ``branch_pattern`` filters the operator configured.
+
+        Org-scoped identically to :meth:`agent_triggers`: ``org_id`` must
+        match the caller's active tenant (``_caller_org_id`` raises
+        otherwise) and the agent is resolved inside that org, so a foreign
+        slug yields an empty page — items AND ``totalCount``.
+        """
+        org_pk = _caller_org_id(info, org_id)
+        page = keyset_page(
+            _agent_triggers_qs(org_pk, agent_slug=agent_slug, search=search),
+            cursor=after,
+            limit=limit,
+            tiebreak_field="slug",
+        )
+        return page.map(agent_trigger_to_type)
 
     @strawberry.field
     @require_permission(Permission.AGENT_READ)

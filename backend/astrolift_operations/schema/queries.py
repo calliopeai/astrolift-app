@@ -2,18 +2,15 @@
 
 from __future__ import annotations
 
-import base64
-import binascii
 import datetime as dt
 import hashlib
-import json
 from datetime import timedelta
 
 import strawberry
 from django.utils import timezone
 from strawberry.types import Info
 
-from astrolift_graphql import GUID
+from astrolift_graphql import GUID, PageType, clamp_limit, encode_cursor, keyset_page, search_q
 from astrolift_operations.models import (
     AlertEvent,
     AlertRule,
@@ -174,7 +171,52 @@ class OperationsQuery:
             ],
         )
 
-    @strawberry.field
+    def _events_qs(
+        self,
+        *,
+        event_type: str | None = None,
+        severity: str | None = None,
+        app_slug: str | None = None,
+        search: str | None = None,
+    ):
+        """Filtered, unordered platform-event stream for the caller's org.
+
+        Shared by the raw list field, the aggregator, and both paginated
+        siblings so none of them can disagree about what an event row
+        is. Ordering is deliberately not applied — ``keyset_page``
+        imposes it from the seek key, and the two list callers apply
+        ``-occurred_at`` themselves.
+
+        Scopes the BASE queryset to the caller's org (#1183): without
+        this, the unfiltered Event stream leaked every org's events —
+        the app_slug path scoped its own JOIN but the default view did
+        not. org_id None → deny-by-default (matches nothing).
+        """
+        org_id = _caller_org_id()
+        if org_id is None:
+            return Event.objects.none()
+        qs = Event.objects.filter(organization_id=org_id)
+        if event_type:
+            qs = qs.filter(event_type=event_type)
+        if severity:
+            qs = qs.filter(severity=severity)
+        if app_slug:
+            qs = _filter_by_app_slug(qs, app_slug)
+        if search:
+            qs = qs.filter(
+                search_q(
+                    search,
+                    "event_type",
+                    "resource_kind",
+                    "resource_id",
+                    "registered_app__slug",
+                )
+            )
+        return qs
+
+    @strawberry.field(
+        deprecation_reason=("Caps at 500 rows with no way to reach the 501st. Use astroliftEventsPage.")
+    )
     @require_permission(Permission.AUDIT_LOG_READ)
     @tenant_scoped()
     def astrolift_events(
@@ -185,23 +227,20 @@ class OperationsQuery:
         severity: str | None = None,
         app_slug: str | None = None,
     ) -> list[EventType]:
-        # Scope the BASE queryset to the caller's org (#1183): without
-        # this, the unfiltered Event stream leaked every org's events —
-        # the app_slug path scoped its own JOIN but the default view did
-        # not. org_id None → deny-by-default (empty).
-        org_id = _caller_org_id()
-        if org_id is None:
-            return []
-        qs = Event.objects.filter(organization_id=org_id).order_by("-occurred_at")
-        if event_type:
-            qs = qs.filter(event_type=event_type)
-        if severity:
-            qs = qs.filter(severity=severity)
-        if app_slug:
-            qs = _filter_by_app_slug(qs, app_slug)
+        qs = self._events_qs(
+            event_type=event_type,
+            severity=severity,
+            app_slug=app_slug,
+        ).order_by("-occurred_at")
         return [event_to_type(e) for e in qs[: max(1, min(limit, 500))]]
 
-    @strawberry.field
+    @strawberry.field(
+        deprecation_reason=(
+            "Caps at 500 buckets folded from a bounded 10k-row scan, so "
+            "activity older than the scan window is unreachable. Use "
+            "astroliftEventsAggregatedPage."
+        )
+    )
     @require_permission(Permission.AUDIT_LOG_READ)
     @tenant_scoped()
     def astrolift_events_aggregated(
@@ -236,22 +275,94 @@ class OperationsQuery:
         # raw rows to fill ``capped_limit`` buckets even when most events
         # collapse 10:1.
         scan_cap = min(capped_limit * 50, 10_000)
-        # Scope the base stream to the caller's org (#1183).
-        org_id = _caller_org_id()
-        if org_id is None:
-            return []
-        qs = Event.objects.filter(organization_id=org_id).order_by("-occurred_at")
-        if event_type:
-            qs = qs.filter(event_type=event_type)
-        if severity:
-            qs = qs.filter(severity=severity)
-        if app_slug:
-            qs = _filter_by_app_slug(qs, app_slug)
+        qs = self._events_qs(
+            event_type=event_type,
+            severity=severity,
+            app_slug=app_slug,
+        ).order_by("-occurred_at")
         rows = list(qs[:scan_cap])
         return _aggregate_events(
             rows,
             window_seconds=max(1, aggregate_window_seconds),
             limit=capped_limit,
+        )
+
+    @strawberry.field
+    @require_permission(Permission.AUDIT_LOG_READ)
+    @tenant_scoped()
+    def astrolift_events_aggregated_page(
+        self,
+        info: Info,
+        limit: int = 50,
+        after: str | None = None,
+        event_type: str | None = None,
+        severity: str | None = None,
+        app_slug: str | None = None,
+        search: str | None = None,
+        aggregate_window_seconds: int = 300,
+    ) -> PageType[AggregatedEventType]:
+        """Cursor-paginated rollup of the raw event stream (#1235).
+
+        Replaces ``astroliftEventsAggregated``, which folded a bounded
+        10k-row scan and then sliced: anything older than that scan was
+        unreachable no matter how the operator filtered.
+
+        The cursor is a position in the RAW stream — ``(occurred_at,
+        guid)``, the same seek key and token format as
+        ``astroliftEventsPage`` — because buckets are folds, not table
+        rows, and have no column of their own to seek on. ``limit``
+        still counts *buckets*: the walk consumes exactly the raw rows
+        that fold into the first ``limit`` buckets and parks the cursor
+        on the last one consumed, so every raw event is counted in
+        exactly one bucket across the whole walk.
+
+        The trade-off that buys that guarantee: a burst straddling a
+        page boundary is reported as two adjacent buckets (``×30`` then
+        ``×12``) instead of one ``×42``. Folding the whole stream first
+        would avoid it and defeat the pagination.
+
+        ``total_count`` is the number of matching RAW events, not
+        buckets — the bucket count isn't knowable without folding
+        everything, and "1,204 events" is the number the operator wants
+        beside a grouped table anyway.
+        """
+        page_size = clamp_limit(limit)
+        # Same 50:1 headroom the list field uses: enough raw rows to
+        # open ``page_size`` buckets even when events collapse hard.
+        scan_cap = min(page_size * 50, 10_000)
+        window = max(1, aggregate_window_seconds)
+        raw = keyset_page(
+            self._events_qs(
+                event_type=event_type,
+                severity=severity,
+                app_slug=app_slug,
+                search=search,
+            ),
+            cursor=after,
+            limit=scan_cap,
+            max_limit=scan_cap,
+            sort_field="occurred_at",
+        )
+
+        rows = raw.rows
+        folded = _fold_events(rows, window_seconds=window)
+        if len(folded) > page_size:
+            # Bucket ``page_size`` (0-indexed) is the first one that
+            # doesn't fit. Every row before it belongs to a bucket we
+            # ARE returning, so cut there and re-fold — the counts must
+            # reflect only the rows this page consumed.
+            consumed = folded[page_size]["open_index"]
+            rows = rows[:consumed]
+            folded = _fold_events(rows, window_seconds=window)
+            last = rows[-1]
+            next_cursor = encode_cursor(last.occurred_at, last.guid)
+        else:
+            next_cursor = raw.next_cursor
+
+        return PageType(
+            items=[_bucket_to_type(b) for b in folded],
+            next_cursor=next_cursor,
+            total_count=raw.total_count,
         )
 
     @strawberry.field
@@ -265,6 +376,7 @@ class OperationsQuery:
         event_type: str | None = None,
         severity: str | None = None,
         app_slug: str | None = None,
+        search: str | None = None,
     ) -> EventPageType:
         """Cursor-paginated event stream.
 
@@ -272,7 +384,15 @@ class OperationsQuery:
         omit it to start from the newest event. Cursor is base64-JSON
         of ``[occurred_at_iso, guid_str]`` so the (occurred_at, guid)
         composite is the seek key — guid is a UUIDv7 so the secondary
-        sort is also time-ordered, eliminating tie-break churn.
+        sort is also time-ordered, eliminating tie-break churn. The
+        walk itself is the shared ``keyset_page`` helper (#1235), which
+        mints byte-identical tokens, so cursors issued before the
+        cutover keep decoding.
+
+        ``search`` (#1235) is a free-text narrowing over event type,
+        resource kind/id, and app slug — the same filter box the
+        deprecated ``astroliftEvents`` list forced clients to apply
+        over a 200-row window.
 
         ``severity`` (``info`` | ``warn`` | ``error``) is an optional
         server-side filter (#540); it rides the composite
@@ -291,39 +411,33 @@ class OperationsQuery:
         Tenancy is preserved by the existing ``@tenant_scoped``
         decorator on the resolver.
         """
+        # Pre-clamp to this surface's own 500-row ceiling before the
+        # shared helper sees it, so ``limit=0`` still collapses to a
+        # single row rather than the helper's default page size.
         page_size = max(1, min(limit, 500))
-        # Scope the base stream to the caller's org (#1183).
-        org_id = _caller_org_id()
-        if org_id is None:
+        # Scope the base stream to the caller's org (#1183). Kept as an
+        # explicit branch (not just ``_events_qs``'s empty queryset) so
+        # the deny case reports NO_DATA_YET even on a continuation.
+        if _caller_org_id() is None:
             return EventPageType(
                 items=[],
                 next_cursor=None,
                 reason=ObservabilityPanelReason.NO_DATA_YET,
             )
-        qs = Event.objects.filter(organization_id=org_id).order_by("-occurred_at", "-guid")
-        if event_type:
-            qs = qs.filter(event_type=event_type)
-        if severity:
-            qs = qs.filter(severity=severity)
-        if app_slug:
-            qs = _filter_by_app_slug(qs, app_slug)
-        if after:
-            decoded = _decode_event_cursor(after)
-            if decoded is not None:
-                from django.db.models import Q
-
-                cursor_at, cursor_guid = decoded
-                qs = qs.filter(
-                    Q(occurred_at__lt=cursor_at) | (Q(occurred_at=cursor_at) & Q(guid__lt=cursor_guid))
-                )
-        # Fetch one extra to detect end-of-stream cheaply.
-        rows = list(qs[: page_size + 1])
-        items = rows[:page_size]
-        next_cursor = (
-            _encode_event_cursor(items[-1].occurred_at, str(items[-1].guid))
-            if len(rows) > page_size and items
-            else None
+        page = keyset_page(
+            self._events_qs(
+                event_type=event_type,
+                severity=severity,
+                app_slug=app_slug,
+                search=search,
+            ),
+            cursor=after,
+            limit=page_size,
+            max_limit=500,
+            sort_field="occurred_at",
+            with_total=False,
         )
+        items = [event_to_type(e) for e in page.rows]
         if items:
             reason = ObservabilityPanelReason.OK
         elif after:
@@ -333,8 +447,8 @@ class OperationsQuery:
         else:
             reason = ObservabilityPanelReason.NO_DATA_YET
         return EventPageType(
-            items=[event_to_type(e) for e in items],
-            next_cursor=next_cursor,
+            items=items,
+            next_cursor=page.next_cursor,
             reason=reason,
         )
 
@@ -372,6 +486,9 @@ class OperationsQuery:
         ``registered_app`` keeps the per-row lookups off the per-page
         hot path.
         """
+        # Pre-clamp to this feed's own 100-row ceiling before the shared
+        # helper sees it, so ``limit=0`` still collapses to a single row
+        # rather than the helper's default page size.
         page_size = max(1, min(limit, 100))
         # Scope to the caller's org (#1183) — the activity feed is a
         # filtered view over the same Event stream, so the org clause
@@ -379,30 +496,20 @@ class OperationsQuery:
         org_id = _caller_org_id()
         if org_id is None:
             return ActivityPageType(items=[], next_cursor=None)
-        qs = (
-            Event.objects.select_related("actor_user", "registered_app")
-            .filter(_lifecycle_event_filter(), organization_id=org_id)
-            .order_by("-occurred_at", "-guid")
+        qs = Event.objects.select_related("actor_user", "registered_app").filter(
+            _lifecycle_event_filter(), organization_id=org_id
         )
-        if cursor:
-            decoded = _decode_event_cursor(cursor)
-            if decoded is not None:
-                from django.db.models import Q
-
-                cursor_at, cursor_guid = decoded
-                qs = qs.filter(
-                    Q(occurred_at__lt=cursor_at) | (Q(occurred_at=cursor_at) & Q(guid__lt=cursor_guid))
-                )
-        rows = list(qs[: page_size + 1])
-        items = rows[:page_size]
-        next_cursor = (
-            _encode_event_cursor(items[-1].occurred_at, str(items[-1].guid))
-            if len(rows) > page_size and items
-            else None
+        page = keyset_page(
+            qs,
+            cursor=cursor,
+            limit=page_size,
+            max_limit=100,
+            sort_field="occurred_at",
+            with_total=False,
         )
         return ActivityPageType(
-            items=[shape_activity_item(e) for e in items],
-            next_cursor=next_cursor,
+            items=[shape_activity_item(e) for e in page.rows],
+            next_cursor=page.next_cursor,
         )
 
     @strawberry.field
@@ -469,6 +576,9 @@ class OperationsQuery:
         row count alongside the page — operators want the count for
         narrow filters but a full-range count is expensive, so the
         caller opts in."""
+        # Pre-clamp to this surface's own 500-row ceiling before the
+        # shared helper sees it, so ``limit=0`` still collapses to a
+        # single row rather than the helper's default page size.
         page_size = max(1, min(limit, 500))
         # Scope to the caller's org (#1183) before the count + page so
         # both the returned rows and include_total reflect only the
@@ -481,7 +591,7 @@ class OperationsQuery:
                 next_cursor=None,
                 total_count=0 if include_total else None,
             )
-        qs = AuditEvent.objects.filter(organization_id=org_id).order_by("-occurred_at", "-guid")
+        qs = AuditEvent.objects.filter(organization_id=org_id)
         if action:
             qs = qs.filter(action=action)
         if decision:
@@ -493,31 +603,18 @@ class OperationsQuery:
         if created_at_lte is not None:
             qs = qs.filter(occurred_at__lte=created_at_lte)
 
-        total_count: int | None = None
-        if include_total:
-            total_count = qs.count()
-
-        if after:
-            decoded = _decode_event_cursor(after)
-            if decoded is not None:
-                from django.db.models import Q
-
-                cursor_at, cursor_guid = decoded
-                qs = qs.filter(
-                    Q(occurred_at__lt=cursor_at) | (Q(occurred_at=cursor_at) & Q(guid__lt=cursor_guid))
-                )
-
-        rows = list(qs[: page_size + 1])
-        items = rows[:page_size]
-        next_cursor = (
-            _encode_event_cursor(items[-1].occurred_at, str(items[-1].guid))
-            if len(rows) > page_size and items
-            else None
+        page = keyset_page(
+            qs,
+            cursor=after,
+            limit=page_size,
+            max_limit=500,
+            sort_field="occurred_at",
+            with_total=include_total,
         )
         return AuditEventPageType(
-            items=[audit_to_type(a) for a in items],
-            next_cursor=next_cursor,
-            total_count=total_count,
+            items=[audit_to_type(a) for a in page.rows],
+            next_cursor=page.next_cursor,
+            total_count=page.total_count,
         )
 
     @strawberry.field
@@ -566,7 +663,35 @@ class OperationsQuery:
         ]
         return [workflow_run_to_type(w) for w in qs]
 
-    @strawberry.field
+    def _webhook_subscriptions_qs(self, *, app_slug: str | None, search: str | None = None):
+        """Filtered, unordered webhook subscriptions for the caller's org.
+
+        Shared by the list field and its paginated sibling so the two
+        can never disagree about which hooks are visible. Ordering is
+        left to the caller / ``keyset_page``.
+
+        Scope to the caller's org (#1183): WebhookSubscription owns an
+        organization FK. Without it, the app_slug branch matched a
+        same-slug app in any tenant and the org-wide branch listed
+        every tenant's global hooks. org_id None → deny-by-default.
+        """
+        org_id = _caller_org_id()
+        if org_id is None:
+            return WebhookSubscription.objects.none()
+        qs = WebhookSubscription.objects.filter(organization_id=org_id)
+        if app_slug:
+            qs = qs.filter(registered_app__slug=app_slug)
+        else:
+            qs = qs.filter(registered_app__isnull=True)
+        if search:
+            qs = qs.filter(search_q(search, "url"))
+        return qs
+
+    @strawberry.field(
+        deprecation_reason=(
+            "Caps at 200 rows with no way to reach the 201st. " "Use astroliftWebhookSubscriptionsPage."
+        )
+    )
     @require_permission(Permission.WEBHOOK_CREATE)
     @tenant_scoped()
     def astrolift_webhook_subscriptions(
@@ -579,21 +704,62 @@ class OperationsQuery:
         Without ``app_slug``: org-wide subscriptions (those not bound
         to any app). Pass ``app_slug`` to list per-app subscriptions
         scoped to that app's UI page (#281)."""
-        # Scope to the caller's org (#1183): WebhookSubscription owns an
-        # organization FK. Without it, the app_slug branch matched a
-        # same-slug app in any tenant and the org-wide branch listed
-        # every tenant's global hooks. org_id None → deny-by-default.
-        org_id = _caller_org_id()
-        if org_id is None:
-            return []
-        qs = WebhookSubscription.objects.filter(organization_id=org_id).order_by("-created_at")
-        if app_slug:
-            qs = qs.filter(registered_app__slug=app_slug)
-        else:
-            qs = qs.filter(registered_app__isnull=True)
+        qs = self._webhook_subscriptions_qs(app_slug=app_slug).order_by("-created_at")
         return [webhook_to_type(w) for w in qs[:200]]
 
     @strawberry.field
+    @require_permission(Permission.WEBHOOK_CREATE)
+    @tenant_scoped()
+    def astrolift_webhook_subscriptions_page(
+        self,
+        info: Info,
+        app_slug: str | None = None,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[WebhookSubscriptionType]:
+        """Cursor-paginated webhook subscriptions (#1235).
+
+        Replaces ``astroliftWebhookSubscriptions`` and its 200-row cap.
+        Seek key is ``(-created_at, -guid)``; ``search`` matches the
+        destination URL, which is the only operator-typed identifier a
+        subscription carries.
+        """
+        page = keyset_page(
+            self._webhook_subscriptions_qs(app_slug=app_slug, search=search),
+            cursor=after,
+            limit=limit,
+        )
+        return page.map(webhook_to_type)
+
+    def _webhook_deliveries_qs(self, *, subscription_id: GUID, search: str | None = None):
+        """Filtered, unordered delivery attempts for one subscription.
+
+        Tenant scoping rides on the subscription lookup — the org
+        clause on that fetch is what makes a sibling-org
+        ``subscription_id`` read as "no deliveries" rather than leaking
+        another tenant's fan-out history. org_id None → deny-by-default.
+        """
+        org_id = _caller_org_id()
+        if org_id is None:
+            return WebhookDelivery.objects.none()
+        sub = WebhookSubscription.objects.filter(
+            guid=str(subscription_id),
+            organization_id=org_id,
+            deleted_at__isnull=True,
+        ).first()
+        if sub is None:
+            return WebhookDelivery.objects.none()
+        qs = WebhookDelivery.objects.filter(subscription=sub).select_related("subscription")
+        if search:
+            qs = qs.filter(search_q(search, "event_type", "delivery_id", "error"))
+        return qs
+
+    @strawberry.field(
+        deprecation_reason=(
+            "Caps at 100 attempts with no way to reach the 101st. " "Use astroliftWebhookDeliveriesPage."
+        )
+    )
     @require_permission(Permission.WEBHOOK_CREATE)
     @tenant_scoped()
     def astrolift_webhook_deliveries(
@@ -609,24 +775,41 @@ class OperationsQuery:
         scoping rides on the subscription's organization — a query
         for a sibling-org subscription returns an empty list rather
         than leaking row counts."""
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        if org_id is None:
-            return []
-        sub = WebhookSubscription.objects.filter(
-            guid=str(subscription_id),
-            organization_id=org_id,
-            deleted_at__isnull=True,
-        ).first()
-        if sub is None:
-            return []
         capped = max(1, min(int(limit or 10), 100))
-        qs = (
-            WebhookDelivery.objects.filter(subscription=sub)
-            .select_related("subscription")
-            .order_by("-delivered_at")[:capped]
-        )
+        qs = self._webhook_deliveries_qs(subscription_id=subscription_id).order_by("-delivered_at")[:capped]
         return [webhook_delivery_to_type(d) for d in qs]
+
+    @strawberry.field
+    @require_permission(Permission.WEBHOOK_CREATE)
+    @tenant_scoped()
+    def astrolift_webhook_deliveries_page(
+        self,
+        info: Info,
+        subscription_id: GUID,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[WebhookDeliveryType]:
+        """Cursor-paginated delivery history for a subscription (#1235).
+
+        Replaces ``astroliftWebhookDeliveries``, whose 100-attempt cap
+        put the whole point of the surface out of reach: a hook that
+        retries on every event burns through 100 rows in minutes, so
+        "when did this integration start failing?" was unanswerable.
+
+        Seek key is ``(-delivered_at, -guid)`` — ``delivered_at`` is
+        the stamped attempt time and is NOT NULL, unlike the inherited
+        ``created_at``-shaped ordering the rest of these pages use.
+        ``search`` matches the event type, the echoed delivery id, and
+        the captured error text.
+        """
+        page = keyset_page(
+            self._webhook_deliveries_qs(subscription_id=subscription_id, search=search),
+            cursor=after,
+            limit=limit,
+            sort_field="delivered_at",
+        )
+        return page.map(webhook_delivery_to_type)
 
     @strawberry.field
     @tenant_scoped()
@@ -787,7 +970,41 @@ class OperationsQuery:
             qs = qs.filter(registered_app__slug=app_slug)
         return [user_alert_subscription_to_type(s) for s in qs]
 
-    @strawberry.field
+    def _alert_rules_qs(
+        self,
+        *,
+        target: str | None,
+        target_id: str | None,
+        active_only: bool,
+        search: str | None = None,
+    ):
+        """Filtered, unordered alert rules for the caller's org.
+
+        Shared by the list field and its paginated sibling. Ordering is
+        left to the caller / ``keyset_page``.
+
+        Scope to the caller's org (#1183): AlertRule owns a non-null
+        organization FK. Without it, every tenant's rules (predicates,
+        notify channels) were listed to all. org_id None →
+        deny-by-default.
+        """
+        org_id = _caller_org_id()
+        if org_id is None:
+            return AlertRule.objects.none()
+        qs = AlertRule.objects.select_related("organization").filter(organization_id=org_id)
+        if active_only:
+            qs = qs.filter(is_active=True)
+        if target:
+            qs = qs.filter(target=target)
+        if target_id:
+            qs = qs.filter(target_id=target_id)
+        if search:
+            qs = qs.filter(search_q(search, "name", "target_id"))
+        return qs
+
+    @strawberry.field(
+        deprecation_reason=("Caps at 200 rows with no way to reach the 201st. Use astroliftAlertRulesPage.")
+    )
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_alert_rules(
@@ -802,21 +1019,47 @@ class OperationsQuery:
         Without ``target``: every rule visible to the tenant. Pass
         ``target=app|env|workload|global`` (and optionally
         ``target_id``) to scope to one target."""
-        # Scope to the caller's org (#1183): AlertRule owns a non-null
-        # organization FK. Without it, every tenant's rules (predicates,
-        # notify channels) were listed to all. org_id None → deny-by-default.
-        org_id = _caller_org_id()
-        if org_id is None:
-            return []
-        qs = AlertRule.objects.select_related("organization").filter(organization_id=org_id)
-        if active_only:
-            qs = qs.filter(is_active=True)
-        if target:
-            qs = qs.filter(target=target)
-        if target_id:
-            qs = qs.filter(target_id=target_id)
-        qs = qs.order_by("-created_at")[:200]
+        qs = self._alert_rules_qs(
+            target=target,
+            target_id=target_id,
+            active_only=active_only,
+        ).order_by("-created_at")[:200]
         return [alert_rule_to_type(r) for r in qs]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_alert_rules_page(
+        self,
+        info: Info,
+        target: str | None = None,
+        target_id: str | None = None,
+        active_only: bool = True,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[AlertRuleType]:
+        """Cursor-paginated alert rules (#1235).
+
+        Replaces ``astroliftAlertRules`` and its 200-row cap. Seek key
+        is ``(-created_at, -guid)``; ``search`` matches the rule name
+        and the target identifier (app slug / workload slug / guid) an
+        operator types when hunting for "which rule covers this thing".
+
+        Note ``activeOnly`` defaults to ``true``, same as the list
+        field — an operator auditing muted/retired rules has to ask.
+        """
+        page = keyset_page(
+            self._alert_rules_qs(
+                target=target,
+                target_id=target_id,
+                active_only=active_only,
+                search=search,
+            ),
+            cursor=after,
+            limit=limit,
+        )
+        return page.map(alert_rule_to_type)
 
     @strawberry.field
     @require_permission(Permission.APP_READ_METRICS)
@@ -915,7 +1158,39 @@ class OperationsQuery:
             deploy_count=deploy_count,
         )
 
-    @strawberry.field
+    def _alert_events_qs(
+        self,
+        *,
+        rule_id: GUID | None,
+        unresolved_only: bool,
+        search: str | None = None,
+    ):
+        """Filtered, unordered alert-firing history for the caller's org.
+
+        Shared by the list field and its paginated sibling. Ordering is
+        left to the caller / ``keyset_page``.
+
+        Scope to the caller's org (#1183): without it, any tenant's
+        firing history (summaries + detail payloads) was visible to
+        all. Scope through the owning rule's org — consistent with the
+        existing rule__guid filter — so an event surfaces only when its
+        rule belongs to the caller. org_id None → deny-by-default.
+        """
+        org_id = _caller_org_id()
+        if org_id is None:
+            return AlertEvent.objects.none()
+        qs = AlertEvent.objects.select_related("rule").filter(rule__organization_id=org_id)
+        if rule_id is not None:
+            qs = qs.filter(rule__guid=str(rule_id))
+        if unresolved_only:
+            qs = qs.filter(resolved_at__isnull=True)
+        if search:
+            qs = qs.filter(search_q(search, "summary", "rule__name"))
+        return qs
+
+    @strawberry.field(
+        deprecation_reason=("Caps at 500 rows with no way to reach the 501st. Use astroliftAlertEventsPage.")
+    )
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_alert_events(
@@ -925,21 +1200,43 @@ class OperationsQuery:
         unresolved_only: bool = False,
         limit: int = 100,
     ) -> list[AlertEventType]:
-        # Scope to the caller's org (#1183): without it, any tenant's
-        # firing history (summaries + detail payloads) was visible to
-        # all. Scope through the owning rule's org — consistent with the
-        # existing rule__guid filter — so an event surfaces only when
-        # its rule belongs to the caller. org_id None → deny-by-default.
-        org_id = _caller_org_id()
-        if org_id is None:
-            return []
-        qs = AlertEvent.objects.select_related("rule").filter(rule__organization_id=org_id)
-        if rule_id is not None:
-            qs = qs.filter(rule__guid=str(rule_id))
-        if unresolved_only:
-            qs = qs.filter(resolved_at__isnull=True)
-        qs = qs.order_by("-fired_at")[: max(1, min(limit, 500))]
-        return [alert_event_to_type(e) for e in qs]
+        qs = self._alert_events_qs(rule_id=rule_id, unresolved_only=unresolved_only).order_by("-fired_at")
+        return [alert_event_to_type(e) for e in qs[: max(1, min(limit, 500))]]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_alert_events_page(
+        self,
+        info: Info,
+        rule_id: GUID | None = None,
+        unresolved_only: bool = False,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[AlertEventType]:
+        """Cursor-paginated alert-firing history (#1235).
+
+        Replaces ``astroliftAlertEvents`` and its 500-row cap — a noisy
+        rule burns that in a day, which put "when did this first fire?"
+        out of reach.
+
+        Seek key is ``(-fired_at, -guid)``: ``fired_at`` is the moment
+        the predicate matched and is NOT NULL, whereas ``resolved_at``
+        is null for everything still firing. ``search`` matches the
+        event summary and the owning rule's name.
+        """
+        page = keyset_page(
+            self._alert_events_qs(
+                rule_id=rule_id,
+                unresolved_only=unresolved_only,
+                search=search,
+            ),
+            cursor=after,
+            limit=limit,
+            sort_field="fired_at",
+        )
+        return page.map(alert_event_to_type)
 
 
 # ---------------------------------------------------------------------------
@@ -1011,14 +1308,9 @@ def _lifecycle_event_filter():
 # ---------------------------------------------------------------------------
 
 
-def _aggregate_events(
-    rows: list,
-    *,
-    window_seconds: int,
-    limit: int,
-) -> list[AggregatedEventType]:
-    """Walk newest→oldest, fold consecutive identical events into
-    buckets, return at most ``limit`` buckets in newest-first order.
+def _fold_events(rows: list, *, window_seconds: int) -> list[dict]:
+    """Walk newest→oldest, folding consecutive identical events into
+    buckets. Returns the raw bucket dicts in newest-first *open* order.
 
     "Consecutive identical" means: same
     ``(event_type, resource_kind, resource_id)`` key AND the gap from
@@ -1027,16 +1319,19 @@ def _aggregate_events(
     when the key matches — that's how we model "the issue cleared and
     then came back."
 
+    Each bucket carries ``open_index``: the position in ``rows`` of the
+    member that opened it. ``astroliftEventsAggregatedPage`` cuts the
+    scan at the open index of the first bucket that doesn't fit on the
+    page — every earlier row belongs to a bucket being returned, so
+    that index is exactly the row count this page consumed.
+
     Caller is responsible for tenant-scoping the input queryset; this
     function is pure aggregation.
     """
-    if not rows:
-        return []
-
     buckets: list[dict] = []
     bucket_by_key: dict[tuple[str, str, str], int] = {}
 
-    for row in rows:
+    for index, row in enumerate(rows):
         key = (
             row.event_type or "",
             row.resource_kind or "",
@@ -1066,47 +1361,40 @@ def _aggregate_events(
                 "event_type": key[0],
                 "resource_kind": key[1],
                 "resource_id": key[2],
+                "open_index": index,
             }
         )
-
-    capped = buckets[:limit]
-    return [
-        AggregatedEventType(
-            representative=event_to_type(b["representative"]),
-            count=b["count"],
-            first_at=b["oldest"],
-            last_at=b["newest"],
-            event_type=b["event_type"],
-            resource_kind=b["resource_kind"],
-            resource_id=b["resource_id"],
-        )
-        for b in capped
-    ]
+    return buckets
 
 
-# ---------------------------------------------------------------------------
-# Cursor helpers (Event)
-# ---------------------------------------------------------------------------
+def _bucket_to_type(bucket: dict) -> AggregatedEventType:
+    """Project one folded bucket onto its GraphQL type."""
+    return AggregatedEventType(
+        representative=event_to_type(bucket["representative"]),
+        count=bucket["count"],
+        first_at=bucket["oldest"],
+        last_at=bucket["newest"],
+        event_type=bucket["event_type"],
+        resource_kind=bucket["resource_kind"],
+        resource_id=bucket["resource_id"],
+    )
 
 
-def _encode_event_cursor(occurred_at, guid: str) -> str:
-    payload = json.dumps([occurred_at.isoformat(), guid], separators=(",", ":")).encode()
-    return base64.urlsafe_b64encode(payload).rstrip(b"=").decode()
+def _aggregate_events(
+    rows: list,
+    *,
+    window_seconds: int,
+    limit: int,
+) -> list[AggregatedEventType]:
+    """Fold ``rows`` and return at most ``limit`` buckets, newest-first.
 
-
-def _decode_event_cursor(token: str):
-    """Return ``(occurred_at_dt, guid_str)`` or ``None`` if the token
-    is malformed. We swallow garbage so a bogus cursor restarts from
-    the top instead of erroring — UX over strictness."""
-    import datetime as dt
-
-    pad = "=" * (-len(token) % 4)
-    try:
-        raw = base64.urlsafe_b64decode(token + pad)
-        ts, guid = json.loads(raw)
-        return dt.datetime.fromisoformat(ts), guid
-    except (binascii.Error, ValueError, TypeError, json.JSONDecodeError):
-        return None
+    Note the slice happens AFTER the whole input is folded, so a
+    bucket's ``count`` includes members that appear beyond the cut —
+    that is the (deprecated) list field's long-standing behaviour and
+    is why ``astroliftEventsAggregatedPage`` re-folds its cut instead
+    of reusing this.
+    """
+    return [_bucket_to_type(b) for b in _fold_events(rows, window_seconds=window_seconds)[:limit]]
 
 
 # ---------------------------------------------------------------------------

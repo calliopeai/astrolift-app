@@ -1,8 +1,8 @@
 "use client";
 
-import { type Table } from "@tanstack/react-table";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
-import { useTranslations } from "next-intl";
+import * as React from "react";
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -11,74 +11,70 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
-const PAGE_SIZES = [5, 10, 20, 50];
+import { PAGE_SIZES, type CursorTableController } from "./use-cursor-table";
 
-type DataTablePaginationProps<TData> = {
-  table: Table<TData>;
+type DataTablePaginationProps<TRow> = {
+  controller: CursorTableController<TRow>;
+  className?: string;
 };
 
-export const DataTablePagination = <TData,>({ table }: DataTablePaginationProps<TData>) => {
-  const t = useTranslations("dataTable.pagination");
-  const { pageIndex, pageSize } = table.getState().pagination;
-  const total = table.getFilteredRowModel().rows.length;
+/**
+ * Prev / next only, no page-number jump.
+ *
+ * A keyset walk has no "page 7" to jump to: cursors are positions, not
+ * offsets, so the only reachable pages are the ones adjacent to a cursor
+ * already held. The old server table accepted an `onGoToPage` prop and
+ * silently never called it; being unable to render the control is more
+ * honest than rendering one that lies.
+ */
+export function DataTablePagination<TRow>({
+  controller,
+  className,
+}: DataTablePaginationProps<TRow>) {
+  const { pageIndex, hasNext, hasPrev, next, prev, pageSize, setPageSize } = controller;
+
+  if (!hasNext && !hasPrev) return null;
 
   return (
-    <div className="flex items-center justify-between">
+    <div className={cn("flex flex-wrap items-center justify-end gap-4", className)}>
       <div className="flex items-center gap-2">
-        <p className="text-muted-foreground text-sm">{t("rowsPerPage")}</p>
-        <Select value={String(pageSize)} onValueChange={(v) => table.setPageSize(Number(v))}>
-          <SelectTrigger className="h-8 w-16">
+        <span className="text-muted-foreground text-sm">Rows per page</span>
+        <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+          <SelectTrigger size="sm" className="w-18" aria-label="Rows per page">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {PAGE_SIZES.map((size) => (
-              <SelectItem key={size} value={String(size)}>
-                {size}
+            {PAGE_SIZES.map((n) => (
+              <SelectItem key={n} value={String(n)}>
+                {n}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <p className="text-muted-foreground text-sm">{t("results", { count: total })}</p>
       </div>
-
-      <div className="flex items-center gap-1">
-        <p className="text-muted-foreground mr-2 text-sm">
-          {t("page", { current: pageIndex + 1, total: table.getPageCount() })}
-        </p>
+      <div className="flex items-center gap-2">
+        <span className="text-muted-foreground text-sm tabular-nums">Page {pageIndex + 1}</span>
         <Button
           variant="outline"
           size="icon"
-          onClick={() => table.firstPage()}
-          disabled={!table.getCanPreviousPage()}
+          onClick={prev}
+          disabled={!hasPrev}
+          aria-label="Previous page"
         >
-          <ChevronsLeft className="h-4 w-4" />
+          <ChevronLeftIcon className="size-4" />
         </Button>
         <Button
           variant="outline"
           size="icon"
-          onClick={() => table.previousPage()}
-          disabled={!table.getCanPreviousPage()}
+          onClick={next}
+          disabled={!hasNext}
+          aria-label="Next page"
         >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => table.nextPage()}
-          disabled={!table.getCanNextPage()}
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => table.lastPage()}
-          disabled={!table.getCanNextPage()}
-        >
-          <ChevronsRight className="h-4 w-4" />
+          <ChevronRightIcon className="size-4" />
         </Button>
       </div>
     </div>
   );
-};
+}

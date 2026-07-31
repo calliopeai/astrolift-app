@@ -13,7 +13,9 @@ against a real backend.
 
 from __future__ import annotations
 
+import base64
 import datetime as dt
+import json
 import uuid
 
 import pytest
@@ -107,12 +109,26 @@ def test_null_seek_value_terminates_rather_than_looping():
 
 
 def test_cursor_format_matches_the_event_codec_it_generalises():
-    """Cursors already issued by the operations resolvers keep working."""
-    from astrolift_operations.schema.queries import _encode_event_cursor
+    """Cursors already issued by the operations resolvers keep working.
 
+    The ``Event`` codec this generalises (``_encode_event_cursor``,
+    deleted when ``astroliftEventsPage`` / ``astroliftRecentActivity``
+    / ``astroliftAuditEventsPage`` moved onto ``keyset_page``) emitted
+    unpadded urlsafe base64 of compact JSON
+    ``[occurred_at_iso, guid_str]``. Its exact bytes are reconstructed
+    here rather than compared against the deleted function: a bookmark
+    or an in-flight "load more" holds a token minted before the
+    cutover, and a format change would silently restart those walks
+    from the top instead of erroring.
+    """
     now = timezone.now()
     guid = str(uuid.uuid4())
-    assert encode_cursor(now, guid) == _encode_event_cursor(now, guid)
+    legacy = (
+        base64.urlsafe_b64encode(json.dumps([now.isoformat(), guid], separators=(",", ":")).encode())
+        .rstrip(b"=")
+        .decode()
+    )
+    assert encode_cursor(now, guid) == legacy
 
 
 # ---------------------------------------------------------------------------

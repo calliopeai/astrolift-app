@@ -42,8 +42,9 @@ BACKEND = Path(__file__).resolve().parents[2]
 SCOPED_AT_RUNTIME: dict[str, str] = {
     "Query.organization": "#537 — _caller_org_ids gate against caller memberships",
     "Query.organizations": "#537 — filters by id__in=_caller_org_ids(info)",
+    "Query.organizations_page": "#1235 — shares _organizations_qs with Query.organizations",
     "Query.members": "#537 — filters by organization_id__in=_caller_org_ids(info)",
-    "Query.employees": "#537 — filters by organization_id__in=_caller_org_ids(info)",
+    "Query.members_page": "#1235 — shares _members_qs with Query.members",
     "Mutation.organization": "#537 — _require_caller_in_org for edits; creates allowed for any authed user",
     "Mutation.upsert_organization": "#537 — _require_caller_in_org when editing existing org row",
     "Mutation.organization_member_status": "#537 — _require_caller_in_org against the target org",
@@ -59,6 +60,12 @@ EXEMPT: dict[str, str] = {
     "AuditLogQuery.audit_logs": (
         "#537: install-operator surface; superuser-gated inline. "
         "Cross-tenant inspection is the intended use case."
+    ),
+    "AuditLogQuery.audit_logs_page": (
+        "#1235: paginated sibling of audit_logs. Same install-operator "
+        "surface, same _require_superuser gate on its first line, same "
+        "_audit_logs_qs builder. MutationAuditLog has no organization "
+        "column — cross-tenant inspection IS the point."
     ),
     # Permission analysis is gated inline on self-or-superuser (#537).
     # The shape is "diagnose THIS user", not "list rows" — tenant

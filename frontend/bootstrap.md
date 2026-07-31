@@ -13,7 +13,7 @@ settings.
 | Data fetching  | Apollo Client 4 + `@apollo/client-integration-nextjs` |
 | Styling        | Tailwind 4 + shadcn/ui + Base UI                      |
 | Forms          | react-hook-form + zod                                 |
-| Tables         | TanStack React Table                                  |
+| Tables         | `components/data-table` (see "Data surfaces")         |
 | i18n           | next-intl                                             |
 | Theming        | next-themes (light / dark / system)                   |
 | Icons          | lucide-react                                          |
@@ -53,7 +53,7 @@ app/              Next.js App Router pages and layouts
   actions/        Server actions
 components/       Shared React components
   ui/             shadcn primitives (button, input, card, etc.)
-  data-table/     DataTable + DataTableServer + toolbar/pagination
+  data-table/     DataTable + useCursorTable + useRowSelection
   forms/          Form builder components
   workflows/      Workflow builder components
 graphql/          GraphQL operations, grouped by domain
@@ -95,6 +95,70 @@ public/           Static assets
   `graphql/permissions/permissions.types.ts`. Server guard:
   `requirePermission()`. Client guard: `<PermissionGuard>`.
 - **No AI co-authorship messages** in commits or code.
+
+## Data surfaces
+
+Every list and table goes through `components/data-table`. The rules below
+are the ones an audit of ~107 surfaces found being broken (epic #1230); the
+lint rule `astroliftData/no-raw-table` enforces the first one, because the
+previous version of this section was documentation alone and had zero
+consumers three months after it was written.
+
+1. **Never import `@/components/ui/table` outside `components/data-table`.**
+   Those primitives are DataTable's private dependency. A surface reaching
+   for them is about to re-derive pagination, empty, loading and error
+   behaviour the component already gets right.
+2. **Pagination is server-side, always.** `useCursorTable` is the only data
+   mode. Fetching a capped page and paginating it in the browser is what
+   made deployment 101 unreachable from `/deployments`. The one sanctioned
+   exception is a small fixed-cardinality list (the ~17 system roles) that
+   may render unpaginated — still through `DataTable`, for the chrome — and
+   the exception must be argued in the PR, not assumed.
+3. **The query must expose a `search` argument before the table shows a
+   search box.** `searchVariable` opts in; omit it and no box renders.
+   Filtering the one page in hand looks like search and is not.
+4. **Search is debounced by the controller.** Never hand-roll a
+   `setTimeout`, and never wire an input straight into query variables —
+   `/administration/audit` issued one network round trip per keystroke.
+5. **`empty` and `emptyFiltered` are different states.** "You have no
+   clusters yet" and "no cluster matches 'prod'" want different words and
+   different actions. `empty` is a required prop; the type will not let you
+   render nothing.
+6. **Loading renders skeleton rows inside the real table**, sized from the
+   column defs. DataTable does this for you — do not swap the table out for
+   a floating `<Skeleton>` block, which reflows the page when rows land.
+7. **Sorting is server-side, declared per column** via `Column.sortKey`
+   plus the controller's `sortVariable`. There is no client sort: reordering
+   one page while the rest of the result set sits on the server produces an
+   order that is wrong at every page boundary.
+8. **`rowHref` XOR `onRowActivate`.** Rows that navigate must be real links
+   so middle-click, open-in-new-tab and copy-link work. Rows that do
+   something else must not pretend to be links. The types enforce the choice.
+9. **Selection comes from `useRowSelection`.** It persists across pages, so
+   the count in the bulk bar means what it says.
+10. **Destructive actions confirm** via `ConfirmDialog` / `useConfirm`.
+    `window.confirm` is lint-flagged: it blocks the event loop and gives the
+    action no pending state.
+
+Typical shape:
+
+```tsx
+const table = useCursorTable<Deployment>({
+  query: LIST_DEPLOYMENTS_PAGE,
+  extract: (d) => (d as Resp | undefined)?.astroliftDeploymentsPage,
+  searchVariable: "search",
+  urlKey: "dep",
+});
+
+<DataTable
+  label="Deployments"
+  controller={table}
+  columns={columns}
+  getRowId={(d) => d.id}
+  rowHref={(d) => `/deployments/${d.id}`}
+  empty={{ icon: <RocketIcon />, title: "No deployments yet", ... }}
+/>;
+```
 
 ## Design system
 

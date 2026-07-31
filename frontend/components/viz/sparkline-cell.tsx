@@ -18,11 +18,11 @@ export interface SparklineCellProps {
 }
 
 /**
- * A `@tanstack/react-table` cell renderer: a right-aligned sparkline with the
- * latest value beside it. Drop straight into a column `cell`:
+ * A DataTable cell renderer: a right-aligned sparkline with the latest value
+ * beside it. Drop straight into a column `cell`:
  *
  * @example
- * { id: "trend", cell: ({ row }) => <SparklineCell data={row.original.series} /> }
+ * { id: "trend", header: "Trend", cell: (row) => <SparklineCell data={row.series} /> }
  */
 export function SparklineCell({
   data,

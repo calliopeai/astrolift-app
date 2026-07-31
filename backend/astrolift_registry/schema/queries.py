@@ -16,6 +16,7 @@ from django.db.models.functions import Lower
 from django.utils import timezone
 from strawberry.types import Info
 
+from astrolift_graphql import PageType, keyset_page, search_q
 from astrolift_identity.schema.types import ProjectType, project_to_type
 from astrolift_lifecycle.models import AppEnvironment, Deployment
 from astrolift_registry.models import AppTeamAccess, Container, RegisteredApp, Workload
@@ -1145,7 +1146,40 @@ class RegistryQuery:
             include_retention_policies=True,
         )
 
-    @strawberry.field
+    def _app_team_accesses_qs(self, *, app_slug: str, search: str | None = None):
+        """Filtered, unordered team-access rows for one app in the caller's org.
+
+        Shared by the list field and its paginated sibling so the two
+        can never disagree about which grants exist. Ordering is
+        deliberately not applied here — ``keyset_page`` imposes it from
+        the seek key.
+
+        The pre-#1235 resolver fetched the app first (org-scoped, live
+        only) and returned ``[]`` when it was missing; joining through
+        ``registered_app`` selects exactly that row set in one query and
+        keeps the org constraint on the query itself. ``AppTeamAccess``
+        has no organization FK of its own, so this join IS the tenant
+        boundary — ``@tenant_scoped`` only asserts a tenant exists.
+        Deny-by-default: no tenant context matches no rows (#1042/#1183).
+        """
+        org_id = _caller_org_id()
+        if org_id is None:
+            return AppTeamAccess.objects.none()
+        qs = AppTeamAccess.objects.select_related("registered_app", "team").filter(
+            registered_app__slug=app_slug,
+            registered_app__organization_id=org_id,
+            registered_app__deleted_at__isnull=True,
+            deleted_at__isnull=True,
+        )
+        if search:
+            qs = qs.filter(search_q(search, "team__slug", "team__name"))
+        return qs
+
+    @strawberry.field(
+        deprecation_reason=(
+            "Returns every grant in one unbounded response. " "Use astroliftAppTeamAccessesPage."
+        )
+    )
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_app_team_accesses(self, info: Info, app_slug: str) -> list[AppTeamAccessType]:
@@ -1156,33 +1190,117 @@ class RegistryQuery:
         Backfilled deployments will show exactly one row (the home
         team at ``OWNER``) until the operator grants more teams.
         """
-
-        org_id = _caller_org_id()
-        app = (
-            RegisteredApp.objects.select_related("team")
-            .filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
-            .first()
-        )
-        if app is None:
-            return []
-        rows = (
-            AppTeamAccess.objects.select_related("registered_app", "team")
-            .filter(registered_app=app, deleted_at__isnull=True)
-            .order_by("team__slug")
-        )
-        return [app_team_access_to_type(r, home_team_id=app.team_id) for r in rows]
+        rows = self._app_team_accesses_qs(app_slug=app_slug).order_by("team__slug")
+        # Every row in the set belongs to the one app the filter names,
+        # so the app's home team comes off the select_related row rather
+        # than a second fetch.
+        return [app_team_access_to_type(r, home_team_id=r.registered_app.team_id) for r in rows]
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
-    def astrolift_workloads(self, info: Info, app_slug: str | None = None) -> list[WorkloadType]:
+    def astrolift_app_team_accesses_page(
+        self,
+        info: Info,
+        app_slug: str,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[AppTeamAccessType]:
+        """Cursor-paginated team-access grants for one app (#1235).
+
+        Replaces ``astroliftAppTeamAccesses``, which had no cap at all:
+        an app shared across a large org's teams returned every grant in
+        one response.
+
+        Seek key is ``(team__slug, guid)`` ASCENDING — the alphabetical
+        order the Teams card already renders. Kept (rather than moved to
+        the ``-created_at`` default) because this table is read as a
+        roster, where "who has access" is looked up by name, not as a
+        feed; and because ``(registered_app, team)`` is unique among
+        live rows, so ``team__slug`` is already unique within this
+        filtered set and the walk cannot churn. ``guid`` rides along as
+        the tiebreak anyway so the walk stays correct if that ever stops
+        holding. Both columns are NOT NULL — ``team`` is a non-nullable
+        FK and ``Team.slug`` a non-nullable slug field.
+        """
+        page = keyset_page(
+            self._app_team_accesses_qs(app_slug=app_slug, search=search),
+            cursor=after,
+            limit=limit,
+            sort_field="team__slug",
+            tiebreak_field="guid",
+            descending=False,
+        )
+        return page.map(lambda r: app_team_access_to_type(r, home_team_id=r.registered_app.team_id))
+
+    def _workloads_qs(self, *, app_slug: str | None, search: str | None = None):
+        """Filtered, unordered workload rows for the caller's org.
+
+        Shared by the list field and its paginated sibling so the two
+        can never disagree about what a workload row is. Ordering is
+        deliberately not applied here — ``keyset_page`` imposes it from
+        the seek key.
+
+        ``Workload`` has no organization FK of its own; it reaches the
+        tenant through ``registered_app``, and the default manager is
+        not tenant-aware — this filter IS the tenant boundary. Deny-by-
+        default: no tenant context matches no rows (#1042 / #1183).
+        """
         org_id = _caller_org_id()
         if org_id is None:
-            return []
+            return Workload.objects.none()
         qs = Workload.objects.select_related("registered_app").filter(registered_app__organization_id=org_id)
         if app_slug:
             qs = qs.filter(registered_app__slug=app_slug)
-        return [workload_to_type(w) for w in qs[:200]]
+        if search:
+            qs = qs.filter(search_q(search, "name", "slug", "kind", "registered_app__slug"))
+        return qs
+
+    @strawberry.field(
+        deprecation_reason=("Caps at 200 rows with no way to reach the 201st. " "Use astroliftWorkloadsPage.")
+    )
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_workloads(self, info: Info, app_slug: str | None = None) -> list[WorkloadType]:
+        # No ``order_by``: this field never had one, and the workload
+        # cards on /apps/<slug>/workloads, /functions, /tasks and the
+        # /jobs schedule list all render in whatever order it returned.
+        # Imposing one now would visibly reshuffle every one of them, so
+        # the deprecated field keeps its exact behaviour; the page field
+        # below defines its own (newest-first).
+        return [workload_to_type(w) for w in self._workloads_qs(app_slug=app_slug)[:200]]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_workloads_page(
+        self,
+        info: Info,
+        app_slug: str | None = None,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[WorkloadType]:
+        """Cursor-paginated workload list (#1235).
+
+        Replaces ``astroliftWorkloads``, whose 200-row cap left an
+        install's 201st workload unreachable. Four surfaces read that
+        one field — the app workloads tab, /functions, /tasks and the
+        /jobs schedule list — so the cap silently truncated all of them
+        at once.
+
+        Seek key is ``(-created_at, -guid)``. ``search`` matches the
+        workload name, slug and kind plus the owning app's slug, so the
+        cross-app surfaces can narrow to one app by name without a
+        second round-trip.
+        """
+        page = keyset_page(
+            self._workloads_qs(app_slug=app_slug, search=search),
+            cursor=after,
+            limit=limit,
+        )
+        return page.map(workload_to_type)
 
     @strawberry.field
     @require_permission(Permission.APP_READ)

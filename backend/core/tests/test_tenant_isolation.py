@@ -144,7 +144,13 @@ class TestUploadQuerySetWithViewPermission:
 
 
 # ---------------------------------------------------------------------------
-# organization.queries.organizations / members / employees
+# organization.queries.organizations / members (+ their paginated siblings)
+#
+# ``employees`` used to live here too — a first/offset/edges/totalCount
+# Relay demo with no consumers. #1235 deleted it and replaced its
+# coverage with the two page resolvers below: ``membersPage`` carries
+# the paginated-membership assertion the employees test made, and
+# ``organizationsPage`` carries the through-the-schema execution path.
 # ---------------------------------------------------------------------------
 
 
@@ -172,21 +178,44 @@ class TestOrganizationQueryTenantFilter:
                 self.context = _ctx(user)
 
         result_a = OrgQuery.members(None, _Info(two_tenants.a.user))
-        ids_a = set(result_a.values_list("pk", flat=True))
+        ids_a = {m.pk for m in result_a}
         assert two_tenants.a.membership.pk in ids_a
         assert (
             two_tenants.b.membership.pk not in ids_a
         ), "members query must not surface members from non-caller orgs"
 
-    def test_employees_query_filters_to_caller_organizations(self, two_tenants):
+    def test_members_page_filters_to_caller_organizations(self, two_tenants):
+        """#1235 replacement for the deleted ``employees`` coverage: the
+        paginated membership surface is scoped the same way the list
+        field is, in items AND in total_count."""
+        from organization.schema.queries import Query as OrgQuery
+
+        class _Info:
+            def __init__(self, user):
+                self.context = _ctx(user)
+
+        page = OrgQuery.members_page(None, _Info(two_tenants.a.user), limit=50)
+        ids_a = {m.pk for m in page.items}
+        assert two_tenants.a.membership.pk in ids_a
+        assert (
+            two_tenants.b.membership.pk not in ids_a
+        ), "membersPage must not surface members from non-caller orgs"
+        assert page.total_count == len(ids_a), "the count leaked rows the page did not show"
+
+    def test_organizations_page_filters_to_caller_memberships(self, two_tenants):
+        """The page resolver's scope has to hold through the schema, not
+        just under direct invocation — this is the execution path the
+        deleted ``employees`` test covered."""
         result = schema.execute_sync(
-            "{ employees(first: 50) { edges { node { user { email } } } } }",
+            "{ organizationsPage(limit: 50) { items { name } totalCount nextCursor } }",
             context_value=_ctx(two_tenants.a.user),
         )
         assert result.errors is None
-        emails = {e["node"]["user"]["email"] for e in result.data["employees"]["edges"]}
-        assert two_tenants.a.user.email in emails
-        assert two_tenants.b.user.email not in emails
+        page = result.data["organizationsPage"]
+        names = {o["name"] for o in page["items"]}
+        assert two_tenants.a.organization.name in names
+        assert two_tenants.b.organization.name not in names
+        assert page["totalCount"] == len(names), "the count leaked another org's row"
 
     def test_organization_lookup_blocks_non_member(self, two_tenants):
         # Asking for org-B by id as user-A returns null, not the row.

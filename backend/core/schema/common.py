@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Generic, Optional, Sequence, TypeVar
+from typing import Optional, Sequence
 
 import django_filters
 import strawberry
@@ -11,26 +11,6 @@ from django_filters.constants import EMPTY_VALUES
 from graphql import GraphQLError
 from strawberry import relay
 from strawberry.types import Info
-
-T = TypeVar("T")
-
-
-# ---------------------------------------------------------------------------
-# Custom relay connection with total_count
-# ---------------------------------------------------------------------------
-
-@strawberry.type(description="A connection with total count support.")
-class CustomConnection(relay.ListConnection[T], Generic[T]):
-    """Relay connection that includes total_count for pagination."""
-
-    @strawberry.field(description="Total number of items in the connection.")
-    def total_count(self) -> int:
-        nodes = self.nodes
-        if isinstance(nodes, QuerySet):
-            return nodes.count()
-        if hasattr(nodes, '__len__'):
-            return len(nodes)
-        return 0
 
 
 # ---------------------------------------------------------------------------

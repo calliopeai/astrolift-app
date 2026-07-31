@@ -25,6 +25,98 @@ const TEXT_SIZE = /(?<![\w-])text-\[[0-9.]+px\]/;
 const ROUND_SIZE = /(?<![\w-])rounded-\[[0-9.]+px\]/;
 const VARIANT_HELPERS = new Set(["cva", "tv"]);
 
+/**
+ * Data-surface guardrail (#1231 / epic #1230).
+ *
+ * The audit's verdict was that documentation alone demonstrably failed: a
+ * DataTable composition layer was declared the house standard in
+ * frontend/bootstrap.md and then sat at zero consumers for three months
+ * while 100+ surfaces shipped their own tables. Nobody filed an issue.
+ * Only a lint gate makes a standard hold.
+ *
+ *   - `no-raw-table` — `@/components/ui/table` is DataTable's private
+ *     dependency. Import `DataTable` instead; a surface that reaches for
+ *     the primitives is re-deriving pagination, empty states and loading
+ *     behaviour that the component already gets right. Ships at `warn`
+ *     until the wave migrations land, then flips to `error`.
+ *   - `no-native-confirm` — `window.confirm` blocks the event loop, cannot
+ *     be styled or tested, and gives destructive actions no pending state.
+ *     Use `ConfirmDialog` / `useConfirm`. The imperative `useConfirm()`
+ *     binding is resolved by scope analysis, not by name, so it is not
+ *     flagged.
+ *
+ * Both ship at `warn` while the wave migrations land and flip to `error` at
+ * epic close-out, once the last surface is converted.
+ */
+const dataSurfacePlugin = {
+  rules: {
+    "no-raw-table": {
+      meta: {
+        type: "problem",
+        docs: {
+          description:
+            "Disallow importing the raw table primitives outside components/data-table.",
+        },
+        messages: {
+          rawTable:
+            "Raw `ui/table` import. Use `DataTable` from @/components/data-table — it carries the pagination, empty, loading and error states this surface would otherwise re-derive. See frontend/bootstrap.md 'Data surfaces'.",
+        },
+        schema: [],
+      },
+      create(context) {
+        return {
+          ImportDeclaration(node) {
+            if (node.source.value === "@/components/ui/table") {
+              context.report({ node, messageId: "rawTable" });
+            }
+          },
+        };
+      },
+    },
+    "no-native-confirm": {
+      meta: {
+        type: "problem",
+        docs: { description: "Disallow window.confirm; use ConfirmDialog." },
+        messages: {
+          nativeConfirm:
+            "Native confirm() blocks the event loop and cannot show a pending state. Use `ConfirmDialog` (or `useConfirm()`) from @/components.",
+        },
+        schema: [],
+      },
+      create(context) {
+        const sourceCode = context.sourceCode ?? context.getSourceCode();
+        // A bare `confirm(...)` is only the native dialog when nothing in
+        // scope shadows it. `const confirm = useConfirm()` is the sanctioned
+        // imperative wrapper and resolves to a local binding, so scope
+        // analysis — not the name — decides.
+        const isNativeBareCall = (node) => {
+          if (node.callee.type !== "Identifier" || node.callee.name !== "confirm") return false;
+          let scope = sourceCode.getScope(node);
+          while (scope) {
+            if (scope.variables.some((v) => v.name === "confirm" && v.defs.length > 0)) {
+              return false;
+            }
+            scope = scope.upper;
+          }
+          return true;
+        };
+        const isWindowCall = (node) =>
+          node.callee.type === "MemberExpression" &&
+          node.callee.object?.type === "Identifier" &&
+          node.callee.object.name === "window" &&
+          node.callee.property?.name === "confirm";
+        return {
+          CallExpression(node) {
+            if (isWindowCall(node) || isNativeBareCall(node)) {
+              context.report({ node, messageId: "nativeConfirm" });
+            }
+          },
+        };
+      },
+    },
+  },
+};
+
 const designTokensPlugin = {
   rules: {
     "no-raw-design-values": {
@@ -99,6 +191,17 @@ const eslintConfig = defineConfig([
     files: ["components/**/*.{ts,tsx}", "app/**/*.{ts,tsx}"],
     plugins: { astrolift: designTokensPlugin },
     rules: { "astrolift/no-raw-design-values": "error" },
+  },
+  // Data-surface guardrail — see the rule's doc block above. Ships at
+  // `warn` while the wave migrations land, then flips to `error`.
+  {
+    files: ["components/**/*.{ts,tsx}", "app/**/*.{ts,tsx}"],
+    ignores: ["components/data-table/**"],
+    plugins: { astroliftData: dataSurfacePlugin },
+    rules: {
+      "astroliftData/no-raw-table": "warn",
+      "astroliftData/no-native-confirm": "warn",
+    },
   },
   // Override default ignores of eslint-config-next.
   globalIgnores([

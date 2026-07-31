@@ -289,181 +289,139 @@ class Mutation:
     slug: "server-paginated-table",
     title: "Wire up a server-paginated data table",
     description:
-      "Use usePaginatedQuery with DataTableServer to build a table with URL-synced pagination, search, column filters, and sorting — all backed by a GraphQL connection query.",
+      "Use useCursorTable with DataTable to build a list surface with server-side pagination, debounced search, and the required empty, loading, and error states.",
     level: "Intermediate",
-    duration: "35 min",
+    duration: "25 min",
     steps: [
       {
-        title: "Write the connection query",
-        body: "Use Relay-style pagination with edges, nodes, and totalCount. The backend should accept offset, limit, search, and filter variables.",
+        title: "Write the page query",
+        body: "Return a Page envelope — items, nextCursor, totalCount — and accept limit, after, and search. This is the shape every Astrolift list query speaks; the backend helper keyset_page() produces it.",
         code: `// graphql/invoices/invoices.queries.ts
 import { gql } from "@apollo/client";
 
-export const getInvoices = gql\`
-  query GetInvoices(
-    $offset: Int
+export const LIST_INVOICES_PAGE = gql\`
+  query ListInvoicesPage(
     $limit: Int
+    $after: String
     $search: String
     $status: String
   ) {
-    invoices(
-      offset: $offset
+    astroliftInvoicesPage(
       limit: $limit
+      after: $after
       search: $search
       status: $status
     ) {
-      totalCount
-      edges {
-        node {
-          id
-          guid
-          name
-          amount
-          status
-          dueDate
-        }
+      items {
+        id
+        name
+        amount
+        status
+        dueDate
       }
+      nextCursor
+      totalCount
     }
   }
-\`;`,
+\\\`;`,
       },
       {
-        title: "Create the domain hook",
-        body: "Co-locate columns, filters, and the paginated query hook in a .tsx file so JSX column definitions work. Use usePaginatedQuery with urlSync for URL-persisted state.",
-        code: `// graphql/invoices/invoices.hooks.tsx
+        title: "Define the columns",
+        body: "A column is an id, a header, and a cell function. Give width classes so the loading skeletons match the real rows. Add sortKey only for columns the server can actually sort on.",
+        code: `// app/(app)/invoices/columns.tsx
 "use client";
-import type { ColumnDef } from "@tanstack/react-table";
-import { DataTableColumnHeader, type FilterConfig } from "@/components/data-table";
-import { usePaginatedQuery } from "@/hooks/use-paginated-query";
+import type { Column } from "@/components/data-table";
 import { Badge } from "@/components/ui/badge";
-import { getInvoices } from "./invoices.queries";
 
-type Invoice = {
+export type Invoice = {
   id: string;
-  guid: string;
   name: string;
   amount: string;
   status: string;
   dueDate: string;
 };
 
-export const invoiceColumns: ColumnDef<Invoice, unknown>[] = [
+export const invoiceColumns: Column<Invoice>[] = [
   {
-    accessorKey: "name",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Name" />
-    ),
-    enableSorting: true,
+    id: "name",
+    header: "Name",
+    cell: (row) => <span className="font-medium">{row.name}</span>,
   },
   {
-    accessorKey: "amount",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Amount" />
-    ),
+    id: "amount",
+    header: "Amount",
+    align: "right",
+    width: "w-32",
+    cell: (row) => <span className="tabular-nums">{row.amount}</span>,
   },
-  {
-    accessorKey: "status",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Status" />
-    ),
-    cell: ({ row }) => (
-      <Badge variant="outline">{row.getValue("status")}</Badge>
-    ),
-  },
-  {
-    accessorKey: "dueDate",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Due Date" />
-    ),
-  },
-];
-
-export const invoiceFilters: FilterConfig[] = [
   {
     id: "status",
-    label: "Status",
-    type: "select",
-    options: [
-      { value: "draft", label: "Draft" },
-      { value: "sent", label: "Sent" },
-      { value: "paid", label: "Paid" },
-    ],
+    header: "Status",
+    width: "w-28",
+    cell: (row) => <Badge variant="outline">{row.status}</Badge>,
   },
-];
-
-export const useInvoices = () =>
-  usePaginatedQuery({
-    query: getInvoices,
-    variables: {},
-    ancestor: "invoices",
-    dataExtractor: (edges: { node: Invoice }[]) =>
-      edges.map((e) => e.node),
-    storageKey: "invoices-per-page",
-    fetchPolicy: "cache-and-network",
-    urlSync: "invoice",
-    filterKeys: ["status"],
-    variablesFromFilters: (filters) => ({
-      status: filters.status ?? undefined,
-    }),
-  });`,
+  {
+    id: "dueDate",
+    header: "Due",
+    width: "w-32",
+    cell: (row) => row.dueDate,
+  },
+];`,
       },
       {
-        title: "Build the table component",
-        body: "Wire everything into DataTableServer. The hook returns all the props the component needs — pagination, search, filters, and sorting.",
-        code: `// components/DataTableInvoices.tsx
+        title: "Drive it with useCursorTable",
+        body: "extract picks the Page envelope out of the response. searchVariable names the query's search argument — only pass it if the query really has one, or the table renders a box that does nothing. urlKey persists the search term in the URL.",
+        code: `// app/(app)/invoices/invoices-client.tsx
 "use client";
-import { DataTableServer } from "@/components/data-table";
-import {
-  invoiceColumns,
-  invoiceFilters,
-  useInvoices,
-} from "@/graphql/invoices/invoices.hooks";
+import { FileTextIcon } from "lucide-react";
+import { DataTable, useCursorTable } from "@/components/data-table";
 
-export function DataTableInvoices() {
-  const {
-    nodes, loading, error,
-    totalCount, page, totalPageCount, perPage,
-    setPerPage, nextPage, prevPage, goToPage,
-    setSearch, offset, tailOffset,
-    onFiltersChange, columnFiltersState,
-    sorting, setSorting,
-  } = useInvoices();
+import { LIST_INVOICES_PAGE } from "@/graphql/invoices/invoices.queries";
+import { invoiceColumns, type Invoice } from "./columns";
+
+type Resp = {
+  astroliftInvoicesPage: {
+    items: Invoice[];
+    nextCursor?: string | null;
+    totalCount?: number | null;
+  };
+};
+
+export function InvoicesClient() {
+  const table = useCursorTable<Invoice>({
+    query: LIST_INVOICES_PAGE,
+    extract: (data) => (data as Resp | undefined)?.astroliftInvoicesPage,
+    searchVariable: "search",
+    urlKey: "inv",
+    fetchPolicy: "cache-and-network",
+  });
 
   return (
-    <DataTableServer
-      data={nodes}
+    <DataTable
+      label="Invoices"
+      controller={table}
       columns={invoiceColumns}
-      getRowId={(r) => r.id}
-      loading={loading}
-      error={error}
-      totalCount={totalCount}
-      page={page}
-      totalPageCount={totalPageCount}
-      perPage={perPage}
-      onPerPageChange={setPerPage}
-      onNextPage={nextPage}
-      onPrevPage={prevPage}
-      onGoToPage={goToPage}
-      onSearchChange={setSearch}
-      offset={offset}
-      tailOffset={tailOffset}
-      filters={invoiceFilters}
-      onFiltersChange={onFiltersChange}
-      initialColumnFilters={columnFiltersState}
-      initialSorting={sorting}
-      onSortingChange={setSorting}
+      getRowId={(row) => row.id}
+      rowHref={(row) => \\\`/invoices/\\\${row.id}\\\`}
       searchPlaceholder="Search invoices…"
+      empty={{
+        icon: <FileTextIcon className="size-5" />,
+        title: "No invoices yet",
+        description: "Invoices appear here once your first one is issued.",
+      }}
+      emptyFiltered={{
+        title: "No matching invoices",
+        description: "No invoice matches that search. Try a different term.",
+      }}
     />
   );
 }`,
       },
       {
-        title: "Use in a page with Suspense",
-        body: "Wrap the table in Suspense because urlSync uses useSearchParams, which requires a Suspense boundary.",
+        title: "Render it",
+        body: "No Suspense boundary is needed: the controller reads the URL through window.location on mount and writes it back with history.replaceState, so it never touches useSearchParams.",
         code: `// app/(app)/invoices/page.tsx
-import { Suspense } from "react";
-import { Separator } from "@/components/ui/separator";
-import { DataTableInvoices } from "@/components/DataTableInvoices";
+import { InvoicesClient } from "./invoices-client";
 
 export default function InvoicesPage() {
   return (
@@ -474,13 +432,24 @@ export default function InvoicesPage() {
           Manage your invoices.
         </p>
       </div>
-      <Separator />
-      <Suspense>
-        <DataTableInvoices />
-      </Suspense>
+      <InvoicesClient />
     </div>
   );
 }`,
+      },
+      {
+        title: "What you did NOT have to write",
+        body: "Pagination controls, the debounce, the skeleton rows, the empty and no-match states, the error-and-retry row, and the search box are all in DataTable. If you find yourself reaching for @/components/ui/table directly, the lint rule astroliftData/no-raw-table will stop you — that is the signal you are re-deriving one of these. See the 'Data surfaces' section of frontend/bootstrap.md.",
+        code: `# The rules that matter, in short:
+#
+#   - Pagination is server-side. Always. Fetching a capped list and
+#     paging it in the browser hides every row past the cap.
+#   - No search box unless the query has a search argument.
+#   - empty and emptyFiltered are different states with different copy.
+#   - rowHref for rows that navigate; onRowActivate for rows that do
+#     something else. Never both.
+#   - Destructive actions confirm through ConfirmDialog, never
+#     window.confirm.`,
       },
     ],
   },

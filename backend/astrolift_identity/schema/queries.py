@@ -18,7 +18,7 @@ import strawberry
 from django.db.models import Q
 from strawberry.types import Info
 
-from astrolift_graphql import GUID
+from astrolift_graphql import GUID, PageType, keyset_page, search_q
 from astrolift_identity.models import (
     ApiToken,
     IdentityProvider,
@@ -206,31 +206,99 @@ class IdentityQuery:
             )[:100]
         return [organization_to_type(o) for o in orgs]
 
-    @strawberry.field
-    @require_permission(Permission.TEAM_READ)
-    @tenant_scoped()
-    def astrolift_teams(self, info: Info) -> list[TeamType]:
+    def _teams_qs(self, *, search: str | None = None):
+        """Filtered, unordered team list for the caller's org.
+
+        Shared by the list field and its paginated sibling so the two
+        can't drift on what a visible team is. No ``order_by`` here —
+        ``keyset_page`` imposes the ordering from its seek key.
+        """
         from core.tenancy import get_current_tenant
 
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         if org_id is None:
-            return []
-        qs = Team.objects.filter(organization_id=org_id).select_related("organization")[:200]
-        return [team_to_type(t) for t in qs]
+            return Team.objects.none()
+        qs = Team.objects.filter(organization_id=org_id).select_related("organization")
+        term = (search or "").strip()
+        if term:
+            qs = qs.filter(search_q(term, "slug", "name", "description"))
+        return qs
+
+    @strawberry.field(
+        deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftTeamsPage."
+    )
+    @require_permission(Permission.TEAM_READ)
+    @tenant_scoped()
+    def astrolift_teams(self, info: Info) -> list[TeamType]:
+        return [team_to_type(t) for t in self._teams_qs()[:200]]
+
+    @strawberry.field
+    @require_permission(Permission.TEAM_READ)
+    @tenant_scoped()
+    def astrolift_teams_page(
+        self,
+        info: Info,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[TeamType]:
+        """Cursor-paginated team list (#1235).
+
+        Replaces ``astroliftTeams``, whose 200-row cap put the 201st
+        team out of reach of the UI entirely. Seek key is
+        ``(-created_at, -guid)``; the list field left the slice
+        unordered, so newest-first is the first stable order this
+        surface has had. ``search`` matches slug, name, description.
+        """
+        page = keyset_page(self._teams_qs(search=search), cursor=after, limit=limit)
+        return page.map(team_to_type)
+
+    def _projects_qs(self, *, search: str | None = None):
+        """Filtered, unordered project list for the caller's org.
+
+        Shared by the list field and its paginated sibling; ordering is
+        left to ``keyset_page``.
+        """
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return Project.objects.none()
+        qs = Project.objects.filter(organization_id=org_id).select_related("organization", "team")
+        term = (search or "").strip()
+        if term:
+            qs = qs.filter(search_q(term, "slug", "name", "description", "team__slug", "team__name"))
+        return qs
+
+    @strawberry.field(
+        deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftProjectsPage."
+    )
+    @require_permission(Permission.PROJECT_READ)
+    @tenant_scoped()
+    def astrolift_projects(self, info: Info) -> list[ProjectType]:
+        return [project_to_type(p) for p in self._projects_qs()[:200]]
 
     @strawberry.field
     @require_permission(Permission.PROJECT_READ)
     @tenant_scoped()
-    def astrolift_projects(self, info: Info) -> list[ProjectType]:
-        from core.tenancy import get_current_tenant
+    def astrolift_projects_page(
+        self,
+        info: Info,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[ProjectType]:
+        """Cursor-paginated project list (#1235).
 
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        if org_id is None:
-            return []
-        qs = Project.objects.filter(organization_id=org_id).select_related("organization", "team")[:200]
-        return [project_to_type(p) for p in qs]
+        Replaces ``astroliftProjects`` and its unreachable-past-200 cap.
+        Seek key is ``(-created_at, -guid)``. ``search`` matches the
+        project's own slug / name / description plus the owning team's
+        slug and name, because operators navigate projects by team.
+        """
+        page = keyset_page(self._projects_qs(search=search), cursor=after, limit=limit)
+        return page.map(project_to_type)
 
     @strawberry.field
     @require_permission(Permission.TEAM_UPDATE)
@@ -378,9 +446,7 @@ class IdentityQuery:
             wls = _wl_by_app.get(app.id, [])
             kinds = {k for k, _ in wls}
             if Workload.Kind.AGENT.value in kinds:
-                agent_slug = next(
-                    (s for k, s in wls if k == Workload.Kind.AGENT.value), app.slug
-                )
+                agent_slug = next((s for k, s in wls if k == Workload.Kind.AGENT.value), app.slug)
                 return ("agent", agent_slug)
             if len(kinds) > 1:
                 return ("bundle", app.slug)
@@ -432,67 +498,80 @@ class IdentityQuery:
 
     # ---- RBAC queries ------------------------------------------------
 
-    @strawberry.field
+    def _members_qs(self, *, search: str | None = None):
+        """Filtered, unordered member list for the caller's org.
+
+        Shared by the list field and its paginated sibling so the two
+        can never disagree about which Member rows the caller may see.
+        Ordering is deliberately not applied — ``keyset_page`` imposes
+        it from the seek key.
+
+        ``search`` filters case-insensitively across username, email,
+        first_name, and last_name. The filter runs at the DB layer so
+        big orgs don't pull 500 rows just to grep them client-side.
+        """
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return Member.objects.none()
+
+        # Scope to members of the caller org's own scopes (PII): the org
+        # itself plus its teams / projects / apps. Without this the
+        # resolver returned every Member row across every tenant.
+        qs = Member.objects.select_related("user").filter(_org_scope_q(org_id))
+        term = (search or "").strip()
+        if term:
+            qs = qs.filter(
+                search_q(term, "user__username", "user__email", "user__first_name", "user__last_name")
+            )
+        return qs
+
+    @strawberry.field(
+        deprecation_reason="Caps at 500 rows with no way to reach the 501st. Use astroliftMembersPage."
+    )
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()
     def astrolift_members(self, info: Info, search: str | None = None) -> list[MemberType]:
         """Org-member listing with discoverability affordances.
 
         ``search`` filters case-insensitively across username, email,
-        first_name, and last_name. The filter runs at the DB layer so
-        big orgs don't pull 500 rows just to grep them client-side.
+        first_name, and last_name.
 
         ``last_active_at`` is computed per-member as the most recent
         ``AuditEvent.occurred_at`` where the actor matches this member's
         user, scoped to the current organization. Resolved in one
         aggregate query so the field doesn't fan out N+1 on member count.
         """
-        from django.db.models import Max, Q
+        members = list(self._members_qs(search=search).order_by("-created_at")[:500])
+        last_active = _last_active_by_user_id(members)
+        return [member_to_type(m, last_active_at=last_active.get(m.user_id)) for m in members]
 
-        from astrolift_operations.models.audit_event import AuditEvent
-        from core.tenancy import get_current_tenant
+    @strawberry.field
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def astrolift_members_page(
+        self,
+        info: Info,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[MemberType]:
+        """Cursor-paginated org-member listing (#1235).
 
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        if org_id is None:
-            return []
+        Replaces ``astroliftMembers``, whose 500-row cap made the 501st
+        member unreachable from the People table rather than merely slow
+        to reach. Seek key is ``(-created_at, -guid)``; ``search``
+        matches the same four user columns the list field does.
 
-        # Scope to members of the caller org's own scopes (PII): the org
-        # itself plus its teams / projects / apps. Without this the
-        # resolver returned every Member row across every tenant.
-        qs = Member.objects.select_related("user").filter(_org_scope_q(org_id)).order_by("-created_at")
-        term = (search or "").strip()
-        if term:
-            qs = qs.filter(
-                Q(user__username__icontains=term)
-                | Q(user__email__icontains=term)
-                | Q(user__first_name__icontains=term)
-                | Q(user__last_name__icontains=term)
-            )
-        members = list(qs[:500])
-        if not members:
-            return []
-
-        user_ids = [m.user_id for m in members if m.user_id is not None]
-        last_active_by_user_id: dict[int, dt.datetime] = {}
-        if user_ids:
-            actor_id_strs = [str(uid) for uid in user_ids]
-            ae_rows = (
-                AuditEvent.objects.filter(
-                    organization_id=org_id,
-                    actor_kind="user",
-                    actor_id__in=actor_id_strs,
-                )
-                .values("actor_id")
-                .annotate(last_at=Max("occurred_at"))
-            )
-            for row in ae_rows:
-                try:
-                    last_active_by_user_id[int(row["actor_id"])] = row["last_at"]
-                except (TypeError, ValueError):
-                    continue
-
-        return [member_to_type(m, last_active_at=last_active_by_user_id.get(m.user_id)) for m in members]
+        The ``last_active_at`` aggregate runs over the page's rows only
+        — resolving it across the whole filtered set would scan the
+        org's entire audit stream to render fifty rows.
+        """
+        page = keyset_page(self._members_qs(search=search), cursor=after, limit=limit)
+        last_active = _last_active_by_user_id(page.rows)
+        return page.map(lambda m: member_to_type(m, last_active_at=last_active.get(m.user_id)))
 
     @strawberry.field
     @require_permission(Permission.TEAM_READ)
@@ -592,7 +671,44 @@ class IdentityQuery:
 
         return [approver_user_to_type(u, userinfo=userinfo_by_user_id.get(u.pk)) for u in users]
 
-    @strawberry.field
+    def _invitations_qs(self, *, status: str | None = None, search: str | None = None):
+        """Filtered, unordered invitation list for the caller's org.
+
+        Shared by the list field and its paginated sibling; ordering is
+        left to ``keyset_page``. A ``None`` org id yields an empty
+        queryset rather than ``scope_id IS NULL`` — same (no) rows, but
+        the deny-by-default is stated rather than incidental (#1183).
+        """
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return Invitation.objects.none()
+        qs = Invitation.objects.filter(
+            scope_kind=Invitation.ScopeKind.ORG,
+            scope_id=org_id,
+            deleted_at__isnull=True,
+        ).select_related("role", "invited_by")
+        if status:
+            qs = qs.filter(status=status)
+        term = (search or "").strip()
+        if term:
+            qs = qs.filter(
+                search_q(
+                    term,
+                    "email",
+                    "role__slug",
+                    "role__name",
+                    "invited_by__username",
+                    "invited_by__email",
+                )
+            )
+        return qs
+
+    @strawberry.field(
+        deprecation_reason="Caps at 500 rows with no way to reach the 501st. Use astroliftInvitationsPage."
+    )
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()
     def astrolift_invitations(self, info: Info, status: str | None = None) -> list[InvitationType]:
@@ -604,49 +720,85 @@ class IdentityQuery:
         in one query so the invitation row can render the inviter's
         avatar URL (#418) without a per-row lookup.
         """
-        from auth1.models import UserInfo
-        from core.tenancy import get_current_tenant
-
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        qs = (
-            Invitation.objects.filter(
-                scope_kind=Invitation.ScopeKind.ORG,
-                scope_id=org_id,
-                deleted_at__isnull=True,
-            )
-            .select_related("role", "invited_by")
-            .order_by("-created_at")
-        )
-        if status:
-            qs = qs.filter(status=status)
-        rows = list(qs[:500])
-        inviter_ids = {r.invited_by_id for r in rows if r.invited_by_id}
-        userinfo_by_user_id: dict[int, object] = {}
-        if inviter_ids:
-            for ui in UserInfo.objects.filter(internal_user_id__in=inviter_ids):
-                # A user can have multiple UserInfo rows (one per Auth0
-                # subject claim) — last write wins; the picker only
-                # needs a representative avatar, so any is fine.
-                userinfo_by_user_id[ui.internal_user_id] = ui
+        rows = list(self._invitations_qs(status=status).order_by("-created_at")[:500])
+        userinfo_by_user_id = _userinfo_by_inviter_id(rows)
         return [invitation_to_type(r, userinfo_by_user_id=userinfo_by_user_id) for r in rows]
 
     @strawberry.field
-    @require_permission(Permission.ORG_READ)
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()
-    def astrolift_roles(self, info: Info) -> list[RoleType]:
+    def astrolift_invitations_page(
+        self,
+        info: Info,
+        status: str | None = None,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[InvitationType]:
+        """Cursor-paginated invitation history (#1235).
+
+        Replaces ``astroliftInvitations`` and its 500-row cap. Because
+        the default surfaces every status, an org that has been inviting
+        for a year hits that cap on accepted rows alone and can no
+        longer see its own pending ones. Seek key is
+        ``(-created_at, -guid)``; ``search`` matches the invitee's
+        email, the granted role, and the inviter.
+
+        The inviter ``UserInfo`` prefetch runs over the page's rows
+        only, so it stays one small query per page instead of one over
+        every invitation the org has ever sent.
+        """
+        page = keyset_page(self._invitations_qs(status=status, search=search), cursor=after, limit=limit)
+        userinfo_by_user_id = _userinfo_by_inviter_id(page.rows)
+        return page.map(lambda r: invitation_to_type(r, userinfo_by_user_id=userinfo_by_user_id))
+
+    def _roles_qs(self, *, search: str | None = None):
+        """Roles visible to the caller: this org's custom roles plus the
+        system catalog. Unordered — ``keyset_page`` orders the page.
+        """
         from core.tenancy import get_current_tenant
 
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         if org_id is None:
-            return []
+            return Role.objects.none()
         # System roles carry a null organization; custom roles are bound
         # to the org. Another org's custom roles never surface.
-        qs = Role.objects.filter(Q(organization_id=org_id) | Q(organization__isnull=True)).order_by(
-            "scope_level", "slug"
-        )[:200]
-        return [role_to_type(r) for r in qs]
+        qs = Role.objects.filter(Q(organization_id=org_id) | Q(organization__isnull=True))
+        term = (search or "").strip()
+        if term:
+            qs = qs.filter(search_q(term, "slug", "name", "description"))
+        return qs
+
+    @strawberry.field(
+        deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftRolesPage."
+    )
+    @require_permission(Permission.ORG_READ)
+    @tenant_scoped()
+    def astrolift_roles(self, info: Info) -> list[RoleType]:
+        return [role_to_type(r) for r in self._roles_qs().order_by("scope_level", "slug")[:200]]
+
+    @strawberry.field
+    @require_permission(Permission.ORG_READ)
+    @tenant_scoped()
+    def astrolift_roles_page(
+        self,
+        info: Info,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[RoleType]:
+        """Cursor-paginated role catalog (#1235).
+
+        Replaces ``astroliftRoles`` and its 200-row cap. Seek key is
+        ``(-created_at, -guid)``: the list field's ``(scope_level,
+        slug)`` order has no not-null unique tiebreak to hang a cursor
+        on, and newest-first surfaces the org's own custom roles above
+        the seeded system catalog. ``search`` matches slug, name,
+        description — sort by name client-side if the table wants it.
+        """
+        page = keyset_page(self._roles_qs(search=search), cursor=after, limit=limit)
+        return page.map(role_to_type)
 
     # ---- Invite-flow polish (#418) -------------------------------------
 
@@ -859,7 +1011,39 @@ class IdentityQuery:
                 grantable.append(r)
         return [role_to_type(r) for r in grantable]
 
-    @strawberry.field
+    def _role_bindings_qs(self, *, search: str | None = None):
+        """Org-wide role bindings, filtered and unordered.
+
+        Shared by the list field and its paginated sibling. Ordering is
+        left to ``keyset_page`` — note the seek column is ``granted_at``
+        (the grant's own clock), not ``created_at``.
+        """
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return RoleBinding.objects.none()
+        qs = RoleBinding.objects.select_related("user", "role").filter(_org_scope_q(org_id))
+        term = (search or "").strip()
+        if term:
+            qs = qs.filter(
+                search_q(
+                    term,
+                    "user__username",
+                    "user__email",
+                    "user__first_name",
+                    "user__last_name",
+                    "group_external_id",
+                    "role__slug",
+                    "role__name",
+                )
+            )
+        return qs
+
+    @strawberry.field(
+        deprecation_reason="Caps at 500 rows with no way to reach the 501st. Use astroliftRoleBindingsPage."
+    )
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()
     def astrolift_role_bindings(self, info: Info) -> list[RoleBindingType]:
@@ -872,17 +1056,7 @@ class IdentityQuery:
         one batch per kind to keep this O(scope-kinds) rather than
         O(bindings).
         """
-        from core.tenancy import get_current_tenant
-
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        if org_id is None:
-            return []
-        qs = list(
-            RoleBinding.objects.select_related("user", "role")
-            .filter(_org_scope_q(org_id))
-            .order_by("-granted_at")[:500]
-        )
+        qs = list(self._role_bindings_qs().order_by("-granted_at")[:500])
         labels = _resolve_source_scope_labels(qs)
         return [
             role_binding_to_type(rb, source_scope_label=labels.get((rb.scope_kind, rb.scope_id), ""))
@@ -890,41 +1064,133 @@ class IdentityQuery:
         ]
 
     @strawberry.field
-    @require_permission(Permission.API_TOKEN_CREATE)
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()
-    def astrolift_api_tokens(self, info: Info) -> list[ApiTokenType]:
+    def astrolift_role_bindings_page(
+        self,
+        info: Info,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[RoleBindingType]:
+        """Cursor-paginated role bindings (#1235).
+
+        Replaces ``astroliftRoleBindings`` and its 500-row cap — a cap
+        an org with a few hundred members clears on org-scope grants
+        alone, hiding every team / project / app grant behind it.
+
+        Seek key is ``(-granted_at, -guid)``: ``granted_at`` is the
+        column the list field sorted on and is a distinct, not-null
+        (``auto_now_add``) timestamp from ``created_at``, so paging on
+        ``created_at`` could disagree with the order the operator sees.
+
+        The source-scope label batch runs over the page's rows only —
+        resolving labels for every binding in the org would defeat the
+        pagination it is decorating.
+        """
+        page = keyset_page(
+            self._role_bindings_qs(search=search),
+            cursor=after,
+            limit=limit,
+            sort_field="granted_at",
+        )
+        labels = _resolve_source_scope_labels(page.rows)
+        return page.map(
+            lambda rb: role_binding_to_type(
+                rb, source_scope_label=labels.get((rb.scope_kind, rb.scope_id), "")
+            )
+        )
+
+    def _api_tokens_qs(self, *, search: str | None = None):
+        """The caller org's API tokens, filtered and unordered."""
         from core.tenancy import get_current_tenant
 
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         if org_id is None:
-            return []
-        qs = (
-            ApiToken.objects.filter(organization_id=org_id)
-            .select_related("user", "team")
-            .order_by("-created_at")[:200]
-        )
-        return [api_token_to_type(t) for t in qs]
+            return ApiToken.objects.none()
+        qs = ApiToken.objects.filter(organization_id=org_id).select_related("user", "team")
+        term = (search or "").strip()
+        if term:
+            qs = qs.filter(
+                search_q(term, "name", "user__username", "user__email", "team__slug", "token_last_4")
+            )
+        return qs
+
+    @strawberry.field(
+        deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftApiTokensPage."
+    )
+    @require_permission(Permission.API_TOKEN_CREATE)
+    @tenant_scoped()
+    def astrolift_api_tokens(self, info: Info) -> list[ApiTokenType]:
+        return [api_token_to_type(t) for t in self._api_tokens_qs().order_by("-created_at")[:200]]
+
+    @strawberry.field
+    @require_permission(Permission.API_TOKEN_CREATE)
+    @tenant_scoped()
+    def astrolift_api_tokens_page(
+        self,
+        info: Info,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[ApiTokenType]:
+        """Cursor-paginated API-token list (#1235).
+
+        Replaces ``astroliftApiTokens`` and its 200-row cap. Seek key is
+        ``(-created_at, -guid)``. ``search`` matches the token name, its
+        owner, its team, and ``token_last_4`` — the last four is what an
+        operator has in hand when chasing a token seen in an audit log.
+        """
+        page = keyset_page(self._api_tokens_qs(search=search), cursor=after, limit=limit)
+        return page.map(api_token_to_type)
+
+    def _policies_qs(self, *, search: str | None = None):
+        """The caller org's ABAC policies, filtered and unordered."""
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return Policy.objects.none()
+        # ``created_by`` / ``updated_by`` are FK columns on the Tracking
+        # mixin; ``select_related`` keeps the per-row username lookup
+        # inside the same query (no N+1 on the policies table — #466).
+        qs = Policy.objects.filter(organization_id=org_id).select_related("created_by", "updated_by")
+        term = (search or "").strip()
+        if term:
+            qs = qs.filter(search_q(term, "slug", "name", "description", "action_pattern"))
+        return qs
+
+    @strawberry.field(
+        deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftPoliciesPage."
+    )
+    @require_permission(Permission.ORG_READ)
+    @tenant_scoped()
+    def astrolift_policies(self, info: Info) -> list[PolicyType]:
+        return [policy_to_type(p) for p in self._policies_qs().order_by("scope_level", "slug")[:200]]
 
     @strawberry.field
     @require_permission(Permission.ORG_READ)
     @tenant_scoped()
-    def astrolift_policies(self, info: Info) -> list[PolicyType]:
-        from core.tenancy import get_current_tenant
+    def astrolift_policies_page(
+        self,
+        info: Info,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[PolicyType]:
+        """Cursor-paginated ABAC policy list (#1235).
 
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        if org_id is None:
-            return []
-        # ``created_by`` / ``updated_by`` are FK columns on the Tracking
-        # mixin; ``select_related`` keeps the per-row username lookup
-        # inside the same query (no N+1 on the policies table — #466).
-        qs = (
-            Policy.objects.filter(organization_id=org_id)
-            .select_related("created_by", "updated_by")
-            .order_by("scope_level", "slug")[:200]
-        )
-        return [policy_to_type(p) for p in qs]
+        Replaces ``astroliftPolicies`` and its 200-row cap. Seek key is
+        ``(-created_at, -guid)`` rather than the list field's
+        ``(scope_level, slug)``, which carries no not-null unique
+        tiebreak to anchor a cursor on; newest-first also puts the
+        policy an operator just wrote at the top. ``search`` matches
+        slug, name, description, and ``action_pattern``.
+        """
+        page = keyset_page(self._policies_qs(search=search), cursor=after, limit=limit)
+        return page.map(policy_to_type)
 
     # ---- Domain allowlist --------------------------------------------
 
@@ -1160,6 +1426,66 @@ def _org_scope_q(org_id: int | None) -> Q:
         | Q(scope_kind="PROJECT", scope_id__in=project_ids)
         | Q(scope_kind="APP", scope_id__in=app_ids)
     )
+
+
+def _last_active_by_user_id(members) -> dict[int, dt.datetime]:
+    """Newest ``AuditEvent.occurred_at`` per member, in the caller's org.
+
+    One aggregate query for the whole batch so ``last_active_at``
+    doesn't fan out N+1 on member count. Call it with the rows that are
+    actually being rendered: for the paginated field that is the page,
+    not the filtered set behind it (#1235).
+
+    Rows whose ``actor_id`` isn't an integer are skipped — the column is
+    a free-form string shared with service / token actors, so a
+    non-user actor id is data, not corruption.
+    """
+    from django.db.models import Max
+
+    from astrolift_operations.models.audit_event import AuditEvent
+    from core.tenancy import get_current_tenant
+
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    user_ids = [m.user_id for m in members if m.user_id is not None]
+    if org_id is None or not user_ids:
+        return {}
+
+    last_active_by_user_id: dict[int, dt.datetime] = {}
+    rows = (
+        AuditEvent.objects.filter(
+            organization_id=org_id,
+            actor_kind="user",
+            actor_id__in=[str(uid) for uid in user_ids],
+        )
+        .values("actor_id")
+        .annotate(last_at=Max("occurred_at"))
+    )
+    for row in rows:
+        try:
+            last_active_by_user_id[int(row["actor_id"])] = row["last_at"]
+        except (TypeError, ValueError):
+            continue
+    return last_active_by_user_id
+
+
+def _userinfo_by_inviter_id(invitations) -> dict[int, object]:
+    """Auth0 ``UserInfo`` rows for a batch of invitations' inviters.
+
+    One query for the batch so an invitation row can render the
+    inviter's avatar (#418) without a per-row lookup. Call it with the
+    rows being rendered — the page, not the whole stream (#1235).
+
+    A user can have multiple UserInfo rows (one per Auth0 subject
+    claim); last write wins, and the row only needs a representative
+    avatar, so any is fine.
+    """
+    from auth1.models import UserInfo
+
+    inviter_ids = {inv.invited_by_id for inv in invitations if inv.invited_by_id}
+    if not inviter_ids:
+        return {}
+    return {ui.internal_user_id: ui for ui in UserInfo.objects.filter(internal_user_id__in=inviter_ids)}
 
 
 def _active_idp_pk() -> int | None:
