@@ -501,36 +501,40 @@ export const LIST_POLICIES_PAGE = gql`
   }
 `;
 
-const IDP_FIELDS = `
-  id
-  organizationSlug
-  kind
-  name
-  config
-  metadataUrl
-  oidcDiscoveryUrl
-  clientId
-  isDefault
-  isActive
-  createdAt
-  updatedAt
-  activatedAt
-  lastSwitchedByUsername
-  version
+const IDP_FIELDS = gql`
+  fragment IdentityProviderFields on AstroliftIdentityProvider {
+    id
+    organizationSlug
+    kind
+    name
+    config
+    metadataUrl
+    oidcDiscoveryUrl
+    clientId
+    isDefault
+    isActive
+    createdAt
+    updatedAt
+    activatedAt
+    lastSwitchedByUsername
+    version
+  }
 `;
 
 export const LIST_IDENTITY_PROVIDERS = gql`
+  ${IDP_FIELDS}
   query ListIdentityProviders {
     astroliftIdentityProviders {
-      ${IDP_FIELDS}
+      ...IdentityProviderFields
     }
   }
 `;
 
 export const GET_ACTIVE_IDENTITY_PROVIDER = gql`
+  ${IDP_FIELDS}
   query GetActiveIdentityProvider {
     astroliftActiveIdentityProvider {
-      ${IDP_FIELDS}
+      ...IdentityProviderFields
     }
   }
 `;

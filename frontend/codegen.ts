@@ -57,7 +57,10 @@ const config: CodegenConfig = {
     // of vanishing. To re-include a file, rewrite its shared field-list
     // constants as named gql fragments and spread them (`...FragmentName`).
     "!graphql/agents/agents.queries.ts",
-    "!graphql/identity/identity.queries.ts",
+    // identity.queries.ts was re-included in #1232: its last plain constant
+    // (IDP_FIELDS) is a named fragment now, so the eight cursor-page
+    // documents the members/teams/projects/policies/tokens tables walk are
+    // typed rather than hand-written at each call site.
     "!graphql/identity/identity.mutations.ts",
     "!graphql/lifecycle/lifecycle.mutations.ts",
     "!graphql/observability/observability.queries.ts",
