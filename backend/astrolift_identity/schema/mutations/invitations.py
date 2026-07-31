@@ -174,6 +174,41 @@ class InvitationMutations:
         return gql_success(invitation_to_type(inv))
 
     @strawberry.field
+    @mutation_audit(action="invitation.delete")
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def delete_invitation(
+        self, info: Info, input: RevokeInvitationInput
+    ) -> MutationResultType[InvitationType]:
+        """Soft-delete a RESOLVED invitation so it leaves the Members page.
+
+        Revoked / accepted / expired rows previously had no action at all
+        and sat in the list forever. Pending invitations are refused —
+        revoke first, so a live accept token can't vanish without the
+        explicit revoke step (and its audit entry).
+        """
+        from django.utils import timezone
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        inv = Invitation.objects.filter(
+            guid=str(input.id),
+            scope_kind=Invitation.ScopeKind.ORG,
+            scope_id=org_id,
+            deleted_at__isnull=True,
+        ).first()
+        if inv is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "invitation not found")
+        if inv.status == Invitation.Status.PENDING:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "invitation is still pending — revoke it first",
+            )
+        inv.deleted_at = timezone.now()
+        inv.save(update_fields=["deleted_at", "updated_at", "version"])
+        return gql_success(invitation_to_type(inv))
+
+    @strawberry.field
     @mutation_audit(action="invitation.resend")
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()

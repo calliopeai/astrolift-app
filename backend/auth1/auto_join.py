@@ -68,7 +68,7 @@ def _audit(
     )
 
 
-def _resolve_pending_invitations(user, org, *, member_is_active: bool) -> None:
+def _resolve_pending_invitations(user, org, *, member_is_active: bool) -> bool:
     """Consume pending invitations fulfilled by an SSO join (#1228).
 
     Domain-allowlist auto-join and explicit invitations are two doors
@@ -81,9 +81,13 @@ def _resolve_pending_invitations(user, org, *, member_is_active: bool) -> None:
 
     Marks matching invitations accepted and applies their role binding
     (skipped when the membership is pending review — same gate as the
-    allowlist default role). Never raises; the caller's auth-first
-    posture applies.
+    allowlist default role). Returns True when at least one invite ROLE
+    was applied, so the caller can skip the allowlist default role — the
+    invite's role is the operator's explicit intent and stacking the
+    default on top just produces chip noise. Never raises; the caller's
+    auth-first posture applies.
     """
+    applied_role = False
     try:
         from django.utils import timezone
 
@@ -111,6 +115,7 @@ def _resolve_pending_invitations(user, org, *, member_is_active: bool) -> None:
                     scope_kind=RoleBinding.ScopeKind.ORG,
                     scope_id=org.pk,
                 )
+                applied_role = True
             inv.status = Invitation.Status.ACCEPTED
             inv.accepted_at = timezone.now()
             inv.save(update_fields=["status", "accepted_at", "updated_at", "version"])
@@ -125,6 +130,7 @@ def _resolve_pending_invitations(user, org, *, member_is_active: bool) -> None:
             "auto_join: invitation resolution failed for user=%s — auth flow continues",
             getattr(user, "pk", None),
         )
+    return applied_role
 
 
 def maybe_auto_join_user(user) -> bool:
@@ -206,8 +212,12 @@ def maybe_auto_join_user(user) -> bool:
                 is_active=is_active,
                 joined_at=timezone.now() if is_active else None,
             )
+            # Resolve invitations first (#1228): when the invite carried a
+            # role, that is the operator's explicit intent — skip the
+            # allowlist default role instead of stacking both.
+            invite_role_applied = _resolve_pending_invitations(user, org, member_is_active=is_active)
             granted_role_slug: str | None = None
-            if rule.default_role_id is not None and is_active:
+            if rule.default_role_id is not None and is_active and not invite_role_applied:
                 # Skip the RoleBinding when the member is pending review —
                 # giving them a binding before approval would defeat the
                 # whole point of the review gate. The reviewer can flip
@@ -219,12 +229,6 @@ def maybe_auto_join_user(user) -> bool:
                     scope_id=org.pk,
                 )
                 granted_role_slug = rule.default_role.slug
-
-        # The SSO join fulfills any pending invitation for this email —
-        # mark it accepted and apply its intended role (#1228) so an
-        # invited org_owner doesn't silently land as the allowlist
-        # default role with a forever-Pending invite row behind them.
-        _resolve_pending_invitations(user, org, member_is_active=is_active)
 
         _audit(
             actor_user_id=user.pk,

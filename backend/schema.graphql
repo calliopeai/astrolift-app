@@ -4637,6 +4637,7 @@ type Mutation {
   softDeleteRole(input: DeleteRoleInput!): SoftdeletepayloadMutationResult!
   createInvitation(input: CreateInvitationInput!): AstroliftInvitationCreatedMutationResult!
   revokeInvitation(input: RevokeInvitationInput!): AstroliftInvitationMutationResult!
+  deleteInvitation(input: RevokeInvitationInput!): AstroliftInvitationMutationResult!
   resendInvitation(input: ResendInvitationInput!): AstroliftInvitationCreatedMutationResult!
   acceptInvitation(input: AcceptInvitationInput!): AstroliftInvitationMutationResult!
   addOrganizationAllowlistDomain(input: AddOrganizationAllowlistDomainInput!): AstroliftOrganizationAllowlistedDomainMutationResult!

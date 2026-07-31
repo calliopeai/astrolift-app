@@ -641,6 +641,23 @@ export const REVOKE_INVITATION = gql`
   }
 `;
 
+/** Soft-deletes a RESOLVED (revoked/accepted/expired) invitation so it
+ *  leaves the Members page; pending invites must be revoked first. */
+export const DELETE_INVITATION = gql`
+  mutation DeleteInvitation($input: RevokeInvitationInput!) {
+    deleteInvitation(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        ${INVITATION_FIELDS}
+      }
+    }
+  }
+`;
+
 // Resend rotates the token (the previous link dies) and refreshes the
 // expiry, returning the fresh plaintext + accept path exactly once —
 // same InvitationCreated payload as create, so the copy-link durable

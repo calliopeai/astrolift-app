@@ -166,3 +166,38 @@ def test_foreign_org_invite_untouched():
 
     foreign.refresh_from_db()
     assert foreign.status == Invitation.Status.PENDING
+
+
+def test_invite_role_suppresses_allowlist_default_role():
+    """When the resolved invitation carries a role, that is the operator's
+    explicit intent — the allowlist default role is skipped instead of
+    stacking both (the project_viewer chip-noise case)."""
+    org = _org()
+    default_role = _role("default-viewer")
+    rule = _allowlist(org)
+    rule.default_role = default_role
+    rule.save()
+    owner_role = _role("owner-intent")
+    user = _user("intent@acme.dev")
+    _invite(org, "intent@acme.dev", role=owner_role)
+
+    assert maybe_auto_join_user(user) is True
+
+    assert RoleBinding.objects.filter(user=user, role=owner_role).exists()
+    assert not RoleBinding.objects.filter(user=user, role=default_role).exists()
+
+
+def test_roleless_invite_still_gets_allowlist_default_role():
+    org = _org()
+    default_role = _role("default-viewer-2")
+    rule = _allowlist(org)
+    rule.default_role = default_role
+    rule.save()
+    user = _user("plain@acme.dev")
+    inv = _invite(org, "plain@acme.dev")  # no role on the invite
+
+    assert maybe_auto_join_user(user) is True
+
+    inv.refresh_from_db()
+    assert inv.status == Invitation.Status.ACCEPTED
+    assert RoleBinding.objects.filter(user=user, role=default_role).exists()

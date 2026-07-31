@@ -50,6 +50,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import {
   ANONYMIZE_USER,
   BULK_REVOKE_ROLE_BINDINGS,
+  DELETE_INVITATION,
   RESEND_INVITATION,
   REVOKE_INVITATION,
   REVOKE_ROLE_BINDING,
@@ -127,6 +128,10 @@ export function MembersClient() {
   // The dialog calls onOpenChange(false) on submit/cancel, which clears
   // this back to null via the wrapper handler below.
   const [grantForMember, setGrantForMember] = React.useState<AstroliftMember | null>(null);
+  // Resolved (revoked/accepted/expired) invitations are hidden by default
+  // and deletable — pending ones keep the resend/revoke pair.
+  const [showResolvedInvites, setShowResolvedInvites] = React.useState(false);
+  const [deleteInviteTarget, setDeleteInviteTarget] = React.useState<AstroliftInvitation | null>(null);
 
   // Bulk-revoke selection state (#416). A Set of binding GUIDs the
   // operator has checked; cleared on success so the footer disappears.
@@ -172,6 +177,12 @@ export function MembersClient() {
   const [revokeInvite, { loading: revokingInvite }] = useMutation<{
     revokeInvitation: MutationResult<AstroliftInvitation>;
   }>(REVOKE_INVITATION, {
+    refetchQueries: [{ query: LIST_INVITATIONS }],
+    awaitRefetchQueries: true,
+  });
+  const [deleteInvite, { loading: deletingInvite }] = useMutation<{
+    deleteInvitation: MutationResult<AstroliftInvitation>;
+  }>(DELETE_INVITATION, {
     refetchQueries: [{ query: LIST_INVITATIONS }],
     awaitRefetchQueries: true,
   });
@@ -387,6 +398,10 @@ export function MembersClient() {
 
   const hasActiveSearch = debouncedSearch.trim().length > 0;
   const invitationList = invitations.data?.astroliftInvitations ?? [];
+  const resolvedInviteCount = invitationList.filter((i) => i.status !== "pending").length;
+  const visibleInvitations = showResolvedInvites
+    ? invitationList
+    : invitationList.filter((i) => i.status === "pending");
 
   return (
     <TooltipProvider>
@@ -686,16 +701,35 @@ export function MembersClient() {
           )}
         </Section>
 
-        <Section title="Invitations">
+        <Section
+          title="Invitations"
+          action={
+            resolvedInviteCount > 0 ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowResolvedInvites((v) => !v)}
+              >
+                {showResolvedInvites
+                  ? "Hide resolved"
+                  : `Show resolved (${resolvedInviteCount})`}
+              </Button>
+            ) : undefined
+          }
+        >
           {invitations.loading ? (
             <div className="space-y-2">
               <Skeleton className="h-12 w-full" />
             </div>
-          ) : invitationList.length === 0 ? (
+          ) : visibleInvitations.length === 0 ? (
             <EmptyState
               icon={<MailIcon className="size-5" />}
-              title="No invitations"
-              description="Use Invite to send a one-time accept link. Tokens are hashed at rest; the plaintext is shown once at creation."
+              title={resolvedInviteCount > 0 ? "No pending invitations" : "No invitations"}
+              description={
+                resolvedInviteCount > 0
+                  ? "Resolved invitations are hidden — use Show resolved to review or delete them."
+                  : "Use Invite to send a one-time accept link. Tokens are hashed at rest; the plaintext is shown once at creation."
+              }
             />
           ) : (
             <Table>
@@ -710,7 +744,7 @@ export function MembersClient() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {invitationList.map((inv) => (
+                {visibleInvitations.map((inv) => (
                   <TableRow key={inv.id}>
                     <TableCell className="font-medium">{inv.email}</TableCell>
                     <TableCell>
@@ -743,6 +777,25 @@ export function MembersClient() {
                       <InviterCell invitation={inv} />
                     </TableCell>
                     <TableCell className="text-right">
+                      {inv.status !== "pending" && (
+                        <Can permission="org.manage_members">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setDeleteInviteTarget(inv)}
+                                disabled={deletingInvite}
+                                aria-label={`Delete resolved invitation for ${inv.email}`}
+                              >
+                                <Trash2Icon className="size-4" />
+                                <span className="sr-only">Delete</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Delete this resolved invitation</TooltipContent>
+                          </Tooltip>
+                        </Can>
+                      )}
                       {inv.status === "pending" && (
                         <Can permission="org.manage_members">
                           <div className="flex items-center justify-end gap-1">
@@ -839,6 +892,29 @@ export function MembersClient() {
           initialUserLabel={grantForMember?.user.username ?? null}
         />
         <InviteDialog open={inviteOpen} onOpenChange={setInviteOpen} />
+
+        <ConfirmDialog
+          open={deleteInviteTarget !== null}
+          onOpenChange={(next) => {
+            if (!next) setDeleteInviteTarget(null);
+          }}
+          title={`Delete resolved invitation for ${deleteInviteTarget?.email ?? ""}?`}
+          description="Removes this resolved invitation from the list. It has no effect on the person's membership or roles."
+          confirmLabel="Delete"
+          destructive
+          onConfirm={async () => {
+            if (!deleteInviteTarget) return;
+            const { data } = await deleteInvite({
+              variables: { input: { id: deleteInviteTarget.id } },
+            });
+            if (data?.deleteInvitation.ok) {
+              toast.success("Invitation deleted");
+              setDeleteInviteTarget(null);
+            } else {
+              throw new Error(data?.deleteInvitation.errors?.[0]?.message ?? "Delete failed");
+            }
+          }}
+        />
 
         <ConfirmDialog
           open={revokeTarget !== null}

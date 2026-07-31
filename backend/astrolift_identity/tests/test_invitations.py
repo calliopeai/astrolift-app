@@ -454,3 +454,55 @@ def test_accept_rejects_revoked(permission_resolver):
     )
     assert not r.ok
     assert r.errors[0].code == "PRECONDITION"
+
+
+# ---- delete_invitation (resolved-row cleanup) ------------------------
+
+
+def test_delete_invitation_removes_resolved_row(permission_resolver):
+    from django.utils import timezone as _tz
+
+    org = Organization.objects.create(name="Del", slug="del-inv")
+    actor = _admin_user()
+    permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
+    inv = Invitation.objects.create(
+        email="gone@astrolift.dev",
+        scope_kind=Invitation.ScopeKind.ORG,
+        scope_id=org.id,
+        status=Invitation.Status.REVOKED,
+        token_hash="x" * 64,
+        expires_at=_tz.now(),
+    )
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=actor.id)):
+        result = IdentityMutation().delete_invitation(
+            _info(actor), input=RevokeInvitationInput(id=str(inv.guid))
+        )
+    assert result.ok, result.errors
+    inv.refresh_from_db()
+    assert inv.deleted_at is not None
+
+
+def test_delete_invitation_refuses_pending(permission_resolver):
+    from datetime import timedelta
+
+    from django.utils import timezone as _tz
+
+    org = Organization.objects.create(name="Del2", slug="del-inv-2")
+    actor = _admin_user()
+    permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
+    inv = Invitation.objects.create(
+        email="live@astrolift.dev",
+        scope_kind=Invitation.ScopeKind.ORG,
+        scope_id=org.id,
+        status=Invitation.Status.PENDING,
+        token_hash="y" * 64,
+        expires_at=_tz.now() + timedelta(days=7),
+    )
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=actor.id)):
+        result = IdentityMutation().delete_invitation(
+            _info(actor), input=RevokeInvitationInput(id=str(inv.guid))
+        )
+    assert result.ok is False
+    assert "pending" in result.errors[0].message
+    inv.refresh_from_db()
+    assert inv.deleted_at is None
