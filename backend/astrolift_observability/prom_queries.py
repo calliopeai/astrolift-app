@@ -193,7 +193,23 @@ def _edge_labels(edge: EdgeMetricsMapping, namespace: str) -> dict[str, str]:
     know workloads; environment is implied by the namespace/cluster the
     query runs against), so edge queries are app-level roll-ups.
     """
-    return {edge.namespace_label: sanitize_label_value(namespace)}
+    value = edge.namespace_value.format(ns=sanitize_label_value(namespace))
+    return {edge.namespace_label: value}
+
+
+def _edge_match(edge: EdgeMetricsMapping, namespace: str) -> str:
+    """Render the edge selector — ``=`` for a literal namespace value,
+    ``=~`` when the variant's ``namespace_value`` template carries a
+    regex tail (e.g. the ALB stack tag's ``<namespace>/<ingress>``)."""
+    labels = _edge_labels(edge, namespace)
+    op = "=" if edge.namespace_value == "{ns}" else "=~"
+    inner = ",".join(f'{k}{op}"{v}"' for k, v in sorted(labels.items()))
+    return "{" + inner + "}"
+
+
+# CloudWatch statistic suffix per requested quantile (cloudwatch_gauge
+# style latency). The exporter is configured to publish exactly these.
+_CW_LATENCY_SUFFIX = {0.50: "p50", 0.90: "p90", 0.95: "p95", 0.99: "p99"}
 
 
 def build_request_rate_query(
@@ -219,7 +235,13 @@ def build_request_rate_query(
     rate_window = pick_rate_window(range_seconds)
     if edge is not None and namespace and not workload_slug:
         labels = _edge_labels(edge, namespace)
-        expr = f"sum(rate({edge.requests_total}{_render_label_match(labels)}[{rate_window}]))"
+        match = _edge_match(edge, namespace)
+        if edge.style == "cloudwatch_gauge":
+            # Per-period request sums (already aggregated by CloudWatch) —
+            # divide by the export period for req/s; no rate() on gauges.
+            expr = f"sum({edge.requests_total}{match}) / {edge.period_seconds}"
+        else:
+            expr = f"sum(rate({edge.requests_total}{match}[{rate_window}]))"
         return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
     labels = _build_labels(
         app_slug=app_slug,
@@ -253,7 +275,17 @@ def build_error_rate_query(
     rate_window = pick_rate_window(range_seconds)
     if edge is not None and namespace and not workload_slug:
         labels = _edge_labels(edge, namespace)
-        base_match = _render_label_match(labels)
+        if edge.style == "cloudwatch_gauge":
+            # 5xx and total request counts are separate per-period gauges;
+            # ``or vector(0)`` guards a zero-error window where CloudWatch
+            # emits no 5xx datapoints at all.
+            match = _edge_match(edge, namespace)
+            expr = (
+                f"(sum({edge.errors_total}{match}) or vector(0)) "
+                f"/ clamp_min(sum({edge.requests_total}{match}), 1e-9)"
+            )
+            return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
+        base_match = _edge_match(edge, namespace)
         err_match = _render_label_match_with_extra(labels, f'{edge.status_label}=~"5.."')
         expr = (
             f"sum(rate({edge.requests_total}{err_match}[{rate_window}])) "
@@ -293,13 +325,24 @@ def build_latency_quantile_query(
         raise ValueError(f"quantile must be in (0, 1); got {quantile}")
     rate_window = pick_rate_window(range_seconds)
     if edge is not None and namespace and not workload_slug:
-        labels = _edge_labels(edge, namespace)
-        match = _render_label_match(labels)
-        expr = (
-            f"histogram_quantile({quantile:g}, "
-            f"sum by (le)(rate({edge.duration_bucket}{match}[{rate_window}])))"
-        )
-        return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
+        if edge.style == "cloudwatch_gauge":
+            suffix = _CW_LATENCY_SUFFIX.get(round(quantile, 2))
+            if suffix is not None:
+                # Pre-computed percentile statistic series — one per LB;
+                # max() collapses the (single-ALB-per-app) roll-up.
+                labels = _edge_labels(edge, namespace)
+                match = _edge_match(edge, namespace)
+                expr = f"max({edge.latency_stat_prefix}_{suffix}{match})"
+                return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
+            # Unsupported quantile for this style — legacy shape below.
+        else:
+            labels = _edge_labels(edge, namespace)
+            match = _edge_match(edge, namespace)
+            expr = (
+                f"histogram_quantile({quantile:g}, "
+                f"sum by (le)(rate({edge.duration_bucket}{match}[{rate_window}])))"
+            )
+            return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
     labels = _build_labels(
         app_slug=app_slug,
         environment_name=environment_name,
@@ -450,9 +493,13 @@ def build_status_code_breakdown_query(
     classes plus a top-5 individual-code list for tooltip use.
     """
     rate_window = pick_rate_window(range_seconds)
-    if edge is not None and namespace and not workload_slug:
+    if edge is not None and namespace and not workload_slug and edge.status_label:
+        # cloudwatch_gauge variants have no per-status-code label (5xx/4xx
+        # arrive as separate class-level metrics) — no breakdown; they take
+        # the legacy shape below, which returns empty for uninstrumented
+        # apps. Only per-code-labeled styles render the edge breakdown.
         labels = _edge_labels(edge, namespace)
-        match = _render_label_match(labels)
+        match = _edge_match(edge, namespace)
         expr = f"sum by ({edge.status_label}) (rate({edge.requests_total}{match}[{rate_window}]))"
         return QueryPlan(
             promql=expr,

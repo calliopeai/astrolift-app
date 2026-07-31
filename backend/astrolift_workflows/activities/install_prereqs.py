@@ -478,6 +478,7 @@ def _provision_ebs_csi_irsa_role(cluster: Any, selected_set: set[str]) -> str | 
 # maps to a mint method on the AWS IRSADriver.
 _ALB_CONTROLLER_COMPONENT_KEY = "aws-load-balancer-controller"
 _EXTERNAL_DNS_COMPONENT_KEY = "external-dns"
+_CLOUDWATCH_EXPORTER_COMPONENT_KEY = "cloudwatch-exporter"
 
 
 def _provision_aws_controller_irsa_role(
@@ -598,6 +599,12 @@ def _install_cluster_prereqs_sync(
         selected_set,
         component_key=_EXTERNAL_DNS_COMPONENT_KEY,
         mint_method="provision_external_dns_role",
+    )
+    _provision_aws_controller_irsa_role(
+        cluster,
+        selected_set,
+        component_key=_CLOUDWATCH_EXPORTER_COMPONENT_KEY,
+        mint_method="provision_cloudwatch_exporter_role",
     )
 
     resources: list[dict[str, Any]] = []

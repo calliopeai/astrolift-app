@@ -744,6 +744,16 @@ class K8sNativeClusterDriver(ClusterDriver):
                 ),
                 helm_values={
                     "grafana": {"enabled": True},
+                    "prometheus": {
+                        "prometheusSpec": {
+                            # Watch ALL ServiceMonitors — sibling addons
+                            # (ingress-nginx's controller monitor, spec 08
+                            # §6.1) ship their own and must be scraped
+                            # without per-monitor release labeling.
+                            "serviceMonitorSelectorNilUsesHelmValues": False,
+                            "podMonitorSelectorNilUsesHelmValues": False,
+                        },
+                    },
                 },
                 requires=["storage:rwo for Prom + Grafana PVs"],
                 options=[],

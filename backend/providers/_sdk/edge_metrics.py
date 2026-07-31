@@ -23,20 +23,53 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True, slots=True)
 class EdgeMetricsMapping:
-    """Prometheus coordinates for one ingress variant's edge metrics."""
+    """Prometheus coordinates for one ingress variant's edge metrics.
+
+    Two styles exist:
+
+    * ``prom_histogram`` — the controller natively exports Prometheus
+      counters + duration histograms (nginx, traefik). Rates come from
+      ``rate()``, latency from ``histogram_quantile``, errors from the
+      ``status_label`` regex.
+    * ``cloudwatch_gauge`` — the edge's metrics are republished from the
+      cloud's metrics API by an exporter (ALB via YACE). Series are
+      per-period gauges, not counters: traffic is the per-period request
+      sum divided by ``period_seconds``, errors are a separate 5xx-count
+      metric (no status label), and latency quantiles are pre-computed
+      statistic series selected by suffix (``_p50`` … ``_p99``).
+    """
 
     variant: str
     requests_total: str
-    """Counter of requests through the edge, carrying ``status_label``."""
+    """Request-count metric (counter for prom_histogram; per-period sum
+    gauge for cloudwatch_gauge)."""
 
     duration_bucket: str
-    """Request-duration histogram ``_bucket`` series (for histogram_quantile)."""
+    """Request-duration histogram ``_bucket`` series (prom_histogram only)."""
 
     namespace_label: str
-    """Label key whose value is the app's Kubernetes namespace."""
+    """Label key whose value identifies the app's Kubernetes namespace."""
 
     status_label: str
-    """Label key carrying the upstream HTTP status code."""
+    """Label key carrying the upstream HTTP status code (prom_histogram only)."""
+
+    style: str = "prom_histogram"
+
+    errors_total: str = ""
+    """cloudwatch_gauge only: per-period 5xx count metric."""
+
+    latency_stat_prefix: str = ""
+    """cloudwatch_gauge only: latency metric name minus the statistic
+    suffix; the builder appends ``_p50`` / ``_p90`` / ``_p95`` / ``_p99``."""
+
+    period_seconds: int = 60
+    """cloudwatch_gauge only: the export period each gauge sums over."""
+
+    namespace_value: str = "{ns}"
+    """Template for the ``namespace_label`` match value. ``{ns}`` is the
+    app namespace. A template ending in a regex (e.g. ``{ns}/.*`` for the
+    ALB controller's ``<namespace>/<ingress>`` stack tag) is matched with
+    ``=~`` instead of ``=``."""
 
 
 # ingress-nginx controller metrics. The controller stamps the ingress
@@ -52,11 +85,32 @@ NGINX_INGRESS = EdgeMetricsMapping(
     status_label="status",
 )
 
+# AWS ALB controller via the platform-provisioned CloudWatch exporter
+# (YACE, the ``cloudwatch-exporter`` bootstrap component, #1225). The
+# controller mints one ALB per app ingress, tagged
+# ``ingress.k8s.aws/stack=<namespace>/<ingress-name>`` — the exporter
+# republishes that tag as the ``tag_ingress_k8s_aws_stack`` label, so the
+# app join is a namespace-prefix regex on it. Latency arrives as
+# pre-computed percentile statistics, not histograms.
+AWS_ALB_CONTROLLER = EdgeMetricsMapping(
+    variant="aws_alb_controller",
+    requests_total="aws_applicationelb_request_count_sum",
+    duration_bucket="",
+    namespace_label="tag_ingress_k8s_aws_stack",
+    status_label="",
+    style="cloudwatch_gauge",
+    errors_total="aws_applicationelb_httpcode_target_5xx_count_sum",
+    latency_stat_prefix="aws_applicationelb_target_response_time",
+    period_seconds=60,
+    namespace_value="{ns}/.*",
+)
+
 # variant slug -> mapping. Grows one entry per variant as its metrics
-# pipeline comes online (traefik, gateway-api, alb-via-CloudWatch-exporter,
-# ...). Absence == parity gap for that variant.
+# pipeline comes online (traefik, gateway-api, ...). Absence == parity
+# gap for that variant.
 EDGE_METRICS_BY_VARIANT: dict[str, EdgeMetricsMapping] = {
     NGINX_INGRESS.variant: NGINX_INGRESS,
+    AWS_ALB_CONTROLLER.variant: AWS_ALB_CONTROLLER,
 }
 
 # ``TenantCluster.ingress_class`` -> driver variant. Mirrors the mapping the

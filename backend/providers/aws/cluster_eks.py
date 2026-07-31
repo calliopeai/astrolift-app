@@ -1387,6 +1387,14 @@ class EKSClusterDriver(ClusterDriver):
                         "prometheusSpec": {
                             "retention": "24h",
                             "storageSpec": {},
+                            # Watch ALL ServiceMonitors/PodMonitors, not just
+                            # ones carrying this release's label — sibling
+                            # addons (cloudwatch-exporter, ingress-nginx on
+                            # other recipes) ship their own monitors and the
+                            # edge-metrics contract (spec 08 §6.1) requires
+                            # they get scraped without per-monitor labeling.
+                            "serviceMonitorSelectorNilUsesHelmValues": False,
+                            "podMonitorSelectorNilUsesHelmValues": False,
                         },
                     },
                     "grafana": {"enabled": True, "persistence": {"enabled": False}},
@@ -1423,6 +1431,72 @@ class EKSClusterDriver(ClusterDriver):
                 chart_version="65.1.0",
                 install_timeout="15m",
                 depends_on=["aws-load-balancer-controller"],
+            ),
+            BootstrapComponent(
+                key="cloudwatch-exporter",
+                title="CloudWatch exporter (ALB edge metrics)",
+                default_enabled=True,
+                rationale=(
+                    "ALB-fronted clusters have no Prometheus-native ingress "
+                    "metrics — request rate / errors / latency live in "
+                    "CloudWatch. YACE republishes AWS/ApplicationELB metrics "
+                    "into the cluster's Prometheus, discovering the ALB "
+                    "controller's load balancers by their cluster tag and "
+                    "exporting the ingress.k8s.aws/stack tag that joins each "
+                    "ALB back to its app namespace. This is what feeds the "
+                    "edge-sourced golden signals (spec 08 §6.1) on the "
+                    "aws_alb_controller ingress variant. The ServiceAccount "
+                    "name is pinned so the platform-minted IRSA trust subject "
+                    "(astrolift-system:cloudwatch-exporter) is deterministic."
+                ),
+                helm_values={
+                    "serviceAccount": {
+                        **_sa_with_irsa("cloudwatch-exporter"),
+                        "name": "cloudwatch-exporter",
+                    },
+                    "serviceMonitor": {"enabled": True},
+                    "config": (
+                        "apiVersion: v1alpha1\n"
+                        "discovery:\n"
+                        "  exportedTagsOnMetrics:\n"
+                        "    AWS/ApplicationELB:\n"
+                        "      - ingress.k8s.aws/stack\n"
+                        "  jobs:\n"
+                        "    - type: AWS/ApplicationELB\n"
+                        "      regions:\n"
+                        f"        - {self._config.region}\n"
+                        "      searchTags:\n"
+                        "        - key: elbv2.k8s.aws/cluster\n"
+                        f"          value: {eks_cluster_name}\n"
+                        "      period: 60\n"
+                        "      length: 300\n"
+                        "      metrics:\n"
+                        "        - name: RequestCount\n"
+                        "          statistics: [Sum]\n"
+                        "          nilToZero: true\n"
+                        "        - name: HTTPCode_Target_5XX_Count\n"
+                        "          statistics: [Sum]\n"
+                        "          nilToZero: true\n"
+                        "        - name: HTTPCode_Target_4XX_Count\n"
+                        "          statistics: [Sum]\n"
+                        "          nilToZero: true\n"
+                        "        - name: HTTPCode_ELB_5XX_Count\n"
+                        "          statistics: [Sum]\n"
+                        "          nilToZero: true\n"
+                        "        - name: TargetResponseTime\n"
+                        "          statistics: [p50, p90, p95, p99]\n"
+                    ),
+                },
+                requires=["irsa:cloudwatch-exporter"],
+                options=[],
+                chart_name="yet-another-cloudwatch-exporter",
+                chart_repo_url="https://nerdswords.github.io/helm-charts",
+                chart_repo_type="default",
+                chart_version="0.38.0",
+                install_timeout="10m",
+                # The chart's ServiceMonitor needs the monitoring.coreos.com
+                # CRDs kube-prometheus-stack registers.
+                depends_on=["kube-prometheus-stack"],
             ),
             BootstrapComponent(
                 key="cert-manager",

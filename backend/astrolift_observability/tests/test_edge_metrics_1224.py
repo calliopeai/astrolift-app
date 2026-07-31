@@ -20,6 +20,7 @@ import pytest
 
 from astrolift_observability import prom_client, prom_queries
 from providers._sdk.edge_metrics import (
+    AWS_ALB_CONTROLLER,
     EDGE_METRICS_BY_VARIANT,
     NGINX_INGRESS,
     edge_metrics_for_ingress_class,
@@ -56,11 +57,11 @@ def test_variant_for_ingress_class(ingress_class, variant):
     assert variant_for_ingress_class(ingress_class) == variant
 
 
-def test_edge_metrics_resolution_is_none_for_unmapped_variants():
-    """alb / traefik map to a variant but have no metrics pipeline yet —
-    resolution returns None (recorded parity gap), never a wrong mapping."""
+def test_edge_metrics_resolution_per_variant():
+    """Mapped variants resolve; unmapped ones (traefik) return None — a
+    recorded parity gap, never a wrong mapping."""
     assert edge_metrics_for_ingress_class("nginx") is NGINX_INGRESS
-    assert edge_metrics_for_ingress_class("alb") is None
+    assert edge_metrics_for_ingress_class("alb") is AWS_ALB_CONTROLLER
     assert edge_metrics_for_ingress_class("traefik") is None
 
 
@@ -214,7 +215,68 @@ def test_resolve_edge_metrics_from_cluster_ingress_class():
     )
 
     assert prom_client.resolve_edge_metrics(app=app, environment_name="prod") is NGINX_INGRESS
-    # alb variant has no mapping yet — parity gap, legacy fallback.
-    assert prom_client.resolve_edge_metrics(app=app, environment_name="staging") is None
+    # alb resolves to the CloudWatch-exporter-backed mapping (#1225).
+    assert prom_client.resolve_edge_metrics(app=app, environment_name="staging") is AWS_ALB_CONTROLLER
     # No matching env at all.
     assert prom_client.resolve_edge_metrics(app=app, environment_name="nope") is None
+
+
+# ---------------------------------------------------------------------------
+# cloudwatch_gauge style (aws_alb_controller via YACE, #1225)
+# ---------------------------------------------------------------------------
+
+
+def test_alb_traffic_is_period_normalized_gauge_sum():
+    plan = prom_queries.build_request_rate_query(
+        app_slug="hello-app",
+        environment_name=None,
+        range_seconds=3600,
+        edge=AWS_ALB_CONTROLLER,
+        namespace=_NS,
+    )
+    assert plan.promql == (
+        f'sum(aws_applicationelb_request_count_sum{{tag_ingress_k8s_aws_stack=~"{_NS}/.*"}}) / 60'
+    )
+
+
+def test_alb_error_rate_uses_separate_5xx_metric_with_zero_guard():
+    plan = prom_queries.build_error_rate_query(
+        app_slug="hello-app",
+        environment_name=None,
+        range_seconds=3600,
+        edge=AWS_ALB_CONTROLLER,
+        namespace=_NS,
+    )
+    assert plan.promql == (
+        f'(sum(aws_applicationelb_httpcode_target_5xx_count_sum{{tag_ingress_k8s_aws_stack=~"{_NS}/.*"}}) or vector(0)) '
+        f'/ clamp_min(sum(aws_applicationelb_request_count_sum{{tag_ingress_k8s_aws_stack=~"{_NS}/.*"}}), 1e-9)'
+    )
+
+
+@pytest.mark.parametrize(("quantile", "suffix"), [(0.50, "p50"), (0.90, "p90"), (0.95, "p95"), (0.99, "p99")])
+def test_alb_latency_selects_precomputed_statistic(quantile, suffix):
+    plan = prom_queries.build_latency_quantile_query(
+        app_slug="hello-app",
+        environment_name=None,
+        range_seconds=3600,
+        quantile=quantile,
+        edge=AWS_ALB_CONTROLLER,
+        namespace=_NS,
+    )
+    assert plan.promql == (
+        f'max(aws_applicationelb_target_response_time_{suffix}{{tag_ingress_k8s_aws_stack=~"{_NS}/.*"}})'
+    )
+
+
+def test_alb_status_breakdown_falls_back_to_legacy():
+    """No per-status-code label on CloudWatch ALB metrics — the breakdown
+    keeps the legacy app-metric shape (empty for uninstrumented apps)."""
+    plan = prom_queries.build_status_code_breakdown_query(
+        app_slug="hello-app",
+        environment_name=None,
+        range_seconds=3600,
+        edge=AWS_ALB_CONTROLLER,
+        namespace=_NS,
+    )
+    assert "http_requests_total" in plan.promql
+    assert plan.group_label == "code"

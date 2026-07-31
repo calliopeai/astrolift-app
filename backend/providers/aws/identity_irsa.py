@@ -59,6 +59,25 @@ ALB_CONTROLLER_NAMESPACE = "astrolift-system"
 ALB_CONTROLLER_SA = "aws-load-balancer-controller"
 EXTERNAL_DNS_NAMESPACE = "astrolift-system"
 EXTERNAL_DNS_SA = "external-dns"
+CLOUDWATCH_EXPORTER_NAMESPACE = "astrolift-system"
+CLOUDWATCH_EXPORTER_SA = "cloudwatch-exporter"
+
+# Read-only statements for the CloudWatch exporter (#1225): GetMetricData /
+# ListMetrics to pull ALB edge metrics, tag:GetResources so YACE's tag-based
+# discovery can find the ALB controller's load balancers and export the
+# ``ingress.k8s.aws/stack`` tag that joins each ALB back to its app.
+CLOUDWATCH_EXPORTER_POLICY_STATEMENTS: list[dict[str, Any]] = [
+    {
+        "Effect": "Allow",
+        "Action": [
+            "cloudwatch:GetMetricData",
+            "cloudwatch:GetMetricStatistics",
+            "cloudwatch:ListMetrics",
+            "tag:GetResources",
+        ],
+        "Resource": "*",
+    },
+]
 
 # Inline IAM policy statements for the AWS Load Balancer Controller. This is
 # the canonical ``AWSLoadBalancerControllerIAMPolicy`` permission set (the
@@ -471,6 +490,32 @@ class IRSADriver(WorkloadIdentityDriver):
             role_name=role_name,
             namespace=EXTERNAL_DNS_NAMESPACE,
             sa_name=EXTERNAL_DNS_SA,
+        )
+        return role_arn
+
+    @driver_op(
+        cloud="aws",
+        driver="identity",
+        audit=True,
+        sensitive_kind="identity.provision_cloudwatch_exporter_role",
+    )
+    def provision_cloudwatch_exporter_role(self, role_name: str) -> str:
+        """Self-provision the IRSA role the CloudWatch exporter assumes (#1225).
+
+        The exporter (YACE) republishes ``AWS/ApplicationELB`` metrics into
+        the cluster's Prometheus so the edge-sourced golden signals (spec 08
+        §6.1) work on ALB-fronted clusters. Read-only: CloudWatch metric
+        reads + resource-tag discovery, attached inline. Creates the
+        OIDC-trust role and scopes its trust to the
+        ``astrolift-system:cloudwatch-exporter`` subject.
+
+        Idempotent: re-runs reconcile the trust subject + re-write the inline
+        policy. Returns the role ARN."""
+        role_arn = self.create_identity_role(role_name, permissions=CLOUDWATCH_EXPORTER_POLICY_STATEMENTS)
+        self._ensure_trust_includes(
+            role_name=role_name,
+            namespace=CLOUDWATCH_EXPORTER_NAMESPACE,
+            sa_name=CLOUDWATCH_EXPORTER_SA,
         )
         return role_arn
 
