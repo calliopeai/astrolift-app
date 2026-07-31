@@ -15,50 +15,77 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { EmptyState } from "@/components/EmptyState";
+import {
+  DataTable,
+  useCursorTable,
+  type Column,
+  type CursorPage,
+} from "@/components/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { gql } from "@apollo/client";
-import { ListControls, SortableHeader } from "@/components/ListControls";
-import { useListControls } from "@/hooks/use-list-controls";
 
 // ---------------------------------------------------------------------------
 // GraphQL
+//
+// Kept inline, as the rest of this file's operations are. Both fields are
+// the cursor-paginated ones: `{ items, nextCursor, totalCount }` out,
+// `limit` + `after` (+ `search`) in, which is what `useCursorTable` walks.
+// `$limit: Int` is nullable against the schema's `limit: Int! = 50` because
+// that argument carries a default; `$pipelineId: String!` does not, so the
+// run stream declares it non-null.
 // ---------------------------------------------------------------------------
 
-const LIST_PIPELINES = gql`
-  query ListPipelines($limit: Int) {
-    astroliftPipelines(limit: $limit) {
-      id
-      name
-      repoUrl
-      defaultBranch
-      tomlPath
-      createdAt
+const LIST_PIPELINES_PAGE = gql`
+  query ListPipelinesPage($search: String, $limit: Int, $after: String) {
+    astroliftPipelinesPage(search: $search, limit: $limit, after: $after) {
+      items {
+        id
+        name
+        repoUrl
+        defaultBranch
+        tomlPath
+        createdAt
+      }
+      nextCursor
+      totalCount
     }
   }
 `;
 
-const LIST_PIPELINE_RUNS = gql`
-  query ListPipelineRuns($pipelineId: ID, $limit: Int) {
-    astroliftPipelineRuns(pipelineId: $pipelineId, limit: $limit) {
-      id
-      runNumber
-      triggerKind
-      triggerRef
-      triggerActor
-      status
-      startedAt
-      finishedAt
+const LIST_PIPELINE_RUNS_PAGE = gql`
+  query ListPipelineRunsPage(
+    $pipelineId: String!
+    $search: String
+    $limit: Int
+    $after: String
+  ) {
+    astroliftPipelineRunsPage(
+      pipelineId: $pipelineId
+      search: $search
+      limit: $limit
+      after: $after
+    ) {
+      items {
+        id
+        runNumber
+        triggerKind
+        triggerRef
+        triggerActor
+        status
+        startedAt
+        finishedAt
+      }
+      nextCursor
+      totalCount
     }
   }
 `;
@@ -115,6 +142,20 @@ interface PipelineRun {
   startedAt: string | null;
   finishedAt: string | null;
 }
+
+interface PipelinesPageResp {
+  astroliftPipelinesPage: CursorPage<Pipeline>;
+}
+
+interface RunsPageResp {
+  astroliftPipelineRunsPage: CursorPage<PipelineRun>;
+}
+
+/**
+ * Cells that carry their own links or buttons have to sit above
+ * `rowHref`'s stretched row link, which is an overlay across the row.
+ */
+const ABOVE_ROW_LINK = "relative z-10";
 
 // ---------------------------------------------------------------------------
 // Status badge
@@ -222,105 +263,81 @@ function PipelineListTab({
   onTrigger: (p: Pipeline) => Promise<void>;
   triggering: boolean;
 }) {
-  const { data, loading } = useQuery<{ astroliftPipelines: Pipeline[] }>(LIST_PIPELINES, {
-    variables: { limit: 100 },
-    fetchPolicy: "cache-and-network",
+  // `astroliftPipelinesPage` takes `search`, `limit` and `after` only —
+  // no sort argument, so no column declares a `sortKey`. The name / repo /
+  // branch comparators this tab used to run reordered one page of a
+  // server-ordered catalogue, which is the wrong order at every boundary.
+  const table = useCursorTable<Pipeline>({
+    query: LIST_PIPELINES_PAGE,
+    extract: (d) => (d as PipelinesPageResp | undefined)?.astroliftPipelinesPage,
+    searchVariable: "search",
+    urlKey: "pipe",
   });
 
-  const pipelines = data?.astroliftPipelines ?? [];
-
-  const ctrl = useListControls({
-    data: pipelines,
-    searchFn: (p) => [p.name, p.repoUrl, p.defaultBranch].join(" "),
-    initialPageSize: 25,
-    sortFn: (a, b, sort) => {
-      let av = "";
-      let bv = "";
-      if (sort.key === "name") { av = a.name; bv = b.name; }
-      else if (sort.key === "repo") { av = a.repoUrl; bv = b.repoUrl; }
-      else if (sort.key === "branch") { av = a.defaultBranch; bv = b.defaultBranch; }
-      const cmp = av.localeCompare(bv);
-      return sort.dir === "asc" ? cmp : -cmp;
+  const columns: Column<Pipeline>[] = [
+    {
+      id: "name",
+      header: "Name",
+      cell: (p) => <span className="font-medium">{p.name}</span>,
     },
-  });
-
-  if (loading && pipelines.length === 0) {
-    return (
-      <div className="space-y-2">
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-12 w-full" />
-      </div>
-    );
-  }
-
-  if (pipelines.length === 0) {
-    return (
-      <EmptyState
-        icon={<GitBranchIcon className="size-5" />}
-        title="No pipelines yet"
-        description="Create a pipeline TOML in your repo and register it here."
-        actionHref="/pipelines/new"
-        actionLabel="New Pipeline"
-      />
-    );
-  }
+    {
+      id: "repo",
+      header: "Repository",
+      cellClassName: cn("text-muted-foreground text-sm", ABOVE_ROW_LINK),
+      cell: (p) => (
+        <a href={p.repoUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
+          {p.repoUrl.replace(/^https?:\/\//, "")}
+        </a>
+      ),
+    },
+    {
+      id: "branch",
+      header: "Default branch",
+      cellClassName: "font-mono text-xs",
+      cell: (p) => p.defaultBranch,
+    },
+    {
+      id: "toml",
+      header: "TOML path",
+      cellClassName: "text-muted-foreground font-mono text-xs",
+      cell: (p) => p.tomlPath,
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      align: "right",
+      width: "w-24",
+      cellClassName: ABOVE_ROW_LINK,
+      cell: (p) => (
+        <Button variant="outline" size="sm" disabled={triggering} onClick={() => onTrigger(p)}>
+          <PlayIcon className="mr-1 size-3" />
+          Run
+        </Button>
+      ),
+    },
+  ];
 
   return (
-    <div className="space-y-3">
-      <ListControls controls={ctrl} searchPlaceholder="Search pipelines…" />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>
-              <SortableHeader sortKey="name" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                Name
-              </SortableHeader>
-            </TableHead>
-            <TableHead>
-              <SortableHeader sortKey="repo" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                Repository
-              </SortableHeader>
-            </TableHead>
-            <TableHead>
-              <SortableHeader sortKey="branch" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                Default branch
-              </SortableHeader>
-            </TableHead>
-            <TableHead>TOML path</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {ctrl.rows.map((p) => (
-            <TableRow key={p.id}>
-              <TableCell className="font-medium">
-                <Link href={`/pipelines/${p.id}`} className="hover:underline">
-                  {p.name}
-                </Link>
-              </TableCell>
-              <TableCell className="text-muted-foreground text-sm">
-                <a href={p.repoUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                  {p.repoUrl.replace(/^https?:\/\//, "")}
-                </a>
-              </TableCell>
-              <TableCell className="font-mono text-xs">{p.defaultBranch}</TableCell>
-              <TableCell className="font-mono text-xs text-muted-foreground">{p.tomlPath}</TableCell>
-              <TableCell className="text-right">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={triggering}
-                  onClick={() => onTrigger(p)}
-                >
-                  <PlayIcon className="mr-1 size-3" />
-                  Run
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <DataTable
+      label="Pipelines"
+      controller={table}
+      columns={columns}
+      getRowId={(p) => p.id}
+      rowHref={(p) => `/pipelines/${p.id}`}
+      searchPlaceholder="Search pipelines…"
+      empty={{
+        icon: <GitBranchIcon className="size-5" />,
+        title: "No pipelines yet",
+        description: "Create a pipeline TOML in your repo and register it here.",
+        actionHref: "/pipelines/new",
+        actionLabel: "New Pipeline",
+      }}
+      emptyFiltered={{
+        title: "No matching pipelines",
+        description:
+          "No pipeline matches that search. The server matches the pipeline name, its repository URL, and the app it deploys.",
+      }}
+    />
   );
 }
 
@@ -328,74 +345,128 @@ function PipelineListTab({
 // Run history tab (#107)
 // ---------------------------------------------------------------------------
 
+/**
+ * `astroliftPipelineRunsPage` is single-pipeline by construction —
+ * `run_number` is a per-pipeline counter, which is what makes it a valid
+ * seek key — so `pipelineId` is a required argument. The cross-pipeline
+ * stream this tab used to ask for does not exist server-side: it sent a
+ * nullable `$pipelineId: ID` into a `String!` argument, which the server
+ * rejects at validation, so the tab has been rendering its empty state
+ * unconditionally. It now picks a pipeline instead.
+ */
 function RunHistoryTab() {
-  const { data, loading } = useQuery<{ astroliftPipelineRuns: PipelineRun[] }>(
-    LIST_PIPELINE_RUNS,
-    { variables: { limit: 100 }, fetchPolicy: "cache-and-network" }
-  );
+  const [pipelineId, setPipelineId] = useState<string | null>(null);
 
-  const runs = data?.astroliftPipelineRuns ?? [];
+  const pipelines = useQuery<PipelinesPageResp>(LIST_PIPELINES_PAGE, {
+    variables: { limit: 100 },
+    fetchPolicy: "cache-and-network",
+  });
+  const options = pipelines.data?.astroliftPipelinesPage.items ?? [];
+  const selected = pipelineId ?? options[0]?.id ?? null;
+  const loadingOptions = pipelines.loading && options.length === 0;
 
-  if (loading && runs.length === 0) {
-    return (
-      <div className="space-y-2">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-      </div>
-    );
-  }
+  const table = useCursorTable<PipelineRun>({
+    query: LIST_PIPELINE_RUNS_PAGE,
+    variables: { pipelineId: selected },
+    extract: (d) => (d as RunsPageResp | undefined)?.astroliftPipelineRunsPage,
+    searchVariable: "search",
+    urlKey: "run",
+    skip: !selected,
+  });
 
-  if (runs.length === 0) {
-    return (
-      <EmptyState
-        icon={<ClockIcon className="size-5" />}
-        title="No pipeline runs yet"
-        description="Trigger a run manually or connect a webhook to your repository."
-      />
-    );
-  }
+  const columns: Column<PipelineRun>[] = [
+    {
+      id: "run",
+      header: "Run",
+      cellClassName: "font-mono text-sm",
+      cell: (run) => `#${run.runNumber}`,
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: (run) => <StatusBadge status={run.status} />,
+    },
+    {
+      id: "trigger",
+      header: "Trigger",
+      cellClassName: "text-muted-foreground text-sm capitalize",
+      cell: (run) => run.triggerKind,
+    },
+    {
+      id: "ref",
+      header: "Ref",
+      cellClassName: "font-mono text-xs",
+      cell: (run) => run.triggerRef?.replace(/^refs\/heads\//, ""),
+    },
+    {
+      id: "actor",
+      header: "Actor",
+      cellClassName: "text-muted-foreground text-sm",
+      cell: (run) => run.triggerActor ?? "—",
+    },
+    {
+      id: "duration",
+      header: "Duration",
+      cellClassName: "text-muted-foreground text-sm",
+      cell: (run) =>
+        run.startedAt && run.finishedAt
+          ? `${Math.round(
+              (new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) / 1000
+            )}s`
+          : run.startedAt
+            ? "running"
+            : "—",
+    },
+  ];
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Run</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Trigger</TableHead>
-          <TableHead>Ref</TableHead>
-          <TableHead>Actor</TableHead>
-          <TableHead>Duration</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {runs.map((run) => {
-          const duration =
-            run.startedAt && run.finishedAt
-              ? Math.round(
-                  (new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) / 1000
-                ) + "s"
-              : run.startedAt
-              ? "running"
-              : "—";
-
-          return (
-            <TableRow key={run.id}>
-              <TableCell className="font-mono text-sm">#{run.runNumber}</TableCell>
-              <TableCell>
-                <StatusBadge status={run.status} />
-              </TableCell>
-              <TableCell className="text-muted-foreground text-sm capitalize">
-                {run.triggerKind}
-              </TableCell>
-              <TableCell className="font-mono text-xs">
-                {run.triggerRef?.replace(/^refs\/heads\//, "")}
-              </TableCell>
-              <TableCell className="text-muted-foreground text-sm">{run.triggerActor ?? "—"}</TableCell>
-              <TableCell className="text-muted-foreground text-sm">{duration}</TableCell>
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
+    <DataTable
+      label="Pipeline runs"
+      controller={table}
+      columns={columns}
+      getRowId={(run) => run.id}
+      searchPlaceholder="Search runs…"
+      toolbar={
+        <Select
+          value={selected ?? ""}
+          onValueChange={setPipelineId}
+          disabled={options.length === 0}
+        >
+          <SelectTrigger size="sm" className="w-56" aria-label="Pipeline">
+            <SelectValue placeholder={loadingOptions ? "Loading pipelines…" : "Select a pipeline"} />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      }
+      empty={
+        loadingOptions
+          ? { icon: <Loader2Icon className="size-5 animate-spin" />, title: "Loading pipelines…" }
+          : options.length === 0
+            ? {
+                icon: <GitBranchIcon className="size-5" />,
+                title: "No pipelines yet",
+                description: "Register a pipeline before there is a run history to read.",
+                actionHref: "/pipelines/new",
+                actionLabel: "New Pipeline",
+              }
+            : {
+                icon: <ClockIcon className="size-5" />,
+                title: "No pipeline runs yet",
+                description:
+                  "Trigger a run manually or connect a webhook to your repository.",
+              }
+      }
+      emptyFiltered={{
+        title: "No matching runs",
+        description:
+          "No run matches that search. The server matches the triggering ref, the actor, and the trigger kind.",
+      }}
+    />
   );
 }

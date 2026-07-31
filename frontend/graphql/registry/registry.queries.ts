@@ -126,16 +126,21 @@ export const LIST_APPS = gql`
 /**
  * Server-side filter + cursor-pagination companion to ``LIST_APPS`` (#481).
  *
- * Returns a page envelope so the FE can render "N of M" + a "Load more"
+ * Returns a page envelope so the FE can render "N of M" + a prev/next
  * cursor walk instead of pulling the entire registry into memory and
  * client-filtering. Filter axes match the backend resolver: ``search``
  * (case-insensitive contains on name/slug/description/repo), ``status``
  * (health-pulse bucket), ``teamSlug`` / ``projectSlug`` (exact match),
  * ``sourceKind`` (source-host enum). All filters compose intersectionally.
  *
+ * ``sortBy`` picks the server-side order (#729) — CREATED_DESC (the
+ * default), DEPLOYED_DESC, or NAME_ASC. The cursor is keyed to the
+ * active sort, so changing it restarts the walk at page one.
+ *
  * ``cursor``/``limit`` follow the same shape ``astroliftEventsPage`` uses
  * (base64-JSON of ``(createdAt, guid)``); the FE treats the value as
- * opaque and just round-trips ``nextCursor`` back via ``fetchMore``.
+ * opaque and just round-trips ``nextCursor`` back through the cursor
+ * argument.
  */
 export const LIST_APPS_PAGE = gql`
   ${APP_FIELDS}
@@ -147,6 +152,7 @@ export const LIST_APPS_PAGE = gql`
     $projectSlug: String
     $status: AstroliftAppListStatusFilter
     $sourceKind: AstroliftAppSourceKindFilter
+    $sortBy: AppsListSortKey = CREATED_DESC
     $cursor: String
     $limit: Int = 50
   ) {
@@ -157,6 +163,7 @@ export const LIST_APPS_PAGE = gql`
       projectSlug: $projectSlug
       status: $status
       sourceKind: $sourceKind
+      sortBy: $sortBy
       cursor: $cursor
       limit: $limit
     ) {
@@ -433,18 +440,8 @@ const APP_TEAM_ACCESS_FIELDS = gql`
 
 export const LIST_APP_TEAM_ACCESSES_PAGE = gql`
   ${APP_TEAM_ACCESS_FIELDS}
-  query ListAppTeamAccessesPage(
-    $appSlug: String!
-    $search: String
-    $limit: Int
-    $after: String
-  ) {
-    astroliftAppTeamAccessesPage(
-      appSlug: $appSlug
-      search: $search
-      limit: $limit
-      after: $after
-    ) {
+  query ListAppTeamAccessesPage($appSlug: String!, $search: String, $limit: Int, $after: String) {
+    astroliftAppTeamAccessesPage(appSlug: $appSlug, search: $search, limit: $limit, after: $after) {
       items {
         ...AppTeamAccessFields
       }

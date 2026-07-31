@@ -11,16 +11,20 @@ import {
   VolumeOffIcon,
   Volume2Icon,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
+import {
+  DataTable,
+  useCursorTable,
+  type Column,
+  type CursorPage,
+} from "@/components/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -48,33 +52,24 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import {
   ACKNOWLEDGE_ALERT_EVENT,
   CREATE_ALERT_RULE,
   DELETE_ALERT_RULE,
-  LIST_ALERT_EVENTS,
-  LIST_ALERT_RULES,
+  LIST_ALERT_EVENTS_PAGE,
+  LIST_ALERT_RULES_PAGE,
   MUTE_ALERT_RULE,
   UNMUTE_ALERT_RULE,
 } from "@/graphql/operations/alerts.queries";
 import { useFormatters } from "@/lib/i18n/formatters";
-import { cn } from "@/lib/utils";
-import { ListControls, SortableHeader } from "@/components/ListControls";
-import { useListControls } from "@/hooks/use-list-controls";
 
-const ROW_NAV_CLASS =
-  "hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]";
+/**
+ * Cells that carry their own controls have to sit above `rowHref`'s
+ * stretched row link, which is an overlay across the whole row.
+ */
+const ABOVE_ROW_LINK = "relative z-10";
 
 interface AlertMute {
   id: string;
@@ -109,11 +104,11 @@ interface AlertEvent {
   detail: Record<string, unknown>;
 }
 
-interface RulesResp {
-  astroliftAlertRules: AlertRule[];
+interface RulesPageResp {
+  astroliftAlertRulesPage: CursorPage<AlertRule>;
 }
-interface EventsResp {
-  astroliftAlertEvents: AlertEvent[];
+interface EventsPageResp {
+  astroliftAlertEventsPage: CursorPage<AlertEvent>;
 }
 
 const SEVERITY_TONE: Record<string, "ok" | "warn" | "error" | "muted"> = {
@@ -124,39 +119,59 @@ const SEVERITY_TONE: Record<string, "ok" | "warn" | "error" | "muted"> = {
   error: "error",
 };
 
-const SEVERITY_ORDER: Record<string, number> = {
-  info: 0,
-  warn: 1,
-  warning: 1,
-  critical: 2,
-  error: 2,
-};
-
 const TARGETS = ["app", "env", "workload", "global"];
 const SEVERITIES = ["info", "warn", "critical"];
 
 export function AlertsClient() {
   const t = useTranslations("lists.alerts");
   const fmt = useFormatters();
-  const router = useRouter();
   const [createOpen, setCreateOpen] = React.useState(false);
-  const rules = useQuery<RulesResp>(LIST_ALERT_RULES, {
+
+  // Both page fields take `search`; neither takes a sort argument, so no
+  // column declares a `sortKey`. The comparators this file used to run
+  // (name / severity / created) only ever reordered the rows already in
+  // hand, which is the wrong order at every page boundary.
+  const rulesTable = useCursorTable<AlertRule>({
+    query: LIST_ALERT_RULES_PAGE,
     variables: { activeOnly: false },
+    extract: (d) => (d as RulesPageResp | undefined)?.astroliftAlertRulesPage,
+    searchVariable: "search",
+    urlKey: "rule",
+  });
+
+  const eventsTable = useCursorTable<AlertEvent>({
+    query: LIST_ALERT_EVENTS_PAGE,
+    variables: { unresolvedOnly: false },
+    extract: (d) => (d as EventsPageResp | undefined)?.astroliftAlertEventsPage,
+    searchVariable: "search",
+    urlKey: "event",
+    pollInterval: 30000,
+  });
+
+  // Stat-card counts. `totalCount` is computed over the whole filtered
+  // set, so `limit: 1` buys the number without the rows — the cards used
+  // to count a capped array in the browser, which stopped being true at
+  // the 201st rule and the 101st event.
+  const activeRules = useQuery<RulesPageResp>(LIST_ALERT_RULES_PAGE, {
+    variables: { activeOnly: true, limit: 1 },
     fetchPolicy: "cache-and-network",
   });
-  const events = useQuery<EventsResp>(LIST_ALERT_EVENTS, {
-    variables: { unresolvedOnly: false, limit: 100 },
+  const unresolved = useQuery<EventsPageResp>(LIST_ALERT_EVENTS_PAGE, {
+    variables: { unresolvedOnly: true, limit: 1 },
     fetchPolicy: "cache-and-network",
     pollInterval: 30000,
   });
 
-  const refetch = [
-    { query: LIST_ALERT_RULES, variables: { activeOnly: false } },
-    {
-      query: LIST_ALERT_EVENTS,
-      variables: { unresolvedOnly: false, limit: 100 },
-    },
-  ];
+  const ruleCount = rulesTable.totalCount ?? 0;
+  const activeRuleCount = activeRules.data?.astroliftAlertRulesPage.totalCount ?? 0;
+  const unresolvedCount = unresolved.data?.astroliftAlertEventsPage.totalCount ?? 0;
+  const eventCount = eventsTable.totalCount ?? 0;
+
+  // Refetch by operation name: every mutation below moves rows in both
+  // walks *and* in the two count queries, which are the same documents at
+  // different variables. A `{ query, variables }` entry would refresh one
+  // variable set and leave the others stale.
+  const refetch = ["ListAlertRulesPage", "ListAlertEventsPage"];
 
   const [createRule, createState] = useMutation<{
     createAlertRule: MutationResult<AlertRule>;
@@ -189,56 +204,9 @@ export function AlertsClient() {
     ackState.loading ||
     muteState.loading ||
     unmuteState.loading;
-  const ruleList = rules.data?.astroliftAlertRules ?? [];
-  const eventList = events.data?.astroliftAlertEvents ?? [];
-  const unresolvedEvents = eventList.filter((e) => !e.resolvedAt);
 
   const [deleteTarget, setDeleteTarget] = React.useState<AlertRule | null>(null);
   const [muteTarget, setMuteTarget] = React.useState<AlertRule | null>(null);
-  const [showMuted, setShowMuted] = React.useState(false);
-
-  const visibleRules = showMuted
-    ? ruleList
-    : ruleList.filter((r) => !r.activeMute);
-  const mutedCount = ruleList.filter((r) => r.activeMute).length;
-
-  const rulesCtrl = useListControls({
-    data: visibleRules,
-    searchFn: (r) => [r.name, r.target, r.severity].join(" "),
-    initialPageSize: 25,
-    sortFn: (a, b, sort) => {
-      if (sort.key === "name") {
-        const cmp = a.name.localeCompare(b.name);
-        return sort.dir === "asc" ? cmp : -cmp;
-      }
-      if (sort.key === "severity") {
-        const cmp = (SEVERITY_ORDER[a.severity] ?? 0) - (SEVERITY_ORDER[b.severity] ?? 0);
-        return sort.dir === "asc" ? cmp : -cmp;
-      }
-      if (sort.key === "createdAt") {
-        const cmp = a.createdAt.localeCompare(b.createdAt);
-        return sort.dir === "asc" ? cmp : -cmp;
-      }
-      return 0;
-    },
-  });
-
-  const eventsCtrl = useListControls({
-    data: eventList,
-    searchFn: (e) => [e.summary, e.severity].join(" "),
-    initialPageSize: 25,
-    sortFn: (a, b, sort) => {
-      if (sort.key === "severity") {
-        const cmp = (SEVERITY_ORDER[a.severity] ?? 0) - (SEVERITY_ORDER[b.severity] ?? 0);
-        return sort.dir === "asc" ? cmp : -cmp;
-      }
-      if (sort.key === "firedAt") {
-        const cmp = a.firedAt.localeCompare(b.firedAt);
-        return sort.dir === "asc" ? cmp : -cmp;
-      }
-      return 0;
-    },
-  });
 
   async function handleDelete(r: AlertRule) {
     const { data } = await deleteRule({ variables: { input: { id: r.id } } });
@@ -323,6 +291,199 @@ export function AlertsClient() {
     }
   }
 
+  // The rule state icon rides in the name cell rather than in a column of
+  // its own: `rowHref` stretches a link over the first cell, and an
+  // icon-only first cell would leave that link with no accessible name.
+  const ruleColumns: Column<AlertRule>[] = [
+    {
+      id: "name",
+      header: t("rules.columns.name"),
+      cell: (r) => (
+        <span className="flex items-center gap-2 font-medium">
+          {r.activeMute ? (
+            <VolumeOffIcon className="text-muted-foreground size-4 shrink-0" />
+          ) : r.isActive ? (
+            <BellIcon className="text-success-fg size-4 shrink-0" />
+          ) : (
+            <BellOffIcon className="text-muted-foreground size-4 shrink-0" />
+          )}
+          {r.name}
+          {r.activeMute && (
+            <Badge variant="secondary" className="text-2xs">
+              {t("mute.badge", { remaining: formatRemaining(r.activeMute.ttlUntil) })}
+            </Badge>
+          )}
+        </span>
+      ),
+    },
+    {
+      id: "target",
+      header: t("rules.columns.target"),
+      cell: (r) => (
+        <>
+          <Badge variant="outline">{r.target}</Badge>
+          {r.targetId && (
+            <span className="text-muted-foreground text-2xs ml-2 font-mono">{r.targetId}</span>
+          )}
+        </>
+      ),
+    },
+    {
+      id: "severity",
+      header: t("rules.columns.severity"),
+      cell: (r) => (
+        <Badge variant="secondary" className="capitalize">
+          {r.severity}
+        </Badge>
+      ),
+    },
+    {
+      id: "createdAt",
+      header: t("rules.columns.created"),
+      cell: (r) => (
+        <span className="text-muted-foreground text-xs">{fmt.formatDate(r.createdAt)}</span>
+      ),
+    },
+    {
+      id: "actions",
+      // The header stayed blank in the old table; sr-only keeps that look
+      // without leaving the column unnamed for a screen reader.
+      header: <span className="sr-only">Actions</span>,
+      align: "right",
+      width: "w-16",
+      cellClassName: ABOVE_ROW_LINK,
+      cell: (r) => (
+        <div className="flex items-center justify-end gap-1">
+          <Can permission="org.update">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  disabled={busy}
+                  aria-label={t("mute.menuLabel")}
+                >
+                  <MoreHorizontalIcon className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {r.activeMute ? (
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      void handleUnmute(r);
+                    }}
+                  >
+                    <Volume2Icon className="size-4" />
+                    {t("mute.unmute")}
+                  </DropdownMenuItem>
+                ) : (
+                  <>
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        void handleMutePreset(r, 1, "1h");
+                      }}
+                    >
+                      <VolumeOffIcon className="size-4" />
+                      {t("mute.preset1h")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        void handleMutePreset(r, 4, "4h");
+                      }}
+                    >
+                      <VolumeOffIcon className="size-4" />
+                      {t("mute.preset4h")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        void handleMutePreset(r, 24, "24h");
+                      }}
+                    >
+                      <VolumeOffIcon className="size-4" />
+                      {t("mute.preset24h")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setMuteTarget(r)}>
+                      <VolumeOffIcon className="size-4" />
+                      {t("mute.presetCustom")}
+                    </DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setDeleteTarget(r)} variant="destructive">
+                  <Trash2Icon className="size-4" />
+                  {t("delete.confirm")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </Can>
+        </div>
+      ),
+    },
+  ];
+
+  const eventColumns: Column<AlertEvent>[] = [
+    {
+      id: "summary",
+      header: t("events.columns.summary"),
+      cell: (e) => (
+        <span className="flex items-center gap-2">
+          <StatusDot status={SEVERITY_TONE[e.severity] ?? "muted"} />
+          <span className="max-w-md truncate">{e.summary}</span>
+        </span>
+      ),
+    },
+    {
+      id: "severity",
+      header: t("events.columns.severity"),
+      cell: (e) => (
+        <Badge variant="secondary" className="capitalize">
+          {e.severity}
+        </Badge>
+      ),
+    },
+    {
+      id: "firedAt",
+      header: t("events.columns.fired"),
+      cell: (e) => (
+        <span className="text-muted-foreground text-xs">{fmt.formatDateTime(e.firedAt)}</span>
+      ),
+    },
+    {
+      id: "state",
+      header: t("events.columns.state"),
+      cell: (e) =>
+        e.resolvedAt ? (
+          <Badge variant="outline">{t("events.resolved")}</Badge>
+        ) : e.acknowledgedAt ? (
+          <Badge variant="secondary">{t("events.acknowledged")}</Badge>
+        ) : (
+          <Badge variant="destructive">{t("events.firing")}</Badge>
+        ),
+    },
+    {
+      id: "actions",
+      header: <span className="sr-only">{t("events.ack")}</span>,
+      align: "right",
+      width: "w-24",
+      cellClassName: ABOVE_ROW_LINK,
+      cell: (e) =>
+        !e.resolvedAt && !e.acknowledgedAt ? (
+          <Can permission="org.update">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleAcknowledge(e)}
+              disabled={busy}
+            >
+              <CheckIcon className="size-3.5" />
+              {t("events.ack")}
+            </Button>
+          </Can>
+        ) : null,
+    },
+  ];
+
   return (
     <PageShell
       title={t("title")}
@@ -342,9 +503,9 @@ export function AlertsClient() {
             <p className="text-muted-foreground text-xs uppercase tracking-wide">
               {t("stats.rules")}
             </p>
-            <p className="mt-1 text-2xl font-bold">{ruleList.length}</p>
+            <p className="mt-1 text-2xl font-bold">{ruleCount}</p>
             <p className="text-muted-foreground text-xs">
-              {t("stats.active", { count: ruleList.filter((r) => r.isActive).length })}
+              {t("stats.active", { count: activeRuleCount })}
             </p>
           </CardContent>
         </Card>
@@ -353,9 +514,7 @@ export function AlertsClient() {
             <p className="text-muted-foreground text-xs uppercase tracking-wide">
               {t("stats.unresolved")}
             </p>
-            <p className="mt-1 text-2xl font-bold text-destructive">
-              {unresolvedEvents.length}
-            </p>
+            <p className="mt-1 text-2xl font-bold text-destructive">{unresolvedCount}</p>
             <p className="text-muted-foreground text-xs">{t("stats.inWindow")}</p>
           </CardContent>
         </Card>
@@ -364,329 +523,69 @@ export function AlertsClient() {
             <p className="text-muted-foreground text-xs uppercase tracking-wide">
               {t("stats.total")}
             </p>
-            <p className="mt-1 text-2xl font-bold">{eventList.length}</p>
-            <p className="text-muted-foreground text-xs">{t("stats.latest")}</p>
+            <p className="mt-1 text-2xl font-bold">{eventCount}</p>
+            {/* `stats.latest` ("latest 100") described the capped fetch this
+                card used to count. The number above it is the server's total
+                now, so the caption is dropped rather than left saying
+                something false. */}
           </CardContent>
         </Card>
       </div>
 
       <Card>
-        <CardContent className="p-0">
-          <div className="flex items-center justify-between border-b p-4">
-            <div>
-              <h2 className="font-medium">{t("rules.title")}</h2>
-              <p className="text-muted-foreground text-xs">
-                {t("rules.description")}
-              </p>
-            </div>
-            {mutedCount > 0 && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowMuted((v) => !v)}
-              >
-                {showMuted ? t("mute.hideMuted") : t("mute.showMuted")}{" "}
-                ({mutedCount})
-              </Button>
-            )}
+        <CardContent className="flex flex-col gap-3 p-4">
+          <div>
+            <h2 className="font-medium">{t("rules.title")}</h2>
+            <p className="text-muted-foreground text-xs">{t("rules.description")}</p>
           </div>
-          {rules.loading && ruleList.length === 0 ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : visibleRules.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<BellIcon className="size-5" />}
-                title={t("rules.emptyTitle")}
-                description={t("rules.emptyDescription")}
-              />
-            </div>
-          ) : (
-            <>
-              <div className="px-4 py-2 border-b">
-                <ListControls controls={rulesCtrl} searchPlaceholder="Search rules…" />
-              </div>
-              {rulesCtrl.rows.length === 0 ? (
-                <div className="p-6">
-                  <EmptyState
-                    icon={<BellIcon className="size-5" />}
-                    title={t("rules.emptyTitle")}
-                    description={t("rules.emptyDescription")}
-                  />
-                </div>
-              ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead></TableHead>
-                  <TableHead>
-                    <SortableHeader sortKey="name" sort={rulesCtrl.sort} onToggle={rulesCtrl.toggleSort}>
-                      {t("rules.columns.name")}
-                    </SortableHeader>
-                  </TableHead>
-                  <TableHead>{t("rules.columns.target")}</TableHead>
-                  <TableHead>
-                    <SortableHeader sortKey="severity" sort={rulesCtrl.sort} onToggle={rulesCtrl.toggleSort}>
-                      {t("rules.columns.severity")}
-                    </SortableHeader>
-                  </TableHead>
-                  <TableHead>
-                    <SortableHeader sortKey="createdAt" sort={rulesCtrl.sort} onToggle={rulesCtrl.toggleSort}>
-                      {t("rules.columns.created")}
-                    </SortableHeader>
-                  </TableHead>
-                  <TableHead className="text-right"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rulesCtrl.rows.map((r) => (
-                  <TableRow
-                    key={r.id}
-                    tabIndex={0}
-                    role="link"
-                    aria-label={`Open alert rule ${r.name}`}
-                    onClick={() => router.push(`/alerts/rules/${r.id}`)}
-                    onKeyDown={(ev) => {
-                      if (ev.key === "Enter" || ev.key === " ") {
-                        ev.preventDefault();
-                        router.push(`/alerts/rules/${r.id}`);
-                      }
-                    }}
-                    className={cn(ROW_NAV_CLASS, r.activeMute && "opacity-70")}
-                  >
-                    <TableCell className="w-8">
-                      {r.activeMute ? (
-                        <VolumeOffIcon className="text-muted-foreground size-4" />
-                      ) : r.isActive ? (
-                        <BellIcon className="size-4 text-success-fg" />
-                      ) : (
-                        <BellOffIcon className="text-muted-foreground size-4" />
-                      )}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {r.name}
-                      {r.activeMute && (
-                        <Badge variant="secondary" className="ml-2 text-2xs">
-                          {t("mute.badge", {
-                            remaining: formatRemaining(r.activeMute.ttlUntil),
-                          })}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{r.target}</Badge>
-                      {r.targetId && (
-                        <span className="text-muted-foreground ml-2 font-mono text-2xs">
-                          {r.targetId}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="capitalize">
-                        {r.severity}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {fmt.formatDate(r.createdAt)}
-                    </TableCell>
-                    <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-1">
-                        <Can permission="org.update">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="size-8"
-                                disabled={busy}
-                                aria-label={t("mute.menuLabel")}
-                              >
-                                <MoreHorizontalIcon className="size-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              {r.activeMute ? (
-                                <DropdownMenuItem
-                                  onSelect={() => {
-                                    void handleUnmute(r);
-                                  }}
-                                >
-                                  <Volume2Icon className="size-4" />
-                                  {t("mute.unmute")}
-                                </DropdownMenuItem>
-                              ) : (
-                                <>
-                                  <DropdownMenuItem
-                                    onSelect={() => {
-                                      void handleMutePreset(r, 1, "1h");
-                                    }}
-                                  >
-                                    <VolumeOffIcon className="size-4" />
-                                    {t("mute.preset1h")}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onSelect={() => {
-                                      void handleMutePreset(r, 4, "4h");
-                                    }}
-                                  >
-                                    <VolumeOffIcon className="size-4" />
-                                    {t("mute.preset4h")}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onSelect={() => {
-                                      void handleMutePreset(r, 24, "24h");
-                                    }}
-                                  >
-                                    <VolumeOffIcon className="size-4" />
-                                    {t("mute.preset24h")}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onSelect={() => setMuteTarget(r)}
-                                  >
-                                    <VolumeOffIcon className="size-4" />
-                                    {t("mute.presetCustom")}
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onSelect={() => setDeleteTarget(r)}
-                                variant="destructive"
-                              >
-                                <Trash2Icon className="size-4" />
-                                {t("delete.confirm")}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </Can>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-              )}
-            </>
-          )}
+          <DataTable
+            label="Alert rules"
+            controller={rulesTable}
+            columns={ruleColumns}
+            getRowId={(r) => r.id}
+            rowHref={(r) => `/alerts/rules/${r.id}`}
+            rowClassName={(r) => (r.activeMute ? "opacity-70" : undefined)}
+            searchPlaceholder="Search rules…"
+            empty={{
+              icon: <BellIcon className="size-5" />,
+              title: t("rules.emptyTitle"),
+              description: t("rules.emptyDescription"),
+            }}
+            // Hardcoded rather than translated: adding a key here means
+            // editing all eight locale files, which is a separate change.
+            emptyFiltered={{
+              title: "No matching rules",
+              description:
+                "No rule matches that search. The server matches the rule name and the target it covers (app slug, env name, workload slug).",
+            }}
+          />
         </CardContent>
       </Card>
 
       <Card>
-        <CardContent className="p-0">
-          <div className="border-b p-4">
+        <CardContent className="flex flex-col gap-3 p-4">
+          <div>
             <h2 className="font-medium">{t("events.title")}</h2>
             <p className="text-muted-foreground text-xs">{t("events.description")}</p>
           </div>
-          {events.loading && eventList.length === 0 ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : eventList.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<BellIcon className="size-5" />}
-                title={t("events.emptyTitle")}
-                description={t("events.emptyDescription")}
-              />
-            </div>
-          ) : (
-            <>
-              <div className="px-4 py-2 border-b">
-                <ListControls controls={eventsCtrl} searchPlaceholder="Search events…" />
-              </div>
-              {eventsCtrl.rows.length === 0 ? (
-                <div className="p-6">
-                  <EmptyState
-                    icon={<BellIcon className="size-5" />}
-                    title={t("events.emptyTitle")}
-                    description={t("events.emptyDescription")}
-                  />
-                </div>
-              ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead></TableHead>
-                  <TableHead>{t("events.columns.summary")}</TableHead>
-                  <TableHead>
-                    <SortableHeader sortKey="severity" sort={eventsCtrl.sort} onToggle={eventsCtrl.toggleSort}>
-                      {t("events.columns.severity")}
-                    </SortableHeader>
-                  </TableHead>
-                  <TableHead>
-                    <SortableHeader sortKey="firedAt" sort={eventsCtrl.sort} onToggle={eventsCtrl.toggleSort}>
-                      {t("events.columns.fired")}
-                    </SortableHeader>
-                  </TableHead>
-                  <TableHead>{t("events.columns.state")}</TableHead>
-                  <TableHead className="text-right"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {eventsCtrl.rows.map((e) => (
-                  <TableRow
-                    key={e.id}
-                    tabIndex={0}
-                    role="link"
-                    aria-label={`Open alert event ${e.id.slice(0, 8)}`}
-                    onClick={() => router.push(`/alerts/events/${e.id}`)}
-                    onKeyDown={(ev) => {
-                      if (ev.key === "Enter" || ev.key === " ") {
-                        ev.preventDefault();
-                        router.push(`/alerts/events/${e.id}`);
-                      }
-                    }}
-                    className={ROW_NAV_CLASS}
-                  >
-                    <TableCell className="w-8">
-                      <StatusDot status={SEVERITY_TONE[e.severity] ?? "muted"} />
-                    </TableCell>
-                    <TableCell className="max-w-md truncate">
-                      {e.summary}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="capitalize">
-                        {e.severity}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {fmt.formatDateTime(e.firedAt)}
-                    </TableCell>
-                    <TableCell>
-                      {e.resolvedAt ? (
-                        <Badge variant="outline">{t("events.resolved")}</Badge>
-                      ) : e.acknowledgedAt ? (
-                        <Badge variant="secondary">{t("events.acknowledged")}</Badge>
-                      ) : (
-                        <Badge variant="destructive">{t("events.firing")}</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
-                      {!e.resolvedAt && !e.acknowledgedAt && (
-                        <Can permission="org.update">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleAcknowledge(e)}
-                            disabled={busy}
-                          >
-                            <CheckIcon className="size-3.5" />
-                            {t("events.ack")}
-                          </Button>
-                        </Can>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-              )}
-            </>
-          )}
+          <DataTable
+            label="Alert events"
+            controller={eventsTable}
+            columns={eventColumns}
+            getRowId={(e) => e.id}
+            rowHref={(e) => `/alerts/events/${e.id}`}
+            searchPlaceholder="Search events…"
+            empty={{
+              icon: <BellIcon className="size-5" />,
+              title: t("events.emptyTitle"),
+              description: t("events.emptyDescription"),
+            }}
+            emptyFiltered={{
+              title: "No matching events",
+              description:
+                "No firing event matches that search. The server matches the event summary and the name of the rule that fired it.",
+            }}
+          />
         </CardContent>
       </Card>
 

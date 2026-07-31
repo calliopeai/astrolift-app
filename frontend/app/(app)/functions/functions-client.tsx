@@ -1,20 +1,22 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
-import { AlertCircleIcon, BarChart3Icon, BoltIcon, GaugeIcon, LayersIcon, ScrollIcon } from "lucide-react";
-import Link from "next/link";
+import {
+  AlertCircleIcon,
+  BarChart3Icon,
+  BoltIcon,
+  GaugeIcon,
+  LayersIcon,
+  ScrollIcon,
+} from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 
+import { DataTable, useCursorTable, type Column, type CursorPage } from "@/components/data-table";
 import { EmptyState } from "@/components/EmptyState";
-import { ListControls, SortableHeader } from "@/components/ListControls";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
+import { LIST_WORKLOADS_PAGE } from "@/graphql/registry/registry.queries";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
-import { useListControls } from "@/hooks/use-list-controls";
 
 // Tabs folded in from /observe/functions (#892). Fleet is the query-backed
 // workload list; the four signal tabs are gateway placeholders — the
@@ -38,99 +40,90 @@ const TAB_ICONS: Record<FunctionTab, React.ReactNode> = {
   logs: <ScrollIcon className="size-4" />,
 };
 
+interface WorkloadsPageResp {
+  astroliftWorkloadsPage: CursorPage<AstroliftWorkload>;
+}
+
 function FleetTab() {
-  const router = useRouter();
-  const { data, loading } = useQuery<{ astroliftWorkloads: AstroliftWorkload[] }>(LIST_WORKLOADS, {
-    variables: {},
-    fetchPolicy: "cache-and-network",
-  });
-  const workloads = (data?.astroliftWorkloads ?? []).filter((w) => w.kind === "function");
-
-  const ctrl = useListControls({
-    data: workloads,
-    searchFn: (w) => [w.name, w.registeredAppSlug].join(" "),
-    sortFn: (a, b, sort) => {
-      if (sort.key === "name") return a.name.localeCompare(b.name);
-      if (sort.key === "app") return a.registeredAppSlug.localeCompare(b.registeredAppSlug);
-      return 0;
+  /**
+   * Server-paginated workload walk, narrowed to `kind: function` (#1233).
+   *
+   * `astroliftWorkloadsPage` takes `appSlug`, `search`, `limit` and
+   * `after` — there is no `kind` argument and no sort argument, so the
+   * columns declare no `sortKey` (the old name/app client sort is gone,
+   * tracked for the server side in #1239) and the kind narrowing has to
+   * stay on the client for now.
+   *
+   * It runs inside `extract`, over the page the server returned, so the
+   * rows on screen are always functions and never a truncated prefix of
+   * every workload. Two consequences are honest and deliberate:
+   * `totalCount` is dropped (the server counts every workload in the
+   * org, which is not the number of functions, and a wrong count is
+   * worse than none), and a page whose 25 workloads happen to contain no
+   * function renders the empty state with Next still enabled. Both go
+   * away when the field takes a `kinds:` filter — the same shape
+   * `astroliftDeploymentsPage` already has for `statuses:` (#1242).
+   */
+  const table = useCursorTable<AstroliftWorkload>({
+    query: LIST_WORKLOADS_PAGE,
+    extract: (d) => {
+      const page = (d as WorkloadsPageResp | undefined)?.astroliftWorkloadsPage;
+      if (!page) return page;
+      return {
+        items: page.items.filter((w) => w.kind === "function"),
+        nextCursor: page.nextCursor,
+        totalCount: null,
+      };
     },
-    initialPageSize: 25,
+    searchVariable: "search",
+    urlKey: "fn",
   });
 
-  if (loading && workloads.length === 0) {
-    return (
-      <div className="space-y-2">
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-12 w-full" />
-      </div>
-    );
-  }
-
-  if (workloads.length === 0) {
-    return (
-      <EmptyState
-        icon={<BoltIcon className="size-5" />}
-        title="No function workloads"
-        description="Apps with kind: function in their manifest will appear here. Functions scale to zero and trigger on HTTP, queues, or events."
-      />
-    );
-  }
+  const columns: Column<AstroliftWorkload>[] = [
+    {
+      id: "name",
+      header: "Workload",
+      cell: (w) => <span className="font-medium">{w.name}</span>,
+    },
+    {
+      id: "app",
+      header: "App",
+      cell: (w) => <Badge variant="outline">{w.registeredAppSlug}</Badge>,
+    },
+    {
+      id: "minScale",
+      header: "Min scale",
+      cellClassName: "text-muted-foreground text-sm",
+      cell: (w) => w.hpaMinReplicas ?? 0,
+    },
+    {
+      id: "maxScale",
+      header: "Max scale",
+      cellClassName: "text-muted-foreground text-sm",
+      cell: (w) => w.hpaMaxReplicas ?? "—",
+    },
+  ];
 
   return (
-    <>
-      <ListControls controls={ctrl} searchPlaceholder="Filter workloads..." />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>
-              <SortableHeader sortKey="name" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                Workload
-              </SortableHeader>
-            </TableHead>
-            <TableHead>
-              <SortableHeader sortKey="app" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                App
-              </SortableHeader>
-            </TableHead>
-            <TableHead>Min scale</TableHead>
-            <TableHead>Max scale</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {ctrl.rows.map((w) => (
-            <TableRow
-              key={w.id}
-              tabIndex={0}
-              role="link"
-              aria-label={`Open function workload ${w.name}`}
-              onClick={() => router.push(`/apps/${w.registeredAppSlug}/workloads/${w.slug}`)}
-              onKeyDown={(ev) => {
-                if (ev.key === "Enter" || ev.key === " ") {
-                  ev.preventDefault();
-                  router.push(`/apps/${w.registeredAppSlug}/workloads/${w.slug}`);
-                }
-              }}
-              className="hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
-            >
-              <TableCell className="font-medium">
-                <Link
-                  href={`/apps/${w.registeredAppSlug}/workloads/${w.slug}`}
-                  onClick={(ev) => ev.stopPropagation()}
-                  className="hover:underline"
-                >
-                  {w.name}
-                </Link>
-              </TableCell>
-              <TableCell>
-                <Badge variant="outline">{w.registeredAppSlug}</Badge>
-              </TableCell>
-              <TableCell className="text-muted-foreground text-sm">{w.hpaMinReplicas ?? 0}</TableCell>
-              <TableCell className="text-muted-foreground text-sm">{w.hpaMaxReplicas ?? "—"}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </>
+    <DataTable
+      label="Function workloads"
+      controller={table}
+      columns={columns}
+      getRowId={(w) => w.id}
+      rowHref={(w) => `/apps/${w.registeredAppSlug}/workloads/${w.slug}`}
+      searchPlaceholder="Filter workloads..."
+      empty={{
+        icon: <BoltIcon className="size-5" />,
+        title: "No function workloads",
+        description:
+          "Apps with kind: function in their manifest will appear here. Functions scale to zero and trigger on HTTP, queues, or events.",
+      }}
+      emptyFiltered={{
+        title: "No matching function workloads",
+        description:
+          "No function workload on this page matches that search. The server matches workload name, slug and kind plus the owning app's slug.",
+      }}
+    />
   );
 }
 

@@ -1,8 +1,8 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useMutation } from "@apollo/client/react";
 import {
-  AlertCircleIcon,
+  AlertTriangleIcon,
   ExternalLinkIcon,
   GitBranchIcon,
   KeyIcon,
@@ -13,22 +13,29 @@ import {
   RotateCcwIcon,
   SearchIcon,
   StarIcon,
-  XIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import {
+  DataTable,
+  DataTablePagination,
+  DataTableToolbar,
+  useCursorTable,
+  useRowSelection,
+  type Column,
+  type CursorTableController,
+  type EmptyStateSpec,
+  type RowSelection,
+} from "@/components/data-table";
 import { EmptyState } from "@/components/EmptyState";
-import { ListControls, SortableHeader } from "@/components/ListControls";
 import { PageShell } from "@/components/PageShell";
-import { ViewToggle } from "@/components/ViewToggle";
-import { useViewToggle } from "@/hooks/use-view-toggle";
-import { useListControls } from "@/hooks/use-list-controls";
 import { StatusDot } from "@/components/StatusDot";
+import { ViewToggle } from "@/components/ViewToggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -43,6 +50,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { AppsListSortKey } from "@/graphql/__generated__/schema";
 import {
   BULK_PUSH_SECRETS,
   BULK_RESYNC_MANIFEST,
@@ -56,7 +64,8 @@ import type {
   AstroliftRegisteredAppPage,
   ProvisioningStatus,
 } from "@/graphql/registry/registry.types";
-import { useDebounce } from "@/hooks/use-debounce";
+import { useViewToggle } from "@/hooks/use-view-toggle";
+import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 import { cn } from "@/lib/utils";
 
 import { AppFreshnessRow } from "./components/AppFreshnessRow";
@@ -95,7 +104,38 @@ const STATUS_FILTER_TO_PILL: Record<AppListStatusFilter, Pill> = {
   NEVER_DEPLOYED: "never_deployed",
 };
 
-const PAGE_SIZE = 50;
+/**
+ * The one sort control (#1232).
+ *
+ * This page used to stack three: a `<select>` that re-ordered the loaded
+ * page, a `sortFn` inside `useListControls`, and sortable column headers
+ * visible only in list mode — all three client-side over whichever rows
+ * happened to be fetched, so every one of them was wrong at the page
+ * boundary. `astroliftAppsPage` has taken a server-side `sortBy` since
+ * #729 and keys its cursor to the active sort, so the select now rides
+ * in the controller's `variables`: changing it restarts the walk at page
+ * one, which is what a re-sorted result set needs.
+ *
+ * It stays a select rather than `Column.sortKey` headers because
+ * DEPLOYED_DESC has no column to hang off and the card view has no
+ * headers at all.
+ */
+const SORT_OPTIONS: { value: AppsListSortKey; label: string }[] = [
+  { value: "CREATED_DESC", label: "Recently registered" },
+  { value: "DEPLOYED_DESC", label: "Last deployed" },
+  { value: "NAME_ASC", label: "Name (A→Z)" },
+];
+
+/**
+ * DataTable stretches the row's link across the whole row (an ::after on
+ * the first cell), and that overlay paints above the un-positioned cells
+ * beside it. The selection checkbox and the pin toggle have to be lifted
+ * back on top of it or the only thing a click in those cells can do is
+ * navigate.
+ */
+const INTERACTIVE_CELLS =
+  "[&>td:has([role=checkbox])]:relative [&>td:has([role=checkbox])]:z-10 " +
+  "[&>td:last-child]:relative [&>td:last-child]:z-10";
 
 // #697 — pinned apps persist in localStorage so operators who work
 // with the same 2-3 apps daily can keep them at the top across
@@ -147,73 +187,128 @@ function pillFromParam(value: string | null): Pill {
   return STATUS_FILTER_TO_PILL[upper] ?? "all";
 }
 
+/** #697 — pin / unpin toggle, shared by the card and the list row. */
+function PinButton({
+  pinned,
+  onToggle,
+  className,
+}: {
+  pinned: boolean;
+  onToggle: () => void;
+  className?: string;
+}) {
+  const label = pinned ? "Unpin app" : "Pin to top";
+  return (
+    <button
+      type="button"
+      // Both card and row sit inside a link; stop the click before it
+      // navigates.
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onToggle();
+      }}
+      className={cn(
+        "text-muted-foreground hover:text-warning-fg size-7 rounded-md p-1 transition-colors",
+        className
+      )}
+      title={label}
+      aria-pressed={pinned}
+    >
+      <StarIcon className={pinned ? "fill-warning text-warning-fg size-4" : "size-4"} aria-hidden />
+      <span className="sr-only">{label}</span>
+    </button>
+  );
+}
+
 export function AppsClient() {
   const t = useTranslations("apps.list");
   const [viewMode, setViewMode] = useViewToggle("astrolift_view_apps", "card");
-  const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { can } = useMyPermissions();
+  const canDeploy = can("app.deploy");
+  const surfaceRef = useRef<HTMLDivElement>(null);
 
   // URL params seed the initial filter state so a shared link arrives
-  // pre-filtered. We treat the URL as the source of truth for filter
-  // state and round-trip user input through router.replace so the
-  // browser back/forward buttons still work as expected.
-  const initialSearch = searchParams.get("q") ?? "";
-  const initialPill = pillFromParam(searchParams.get("status"));
-  const initialTeam = searchParams.get("team") ?? "";
-  const initialProject = searchParams.get("project") ?? "";
+  // pre-filtered. Read once, on mount: the effect below owns the query
+  // string from then on. The search term and page size are the
+  // controller's business (?apps-q=, ?apps-size=).
+  const [pill, setPill] = useState<Pill>(() => pillFromParam(searchParams.get("status")));
+  const [teamSlug, setTeamSlug] = useState(() => searchParams.get("team") ?? "");
+  const [projectSlug, setProjectSlug] = useState(() => searchParams.get("project") ?? "");
+  const [sortBy, setSortBy] = useState<AppsListSortKey>("CREATED_DESC");
 
-  const [rawSearch, setRawSearch] = useState(initialSearch);
-  const debouncedSearch = useDebounce(rawSearch, 200);
-  const [pill, setPill] = useState<Pill>(initialPill);
-  const [teamSlug, setTeamSlug] = useState(initialTeam);
-  const [projectSlug, setProjectSlug] = useState(initialProject);
-  const searchRef = useRef<HTMLInputElement>(null);
-
-  // Reflect filter state back into the URL whenever it changes — this
-  // is what makes the page state shareable. Skips replace when the URL
-  // already matches so the router doesn't churn on first paint.
-  useEffect(() => {
-    const next = new URLSearchParams();
-    if (debouncedSearch.trim()) next.set("q", debouncedSearch.trim());
-    if (pill !== "all") next.set("status", PILL_TO_STATUS_FILTER[pill] ?? "");
-    if (teamSlug) next.set("team", teamSlug);
-    if (projectSlug) next.set("project", projectSlug);
-    const target = next.toString();
-    const current = searchParams.toString();
-    if (target === current) return;
-    const url = target ? `${pathname}?${target}` : pathname;
-    router.replace(url, { scroll: false });
-  }, [debouncedSearch, pill, teamSlug, projectSlug, pathname, router, searchParams]);
-
-  const queryVariables = useMemo(() => {
-    const status = PILL_TO_STATUS_FILTER[pill];
-    return {
+  const variables = useMemo(
+    () => ({
       includeFreshness: true,
-      limit: PAGE_SIZE,
-      search: debouncedSearch.trim() || null,
-      status: status,
+      status: PILL_TO_STATUS_FILTER[pill],
       teamSlug: teamSlug || null,
       projectSlug: projectSlug || null,
-    };
-  }, [debouncedSearch, pill, teamSlug, projectSlug]);
+      sortBy,
+    }),
+    [pill, teamSlug, projectSlug, sortBy]
+  );
 
-  const { data, loading, error, refetch, fetchMore } = useQuery<Resp>(LIST_APPS_PAGE, {
-    variables: queryVariables,
-    notifyOnNetworkStatusChange: true,
+  const table = useCursorTable<AstroliftRegisteredApp>({
+    query: LIST_APPS_PAGE,
+    variables,
+    extract: (d) => (d as Resp | undefined)?.astroliftAppsPage,
+    searchVariable: "search",
+    // This query spells its cursor argument `cursor`; the audit and
+    // events pages spell theirs `after`.
+    cursorVariable: "cursor",
+    urlKey: "apps",
   });
 
-  const page = data?.astroliftAppsPage;
-  const rawApps: AstroliftRegisteredApp[] = useMemo(() => page?.items ?? [], [page]);
-  const totalCount = page?.totalCount ?? 0;
-  const nextCursor = page?.nextCursor ?? null;
+  const { clearFilters: clearSearch, isFiltered, rows } = table;
 
-  // #697 — pinned apps sort to the top of the grid.
+  // Reflect the filter axes the controller does not own back into the
+  // URL, so the page state stays shareable. Mutates the existing query
+  // string rather than rebuilding it, because `useCursorTable` writes
+  // ?apps-q= / ?apps-size= into the same one — and uses replaceState for
+  // the same reason it does: a Next navigation would remount the tree
+  // and throw away the cursor stack.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const set = (key: string, value: string) => {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    };
+    set("status", pill === "all" ? "" : (PILL_TO_STATUS_FILTER[pill] ?? ""));
+    set("team", teamSlug);
+    set("project", projectSlug);
+    const qs = params.toString();
+    window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+  }, [pill, teamSlug, projectSlug]);
+
+  // #697 — pinned apps sort to the top. This is the one client-side
+  // reorder left on the page and it is deliberately scoped to the page
+  // in hand: there is no server-side "pinned" axis (the set is a
+  // per-browser preference), so an app pinned on page three stays on
+  // page three until the operator walks to it.
   const { pinned: pinnedSet, toggle: togglePin } = usePinnedApps();
+  const apps = useMemo(() => {
+    if (pinnedSet.size === 0) return rows;
+    const pins: AstroliftRegisteredApp[] = [];
+    const rest: AstroliftRegisteredApp[] = [];
+    for (const app of rows) {
+      if (pinnedSet.has(app.slug)) pins.push(app);
+      else rest.push(app);
+    }
+    return [...pins, ...rest];
+  }, [rows, pinnedSet]);
 
-  // #698 — bulk-action selection. Tracks slugs (not ids) because the
-  // bulk mutations are keyed on slug.
-  const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
+  // Same controller, pinned rows first: paging, search, sort and state
+  // all still come from the server-side walk.
+  const pinnedController: CursorTableController<AstroliftRegisteredApp> = {
+    ...table,
+    rows: apps,
+  };
+
+  // #698 — bulk-action selection. Row ids are slugs (not guids) because
+  // the bulk mutations are keyed on slug.
+  const selection = useRowSelection();
   const [pushSecretsOpen, setPushSecretsOpen] = useState(false);
 
   const [bulkRollingRestart, rollingRestartState] = useMutation<{
@@ -227,20 +322,7 @@ export function AppsClient() {
   }>(BULK_RESYNC_MANIFEST);
 
   const bulkBusy =
-    rollingRestartState.loading ||
-    pushSecretsState.loading ||
-    resyncManifestState.loading;
-
-  const toggleSelect = useCallback((slug: string) => {
-    setSelectedSlugs((prev) => {
-      const next = new Set(prev);
-      if (next.has(slug)) next.delete(slug);
-      else next.add(slug);
-      return next;
-    });
-  }, []);
-
-  const clearSelection = useCallback(() => setSelectedSlugs(new Set()), []);
+    rollingRestartState.loading || pushSecretsState.loading || resyncManifestState.loading;
 
   function reportBulkResult(label: string, result: BulkOperationResult) {
     const total = result.okCount + result.failedCount;
@@ -254,93 +336,44 @@ export function AppsClient() {
     }
   }
 
-  async function handleRollingRestart() {
-    const appSlugs = Array.from(selectedSlugs);
+  async function handleRollingRestart(appSlugs: string[]) {
     const { data } = await bulkRollingRestart({
       variables: { input: { appSlugs, environmentName: null } },
     });
     if (data?.bulkRollingRestart) {
       reportBulkResult("Rolling restart", data.bulkRollingRestart);
-      clearSelection();
+      selection.clear();
     }
   }
 
   async function handlePushSecrets(bundleSlug: string, environmentName: string | null) {
-    const appSlugs = Array.from(selectedSlugs);
+    const appSlugs = selection.selectedIds;
     const { data } = await bulkPushSecrets({
       variables: { input: { appSlugs, bundleSlug, environmentName } },
     });
     if (data?.bulkPushSecrets) {
       reportBulkResult("Push secrets", data.bulkPushSecrets);
-      clearSelection();
+      selection.clear();
       setPushSecretsOpen(false);
     }
   }
 
-  async function handleResyncManifest() {
-    const appSlugs = Array.from(selectedSlugs);
+  async function handleResyncManifest(appSlugs: string[]) {
     const { data } = await bulkResyncManifest({
       variables: { input: { appSlugs } },
     });
     if (data?.bulkResyncManifest) {
       reportBulkResult("Resync manifest", data.bulkResyncManifest);
-      clearSelection();
+      selection.clear();
     }
   }
-  // #695 — client-side sort dropdown. Default is the backend's
-  // `created_at desc` (so it matches the cursor pagination); other
-  // options re-order the currently-loaded page. True cross-page sort
-  // needs a backend `sort_by` parameter — filed as a follow-up; most
-  // orgs fit in one page anyway.
-  const [sortKey, setSortKey] = useState<"recent" | "deployed" | "name">("recent");
-  const apps: AstroliftRegisteredApp[] = useMemo(() => {
-    let sorted = rawApps;
-    if (sortKey === "deployed") {
-      sorted = [...rawApps].sort((a, b) => {
-        const ta = a.lastDeployedAt ? Date.parse(a.lastDeployedAt) : 0;
-        const tb = b.lastDeployedAt ? Date.parse(b.lastDeployedAt) : 0;
-        return tb - ta;
-      });
-    } else if (sortKey === "name") {
-      sorted = [...rawApps].sort((a, b) => a.name.localeCompare(b.name));
-    }
-    if (pinnedSet.size === 0) return sorted;
-    const pins: AstroliftRegisteredApp[] = [];
-    const rest: AstroliftRegisteredApp[] = [];
-    for (const a of sorted) {
-      if (pinnedSet.has(a.slug)) pins.push(a);
-      else rest.push(a);
-    }
-    return [...pins, ...rest];
-  }, [rawApps, pinnedSet, sortKey]);
-
-  const ctrl = useListControls({
-    data: apps,
-    searchFn: (app) =>
-      [app.name, app.slug, app.teamSlug, app.projectSlug, app.sourceKind].join(" "),
-    initialPageSize: 25,
-    sortFn: (a, b, sort) => {
-      if (sort.key === "name") {
-        const cmp = a.name.localeCompare(b.name);
-        return sort.dir === "asc" ? cmp : -cmp;
-      }
-      if (sort.key === "status") {
-        const cmp = a.provisioningStatus.localeCompare(b.provisioningStatus);
-        return sort.dir === "asc" ? cmp : -cmp;
-      }
-      if (sort.key === "createdAt") {
-        const ta = a.createdAt ? Date.parse(a.createdAt) : 0;
-        const tb = b.createdAt ? Date.parse(b.createdAt) : 0;
-        return sort.dir === "asc" ? ta - tb : tb - ta;
-      }
-      return 0;
-    },
-  });
 
   // `/` global shortcut focuses the search input — but only when the
   // user isn't already typing into a form control / contenteditable,
   // and no modifier key is held (so it doesn't intercept browser
-  // shortcuts).
+  // shortcuts). DataTable owns the search box, so there is no ref to
+  // hand out: the toolbar is the first thing it renders, which makes
+  // the surface's first <input> the search field in both view modes.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "/") return;
@@ -352,51 +385,331 @@ export function AppsClient() {
           return;
         }
       }
+      const box = surfaceRef.current?.querySelector("input");
+      if (!box) return;
       e.preventDefault();
-      searchRef.current?.focus();
-      searchRef.current?.select();
+      box.focus();
+      box.select();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const onLoadMore = useCallback(() => {
-    if (!nextCursor) return;
-    void fetchMore({
-      variables: { ...queryVariables, cursor: nextCursor },
-      updateQuery: (prev, { fetchMoreResult }) => {
-        if (!fetchMoreResult) return prev;
-        const prevPage = prev.astroliftAppsPage;
-        const nextPage = fetchMoreResult.astroliftAppsPage;
-        return {
-          astroliftAppsPage: {
-            ...nextPage,
-            // Merge dedupes by id in case a row appears in both pages
-            // (the cursor seek key is stable so this should never
-            // happen in practice, but defensive merging avoids React
-            // key collisions if it does).
-            items: dedupeApps([...(prevPage?.items ?? []), ...nextPage.items]),
-          },
-        };
-      },
-    }).catch(() => {
-      // Swallowed: a failed `fetchMore` leaves the existing page in
-      // place; the error banner re-renders from the parent query.
-    });
-  }, [fetchMore, nextCursor, queryVariables]);
+  // Filters the controller doesn't own. A pill / team / project filter
+  // narrows the result set server-side but leaves `isFiltered` false —
+  // that flag tracks the search box — so the "you have no apps" empty
+  // state has to be swapped for the "nothing matched" one by hand.
+  const narrowed = pill !== "all" || teamSlug !== "" || projectSlug !== "";
+  const hasActiveFilters = narrowed || isFiltered;
 
   const clearFilters = useCallback(() => {
-    setRawSearch("");
     setPill("all");
     setTeamSlug("");
     setProjectSlug("");
-  }, []);
+    clearSearch();
+  }, [clearSearch]);
 
-  const hasActiveFilters =
-    debouncedSearch.trim() !== "" ||
-    pill !== "all" ||
-    teamSlug !== "" ||
-    projectSlug !== "";
+  const empty: EmptyStateSpec = narrowed
+    ? {
+        icon: <SearchIcon className="size-5" />,
+        title: t("noMatch.title"),
+        description: t("noMatch.description"),
+      }
+    : {
+        icon: <RocketIcon className="size-5" />,
+        title: t("empty.title"),
+        description: t("empty.description"),
+        actionHref: "/apps/new",
+        actionLabel: t("empty.action"),
+      };
+
+  const emptyFiltered = {
+    title: "No apps match that search",
+    description:
+      "The search runs on the server across the app name, slug, description, and repo. Try a shorter term, or clear it to see the rest of the registry.",
+  };
+
+  const filterControls = (
+    <>
+      <label className="text-muted-foreground inline-flex items-center gap-2 text-xs">
+        <span>Sort</span>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as AppsListSortKey)}
+          className="border-border bg-background h-8 rounded-md border px-2 text-xs"
+          aria-label="Sort apps"
+        >
+          {SORT_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div
+        className="flex flex-wrap items-center gap-1.5"
+        role="group"
+        aria-label={t("filters.ariaLabel")}
+      >
+        {PILL_ORDER.map((p) => {
+          const isActive = pill === p;
+          return (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setPill(p)}
+              aria-pressed={isActive}
+              className={cn(
+                "border-border focus-visible:ring-ring inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none",
+                isActive
+                  ? "bg-foreground text-background border-foreground"
+                  : "bg-background text-muted-foreground hover:text-foreground hover:bg-accent/40"
+              )}
+            >
+              <span>{t(`filters.${p}`)}</span>
+            </button>
+          );
+        })}
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="border-border text-muted-foreground hover:text-foreground hover:bg-accent/40 ml-1 inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+          >
+            {t("noMatch.clear")}
+          </button>
+        )}
+      </div>
+    </>
+  );
+
+  // #698 — each action fans out server-side; the toast reports the
+  // aggregate okCount/total plus a separate destructive toast listing
+  // the failed slugs.
+  const renderBulkActions = (sel: RowSelection) => (
+    <>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => handleRollingRestart(sel.selectedIds)}
+        disabled={bulkBusy}
+      >
+        <RotateCcwIcon className="size-3.5" />
+        Rolling restart
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => setPushSecretsOpen(true)}
+        disabled={bulkBusy}
+      >
+        <KeyIcon className="size-3.5" />
+        Push secrets
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => handleResyncManifest(sel.selectedIds)}
+        disabled={bulkBusy}
+      >
+        <RefreshCwIcon className="size-3.5" />
+        Resync manifest
+      </Button>
+    </>
+  );
+
+  const columns: Column<AstroliftRegisteredApp>[] = [
+    {
+      id: "name",
+      header: "Name",
+      cell: (app) => (
+        <span className="flex items-center gap-2">
+          <StatusDot status={statusDot[app.provisioningStatus]} />
+          <span className="min-w-0">
+            <span className="block truncate font-medium">{app.name}</span>
+            <span className="text-muted-foreground block font-mono text-xs">
+              {app.teamSlug}/{app.projectSlug}/{app.slug}
+            </span>
+          </span>
+        </span>
+      ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      width: "w-40",
+      cell: (app) => (
+        <Badge variant="outline" className="text-xs">
+          {app.provisioningStatus}
+        </Badge>
+      ),
+    },
+    {
+      id: "image",
+      header: "Image",
+      width: "w-52",
+      cellClassName: "text-muted-foreground font-mono text-xs",
+      cell: (app) => app.latestDeployment?.imageTag || "—",
+    },
+    {
+      id: "pin",
+      header: <span className="sr-only">Pin</span>,
+      width: "w-12",
+      align: "right",
+      cell: (app) => (
+        <PinButton pinned={pinnedSet.has(app.slug)} onToggle={() => togglePin(app.slug)} />
+      ),
+    },
+  ];
+
+  const cardBody = (() => {
+    switch (table.state) {
+      case "loading":
+        // Skeletons keep the grid's geometry, so nothing jumps when the
+        // cards land.
+        return (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={`app-skeleton-${i}`} className="h-44 w-full" />
+            ))}
+          </div>
+        );
+
+      case "error":
+        return (
+          <div
+            role="alert"
+            className="flex flex-col items-center gap-3 rounded-md border py-10 text-center"
+          >
+            <AlertTriangleIcon className="text-danger size-5" />
+            <div>
+              <p className="font-medium">{t("errorBanner.title")}</p>
+              <p className="text-muted-foreground mt-1 max-w-md text-sm">
+                {table.error?.message ?? "The request failed."}
+              </p>
+            </div>
+            <Button size="sm" variant="outline" onClick={table.retry}>
+              <RefreshCcwIcon className="size-3.5" />
+              {t("errorBanner.retry")}
+            </Button>
+          </div>
+        );
+
+      case "emptyFiltered":
+        return (
+          <EmptyState
+            icon={<SearchIcon className="size-5" />}
+            title={emptyFiltered.title}
+            description={emptyFiltered.description}
+            // Same words and same effect as DataTable's own
+            // filtered-empty state, so the two views cannot disagree.
+            secondary={
+              <Button size="sm" variant="outline" onClick={clearSearch}>
+                Clear search
+              </Button>
+            }
+          />
+        );
+
+      case "empty":
+        return <EmptyState {...empty} />;
+
+      case "ready":
+        return (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {apps.map((app) => {
+              const isPinned = pinnedSet.has(app.slug);
+              const isSelected = selection.isSelected(app.slug);
+              return (
+                <Link key={app.slug} href={`/apps/${app.slug}`} className="contents">
+                  <Card className="hover:bg-accent/30 group relative transition-colors">
+                    {/* #698 — multi-select checkbox. Same stop-propagation
+                        pattern as the pin button so a checkbox click
+                        never navigates into the app. */}
+                    {canDeploy && (
+                      <label
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute top-3 left-3 z-10 inline-flex cursor-pointer items-center"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            selection.toggle(app.slug);
+                          }}
+                          aria-label={`Select ${app.name}`}
+                        />
+                      </label>
+                    )}
+                    <PinButton
+                      pinned={isPinned}
+                      onToggle={() => togglePin(app.slug)}
+                      className="absolute top-3 right-12 z-10"
+                    />
+                    <CardContent className="flex flex-col gap-3 p-5 pl-9">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h3 className="truncate text-lg font-semibold">{app.name}</h3>
+                          <p className="text-muted-foreground font-mono text-xs">
+                            {app.teamSlug}/{app.projectSlug}/{app.slug}
+                          </p>
+                        </div>
+                        <StatusDot status={statusDot[app.provisioningStatus]} />
+                      </div>
+
+                      {app.description && (
+                        <p className="text-muted-foreground line-clamp-2 text-sm">
+                          {app.description}
+                        </p>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        {app.sourceRepo && (
+                          <Badge variant="outline" className="gap-1">
+                            <GitBranchIcon className="size-3" />
+                            {app.sourceRepo}
+                          </Badge>
+                        )}
+                        <Badge variant="secondary">{app.sourceKind}</Badge>
+                        <Badge variant={app.isActive ? "default" : "secondary"}>
+                          {app.provisioningStatus}
+                        </Badge>
+                        {/* #696 — live preview count badge. Hidden when 0
+                            to keep the card tight; visible badge tells
+                            operators "this app has N previews up right
+                            now without leaving the list to find out". */}
+                        {app.activePreviewCount > 0 && (
+                          <Badge variant="outline" className="gap-1">
+                            {app.activePreviewCount} preview
+                            {app.activePreviewCount === 1 ? "" : "s"}
+                          </Badge>
+                        )}
+                      </div>
+
+                      <AppFreshnessRow
+                        pulse={app.healthPulse}
+                        latestDeployment={app.latestDeployment}
+                        lastDeployedAt={app.lastDeployedAt ?? null}
+                      />
+
+                      <div className="text-muted-foreground flex items-center justify-between text-xs">
+                        <span>
+                          {t("branchLabel")} <span className="font-mono">{app.deployBranch}</span>
+                        </span>
+                        <span className="group-hover:text-foreground inline-flex items-center gap-1">
+                          {t("open")} <ExternalLinkIcon className="size-3" />
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
+          </div>
+        );
+    }
+  })();
 
   return (
     <PageShell
@@ -416,353 +729,66 @@ export function AppsClient() {
         </div>
       }
     >
-      {error && (
-        <div
-          role="alert"
-          className="border-destructive/40 bg-destructive/10 text-destructive flex flex-col gap-2 rounded-md border p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
-        >
-          <div className="flex items-start gap-2">
-            <AlertCircleIcon className="mt-0.5 size-4 shrink-0" />
-            <div className="min-w-0">
-              <p className="font-medium">{t("errorBanner.title")}</p>
-              <p className="text-destructive/90 mt-0.5 text-xs break-words">{error.message}</p>
-            </div>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            className="border-destructive/40 text-destructive hover:bg-destructive/15 hover:text-destructive shrink-0 self-start sm:self-auto"
-            onClick={() => {
-              void refetch();
-            }}
-          >
-            <RefreshCcwIcon className="size-3.5" />
-            {t("errorBanner.retry")}
-          </Button>
-        </div>
-      )}
+      <div ref={surfaceRef} className="flex flex-col gap-3">
+        {viewMode === "list" ? (
+          <DataTable
+            label="Apps"
+            controller={pinnedController}
+            columns={columns}
+            getRowId={(app) => app.slug}
+            rowHref={(app) => `/apps/${app.slug}`}
+            rowClassName={() => INTERACTIVE_CELLS}
+            searchPlaceholder={t("search.placeholder")}
+            toolbar={filterControls}
+            // Selection drives the bulk bar, which has nothing to offer
+            // an operator who cannot deploy.
+            selection={canDeploy ? selection : undefined}
+            bulkActions={renderBulkActions}
+            empty={empty}
+            emptyFiltered={emptyFiltered}
+          />
+        ) : (
+          // The card view is the same controller wearing different
+          // clothes: DataTable's chrome (toolbar, bulk bar, pagination)
+          // around a grid instead of a table, because cards are not rows
+          // and a one-column table of cards would be a lie.
+          <>
+            <DataTableToolbar controller={table} searchPlaceholder={t("search.placeholder")}>
+              {filterControls}
+            </DataTableToolbar>
 
-      {/* Triage controls: search on top, status pills below. Pills wrap on
-          narrow viewports so the row never overflows. */}
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative max-w-md flex-1">
-            <SearchIcon className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
-            <Input
-              ref={searchRef}
-              type="search"
-              value={rawSearch}
-              onChange={(e) => setRawSearch(e.target.value)}
-              placeholder={t("search.placeholder")}
-              aria-label={t("search.ariaLabel")}
-              className="pr-12 pl-8"
-            />
-            <kbd
-              aria-hidden="true"
-              className="border-border bg-muted text-muted-foreground pointer-events-none absolute top-1/2 right-2 hidden h-5 -translate-y-1/2 items-center rounded border px-1.5 font-mono text-2xs sm:inline-flex"
+            {canDeploy && selection.selectedCount > 0 && (
+              <div className="bg-muted/50 flex flex-wrap items-center gap-3 rounded-md border px-3 py-2">
+                <span className="text-sm font-medium tabular-nums">
+                  {selection.selectedCount} selected
+                </span>
+                <Button variant="ghost" size="sm" onClick={selection.clear}>
+                  Clear
+                </Button>
+                <div className="ml-auto flex flex-wrap items-center gap-2">
+                  {renderBulkActions(selection)}
+                </div>
+              </div>
+            )}
+
+            {/* Cards persist across a refetch rather than blanking, so
+                fade them while they answer the previous question. */}
+            <div
+              className={cn("transition-opacity", table.isStale && "opacity-60")}
+              aria-busy={table.isStale || undefined}
             >
-              /
-            </kbd>
-          </div>
-          {/* #695 — client-side sort dropdown. Pinned apps always
-              float to the top regardless of sort key. */}
-          <label className="text-muted-foreground inline-flex items-center gap-2 text-xs">
-            <span>Sort</span>
-            <select
-              value={sortKey}
-              onChange={(e) => setSortKey(e.target.value as typeof sortKey)}
-              className="border-border bg-background h-8 rounded-md border px-2 text-xs"
-              aria-label="Sort apps"
-            >
-              <option value="recent">Recently registered</option>
-              <option value="deployed">Last deployed</option>
-              <option value="name">Name (A→Z)</option>
-            </select>
-          </label>
-        </div>
-        <div
-          className="flex flex-wrap items-center gap-1.5"
-          role="group"
-          aria-label={t("filters.ariaLabel")}
-        >
-          {PILL_ORDER.map((p) => {
-            const isActive = pill === p;
-            return (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPill(p)}
-                aria-pressed={isActive}
-                className={cn(
-                  "border-border focus-visible:ring-ring inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none",
-                  isActive
-                    ? "bg-foreground text-background border-foreground"
-                    : "bg-background text-muted-foreground hover:text-foreground hover:bg-accent/40"
-                )}
-              >
-                <span>{t(`filters.${p}`)}</span>
-              </button>
-            );
-          })}
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="border-border text-muted-foreground hover:text-foreground hover:bg-accent/40 ml-1 inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-colors"
-            >
-              {t("noMatch.clear")}
-            </button>
-          )}
-        </div>
-        {totalCount > 0 && (
-          <p className="text-muted-foreground text-xs">
-            {t("count", { shown: ctrl.totalFiltered, total: totalCount })}
-          </p>
+              {cardBody}
+            </div>
+
+            <DataTablePagination controller={table} />
+          </>
         )}
       </div>
-
-      {/* #698 — bulk-action toolbar. Shows when at least one app is
-          selected. Each action fans out server-side; the toast reports
-          aggregate okCount/total plus a separate destructive toast
-          listing failed slugs. */}
-      {selectedSlugs.size > 0 && (
-        <Can permission="app.deploy">
-          <div className="bg-accent/30 border-border flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-sm">
-            <Badge variant="secondary">{selectedSlugs.size} selected</Badge>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleRollingRestart}
-              disabled={bulkBusy}
-            >
-              <RotateCcwIcon className="size-3.5" />
-              Rolling restart
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setPushSecretsOpen(true)}
-              disabled={bulkBusy}
-            >
-              <KeyIcon className="size-3.5" />
-              Push secrets
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleResyncManifest}
-              disabled={bulkBusy}
-            >
-              <RefreshCwIcon className="size-3.5" />
-              Resync manifest
-            </Button>
-            <Button size="sm" variant="ghost" onClick={clearSelection} className="ml-auto">
-              <XIcon className="size-3.5" />
-              Clear
-            </Button>
-          </div>
-        </Can>
-      )}
-
-      {loading && !data ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <Skeleton className="h-44 w-full" />
-          <Skeleton className="h-44 w-full" />
-          <Skeleton className="h-44 w-full" />
-        </div>
-      ) : apps.length === 0 && !hasActiveFilters ? (
-        <Card className="border-dashed">
-          <CardContent className="p-8">
-            <EmptyState
-              icon={<RocketIcon className="size-5" />}
-              title={t("empty.title")}
-              description={t("empty.description")}
-              actionHref="/apps/new"
-              actionLabel={t("empty.action")}
-            />
-          </CardContent>
-        </Card>
-      ) : apps.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="p-8">
-            <EmptyState
-              icon={<SearchIcon className="size-5" />}
-              title={t("noMatch.title")}
-              description={t("noMatch.description")}
-              secondary={
-                <Button size="sm" variant="outline" onClick={clearFilters}>
-                  {t("noMatch.clear")}
-                </Button>
-              }
-            />
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <ListControls controls={ctrl} searchPlaceholder="Filter loaded apps…" hideSearch={false} />
-          {viewMode === "list" && (
-            <div className="flex items-center gap-3 px-4 py-1">
-              <div className="w-4 shrink-0" />
-              <div className="flex min-w-0 flex-1 items-center gap-4">
-                <SortableHeader sortKey="name" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                  Name
-                </SortableHeader>
-              </div>
-              <SortableHeader sortKey="status" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                Status
-              </SortableHeader>
-              <div className="w-24 shrink-0" />
-            </div>
-          )}
-          <div className={viewMode === "card" ? "grid gap-4 md:grid-cols-2 lg:grid-cols-3" : "flex flex-col gap-1"}>
-            {ctrl.rows.map((app) => {
-              const isPinned = pinnedSet.has(app.slug);
-              const isSelected = selectedSlugs.has(app.slug);
-
-              // ── List row ─────────────────────────────────────────────
-              if (viewMode === "list") {
-                return (
-                  <Link key={app.id} href={`/apps/${app.slug}`} className="contents">
-                    <div className="hover:bg-accent/50 flex items-center gap-3 rounded-md border px-4 py-2.5 transition-colors">
-                      <StatusDot status={statusDot[app.provisioningStatus]} />
-                      <div className="min-w-0 flex-1">
-                        <span className="truncate font-medium">{app.name}</span>
-                        <span className="text-muted-foreground ml-2 font-mono text-xs">{app.slug}</span>
-                      </div>
-                      <Badge variant="outline" className="shrink-0 text-xs">
-                        {app.provisioningStatus}
-                      </Badge>
-                      {app.latestDeployment && (
-                        <span className="text-muted-foreground shrink-0 text-xs">
-                          {app.latestDeployment.imageTag}
-                        </span>
-                      )}
-                      <ExternalLinkIcon className="text-muted-foreground size-3.5 shrink-0" />
-                    </div>
-                  </Link>
-                );
-              }
-
-              // ── Card ──────────────────────────────────────────────────
-              return (
-              <Link key={app.id} href={`/apps/${app.slug}`} className="contents">
-                <Card className="hover:bg-accent/30 group relative transition-colors">
-                  {/* #698 — multi-select checkbox. Same stop-propagation
-                      pattern as the pin button so a checkbox click
-                      never navigates into the app. */}
-                  <label
-                    onClick={(e) => e.stopPropagation()}
-                    className="absolute top-3 left-3 z-10 inline-flex cursor-pointer items-center"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        toggleSelect(app.slug);
-                      }}
-                      aria-label={`Select ${app.name}`}
-                    />
-                  </label>
-                  {/* #697 — Pin / unpin toggle. Positioned absolutely so
-                      it can sit inside the card without breaking the
-                      <Link> parent's whole-card click target. The
-                      button stops both default + propagation so a
-                      click on the star doesn't navigate to the app. */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      togglePin(app.slug);
-                    }}
-                    className="text-muted-foreground hover:text-warning-fg absolute top-3 right-12 z-10 size-7 rounded-md p-1 transition-colors"
-                    title={isPinned ? "Unpin app" : "Pin to top"}
-                    aria-pressed={isPinned}
-                  >
-                    <StarIcon
-                      className={isPinned ? "size-4 fill-warning text-warning-fg" : "size-4"}
-                      aria-hidden
-                    />
-                    <span className="sr-only">{isPinned ? "Unpin app" : "Pin to top"}</span>
-                  </button>
-                  <CardContent className="flex flex-col gap-3 p-5 pl-9">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <h3 className="truncate text-lg font-semibold">{app.name}</h3>
-                        <p className="text-muted-foreground font-mono text-xs">
-                          {app.teamSlug}/{app.projectSlug}/{app.slug}
-                        </p>
-                      </div>
-                      <StatusDot status={statusDot[app.provisioningStatus]} />
-                    </div>
-
-                    {app.description && (
-                      <p className="text-muted-foreground line-clamp-2 text-sm">{app.description}</p>
-                    )}
-
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      {app.sourceRepo && (
-                        <Badge variant="outline" className="gap-1">
-                          <GitBranchIcon className="size-3" />
-                          {app.sourceRepo}
-                        </Badge>
-                      )}
-                      <Badge variant="secondary">{app.sourceKind}</Badge>
-                      <Badge variant={app.isActive ? "default" : "secondary"}>
-                        {app.provisioningStatus}
-                      </Badge>
-                      {/* #696 — live preview count badge. Hidden when 0
-                          to keep the card tight; visible badge tells
-                          operators "this app has N previews up right
-                          now without leaving the list to find out". */}
-                      {app.activePreviewCount > 0 && (
-                        <Badge variant="outline" className="gap-1">
-                          {app.activePreviewCount} preview
-                          {app.activePreviewCount === 1 ? "" : "s"}
-                        </Badge>
-                      )}
-                    </div>
-
-                    <AppFreshnessRow
-                      pulse={app.healthPulse}
-                      latestDeployment={app.latestDeployment}
-                      lastDeployedAt={app.lastDeployedAt ?? null}
-                    />
-
-                    <div className="text-muted-foreground flex items-center justify-between text-xs">
-                      <span>
-                        {t("branchLabel")} <span className="font-mono">{app.deployBranch}</span>
-                      </span>
-                      <span className="group-hover:text-foreground inline-flex items-center gap-1">
-                        {t("open")} <ExternalLinkIcon className="size-3" />
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-              );
-            })}
-          </div>
-          {nextCursor && (
-            <div className="flex justify-center pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onLoadMore}
-                disabled={loading}
-              >
-                {loading ? t("loadMore.loading") : t("loadMore.label")}
-              </Button>
-            </div>
-          )}
-        </>
-      )}
 
       <PushSecretsDialog
         open={pushSecretsOpen}
         onOpenChange={setPushSecretsOpen}
-        appCount={selectedSlugs.size}
+        appCount={selection.selectedCount}
         busy={bulkBusy}
         onSubmit={handlePushSecrets}
       />
@@ -800,9 +826,12 @@ function PushSecretsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Push secrets to {appCount} app{appCount === 1 ? "" : "s"}</DialogTitle>
+          <DialogTitle>
+            Push secrets to {appCount} app{appCount === 1 ? "" : "s"}
+          </DialogTitle>
           <DialogDescription>
-            Project the named secret bundle onto every selected app. Leave environment blank to fan out to every environment the bundle is bound to.
+            Project the named secret bundle onto every selected app. Leave environment blank to fan
+            out to every environment the bundle is bound to.
           </DialogDescription>
         </DialogHeader>
         <form
@@ -849,15 +878,4 @@ function PushSecretsDialog({
       </DialogContent>
     </Dialog>
   );
-}
-
-function dedupeApps(rows: AstroliftRegisteredApp[]): AstroliftRegisteredApp[] {
-  const seen = new Set<string>();
-  const out: AstroliftRegisteredApp[] = [];
-  for (const row of rows) {
-    if (seen.has(row.id)) continue;
-    seen.add(row.id);
-    out.push(row);
-  }
-  return out;
 }

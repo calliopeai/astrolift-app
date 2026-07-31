@@ -656,6 +656,7 @@ function RowActions({
   }>(REDEPLOY_APP, { refetchQueries: refetch });
 
   const [confirmAbort, setConfirmAbort] = React.useState(false);
+  const [confirmRedeploy, setConfirmRedeploy] = React.useState(false);
   const [confirmRollback, setConfirmRollback] = React.useState(false);
   const [confirmTrash, setConfirmTrash] = React.useState(false);
 
@@ -710,21 +711,7 @@ function RowActions({
         </Button>
       )}
       {showRedeploy && (
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={busy}
-          onClick={async () => {
-            try {
-              const { data } = await redeploy({
-                variables: { input: { id: d.id } },
-              });
-              reportResult("redeployApp", data?.redeployApp);
-            } catch (err) {
-              toast.error(err instanceof Error ? err.message : "Redeploy failed");
-            }
-          }}
-        >
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => setConfirmRedeploy(true)}>
           <RotateCcwIcon className="size-3.5" />
           Redeploy
         </Button>
@@ -777,6 +764,24 @@ function RowActions({
             variables: { input: { id: d.id, reason } },
           });
           reportResult("abortDeployment", data?.abortDeployment);
+        }}
+      />
+
+      {/* Redeploy spawns a real rollout — the same mutation /deployments
+          confirms before firing, and the sibling actions in this very row
+          already do. Wording matches the fleet surface so the two pages
+          describe the same action the same way. */}
+      <ConfirmDialog
+        open={confirmRedeploy}
+        onOpenChange={setConfirmRedeploy}
+        title={`Redeploy ${d.imageTag || d.id.slice(0, 8)} to ${app.slug}/${d.environmentName}?`}
+        description="Spawns a fresh deployment with the same image. Useful to retry after a transient failure or pick up an updated config."
+        confirmLabel="Redeploy"
+        onConfirm={async () => {
+          const { data } = await redeploy({
+            variables: { input: { id: d.id } },
+          });
+          reportResult("redeployApp", data?.redeployApp);
         }}
       />
 

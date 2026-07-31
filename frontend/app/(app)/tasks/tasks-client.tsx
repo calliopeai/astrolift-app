@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useMutation } from "@apollo/client/react";
 import {
   ClipboardListIcon,
   ClockIcon,
@@ -8,34 +8,35 @@ import {
   Loader2Icon,
   PlayIcon,
   ScrollIcon,
-  TerminalIcon,
 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
+import {
+  DataTable,
+  useCursorTable,
+  type Column,
+  type CursorPage,
+  type CursorTableController,
+  type EmptyStateSpec,
+} from "@/components/data-table";
 import { EmptyState } from "@/components/EmptyState";
-import { ListControls, SortableHeader } from "@/components/ListControls";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { RUN_TASK } from "@/graphql/lifecycle/lifecycle.mutations";
-import { LIST_TASK_RUNS } from "@/graphql/lifecycle/lifecycle.queries";
+import { LIST_TASK_RUNS_PAGE } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftTaskRun, TaskRunStatus } from "@/graphql/lifecycle/lifecycle.types";
-import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
-import { useListControls } from "@/hooks/use-list-controls";
-import type { SortState } from "@/hooks/use-list-controls";
+import { LIST_WORKLOADS_PAGE } from "@/graphql/registry/registry.queries";
 
 // ── types ─────────────────────────────────────────────────────────────────
 
@@ -47,12 +48,12 @@ interface TaskWorkload {
   registeredAppSlug: string;
 }
 
-interface WorkloadResp {
-  astroliftWorkloads: TaskWorkload[];
+interface WorkloadsPageResp {
+  astroliftWorkloadsPage: CursorPage<TaskWorkload>;
 }
 
-interface TaskRunResp {
-  astroliftTaskRuns: AstroliftTaskRun[];
+interface TaskRunsPageResp {
+  astroliftTaskRunsPage: CursorPage<AstroliftTaskRun>;
 }
 
 interface MutationResultLite<T> {
@@ -63,11 +64,27 @@ interface MutationResultLite<T> {
 
 // ── helpers ───────────────────────────────────────────────────────────────
 
-const SEVEN_DAYS_AGO = () => {
-  const d = new Date();
-  d.setDate(d.getDate() - 7);
-  return d.toISOString();
-};
+/**
+ * `astroliftWorkloadsPage` has no `kind:` argument, so the one axis that
+ * *defines* this tab has to ride on `search` — an OR of `icontains` over
+ * the workload's name, slug, kind and the owning app's slug, which makes
+ * "task" a superset of the task templates. The row guard in `TemplatesTab`
+ * drops whatever matched on the wrong column, so a "Run now" button can
+ * never land on a deployment. The trade is the tab's own search box:
+ * `search` is already carrying the kind filter.
+ */
+const TASK_KIND_TERM = "task";
+
+/** Radix rejects an empty-string item value, so "no filter" needs a sentinel. */
+const ANY_STATUS = "all";
+
+const TASK_RUN_STATUSES: TaskRunStatus[] = [
+  "pending",
+  "running",
+  "succeeded",
+  "failed",
+  "cancelled",
+];
 
 function formatDuration(seconds: number | null | undefined): string {
   if (seconds == null) return "—";
@@ -77,10 +94,7 @@ function formatDuration(seconds: number | null | undefined): string {
   return `${m}m ${s}s`;
 }
 
-const STATUS_VARIANT: Record<
-  TaskRunStatus,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
+const STATUS_VARIANT: Record<TaskRunStatus, "default" | "secondary" | "destructive" | "outline"> = {
   pending: "secondary",
   running: "default",
   succeeded: "outline",
@@ -104,9 +118,9 @@ export function TasksClient() {
   const rawTab = searchParams.get("tab") as TaskTab | null;
   const tab: TaskTab = rawTab && TASK_TABS.includes(rawTab) ? rawTab : "templates";
 
-  const [appFilter, setAppFilter] = React.useState<string>(
-    () => searchParams.get("app") ?? ""
-  );
+  // Status is a server-side filter argument on `astroliftTaskRunsPage`, so
+  // it changes the query rather than the rows in hand; the cursor walk
+  // restarts at page one when it flips.
   const [statusFilter, setStatusFilter] = React.useState<string>(
     () => searchParams.get("status") ?? ""
   );
@@ -124,77 +138,20 @@ export function TasksClient() {
   // "templates" is the default — omit it from the URL to keep /tasks clean.
   const setTab = (v: TaskTab) => updateParam("tab", v, "templates");
 
-  React.useEffect(() => {
-    const id = setTimeout(() => updateParam("app", appFilter), 300);
-    return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appFilter]);
-
-  // ── queries ──────────────────────────────────────────────────────────────
-
-  const { data: workloadData, loading: workloadsLoading } = useQuery<WorkloadResp>(
-    LIST_WORKLOADS,
-    { variables: {}, pollInterval: 60000 }
-  );
-
-  const taskWorkloads = React.useMemo(
-    () => (workloadData?.astroliftWorkloads ?? []).filter((w) => w.kind === "task"),
-    [workloadData]
-  );
-
-  // Task runs — present only once the backend GQL layer is wired.
-  // The query degrades gracefully: if the field doesn't exist in the
-  // schema yet, the component shows EmptyState in Recent / History.
-  const { data: runsData, loading: runsLoading } = useQuery<TaskRunResp>(LIST_TASK_RUNS, {
-    variables: { limit: 100 },
-    // Don't block render on a missing backend field — ignore GQL errors
-    // so the rest of the page still renders.
-    errorPolicy: "ignore",
-    pollInterval: 15000,
-    skip: tab === "templates" || tab === "logs",
-  });
-
-  const allRuns = React.useMemo(
-    () => runsData?.astroliftTaskRuns ?? [],
-    [runsData]
-  );
-
-  // "Recent" = last 7 days.
-  const cutoff = SEVEN_DAYS_AGO();
-  const recentRuns = React.useMemo(
-    () => allRuns.filter((r) => r.createdAt >= cutoff),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allRuns]
-  );
-
-  // History filter (app + status).
-  const historyRuns = React.useMemo(() => {
-    return allRuns.filter((r) => {
-      if (
-        appFilter &&
-        !r.registeredAppSlug.toLowerCase().includes(appFilter.toLowerCase())
-      )
-        return false;
-      if (statusFilter && r.status !== statusFilter) return false;
-      return true;
-    });
-  }, [allRuns, appFilter, statusFilter]);
-
-  // Filtered templates (by app).
-  const filteredTemplates = React.useMemo(() => {
-    if (!appFilter) return taskWorkloads;
-    return taskWorkloads.filter((w) =>
-      w.registeredAppSlug.toLowerCase().includes(appFilter.toLowerCase())
-    );
-  }, [taskWorkloads, appFilter]);
+  function handleStatusChange(next: string) {
+    setStatusFilter(next);
+    updateParam("status", next);
+  }
 
   // ── mutations ─────────────────────────────────────────────────────────────
 
+  // No `refetchQueries`: a successful run switches to the Recent tab, which
+  // mounts that walk fresh (`cache-and-network`). Naming the page query here
+  // instead would target a query that is not mounted while the operator is
+  // on Templates.
   const [runTask, runTaskState] = useMutation<{
     runTask: MutationResultLite<AstroliftTaskRun>;
-  }>(RUN_TASK, {
-    refetchQueries: [{ query: LIST_TASK_RUNS, variables: { limit: 100 } }],
-  });
+  }>(RUN_TASK);
 
   const [runningWorkloadId, setRunningWorkloadId] = React.useState<string | null>(null);
 
@@ -270,34 +227,9 @@ export function TasksClient() {
         })}
       </div>
 
-      {/* Filter row — hidden on the logs placeholder, which lists nothing. */}
-      {tab !== "logs" && (
-        <div className="flex flex-wrap items-center gap-2">
-          <Input
-            placeholder="Filter by app…"
-            value={appFilter}
-            onChange={(e) => setAppFilter(e.target.value)}
-            className="max-w-xs"
-          />
-          {tab === "history" && (
-            <Input
-              placeholder="Filter by status…"
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                updateParam("status", e.target.value);
-              }}
-              className="max-w-xs"
-            />
-          )}
-        </div>
-      )}
-
       {/* Tab content */}
       {tab === "templates" && (
         <TemplatesTab
-          workloads={filteredTemplates}
-          loading={workloadsLoading}
           runningWorkloadId={runningWorkloadId}
           onRunNow={handleRunNow}
           mutationLoading={runTaskState.loading}
@@ -305,20 +237,31 @@ export function TasksClient() {
       )}
       {tab === "recent" && (
         <RunsTab
-          runs={recentRuns}
-          loading={runsLoading}
-          emptyTitle="No recent task runs"
-          emptyDescription="Task runs from the last 7 days will appear here."
+          urlKey="recent"
           searchPlaceholder="Search recent runs…"
+          empty={{
+            icon: <HistoryIcon className="size-5" />,
+            title: "No recent task runs",
+            description: "Task runs appear here as soon as one is triggered, newest first.",
+          }}
         />
       )}
       {tab === "history" && (
         <RunsTab
-          runs={historyRuns}
-          loading={runsLoading}
-          emptyTitle="No task runs yet"
-          emptyDescription="Once tasks are run they'll appear here. Use the Templates tab to trigger one."
+          urlKey="hist"
           searchPlaceholder="Search history…"
+          status={statusFilter}
+          onStatusChange={handleStatusChange}
+          // The status filter is a server argument, not a search term, so
+          // DataTable reports its result as `empty` rather than
+          // `emptyFiltered` — the copy has to name the filter itself.
+          empty={{
+            icon: <HistoryIcon className="size-5" />,
+            title: statusFilter ? `No ${statusFilter} task runs` : "No task runs yet",
+            description: statusFilter
+              ? "No task run has that status. Clear the status filter to see the whole history."
+              : "Once tasks are run they'll appear here. Use the Templates tab to trigger one.",
+          }}
         />
       )}
       {/* Gateway placeholder ported from /observe/tasks (#892). */}
@@ -339,301 +282,204 @@ export function TasksClient() {
 
 // ── Templates tab ─────────────────────────────────────────────────────────
 
-function templateSortFn(a: TaskWorkload, b: TaskWorkload, sort: SortState): number {
-  const dir = sort.dir === "asc" ? 1 : -1;
-  if (sort.key === "name") return a.name.localeCompare(b.name) * dir;
-  if (sort.key === "app") return a.registeredAppSlug.localeCompare(b.registeredAppSlug) * dir;
-  return 0;
-}
-
 interface TemplatesTabProps {
-  workloads: TaskWorkload[];
-  loading: boolean;
   runningWorkloadId: string | null;
   onRunNow: (w: TaskWorkload) => void;
   mutationLoading: boolean;
 }
 
-function TemplatesTab({
-  workloads,
-  loading,
-  runningWorkloadId,
-  onRunNow,
-  mutationLoading,
-}: TemplatesTabProps) {
-  const ctrl = useListControls({
-    data: workloads,
-    searchFn: (w) => [w.name, w.slug, w.registeredAppSlug].join(" "),
-    initialPageSize: 25,
-    sortFn: templateSortFn,
+function TemplatesTab({ runningWorkloadId, onRunNow, mutationLoading }: TemplatesTabProps) {
+  // `astroliftWorkloadsPage` takes `appSlug`, `search`, `limit` and `after`
+  // — no sort argument, so no column declares a `sortKey`. Rows arrive
+  // newest-first from the server's `(-created_at, -guid)` seek key.
+  const table = useCursorTable<TaskWorkload>({
+    query: LIST_WORKLOADS_PAGE,
+    variables: { search: TASK_KIND_TERM },
+    extract: (d) => (d as WorkloadsPageResp | undefined)?.astroliftWorkloadsPage,
+    urlKey: "tpl",
+    pollInterval: 60000,
   });
 
-  if (loading && workloads.length === 0) {
-    return (
-      <Card>
-        <CardContent className="space-y-2 p-6">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-        </CardContent>
-      </Card>
-    );
-  }
+  const taskRows = React.useMemo(
+    () => table.rows.filter((w) => w.kind === "task"),
+    [table.rows]
+  );
 
-  if (workloads.length === 0) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <EmptyState
-            icon={<ClipboardListIcon className="size-5" />}
-            title="No task workloads"
-            description="Register a workload with kind=task on an app to create a named task template."
-            actionHref="/apps"
-            actionLabel="Go to Apps"
-          />
-        </CardContent>
-      </Card>
-    );
-  }
+  // Same controller, guarded rows: the walk — cursor, page size, error and
+  // retry — still comes from the server. `state` has to be recomputed or a
+  // page whose rows all fail the guard renders as nothing at all.
+  const controller: CursorTableController<TaskWorkload> = {
+    ...table,
+    rows: taskRows,
+    state: table.state === "ready" && taskRows.length === 0 ? "empty" : table.state,
+  };
 
-  // Group by app from the paginated+filtered slice.
-  const byApp = new Map<string, TaskWorkload[]>();
-  for (const w of ctrl.rows) {
-    const group = byApp.get(w.registeredAppSlug) ?? [];
-    group.push(w);
-    byApp.set(w.registeredAppSlug, group);
-  }
+  const columns: Column<TaskWorkload>[] = [
+    {
+      id: "app",
+      header: "App",
+      cell: (w) => <span className="font-medium">{w.registeredAppSlug}</span>,
+    },
+    {
+      id: "name",
+      header: "Name",
+      cell: (w) => <span className="font-medium">{w.name}</span>,
+    },
+    {
+      id: "slug",
+      header: "Slug",
+      cellClassName: "text-muted-foreground font-mono text-xs",
+      cell: (w) => w.slug,
+    },
+    {
+      id: "action",
+      header: "Action",
+      align: "right",
+      width: "w-28",
+      cell: (w) => {
+        const isRunning = runningWorkloadId === w.id;
+        return (
+          <Button size="sm" disabled={mutationLoading || isRunning} onClick={() => onRunNow(w)}>
+            {isRunning ? (
+              <Loader2Icon className="size-3.5 animate-spin" />
+            ) : (
+              <PlayIcon className="size-3.5" />
+            )}
+            Run now
+          </Button>
+        );
+      },
+    },
+  ];
 
   return (
-    <div className="space-y-4">
-      <ListControls controls={ctrl} searchPlaceholder="Search templates…" />
-      {ctrl.rows.length === 0 ? (
-        <Card>
-          <CardContent className="p-6">
-            <EmptyState
-              icon={<ClipboardListIcon className="size-5" />}
-              title="No matching templates"
-              description="Adjust your search to find task templates."
-            />
-          </CardContent>
-        </Card>
-      ) : (
-        Array.from(byApp.entries()).map(([appSlug, appWorkloads]) => (
-          <Card key={appSlug}>
-            <CardContent className="p-0">
-              <div className="flex items-center gap-2 border-b px-4 py-3">
-                <TerminalIcon className="text-muted-foreground size-4" />
-                <span className="font-medium">{appSlug}</span>
-                <Badge variant="secondary" className="ml-auto text-xs">
-                  {appWorkloads.length} {appWorkloads.length === 1 ? "template" : "templates"}
-                </Badge>
-              </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>
-                      <SortableHeader sortKey="name" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                        Name
-                      </SortableHeader>
-                    </TableHead>
-                    <TableHead>Slug</TableHead>
-                    <TableHead className="w-28 text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {appWorkloads.map((w) => {
-                    const isRunning = runningWorkloadId === w.id;
-                    return (
-                      <TableRow key={w.id}>
-                        <TableCell className="font-medium">{w.name}</TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">
-                          {w.slug}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            disabled={mutationLoading || isRunning}
-                            onClick={() => onRunNow(w)}
-                          >
-                            {isRunning ? (
-                              <Loader2Icon className="size-3.5 animate-spin" />
-                            ) : (
-                              <PlayIcon className="size-3.5" />
-                            )}
-                            Run now
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        ))
-      )}
-    </div>
+    <DataTable
+      label="Task templates"
+      controller={controller}
+      columns={columns}
+      getRowId={(w) => w.id}
+      empty={{
+        icon: <ClipboardListIcon className="size-5" />,
+        title: "No task workloads",
+        description:
+          "Register a workload with kind=task on an app to create a named task template.",
+        actionHref: "/apps",
+        actionLabel: "Go to Apps",
+      }}
+    />
   );
 }
 
 // ── Runs tab (shared by Recent + History) ─────────────────────────────────
 
-function runSortFn(a: AstroliftTaskRun, b: AstroliftTaskRun, sort: SortState): number {
-  const dir = sort.dir === "asc" ? 1 : -1;
-  if (sort.key === "app") return a.registeredAppSlug.localeCompare(b.registeredAppSlug) * dir;
-  if (sort.key === "workload") return (a.workloadSlug ?? "").localeCompare(b.workloadSlug ?? "") * dir;
-  if (sort.key === "status") return a.status.localeCompare(b.status) * dir;
-  if (sort.key === "started") {
-    const at = (a.startedAt ?? "").localeCompare(b.startedAt ?? "");
-    return at * dir;
-  }
-  if (sort.key === "duration") {
-    return ((a.durationSeconds ?? 0) - (b.durationSeconds ?? 0)) * dir;
-  }
-  return 0;
-}
-
 interface RunsTabProps {
-  runs: AstroliftTaskRun[];
-  loading: boolean;
-  emptyTitle: string;
-  emptyDescription: string;
+  /** URL prefix for this tab's search + page size (`?recent-q=`). */
+  urlKey: string;
+  empty: EmptyStateSpec;
   searchPlaceholder?: string;
+  /** Server-side status filter. Only History exposes the control. */
+  status?: string;
+  onStatusChange?: (next: string) => void;
 }
 
-function RunsTab({ runs, loading, emptyTitle, emptyDescription, searchPlaceholder }: RunsTabProps) {
-  const router = useRouter();
-  const ctrl = useListControls({
-    data: runs,
-    searchFn: (r) =>
-      [r.registeredAppSlug, r.workloadSlug, r.status, r.triggeredByUsername, r.triggerKind]
-        .filter(Boolean)
-        .join(" "),
-    initialPageSize: 25,
-    initialSort: { key: "started", dir: "desc" },
-    sortFn: runSortFn,
+function RunsTab({ urlKey, empty, searchPlaceholder, status, onStatusChange }: RunsTabProps) {
+  // `astroliftTaskRunsPage` takes `appSlug`, `workloadSlug`, `status`,
+  // `search`, `limit` and `after`. No sort argument, so no column declares
+  // a `sortKey`; the walk is newest-first on `(-created_at, -guid)`.
+  const table = useCursorTable<AstroliftTaskRun>({
+    query: LIST_TASK_RUNS_PAGE,
+    variables: { status: status || null },
+    extract: (d) => (d as TaskRunsPageResp | undefined)?.astroliftTaskRunsPage,
+    searchVariable: "search",
+    urlKey,
+    pollInterval: 15000,
   });
 
-  if (loading && runs.length === 0) {
-    return (
-      <Card>
-        <CardContent className="space-y-2 p-6">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (runs.length === 0) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <EmptyState
-            icon={<HistoryIcon className="size-5" />}
-            title={emptyTitle}
-            description={emptyDescription}
-          />
-        </CardContent>
-      </Card>
-    );
-  }
+  const columns: Column<AstroliftTaskRun>[] = [
+    {
+      id: "app",
+      header: "App",
+      cellClassName: "font-medium",
+      cell: (r) => r.registeredAppSlug,
+    },
+    {
+      id: "workload",
+      header: "Workload",
+      cellClassName: "text-muted-foreground font-mono text-xs",
+      cell: (r) => r.workloadSlug,
+    },
+    {
+      id: "command",
+      header: "Command",
+      cellClassName: "max-w-48 truncate font-mono text-xs",
+      cell: (r) => (Array.isArray(r.command) ? r.command.join(" ") : r.command || "—"),
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: (r) => (
+        <Badge variant={STATUS_VARIANT[r.status as TaskRunStatus] ?? "secondary"}>{r.status}</Badge>
+      ),
+    },
+    {
+      id: "duration",
+      header: "Duration",
+      cellClassName: "font-mono text-xs",
+      cell: (r) => (
+        <span className="inline-flex items-center gap-1">
+          <ClockIcon className="size-3" />
+          {formatDuration(r.durationSeconds)}
+        </span>
+      ),
+    },
+    {
+      id: "actor",
+      header: "Actor",
+      cellClassName: "text-muted-foreground text-sm",
+      cell: (r) => r.triggeredByUsername ?? r.triggerKind ?? "—",
+    },
+    {
+      id: "started",
+      header: "Started",
+      cellClassName: "text-muted-foreground text-sm",
+      cell: (r) => (r.startedAt ? new Date(r.startedAt).toLocaleString() : "—"),
+    },
+  ];
 
   return (
-    <div className="space-y-4">
-      <ListControls
-        controls={ctrl}
-        searchPlaceholder={searchPlaceholder ?? "Search runs…"}
-      />
-      <Card>
-        <CardContent className="p-0">
-          {ctrl.rows.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<HistoryIcon className="size-5" />}
-                title="No matching runs"
-                description="Adjust your search to find task runs."
-              />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>
-                    <SortableHeader sortKey="app" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                      App
-                    </SortableHeader>
-                  </TableHead>
-                  <TableHead>
-                    <SortableHeader sortKey="workload" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                      Workload
-                    </SortableHeader>
-                  </TableHead>
-                  <TableHead>Command</TableHead>
-                  <TableHead>
-                    <SortableHeader sortKey="status" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                      Status
-                    </SortableHeader>
-                  </TableHead>
-                  <TableHead>
-                    <SortableHeader sortKey="duration" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                      Duration
-                    </SortableHeader>
-                  </TableHead>
-                  <TableHead>Actor</TableHead>
-                  <TableHead>
-                    <SortableHeader sortKey="started" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                      Started
-                    </SortableHeader>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ctrl.rows.map((r) => (
-                  <TableRow
-                    key={r.id}
-                    tabIndex={0}
-                    role="link"
-                    aria-label={`Open task run ${r.id.slice(0, 8)}`}
-                    onClick={() => router.push(`/tasks/runs/${r.id}`)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        router.push(`/tasks/runs/${r.id}`);
-                      }
-                    }}
-                    className="hover:bg-accent/30 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
-                  >
-                    <TableCell className="font-medium">{r.registeredAppSlug}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {r.workloadSlug}
-                    </TableCell>
-                    <TableCell className="max-w-48 truncate font-mono text-xs">
-                      {Array.isArray(r.command) ? r.command.join(" ") : r.command || "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={STATUS_VARIANT[r.status as TaskRunStatus] ?? "secondary"}>
-                        {r.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      <span className="inline-flex items-center gap-1">
-                        <ClockIcon className="size-3" />
-                        {formatDuration(r.durationSeconds)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {r.triggeredByUsername ?? r.triggerKind ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {r.startedAt ? new Date(r.startedAt).toLocaleString() : "—"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+    <DataTable
+      label="Task runs"
+      controller={table}
+      columns={columns}
+      getRowId={(r) => r.id}
+      rowHref={(r) => `/tasks/runs/${r.id}`}
+      searchPlaceholder={searchPlaceholder}
+      toolbar={
+        onStatusChange ? (
+          <Select
+            value={status ? status : ANY_STATUS}
+            onValueChange={(v) => onStatusChange(v === ANY_STATUS ? "" : v)}
+          >
+            <SelectTrigger size="sm" className="w-40" aria-label="Filter by status">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ANY_STATUS}>All statuses</SelectItem>
+              {TASK_RUN_STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : undefined
+      }
+      empty={empty}
+      emptyFiltered={{
+        title: "No matching runs",
+        description:
+          "No task run matches that search under the current status filter. The server looks at the app, workload, status, the batch/v1 Job name, and the operator who triggered it.",
+      }}
+    />
   );
 }

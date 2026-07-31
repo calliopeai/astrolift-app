@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useMutation } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
   CheckCircleIcon,
@@ -10,6 +10,7 @@ import {
   PlayIcon,
   PlusIcon,
   RefreshCcwIcon,
+  SearchXIcon,
   Trash2Icon,
 } from "lucide-react";
 import * as React from "react";
@@ -17,13 +18,19 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import {
+  DataTable,
+  DataTablePagination,
+  DataTableToolbar,
+  useCursorTable,
+  type Column,
+  type CursorPage,
+  type EmptyStateSpec,
+} from "@/components/data-table";
 import { EmptyState } from "@/components/EmptyState";
-import { ListControls, SortableHeader } from "@/components/ListControls";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { ViewToggle } from "@/components/ViewToggle";
-import { useListControls } from "@/hooks/use-list-controls";
-import { useViewToggle } from "@/hooks/use-view-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -34,23 +41,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   BRING_CLUSTER_INTO_MANAGEMENT,
   LIST_CLUSTERS,
+  LIST_CLUSTERS_PAGE,
   REFRESH_CLUSTER_MANAGEMENT,
   UNREGISTER_TENANT_CLUSTER,
 } from "@/graphql/clusters/clusters.queries";
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
+import { useViewToggle } from "@/hooks/use-view-toggle";
 import {
   formatHeartbeatAge,
   heartbeatPresentation,
@@ -58,27 +59,59 @@ import {
   type HeartbeatStatus,
 } from "@/lib/cluster-heartbeat";
 import { useFormatters } from "@/lib/i18n/formatters";
+import { cn } from "@/lib/utils";
 
 import { RegisterClusterDialog } from "./register-cluster-dialog";
 
 // The committed codegen output lags the live backend, so the generated
 // AstroliftTenantCluster doesn't yet carry the heartbeat fields the
-// LIST_CLUSTERS query now selects. Intersect them in locally.
+// cluster queries now select. Intersect them in locally.
 type ClusterRow = AstroliftTenantCluster & Partial<ClusterHeartbeatFields>;
 
-interface Resp {
-  astroliftClusters: ClusterRow[];
+interface ClustersPageResp {
+  astroliftClustersPage: CursorPage<ClusterRow>;
 }
 
 // Active polling cadence while any row is in the "managing" state.
 // 4 seconds keeps the UI responsive to the workflow (which typically
-// completes in 10-30s) without hammering the apiserver. Stops polling
-// as soon as no row is managing.
+// completes in 10-30s) without hammering the apiserver. Drops back to
+// the heartbeat cadence as soon as no visible row is managing.
 const POLL_INTERVAL_MS = 4000;
 
 // Steady-state poll cadence to keep heartbeat-derived live status pills
 // fresh (#808). Matches the default agent heartbeat interval.
 const HEARTBEAT_POLL_INTERVAL_MS = 30000;
+
+// This surface walks `ListClustersPage`, but LIST_CLUSTERS still backs the
+// cluster detail tabs, /ops, /providers, /administration/metrics and the
+// fleet map. Both have to be refreshed after a lifecycle change or one of
+// the two goes stale — the walk by operation name, since its variables
+// carry the cursor and the search term and no literal variables object
+// names the page the operator is actually looking at.
+const REFETCH_LIST = [{ query: LIST_CLUSTERS }, "ListClustersPage"];
+
+// Both views render the same two empty states, so the copy lives in one
+// place: switching card ↔ list must not change what the operator is told.
+const EMPTY: EmptyStateSpec = {
+  icon: <LayersIcon className="size-5" />,
+  title: "No clusters registered",
+  description:
+    "Register a tenant Kubernetes cluster to record its metadata, then bring it into management once its prerequisites are installed.",
+  learnMoreHref: "/documentation/cluster-prerequisites",
+  learnMoreLabel: "Cluster prerequisites",
+};
+
+const EMPTY_FILTERED = {
+  title: "No matching clusters",
+  description:
+    "No cluster matches that search. The server matches the cluster name, slug, endpoint, region and provider — try another term, or clear the search to see the whole fleet.",
+};
+
+// The row's link is an ::after overlay stretched across the whole row, and
+// it paints above any cell that isn't lifted out of its way — a tooltip
+// trigger or a button underneath it never receives the pointer. Anything
+// interactive in a later cell carries this.
+const ABOVE_ROW_LINK = "relative z-10";
 
 type Lifecycle = "registered" | "managing" | "managed" | "error";
 
@@ -183,87 +216,54 @@ export function ClustersClient() {
     null
   );
 
-  // cache-and-network ensures the first client-side render issues a live
-  // fetch with the correct X-Astrolift-Organization header. Without it
-  // the default cache-first policy reads the stale SSR-primed result
-  // (which was fetched server-side before the org cookie was set) and
-  // never re-fetches — producing an empty list even though clusters exist.
-  const { data, loading, startPolling, stopPolling } = useQuery<Resp>(LIST_CLUSTERS, {
-    fetchPolicy: "cache-and-network",
-    notifyOnNetworkStatusChange: true,
+  // `astroliftClustersPage` takes `search`, `limit` and `after` only —
+  // there is no sort argument, so no column declares a `sortKey` and the
+  // headers stay plain labels rather than controls that could only
+  // reorder the page in hand (server-side sort is tracked in #1239).
+  //
+  // The controller's default `cache-and-network` is load-bearing here:
+  // a cache-first read would answer from the SSR-primed result fetched
+  // before the org cookie was set and never re-fetch, showing an empty
+  // fleet to an org that has clusters.
+  const table = useCursorTable<ClusterRow>({
+    query: LIST_CLUSTERS_PAGE,
+    extract: (d) => (d as ClustersPageResp | undefined)?.astroliftClustersPage,
+    searchVariable: "search",
+    urlKey: "cluster",
+    // Steady-state cadence: keeps the heartbeat-derived Live pills fresh
+    // without an operator reload (#808).
+    pollInterval: HEARTBEAT_POLL_INTERVAL_MS,
   });
 
-  // Poll while any row is in flight. Stop the moment all rows are in a
-  // terminal state — Apollo will hold the cache for follow-up renders.
-  const list = data?.astroliftClusters ?? [];
-  const anyManaging = list.some((c) => c.lifecycle === "managing");
-
-  const lifecycleOrder: Record<string, number> = {
-    managing: 0,
-    error: 1,
-    registered: 2,
-    managed: 3,
-  };
-
-  const ctrl = useListControls({
-    data: list,
-    searchFn: (c) => [c.slug, c.name, c.providerPluginSlug, c.region].filter(Boolean).join(" "),
-    initialPageSize: 25,
-    sortFn: (a, b, sort) => {
-      let cmp = 0;
-      if (sort.key === "name") {
-        cmp = (a.name ?? "").localeCompare(b.name ?? "");
-      } else if (sort.key === "provider") {
-        cmp = (a.providerPluginSlug ?? "").localeCompare(b.providerPluginSlug ?? "");
-      } else if (sort.key === "region") {
-        cmp = (a.region ?? "").localeCompare(b.region ?? "");
-      } else if (sort.key === "lifecycle") {
-        cmp = (lifecycleOrder[a.lifecycle ?? ""] ?? 99) - (lifecycleOrder[b.lifecycle ?? ""] ?? 99);
-      } else if (sort.key === "lastProbeAt") {
-        const at = (c: AstroliftTenantCluster) =>
-          c.capabilitiesProbedAt ? new Date(c.capabilitiesProbedAt).getTime() : 0;
-        cmp = at(a) - at(b);
-      } else if (sort.key === "liveStatus") {
-        // Most-broken first: offline > degraded > never_seen > connected,
-        // so an operator scanning the fleet sees trouble at the top.
-        const rank: Record<string, number> = {
-          offline: 0,
-          degraded: 1,
-          never_seen: 2,
-          connected: 3,
-        };
-        cmp =
-          (rank[a.heartbeatStatus ?? "never_seen"] ?? 9) -
-          (rank[b.heartbeatStatus ?? "never_seen"] ?? 9);
-      }
-      return sort.dir === "asc" ? cmp : -cmp;
-    },
-  });
+  // While a management workflow is in flight, overlay a faster refetch so
+  // the lifecycle badge tracks the transition (it typically completes in
+  // 10-30s). The cadence is decided by the page on screen rather than by
+  // the whole fleet now that the walk is server-side — the fast poll
+  // exists to animate a transition the operator is watching.
+  const anyManaging = table.rows.some((c) => c.lifecycle === "managing");
+  const { refetch } = table;
   React.useEffect(() => {
-    // Poll fast (4s) while a workflow is in flight so the lifecycle
-    // badge tracks the transition; otherwise poll on a 30s cadence —
-    // matching the heartbeat interval — so the live status pills stay
-    // fresh without an operator reload (#808).
-    startPolling(anyManaging ? POLL_INTERVAL_MS : HEARTBEAT_POLL_INTERVAL_MS);
-    return () => stopPolling();
-  }, [anyManaging, startPolling, stopPolling]);
+    if (!anyManaging) return;
+    const id = setInterval(refetch, POLL_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [anyManaging, refetch]);
 
   const [unregister, { loading: deleting }] = useMutation<{
     unregisterTenantCluster: MutationResult<{ id: string; deleted: boolean }>;
   }>(UNREGISTER_TENANT_CLUSTER, {
-    refetchQueries: [{ query: LIST_CLUSTERS }],
+    refetchQueries: REFETCH_LIST,
     awaitRefetchQueries: true,
   });
   const [bring, { loading: bringing }] = useMutation<{
     bringClusterIntoManagement: MutationResult<AstroliftTenantCluster>;
   }>(BRING_CLUSTER_INTO_MANAGEMENT, {
-    refetchQueries: [{ query: LIST_CLUSTERS }],
+    refetchQueries: REFETCH_LIST,
     awaitRefetchQueries: true,
   });
   const [refresh, { loading: refreshing }] = useMutation<{
     refreshClusterManagement: MutationResult<AstroliftTenantCluster>;
   }>(REFRESH_CLUSTER_MANAGEMENT, {
-    refetchQueries: [{ query: LIST_CLUSTERS }],
+    refetchQueries: REFETCH_LIST,
     awaitRefetchQueries: true,
   });
 
@@ -296,6 +296,14 @@ export function ClustersClient() {
     } else {
       toast.error(data?.refreshClusterManagement.errors?.[0]?.message ?? "Failed");
     }
+  }
+
+  // The register dialog refetches LIST_CLUSTERS, which is a different root
+  // field from the page this surface walks, so a newly registered cluster
+  // would not appear until a navigation. Refetch the walk when it closes.
+  function handleRegisterOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) table.refetch();
   }
 
   // Action descriptors. Each lifecycle resolves to one primary action
@@ -420,28 +428,161 @@ export function ClustersClient() {
     );
   }
 
-  return (
-    <PageShell
-      title="Clusters"
-      description="Tenant Kubernetes clusters registered with the platform. Register a cluster to record its metadata, then click Bring into management when its prereqs (cert-manager, ingress controller) are installed."
-      actions={
-        <div className="flex items-center gap-2">
-          <ViewToggle mode={viewMode} onChange={setViewMode} />
-          <Can permission="cluster.register">
-            <Button onClick={() => setOpen(true)}>
-              <PlusIcon className="size-4" />
-              Register cluster
-            </Button>
-          </Can>
+  const columns: Column<ClusterRow>[] = [
+    {
+      id: "cluster",
+      header: "Cluster",
+      // The active dot folds into this cell rather than sitting in a
+      // column of its own: the first column carries the row link, and a
+      // link whose only content is a coloured dot has no accessible name.
+      cell: (c) => (
+        <span className="flex items-start gap-2">
+          <StatusDot status={c.isActive ? "ok" : "muted"} className="mt-1.5 shrink-0" />
+          <span className="block">
+            <span className="block font-medium">{c.name}</span>
+            <span className="text-muted-foreground block font-mono text-xs">{c.slug}</span>
+          </span>
+        </span>
+      ),
+    },
+    {
+      id: "lifecycle",
+      header: "Lifecycle",
+      cell: (c) => (
+        <span className={cn(ABOVE_ROW_LINK, "inline-flex")}>
+          <LifecycleBadge
+            lifecycle={(c.lifecycle as Lifecycle) ?? "registered"}
+            error={c.lastManagementError ?? undefined}
+          />
+        </span>
+      ),
+    },
+    {
+      id: "provider",
+      header: "Provider",
+      cell: (c) => <Badge variant="outline">{c.providerPluginSlug}</Badge>,
+    },
+    {
+      id: "region",
+      header: "Region",
+      cellClassName: "font-mono text-xs",
+      cell: (c) => c.region || "—",
+    },
+    {
+      id: "ingress",
+      header: "Ingress",
+      cellClassName: "font-mono text-xs",
+      cell: (c) => c.ingressClass,
+    },
+    {
+      id: "live",
+      header: "Live",
+      cell: (c) => (
+        <span className={cn(ABOVE_ROW_LINK, "inline-flex")}>
+          <HeartbeatBadge status={c.heartbeatStatus} ageSeconds={c.heartbeatAgeSeconds} />
+        </span>
+      ),
+    },
+    {
+      id: "lastProbe",
+      header: "Last probe",
+      cellClassName: "text-muted-foreground text-sm",
+      cell: (c) => (c.capabilitiesProbedAt ? fmt.formatDateTime(c.capabilitiesProbedAt) : "never"),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      align: "right",
+      cell: (c) => (
+        <div className={cn(ABOVE_ROW_LINK, "flex items-center justify-end")}>
+          <div className="hidden items-center justify-end gap-2 md:flex">
+            {renderActionButton(c)}
+            <Can permission="cluster.unregister">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setUnregisterTarget(c)}
+                disabled={deleting}
+              >
+                <Trash2Icon className="size-4" />
+                <span className="sr-only">Unregister</span>
+              </Button>
+            </Can>
+          </div>
+          <div className="flex items-center justify-end md:hidden">{renderRowMenu(c)}</div>
         </div>
-      }
-    >
-      {/* Card view */}
-      {viewMode === "card" && list.length > 0 && (
-        <>
-          <ListControls controls={ctrl} searchPlaceholder="Search clusters..." />
+      ),
+    },
+  ];
+
+  // The card grid is a real view, not decoration, so it reads its rows
+  // from the same controller the table does: search, page size and the
+  // cursor walk apply identically in both modes. DataTable owns the four
+  // states for the list view; the grid renders them itself, with the same
+  // copy, so switching modes never changes what the operator is told.
+  const cardBody = (() => {
+    switch (table.state) {
+      case "loading":
+        // Skeleton cards, not a floating skeleton block: the placeholders
+        // stand in the grid the cards will occupy, so nothing reflows when
+        // the rows land.
+        return (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {ctrl.rows.map((c) => (
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Card key={`skeleton-${i}`}>
+                <CardContent className="flex flex-col gap-3 p-5">
+                  <Skeleton className="h-5 w-40" />
+                  <Skeleton className="h-3 w-24" />
+                  <div className="flex flex-wrap gap-2">
+                    <Skeleton className="h-5 w-24 rounded-full" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                    <Skeleton className="h-5 w-20 rounded-full" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        );
+
+      case "error":
+        return (
+          <div className="flex flex-col items-center gap-3 rounded-md border py-10 text-center">
+            <AlertTriangleIcon className="text-danger size-5" />
+            <div>
+              <p className="font-medium">Could not load clusters</p>
+              <p className="text-muted-foreground mt-1 max-w-md text-sm">
+                {table.error?.message ?? "The request failed."}
+              </p>
+            </div>
+            <Button size="sm" variant="outline" onClick={table.retry}>
+              Retry
+            </Button>
+          </div>
+        );
+
+      case "emptyFiltered":
+        return (
+          <div className="flex flex-col items-center gap-3 rounded-md border py-10 text-center">
+            <SearchXIcon className="text-muted-foreground size-5" />
+            <div>
+              <p className="font-medium">{EMPTY_FILTERED.title}</p>
+              <p className="text-muted-foreground mt-1 max-w-md text-sm">
+                {EMPTY_FILTERED.description}
+              </p>
+            </div>
+            <Button size="sm" variant="outline" onClick={table.clearFilters}>
+              Clear search
+            </Button>
+          </div>
+        );
+
+      case "empty":
+        return <EmptyState {...EMPTY} />;
+
+      case "ready":
+        return (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {table.rows.map((c) => (
               <a key={c.id} href={`/clusters/${c.slug}`} className="block">
                 <Card className="hover:bg-accent/30 transition-colors">
                   <CardContent className="flex flex-col gap-3 p-5">
@@ -466,208 +607,54 @@ export function ClustersClient() {
               </a>
             ))}
           </div>
-        </>
+        );
+    }
+  })();
+
+  return (
+    <PageShell
+      title="Clusters"
+      description="Tenant Kubernetes clusters registered with the platform. Register a cluster to record its metadata, then click Bring into management when its prereqs (cert-manager, ingress controller) are installed."
+      actions={
+        <div className="flex items-center gap-2">
+          <ViewToggle mode={viewMode} onChange={setViewMode} />
+          <Can permission="cluster.register">
+            <Button onClick={() => setOpen(true)}>
+              <PlusIcon className="size-4" />
+              Register cluster
+            </Button>
+          </Can>
+        </div>
+      }
+    >
+      {viewMode === "card" ? (
+        <div className="flex flex-col gap-3">
+          <DataTableToolbar controller={table} searchPlaceholder="Search clusters..." />
+          {/* Rows persist across a refetch rather than blanking, so fade
+              them while they answer the previous question — the same cue
+              DataTable gives the list view. */}
+          <div
+            className={cn("transition-opacity", table.isStale && "opacity-60")}
+            aria-busy={table.isStale || undefined}
+          >
+            {cardBody}
+          </div>
+          <DataTablePagination controller={table} />
+        </div>
+      ) : (
+        <DataTable
+          label="Clusters"
+          controller={table}
+          columns={columns}
+          getRowId={(c) => c.id}
+          rowHref={(c) => `/clusters/${c.slug}`}
+          searchPlaceholder="Search clusters..."
+          empty={EMPTY}
+          emptyFiltered={EMPTY_FILTERED}
+        />
       )}
 
-      {/* List view (table) — also used during loading and empty states */}
-      {(viewMode === "list" || list.length === 0 || loading) && (
-        <>
-          {!loading && list.length > 0 && (
-            <ListControls controls={ctrl} searchPlaceholder="Search clusters..." />
-          )}
-          <Card>
-            <CardContent className="p-0">
-              {loading && list.length === 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead></TableHead>
-                      <TableHead>Cluster</TableHead>
-                      <TableHead>Lifecycle</TableHead>
-                      <TableHead>Provider</TableHead>
-                      <TableHead>Region</TableHead>
-                      <TableHead>Ingress</TableHead>
-                      <TableHead>Live</TableHead>
-                      <TableHead>Last probe</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {Array.from({ length: 3 }).map((_, i) => (
-                      <TableRow key={`skel-${i}`}>
-                        <TableCell className="w-8">
-                          <Skeleton className="size-2.5 rounded-full" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="mb-1 h-4 w-32" />
-                          <Skeleton className="h-3 w-20" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-5 w-24 rounded-full" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-5 w-16 rounded-full" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-3 w-20" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-3 w-16" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-5 w-20 rounded-full" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-3 w-28" />
-                        </TableCell>
-                        <TableCell className="flex items-center justify-end gap-2 text-right">
-                          <Skeleton className="h-8 w-24" />
-                          <Skeleton className="size-8" />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : list.length === 0 ? (
-                <div className="p-6">
-                  <EmptyState
-                    icon={<LayersIcon className="size-5" />}
-                    title="No clusters registered"
-                    description="Register a tenant Kubernetes cluster to record its metadata, then bring it into management once its prerequisites are installed."
-                    learnMoreHref="/documentation/cluster-prerequisites"
-                    learnMoreLabel="Cluster prerequisites"
-                    secondary={
-                      <Can permission="cluster.register">
-                        <Button size="sm" onClick={() => setOpen(true)}>
-                          Register cluster
-                        </Button>
-                      </Can>
-                    }
-                  />
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead></TableHead>
-                      <TableHead>
-                        <SortableHeader sortKey="name" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                          Cluster
-                        </SortableHeader>
-                      </TableHead>
-                      <TableHead>
-                        <SortableHeader
-                          sortKey="lifecycle"
-                          sort={ctrl.sort}
-                          onToggle={ctrl.toggleSort}
-                        >
-                          Lifecycle
-                        </SortableHeader>
-                      </TableHead>
-                      <TableHead>
-                        <SortableHeader
-                          sortKey="provider"
-                          sort={ctrl.sort}
-                          onToggle={ctrl.toggleSort}
-                        >
-                          Provider
-                        </SortableHeader>
-                      </TableHead>
-                      <TableHead>
-                        <SortableHeader
-                          sortKey="region"
-                          sort={ctrl.sort}
-                          onToggle={ctrl.toggleSort}
-                        >
-                          Region
-                        </SortableHeader>
-                      </TableHead>
-                      <TableHead>Ingress</TableHead>
-                      <TableHead>
-                        <SortableHeader
-                          sortKey="liveStatus"
-                          sort={ctrl.sort}
-                          onToggle={ctrl.toggleSort}
-                        >
-                          Live
-                        </SortableHeader>
-                      </TableHead>
-                      <TableHead>
-                        <SortableHeader
-                          sortKey="lastProbeAt"
-                          sort={ctrl.sort}
-                          onToggle={ctrl.toggleSort}
-                        >
-                          Last probe
-                        </SortableHeader>
-                      </TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {ctrl.rows.map((c) => (
-                      <TableRow key={c.id}>
-                        <TableCell className="w-8">
-                          <StatusDot status={c.isActive ? "ok" : "muted"} />
-                        </TableCell>
-                        <TableCell>
-                          <a href={`/clusters/${c.slug}`} className="hover:underline">
-                            <div className="font-medium">{c.name}</div>
-                            <div className="text-muted-foreground font-mono text-xs">{c.slug}</div>
-                          </a>
-                        </TableCell>
-                        <TableCell>
-                          <LifecycleBadge
-                            lifecycle={(c.lifecycle as Lifecycle) ?? "registered"}
-                            error={c.lastManagementError ?? undefined}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{c.providerPluginSlug}</Badge>
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">{c.region || "—"}</TableCell>
-                        <TableCell className="font-mono text-xs">{c.ingressClass}</TableCell>
-                        <TableCell>
-                          <HeartbeatBadge
-                            status={c.heartbeatStatus}
-                            ageSeconds={c.heartbeatAgeSeconds}
-                          />
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {c.capabilitiesProbedAt
-                            ? fmt.formatDateTime(c.capabilitiesProbedAt)
-                            : "never"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="hidden items-center justify-end gap-2 md:flex">
-                            {renderActionButton(c)}
-                            <Can permission="cluster.unregister">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setUnregisterTarget(c)}
-                                disabled={deleting}
-                              >
-                                <Trash2Icon className="size-4" />
-                                <span className="sr-only">Unregister</span>
-                              </Button>
-                            </Can>
-                          </div>
-                          <div className="flex items-center justify-end md:hidden">
-                            {renderRowMenu(c)}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
-
-      <RegisterClusterDialog open={open} onOpenChange={setOpen} />
+      <RegisterClusterDialog open={open} onOpenChange={handleRegisterOpenChange} />
 
       <ConfirmDialog
         open={unregisterTarget !== null}

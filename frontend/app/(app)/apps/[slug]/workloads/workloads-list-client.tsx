@@ -17,38 +17,23 @@ import {
   ScalingIcon,
   WorkflowIcon,
 } from "lucide-react";
-import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import { DataTable, useCursorTable, type Column } from "@/components/data-table";
 import { EmptyState } from "@/components/EmptyState";
-import { ListControls, SortableHeader } from "@/components/ListControls";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { useListControls } from "@/hooks/use-list-controls";
-import type { SortState } from "@/hooks/use-list-controls";
 import { SCALE_WORKLOAD } from "@/graphql/lifecycle/lifecycle.mutations";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import { LIST_APP_PODS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppPod } from "@/graphql/lifecycle/lifecycle.types";
-import {
-  GET_APP,
-  LIST_WORKLOADS,
-} from "@/graphql/registry/registry.queries";
+import { GET_APP, LIST_WORKLOADS, LIST_WORKLOADS_PAGE } from "@/graphql/registry/registry.queries";
 import type {
   AstroliftRegisteredApp,
   AstroliftWorkload,
@@ -63,6 +48,13 @@ interface AppResp {
 }
 interface WorkloadsResp {
   astroliftWorkloads: AstroliftWorkload[];
+}
+interface WorkloadsPageResp {
+  astroliftWorkloadsPage: {
+    items: AstroliftWorkload[];
+    nextCursor?: string | null;
+    totalCount?: number | null;
+  };
 }
 interface AppPodsResp {
   astroliftAppPods: AstroliftAppPod[];
@@ -94,10 +86,13 @@ interface WorkloadLiveStatus {
  * fresh deploy still spinning up). `maxRestarts` is the **max**
  * restart_count across pods in the workload — that matches what an
  * operator wants to see ("which workload is flapping?"), not a sum.
+ *
+ * Runs over the workloads on the current page only; the pod list is
+ * app-wide, so a page's rows always find their pods.
  */
 function aggregatePodStatus(
   workloads: AstroliftWorkload[],
-  pods: AstroliftAppPod[],
+  pods: AstroliftAppPod[]
 ): Map<string, WorkloadLiveStatus> {
   const byWorkload = new Map<string, AstroliftAppPod[]>();
   for (const p of pods) {
@@ -115,14 +110,16 @@ function aggregatePodStatus(
     // is null on healthy pods.
     let errorEvent: WorkloadLiveStatus["errorEvent"] = null;
     for (const p of pp) {
-      const ev = (p as AstroliftAppPod & {
-        recentErrorEvent?: {
-          reason: string;
-          message: string;
-          count: number;
-          lastSeen: string;
-        } | null;
-      }).recentErrorEvent;
+      const ev = (
+        p as AstroliftAppPod & {
+          recentErrorEvent?: {
+            reason: string;
+            message: string;
+            count: number;
+            lastSeen: string;
+          } | null;
+        }
+      ).recentErrorEvent;
       if (!ev) continue;
       if (!errorEvent || Date.parse(ev.lastSeen) > Date.parse(errorEvent.lastSeen)) {
         errorEvent = ev;
@@ -140,16 +137,12 @@ function aggregatePodStatus(
 
 function readinessTone(ready: number, desired: number): string {
   if (desired === 0) return "bg-muted text-muted-foreground";
-  if (ready === desired)
-    return "bg-success/15 text-success-fg";
+  if (ready === desired) return "bg-success/15 text-success-fg";
   if (ready === 0) return "bg-danger/15 text-danger-fg";
   return "bg-warning/15 text-warning-fg";
 }
 
-const KIND_ICON: Record<
-  WorkloadKind,
-  React.ComponentType<{ className?: string }>
-> = {
+const KIND_ICON: Record<WorkloadKind, React.ComponentType<{ className?: string }>> = {
   deployment: RocketIcon,
   statefulset: HardDriveIcon,
   job: WorkflowIcon,
@@ -174,7 +167,16 @@ const KIND_LABEL: Record<WorkloadKind, string> = {
 export function WorkloadsListClient({ slug }: { slug: string }) {
   const chrome = useAppChrome();
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
-  const workloads = useQuery<WorkloadsResp>(LIST_WORKLOADS, {
+
+  /**
+   * The stats strip summarises the app's *whole* workload set, and
+   * `astroliftWorkloadsPage` exposes no aggregate — summing the page in
+   * hand would make "Total replicas" quietly mean "on this page". So the
+   * strip stays on the flat field while the table below pages on the
+   * server. Backend ask: a workload-summary field (or kind / public
+   * filters with `totalCount`) would retire this second round trip.
+   */
+  const summary = useQuery<WorkloadsResp>(LIST_WORKLOADS, {
     variables: { appSlug: slug },
     pollInterval: 60000,
   });
@@ -187,42 +189,32 @@ export function WorkloadsListClient({ slug }: { slug: string }) {
     fetchPolicy: "cache-and-network",
   });
 
+  // `astroliftWorkloadsPage` filters on `appSlug` and searches name,
+  // slug, kind and app slug. It takes no sort argument, so no column
+  // declares a `sortKey` — sorting the page in hand while the rest of
+  // the set sits on the server is wrong at every page boundary.
+  const table = useCursorTable<AstroliftWorkload>({
+    query: LIST_WORKLOADS_PAGE,
+    variables: { appSlug: slug },
+    extract: (d) => (d as WorkloadsPageResp | undefined)?.astroliftWorkloadsPage,
+    searchVariable: "search",
+    urlKey: "wl",
+    pollInterval: 60000,
+  });
+
   const a = app.data?.astroliftApp;
-  const list = React.useMemo(
-    () => workloads.data?.astroliftWorkloads ?? [],
-    [workloads.data?.astroliftWorkloads],
+  const summaryList = React.useMemo(
+    () => summary.data?.astroliftWorkloads ?? [],
+    [summary.data?.astroliftWorkloads]
   );
   const podList = React.useMemo(
     () => pods.data?.astroliftAppPods ?? [],
-    [pods.data?.astroliftAppPods],
+    [pods.data?.astroliftAppPods]
   );
   const liveStatus = React.useMemo(
-    () => aggregatePodStatus(list, podList),
-    [list, podList],
+    () => aggregatePodStatus(table.rows, podList),
+    [table.rows, podList]
   );
-
-  const ctrl = useListControls({
-    data: list,
-    searchFn: (w) =>
-      [w.name, w.slug, KIND_LABEL[w.kind] ?? w.kind, w.schedule ?? ""].join(" "),
-    initialPageSize: 25,
-    sortFn: (a, b, sort: SortState) => {
-      const dir = sort.dir === "asc" ? 1 : -1;
-      if (sort.key === "name") return a.name.localeCompare(b.name) * dir;
-      if (sort.key === "kind") return a.kind.localeCompare(b.kind) * dir;
-      if (sort.key === "replicas") {
-        const aLive = liveStatus.get(a.slug);
-        const bLive = liveStatus.get(b.slug);
-        const aReady = aLive?.ready ?? 0;
-        const bReady = bLive?.ready ?? 0;
-        return (aReady - bReady) * dir;
-      }
-      if (sort.key === "public") {
-        return ((a.isPublic ? 1 : 0) - (b.isPublic ? 1 : 0)) * dir;
-      }
-      return 0;
-    },
-  });
 
   if (app.loading && !a) {
     return (
@@ -248,15 +240,151 @@ export function WorkloadsListClient({ slug }: { slug: string }) {
 
   // Surface stats up top so an operator immediately sees the shape of
   // the app's workload set before diving into rows.
-  const totalReplicas = list.reduce((acc, w) => acc + (w.replicas || 0), 0);
-  const publicCount = list.filter((w) => w.isPublic).length;
-  const kindCounts = list.reduce<Partial<Record<WorkloadKind, number>>>(
-    (acc, w) => {
-      acc[w.kind] = (acc[w.kind] ?? 0) + 1;
-      return acc;
+  const totalReplicas = summaryList.reduce((acc, w) => acc + (w.replicas || 0), 0);
+  const publicCount = summaryList.filter((w) => w.isPublic).length;
+  const kindCounts = summaryList.reduce<Partial<Record<WorkloadKind, number>>>((acc, w) => {
+    acc[w.kind] = (acc[w.kind] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const columns: Column<AstroliftWorkload>[] = [
+    {
+      id: "name",
+      header: "Name",
+      cell: (w) => {
+        const Icon = KIND_ICON[w.kind] ?? BoxIcon;
+        return (
+          <span className="flex items-center gap-2">
+            <Icon className="text-muted-foreground size-4 shrink-0" />
+            <span className="block">
+              <span className="block font-medium">{w.name}</span>
+              <span className="text-muted-foreground block font-mono text-xs">{w.slug}</span>
+            </span>
+          </span>
+        );
+      },
     },
-    {},
-  );
+    {
+      id: "kind",
+      header: "Kind",
+      cell: (w) => (
+        <Badge variant="outline" className="capitalize">
+          {KIND_LABEL[w.kind] ?? w.kind}
+        </Badge>
+      ),
+    },
+    {
+      id: "replicas",
+      header: "Ready / desired",
+      // The row link is an ::after overlay stretched from the first
+      // cell; the scale popover lives in this one and has to be lifted
+      // back on top of it or the only thing a click here can do is
+      // navigate.
+      cellClassName: "relative z-10 font-mono text-xs",
+      cell: (w) => {
+        const live = liveStatus.get(w.slug) ?? {
+          ready: 0,
+          desired: w.replicas || 0,
+          maxRestarts: 0,
+          errorEvent: null as WorkloadLiveStatus["errorEvent"],
+        };
+        return (
+          <>
+            <div className="flex items-center gap-1.5">
+              <Badge className={readinessTone(live.ready, live.desired)}>
+                Ready {live.ready}/{live.desired}
+              </Badge>
+              {/* #668 — inline scale popover so operators can bump
+                  replicas during an incident without navigating to the
+                  detail page. HPA-bound workloads skip the affordance
+                  (HPA owns the replica count). */}
+              {!w.hpaMinReplicas && !w.hpaMaxReplicas ? (
+                <Can permission="app.deploy">
+                  <ScalePopover
+                    workloadId={w.id}
+                    workloadName={w.name}
+                    currentDesired={live.desired}
+                  />
+                </Can>
+              ) : null}
+            </div>
+            {w.hpaMinReplicas && w.hpaMaxReplicas ? (
+              <div className="text-muted-foreground mt-1">
+                HPA {w.hpaMinReplicas}–{w.hpaMaxReplicas} @ {w.hpaTargetCpuPct}% CPU
+              </div>
+            ) : null}
+            {/* #666 — inline error chip for ImagePullBackOff /
+                CrashLoopBackOff / OOMKilled / FailedScheduling. Shows the
+                K8s reason as the badge label; the tooltip carries the
+                full event message. */}
+            {live.errorEvent ? (
+              <div className="mt-1" title={live.errorEvent.message}>
+                <Badge variant="outline" className="border-danger-border text-danger-fg gap-1">
+                  <AlertCircleIcon className="size-3" />
+                  {live.errorEvent.reason}
+                  {live.errorEvent.count > 1 ? ` × ${live.errorEvent.count}` : ""}
+                </Badge>
+              </div>
+            ) : null}
+          </>
+        );
+      },
+    },
+    {
+      id: "restarts",
+      header: "Restarts",
+      cellClassName: "font-mono text-xs",
+      cell: (w) => {
+        const restarts = liveStatus.get(w.slug)?.maxRestarts ?? 0;
+        return restarts > 0 ? (
+          <Badge
+            variant="outline"
+            className={
+              restarts >= 3
+                ? "border-danger-border text-danger-fg"
+                : "border-warning-border text-warning-fg"
+            }
+          >
+            {restarts}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground">0</span>
+        );
+      },
+    },
+    {
+      id: "public",
+      header: "Public",
+      cell: (w) =>
+        w.isPublic ? (
+          <Badge className="bg-success/15 text-success-fg">
+            <GlobeIcon className="size-3" /> public
+          </Badge>
+        ) : (
+          <Badge variant="secondary">internal</Badge>
+        ),
+    },
+    {
+      id: "resources",
+      header: "Resources",
+      cellClassName: "text-muted-foreground font-mono text-xs",
+      cell: (w) => `${w.cpuRequest || "—"} cpu · ${w.memoryRequest || "—"} mem`,
+    },
+    {
+      id: "schedule",
+      header: "Schedule",
+      cellClassName: "font-mono text-xs",
+      cell: (w) =>
+        w.schedule ? (
+          <span className="inline-flex items-center gap-1">
+            <CalendarClockIcon className="size-3" />
+            {w.schedule}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+  ];
 
   return (
     <PageShell
@@ -270,209 +398,38 @@ export function WorkloadsListClient({ slug }: { slug: string }) {
       <AppTabs slug={a.slug} active="workloads" />
 
       {/* ─── stats strip ───────────────────────────────────────────────── */}
-      <div className="grid gap-3 sm:grid-cols-4 text-sm">
-        <SummaryTile icon={LayersIcon} label="Workloads" value={list.length} />
+      <div className="grid gap-3 text-sm sm:grid-cols-4">
         <SummaryTile
-          icon={BoxIcon}
-          label="Total replicas"
-          value={totalReplicas}
+          icon={LayersIcon}
+          label="Workloads"
+          value={table.totalCount ?? summaryList.length}
         />
+        <SummaryTile icon={BoxIcon} label="Total replicas" value={totalReplicas} />
         <SummaryTile icon={GlobeIcon} label="Public" value={publicCount} />
-        <SummaryTile
-          icon={CalendarClockIcon}
-          label="Scheduled"
-          value={kindCounts.cronjob ?? 0}
-        />
+        <SummaryTile icon={CalendarClockIcon} label="Scheduled" value={kindCounts.cronjob ?? 0} />
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {workloads.loading && list.length === 0 ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : list.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<BoxIcon className="size-5" />}
-                title="No workloads declared"
-                description="Workloads are parsed from this app's manifest. Add a workload section to astrolift.yaml and push to repopulate this view."
-                actionHref={appPath(chrome, a.slug, "manifest")}
-                actionLabel="Open manifest"
-              />
-            </div>
-          ) : (
-            <>
-              <div className="px-4 pt-4">
-                <ListControls controls={ctrl} searchPlaceholder="Filter workloads..." />
-              </div>
-              {ctrl.totalFiltered === 0 ? (
-                <div className="p-6">
-                  <EmptyState
-                    icon={<BoxIcon className="size-5" />}
-                    title="No workloads match"
-                    description="Try a different search term."
-                  />
-                </div>
-              ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>
-                    <SortableHeader sortKey="name" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                      Name
-                    </SortableHeader>
-                  </TableHead>
-                  <TableHead>
-                    <SortableHeader sortKey="kind" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                      Kind
-                    </SortableHeader>
-                  </TableHead>
-                  <TableHead>
-                    <SortableHeader sortKey="replicas" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                      Ready / desired
-                    </SortableHeader>
-                  </TableHead>
-                  <TableHead>Restarts</TableHead>
-                  <TableHead>
-                    <SortableHeader sortKey="public" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
-                      Public
-                    </SortableHeader>
-                  </TableHead>
-                  <TableHead>Resources</TableHead>
-                  <TableHead>Schedule</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ctrl.rows.map((w) => {
-                  const Icon = KIND_ICON[w.kind] ?? BoxIcon;
-                  const live = liveStatus.get(w.slug) ?? {
-                    ready: 0,
-                    desired: w.replicas || 0,
-                    maxRestarts: 0,
-                    errorEvent: null as WorkloadLiveStatus["errorEvent"],
-                  };
-                  return (
-                    <TableRow
-                      key={w.id}
-                      className="hover:bg-accent/30 cursor-pointer"
-                      onClick={() =>
-                        (window.location.href = appPath(chrome, a.slug, "workloads", w.slug))
-                      }
-                    >
-                      <TableCell>
-                        <Link
-                          href={appPath(chrome, a.slug, "workloads", w.slug)}
-                          className="flex items-center gap-2 hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Icon className="text-muted-foreground size-4" />
-                          <div>
-                            <div className="font-medium">{w.name}</div>
-                            <div className="text-muted-foreground font-mono text-xs">
-                              {w.slug}
-                            </div>
-                          </div>
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="capitalize">
-                          {KIND_LABEL[w.kind] ?? w.kind}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                          <Badge className={readinessTone(live.ready, live.desired)}>
-                            Ready {live.ready}/{live.desired}
-                          </Badge>
-                          {/* #668 — inline scale popover so operators
-                              can bump replicas during an incident
-                              without navigating to the detail page.
-                              HPA-bound workloads skip the affordance
-                              (HPA owns the replica count). */}
-                          {!w.hpaMinReplicas && !w.hpaMaxReplicas ? (
-                            <Can permission="app.deploy">
-                              <ScalePopover
-                                workloadId={w.id}
-                                workloadName={w.name}
-                                currentDesired={live.desired}
-                              />
-                            </Can>
-                          ) : null}
-                        </div>
-                        {w.hpaMinReplicas && w.hpaMaxReplicas ? (
-                          <div className="text-muted-foreground mt-1">
-                            HPA {w.hpaMinReplicas}–{w.hpaMaxReplicas} @{" "}
-                            {w.hpaTargetCpuPct}% CPU
-                          </div>
-                        ) : null}
-                        {/* #666 — inline error chip for ImagePullBackOff /
-                            CrashLoopBackOff / OOMKilled / FailedScheduling.
-                            Shows the K8s reason as the badge label; the
-                            tooltip carries the full event message. */}
-                        {live.errorEvent ? (
-                          <div className="mt-1" title={live.errorEvent.message}>
-                            <Badge
-                              variant="outline"
-                              className="border-danger-border text-danger-fg gap-1"
-                            >
-                              <AlertCircleIcon className="size-3" />
-                              {live.errorEvent.reason}
-                              {live.errorEvent.count > 1 ? ` × ${live.errorEvent.count}` : ""}
-                            </Badge>
-                          </div>
-                        ) : null}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {live.maxRestarts > 0 ? (
-                          <Badge
-                            variant="outline"
-                            className={
-                              live.maxRestarts >= 3
-                                ? "border-danger-border text-danger-fg"
-                                : "border-warning-border text-warning-fg"
-                            }
-                          >
-                            {live.maxRestarts}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">0</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {w.isPublic ? (
-                          <Badge className="bg-success/15 text-success-fg">
-                            <GlobeIcon className="size-3" /> public
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary">internal</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground font-mono text-xs">
-                        {w.cpuRequest || "—"} cpu · {w.memoryRequest || "—"}{" "}
-                        mem
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {w.schedule ? (
-                          <span className="inline-flex items-center gap-1">
-                            <CalendarClockIcon className="size-3" />
-                            {w.schedule}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+      <DataTable
+        label="Workloads"
+        controller={table}
+        columns={columns}
+        getRowId={(w) => w.id}
+        rowHref={(w) => appPath(chrome, a.slug, "workloads", w.slug)}
+        searchPlaceholder="Filter workloads..."
+        empty={{
+          icon: <BoxIcon className="size-5" />,
+          title: "No workloads declared",
+          description:
+            "Workloads are parsed from this app's manifest. Add a workload section to astrolift.yaml and push to repopulate this view.",
+          actionHref: appPath(chrome, a.slug, "manifest"),
+          actionLabel: "Open manifest",
+        }}
+        emptyFiltered={{
+          title: "No matching workloads",
+          description:
+            "No workload matches that name, slug, or kind. Clear the search to see every workload in this app.",
+        }}
+      />
     </PageShell>
   );
 }
@@ -523,12 +480,7 @@ function ScalePopover({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-6"
-          title={`Scale ${workloadName}`}
-        >
+        <Button variant="ghost" size="icon" className="size-6" title={`Scale ${workloadName}`}>
           <ScalingIcon className="size-3" />
           <span className="sr-only">Scale</span>
         </Button>
@@ -553,7 +505,7 @@ function ScalePopover({
             {loading ? <Loader2Icon className="size-3 animate-spin" /> : "Apply"}
           </Button>
         </div>
-        <p className="text-muted-foreground mt-2 text-2xs">
+        <p className="text-muted-foreground text-2xs mt-2">
           Current: {currentDesired}. Takes effect immediately.
         </p>
       </PopoverContent>
@@ -576,9 +528,7 @@ function SummaryTile({
         <Icon className="size-4" />
       </div>
       <div>
-        <div className="text-muted-foreground text-xs uppercase tracking-wide">
-          {label}
-        </div>
+        <div className="text-muted-foreground text-xs tracking-wide uppercase">{label}</div>
         <div className="text-lg font-bold tabular-nums">{value}</div>
       </div>
     </div>

@@ -13,10 +13,9 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
-import { ListControls } from "@/components/ListControls";
-import { useListControls } from "@/hooks/use-list-controls";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { CopyBadge } from "@/components/CopyBadge";
+import { DataTable, useCursorTable, type Column } from "@/components/data-table";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
@@ -34,21 +33,16 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   CREATE_PREVIEW_ENVIRONMENT,
   EXTEND_PREVIEW_TTL,
   TEAR_DOWN_PREVIEW,
 } from "@/graphql/lifecycle/lifecycle.mutations";
-import { LIST_PREVIEW_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
+import {
+  LIST_PREVIEW_ENVIRONMENTS,
+  LIST_PREVIEW_ENVIRONMENTS_PAGE,
+} from "@/graphql/lifecycle/lifecycle.queries";
 import type {
   AstroliftPreviewEnvironment,
   PreviewStatus,
@@ -66,6 +60,13 @@ interface AppResp {
 }
 interface PreviewsResp {
   astroliftPreviewEnvironments: AstroliftPreviewEnvironment[];
+}
+interface PreviewsPageResp {
+  astroliftPreviewEnvironmentsPage: {
+    items: AstroliftPreviewEnvironment[];
+    nextCursor?: string | null;
+    totalCount?: number | null;
+  };
 }
 interface MutationResultLite {
   ok: boolean;
@@ -86,25 +87,17 @@ const statusToDot: Record<PreviewStatus, "ok" | "warn" | "error" | "muted" | "pe
 const STALE_DAYS = 7;
 const STALE_THRESHOLD_MS = STALE_DAYS * 24 * 60 * 60 * 1000;
 
-// Status-filter buttons in the list header (#431 scope B). "active"
-// (default) hides torn-down rows since drowning in them is the #1
-// reported friction; "all" lets an operator audit teardown history
-// without leaving the page.
-type StatusFilter = "active" | "running" | "failed" | "all";
-
-const STATUS_FILTERS: StatusFilter[] = ["active", "running", "failed", "all"];
-
-function matchesFilter(p: AstroliftPreviewEnvironment, filter: StatusFilter): boolean {
-  switch (filter) {
-    case "active":
-      return p.status !== "torn_down";
-    case "running":
-      return p.status === "running";
-    case "failed":
-      return p.status === "failed";
-    case "all":
-      return true;
-  }
+/**
+ * Both the teardown and the TTL-extend paths refresh two documents: the
+ * table's paginated one by operation name, so it re-runs with the cursor
+ * and search currently in effect, and the flat summary query the spend
+ * roll-up and stale sweep read.
+ */
+function refetchFor(appSlug: string) {
+  return [
+    "ListPreviewEnvironmentsPage",
+    { query: LIST_PREVIEW_ENVIRONMENTS, variables: { appSlug } },
+  ];
 }
 
 function isStale(p: AstroliftPreviewEnvironment): boolean {
@@ -167,9 +160,7 @@ function CreatePreviewSheet({ appSlug, disabled }: { appSlug: string; disabled: 
 
   const [createPreview, { loading }] = useMutation<{
     createPreviewEnvironment: MutationResultLite;
-  }>(CREATE_PREVIEW_ENVIRONMENT, {
-    refetchQueries: [{ query: LIST_PREVIEW_ENVIRONMENTS, variables: { appSlug } }],
-  });
+  }>(CREATE_PREVIEW_ENVIRONMENT, { refetchQueries: refetchFor(appSlug) });
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -214,8 +205,8 @@ function CreatePreviewSheet({ appSlug, disabled }: { appSlug: string; disabled: 
                 autoFocus
               />
               <p className="text-muted-foreground text-xs">
-                The branch must exist in the connected repository. The environment will use the
-                same TTL and resource limits as auto-preview environments.
+                The branch must exist in the connected repository. The environment will use the same
+                TTL and resource limits as auto-preview environments.
               </p>
             </div>
             <SheetFooter>
@@ -238,52 +229,55 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
   const tCommon = useTranslations("apps.common");
   const t = useTranslations("apps.previews");
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
-  const previews = useQuery<PreviewsResp>(LIST_PREVIEW_ENVIRONMENTS, {
+
+  /**
+   * Summary chrome — the status counts, the stale sweep (#431) and the
+   * monthly spend roll-up (#660) — answers questions about the app's
+   * *whole* preview set, and `astroliftPreviewEnvironmentsPage` exposes
+   * no aggregate. Summing the page in hand would make "$X/day across N
+   * previews" quietly mean "across this page", so the summary stays on
+   * the flat field while the table below pages on the server.
+   */
+  const summary = useQuery<PreviewsResp>(LIST_PREVIEW_ENVIRONMENTS, {
     variables: { appSlug: slug },
     pollInterval: 30000,
     fetchPolicy: "cache-and-network",
   });
 
+  // `astroliftPreviewEnvironmentsPage` filters on `appSlug` and searches
+  // the app, branch, hostname, commit **and status**. It has no status
+  // filter and no sort argument, so this table declares neither — the
+  // status pills that used to filter one fetched page are gone (typing
+  // `running` / `failed` / `torn_down` in the box is the server-side
+  // equivalent).
+  const table = useCursorTable<AstroliftPreviewEnvironment>({
+    query: LIST_PREVIEW_ENVIRONMENTS_PAGE,
+    variables: { appSlug: slug },
+    extract: (d) => (d as PreviewsPageResp | undefined)?.astroliftPreviewEnvironmentsPage,
+    searchVariable: "search",
+    urlKey: "pv",
+    pollInterval: 30000,
+  });
+
   const [tearDown, tearState] = useMutation<{
     tearDownPreview: MutationResultLite;
-  }>(TEAR_DOWN_PREVIEW, {
-    refetchQueries: [{ query: LIST_PREVIEW_ENVIRONMENTS, variables: { appSlug: slug } }],
-  });
+  }>(TEAR_DOWN_PREVIEW, { refetchQueries: refetchFor(slug) });
 
   const [extendTtl, extendState] = useMutation<{
     extendPreviewTtl: MutationResultLite;
-  }>(EXTEND_PREVIEW_TTL, {
-    refetchQueries: [{ query: LIST_PREVIEW_ENVIRONMENTS, variables: { appSlug: slug } }],
-  });
+  }>(EXTEND_PREVIEW_TTL, { refetchQueries: refetchFor(slug) });
 
   const a = app.data?.astroliftApp;
-  const list = previews.data?.astroliftPreviewEnvironments ?? [];
-
-  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("active");
-  const statusFiltered = React.useMemo(
-    () => list.filter((p) => matchesFilter(p, statusFilter)),
-    [list, statusFilter]
+  const list = React.useMemo(
+    () => summary.data?.astroliftPreviewEnvironments ?? [],
+    [summary.data?.astroliftPreviewEnvironments]
   );
-  const ctrl = useListControls({
-    data: statusFiltered,
-    searchFn: (p) => [p.branch, String(p.prNumber), p.commitSha].join(" "),
-    initialPageSize: 25,
-    sortFn: (a, b, s) => {
-      const dir = s.dir === "asc" ? 1 : -1;
-      if (s.key === "branch") return a.branch.localeCompare(b.branch) * dir;
-      if (s.key === "status") return a.status.localeCompare(b.status) * dir;
-      return 0;
-    },
-  });
-  const filtered = ctrl.rows;
 
   const counts = React.useMemo(
     () => ({
       running: list.filter((p) => p.status === "running").length,
-      building: list.filter((p) => p.status === "building").length,
       failed: list.filter((p) => p.status === "failed").length,
       tornDown: list.filter((p) => p.status === "torn_down").length,
-      total: list.length,
     }),
     [list]
   );
@@ -330,6 +324,21 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
     return () => clearInterval(id);
   }, []);
 
+  const handleExtend = React.useCallback(
+    async (p: AstroliftPreviewEnvironment, days: PreviewTtlExtendDays) => {
+      const { data } = await extendTtl({
+        variables: { input: { id: p.id, days } },
+      });
+      const r = data?.extendPreviewTtl;
+      if (r?.ok) {
+        toast.success(t("toasts.ttlExtended", { pr: p.prNumber, days }));
+      } else {
+        toast.error(r?.errors[0]?.message ?? t("toasts.extendFailed"));
+      }
+    },
+    [extendTtl, t]
+  );
+
   if (app.loading && !a) {
     return (
       <PageShell title={tCommon("loading")}>
@@ -362,19 +371,189 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
     }
   }
 
-  async function handleExtend(p: AstroliftPreviewEnvironment, days: PreviewTtlExtendDays) {
-    const { data } = await extendTtl({
-      variables: { input: { id: p.id, days } },
-    });
-    const r = data?.extendPreviewTtl;
-    if (r?.ok) {
-      toast.success(t("toasts.ttlExtended", { pr: p.prNumber, days }));
-    } else {
-      toast.error(r?.errors[0]?.message ?? t("toasts.extendFailed"));
-    }
-  }
-
-  const isEmpty = list.length === 0;
+  const columns: Column<AstroliftPreviewEnvironment>[] = [
+    {
+      id: "health",
+      header: <span className="sr-only">{t("columns.status")}</span>,
+      width: "w-6",
+      cell: (p) => <StatusDot status={statusToDot[p.status]} />,
+    },
+    {
+      id: "pr",
+      header: t("columns.pr"),
+      cell: (p) => (
+        <>
+          {p.prNumber > 0 ? (
+            p.prUrl ? (
+              <a
+                href={p.prUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium hover:underline"
+                title={t("openPr", { pr: p.prNumber })}
+              >
+                #{p.prNumber}
+              </a>
+            ) : (
+              <span className="font-medium">#{p.prNumber}</span>
+            )
+          ) : (
+            <span className="font-medium">{p.branch}</span>
+          )}
+          {p.prNumber > 0 && <span className="text-muted-foreground"> · {p.branch}</span>}
+          <div className="text-muted-foreground font-mono text-xs">
+            ns {p.namespace}
+            {p.commitSha && <> · {p.commitSha.slice(0, 7)}</>}
+          </div>
+          {p.isManual && (
+            <Badge variant="outline" className="text-2xs mt-1 uppercase">
+              manual
+            </Badge>
+          )}
+        </>
+      ),
+    },
+    {
+      id: "hostname",
+      header: t("columns.hostname"),
+      cell: (p) =>
+        p.status === "running" ? (
+          <CopyBadge
+            value={p.hostname}
+            openHref={`https://${p.hostname}`}
+            openLabel={t("openInTab")}
+            title={t("copyHostname")}
+          />
+        ) : (
+          <span className="text-muted-foreground font-mono text-xs">{p.hostname}</span>
+        ),
+    },
+    {
+      id: "ttl",
+      header: t("columns.ttl"),
+      cell: (p) => {
+        if (p.status === "torn_down") {
+          return <span className="text-muted-foreground text-xs">—</span>;
+        }
+        const countdown = formatCountdown(p.ttlUntil, now);
+        const ttlDate = new Date(p.ttlUntil);
+        return (
+          <div className="flex flex-col gap-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className={cn(
+                    "font-mono text-xs",
+                    countdown.expired ? "text-danger-fg" : "text-muted-foreground"
+                  )}
+                >
+                  {countdown.label}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{t("ttlTooltip", { date: ttlDate.toLocaleString() })}</TooltipContent>
+            </Tooltip>
+            <Can permission="app.deploy">
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  disabled={extendState.loading}
+                  onClick={() => handleExtend(p, 1)}
+                >
+                  {t("extend.1d")}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  disabled={extendState.loading}
+                  onClick={() => handleExtend(p, 7)}
+                >
+                  {t("extend.7d")}
+                </Button>
+              </div>
+            </Can>
+          </div>
+        );
+      },
+    },
+    {
+      id: "footprint",
+      header: t("columns.footprint"),
+      cell: (p) => {
+        const aggregate = p.aggregateResources;
+        if (aggregate.podCount === 0) {
+          return <span className="text-muted-foreground text-xs">—</span>;
+        }
+        const dailyCost = p.estimatedDailyCostUsd;
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="cursor-default">
+                <div className="text-xs">
+                  {formatCpuCores(aggregate.cpuCores)} · {formatMemoryBytes(aggregate.memoryBytes)}
+                </div>
+                <div className="text-muted-foreground text-xs">
+                  {dailyCost != null
+                    ? t("costPerDay", { cost: dailyCost.toFixed(2) })
+                    : t("costUnavailable")}
+                </div>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              {dailyCost != null
+                ? t("costTooltip", { pods: aggregate.podCount, cost: dailyCost.toFixed(2) })
+                : t("costTooltipUnavailable", { pods: aggregate.podCount })}
+            </TooltipContent>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      id: "lastDeploy",
+      header: t("columns.lastDeploy"),
+      cellClassName: "text-muted-foreground text-sm",
+      cell: (p) => (
+        <>
+          {p.lastDeployedAt ? new Date(p.lastDeployedAt).toLocaleString() : "—"}
+          {isStale(p) && (
+            <Badge variant="outline" className="text-2xs ml-2 uppercase">
+              {t("staleBadge")}
+            </Badge>
+          )}
+        </>
+      ),
+    },
+    {
+      id: "status",
+      header: t("columns.status"),
+      cell: (p) => (
+        <Badge variant="secondary" className="capitalize">
+          {p.status.replace(/_/g, " ")}
+        </Badge>
+      ),
+    },
+    {
+      id: "actions",
+      header: t("columns.actions"),
+      align: "right",
+      width: "w-32",
+      cell: (p) =>
+        p.status === "torn_down" ? null : (
+          <Can permission="app.deploy">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={tearState.loading}
+              onClick={() => setTearDownTarget(p)}
+            >
+              <TrashIcon className="size-3" /> {t("tearDown")}
+            </Button>
+          </Can>
+        ),
+    },
+  ];
 
   return (
     <PageShell
@@ -394,7 +573,7 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
       {!a.previewEnabled && (
         <Card className="border-warning-border bg-warning/5">
           <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3">
-            <AlertTriangleIcon className="mt-0.5 size-4 text-warning-fg" />
+            <AlertTriangleIcon className="text-warning-fg mt-0.5 size-4" />
             <div className="flex-1">
               <CardTitle className="text-sm">{t("disabled.title")}</CardTitle>
               <CardDescription>{t("disabled.description")}</CardDescription>
@@ -406,7 +585,7 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
       {stale.length > 0 && (
         <Card className="border-warning-border bg-warning/5">
           <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3">
-            <CalendarClockIcon className="mt-0.5 size-4 text-warning-fg" />
+            <CalendarClockIcon className="text-warning-fg mt-0.5 size-4" />
             <div className="flex-1">
               <CardTitle className="text-sm">{t("stale.title", { count: stale.length })}</CardTitle>
               <CardDescription>{t("stale.description", { days: STALE_DAYS })}</CardDescription>
@@ -432,9 +611,7 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
             </div>
             <div>
               <span className="text-muted-foreground text-xs">This month (projected)</span>
-              <div className="font-mono text-lg">
-                ${spend.monthlyProjection.toFixed(2)}
-              </div>
+              <div className="font-mono text-lg">${spend.monthlyProjection.toFixed(2)}</div>
             </div>
             <div className="text-muted-foreground ml-auto text-xs">
               {spend.priced} of {spend.liveCount} previews priced
@@ -444,107 +621,51 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
         </Card>
       )}
 
-      <Card>
-        {!isEmpty && (
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <div className="flex flex-wrap items-center gap-2">
-              {STATUS_FILTERS.map((f) => (
-                <Button
-                  key={f}
-                  variant={statusFilter === f ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setStatusFilter(f)}
-                  className="h-7 text-xs"
-                  title={t(`filterTooltips.${f}`)}
-                >
-                  {t(`filters.${f}`)}
-                  <span className="text-muted-foreground ml-1">
-                    {f === "active"
-                      ? counts.running + counts.failed + counts.building
-                      : f === "running"
-                        ? counts.running
-                        : f === "failed"
-                          ? counts.failed
-                          : counts.total}
-                  </span>
-                </Button>
-              ))}
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="text-muted-foreground text-xs">
-                {t("groupSummary", {
-                  running: counts.running,
-                  failed: counts.failed,
-                  tornDown: counts.tornDown,
-                })}
-              </div>
-              {statusFiltered.length > 0 && (
-                <ListControls controls={ctrl} searchPlaceholder="Search by branch or PR…" hideSearch={false} />
-              )}
-            </div>
-          </CardHeader>
-        )}
+      <TooltipProvider delayDuration={200}>
+        <DataTable
+          label="Preview environments"
+          controller={table}
+          columns={columns}
+          getRowId={(p) => p.id}
+          searchPlaceholder="Search by branch, host, commit, or status…"
+          toolbar={
+            <span className="text-muted-foreground text-xs">
+              {t("groupSummary", {
+                running: counts.running,
+                failed: counts.failed,
+                tornDown: counts.tornDown,
+              })}
+            </span>
+          }
+          empty={{
+            icon: <GitPullRequestIcon className="size-5" />,
+            title: t("empty.title"),
+            description: a.previewEnabled ? t("empty.enabledHint") : t("empty.disabledHint"),
+            actionHref: a.previewEnabled
+              ? (a.sourceUrl ?? undefined)
+              : appPath(chrome, a.slug, "config"),
+            actionLabel: a.previewEnabled
+              ? a.sourceUrl
+                ? t("openRepo")
+                : undefined
+              : t("enablePreviews"),
+            learnMoreHref: DOCS_PREVIEWS_HREF,
+            learnMoreLabel: t("empty.learnMore"),
+          }}
+          emptyFiltered={{
+            title: "No matching previews",
+            description:
+              "No preview matches that branch, hostname, commit, or status. Clear the search to see every preview for this app.",
+          }}
+        />
+      </TooltipProvider>
 
-        <CardContent className="p-0">
-          {previews.loading && list.length === 0 ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : isEmpty ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<GitPullRequestIcon className="size-5" />}
-                title={t("empty.title")}
-                description={a.previewEnabled ? t("empty.enabledHint") : t("empty.disabledHint")}
-                actionHref={
-                  a.previewEnabled ? (a.sourceUrl ?? undefined) : appPath(chrome, a.slug, "config")
-                }
-                actionLabel={
-                  a.previewEnabled ? (a.sourceUrl ? t("openRepo") : undefined) : t("enablePreviews")
-                }
-                learnMoreHref={DOCS_PREVIEWS_HREF}
-                learnMoreLabel={t("empty.learnMore")}
-                secondary={<EmptyStateSteps />}
-              />
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="text-muted-foreground p-10 text-center text-sm">{t("filterEmpty")}</div>
-          ) : (
-            <TooltipProvider delayDuration={200}>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-6"></TableHead>
-                    <TableHead>{t("columns.pr")}</TableHead>
-                    <TableHead>{t("columns.hostname")}</TableHead>
-                    <TableHead>{t("columns.ttl")}</TableHead>
-                    <TableHead>{t("columns.footprint")}</TableHead>
-                    <TableHead>{t("columns.lastDeploy")}</TableHead>
-                    <TableHead>{t("columns.status")}</TableHead>
-                    <TableHead className="text-right">{t("columns.actions")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((p) => (
-                    <PreviewRow
-                      key={p.id}
-                      preview={p}
-                      now={now}
-                      tearLoading={tearState.loading}
-                      extendLoading={extendState.loading}
-                      onTearDown={() => setTearDownTarget(p)}
-                      onExtend={(days) => handleExtend(p, days)}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
-            </TooltipProvider>
-          )}
-        </CardContent>
-      </Card>
+      {/* The onboarding steps used to ride along inside the empty state's
+          `secondary` slot, which DataTable's EmptyStateSpec has no room
+          for — so they follow the table while it is showing that state. */}
+      {table.state === "empty" && <EmptyStateSteps />}
 
-      {!isEmpty && (
+      {list.length > 0 && (
         <p className="text-muted-foreground text-center text-xs">
           {t("footer", {
             count: a.previewMaxActive,
@@ -578,173 +699,6 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
         }}
       />
     </PageShell>
-  );
-}
-
-// ---- row -------------------------------------------------------------
-
-interface PreviewRowProps {
-  preview: AstroliftPreviewEnvironment;
-  now: number;
-  tearLoading: boolean;
-  extendLoading: boolean;
-  onTearDown: () => void;
-  onExtend: (days: PreviewTtlExtendDays) => void | Promise<void>;
-}
-
-function PreviewRow({
-  preview: p,
-  now,
-  tearLoading,
-  extendLoading,
-  onTearDown,
-  onExtend,
-}: PreviewRowProps) {
-  const t = useTranslations("apps.previews");
-  const countdown = formatCountdown(p.ttlUntil, now);
-  const ttlDate = new Date(p.ttlUntil);
-  const aggregate = p.aggregateResources;
-  const hasFootprint = aggregate.podCount > 0;
-  const dailyCost = p.estimatedDailyCostUsd;
-  const teardown = p.status !== "torn_down";
-
-  return (
-    <TableRow>
-      <TableCell className="w-6">
-        <StatusDot status={statusToDot[p.status]} />
-      </TableCell>
-      <TableCell>
-        {p.prNumber > 0 ? (
-          p.prUrl ? (
-            <a
-              href={p.prUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="font-medium hover:underline"
-              title={t("openPr", { pr: p.prNumber })}
-            >
-              #{p.prNumber}
-            </a>
-          ) : (
-            <span className="font-medium">#{p.prNumber}</span>
-          )
-        ) : (
-          <span className="font-medium">{p.branch}</span>
-        )}
-        {p.prNumber > 0 && <span className="text-muted-foreground"> · {p.branch}</span>}
-        <div className="text-muted-foreground font-mono text-xs">
-          ns {p.namespace}
-          {p.commitSha && <> · {p.commitSha.slice(0, 7)}</>}
-        </div>
-        {p.isManual && (
-          <Badge variant="outline" className="mt-1 text-2xs uppercase">
-            manual
-          </Badge>
-        )}
-      </TableCell>
-      <TableCell>
-        {p.status === "running" ? (
-          <CopyBadge
-            value={p.hostname}
-            openHref={`https://${p.hostname}`}
-            openLabel={t("openInTab")}
-            title={t("copyHostname")}
-          />
-        ) : (
-          <span className="text-muted-foreground font-mono text-xs">{p.hostname}</span>
-        )}
-      </TableCell>
-      <TableCell>
-        {teardown ? (
-          <div className="flex flex-col gap-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span
-                  className={cn(
-                    "font-mono text-xs",
-                    countdown.expired ? "text-danger-fg" : "text-muted-foreground"
-                  )}
-                >
-                  {countdown.label}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{t("ttlTooltip", { date: ttlDate.toLocaleString() })}</TooltipContent>
-            </Tooltip>
-            <Can permission="app.deploy">
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  disabled={extendLoading}
-                  onClick={() => onExtend(1)}
-                >
-                  {t("extend.1d")}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  disabled={extendLoading}
-                  onClick={() => onExtend(7)}
-                >
-                  {t("extend.7d")}
-                </Button>
-              </div>
-            </Can>
-          </div>
-        ) : (
-          <span className="text-muted-foreground text-xs">—</span>
-        )}
-      </TableCell>
-      <TableCell>
-        {hasFootprint ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="cursor-default">
-                <div className="text-xs">
-                  {formatCpuCores(aggregate.cpuCores)} · {formatMemoryBytes(aggregate.memoryBytes)}
-                </div>
-                <div className="text-muted-foreground text-xs">
-                  {dailyCost != null
-                    ? t("costPerDay", { cost: dailyCost.toFixed(2) })
-                    : t("costUnavailable")}
-                </div>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              {dailyCost != null
-                ? t("costTooltip", { pods: aggregate.podCount, cost: dailyCost.toFixed(2) })
-                : t("costTooltipUnavailable", { pods: aggregate.podCount })}
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          <span className="text-muted-foreground text-xs">—</span>
-        )}
-      </TableCell>
-      <TableCell className="text-muted-foreground text-sm">
-        {p.lastDeployedAt ? new Date(p.lastDeployedAt).toLocaleString() : "—"}
-        {isStale(p) && (
-          <Badge variant="outline" className="ml-2 text-2xs uppercase">
-            {t("staleBadge")}
-          </Badge>
-        )}
-      </TableCell>
-      <TableCell>
-        <Badge variant="secondary" className="capitalize">
-          {p.status.replace(/_/g, " ")}
-        </Badge>
-      </TableCell>
-      <TableCell className="text-right">
-        {teardown && (
-          <Can permission="app.deploy">
-            <Button size="sm" variant="outline" disabled={tearLoading} onClick={onTearDown}>
-              <TrashIcon className="size-3" /> {t("tearDown")}
-            </Button>
-          </Can>
-        )}
-      </TableCell>
-    </TableRow>
   );
 }
 

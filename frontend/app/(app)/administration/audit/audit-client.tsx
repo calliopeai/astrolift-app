@@ -14,11 +14,10 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { EmptyState } from "@/components/EmptyState";
+import { DataTable, useCursorTable, type Column } from "@/components/data-table";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogClose,
@@ -51,15 +50,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import { UPDATE_ORGANIZATION } from "@/graphql/identity/identity.mutations";
 import type {
@@ -84,6 +74,13 @@ interface PageResp {
   astroliftAuditEventsPage: AstroliftAuditEventPage;
 }
 
+/**
+ * The audit trail is the densest list on the platform and operators
+ * read it a screen at a time, so this surface keeps the 100-row page
+ * the hand-rolled version defaulted to rather than DataTable's 25.
+ */
+const AUDIT_PAGE_SIZE = 100;
+
 interface RetentionResp {
   astroliftAuditRetention: AstroliftAuditRetention;
 }
@@ -95,9 +92,6 @@ interface ExportResp {
     data: AstroliftAuditExport | null;
   };
 }
-
-const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
-const DEFAULT_PAGE_SIZE = 100;
 
 // Server-side bound on Organization.audit_log_retention_days (spec
 // ceiling ~7 years); mirrors the guard in updateOrganization.
@@ -144,32 +138,40 @@ export function AuditClient() {
   const t = useTranslations("lists.audit");
   const fmt = useFormatters();
 
-  const [actionFilter, setActionFilter] = React.useState("");
   const [decisionFilter, setDecisionFilter] = React.useState<string>("");
   const [fromDate, setFromDate] = React.useState<string>("");
   const [toDate, setToDate] = React.useState<string>("");
   const [activeRow, setActiveRow] = React.useState<AstroliftAuditEvent | null>(null);
   const [exporting, setExporting] = React.useState(false);
-  const [pageSize, setPageSize] = React.useState<number>(DEFAULT_PAGE_SIZE);
 
+  // Filters the controller doesn't own. Changing any of them resets the
+  // cursor walk to page one, which is what a different result set needs.
   const variables = React.useMemo(
     () => ({
-      limit: pageSize,
-      after: null as string | null,
-      action: actionFilter || null,
       decision: decisionFilter || null,
-      actorId: null as string | null,
       createdAtGte: dateInputToIso(fromDate, false),
       createdAtLte: dateInputToIso(toDate, true),
+      // `totalCount` on this page is opt-in — a full-range count is
+      // expensive, so the caller asks for it.
       includeTotal: true,
     }),
-    [actionFilter, decisionFilter, fromDate, toDate, pageSize]
+    [decisionFilter, fromDate, toDate]
   );
 
-  const { data, loading, fetchMore } = useQuery<PageResp>(LIST_AUDIT_EVENTS_PAGE, {
+  const table = useCursorTable<AstroliftAuditEvent>({
+    query: LIST_AUDIT_EVENTS_PAGE,
     variables,
-    pollInterval: 5000,
+    extract: (d) => (d as PageResp | undefined)?.astroliftAuditEventsPage,
+    // The action box is the query's `action` argument, debounced by the
+    // controller. It used to be an ordinary <Input> wired straight into
+    // the query variables, which cost one network round trip per
+    // keystroke. Note the server matches it *exactly*, hence the
+    // placeholder and the filtered-empty copy below.
+    searchVariable: "action",
+    pageSize: AUDIT_PAGE_SIZE,
+    urlKey: "audit",
     fetchPolicy: "cache-and-network",
+    pollInterval: 5000,
   });
 
   const { data: retentionData } = useQuery<RetentionResp>(GET_AUDIT_RETENTION, {
@@ -178,29 +180,9 @@ export function AuditClient() {
 
   const [exportMutation] = useMutation<ExportResp>(EXPORT_AUDIT_EVENTS);
 
-  const page = data?.astroliftAuditEventsPage;
-  const list = page?.items ?? [];
-  const nextCursor = page?.nextCursor ?? null;
-  const totalCount = page?.totalCount ?? null;
-
-  const handleLoadMore = React.useCallback(() => {
-    if (!nextCursor) return;
-    fetchMore({
-      variables: { ...variables, after: nextCursor },
-      updateQuery: (prev, { fetchMoreResult }) => {
-        if (!fetchMoreResult) return prev;
-        return {
-          astroliftAuditEventsPage: {
-            ...fetchMoreResult.astroliftAuditEventsPage,
-            items: [
-              ...prev.astroliftAuditEventsPage.items,
-              ...fetchMoreResult.astroliftAuditEventsPage.items,
-            ],
-          },
-        };
-      },
-    });
-  }, [fetchMore, nextCursor, variables]);
+  // The export takes the filter set the operator is looking at, not the
+  // page: `action` comes from the search box, the rest from `variables`.
+  const actionFilter = table.search.trim();
 
   const handleExport = React.useCallback(
     async (format: AuditExportFormat) => {
@@ -211,9 +193,9 @@ export function AuditClient() {
           variables: {
             input: {
               format: format.toUpperCase(),
-              action: variables.action,
+              action: actionFilter || null,
               decision: variables.decision,
-              actorId: variables.actorId,
+              actorId: null,
               createdAtGte: variables.createdAtGte,
               createdAtLte: variables.createdAtLte,
             },
@@ -243,7 +225,7 @@ export function AuditClient() {
         setExporting(false);
       }
     },
-    [exportMutation, t, variables]
+    [exportMutation, t, actionFilter, variables]
   );
 
   const retentionDays = retentionData?.astroliftAuditRetention?.days;
@@ -252,6 +234,65 @@ export function AuditClient() {
     : t("description");
 
   const maxDate = todayIso();
+
+  const columns: Column<AstroliftAuditEvent>[] = [
+    {
+      id: "when",
+      header: t("columns.when"),
+      cellClassName: "font-mono text-xs whitespace-nowrap",
+      cell: (row) => fmt.formatDateTime(row.occurredAt),
+    },
+    {
+      id: "actor",
+      header: t("columns.actor"),
+      cell: (row) => (
+        <>
+          <div className="text-sm">{row.actorDisplay || row.actorKind}</div>
+          <div className="text-muted-foreground text-xs">
+            {row.actorKind}
+            {row.actorId ? ` · ${row.actorId}` : ""}
+          </div>
+        </>
+      ),
+    },
+    {
+      id: "action",
+      header: t("columns.action"),
+      cell: (row) => (
+        <Badge variant="outline" className="font-mono text-xs">
+          {row.action}
+        </Badge>
+      ),
+    },
+    {
+      id: "target",
+      header: t("columns.target"),
+      cellClassName: "text-sm",
+      cell: (row) =>
+        row.targetKind ? (
+          <div className="font-mono text-xs">
+            {row.targetKind}
+            {row.targetSlug ? `:${row.targetSlug}` : ""}
+            {row.targetId ? ` (${row.targetId})` : ""}
+          </div>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
+      id: "decision",
+      header: t("columns.decision"),
+      cell: (row) => {
+        const style = decisionStyles[row.decision] ?? decisionStyles.UNKNOWN;
+        return (
+          <Badge className={style.cls + " gap-1 px-2 py-0.5 text-xs"} variant="secondary">
+            {style.icon}
+            {row.decision}
+          </Badge>
+        );
+      },
+    },
+  ];
 
   return (
     <PageShell
@@ -283,176 +324,77 @@ export function AuditClient() {
         </div>
       }
     >
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="audit-action-filter" className="text-xs">
-            {t("filters.actionLabel")}
-          </Label>
-          <Input
-            id="audit-action-filter"
-            value={actionFilter}
-            onChange={(e) => setActionFilter(e.target.value)}
-            placeholder={t("filters.actionPlaceholder")}
-            className="w-64"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="audit-decision-filter" className="text-xs">
-            {t("filters.decisionLabel")}
-          </Label>
-          <Select
-            value={decisionFilter || "ALL"}
-            onValueChange={(v) => setDecisionFilter(v === "ALL" ? "" : v)}
-          >
-            <SelectTrigger id="audit-decision-filter" className="w-40">
-              <SelectValue placeholder={t("filters.decisionLabel")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">{t("filters.anyDecision")}</SelectItem>
-              <SelectItem value="ALLOW">ALLOW</SelectItem>
-              <SelectItem value="DENY">DENY</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="audit-from-date" className="text-xs">
-            {t("filters.fromLabel")}
-          </Label>
-          <Input
-            id="audit-from-date"
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            max={maxDate}
-            className="w-44"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="audit-to-date" className="text-xs">
-            {t("filters.toLabel")}
-          </Label>
-          <Input
-            id="audit-to-date"
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            max={maxDate}
-            className="w-44"
-          />
-        </div>
-        <div className="ml-auto flex items-end gap-3">
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="audit-page-size" className="text-xs">
-              {t("pageSizeLabel")}
-            </Label>
-            <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
-              <SelectTrigger id="audit-page-size" className="w-24">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PAGE_SIZE_OPTIONS.map((n) => (
-                  <SelectItem key={n} value={String(n)}>
-                    {n}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {totalCount != null && (
-            <div className="text-muted-foreground pb-2 text-xs">
-              {t("filters.totalCount", { count: totalCount })}
+      <DataTable
+        label="Audit events"
+        controller={table}
+        columns={columns}
+        getRowId={(row) => row.id}
+        // Rows open the detail sheet; they are not links, so they must
+        // not pretend to be.
+        onRowActivate={setActiveRow}
+        // DataTable owns the search box, so the field names itself in
+        // its own placeholder: it is the action filter, not a free-text
+        // search across the row.
+        searchPlaceholder={`${t("filters.actionLabel")}: ${t("filters.actionPlaceholder")}`}
+        toolbar={
+          <>
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="audit-decision-filter" className="text-muted-foreground text-xs">
+                {t("filters.decisionLabel")}
+              </Label>
+              <Select
+                value={decisionFilter || "ALL"}
+                onValueChange={(v) => setDecisionFilter(v === "ALL" ? "" : v)}
+              >
+                <SelectTrigger id="audit-decision-filter" className="w-40">
+                  <SelectValue placeholder={t("filters.decisionLabel")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">{t("filters.anyDecision")}</SelectItem>
+                  <SelectItem value="ALLOW">ALLOW</SelectItem>
+                  <SelectItem value="DENY">DENY</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          )}
-        </div>
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
-          {loading && list.length === 0 ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : list.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<ScrollTextIcon className="size-5" />}
-                title={t("emptyTitle")}
-                description={t("emptyDescription")}
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="audit-from-date" className="text-muted-foreground text-xs">
+                {t("filters.fromLabel")}
+              </Label>
+              <Input
+                id="audit-from-date"
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                max={maxDate}
+                className="w-40"
               />
             </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("columns.when")}</TableHead>
-                  <TableHead>{t("columns.actor")}</TableHead>
-                  <TableHead>{t("columns.action")}</TableHead>
-                  <TableHead>{t("columns.target")}</TableHead>
-                  <TableHead>{t("columns.decision")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {list.map((row) => {
-                  const style = decisionStyles[row.decision] ?? decisionStyles.UNKNOWN;
-                  return (
-                    <TableRow
-                      key={row.id}
-                      className="hover:bg-muted/40 cursor-pointer"
-                      onClick={() => setActiveRow(row)}
-                    >
-                      <TableCell className="font-mono text-xs whitespace-nowrap">
-                        {fmt.formatDateTime(row.occurredAt)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">{row.actorDisplay || row.actorKind}</div>
-                        <div className="text-muted-foreground text-xs">
-                          {row.actorKind}
-                          {row.actorId ? ` · ${row.actorId}` : ""}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="font-mono text-xs">
-                          {row.action}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {row.targetKind ? (
-                          <div className="font-mono text-xs">
-                            {row.targetKind}
-                            {row.targetSlug ? `:${row.targetSlug}` : ""}
-                            {row.targetId ? ` (${row.targetId})` : ""}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          className={style.cls + " gap-1 px-2 py-0.5 text-xs"}
-                          variant="secondary"
-                        >
-                          {style.icon}
-                          {row.decision}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      {nextCursor && (
-        <div className="flex justify-center">
-          <Button variant="outline" size="sm" onClick={handleLoadMore} disabled={loading}>
-            {t("loadMore")}
-          </Button>
-        </div>
-      )}
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="audit-to-date" className="text-muted-foreground text-xs">
+                {t("filters.toLabel")}
+              </Label>
+              <Input
+                id="audit-to-date"
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                max={maxDate}
+                className="w-40"
+              />
+            </div>
+          </>
+        }
+        empty={{
+          icon: <ScrollTextIcon className="size-5" />,
+          title: t("emptyTitle"),
+          description: t("emptyDescription"),
+        }}
+        emptyFiltered={{
+          title: "No events for that action",
+          description:
+            "The action filter matches exactly: “team.create”, not “team”. Check the full action name on a row you can see, or clear the filter to get the whole range back.",
+        }}
+      />
 
       <AuditDetailsSheet row={activeRow} onOpenChange={(open) => !open && setActiveRow(null)} />
     </PageShell>

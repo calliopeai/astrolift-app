@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useMutation } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
   BookOpenIcon,
@@ -22,11 +22,9 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
-import { ListControls } from "@/components/ListControls";
-import { useListControls } from "@/hooks/use-list-controls";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
+import { DataTable, useCursorTable, type Column, type CursorPage } from "@/components/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -49,15 +47,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import {
@@ -67,7 +56,10 @@ import {
   TEST_FIRE_WEBHOOK,
   UPDATE_WEBHOOK,
 } from "@/graphql/operations/operations.mutations";
-import { LIST_WEBHOOK_DELIVERIES, LIST_WEBHOOKS } from "@/graphql/operations/operations.queries";
+import {
+  LIST_WEBHOOK_DELIVERIES_PAGE,
+  LIST_WEBHOOKS_PAGE,
+} from "@/graphql/operations/operations.queries";
 import { handleVersionMismatch } from "@/lib/apollo/version-mismatch";
 import { DOC_LINKS } from "@/lib/docs/urls";
 import { useFormatters } from "@/lib/i18n/formatters";
@@ -81,12 +73,12 @@ import type {
 
 import { SNIPPETS, SNIPPET_LABELS, type SnippetLanguage } from "./verification-snippets";
 
-interface Resp {
-  astroliftWebhookSubscriptions: AstroliftWebhookSubscription[];
+interface SubscriptionsPageResp {
+  astroliftWebhookSubscriptionsPage: CursorPage<AstroliftWebhookSubscription>;
 }
 
-interface DeliveriesResp {
-  astroliftWebhookDeliveries: AstroliftWebhookDelivery[];
+interface DeliveriesPageResp {
+  astroliftWebhookDeliveriesPage: CursorPage<AstroliftWebhookDelivery>;
 }
 
 const SUGGESTED_EVENTS = [
@@ -133,10 +125,21 @@ export function WebhooksClient({
   const [eventsRaw, setEventsRaw] = React.useState(SUGGESTED_EVENTS.join("\n"));
   const [format, setFormat] = React.useState<WebhookFormat>("generic");
 
-  const variables = { appSlug: appSlug ?? null };
-  const subs = useQuery<Resp>(LIST_WEBHOOKS, { variables });
+  // `astroliftWebhookSubscriptionsPage` takes `appSlug`, `search`, `limit`
+  // and `after` — no sort argument, so no column declares a `sortKey` and
+  // the client-side URL comparator this file used to run is gone.
+  const table = useCursorTable<AstroliftWebhookSubscription>({
+    query: LIST_WEBHOOKS_PAGE,
+    variables: { appSlug: appSlug ?? null },
+    extract: (d) => (d as SubscriptionsPageResp | undefined)?.astroliftWebhookSubscriptionsPage,
+    searchVariable: "search",
+    urlKey: "wh",
+  });
 
-  const refetchVars = [{ query: LIST_WEBHOOKS, variables }];
+  // Refetch by operation name: the app-scoped tab and the platform-wide
+  // surface are the same document at different `appSlug`s, and a name
+  // covers whichever one is mounted.
+  const refetchVars = ["ListWebhooksPage"];
 
   const [createWebhook, { loading: creating }] = useMutation<{
     createWebhookSubscription: MutationResult<AstroliftWebhookSecretReveal>;
@@ -213,7 +216,7 @@ export function WebhooksClient({
     } else if (
       handleVersionMismatch(data?.updateWebhookSubscription, {
         label: "webhook subscription",
-        onRefresh: () => subs.refetch(),
+        onRefresh: () => table.refetch(),
       })
     ) {
       // toast already raised by helper
@@ -231,7 +234,7 @@ export function WebhooksClient({
     } else if (
       handleVersionMismatch(data?.updateWebhookSubscription, {
         label: "webhook subscription",
-        onRefresh: () => subs.refetch(),
+        onRefresh: () => table.refetch(),
       })
     ) {
       // toast already raised by helper
@@ -273,18 +276,179 @@ export function WebhooksClient({
     toast.success("Copied");
   }
 
-  const allSubs = subs.data?.astroliftWebhookSubscriptions ?? [];
-  const subsCtrl = useListControls({
-    data: allSubs,
-    searchFn: (s) => [s.url ?? "", ...(s.events ?? [])].join(" "),
-    initialPageSize: 25,
-    sortFn: (a, b, sort) => {
-      const dir = sort.dir === "asc" ? 1 : -1;
-      if (sort.key === "url") return (a.url ?? "").localeCompare(b.url ?? "") * dir;
-      return 0;
+  // The expanded subscription is resolved against the page in hand, so
+  // paging away (or searching past it) closes the panel rather than
+  // leaving it describing a row that is no longer on screen.
+  const expanded = table.rows.find((s) => s.id === expandedId) ?? null;
+
+  const columns: Column<AstroliftWebhookSubscription>[] = [
+    {
+      id: "expand",
+      header: <span className="sr-only">Details</span>,
+      width: "w-8",
+      cellClassName: "p-2",
+      cell: (s) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7"
+          onClick={() => setExpandedId((prev) => (prev === s.id ? null : s.id))}
+          aria-label={expandedId === s.id ? "Collapse" : "Expand"}
+          aria-expanded={expandedId === s.id}
+        >
+          {expandedId === s.id ? (
+            <ChevronDownIcon className="size-4" />
+          ) : (
+            <ChevronRightIcon className="size-4" />
+          )}
+        </Button>
+      ),
     },
-  });
-  const list = subsCtrl.rows;
+    {
+      id: "url",
+      header: "URL",
+      cellClassName: "max-w-xs truncate font-mono text-xs",
+      cell: (s) =>
+        appSlug ? (
+          s.url
+        ) : (
+          <Link
+            href={`/webhooks/${s.id}`}
+            className="hover:text-[var(--brand-primary)] hover:underline"
+          >
+            {s.url}
+          </Link>
+        ),
+    },
+    {
+      id: "events",
+      header: "Events",
+      cell: (s) => (
+        <div className="flex flex-wrap gap-1">
+          {s.events.slice(0, 3).map((e) => (
+            <Badge key={e} variant="outline" className="text-xs">
+              {e}
+            </Badge>
+          ))}
+          {s.events.length > 3 && (
+            <Badge variant="secondary" className="text-xs">
+              +{s.events.length - 3}
+            </Badge>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: "format",
+      header: "Format",
+      cell: (s) => (
+        <Can
+          permission="webhook.update"
+          fallback={
+            <Badge variant="outline" className="text-xs capitalize">
+              {s.format}
+            </Badge>
+          }
+        >
+          <Select value={s.format} onValueChange={(v) => handleFormatChange(s, v as WebhookFormat)}>
+            <SelectTrigger size="sm" className="h-7 w-32 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {FORMAT_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Can>
+      ),
+    },
+    {
+      id: "lastDelivery",
+      header: "Last delivery",
+      cellClassName: "text-muted-foreground text-sm",
+      cell: (s) =>
+        s.lastDeliveryAt
+          ? `${fmt.formatDateTime(s.lastDeliveryAt)} (${s.lastResponseStatus ?? "?"})`
+          : "never",
+    },
+    {
+      id: "failures",
+      header: "Failures",
+      cellClassName: "font-mono text-xs",
+      cell: (s) =>
+        s.failureCount > 0 ? (
+          <span className="text-destructive inline-flex items-center gap-1">
+            <AlertTriangleIcon className="size-3" />
+            {s.failureCount}
+          </span>
+        ) : (
+          "0"
+        ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: (s) => (
+        <Badge variant={s.isActive ? "secondary" : "outline"}>
+          {s.isActive ? "active" : "paused"}
+        </Badge>
+      ),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      align: "right",
+      cell: (s) => (
+        <div className="flex justify-end gap-1">
+          <Can permission="webhook.update">
+            <Button
+              size="sm"
+              variant="ghost"
+              title={s.isActive ? "Pause" : "Resume"}
+              onClick={() => handleToggleActive(s)}
+            >
+              {s.isActive ? <PauseIcon className="size-4" /> : <PlayIcon className="size-4" />}
+              <span className="sr-only">{s.isActive ? "Pause" : "Resume"}</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              title="Send test event"
+              disabled={firing || !s.isActive}
+              onClick={() => setTestTarget(s)}
+            >
+              <SendIcon className="size-4" />
+              <span className="sr-only">Send test</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              title="Rotate secret"
+              disabled={rotating}
+              onClick={() => setRotateTarget(s)}
+            >
+              <KeyRoundIcon className="size-4" />
+              <span className="sr-only">Rotate secret</span>
+            </Button>
+          </Can>
+          <Can permission="webhook.delete">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setDeleteTarget(s)}
+              disabled={deleting}
+            >
+              <Trash2Icon className="size-4" />
+              <span className="sr-only">Delete</span>
+            </Button>
+          </Can>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <PageShell
@@ -350,195 +514,37 @@ export function WebhooksClient({
 
       {testResult && <TestResultCard result={testResult} onDismiss={() => setTestResult(null)} />}
 
-      {allSubs.length > 0 && (
-        <ListControls controls={subsCtrl} searchPlaceholder="Search webhooks…" className="mb-3" />
+      <DataTable
+        label="Webhook subscriptions"
+        controller={table}
+        columns={columns}
+        getRowId={(s) => s.id}
+        rowClassName={(s) =>
+          s.isActive ? undefined : "text-muted-foreground line-through opacity-60"
+        }
+        searchPlaceholder="Search webhooks…"
+        empty={{
+          icon: <WebhookIcon className="size-5" />,
+          title: "No webhook subscriptions",
+          description:
+            "Subscribe an external system (Zentinelle, Slack relay, custom collector) to platform events.",
+        }}
+        emptyFiltered={{
+          title: "No matching webhooks",
+          description:
+            "No subscription matches that search. The server matches the delivery URL, not the event list.",
+        }}
+      />
+
+      {expanded && (
+        // Keyed by id so expanding a different subscription starts its own
+        // delivery walk rather than inheriting the previous one's search.
+        <SubscriptionDetail
+          key={expanded.id}
+          subscription={expanded}
+          onClose={() => setExpandedId(null)}
+        />
       )}
-      <Card>
-        <CardContent className="p-0">
-          {subs.loading ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : list.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<WebhookIcon className="size-5" />}
-                title="No webhook subscriptions"
-                description="Subscribe an external system (Zentinelle, Slack relay, custom collector) to platform events."
-              />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-8" />
-                  <TableHead>URL</TableHead>
-                  <TableHead>Events</TableHead>
-                  <TableHead>Format</TableHead>
-                  <TableHead>Last delivery</TableHead>
-                  <TableHead>Failures</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {list.map((s) => (
-                  <React.Fragment key={s.id}>
-                    <TableRow
-                      className={s.isActive ? "" : "text-muted-foreground line-through opacity-60"}
-                    >
-                      <TableCell className="w-8 p-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-7"
-                          onClick={() => setExpandedId((prev) => (prev === s.id ? null : s.id))}
-                          aria-label={expandedId === s.id ? "Collapse" : "Expand"}
-                        >
-                          {expandedId === s.id ? (
-                            <ChevronDownIcon className="size-4" />
-                          ) : (
-                            <ChevronRightIcon className="size-4" />
-                          )}
-                        </Button>
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate font-mono text-xs">
-                        {appSlug ? (
-                          s.url
-                        ) : (
-                          <Link
-                            href={`/webhooks/${s.id}`}
-                            className="hover:text-[var(--brand-primary)] hover:underline"
-                          >
-                            {s.url}
-                          </Link>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {s.events.slice(0, 3).map((e) => (
-                            <Badge key={e} variant="outline" className="text-xs">
-                              {e}
-                            </Badge>
-                          ))}
-                          {s.events.length > 3 && (
-                            <Badge variant="secondary" className="text-xs">
-                              +{s.events.length - 3}
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Can
-                          permission="webhook.update"
-                          fallback={
-                            <Badge variant="outline" className="text-xs capitalize">
-                              {s.format}
-                            </Badge>
-                          }
-                        >
-                          <Select
-                            value={s.format}
-                            onValueChange={(v) => handleFormatChange(s, v as WebhookFormat)}
-                          >
-                            <SelectTrigger size="sm" className="h-7 w-32 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {FORMAT_OPTIONS.map((o) => (
-                                <SelectItem key={o.value} value={o.value}>
-                                  {o.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </Can>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {s.lastDeliveryAt
-                          ? `${fmt.formatDateTime(s.lastDeliveryAt)} (${s.lastResponseStatus ?? "?"})`
-                          : "never"}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {s.failureCount > 0 ? (
-                          <span className="text-destructive inline-flex items-center gap-1">
-                            <AlertTriangleIcon className="size-3" />
-                            {s.failureCount}
-                          </span>
-                        ) : (
-                          "0"
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={s.isActive ? "secondary" : "outline"}>
-                          {s.isActive ? "active" : "paused"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Can permission="webhook.update">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              title={s.isActive ? "Pause" : "Resume"}
-                              onClick={() => handleToggleActive(s)}
-                            >
-                              {s.isActive ? (
-                                <PauseIcon className="size-4" />
-                              ) : (
-                                <PlayIcon className="size-4" />
-                              )}
-                              <span className="sr-only">{s.isActive ? "Pause" : "Resume"}</span>
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              title="Send test event"
-                              disabled={firing || !s.isActive}
-                              onClick={() => setTestTarget(s)}
-                            >
-                              <SendIcon className="size-4" />
-                              <span className="sr-only">Send test</span>
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              title="Rotate secret"
-                              disabled={rotating}
-                              onClick={() => setRotateTarget(s)}
-                            >
-                              <KeyRoundIcon className="size-4" />
-                              <span className="sr-only">Rotate secret</span>
-                            </Button>
-                          </Can>
-                          <Can permission="webhook.delete">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setDeleteTarget(s)}
-                              disabled={deleting}
-                            >
-                              <Trash2Icon className="size-4" />
-                              <span className="sr-only">Delete</span>
-                            </Button>
-                          </Can>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    {expandedId === s.id && (
-                      <TableRow>
-                        <TableCell colSpan={8} className="bg-muted/30 p-0">
-                          <ExpandedRow subscription={s} />
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </React.Fragment>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="flex flex-col">
@@ -714,102 +720,144 @@ function TestResultCard({
   );
 }
 
-function ExpandedRow({ subscription }: { subscription: AstroliftWebhookSubscription }) {
+/**
+ * Subscription detail, rendered as a panel under the table rather than as
+ * an extra `<tr>` inside it: DataTable owns one row per item, and a
+ * detail row folded into the body would have to re-derive the table
+ * primitives this surface just stopped importing.
+ */
+function SubscriptionDetail({
+  subscription,
+  onClose,
+}: {
+  subscription: AstroliftWebhookSubscription;
+  onClose: () => void;
+}) {
   const fmt = useFormatters();
-  const { data, loading } = useQuery<DeliveriesResp>(LIST_WEBHOOK_DELIVERIES, {
-    variables: { subscriptionId: subscription.id, limit: 10 },
-    fetchPolicy: "cache-and-network",
+
+  // `subscriptionId` is required by the field, and this component only
+  // mounts for a selected subscription, so the walk never needs skipping.
+  // No `urlKey`: the panel is transient and two subscriptions would fight
+  // over the same query-string keys.
+  const deliveries = useCursorTable<AstroliftWebhookDelivery>({
+    query: LIST_WEBHOOK_DELIVERIES_PAGE,
+    variables: { subscriptionId: subscription.id },
+    extract: (d) => (d as DeliveriesPageResp | undefined)?.astroliftWebhookDeliveriesPage,
+    searchVariable: "search",
+    pageSize: 10,
   });
-  const allDeliveries = data?.astroliftWebhookDeliveries ?? [];
-  const deliveriesCtrl = useListControls({
-    data: allDeliveries,
-    searchFn: (d) => [d.eventType, d.success ? "success" : "failed"].join(" "),
-    initialPageSize: 25,
-  });
-  const rows = deliveriesCtrl.rows;
+
+  const columns: Column<AstroliftWebhookDelivery>[] = [
+    {
+      id: "attempt",
+      header: "#",
+      width: "w-12",
+      cellClassName: "font-mono text-xs",
+      cell: (d) => d.retryAttempt,
+    },
+    {
+      id: "when",
+      header: "When",
+      cellClassName: "text-xs",
+      cell: (d) => fmt.formatDateTime(d.deliveredAt),
+    },
+    {
+      id: "event",
+      header: "Event",
+      cellClassName: "font-mono text-xs",
+      cell: (d) => d.eventType,
+    },
+    {
+      id: "status",
+      header: "Status",
+      width: "w-16",
+      cell: (d) => (
+        <Badge variant={d.success ? "secondary" : "outline"} className="text-2xs">
+          {d.statusCode ?? "ERR"}
+        </Badge>
+      ),
+    },
+    {
+      id: "latency",
+      header: "Latency",
+      width: "w-20",
+      cellClassName: "font-mono text-xs",
+      cell: (d) => `${d.latencyMs}ms`,
+    },
+    {
+      id: "test",
+      header: "Test?",
+      width: "w-16",
+      cell: (d) =>
+        d.isTest ? (
+          <Badge variant="outline" className="text-2xs">
+            test
+          </Badge>
+        ) : null,
+    },
+    {
+      id: "response",
+      header: "Response",
+      cellClassName: "max-w-xs truncate font-mono text-xs",
+      cell: (d) => d.error || d.responseBodyExcerpt || "—",
+    },
+  ];
 
   return (
-    <div className="space-y-3 p-4">
-      <DefinitionList
-        orientation="stack"
-        className="grid grid-cols-2 gap-3 md:grid-cols-4"
-        items={[
-          {
-            term: "Secret rotated",
-            description: subscription.secretRotatedAt
-              ? fmt.formatDateTime(subscription.secretRotatedAt)
-              : "never",
-          },
-          {
-            term: "Last delivery",
-            description: subscription.lastDeliveryAt
-              ? fmt.formatDateTime(subscription.lastDeliveryAt)
-              : "never",
-          },
-          { term: "Last status", description: subscription.lastResponseStatus ?? "—" },
-          { term: "Failure count", description: subscription.failureCount },
-        ]}
-      />
-
-      <div>
-        <div className="mb-1 flex items-center justify-between">
-          <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-            Recent deliveries
-          </p>
-          {allDeliveries.length > 0 && (
-            <ListControls controls={deliveriesCtrl} hideSearch className="!mb-0" />
-          )}
+    <Card className="bg-muted/30">
+      <CardContent className="space-y-3 p-4">
+        <div className="flex items-start justify-between gap-2">
+          <p className="font-mono text-xs break-all">{subscription.url}</p>
+          <Button size="sm" variant="ghost" onClick={onClose}>
+            Close
+          </Button>
         </div>
-        {loading && rows.length === 0 ? (
-          <Skeleton className="h-16 w-full" />
-        ) : rows.length === 0 ? (
-          <p className="text-muted-foreground text-xs">
-            No deliveries yet. Use the Send test event button to fire one.
+
+        <DefinitionList
+          orientation="stack"
+          className="grid grid-cols-2 gap-3 md:grid-cols-4"
+          items={[
+            {
+              term: "Secret rotated",
+              description: subscription.secretRotatedAt
+                ? fmt.formatDateTime(subscription.secretRotatedAt)
+                : "never",
+            },
+            {
+              term: "Last delivery",
+              description: subscription.lastDeliveryAt
+                ? fmt.formatDateTime(subscription.lastDeliveryAt)
+                : "never",
+            },
+            { term: "Last status", description: subscription.lastResponseStatus ?? "—" },
+            { term: "Failure count", description: subscription.failureCount },
+          ]}
+        />
+
+        <div className="space-y-2">
+          <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+            Deliveries
           </p>
-        ) : (
-          <div className="bg-background overflow-hidden rounded">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">#</TableHead>
-                  <TableHead>When</TableHead>
-                  <TableHead>Event</TableHead>
-                  <TableHead className="w-16">Status</TableHead>
-                  <TableHead className="w-20">Latency</TableHead>
-                  <TableHead className="w-16">Test?</TableHead>
-                  <TableHead>Response</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((d) => (
-                  <TableRow key={d.id}>
-                    <TableCell className="font-mono text-xs">{d.retryAttempt}</TableCell>
-                    <TableCell className="text-xs">{fmt.formatDateTime(d.deliveredAt)}</TableCell>
-                    <TableCell className="font-mono text-xs">{d.eventType}</TableCell>
-                    <TableCell>
-                      <Badge variant={d.success ? "secondary" : "outline"} className="text-2xs">
-                        {d.statusCode ?? "ERR"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{d.latencyMs}ms</TableCell>
-                    <TableCell>
-                      {d.isTest && (
-                        <Badge variant="outline" className="text-2xs">
-                          test
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="max-w-xs truncate font-mono text-xs">
-                      {d.error || d.responseBodyExcerpt || "—"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </div>
-    </div>
+          <DataTable
+            label="Deliveries"
+            controller={deliveries}
+            columns={columns}
+            getRowId={(d) => d.id}
+            searchPlaceholder="Search deliveries…"
+            empty={{
+              icon: <SendIcon className="size-5" />,
+              title: "No deliveries yet",
+              description: "Use the Send test event button to fire one.",
+            }}
+            emptyFiltered={{
+              title: "No matching deliveries",
+              description:
+                "No attempt matches that search. The server matches the event type, the delivery id, and the error text.",
+            }}
+          />
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
