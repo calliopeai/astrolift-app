@@ -209,3 +209,60 @@ def test_no_tenant_context_is_refused_outright(app, env, permission_resolver):
     with tenant_context(TenantContext(organization_id=None)):
         with pytest.raises(TenantRequired):
             LifecycleQuery().astrolift_deployments_page(_info(), limit=50)
+
+
+def test_statuses_filter_expresses_a_tab_group(app, env, org, permission_resolver):
+    """The /deployments tabs are status *groups* — "active" is in-flight
+    plus running, minus the approval queue. Without a plural filter the
+    surface has to fetch everything and split it client-side, which is
+    the capped-then-filtered pattern #1230 exists to remove."""
+    permission_resolver.grant(Permission.APP_READ)
+    _deploy(app, env, "live", status=Deployment.Status.RUNNING.value)
+    _deploy(app, env, "moving", status=Deployment.Status.DEPLOYING.value)
+    _deploy(app, env, "queued", status=Deployment.Status.PENDING_APPROVAL.value)
+    _deploy(app, env, "dead", status=Deployment.Status.FAILED.value)
+
+    active = [
+        Deployment.Status.PENDING.value,
+        Deployment.Status.DEPLOYING.value,
+        Deployment.Status.REDEPLOYING.value,
+        Deployment.Status.RUNNING.value,
+    ]
+    with tenant_context(TenantContext(organization_id=org.id)):
+        page = LifecycleQuery().astrolift_deployments_page(_info(), statuses=active)
+
+    assert sorted(i.image_tag for i in page.items) == ["live", "moving"]
+    assert page.total_count == 2, "the count must narrow with the group, not just the page"
+
+
+def test_is_preview_splits_pull_request_deployments(app, env, org, permission_resolver):
+    """`isPreview` is `prNumber > 0` — the split the previews tab makes."""
+    permission_resolver.grant(Permission.APP_READ)
+    _deploy(app, env, "from-pr", pr_number=42)
+    _deploy(app, env, "from-main", pr_number=0)
+
+    query = LifecycleQuery()
+    with tenant_context(TenantContext(organization_id=org.id)):
+        previews = query.astrolift_deployments_page(_info(), is_preview=True)
+        mainline = query.astrolift_deployments_page(_info(), is_preview=False)
+        both = query.astrolift_deployments_page(_info())
+
+    assert [i.image_tag for i in previews.items] == ["from-pr"]
+    assert [i.image_tag for i in mainline.items] == ["from-main"]
+    assert both.total_count == 2, "omitting the filter must not split anything"
+
+
+def test_group_filters_compose(app, env, org, permission_resolver):
+    """The active tab needs both at once: running, but not a preview."""
+    permission_resolver.grant(Permission.APP_READ)
+    _deploy(app, env, "live-main", status=Deployment.Status.RUNNING.value, pr_number=0)
+    _deploy(app, env, "live-preview", status=Deployment.Status.RUNNING.value, pr_number=7)
+    _deploy(app, env, "dead-main", status=Deployment.Status.FAILED.value, pr_number=0)
+
+    with tenant_context(TenantContext(organization_id=org.id)):
+        page = LifecycleQuery().astrolift_deployments_page(
+            _info(), statuses=[Deployment.Status.RUNNING.value], is_preview=False
+        )
+
+    assert [i.image_tag for i in page.items] == ["live-main"]
+    assert page.total_count == 1

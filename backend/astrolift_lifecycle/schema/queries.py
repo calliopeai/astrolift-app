@@ -361,6 +361,8 @@ def _deployments_qs(
     app_slug: str | None,
     environment_name: str | None,
     status: str | None = None,
+    statuses: list[str] | None = None,
+    is_preview: bool | None = None,
     search: str | None = None,
 ):
     """Filtered, unordered deployment stream for the caller's org.
@@ -390,6 +392,13 @@ def _deployments_qs(
         qs = qs.filter(app_environment__name=environment_name)
     if status:
         qs = qs.filter(status=status)
+    if statuses:
+        qs = qs.filter(status__in=statuses)
+    if is_preview is not None:
+        # A preview deployment is one raised from a pull request; the
+        # /deployments tabs split on exactly this (`prNumber > 0`) and
+        # could not express it server-side before.
+        qs = qs.filter(pr_number__gt=0) if is_preview else qs.filter(pr_number=0)
     if search:
         qs = qs.filter(
             search_q(
@@ -724,6 +733,8 @@ class LifecycleQuery:
         app_slug: str | None = None,
         environment_name: str | None = None,
         status: str | None = None,
+        statuses: list[str] | None = None,
+        is_preview: bool | None = None,
         search: str | None = None,
         limit: int = 50,
         after: str | None = None,
@@ -737,12 +748,21 @@ class LifecycleQuery:
         Seek key is ``(-created_at, -guid)``; ``search`` matches the app,
         environment, branch, image tag, and commit the operator is most
         likely to be hunting for.
+
+        ``statuses`` and ``is_preview`` exist because the /deployments
+        tabs are status *groups* ("active" is in-flight plus running,
+        minus the approval queue and previews), which the singular
+        ``status`` cannot express. Without them the surface has to fetch
+        everything and split it client-side — which is exactly the
+        capped-then-filtered pattern #1230 is removing.
         """
         page = keyset_page(
             _deployments_qs(
                 app_slug=app_slug,
                 environment_name=environment_name,
                 status=status,
+                statuses=statuses,
+                is_preview=is_preview,
                 search=search,
             ),
             cursor=after,

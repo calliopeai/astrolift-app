@@ -7713,9 +7713,11 @@ export type QueryAstroliftDeploymentsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   appSlug?: InputMaybe<Scalars['String']['input']>;
   environmentName?: InputMaybe<Scalars['String']['input']>;
+  isPreview?: InputMaybe<Scalars['Boolean']['input']>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
+  statuses?: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 

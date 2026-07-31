@@ -5591,7 +5591,7 @@ type Query {
   scanCloudOrphans: CloudOrphanReportType!
   astroliftEnvironments(appSlug: String = null): [AstroliftAppEnvironment!]!
   astroliftDeployments(appSlug: String = null, environmentName: String = null, limit: Int! = 50): [AstroliftDeployment!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftDeploymentsPage.")
-  astroliftDeploymentsPage(appSlug: String = null, environmentName: String = null, status: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftDeploymentPage!
+  astroliftDeploymentsPage(appSlug: String = null, environmentName: String = null, status: String = null, statuses: [String!] = null, isPreview: Boolean = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftDeploymentPage!
   astroliftDeployment(id: String!): AstroliftDeployment
   astroliftDeploymentApprovalHistory(deploymentId: String!): [AstroliftDeploymentApprovalHistoryEntry!]!
   astroliftDeploymentReleaseNotes(deploymentId: String!): AstroliftReleaseNotes
