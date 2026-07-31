@@ -22,7 +22,7 @@ from types import SimpleNamespace
 import pytest
 
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
-from astrolift_clusters.schema.queries import ClustersQuery
+from astrolift_clusters.schema.queries import ClustersQuery, _clusters_qs
 from astrolift_identity.models import Organization
 from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
@@ -290,4 +290,4 @@ def test_no_tenant_context_is_refused_outright(permission_resolver):
     with tenant_context(TenantContext(organization_id=None)):
         with pytest.raises(TenantRequired):
             ClustersQuery().astrolift_clusters_page(_info(), limit=50)
-        assert ClustersQuery()._clusters_qs().count() == 0
+        assert _clusters_qs().count() == 0

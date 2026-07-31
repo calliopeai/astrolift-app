@@ -22,7 +22,11 @@ import pytest
 
 from astrolift_identity.models import Organization, Project, Team
 from astrolift_registry.models import AppTeamAccess, RegisteredApp, Workload
-from astrolift_registry.schema.queries import RegistryQuery
+from astrolift_registry.schema.queries import (
+    RegistryQuery,
+    _app_team_accesses_qs,
+    _workloads_qs,
+)
 from core.decorators import TenantRequired
 from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
@@ -262,7 +266,7 @@ def test_workloads_qs_matches_nothing_without_an_org(permission_resolver):
     _workload(app, "web")
 
     with tenant_context(TenantContext(organization_id=None)):
-        assert not RegistryQuery()._workloads_qs(app_slug=None).exists()
+        assert not _workloads_qs(app_slug=None).exists()
 
 
 # ---------------------------------------------------------------------------
@@ -438,4 +442,4 @@ def test_team_accesses_qs_matches_nothing_without_an_org(permission_resolver):
     _grant(app, home_team, AppTeamAccess.AccessLevel.OWNER.value)
 
     with tenant_context(TenantContext(organization_id=None)):
-        assert not RegistryQuery()._app_team_accesses_qs(app_slug="hello-app").exists()
+        assert not _app_team_accesses_qs(app_slug="hello-app").exists()
