@@ -248,7 +248,7 @@ def test_alb_error_rate_uses_separate_5xx_metric_with_zero_guard():
         namespace=_NS,
     )
     assert plan.promql == (
-        f'(sum(aws_applicationelb_httpcode_target_5xx_count_sum{{tag_ingress_k8s_aws_stack=~"{_NS}/.*"}}) or vector(0)) '
+        f'(sum(aws_applicationelb_httpcode_target_5_xx_count_sum{{tag_ingress_k8s_aws_stack=~"{_NS}/.*"}}) or vector(0)) '
         f'/ clamp_min(sum(aws_applicationelb_request_count_sum{{tag_ingress_k8s_aws_stack=~"{_NS}/.*"}}), 1e-9)'
     )
 
