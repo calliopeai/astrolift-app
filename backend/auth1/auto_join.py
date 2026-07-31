@@ -68,6 +68,65 @@ def _audit(
     )
 
 
+def _resolve_pending_invitations(user, org, *, member_is_active: bool) -> None:
+    """Consume pending invitations fulfilled by an SSO join (#1228).
+
+    Domain-allowlist auto-join and explicit invitations are two doors
+    into the same room: when a user walks through the SSO door, any
+    pending org-scope invitation for their email has served its purpose.
+    Left unresolved it sits "Pending" until expiry — confusing on the
+    Members page, a dangling live accept token, and (worse) the invite's
+    intended role silently never applies, so an invited org_owner lands
+    as the allowlist default role instead.
+
+    Marks matching invitations accepted and applies their role binding
+    (skipped when the membership is pending review — same gate as the
+    allowlist default role). Never raises; the caller's auth-first
+    posture applies.
+    """
+    try:
+        from django.utils import timezone
+
+        from astrolift_identity.models import Invitation, RoleBinding
+
+        email = (getattr(user, "email", None) or "").strip().lower()
+        if not email:
+            return
+        pending = Invitation.objects.filter(
+            email__iexact=email,
+            scope_kind=Invitation.ScopeKind.ORG,
+            scope_id=org.pk,
+            status=Invitation.Status.PENDING,
+            deleted_at__isnull=True,
+        )
+        for inv in pending:
+            if inv.is_expired:
+                inv.status = Invitation.Status.EXPIRED
+                inv.save(update_fields=["status", "updated_at", "version"])
+                continue
+            if inv.role_id and member_is_active:
+                RoleBinding.objects.get_or_create(
+                    user=user,
+                    role_id=inv.role_id,
+                    scope_kind=RoleBinding.ScopeKind.ORG,
+                    scope_id=org.pk,
+                )
+            inv.status = Invitation.Status.ACCEPTED
+            inv.accepted_at = timezone.now()
+            inv.save(update_fields=["status", "accepted_at", "updated_at", "version"])
+            logger.info(
+                "auto_join: resolved pending invitation %s for user=%s (role_id=%s)",
+                inv.pk,
+                user.pk,
+                inv.role_id,
+            )
+    except Exception:
+        logger.exception(
+            "auto_join: invitation resolution failed for user=%s — auth flow continues",
+            getattr(user, "pk", None),
+        )
+
+
 def maybe_auto_join_user(user) -> bool:
     """Auto-create a ``Member`` for ``user`` when their email's domain
     is on the active org's allowlist. Returns True when a Member was
@@ -105,13 +164,18 @@ def maybe_auto_join_user(user) -> bool:
 
         # Already a member of this org? Skip silently — even if the
         # allowlist row would otherwise apply, we never disturb an
-        # existing membership.
-        if Member.objects.filter(
+        # existing membership. Still resolve any pending invitation for
+        # this email (#1228): an invite issued after the member joined —
+        # or one that raced the join — has been fulfilled and must not
+        # dangle as a live Pending token.
+        existing = Member.objects.filter(
             user_id=user.pk,
             scope_kind=Member.ScopeKind.ORG,
             scope_id=org.pk,
             deleted_at__isnull=True,
-        ).exists():
+        ).first()
+        if existing is not None:
+            _resolve_pending_invitations(user, org, member_is_active=bool(existing.is_active))
             return False
 
         rule = (
@@ -155,6 +219,12 @@ def maybe_auto_join_user(user) -> bool:
                     scope_id=org.pk,
                 )
                 granted_role_slug = rule.default_role.slug
+
+        # The SSO join fulfills any pending invitation for this email —
+        # mark it accepted and apply its intended role (#1228) so an
+        # invited org_owner doesn't silently land as the allowlist
+        # default role with a forever-Pending invite row behind them.
+        _resolve_pending_invitations(user, org, member_is_active=is_active)
 
         _audit(
             actor_user_id=user.pk,
