@@ -998,7 +998,7 @@ ${meta.renderWorkflowSteps()}
           code=$(curl -sS -o /tmp/astrolift-deploy-response.json -w '%{http_code}' -X POST "$API_URL/api/cli/v1/apps/$APP_SLUG/deploy/" \\
             -H "Authorization: Bearer $TOKEN" \\
             -H "Content-Type: application/json" \\
-            -d "{\\"image_tags\\":{\\"*\\":\\"\${{ github.sha }}\\"},\\"commit_sha\\":\\"\${{ github.sha }}\\",\\"trigger_kind\\":\\"ci\\"}")
+            -d "{\\"image_tags\\":{\\"*\\":\\"\${{ github.sha }}\\"},\\"commit_sha\\":\\"\${{ github.sha }}\\",\\"branch\\":\\"\${{ github.ref_name }}\\",\\"trigger_kind\\":\\"ci\\"}")
           cat /tmp/astrolift-deploy-response.json; echo
           case "$code" in 2*) ;; *) echo "Astrolift deploy notification FAILED (HTTP $code)"; exit 1;; esac
 `;

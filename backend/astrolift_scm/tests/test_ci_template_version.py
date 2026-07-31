@@ -72,7 +72,7 @@ _RENDERERS = {
 # The version these hashes belong to. Kept as its own constant (rather than
 # reading TEMPLATE_VERSION) so that bumping TEMPLATE_VERSION without refreshing
 # the pins trips ``test_template_version_matches_pins`` loudly.
-PINNED_TEMPLATE_VERSION = 3
+PINNED_TEMPLATE_VERSION = 4
 
 # content_hash (sha256, stamp removed) of each host's rendered body at
 # PINNED_TEMPLATE_VERSION, computed against GOLDEN_API_URL and _golden_app().
@@ -83,10 +83,10 @@ PINNED_TEMPLATE_VERSION = 3
 # skip-if-built ECR probe. The deploy-only render (blank registry_repo_uri)
 # is covered by ``test_deploy_only_workflow.py`` instead.
 PINNED_CONTENT_HASHES = {
-    "github": "a0dd6df23916e3c55d7b096b5906185457f006f26412baf12aaf01307901cfd5",
-    "gitlab": "0d40fb007b9da85b6b6711770d54cb221cfcaf407dc4c4bb3bc76ec87cf30b6d",
-    "gitea": "27eab2d5b9cfa025384a6c3b807f361a662e963ea0bd8ad40fef32cc15058b50",
-    "bitbucket": "ac95dc3e66956ac4fac71f31415ffa8303990e6b635dd2343edcb0be25873377",
+    "github": "4c51e246e76f331cddf54aa07da1ece17800e390964fa16ace497250be19a009",
+    "gitlab": "77f0d228c7b159e6040b7ec10a348b039f94ef188a565ea901b7c422b6dbcbc8",
+    "gitea": "d370f2cf4f0080e7c04ad7e00ee735163c688a4222f8415114d894f6a9b83170",
+    "bitbucket": "7821f3ac5724b4b30b3e48473652c39eb3f1edff8d771dcdad7e89b10e43e213",
 }
 
 _BUMP_HINT = (

@@ -59,7 +59,11 @@ import re
 # used to count as success). The GitHub template additionally skips the
 # build/push when the commit's image already exists in the registry, so
 # re-runs on a built SHA no longer die on immutable tags.
-TEMPLATE_VERSION = 3
+#
+# v4 (#1220): the notify body carries ``branch`` (the runner's own ref —
+# ``github.ref_name`` / ``$CI_COMMIT_REF_NAME`` / ``$BITBUCKET_BRANCH``);
+# ``ci_deploy`` requires it and v3 got a 400 back.
+TEMPLATE_VERSION = 4
 
 # The stamp is a host-agnostic ``#`` comment so it's inert on GitHub
 # Actions / GitLab CI / Bitbucket Pipelines / Gitea alike — it never

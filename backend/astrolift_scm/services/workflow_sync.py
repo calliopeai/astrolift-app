@@ -291,7 +291,7 @@ def render_astrolift_bitbucket_pipeline(app: RegisteredApp) -> str:
         f"              code=$(curl -sS -o /tmp/astrolift-deploy-response.json -w '%{{http_code}}' -X POST {api_url_literal}/api/cli/v1/apps/{app.slug}/deploy/ \\\n"
         '                -H "Authorization: Bearer $ASTROLIFT_DEPLOY_TOKEN" \\\n'
         '                -H "Content-Type: application/json" \\\n'
-        '                -d "{\\"image_tags\\":{\\"*\\":\\"$BITBUCKET_COMMIT\\"},\\"commit_sha\\":\\"$BITBUCKET_COMMIT\\",\\"trigger_kind\\":\\"ci\\"}")\n'
+        '                -d "{\\"image_tags\\":{\\"*\\":\\"$BITBUCKET_COMMIT\\"},\\"commit_sha\\":\\"$BITBUCKET_COMMIT\\",\\"branch\\":\\"$BITBUCKET_BRANCH\\",\\"trigger_kind\\":\\"ci\\"}")\n'
         "              cat /tmp/astrolift-deploy-response.json; echo\n"
         '              case "$code" in 2*) ;; *) echo "Astrolift deploy notification FAILED (HTTP $code)"; exit 1;; esac\n'
     )
@@ -361,7 +361,7 @@ def render_astrolift_gitea_ci_workflow(app: RegisteredApp) -> str:
         f"          code=$(curl -sS -o /tmp/astrolift-deploy-response.json -w '%{{http_code}}' -X POST {api_url_literal}/api/cli/v1/apps/{app.slug}/deploy/ \\\n"
         '            -H "Authorization: Bearer $ASTROLIFT_DEPLOY_TOKEN" \\\n'
         '            -H "Content-Type: application/json" \\\n'
-        '            -d \'{"image_tags":{"*":"${{ github.sha }}"},"commit_sha":"${{ github.sha }}","trigger_kind":"ci"}\')\n'
+        '            -d \'{"image_tags":{"*":"${{ github.sha }}"},"commit_sha":"${{ github.sha }}","branch":"${{ github.ref_name }}","trigger_kind":"ci"}\')\n'
         "          cat /tmp/astrolift-deploy-response.json; echo\n"
         '          case "$code" in 2*) ;; *) echo "Astrolift deploy notification FAILED (HTTP $code)"; exit 1;; esac\n'
     )
@@ -446,6 +446,7 @@ def render_astrolift_gitlab_ci_workflow(app: RegisteredApp) -> str:
         + '        -H "Content-Type: application/json" \\\n'
         + '        -d "{\\"image_tags\\":{\\"*\\":\\"$CI_COMMIT_SHA\\"},'
         + '\\"commit_sha\\":\\"$CI_COMMIT_SHA\\",'
+        + '\\"branch\\":\\"$CI_COMMIT_REF_NAME\\",'
         + '\\"trigger_kind\\":\\"ci\\"}")\n'
         + "      cat /tmp/astrolift-deploy-response.json; echo\n"
         + '      case "$code" in 2*) ;; *) echo "Astrolift deploy notification FAILED (HTTP $code)"; exit 1;; esac\n'
