@@ -45,8 +45,9 @@ const VARIANT_HELPERS = new Set(["cva", "tv"]);
  *     binding is resolved by scope analysis, not by name, so it is not
  *     flagged.
  *
- * Both ship at `warn` while the wave migrations land and flip to `error` at
- * epic close-out, once the last surface is converted.
+ * `no-native-confirm` is at `error` — that sweep is finished. `no-raw-table`
+ * stays at `warn` until the residual backlog is triaged; see the rule config
+ * below for why it cannot simply be flipped.
  */
 const dataSurfacePlugin = {
   rules: {
@@ -199,8 +200,15 @@ const eslintConfig = defineConfig([
     ignores: ["components/data-table/**"],
     plugins: { astroliftData: dataSurfacePlugin },
     rules: {
+      // Still `warn`: the residual backlog is not all list surfaces. A chunk
+      // of it is detail / key-value tables where DataTable is the wrong tool
+      // and `DefinitionList` is the right home, so flipping this to `error`
+      // before that population is triaged would force those through a
+      // pagination component that makes no sense for them.
       "astroliftData/no-raw-table": "warn",
-      "astroliftData/no-native-confirm": "warn",
+      // `error`: the sweep is done, every call site is a ConfirmDialog, and
+      // there is no legitimate reason to add a new one.
+      "astroliftData/no-native-confirm": "error",
     },
   },
   // Override default ignores of eslint-config-next.
