@@ -95,16 +95,25 @@ def query_range_series(
         end_unix=end_unix,
         step_seconds=step_seconds,
     )
+    import math
+
     out: list[tuple[str, list[tuple[float, float]]]] = []
     for row in rows:
         if label_key is None:
             key = ""
         else:
             key = row.metric_labels.get(label_key, "")
-        # ``row.values`` is a tuple of (ts_unix_seconds, value) pairs;
-        # the upstream parser already coerced NaN strings to 0.0 so we
-        # can hand them straight to the GraphQL layer.
-        out.append((key, list(row.values)))
+        # ``row.values`` is a tuple of (ts_unix_seconds, value) pairs.
+        # Real float NaN/Inf can still land in a matrix (e.g. CloudWatch
+        # exporter gauges for zero-traffic minutes, #1225) and GraphQL's
+        # Float cannot represent them — drop those points ("no sample" is
+        # the honest reading of NaN) rather than coercing to 0.
+        out.append(
+            (
+                key,
+                [(ts, v) for ts, v in row.values if isinstance(v, (int, float)) and math.isfinite(v)],
+            )
+        )
     return out
 
 
