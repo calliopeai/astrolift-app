@@ -10677,6 +10677,7 @@ export type ListAppsPageQueryVariables = Exact<{
   projectSlug?: InputMaybe<Scalars['String']['input']>;
   status?: InputMaybe<AstroliftAppListStatusFilter>;
   sourceKind?: InputMaybe<AstroliftAppSourceKindFilter>;
+  sortBy?: InputMaybe<AppsListSortKey>;
   cursor?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
 }>;
