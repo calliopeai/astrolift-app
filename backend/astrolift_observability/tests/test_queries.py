@@ -237,23 +237,29 @@ def test_memory_saturation_uses_working_set_bytes(permission_resolver):
 
 def test_signal_promql_disclosure_includes_app_label(permission_resolver):
     """The dev-mode disclosure text must scope every signal to the app so
-    an operator can copy-paste the query into Grafana. App-instrumentation
-    signals carry the ``app="<slug>"`` matcher; the saturation pair reads
-    cAdvisor / kube-state-metrics series that only carry namespace/pod/
-    container labels, so those scope by ``namespace="<ns>"`` instead."""
+    an operator can copy-paste the query into Grafana. Since #1224 the
+    request-path signals are edge-sourced (cluster ingress_class is
+    ``nginx`` by default) and scope by ``exported_namespace="<ns>"``; the
+    saturation pair reads cAdvisor / kube-state-metrics series and scopes
+    by ``namespace="<ns>"``. Nothing scopes by app-instrumentation labels
+    on a mapped variant."""
     org, app = _scaffold(prometheus_endpoint="http://prom:9090")
     permission_resolver.grant(Permission.APP_READ)
 
     with patch.object(prom_client, "query_range_series", return_value=[]):
         with _tenant(org):
             result = GoldenSignalsQuery().astrolift_app_golden_signals(_info(), app_slug=app.slug)
+    from core.cluster_observability import namespace_for_app
+
+    ns = namespace_for_app(app)
     namespace_scoped = {GoldenSignalKind.SATURATION_CPU, GoldenSignalKind.SATURATION_MEMORY}
     for row in result.signals:
         if row.name in namespace_scoped:
-            assert f'namespace="{app.k8s_namespace}"' in row.promql, row.promql
+            assert f'namespace="{ns}"' in row.promql, row.promql
             assert f'app="{app.slug}"' not in row.promql, row.promql
         else:
-            assert f'app="{app.slug}"' in row.promql, row.promql
+            assert f'exported_namespace="{ns}"' in row.promql, row.promql
+            assert "http_requests_total" not in row.promql, row.promql
 
 
 def test_prometheus_error_reports_error(permission_resolver):

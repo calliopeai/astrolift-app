@@ -33,6 +33,7 @@ from __future__ import annotations
 import dataclasses
 
 from astrolift_operations.prometheus_client import sanitize_label_value
+from providers._sdk.edge_metrics import EdgeMetricsMapping
 
 # ----------------------------------------------------------------------
 # QueryPlan
@@ -55,6 +56,12 @@ class QueryPlan:
     """The rate-of-change window used inside the PromQL — exposed so
     range-query callers can pass the same width as the ``step`` lower
     bound and keep the series honest."""
+
+    group_label: str = "code"
+    """For grouped queries (status-code breakdown): the label key the
+    PromQL groups by. App-instrumentation metrics use ``code``; edge
+    variants group by their own status label (e.g. nginx's ``status``),
+    so the resolver must read series keys off this, not a literal."""
 
 
 # ----------------------------------------------------------------------
@@ -177,23 +184,48 @@ def _render_label_match_with_extra(
 # ----------------------------------------------------------------------
 
 
+def _edge_labels(edge: EdgeMetricsMapping, namespace: str) -> dict[str, str]:
+    """Label matchers selecting one app's edge traffic (spec 08 §6.1).
+
+    Edge metrics are keyed by the app's Kubernetes namespace — the one
+    join key that exists without any app cooperation. Environment and
+    workload narrowing don't apply at the edge (the controller doesn't
+    know workloads; environment is implied by the namespace/cluster the
+    query runs against), so edge queries are app-level roll-ups.
+    """
+    return {edge.namespace_label: sanitize_label_value(namespace)}
+
+
 def build_request_rate_query(
     *,
     app_slug: str,
     environment_name: str | None,
     range_seconds: int,
     workload_slug: str | None = None,
+    edge: EdgeMetricsMapping | None = None,
+    namespace: str | None = None,
 ) -> QueryPlan:
     """Traffic — requests / second.
 
+    Edge-sourced (spec 08 §6.1) when ``edge`` + ``namespace`` are given:
+
+    ``sum(rate(<edge.requests_total>{<ns-label>=...}[<w>]))``
+
+    Legacy app-instrumentation shape otherwise (kept only for ingress
+    variants with no edge-metrics mapping yet — a recorded parity gap):
+
     ``sum(rate(http_requests_total{app=...}[<w>]))``
     """
+    rate_window = pick_rate_window(range_seconds)
+    if edge is not None and namespace and not workload_slug:
+        labels = _edge_labels(edge, namespace)
+        expr = f"sum(rate({edge.requests_total}{_render_label_match(labels)}[{rate_window}]))"
+        return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
     labels = _build_labels(
         app_slug=app_slug,
         environment_name=environment_name,
         workload_slug=workload_slug,
     )
-    rate_window = pick_rate_window(range_seconds)
     expr = f"sum(rate(http_requests_total{_render_label_match(labels)}[{rate_window}]))"
     return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
 
@@ -204,22 +236,35 @@ def build_error_rate_query(
     environment_name: str | None,
     range_seconds: int,
     workload_slug: str | None = None,
+    edge: EdgeMetricsMapping | None = None,
+    namespace: str | None = None,
 ) -> QueryPlan:
     """Errors — 5xx rate / total rate.
 
-    ``sum(rate(http_requests_total{...,code=~"5.."}[<w>])) / clamp_min(sum(rate(http_requests_total{...}[<w>])), 1e-9)``
+    Edge-sourced when ``edge`` + ``namespace`` are given (the status
+    label key comes from the variant mapping); legacy app-metric shape
+    otherwise.
 
     ``clamp_min`` guards the zero-traffic case so the resolver gets
     ``0`` instead of a NaN (Prometheus serializes NaN as the string
     ``"NaN"`` which the existing client coerces to ``0.0`` but only
     after a parse failure — cleaner to clamp at the query layer).
     """
+    rate_window = pick_rate_window(range_seconds)
+    if edge is not None and namespace and not workload_slug:
+        labels = _edge_labels(edge, namespace)
+        base_match = _render_label_match(labels)
+        err_match = _render_label_match_with_extra(labels, f'{edge.status_label}=~"5.."')
+        expr = (
+            f"sum(rate({edge.requests_total}{err_match}[{rate_window}])) "
+            f"/ clamp_min(sum(rate({edge.requests_total}{base_match}[{rate_window}])), 1e-9)"
+        )
+        return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
     labels = _build_labels(
         app_slug=app_slug,
         environment_name=environment_name,
         workload_slug=workload_slug,
     )
-    rate_window = pick_rate_window(range_seconds)
     base_match = _render_label_match(labels)
     err_match = _render_label_match_with_extra(labels, 'code=~"5.."')
     expr = (
@@ -236,20 +281,30 @@ def build_latency_quantile_query(
     range_seconds: int,
     quantile: float,
     workload_slug: str | None = None,
+    edge: EdgeMetricsMapping | None = None,
+    namespace: str | None = None,
 ) -> QueryPlan:
     """Latency — histogram_quantile over the request-latency bucket
-    histogram.
+    histogram; edge-sourced when ``edge`` + ``namespace`` are given.
 
-    ``histogram_quantile(q, sum by (le)(rate(http_request_duration_seconds_bucket{...}[<w>])))``
+    ``histogram_quantile(q, sum by (le)(rate(<bucket-metric>{...}[<w>])))``
     """
     if not 0.0 < quantile < 1.0:
         raise ValueError(f"quantile must be in (0, 1); got {quantile}")
+    rate_window = pick_rate_window(range_seconds)
+    if edge is not None and namespace and not workload_slug:
+        labels = _edge_labels(edge, namespace)
+        match = _render_label_match(labels)
+        expr = (
+            f"histogram_quantile({quantile:g}, "
+            f"sum by (le)(rate({edge.duration_bucket}{match}[{rate_window}])))"
+        )
+        return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
     labels = _build_labels(
         app_slug=app_slug,
         environment_name=environment_name,
         workload_slug=workload_slug,
     )
-    rate_window = pick_rate_window(range_seconds)
     match = _render_label_match(labels)
     expr = (
         f"histogram_quantile({quantile:g}, "
@@ -382,20 +437,34 @@ def build_status_code_breakdown_query(
     environment_name: str | None,
     range_seconds: int,
     workload_slug: str | None = None,
+    edge: EdgeMetricsMapping | None = None,
+    namespace: str | None = None,
 ) -> QueryPlan:
-    """Per-status-code stacked time-series.
+    """Per-status-code stacked time-series; edge-sourced when ``edge`` +
+    ``namespace`` are given (grouped by the variant's status label —
+    surfaced on ``QueryPlan.group_label`` for the resolver).
 
-    ``sum by (code) (rate(http_requests_total{...}[<w>]))``
+    ``sum by (<status-label>) (rate(<requests-metric>{...}[<w>]))``
 
     The resolver groups the returned matrix into 2xx / 3xx / 4xx / 5xx
     classes plus a top-5 individual-code list for tooltip use.
     """
+    rate_window = pick_rate_window(range_seconds)
+    if edge is not None and namespace and not workload_slug:
+        labels = _edge_labels(edge, namespace)
+        match = _render_label_match(labels)
+        expr = f"sum by ({edge.status_label}) (rate({edge.requests_total}{match}[{rate_window}]))"
+        return QueryPlan(
+            promql=expr,
+            labels=labels,
+            rate_window=rate_window,
+            group_label=edge.status_label,
+        )
     labels = _build_labels(
         app_slug=app_slug,
         environment_name=environment_name,
         workload_slug=workload_slug,
     )
-    rate_window = pick_rate_window(range_seconds)
     match = _render_label_match(labels)
     expr = f"sum by (code) (rate(http_requests_total{match}[{rate_window}]))"
     return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)

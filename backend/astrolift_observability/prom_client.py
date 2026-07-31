@@ -106,3 +106,36 @@ def query_range_series(
         # can hand them straight to the GraphQL layer.
         out.append((key, list(row.values)))
     return out
+
+
+def resolve_edge_metrics(
+    *,
+    app,
+    environment_name: str | None,
+):
+    """Resolve the edge-metrics mapping for ``app``'s cluster ingress
+    variant (spec 08 §6.1).
+
+    Walks the same env → tenant-cluster path as
+    :func:`resolve_prometheus_endpoint`, maps the cluster's
+    ``ingress_class`` to its ingress variant, and returns the variant's
+    :class:`providers._sdk.edge_metrics.EdgeMetricsMapping` — or ``None``
+    when the app has no cluster or the variant has no metrics pipeline
+    yet (e.g. ``alb`` until the CloudWatch-exporter component lands).
+    ``None`` means the RED builders fall back to the legacy
+    app-instrumentation queries: status quo for that variant, recorded
+    as a parity gap rather than silently wrong data.
+    """
+    from astrolift_lifecycle.models import AppEnvironment
+    from providers._sdk.edge_metrics import edge_metrics_for_ingress_class
+
+    qs = AppEnvironment.objects.filter(
+        registered_app=app,
+        deleted_at__isnull=True,
+    ).select_related("tenant_cluster")
+    if environment_name:
+        qs = qs.filter(name=environment_name)
+    env = qs.order_by("name").first()
+    if env is None or env.tenant_cluster is None:
+        return None
+    return edge_metrics_for_ingress_class(getattr(env.tenant_cluster, "ingress_class", None))

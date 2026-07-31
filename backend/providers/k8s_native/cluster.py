@@ -622,15 +622,34 @@ class K8sNativeClusterDriver(ClusterDriver):
                 rationale=(
                     "Bare-metal clusters don't get a cloud ingress for free. "
                     "ingress-nginx is the platform's default; pair it with "
-                    "MetalLB so its Service:LoadBalancer gets an IP."
+                    "MetalLB so its Service:LoadBalancer gets an IP. "
+                    "Controller metrics + ServiceMonitor are enabled (spec 08 "
+                    "§6.1): the edge is where the platform sources every app's "
+                    "traffic / error-rate / latency golden signals, so a "
+                    "cluster whose ingress doesn't export metrics is a "
+                    "provisioning defect."
                 ),
-                helm_values={},
+                helm_values={
+                    "controller": {
+                        "metrics": {
+                            "enabled": True,
+                            # Picked up by the kube-prometheus-stack operator;
+                            # without a ServiceMonitor the exporter runs but
+                            # nothing scrapes it and the RED panels stay empty.
+                            "serviceMonitor": {"enabled": True},
+                        },
+                    },
+                },
                 requires=["metallb"],
                 options=[],
                 chart_name="ingress-nginx",
                 chart_repo_url="https://kubernetes.github.io/ingress-nginx",
                 chart_repo_type="default",
                 chart_version="4.11.1",
+                # The chart's ServiceMonitor needs the monitoring.coreos.com
+                # CRDs; installing after kube-prometheus-stack avoids a
+                # first-reconcile flap while Flux waits for the CRD.
+                depends_on=["kube-prometheus-stack"],
             ),
             BootstrapComponent(
                 key="metallb",

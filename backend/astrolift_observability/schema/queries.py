@@ -364,30 +364,38 @@ class GoldenSignalsQuery:
         # Kubernetes namespace so saturation queries use the correct selector.
         app_namespace = namespace_for_app(app)
 
+        # Edge-sourced RED (#1224, spec 08 §6.1): when the app's cluster
+        # ingress variant has an edge-metrics mapping, traffic / errors /
+        # latency come from the ingress controller's metrics keyed by the
+        # app's namespace — an uninstrumented app gets full panels. Variants
+        # without a mapping yet fall back to the legacy app-metric queries.
+        edge = prom_client.resolve_edge_metrics(app=app, environment_name=environment_name)
+        red_extra = {"edge": edge, "namespace": app_namespace}
+
         builders: list[tuple[GoldenSignalKind, str, Callable[..., prom_queries.QueryPlan], dict]] = [
             (
                 GoldenSignalKind.TRAFFIC,
                 "rps",
                 prom_queries.build_request_rate_query,
-                {},
+                {**red_extra},
             ),
             (
                 GoldenSignalKind.ERRORS,
                 "ratio",
                 prom_queries.build_error_rate_query,
-                {},
+                {**red_extra},
             ),
             (
                 GoldenSignalKind.LATENCY_P50,
                 "seconds",
                 prom_queries.build_latency_quantile_query,
-                {"quantile": 0.50},
+                {"quantile": 0.50, **red_extra},
             ),
             (
                 GoldenSignalKind.LATENCY_P90,
                 "seconds",
                 prom_queries.build_latency_quantile_query,
-                {"quantile": 0.90},
+                {"quantile": 0.90, **red_extra},
             ),
             # #640 — p95 is the SLO-canonical default for the latency
             # tile. Keep p90 in the wire shape so legacy dashboards
@@ -397,13 +405,13 @@ class GoldenSignalsQuery:
                 GoldenSignalKind.LATENCY_P95,
                 "seconds",
                 prom_queries.build_latency_quantile_query,
-                {"quantile": 0.95},
+                {"quantile": 0.95, **red_extra},
             ),
             (
                 GoldenSignalKind.LATENCY_P99,
                 "seconds",
                 prom_queries.build_latency_quantile_query,
-                {"quantile": 0.99},
+                {"quantile": 0.99, **red_extra},
             ),
             (
                 GoldenSignalKind.SATURATION_CPU,
@@ -535,7 +543,8 @@ class GoldenSignalsQuery:
                 organization_id=tenant.organization_id,
                 deleted_at__isnull=True,
             )
-            .only("id", "slug")
+            .only("id", "slug", "k8s_namespace", "organization__slug")
+            .select_related("organization")
             .first()
         )
         if app is None:
@@ -554,11 +563,17 @@ class GoldenSignalsQuery:
         start_unix = end_unix - seconds
         step = prom_queries.pick_step_seconds(seconds)
 
+        # Edge-sourced when the cluster's ingress variant is mapped (#1224):
+        # grouped by the variant's status label, surfaced on
+        # ``plan.group_label`` so the series keys resolve either way.
+        edge = prom_client.resolve_edge_metrics(app=app, environment_name=environment_name)
         plan = prom_queries.build_status_code_breakdown_query(
             app_slug=app.slug,
             environment_name=environment_name,
             workload_slug=workload_slug,
             range_seconds=seconds,
+            edge=edge,
+            namespace=namespace_for_app(app),
         )
         try:
             rows = prom_client.query_range_series(
@@ -567,7 +582,7 @@ class GoldenSignalsQuery:
                 start_unix=start_unix,
                 end_unix=end_unix,
                 step_seconds=step,
-                label_key="code",
+                label_key=plan.group_label,
             )
         except PrometheusError:
             log.warning("status_code_breakdown: prometheus query failed for app %s", app.slug)
