@@ -305,6 +305,11 @@ class ECRDriver(ImageRegistryDriver):
                         "ecr:UploadLayerPart",
                         "ecr:CompleteLayerUpload",
                         "ecr:BatchGetImage",
+                        # The CI workflow's skip-if-built probe (#1220):
+                        # without DescribeImages the probe's AccessDenied
+                        # reads as "not built" and a re-run on a built SHA
+                        # dies on the repo's immutable tags.
+                        "ecr:DescribeImages",
                     ],
                     "Resource": repo_arn,
                 },
