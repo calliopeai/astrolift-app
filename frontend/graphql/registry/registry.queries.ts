@@ -1,74 +1,86 @@
 import { gql } from "@apollo/client";
 
-const APP_FIELDS = `
-  id
-  slug
-  name
-  description
-  organizationSlug
-  teamSlug
-  teamId
-  teamName
-  projectSlug
-  projectId
-  projectName
-  sourceKind
-  sourceRepo
-  sourceUrl
-  manifestPath
-  defaultBranch
-  manifestHash
-  registryRepoUri
-  reprovision {
-    needsReprovision
-    state
-    reason
-    elapsedSeconds
+/**
+ * Shared app row selection.
+ *
+ * A named gql fragment, not a plain template-literal constant:
+ * ``graphql-tag-pluck`` (the extractor codegen runs over this directory)
+ * cannot resolve a bare ``${FIELDS}`` interpolation, so a file that used
+ * one had every operation in it silently dropped from
+ * ``__generated__/operations.ts`` and had to be excluded from the document
+ * set (#934). Spreading a real fragment is what puts this file back in.
+ */
+const APP_FIELDS = gql`
+  fragment AppFields on AstroliftRegisteredApp {
+    id
+    slug
+    name
+    description
+    organizationSlug
+    teamSlug
+    teamId
+    teamName
+    projectSlug
+    projectId
+    projectName
+    sourceKind
+    sourceRepo
+    sourceUrl
+    manifestPath
+    defaultBranch
+    manifestHash
+    registryRepoUri
+    reprovision {
+      needsReprovision
+      state
+      reason
+      elapsedSeconds
+    }
+    ecrRepoUri
+    ecrPushRoleArn
+    providerPluginSlug
+    k8sNamespace
+    subdomain
+    managedHostname
+    isActive
+    provisioningStatus
+    provisioningError
+    provisioningProgress {
+      currentStep
+      completed
+      totalSteps
+    }
+    deployTokenLast4
+    logRetentionDays
+    previewMaxActive
+    previewEnabled
+    triggerMode
+    cronExpression
+    deployBranch
+    previewScreenshotUrl
+    rawManifest
+    rawManifestStaged
+    lastSyncedHash
+    manifestSyncState
+    lastResyncAt
+    sourceWebhookInstalledAt
+    isArchived
+    archivedAt
+    webhookDeploysPaused
+    webhookDeploysPausedAt
+    webhookDeploysPausedByEmail
+    webhookDeploysPauseReason
+    activePreviewCount
+    securityPolicy {
+      blockOnCriticalCves
+      blockOnMissingSignature
+      blockOnHighCveThreshold
+    }
+    createdAt
+    updatedAt
+    deletedAt
+    version
   }
-  ecrRepoUri
-  ecrPushRoleArn
-  providerPluginSlug
-  k8sNamespace
-  subdomain
-  managedHostname
-  isActive
-  provisioningStatus
-  provisioningError
-  provisioningProgress {
-    currentStep
-    completed
-    totalSteps
-  }
-  deployTokenLast4
-  logRetentionDays
-  previewMaxActive
-  previewEnabled
-  triggerMode
-  cronExpression
-  deployBranch
-  previewScreenshotUrl
-  rawManifest
-  rawManifestStaged
-  lastSyncedHash
-  manifestSyncState
-  lastResyncAt
-  sourceWebhookInstalledAt
-  isArchived
-  archivedAt
-  webhookDeploysPaused
-  webhookDeploysPausedAt
-  webhookDeploysPausedByEmail
-  webhookDeploysPauseReason
-  activePreviewCount
-  securityPolicy {
-    blockOnCriticalCves
-    blockOnMissingSignature
-    blockOnHighCveThreshold
-  }
-  createdAt
-  updatedAt
-  deletedAt
-  version
 `;
 
 /**
@@ -78,31 +90,35 @@ const APP_FIELDS = `
  * cheap; the FE opts in only on screens that render the health
  * pulse + last-deployed badge.
  */
-const APP_FRESHNESS_FIELDS = `
-  lastDeployedAt
-  healthPulse {
-    status
-    ageSeconds
-    message
-  }
-  latestDeployment {
-    id
-    status
-    startedAt
-    endedAt
-    createdAt
-    environmentName
-    triggeredBy
-    imageTag
-    commitSha
+const APP_FRESHNESS_FIELDS = gql`
+  fragment AppFreshnessFields on AstroliftRegisteredApp {
+    lastDeployedAt
+    healthPulse {
+      status
+      ageSeconds
+      message
+    }
+    latestDeployment {
+      id
+      status
+      startedAt
+      endedAt
+      createdAt
+      environmentName
+      triggeredBy
+      imageTag
+      commitSha
+    }
   }
 `;
 
 export const LIST_APPS = gql`
+  ${APP_FIELDS}
+  ${APP_FRESHNESS_FIELDS}
   query ListApps($includeFreshness: Boolean = false) {
     astroliftApps(includeFreshness: $includeFreshness) {
-      ${APP_FIELDS}
-      ${APP_FRESHNESS_FIELDS}
+      ...AppFields
+      ...AppFreshnessFields
     }
   }
 `;
@@ -122,6 +138,8 @@ export const LIST_APPS = gql`
  * opaque and just round-trips ``nextCursor`` back via ``fetchMore``.
  */
 export const LIST_APPS_PAGE = gql`
+  ${APP_FIELDS}
+  ${APP_FRESHNESS_FIELDS}
   query ListAppsPage(
     $includeFreshness: Boolean = false
     $search: String
@@ -143,8 +161,8 @@ export const LIST_APPS_PAGE = gql`
       limit: $limit
     ) {
       items {
-        ${APP_FIELDS}
-        ${APP_FRESHNESS_FIELDS}
+        ...AppFields
+        ...AppFreshnessFields
       }
       nextCursor
       totalCount
@@ -153,9 +171,10 @@ export const LIST_APPS_PAGE = gql`
 `;
 
 export const GET_APP = gql`
+  ${APP_FIELDS}
   query GetApp($slug: String!, $includeDrift: Boolean = false) {
     astroliftApp(slug: $slug, includeDrift: $includeDrift) {
-      ${APP_FIELDS}
+      ...AppFields
       configDrift {
         hasDrift
         fields
@@ -221,6 +240,56 @@ export const LIST_WORKLOADS = gql`
       storageSize
       volumes
       registeredAppSlug
+    }
+  }
+`;
+
+/**
+ * Cursor-paginated companion to ``LIST_WORKLOADS`` (#1230).
+ *
+ * ``appSlug`` stays optional — omitted, the field pages every workload in
+ * the org, which is what the fleet-wide surfaces want; passed, it scopes
+ * to one app. ``search`` is the only other filter and there is no sort
+ * argument, so a table over it declares no ``sortVariable`` and no
+ * ``Column.sortKey``.
+ *
+ * ``$limit: Int`` is nullable against the schema's ``limit: Int! = 50``:
+ * the argument's default is what makes that legal, and the controller
+ * always sends a value.
+ */
+const WORKLOAD_FIELDS = gql`
+  fragment WorkloadFields on AstroliftWorkload {
+    id
+    slug
+    name
+    kind
+    isPublic
+    schedule
+    concurrencyPolicy
+    replicas
+    cpuRequest
+    cpuLimit
+    memoryRequest
+    memoryLimit
+    hpaMinReplicas
+    hpaMaxReplicas
+    hpaTargetCpuPct
+    storageClass
+    storageSize
+    volumes
+    registeredAppSlug
+  }
+`;
+
+export const LIST_WORKLOADS_PAGE = gql`
+  ${WORKLOAD_FIELDS}
+  query ListWorkloadsPage($appSlug: String, $search: String, $limit: Int, $after: String) {
+    astroliftWorkloadsPage(appSlug: $appSlug, search: $search, limit: $limit, after: $after) {
+      items {
+        ...WorkloadFields
+      }
+      nextCursor
+      totalCount
     }
   }
 `;
@@ -336,6 +405,51 @@ export const LIST_APP_TEAM_ACCESSES = gql`
       isHome
       createdAt
       updatedAt
+    }
+  }
+`;
+
+/**
+ * Cursor-paginated companion to ``LIST_APP_TEAM_ACCESSES`` (#1230).
+ *
+ * ``appSlug`` stays required — a team grant only exists in the context of
+ * one app, so there is no all-apps page to fall back to. ``search`` is the
+ * only filter; the field takes no sort argument.
+ */
+const APP_TEAM_ACCESS_FIELDS = gql`
+  fragment AppTeamAccessFields on AstroliftAppTeamAccess {
+    id
+    appId
+    appSlug
+    teamId
+    teamSlug
+    teamName
+    accessLevel
+    isHome
+    createdAt
+    updatedAt
+  }
+`;
+
+export const LIST_APP_TEAM_ACCESSES_PAGE = gql`
+  ${APP_TEAM_ACCESS_FIELDS}
+  query ListAppTeamAccessesPage(
+    $appSlug: String!
+    $search: String
+    $limit: Int
+    $after: String
+  ) {
+    astroliftAppTeamAccessesPage(
+      appSlug: $appSlug
+      search: $search
+      limit: $limit
+      after: $after
+    ) {
+      items {
+        ...AppTeamAccessFields
+      }
+      nextCursor
+      totalCount
     }
   }
 `;

@@ -126,6 +126,80 @@ export const LIST_CLUSTERS = gql`
   }
 `;
 
+/**
+ * Cursor-paginated companion to ``LIST_CLUSTERS`` (#1230).
+ *
+ * Speaks the platform page envelope — ``{ items, nextCursor, totalCount }``
+ * out, ``limit`` + ``after`` in — so ``useCursorTable`` walks the whole
+ * fleet on the server instead of the surface fetching every cluster and
+ * filtering the result in the browser. ``search`` is the field's only
+ * filter argument; it takes no sort argument, so a table over it declares
+ * no ``sortVariable`` and no ``Column.sortKey``.
+ *
+ * ``$limit: Int`` is deliberately nullable against the schema's
+ * ``limit: Int! = 50`` — the argument carries a default, which is what
+ * makes a nullable variable legal there, and the controller always sends
+ * a value anyway.
+ *
+ * The row selection is a spreadable fragment rather than a plain
+ * template-literal constant because this file IS in the codegen document
+ * set: ``graphql-tag-pluck`` cannot resolve a bare ``${FIELDS}``
+ * interpolation and (with ``noSilentErrors``) fails the run. ``LIST_CLUSTERS``
+ * keeps its inline copy until its last consumer is migrated — the cluster
+ * detail and settings surfaces still read the whole list from cache — then
+ * goes away with them.
+ */
+const CLUSTER_FIELDS = gql`
+  fragment ClusterFields on AstroliftTenantCluster {
+    id
+    slug
+    name
+    organizationSlug
+    providerPluginSlug
+    region
+    endpoint
+    authMethod
+    ingressClass
+    albAuthConfig
+    isActive
+    capabilities
+    capabilitiesProbedAt
+    createdAt
+    lifecycle
+    lastManagementError
+    managedAt
+    lastHeartbeatAt
+    heartbeatIntervalSeconds
+    heartbeatStatus
+    heartbeatAgeSeconds
+    agentProvisioned
+    lastBootstrapRun {
+      id
+      status
+      chartVersion
+      installedReleases
+      cliVersion
+      errorMessage
+      startedAt
+      endedAt
+      triggeredByUsername
+    }
+  }
+`;
+
+export const LIST_CLUSTERS_PAGE = gql`
+  ${CLUSTER_FIELDS}
+  query ListClustersPage($search: String, $limit: Int, $after: String) {
+    astroliftClustersPage(search: $search, limit: $limit, after: $after) {
+      items {
+        ...ClusterFields
+      }
+      nextCursor
+      totalCount
+    }
+  }
+`;
+
 export const UPDATE_TENANT_CLUSTER = gql`
   mutation UpdateTenantCluster($input: UpdateTenantClusterInput!) {
     updateTenantCluster(input: $input) {

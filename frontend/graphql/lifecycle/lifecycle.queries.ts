@@ -324,6 +324,62 @@ export const LIST_SCHEDULED_JOB_RUNS = gql`
   }
 `;
 
+const SCHEDULED_JOB_RUN_FIELDS = gql`
+  fragment ScheduledJobRunFields on AstroliftScheduledJobRun {
+    id
+    registeredAppSlug
+    environmentName
+    workloadSlug
+    k8sJobName
+    status
+    startedAt
+    endedAt
+    durationSeconds
+    exitCode
+    logExcerpt
+    output
+    createdAt
+  }
+`;
+
+/**
+ * Cursor-paginated companion to ``LIST_SCHEDULED_JOB_RUNS`` (#1230).
+ *
+ * ``appSlug`` / ``environmentName`` stay optional — omitted, the field pages
+ * every scheduled-job run in the org, which is what the fleet-wide Jobs
+ * surface wants; passed, they scope to one app or one environment. There is
+ * no sort argument, so a table over it declares no ``sortVariable`` and no
+ * ``Column.sortKey``.
+ *
+ * ``$limit: Int`` is nullable against the schema's ``limit: Int! = 50``: the
+ * argument's default is what makes that legal, and the controller always
+ * sends a value.
+ */
+export const LIST_SCHEDULED_JOB_RUNS_PAGE = gql`
+  ${SCHEDULED_JOB_RUN_FIELDS}
+  query ListScheduledJobRunsPage(
+    $appSlug: String
+    $environmentName: String
+    $search: String
+    $limit: Int
+    $after: String
+  ) {
+    astroliftScheduledJobRunsPage(
+      appSlug: $appSlug
+      environmentName: $environmentName
+      search: $search
+      limit: $limit
+      after: $after
+    ) {
+      items {
+        ...ScheduledJobRunFields
+      }
+      nextCursor
+      totalCount
+    }
+  }
+`;
+
 // Single scheduled-job run by id — backs a cold detail deep-link (#1118)
 // when the run has aged out of the LIST_SCHEDULED_JOB_RUNS window. Same
 // field set so the normalized cache entry is complete either way.
@@ -361,6 +417,40 @@ export const LIST_COMMAND_RUNS = gql`
       logExcerpt
       output
       createdAt
+    }
+  }
+`;
+
+const COMMAND_RUN_FIELDS = gql`
+  fragment CommandRunFields on AstroliftCommandRun {
+    id
+    registeredAppSlug
+    workloadSlug
+    invokedByUsername
+    command
+    startedAt
+    endedAt
+    exitCode
+    logExcerpt
+    output
+    createdAt
+  }
+`;
+
+/**
+ * Cursor-paginated companion to ``LIST_COMMAND_RUNS`` (#1230). ``appSlug``
+ * is the field's only filter besides ``search`` — there is no environment
+ * axis on a one-off exec — and it takes no sort argument.
+ */
+export const LIST_COMMAND_RUNS_PAGE = gql`
+  ${COMMAND_RUN_FIELDS}
+  query ListCommandRunsPage($appSlug: String, $search: String, $limit: Int, $after: String) {
+    astroliftCommandRunsPage(appSlug: $appSlug, search: $search, limit: $limit, after: $after) {
+      items {
+        ...CommandRunFields
+      }
+      nextCursor
+      totalCount
     }
   }
 `;
@@ -525,6 +615,62 @@ export const LIST_PREVIEW_ENVIRONMENTS = gql`
         podCount
       }
       estimatedDailyCostUsd
+    }
+  }
+`;
+
+const PREVIEW_ENVIRONMENT_FIELDS = gql`
+  fragment PreviewEnvironmentFields on AstroliftPreviewEnvironment {
+    id
+    registeredAppSlug
+    prNumber
+    branch
+    commitSha
+    status
+    hostname
+    namespace
+    lastDeployedAt
+    tornDownAt
+    ttlUntil
+    sourceUrl
+    prUrl
+    isManual
+    aggregateResources {
+      cpuCores
+      memoryBytes
+      podCount
+    }
+    estimatedDailyCostUsd
+  }
+`;
+
+/**
+ * Cursor-paginated companion to ``LIST_PREVIEW_ENVIRONMENTS`` (#1230).
+ *
+ * ``appSlug`` stays optional so the same document serves both the app's
+ * Previews tab and the fleet-wide Previews surface. ``search`` is the only
+ * other filter; there is no status filter and no sort argument on this
+ * field, so a table over it declares neither.
+ */
+export const LIST_PREVIEW_ENVIRONMENTS_PAGE = gql`
+  ${PREVIEW_ENVIRONMENT_FIELDS}
+  query ListPreviewEnvironmentsPage(
+    $appSlug: String
+    $search: String
+    $limit: Int
+    $after: String
+  ) {
+    astroliftPreviewEnvironmentsPage(
+      appSlug: $appSlug
+      search: $search
+      limit: $limit
+      after: $after
+    ) {
+      items {
+        ...PreviewEnvironmentFields
+      }
+      nextCursor
+      totalCount
     }
   }
 `;
@@ -789,6 +935,59 @@ export const LIST_TASK_RUNS = gql`
   }
 `;
 
+const TASK_RUN_FIELDS = gql`
+  fragment TaskRunFields on AstroliftTaskRun {
+    id
+    registeredAppSlug
+    workloadSlug
+    triggerKind
+    triggeredByUsername
+    command
+    status
+    exitCode
+    startedAt
+    endedAt
+    durationSeconds
+    k8sJobName
+    createdAt
+  }
+`;
+
+/**
+ * Cursor-paginated companion to ``LIST_TASK_RUNS`` (#1230).
+ *
+ * The page field filters on ``appSlug`` / ``workloadSlug`` / ``status`` as
+ * well as ``search``; all four are static controller variables, so changing
+ * one restarts the walk at page one. No sort argument, so no
+ * ``sortVariable`` / ``Column.sortKey``.
+ */
+export const LIST_TASK_RUNS_PAGE = gql`
+  ${TASK_RUN_FIELDS}
+  query ListTaskRunsPage(
+    $appSlug: String
+    $workloadSlug: String
+    $status: String
+    $search: String
+    $limit: Int
+    $after: String
+  ) {
+    astroliftTaskRunsPage(
+      appSlug: $appSlug
+      workloadSlug: $workloadSlug
+      status: $status
+      search: $search
+      limit: $limit
+      after: $after
+    ) {
+      items {
+        ...TaskRunFields
+      }
+      nextCursor
+      totalCount
+    }
+  }
+`;
+
 // Single task run by id — cold detail deep-link (#1118) for runs aged out
 // of the LIST_TASK_RUNS window.
 export const GET_TASK_RUN = gql`
@@ -807,6 +1006,69 @@ export const GET_TASK_RUN = gql`
       durationSeconds
       k8sJobName
       createdAt
+    }
+  }
+`;
+
+const AGENT_RUN_FIELDS = gql`
+  fragment AgentRunFields on AstroliftAgentRun {
+    id
+    registeredAppSlug
+    workloadSlug
+    triggerKind
+    triggeredByUsername
+    status
+    input
+    output
+    reasoningTraceUrl
+    toolCallsCount
+    retryCount
+    startedAt
+    endedAt
+    durationSeconds
+    k8sPodName
+    resultTtlHours
+    createdAt
+  }
+`;
+
+/**
+ * Agent-run history (#1230). Unlike its neighbours this one has no
+ * unpaginated sibling to migrate from — ``astroliftAgentRuns`` was never
+ * given a query document — so the page field is the only way the FE reads
+ * agent runs, and the selection is the whole ``AstroliftAgentRun`` type.
+ *
+ * Filters: ``appSlug`` / ``workloadSlug`` / ``projectSlug`` / ``status``
+ * plus ``search``, all static controller variables. No sort argument.
+ * ``input`` / ``output`` are JSON blobs carried per row on purpose — the run
+ * drawer reads them off the row it was opened from, the same way the command
+ * -run list carries its ``output`` excerpt.
+ */
+export const LIST_AGENT_RUNS_PAGE = gql`
+  ${AGENT_RUN_FIELDS}
+  query ListAgentRunsPage(
+    $appSlug: String
+    $workloadSlug: String
+    $projectSlug: String
+    $status: String
+    $search: String
+    $limit: Int
+    $after: String
+  ) {
+    astroliftAgentRunsPage(
+      appSlug: $appSlug
+      workloadSlug: $workloadSlug
+      projectSlug: $projectSlug
+      status: $status
+      search: $search
+      limit: $limit
+      after: $after
+    ) {
+      items {
+        ...AgentRunFields
+      }
+      nextCursor
+      totalCount
     }
   }
 `;

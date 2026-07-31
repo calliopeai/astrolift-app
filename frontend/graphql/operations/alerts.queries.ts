@@ -64,6 +64,79 @@ export const LIST_ALERT_EVENTS = gql`
   }
 `;
 
+/**
+ * Cursor-paginated companions to ``LIST_ALERT_RULES`` / ``LIST_ALERT_EVENTS``
+ * (#1230). ``{ items, nextCursor, totalCount }`` out, ``limit`` + ``after``
+ * in, so ``useCursorTable`` walks the whole result set on the server.
+ *
+ * ``target`` / ``targetId`` / ``activeOnly`` (rules) and ``ruleId`` /
+ * ``unresolvedOnly`` (events) are static controller variables — changing one
+ * changes the question and restarts the walk at page one. Neither field takes
+ * a sort argument, so a table over them declares no ``sortVariable`` and no
+ * ``Column.sortKey``.
+ *
+ * ``$limit: Int`` is nullable against the schema's ``limit: Int! = 50``, and
+ * ``$activeOnly`` / ``$unresolvedOnly`` are nullable against non-null
+ * arguments for the same reason: those arguments carry defaults, which is
+ * what makes a nullable variable legal in that position.
+ *
+ * These documents interpolate the file's field-list constants rather than
+ * spreading named fragments because every other document here does, and the
+ * file is excluded from the codegen document set for exactly that reason
+ * (see ``codegen.ts``). Converting all of them together — and dropping the
+ * exclusion — is a separate change; splitting the file's style in half
+ * without being able to re-run codegen would be worse than either end state.
+ */
+export const LIST_ALERT_RULES_PAGE = gql`
+  query ListAlertRulesPage(
+    $target: String
+    $targetId: String
+    $activeOnly: Boolean
+    $search: String
+    $limit: Int
+    $after: String
+  ) {
+    astroliftAlertRulesPage(
+      target: $target
+      targetId: $targetId
+      activeOnly: $activeOnly
+      search: $search
+      limit: $limit
+      after: $after
+    ) {
+      items {
+        ${ALERT_RULE_FIELDS}
+      }
+      nextCursor
+      totalCount
+    }
+  }
+`;
+
+export const LIST_ALERT_EVENTS_PAGE = gql`
+  query ListAlertEventsPage(
+    $ruleId: GUID
+    $unresolvedOnly: Boolean
+    $search: String
+    $limit: Int
+    $after: String
+  ) {
+    astroliftAlertEventsPage(
+      ruleId: $ruleId
+      unresolvedOnly: $unresolvedOnly
+      search: $search
+      limit: $limit
+      after: $after
+    ) {
+      items {
+        ${ALERT_EVENT_FIELDS}
+      }
+      nextCursor
+      totalCount
+    }
+  }
+`;
+
 export const CREATE_ALERT_RULE = gql`
   mutation CreateAlertRule($input: CreateAlertRuleInput!) {
     createAlertRule(input: $input) {

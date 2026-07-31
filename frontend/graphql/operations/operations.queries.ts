@@ -36,6 +36,72 @@ export const LIST_EVENTS = gql`
   }
 `;
 
+/**
+ * Cursor-paginated companion to ``LIST_EVENTS`` (#1230).
+ *
+ * Two things about this page envelope are unlike every other one in the
+ * schema, and a table over it has to account for both:
+ *
+ *  - ``AstroliftEventPage`` has NO ``totalCount``. The event stream is
+ *    unbounded and counting it is a table scan, so the field was never
+ *    added. ``useCursorTable`` already treats a missing count as null and
+ *    DataTable renders the range without a total, so nothing needs to
+ *    special-case it — but do not add ``totalCount`` to this selection
+ *    expecting it to resolve.
+ *  - It carries ``reason`` (``AstroliftObservabilityPanelReason``), the
+ *    observability panels' shared "why is this empty" signal —
+ *    ``NOT_CONFIGURED`` / ``NOT_SUPPORTED_BY_PROVIDER`` / ``NO_DATA_YET``
+ *    tell a genuinely empty stream apart from one that cannot report.
+ *    Selected here so the surface can say which, rather than showing the
+ *    same "no events" copy for all three.
+ *
+ * ``severity`` is selected as well as filtered on: the raw list query
+ * predates the field, and a table that can filter by severity has to be
+ * able to show it.
+ */
+const EVENT_FIELDS = gql`
+  fragment EventFields on AstroliftEvent {
+    id
+    eventType
+    payload
+    organizationId
+    teamId
+    projectId
+    registeredAppId
+    occurredAt
+    resourceKind
+    resourceId
+    severity
+  }
+`;
+
+export const LIST_EVENTS_PAGE = gql`
+  ${EVENT_FIELDS}
+  query ListEventsPage(
+    $limit: Int
+    $after: String
+    $eventType: String
+    $severity: String
+    $appSlug: String
+    $search: String
+  ) {
+    astroliftEventsPage(
+      limit: $limit
+      after: $after
+      eventType: $eventType
+      severity: $severity
+      appSlug: $appSlug
+      search: $search
+    ) {
+      items {
+        ...EventFields
+      }
+      nextCursor
+      reason
+    }
+  }
+`;
+
 export const LIST_EVENTS_AGGREGATED = gql`
   query ListEventsAggregated(
     $limit: Int
@@ -65,6 +131,51 @@ export const LIST_EVENTS_AGGREGATED = gql`
       eventType
       resourceKind
       resourceId
+    }
+  }
+`;
+
+/**
+ * Cursor-paginated companion to ``LIST_EVENTS_AGGREGATED`` (#1230).
+ *
+ * Unlike the raw event page this one DOES carry ``totalCount`` — it counts
+ * buckets, not events. ``aggregateWindowSeconds`` is the roll-up window
+ * (schema default 300); pass it as a static controller variable, since
+ * changing it changes the question and has to restart the walk at page one.
+ */
+export const LIST_EVENTS_AGGREGATED_PAGE = gql`
+  ${EVENT_FIELDS}
+  query ListEventsAggregatedPage(
+    $limit: Int
+    $after: String
+    $eventType: String
+    $severity: String
+    $appSlug: String
+    $search: String
+    $aggregateWindowSeconds: Int
+  ) {
+    astroliftEventsAggregatedPage(
+      limit: $limit
+      after: $after
+      eventType: $eventType
+      severity: $severity
+      appSlug: $appSlug
+      search: $search
+      aggregateWindowSeconds: $aggregateWindowSeconds
+    ) {
+      items {
+        representative {
+          ...EventFields
+        }
+        count
+        firstAt
+        lastAt
+        eventType
+        resourceKind
+        resourceId
+      }
+      nextCursor
+      totalCount
     }
   }
 `;
@@ -175,6 +286,46 @@ export const LIST_WEBHOOKS = gql`
   }
 `;
 
+/**
+ * Cursor-paginated companion to ``LIST_WEBHOOKS`` (#1230). ``appSlug``
+ * stays optional — omitted, the field pages every subscription in the org
+ * (the platform-wide Webhooks surface); passed, it scopes to one app's
+ * settings tab. No sort argument, so no ``sortVariable`` / ``Column.sortKey``.
+ */
+const WEBHOOK_SUBSCRIPTION_FIELDS = gql`
+  fragment WebhookSubscriptionFields on AstroliftWebhookSubscription {
+    id
+    url
+    events
+    isActive
+    format
+    lastDeliveryAt
+    lastResponseStatus
+    failureCount
+    secretRotatedAt
+    createdAt
+    version
+  }
+`;
+
+export const LIST_WEBHOOKS_PAGE = gql`
+  ${WEBHOOK_SUBSCRIPTION_FIELDS}
+  query ListWebhooksPage($appSlug: String, $search: String, $limit: Int, $after: String) {
+    astroliftWebhookSubscriptionsPage(
+      appSlug: $appSlug
+      search: $search
+      limit: $limit
+      after: $after
+    ) {
+      items {
+        ...WebhookSubscriptionFields
+      }
+      nextCursor
+      totalCount
+    }
+  }
+`;
+
 export const LIST_WEBHOOK_DELIVERIES = gql`
   query ListWebhookDeliveries($subscriptionId: GUID!, $limit: Int) {
     astroliftWebhookDeliveries(subscriptionId: $subscriptionId, limit: $limit) {
@@ -191,6 +342,53 @@ export const LIST_WEBHOOK_DELIVERIES = gql`
       error
       deliveryId
       deliveredAt
+    }
+  }
+`;
+
+/**
+ * Cursor-paginated companion to ``LIST_WEBHOOK_DELIVERIES`` (#1230).
+ * ``subscriptionId`` is required — a delivery only exists under one
+ * subscription — so the delivery table stays skipped until a subscription
+ * is selected.
+ */
+const WEBHOOK_DELIVERY_FIELDS = gql`
+  fragment WebhookDeliveryFields on AstroliftWebhookDelivery {
+    id
+    subscriptionId
+    eventType
+    retryAttempt
+    statusCode
+    latencyMs
+    success
+    isTest
+    requestPayloadExcerpt
+    responseBodyExcerpt
+    error
+    deliveryId
+    deliveredAt
+  }
+`;
+
+export const LIST_WEBHOOK_DELIVERIES_PAGE = gql`
+  ${WEBHOOK_DELIVERY_FIELDS}
+  query ListWebhookDeliveriesPage(
+    $subscriptionId: GUID!
+    $search: String
+    $limit: Int
+    $after: String
+  ) {
+    astroliftWebhookDeliveriesPage(
+      subscriptionId: $subscriptionId
+      search: $search
+      limit: $limit
+      after: $after
+    ) {
+      items {
+        ...WebhookDeliveryFields
+      }
+      nextCursor
+      totalCount
     }
   }
 `;
