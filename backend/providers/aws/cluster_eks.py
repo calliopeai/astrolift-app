@@ -1395,6 +1395,14 @@ class EKSClusterDriver(ClusterDriver):
                             # they get scraped without per-monitor labeling.
                             "serviceMonitorSelectorNilUsesHelmValues": False,
                             "podMonitorSelectorNilUsesHelmValues": False,
+                            # Fargate sizes pods from requests — without them
+                            # Prometheus gets the 0.25vCPU/512Mi default and
+                            # OOM-loops under 24h retention. Matches the
+                            # tuning proven on the SMD prd cluster.
+                            "resources": {
+                                "requests": {"cpu": "200m", "memory": "512Mi"},
+                                "limits": {"memory": "1500Mi"},
+                            },
                         },
                     },
                     "grafana": {"enabled": True, "persistence": {"enabled": False}},
