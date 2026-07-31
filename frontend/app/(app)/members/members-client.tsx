@@ -332,6 +332,14 @@ export function MembersClient() {
   // alongside.
   const teamById = new Map(teamList.map((team) => [team.id, team]));
   const projectById = new Map(projectList.map((project) => [project.id, project]));
+  // APP-scope labels come from the bindings' server-resolved
+  // sourceScopeLabel (the client doesn't load the app list here).
+  const appScopeLabels = new Map<string, string>();
+  for (const b of bindingList) {
+    if (b.scopeKind === "APP" && b.sourceScopeLabel) {
+      appScopeLabels.set(String(b.scopeId), b.sourceScopeLabel);
+    }
+  }
   function scopeLabel(m: AstroliftMember): string {
     if (m.scopeKind === "TEAM") {
       return teamById.get(m.scopeId)?.slug ?? "—";
@@ -342,6 +350,9 @@ export function MembersClient() {
     }
     if (m.scopeKind === "ORG") {
       return "organization";
+    }
+    if (m.scopeKind === "APP") {
+      return appScopeLabels.get(String(m.scopeId)) ?? "app";
     }
     return "—";
   }
@@ -354,6 +365,25 @@ export function MembersClient() {
     arr.push(b);
     bindingsByUser.set(b.user.id, arr);
   }
+
+  // One People row per USER (#1229). A user can hold several Member rows
+  // (ORG plus per-APP rows auto-created by app-scope grants); rendering
+  // one row per membership reads as a duplicate account. Group them:
+  // scopes aggregate into the Scope cell, the ORG row (or the first row)
+  // is the primary for row-click navigation and the row actions, and the
+  // per-scope detail stays visible in the Role bindings table below.
+  const memberGroups = React.useMemo(() => {
+    const byUser = new Map<string, AstroliftMember[]>();
+    for (const m of memberList) {
+      const arr = byUser.get(m.user.id) ?? [];
+      arr.push(m);
+      byUser.set(m.user.id, arr);
+    }
+    return Array.from(byUser.values()).map((rows) => ({
+      rows,
+      primary: rows.find((r) => r.scopeKind === "ORG") ?? rows[0],
+    }));
+  }, [memberList]);
 
   const hasActiveSearch = debouncedSearch.trim().length > 0;
   const invitationList = invitations.data?.astroliftInvitations ?? [];
@@ -431,12 +461,13 @@ export function MembersClient() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {memberList.map((m) => {
+                {memberGroups.map(({ rows, primary }) => {
+                  const m = primary;
                   const userBindings = bindingsByUser.get(m.user.id) ?? [];
-                  const alreadyAnonymized = m.lifecycle === "anonymized";
+                  const alreadyAnonymized = rows.some((r) => r.lifecycle === "anonymized");
                   return (
                     <TableRow
-                      key={m.id}
+                      key={m.user.id}
                       id={`u-${m.user.id}`}
                       tabIndex={0}
                       role="link"
@@ -456,10 +487,14 @@ export function MembersClient() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col items-start gap-1">
-                          <Badge className={scopeBadge[m.scopeKind]} variant="secondary">
-                            {m.scopeKind}
-                          </Badge>
-                          <span className="text-muted-foreground text-xs">{scopeLabel(m)}</span>
+                          {rows.map((r) => (
+                            <div key={r.id} className="flex items-center gap-1.5">
+                              <Badge className={scopeBadge[r.scopeKind]} variant="secondary">
+                                {r.scopeKind}
+                              </Badge>
+                              <span className="text-muted-foreground text-xs">{scopeLabel(r)}</span>
+                            </div>
+                          ))}
                         </div>
                       </TableCell>
                       <TableCell>
