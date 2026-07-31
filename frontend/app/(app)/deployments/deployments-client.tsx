@@ -605,7 +605,9 @@ export function DeploymentsClient() {
       header: t("columns.started"),
       cellClassName: "text-muted-foreground text-sm",
       cell: (d) =>
-        d.startedAt ? new Date(d.startedAt).toLocaleString() : new Date(d.createdAt).toLocaleString(),
+        d.startedAt
+          ? new Date(d.startedAt).toLocaleString()
+          : new Date(d.createdAt).toLocaleString(),
     },
     {
       id: "actions",
