@@ -65,7 +65,10 @@ const config: CodegenConfig = {
     "!graphql/lifecycle/lifecycle.mutations.ts",
     "!graphql/observability/observability.queries.ts",
     "!graphql/operations/alerts.queries.ts",
-    "!graphql/registry/registry.queries.ts",
+    // registry.queries.ts came off this list once its APP_FIELDS /
+    // APP_FRESHNESS_FIELDS constants became the named fragments `AppFields`
+    // and `AppFreshnessFields` (#1230) — the fix this comment prescribes.
+    // Its mutations file still interpolates plain constants and stays out.
     "!graphql/registry/registry.mutations.ts",
     "!graphql/scm/scm.queries.ts",
     "!graphql/services/services.mutations.ts",
