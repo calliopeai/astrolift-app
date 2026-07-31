@@ -104,10 +104,10 @@ const SUMMARY_LIMIT = 100;
  * Tab badge counts + the Runs summary in one round trip.
  *
  * Each badge wants the size of its tab, not the rows in it, so the count
- * aliases ask for `limit: 1` and read `totalCount`. Before #1235 these
- * numbers came from `.length` on a `limit: 100` fetch, which meant every
- * badge silently stopped counting at 100 and the sparkline lost whatever
- * fell off the end.
+ * aliases ask for `limit: 1` and read `totalCount`. These numbers used to
+ * be `.length` on the capped fetch that also drew the table, so they
+ * stopped counting at the cap (100 runs, 200 workloads) and said so with
+ * no hint that they had.
  */
 const JOBS_OVERVIEW = gql`
   query JobsOverview(

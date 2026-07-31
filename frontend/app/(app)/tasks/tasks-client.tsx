@@ -300,10 +300,7 @@ function TemplatesTab({ runningWorkloadId, onRunNow, mutationLoading }: Template
     pollInterval: 60000,
   });
 
-  const taskRows = React.useMemo(
-    () => table.rows.filter((w) => w.kind === "task"),
-    [table.rows]
-  );
+  const taskRows = React.useMemo(() => table.rows.filter((w) => w.kind === "task"), [table.rows]);
 
   // Same controller, guarded rows: the walk — cursor, page size, error and
   // retry — still comes from the server. `state` has to be recomputed or a
