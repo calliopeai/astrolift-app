@@ -59,7 +59,7 @@ function AgentNode({ data }: NodeProps<Node<AgentNodeData>>) {
           )}
         />
         <span className="max-w-[140px] truncate text-sm font-semibold">{data.label}</span>
-        <span className="text-muted-foreground text-[10px] uppercase tracking-wide">
+        <span className="text-muted-foreground text-2xs tracking-wide uppercase">
           {data.active ? `${data.runningCount} running` : "idle"}
         </span>
       </div>
@@ -76,7 +76,7 @@ function ToolNode({ data }: NodeProps<Node<ToolNodeData>>) {
       className={cn(
         "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs shadow-sm transition-colors",
         data.active
-          ? "border-[var(--brand-primary)]/50 bg-card"
+          ? "bg-card border-[var(--brand-primary)]/50"
           : "bg-muted/50 border-border text-muted-foreground"
       )}
     >

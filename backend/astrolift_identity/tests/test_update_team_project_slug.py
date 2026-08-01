@@ -402,9 +402,7 @@ def test_project_slug_available_isolated_across_orgs(team, org, other_org, permi
     permission_resolver.grant(Permission.PROJECT_UPDATE)
     with _ctx(org):
         assert (
-            IdentityQuery().astrolift_project_slug_available(
-                _info(), team_id=str(team.guid), slug="gateway"
-            )
+            IdentityQuery().astrolift_project_slug_available(_info(), team_id=str(team.guid), slug="gateway")
             is True
         )
 

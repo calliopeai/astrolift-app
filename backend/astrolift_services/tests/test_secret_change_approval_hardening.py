@@ -779,9 +779,7 @@ def test_reject_after_approve_flips_stale_vote_row_1214(permission_resolver):
     proposal.refresh_from_db()
     assert proposal.status == "rejected"
 
-    rows = SecretChangeApproval.objects.filter(
-        proposal=proposal, approver=approver, deleted_at__isnull=True
-    )
+    rows = SecretChangeApproval.objects.filter(proposal=proposal, approver=approver, deleted_at__isnull=True)
     assert rows.count() == 1  # flipped in place, not a duplicate row
     row = rows.first()
     assert row.decision == SecretChangeApproval.Decision.REJECTED.value

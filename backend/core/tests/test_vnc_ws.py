@@ -629,9 +629,7 @@ def test_resolve_vnc_runtime_uses_label_discovered_pod(monkeypatch) -> None:
         seen["task_id"] = task_id
         return [_FakePod("agent-task-abc123-x9k2")]  # real pod (Job + hash)
 
-    monkeypatch.setattr(
-        "core.cluster_observability.list_app_pods", _fake_list_app_pods
-    )
+    monkeypatch.setattr("core.cluster_observability.list_app_pods", _fake_list_app_pods)
 
     resolved = cluster_vnc._resolve_vnc_runtime.func(task_guid=str(task.guid))
     assert resolved is not None
