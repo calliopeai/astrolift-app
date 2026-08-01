@@ -161,7 +161,7 @@ def test_instances_list_filters_out_foreign_runs(permission_resolver, monkeypatc
     permission_resolver.grant(Permission.AUDIT_LOG_READ)
     monkeypatch.setattr(
         "astrolift_workflows.schema.queries.list_workflow_instances",
-        lambda **kw: [_row_for("wf-own-list"), _row_for("wf-foreign-list")],
+        lambda **kw: ([_row_for("wf-own-list"), _row_for("wf-foreign-list")], None),
     )
     q = TemporalWorkflowsQuery()
     with _org_tenant(org):
@@ -178,7 +178,7 @@ def test_instances_list_elevated_pair_sees_all(permission_resolver, monkeypatch,
     permission_resolver.grant(Permission.ADMIN_ELEVATE)
     monkeypatch.setattr(
         "astrolift_workflows.schema.queries.list_workflow_instances",
-        lambda **kw: [_row_for("wf-own-list-2"), _row_for("wf-foreign-list-2")],
+        lambda **kw: ([_row_for("wf-own-list-2"), _row_for("wf-foreign-list-2")], None),
     )
     q = TemporalWorkflowsQuery()
     with _org_tenant(org):

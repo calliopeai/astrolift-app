@@ -360,7 +360,7 @@ def _fatal_pod_wait_reason(cluster: Any, namespace: str, task_guid: str) -> str:
     except ClusterObservabilityError:
         return ""
     except Exception:  # noqa: BLE001 — a probe hiccup must not fail the task
-        logger.exception("agent poll: pod health probe failed for %s", task_guid)
+        log.exception("agent poll: pod health probe failed for %s", task_guid)
         return ""
     for pod in pods:
         status = (getattr(pod, "status", "") or "").strip()
