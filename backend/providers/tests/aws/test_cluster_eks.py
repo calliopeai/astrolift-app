@@ -663,11 +663,7 @@ def test_bootstrap_knative_post_install_has_namespace_and_cr(fake_k8s_client) ->
     component = _knative_component(fake_k8s_client)
     manifests = component.post_install_manifests
 
-    ns = next(
-        m
-        for m in manifests
-        if m["kind"] == "Namespace" and m["metadata"]["name"] == "knative-serving"
-    )
+    ns = next(m for m in manifests if m["kind"] == "Namespace" and m["metadata"]["name"] == "knative-serving")
     assert ns["metadata"]["name"] == "knative-serving"
 
     cr = next(m for m in manifests if m["kind"] == "KnativeServing")
@@ -685,17 +681,10 @@ def test_bootstrap_knative_post_install_bundles_vendored_operator(fake_k8s_clien
     manifests = component.post_install_manifests
 
     # The vendored operator Namespace is present (distinct from knative-serving).
-    assert any(
-        m["kind"] == "Namespace" and m["metadata"]["name"] == "knative-operator"
-        for m in manifests
-    )
+    assert any(m["kind"] == "Namespace" and m["metadata"]["name"] == "knative-operator" for m in manifests)
     # The CRD that defines the KnativeServing CR is bundled (from the vendored
     # YAML) so the CR has a registered type to bind to.
-    crd_names = {
-        m["metadata"]["name"]
-        for m in manifests
-        if m["kind"] == "CustomResourceDefinition"
-    }
+    crd_names = {m["metadata"]["name"] for m in manifests if m["kind"] == "CustomResourceDefinition"}
     assert "knativeservings.operator.knative.dev" in crd_names
 
     # And that CRD is authored before the KnativeServing CR in the list, so the
@@ -704,8 +693,9 @@ def test_bootstrap_knative_post_install_bundles_vendored_operator(fake_k8s_clien
         return next(i for i, m in enumerate(manifests) if pred(m))
 
     crd_i = _index(
-        lambda m: m["kind"] == "CustomResourceDefinition"
-        and m["metadata"]["name"] == "knativeservings.operator.knative.dev"
+        lambda m: (
+            m["kind"] == "CustomResourceDefinition" and m["metadata"]["name"] == "knativeservings.operator.knative.dev"
+        )
     )
     cr_i = _index(lambda m: m["kind"] == "KnativeServing")
     assert crd_i < cr_i
@@ -718,10 +708,7 @@ def test_bootstrap_knative_cr_uses_kourier_ingress(fake_k8s_client) -> None:
     cr = next(m for m in component.post_install_manifests if m["kind"] == "KnativeServing")
 
     assert cr["spec"]["ingress"]["kourier"]["enabled"] is True
-    assert (
-        cr["spec"]["config"]["network"]["ingress-class"]
-        == "kourier.ingress.networking.knative.dev"
-    )
+    assert cr["spec"]["config"]["network"]["ingress-class"] == "kourier.ingress.networking.knative.dev"
 
 
 def test_bootstrap_knative_cr_pre_enables_request_logging(fake_k8s_client) -> None:
