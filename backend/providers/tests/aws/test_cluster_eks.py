@@ -700,7 +700,7 @@ def test_bootstrap_knative_post_install_bundles_vendored_operator(fake_k8s_clien
 
     # And that CRD is authored before the KnativeServing CR in the list, so the
     # install path's foundational-first sort keeps it ahead of the CR.
-    def _index(pred):  # noqa: ANN001
+    def _index(pred):
         return next(i for i, m in enumerate(manifests) if pred(m))
 
     crd_i = _index(
