@@ -259,12 +259,48 @@ def ci_deploy(request: HttpRequest, app_slug: str) -> JsonResponse:
     if not declared_workloads:
         declared_workloads = tuple(body.get("image_tags", {}).keys())
 
-    registered_envs: tuple[str, ...] = tuple(
-        AppEnvironment.objects.filter(
-            registered_app=app,
-            deleted_at__isnull=True,
-        ).values_list("name", flat=True)
-    )
+    def _active_env_names() -> tuple[str, ...]:
+        return tuple(
+            AppEnvironment.objects.filter(
+                registered_app=app,
+                deleted_at__isnull=True,
+            ).values_list("name", flat=True)
+        )
+
+    registered_envs: tuple[str, ...] = _active_env_names()
+
+    # Zero environments (#1223). Registration already bootstraps a default
+    # environment, so an app with none either predates that or had its only
+    # env deleted. CI then 400s with "environment is required" — truthful,
+    # but a dead end: there is no environment to name and no way for the
+    # caller to make one. Agent-fleet and deploy-only repos land here.
+    #
+    # Apply the same guarantee registration makes, at the point of use, so
+    # the invariant is "every app is deployable" rather than "every app
+    # registered after the bootstrap landed is deployable". The helper is
+    # idempotent, creates a single ``production`` env bound to the app's
+    # managed cluster, and starts the (workflow-id-guarded) OnboardAppWorkflow
+    # — which such an app needs anyway, since it was never provisioned.
+    if not registered_envs:
+        from astrolift_registry.schema.mutations import _bootstrap_app_environments
+
+        _bootstrap_app_environments(app, [])
+        registered_envs = _active_env_names()
+
+    if not registered_envs:
+        # The bootstrap no-ops when the org has no managed cluster to bind
+        # to. Say that, rather than letting validate_environment ask for an
+        # environment name that cannot exist yet.
+        return JsonResponse(
+            {
+                "detail": (
+                    "app has no environments and none could be created: no managed "
+                    "cluster is available to bind one to. Bring a cluster into "
+                    "management, then retry."
+                )
+            },
+            status=409,
+        )
 
     # Environment default (#1220): the managed workflows don't render an
     # environment name (it would go stale on rename). When the caller

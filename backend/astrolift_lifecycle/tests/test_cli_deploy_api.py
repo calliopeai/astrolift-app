@@ -851,3 +851,89 @@ def test_ci_deploy_accepts_legacy_deploy_scope(app_with_manifest, env, workflow_
     )
     assert r.status_code == 201, r.content
     assert len(workflow_starts) == 1
+
+
+# ---- ci_deploy: apps with no environments (#1223) --------------------
+#
+# Registration bootstraps a default environment, so an app with none either
+# predates that or had its only env deleted. CI then failed with
+# "environment is required" — truthful, but a dead end: there was no
+# environment to name and no way for the caller to create one. Agent-fleet
+# and deploy-only repos (emr-bug-triage) sat there permanently red.
+#
+# The guarantee registration makes is now applied at the point of use, so
+# "every app is deployable" holds for apps registered before it landed too.
+
+
+def test_ci_deploy_bootstraps_a_default_environment_when_the_app_has_none(
+    app_with_manifest, cluster, deploy_token, auth_headers, workflow_starts
+):
+    app_with_manifest.default_tenant_cluster = cluster
+    app_with_manifest.save(update_fields=["default_tenant_cluster", "updated_at", "version"])
+    assert not AppEnvironment.objects.filter(
+        registered_app=app_with_manifest, deleted_at__isnull=True
+    ).exists()
+
+    client = Client()
+    r = _post_json(
+        client,
+        f"/api/cli/v1/apps/{app_with_manifest.slug}/deploy/",
+        # No `environment`: the caller has none to name, which is the whole
+        # point. The managed CI workflow templates don't render one either.
+        _valid_body(environment=""),
+        auth_headers,
+    )
+
+    assert r.status_code == 201, r.content
+    created = AppEnvironment.objects.filter(registered_app=app_with_manifest, deleted_at__isnull=True)
+    assert created.count() == 1
+    assert created.first().name == "production"
+    assert created.first().tenant_cluster_id == cluster.pk
+
+
+def test_ci_deploy_leaves_an_existing_environment_alone(
+    app_with_manifest, env, deploy_token, auth_headers, workflow_starts
+):
+    """The bootstrap must not fire for an app that already has an env, and
+    must not invent a second one alongside it."""
+    client = Client()
+    r = _post_json(
+        client,
+        f"/api/cli/v1/apps/{app_with_manifest.slug}/deploy/",
+        _valid_body(environment=env.name),
+        auth_headers,
+    )
+
+    assert r.status_code == 201, r.content
+    names = set(
+        AppEnvironment.objects.filter(registered_app=app_with_manifest, deleted_at__isnull=True).values_list(
+            "name", flat=True
+        )
+    )
+    assert names == {env.name}
+
+
+def test_ci_deploy_says_why_when_no_cluster_can_back_an_environment(
+    app_with_manifest, deploy_token, auth_headers, workflow_starts
+):
+    """With no managed cluster the bootstrap can't bind an environment, so
+    the request still fails — but naming the real precondition beats asking
+    for an environment name that cannot exist yet."""
+    # Drop the app's reference before deleting the rows — TenantCluster is
+    # PROTECTed by the FKs that point at it.
+    app_with_manifest.default_tenant_cluster = None
+    app_with_manifest.save(update_fields=["default_tenant_cluster", "updated_at", "version"])
+    TenantCluster.objects.all().delete()
+
+    client = Client()
+    r = _post_json(
+        client,
+        f"/api/cli/v1/apps/{app_with_manifest.slug}/deploy/",
+        _valid_body(environment=""),
+        auth_headers,
+    )
+
+    assert r.status_code == 409, r.content
+    detail = json.loads(r.content)["detail"]
+    assert "managed cluster" in detail
+    assert "environment is required" not in detail
