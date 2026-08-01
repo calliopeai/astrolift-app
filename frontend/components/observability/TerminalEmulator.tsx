@@ -64,7 +64,7 @@ export interface TerminalEmulatorProps {
  */
 export function TerminalEmulator(props: TerminalEmulatorProps) {
   const { appSlug, podName, container, command, className } = props;
-  const t = useTranslations("apps.console.terminal");
+  const t = useTranslations("apps.shell.terminal");
 
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const termRef = React.useRef<Terminal | null>(null);
@@ -372,7 +372,7 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
 }
 
 function ConnectionBanner({ state, message }: { state: ConnectionState; message: string | null }) {
-  const t = useTranslations("apps.console.terminal");
+  const t = useTranslations("apps.shell.terminal");
   if (state === "ready" || state === "idle") return null;
 
   let tone: "info" | "warn" | "error" = "info";

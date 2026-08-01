@@ -408,7 +408,6 @@
       "deployments": "Déploiements",
       "workloads": "Workloads",
       "observability": "Observabilité",
-      "console": "Console",
       "previews": "Prévisualisations",
       "domains": "Domaines",
       "secrets": "Secrets",
@@ -429,7 +428,9 @@
         "observe": "Observe",
         "control": "Control",
         "secure": "Secure"
-      }
+      },
+      "logs": "Journaux",
+      "shell": "Shell"
     },
     "workloadDetail": {
       "resourceUsage": {
@@ -1396,70 +1397,6 @@
         "promotion": "promotion"
       }
     },
-    "console": {
-      "title": "{name} · Console",
-      "description": "{slug} · interactive shell into the running workloads",
-      "logs": {
-        "title": "Live logs",
-        "selectPrompt": "Pick a pod to start tailing — sidecars surface under the container picker once a pod is selected.",
-        "podLabel": "Pod",
-        "podPlaceholder": "Pick a pod…"
-      },
-      "terminal": {
-        "title": "In-browser terminal",
-        "description": "Attach a PTY to a chosen pod and container — same backend protocol the CLI uses, no context switch.",
-        "open": "Open shell",
-        "close": "Close shell",
-        "targetDescription": "Ready to attach to {container} in {pod}.",
-        "pickTarget": "Pick a pod + container above to open a shell.",
-        "readyHint": "Click Open shell to attach the terminal.",
-        "ariaLabel": "Interactive pod terminal",
-        "statusConnecting": "Connecting to pod…",
-        "statusReconnecting": "Connection dropped — reconnecting with backoff…",
-        "statusClosed": "Session closed.",
-        "statusDenied": "Permission denied — your role does not include app.exec_pod.",
-        "statusError": "Terminal error — see the log line above for details.",
-        "authExpired": "Session expired — sign in again to resume.",
-        "untilThen": "Or run {cli} locally — the CLI uses the same backend protocol.",
-        "install": "Install the CLI",
-        "manageTokens": "Manage deploy tokens"
-      },
-      "shortcuts": {
-        "title": "CLI shortcuts",
-        "description": "Common commands you'd run against this app. Each one authenticates with your local {login} session.",
-        "openShell": "Open an interactive shell",
-        "djangoCmd": "Run a Django management command",
-        "tailLogs": "Tail logs from the primary workload"
-      },
-      "lands": {
-        "title": "Capabilities",
-        "execLabel": "CLI exec via astro exec",
-        "execNote": "Available today on every connected cluster.",
-        "bridgeLabel": "WebSocket log + exec bridge",
-        "bridgeNote": "Streams the runtime PTY through a permission-gated, audit-logged WebSocket.",
-        "webLabel": "Web terminal",
-        "webNote": "The xterm.js + PTY surface above — reconnects with backoff and replays the last 1000 lines.",
-        "shipped": "shipped"
-      },
-      "copy": "Copy command",
-      "copied": "Copied to clipboard",
-      "copyFailed": "Couldn't copy — clipboard access blocked",
-      "upload": {
-        "title": "Upload script",
-        "description": "Drop a .py / .sql / .sh / .ts / .js / .rb / .go file. We mint a pre-signed URL, push the bytes, and hand you a paste-ready curl + run pair.",
-        "pick": "Upload script",
-        "uploading": "Uploading…",
-        "clear": "Clear uploaded file",
-        "empty": "No file uploaded yet — the command palette below runs unchanged.",
-        "path": "Will land at {path}",
-        "runLabel": "Run command",
-        "fetchLabel": "Fetch into the pod first",
-        "note": "The pre-signed URL is scoped to this upload. Run the fetch command inside the pod before the run command; the bytes are fetched over HTTPS and dropped at /tmp.",
-        "success": "Uploaded {name}",
-        "failed": "Upload failed: {error}",
-        "noUrl": "no pre-signed URL returned"
-      }
-    },
     "secrets": {
       "title": "Secrets",
       "description": "App-level [env] literals + attached bundles + managed-service envelopes for {slug}. Set/delete writes to the staged manifest; push to repo to land.",
@@ -1802,6 +1739,68 @@
         "implementationConfig": "Implementation config (JSON)",
         "jsonHelp": "A JSON object. Leave blank for none.",
         "validAgentSummary": "Valid — {skills, plural, one {# skill} other {# skills}}, {tools, plural, one {# tool} other {# tools}}"
+      }
+    },
+    "logs": {
+      "title": "{name} · Logs",
+      "description": "{slug} · live output from the running workloads",
+      "logs": {
+        "title": "Live logs",
+        "selectPrompt": "Pick a pod to start tailing — sidecars surface under the container picker once a pod is selected.",
+        "podLabel": "Pod",
+        "podPlaceholder": "Pick a pod…"
+      }
+    },
+    "shell": {
+      "title": "{name} · Shell",
+      "description": "{slug} · interactive shell into the running workloads",
+      "podLabel": "Pod",
+      "podPlaceholder": "Pick a pod…",
+      "containerLabel": "Container",
+      "containerPlaceholder": "Pick a container…",
+      "terminal": {
+        "title": "In-browser terminal",
+        "description": "Attach a PTY to a chosen pod and container — same backend protocol the CLI uses, no context switch.",
+        "open": "Open shell",
+        "close": "Close shell",
+        "targetDescription": "Ready to attach to {container} in {pod}.",
+        "pickTarget": "Pick a pod + container above to open a shell.",
+        "readyHint": "Click Open shell to attach the terminal.",
+        "ariaLabel": "Interactive pod terminal",
+        "statusConnecting": "Connecting to pod…",
+        "statusReconnecting": "Connection dropped — reconnecting with backoff…",
+        "statusClosed": "Session closed.",
+        "statusDenied": "Permission denied — your role does not include app.exec_pod.",
+        "statusError": "Terminal error — see the log line above for details.",
+        "authExpired": "Session expired — sign in again to resume.",
+        "untilThen": "Or run {cli} locally — the CLI uses the same backend protocol.",
+        "install": "Install the CLI",
+        "manageTokens": "Manage deploy tokens"
+      },
+      "shortcuts": {
+        "title": "CLI shortcuts",
+        "description": "Common commands you'd run against this app. Each one authenticates with your local {login} session.",
+        "openShell": "Open an interactive shell",
+        "djangoCmd": "Run a Django management command",
+        "tailLogs": "Tail logs from the primary workload"
+      },
+      "copy": "Copy command",
+      "copied": "Copied to clipboard",
+      "copyFailed": "Couldn't copy — clipboard access blocked",
+      "upload": {
+        "title": "Upload script",
+        "description": "Drop a .py / .sql / .sh / .ts / .js / .rb / .go file. We mint a pre-signed URL, push the bytes, and hand you a paste-ready curl + run pair.",
+        "pick": "Upload script",
+        "uploading": "Uploading…",
+        "clear": "Clear uploaded file",
+        "empty": "No file uploaded yet — the command palette below runs unchanged.",
+        "path": "Will land at {path}",
+        "runLabel": "Run command",
+        "fetchLabel": "Fetch into the pod first",
+        "note": "The pre-signed URL is scoped to this upload. Run the fetch command inside the pod before the run command; the bytes are fetched over HTTPS and dropped at /tmp.",
+        "success": "Uploaded {name}",
+        "failed": "Upload failed: {error}",
+        "noUrl": "no pre-signed URL returned"
       }
     }
   },

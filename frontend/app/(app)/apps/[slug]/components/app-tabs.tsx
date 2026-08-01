@@ -103,12 +103,6 @@ const PILLARS: Pillar[] = [
       },
       { label: "jobs", href: (b, s) => at(b, s, "jobs"), match: under("jobs"), legacy: [] },
       {
-        label: "commands",
-        href: (b, s) => at(b, s, "commands"),
-        match: under("commands"),
-        legacy: [],
-      },
-      {
         label: "workloads",
         href: (b, s) => at(b, s, "workloads"),
         match: under("workloads"),
@@ -139,9 +133,12 @@ const PILLARS: Pillar[] = [
         legacy: ["observability"],
       },
       {
-        label: "console",
-        href: (b, s) => at(b, s, "console"),
-        match: under("console"),
+        // Formerly "console", which also carried the shell and the script
+        // upload. Those moved to Control › Shell (#1247); what stayed is the
+        // log stream, and `legacy` keeps old `/console` links resolving here.
+        label: "logs",
+        href: (b, s) => at(b, s, "logs"),
+        match: under("logs"),
         legacy: ["console"],
       },
     ],
@@ -150,6 +147,21 @@ const PILLARS: Pillar[] = [
     key: "control",
     label: "control",
     subs: [
+      {
+        // Acting on a running pod is control, not observability: an
+        // interactive root shell and an arbitrary one-off command belong
+        // beside the other levers, not beside the log tail (#1247).
+        label: "shell",
+        href: (b, s) => at(b, s, "shell"),
+        match: under("shell"),
+        legacy: [],
+      },
+      {
+        label: "commands",
+        href: (b, s) => at(b, s, "commands"),
+        match: under("commands"),
+        legacy: [],
+      },
       {
         label: "domains",
         href: (b, s) => at(b, s, "domains"),
@@ -256,7 +268,7 @@ export function AppTabs({ slug, active }: AppTabsProps) {
       {/* Primary: BROCS pillar bar. */}
       <nav
         aria-label={t("pillarAriaLabel")}
-        className="border-border flex gap-1 overflow-x-auto border-b px-6 scrollbar-none [mask-image:linear-gradient(to_right,transparent_0,black_1.5rem,black_calc(100%-3rem),transparent_100%)]"
+        className="border-border scrollbar-none flex gap-1 overflow-x-auto border-b [mask-image:linear-gradient(to_right,transparent_0,black_1.5rem,black_calc(100%-3rem),transparent_100%)] px-6"
       >
         {PILLARS.map((pillar) => {
           const isActive = pillar.key === activePillar;
@@ -285,7 +297,7 @@ export function AppTabs({ slug, active }: AppTabsProps) {
           when a pillar has a single sub-route. */}
       <nav
         aria-label={t("ariaLabel")}
-        className="border-border bg-muted/30 flex gap-1 overflow-x-auto border-b px-6 scrollbar-none [mask-image:linear-gradient(to_right,transparent_0,black_1.5rem,black_calc(100%-3rem),transparent_100%)]"
+        className="border-border bg-muted/30 scrollbar-none flex gap-1 overflow-x-auto border-b [mask-image:linear-gradient(to_right,transparent_0,black_1.5rem,black_calc(100%-3rem),transparent_100%)] px-6"
       >
         {current.subs.map((sub) => {
           const isActive = sub.label === activeSub;

@@ -10,13 +10,13 @@
  *   from the per-pod ``astroliftPodResourceUsage`` resolver.
  * * Restart count + last-restart timestamp (when the driver SDK
  *   exposes it — null today; falls back to a "—" affordance).
- * * "Open in Console" deep-link to ``/apps/[slug]/console?pod=…``
- *   so an operator drops straight into an interactive shell scoped
- *   to this pod.
+ * * "Open shell" deep-link to ``/apps/[slug]/shell?pod=…`` so an
+ *   operator drops straight into an interactive shell scoped to this
+ *   pod. (Was ``/console`` until the shell moved to Control — #1247.)
  *
  * Empty-state: when Prometheus isn't reachable or the pod's series
  * has dropped (terminated pod), the panel renders a "metrics not
- * flowing" callout but keeps the Open Console + restart-count
+ * flowing" callout but keeps the Open shell + restart-count
  * affordances rendering — those don't depend on Prometheus.
  */
 
@@ -58,7 +58,7 @@ export interface PodExpanderProps {
   podName: string;
   /** Environment to scope the queries to. Null rolls up across envs. */
   environmentName: string | null;
-  /** Container to deep-link the Open Console action at. Falls back to
+  /** Container to deep-link the Open shell action at. Falls back to
    *  the resolver's heuristic default when null. */
   defaultContainer: string | null;
   /** Fallback restart count from the parent table row so the panel
@@ -105,7 +105,7 @@ export function PodExpander({
   const cpuRows = React.useMemo(() => samplesToCpuRows(samples), [samples]);
   const memRows = React.useMemo(() => samplesToMemRows(samples), [samples]);
 
-  const consoleHref = buildConsoleHref({
+  const shellHref = buildShellHref({
     appSlug,
     podName,
     container: defaultContainer,
@@ -130,9 +130,9 @@ export function PodExpander({
           </span>
         </div>
         <Button asChild variant="outline" size="sm">
-          <Link href={consoleHref}>
+          <Link href={shellHref}>
             <TerminalIcon className="size-3" />
-            Open in Console
+            Open shell
           </Link>
         </Button>
       </div>
@@ -147,12 +147,7 @@ export function PodExpander({
           <p className="font-medium">{podEmpty.title}</p>
           <p className="mt-1">{podEmpty.description}</p>
           {data?.reason === "ERROR" && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="mt-3"
-              onClick={() => void q.refetch()}
-            >
+            <Button size="sm" variant="outline" className="mt-3" onClick={() => void q.refetch()}>
               Try again
             </Button>
           )}
@@ -202,7 +197,7 @@ function samplesToMemRows(samples: AstroliftPodResourceUsagePoint[]): ChartRow[]
   }));
 }
 
-function buildConsoleHref(args: {
+function buildShellHref(args: {
   appSlug: string;
   podName: string;
   container: string | null;
@@ -212,7 +207,7 @@ function buildConsoleHref(args: {
   params.set("pod", args.podName);
   if (args.container) params.set("container", args.container);
   if (args.environmentName) params.set("env", args.environmentName);
-  return `/apps/${args.appSlug}/console?${params.toString()}`;
+  return `/apps/${args.appSlug}/shell?${params.toString()}`;
 }
 
 function formatBytes(v: number): string {
@@ -250,11 +245,7 @@ function MiniChart({ title, description, rows, color, yFormatter }: MiniChartPro
               }}
               minTickGap={32}
             />
-            <YAxis
-              tick={{ fontSize: 10 }}
-              tickFormatter={yFormatter}
-              width={64}
-            />
+            <YAxis tick={{ fontSize: 10 }} tickFormatter={yFormatter} width={64} />
             <Tooltip
               formatter={(v: number) => yFormatter(v)}
               labelFormatter={(label: string) => label}

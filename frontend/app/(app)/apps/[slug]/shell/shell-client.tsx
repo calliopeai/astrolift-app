@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useSubscription } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
   BoxIcon,
@@ -9,12 +9,9 @@ import {
   DownloadIcon,
   ExternalLinkIcon,
   FileCode2Icon,
+  LayersIcon,
   Loader2Icon,
-  PauseIcon,
-  PlayIcon,
-  ScrollTextIcon,
   TerminalIcon,
-  Trash2Icon,
   UploadIcon,
   XIcon,
 } from "lucide-react";
@@ -24,7 +21,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/EmptyState";
-import { AppLogExportDialog, LogViewer, TerminalEmulator } from "@/components/observability";
+import { TerminalEmulator } from "@/components/observability";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,9 +34,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LIST_APP_PODS } from "@/graphql/lifecycle/lifecycle.queries";
-import { ON_APP_LOG } from "@/graphql/lifecycle/lifecycle.subscriptions";
-import type { AstroliftAppLogLine, AstroliftAppPod } from "@/graphql/lifecycle/lifecycle.types";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 import { UPLOAD_FILE } from "@/graphql/uploads/uploads.mutations";
@@ -47,160 +41,55 @@ import type { FileUploadResult } from "@/graphql/__generated__/schema";
 
 import { appPath, useAppChrome } from "../components/app-chrome-context";
 import { AppTabs } from "../components/app-tabs";
+import { usePodTarget } from "../components/use-pod-target";
 
 interface AppResp {
   astroliftApp: AstroliftRegisteredApp | null;
 }
 
-interface PodsResp {
-  astroliftAppPods: AstroliftAppPod[];
-}
-
-interface LogResp {
-  astroliftOnAppLog: AstroliftAppLogLine;
-}
-
-// Same defaults the observability page uses — keep them in sync so an
-// operator switching tabs gets identical buffer behaviour.
-const POD_POLL_MS = 5000;
-const LOG_BUFFER_LIMIT = 500;
-const DEFAULT_TAIL_LINES = 200;
-
-const KNOWN_SIDECARS = new Set([
-  "istio-proxy",
-  "envoy",
-  "linkerd-proxy",
-  "datadog-agent",
-  "otel-collector",
-  "otc-container",
-  "newrelic-infrastructure",
-  "fluent-bit",
-  "fluentd",
-  "filebeat",
-  "vault-agent",
-  "vault-agent-init",
-]);
-
-function pickDefaultContainer(
-  containers: string[],
-  workload: string | null | undefined
-): string | null {
-  if (containers.length === 0) return null;
-  if (workload) {
-    const match = containers.find((c) => c === workload);
-    if (match) return match;
-  }
-  const nonSidecar = containers.find((c) => !KNOWN_SIDECARS.has(c));
-  return nonSidecar ?? containers[0];
-}
-
-export function ConsoleClient({ slug }: { slug: string }) {
+/**
+ * Control › Shell — the acting half of what used to be the Console tab
+ * (#1247). An interactive root shell on a running pod, the script upload that
+ * feeds it, and the paste-ready CLI equivalents. Observability sits next door
+ * and stays read-only.
+ */
+export function ShellClient({ slug }: { slug: string }) {
   const chrome = useAppChrome();
   const tCommon = useTranslations("apps.common");
-  const t = useTranslations("apps.console");
+  const t = useTranslations("apps.shell");
   const tObs = useTranslations("apps.observability");
+
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
   const a = app.data?.astroliftApp;
 
-  const pods = useQuery<PodsResp>(LIST_APP_PODS, {
-    variables: { appSlug: slug },
-    pollInterval: POD_POLL_MS,
-    fetchPolicy: "cache-and-network",
-  });
+  const {
+    podRows,
+    selectedPod,
+    setPickedPod,
+    podContainers,
+    selectedContainer,
+    setPickedContainer,
+    podsLoading,
+    noPods,
+  } = usePodTarget(slug);
 
-  const podRows: AstroliftAppPod[] = React.useMemo(
-    () => pods.data?.astroliftAppPods ?? [],
-    [pods.data]
-  );
-
-  const [pickedPod, setPickedPod] = React.useState<string | null>(null);
-  const selectedPod: string | null = React.useMemo(() => {
-    if (pickedPod && podRows.some((p) => p.name === pickedPod)) return pickedPod;
-    const running = podRows.find((p) => p.status === "Running");
-    return running?.name ?? podRows[0]?.name ?? null;
-  }, [pickedPod, podRows]);
-
-  const podContainers: string[] = React.useMemo(() => {
-    const pod = podRows.find((p) => p.name === selectedPod);
-    return pod?.containerStatuses.map((c) => c.name) ?? [];
-  }, [podRows, selectedPod]);
-  const selectedPodWorkload = React.useMemo(
-    () => podRows.find((p) => p.name === selectedPod)?.workload ?? null,
-    [podRows, selectedPod]
-  );
-
-  const [pickedContainer, setPickedContainer] = React.useState<string | null>(null);
-  const selectedContainer: string | null = React.useMemo(() => {
-    if (pickedContainer && podContainers.includes(pickedContainer)) {
-      return pickedContainer;
-    }
-    return pickDefaultContainer(podContainers, selectedPodWorkload);
-  }, [pickedContainer, podContainers, selectedPodWorkload]);
-
-  const [streaming, setStreaming] = React.useState(false);
-  const [logBuffer, setLogBuffer] = React.useState<AstroliftAppLogLine[]>([]);
-
-  // Pre-buffer on open: as soon as a pod resolves flip streaming on once
-  // so the subscription replays the last DEFAULT_TAIL_LINES before following.
-  // A one-shot guard stops the 5s pod poll from re-arming after the operator pauses.
-  const [autoStreamed, setAutoStreamed] = React.useState(false);
-  if (!autoStreamed && selectedPod) {
-    setAutoStreamed(true);
-    setStreaming(true);
-  }
-
-  // App-log export modal — same affordance as the observability tab,
-  // operators on the console page also want to ship a bundle to a
-  // vendor without bouncing tabs. (#483)
-  const [exportOpen, setExportOpen] = React.useState(false);
-
-  // Operator opts into the WS exec connection — keeps an idle
-  // console tab from holding a kubelet exec socket open just
-  // because someone clicked Console while triaging.
+  // Operator opts into the WS exec connection — keeps an idle shell tab from
+  // holding a kubelet exec socket open just because someone clicked through
+  // while triaging.
   const [shellOpen, setShellOpen] = React.useState(false);
-  // Reset the open shell when the pod/container picker changes so
-  // the next click starts a clean session against the new target.
-  const [prevShellKey, setPrevShellKey] = React.useState(
-    `${selectedPod ?? ""}::${selectedContainer ?? ""}`
-  );
+  // Reset the open shell when the pod/container picker changes so the next
+  // click starts a clean session against the new target.
   const shellKey = `${selectedPod ?? ""}::${selectedContainer ?? ""}`;
+  const [prevShellKey, setPrevShellKey] = React.useState(shellKey);
   if (prevShellKey !== shellKey) {
     setPrevShellKey(shellKey);
     if (shellOpen) setShellOpen(false);
   }
 
-  // Reset the buffer whenever the operator switches pod or container.
-  // See: https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes
-  const streamKey = `${selectedPod ?? ""}::${selectedContainer ?? ""}`;
-  const [prevStreamKey, setPrevStreamKey] = React.useState(streamKey);
-  if (prevStreamKey !== streamKey) {
-    setPrevStreamKey(streamKey);
-    if (logBuffer.length !== 0) setLogBuffer([]);
-  }
-
-  useSubscription<LogResp>(ON_APP_LOG, {
-    variables: {
-      appSlug: slug,
-      podName: selectedPod ?? "",
-      container: selectedContainer ?? null,
-      follow: true,
-      tailLines: DEFAULT_TAIL_LINES,
-    },
-    skip: !streaming || !selectedPod,
-    onData: ({ data }) => {
-      const line = data.data?.astroliftOnAppLog;
-      if (!line) return;
-      setLogBuffer((prev) => {
-        const next = [...prev, line];
-        return next.length > LOG_BUFFER_LIMIT ? next.slice(-LOG_BUFFER_LIMIT) : next;
-      });
-    },
-  });
-
-  // #673 — script upload. Operator picks a .py/.sh/.sql/etc. file; we
-  // mint a pre-signed PUT URL via fileUpload, push the bytes to object
-  // storage, and surface the public URL + a paste-ready `curl`/run pair
-  // so the next `astro exec` lands the file at /tmp and runs it.
+  // #673 — script upload. Operator picks a .py/.sh/.sql/etc. file; we mint a
+  // pre-signed PUT URL via fileUpload, push the bytes to object storage, and
+  // surface the public URL + a paste-ready `curl`/run pair so the next
+  // `astro exec` lands the file at /tmp and runs it.
   const [uploadFile, uploadState] = useMutation<{ fileUpload: FileUploadResult }>(UPLOAD_FILE);
   const [uploadedFile, setUploadedFile] = React.useState<{
     name: string;
@@ -263,11 +152,11 @@ export function ConsoleClient({ slug }: { slug: string }) {
     return `curl -fsSL -o /tmp/${uploadedFile.name} '${uploadedFile.publicUrl}'`;
   }, [uploadedFile]);
 
-  // #674 — prefilled command palette. Each shortcut is a frequent
-  // operator action; clicking the row copies the command. Grouped by
-  // intent (shell / runtime / observability / lifecycle) but rendered
-  // flat for now since the list is short. Templates take the app slug
-  // so the command is paste-ready for the current app.
+  // #674 — prefilled command palette. Each shortcut is a frequent operator
+  // action; clicking the row copies the command. Grouped by intent (shell /
+  // runtime / observability / lifecycle) but rendered flat for now since the
+  // list is short. Templates take the app slug so the command is paste-ready
+  // for the current app.
   const sampleCommands = React.useMemo(
     () => [
       // Interactive shell + REPL — fastest way to land inside a pod
@@ -360,9 +249,6 @@ export function ConsoleClient({ slug }: { slug: string }) {
     );
   }
 
-  const podsLoading = pods.loading && podRows.length === 0;
-  const noPods = !podsLoading && podRows.length === 0;
-
   return (
     <PageShell
       title={t("title", { name: a.name })}
@@ -372,118 +258,7 @@ export function ConsoleClient({ slug }: { slug: string }) {
         </span>
       }
     >
-      <AppTabs slug={a.slug} active="console" />
-
-      {/* ─── live logs (pod + container picker + LogViewer) ──────────── */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <ScrollTextIcon className="size-4" /> {t("logs.title")}
-            </CardTitle>
-            <CardDescription>
-              {selectedPod ? (
-                <>
-                  {tObs("logs.streaming")}{" "}
-                  <code className="bg-muted rounded px-1 py-0.5 font-mono text-2xs">
-                    {selectedPod}
-                  </code>{" "}
-                  {tObs("logs.fromCluster")}
-                </>
-              ) : (
-                t("logs.selectPrompt")
-              )}
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5">
-              <BoxIcon aria-hidden="true" className="text-muted-foreground size-3.5" />
-              <Select
-                value={selectedPod ?? ""}
-                onValueChange={(v) => setPickedPod(v)}
-                disabled={podsLoading || noPods}
-              >
-                <SelectTrigger
-                  size="sm"
-                  aria-label={t("logs.podLabel")}
-                  className="font-mono text-xs"
-                >
-                  <SelectValue placeholder={t("logs.podPlaceholder")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {podRows.map((p) => (
-                    <SelectItem key={p.name} value={p.name} className="font-mono">
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setLogBuffer([])}
-              disabled={logBuffer.length === 0}
-            >
-              <Trash2Icon className="size-3" /> {tObs("logs.clear")}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setExportOpen(true)}
-              disabled={!selectedPod}
-              title={tObs("logs.exportTitle")}
-            >
-              <DownloadIcon className="size-3" /> {tObs("logs.export")}
-            </Button>
-            <Button
-              size="sm"
-              variant={streaming ? "outline" : "default"}
-              onClick={() => setStreaming((s) => !s)}
-              disabled={!selectedPod}
-            >
-              {streaming ? (
-                <>
-                  <PauseIcon className="size-3" /> {tObs("logs.pause")}
-                </>
-              ) : (
-                <>
-                  <PlayIcon className="size-3" /> {tObs("logs.stream")}
-                </>
-              )}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {noPods ? (
-            <EmptyState
-              icon={<BoxIcon className="size-5" />}
-              title={tObs("pods.emptyTitle")}
-              description={tObs("pods.emptyDescription")}
-              actionHref={appPath(chrome, a.slug, "deployments")}
-              actionLabel={tObs("pods.emptyAction")}
-            />
-          ) : (
-            <LogViewer
-              lines={logBuffer}
-              appSlug={a.slug}
-              podName={selectedPod}
-              containers={podContainers}
-              selectedContainer={selectedContainer}
-              onContainerChange={setPickedContainer}
-              loading={podsLoading}
-              bufferLimit={LOG_BUFFER_LIMIT}
-              emptyHint={
-                streaming
-                  ? tObs("logs.waiting")
-                  : selectedPod
-                    ? tObs("logs.pressStream")
-                    : tObs("logs.pickPod")
-              }
-            />
-          )}
-        </CardContent>
-      </Card>
+      <AppTabs slug={a.slug} />
 
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
@@ -501,7 +276,52 @@ export function ConsoleClient({ slug }: { slug: string }) {
                 : t("terminal.pickTarget")}
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Pod + container pickers live here now: the Console tab hosted
+                them in the log card's header, and the shell borrowed the
+                selection. Split apart, each surface owns its own target. */}
+            <div className="flex items-center gap-1.5">
+              <BoxIcon aria-hidden="true" className="text-muted-foreground size-3.5" />
+              <Select
+                value={selectedPod ?? ""}
+                onValueChange={(v) => setPickedPod(v)}
+                disabled={podsLoading || noPods}
+              >
+                <SelectTrigger size="sm" aria-label={t("podLabel")} className="font-mono text-xs">
+                  <SelectValue placeholder={t("podPlaceholder")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {podRows.map((p) => (
+                    <SelectItem key={p.name} value={p.name} className="font-mono">
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <LayersIcon aria-hidden="true" className="text-muted-foreground size-3.5" />
+              <Select
+                value={selectedContainer ?? ""}
+                onValueChange={(v) => setPickedContainer(v)}
+                disabled={podContainers.length === 0}
+              >
+                <SelectTrigger
+                  size="sm"
+                  aria-label={t("containerLabel")}
+                  className="font-mono text-xs"
+                >
+                  <SelectValue placeholder={t("containerPlaceholder")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {podContainers.map((c) => (
+                    <SelectItem key={c} value={c} className="font-mono">
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             {shellOpen ? (
               <Button size="sm" variant="outline" onClick={() => setShellOpen(false)}>
                 {t("terminal.close")}
@@ -519,7 +339,15 @@ export function ConsoleClient({ slug }: { slug: string }) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {shellOpen && selectedPod && selectedContainer ? (
+          {noPods ? (
+            <EmptyState
+              icon={<BoxIcon className="size-5" />}
+              title={tObs("pods.emptyTitle")}
+              description={tObs("pods.emptyDescription")}
+              actionHref={appPath(chrome, a.slug, "deployments")}
+              actionLabel={tObs("pods.emptyAction")}
+            />
+          ) : shellOpen && selectedPod && selectedContainer ? (
             <TerminalEmulator
               appSlug={a.slug}
               podName={selectedPod}
@@ -648,41 +476,6 @@ export function ConsoleClient({ slug }: { slug: string }) {
           ))}
         </CardContent>
       </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t("lands.title")}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <Item
-            done
-            label={t("lands.execLabel")}
-            note={t("lands.execNote")}
-            shippedLabel={t("lands.shipped")}
-          />
-          <Item
-            done
-            label={t("lands.bridgeLabel")}
-            note={t("lands.bridgeNote")}
-            shippedLabel={t("lands.shipped")}
-          />
-          <Item
-            done
-            label={t("lands.webLabel")}
-            note={t("lands.webNote")}
-            shippedLabel={t("lands.shipped")}
-          />
-        </CardContent>
-      </Card>
-
-      {/* #483 app-log export modal — vendor handoff + compliance. */}
-      <AppLogExportDialog
-        open={exportOpen}
-        onOpenChange={setExportOpen}
-        appSlug={a.slug}
-        podName={selectedPod}
-        container={selectedContainer}
-      />
     </PageShell>
   );
 }
@@ -702,7 +495,7 @@ function CopyableCommand({ label, command }: { label: string; command: string })
 }
 
 function CopyButton({ value }: { value: string }) {
-  const t = useTranslations("apps.console");
+  const t = useTranslations("apps.shell");
   const [copied, setCopied] = React.useState(false);
   return (
     <Button
@@ -724,39 +517,5 @@ function CopyButton({ value }: { value: string }) {
     >
       {copied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
     </Button>
-  );
-}
-
-function Item({
-  done,
-  label,
-  note,
-  shippedLabel,
-}: {
-  done?: boolean;
-  label: string;
-  note: string;
-  shippedLabel: string;
-}) {
-  return (
-    <div className="flex items-start gap-3">
-      <div
-        className={`mt-1 size-2 shrink-0 rounded-full ${done ? "bg-[var(--brand-primary)]" : "bg-muted-foreground/40"}`}
-      />
-      <div>
-        <div className="text-sm font-medium">
-          {label}
-          {done && (
-            <Badge
-              variant="secondary"
-              className="ml-2 bg-success/15 text-xs text-success-fg"
-            >
-              {shippedLabel}
-            </Badge>
-          )}
-        </div>
-        <div className="text-muted-foreground text-xs">{note}</div>
-      </div>
-    </div>
   );
 }
