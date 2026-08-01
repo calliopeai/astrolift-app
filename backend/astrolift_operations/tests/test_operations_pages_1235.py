@@ -80,25 +80,35 @@ def _events(
 ) -> list[Event]:
     """Insert ``(event_type, seconds_ago)`` rows.
 
-    ``occurred_at`` is ``auto_now_add`` so it can't be set through
-    ``.objects.create()``; ``bulk_create`` bypasses that, which is the
-    only way to get a deterministic stream order.
+    ``occurred_at`` is ``auto_now_add``, and **bulk_create does not bypass
+    that** — Django calls ``DateTimeField.pre_save`` per instance there too,
+    which overwrites the value with ``timezone.now()``. The rows therefore
+    landed with timestamps microseconds apart in list order, so a newest-first
+    read returned the list exactly reversed rather than in ``seconds_ago``
+    order. An interleaved ``a b a b a b`` stream came back ``b a b a b a``.
+
+    ``QuerySet.update`` is the operation that really does skip ``pre_save``,
+    so the intended timestamps are written after the insert.
     """
     now = timezone.now()
-    return Event.objects.bulk_create(
+    rows = Event.objects.bulk_create(
         [
             Event(
                 organization=org,
                 event_type=event_type,
                 payload={},
-                occurred_at=now - dt.timedelta(seconds=seconds_ago),
                 resource_kind=resource_kind,
                 resource_id=resource_id,
                 registered_app=registered_app,
             )
-            for event_type, seconds_ago in specs
+            for event_type, _seconds_ago in specs
         ]
     )
+    for row, (_event_type, seconds_ago) in zip(rows, specs, strict=True):
+        occurred_at = now - dt.timedelta(seconds=seconds_ago)
+        Event.objects.filter(pk=row.pk).update(occurred_at=occurred_at)
+        row.occurred_at = occurred_at
+    return rows
 
 
 def _rule(org: Organization, name: str, **kwargs) -> AlertRule:
