@@ -196,8 +196,16 @@ def test_spawn_without_managed_model_is_unchanged(monkeypatch):
 
 
 def test_spawn_managed_model_spec_env_overrides_injected(monkeypatch):
-    # A spec env var of the same name as an injected one must win — it is
-    # placed AFTER the model env, and k8s takes the later duplicate.
+    # A spec env var of the same name as an injected one must win, and must
+    # be the ONLY entry under that name.
+    #
+    # This test used to assert both entries survived, on the theory that k8s
+    # takes the later duplicate. It doesn't: server-side apply rejects a
+    # container whose env carries duplicate `name` keys with a 500
+    # ("duplicate entries for key") that fails the whole Job POST. That is
+    # why `_dedupe_job_container_env` exists — it collapses by name keeping
+    # the last occurrence, so assembly order still encodes precedence while
+    # the manifest stays applyable.
     driver = _ManagedDriver()
     result, driver = _spawn(
         monkeypatch,
@@ -208,8 +216,13 @@ def test_spawn_managed_model_spec_env_overrides_injected(monkeypatch):
     job = driver.applied[-1]
     env = _pod_spec(job)["containers"][0]["env"]
     region_entries = [e for e in env if e["name"] == "AWS_REGION"]
-    # Both present; the spec's override is the last occurrence.
-    assert [e["value"] for e in region_entries] == ["us-west-2", "eu-west-1"]
+    assert [e["value"] for e in region_entries] == ["eu-west-1"], (
+        "the spec override must win and must be the sole AWS_REGION entry — "
+        "a duplicate name makes server-side apply reject the Job"
+    )
+    # The invariant the dedupe exists to guarantee, stated over the whole env.
+    names = [e["name"] for e in env]
+    assert len(names) == len(set(names)), f"duplicate env names would fail SSA: {names}"
 
 
 def test_spawn_managed_model_provider_failure_surfaces_and_applies_nothing(monkeypatch):

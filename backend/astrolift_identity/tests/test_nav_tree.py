@@ -58,31 +58,54 @@ def test_nav_tree_classifies_primitives():
     org, team, project, app = _scaffold()  # "hello" — 0 workloads → app
 
     agent_app = RegisteredApp.objects.create(
-        organization=org, team=team, project=project,
-        name="EMR Bug Triage", slug="agent-emr", provisioning_status="ready",
+        organization=org,
+        team=team,
+        project=project,
+        name="EMR Bug Triage",
+        slug="agent-emr",
+        provisioning_status="ready",
     )
     Workload.objects.create(
-        registered_app=agent_app, name="emr-bug-triage", slug="emr-bug-triage",
+        registered_app=agent_app,
+        name="emr-bug-triage",
+        slug="emr-bug-triage",
         kind=Workload.Kind.AGENT,
     )
 
     wf_app = RegisteredApp.objects.create(
-        organization=org, team=team, project=project,
-        name="Pipeline", slug="pipeline", provisioning_status="ready",
+        organization=org,
+        team=team,
+        project=project,
+        name="Pipeline",
+        slug="pipeline",
+        provisioning_status="ready",
     )
     Workload.objects.create(
-        registered_app=wf_app, name="wf", slug="wf", kind=Workload.Kind.WORKFLOW,
+        registered_app=wf_app,
+        name="wf",
+        slug="wf",
+        kind=Workload.Kind.WORKFLOW,
     )
 
     bundle_app = RegisteredApp.objects.create(
-        organization=org, team=team, project=project,
-        name="Bundle", slug="bundle", provisioning_status="ready",
+        organization=org,
+        team=team,
+        project=project,
+        name="Bundle",
+        slug="bundle",
+        provisioning_status="ready",
     )
     Workload.objects.create(
-        registered_app=bundle_app, name="web", slug="web", kind=Workload.Kind.DEPLOYMENT,
+        registered_app=bundle_app,
+        name="web",
+        slug="web",
+        kind=Workload.Kind.DEPLOYMENT,
     )
     Workload.objects.create(
-        registered_app=bundle_app, name="cron", slug="cron", kind=Workload.Kind.CRONJOB,
+        registered_app=bundle_app,
+        name="cron",
+        slug="cron",
+        kind=Workload.Kind.CRONJOB,
     )
 
     with tenant_context(TenantContext(organization_id=org.id)):

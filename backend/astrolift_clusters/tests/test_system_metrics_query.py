@@ -205,7 +205,9 @@ def test_system_metrics_happy_path(aws_cluster, org, permission_resolver, monkey
     assert by_metric["latency_p95"].current == pytest.approx(0.12)
 
 
-def test_system_metrics_default_namespace_falls_back_to_system(aws_cluster, org, permission_resolver, monkeypatch):
+def test_system_metrics_default_namespace_falls_back_to_system(
+    aws_cluster, org, permission_resolver, monkeypatch
+):
     """With no apps bound to the cluster, the default namespace resolves
     to 'astrolift-system' and is echoed back so the UI can label the
     panel scope."""
@@ -259,7 +261,9 @@ def test_system_metrics_clamps_range_and_step(aws_cluster, org, permission_resol
     assert captured["end_unix"] - captured["start_unix"] == 300
 
 
-def test_system_metrics_dispatch_failure_returns_unreachable(aws_cluster, org, permission_resolver, monkeypatch):
+def test_system_metrics_dispatch_failure_returns_unreachable(
+    aws_cluster, org, permission_resolver, monkeypatch
+):
     """A ClusterManagementError from the dispatch (no creds, throttled,
     plugin missing) surfaces as available=False / reason='unreachable'."""
     _patch_dispatch(monkeypatch, raises=True)

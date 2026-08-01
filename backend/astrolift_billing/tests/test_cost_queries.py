@@ -481,3 +481,102 @@ def test_cost_snapshots_are_tenant_scoped(permission_resolver):
     with _tenant(org_a):
         out = BillingQuery().astrolift_cost_snapshots(_info(), window=CostWindow.D7)
     assert all(c.amount_cents == 100 for c in out)
+
+
+# ----------------------------------------------------------------------
+# month-to-date is a calendar figure, not a rolling-window one (#1240)
+# ----------------------------------------------------------------------
+
+
+@pytest.fixture
+def frozen_today(monkeypatch):
+    """Pin ``timezone.now()`` so month arithmetic is deterministic.
+
+    The forecast resolver derives every date from "today", so its output
+    depends on the calendar date the suite happens to run on. That is how
+    #1240 stayed hidden: the defect only surfaces on the 31st.
+    """
+
+    def _freeze(day: dt.date):
+        frozen = dt.datetime.combine(day, dt.time(12, 0), tzinfo=dt.UTC)
+        monkeypatch.setattr("django.utils.timezone.now", lambda: frozen)
+
+    return _freeze
+
+
+def test_mtd_covers_the_whole_month_on_the_31st(permission_resolver, frozen_today):
+    """On the 31st the forecast's 30-day window opens on the 2nd, so an
+    MTD summed out of that window drops the 1st entirely. Before the fix
+    this reported 0c MTD and a -100% delta on a month that had spent 2000c
+    — 7 days a year, on every 31-day month."""
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.BILLING_READ)
+    frozen_today(dt.date(2026, 7, 31))
+
+    # Spend on the 1st only: exactly the day the rolling window excludes.
+    _seed_day(org=org, day=dt.date(2026, 7, 1), amount_cents=2000, app=app)
+    _seed_day(org=org, day=dt.date(2026, 6, 1), amount_cents=1000, app=app)
+
+    with _tenant(org):
+        forecast = BillingQuery().astrolift_cost_forecast(_info())
+
+    assert forecast.mtd_cents == 2000
+    assert forecast.previous_month_cents == 1000
+    assert forecast.delta_pct == 100.0
+
+
+def test_mtd_matches_the_month_on_a_mid_month_day(permission_resolver, frozen_today):
+    """The control: mid-month the window comfortably covers the month, so
+    the fix must not change the answer there."""
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.BILLING_READ)
+    frozen_today(dt.date(2026, 7, 15))
+
+    _seed_day(org=org, day=dt.date(2026, 7, 1), amount_cents=2000, app=app)
+    _seed_day(org=org, day=dt.date(2026, 6, 1), amount_cents=1000, app=app)
+
+    with _tenant(org):
+        forecast = BillingQuery().astrolift_cost_forecast(_info())
+
+    assert forecast.mtd_cents == 2000
+    assert forecast.delta_pct == 100.0
+
+
+def test_mtd_excludes_spend_from_before_the_month(permission_resolver, frozen_today):
+    """Aggregating over the month rather than the window must not swing
+    the other way and pull last month's spend into MTD."""
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.BILLING_READ)
+    frozen_today(dt.date(2026, 7, 31))
+
+    # The 30th of June is inside the rolling window but not inside July.
+    _seed_day(org=org, day=dt.date(2026, 6, 30), amount_cents=5000, app=app)
+    _seed_day(org=org, day=dt.date(2026, 7, 10), amount_cents=700, app=app)
+
+    with _tenant(org):
+        forecast = BillingQuery().astrolift_cost_forecast(_info())
+
+    assert forecast.mtd_cents == 700
+
+
+def test_projection_is_never_below_actual_spend(permission_resolver, frozen_today):
+    """A month-end projection below actual month-to-date is not a cautious
+    estimate, it is a wrong one — and the same payload carries both, so the
+    panel would have read "spent 2000c, projected 0c".
+
+    Reached whenever spend stopped more than 14 days ago: the regression
+    window is all zeros, so the resolver bails before adding the actual.
+    """
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.BILLING_READ)
+    frozen_today(dt.date(2026, 7, 31))
+
+    _seed_day(org=org, day=dt.date(2026, 7, 1), amount_cents=2000, app=app)
+
+    with _tenant(org):
+        forecast = BillingQuery().astrolift_cost_forecast(_info())
+
+    assert forecast.mtd_cents == 2000
+    assert forecast.projected_monthly_cents >= forecast.mtd_cents
+    # No signal to regress on, so the estimate is still flagged untrustworthy.
+    assert forecast.confidence == ForecastConfidence.LOW

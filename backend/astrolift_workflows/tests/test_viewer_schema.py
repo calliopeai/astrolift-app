@@ -76,10 +76,11 @@ def test_list_workflow_instances_passes_filters(permission_resolver, settings, m
     permission_resolver.grant(Permission.ADMIN_ELEVATE)
     captured: dict = {}
 
-    def _fake_list(*, workflow_type, status, limit):
+    def _fake_list(*, workflow_type, status, limit, after):
         captured["workflow_type"] = workflow_type
         captured["status"] = status
         captured["limit"] = limit
+        captured["after"] = after
         return [
             {
                 "workflow_id": "DeployAppWorkflow-x",
@@ -91,7 +92,7 @@ def test_list_workflow_instances_passes_filters(permission_resolver, settings, m
                 "duration_seconds": None,
                 "task_queue": "astrolift-main",
             }
-        ]
+        ], None
 
     monkeypatch.setattr("astrolift_workflows.schema.queries.list_workflow_instances", _fake_list)
     q = TemporalWorkflowsQuery()
@@ -99,10 +100,67 @@ def test_list_workflow_instances_passes_filters(permission_resolver, settings, m
         page = q.astrolift_workflow_instances(
             _info(), workflow_type="DeployAppWorkflow", status="RUNNING", limit=10
         )
-    assert captured == {"workflow_type": "DeployAppWorkflow", "status": "RUNNING", "limit": 10}
+    assert captured == {
+        "workflow_type": "DeployAppWorkflow",
+        "status": "RUNNING",
+        "limit": 10,
+        "after": None,
+    }
     assert len(page.items) == 1
     assert page.items[0].workflow_id == "DeployAppWorkflow-x"
     assert page.items[0].duration_seconds is None
+
+
+def test_list_workflow_instances_forwards_the_cursor(permission_resolver, settings, monkeypatch):
+    """#1236: the resolver used to `del after` while the SDL advertised it,
+    so a paging client looped on page one forever. The cursor has to reach
+    the client helper, and Temporal's next token has to reach the caller."""
+    settings.ASTROLIFT_TEMPORAL_ENABLED = True
+    permission_resolver.grant(Permission.AUDIT_LOG_READ)
+    permission_resolver.grant(Permission.ADMIN_ELEVATE)
+    captured: dict = {}
+
+    def _fake_list(*, workflow_type, status, limit, after):
+        captured["after"] = after
+        return [], "cursor-for-page-3"
+
+    monkeypatch.setattr("astrolift_workflows.schema.queries.list_workflow_instances", _fake_list)
+    q = TemporalWorkflowsQuery()
+    with _tenant():
+        page = q.astrolift_workflow_instances(_info(), after="cursor-for-page-2")
+
+    assert captured["after"] == "cursor-for-page-2"
+    assert page.next_cursor == "cursor-for-page-3"
+
+
+def test_scoped_page_can_be_empty_while_more_pages_remain(permission_resolver, settings, monkeypatch):
+    """Ownership filtering happens after the fetch, so a scoped viewer can
+    get an empty page with a live cursor. Clients page until the cursor is
+    null; stopping on a short page would hide their own runs."""
+    settings.ASTROLIFT_TEMPORAL_ENABLED = True
+    permission_resolver.grant(Permission.AUDIT_LOG_READ)
+
+    def _fake_list(*, workflow_type, status, limit, after):
+        return [
+            {
+                "workflow_id": "someone-elses-run",
+                "workflow_type": "DeployAppWorkflow",
+                "status": "RUNNING",
+                "started_at": "2026-05-17T00:00:00+00:00",
+                "closed_at": "",
+                "run_id": "r1",
+                "duration_seconds": None,
+                "task_queue": "astrolift-main",
+            }
+        ], "cursor-for-page-2"
+
+    monkeypatch.setattr("astrolift_workflows.schema.queries.list_workflow_instances", _fake_list)
+    q = TemporalWorkflowsQuery()
+    with _tenant():
+        page = q.astrolift_workflow_instances(_info())
+
+    assert page.items == []
+    assert page.next_cursor == "cursor-for-page-2"
 
 
 def test_instance_detail_returns_none_when_missing(permission_resolver, settings):

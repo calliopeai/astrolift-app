@@ -80,25 +80,45 @@ def _events(
 ) -> list[Event]:
     """Insert ``(event_type, seconds_ago)`` rows.
 
-    ``occurred_at`` is ``auto_now_add`` so it can't be set through
-    ``.objects.create()``; ``bulk_create`` bypasses that, which is the
-    only way to get a deterministic stream order.
+    Two constraints collide here.
+
+    ``occurred_at`` is ``auto_now_add``, and ``bulk_create`` does **not**
+    bypass that — Django calls ``DateTimeField.pre_save`` per instance there
+    too, overwriting the value with ``timezone.now()``. Rows therefore landed
+    microseconds apart in list order, so a newest-first read returned the
+    stream exactly reversed: an interleaved ``a b a b a b`` came back
+    ``b a b a b a``.
+
+    The usual escape — write the timestamps back with ``QuerySet.update``,
+    which does skip ``pre_save`` — is unavailable: ``Event`` is append-only,
+    enforced by a database trigger (migration ``0003_append_only_triggers``,
+    Spec/04 §1 modeling principle 7). ``UPDATE`` is refused outright.
+
+    So the value has to be right at INSERT time, which means turning
+    ``auto_now_add`` off for the duration of the insert. Restored in
+    ``finally`` — the flag lives on the shared field instance, so leaking it
+    would silently disable timestamping for every later test in the process.
     """
     now = timezone.now()
-    return Event.objects.bulk_create(
-        [
-            Event(
-                organization=org,
-                event_type=event_type,
-                payload={},
-                occurred_at=now - dt.timedelta(seconds=seconds_ago),
-                resource_kind=resource_kind,
-                resource_id=resource_id,
-                registered_app=registered_app,
-            )
-            for event_type, seconds_ago in specs
-        ]
-    )
+    occurred_at_field = Event._meta.get_field("occurred_at")
+    occurred_at_field.auto_now_add = False
+    try:
+        return Event.objects.bulk_create(
+            [
+                Event(
+                    organization=org,
+                    event_type=event_type,
+                    payload={},
+                    occurred_at=now - dt.timedelta(seconds=seconds_ago),
+                    resource_kind=resource_kind,
+                    resource_id=resource_id,
+                    registered_app=registered_app,
+                )
+                for event_type, seconds_ago in specs
+            ]
+        )
+    finally:
+        occurred_at_field.auto_now_add = True
 
 
 def _rule(org: Organization, name: str, **kwargs) -> AlertRule:

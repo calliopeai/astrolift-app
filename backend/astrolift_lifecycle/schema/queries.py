@@ -6,6 +6,7 @@ import logging
 from datetime import timedelta
 
 import strawberry
+from django.db.models import Count
 from django.utils import timezone
 from strawberry.types import Info
 
@@ -1336,38 +1337,67 @@ class LifecycleQuery:
         ``latest_deployment_status=None``.
         """
         recent_window = timezone.now() - timedelta(days=7)
-        out: list[AppHealthSummaryType] = []
         # Org-scope the per-app rollup to the caller's tenant — without this
         # it scans every org's apps. Fails closed (empty) when org_id is
         # None (#1183).
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        apps = RegisteredApp.objects.filter(deleted_at__isnull=True, organization_id=org_id).order_by("slug")
-        for app in apps[:300]:
-            env_count = AppEnvironment.objects.filter(registered_app=app, deleted_at__isnull=True).count()
-            latest = (
-                Deployment.objects.filter(registered_app=app, deleted_at__isnull=True)
-                .order_by("-created_at")
-                .first()
-            )
-            has_recent_failure = Deployment.objects.filter(
-                registered_app=app,
+        apps = list(
+            RegisteredApp.objects.filter(deleted_at__isnull=True, organization_id=org_id).order_by("slug")[
+                :300
+            ]
+        )
+        if not apps:
+            return []
+        app_ids = [a.id for a in apps]
+
+        # Four queries total rather than three per app (#1237). This is a
+        # dashboard-path resolver capped at 300 apps, so the loop form was
+        # up to 901 round-trips on one page render. Each rollup is gathered
+        # in one pass and joined in Python; separate queries rather than
+        # annotations on the app queryset so the counts can't multiply
+        # against each other across joins.
+        env_counts = dict(
+            AppEnvironment.objects.filter(registered_app_id__in=app_ids, deleted_at__isnull=True)
+            .values_list("registered_app_id")
+            .annotate(n=Count("id"))
+            .values_list("registered_app_id", "n")
+        )
+
+        # DISTINCT ON gives the newest deployment per app in one query.
+        # Postgres requires the ORDER BY to lead with the DISTINCT ON
+        # expression, hence registered_app_id first.
+        latest_by_app = {
+            d.registered_app_id: d
+            for d in Deployment.objects.filter(registered_app_id__in=app_ids, deleted_at__isnull=True)
+            .order_by("registered_app_id", "-created_at")
+            .distinct("registered_app_id")
+        }
+
+        failed_app_ids = set(
+            Deployment.objects.filter(
+                registered_app_id__in=app_ids,
                 deleted_at__isnull=True,
                 created_at__gte=recent_window,
                 status__in=[
                     Deployment.Status.FAILED.value,
                     Deployment.Status.ROLLED_BACK.value,
                 ],
-            ).exists()
+            ).values_list("registered_app_id", flat=True)
+        )
+
+        out: list[AppHealthSummaryType] = []
+        for app in apps:
+            latest = latest_by_app.get(app.id)
             out.append(
                 AppHealthSummaryType(
                     app_slug=app.slug,
                     app_name=app.name,
-                    environment_count=env_count,
+                    environment_count=env_counts.get(app.id, 0),
                     latest_deployment_status=(latest.status if latest else None),
                     latest_image_tag=(latest.image_tag if latest else ""),
                     last_deployed_at=(latest.created_at if latest else None),
-                    has_recent_failure=has_recent_failure,
+                    has_recent_failure=app.id in failed_app_ids,
                 )
             )
         return out

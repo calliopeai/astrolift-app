@@ -683,7 +683,9 @@ def test_apply_post_install_orders_by_depends_on():
     from astrolift_workflows.activities.install_prereqs import _apply_post_install_manifests
 
     driver = _FakeDriver()
-    a = _pi_component("a", [{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "a", "namespace": "x"}}])
+    a = _pi_component(
+        "a", [{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "a", "namespace": "x"}}]
+    )
     b = _pi_component(
         "b",
         [{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "b", "namespace": "x"}}],
@@ -792,8 +794,12 @@ def test_apply_post_install_non_crd_error_is_best_effort():
         )
 
     driver = _FakeDriver(result_fn)
-    bad = _pi_component("bad", [{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "bad", "namespace": "x"}}])
-    good = _pi_component("good", [{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "good", "namespace": "x"}}])
+    bad = _pi_component(
+        "bad", [{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "bad", "namespace": "x"}}]
+    )
+    good = _pi_component(
+        "good", [{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "good", "namespace": "x"}}]
+    )
 
     crd_not_ready, errors = _apply_post_install_manifests(
         driver, "s", [bad, good], {"bad", "good"}, "astrolift-system"
@@ -839,9 +845,7 @@ def _run_install_sync(monkeypatch, components, driver, selected_keys, overrides=
     import core.cluster_management as cm
     from astrolift_workflows.activities.install_prereqs import _install_cluster_prereqs_sync
 
-    fake_cluster = type(
-        "FakeCluster", (), {"provider_plugin": type("PP", (), {"slug": "test"})()}
-    )()
+    fake_cluster = type("FakeCluster", (), {"provider_plugin": type("PP", (), {"slug": "test"})()})()
 
     class _FakeManager:
         def select_related(self, *a, **k):  # noqa: ANN002, ANN003
