@@ -404,3 +404,37 @@ def test_open_telemetry(request):
 def metrics_view(request):
     from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
     return HttpResponse(generate_latest(), content_type=CONTENT_TYPE_LATEST)
+
+
+def ratelimited(request, exception=None):
+    """Response for a request django-ratelimit blocked (#1248).
+
+    ``RatelimitMiddleware`` routes ``Ratelimited`` here. It pointed at
+    Django's ``permission_denied`` view, so exhausting the GraphQL budget
+    returned a bare **403** — indistinguishable, to both a client and a
+    person reading devtools, from "you lost access to this resource". The
+    browser console filled with `[Apollo] Network error: … status code 403`
+    and the obvious reading was an auth failure.
+
+    429 says what actually happened, and ``Retry-After`` says when to come
+    back. The body is GraphQL-shaped because every rate-limited route here
+    is a GraphQL endpoint, so a client that parses the payload gets a code
+    it can branch on rather than a stack of HTML.
+    """
+    retry_after = getattr(settings, "RATELIMIT_RETRY_AFTER_SECONDS", 60)
+    response = JsonResponse(
+        {
+            "errors": [
+                {
+                    "message": (
+                        "Rate limit exceeded. This is a request-budget limit, "
+                        "not a permission failure — retry after the window rolls."
+                    ),
+                    "extensions": {"code": "RATE_LIMITED", "retryAfterSeconds": retry_after},
+                }
+            ]
+        },
+        status=429,
+    )
+    response["Retry-After"] = str(retry_after)
+    return response
