@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@apollo/client/react";
+import { useSearchParams } from "next/navigation";
 import * as React from "react";
 
 import { LIST_APP_PODS } from "@/graphql/lifecycle/lifecycle.queries";
@@ -68,11 +69,22 @@ export interface PodTarget {
  * which is easy to get subtly wrong twice.
  *
  * Selection is derived, not stored: an explicit pick wins while it still
- * exists in the current pod list, and otherwise falls back. That way a pod
- * being replaced under the operator resolves to a live target instead of
- * pinning a name that no longer exists.
+ * exists in the current pod list, then `?pod=` / `?container=` from the URL,
+ * and otherwise the default. That way a pod being replaced under the operator
+ * resolves to a live target instead of pinning a name that no longer exists —
+ * which matters most for the URL case, since a pod name is inherently
+ * short-lived and a deep link outlives the pod it names (#1250).
  */
 export function usePodTarget(slug: string): PodTarget {
+  // PodExpander deep-links a specific pod ("open shell" / "open logs" on an
+  // expanded pod row). Honouring it is the whole point of the link: without
+  // it the operator picks the misbehaving replica, clicks through, and lands
+  // on whichever pod sorts first — invisibly correct on a single-replica app,
+  // and quietly the wrong target on anything scaled out.
+  const searchParams = useSearchParams();
+  const urlPod = searchParams?.get("pod") || null;
+  const urlContainer = searchParams?.get("container") || null;
+
   const pods = useQuery<PodsResp>(LIST_APP_PODS, {
     variables: { appSlug: slug },
     pollInterval: POD_POLL_MS,
@@ -86,10 +98,14 @@ export function usePodTarget(slug: string): PodTarget {
 
   const [pickedPod, setPickedPod] = React.useState<string | null>(null);
   const selectedPod: string | null = React.useMemo(() => {
-    if (pickedPod && podRows.some((p) => p.name === pickedPod)) return pickedPod;
+    // The URL is a *default*, not a pin: once the operator touches the
+    // picker their choice wins, and the link's pod is dropped as soon as it
+    // stops existing rather than leaving the surface stuck on a dead name.
+    const desired = pickedPod ?? urlPod;
+    if (desired && podRows.some((p) => p.name === desired)) return desired;
     const running = podRows.find((p) => p.status === "Running");
     return running?.name ?? podRows[0]?.name ?? null;
-  }, [pickedPod, podRows]);
+  }, [pickedPod, urlPod, podRows]);
 
   const podContainers: string[] = React.useMemo(() => {
     const pod = podRows.find((p) => p.name === selectedPod);
@@ -103,9 +119,10 @@ export function usePodTarget(slug: string): PodTarget {
 
   const [pickedContainer, setPickedContainer] = React.useState<string | null>(null);
   const selectedContainer: string | null = React.useMemo(() => {
-    if (pickedContainer && podContainers.includes(pickedContainer)) return pickedContainer;
+    const desired = pickedContainer ?? urlContainer;
+    if (desired && podContainers.includes(desired)) return desired;
     return pickDefaultContainer(podContainers, selectedPodWorkload);
-  }, [pickedContainer, podContainers, selectedPodWorkload]);
+  }, [pickedContainer, urlContainer, podContainers, selectedPodWorkload]);
 
   const podsLoading = pods.loading && podRows.length === 0;
 

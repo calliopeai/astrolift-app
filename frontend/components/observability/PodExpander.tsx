@@ -109,7 +109,6 @@ export function PodExpander({
     appSlug,
     podName,
     container: defaultContainer,
-    environmentName,
   });
 
   return (
@@ -201,12 +200,15 @@ function buildShellHref(args: {
   appSlug: string;
   podName: string;
   container: string | null;
-  environmentName: string | null;
 }): string {
   const params = new URLSearchParams();
   params.set("pod", args.podName);
   if (args.container) params.set("container", args.container);
-  if (args.environmentName) params.set("env", args.environmentName);
+  // `env` used to ride along here and nothing ever read it (#1250). The
+  // shell is pod-scoped, not environment-scoped — the pod already fixes the
+  // environment — so an `env` param has nothing to select. Dropped rather
+  // than left inert, since a parameter that looks meaningful and isn't is
+  // how the pod deep-link went unnoticed for so long.
   return `/apps/${args.appSlug}/shell?${params.toString()}`;
 }
 
