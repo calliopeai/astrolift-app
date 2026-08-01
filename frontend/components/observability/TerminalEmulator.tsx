@@ -349,7 +349,14 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
   }, [appSlug, podName, container, commandKey, connect]);
 
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
+    // The height must be *definite*. An auto-height host closes a feedback
+    // loop with the fit addon: fit() sizes `rows` to the host, xterm renders
+    // those rows, the auto-height host grows to fit them, the ResizeObserver
+    // fires, fit() adds more rows — and the terminal walks down the page
+    // forever instead of scrolling inside itself (#1245). A bounded host makes
+    // fit() converge on the first pass and lets .xterm-viewport do the
+    // scrolling. Callers may override the default height via `className`.
+    <div className={cn("flex h-96 min-h-0 flex-col gap-2", className)}>
       <ConnectionBanner state={state} message={errorMessage} />
       <div
         ref={containerRef}
@@ -358,7 +365,7 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
         // exact terminal-canvas background — must match the xterm
         // theme.background literal set above; not tokenizable.
         // eslint-disable-next-line astrolift/no-raw-design-values
-        className="min-h-[20rem] rounded-md border bg-[#0b0f17] p-2 [&_.xterm-viewport]:!overflow-y-auto"
+        className="min-h-0 flex-1 rounded-md border bg-[#0b0f17] p-2 [&_.xterm-viewport]:!overflow-y-auto"
       />
     </div>
   );
