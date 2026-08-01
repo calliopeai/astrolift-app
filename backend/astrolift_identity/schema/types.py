@@ -543,9 +543,7 @@ class NavTreeType:
     unassigned_apps: list[AppSummaryType]
 
 
-def app_to_summary(
-    app, *, primitive_kind: str = "app", primitive_slug: str | None = None
-) -> AppSummaryType:
+def app_to_summary(app, *, primitive_kind: str = "app", primitive_slug: str | None = None) -> AppSummaryType:
     return AppSummaryType(
         id=GUID(str(app.guid)),
         slug=app.slug,

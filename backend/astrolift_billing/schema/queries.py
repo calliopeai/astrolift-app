@@ -438,13 +438,26 @@ def _project_month_end(
     totals: Sequence[tuple[dt.date, int]],
     *,
     today: dt.date,
+    mtd_cents: int,
 ) -> tuple[int, ForecastConfidence]:
     """Linear-regress the last 14 daily totals; extrapolate to
     month-end; sum the MTD portion + extrapolated remainder.
 
+    ``mtd_cents`` is passed in rather than summed out of ``totals``:
+    ``totals`` is a rolling 30-day window, which is one day short of a
+    31-day month, so deriving month-to-date from it drops the 1st on the
+    31st (#1240). The window is for the regression; the month figure comes
+    from the month.
+
     Returns (projected_cents, confidence)."""
+    # The bail-outs floor at money already spent. A month-end projection
+    # below actual month-to-date is not a cautious estimate, it is a wrong
+    # one — and the same payload carries both numbers, so returning 0 next
+    # to a non-zero MTD contradicts itself on screen. Reachable whenever
+    # spend stopped more than 14 days ago, e.g. spend on the 1st read on
+    # the 31st.
     if not totals:
-        return (0, ForecastConfidence.LOW)
+        return (max(0, mtd_cents), ForecastConfidence.LOW)
     recent = list(totals[-14:])
     xs = [float(i) for i in range(len(recent))]
     ys = [float(t[1]) for t in recent]
@@ -453,12 +466,10 @@ def _project_month_end(
     # Bail with LOW confidence so the UI doesn't pretend it has a
     # forecast.
     if not any(y > 0 for y in ys):
-        return (0, ForecastConfidence.LOW)
+        return (max(0, mtd_cents), ForecastConfidence.LOW)
     slope, intercept = _linear_regression_slope_intercept(xs, ys)
 
-    # Build the month: MTD actual (sum of days in current month
-    # we already have) + extrapolated remainder.
-    month_start = today.replace(day=1)
+    # Build the month: MTD actual + extrapolated remainder.
     # last day of current month
     if today.month == 12:
         next_month = today.replace(year=today.year + 1, month=1, day=1)
@@ -466,7 +477,7 @@ def _project_month_end(
         next_month = today.replace(month=today.month + 1, day=1)
     month_end = next_month - dt.timedelta(days=1)
 
-    mtd_actual = sum(c for d, c in totals if month_start <= d <= today)
+    mtd_actual = mtd_cents
     days_remaining = (month_end - today).days
     # Forecast each remaining day by extrapolating the regression
     # one step further. We start at the next x past the regression
@@ -644,10 +655,23 @@ class BillingQuery:
         )
         currency = qs[0].currency if qs else "USD"
         totals = _daily_totals(qs, start=start, end=today)
-        projected, confidence = _project_month_end(totals, today=today)
 
+        # Month-to-date is a calendar-month figure, so it is aggregated over
+        # the month rather than summed out of `totals`. `totals` covers a
+        # rolling 30 days, which is one day short of a 31-day month: on the
+        # 31st its window opens on the 2nd, so a month-to-date derived from
+        # it silently drops whatever was spent on the 1st, and `delta_pct`
+        # and the projection go with it (#1240). Same shape as the
+        # previous-month aggregate below.
         month_start = today.replace(day=1)
-        mtd_cents = sum(c for d, c in totals if month_start <= d <= today)
+        mtd_agg = CostSnapshot.objects.filter(
+            organization_id=tenant.organization_id,
+            taken_at__gte=month_start,
+            taken_at__lte=today,
+        ).aggregate(total=Sum("amount_cents"))
+        mtd_cents = int(mtd_agg["total"] or 0)
+
+        projected, confidence = _project_month_end(totals, today=today, mtd_cents=mtd_cents)
 
         # Previous month: full calendar month
         prev_month_end = month_start - dt.timedelta(days=1)

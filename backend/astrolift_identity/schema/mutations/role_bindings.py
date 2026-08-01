@@ -186,7 +186,6 @@ class RoleBindingMutations:
     def bulk_revoke_astrolift_role_bindings(
         self, info: Info, input: BulkRevokeRoleBindingsInput
     ) -> MutationResultType[_BulkRevokeRoleBindingsPayload]:
-
         ids = list(input.binding_ids or [])
         if not ids:
             return gql_failure(
@@ -300,7 +299,6 @@ class RoleBindingMutations:
     def bulk_assign_astrolift_team_member_roles(
         self, info: Info, input: BulkAssignTeamMemberRolesInput
     ) -> MutationResultType[_BulkAssignTeamMemberRolesPayload]:
-
         member_ids = list(input.member_ids or [])
         if not member_ids:
             return gql_failure(

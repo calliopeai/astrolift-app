@@ -140,27 +140,29 @@ class TemporalWorkflowsQuery:
         """List recent Temporal instances.
 
         Filters: ``workflow_type`` (e.g. ``DeployAppWorkflow``),
-        ``status`` (Temporal ExecutionStatus name). ``after`` is reserved
-        for future Temporal cursor support; today the resolver caps by
-        limit and returns ``next_cursor = null``.
+        ``status`` (Temporal ExecutionStatus name). ``after`` takes the
+        ``next_cursor`` of a previous page — Temporal's own opaque page
+        token — and ``next_cursor`` is ``null`` on the last page (#1236).
 
         Scoped to the caller's org (#1183): a non-elevated
         ``AUDIT_LOG_READ`` holder sees only runs their own org owns; the
         elevated platform-operator pair sees the whole namespace. The
         namespace list is fetched then filtered, so a scoped page can
-        return fewer than ``limit`` rows.
+        return fewer than ``limit`` rows — including zero while
+        ``next_cursor`` is still non-null. Callers page until the cursor
+        is null rather than until a page comes back short.
 
         Returns an empty page when Temporal is disabled — the UI's
         empty state copy handles "no temporal" and "no runs"
         indistinguishably."""
-        del after  # reserved for future cursor wiring
         elevated, caller = _viewer_scope()
         if not elevated and caller is None:
             return WorkflowInstancePageType(items=[], next_cursor=None)
-        rows = list_workflow_instances(
+        rows, next_cursor = list_workflow_instances(
             workflow_type=workflow_type,
             status=status,
             limit=limit,
+            after=after,
         )
         items = []
         for r in rows:
@@ -168,7 +170,7 @@ class TemporalWorkflowsQuery:
             if not _viewer_can_see(wid, elevated=elevated, caller=caller):
                 continue
             items.append(instance_to_type(r, _triggered_by_for(wid, None if elevated else caller)))
-        return WorkflowInstancePageType(items=items, next_cursor=None)
+        return WorkflowInstancePageType(items=items, next_cursor=next_cursor)
 
     @strawberry.field
     @require_permission(Permission.AUDIT_LOG_READ)

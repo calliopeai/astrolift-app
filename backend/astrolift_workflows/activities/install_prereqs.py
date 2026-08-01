@@ -279,9 +279,7 @@ def _ensure_flux_installed(driver, ctx_slug: str) -> None:
 # establish the scope (Namespace) or the type (CRD) that later manifests in
 # the same batch depend on, so a CR that lands in the Namespace / uses the
 # CRD doesn't 404 within one apply pass.
-_POST_INSTALL_FOUNDATIONAL_KINDS: frozenset[str] = frozenset(
-    {"Namespace", "CustomResourceDefinition"}
-)
+_POST_INSTALL_FOUNDATIONAL_KINDS: frozenset[str] = frozenset({"Namespace", "CustomResourceDefinition"})
 
 
 def _order_by_depends_on(components: list) -> list:
@@ -401,8 +399,7 @@ def _apply_post_install_manifests(
             errors.append(str(err))
             if not _flux_crd_missing([err]):
                 log.warning(
-                    "install_cluster_prereqs: post-install %s manifest error "
-                    "(non-fatal): %s",
+                    "install_cluster_prereqs: post-install %s manifest error " "(non-fatal): %s",
                     component.key,
                     err,
                 )

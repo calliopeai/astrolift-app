@@ -80,9 +80,7 @@ def _make_org_app(
     """
     org = Organization.objects.create(name=f"Org {label}", slug=f"org-{label}-pi")
     team = Team.objects.create(organization=org, name="Eng", slug=f"team-{label}-pi")
-    project = Project.objects.create(
-        organization=org, team=team, name="Demo", slug=f"proj-{label}-pi"
-    )
+    project = Project.objects.create(organization=org, team=team, name="Demo", slug=f"proj-{label}-pi")
     cluster = TenantCluster.objects.create(
         organization=org,
         name=f"cluster-{label}",
