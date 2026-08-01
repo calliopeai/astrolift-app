@@ -22,6 +22,8 @@ each call site is that the Temporal client is expensive to construct
 
 from __future__ import annotations
 
+import base64
+import binascii
 import logging
 import threading
 from dataclasses import dataclass
@@ -268,12 +270,27 @@ def list_workflows_for_cluster(
 #   signal_workflow() — generic signal send (already above)
 
 
+def _encode_cursor(token: bytes | None) -> str | None:
+    """Temporal's page token is opaque bytes; GraphQL cursors are strings."""
+    if not token:
+        return None
+    return base64.urlsafe_b64encode(token).decode("ascii")
+
+
+def _decode_cursor(cursor: str | None) -> bytes | None:
+    """Inverse of :func:`_encode_cursor`. Raises on a cursor we didn't mint."""
+    if not cursor:
+        return None
+    return base64.urlsafe_b64decode(cursor.encode("ascii"))
+
+
 @async_to_sync
 async def _list_instances_async(
     workflow_type: str | None,
     status: str | None,
     limit: int,
-) -> list[dict[str, Any]]:
+    after_token: bytes | None,
+) -> tuple[list[dict[str, Any]], str | None]:
     client = await _get_client_async()
     parts: list[str] = []
     if workflow_type:
@@ -286,7 +303,17 @@ async def _list_instances_async(
     query = " AND ".join(parts) if parts else ""
     rows: list[dict[str, Any]] = []
     try:
-        async for run in client.list_workflows(query=query):
+        # One explicit page rather than `async for`: the iterator's own
+        # paging hides the page boundary, and the boundary is exactly what
+        # the caller needs to hand back as a cursor. `fetch_next_page` on a
+        # fresh iterator sends an empty token, i.e. fetches page one.
+        page = client.list_workflows(
+            query=query,
+            page_size=limit,
+            next_page_token=after_token,
+        )
+        await page.fetch_next_page()
+        for run in (page.current_page or ())[:limit]:
             duration_seconds: float | None = None
             if run.start_time and run.close_time:
                 duration_seconds = (run.close_time - run.start_time).total_seconds()
@@ -302,12 +329,11 @@ async def _list_instances_async(
                     "task_queue": getattr(run, "task_queue", "") or "",
                 },
             )
-            if len(rows) >= limit:
-                break
+        next_cursor = _encode_cursor(page.next_page_token)
     except Exception as exc:  # noqa: BLE001
         logger.warning("temporal list_workflows failed: %s", exc)
-        return []
-    return rows
+        return [], None
+    return rows, next_cursor
 
 
 def list_workflow_instances(
@@ -315,15 +341,27 @@ def list_workflow_instances(
     workflow_type: str | None = None,
     status: str | None = None,
     limit: int = 50,
-) -> list[dict[str, Any]]:
+    after: str | None = None,
+) -> tuple[list[dict[str, Any]], str | None]:
     """List recent Temporal instances, optionally filtered.
 
-    Returns ``[]`` when Temporal is disabled or the visibility query
-    fails — keeps the UI render path identical for "no temporal" vs.
-    "no runs"."""
+    Returns ``(rows, next_cursor)``. ``next_cursor`` is Temporal's own
+    opaque page token, base64'd for transport; ``None`` means the last
+    page. Pass it back as ``after`` to get the following page (#1236).
+
+    Returns ``([], None)`` when Temporal is disabled or the visibility
+    query fails — keeps the UI render path identical for "no temporal"
+    vs. "no runs" — and likewise for a cursor we didn't mint, since the
+    alternative is silently serving page one to a client that asked for
+    page five."""
     if not _temporal_enabled():
-        return []
-    return _list_instances_async(workflow_type, status, max(1, min(limit, 200)))
+        return [], None
+    try:
+        after_token = _decode_cursor(after)
+    except (ValueError, binascii.Error):
+        logger.warning("temporal list_workflows got an undecodable cursor")
+        return [], None
+    return _list_instances_async(workflow_type, status, max(1, min(limit, 200)), after_token)
 
 
 @async_to_sync
