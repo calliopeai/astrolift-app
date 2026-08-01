@@ -589,9 +589,7 @@ def test_gate_approved_records_interaction_attributed_to_agent(run, definition):
     _record_human_gate_decision_sync(gate_exec, "approved", user.pk, "ship it")
 
     rows = list(
-        AgentInteraction.objects.filter(
-            agent_task=task, kind=AgentInteraction.Kind.GATE
-        ).order_by("id")
+        AgentInteraction.objects.filter(agent_task=task, kind=AgentInteraction.Kind.GATE).order_by("id")
     )
     # gate-open (pending) then decision (approved).
     assert [r.status for r in rows] == ["pending", "approved"]
@@ -637,18 +635,27 @@ def test_gate_attributes_to_nearest_preceding_agent_stage(run, agent_workload):
         is_enabled=True,
     )
     WorkflowStage.objects.create(
-        slug="tag-s0", definition=wd, order=0,
+        slug="tag-s0",
+        definition=wd,
+        order=0,
         kind=WorkflowStage.StageKind.AGENT_DISPATCH,
-        agent_definition=agent_workload, timeout_seconds=120,
+        agent_definition=agent_workload,
+        timeout_seconds=120,
     )
     WorkflowStage.objects.create(
-        slug="tag-s1", definition=wd, order=1,
+        slug="tag-s1",
+        definition=wd,
+        order=1,
         kind=WorkflowStage.StageKind.AGENT_DISPATCH,
-        agent_definition=agent_workload, timeout_seconds=120,
+        agent_definition=agent_workload,
+        timeout_seconds=120,
     )
     WorkflowStage.objects.create(
-        slug="tag-s2", definition=wd, order=2,
-        kind=WorkflowStage.StageKind.HUMAN_GATE, timeout_seconds=300,
+        slug="tag-s2",
+        definition=wd,
+        order=2,
+        kind=WorkflowStage.StageKind.HUMAN_GATE,
+        timeout_seconds=300,
     )
 
     _, task0 = _dispatch_agent_stage(run, wd, 0)

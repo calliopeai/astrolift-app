@@ -85,7 +85,6 @@ class EnvironmentSettingMutations:
         info: Info,
         input: ClearEnvironmentSettingInput,
     ) -> MutationResultType[EnvironmentSettingType]:
-
         tenant = get_current_tenant()
         env = (
             AppEnvironment.objects.select_related("registered_app")

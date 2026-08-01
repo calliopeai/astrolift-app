@@ -53,7 +53,9 @@ def _info():
 
 
 def _put_result(sha="side-commit"):
-    return SimpleNamespace(commit_sha=sha, file_path=".github/workflows/astrolift-ci.yml", web_url="https://x")
+    return SimpleNamespace(
+        commit_sha=sha, file_path=".github/workflows/astrolift-ci.yml", web_url="https://x"
+    )
 
 
 def _scaffold(org, *, source_kind: str = "github", source_repo: str = "acme/api", slug: str = "hello-app"):
@@ -443,7 +445,9 @@ def test_reconcile_bitbucket_unsupported(monkeypatch, org, permission_resolver):
     # A direct write would clobber the operator's edits — must never happen.
     monkeypatch.setattr(
         "astrolift_scm.services.workflow_sync.put_file",
-        lambda *a, **kw: (_ for _ in ()).throw(AssertionError("must not direct-write on bitbucket reconcile")),
+        lambda *a, **kw: (_ for _ in ()).throw(
+            AssertionError("must not direct-write on bitbucket reconcile")
+        ),
     )
 
     with tenant_context(TenantContext(organization_id=org.id)):
