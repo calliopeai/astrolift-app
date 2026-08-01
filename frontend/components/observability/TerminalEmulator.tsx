@@ -3,6 +3,7 @@
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Terminal } from "@xterm/xterm";
+import { ExternalLinkIcon, Maximize2Icon, Minimize2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
@@ -38,6 +39,14 @@ type ConnectionState =
 const MAX_BACKOFF_MS = 30_000;
 const INITIAL_BACKOFF_MS = 500;
 
+/** Drag bounds. Below the minimum a PTY is unusable; the maximum is the
+ *  viewport less enough room to still reach the handle. */
+const MIN_HEIGHT_PX = 192;
+const HEIGHT_VIEWPORT_MARGIN_PX = 120;
+
+/** Per-app so an operator's preferred height follows the app, not the tab. */
+const heightStorageKey = (appSlug: string) => `astrolift.terminal.height.${appSlug}`;
+
 export interface TerminalEmulatorProps {
   appSlug: string;
   /** Pod name — encoded into the WS path. */
@@ -46,6 +55,12 @@ export interface TerminalEmulatorProps {
   container: string;
   /** Command (defaults to ``["sh"]`` server-side if empty). */
   command?: string[];
+  /**
+   * The terminal is the whole page (the popped-out window). Drops the
+   * resize handle, the expand toggle and the pop-out button: the OS window
+   * already does all three, and a pop-out button inside a pop-out is a loop.
+   */
+  standalone?: boolean;
   className?: string;
 }
 
@@ -61,11 +76,20 @@ export interface TerminalEmulatorProps {
  * the server-side ring buffer catches the terminal up before
  * resuming live IO. Typed input that landed *during* the dead window
  * is queued locally and flushed once the new session is ``ready``.
+ *
+ * Sizing (#1246): the operator can drag the bottom edge, expand to fill the
+ * viewport, or pop the session out into its own OS window. Expanding is a
+ * CSS state change on the element the terminal already lives in — the node
+ * is never reparented and the component never unmounts, so the exec socket
+ * and the scrollback survive it. Popping out cannot preserve the socket (a
+ * separate window is a separate React tree), so it opens a fresh session and
+ * leans on the server-side ring buffer's ``replay`` to open warm.
  */
 export function TerminalEmulator(props: TerminalEmulatorProps) {
-  const { appSlug, podName, container, command, className } = props;
+  const { appSlug, podName, container, command, standalone, className } = props;
   const t = useTranslations("apps.shell.terminal");
 
+  const wrapperRef = React.useRef<HTMLDivElement | null>(null);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const termRef = React.useRef<Terminal | null>(null);
   const fitRef = React.useRef<FitAddon | null>(null);
@@ -77,6 +101,96 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
 
   const [state, setState] = React.useState<ConnectionState>("idle");
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [expanded, setExpanded] = React.useState(false);
+  // The inline height in force before expanding, so collapsing puts the
+  // operator back exactly where they were rather than at the default.
+  const collapsedHeightRef = React.useRef<string>("");
+
+  // Height is written straight to the node instead of held in state: it
+  // changes on every pointermove during a drag, and re-rendering a terminal
+  // at pointer rate is both pointless and janky. It also keeps the restored
+  // height out of the SSR markup, so there's no hydration mismatch.
+  React.useLayoutEffect(() => {
+    if (standalone) return;
+    const el = wrapperRef.current;
+    if (!el) return;
+    const stored = Number(window.localStorage.getItem(heightStorageKey(appSlug)));
+    if (Number.isFinite(stored) && stored >= MIN_HEIGHT_PX) {
+      el.style.height = `${Math.min(stored, maxHeightPx())}px`;
+    }
+  }, [appSlug, standalone]);
+
+  // Escape is the universal "give me my page back" for a full-viewport
+  // overlay; without it the expanded terminal swallows the whole screen and
+  // the only way out is the toolbar button.
+  React.useEffect(() => {
+    if (!expanded) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setExpanded(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [expanded]);
+
+  const toggleExpanded = React.useCallback(() => {
+    const el = wrapperRef.current;
+    setExpanded((prev) => {
+      if (!el) return !prev;
+      if (prev) {
+        // Collapsing — put the dragged height back.
+        el.style.height = collapsedHeightRef.current;
+      } else {
+        // Expanding — `inset-0` supplies the height, so an explicit one
+        // would fight it. Remember it and get out of the way.
+        collapsedHeightRef.current = el.style.height;
+        el.style.height = "";
+      }
+      return !prev;
+    });
+  }, []);
+
+  const onResizeStart = React.useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const el = wrapperRef.current;
+      if (!el) return;
+      e.preventDefault();
+      const startY = e.clientY;
+      const startHeight = el.getBoundingClientRect().height;
+      let latest = startHeight;
+      const onMove = (ev: PointerEvent) => {
+        latest = Math.min(
+          Math.max(startHeight + ev.clientY - startY, MIN_HEIGHT_PX),
+          maxHeightPx()
+        );
+        el.style.height = `${latest}px`;
+      };
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        // Persist what the drag computed rather than re-measuring: same
+        // number, minus a forced reflow on every pointer release.
+        window.localStorage.setItem(heightStorageKey(appSlug), String(Math.round(latest)));
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    },
+    [appSlug]
+  );
+
+  /**
+   * Open the session in its own OS window. The window is *named* after the
+   * target, so clicking pop-out again focuses the window already showing
+   * this pod instead of stacking duplicates.
+   */
+  const onPopOut = React.useCallback(() => {
+    const params = new URLSearchParams({ pod: podName, container });
+    if (command && command.length > 0) params.set("command", command.join(" "));
+    window.open(
+      `/terminal/${encodeURIComponent(appSlug)}?${params.toString()}`,
+      `astrolift-shell-${appSlug}-${podName}-${container}`,
+      "popup=yes,width=960,height=620"
+    );
+  }, [appSlug, podName, container, command]);
 
   // Lifetime: one xterm per mount, reused across reconnects.
   React.useEffect(() => {
@@ -356,18 +470,90 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
     // forever instead of scrolling inside itself (#1245). A bounded host makes
     // fit() converge on the first pass and lets .xterm-viewport do the
     // scrolling. Callers may override the default height via `className`.
-    <div className={cn("flex h-96 min-h-0 flex-col gap-2", className)}>
+    //
+    // Expanding only swaps these classes: the element is never reparented, so
+    // the xterm instance and its WebSocket ride through untouched (#1246).
+    <div
+      ref={wrapperRef}
+      className={cn(
+        "flex min-h-0 flex-col gap-2",
+        expanded && "bg-background fixed inset-0 z-50 p-4",
+        // Standalone fills whatever the window gives it; the default height
+        // only applies to the inline, in-page case.
+        !expanded && !standalone && "h-96",
+        className
+      )}
+    >
       <ConnectionBanner state={state} message={errorMessage} />
-      <div
-        ref={containerRef}
-        role="region"
-        aria-label={t("ariaLabel")}
-        // exact terminal-canvas background — must match the xterm
-        // theme.background literal set above; not tokenizable.
-        // eslint-disable-next-line astrolift/no-raw-design-values
-        className="min-h-0 flex-1 rounded-md border bg-[#0b0f17] p-2 [&_.xterm-viewport]:!overflow-y-auto"
-      />
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={containerRef}
+          role="region"
+          aria-label={t("ariaLabel")}
+          // exact terminal-canvas background — must match the xterm
+          // theme.background literal set above; not tokenizable.
+          // eslint-disable-next-line astrolift/no-raw-design-values
+          className="h-full w-full rounded-md border bg-[#0b0f17] p-2 [&_.xterm-viewport]:!overflow-y-auto"
+        />
+        {!standalone && (
+          <div className="absolute top-2 right-3 flex items-center gap-1 opacity-40 transition-opacity focus-within:opacity-100 hover:opacity-100">
+            <TerminalToolbarButton onClick={onPopOut} label={t("popOut")}>
+              <ExternalLinkIcon className="size-3.5" />
+            </TerminalToolbarButton>
+            <TerminalToolbarButton
+              onClick={toggleExpanded}
+              label={expanded ? t("collapse") : t("expand")}
+            >
+              {expanded ? (
+                <Minimize2Icon className="size-3.5" />
+              ) : (
+                <Maximize2Icon className="size-3.5" />
+              )}
+            </TerminalToolbarButton>
+          </div>
+        )}
+      </div>
+      {!standalone && !expanded && (
+        // Expanded the drag handle is meaningless (the viewport sets the
+        // height), and standalone hands resizing to the OS window.
+        <div
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label={t("resizeHandle")}
+          onPointerDown={onResizeStart}
+          className="group flex h-2 shrink-0 cursor-ns-resize items-center justify-center"
+        >
+          <div className="bg-border group-hover:bg-muted-foreground h-0.5 w-10 rounded-full transition-colors" />
+        </div>
+      )}
     </div>
+  );
+}
+
+/** Largest height that still leaves the drag handle reachable. */
+function maxHeightPx(): number {
+  return Math.max(MIN_HEIGHT_PX, window.innerHeight - HEIGHT_VIEWPORT_MARGIN_PX);
+}
+
+function TerminalToolbarButton({
+  onClick,
+  label,
+  children,
+}: {
+  onClick: () => void;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="rounded-md border border-slate-700 bg-slate-900/80 p-1.5 text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-100"
+    >
+      {children}
+    </button>
   );
 }
 

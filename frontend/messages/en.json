@@ -1806,7 +1806,11 @@
         "authExpired": "Session expired — sign in again to resume.",
         "untilThen": "Or run {cli} locally — the CLI uses the same backend protocol.",
         "install": "Install the CLI",
-        "manageTokens": "Manage deploy tokens"
+        "manageTokens": "Manage deploy tokens",
+        "expand": "Expand to full screen",
+        "collapse": "Exit full screen (Esc)",
+        "popOut": "Open in a separate window",
+        "resizeHandle": "Drag to resize the terminal"
       },
       "shortcuts": {
         "title": "CLI shortcuts",
