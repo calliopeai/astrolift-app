@@ -124,7 +124,12 @@ jobs:
       - name: Run migrations
         run: pipenv run python manage.py migrate --noinput
       - name: Run tests
-        run: pipenv run pytest -x
+        # Not `-x`. Halting at the first failure is why the suite's real state
+        # stayed unknown for weeks: one failure masks every one behind it, so
+        # each fix buys exactly one more data point. Running to completion
+        # reports the whole set at once, which is what attributing the backlog
+        # in #1244 actually needs. `-rf` prints the FAILED list for diffing.
+        run: pipenv run pytest -q --tb=short -rf
 
   typecheck:
     name: typecheck
