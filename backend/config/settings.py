@@ -859,7 +859,27 @@ REST_FRAMEWORK = {
 }
 
 # Rate limiting
-RATELIMIT_VIEW = "django.views.defaults.permission_denied"
+# django-ratelimit renders this view when a request is blocked. Django's
+# permission_denied view returned a bare 403, which reads as "you lost
+# access" rather than "you spent your budget" (#1248).
+RATELIMIT_VIEW = "config.views.ratelimited"
+RATELIMIT_RETRY_AFTER_SECONDS = int(env_str("RATELIMIT_RETRY_AFTER_SECONDS", "60"))
+
+# Per-user (or per-IP when anonymous) budget for the GraphQL endpoint.
+#
+# This was a hardcoded 100/m, which the UI exceeded on its own: ~98 polled
+# queries exist in the frontend, ~21 of them at 5s or faster, and a single
+# page such as clusters/[slug]/status mounts about seven at once. One
+# operator on one dashboard could exhaust the window without doing anything
+# unusual, and then *every* request 403'd until it rolled — including the
+# app-shell query, so the whole UI appeared to break.
+#
+# 600/m is 10 requests/second sustained per user: comfortable for a polling
+# dashboard, still tight enough to stop a runaway client loop. Tune via env
+# without a code change; the auth endpoint keeps its own tighter budget
+# since it is unauthenticated and brute-forceable.
+RATELIMIT_GRAPHQL_RATE = env_str("RATELIMIT_GRAPHQL_RATE", "600/m")
+RATELIMIT_GRAPHQL_AUTH_RATE = env_str("RATELIMIT_GRAPHQL_AUTH_RATE", "30/m")
 
 # Temporal — durable workflow runtime
 TEMPORAL_ADDRESS = env_str("TEMPORAL_ADDRESS", "localhost:7233")

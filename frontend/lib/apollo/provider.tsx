@@ -22,6 +22,20 @@ function makeClient(): ApolloClient {
   return new ApolloClient({
     link: buildClientLinks(httpLink),
     cache: getClientCache(),
+    defaultOptions: {
+      watchQuery: {
+        // Don't poll a tab nobody is looking at (#1248). There are ~98
+        // polled queries across the UI, ~21 of them at 5s or faster, and a
+        // page like clusters/[slug]/status mounts about seven at once. Left
+        // running in background tabs they spend the server-side request
+        // budget on data no one can see — and when that budget runs out the
+        // *foreground* tab starts failing, including the app-shell query.
+        //
+        // Set as a client default rather than per-query: the point is that
+        // no future polled query has to remember to opt in.
+        skipPollAttempt: () => typeof document !== "undefined" && document.hidden,
+      },
+    },
   });
 }
 
