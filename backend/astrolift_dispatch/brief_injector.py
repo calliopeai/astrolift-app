@@ -72,10 +72,7 @@ def _kickoff_prompt(task: AgentTask) -> str:
     run and threads through the per-dispatch trigger input (batch size, backfill
     mode, etc.) when one was supplied on ``runAstroliftAgent``.
     """
-    base = (
-        "Begin your task now, following your system instructions. "
-        "Work it to completion, then stop."
-    )
+    base = "Begin your task now, following your system instructions. " "Work it to completion, then stop."
     payload = getattr(task, "dispatch_input", None)
     if payload:
         return f"{base} Trigger input (JSON): {json.dumps(payload, separators=(',', ':'))}"

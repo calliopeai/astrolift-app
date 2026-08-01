@@ -543,9 +543,4 @@ def test_cancel_signal_capture_failure_does_not_break_cancel(
 
     task.refresh_from_db()
     assert task.status == AgentTask.Status.CANCELLED
-    assert (
-        AgentInteraction.objects.filter(
-            agent_task=task, kind=AgentInteraction.Kind.SIGNAL
-        ).count()
-        == 0
-    )
+    assert AgentInteraction.objects.filter(agent_task=task, kind=AgentInteraction.Kind.SIGNAL).count() == 0

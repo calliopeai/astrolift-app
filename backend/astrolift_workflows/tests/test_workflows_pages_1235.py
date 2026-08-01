@@ -430,7 +430,12 @@ def test_definitions_search_narrows_total_count_not_just_the_page(org, permissio
         matched = query.workflow_definitions_page(_info(), search="pipeline", limit=1)
         by_slug = query.workflow_definitions_page(_info(), search="defpage-s-gamma", limit=50)
 
-    assert unfiltered.total_count == 3
+    # Not a literal 3: migration 0006 seeds a platform-global catalogue into
+    # every test database and `visible_to_org` returns those too, so the
+    # unfiltered count is "everything visible", not "everything this test
+    # made". Derived from the DB for the same reason `_db_definition_order`
+    # is — a hard-coded count silently tracks the size of the seed data.
+    assert unfiltered.total_count == len(_db_definition_order(org))
     assert len(matched.items) == 1
     assert matched.total_count == 2, "the count ignored the search term"
     assert set(_walk_definitions(query, org, limit=1, search="pipeline")) == {
@@ -464,7 +469,11 @@ def test_definition_with_a_null_name_stays_reachable(org, permission_resolver):
     guids = _walk_definitions(WorkflowsQuery(), org, limit=1)
 
     assert str(unnamed.guid) in guids, "the NULL-named row fell off the end of the walk"
-    assert set(guids) == {str(d.guid) for d in named} | {str(unnamed.guid)}
+    # Every row this test created has to survive the walk. Not set *equality*:
+    # the seeded platform-global catalogue is visible to this org too, so the
+    # walk legitimately returns more than what the test made. The exact
+    # contents and ordering are pinned on the next line, against the DB.
+    assert {str(d.guid) for d in named} | {str(unnamed.guid)} <= set(guids)
     assert guids == _db_definition_order(org)
 
 

@@ -336,9 +336,7 @@ def _poll_agent_task_sync(task_pk: int) -> dict[str, Any]:
 # it becomes ImagePullBackOff once genuinely stuck) and CrashLoopBackOff (the
 # container DID start and its exit is captured through the Job's Failed
 # condition / exit code path).
-_FATAL_POD_WAIT_REASONS = frozenset(
-    {"ImagePullBackOff", "InvalidImageName", "CreateContainerConfigError"}
-)
+_FATAL_POD_WAIT_REASONS = frozenset({"ImagePullBackOff", "InvalidImageName", "CreateContainerConfigError"})
 
 
 def _fatal_pod_wait_reason(cluster: Any, namespace: str, task_guid: str) -> str:
@@ -362,7 +360,7 @@ def _fatal_pod_wait_reason(cluster: Any, namespace: str, task_guid: str) -> str:
     except ClusterObservabilityError:
         return ""
     except Exception:  # noqa: BLE001 — a probe hiccup must not fail the task
-        logger.exception("agent poll: pod health probe failed for %s", task_guid)
+        log.exception("agent poll: pod health probe failed for %s", task_guid)
         return ""
     for pod in pods:
         status = (getattr(pod, "status", "") or "").strip()

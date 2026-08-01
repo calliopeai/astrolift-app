@@ -635,9 +635,7 @@ def _assert_soft_deleted(row):
     assert cls.all_objects.get(pk=row.pk).deleted_at is not None
 
 
-def test_soft_delete_records_covers_every_per_app_owned_row(
-    app, org, project, team, actor, cluster
-):
+def test_soft_delete_records_covers_every_per_app_owned_row(app, org, project, team, actor, cluster):
     """#1213: the final soft-delete pass soft-deletes EVERY per-app-owned row
     (FK- and slug-linked), not just the original handful — while a second
     app's identical rows and org-scoped (null-FK) rows are left untouched."""
@@ -687,9 +685,7 @@ def test_soft_delete_records_covers_every_per_app_owned_row(
     assert app.deleted_at is not None
 
 
-def test_soft_delete_records_expires_app_log_export_download(
-    app, org, project, team
-):
+def test_soft_delete_records_expires_app_log_export_download(app, org, project, team):
     """#1213: AppLogExport has no soft-delete field, so the pass revokes its
     live download credential (status→EXPIRED, expires_at→now, which the
     download view treats as a 404) rather than soft-deleting the row. A second
@@ -735,9 +731,7 @@ def test_soft_delete_records_expires_app_log_export_download(
     assert export.status == AppLogExport.Status.EXPIRED
 
 
-def test_soft_delete_records_retains_audit_and_org_owned_rows(
-    app, org, project, team, cluster
-):
+def test_soft_delete_records_retains_audit_and_org_owned_rows(app, org, project, team, cluster):
     """#1213: telemetry/history rows (WorkflowRun, AppUptimeResult) and
     org-owned rows that only *reference* the app via a nullable SET_NULL FK
     (Pipeline, Brief) are NOT soft-deleted — they are designed to outlive the

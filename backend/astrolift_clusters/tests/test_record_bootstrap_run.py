@@ -315,20 +315,28 @@ def test_last_bootstrap_run_returns_most_recent(cluster, org, permission_resolve
     )
 
     cluster_type = cluster_to_type(cluster)
-    latest = cluster_type.last_bootstrap_run()
+    # These resolvers re-scope by caller org (#1183) and fail closed when
+    # there is no tenant, so they have to be called inside one — without it
+    # they answer None for every cluster and the assertions below can only
+    # pass by accident.
+    with _ctx(org):
+        latest = cluster_type.last_bootstrap_run()
+        history = cluster_type.bootstrap_runs(limit=10)
+
     assert latest is not None
     assert str(latest.id) == str(newer.guid)
     assert latest.status == "succeeded"
     assert latest.chart_version == "astrolift-0.42.0"
-
-    history = cluster_type.bootstrap_runs(limit=10)
     assert [str(r.id) for r in history] == [str(newer.guid), str(older.guid)]
 
 
 def test_last_bootstrap_run_is_none_when_no_history(cluster, org):
     cluster_type = cluster_to_type(cluster)
-    assert cluster_type.last_bootstrap_run() is None
-    assert cluster_type.bootstrap_runs() == []
+    # Inside a tenant context, so this asserts "no runs recorded" rather
+    # than passing on the fail-closed path and hiding a real regression.
+    with _ctx(org):
+        assert cluster_type.last_bootstrap_run() is None
+        assert cluster_type.bootstrap_runs() == []
 
 
 def test_bootstrap_runs_respects_limit(cluster, org):
@@ -346,5 +354,6 @@ def test_bootstrap_runs_respects_limit(cluster, org):
             ended_at=base + dt.timedelta(hours=i, minutes=2),
         )
     cluster_type = cluster_to_type(cluster)
-    assert len(cluster_type.bootstrap_runs(limit=2)) == 2
-    assert len(cluster_type.bootstrap_runs(limit=10)) == 5
+    with _ctx(org):
+        assert len(cluster_type.bootstrap_runs(limit=2)) == 2
+        assert len(cluster_type.bootstrap_runs(limit=10)) == 5
