@@ -2,8 +2,17 @@ name: ci
 
 on:
   workflow_dispatch:
-  # CI disabled until we have a stable working version — re-enable by
-  # restoring: pull_request + push: branches: [main]
+  pull_request:
+  push:
+    branches: [main]
+  # Re-enabled (#1244). While this was dispatch-only, nothing verified a PR
+  # and nothing verified main: build-publish.yml is the only workflow that
+  # runs on main and it invokes no tests, so code could reach a published
+  # image without a single test having executed.
+  #
+  # `push: [main]` matters as much as `pull_request` here, because the team
+  # commits directly to main in non-overlapping scopes — gating PRs alone
+  # would leave the common path unchecked.
 
 permissions:
   contents: read
