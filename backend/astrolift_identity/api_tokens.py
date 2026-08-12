@@ -81,6 +81,7 @@ _READ_APP_PERMISSIONS = frozenset(
     }
 )
 _WRITE_APP_PREFIXES = ("app.", "agent.", "agent_env_spec.", "skill.", "workflow.")
+_WRITE_APP_PERMISSIONS = frozenset({"secret.write"})
 
 
 def set_current_api_token(token) -> contextvars.Token:
@@ -102,7 +103,9 @@ def token_scope_allows_permission(token, permission: str) -> bool:
     scopes = set(token.scopes or [])
     if SCOPE_READ_APPS in scopes and permission in _READ_APP_PERMISSIONS:
         return True
-    if SCOPE_WRITE_APPS in scopes and permission.startswith(_WRITE_APP_PREFIXES):
+    if SCOPE_WRITE_APPS in scopes and (
+        permission.startswith(_WRITE_APP_PREFIXES) or permission in _WRITE_APP_PERMISSIONS
+    ):
         return True
     if SCOPE_READ_CLUSTERS in scopes and permission == "provider_plugin.read":
         return True

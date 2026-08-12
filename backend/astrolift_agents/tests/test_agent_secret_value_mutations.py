@@ -273,7 +273,6 @@ def test_delete_denied_without_secret_write(permission_resolver, info, org, with
 
 
 def test_status_reports_exists_true_and_false(permission_resolver, info, org, with_tenant_org, fake_store):
-    permission_resolver.grant(Permission.SECRET_READ)
     permission_resolver.grant(Permission.SECRET_LIST)
     fake_store.store = {"sm:a": {"value": "AAA"}}  # sm:b absent
     spec = _spec(
@@ -295,7 +294,6 @@ def test_status_reports_exists_true_and_false(permission_resolver, info, org, wi
 def test_status_driver_error_is_exists_false_not_raised(
     permission_resolver, info, org, with_tenant_org, monkeypatch
 ):
-    permission_resolver.grant(Permission.SECRET_READ)
     permission_resolver.grant(Permission.SECRET_LIST)
     backend = _FakeSecrets(get_raises=True)
     import astrolift_agents.services.agent_cluster as agent_cluster
@@ -313,7 +311,7 @@ def test_status_driver_error_is_exists_false_not_raised(
     assert rows[0].error  # a non-empty error string, not a raised exception
 
 
-def test_status_denied_without_read_perms(permission_resolver, info, org, with_tenant_org, fake_store):
+def test_status_denied_without_list_permission(permission_resolver, info, org, with_tenant_org, fake_store):
     spec = _spec(org)
     with pytest.raises(PermissionDenied):
         with with_tenant_org(org):
