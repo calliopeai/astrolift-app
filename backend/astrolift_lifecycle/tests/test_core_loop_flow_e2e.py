@@ -452,6 +452,26 @@ def test_agent_task_and_cancel_scoped_to_org(
     assert AgentTask.objects.get(pk=task.pk).status == AgentTask.Status.CANCELLED
 
 
+def test_agent_cancel_rejects_app_deploy_without_agent_dispatch(permission_resolver, org, actor, info):
+    permission_resolver.grant(Permission.APP_DEPLOY)
+
+    with _ctx(org, actor):
+        result = AgentsMutation().cancel_task(info, id="00000000-0000-0000-0000-000000000000")
+
+    _assert_err(result, ErrorCode.PERMISSION_DENIED.value)
+
+
+def test_agent_cancel_accepts_agent_dispatch_permission(permission_resolver, org, actor, info):
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+
+    with _ctx(org, actor):
+        result = AgentsMutation().cancel_task(info, id="00000000-0000-0000-0000-000000000000")
+
+    # NOT_FOUND proves the resolver passed its permission gate and performed
+    # the tenant-scoped lookup.
+    _assert_err(result, ErrorCode.NOT_FOUND.value)
+
+
 def test_agent_task_logs_callable_and_scoped(org, other_org, actor, info, grant_core_loop, loop_recorder):
     """agentTaskLogs is callable and tenant-scoped: it returns a list (empty
     here — the task's dispatcher has no live cluster/pod) for the owning org

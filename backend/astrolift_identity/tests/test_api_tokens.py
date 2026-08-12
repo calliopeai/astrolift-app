@@ -32,10 +32,14 @@ from django.utils import timezone
 
 from astrolift_identity.api_tokens import (
     ALLOWED_SCOPES,
+    CLI_DEVICE_SCOPES,
     DEFAULT_SCOPES,
     PLAINTEXT_PREFIX,
     SCOPE_ADMIN,
+    SCOPE_MCP_DISPATCH,
     SCOPE_READ_APPS,
+    SCOPE_SECRET_READ,
+    SCOPE_SECRET_WRITE,
     SCOPE_WRITE_APPS,
     client_ip_from_request,
     enforce_scopes,
@@ -105,6 +109,10 @@ def test_validate_scopes_returns_unknown_set():
 
 def test_default_scopes_are_subset_of_allowed():
     assert set(DEFAULT_SCOPES).issubset(ALLOWED_SCOPES)
+
+
+def test_cli_device_scopes_are_subset_of_allowed():
+    assert set(CLI_DEVICE_SCOPES).issubset(ALLOWED_SCOPES)
 
 
 # ---- create_api_token mutation ---------------------------------------
@@ -359,6 +367,31 @@ def test_write_apps_scope_allows_secret_writes_but_not_reads():
     assert token_scope_allows_permission(token, Permission.SECRET_WRITE)
     assert not token_scope_allows_permission(token, Permission.SECRET_READ)
     assert not token_scope_allows_permission(token, Permission.SECRET_LIST)
+
+
+def test_secret_scopes_map_only_to_their_exact_permissions():
+    read_token = SimpleNamespace(scopes=[SCOPE_SECRET_READ])
+    write_token = SimpleNamespace(scopes=[SCOPE_SECRET_WRITE])
+
+    assert token_scope_allows_permission(read_token, Permission.SECRET_READ)
+    assert not token_scope_allows_permission(read_token, Permission.SECRET_WRITE)
+    assert not token_scope_allows_permission(read_token, Permission.APP_READ)
+    assert token_scope_allows_permission(write_token, Permission.SECRET_WRITE)
+    assert not token_scope_allows_permission(write_token, Permission.SECRET_READ)
+    assert not token_scope_allows_permission(write_token, Permission.APP_DEPLOY)
+
+
+def test_cli_device_scopes_allow_agent_ops_and_secret_write_without_reveal_or_admin():
+    token = SimpleNamespace(scopes=list(CLI_DEVICE_SCOPES))
+
+    assert SCOPE_SECRET_WRITE in token.scopes
+    assert SCOPE_MCP_DISPATCH in token.scopes
+    assert token_scope_allows_permission(token, Permission.AGENT_DISPATCH)
+    assert token_scope_allows_permission(token, Permission.SECRET_WRITE)
+    assert not token_scope_allows_permission(token, Permission.SECRET_READ)
+    assert not token_scope_allows_permission(token, Permission.APP_DEPLOY)
+    assert not token_scope_allows_permission(token, Permission.AGENT_UPDATE)
+    assert not token_scope_allows_permission(token, Permission.ADMIN_ELEVATE)
 
 
 def test_api_token_scope_is_a_ceiling_over_rbac(permission_resolver):

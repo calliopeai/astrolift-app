@@ -68,6 +68,16 @@ const SCOPE_CHOICES = [
     hint: "List clusters, view kubeconfig metadata, read provider state.",
   },
   {
+    value: "secret:read",
+    label: "Reveal secrets",
+    hint: "Reveal stored secret values. Sensitive; grant only when required.",
+  },
+  {
+    value: "secret:write",
+    label: "Write secrets",
+    hint: "Set, rotate, and delete stored secret values without revealing them.",
+  },
+  {
     value: "mcp:read",
     label: "MCP read",
     hint: "List agent packages and inspect run status through remote MCP.",

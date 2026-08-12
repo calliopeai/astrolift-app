@@ -19,6 +19,9 @@
   an agent run or deploy a standing application.
 
 ### Fixed
+- Issue browser-approved CLI credentials with narrow agent dispatch and secret
+  write scopes so `astro agent dispatch`, `cancel`, and `secret set/rm` work
+  after login or refresh without requiring an admin bearer.
 - Reconcile immutable agent packages from shared GitHub App push webhooks
   without dispatching an agent run.
 - Map API-token app scopes to agent secret status and write permissions so

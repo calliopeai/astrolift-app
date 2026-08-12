@@ -15,6 +15,10 @@
             font-size: 0.875rem; color: #c0d1ea; margin-bottom: 1.5rem; }
     .meta dt { color: #7e98bd; }
     .meta dd { margin: 0 0 0.5rem; word-break: break-word; }
+    .scope-list { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.25rem; }
+    .scope { background: #1b3049; border: 1px solid #2c4866; border-radius: 999px;
+             color: #d8e8fb; padding: 0.15rem 0.5rem; font-family: monospace;
+             font-size: 0.75rem; }
     .actions { display: flex; gap: 0.5rem; }
     button { flex: 1; padding: 0.75rem 1rem; border: 0; border-radius: 8px;
              font-size: 0.875rem; font-weight: 600; cursor: pointer; }
@@ -49,6 +53,10 @@
         <dt>{% trans "Originating IP" %}</dt>
         <dd>{{ session.client_ip }}</dd>
       {% endif %}
+      <dt>{% trans "Requested access" %}</dt>
+      <dd class="scope-list">
+        {% for scope in requested_scopes %}<span class="scope">{{ scope }}</span>{% endfor %}
+      </dd>
     </dl>
 
     <form method="post">

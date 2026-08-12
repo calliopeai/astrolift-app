@@ -152,6 +152,7 @@ def test_poll_complete_pending_then_issued():
     row.refresh_from_db()
     assert row.state == DeviceFlowSession.STATE_CONSUMED
     assert row.api_token_id is not None
+    assert row.api_token.scopes == device_flow.token_scopes_for_client_kind("cli")
     # second poll after consume returns expired (single-use)
     r3 = device_flow.poll_complete(sid, now=later + dt.timedelta(seconds=5))
     assert r3.status == "expired"
@@ -220,6 +221,7 @@ def test_refresh_rotates_access_and_refresh():
     row.refresh_from_db()
     assert row.api_token_id is not None
     assert row.api_token_id != prior_api_token_id
+    assert row.api_token.scopes == device_flow.token_scopes_for_client_kind("cli")
     prior = ApiToken.all_objects.get(pk=prior_api_token_id)
     assert prior.is_revoked is True
 
@@ -394,6 +396,14 @@ def test_approval_page_renders_for_authed_user():
     assert r.status_code == 200
     assert b"astro cli" in r.content
     assert b"Approve" in r.content
+    assert b"secret:write" in r.content
+    assert b"mcp:dispatch" in r.content
+    assert b"secret:read" not in r.content
+
+
+def test_non_cli_device_sessions_keep_read_only_scopes():
+    for kind in ("mobile", "browser", "ide"):
+        assert device_flow.token_scopes_for_client_kind(kind) == list(device_flow.DEFAULT_SCOPES)
 
 
 def test_approval_post_approve_drives_state_machine():

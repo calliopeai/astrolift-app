@@ -8,8 +8,8 @@ The mutation in :mod:`astrolift_identity.schema.mutations` mints rows;
 the auth integration in :mod:`astrolift_identity.auth_drf` calls
 ``verify_token`` + ``touch_token`` on every authed request.
 
-Scopes are coarse-grained access classes (``read:apps``,
-``write:apps``, ``read:clusters``, ``admin``). They narrow the
+Scopes are access classes (``read:apps``, ``write:apps``,
+``secret:write``, ``read:clusters``, ``admin``). They narrow the
 *user's* permission set down to the subset the token may exercise —
 they never widen it. ``admin`` implies all other scopes (operators
 intentionally treat it as the "full power" wildcard so they don't
@@ -36,6 +36,8 @@ PLAINTEXT_PREFIX = "alft_at_"
 SCOPE_READ_APPS = "read:apps"
 SCOPE_WRITE_APPS = "write:apps"
 SCOPE_READ_CLUSTERS = "read:clusters"
+SCOPE_SECRET_READ = "secret:read"
+SCOPE_SECRET_WRITE = "secret:write"
 SCOPE_MCP_READ = "mcp:read"
 SCOPE_MCP_DISPATCH = "mcp:dispatch"
 SCOPE_MCP_WRITE = "mcp:write"
@@ -46,6 +48,8 @@ ALLOWED_SCOPES: frozenset[str] = frozenset(
         SCOPE_READ_APPS,
         SCOPE_WRITE_APPS,
         SCOPE_READ_CLUSTERS,
+        SCOPE_SECRET_READ,
+        SCOPE_SECRET_WRITE,
         SCOPE_MCP_READ,
         SCOPE_MCP_DISPATCH,
         SCOPE_MCP_WRITE,
@@ -57,6 +61,16 @@ DEFAULT_SCOPES: tuple[str, ...] = (
     SCOPE_READ_APPS,
     SCOPE_READ_CLUSTERS,
     SCOPE_MCP_READ,
+)
+
+# Browser-approved CLI sessions need to exercise the CLI's documented
+# operator commands. Keep this separate from DEFAULT_SCOPES: generic API
+# tokens and mobile/browser enrollment stay read-only unless the operator
+# explicitly selects a stronger scope.
+CLI_DEVICE_SCOPES: tuple[str, ...] = (
+    *DEFAULT_SCOPES,
+    SCOPE_SECRET_WRITE,
+    SCOPE_MCP_DISPATCH,
 )
 
 _current_api_token: contextvars.ContextVar[object | None] = contextvars.ContextVar(
@@ -108,6 +122,10 @@ def token_scope_allows_permission(token, permission: str) -> bool:
     ):
         return True
     if SCOPE_READ_CLUSTERS in scopes and permission == "provider_plugin.read":
+        return True
+    if SCOPE_SECRET_READ in scopes and permission == "secret.read":
+        return True
+    if SCOPE_SECRET_WRITE in scopes and permission == "secret.write":
         return True
     if SCOPE_MCP_READ in scopes and permission == "agent.read":
         return True
