@@ -20,6 +20,9 @@
 
 ### Fixed
 
+- Preserve resolved command tools in one-shot harness system prompts as well
+  as thread-mode dispatch packets.
+
 - Always inject and verify agent callback delivery so successful runs cannot
   silently lose findings or telemetry.
 - Use public application GUIDs for managed workflow resync operations.

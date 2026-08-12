@@ -170,19 +170,35 @@ def test_spawned_job_omits_env_for_unattended_dispatch(monkeypatch):
 
 
 class _Brief:
-    def __init__(self, system_prompt="", env_vars=None):
+    def __init__(self, system_prompt="", env_vars=None, tools=None, agent_package=None):
         self.guid = "brief-1"
         self.content_hash = "deadbeef"
         self.manifest_snapshot = {"system_prompt": system_prompt}
         if env_vars is not None:
             self.manifest_snapshot["env_vars"] = env_vars
+        if tools is not None:
+            self.manifest_snapshot["tools"] = tools
+        if agent_package is not None:
+            self.manifest_snapshot["agent_package"] = agent_package
 
 
 class _TaskWithBrief:
-    def __init__(self, system_prompt="", dispatch_input=None, env_vars=None):
+    def __init__(
+        self,
+        system_prompt="",
+        dispatch_input=None,
+        env_vars=None,
+        tools=None,
+        agent_package=None,
+    ):
         self.guid = "task-1"
         self.brief_id = "brief-1"
-        self.brief = _Brief(system_prompt=system_prompt, env_vars=env_vars)
+        self.brief = _Brief(
+            system_prompt=system_prompt,
+            env_vars=env_vars,
+            tools=tools,
+            agent_package=agent_package,
+        )
         self.dispatch_input = dispatch_input
         self.callback_token_hash = ""
 
@@ -203,6 +219,35 @@ def test_kickoff_prompt_threads_trigger_payload():
     }
     assert "backfill" in env["AGENT_PROMPT"]
     assert '"batches":3' in env["AGENT_PROMPT"]
+
+
+def test_legacy_brief_tools_reach_oneshot_system_prompt():
+    env = {
+        entry["name"]: entry["value"]
+        for entry in brief_env_vars(
+            _TaskWithBrief(system_prompt="Triage safely.", tools=["jira-search", "agent-report"])
+        )
+    }
+
+    assert "Triage safely." in env["AGENT_SYSTEM"]
+    assert "`jira-search`" in env["AGENT_SYSTEM"]
+    assert "`agent-report`" in env["AGENT_SYSTEM"]
+
+
+def test_canonical_package_prompt_does_not_duplicate_tool_roster():
+    prompt = "# Available command tools\n\n- `agent-report`. Commands: `agent-report`."
+    env = {
+        entry["name"]: entry["value"]
+        for entry in brief_env_vars(
+            _TaskWithBrief(
+                system_prompt=prompt,
+                tools=["agent-report"],
+                agent_package={"schema": "astrolift.agent.package/v1"},
+            )
+        )
+    }
+
+    assert env["AGENT_SYSTEM"] == prompt
 
 
 def test_no_brief_no_env():

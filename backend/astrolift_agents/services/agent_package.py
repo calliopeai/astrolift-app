@@ -307,8 +307,19 @@ def source_slice_from_manifest(*, manifest_path: str, package_config: Any) -> di
     }
 
 
-def compose_system_prompt(*, brief: str, skills: list[dict[str, Any]]) -> str:
-    """Compose one stable system prompt without leaking source syntax."""
+def compose_system_prompt(
+    *,
+    brief: str,
+    skills: list[dict[str, Any]],
+    tools: list[dict[str, Any]] | None = None,
+) -> str:
+    """Compose one stable prompt, including the runnable command contract.
+
+    Harness runtimes receive this prompt directly rather than the thread-mode
+    structured tool packet.  Folding command-backed tools into the prompt keeps
+    ``tool_refs`` and legacy ``tools = [...]`` declarations actionable in both
+    modes instead of leaving the resolved tools only in Brief metadata.
+    """
     sections: list[str] = []
     brief_text = (brief or "").strip()
     if brief_text:
@@ -319,6 +330,26 @@ def compose_system_prompt(*, brief: str, skills: list[dict[str, Any]]) -> str:
             continue
         name = str(skill.get("name") or skill.get("slug") or "skill")
         sections.append(f"# Skill: {name}\n\n{content}")
+    tool_lines: list[str] = []
+    for tool in tools or []:
+        slug = str(tool.get("slug") or "").strip()
+        commands = [
+            str(command).strip()
+            for command in (tool.get("commands") or [])
+            if isinstance(command, str) and command.strip()
+        ]
+        if not slug or not commands:
+            continue
+        description = re.sub(r"\s+", " ", str(tool.get("description") or "").strip())
+        command_text = ", ".join(f"`{command}`" for command in commands)
+        detail = f" — {description}" if description else ""
+        tool_lines.append(f"- `{slug}`{detail}. Commands: {command_text}.")
+    if tool_lines:
+        sections.append(
+            "# Available command tools\n\n"
+            "The following commands are provided by the selected agent runtime. "
+            "Use only the commands needed for this task.\n\n" + "\n".join(tool_lines)
+        )
     return "\n\n---\n\n".join(sections)
 
 
@@ -341,7 +372,7 @@ def build_agent_package(
 ) -> dict[str, Any]:
     """Build the canonical IR persisted into ``Brief.manifest_snapshot``."""
     source = source_slice_from_manifest(manifest_path=manifest_path, package_config=package_config)
-    system_prompt = compose_system_prompt(brief=brief_text, skills=skills)
+    system_prompt = compose_system_prompt(brief=brief_text, skills=skills, tools=tools)
     package = {
         "schema": PACKAGE_SCHEMA,
         "agent": {"name": agent_name},

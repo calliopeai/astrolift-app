@@ -616,10 +616,7 @@ def test_streamable_http_rejects_nonstandard_nonfinite_json():
     user, token = _token(org, scopes=[SCOPE_MCP_READ])
     request = RequestFactory().post(
         "/api/mcp/v1/",
-        data=(
-            b'{"jsonrpc":"2.0","id":1,"method":"initialize",'
-            b'"params":{"bad":NaN}}'
-        ),
+        data=(b'{"jsonrpc":"2.0","id":1,"method":"initialize",' b'"params":{"bad":NaN}}'),
         content_type="application/json",
         HTTP_ACCEPT="application/json, text/event-stream",
     )
