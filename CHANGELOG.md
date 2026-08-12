@@ -19,9 +19,10 @@
   an agent run or deploy a standing application.
 
 ### Fixed
-
 - Reconcile immutable agent packages from shared GitHub App push webhooks
   without dispatching an agent run.
+- Map API-token app scopes to agent secret status and write permissions so
+  scoped CLI tokens can manage agent secret references as documented.
 - Use the install's configured S3 bucket for immutable agent payloads and
   platform artifacts when no organization-specific blob driver is registered.
 - Preserve resolved command tools in one-shot harness system prompts as well
