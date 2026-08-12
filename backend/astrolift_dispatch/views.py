@@ -20,6 +20,8 @@ import logging
 import secrets
 from functools import wraps
 
+from django.core.exceptions import RequestDataTooBig
+from django.db import transaction
 from django.http import HttpRequest, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -36,6 +38,10 @@ logger = logging.getLogger(__name__)
 
 _API_KEY_BYTES = 32  # 256-bit random key
 _BOOTSTRAP_TOKEN_SETTING = "DISPATCHER_BOOTSTRAP_TOKEN"
+_MAX_CALLBACK_FINDING_BYTES = 64 * 1024
+_MAX_CALLBACK_FINDINGS = 100
+_MAX_CALLBACK_FINDINGS_TOTAL_BYTES = 1024 * 1024
+_MAX_CALLBACK_BODY_BYTES = 2 * 1024 * 1024
 
 
 def _get_bootstrap_token() -> str | None:
@@ -48,6 +54,11 @@ def _get_bootstrap_token() -> str | None:
 def _hash_key(raw_key: str) -> str:
     """SHA-256 hash of an API key for storage."""
     return hashlib.sha256(raw_key.encode()).hexdigest()
+
+
+def _reject_nonfinite_json(value: str):
+    """Reject Python's non-standard NaN/Infinity JSON extensions."""
+    raise ValueError(f"non-finite JSON number {value!r} is not allowed")
 
 
 def _get_dispatcher_from_request(request: HttpRequest) -> DispatcherInstance | None:
@@ -81,6 +92,40 @@ def _require_dispatcher(view_func):
     return wrapper
 
 
+def _require_agent_callback_auth(view_func):
+    """Authenticate a callback with either a dispatcher or task-scoped key.
+
+    K8s one-shot pods do not possess a DispatcherInstance plaintext key (the
+    Controller stores only its hash), so spawn injects a unique callback key
+    whose hash is frozen on the exact AgentTask.  Binding both the hash and URL
+    task id prevents that credential from reading or updating another task.
+    """
+
+    @wraps(view_func)
+    def wrapper(request: HttpRequest, task_id: str, *args, **kwargs):
+        dispatcher = _get_dispatcher_from_request(request)
+        if dispatcher is not None:
+            request.dispatcher = dispatcher
+            return view_func(request, task_id, *args, **kwargs)
+
+        auth = request.headers.get("Authorization", "")
+        raw_key = auth[len("Bearer ") :] if auth.startswith("Bearer ") else ""
+        if not raw_key.startswith("alft_cb_"):
+            return JsonResponse({"error": "unauthorized"}, status=401)
+        task = AgentTask.objects.filter(
+            guid=task_id,
+            callback_token_hash=_hash_key(raw_key),
+            deleted_at__isnull=True,
+        ).first()
+        if task is None:
+            return JsonResponse({"error": "unauthorized"}, status=401)
+        request.agent_task = task
+        request.agent_callback_token_hash = _hash_key(raw_key)
+        return view_func(request, task_id, *args, **kwargs)
+
+    return wrapper
+
+
 # ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
@@ -96,10 +141,12 @@ def register(request: HttpRequest) -> JsonResponse:
     Returns: {dispatcher_id, api_key}
     """
     bootstrap_token = _get_bootstrap_token()
-    if bootstrap_token:
-        auth = request.headers.get("Authorization", "")
-        if auth != f"Bearer {bootstrap_token}":
-            return JsonResponse({"error": "invalid bootstrap token"}, status=401)
+    if not bootstrap_token:
+        logger.error("dispatch.register refused: DISPATCHER_BOOTSTRAP_TOKEN is not configured")
+        return JsonResponse({"error": "dispatcher registration is not configured"}, status=503)
+    auth = request.headers.get("Authorization", "")
+    if not secrets.compare_digest(auth, f"Bearer {bootstrap_token}"):
+        return JsonResponse({"error": "invalid bootstrap token"}, status=401)
 
     try:
         body = json.loads(request.body)
@@ -236,15 +283,6 @@ def update_task_status(request: HttpRequest, task_id: str) -> JsonResponse:
     except (json.JSONDecodeError, ValueError):
         return JsonResponse({"error": "invalid JSON"}, status=400)
 
-    task = AgentTask.objects.filter(
-        guid=task_id,
-        dispatcher=dispatcher,
-        deleted_at__isnull=True,
-    ).first()
-
-    if task is None:
-        return JsonResponse({"error": "task not found"}, status=404)
-
     new_status = body.get("status")
     if new_status not in {"running", "completed", "failed", "cancelled"}:
         return JsonResponse({"error": f"invalid status: {new_status!r}"}, status=400)
@@ -257,36 +295,46 @@ def update_task_status(request: HttpRequest, task_id: str) -> JsonResponse:
         "cancelled": AgentTask.Status.CANCELLED,
     }
 
-    update_fields = ["status", "updated_at", "version"]
-    task.status = status_map[new_status]
+    with transaction.atomic():
+        task = (
+            AgentTask.objects.select_for_update()
+            .filter(
+                guid=task_id,
+                dispatcher=dispatcher,
+                deleted_at__isnull=True,
+            )
+            .first()
+        )
+        if task is None:
+            return JsonResponse({"error": "task not found"}, status=404)
 
-    if body.get("external_id"):
-        task.external_id = body["external_id"]
-        update_fields.append("external_id")
+        target = status_map[new_status]
+        if task.status in AgentTask.TERMINAL_STATUSES:
+            if task.status != target:
+                return JsonResponse(
+                    {"error": f"task is already terminal ({task.status})"},
+                    status=409,
+                )
+        else:
+            update_fields: list[str] = []
+            if body.get("external_id"):
+                task.external_id = str(body["external_id"])[:255]
+                update_fields.append("external_id")
+            if body.get("error_message"):
+                task.failure = {"message": str(body["error_message"])}
+                update_fields.append("failure")
+            if update_fields:
+                task.save(update_fields=[*update_fields, "updated_at", "version"])
 
-    if body.get("error_message"):
-        task.failure = {"message": body["error_message"]}
-        update_fields.append("failure")
-
-    now = timezone.now()
-    if new_status == "running" and not task.started_at:
-        task.started_at = now
-        update_fields.append("started_at")
-    elif new_status in {"completed", "failed", "cancelled"} and not task.ended_at:
-        task.ended_at = now
-        update_fields.append("ended_at")
-
-    # Publish the noVNC relay path on the RUNNING transition for a
-    # vnc-enabled task. The Temporal transition_to() path does this in the
-    # model, but this push-mode dispatcher callback assigns status
-    # directly, so without this a vnc_enabled task reaching RUNNING here
-    # would keep an empty vnc_url forever and the viewer never connects.
-    # Mirrors AgentTask.transition_to()'s RUNNING branch exactly.
-    if new_status == "running" and task.vnc_enabled and not task.vnc_url:
-        task.vnc_url = f"/app/vnc/{task.guid}"
-        update_fields.append("vnc_url")
-
-    task.save(update_fields=update_fields)
+            try:
+                if target == AgentTask.Status.RUNNING and task.status == AgentTask.Status.QUEUED:
+                    task.transition_to(AgentTask.Status.PROVISIONING)
+                if target == AgentTask.Status.COMPLETED and task.status == AgentTask.Status.PROVISIONING:
+                    task.transition_to(AgentTask.Status.RUNNING)
+                if task.status != target:
+                    task.transition_to(target)
+            except ValueError as exc:
+                return JsonResponse({"error": str(exc)}, status=409)
 
     record_interaction(
         task,
@@ -410,69 +458,154 @@ def agent_checkin(request: HttpRequest, task_id: str) -> JsonResponse:
 
 @csrf_exempt
 @require_http_methods(["POST"])
-@_require_dispatcher
+@_require_agent_callback_auth
 def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
     """Heartbeat and result callback from thread-mode agents.
 
     Body: {status, result?, partial?, error?, continue?}
 
     A terminal ``status`` of "completed"/"failed" records the outcome and
-    transitions the task. Any other value is treated as a heartbeat and
-    simply acknowledged. The response carries ``continue`` — false tells the
-    agent to stop (the task is no longer RUNNING).
+    transitions the task. ``running`` (or an omitted status) is a heartbeat;
+    unknown values are rejected. The response carries ``continue`` — false
+    tells the agent to stop (the task is no longer RUNNING).
     """
-    dispatcher = request.dispatcher
-
     try:
-        body = json.loads(request.body)
+        content_length = int(request.META.get("CONTENT_LENGTH") or 0)
+    except (TypeError, ValueError):
+        content_length = 0
+    if content_length > _MAX_CALLBACK_BODY_BYTES:
+        return JsonResponse(
+            {"error": f"callback body exceeds {_MAX_CALLBACK_BODY_BYTES} bytes"},
+            status=413,
+        )
+    try:
+        body_bytes = request.body
+    except RequestDataTooBig:
+        return JsonResponse(
+            {"error": f"callback body exceeds {_MAX_CALLBACK_BODY_BYTES} bytes"},
+            status=413,
+        )
+    if len(body_bytes) > _MAX_CALLBACK_BODY_BYTES:
+        return JsonResponse(
+            {"error": f"callback body exceeds {_MAX_CALLBACK_BODY_BYTES} bytes"},
+            status=413,
+        )
+    try:
+        body = json.loads(body_bytes, parse_constant=_reject_nonfinite_json)
     except (json.JSONDecodeError, ValueError):
         return JsonResponse({"error": "invalid JSON"}, status=400)
-
-    task = AgentTask.objects.filter(
-        guid=task_id,
-        organization=dispatcher.organization,
-        deleted_at__isnull=True,
-    ).first()
-
-    if task is None:
-        return JsonResponse({"error": "task not found"}, status=404)
+    if not isinstance(body, dict):
+        return JsonResponse({"error": "callback body must be a JSON object"}, status=400)
 
     new_status = body.get("status")
-
-    if new_status in {"completed", "failed"}:
-        if new_status == "completed":
-            task.result = {"output": body.get("result") or body.get("error", "")}
-        else:
-            task.failure = {
-                "message": body.get("error", ""),
-                "output": body.get("result", ""),
-            }
-        # Persist the terminal output explicitly: transition_to() saves a
-        # fixed update_fields set that excludes result/failure, so those
-        # columns would otherwise be dropped on the success path.
-        task.save(update_fields=["result", "failure", "updated_at", "version"])
-
-        target = AgentTask.Status.COMPLETED if new_status == "completed" else AgentTask.Status.FAILED
-        try:
-            task.transition_to(target)
-        except ValueError:
-            # Task was not in a state that allows this terminal transition
-            # (e.g. already terminal). The output above is already saved.
-            logger.warning(
-                "dispatch.agent_callback: task %s cannot transition %s → %s",
-                task_id,
-                task.status,
-                target,
+    if new_status not in {None, "running", "completed", "failed"}:
+        return JsonResponse({"error": f"invalid callback status: {new_status!r}"}, status=400)
+    finding = body.get("finding")
+    if finding is not None:
+        if not isinstance(finding, dict):
+            return JsonResponse({"error": "finding must be a JSON object"}, status=400)
+        finding_size = len(json.dumps(finding, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+        if finding_size > _MAX_CALLBACK_FINDING_BYTES:
+            return JsonResponse(
+                {"error": f"finding exceeds {_MAX_CALLBACK_FINDING_BYTES} bytes"},
+                status=413,
             )
+
+    finding_index: int | None = None
+
+    with transaction.atomic():
+        query = AgentTask.objects.select_for_update().filter(guid=task_id, deleted_at__isnull=True)
+        callback_hash = getattr(request, "agent_callback_token_hash", "")
+        if callback_hash:
+            query = query.filter(callback_token_hash=callback_hash)
+        else:
+            query = query.filter(
+                organization=request.dispatcher.organization,
+                dispatcher=request.dispatcher,
+            )
+        task = query.first()
+
+        if task is None:
+            # A task-token request that authenticated immediately before an
+            # operator cancellation may wait on the row lock and find the
+            # token revoked. Do not let that stale callback mutate the task.
+            return JsonResponse({"error": "task not found or callback token expired"}, status=404)
+
+        if finding is not None:
+            if task.status != AgentTask.Status.RUNNING:
+                return JsonResponse(
+                    {"error": f"task is not accepting findings ({task.status})", "continue": False},
+                    status=409,
+                )
+            result = dict(task.result) if isinstance(task.result, dict) else {}
+            findings = list(result.get("findings") or [])
+            if len(findings) >= _MAX_CALLBACK_FINDINGS:
+                return JsonResponse(
+                    {"error": f"task already has {_MAX_CALLBACK_FINDINGS} findings", "continue": False},
+                    status=409,
+                )
+            findings.append(finding)
+            findings_size = len(json.dumps(findings, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+            if findings_size > _MAX_CALLBACK_FINDINGS_TOTAL_BYTES:
+                return JsonResponse(
+                    {
+                        "error": (
+                            f"task findings exceed {_MAX_CALLBACK_FINDINGS_TOTAL_BYTES} aggregate bytes"
+                        ),
+                        "continue": False,
+                    },
+                    status=413,
+                )
+            finding_index = len(findings) - 1
+            result["findings"] = findings
+            task.result = result
+            task.save(update_fields=["result", "updated_at", "version"])
+
+        if new_status in {"completed", "failed"}:
+            if task.status in AgentTask.TERMINAL_STATUSES:
+                return JsonResponse(
+                    {"error": f"task is already terminal ({task.status})", "continue": False},
+                    status=409,
+                )
+            # A very fast one-shot pod can finish before the status poll sees
+            # it running. Preserve the lifecycle graph rather than dropping a
+            # valid result from PROVISIONING.
+            if task.status == AgentTask.Status.PROVISIONING:
+                task.transition_to(AgentTask.Status.RUNNING)
+            if task.status != AgentTask.Status.RUNNING:
+                return JsonResponse(
+                    {"error": f"task is not accepting results ({task.status})", "continue": False},
+                    status=409,
+                )
+
+            if new_status == "completed":
+                result = dict(task.result) if isinstance(task.result, dict) else {}
+                result["output"] = body["result"] if "result" in body else body.get("error", "")
+                task.result = result
+            else:
+                task.failure = {
+                    "message": body.get("error", ""),
+                    "output": body.get("result", ""),
+                }
+            task.save(update_fields=["result", "failure", "updated_at", "version"])
+            target = AgentTask.Status.COMPLETED if new_status == "completed" else AgentTask.Status.FAILED
+            task.transition_to(target)
 
     # Heartbeat (any non-terminal status) is a no-op acknowledgement.
 
     record_interaction(
         task,
         kind=AgentInteraction.Kind.CONTROL_API,
-        name="callback",
+        name="finding" if finding is not None else "callback",
         status="error" if new_status == "failed" else "ok",
-        detail={"new_status": new_status or "heartbeat"},
+        detail={
+            "new_status": new_status or "heartbeat",
+            **(
+                {"finding_index": finding_index, "finding_keys": sorted(finding)}
+                if finding is not None
+                else {}
+            ),
+        },
     )
 
     return JsonResponse({"ok": True, "continue": task.status == AgentTask.Status.RUNNING})

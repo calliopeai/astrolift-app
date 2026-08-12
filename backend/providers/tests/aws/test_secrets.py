@@ -65,6 +65,17 @@ def test_sm_delete_uses_recovery_window(sm_backend: AWSSecretsBackend, secrets_c
     assert len(deleted) > 0
 
 
+def test_sm_deleted_value_reads_absent_and_can_be_set_again(sm_backend: AWSSecretsBackend) -> None:
+    """The UI's delete -> set flow must not stay wedged for the recovery window."""
+    sm_backend.upsert("my-app/recoverable", {"value": "old"})
+    sm_backend.delete("my-app/recoverable")
+
+    assert sm_backend.get("my-app/recoverable") is None
+
+    sm_backend.upsert("my-app/recoverable", {"value": "new"})
+    assert sm_backend.get("my-app/recoverable") == {"value": "new"}
+
+
 def test_sm_delete_missing_raises_not_found(sm_backend: AWSSecretsBackend) -> None:
     with pytest.raises(NotFoundError):
         sm_backend.delete("never/existed")

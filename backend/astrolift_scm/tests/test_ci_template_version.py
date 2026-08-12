@@ -32,6 +32,7 @@ from astrolift_scm.ci_templates import (
     stamp_workflow,
 )
 from astrolift_scm.services.workflow_sync import (
+    github_workflow_path_for,
     render_astrolift_bitbucket_pipeline,
     render_astrolift_ci_workflow,
     render_astrolift_gitea_ci_workflow,
@@ -72,7 +73,7 @@ _RENDERERS = {
 # The version these hashes belong to. Kept as its own constant (rather than
 # reading TEMPLATE_VERSION) so that bumping TEMPLATE_VERSION without refreshing
 # the pins trips ``test_template_version_matches_pins`` loudly.
-PINNED_TEMPLATE_VERSION = 4
+PINNED_TEMPLATE_VERSION = 6
 
 # content_hash (sha256, stamp removed) of each host's rendered body at
 # PINNED_TEMPLATE_VERSION, computed against GOLDEN_API_URL and _golden_app().
@@ -83,7 +84,7 @@ PINNED_TEMPLATE_VERSION = 4
 # skip-if-built ECR probe. The deploy-only render (blank registry_repo_uri)
 # is covered by ``test_deploy_only_workflow.py`` instead.
 PINNED_CONTENT_HASHES = {
-    "github": "4c51e246e76f331cddf54aa07da1ece17800e390964fa16ace497250be19a009",
+    "github": "5485ba8451035158c1952e9a32b71f4d0b1ff304d343c0d8272da198d1012856",
     "gitlab": "77f0d228c7b159e6040b7ec10a348b039f94ef188a565ea901b7c422b6dbcbc8",
     "gitea": "d370f2cf4f0080e7c04ad7e00ee735163c688a4222f8415114d894f6a9b83170",
     "bitbucket": "7821f3ac5724b4b30b3e48473652c39eb3f1edff8d771dcdad7e89b10e43e213",
@@ -151,6 +152,25 @@ def test_content_hash_ignores_stamp_version():
     v2 = stamp_workflow(body, version=2, digest="a" * 64)
     assert v1 != v2  # the stamp lines differ
     assert content_hash(v1) == content_hash(v2) == content_hash(body)
+
+
+def test_agent_github_workflow_validates_package_without_app_build_or_deploy(settings):
+    settings.PLATFORM_API_URL = GOLDEN_API_URL
+    app = _golden_app()
+    app.is_agent = True
+    app.manifest_path = "agents/emr-bug-triage/astrolift.toml"
+
+    body = render_astrolift_ci_workflow(app)
+
+    assert "name: astrolift agent package" in body
+    assert "group: astrolift-hello-app" in body
+    assert "cancel-in-progress: true" in body
+    assert "agents/emr-bug-triage/**" in body
+    assert "selected manifest must declare exactly one agent workload" in body
+    assert "docker build" not in body
+    assert "/api/cli/v1/apps/" not in body
+    assert "ASTROLIFT_DEPLOY_TOKEN" not in body
+    assert github_workflow_path_for(app) == ".github/workflows/astrolift-agent-hello-app.yml"
 
 
 def test_parse_stamp_absent_is_identity():

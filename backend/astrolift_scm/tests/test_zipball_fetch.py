@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 import pytest
 
-from astrolift_scm.providers import ProviderError, fetch_zipball
+from astrolift_scm.providers import ProviderError, fetch_branch_head, fetch_zipball
 
 
 class _FakeConn:
@@ -37,7 +37,7 @@ class _MockResponse:
         self._body = body
 
     def __enter__(self):
-        return SimpleNamespace(read=lambda: self._body)
+        return SimpleNamespace(read=lambda *_args: self._body)
 
     def __exit__(self, *_):
         return False
@@ -60,6 +60,24 @@ def test_github_zipball_routes_and_returns_bytes():
 
     assert out == _ZIP_BYTES
     assert captured["url"].endswith("/repos/owner/repo/zipball/main")
+    assert captured["auth"].startswith("token ")
+
+
+def test_github_branch_head_resolves_current_immutable_sha():
+    conn = _FakeConn(kind="github_pat")
+    captured = {}
+    sha = "d" * 40
+
+    def _fake_urlopen(req, timeout=None):
+        captured["url"] = req.full_url
+        captured["auth"] = req.get_header("Authorization")
+        return _MockResponse((f'{{"commit":{{"sha":"{sha}"}}}}').encode())
+
+    with patch("urllib.request.urlopen", _fake_urlopen):
+        out = fetch_branch_head(conn, repo_full_name="owner/repo", branch="feature/x")
+
+    assert out == sha
+    assert captured["url"].endswith("/repos/owner/repo/branches/feature%2Fx")
     assert captured["auth"].startswith("token ")
 
 

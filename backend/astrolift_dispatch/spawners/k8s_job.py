@@ -89,19 +89,6 @@ class K8sJobSpawner(ContainerSpawner):
         # non-VNC tasks and when no blob store is configured).
         job_manifest = inject_snapshot_into_job_spec(job_manifest, task)
 
-        # Final env dedupe (authoritative). The container env is assembled from
-        # several sources — managed-model provider env, the spec's env_vars +
-        # secret_refs, then the Brief prepends the manifest [environment] config
-        # (JIRA_BASE_URL, etc.) and dispatch input. Sources legitimately overlap
-        # (an agent config env var also bound as a secret_ref; a spec key the
-        # Bedrock env also sets). The pod manifest is applied server-side, and
-        # SSA REJECTS a container whose env has duplicate `name` keys with a 500
-        # ("duplicate entries for key") — it does not honour last-wins. Dedupe
-        # here, after every injection, keeping the LAST occurrence so the
-        # precedence the assembly order encodes (spec/operator override wins over
-        # the prepended Brief defaults) is preserved.
-        _dedupe_job_container_env(job_manifest)
-
         # Resolve the spec's secret_refs to live values from the install's
         # secret store (the SAME store setAgentSecretValue writes into, via
         # self._cluster) and materialize them as a per-task K8s Secret the
@@ -125,6 +112,24 @@ class K8sJobSpawner(ContainerSpawner):
         except AgentSecretResolutionError as exc:
             logger.warning("k8s_job_spawner: secret preflight failed for Job %s: %s", job_name, exc)
             return SpawnResult(external_id=job_name, ok=False, error=str(exc))
+
+        # Bundle keys are enumerated from the live backend during preflight.
+        # Inject the resulting names after resolution so a new bundle key is
+        # available immediately even if the cached key list was stale when the
+        # base Job was rendered. The per-task Secret already contains the
+        # direct-ref-over-bundle merged value for each name.
+        if secret_manifest:
+            _inject_resolved_secret_env(
+                job_manifest,
+                secret_name=task_secret_name(job_name),
+                env_names=list((secret_manifest.get("stringData") or {}).keys()),
+            )
+
+        # Final env dedupe (authoritative). SSA rejects duplicate env names.
+        # Keeping the last occurrence preserves operator/direct-secret
+        # precedence over package defaults while every secret reference points
+        # at the same merged per-task Secret.
+        _dedupe_job_container_env(job_manifest)
 
         # Order: model SA (annotated with the cloud identity) first so it
         # exists before the pod it binds, then the per-task Secret, then the
@@ -156,12 +161,31 @@ class K8sJobSpawner(ContainerSpawner):
             if not getattr(result, "ok", False):
                 error = result.summary() if hasattr(result, "summary") else "apply failed"
                 logger.warning("k8s_job_spawner: apply failed for Job %s: %s", job_name, error)
+                self._cleanup_failed_spawn(job_name)
                 return SpawnResult(external_id=job_name, ok=False, error=str(error))
             logger.info("k8s_job_spawner: created Job %s for task %s", job_name, task.guid)
             return SpawnResult(external_id=job_name)
         except Exception as exc:
             logger.exception("k8s_job_spawner: failed to create Job %s", job_name)
+            self._cleanup_failed_spawn(job_name)
             return SpawnResult(external_id=job_name, ok=False, error=str(exc))
+
+    def _cleanup_failed_spawn(self, job_name: str) -> None:
+        """Best-effort cleanup after a non-atomic multi-manifest apply.
+
+        Provider drivers may create the per-task Secret before rejecting the
+        Job. Never leave that plaintext-bearing Secret behind when spawn
+        reports failure. The managed-model ServiceAccount is intentionally not
+        deleted because it is shared across tasks.
+        """
+        try:
+            self.stop(job_name)
+        except Exception:  # noqa: BLE001 - preserve the original spawn error
+            logger.warning(
+                "k8s_job_spawner: cleanup after failed spawn did not complete for Job %s",
+                job_name,
+                exc_info=True,
+            )
 
     def status(self, external_id: str) -> TaskStatus:
         """Poll the K8s Job status."""
@@ -213,10 +237,40 @@ class K8sJobSpawner(ContainerSpawner):
         try:
             driver = _driver_for_cluster(self._cluster)
             ctx = _context_for_cluster(self._cluster)
-            driver.delete_manifests(ctx.slug, self._namespace, refs)
+            result = driver.delete_manifests(ctx.slug, self._namespace, refs)
+            if result is not None and not getattr(result, "ok", True):
+                detail = result.summary() if hasattr(result, "summary") else "delete failed"
+                raise RuntimeError(str(detail))
             logger.info("k8s_job_spawner: deleted Job %s (+ secret)", external_id)
         except Exception:  # noqa: BLE001
             logger.exception("k8s_job_spawner: failed to delete Job %s", external_id)
+            raise
+
+    def cleanup_task_secret(self, external_id: str) -> None:
+        """Delete only the plaintext-bearing per-task Secret.
+
+        Completed Job/pod objects remain available to the log surface. The
+        Secret is no longer needed once the process has received its env and
+        must not linger for the lifetime of retained Job history.
+        """
+        from astrolift_dispatch.agent_secrets import task_secret_name
+        from core.cluster_management import _context_for_cluster, _driver_for_cluster
+
+        ref = {
+            "apiVersion": "v1",
+            "kind": "Secret",
+            "metadata": {
+                "name": task_secret_name(external_id),
+                "namespace": self._namespace,
+            },
+        }
+        driver = _driver_for_cluster(self._cluster)
+        ctx = _context_for_cluster(self._cluster)
+        result = driver.delete_manifests(ctx.slug, self._namespace, [ref])
+        if result is not None and not getattr(result, "ok", True):
+            detail = result.summary() if hasattr(result, "summary") else "secret delete failed"
+            raise RuntimeError(str(detail))
+        logger.info("k8s_job_spawner: deleted per-task Secret for Job %s", external_id)
 
 
 def _vnc_image(image: str) -> str:
@@ -314,6 +368,28 @@ def _dedupe_job_container_env(job_manifest: dict) -> None:
     containers[0]["env"] = list(by_name.values())
 
 
+def _inject_resolved_secret_env(job_manifest: dict, *, secret_name: str, env_names: list[str]) -> None:
+    """Append secretKeyRef entries for the live, fully merged secret keys."""
+    try:
+        container = job_manifest["spec"]["template"]["spec"]["containers"][0]
+    except (KeyError, TypeError, IndexError):
+        return
+    from astrolift_dispatch.agent_secrets import secret_env_entries
+
+    refs = [{"env_var": name, "uri": ""} for name in env_names]
+    container.setdefault("env", []).extend(secret_env_entries(secret_name, refs))
+
+
+def _image_pull_policy(image: str) -> str:
+    """Always refresh mutable implicit/explicit ``latest`` references."""
+    if "@" in image:
+        return "IfNotPresent"
+    last_component = image.rsplit("/", 1)[-1]
+    if ":" not in last_component or last_component.rsplit(":", 1)[-1] == "latest":
+        return "Always"
+    return "IfNotPresent"
+
+
 def _render_agent_job(
     *,
     job_name: str,
@@ -390,6 +466,10 @@ def _render_agent_job(
         "spec": {
             "backoffLimit": 0,  # No retries — AgentTask handles retry logic
             "completions": 1,
+            # Kubernetes enforces the task deadline even if the Temporal
+            # worker or control plane is unavailable. This is the final
+            # backstop against a runaway agent pod.
+            "activeDeadlineSeconds": max(1, int(getattr(task, "timeout_seconds", 300) or 300)),
             "template": {
                 "metadata": {
                     "labels": {
@@ -408,6 +488,10 @@ def _render_agent_job(
                         {
                             "name": "agent",
                             "image": image,
+                            # Literal :latest must always resolve at Job create;
+                            # immutable/versioned tags retain K8s's normal
+                            # IfNotPresent behavior for reproducible runs.
+                            "imagePullPolicy": _image_pull_policy(image),
                             "env": container_env,
                             **({"command": command} if command else {}),
                             **({"args": args} if args else {}),

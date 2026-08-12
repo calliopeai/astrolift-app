@@ -35,8 +35,10 @@ import hashlib
 import io
 import json
 import logging
+import stat
 import tomllib
 import zipfile
+from pathlib import PurePosixPath
 from typing import Any
 
 import requests
@@ -44,6 +46,11 @@ from django.conf import settings
 from django.utils import timezone
 
 from astrolift_agents.models import Brief
+from astrolift_agents.services.agent_payload import (
+    MAX_SOURCE_ARCHIVE_BYTES,
+    MAX_SOURCE_EXPANDED_BYTES,
+    MAX_SOURCE_FILES,
+)
 
 log = logging.getLogger(__name__)
 
@@ -55,10 +62,21 @@ _REQUEST_TIMEOUT_SECONDS = 60
 # Keys consumed structurally from the manifest's [environment] table; everything
 # else under [environment] is treated as a literal env var.
 _ENVIRONMENT_RESERVED_KEYS = frozenset({"tool_preset", "allow_install"})
+_MAX_MANIFEST_BYTES = 1 * 1024 * 1024
+_MAX_PROMPT_BYTES = 1 * 1024 * 1024
+_MAX_INCLUDE_DEPTH = 16
 
 
 class ManifestNotFoundError(ValueError):
     """Raised when an explicit ``manifest_path`` has no matching astrolift.toml."""
+
+
+class ManifestReferenceError(ValueError):
+    """A manifest include/file reference is unsafe, missing, or malformed."""
+
+
+class PayloadStorageError(RuntimeError):
+    """A manifest references runtime files but its bundle could not be stored."""
 
 
 def assemble_agent_brief(
@@ -146,6 +164,10 @@ def assemble_agent_brief(
     manifest, secrets_refs = _parse_manifest(zip_bytes, manifest_path)
 
     storage_key = _store_bundle(organization=organization, content_hash=content_hash, zip_bytes=zip_bytes)
+    if manifest.get("requires_payload") and not storage_key:
+        raise PayloadStorageError(
+            "agent manifest references files/scripts/binaries, but no payload blob store is available"
+        )
 
     brief = Brief.objects.create(
         organization=organization,
@@ -189,9 +211,18 @@ def _fetch_zipball(owner_repo: str, branch: str) -> bytes:
         headers=headers,
         timeout=_REQUEST_TIMEOUT_SECONDS,
         allow_redirects=True,
+        stream=True,
     )
     resp.raise_for_status()
-    return resp.content
+    from astrolift_scm.providers.archive_download import (
+        ArchiveDownloadTooLarge,
+        read_requests_response,
+    )
+
+    try:
+        return read_requests_response(resp, limit=MAX_SOURCE_ARCHIVE_BYTES)
+    except ArchiveDownloadTooLarge as exc:
+        raise ManifestReferenceError(str(exc)) from exc
 
 
 def _content_hash(*, organization, zip_digest: str, context: dict, manifest_path: str = "") -> str:
@@ -258,24 +289,108 @@ def _parse_manifest(zip_bytes: bytes, manifest_path: str = "") -> tuple[dict[str
     manifest: dict[str, Any] = {}
     secrets_refs: list[dict[str, str]] = []
 
-    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+    if len(zip_bytes) > MAX_SOURCE_ARCHIVE_BYTES:
+        raise ManifestReferenceError(f"source ZIP exceeds {MAX_SOURCE_ARCHIVE_BYTES} bytes")
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(zip_bytes))
+    except zipfile.BadZipFile as exc:
+        raise ManifestReferenceError("source payload is not a valid ZIP archive") from exc
+
+    with zf:
+        infos = [info for info in zf.infolist() if not info.is_dir()]
+        if len(infos) > MAX_SOURCE_FILES:
+            raise ManifestReferenceError(f"source ZIP contains more than {MAX_SOURCE_FILES} files")
+        if sum(info.file_size for info in infos) > MAX_SOURCE_EXPANDED_BYTES:
+            raise ManifestReferenceError(f"source ZIP expands beyond {MAX_SOURCE_EXPANDED_BYTES} bytes")
+        for info in infos:
+            file_type = (info.external_attr >> 16) & 0o170000
+            if file_type == stat.S_IFLNK:
+                raise ManifestReferenceError(f"source ZIP symlinks are not allowed: {info.filename!r}")
         toml_path = select_manifest_member(zf.namelist(), manifest_path)
         if toml_path is None:
             if manifest_path:
                 raise ManifestNotFoundError(f"no astrolift.toml at {manifest_path!r} in the config repo")
             return manifest, secrets_refs
-        with zf.open(toml_path) as fh:
-            config = tomllib.load(fh)
+        repo_members, selected_manifest = _repo_member_map(zf, toml_path)
+        config = _load_manifest_tree(repo_members, selected_manifest)
 
-    # [skills.*] -> manifest. The first skill table is the agent's primary
-    # skill; its slug is the table key (e.g. [skills.reviewer]).
+        manifest_dir = str(PurePosixPath(selected_manifest).parent)
+        if manifest_dir == ".":
+            manifest_dir = ""
+
+        # File-backed system prompts keep the TOML small while preserving the
+        # same immutable Brief snapshot contract.  References are relative to
+        # the selected astrolift.toml and cannot escape its directory.
+        skills = config.get("skills") or {}
+        if not isinstance(skills, dict):
+            raise ManifestReferenceError("[skills] must be a TOML table")
+        for skill_slug, raw_skill_cfg in skills.items():
+            skill_cfg = raw_skill_cfg or {}
+            if not isinstance(skill_cfg, dict):
+                raise ManifestReferenceError(f"[skills.{skill_slug}] must be a TOML table")
+            inline_prompt = skill_cfg.get("system_prompt", "")
+            prompt_ref = skill_cfg.get("system_prompt_file", "")
+            if inline_prompt and prompt_ref:
+                raise ManifestReferenceError(
+                    f"skills.{skill_slug} may set only one of system_prompt or system_prompt_file"
+                )
+            if prompt_ref:
+                prompt_path = _referenced_repo_path(
+                    str(prompt_ref), base_dir=manifest_dir, field=f"skills.{skill_slug}.system_prompt_file"
+                )
+                prompt_bytes = _read_referenced_member(
+                    repo_members,
+                    prompt_path,
+                    field=f"skills.{skill_slug}.system_prompt_file",
+                    max_bytes=_MAX_PROMPT_BYTES,
+                )
+                try:
+                    skill_cfg["system_prompt"] = prompt_bytes.decode("utf-8")
+                except UnicodeDecodeError as exc:
+                    raise ManifestReferenceError(f"system prompt file {prompt_path!r} is not UTF-8") from exc
+
+        asset_paths, executable_paths = _collect_assets(config, repo_members, manifest_dir)
+
+    # [skills.*] -> manifest. Keep the first skill's slug for compatibility,
+    # but compose every skill prompt/tool list in declaration order.
     skills = config.get("skills") or {}
     if skills:
         skill_slug = next(iter(skills))
-        skill_cfg = skills[skill_slug] or {}
+        skill_rows: list[dict[str, Any]] = []
+        for slug, raw_cfg in skills.items():
+            cfg = raw_cfg or {}
+            prompt = cfg.get("system_prompt", "")
+            raw_tools = cfg.get("tools", []) or []
+            if not isinstance(prompt, str):
+                raise ManifestReferenceError(f"skills.{slug}.system_prompt must be a string")
+            if not isinstance(raw_tools, list) or any(not isinstance(tool, str) for tool in raw_tools):
+                raise ManifestReferenceError(f"skills.{slug}.tools must be a string array")
+            skill_rows.append(
+                {
+                    "slug": slug,
+                    "system_prompt": prompt,
+                    "tools": list(raw_tools),
+                }
+            )
+        prompts = [str(row["system_prompt"]).strip() for row in skill_rows if row["system_prompt"]]
+        composed_prompt = "\n\n---\n\n".join(prompts)
+        if len(composed_prompt.encode("utf-8")) > _MAX_PROMPT_BYTES:
+            raise ManifestReferenceError(f"composed skill prompts exceed {_MAX_PROMPT_BYTES} bytes")
+        tools: list[Any] = []
+        for row in skill_rows:
+            for tool in row["tools"]:
+                if tool not in tools:
+                    tools.append(tool)
         manifest["skill_slug"] = skill_slug
-        manifest["system_prompt"] = skill_cfg.get("system_prompt", "")
-        manifest["tools"] = skill_cfg.get("tools", [])
+        manifest["skills"] = skill_rows
+        manifest["system_prompt"] = composed_prompt
+        manifest["tools"] = tools
+
+    manifest["payload_sha256"] = hashlib.sha256(zip_bytes).hexdigest()
+    manifest["manifest_path"] = selected_manifest
+    manifest["asset_paths"] = asset_paths
+    manifest["executable_paths"] = executable_paths
+    manifest["requires_payload"] = bool(asset_paths)
 
     # [environment] -> env_vars plus the two structural keys.
     env_section = config.get("environment") or {}
@@ -294,6 +409,137 @@ def _parse_manifest(zip_bytes: bytes, manifest_path: str = "") -> tuple[dict[str
             secrets_refs.append({"env_var": env_var, "uri": ref})
 
     return manifest, secrets_refs
+
+
+def _repo_member_map(zf: zipfile.ZipFile, selected_member: str) -> tuple[dict[str, bytes], str]:
+    """Return ``{repo-relative path: bytes}`` and the selected relative path.
+
+    GitHub/GitLab archives normally wrap the repository in one generated top
+    directory.  The map strips only the selected manifest's first component,
+    making all subsequent include and asset validation independent of the SCM
+    provider's archive prefix.
+    """
+    prefix = selected_member.split("/", 1)[0] if "/" in selected_member else ""
+    members: dict[str, bytes] = {}
+    for info in zf.infolist():
+        if info.is_dir():
+            continue
+        name = info.filename
+        rel = name[len(prefix) + 1 :] if prefix and name.startswith(f"{prefix}/") else name
+        path = _referenced_repo_path(rel, field="archive member")
+        if path in members:
+            raise ManifestReferenceError(f"duplicate archive member {path!r}")
+        members[path] = zf.read(info)
+    selected = selected_member[len(prefix) + 1 :] if prefix else selected_member
+    return members, _referenced_repo_path(selected, field="manifest_path")
+
+
+def _load_manifest_tree(
+    members: dict[str, bytes],
+    path: str,
+    *,
+    stack: tuple[str, ...] = (),
+) -> dict[str, Any]:
+    if path in stack:
+        chain = " -> ".join((*stack, path))
+        raise ManifestReferenceError(f"manifest include cycle: {chain}")
+    if len(stack) >= _MAX_INCLUDE_DEPTH:
+        raise ManifestReferenceError(f"manifest include depth exceeds {_MAX_INCLUDE_DEPTH}")
+    raw = _read_referenced_member(members, path, field="include", max_bytes=_MAX_MANIFEST_BYTES)
+    try:
+        current = tomllib.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+        raise ManifestReferenceError(f"invalid TOML in {path!r}: {exc}") from exc
+
+    includes = current.pop("include", [])
+    if isinstance(includes, str):
+        includes = [includes]
+    if not isinstance(includes, list) or any(not isinstance(item, str) for item in includes):
+        raise ManifestReferenceError(f"top-level include in {path!r} must be a string array")
+
+    merged: dict[str, Any] = {}
+    base_dir = str(PurePosixPath(path).parent)
+    if base_dir == ".":
+        base_dir = ""
+    for include in includes:
+        include_path = _referenced_repo_path(include, base_dir=base_dir, field=f"include in {path}")
+        merged = _deep_merge(merged, _load_manifest_tree(members, include_path, stack=(*stack, path)))
+    return _deep_merge(merged, current)
+
+
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    """Recursively merge TOML tables; later includes/main values win."""
+    out = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            out[key] = _deep_merge(out[key], value)
+        else:
+            out[key] = value
+    return out
+
+
+def _referenced_repo_path(value: str, *, base_dir: str = "", field: str) -> str:
+    if not isinstance(value, str) or not value or "\x00" in value or "\\" in value:
+        raise ManifestReferenceError(f"{field} must be a non-empty POSIX path")
+    raw = PurePosixPath(value)
+    if raw.is_absolute() or ".." in raw.parts:
+        raise ManifestReferenceError(f"{field} path may not be absolute or contain '..': {value!r}")
+    joined = PurePosixPath(base_dir) / raw if base_dir else raw
+    normalized = joined.as_posix()
+    if normalized.startswith("./"):
+        normalized = normalized[2:]
+    if not normalized or normalized == ".":
+        raise ManifestReferenceError(f"{field} resolves to an empty path")
+    return normalized
+
+
+def _read_referenced_member(
+    members: dict[str, bytes], path: str, *, field: str, max_bytes: int | None = None
+) -> bytes:
+    try:
+        value = members[path]
+    except KeyError as exc:
+        raise ManifestReferenceError(f"{field} references missing file {path!r}") from exc
+    if max_bytes is not None and len(value) > max_bytes:
+        raise ManifestReferenceError(f"{field} file {path!r} exceeds {max_bytes} bytes")
+    return value
+
+
+def _collect_assets(
+    config: dict[str, Any], members: dict[str, bytes], manifest_dir: str
+) -> tuple[list[str], list[str]]:
+    """Validate file/script/binary refs and return stable repo-relative lists."""
+    sources: list[tuple[str, dict[str, Any]]] = []
+    assets = config.get("assets") or {}
+    if not isinstance(assets, dict):
+        raise ManifestReferenceError("[assets] must be a TOML table")
+    sources.append(("assets", assets))
+    skills = config.get("skills") or {}
+    if not isinstance(skills, dict):
+        raise ManifestReferenceError("[skills] must be a TOML table")
+    for skill_slug, raw_skill_cfg in skills.items():
+        skill_cfg = raw_skill_cfg or {}
+        if not isinstance(skill_cfg, dict):
+            raise ManifestReferenceError(f"[skills.{skill_slug}] must be a TOML table")
+        sources.append((f"skills.{skill_slug}", skill_cfg))
+
+    all_paths: list[str] = []
+    executables: list[str] = []
+    for label, source in sources:
+        for key in ("files", "scripts", "binaries"):
+            refs = source.get(key, [])
+            if isinstance(refs, str):
+                refs = [refs]
+            if not isinstance(refs, list) or any(not isinstance(item, str) for item in refs):
+                raise ManifestReferenceError(f"{label}.{key} must be a string array")
+            for item in refs:
+                path = _referenced_repo_path(item, base_dir=manifest_dir, field=f"{label}.{key}")
+                _read_referenced_member(members, path, field=f"{label}.{key}")
+                if path not in all_paths:
+                    all_paths.append(path)
+                if key in {"scripts", "binaries"} and path not in executables:
+                    executables.append(path)
+    return all_paths, executables
 
 
 def _store_bundle(*, organization, content_hash: str, zip_bytes: bytes) -> str:

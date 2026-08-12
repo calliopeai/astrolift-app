@@ -23,7 +23,10 @@ because the AWS driver wraps a bare ``SecretString`` under ``"value"``.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
+
+from astrolift_agents.services.agent_package import is_reserved_agent_environment_name
 
 log = logging.getLogger("astrolift_dispatch.agent_secrets")
 
@@ -34,6 +37,7 @@ SECRET_VALUE_KEY = "value"
 # Labels stamped on the per-task Secret so it is discoverable + cleaned up
 # alongside the task's Job (K8sJobSpawner.stop deletes by name).
 _MANAGED_BY = "astrolift-agents"
+_ENV_VAR_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 class AgentSecretResolutionError(Exception):
@@ -73,6 +77,104 @@ def normalize_secret_refs(raw: Any) -> list[dict[str, str]]:
         if uri and env_var:
             out.append({"uri": uri, "env_var": env_var})
     return out
+
+
+def valid_env_var(value: str) -> bool:
+    """Whether ``value`` is safe as a process/Kubernetes env-var name."""
+    return bool(_ENV_VAR_RE.fullmatch(str(value or "")))
+
+
+def valid_agent_env_var(value: str) -> bool:
+    """Whether a user-controlled variable is syntactically safe and not dispatcher-owned."""
+    return valid_env_var(value) and not is_reserved_agent_environment_name(value)
+
+
+def effective_secret_refs(spec) -> list[dict[str, str]]:
+    """Merge manifest refs with persistent operator overrides/tombstones."""
+    refs = {row["env_var"]: row for row in normalize_secret_refs(getattr(spec, "secret_refs", None))}
+    if spec is None or not getattr(spec, "pk", None):
+        return list(refs.values())
+    try:
+        overrides = spec.secret_binding_overrides.filter(deleted_at__isnull=True).order_by("created_at", "pk")
+    except (AttributeError, TypeError):
+        return list(refs.values())
+    for override in overrides:
+        if override.removed:
+            refs.pop(override.env_var, None)
+        elif override.uri:
+            refs[override.env_var] = {"env_var": override.env_var, "uri": override.uri}
+    return list(refs.values())
+
+
+def agent_bundle_refs(spec, *, environment: str = "default"):
+    """Active bundle attachments for one environment, in precedence order.
+
+    Agent tasks currently launch the ``default`` environment.  Filtering here
+    is intentionally fail-closed: an attachment prepared for a future named
+    environment must not leak into today's default task pods.
+    """
+    if spec is None or not getattr(spec, "pk", None):
+        return []
+    try:
+        return list(
+            spec.secret_bundle_refs.select_related("secret_bundle")
+            .filter(
+                environment=environment,
+                deleted_at__isnull=True,
+                secret_bundle__deleted_at__isnull=True,
+            )
+            .order_by("position", "created_at", "pk")
+        )
+    except (AttributeError, TypeError):
+        return []
+
+
+def secret_backend_capabilities(backend) -> dict[str, Any]:
+    """Describe the backing provider's disclosure capability explicitly."""
+    if backend is None:
+        return {
+            "provider": "unavailable",
+            "can_reveal": False,
+            "read_limitation": "No secrets backend is available for this agent.",
+        }
+    cls = type(backend)
+    identity = f"{cls.__module__}.{cls.__name__}".lower()
+    provider = str(getattr(backend, "provider_id", "") or "").strip()
+    explicit_reveal = getattr(backend, "supports_value_reveal", None)
+    explicit_limitation = getattr(backend, "value_reveal_limitation", None)
+    if explicit_reveal is not None:
+        can_reveal = bool(explicit_reveal)
+        return {
+            "provider": provider or "external-secret-store",
+            "can_reveal": can_reveal,
+            "read_limitation": (
+                None
+                if can_reveal
+                else explicit_limitation or f"{provider or 'provider'} does not expose value reads."
+            ),
+        }
+    if "github" in identity:
+        return {
+            "provider": "github-actions",
+            "can_reveal": False,
+            "read_limitation": "GitHub Actions secret values are write-only and cannot be read back.",
+        }
+    provider = provider or "external-secret-store"
+    for needle, label in (
+        ("aws", "aws-secrets-manager"),
+        ("gcp", "gcp-secret-manager"),
+        ("keyvault", "azure-key-vault"),
+        ("vault", "hashicorp-vault"),
+    ):
+        if needle in identity:
+            provider = label
+            break
+    can_reveal = callable(getattr(backend, "get", None))
+    return {
+        "provider": provider,
+        "can_reveal": can_reveal,
+        "read_limitation": None if can_reveal else f"{provider} does not expose value reads.",
+    }
 
 
 def resolve_secrets_backend(cluster) -> Any:
@@ -140,8 +242,10 @@ def env_var_entries(env_vars: Any) -> list[dict[str, str]]:
     out: list[dict[str, str]] = []
     for key, value in (env_vars or {}).items():
         name = str(key).strip()
-        if name:
+        if valid_agent_env_var(name):
             out.append({"name": name, "value": str(value)})
+        elif name:
+            log.warning("agent_secrets: ignoring invalid or dispatcher-owned plain env var %r", name)
     return out
 
 
@@ -172,8 +276,19 @@ def agent_container_env(spec, secret_name: str) -> list[dict]:
     it collides with a plain env var of the same name)."""
     if spec is None:
         return []
-    refs = normalize_secret_refs(getattr(spec, "secret_refs", None))
-    return env_var_entries(getattr(spec, "env_vars", None)) + secret_env_entries(secret_name, refs)
+    refs = effective_secret_refs(spec)
+    bundle_refs: list[dict[str, str]] = []
+    for attachment in agent_bundle_refs(spec):
+        prefix = attachment.prefix or ""
+        for key in attachment.secret_bundle.last_known_keys or []:
+            env_var = f"{prefix}{key}"
+            if valid_agent_env_var(env_var):
+                bundle_refs.append({"env_var": env_var, "uri": attachment.secret_bundle.backend_ref})
+    return (
+        env_var_entries(getattr(spec, "env_vars", None))
+        + secret_env_entries(secret_name, bundle_refs)
+        + secret_env_entries(secret_name, refs)
+    )
 
 
 def build_task_secret_manifest(
@@ -224,8 +339,9 @@ def resolve_task_secret_manifest(
     spawn fails with one readable message instead of the pod later
     crash-looping on an unresolvable ``secretKeyRef``.
     """
-    refs = normalize_secret_refs(getattr(spec, "secret_refs", None))
-    if not refs:
+    refs = effective_secret_refs(spec)
+    bundle_refs = agent_bundle_refs(spec)
+    if not refs and not bundle_refs:
         return None
 
     spec_slug = str(getattr(spec, "slug", "") or "?")
@@ -234,18 +350,58 @@ def resolve_task_secret_manifest(
     except Exception as exc:  # noqa: BLE001 — no secrets driver ⇒ every ref unresolvable
         raise AgentSecretResolutionError(
             spec_slug,
-            [f"{r['env_var']} ({r['uri']})" for r in refs],
+            [f"{r['env_var']} ({r['uri']})" for r in refs]
+            + [f"bundle:{r.secret_bundle.slug}" for r in bundle_refs],
             reason=str(exc),
         ) from exc
 
     resolved: dict[str, str] = {}
     missing: list[str] = []
+    # Bundles merge in attachment order. A later bundle wins, then direct
+    # per-agent refs override every bundle on collision.
+    for attachment in bundle_refs:
+        bundle = attachment.secret_bundle
+        try:
+            payload = backend.get(bundle.backend_ref)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("agent_secrets: bundle read failed for %s: %s", bundle.slug, exc)
+            payload = None
+        if payload is None:
+            missing.append(f"bundle:{bundle.slug} ({bundle.backend_ref})")
+            continue
+        keys: list[str] = []
+        for key, value in payload.items():
+            env_var = f"{attachment.prefix or ''}{key}"
+            if not valid_agent_env_var(env_var):
+                missing.append(f"bundle:{bundle.slug} invalid or dispatcher-owned env var {env_var!r}")
+                continue
+            value = str(value)
+            if not value:
+                missing.append(f"bundle:{bundle.slug} empty value for {key}")
+                continue
+            keys.append(str(key))
+            resolved[env_var] = value
+        normalized_keys = sorted(set(keys))
+        if normalized_keys != list(bundle.last_known_keys or []):
+            bundle.last_known_keys = normalized_keys
+            from django.utils import timezone
+
+            bundle.last_key_enum_at = timezone.now()
+            bundle.save(update_fields=["last_known_keys", "last_key_enum_at", "updated_at", "version"])
     for ref in refs:
         uri, env_var = ref["uri"], ref["env_var"]
+        if not valid_agent_env_var(env_var):
+            missing.append(f"{env_var} ({uri}; invalid or dispatcher-owned env var name)")
+            continue
         try:
             value = read_secret_value(backend, uri)
         except Exception as exc:  # noqa: BLE001 — read failure ⇒ treat as unresolvable
-            log.warning("agent_secrets: read failed for %s (%s): %s", env_var, uri, exc)
+            log.warning(
+                "agent_secrets: read failed for %s (%s): %s",
+                env_var,
+                uri,
+                exc.__class__.__name__,
+            )
             value = None
         if not value:
             missing.append(f"{env_var} ({uri})")
@@ -279,18 +435,44 @@ def probe_ref_statuses(*, cluster, refs: Any) -> list[dict[str, Any]]:
         backend = resolve_secrets_backend(cluster) if cluster is not None else None
         if backend is None and cluster is None:
             backend_error = "org has no managed cluster to resolve a secret store"
-    except Exception as exc:  # noqa: BLE001 — resolution failure must not 500 the status page
-        backend_error = str(exc)
+    except Exception:  # noqa: BLE001 — never reflect provider response bodies
+        backend_error = "secret store unavailable; inspect the provider audit log"
+
+    capabilities = secret_backend_capabilities(backend)
 
     out: list[dict[str, Any]] = []
     for ref in normalized:
         env_var, uri = ref["env_var"], ref["uri"]
         if backend is None:
-            out.append({"env_var": env_var, "uri": uri, "exists": False, "error": backend_error})
+            out.append(
+                {
+                    "env_var": env_var,
+                    "uri": uri,
+                    "exists": False,
+                    "error": backend_error,
+                    **capabilities,
+                }
+            )
             continue
         try:
             value = read_secret_value(backend, uri)
-            out.append({"env_var": env_var, "uri": uri, "exists": bool(value), "error": None})
-        except Exception as exc:  # noqa: BLE001 — swallow into exists=false + error
-            out.append({"env_var": env_var, "uri": uri, "exists": False, "error": str(exc)})
+            out.append(
+                {
+                    "env_var": env_var,
+                    "uri": uri,
+                    "exists": bool(value),
+                    "error": None,
+                    **capabilities,
+                }
+            )
+        except Exception:  # noqa: BLE001 — never reflect provider response bodies
+            out.append(
+                {
+                    "env_var": env_var,
+                    "uri": uri,
+                    "exists": False,
+                    "error": "secret presence check failed; inspect the provider audit log",
+                    **capabilities,
+                }
+            )
     return out

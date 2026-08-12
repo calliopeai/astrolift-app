@@ -273,8 +273,15 @@ def fetch_gitlab_zipball(
         },
     )
     try:
+        from astrolift_scm.providers.archive_download import (
+            ArchiveDownloadTooLarge,
+            read_urllib_response,
+        )
+
         with urllib.request.urlopen(req, timeout=60) as resp:
-            return resp.read()
+            return read_urllib_response(resp)
+    except ArchiveDownloadTooLarge as exc:
+        raise GitlabProviderError("PAYLOAD_TOO_LARGE", str(exc)) from exc
     except urllib.error.HTTPError as exc:
         if exc.code in (401, 403):
             raise GitlabProviderError(

@@ -41,10 +41,11 @@ def test_pat_fetch_builds_authed_url_and_unpacks_tree():
         }
     )
 
-    def _fake_get(url, headers=None, timeout=None, allow_redirects=None):
+    def _fake_get(url, headers=None, timeout=None, allow_redirects=None, stream=None):
         captured["url"] = url
         captured["headers"] = headers or {}
         captured["redirects"] = allow_redirects
+        captured["stream"] = stream
         return SimpleNamespace(content=data, raise_for_status=lambda: None)
 
     with patch("astrolift_scm.providers.repo_tree.requests.get", _fake_get):
@@ -53,6 +54,7 @@ def test_pat_fetch_builds_authed_url_and_unpacks_tree():
     assert captured["url"] == "https://api.github.com/repos/steadymd/smd-agents/zipball/main"
     assert captured["headers"].get("Authorization") == "Bearer tok-abc"
     assert captured["redirects"] is True
+    assert captured["stream"] is True
     # Top-level dir stripped → repo-relative paths.
     assert tree == {
         "agents/emr-bug-triage/astrolift.toml": "astrolift_version = 1\n",

@@ -513,6 +513,42 @@ def test_mutation_unknown_app_returns_not_found(permission_resolver):
     assert result.errors[0].code == "NOT_FOUND"
 
 
+def test_mutation_routes_agent_through_immutable_package_registration(permission_resolver, monkeypatch):
+    org, app = _scaffold(manifest_raw="")
+    app.manifest_path = "agents/triage/astrolift.toml"
+    app.save(update_fields=["manifest_path", "updated_at", "version"])
+    Workload.objects.create(
+        registered_app=app,
+        name="Triage",
+        slug="triage",
+        kind=Workload.Kind.AGENT,
+    )
+    permission_resolver.grant(Permission.APP_UPDATE)
+    calls = []
+
+    def _register(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(
+            status="ok",
+            error=None,
+            agents=[SimpleNamespace(slug="triage")],
+        )
+
+    monkeypatch.setattr(
+        "astrolift_registry.services.manifest_sync.register_agent_repo",
+        _register,
+    )
+    with _ctx(org):
+        result = RegistryMutation().resync_astrolift_manifest_from_repo(
+            _info(),
+            input=ResyncManifestFromRepoInput(app_slug=app.slug),
+        )
+
+    assert result.ok is True, result.errors
+    assert result.data.workloads_changed == ["triage"]
+    assert calls[0]["manifest_paths"] == ["agents/triage/astrolift.toml"]
+
+
 def test_mutation_requires_permission():
     org, app = _scaffold(manifest_raw=_BASE_TOML)
     # No grant — should refuse.

@@ -23,7 +23,7 @@ from types import SimpleNamespace
 import pytest
 
 from astrolift_identity.models import Organization, Project, Team
-from astrolift_registry.models import Container, RegisteredApp, Workload
+from astrolift_registry.models import AppTeamAccess, Container, RegisteredApp, Workload
 from astrolift_registry.schema.mutations import RegisterAgentRepoInput, RegistryMutation
 from astrolift_registry.services.manifest_sync import (
     discover_agent_manifests,
@@ -149,6 +149,15 @@ def test_monorepo_registers_two_agent_workloads(org, with_connection):
     assert workloads.count() == 2
     apps = RegisteredApp.objects.filter(organization=org, deleted_at__isnull=True)
     assert apps.count() == 2
+    assert (
+        AppTeamAccess.objects.filter(
+            registered_app__in=apps,
+            team=project.team,
+            access_level=AppTeamAccess.AccessLevel.OWNER.value,
+            deleted_at__isnull=True,
+        ).count()
+        == 2
+    )
     # Distinct manifest paths is what the (source_repo, manifest_path) key keys on.
     assert {a.manifest_path for a in apps} == {
         "agents/triage/astrolift.toml",
@@ -474,10 +483,7 @@ def test_manifest_paths_all_unknown_is_no_match(org, with_connection):
 
 
 def test_registration_is_scoped_to_project_org(org, other_org, with_connection):
-    """Registering under one org's project creates rows only in that org;
-    a same-named repo under another org is independent (the
-    (source_repo, manifest_path) key is global, so the SECOND org can't
-    re-register the same repo+path — proving the rows belong to the first)."""
+    """Registering under one org's project creates rows only in that org."""
     with_connection(org)
     with_connection(other_org)
     project_a = _project(org, slug="team-a")
@@ -502,6 +508,39 @@ def test_registration_is_scoped_to_project_org(org, other_org, with_connection):
             deleted_at__isnull=True,
         ).count()
         == 0
+    )
+
+
+def test_duplicate_agent_slug_in_same_organization_fails_closed(org, with_connection):
+    with_connection(org)
+    project = _project(org, slug="duplicate-slug")
+    files = {"agents/triage/astrolift.toml": _agent_toml("triage")}
+
+    first = register_agent_repo(
+        project=project,
+        source_kind="github",
+        source_repo="acme/agents-one",
+        ref="main",
+        tree=_tree_of(files),
+    )
+    second = register_agent_repo(
+        project=project,
+        source_kind="github",
+        source_repo="acme/agents-two",
+        ref="main",
+        tree=_tree_of(files),
+    )
+
+    assert first.status == "ok"
+    assert second.status == "error"
+    assert "agent workload slug 'triage' is already registered" in (second.error or "")
+    assert (
+        Workload.objects.filter(
+            registered_app__organization=org,
+            slug="triage",
+            deleted_at__isnull=True,
+        ).count()
+        == 1
     )
 
 

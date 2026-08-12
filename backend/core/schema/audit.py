@@ -7,33 +7,50 @@ Sensitive fields (password, pin, token) are redacted from logged variables.
 """
 
 import logging
-from datetime import datetime
 from typing import Any
 
 from django.conf import settings
 from django.db import models
 from strawberry.extensions import SchemaExtension
 
-from core.models import Tracking
-
 logger = logging.getLogger(__name__)
 
 SENSITIVE_KEYS = {"password", "pin", "token", "secret", "ssn", "credit_card", "secure"}
+SECRET_VALUE_KEYS = {"value", "values", "plaintext"}
 
 
-def _redact(variables: dict | None) -> dict:
-    """Redact sensitive fields from mutation variables."""
-    if not variables:
-        return {}
-    redacted = {}
-    for key, value in variables.items():
-        if any(s in key.lower() for s in SENSITIVE_KEYS):
-            redacted[key] = "***REDACTED***"
-        elif isinstance(value, dict):
-            redacted[key] = _redact(value)
-        else:
-            redacted[key] = value
-    return redacted
+def _redact(value: Any, *, secret_operation: bool = False) -> Any:
+    """Recursively redact sensitive mutation variables.
+
+    Secret mutations commonly name their plaintext argument simply ``value``.
+    Those generic value keys are always redacted: operation names are
+    caller-controlled and a document may contain several mutations, so an
+    action-name heuristic cannot be a confidentiality boundary.
+    """
+    if isinstance(value, dict):
+        redacted = {}
+        for raw_key, child in value.items():
+            key = str(raw_key)
+            normalized = key.lower()
+            sensitive = any(token in normalized for token in SENSITIVE_KEYS)
+            # GraphQL operation names are caller-controlled and one document
+            # may execute more than one mutation. Never make plaintext safety
+            # depend on the operation/action classifier: generic value fields
+            # are cheap to lose from diagnostics and catastrophic to retain
+            # when they belong to a secret mutation.
+            sensitive = sensitive or normalized in SECRET_VALUE_KEYS
+            redacted[key] = (
+                "***REDACTED***" if sensitive else _redact(child, secret_operation=secret_operation)
+            )
+        return redacted
+    if isinstance(value, (list, tuple)):
+        return [_redact(item, secret_operation=secret_operation) for item in value]
+    return value
+
+
+def _is_secret_operation(action: str) -> bool:
+    normalized = (action or "").lower()
+    return ".secret." in normalized or "push_secrets" in normalized or normalized.startswith("secret_bundle.")
 
 
 class MutationAuditLog(models.Model):
@@ -112,7 +129,10 @@ class MutationAuditExtension(SchemaExtension):
                 error_messages = [str(e) for e in result.errors[:5]]
 
             # Redact sensitive variables
-            variables = _redact(request.variables)
+            variables = _redact(
+                request.variables,
+                secret_operation=_is_secret_operation(operation_name),
+            )
 
             MutationAuditLog.objects.create(
                 user=user,

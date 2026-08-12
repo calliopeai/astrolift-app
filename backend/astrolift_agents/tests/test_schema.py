@@ -256,6 +256,41 @@ def test_create_spec_stores_secret_refs_not_values(permission_resolver, info, or
     assert spec.secret_refs == refs
 
 
+@pytest.mark.parametrize(
+    ("input_kwargs", "message"),
+    [
+        ({"env_vars": []}, "envVars must be an object"),
+        ({"env_vars": {"BAD-NAME": "x"}}, "invalid environment variable name"),
+        ({"env_vars": {"AGENT_CALLBACK_URL": "https://attacker.invalid"}}, "dispatcher-owned"),
+        ({"env_vars": {"NESTED": {"x": 1}}}, "must be a scalar or null"),
+        ({"secret_refs": {}}, "secretRefs must be an array"),
+        (
+            {"secret_refs": [{"env_var": "TOKEN", "uri": "sm:x", "value": "plaintext"}]},
+            "unsupported fields: value",
+        ),
+    ],
+)
+def test_create_spec_rejects_malformed_environment_json(
+    permission_resolver, info, org, with_tenant_org, input_kwargs, message
+):
+    _grant_crud(permission_resolver)
+    with with_tenant_org(org):
+        result = AgentsMutation().create_agent_environment_spec(
+            info(),
+            input=CreateAgentEnvironmentSpecInput(
+                name="Bad Environment",
+                slug="bad-environment",
+                agent_type="claude",
+                **input_kwargs,
+            ),
+            org_id=str(org.guid),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "VALIDATION"
+    assert message in result.errors[0].message
+
+
 def test_create_spec_requires_app_create(info, org, with_tenant_org):
     # ``@mutation_audit`` wraps ``@require_permission`` and converts a
     # PermissionDenied into a PERMISSION_DENIED envelope (the mutation
@@ -306,6 +341,22 @@ def test_update_spec_invalid_agent_type(permission_resolver, info, org, with_ten
     assert not result.ok
     assert result.errors[0].code == "VALIDATION"
     assert result.errors[0].field == "agentType"
+
+
+def test_update_spec_rejects_malformed_environment_json(permission_resolver, info, org, with_tenant_org):
+    _grant_crud(permission_resolver)
+    spec = _mk_spec(org, "claude-dev", env_vars={"GOOD": "preserved"})
+    with with_tenant_org(org):
+        result = AgentsMutation().update_agent_environment_spec(
+            info(),
+            slug="claude-dev",
+            input=UpdateAgentEnvironmentSpecInput(env_vars=["not", "an", "object"]),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "VALIDATION"
+    spec.refresh_from_db()
+    assert spec.env_vars == {"GOOD": "preserved"}
 
 
 def test_update_spec_not_found_for_other_org(permission_resolver, info, org, other_org, with_tenant_org):

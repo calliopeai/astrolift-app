@@ -156,6 +156,18 @@ def test_set_unknown_env_var_is_not_found(permission_resolver, info, org, with_t
     assert fake_store.upserts == []
 
 
+def test_set_rejects_empty_value(permission_resolver, info, org, with_tenant_org, fake_store):
+    permission_resolver.grant(Permission.SECRET_WRITE)
+    spec = _spec(org)
+    with with_tenant_org(org):
+        result = AgentsMutation().set_agent_secret_value(
+            info, env_spec_slug=spec.slug, env_var="GITHUB_TOKEN", value=""
+        )
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.VALIDATION.value
+    assert fake_store.upserts == []
+
+
 def test_set_cross_org_spec_is_not_found(permission_resolver, info, org, with_tenant_org, fake_store):
     permission_resolver.grant(Permission.SECRET_WRITE)
     other = Organization.objects.create(name="Other", slug="other-org")
@@ -229,6 +241,22 @@ def test_delete_absent_value_is_idempotent_success(
     assert fake_store.deletes == []
 
 
+def test_delete_removes_present_empty_provider_shell(
+    permission_resolver, info, org, with_tenant_org, fake_store
+):
+    permission_resolver.grant(Permission.SECRET_WRITE)
+    fake_store.store = {"sm:gh": {}}
+    spec = _spec(org)
+
+    with with_tenant_org(org):
+        result = AgentsMutation().delete_agent_secret_value(
+            info, env_spec_slug=spec.slug, env_var="GITHUB_TOKEN"
+        )
+
+    assert result.ok is True, result.errors
+    assert fake_store.deletes == ["sm:gh"]
+
+
 def test_delete_denied_without_secret_write(permission_resolver, info, org, with_tenant_org, fake_store):
     spec = _spec(org)
     with with_tenant_org(org):
@@ -290,3 +318,336 @@ def test_status_denied_without_read_perms(permission_resolver, info, org, with_t
     with pytest.raises(PermissionDenied):
         with with_tenant_org(org):
             AgentsQuery().agent_environment_spec_secret_status(info, slug=spec.slug)
+
+
+def test_binding_crud_is_a_durable_override_layer(
+    permission_resolver, info, org, with_tenant_org, fake_store
+):
+    from astrolift_dispatch.agent_secrets import effective_secret_refs
+
+    permission_resolver.grant(Permission.SECRET_WRITE)
+    spec = _spec(org, refs=[{"uri": "sm:source", "env_var": "SOURCE_TOKEN"}])
+    with with_tenant_org(org):
+        added = AgentsMutation().upsert_agent_secret_ref(
+            info,
+            env_spec_slug=spec.slug,
+            env_var="UI_TOKEN",
+            uri="sm:ui",
+        )
+        removed = AgentsMutation().remove_agent_secret_ref(
+            info,
+            env_spec_slug=spec.slug,
+            env_var="SOURCE_TOKEN",
+        )
+
+    assert added.ok is True, added.errors
+    assert removed.ok is True, removed.errors
+    assert effective_secret_refs(spec) == [{"env_var": "UI_TOKEN", "uri": "sm:ui"}]
+    # Source ownership stays intact; the tombstone survives a later manifest
+    # sync that writes this field again.
+    spec.refresh_from_db()
+    assert spec.secret_refs == [{"uri": "sm:source", "env_var": "SOURCE_TOKEN"}]
+
+
+def test_binding_rejects_identifiers_that_exceed_storage_limits(
+    permission_resolver, info, org, with_tenant_org, fake_store
+):
+    permission_resolver.grant(Permission.SECRET_WRITE)
+    spec = _spec(org)
+
+    with with_tenant_org(org):
+        long_env = AgentsMutation().upsert_agent_secret_ref(
+            info,
+            env_spec_slug=spec.slug,
+            env_var="A" * 256,
+            uri="sm:valid",
+        )
+        long_uri = AgentsMutation().upsert_agent_secret_ref(
+            info,
+            env_spec_slug=spec.slug,
+            env_var="VALID_TOKEN",
+            uri="x" * 513,
+        )
+        reserved = AgentsMutation().upsert_agent_secret_ref(
+            info,
+            env_spec_slug=spec.slug,
+            env_var="AGENT_CALLBACK_URL",
+            uri="sm:redirect",
+        )
+
+    assert long_env.ok is False
+    assert long_env.errors[0].field == "envVar"
+    assert long_uri.ok is False
+    assert long_uri.errors[0].field == "uri"
+    assert reserved.ok is False
+    assert reserved.errors[0].field == "envVar"
+
+    # The oversized caller input is also used in the mutation's audit target.
+    # Audit fitting must not poison the surrounding test/request transaction.
+    assert AgentEnvironmentSpec.objects.filter(pk=spec.pk).exists()
+
+
+def test_reveal_agent_secret_is_explicit_read(permission_resolver, info, org, with_tenant_org, fake_store):
+    permission_resolver.grant(Permission.SECRET_READ)
+    fake_store.store = {"sm:gh": {"value": "ghp_revealed"}}
+    spec = _spec(org)
+
+    with with_tenant_org(org):
+        result = AgentsMutation().reveal_agent_secret_value(
+            info, env_spec_slug=spec.slug, env_var="GITHUB_TOKEN"
+        )
+
+    assert result.ok is True, result.errors
+    assert result.data.value == "ghp_revealed"
+    assert result.data.env_var == "GITHUB_TOKEN"
+    assert result.data.provider == "external-secret-store"
+
+
+def test_reveal_reports_write_only_provider_limitation(
+    permission_resolver, info, org, with_tenant_org, monkeypatch
+):
+    class GitHubActionsSecrets:
+        provider_id = "github-actions"
+        supports_value_reveal = False
+        value_reveal_limitation = "GitHub Actions secret values are write-only."
+
+        def get(self, path):  # pragma: no cover - capability gate runs first
+            return None
+
+    permission_resolver.grant(Permission.SECRET_READ)
+    backend = GitHubActionsSecrets()
+    import astrolift_agents.services.agent_cluster as agent_cluster
+    import core.app_deploy as app_deploy
+
+    monkeypatch.setattr(agent_cluster, "resolve_agent_cluster", lambda _org: object())
+    monkeypatch.setattr(app_deploy, "driver_for_capability", lambda _c, _cap: backend)
+    spec = _spec(org)
+
+    with with_tenant_org(org):
+        result = AgentsMutation().reveal_agent_secret_value(
+            info, env_spec_slug=spec.slug, env_var="GITHUB_TOKEN"
+        )
+
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.PRECONDITION.value
+    assert "write-only" in result.errors[0].message
+
+
+def test_bundle_crud_attach_and_runtime_precedence(
+    permission_resolver, info, org, with_tenant_org, fake_store
+):
+    from astrolift_dispatch.agent_secrets import resolve_task_secret_manifest
+
+    permission_resolver.grant(Permission.SECRET_WRITE)
+    permission_resolver.grant(Permission.SECRET_READ)
+    permission_resolver.grant(Permission.SECRET_LIST)
+    spec = _spec(org, refs=[{"uri": "sm:direct", "env_var": "SHARED_TOKEN"}])
+    fake_store.store["sm:direct"] = {"value": "direct-wins"}
+
+    with with_tenant_org(org):
+        created = AgentsMutation().create_agent_secret_bundle(
+            info,
+            env_spec_slug=spec.slug,
+            name="EMR shared",
+            slug="emr-shared",
+            backend_ref="bundles/emr",
+        )
+        assert created.ok is True, created.errors
+        bundle_id = created.data.id
+        duplicate = AgentsMutation().create_agent_secret_bundle(
+            info,
+            env_spec_slug=spec.slug,
+            name="Duplicate",
+            slug="emr-shared",
+            backend_ref="bundles/duplicate",
+        )
+        empty = AgentsMutation().set_agent_bundle_secret_value(
+            info,
+            env_spec_slug=spec.slug,
+            bundle_id=bundle_id,
+            key="EMPTY_VALUE",
+            value="",
+        )
+        reserved = AgentsMutation().set_agent_bundle_secret_value(
+            info,
+            env_spec_slug=spec.slug,
+            bundle_id=bundle_id,
+            key="ASTROLIFT_CLUSTER_KEY",
+            value="must-not-shadow-runtime-auth",
+        )
+        first = AgentsMutation().set_agent_bundle_secret_value(
+            info,
+            env_spec_slug=spec.slug,
+            bundle_id=bundle_id,
+            key="SHARED_TOKEN",
+            value="bundle-loses",
+        )
+        second = AgentsMutation().set_agent_bundle_secret_value(
+            info,
+            env_spec_slug=spec.slug,
+            bundle_id=bundle_id,
+            key="BUNDLE_ONLY",
+            value="bundle-value",
+        )
+        attached = AgentsMutation().attach_agent_secret_bundle(
+            info,
+            env_spec_slug=spec.slug,
+            bundle_id=bundle_id,
+            prefix="",
+            position=5,
+        )
+        bundles = AgentsQuery().agent_secret_bundles(info, env_spec_slug=spec.slug)
+        attachments = AgentsQuery().agent_environment_spec_secret_bundle_attachments(info, slug=spec.slug)
+
+    assert duplicate.ok is False
+    assert duplicate.errors[0].code == ErrorCode.CONFLICT.value
+    assert empty.ok is False
+    assert empty.errors[0].code == ErrorCode.VALIDATION.value
+    assert reserved.ok is False
+    assert reserved.errors[0].code == ErrorCode.VALIDATION.value
+    assert first.ok is True and second.ok is True
+    assert attached.ok is True, attached.errors
+    assert bundles[0].key_names == ["BUNDLE_ONLY", "SHARED_TOKEN"]
+    assert bundles[0].can_reveal is True
+    assert attachments[0].position == 5
+
+    manifest = resolve_task_secret_manifest(
+        cluster=object(),
+        spec=spec,
+        secret_name="agent-task-x-secrets",
+        namespace="ns",
+        task_guid="task-x",
+    )
+    assert manifest["stringData"] == {
+        "BUNDLE_ONLY": "bundle-value",
+        "SHARED_TOKEN": "direct-wins",
+    }
+
+    with with_tenant_org(org):
+        renamed = AgentsMutation().update_agent_secret_bundle(
+            info,
+            env_spec_slug=spec.slug,
+            bundle_id=bundle_id,
+            name="EMR shared renamed",
+            backend_ref="bundles/emr",
+        )
+        blocked_move = AgentsMutation().update_agent_secret_bundle(
+            info,
+            env_spec_slug=spec.slug,
+            bundle_id=bundle_id,
+            name="EMR moved",
+            backend_ref="bundles/emr-moved",
+        )
+        revealed = AgentsMutation().reveal_agent_bundle_secret_value(
+            info,
+            env_spec_slug=spec.slug,
+            bundle_id=bundle_id,
+            key="BUNDLE_ONLY",
+        )
+        blocked_delete = AgentsMutation().delete_agent_secret_bundle(
+            info, env_spec_slug=spec.slug, bundle_id=bundle_id
+        )
+        detached = AgentsMutation().detach_agent_secret_bundle(
+            info,
+            env_spec_slug=spec.slug,
+            attachment_id=attached.data.id,
+        )
+        deleted = AgentsMutation().delete_agent_secret_bundle(
+            info, env_spec_slug=spec.slug, bundle_id=bundle_id
+        )
+
+    assert renamed.ok is True
+    assert blocked_move.ok is False
+    assert blocked_move.errors[0].code == ErrorCode.PRECONDITION.value
+    assert revealed.ok is True and revealed.data.value == "bundle-value"
+    assert blocked_delete.ok is False
+    assert blocked_delete.errors[0].code == ErrorCode.PRECONDITION.value
+    assert detached.ok is True
+    assert deleted.ok is True
+    assert "bundles/emr" in fake_store.deletes
+
+
+def test_default_bundle_backend_path_is_organization_scoped(
+    permission_resolver, info, org, with_tenant_org, fake_store
+):
+    permission_resolver.grant(Permission.SECRET_WRITE)
+    spec = _spec(org)
+
+    with with_tenant_org(org):
+        result = AgentsMutation().create_agent_secret_bundle(
+            info,
+            env_spec_slug=spec.slug,
+            name="Shared defaults",
+            slug="shared-defaults",
+        )
+
+    assert result.ok is True, result.errors
+    assert result.data.backend_ref == f"agent-bundles/{org.guid}/shared-defaults"
+
+
+def test_bundle_backend_move_checks_live_store_not_stale_key_cache(
+    permission_resolver, info, org, with_tenant_org, fake_store
+):
+    """Out-of-band provider writes may precede key-cache enumeration."""
+    permission_resolver.grant(Permission.SECRET_WRITE)
+    spec = _spec(org)
+    with with_tenant_org(org):
+        created = AgentsMutation().create_agent_secret_bundle(
+            info,
+            env_spec_slug=spec.slug,
+            name="External bundle",
+            slug="external-bundle",
+            backend_ref="bundles/external",
+        )
+    assert created.ok is True, created.errors
+    fake_store.store["bundles/external"] = {"EXTERNAL_TOKEN": "present"}
+
+    with with_tenant_org(org):
+        moved = AgentsMutation().update_agent_secret_bundle(
+            info,
+            env_spec_slug=spec.slug,
+            bundle_id=created.data.id,
+            name="External bundle",
+            backend_ref="bundles/moved",
+        )
+
+    assert moved.ok is False
+    assert moved.errors[0].code == ErrorCode.PRECONDITION.value
+    assert "contains keys" in moved.errors[0].message
+
+
+def test_non_default_bundle_is_not_injected_into_default_agent_run(
+    permission_resolver, info, org, with_tenant_org, fake_store
+):
+    from astrolift_dispatch.agent_secrets import resolve_task_secret_manifest
+
+    permission_resolver.grant(Permission.SECRET_WRITE)
+    spec = _spec(org, refs=[])
+    with with_tenant_org(org):
+        created = AgentsMutation().create_agent_secret_bundle(
+            info,
+            env_spec_slug=spec.slug,
+            name="Production only",
+            slug="production-only",
+            backend_ref="bundles/production",
+        )
+        assert created.ok is True, created.errors
+        attached = AgentsMutation().attach_agent_secret_bundle(
+            info,
+            env_spec_slug=spec.slug,
+            bundle_id=created.data.id,
+            environment="production",
+        )
+        assert attached.ok is True, attached.errors
+
+    fake_store.store["bundles/production"] = {"PROD_TOKEN": "must-not-leak"}
+    assert (
+        resolve_task_secret_manifest(
+            cluster=object(),
+            spec=spec,
+            secret_name="agent-task-x-secrets",
+            namespace="ns",
+            task_guid="task-x",
+        )
+        is None
+    )

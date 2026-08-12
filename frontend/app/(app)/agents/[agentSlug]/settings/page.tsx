@@ -22,7 +22,7 @@ export default async function AgentSettingsPage({
             {/* Agent-context-only Model access card, above the shared app
                 settings content but inside the agent shell chrome. */}
             <AgentModelAccessCard agentSlug={agentSlug} />
-            <SettingsClient slug={agentSlug} />
+            <SettingsClient slug={agentSlug} resourceKind="agent" />
           </AgentAppSurface>
         </PreloadQuery>
       </PreloadQuery>

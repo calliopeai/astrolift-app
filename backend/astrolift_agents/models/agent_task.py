@@ -10,8 +10,8 @@ State machine (issue #44):
     QUEUED → PROVISIONING: dispatcher selected + spawn request sent
     PROVISIONING → RUNNING: Dispatch Service confirms container started
     RUNNING → COMPLETED | FAILED | TIMED_OUT | CANCELLED: terminal
-    CANCELLED: only from DRAFT | QUEUED | PROVISIONING
-      (RUNNING requires a stop signal to the Dispatcher)
+    CANCELLED from RUNNING is allowed only after the caller sends a stop
+    signal to the Dispatcher; ``transition_to`` records the resulting state.
 
 The allowed graph is encoded in ``_TRANSITIONS`` — ``transition_to`` is
 the only sanctioned way to advance status.
@@ -20,7 +20,7 @@ the only sanctioned way to advance status.
 from __future__ import annotations
 
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 from core.models.base import BaseCoreModel
@@ -104,6 +104,9 @@ class AgentTask(BaseCoreModel):
     external_id = models.CharField(max_length=255, blank=True, default="")
     # Push-mode: Controller POSTs result here on terminal transition.
     callback_url = models.URLField(blank=True, default="")
+    # SHA-256 of the short-lived, task-scoped callback Bearer token injected
+    # into the pod.  The plaintext is minted at spawn and never persisted.
+    callback_token_hash = models.CharField(max_length=64, blank=True, default="")
     timeout_seconds = models.IntegerField(default=300)
     # Terminal outputs — only one is populated depending on outcome.
     result = models.JSONField(null=True, blank=True)
@@ -194,10 +197,23 @@ class AgentTask(BaseCoreModel):
 
     # Allowed forward transitions.  Terminal states map to empty sets.
     _TRANSITIONS: dict[str, set[str]] = {
-        Status.DRAFT: {Status.QUEUED, Status.CANCELLED},
-        Status.QUEUED: {Status.PROVISIONING, Status.CANCELLED},
-        Status.PROVISIONING: {Status.RUNNING, Status.CANCELLED, Status.FAILED},
-        Status.RUNNING: {Status.COMPLETED, Status.FAILED, Status.TIMED_OUT},
+        # Preparation and durable-workflow enqueue can fail before a container
+        # exists; those are real terminal failures, not immortal draft/queued
+        # rows. Cancellation remains legal in both pre-spawn states.
+        Status.DRAFT: {Status.QUEUED, Status.CANCELLED, Status.FAILED},
+        Status.QUEUED: {Status.PROVISIONING, Status.CANCELLED, Status.FAILED, Status.TIMED_OUT},
+        Status.PROVISIONING: {
+            Status.RUNNING,
+            Status.CANCELLED,
+            Status.FAILED,
+            Status.TIMED_OUT,
+        },
+        Status.RUNNING: {
+            Status.COMPLETED,
+            Status.FAILED,
+            Status.TIMED_OUT,
+            Status.CANCELLED,
+        },
         Status.COMPLETED: set(),
         Status.FAILED: set(),
         Status.TIMED_OUT: set(),
@@ -221,7 +237,7 @@ class AgentTask(BaseCoreModel):
                 allowed = self._TRANSITIONS.get(current_db, set())
                 if self.status not in allowed:
                     raise ValidationError(
-                        f"AgentTask({self.pk}) cannot transition " f"{current_db!r} → {self.status!r}"
+                        f"AgentTask({self.pk}) cannot transition {current_db!r} → {self.status!r}"
                     )
 
     def transition_to(self, new_status: str) -> None:
@@ -230,42 +246,45 @@ class AgentTask(BaseCoreModel):
         Raises ``ValueError`` for invalid transitions so callers can
         surface the reason without catching a broad exception class.
         """
-        current = self.status
-        allowed = self._TRANSITIONS.get(current, set())
-        if new_status not in allowed:
-            raise ValueError(f"AgentTask({self.pk}) cannot transition {current!r} → {new_status!r}")
-        now = timezone.now()
-        self.status = new_status
-        if new_status == self.Status.QUEUED:
-            self.queued_at = self.queued_at or now
-        elif new_status == self.Status.PROVISIONING:
-            self.provisioning_at = self.provisioning_at or now
-        elif new_status == self.Status.RUNNING:
-            self.started_at = self.started_at or now
-            # The framebuffer only exists once the pod is RUNNING; publish
-            # the relay path now so the GraphQL read surface can expose it.
-            if self.vnc_enabled and not self.vnc_url:
-                self.vnc_url = f"/app/vnc/{self.guid}"
-        elif new_status in {
-            self.Status.COMPLETED,
-            self.Status.FAILED,
-            self.Status.TIMED_OUT,
-            self.Status.CANCELLED,
-        }:
-            self.ended_at = self.ended_at or now
+        with transaction.atomic():
+            task = type(self).all_objects.select_for_update().get(pk=self.pk)
+            current = task.status
+            allowed = self._TRANSITIONS.get(current, set())
+            if new_status not in allowed:
+                raise ValueError(f"AgentTask({self.pk}) cannot transition {current!r} → {new_status!r}")
+            now = timezone.now()
+            task.status = new_status
+            if new_status == self.Status.QUEUED:
+                task.queued_at = task.queued_at or now
+            elif new_status == self.Status.PROVISIONING:
+                task.provisioning_at = task.provisioning_at or now
+            elif new_status == self.Status.RUNNING:
+                task.started_at = task.started_at or now
+                if task.vnc_enabled and not task.vnc_url:
+                    task.vnc_url = f"/app/vnc/{task.guid}"
+            elif new_status in {
+                self.Status.COMPLETED,
+                self.Status.FAILED,
+                self.Status.TIMED_OUT,
+                self.Status.CANCELLED,
+            }:
+                task.ended_at = task.ended_at or now
+                task.callback_token_hash = ""
 
-        self.save(
-            update_fields=[
+            fields = [
                 "status",
                 "queued_at",
                 "provisioning_at",
                 "started_at",
                 "ended_at",
                 "vnc_url",
+                "callback_token_hash",
                 "updated_at",
                 "version",
             ]
-        )
+            task.save(update_fields=fields)
+            for field in fields:
+                setattr(self, field, getattr(task, field))
 
     def __str__(self) -> str:
         return f"AgentTask {self.guid} ({self.status})"

@@ -3,6 +3,7 @@
 import { useMutation } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
+  CableIcon,
   CheckCircle2Icon,
   CopyIcon,
   KeyIcon,
@@ -67,13 +68,28 @@ const SCOPE_CHOICES = [
     hint: "List clusters, view kubeconfig metadata, read provider state.",
   },
   {
+    value: "mcp:read",
+    label: "MCP read",
+    hint: "List agent packages and inspect run status through remote MCP.",
+  },
+  {
+    value: "mcp:dispatch",
+    label: "MCP dispatch",
+    hint: "Run and hard-stop agents through remote MCP.",
+  },
+  {
+    value: "mcp:write",
+    label: "MCP write",
+    hint: "Sync agent repositories and package definitions through remote MCP.",
+  },
+  {
     value: "admin",
     label: "Admin",
     hint: "Full power — implies every other scope. Use sparingly.",
   },
 ] as const;
 
-const DEFAULT_SELECTED_SCOPES: string[] = SCOPE_CHOICES.map((s) => s.value);
+const DEFAULT_SELECTED_SCOPES: string[] = ["read:apps", "read:clusters", "mcp:read"];
 
 export function TokensClient() {
   const [open, setOpen] = React.useState(false);
@@ -82,6 +98,11 @@ export function TokensClient() {
   const [selectedScopes, setSelectedScopes] = React.useState<string[]>(DEFAULT_SELECTED_SCOPES);
   const [createdToken, setCreatedToken] = React.useState<AstroliftApiTokenPlaintext | null>(null);
   const [revokeTarget, setRevokeTarget] = React.useState<AstroliftApiToken | null>(null);
+  const [mcpEndpoint, setMcpEndpoint] = React.useState("/api/mcp/v1/");
+
+  React.useEffect(() => {
+    setMcpEndpoint(`${window.location.origin}/api/mcp/v1/`);
+  }, []);
 
   const table = useCursorTable<AstroliftApiToken>({
     query: LIST_API_TOKENS_PAGE,
@@ -160,6 +181,11 @@ export function TokensClient() {
     toast.success("Copied to clipboard");
   }
 
+  function copyMcpEndpoint() {
+    navigator.clipboard.writeText(mcpEndpoint);
+    toast.success("MCP endpoint copied");
+  }
+
   const columns: Column<AstroliftApiToken>[] = [
     {
       id: "name",
@@ -183,7 +209,7 @@ export function TokensClient() {
             <span className="text-muted-foreground text-xs">none</span>
           ) : (
             t.scopes.map((s) => (
-              <Badge key={s} variant="outline" className="font-mono text-2xs">
+              <Badge key={s} variant="outline" className="text-2xs font-mono">
                 {s}
               </Badge>
             ))
@@ -264,11 +290,41 @@ export function TokensClient() {
           </Can>
         }
       >
+        <Card>
+          <CardContent className="space-y-3 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 font-medium">
+                  <CableIcon className="size-4" /> Remote agent MCP
+                </div>
+                <p className="text-muted-foreground max-w-3xl text-xs">
+                  Connect CI or coding clients over authenticated Streamable HTTP. Send an API token
+                  as <code>Authorization: Bearer alft_at_…</code>. MCP scopes still require the
+                  token owner&apos;s matching agent permissions; secret values are not exposed.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <code className="bg-muted rounded px-2 py-1.5 font-mono text-xs">
+                  {mcpEndpoint}
+                </code>
+                <Button size="sm" variant="outline" onClick={copyMcpEndpoint}>
+                  <CopyIcon className="size-4" /> Copy URL
+                </Button>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <Badge variant="outline">mcp:read · inspect packages/tasks</Badge>
+              <Badge variant="outline">mcp:dispatch · run/kill</Badge>
+              <Badge variant="outline">mcp:write · sync repos</Badge>
+            </div>
+          </CardContent>
+        </Card>
+
         {createdToken && (
           <Card className="border-success-border bg-success/5">
             <CardContent className="flex flex-col gap-3 p-4">
               <div className="flex items-center gap-2">
-                <CheckCircle2Icon className="size-4 text-success-fg" />
+                <CheckCircle2Icon className="text-success-fg size-4" />
                 <p className="text-sm font-medium">
                   Token <span className="font-mono">{createdToken.apiToken.name}</span> created
                 </p>
@@ -376,7 +432,8 @@ export function TokensClient() {
                   })}
                 </div>
                 <p className="text-muted-foreground text-xs">
-                  Token may only exercise these scopes. ``admin`` is the full-power wildcard.
+                  Token may only exercise these scopes. <code>admin</code> is the full-power
+                  wildcard and is never selected by default.
                 </p>
               </div>
               <div className="space-y-2">
@@ -449,9 +506,9 @@ function LastUsedCell({ token }: { token: AstroliftApiToken }) {
         </span>
       </TooltipTrigger>
       <TooltipContent className="max-w-sm">
-        <p className="font-mono text-2xs">IP: {token.lastUsedIp ?? "—"}</p>
+        <p className="text-2xs font-mono">IP: {token.lastUsedIp ?? "—"}</p>
         {token.lastUsedAgent && (
-          <p className="font-mono text-2xs break-all opacity-75">UA: {token.lastUsedAgent}</p>
+          <p className="text-2xs font-mono break-all opacity-75">UA: {token.lastUsedAgent}</p>
         )}
       </TooltipContent>
     </Tooltip>

@@ -22,8 +22,12 @@ runtime ecosystem file) just hint.
 from __future__ import annotations
 
 import dataclasses
+import fnmatch
+import hashlib
 import re
+import tomllib
 from collections.abc import Mapping
+from pathlib import PurePosixPath
 from typing import Any
 
 # ---- runtime detection --------------------------------------------------
@@ -312,6 +316,17 @@ def infer_manifest_from_signals(
 # and is ignored so a vendored fixture or example dir doesn't register.
 _AGENTS_DIR = "agents"
 _MANIFEST_BASENAME = "astrolift.toml"
+_FEDERATION_BASENAME = "astrolift.agents.toml"
+_FEDERATION_SCHEMA = "astrolift.agent.federation/v1"
+
+
+class AgentFederationError(ValueError):
+    """The repo's explicit agent-bundle boundary is malformed.
+
+    A present-but-invalid bundle must fail closed. Falling back to the legacy
+    broad ``agents/*`` scan would silently ignore exclusions and could
+    register code the repo owner deliberately kept outside the bundle.
+    """
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -333,6 +348,125 @@ class DiscoveredAgentManifest:
     slug: str
     workload_kind: str
     raw_text: str
+    federation: dict[str, Any] = dataclasses.field(default_factory=dict)
+
+
+def _safe_federation_path(value: Any, *, field: str, allow_glob: bool = False) -> str:
+    raw = str(value or "").strip().removeprefix("./")
+    if not raw or "\x00" in raw or "\\" in raw:
+        raise AgentFederationError(f"{field} must be a non-empty POSIX path")
+    path = PurePosixPath(raw)
+    if path.is_absolute() or ".." in path.parts:
+        raise AgentFederationError(f"{field} may not be absolute or contain '..': {raw!r}")
+    if not allow_glob and any(char in raw for char in "*?["):
+        raise AgentFederationError(f"{field} may not contain glob characters: {raw!r}")
+    return raw
+
+
+def _string_globs(value: Any, *, field: str, default: tuple[str, ...] = ()) -> list[str]:
+    if value is None:
+        value = list(default)
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        raise AgentFederationError(f"{field} must be a string array")
+    return [_safe_federation_path(item, field=field, allow_glob=True) for item in value]
+
+
+def _federated_candidates(files: Mapping[str, Any]) -> dict[str, dict[str, Any]] | None:
+    """Return selected manifest paths + member metadata for an explicit bundle.
+
+    ``None`` means no federation file is present and legacy discovery should
+    apply. An empty dict is a valid bundle that currently selects no agents.
+    """
+    raw_text = files.get(_FEDERATION_BASENAME)
+    if raw_text is None:
+        return None
+    if not isinstance(raw_text, str) or not raw_text.strip():
+        raise AgentFederationError(f"{_FEDERATION_BASENAME} must contain TOML text")
+    try:
+        raw = tomllib.loads(raw_text)
+    except tomllib.TOMLDecodeError as exc:
+        raise AgentFederationError(f"invalid {_FEDERATION_BASENAME}: {exc}") from exc
+
+    schema = str(raw.get("schema") or "").strip()
+    if schema != _FEDERATION_SCHEMA:
+        raise AgentFederationError(f"{_FEDERATION_BASENAME}.schema must be {_FEDERATION_SCHEMA!r}")
+    name = str(raw.get("name") or "").strip()
+    if not name:
+        raise AgentFederationError(f"{_FEDERATION_BASENAME}.name is required")
+    include = _string_globs(
+        raw.get("include"),
+        field=f"{_FEDERATION_BASENAME}.include",
+        default=("agents/*/astrolift.toml",),
+    )
+    exclude = _string_globs(raw.get("exclude"), field=f"{_FEDERATION_BASENAME}.exclude")
+    auto_register_new = raw.get("auto_register_new", False)
+    if not isinstance(auto_register_new, bool):
+        raise AgentFederationError(f"{_FEDERATION_BASENAME}.auto_register_new must be a boolean")
+
+    candidate_paths = sorted(
+        path
+        for path in files
+        if auto_register_new
+        and path != _FEDERATION_BASENAME
+        and path.endswith(f"/{_MANIFEST_BASENAME}")
+        and any(fnmatch.fnmatchcase(path, pattern) for pattern in include)
+        and not any(fnmatch.fnmatchcase(path, pattern) for pattern in exclude)
+    )
+    selected: dict[str, dict[str, Any]] = {path: {} for path in candidate_paths}
+
+    members = raw.get("agents") or []
+    if not isinstance(members, list):
+        raise AgentFederationError(f"{_FEDERATION_BASENAME}.agents must be an array of tables")
+    disabled_paths: set[str] = set()
+    aliases: set[str] = set()
+    for index, member in enumerate(members):
+        field = f"{_FEDERATION_BASENAME}.agents[{index}]"
+        if not isinstance(member, dict):
+            raise AgentFederationError(f"{field} must be a table")
+        path = _safe_federation_path(member.get("manifest"), field=f"{field}.manifest")
+        if not path.endswith(_MANIFEST_BASENAME):
+            raise AgentFederationError(f"{field}.manifest must point to an astrolift.toml")
+        enabled = member.get("enabled", True)
+        if not isinstance(enabled, bool):
+            raise AgentFederationError(f"{field}.enabled must be a boolean")
+        alias = str(member.get("alias") or PurePosixPath(path).parent.name).strip()
+        if not alias or "/" in alias or "\\" in alias:
+            raise AgentFederationError(f"{field}.alias must be one path-free name")
+        if alias in aliases:
+            raise AgentFederationError(f"duplicate federation agent alias {alias!r}")
+        aliases.add(alias)
+        if not enabled:
+            disabled_paths.add(path)
+            selected.pop(path, None)
+            continue
+        if path not in files:
+            raise AgentFederationError(f"{field}.manifest {path!r} does not exist")
+        if any(fnmatch.fnmatchcase(path, pattern) for pattern in exclude):
+            raise AgentFederationError(
+                f"{field}.manifest {path!r} is excluded by {_FEDERATION_BASENAME}.exclude"
+            )
+        selected[path] = {"alias": alias}
+
+    for path in disabled_paths:
+        selected.pop(path, None)
+    ordered_paths = sorted(selected)
+    anchor = ordered_paths[0] if ordered_paths else ""
+    digest = hashlib.sha256(raw_text.encode("utf-8")).hexdigest()
+    for path in ordered_paths:
+        selected[path] = {
+            "schema": _FEDERATION_SCHEMA,
+            "name": name,
+            "manifest_path": _FEDERATION_BASENAME,
+            "definition_sha256": digest,
+            "member": selected[path].get("alias") or PurePosixPath(path).parent.name,
+            "anchor_manifest": anchor,
+            "auto_register_new": auto_register_new,
+            "include": include,
+            "exclude": exclude,
+        }
+    return selected
 
 
 def _candidate_manifest_paths(files: Mapping[str, Any]) -> list[str]:
@@ -403,7 +537,9 @@ def scan_agent_manifests(files: Mapping[str, Any]) -> list[DiscoveredAgentManife
     surfaces "no agents found" to the operator.
     """
     found: list[DiscoveredAgentManifest] = []
-    for path in _candidate_manifest_paths(files):
+    federated = _federated_candidates(files)
+    candidate_paths = sorted(federated) if federated is not None else _candidate_manifest_paths(files)
+    for path in candidate_paths:
         parsed = _parse_agent_manifest(files.get(path) if isinstance(files.get(path), str) else None)
         if parsed is None:
             continue
@@ -415,6 +551,7 @@ def scan_agent_manifests(files: Mapping[str, Any]) -> list[DiscoveredAgentManife
                 slug=slug,
                 workload_kind=kind,
                 raw_text=files[path],
+                federation=(federated or {}).get(path, {}),
             )
         )
     return found

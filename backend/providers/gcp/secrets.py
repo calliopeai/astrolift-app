@@ -23,6 +23,10 @@ class GCPSecretsConfig:
 
 
 class GCPSecretsBackend(SecretsBackend):
+    provider_id = "gcp-secret-manager"
+    supports_value_reveal = True
+    value_reveal_limitation = None
+
     def __init__(self, *, config: GCPSecretsConfig) -> None:
         self._config = config
         if config.client is not None:

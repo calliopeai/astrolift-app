@@ -39,9 +39,12 @@ from astrolift_identity.api_tokens import (
     SCOPE_WRITE_APPS,
     client_ip_from_request,
     enforce_scopes,
+    get_current_api_token,
     has_scope,
     mint_token,
     normalize_scopes,
+    reset_current_api_token,
+    set_current_api_token,
     touch_token,
     validate_scopes,
     verify_token,
@@ -52,7 +55,7 @@ from astrolift_identity.schema.mutations import (
     CreateApiTokenInput,
     IdentityMutation,
 )
-from core.permissions import Permission
+from core.permissions import Permission, PermissionDenied, check_permission
 from core.tenancy import TenantContext, tenant_context
 
 pytestmark = pytest.mark.django_db
@@ -339,6 +342,42 @@ def test_enforce_scopes_returns_first_missing():
     _, row = _make_token(user, org, scopes=[SCOPE_READ_APPS])
     assert enforce_scopes(row, (SCOPE_READ_APPS,)) is None
     assert enforce_scopes(row, (SCOPE_WRITE_APPS,)) == SCOPE_WRITE_APPS
+
+
+def test_api_token_scope_is_a_ceiling_over_rbac(permission_resolver):
+    org = Organization.objects.create(name="X", slug="scope-ceiling")
+    user = _admin_user()
+    _, row = _make_token(user, org, scopes=[SCOPE_READ_APPS])
+    permission_resolver.grant(Permission.AGENT_READ)
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+
+    context_token = set_current_api_token(row)
+    try:
+        with _ctx(org, user):
+            check_permission(Permission.AGENT_READ)
+            with pytest.raises(PermissionDenied, match="api token scope"):
+                check_permission(Permission.AGENT_DISPATCH)
+    finally:
+        reset_current_api_token(context_token)
+
+
+def test_api_token_context_is_reset_after_middleware_response():
+    org = Organization.objects.create(name="X", slug="scope-context")
+    user = _admin_user()
+    plaintext, row = _make_token(user, org, scopes=[SCOPE_READ_APPS])
+    seen = []
+
+    def view(request):
+        seen.append(get_current_api_token())
+        return HttpResponse(b"ok")
+
+    request = RequestFactory().get("/", HTTP_AUTHORIZATION=f"Bearer {plaintext}")
+    request.user = AnonymousUser()
+    response = ApiTokenAuthMiddleware(view)(request)
+
+    assert response.status_code == 200
+    assert seen == [row]
+    assert get_current_api_token() is None
 
 
 # ---- ApiTokenAuthMiddleware -----------------------------------------

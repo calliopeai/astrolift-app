@@ -32,10 +32,11 @@ import json
 import pytest
 from django.test import Client
 
+from astrolift_agents.models import Brief
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization, Project, Team
 from astrolift_lifecycle.models import AppEnvironment, PreviewEnvironment
-from astrolift_registry.models import RegisteredApp
+from astrolift_registry.models import RegisteredApp, Workload
 from astrolift_scm.models import SourceConnection
 from core.secrets import encrypt_at_rest
 
@@ -236,12 +237,185 @@ def test_non_pull_request_event_acked(stack):
 def test_push_event_acked(stack):
     # A push with no WorkflowWebhook bound to the app is acked with a
     # zero dispatch count (the preview lifecycle never runs for push).
-    body = json.dumps({"ref": "refs/heads/main"}).encode("utf-8")
+    body = json.dumps(
+        {"ref": "refs/heads/main", "repository": {"full_name": "acme-org/hello"}}
+    ).encode("utf-8")
     resp = _post(Client(), str(stack["app"].guid), body=body, secret=stack["secret"], event="push")
     assert resp.status_code == 200
     assert resp.json()["detail"] == "push handled"
     assert resp.json()["workflows_dispatched"] == 0
     assert PreviewEnvironment.objects.count() == 0
+
+
+def test_signed_delivery_for_different_repo_is_rejected(stack):
+    body = _pr_payload(repo="acme-org/other-service")
+
+    response = _post(
+        Client(),
+        str(stack["app"].guid),
+        body=body,
+        secret=stack["secret"],
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "repository does not match webhook target"
+    assert PreviewEnvironment.objects.count() == 0
+
+
+def test_agent_push_syncs_only_routed_manifest_at_exact_sha(stack, monkeypatch):
+    from types import SimpleNamespace
+
+    from astrolift_scm.webhook_views import _sync_agent_package_on_push
+
+    app = stack["app"]
+    app.manifest_path = "agents/triage/astrolift.toml"
+    app.save(update_fields=["manifest_path", "updated_at", "version"])
+    Workload.objects.create(
+        registered_app=app,
+        name="Triage",
+        slug="triage",
+        kind=Workload.Kind.AGENT,
+    )
+    calls = []
+
+    def _register(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(
+            status="ok",
+            error=None,
+            agents=[SimpleNamespace(slug="triage", skill_notes=[])],
+        )
+
+    monkeypatch.setattr("astrolift_registry.services.manifest_sync.register_agent_repo", _register)
+    sha = "a" * 40
+    monkeypatch.setattr("astrolift_scm.providers.fetch_branch_head", lambda *args, **kwargs: sha)
+    result = _sync_agent_package_on_push(
+        app,
+        {"ref": "refs/heads/main", "after": sha},
+        connection=stack["conn"],
+    )
+
+    assert result["status"] == "ok"
+    assert result["commit_sha"] == sha
+    assert calls[0]["ref"] == sha
+    assert calls[0]["manifest_paths"] == ["agents/triage/astrolift.toml"]
+
+
+def test_agent_push_on_non_deploy_branch_does_not_sync(stack, monkeypatch):
+    from astrolift_scm.webhook_views import _sync_agent_package_on_push
+
+    app = stack["app"]
+    Workload.objects.create(
+        registered_app=app,
+        name="Triage",
+        slug="triage",
+        kind=Workload.Kind.AGENT,
+    )
+    register = monkeypatch.setattr(
+        "astrolift_registry.services.manifest_sync.register_agent_repo",
+        lambda **kwargs: pytest.fail("non-deploy branch must not sync"),
+    )
+    result = _sync_agent_package_on_push(
+        app,
+        {"ref": "refs/heads/feature/x", "after": "b" * 40},
+    )
+    assert register is None
+    assert result["status"] == "ignored_branch"
+
+
+def test_federation_anchor_can_auto_sync_whole_bundle(stack, monkeypatch):
+    from types import SimpleNamespace
+
+    from astrolift_scm.webhook_views import _sync_agent_package_on_push
+
+    app = stack["app"]
+    app.manifest_path = "agents/emr/astrolift.toml"
+    app.save(update_fields=["manifest_path", "updated_at", "version"])
+    brief = Brief.objects.create(
+        organization=stack["org"],
+        registered_app=app,
+        content_hash="f" * 64,
+        manifest_snapshot={
+            "agent_package": {
+                "federation": {
+                    "anchor_manifest": app.manifest_path,
+                    "auto_register_new": True,
+                }
+            }
+        },
+    )
+    Workload.objects.create(
+        registered_app=app,
+        name="EMR",
+        slug="emr",
+        kind=Workload.Kind.AGENT,
+        brief=brief,
+    )
+    calls = []
+
+    def _register(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(
+            status="ok",
+            error=None,
+            agents=[SimpleNamespace(slug="emr", skill_notes=[])],
+        )
+
+    monkeypatch.setattr("astrolift_registry.services.manifest_sync.register_agent_repo", _register)
+    sha = "c" * 40
+    monkeypatch.setattr("astrolift_scm.providers.fetch_branch_head", lambda *args, **kwargs: sha)
+    result = _sync_agent_package_on_push(
+        app,
+        {"ref": "refs/heads/main", "after": sha},
+        connection=stack["conn"],
+    )
+
+    assert result["mode"] == "bundle"
+    assert calls[0]["manifest_paths"] is None
+
+
+def test_delayed_agent_push_reconciles_current_branch_head(stack, monkeypatch):
+    from types import SimpleNamespace
+
+    from astrolift_scm.webhook_views import _sync_agent_package_on_push
+
+    app = stack["app"]
+    app.manifest_path = "agents/triage/astrolift.toml"
+    app.save(update_fields=["manifest_path", "updated_at", "version"])
+    Workload.objects.create(
+        registered_app=app,
+        name="Triage",
+        slug="triage",
+        kind=Workload.Kind.AGENT,
+    )
+    refs = []
+    old_sha = "a" * 40
+    current_sha = "b" * 40
+
+    monkeypatch.setattr(
+        "astrolift_scm.providers.fetch_branch_head",
+        lambda *args, **kwargs: current_sha,
+    )
+
+    def _register(**kwargs):
+        refs.append(kwargs["ref"])
+        return SimpleNamespace(
+            status="ok",
+            error=None,
+            agents=[SimpleNamespace(slug="triage", skill_notes=[])],
+        )
+
+    monkeypatch.setattr("astrolift_registry.services.manifest_sync.register_agent_repo", _register)
+    result = _sync_agent_package_on_push(
+        app,
+        {"ref": "refs/heads/main", "after": old_sha},
+        connection=stack["conn"],
+    )
+
+    assert refs == [current_sha]
+    assert result["commit_sha"] == current_sha
+    assert result["delivery_commit_sha"] == old_sha
+    assert result["superseded_delivery"] is True
 
 
 def test_malformed_json_returns_400(stack):

@@ -87,6 +87,11 @@ FRONTEND_URL = env_str("FRONTEND_URL", "http://localhost:3000")
 # right install. Falls back to FRONTEND_URL for local dev where the
 # Next.js proxy fronts the Django API at the same origin.
 PLATFORM_API_URL = env_str("PLATFORM_API_URL", FRONTEND_URL)
+# Optional because installs that use only the built-in K8s dispatch path do
+# not need an external dispatcher.  The registration endpoint fails closed
+# while this is empty; operators must explicitly provision a bootstrap token
+# before onboarding a Dispatch Service.
+DISPATCHER_BOOTSTRAP_TOKEN = env_str("DISPATCHER_BOOTSTRAP_TOKEN", "")
 API_SYSTEM_USER = env_str("API_SYSTEM_USER", "system")
 API_SYSTEM_PERMISSION_GROUP = env_str("API_SYSTEM_PERMISSION_GROUP", "astrolift_automatic_system_operations")
 
@@ -103,7 +108,18 @@ CORS_ALLOW_HEADERS = default_headers + (
     "sentry-trace",
     "baggage",
     "x-platform",
+    "last-event-id",
+    "mcp-protocol-version",
+    "mcp-session-id",
 )
+CORS_EXPOSE_HEADERS = ("MCP-Protocol-Version", "Mcp-Session-Id")
+MCP_ALLOWED_ORIGINS = tuple(
+    value.strip()
+    for value in env_str("ASTROLIFT_MCP_ALLOWED_ORIGINS", FRONTEND_URL).split(",")
+    if value.strip()
+)
+MCP_SESSION_TTL_SECONDS = int(env_str("ASTROLIFT_MCP_SESSION_TTL_SECONDS", "3600"))
+MCP_MAX_REQUEST_BYTES = int(env_str("ASTROLIFT_MCP_MAX_REQUEST_BYTES", str(2 * 1024 * 1024)))
 CONSTANCE_BACKEND = "constance.backends.database.DatabaseBackend"
 CONSTANCE_DATABASE_CACHE_BACKEND = "default"
 

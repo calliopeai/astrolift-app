@@ -35,6 +35,8 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from astrolift_identity.api_tokens import (
     PLAINTEXT_PREFIX,
     client_ip_from_request,
+    reset_current_api_token,
+    set_current_api_token,
     touch_token,
     user_agent_from_request,
     verify_token,
@@ -84,6 +86,12 @@ class ApiTokenAuthMiddleware:
                 ip=client_ip_from_request(request),
                 user_agent=user_agent_from_request(request),
             )
+
+            context_token = set_current_api_token(token)
+            try:
+                return self.get_response(request)
+            finally:
+                reset_current_api_token(context_token)
 
         return self.get_response(request)
 

@@ -219,6 +219,41 @@ export const AGENT_ENV_SPEC_SECRET_STATUS = gql`
       uri
       exists
       error
+      provider
+      canReveal
+      readLimitation
+    }
+  }
+`;
+
+export const AGENT_SECRET_BUNDLES = gql`
+  query AgentSecretBundles($slug: String!) {
+    agentSecretBundles(envSpecSlug: $slug) {
+      id
+      slug
+      name
+      backendRef
+      keyNames
+      provider
+      canReveal
+      readLimitation
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const AGENT_SECRET_BUNDLE_ATTACHMENTS = gql`
+  query AgentSecretBundleAttachments($slug: String!) {
+    agentEnvironmentSpecSecretBundleAttachments(slug: $slug) {
+      id
+      bundleId
+      bundleSlug
+      bundleName
+      environment
+      prefix
+      position
+      keyNames
     }
   }
 `;

@@ -34,13 +34,16 @@ production code path always passes the default
 from __future__ import annotations
 
 import dataclasses
+import io
 import logging
+import zipfile
 from collections.abc import Callable
 
 from django.db import transaction
 from django.utils import timezone
 
 from astrolift_manifest.discover import (
+    AgentFederationError,
     DiscoveredAgentManifest,
     DiscoveredAppManifest,
     scan_agent_manifests,
@@ -625,7 +628,7 @@ def summarize_changes(changes: ResyncChanges) -> str:
 #
 # Point at a repo and register each agent manifest it carries as its own
 # agent ``Workload`` (under its own ``RegisteredApp`` keyed by
-# ``(source_repo, manifest_path)``). Two layouts:
+# ``(organization, source_repo, manifest_path)``). Two layouts:
 #
 #   * monorepo — ``agents/<slug>/astrolift.toml`` (N agents, N apps);
 #   * single   — a root ``astrolift.toml`` (1 agent).
@@ -637,8 +640,8 @@ def summarize_changes(changes: ResyncChanges) -> str:
 # tree fetch and the per-manifest persist mirror ``register_app`` /
 # ``resync_app_manifest_from_repo`` so there is one registration contract.
 #
-# Idempotency + re-scan: every app is keyed by ``(source_repo, manifest_path)``
-# (the existing partial-unique constraint — no migration). Re-running the
+# Idempotency + re-scan: every app is keyed by
+# ``(organization, source_repo, manifest_path)``. Re-running the
 # scan registers only manifests not already registered for the repo; existing
 # agents are left untouched. A manifest that *disappeared* from the repo
 # leaves its app + workload in place (we never hard-delete, and an operator
@@ -780,7 +783,10 @@ def _scan_repo_for_agents(
             log.exception("agent-repo scan fetch crashed (repo=%s)", source_repo)
             conn_error = str(exc) or exc.__class__.__name__
 
-    discovered = scan_agent_manifests(files) if files else []
+    try:
+        discovered = scan_agent_manifests(files) if files else []
+    except AgentFederationError as exc:
+        return None, {}, str(exc)
 
     # Fallback: when the per-org SourceConnection path yields no agent
     # manifests — no connection, a fetch error, or an empty/inaccessible tree
@@ -792,7 +798,10 @@ def _scan_repo_for_agents(
     if not discovered and tree is None and source_kind == "github":
         pat_files, pat_error = _pat_fallback_tree(source_repo, ref)
         if pat_files:
-            pat_discovered = scan_agent_manifests(pat_files)
+            try:
+                pat_discovered = scan_agent_manifests(pat_files)
+            except AgentFederationError as exc:
+                return None, {}, str(exc)
             if pat_discovered:
                 return pat_discovered, pat_files, None
         conn_error = conn_error or pat_error
@@ -858,6 +867,7 @@ def discover_agent_manifests(
 
     existing_paths = set(
         RegisteredApp.objects.filter(
+            organization_id=organization_id,
             source_repo=source_repo,
             deleted_at__isnull=True,
         ).values_list("manifest_path", flat=True)
@@ -889,6 +899,7 @@ def _register_one_agent(
     agent_repo_tree: dict[str, str],
     catalogue_tree: dict[str, str] | None,
     org_repo_tree_cache: dict[str, dict[str, str] | None],
+    source_archive: bytes | None,
 ) -> RegisteredAgent:
     """Create (or match) one agent app + workload for a discovered manifest.
 
@@ -914,12 +925,25 @@ def _register_one_agent(
     manifest = _normalize_text(discovered.raw_text)
 
     app = RegisteredApp.objects.filter(
+        organization=org,
         source_repo=source_repo,
         manifest_path=discovered.manifest_path,
         deleted_at__isnull=True,
     ).first()
     created = app is None
     if app is None:
+        from astrolift_registry.models import Workload
+
+        if Workload.objects.filter(
+            slug=discovered.slug,
+            kind=Workload.Kind.AGENT,
+            registered_app__organization=org,
+            registered_app__deleted_at__isnull=True,
+            deleted_at__isnull=True,
+        ).exists():
+            raise ValueError(
+                f"agent workload slug {discovered.slug!r} is already registered in this organization"
+            )
         # Slug must be unique per org; an agent's manifest name can repeat
         # across repos, so qualify with the manifest path's agent segment
         # when it isn't the root manifest. ``_agent_app_slug`` resolves a
@@ -943,10 +967,33 @@ def _register_one_agent(
             default_tenant_cluster=default_cluster,
         )
 
+    # The home-team FK is a compatibility pointer; AppTeamAccess is the
+    # canonical authorization relation. Keep every registration path at the
+    # same invariant as move/grant flows, including pre-existing rows created
+    # before that relation was introduced.
+    from astrolift_registry.schema.mutations.helpers import _ensure_owner_access
+
+    _ensure_owner_access(app, app.team_id)
+
     # Reconcile the agent workload (+ container) rows from the manifest.
     # On a fresh app this creates them; on a re-matched app it updates only
     # what changed (and leaves the row otherwise — never hard-deleted).
     persist_manifest(app, manifest, raw_text=discovered.raw_text)
+    app.last_resync_at = timezone.now()
+    app.save(update_fields=["last_resync_at", "updated_at", "version"])
+
+    # Keep the dispatch environment recipe anchored to the same source slice
+    # as the registered workload. This is the bridge that makes manual,
+    # webhook, cron, loop, and workflow dispatches resolve identical env and
+    # secret bindings without hand-created production rows.
+    _upsert_agent_environment_spec(
+        app=app,
+        workload_slug=discovered.slug,
+        raw_manifest=raw_manifest,
+        source_repo=source_repo,
+        deploy_branch=deploy_branch,
+        manifest_path=discovered.manifest_path,
+    )
 
     # Resolve + store the agent's brief + skills (spec 38 Phase 3). The
     # discovered slug is the agent workload's name == its slug; fetch the
@@ -959,6 +1006,8 @@ def _register_one_agent(
         agent_repo_tree=agent_repo_tree,
         catalogue_tree=catalogue_tree,
         org_repo_tree_cache=org_repo_tree_cache,
+        source_archive=source_archive,
+        federation=discovered.federation,
     )
 
     return RegisteredAgent(
@@ -971,6 +1020,71 @@ def _register_one_agent(
     )
 
 
+def _upsert_agent_environment_spec(
+    *,
+    app: RegisteredApp,
+    workload_slug: str,
+    raw_manifest,
+    source_repo: str,
+    deploy_branch: str,
+    manifest_path: str,
+) -> None:
+    """Create/update the source-owned portion of an agent environment spec.
+
+    Runtime toggles controlled by operators (VNC and managed model) are left
+    untouched on update. Manifest-owned environment values and secret
+    bindings reconcile from source, while secret *values* remain exclusively
+    in the external secrets backend.
+    """
+    from astrolift_agents.models import AgentEnvironmentSpec
+    from astrolift_agents.services.agent_package import project_manifest_environment
+
+    workload = app.workloads.filter(
+        slug=workload_slug,
+        kind="agent",
+        deleted_at__isnull=True,
+    ).first()
+    if workload is None:
+        return
+    primary = workload.containers.filter(is_primary=True).first()
+    image = getattr(primary, "image_ref", "") or ""
+    agent_type = (
+        AgentEnvironmentSpec.AgentType.CODEX
+        if "codex" in image.lower()
+        else AgentEnvironmentSpec.AgentType.CLAUDE
+    )
+
+    env_section = raw_manifest.raw.get("environment") or {}
+    env_vars, secret_refs = project_manifest_environment(
+        env_section,
+        raw_manifest.raw.get("secrets"),
+    )
+
+    spec = AgentEnvironmentSpec.objects.filter(
+        organization=app.organization,
+        slug=workload_slug,
+        deleted_at__isnull=True,
+    ).first()
+    if spec is None:
+        spec = AgentEnvironmentSpec(
+            organization=app.organization,
+            slug=workload_slug,
+            name=f"{workload.name} runtime",
+            agent_type=agent_type,
+        )
+    spec.name = spec.name or f"{workload.name} runtime"
+    spec.agent_type = agent_type
+    spec.image_tag = image
+    spec.tool_preset = str(env_section.get("tool_preset") or "")[:128]
+    spec.allow_install = bool(env_section.get("allow_install", False))
+    spec.env_vars = env_vars
+    spec.secret_refs = secret_refs
+    spec.config_repo = source_repo
+    spec.config_branch = deploy_branch or "main"
+    spec.config_manifest_path = manifest_path
+    spec.save()
+
+
 def _resolve_agent_brief_and_skills(
     *,
     app: RegisteredApp,
@@ -980,19 +1094,17 @@ def _resolve_agent_brief_and_skills(
     agent_repo_tree: dict[str, str],
     catalogue_tree: dict[str, str] | None,
     org_repo_tree_cache: dict[str, dict[str, str] | None],
+    source_archive: bytes | None,
+    federation: dict | None = None,
 ) -> list[str]:
     """Resolve + persist the agent workload's brief + skills; return notes.
 
-    Skips cleanly (empty notes) when the manifest declares neither a brief nor
-    skills — the common case for an agent that carries only a container. Never
-    raises on a resolution failure: the per-skill / per-brief notes are
-    returned for the caller to surface, and any unexpected error is caught and
-    logged so a resolution bug can't abort the whole registration transaction
-    (the agent workload is already persisted at this point).
+    A self-contained image with neither prose brief nor skills still receives
+    a minimal canonical Agent Package. Resolution failures are non-fatal: the
+    per-skill / per-brief notes are returned for the caller to surface, and an
+    unexpected error is caught and logged so a resolution bug cannot abort the
+    whole registration transaction (the agent workload is already persisted).
     """
-    if raw_manifest.brief is None and not raw_manifest.skills:
-        return []
-
     from astrolift_agents.services.agent_skill_registration import (
         resolve_and_store_agent_skills,
     )
@@ -1012,6 +1124,9 @@ def _resolve_agent_brief_and_skills(
         )
         return [f"workload {workload_slug!r}: not found after persist; skills/brief not resolved"]
 
+    from astrolift_agents.services.agent_package import AgentPackageError
+    from astrolift_agents.services.agent_payload import AgentPayloadError
+
     try:
         return resolve_and_store_agent_skills(
             workload=workload,
@@ -1020,8 +1135,16 @@ def _resolve_agent_brief_and_skills(
             agent_repo_tree=agent_repo_tree,
             catalogue_tree=catalogue_tree,
             org_repo_tree_cache=org_repo_tree_cache,
+            source_archive=source_archive,
+            federation=federation,
         )
-    except Exception as exc:  # noqa: BLE001 — resolution must never abort registration
+    except (AgentPackageError, AgentPayloadError):
+        # Invalid package boundaries and payload selection are source errors,
+        # not optional skill degradation.  Let the surrounding transaction
+        # roll back so registration cannot report success for an unrunnable
+        # or unsafe package.
+        raise
+    except Exception as exc:  # noqa: BLE001 — unexpected optional resolution failure
         log.exception(
             "agent skill/brief resolution crashed for workload %r (app %s)",
             workload_slug,
@@ -1064,6 +1187,89 @@ def _slug_taken(org, slug: str) -> bool:
         slug=slug,
         deleted_at__isnull=True,
     ).exists()
+
+
+def _archive_from_text_tree(files: dict[str, str]) -> bytes:
+    """Build a host-shaped source ZIP for injected discovery fixtures."""
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for path, contents in sorted(files.items()):
+            archive.writestr(f"repo-snapshot/{path}", contents.encode("utf-8"))
+    return output.getvalue()
+
+
+def _registration_source_archive(
+    *,
+    organization_id: int,
+    source_kind: str,
+    source_repo: str,
+    ref: str,
+    files: dict[str, str],
+    injected_tree: bool,
+) -> tuple[bytes | None, str | None]:
+    """Fetch the byte-preserving archive bound to modular package Briefs.
+
+    Discovery intentionally keeps only small UTF-8 files, which is enough to
+    find manifests but cannot deliver binaries.  The package snapshot therefore
+    fetches the original ZIP once per registration pass. Tests with an injected
+    tree receive an equivalent synthetic archive.
+    """
+    if injected_tree:
+        return _archive_from_text_tree(files), None
+
+    from astrolift_scm.providers import ProviderError, fetch_zipball
+
+    probe = RegisteredApp(organization_id=organization_id, source_kind=source_kind)
+    connection = _pick_source_connection(probe)
+    primary_error = ""
+    if connection is not None:
+        try:
+            return fetch_zipball(connection, repo_full_name=source_repo, ref=ref), None
+        except ProviderError as exc:
+            primary_error = f"{exc.code}: {exc.message}"
+        except Exception as exc:  # noqa: BLE001 - translated to registration envelope
+            primary_error = str(exc) or exc.__class__.__name__
+
+    if source_kind == "github":
+        try:
+            from astrolift_agents.services.brief_assembler import _fetch_zipball
+
+            return _fetch_zipball(source_repo, ref), None
+        except Exception as exc:  # noqa: BLE001 - translated to registration envelope
+            fallback_error = str(exc) or exc.__class__.__name__
+            return None, primary_error or fallback_error
+    return None, primary_error or "no active source connection can fetch this package archive"
+
+
+def _needs_package_archive(discovered: list[DiscoveredAgentManifest]) -> bool:
+    for item in discovered:
+        try:
+            raw = parse_raw(item.raw_text).raw
+        except ManifestError:
+            continue
+        if "package" in raw:
+            return True
+    return False
+
+
+def _archive_matches_discovery(
+    source_archive: bytes,
+    discovered: list[DiscoveredAgentManifest],
+) -> bool:
+    """Confirm package manifests came from the same tree as the archive.
+
+    Discovery and byte-preserving archive capture are two SCM reads. A push
+    between them must not produce a Brief whose parsed manifest is from one
+    commit while its scripts/binaries are from another. Refuse that mixed
+    snapshot and let the caller retry the registration against one revision.
+    """
+    from astrolift_scm.providers.repo_tree import repo_tree_from_zipball_bytes
+
+    try:
+        archive_tree = repo_tree_from_zipball_bytes(source_archive)
+    except (OSError, ValueError, zipfile.BadZipFile):
+        return False
+    return all(archive_tree.get(item.manifest_path) == item.raw_text for item in discovered)
 
 
 def register_agent_repo(
@@ -1130,6 +1336,30 @@ def register_agent_repo(
 
     eff_deploy_branch = deploy_branch or default_branch or "main"
 
+    source_archive: bytes | None = None
+    if _needs_package_archive(discovered):
+        source_archive, archive_error = _registration_source_archive(
+            organization_id=project.organization_id,
+            source_kind=source_kind,
+            source_repo=source_repo,
+            ref=ref,
+            files=files,
+            injected_tree=tree is not None,
+        )
+        if source_archive is None:
+            return RegisterAgentRepoResult(
+                status="fetch_failed",
+                error=f"could not snapshot modular agent package: {archive_error or 'unknown fetch error'}",
+            )
+        if not _archive_matches_discovery(source_archive, discovered):
+            return RegisterAgentRepoResult(
+                status="fetch_failed",
+                error=(
+                    "source changed while the agent package was being snapshotted; "
+                    "retry the sync against a stable branch or commit SHA"
+                ),
+            )
+
     # Fetch the built-in skills catalogue ONCE for this registration pass and
     # thread it into every agent's resolution (spec 39c). Done only when some
     # discovered manifest actually references a named (non-local) skill — a
@@ -1160,6 +1390,7 @@ def register_agent_repo(
                     agent_repo_tree=files,
                     catalogue_tree=catalogue_tree,
                     org_repo_tree_cache=org_repo_tree_cache,
+                    source_archive=source_archive,
                 )
                 for d in discovered
             ]
@@ -1246,7 +1477,13 @@ def resync_agent_repo_manifests(
     resolves the right connection + branch.
     """
     anchor = (
-        RegisteredApp.objects.filter(source_repo=source_repo, deleted_at__isnull=True).order_by("pk").first()
+        RegisteredApp.objects.filter(
+            organization_id=project.organization_id,
+            source_repo=source_repo,
+            deleted_at__isnull=True,
+        )
+        .order_by("pk")
+        .first()
     )
     eff_source_kind = source_kind or (anchor.source_kind if anchor else "github")
     eff_ref = ref or (anchor.deploy_branch or anchor.default_branch if anchor else "") or "main"
@@ -1274,7 +1511,7 @@ def resync_agent_repo_manifests(
 # The app-side mirror of the agent monorepo path above: point at a repo and
 # register each *app* manifest it carries (one ``apps/<slug>/astrolift.toml``
 # per service, plus a root ``astrolift.toml``) as its own ``RegisteredApp``
-# keyed by ``(source_repo, manifest_path)``. The scan + the app/agent split
+# keyed by ``(organization, source_repo, manifest_path)``. The scan + the app/agent split
 # live in ``astrolift_manifest.discover.scan_app_manifests`` (pure,
 # fixture-testable); the repo tree comes from the same SCM zipball fetch the
 # agent path uses (``_scan_repo_for_apps`` reuses ``_default_tree_fetch``).
@@ -1284,8 +1521,8 @@ def resync_agent_repo_manifests(
 # activity reads ``RegisteredApp.build_context`` (build_image.py is UNCHANGED).
 #
 # Idempotency + re-scan mirror the agent path: every app is keyed by
-# ``(source_repo, manifest_path)`` (the existing partial-unique constraint — no
-# migration). Re-running registers only manifests not already registered for
+# ``(organization, source_repo, manifest_path)``. Re-running registers only
+# manifests not already registered for
 # the repo; an app whose manifest disappeared is left in place (never
 # hard-deleted), and the per-manifest body is reconciled via ``persist_manifest``.
 
@@ -1421,6 +1658,7 @@ def discover_app_manifests(
 
     existing_paths = set(
         RegisteredApp.objects.filter(
+            organization_id=organization_id,
             source_repo=source_repo,
             deleted_at__isnull=True,
         ).values_list("manifest_path", flat=True)
@@ -1489,6 +1727,7 @@ def _register_one_app(
     manifest = _normalize_text(discovered.raw_text)
 
     app = RegisteredApp.objects.filter(
+        organization=org,
         source_repo=source_repo,
         manifest_path=discovered.manifest_path,
         deleted_at__isnull=True,
@@ -1516,6 +1755,10 @@ def _register_one_app(
             subdomain=app_slug,
             default_tenant_cluster=default_cluster,
         )
+
+    from astrolift_registry.schema.mutations.helpers import _ensure_owner_access
+
+    _ensure_owner_access(app, app.team_id)
 
     # Reconcile the workload (+ container) rows from the manifest. On a fresh
     # app this creates them; on a re-matched app it updates only what changed.

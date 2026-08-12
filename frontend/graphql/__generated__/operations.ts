@@ -361,10 +361,63 @@ export type AstroliftAgentScaleResult = {
   readyReplicas?: Maybe<Scalars['Int']['output']>;
 };
 
+export type AstroliftAgentSecretBundle = {
+  backendRef: Scalars['String']['output'];
+  canReveal: Scalars['Boolean']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  id: Scalars['GUID']['output'];
+  keyNames: Array<Scalars['String']['output']>;
+  name: Scalars['String']['output'];
+  provider: Scalars['String']['output'];
+  readLimitation?: Maybe<Scalars['String']['output']>;
+  slug: Scalars['String']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+};
+
+export type AstroliftAgentSecretBundleAttachment = {
+  bundleId: Scalars['GUID']['output'];
+  bundleName: Scalars['String']['output'];
+  bundleSlug: Scalars['String']['output'];
+  environment: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  keyNames: Array<Scalars['String']['output']>;
+  position: Scalars['Int']['output'];
+  prefix: Scalars['String']['output'];
+};
+
+export type AstroliftAgentSecretBundleAttachmentMutationResult = {
+  data?: Maybe<AstroliftAgentSecretBundleAttachment>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftAgentSecretBundleMutationResult = {
+  data?: Maybe<AstroliftAgentSecretBundle>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftAgentSecretReveal = {
+  envVar: Scalars['String']['output'];
+  provider: Scalars['String']['output'];
+  revealedAt: Scalars['DateTime']['output'];
+  uri: Scalars['String']['output'];
+  value: Scalars['String']['output'];
+};
+
+export type AstroliftAgentSecretRevealMutationResult = {
+  data?: Maybe<AstroliftAgentSecretReveal>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftAgentSecretStatus = {
+  canReveal: Scalars['Boolean']['output'];
   envVar: Scalars['String']['output'];
   error?: Maybe<Scalars['String']['output']>;
   exists: Scalars['Boolean']['output'];
+  provider: Scalars['String']['output'];
+  readLimitation?: Maybe<Scalars['String']['output']>;
   uri: Scalars['String']['output'];
 };
 
@@ -4759,6 +4812,7 @@ export type Mutation = {
   astroliftAnonymizeUser: AstroliftAnonymizeUserPayloadMutationResult;
   astroliftConnectUserSourceProvider: AstroliftConnectUserSourceProviderPayloadMutationResult;
   astroliftDisconnectUserSourceProvider: AstroliftDisconnectUserSourceProviderPayloadMutationResult;
+  attachAgentSecretBundle: AstroliftAgentSecretBundleAttachmentMutationResult;
   attachSecretBundle: AstroliftAppSecretBundleAttachmentMutationResult;
   attestSession: AstroliftAttestationResultMutationResult;
   bringClusterIntoManagement: AstroliftTenantClusterMutationResult;
@@ -4784,6 +4838,7 @@ export type Mutation = {
   connectExistingGithubApp: AstroliftSourceConnectionMutationResult;
   connectSource: AstroliftSourceConnectionMutationResult;
   createAgentEnvironmentSpec: AstroliftAgentEnvironmentSpecMutationResult;
+  createAgentSecretBundle: AstroliftAgentSecretBundleMutationResult;
   createAgentTrigger: AstroliftAgentTriggerResult;
   createAlertRule: AstroliftAlertRuleMutationResult;
   createApiToken: AstroliftApiTokenPlaintextMutationResult;
@@ -4816,7 +4871,9 @@ export type Mutation = {
   deelevateAdminSession: AstroliftDeelevatePayloadMutationResult;
   /** Delete an object by its global ID (soft-delete via delete_check). */
   delete: Scalars['Boolean']['output'];
+  deleteAgentBundleSecretValue: AstroliftAgentSecretBundleMutationResult;
   deleteAgentEnvironmentSpec: AstroliftAgentEnvironmentSpecMutationResult;
+  deleteAgentSecretBundle: AstroliftAgentSecretBundleMutationResult;
   deleteAgentSecretValue: AstroliftAgentSecretStatusMutationResult;
   deleteAlertRule: AlertruledeletedpayloadMutationResult;
   deleteAppDnsRecord: AstroliftCapabilityDeprovisionPayloadMutationResult;
@@ -4841,6 +4898,7 @@ export type Mutation = {
   deployClusterAgent: AstroliftTenantClusterMutationResult;
   deprovisionManagedService: ManagedservicedeletedpayloadMutationResult;
   deregisterAstroliftApp: AstroliftDeregisterAppPayloadMutationResult;
+  detachAgentSecretBundle: AstroliftAgentSecretBundleAttachmentMutationResult;
   detachSecretBundle: AttachmentremovedpayloadMutationResult;
   disconnectSource: AstroliftSourceConnectionMutationResult;
   elevateAdminSession: AstroliftElevatePayloadMutationResult;
@@ -4946,6 +5004,7 @@ export type Mutation = {
   rejectDeployment: AstroliftDeploymentMutationResult;
   rejectDeploymentByToken: AstroliftDeploymentMutationResult;
   rejectSecretChange: AstroliftSecretChangeProposalMutationResult;
+  removeAgentSecretRef: AstroliftAgentSecretStatusMutationResult;
   removeAppDomain: AppdomainremovedpayloadMutationResult;
   removeEmailSuppressionEntry: EmailsuppressionremovepayloadMutationResult;
   removeOrgSkillRepo: AstroliftOrgSkillRepoMutationResult;
@@ -4966,6 +5025,8 @@ export type Mutation = {
   resyncAstroliftManifestFromRepo: ResyncManifestPayloadMutationResult;
   retryAstroliftAutowire: AstroliftRetryAutowirePayloadMutationResult;
   revalidateManagedDomain: RevalidateManagedDomainPayloadMutationResult;
+  revealAgentBundleSecretValue: AstroliftAgentSecretRevealMutationResult;
+  revealAgentSecretValue: AstroliftAgentSecretRevealMutationResult;
   revealAppSecret: AstroliftRevealedSecretMutationResult;
   revealManagedServiceConnection: AstroliftManagedServiceConnectionMutationResult;
   revokeApiToken: SoftdeletepayloadMutationResult;
@@ -4993,6 +5054,7 @@ export type Mutation = {
   scaleServiceAgent: AstroliftAgentScaleResult;
   sendManagedServiceTestEmail: AstroliftManagedServiceTestEmailResultMutationResult;
   setActiveIdentityProvider: AstroliftIdentityProviderMutationResult;
+  setAgentBundleSecretValue: AstroliftAgentSecretBundleMutationResult;
   setAgentSecretValue: AstroliftAgentSecretStatusMutationResult;
   setAlertSubscription: AstroliftUserAlertSubscriptionMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
@@ -5042,6 +5104,7 @@ export type Mutation = {
   unregisterTenantCluster: SoftdeletepayloadMutationResult;
   updateAgentEnvironmentSpec: AstroliftAgentEnvironmentSpecMutationResult;
   updateAgentRunSpec: AstroliftAgentRunSpecMutationResult;
+  updateAgentSecretBundle: AstroliftAgentSecretBundleMutationResult;
   updateAlertRule: AstroliftAlertRuleMutationResult;
   updateApp: AstroliftRegisteredAppMutationResult;
   updateAstroliftSecurityPolicy: AstroliftRegisteredAppMutationResult;
@@ -5074,6 +5137,7 @@ export type Mutation = {
   uploadCustomDomainCertificate: AstroliftAppDomainMutationResult;
   /** Upload a data import file and get a pre-signed URL. */
   uploadTextFile: DataImportUploadResult;
+  upsertAgentSecretRef: AstroliftAgentSecretStatusMutationResult;
   upsertOrganization: OrganizationMutationResult;
   /** Upsert user profile via UtilityForm.apply_forms. */
   upsertUser: UpsertUserResult;
@@ -5187,6 +5251,15 @@ export type MutationAstroliftConnectUserSourceProviderArgs = {
 
 export type MutationAstroliftDisconnectUserSourceProviderArgs = {
   input: DisconnectUserSourceProviderInput;
+};
+
+
+export type MutationAttachAgentSecretBundleArgs = {
+  bundleId: Scalars['ID']['input'];
+  envSpecSlug: Scalars['String']['input'];
+  environment?: Scalars['String']['input'];
+  position?: Scalars['Int']['input'];
+  prefix?: Scalars['String']['input'];
 };
 
 
@@ -5308,6 +5381,14 @@ export type MutationConnectSourceArgs = {
 export type MutationCreateAgentEnvironmentSpecArgs = {
   input: CreateAgentEnvironmentSpecInput;
   orgId: Scalars['ID']['input'];
+};
+
+
+export type MutationCreateAgentSecretBundleArgs = {
+  backendRef?: Scalars['String']['input'];
+  envSpecSlug: Scalars['String']['input'];
+  name: Scalars['String']['input'];
+  slug: Scalars['String']['input'];
 };
 
 
@@ -5471,8 +5552,21 @@ export type MutationDeleteArgs = {
 };
 
 
+export type MutationDeleteAgentBundleSecretValueArgs = {
+  bundleId: Scalars['ID']['input'];
+  envSpecSlug: Scalars['String']['input'];
+  key: Scalars['String']['input'];
+};
+
+
 export type MutationDeleteAgentEnvironmentSpecArgs = {
   slug: Scalars['String']['input'];
+};
+
+
+export type MutationDeleteAgentSecretBundleArgs = {
+  bundleId: Scalars['ID']['input'];
+  envSpecSlug: Scalars['String']['input'];
 };
 
 
@@ -5580,6 +5674,12 @@ export type MutationDeprovisionManagedServiceArgs = {
 
 export type MutationDeregisterAstroliftAppArgs = {
   input: DeregisterAppInput;
+};
+
+
+export type MutationDetachAgentSecretBundleArgs = {
+  attachmentId: Scalars['ID']['input'];
+  envSpecSlug: Scalars['String']['input'];
 };
 
 
@@ -6007,6 +6107,12 @@ export type MutationRejectSecretChangeArgs = {
 };
 
 
+export type MutationRemoveAgentSecretRefArgs = {
+  envSpecSlug: Scalars['String']['input'];
+  envVar: Scalars['String']['input'];
+};
+
+
 export type MutationRemoveAppDomainArgs = {
   input: RemoveAppDomainInput;
 };
@@ -6096,6 +6202,19 @@ export type MutationRetryAstroliftAutowireArgs = {
 export type MutationRevalidateManagedDomainArgs = {
   clusterId: Scalars['GUID']['input'];
   zone: Scalars['String']['input'];
+};
+
+
+export type MutationRevealAgentBundleSecretValueArgs = {
+  bundleId: Scalars['ID']['input'];
+  envSpecSlug: Scalars['String']['input'];
+  key: Scalars['String']['input'];
+};
+
+
+export type MutationRevealAgentSecretValueArgs = {
+  envSpecSlug: Scalars['String']['input'];
+  envVar: Scalars['String']['input'];
 };
 
 
@@ -6225,6 +6344,14 @@ export type MutationSendManagedServiceTestEmailArgs = {
 
 export type MutationSetActiveIdentityProviderArgs = {
   input: SetActiveIdentityProviderInput;
+};
+
+
+export type MutationSetAgentBundleSecretValueArgs = {
+  bundleId: Scalars['ID']['input'];
+  envSpecSlug: Scalars['String']['input'];
+  key: Scalars['String']['input'];
+  value: Scalars['String']['input'];
 };
 
 
@@ -6454,6 +6581,14 @@ export type MutationUpdateAgentRunSpecArgs = {
 };
 
 
+export type MutationUpdateAgentSecretBundleArgs = {
+  backendRef: Scalars['String']['input'];
+  bundleId: Scalars['ID']['input'];
+  envSpecSlug: Scalars['String']['input'];
+  name: Scalars['String']['input'];
+};
+
+
 export type MutationUpdateAlertRuleArgs = {
   input: UpdateAlertRuleInput;
 };
@@ -6620,6 +6755,13 @@ export type MutationUploadCustomDomainCertificateArgs = {
 export type MutationUploadTextFileArgs = {
   metadata?: InputMaybe<Scalars['JSON']['input']>;
   mimetype: Scalars['String']['input'];
+};
+
+
+export type MutationUpsertAgentSecretRefArgs = {
+  envSpecSlug: Scalars['String']['input'];
+  envVar: Scalars['String']['input'];
+  uri: Scalars['String']['input'];
 };
 
 
@@ -6893,12 +7035,14 @@ export type Query = {
   PostgresMetrics: Array<Array<Scalars['String']['output']>>;
   agent?: Maybe<AstroliftAgentDetail>;
   agentEnvironmentSpec?: Maybe<AstroliftAgentEnvironmentSpec>;
+  agentEnvironmentSpecSecretBundleAttachments: Array<AstroliftAgentSecretBundleAttachment>;
   agentEnvironmentSpecSecretStatus: Array<AstroliftAgentSecretStatus>;
   agentEnvironmentSpecs: Array<AstroliftAgentEnvironmentSpec>;
   agentFleet: Array<AstroliftAgentListItem>;
   agentGallery: Array<AstroliftAgentTask>;
   agentLiveStatus: Array<AstroliftAgentLiveStatus>;
   agentRuntimes: Array<AstroliftAgentRuntime>;
+  agentSecretBundles: Array<AstroliftAgentSecretBundle>;
   agentTask?: Maybe<AstroliftAgentTask>;
   agentTaskInteractions: Array<AstroliftAgentInteraction>;
   agentTaskLogs: Array<Scalars['String']['output']>;
@@ -7197,6 +7341,11 @@ export type QueryAgentEnvironmentSpecArgs = {
 };
 
 
+export type QueryAgentEnvironmentSpecSecretBundleAttachmentsArgs = {
+  slug: Scalars['String']['input'];
+};
+
+
 export type QueryAgentEnvironmentSpecSecretStatusArgs = {
   slug: Scalars['String']['input'];
 };
@@ -7221,6 +7370,11 @@ export type QueryAgentLiveStatusArgs = {
   orgId: Scalars['ID']['input'];
   projectSlug?: InputMaybe<Scalars['String']['input']>;
   workloadId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+
+export type QueryAgentSecretBundlesArgs = {
+  envSpecSlug: Scalars['String']['input'];
 };
 
 
@@ -9560,6 +9714,109 @@ export type DeleteAgentSecretValueMutationVariables = Exact<{
 
 
 export type DeleteAgentSecretValueMutation = { deleteAgentSecretValue: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { envVar: string, uri: string, exists: boolean } | null } };
+
+export type UpsertAgentSecretRefMutationVariables = Exact<{
+  slug: Scalars['String']['input'];
+  envVar: Scalars['String']['input'];
+  uri: Scalars['String']['input'];
+}>;
+
+
+export type UpsertAgentSecretRefMutation = { upsertAgentSecretRef: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { envVar: string, uri: string, exists: boolean, provider: string, canReveal: boolean, readLimitation?: string | null } | null } };
+
+export type RemoveAgentSecretRefMutationVariables = Exact<{
+  slug: Scalars['String']['input'];
+  envVar: Scalars['String']['input'];
+}>;
+
+
+export type RemoveAgentSecretRefMutation = { removeAgentSecretRef: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { envVar: string, uri: string, exists: boolean } | null } };
+
+export type RevealAgentSecretValueMutationVariables = Exact<{
+  slug: Scalars['String']['input'];
+  envVar: Scalars['String']['input'];
+}>;
+
+
+export type RevealAgentSecretValueMutation = { revealAgentSecretValue: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { envVar: string, uri: string, value: string, provider: string, revealedAt: string } | null } };
+
+export type AgentBundleFieldsFragment = { id: string, slug: string, name: string, backendRef: string, keyNames: Array<string>, provider: string, canReveal: boolean, readLimitation?: string | null, createdAt: string, updatedAt: string };
+
+export type AgentBundleAttachmentFieldsFragment = { id: string, bundleId: string, bundleSlug: string, bundleName: string, environment: string, prefix: string, position: number, keyNames: Array<string> };
+
+export type CreateAgentSecretBundleMutationVariables = Exact<{
+  slug: Scalars['String']['input'];
+  name: Scalars['String']['input'];
+  bundleSlug: Scalars['String']['input'];
+  backendRef: Scalars['String']['input'];
+}>;
+
+
+export type CreateAgentSecretBundleMutation = { createAgentSecretBundle: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, slug: string, name: string, backendRef: string, keyNames: Array<string>, provider: string, canReveal: boolean, readLimitation?: string | null, createdAt: string, updatedAt: string } | null } };
+
+export type UpdateAgentSecretBundleMutationVariables = Exact<{
+  slug: Scalars['String']['input'];
+  bundleId: Scalars['ID']['input'];
+  name: Scalars['String']['input'];
+  backendRef: Scalars['String']['input'];
+}>;
+
+
+export type UpdateAgentSecretBundleMutation = { updateAgentSecretBundle: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, slug: string, name: string, backendRef: string, keyNames: Array<string>, provider: string, canReveal: boolean, readLimitation?: string | null, createdAt: string, updatedAt: string } | null } };
+
+export type DeleteAgentSecretBundleMutationVariables = Exact<{
+  slug: Scalars['String']['input'];
+  bundleId: Scalars['ID']['input'];
+}>;
+
+
+export type DeleteAgentSecretBundleMutation = { deleteAgentSecretBundle: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, slug: string, name: string, backendRef: string, keyNames: Array<string>, provider: string, canReveal: boolean, readLimitation?: string | null, createdAt: string, updatedAt: string } | null } };
+
+export type AttachAgentSecretBundleMutationVariables = Exact<{
+  slug: Scalars['String']['input'];
+  bundleId: Scalars['ID']['input'];
+  prefix: Scalars['String']['input'];
+  position: Scalars['Int']['input'];
+}>;
+
+
+export type AttachAgentSecretBundleMutation = { attachAgentSecretBundle: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, bundleId: string, bundleSlug: string, bundleName: string, environment: string, prefix: string, position: number, keyNames: Array<string> } | null } };
+
+export type DetachAgentSecretBundleMutationVariables = Exact<{
+  slug: Scalars['String']['input'];
+  attachmentId: Scalars['ID']['input'];
+}>;
+
+
+export type DetachAgentSecretBundleMutation = { detachAgentSecretBundle: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, bundleId: string, bundleSlug: string, bundleName: string, environment: string, prefix: string, position: number, keyNames: Array<string> } | null } };
+
+export type SetAgentBundleSecretValueMutationVariables = Exact<{
+  slug: Scalars['String']['input'];
+  bundleId: Scalars['ID']['input'];
+  key: Scalars['String']['input'];
+  value: Scalars['String']['input'];
+}>;
+
+
+export type SetAgentBundleSecretValueMutation = { setAgentBundleSecretValue: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, slug: string, name: string, backendRef: string, keyNames: Array<string>, provider: string, canReveal: boolean, readLimitation?: string | null, createdAt: string, updatedAt: string } | null } };
+
+export type DeleteAgentBundleSecretValueMutationVariables = Exact<{
+  slug: Scalars['String']['input'];
+  bundleId: Scalars['ID']['input'];
+  key: Scalars['String']['input'];
+}>;
+
+
+export type DeleteAgentBundleSecretValueMutation = { deleteAgentBundleSecretValue: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, slug: string, name: string, backendRef: string, keyNames: Array<string>, provider: string, canReveal: boolean, readLimitation?: string | null, createdAt: string, updatedAt: string } | null } };
+
+export type RevealAgentBundleSecretValueMutationVariables = Exact<{
+  slug: Scalars['String']['input'];
+  bundleId: Scalars['ID']['input'];
+  key: Scalars['String']['input'];
+}>;
+
+
+export type RevealAgentBundleSecretValueMutation = { revealAgentBundleSecretValue: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { envVar: string, uri: string, value: string, provider: string, revealedAt: string } | null } };
 
 export type UpdateAgentEnvironmentSpecMutationVariables = Exact<{
   slug: Scalars['String']['input'];

@@ -13,6 +13,15 @@ class SecretsBackend(Protocol):
     external_secrets_operator.
     """
 
+    # Operator-facing disclosure metadata. Secret values may be revealed only
+    # when the provider explicitly opts in; write-only stores (for example,
+    # GitHub Actions secrets) set ``supports_value_reveal = False`` and explain
+    # the limitation. Older/custom drivers without these attributes retain the
+    # structural ``get`` fallback in the control plane for compatibility.
+    provider_id: str
+    supports_value_reveal: bool
+    value_reveal_limitation: str | None
+
     def get(self, path: str) -> dict[str, str] | None: ...
 
     def upsert(self, path: str, kvs: dict[str, str]) -> None: ...

@@ -72,6 +72,52 @@ class AppSettingMutations:
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
 
+        is_agent = app.workloads.filter(kind="agent", deleted_at__isnull=True).exists()
+        if is_agent:
+            from astrolift_registry.services.manifest_sync import register_agent_repo
+
+            if app.project_id is None:
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    "agent has no project binding",
+                )
+            agent_result = register_agent_repo(
+                project=app.project,
+                source_kind=app.source_kind,
+                source_repo=app.source_repo,
+                ref=app.deploy_branch or app.default_branch or "main",
+                source_url=app.source_url,
+                default_branch=app.default_branch or "main",
+                deploy_branch=app.deploy_branch or app.default_branch or "main",
+                default_cluster=app.default_tenant_cluster,
+                manifest_paths=[app.manifest_path],
+            )
+            if agent_result.status != "ok":
+                code = (
+                    ErrorCode.NOT_FOUND.value
+                    if agent_result.status in {"no_agents", "no_match"}
+                    else ErrorCode.INTERNAL.value
+                )
+                return gql_failure(code, agent_result.error or agent_result.status)
+            slugs = [row.slug for row in agent_result.agents]
+            return gql_success(
+                ResyncManifestPayload(
+                    sync_state="applied",
+                    summary=(
+                        f"Agent package re-synced: {', '.join(slugs)}."
+                        if slugs
+                        else "Agent package is already in sync."
+                    ),
+                    workloads_added=[],
+                    workloads_removed=[],
+                    workloads_changed=slugs,
+                    managed_services_added=[],
+                    managed_services_removed=[],
+                    env_keys_changed=0,
+                    schedules_changed=0,
+                )
+            )
+
         result = resync_app_manifest_from_repo(app)
         # ``fetch_failed`` and ``diverged`` are envelope-level errors —
         # nothing was applied, the UI should surface the message in

@@ -63,7 +63,17 @@ import re
 # v4 (#1220): the notify body carries ``branch`` (the runner's own ref —
 # ``github.ref_name`` / ``$CI_COMMIT_REF_NAME`` / ``$BITBUCKET_BRANCH``);
 # ``ci_deploy`` requires it and v3 got a 400 back.
-TEMPLATE_VERSION = 4
+#
+# v5: a RegisteredApp whose workload is an agent renders a package-validator
+# workflow instead of the app Docker-build/deploy workflow. Agent source is
+# frozen by the signed push webhook; image publishing remains repo-owned.
+#
+# v6: GitHub workflows use repo-scoped, per-app concurrency groups and cancel
+# superseded in-progress runs. Agent validators also use per-agent filenames
+# so independently registered monorepo members cannot overwrite one another.
+# Agent source webhooks separately enforce source-SHA freshness because
+# Actions cancellation is cooperative and does not order webhook deliveries.
+TEMPLATE_VERSION = 6
 
 # The stamp is a host-agnostic ``#`` comment so it's inert on GitHub
 # Actions / GitLab CI / Bitbucket Pipelines / Gitea alike — it never
@@ -206,8 +216,8 @@ def render_github_actions_deploy_yml(
         f"    branches: {branches_yaml}\n"
         "\n"
         "concurrency:\n"
-        f"  group: astrolift-deploy-{app_slug}-${{{{ github.ref }}}}\n"
-        "  cancel-in-progress: false\n"
+        f"  group: astrolift-{app_slug}\n"
+        "  cancel-in-progress: true\n"
         "\n"
         "jobs:\n"
         "  deploy:\n"

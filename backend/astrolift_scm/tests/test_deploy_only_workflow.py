@@ -149,6 +149,14 @@ def test_github_build_render_still_has_every_build_step(settings):
     assert "{{ ecr_repo_name }}" not in body
 
 
+def test_github_managed_workflow_cancels_superseded_runs(settings):
+    settings.PLATFORM_API_URL = "https://platform.astrolift.test"
+    body = render_astrolift_ci_workflow(_app(registry_repo_uri=_PLATFORM_URI, source_kind="github"))
+
+    assert "group: astrolift-emr-bug-triage" in body
+    assert "cancel-in-progress: true" in body
+
+
 def test_gitlab_deploy_only_drops_build_stage(settings):
     """GitLab deploy-only has no ``build`` stage / ``build-image`` job / ``needs``."""
     settings.PLATFORM_API_URL = "https://platform.astrolift.test"

@@ -58,6 +58,11 @@ class SecretBundle(NamedBaseCoreModel):
                 condition=models.Q(deleted_at__isnull=True),
                 name="secret_bundle_slug_unique_active_per_team",
             ),
+            models.UniqueConstraint(
+                fields=["organization", "slug"],
+                condition=models.Q(team__isnull=True, deleted_at__isnull=True),
+                name="secret_bundle_slug_unique_active_per_org",
+            ),
         ]
 
     def soft_delete(self, *, by=None) -> None:
@@ -99,7 +104,7 @@ class SecretBundle(NamedBaseCoreModel):
                         ),
                     ),
                 ],
-                workflow_id=(f"DeleteSecretBundleFromClustersWorkflow-" f"{self.guid}"),
+                workflow_id=(f"DeleteSecretBundleFromClustersWorkflow-{self.guid}"),
             )
         except Exception:  # noqa: BLE001
             logging.getLogger(__name__).warning(

@@ -8,6 +8,8 @@ import type {
   AstroliftAgentListItem as GeneratedAgentListItem,
   AstroliftAgentLiveStatus as GeneratedAgentLiveStatus,
   AstroliftAgentRunSpec as GeneratedAgentRunSpec,
+  AstroliftAgentSecretBundle as GeneratedAgentSecretBundle,
+  AstroliftAgentSecretBundleAttachment as GeneratedAgentSecretBundleAttachment,
   AstroliftAgentSecretStatus as GeneratedAgentSecretStatus,
   AstroliftAgentSkill as GeneratedAgentSkill,
   AstroliftAgentTask as GeneratedAgentTask,
@@ -209,8 +211,11 @@ export type AstroliftAgentEnvironmentSpec = Pick<
 // The VALUE is never on this type.
 export type AstroliftAgentSecretStatus = Pick<
   GeneratedAgentSecretStatus,
-  "envVar" | "uri" | "exists" | "error"
+  "envVar" | "uri" | "exists" | "error" | "provider" | "canReveal" | "readLimitation"
 >;
+
+export type AstroliftAgentSecretBundle = GeneratedAgentSecretBundle;
+export type AstroliftAgentSecretBundleAttachment = GeneratedAgentSecretBundleAttachment;
 
 // Registry list row (PR-7). The full row as returned by `agentWorkloads` /
 // `agentFleet` — every field is queried, so the facade is the whole type.

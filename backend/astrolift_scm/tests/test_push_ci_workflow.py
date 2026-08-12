@@ -21,7 +21,7 @@ from types import SimpleNamespace
 import pytest
 
 from astrolift_identity.models import Organization, Project, Team
-from astrolift_registry.models import RegisteredApp
+from astrolift_registry.models import RegisteredApp, Workload
 from astrolift_scm.models import SourceConnection
 from astrolift_scm.providers import ProviderError, put_file
 from astrolift_scm.schema.mutations import (
@@ -407,6 +407,25 @@ def test_push_ci_workflow_writes_system_b_stamped_file_github(
     assert captured["path"] == ".github/workflows/astrolift-ci.yml"
     # The stamp line is System B's fingerprint — System A output carried none.
     assert "# astrolift-managed:" in captured["content"]
+
+
+def test_agent_workflow_path_does_not_collide_in_monorepo(monkeypatch):
+    from astrolift_scm.services.workflow_sync import sync_workflow_file_to_repo
+
+    org, app = _scaffold(source_repo="acme/agents")
+    _scaffold_github_oauth_user_conn(org)
+    Workload.objects.create(
+        registered_app=app,
+        name="Hello agent",
+        slug="hello-agent",
+        kind=Workload.Kind.AGENT,
+    )
+    captured = _capture_sync_put(monkeypatch, source_kind="github", existing=None)
+
+    result = sync_workflow_file_to_repo(app)
+
+    assert result.status == "created"
+    assert captured["path"] == ".github/workflows/astrolift-agent-hello-app.yml"
 
 
 def test_push_ci_workflow_requires_permission(monkeypatch):
