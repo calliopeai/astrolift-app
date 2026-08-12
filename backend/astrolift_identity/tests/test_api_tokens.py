@@ -45,6 +45,7 @@ from astrolift_identity.api_tokens import (
     normalize_scopes,
     reset_current_api_token,
     set_current_api_token,
+    token_scope_allows_permission,
     touch_token,
     validate_scopes,
     verify_token,
@@ -342,6 +343,22 @@ def test_enforce_scopes_returns_first_missing():
     _, row = _make_token(user, org, scopes=[SCOPE_READ_APPS])
     assert enforce_scopes(row, (SCOPE_READ_APPS,)) is None
     assert enforce_scopes(row, (SCOPE_WRITE_APPS,)) == SCOPE_WRITE_APPS
+
+
+def test_read_apps_scope_allows_secret_metadata_but_not_values_or_writes():
+    token = SimpleNamespace(scopes=[SCOPE_READ_APPS])
+
+    assert token_scope_allows_permission(token, Permission.SECRET_LIST)
+    assert not token_scope_allows_permission(token, Permission.SECRET_READ)
+    assert not token_scope_allows_permission(token, Permission.SECRET_WRITE)
+
+
+def test_write_apps_scope_allows_secret_writes_but_not_reads():
+    token = SimpleNamespace(scopes=[SCOPE_WRITE_APPS])
+
+    assert token_scope_allows_permission(token, Permission.SECRET_WRITE)
+    assert not token_scope_allows_permission(token, Permission.SECRET_READ)
+    assert not token_scope_allows_permission(token, Permission.SECRET_LIST)
 
 
 def test_api_token_scope_is_a_ceiling_over_rbac(permission_resolver):

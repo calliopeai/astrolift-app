@@ -789,7 +789,7 @@ class AgentsQuery:
         return agent_env_spec_to_type(row) if row is not None else None
 
     @strawberry.field
-    @require_permission(Permission.SECRET_READ, Permission.SECRET_LIST)
+    @require_permission(Permission.SECRET_LIST)
     @tenant_scoped()
     def agent_environment_spec_secret_status(self, info: Info, slug: str) -> list[AgentSecretStatusType]:
         """Per-ref presence status for a spec's ``secret_refs`` — metadata
@@ -823,7 +823,7 @@ class AgentsQuery:
         return [agent_secret_status_to_type(r) for r in rows]
 
     @strawberry.field
-    @require_permission(Permission.SECRET_READ, Permission.SECRET_LIST)
+    @require_permission(Permission.SECRET_LIST)
     @tenant_scoped()
     def agent_secret_bundles(self, info: Info, env_spec_slug: str) -> list[AgentSecretBundleType]:
         """Reusable bundles visible to this agent's organization."""
