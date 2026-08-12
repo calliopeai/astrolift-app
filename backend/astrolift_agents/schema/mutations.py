@@ -1536,7 +1536,7 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.task.cancel")
-    @require_permission(Permission.APP_DEPLOY)
+    @require_permission(Permission.AGENT_DISPATCH)
     @tenant_scoped()
     def cancel_task(self, info: Info, id: strawberry.ID) -> MutationResultType[None]:
         """Cancel an AgentTask.

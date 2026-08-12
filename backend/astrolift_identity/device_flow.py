@@ -43,6 +43,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from astrolift_identity.api_tokens import (
+    CLI_DEVICE_SCOPES,
     DEFAULT_SCOPES,
 )
 from astrolift_identity.api_tokens import (
@@ -172,6 +173,31 @@ def normalize_client_kind(kind: str | None) -> str:
     return "cli"
 
 
+def token_scopes_for_client_kind(client_kind: str | None) -> list[str]:
+    """Return the bearer ceiling for a browser-approved client kind.
+
+    The CLI exposes secret rotation and agent run/stop as first-class
+    commands, so an explicitly approved CLI session receives those two
+    narrow capabilities. Mobile, IDE, and browser enrollment retain the
+    read-only baseline. RBAC remains the second gate in every case.
+    """
+    if normalize_client_kind(client_kind) == "cli":
+        return list(CLI_DEVICE_SCOPES)
+    return list(DEFAULT_SCOPES)
+
+
+def token_scopes_for_session(session: DeviceFlowSession) -> list[str]:
+    """Return scopes for a persisted session without trusting client labels.
+
+    Enrollment is pre-approved before the consuming device identifies itself,
+    so it must never gain CLI operator scopes by claiming ``client_kind=cli``.
+    ``origin`` is server-authored and immutable for the session lifecycle.
+    """
+    if session.origin == session.ORIGIN_ENROLLMENT:
+        return list(DEFAULT_SCOPES)
+    return token_scopes_for_client_kind(session.client_kind)
+
+
 # ---- lifecycle transitions ------------------------------------------
 
 
@@ -299,7 +325,7 @@ def _consume_session_locked(
         name=session.client_label or session.client_kind or "device-flow",
         token_hash=minted_access.token_hash,
         token_last_4=minted_access.last4,
-        scopes=list(DEFAULT_SCOPES),
+        scopes=token_scopes_for_session(session),
         expires_at=access_expires,
     )
 
@@ -364,7 +390,7 @@ def _rotate_refresh_locked(
         name=session.client_label or session.client_kind or "device-flow",
         token_hash=minted_access.token_hash,
         token_last_4=minted_access.last4,
-        scopes=list(DEFAULT_SCOPES),
+        scopes=token_scopes_for_session(session),
         expires_at=access_expires,
     )
 
@@ -777,7 +803,7 @@ def _consume_enrollment_locked(
         name=client_label or session.enrollment_label or session.client_label or "mobile",
         token_hash=minted_access.token_hash,
         token_last_4=minted_access.last4,
-        scopes=list(DEFAULT_SCOPES),
+        scopes=token_scopes_for_session(session),
         expires_at=access_expires,
     )
 
@@ -941,4 +967,6 @@ __all__ = [
     "mint_refresh_token",
     "poll_complete",
     "refresh_credentials",
+    "token_scopes_for_client_kind",
+    "token_scopes_for_session",
 ]

@@ -392,6 +392,7 @@ def device_flow_approval(request: HttpRequest, session_guid: str) -> HttpRespons
                     {
                         "session": row,
                         "multi_org_options": multi_org_options,
+                        "requested_scopes": device_flow.token_scopes_for_client_kind(row.client_kind),
                         "error": "Choose the organization to authorize.",
                     },
                     status=400,
@@ -414,6 +415,7 @@ def device_flow_approval(request: HttpRequest, session_guid: str) -> HttpRespons
             {
                 "session": row,
                 "multi_org_options": multi_org_options,
+                "requested_scopes": device_flow.token_scopes_for_client_kind(row.client_kind),
                 "error": "Unknown action.",
             },
             status=400,
@@ -428,6 +430,7 @@ def device_flow_approval(request: HttpRequest, session_guid: str) -> HttpRespons
         {
             "session": row,
             "multi_org_options": multi_org_options,
+            "requested_scopes": device_flow.token_scopes_for_client_kind(row.client_kind),
         },
     )
 

@@ -203,6 +203,7 @@ def test_consume_enrollment_issues_credentials_and_burns_token():
     api_token = ApiToken.objects.get(pk=row.api_token_id)
     assert api_token.user_id == user.id
     assert api_token.organization_id == org.id
+    assert api_token.scopes == device_flow.token_scopes_for_client_kind("mobile")
 
 
 def test_consume_enrollment_single_use_rejects_second_attempt():
@@ -215,6 +216,23 @@ def test_consume_enrollment_single_use_rejects_second_attempt():
 
     second = device_flow.consume_enrollment(minted.token_plaintext)
     assert second.status == "unknown", "burned tokens must read as unknown"
+
+
+def test_enrollment_cannot_claim_cli_scopes_on_issue_or_refresh():
+    user, org = _make_user_with_org()
+    minted = device_flow.create_enrollment(user=user, organization=org)
+    assert not isinstance(minted, str)
+
+    issued = device_flow.consume_enrollment(minted.token_plaintext, client_kind="cli")
+    assert issued.status == "issued"
+    row = DeviceFlowSession.objects.get(session_guid=minted.session_id)
+    assert row.client_kind == "cli"  # forensic claim is retained
+    assert row.api_token.scopes == device_flow.token_scopes_for_client_kind("mobile")
+
+    refreshed = device_flow.refresh_credentials(issued.credentials.refresh_token)
+    assert refreshed.status == "issued"
+    row.refresh_from_db()
+    assert row.api_token.scopes == device_flow.token_scopes_for_client_kind("mobile")
 
 
 def test_consume_enrollment_expired_token_is_rejected_and_marked_terminal():
