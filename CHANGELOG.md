@@ -20,6 +20,8 @@
 
 ### Fixed
 
+- Use the install's configured S3 bucket for immutable agent payloads and
+  platform artifacts when no organization-specific blob driver is registered.
 - Preserve resolved command tools in one-shot harness system prompts as well
   as thread-mode dispatch packets.
 

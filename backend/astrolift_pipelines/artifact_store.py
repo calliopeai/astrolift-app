@@ -36,6 +36,7 @@ from providers._sdk.blob_store import (
     BlobStoreNotConfiguredError,
     BlobStoreSizeError,
     LocalFsBlobStoreDriver,
+    S3BlobStoreDriver,
     artifact_blob_key,
     run_blob_prefix,
 )
@@ -55,9 +56,13 @@ def _get_blob_driver(org: object) -> BlobStoreDriver:
        record carries a plugin_id; that plugin is expected to expose a
        ``blob_store`` driver. If the plugin registry is unavailable (e.g.
        during tests without a full Django app), this step is skipped.
-    2. PIPELINE_ARTIFACT_LOCAL_PATH env var — returns LocalFsBlobStoreDriver.
+    2. The install's configured Django S3 bucket. AWS installs already use
+       this bucket for platform-owned media and run with a task role, so it is
+       also the correct fallback for platform-owned artifacts and agent
+       payloads when no tenant-specific provider driver is registered.
+    3. PIPELINE_ARTIFACT_LOCAL_PATH env var — returns LocalFsBlobStoreDriver.
        Only active in local dev and CI.
-    3. Raises BlobStoreNotConfiguredError.
+    4. Raises BlobStoreNotConfiguredError.
 
     ``org`` is the Django Organization model instance (not imported here so
     the providers tree remains import-isolated from the Django ORM).
@@ -73,17 +78,47 @@ def _get_blob_driver(org: object) -> BlobStoreDriver:
         # astrolift_drivers not yet wired — fall through to env-var fallback.
         pass
 
-    # Step 2 — local filesystem fallback.
+    # Step 2 — the install's platform-owned S3 bucket. Keep this lazy so the
+    # provider SDK remains importable without Django and boto3.
+    try:
+        from django.conf import settings
+    except ImportError:
+        settings = None
+
+    if settings is not None and settings.configured:
+        bucket = str(getattr(settings, "AWS_STORAGE_BUCKET_NAME", "") or "").strip()
+        if bucket:
+            import boto3
+
+            region = str(
+                getattr(settings, "AWS_S3_REGION_NAME", "")
+                or os.environ.get("AWS_REGION")
+                or os.environ.get("AWS_DEFAULT_REGION")
+                or "us-east-1"
+            )
+            endpoint_url = str(getattr(settings, "AWS_S3_ENDPOINT_URL", "") or "").strip()
+            client_kwargs: dict[str, str] = {"region_name": region}
+            if endpoint_url:
+                client_kwargs["endpoint_url"] = endpoint_url
+            s3_client = boto3.client("s3", **client_kwargs)
+            logger.debug("Using install S3 blob store bucket %s", bucket)
+            return S3BlobStoreDriver(
+                bucket=bucket,
+                region=region,
+                s3_client=s3_client,
+            )
+
+    # Step 3 — local filesystem fallback.
     local_path = os.environ.get("PIPELINE_ARTIFACT_LOCAL_PATH", "")
     if local_path:
         logger.debug("Using LocalFsBlobStoreDriver at %s", local_path)
         return LocalFsBlobStoreDriver(base_path=local_path)
 
-    # Step 3 — no driver available.
+    # Step 4 — no driver available.
     raise BlobStoreNotConfiguredError(
         "No blob store is configured for this install. "
-        "Set PIPELINE_ARTIFACT_LOCAL_PATH for local dev, or configure a "
-        "blob_store driver in the install's provider plugin registry."
+        "Configure the install storage bucket or a blob_store provider driver, "
+        "or set PIPELINE_ARTIFACT_LOCAL_PATH for local development."
     )
 
 
