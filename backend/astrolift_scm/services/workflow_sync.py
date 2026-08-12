@@ -173,6 +173,99 @@ def _apply_blocks(template: str, flags: dict[str, bool]) -> str:
     return _BLOCK_RE.sub(_sub, template)
 
 
+def _is_agent_app(app: RegisteredApp) -> bool:
+    """Whether this RegisteredApp represents a first-class agent package."""
+    explicit = getattr(app, "is_agent", None)
+    if explicit is not None:
+        return bool(explicit)
+    workloads = getattr(app, "workloads", None)
+    if workloads is None or not getattr(app, "pk", None):
+        return False
+    try:
+        return workloads.filter(kind="agent", deleted_at__isnull=True).exists()
+    except (AttributeError, TypeError, ValueError):
+        return False
+
+
+def render_astrolift_agent_ci_workflow(app: RegisteredApp) -> str:
+    """Render a safe source-package validator for a registered agent.
+
+    Agent Tasks are not standing app deployments. The source webhook freezes
+    the selected manifest/package at the pushed SHA, while image publishing is
+    owned by the repo's image workflow. This managed workflow therefore
+    validates the selected TOML instead of building the repo root or calling
+    the app-deploy endpoint (both are incorrect for a modular agent repo).
+    """
+    branch = json.dumps((app.deploy_branch or "main").strip() or "main")
+    manifest_path = str(app.manifest_path or "astrolift.toml").lstrip("/")
+    manifest_literal = json.dumps(manifest_path)
+    if "/" in manifest_path:
+        package_glob = json.dumps(f"{manifest_path.rsplit('/', 1)[0]}/**")
+        path_rows = f'      - {package_glob}\n      - "astrolift.agents.toml"\n'
+    else:
+        path_rows = f'      - {manifest_literal}\n      - "astrolift.agents.toml"\n'
+    body = (
+        "# Managed by Astrolift — agent package validation. Source delivery is handled by the signed source webhook.\n"
+        "name: astrolift agent package\n"
+        "\n"
+        "on:\n"
+        "  push:\n"
+        f"    branches: [{branch}]\n"
+        "    paths:\n"
+        f"{path_rows}"
+        "  workflow_dispatch: {}\n"
+        "\n"
+        "permissions:\n"
+        "  contents: read\n"
+        "\n"
+        "concurrency:\n"
+        f"  group: astrolift-{app.slug}\n"
+        "  cancel-in-progress: true\n"
+        "\n"
+        "jobs:\n"
+        "  validate-agent-package:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    steps:\n"
+        "      - name: Checkout\n"
+        "        uses: actions/checkout@v4\n"
+        "\n"
+        "      - name: Validate selected agent manifest\n"
+        "        env:\n"
+        f"          ASTROLIFT_AGENT_MANIFEST: {manifest_literal}\n"
+        "        run: |\n"
+        "          python3 - <<'PY'\n"
+        "          import os\n"
+        "          import pathlib\n"
+        "          import tomllib\n"
+        "\n"
+        "          path = pathlib.Path(os.environ['ASTROLIFT_AGENT_MANIFEST'])\n"
+        "          if not path.is_file():\n"
+        "              raise SystemExit(f'agent manifest not found: {path}')\n"
+        "          data = tomllib.loads(path.read_text(encoding='utf-8'))\n"
+        "          agents = [row for row in data.get('workloads', []) if row.get('kind') == 'agent']\n"
+        "          if len(agents) != 1 or len(data.get('workloads', [])) != 1:\n"
+        "              raise SystemExit('selected manifest must declare exactly one agent workload')\n"
+        "          print(f\"validated agent package: {path} ({agents[0].get('name', '?')})\")\n"
+        "          PY\n"
+        "\n"
+        "      - name: Package delivery contract\n"
+        "        run: echo 'Astrolift freezes this source slice from the signed push webhook; this workflow does not deploy a standing app.'\n"
+    )
+    return stamp_workflow(body, version=TEMPLATE_VERSION, digest=content_hash(body))
+
+
+def github_workflow_path_for(app: RegisteredApp) -> str:
+    """Return a collision-free managed workflow path for ``app``.
+
+    A repository can contain many independently registered agents. Their
+    validators must not overwrite the ordinary app workflow or one another.
+    App repos retain the established path for backward compatibility.
+    """
+    if _is_agent_app(app):
+        return f".github/workflows/astrolift-agent-{app.slug}.yml"
+    return WORKFLOW_PATH
+
+
 def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
     """Render the workflow YAML for ``app`` against the file template.
 
@@ -205,6 +298,8 @@ def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
     Checkout, the OIDC credentials step and the Astrolift notify step are
     kept: CI's only job is to tell the platform a new SHA exists.
     """
+    if _is_agent_app(app):
+        return render_astrolift_agent_ci_workflow(app)
     template = _load_template()
     api_url = (getattr(settings, "PLATFORM_API_URL", "") or "").rstrip("/")
     ecr_uri = app.registry_repo_uri or ""
@@ -254,7 +349,7 @@ def render_astrolift_bitbucket_pipeline(app: RegisteredApp) -> str:
     api_url_literal = json.dumps(api_url)
 
     if platform_built:
-        definitions_block = "definitions:\n" "  services:\n" "    docker:\n" "      type: docker\n" "\n"
+        definitions_block = "definitions:\n  services:\n    docker:\n      type: docker\n\n"
         step_name = "Build, push, and notify Astrolift"
         services_block = "          services:\n            - docker\n"
         image_export = f'            - export ASTROLIFT_IMAGE="{ecr_uri}:$BITBUCKET_COMMIT"\n'
@@ -940,7 +1035,7 @@ def _render_and_path(app: RegisteredApp) -> tuple[str, str]:
     dispatch already accepted.
     """
     if app.source_kind == "github":
-        return render_astrolift_ci_workflow(app), WORKFLOW_PATH
+        return render_astrolift_ci_workflow(app), github_workflow_path_for(app)
     if app.source_kind == "gitlab":
         return render_astrolift_gitlab_ci_workflow(app), GITLAB_WORKFLOW_PATH
     if app.source_kind == "bitbucket":
@@ -1069,17 +1164,25 @@ def sync_workflow_file_to_repo(
             "NO_SOURCE_REPO",
             "app has no source repo configured; cannot push the CI workflow",
         )
+    is_agent = _is_agent_app(app)
+    if is_agent and app.source_kind != "github":
+        raise WorkflowSyncError(
+            "AGENT_CI_UNSUPPORTED",
+            "managed agent-package validation is currently supported only for GitHub; "
+            f"source_kind={app.source_kind!r} was left unchanged",
+        )
     if app.source_kind == "github":
         # The GitHub template authenticates via OIDC role assumption, so a
         # blank ``push_role_ref`` renders a workflow that can never work.
         # Heal it here — every push path funnels through this function
         # (#1219) — and refuse to push when provisioning genuinely failed.
-        role_err = ensure_ci_push_role(app)
-        if role_err:
-            raise WorkflowSyncError(
-                "PUSH_ROLE_PROVISION_FAILED",
-                f"couldn't provision the CI push role: {role_err}",
-            )
+        if not is_agent:
+            role_err = ensure_ci_push_role(app)
+            if role_err:
+                raise WorkflowSyncError(
+                    "PUSH_ROLE_PROVISION_FAILED",
+                    f"couldn't provision the CI push role: {role_err}",
+                )
         result = _sync_github(app, force_pr=force_pr)
     elif app.source_kind == "gitlab":
         result = _sync_gitlab(app, force_pr=force_pr)
@@ -1111,12 +1214,13 @@ def _sync_github(app: RegisteredApp, *, force_pr: bool = False) -> WorkflowSyncR
     rendered = render_astrolift_ci_workflow(app)
     rendered_size = len(rendered.encode("utf-8"))
     deploy_branch = (app.deploy_branch or "main").strip() or "main"
+    workflow_path = github_workflow_path_for(app)
 
     try:
         existing = fetch_file(
             connection,
             repo_full_name=app.source_repo,
-            path=WORKFLOW_PATH,
+            path=workflow_path,
             ref=deploy_branch,
         )
     except ProviderError as exc:
@@ -1161,7 +1265,7 @@ def _sync_github(app: RegisteredApp, *, force_pr: bool = False) -> WorkflowSyncR
             put_file(
                 connection,
                 repo_full_name=app.source_repo,
-                path=WORKFLOW_PATH,
+                path=workflow_path,
                 branch=side_branch,
                 content=rendered,
                 commit_message=commit_message,
@@ -1176,7 +1280,7 @@ def _sync_github(app: RegisteredApp, *, force_pr: bool = False) -> WorkflowSyncR
                 title=f"Astrolift: sync CI workflow for {app.slug}",
                 body=(
                     "This PR was opened by Astrolift to keep "
-                    f"`{WORKFLOW_PATH}` in sync with the platform's "
+                    f"`{workflow_path}` in sync with the platform's "
                     f"current settings for **{app.slug}**.\n\n"
                     "Merge to enable platform-driven deploys against "
                     f"`{deploy_branch}`."
@@ -1200,7 +1304,7 @@ def _sync_github(app: RegisteredApp, *, force_pr: bool = False) -> WorkflowSyncR
         put_result = put_file(
             connection,
             repo_full_name=app.source_repo,
-            path=WORKFLOW_PATH,
+            path=workflow_path,
             branch=deploy_branch,
             content=rendered,
             commit_message=commit_message,

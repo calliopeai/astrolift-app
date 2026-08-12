@@ -8,9 +8,7 @@ must attribute each delivery to the org that owns the *installation* (the
 ``installation.id`` in the payload), not the org that owns the receiver URL.
 
 Two orgs share one App (same webhook secret + App ID) but hold distinct
-installation ids and distinct repos (``registered_app_repo_manifest_unique``
-makes ``(source_repo, manifest_path)`` globally unique, so a repo lives in
-exactly one org). Every delivery below hits org A's canonical guid URL; the
+installation ids and distinct repos. Every delivery below hits org A's canonical guid URL; the
 installation id decides whose app deploys. Without attribution org B's
 delivery is scoped to org A, its repo isn't found there, and the deploy is
 silently dropped as ``no_matching_app``.

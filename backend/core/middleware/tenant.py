@@ -80,6 +80,13 @@ class TenantContextMiddleware(MiddlewareMixin):
     # --- resolution helpers ---------------------------------------
 
     def _resolve_organization_id(self, request) -> int | None:
+        # API tokens are minted for exactly one organization. Treat that FK as
+        # an authentication boundary: an X-Astrolift-Organization header must
+        # never retarget the bearer into a different tenant.
+        api_token = getattr(request, "_api_token", None)
+        if api_token is not None:
+            return api_token.organization_id
+
         header = self._resolve_header_org(request)
         if header is not None:
             return header
@@ -94,10 +101,39 @@ class TenantContextMiddleware(MiddlewareMixin):
         return _resolve_single_membership_org(request)
 
     def _resolve_team_id(self, request) -> int | None:
-        return _resolve_int(request.META, TEAM_HEADER)
+        api_token = getattr(request, "_api_token", None)
+        if api_token is not None and api_token.team_id is not None:
+            return api_token.team_id
+        team_id = _resolve_int(request.META, TEAM_HEADER)
+        if api_token is None or team_id is None:
+            return team_id
+        from astrolift_identity.models import Team
+
+        return (
+            team_id
+            if Team.objects.filter(
+                pk=team_id,
+                organization_id=api_token.organization_id,
+                deleted_at__isnull=True,
+            ).exists()
+            else None
+        )
 
     def _resolve_project_id(self, request) -> int | None:
-        return _resolve_int(request.META, PROJECT_HEADER)
+        project_id = _resolve_int(request.META, PROJECT_HEADER)
+        api_token = getattr(request, "_api_token", None)
+        if api_token is None or project_id is None:
+            return project_id
+        from astrolift_identity.models import Project
+
+        scope = Project.objects.filter(
+            pk=project_id,
+            organization_id=api_token.organization_id,
+            deleted_at__isnull=True,
+        )
+        if api_token.team_id is not None:
+            scope = scope.filter(team_id=api_token.team_id)
+        return project_id if scope.exists() else None
 
     def _resolve_header_org(self, request) -> int | None:
         raw = request.META.get(ORG_HEADER)

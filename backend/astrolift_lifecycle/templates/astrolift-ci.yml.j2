@@ -10,6 +10,13 @@ permissions:
   id-token: write
   contents: read
 
+concurrency:
+  # Concurrency groups are already repository-scoped by GitHub. Keep the key
+  # bounded to the app slug: refs can be arbitrarily long, and this workflow
+  # deploys only the configured branch (plus explicit manual dispatches).
+  group: astrolift-{{ app_slug }}
+  cancel-in-progress: true
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest

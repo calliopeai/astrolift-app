@@ -339,11 +339,64 @@ type AstroliftAgentScaleResult {
   readyReplicas: Int
 }
 
+type AstroliftAgentSecretBundle {
+  id: GUID!
+  slug: String!
+  name: String!
+  backendRef: String!
+  keyNames: [String!]!
+  provider: String!
+  canReveal: Boolean!
+  readLimitation: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type AstroliftAgentSecretBundleAttachment {
+  id: GUID!
+  bundleId: GUID!
+  bundleSlug: String!
+  bundleName: String!
+  environment: String!
+  prefix: String!
+  position: Int!
+  keyNames: [String!]!
+}
+
+type AstroliftAgentSecretBundleAttachmentMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAgentSecretBundleAttachment
+}
+
+type AstroliftAgentSecretBundleMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAgentSecretBundle
+}
+
+type AstroliftAgentSecretReveal {
+  envVar: String!
+  uri: String!
+  value: String!
+  provider: String!
+  revealedAt: DateTime!
+}
+
+type AstroliftAgentSecretRevealMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAgentSecretReveal
+}
+
 type AstroliftAgentSecretStatus {
   envVar: String!
   uri: String!
   exists: Boolean!
   error: String
+  provider: String!
+  canReveal: Boolean!
+  readLimitation: String
 }
 
 type AstroliftAgentSecretStatusMutationResult {
@@ -5143,6 +5196,17 @@ type Mutation {
   deleteAgentEnvironmentSpec(slug: String!): AstroliftAgentEnvironmentSpecMutationResult!
   setAgentSecretValue(envSpecSlug: String!, envVar: String!, value: String!): AstroliftAgentSecretStatusMutationResult!
   deleteAgentSecretValue(envSpecSlug: String!, envVar: String!): AstroliftAgentSecretStatusMutationResult!
+  upsertAgentSecretRef(envSpecSlug: String!, envVar: String!, uri: String!): AstroliftAgentSecretStatusMutationResult!
+  removeAgentSecretRef(envSpecSlug: String!, envVar: String!): AstroliftAgentSecretStatusMutationResult!
+  revealAgentSecretValue(envSpecSlug: String!, envVar: String!): AstroliftAgentSecretRevealMutationResult!
+  createAgentSecretBundle(envSpecSlug: String!, name: String!, slug: String!, backendRef: String! = ""): AstroliftAgentSecretBundleMutationResult!
+  updateAgentSecretBundle(envSpecSlug: String!, bundleId: ID!, name: String!, backendRef: String!): AstroliftAgentSecretBundleMutationResult!
+  deleteAgentSecretBundle(envSpecSlug: String!, bundleId: ID!): AstroliftAgentSecretBundleMutationResult!
+  attachAgentSecretBundle(envSpecSlug: String!, bundleId: ID!, environment: String! = "default", prefix: String! = "", position: Int! = 0): AstroliftAgentSecretBundleAttachmentMutationResult!
+  detachAgentSecretBundle(envSpecSlug: String!, attachmentId: ID!): AstroliftAgentSecretBundleAttachmentMutationResult!
+  setAgentBundleSecretValue(envSpecSlug: String!, bundleId: ID!, key: String!, value: String!): AstroliftAgentSecretBundleMutationResult!
+  deleteAgentBundleSecretValue(envSpecSlug: String!, bundleId: ID!, key: String!): AstroliftAgentSecretBundleMutationResult!
+  revealAgentBundleSecretValue(envSpecSlug: String!, bundleId: ID!, key: String!): AstroliftAgentSecretRevealMutationResult!
   assembleBrief(skillIds: [ID!]!, orgId: ID!, config: JSON = null): AstroliftAssembleBriefResultMutationResult!
   launchTask(briefId: ID!, orgId: ID!, callbackUrl: String = null): AstroliftLaunchTaskResultMutationResult!
   cancelTask(id: ID!): NoneTypeMutationResult!
@@ -5714,6 +5778,8 @@ type Query {
   agentEnvironmentSpecs(orgId: ID!): [AstroliftAgentEnvironmentSpec!]!
   agentEnvironmentSpec(slug: String!): AstroliftAgentEnvironmentSpec
   agentEnvironmentSpecSecretStatus(slug: String!): [AstroliftAgentSecretStatus!]!
+  agentSecretBundles(envSpecSlug: String!): [AstroliftAgentSecretBundle!]!
+  agentEnvironmentSpecSecretBundleAttachments(slug: String!): [AstroliftAgentSecretBundleAttachment!]!
   agentWorkloads(orgId: ID!, projectSlug: String = null): [AstroliftAgentListItem!]!
   agentFleet(orgId: ID!): [AstroliftAgentListItem!]!
   agent(orgId: ID!, slug: String!): AstroliftAgentDetail

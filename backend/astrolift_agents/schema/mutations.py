@@ -19,11 +19,15 @@ from __future__ import annotations
 import hashlib
 
 import strawberry
-from django.db import transaction
+from django.db import IntegrityError, transaction
+from django.utils import timezone
+from django.utils.text import slugify
 from strawberry.types import Info
 
 from astrolift_agents.models import (
     AgentEnvironmentSpec,
+    AgentSecretBindingOverride,
+    AgentSecretBundleRef,
     AgentTask,
     Brief,
     BriefSkillRef,
@@ -36,6 +40,9 @@ from astrolift_agents.schema.types import (
     AgentRunFamily,
     AgentRunMode,
     AgentRunSpecType,
+    AgentSecretBundleAttachmentType,
+    AgentSecretBundleType,
+    AgentSecretRevealType,
     AgentSecretStatusType,
     AgentTaskType,
     OrgSkillRepoType,
@@ -43,15 +50,23 @@ from astrolift_agents.schema.types import (
     ToolDefType,
     agent_env_spec_to_type,
     agent_run_spec_to_type,
+    agent_secret_bundle_attachment_to_type,
+    agent_secret_bundle_to_type,
     agent_task_to_type,
     org_skill_repo_to_type,
     skill_to_type,
     tool_def_to_type,
 )
+from astrolift_agents.services.agent_package import (
+    AgentPackageError,
+    normalize_environment_values,
+    normalize_secret_references,
+)
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Organization
+from astrolift_identity.step_up import requires_elevation
 from astrolift_registry.cron import CronValidationError, validate_cron_expression
 from astrolift_registry.models import Workload
 from core.decorators import tenant_scoped
@@ -421,7 +436,7 @@ def _load_spec_and_ref(env_spec_slug: str, env_var: str):
     Org-scoped to the caller's active tenant (a spec in another org is
     NOT_FOUND, no leak). ``ref`` is the normalized ``{"uri", "env_var"}``.
     """
-    from astrolift_dispatch.agent_secrets import normalize_secret_refs
+    from astrolift_dispatch.agent_secrets import effective_secret_refs
 
     tenant = get_current_tenant()
     org_pk = tenant.organization_id if tenant else None
@@ -433,7 +448,7 @@ def _load_spec_and_ref(env_spec_slug: str, env_var: str):
     if spec is None:
         return None, None, gql_failure(ErrorCode.NOT_FOUND.value, "environment spec not found")
     ref = next(
-        (r for r in normalize_secret_refs(spec.secret_refs) if r["env_var"] == env_var),
+        (r for r in effective_secret_refs(spec) if r["env_var"] == env_var),
         None,
     )
     if ref is None:
@@ -447,6 +462,33 @@ def _load_spec_and_ref(env_spec_slug: str, env_var: str):
             ),
         )
     return spec, ref, None
+
+
+def _load_agent_spec(env_spec_slug: str):
+    tenant = get_current_tenant()
+    org_pk = tenant.organization_id if tenant else None
+    spec = (
+        AgentEnvironmentSpec.objects.select_related("organization")
+        .filter(slug=env_spec_slug, organization_id=org_pk, deleted_at__isnull=True)
+        .first()
+    )
+    if spec is None:
+        return None, gql_failure(ErrorCode.NOT_FOUND.value, "environment spec not found")
+    return spec, None
+
+
+def _load_agent_bundle(spec, bundle_id):
+    from astrolift_services.models import SecretBundle
+
+    bundle = SecretBundle.objects.filter(
+        guid=str(bundle_id),
+        organization_id=spec.organization_id,
+        team__isnull=True,
+        deleted_at__isnull=True,
+    ).first()
+    if bundle is None:
+        return None, gql_failure(ErrorCode.NOT_FOUND.value, "secret bundle not found")
+    return bundle, None
 
 
 def _agent_secrets_backend(spec):
@@ -469,10 +511,10 @@ def _agent_secrets_backend(spec):
         return None, gql_failure(ErrorCode.PRECONDITION.value, str(exc))
     try:
         return resolve_secrets_backend(cluster), None
-    except Exception as exc:  # noqa: BLE001 — no secrets driver ⇒ precondition, not 500
+    except Exception:  # noqa: BLE001 — never reflect provider response bodies
         return None, gql_failure(
             ErrorCode.PRECONDITION.value,
-            f"no secret store available for this org: {exc}",
+            "no secret store is available for this org; inspect the provider audit log",
         )
 
 
@@ -660,6 +702,11 @@ class AgentsMutation:
                 f"unknown agent type {input.agent_type!r}",
                 field="agentType",
             )
+        try:
+            secret_refs = normalize_secret_references(input.secret_refs, field="secretRefs")
+            env_vars = normalize_environment_values(input.env_vars, field="envVars")
+        except AgentPackageError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc))
 
         slug = input.slug.strip()[:128]
         if AgentEnvironmentSpec.objects.filter(organization=org, slug=slug, deleted_at__isnull=True).exists():
@@ -684,8 +731,8 @@ class AgentsMutation:
                 config_repo=(input.config_repo or "").strip()[:512],
                 config_branch=(input.config_branch or "main").strip()[:128],
                 config_manifest_path=(input.config_manifest_path or "").strip()[:512],
-                secret_refs=list(input.secret_refs or []),
-                env_vars=dict(input.env_vars or {}),
+                secret_refs=secret_refs,
+                env_vars=env_vars,
             )
         return gql_success(agent_env_spec_to_type(spec))
 
@@ -712,6 +759,19 @@ class AgentsMutation:
                     field="agentType",
                 )
             spec.agent_type = input.agent_type
+        try:
+            secret_refs = (
+                normalize_secret_references(input.secret_refs, field="secretRefs")
+                if input.secret_refs is not None
+                else None
+            )
+            env_vars = (
+                normalize_environment_values(input.env_vars, field="envVars")
+                if input.env_vars is not None
+                else None
+            )
+        except AgentPackageError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc))
         if input.name is not None:
             if not input.name.strip():
                 return gql_failure(ErrorCode.VALIDATION.value, "name is required", field="name")
@@ -734,10 +794,10 @@ class AgentsMutation:
             spec.config_branch = input.config_branch.strip()[:128]
         if input.config_manifest_path is not None:
             spec.config_manifest_path = input.config_manifest_path.strip()[:512]
-        if input.secret_refs is not None:
-            spec.secret_refs = list(input.secret_refs)
-        if input.env_vars is not None:
-            spec.env_vars = dict(input.env_vars)
+        if secret_refs is not None:
+            spec.secret_refs = secret_refs
+        if env_vars is not None:
+            spec.env_vars = env_vars
         spec.save()
         return gql_success(agent_env_spec_to_type(spec))
 
@@ -768,6 +828,7 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.secret.set", target=_agent_secret_target)
+    @requires_elevation(action_label="agents.secret.set")
     @require_permission(Permission.SECRET_WRITE)
     @tenant_scoped()
     def set_agent_secret_value(
@@ -785,17 +846,27 @@ class AgentsMutation:
         spec, ref, err = _load_spec_and_ref(env_spec_slug, env_var)
         if err is not None:
             return err
+        if value == "":
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "value must not be empty; delete the secret instead",
+                field="value",
+            )
         backend, berr = _agent_secrets_backend(spec)
         if berr is not None:
             return berr
         try:
             write_secret_value(backend, ref["uri"], value)
-        except Exception as exc:  # noqa: BLE001 — driver error surfaces value-free
-            return gql_failure(ErrorCode.INTERNAL.value, f"secret store write failed: {exc}")
+        except Exception:  # noqa: BLE001 — never echo a provider payload containing caller input
+            return gql_failure(
+                ErrorCode.INTERNAL.value,
+                "secret store write failed; inspect the provider audit log",
+            )
         return gql_success(AgentSecretStatusType(env_var=env_var, uri=ref["uri"], exists=True, error=None))
 
     @strawberry.field
     @mutation_audit(action="agents.secret.delete", target=_agent_secret_target)
+    @requires_elevation(action_label="agents.secret.delete")
     @require_permission(Permission.SECRET_WRITE)
     @tenant_scoped()
     def delete_agent_secret_value(
@@ -807,7 +878,7 @@ class AgentsMutation:
         absent returns success (desired end-state holds). The env-spec's
         reference itself is untouched — only the store value is removed.
         """
-        from astrolift_dispatch.agent_secrets import delete_secret_value, read_secret_value
+        from astrolift_dispatch.agent_secrets import delete_secret_value
 
         spec, ref, err = _load_spec_and_ref(env_spec_slug, env_var)
         if err is not None:
@@ -817,15 +888,541 @@ class AgentsMutation:
             return berr
         absent = AgentSecretStatusType(env_var=env_var, uri=ref["uri"], exists=False, error=None)
         try:
-            # Probe-then-delete keeps "delete of an already-absent value"
-            # a clean success without coupling to a provider-specific
-            # not-found exception type.
-            if read_secret_value(backend, ref["uri"]) is None:
+            # Probe-then-delete keeps an already-absent ref idempotent while
+            # still deleting a present-but-empty provider shell.
+            if backend.get(ref["uri"]) is None:
                 return gql_success(absent)
             delete_secret_value(backend, ref["uri"])
-        except Exception as exc:  # noqa: BLE001 — driver error surfaces value-free
-            return gql_failure(ErrorCode.INTERNAL.value, f"secret store delete failed: {exc}")
+        except Exception:  # noqa: BLE001 — provider errors can include sensitive response data
+            return gql_failure(
+                ErrorCode.INTERNAL.value,
+                "secret store delete failed; inspect the provider audit log",
+            )
         return gql_success(absent)
+
+    @strawberry.field
+    @mutation_audit(action="agents.secret.binding.upsert", target=_agent_secret_target)
+    @requires_elevation(action_label="agents.secret.binding.upsert")
+    @require_permission(Permission.SECRET_WRITE)
+    @tenant_scoped()
+    def upsert_agent_secret_ref(
+        self, info: Info, env_spec_slug: str, env_var: str, uri: str
+    ) -> MutationResultType[AgentSecretStatusType]:
+        """Create/update a durable operator binding over manifest refs."""
+        from astrolift_dispatch.agent_secrets import valid_agent_env_var
+
+        spec, err = _load_agent_spec(env_spec_slug)
+        if err is not None:
+            return err
+        env_var = (env_var or "").strip()
+        uri = (uri or "").strip()
+        if not valid_agent_env_var(env_var):
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "envVar must be valid and must not be dispatcher-owned",
+                field="envVar",
+            )
+        if len(env_var) > 255:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "envVar must be at most 255 characters",
+                field="envVar",
+            )
+        if not uri:
+            return gql_failure(ErrorCode.VALIDATION.value, "uri is required", field="uri")
+        if len(uri) > 512:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "uri must be at most 512 characters",
+                field="uri",
+            )
+        with transaction.atomic():
+            override = (
+                AgentSecretBindingOverride.objects.select_for_update()
+                .filter(environment_spec=spec, env_var=env_var, deleted_at__isnull=True)
+                .first()
+            )
+            if override is None:
+                override = AgentSecretBindingOverride(
+                    environment_spec=spec,
+                    env_var=env_var,
+                )
+            override.uri = uri
+            override.removed = False
+            override.save()
+        backend, berr = _agent_secrets_backend(spec)
+        exists = False
+        error = None
+        if berr is None:
+            from astrolift_dispatch.agent_secrets import read_secret_value
+
+            try:
+                exists = bool(read_secret_value(backend, override.uri))
+            except Exception:  # noqa: BLE001 — never reflect provider response bodies
+                error = "secret presence check failed; inspect the provider audit log"
+        return gql_success(
+            AgentSecretStatusType(env_var=env_var, uri=override.uri, exists=exists, error=error)
+        )
+
+    @strawberry.field
+    @mutation_audit(action="agents.secret.binding.remove", target=_agent_secret_target)
+    @requires_elevation(action_label="agents.secret.binding.remove")
+    @require_permission(Permission.SECRET_WRITE)
+    @tenant_scoped()
+    def remove_agent_secret_ref(
+        self, info: Info, env_spec_slug: str, env_var: str
+    ) -> MutationResultType[AgentSecretStatusType]:
+        """Remove a binding without deleting its provider-side value."""
+        spec, ref, err = _load_spec_and_ref(env_spec_slug, env_var)
+        if err is not None:
+            return err
+        with transaction.atomic():
+            override = (
+                AgentSecretBindingOverride.objects.select_for_update()
+                .filter(environment_spec=spec, env_var=env_var, deleted_at__isnull=True)
+                .first()
+            )
+            if override is None:
+                override = AgentSecretBindingOverride(environment_spec=spec, env_var=env_var)
+            override.uri = ref["uri"]
+            override.removed = True
+            override.save()
+        return gql_success(AgentSecretStatusType(env_var=env_var, uri=ref["uri"], exists=False, error=None))
+
+    @strawberry.field
+    @mutation_audit(action="agents.secret.reveal", target=_agent_secret_target)
+    @requires_elevation(action_label="agents.secret.reveal")
+    @require_permission(Permission.SECRET_READ)
+    @tenant_scoped()
+    def reveal_agent_secret_value(
+        self, info: Info, env_spec_slug: str, env_var: str
+    ) -> MutationResultType[AgentSecretRevealType]:
+        """Read one value when the backing provider supports disclosure."""
+        from astrolift_dispatch.agent_secrets import (
+            read_secret_value,
+            secret_backend_capabilities,
+        )
+
+        spec, ref, err = _load_spec_and_ref(env_spec_slug, env_var)
+        if err is not None:
+            return err
+        backend, berr = _agent_secrets_backend(spec)
+        if berr is not None:
+            return berr
+        capabilities = secret_backend_capabilities(backend)
+        if not capabilities["can_reveal"]:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                capabilities["read_limitation"] or "provider does not support reveal",
+            )
+        try:
+            value = read_secret_value(backend, ref["uri"])
+        except Exception:  # noqa: BLE001 — never reflect provider response bodies
+            return gql_failure(
+                ErrorCode.INTERNAL.value,
+                "secret store read failed; inspect the provider audit log",
+            )
+        if value is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "secret value is not set")
+        return gql_success(
+            AgentSecretRevealType(
+                env_var=env_var,
+                uri=ref["uri"],
+                value=value,
+                provider=capabilities["provider"],
+                revealed_at=timezone.now(),
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(action="agents.secret.bundle.create")
+    @requires_elevation(action_label="agents.secret.bundle.create")
+    @require_permission(Permission.SECRET_WRITE)
+    @tenant_scoped()
+    def create_agent_secret_bundle(
+        self,
+        info: Info,
+        env_spec_slug: str,
+        name: str,
+        slug: str,
+        backend_ref: str = "",
+    ) -> MutationResultType[AgentSecretBundleType]:
+        from astrolift_dispatch.agent_secrets import secret_backend_capabilities
+        from astrolift_services.models import SecretBundle
+
+        spec, err = _load_agent_spec(env_spec_slug)
+        if err is not None:
+            return err
+        name = (name or "").strip()
+        normalized_slug = slugify(slug or name)[:200]
+        if not name or not normalized_slug:
+            return gql_failure(ErrorCode.VALIDATION.value, "name and slug are required")
+        path = (backend_ref or "").strip() or (f"agent-bundles/{spec.organization.guid}/{normalized_slug}")
+        if len(path) > 512:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "backendRef must be at most 512 characters",
+                field="backendRef",
+            )
+        try:
+            with transaction.atomic():
+                bundle = SecretBundle.objects.create(
+                    organization=spec.organization,
+                    team=None,
+                    name=name[:200],
+                    slug=normalized_slug,
+                    backend_ref=path,
+                )
+        except IntegrityError:
+            return gql_failure(ErrorCode.CONFLICT.value, "a bundle with this slug already exists")
+        backend, berr = _agent_secrets_backend(spec)
+        capabilities = secret_backend_capabilities(backend if berr is None else None)
+        return gql_success(agent_secret_bundle_to_type(bundle, capabilities))
+
+    @strawberry.field
+    @mutation_audit(action="agents.secret.bundle.update")
+    @requires_elevation(action_label="agents.secret.bundle.update")
+    @require_permission(Permission.SECRET_WRITE)
+    @tenant_scoped()
+    def update_agent_secret_bundle(
+        self,
+        info: Info,
+        env_spec_slug: str,
+        bundle_id: strawberry.ID,
+        name: str,
+        backend_ref: str,
+    ) -> MutationResultType[AgentSecretBundleType]:
+        from astrolift_dispatch.agent_secrets import secret_backend_capabilities
+
+        spec, err = _load_agent_spec(env_spec_slug)
+        if err is not None:
+            return err
+        bundle, berr = _load_agent_bundle(spec, bundle_id)
+        if berr is not None:
+            return berr
+        name = (name or "").strip()
+        backend_ref = (backend_ref or "").strip()
+        if not name or not backend_ref:
+            return gql_failure(ErrorCode.VALIDATION.value, "name and backendRef are required")
+        if len(name) > 200:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "name must be at most 200 characters",
+                field="name",
+            )
+        if len(backend_ref) > 512:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "backendRef must be at most 512 characters",
+                field="backendRef",
+            )
+        backend = None
+        store_err = None
+        if backend_ref != bundle.backend_ref:
+            # ``last_known_keys`` is only a cache: out-of-band provider writes
+            # may not have refreshed it yet. Read the authoritative store and
+            # fail closed on an unreadable source before changing the pointer,
+            # otherwise an edit can silently orphan a live secret bundle.
+            backend, store_err = _agent_secrets_backend(spec)
+            if store_err is not None:
+                return store_err
+            try:
+                current_payload = backend.get(bundle.backend_ref) or {}
+            except Exception:  # noqa: BLE001 — fail closed without reflecting provider payloads
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    "current bundle values could not be checked before moving backendRef; "
+                    "inspect the provider audit log",
+                    field="backendRef",
+                )
+            if current_payload:
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    "backendRef cannot change while the bundle contains keys; "
+                    "delete or migrate the provider values first",
+                    field="backendRef",
+                )
+        bundle.name = name
+        bundle.backend_ref = backend_ref
+        bundle.save(update_fields=["name", "backend_ref", "updated_at", "version"])
+        if backend is None:
+            backend, store_err = _agent_secrets_backend(spec)
+        capabilities = secret_backend_capabilities(backend if store_err is None else None)
+        return gql_success(agent_secret_bundle_to_type(bundle, capabilities))
+
+    @strawberry.field
+    @mutation_audit(action="agents.secret.bundle.delete")
+    @requires_elevation(action_label="agents.secret.bundle.delete")
+    @require_permission(Permission.SECRET_WRITE)
+    @tenant_scoped()
+    def delete_agent_secret_bundle(
+        self, info: Info, env_spec_slug: str, bundle_id: strawberry.ID
+    ) -> MutationResultType[AgentSecretBundleType]:
+        from astrolift_dispatch.agent_secrets import secret_backend_capabilities
+
+        spec, err = _load_agent_spec(env_spec_slug)
+        if err is not None:
+            return err
+        bundle, berr = _load_agent_bundle(spec, bundle_id)
+        if berr is not None:
+            return berr
+        if (
+            bundle.agent_refs.filter(deleted_at__isnull=True).exists()
+            or bundle.app_refs.filter(deleted_at__isnull=True).exists()
+        ):
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "detach this bundle from every agent and app before deleting it",
+            )
+        backend, store_err = _agent_secrets_backend(spec)
+        if store_err is not None:
+            return store_err
+        try:
+            # Delete the provider-side bundle as well as its control-plane
+            # metadata. ``None`` means it is already absent; an empty dict is
+            # still a real provider shell and must be removed.
+            if backend.get(bundle.backend_ref) is not None:
+                backend.delete(bundle.backend_ref)
+        except Exception:  # noqa: BLE001 — never expose a provider response body
+            return gql_failure(
+                ErrorCode.INTERNAL.value,
+                "secret bundle delete failed; inspect the provider audit log",
+            )
+        payload = agent_secret_bundle_to_type(bundle, secret_backend_capabilities(backend))
+        bundle.soft_delete()
+        return gql_success(payload)
+
+    @strawberry.field
+    @mutation_audit(action="agents.secret.bundle.attach")
+    @requires_elevation(action_label="agents.secret.bundle.attach")
+    @require_permission(Permission.SECRET_WRITE)
+    @tenant_scoped()
+    def attach_agent_secret_bundle(
+        self,
+        info: Info,
+        env_spec_slug: str,
+        bundle_id: strawberry.ID,
+        environment: str = "default",
+        prefix: str = "",
+        position: int = 0,
+    ) -> MutationResultType[AgentSecretBundleAttachmentType]:
+        from astrolift_dispatch.agent_secrets import valid_env_var
+
+        spec, err = _load_agent_spec(env_spec_slug)
+        if err is not None:
+            return err
+        bundle, berr = _load_agent_bundle(spec, bundle_id)
+        if berr is not None:
+            return berr
+        environment = (environment or "").strip() or "default"
+        prefix = (prefix or "").strip()
+        if len(environment) > 64:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "environment must be at most 64 characters",
+                field="environment",
+            )
+        if len(prefix) > 64:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "prefix must be at most 64 characters",
+                field="prefix",
+            )
+        if prefix and not valid_env_var(f"{prefix}X"):
+            return gql_failure(ErrorCode.VALIDATION.value, "prefix is not env-var safe", field="prefix")
+        ref = AgentSecretBundleRef.objects.filter(
+            environment_spec=spec,
+            secret_bundle=bundle,
+            environment=environment,
+            deleted_at__isnull=True,
+        ).first()
+        if ref is None:
+            ref = AgentSecretBundleRef(
+                environment_spec=spec,
+                secret_bundle=bundle,
+                environment=environment,
+            )
+        ref.prefix = prefix
+        ref.position = max(0, position)
+        ref.save()
+        return gql_success(agent_secret_bundle_attachment_to_type(ref))
+
+    @strawberry.field
+    @mutation_audit(action="agents.secret.bundle.detach")
+    @requires_elevation(action_label="agents.secret.bundle.detach")
+    @require_permission(Permission.SECRET_WRITE)
+    @tenant_scoped()
+    def detach_agent_secret_bundle(
+        self, info: Info, env_spec_slug: str, attachment_id: strawberry.ID
+    ) -> MutationResultType[AgentSecretBundleAttachmentType]:
+        spec, err = _load_agent_spec(env_spec_slug)
+        if err is not None:
+            return err
+        ref = (
+            AgentSecretBundleRef.objects.select_related("secret_bundle")
+            .filter(
+                guid=str(attachment_id),
+                environment_spec=spec,
+                environment_spec__organization_id=spec.organization_id,
+                deleted_at__isnull=True,
+            )
+            .first()
+        )
+        if ref is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "bundle attachment not found")
+        payload = agent_secret_bundle_attachment_to_type(ref)
+        ref.soft_delete()
+        return gql_success(payload)
+
+    @strawberry.field
+    @mutation_audit(action="agents.secret.bundle.key.set")
+    @requires_elevation(action_label="agents.secret.bundle.key.set")
+    @require_permission(Permission.SECRET_WRITE)
+    @tenant_scoped()
+    def set_agent_bundle_secret_value(
+        self,
+        info: Info,
+        env_spec_slug: str,
+        bundle_id: strawberry.ID,
+        key: str,
+        value: str,
+    ) -> MutationResultType[AgentSecretBundleType]:
+        from astrolift_dispatch.agent_secrets import secret_backend_capabilities, valid_agent_env_var
+        from astrolift_services.models import SecretBundle
+
+        spec, err = _load_agent_spec(env_spec_slug)
+        if err is not None:
+            return err
+        bundle, berr = _load_agent_bundle(spec, bundle_id)
+        if berr is not None:
+            return berr
+        key = (key or "").strip()
+        if not valid_agent_env_var(key):
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "key must be env-var safe and must not be dispatcher-owned",
+                field="key",
+            )
+        if len(key) > 255:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "key must be at most 255 characters",
+                field="key",
+            )
+        if value == "":
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "value must not be empty; delete the key instead",
+                field="value",
+            )
+        backend, store_err = _agent_secrets_backend(spec)
+        if store_err is not None:
+            return store_err
+        try:
+            with transaction.atomic():
+                locked = SecretBundle.objects.select_for_update().get(pk=bundle.pk)
+                payload = dict(backend.get(locked.backend_ref) or {})
+                payload[key] = value
+                backend.upsert(locked.backend_ref, payload)
+                locked.last_known_keys = sorted(payload)
+                locked.last_key_enum_at = timezone.now()
+                locked.save(update_fields=["last_known_keys", "last_key_enum_at", "updated_at", "version"])
+                bundle = locked
+        except Exception:  # noqa: BLE001 — write errors may embed the submitted payload
+            return gql_failure(
+                ErrorCode.INTERNAL.value,
+                "secret bundle write failed; inspect the provider audit log",
+            )
+        return gql_success(agent_secret_bundle_to_type(bundle, secret_backend_capabilities(backend)))
+
+    @strawberry.field
+    @mutation_audit(action="agents.secret.bundle.key.delete")
+    @requires_elevation(action_label="agents.secret.bundle.key.delete")
+    @require_permission(Permission.SECRET_WRITE)
+    @tenant_scoped()
+    def delete_agent_bundle_secret_value(
+        self,
+        info: Info,
+        env_spec_slug: str,
+        bundle_id: strawberry.ID,
+        key: str,
+    ) -> MutationResultType[AgentSecretBundleType]:
+        from astrolift_dispatch.agent_secrets import secret_backend_capabilities
+        from astrolift_services.models import SecretBundle
+
+        spec, err = _load_agent_spec(env_spec_slug)
+        if err is not None:
+            return err
+        bundle, berr = _load_agent_bundle(spec, bundle_id)
+        if berr is not None:
+            return berr
+        backend, store_err = _agent_secrets_backend(spec)
+        if store_err is not None:
+            return store_err
+        try:
+            with transaction.atomic():
+                locked = SecretBundle.objects.select_for_update().get(pk=bundle.pk)
+                payload = dict(backend.get(locked.backend_ref) or {})
+                payload.pop(key, None)
+                backend.upsert(locked.backend_ref, payload)
+                locked.last_known_keys = sorted(payload)
+                locked.last_key_enum_at = timezone.now()
+                locked.save(update_fields=["last_known_keys", "last_key_enum_at", "updated_at", "version"])
+                bundle = locked
+        except Exception:  # noqa: BLE001 — never reflect provider response bodies
+            return gql_failure(
+                ErrorCode.INTERNAL.value,
+                "secret bundle key delete failed; inspect the provider audit log",
+            )
+        return gql_success(agent_secret_bundle_to_type(bundle, secret_backend_capabilities(backend)))
+
+    @strawberry.field
+    @mutation_audit(action="agents.secret.bundle.key.reveal")
+    @requires_elevation(action_label="agents.secret.bundle.key.reveal")
+    @require_permission(Permission.SECRET_READ)
+    @tenant_scoped()
+    def reveal_agent_bundle_secret_value(
+        self,
+        info: Info,
+        env_spec_slug: str,
+        bundle_id: strawberry.ID,
+        key: str,
+    ) -> MutationResultType[AgentSecretRevealType]:
+        from astrolift_dispatch.agent_secrets import secret_backend_capabilities
+
+        spec, err = _load_agent_spec(env_spec_slug)
+        if err is not None:
+            return err
+        bundle, berr = _load_agent_bundle(spec, bundle_id)
+        if berr is not None:
+            return berr
+        backend, store_err = _agent_secrets_backend(spec)
+        if store_err is not None:
+            return store_err
+        capabilities = secret_backend_capabilities(backend)
+        if not capabilities["can_reveal"]:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                capabilities["read_limitation"] or "provider does not support reveal",
+            )
+        try:
+            payload = backend.get(bundle.backend_ref) or {}
+        except Exception:  # noqa: BLE001 — never reflect provider response bodies
+            return gql_failure(
+                ErrorCode.INTERNAL.value,
+                "secret bundle read failed; inspect the provider audit log",
+            )
+        if key not in payload:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "secret bundle key not found")
+        return gql_success(
+            AgentSecretRevealType(
+                env_var=key,
+                uri=bundle.backend_ref,
+                value=str(payload[key]),
+                provider=capabilities["provider"],
+                revealed_at=timezone.now(),
+            )
+        )
 
     @strawberry.field
     @mutation_audit(action="agents.brief.assemble")
@@ -944,9 +1541,10 @@ class AgentsMutation:
     def cancel_task(self, info: Info, id: strawberry.ID) -> MutationResultType[None]:
         """Cancel an AgentTask.
 
-        Only ``DRAFT`` / ``QUEUED`` / ``PROVISIONING`` tasks cancel
-        directly (a ``RUNNING`` task needs a stop signal to the
-        Dispatcher); an illegal transition surfaces as a PRECONDITION
+        A task that has already spawned is stopped through its Dispatcher
+        backend before it transitions to ``CANCELLED``. This makes the same
+        mutation work as the operator's hard-stop control for a runaway pod.
+        An illegal terminal-to-terminal transition surfaces as a PRECONDITION
         failure rather than a 500.
         """
         tenant = get_current_tenant()
@@ -954,10 +1552,21 @@ class AgentsMutation:
         task = AgentTask.objects.filter(guid=str(id), organization_id=org_pk, deleted_at__isnull=True).first()
         if task is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "task not found")
-        try:
-            task.transition_to(AgentTask.Status.CANCELLED)
-        except ValueError as exc:
-            return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
+        if task.status in AgentTask.TERMINAL_STATUSES:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"task is already terminal ({task.status})",
+            )
+
+        from astrolift_workflows.activities.agent_stage import _cancel_agent_task_sync
+
+        cancelled = _cancel_agent_task_sync(str(task.guid))
+        task.refresh_from_db(fields=["status"])
+        if not cancelled["ok"] or task.status != AgentTask.Status.CANCELLED:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"task could not be cancelled: {cancelled['error']} (current status: {task.status})",
+            )
         return gql_success(None)
 
     @strawberry.field
@@ -991,9 +1600,6 @@ class AgentsMutation:
         terminal state. Only the run-spec ``once`` mode is wired in PR-1; the
         Workload's run-spec fields carry the other modes for later PRs.
         """
-        from astrolift_workflows.client import start_workflow
-        from astrolift_workflows.inputs import DispatchAgentTaskInput
-
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
         if org_pk is None:
@@ -1003,116 +1609,38 @@ class AgentsMutation:
         if not slug:
             return gql_failure(ErrorCode.VALIDATION.value, "agentSlug is required", field="agentSlug")
 
-        # Resolve the agent Workload org-scoped: the workload lives under a
-        # RegisteredApp whose organization must be the caller's active tenant.
-        # A foreign-org (or non-agent) slug is not resolvable so the surface
-        # never dispatches another tenant's agent or a non-agent workload.
-        workload = (
-            Workload.objects.filter(
-                slug=slug,
-                registered_app__organization_id=org_pk,
-                registered_app__deleted_at__isnull=True,
-                deleted_at__isnull=True,
-            )
-            .select_related("registered_app")
-            .first()
+        from astrolift_agents.services.agent_dispatch import (
+            AgentDispatchError,
+            dispatch_registered_agent,
         )
-        if workload is None:
-            return gql_failure(ErrorCode.NOT_FOUND.value, "agent not found", field="agentSlug")
-        if workload.kind != Workload.Kind.AGENT:
+
+        try:
+            task = dispatch_registered_agent(
+                organization_id=org_pk,
+                agent_slug=slug,
+                actor=_dispatch_actor(info),
+                environment_spec_guid=(
+                    str(input.environment_spec_id) if input.environment_spec_id is not None else ""
+                ),
+                trigger_payload=input.trigger_payload or None,
+                timeout_seconds=input.timeout_seconds,
+                trigger="manual",
+            )
+        except AgentDispatchError as exc:
+            code = {
+                "validation": ErrorCode.VALIDATION.value,
+                "not_found": ErrorCode.NOT_FOUND.value,
+                "precondition": ErrorCode.PRECONDITION.value,
+            }.get(exc.code, ErrorCode.INTERNAL.value)
             return gql_failure(
-                ErrorCode.VALIDATION.value,
-                f"workload {slug!r} is not an agent (kind={workload.kind})",
-                field="agentSlug",
+                code,
+                exc.message,
+                field={
+                    "agent_slug": "agentSlug",
+                    "environment_spec_id": "environmentSpecId",
+                    "timeout_seconds": "timeoutSeconds",
+                }.get(exc.field),
             )
-
-        org = Organization.objects.filter(pk=org_pk, deleted_at__isnull=True).first()
-        if org is None:
-            return gql_failure(ErrorCode.NOT_FOUND.value, "organization not found")
-
-        # Environment spec, org-scoped. A foreign-org spec id is NOT_FOUND for
-        # the same non-leak reason as the workload lookup.
-        env_spec = None
-        if input.environment_spec_id is not None:
-            env_spec = AgentEnvironmentSpec.objects.filter(
-                guid=str(input.environment_spec_id),
-                organization_id=org_pk,
-                deleted_at__isnull=True,
-            ).first()
-            if env_spec is None:
-                return gql_failure(
-                    ErrorCode.NOT_FOUND.value,
-                    "environment spec not found",
-                    field="environmentSpecId",
-                )
-        else:
-            # No spec pinned: default to the agent's own environment spec — the
-            # org-scoped spec whose slug matches the agent slug. That spec
-            # carries the agent's secrets AND the managed-model switch, so a
-            # plain run picks them up instead of dispatching a bare pod with no
-            # config (which crash-loops on a missing ANTHROPIC_API_KEY). Stays
-            # None when the agent has no matching spec — unchanged behavior.
-            env_spec = AgentEnvironmentSpec.objects.filter(
-                slug=slug,
-                organization_id=org_pk,
-                deleted_at__isnull=True,
-            ).first()
-
-        timeout_seconds = (
-            input.timeout_seconds if input.timeout_seconds and input.timeout_seconds > 0 else 300
-        )
-
-        # Ad-hoc input frozen on the task so the spawner surfaces it to the
-        # pod as ASTROLIFT_TRIGGER_PAYLOAD (#930). None/empty -> no env var.
-        dispatch_input = input.trigger_payload or None
-
-        with transaction.atomic():
-            task = AgentTask.objects.create(
-                organization=org,
-                agent_definition=workload,
-                environment_spec=env_spec,
-                status=AgentTask.Status.DRAFT,
-                timeout_seconds=timeout_seconds,
-                dispatch_input=dispatch_input,
-                # Freeze VNC eligibility from the spec so the task stays
-                # self-describing if the spec is later edited or deleted
-                # (mirrors execute_agent_stage._create_agent_task_sync).
-                vnc_enabled=bool(env_spec and env_spec.vnc_enabled),
-            )
-
-        # Assemble + link the Brief so the agent boots with its system prompt
-        # and the in-pod runner runs one-shot: the brief injector emits
-        # AGENT_SYSTEM/AGENT_PROMPT only when task.brief is set, and without
-        # those the runner idles in perpetual listener mode and never processes
-        # its batch. Mirrors execute_agent_stage; done outside the create txn
-        # since it fetches the config repo over the network. Only when the env
-        # spec names a config repo (else the workload's own image/runtime runs
-        # with no assembled brief, as before).
-        if env_spec is not None and env_spec.config_repo:
-            from astrolift_agents.services.brief_assembler import assemble_agent_brief
-
-            brief = assemble_agent_brief(
-                organization=org,
-                config_repo=env_spec.config_repo,
-                config_branch=env_spec.config_branch or "main",
-                manifest_path=env_spec.config_manifest_path or "",
-                context={"task_guid": str(task.guid)},
-                ttl_seconds=timeout_seconds,
-            )
-            task.brief = brief
-            task.save(update_fields=["brief", "updated_at", "version"])
-
-        task.transition_to(AgentTask.Status.QUEUED)
-
-        # Enqueue the durable dispatch. Workflow id is keyed to the task guid
-        # so a duplicate fire joins the in-flight run. When Temporal is
-        # disabled (dev/CI) this is a logged no-op and the task stays QUEUED
-        # until a worker picks it up — the FE still gets a pollable task.
-        start_workflow(
-            "DispatchAgentTaskWorkflow",
-            args=[DispatchAgentTaskInput(agent_task_id=task.pk, actor=_dispatch_actor(info))],
-            workflow_id=f"DispatchAgentTaskWorkflow-{task.guid}",
-        )
 
         return gql_success(agent_task_to_type(task))
 

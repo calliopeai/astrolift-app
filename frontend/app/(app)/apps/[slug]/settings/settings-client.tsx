@@ -232,7 +232,14 @@ const LINK_SECTIONS: LinkSection[] = [
   },
 ];
 
-export function SettingsClient({ slug }: { slug: string }) {
+export function SettingsClient({
+  slug,
+  resourceKind = "app",
+}: {
+  slug: string;
+  resourceKind?: "app" | "agent";
+}) {
+  const isAgent = resourceKind === "agent";
   const tCommon = useTranslations("apps.common");
   const t = useTranslations("apps.settings");
   const app = useQuery<AppResp>(GET_APP, {
@@ -283,19 +290,25 @@ export function SettingsClient({ slug }: { slug: string }) {
           which subpage they navigate to next. */}
       <DeregisterPendingBanner appSlug={a.slug} />
 
-      <ControlsSection appSlug={a.slug} deployBranch={a.deployBranch} />
+      {!isAgent && <ControlsSection appSlug={a.slug} deployBranch={a.deployBranch} />}
 
-      <ResyncSourceSection appSlug={a.slug} lastResyncAt={a.lastResyncAt ?? null} />
-
-      <WebhookDeploysPauseSection
+      <ResyncSourceSection
         appSlug={a.slug}
-        paused={a.webhookDeploysPaused}
-        pausedAt={a.webhookDeploysPausedAt ?? null}
-        pausedByEmail={a.webhookDeploysPausedByEmail ?? null}
-        pauseReason={a.webhookDeploysPauseReason ?? ""}
+        lastResyncAt={a.lastResyncAt ?? null}
+        agentMode={isAgent}
       />
 
-      <IngressControlsSection appSlug={a.slug} />
+      {!isAgent && (
+        <WebhookDeploysPauseSection
+          appSlug={a.slug}
+          paused={a.webhookDeploysPaused}
+          pausedAt={a.webhookDeploysPausedAt ?? null}
+          pausedByEmail={a.webhookDeploysPausedByEmail ?? null}
+          pauseReason={a.webhookDeploysPauseReason ?? ""}
+        />
+      )}
+
+      {!isAgent && <IngressControlsSection appSlug={a.slug} />}
 
       <AssignProjectCard
         appSlug={a.slug}
@@ -306,13 +319,13 @@ export function SettingsClient({ slug }: { slug: string }) {
 
       <TeamsCard appSlug={a.slug} appId={a.id} homeTeamSlug={a.teamSlug} />
 
-      <ManagedServicesSummaryCard appSlug={a.slug} />
+      {!isAgent && <ManagedServicesSummaryCard appSlug={a.slug} />}
 
-      <ManagedServicesAdminSection appSlug={a.slug} />
+      {!isAgent && <ManagedServicesAdminSection appSlug={a.slug} />}
 
-      <RetentionPolicySection appSlug={a.slug} policies={a.retentionPolicies ?? []} />
+      {!isAgent && <RetentionPolicySection appSlug={a.slug} policies={a.retentionPolicies ?? []} />}
 
-      <EnvironmentSettingsSection appSlug={a.slug} />
+      {!isAgent && <EnvironmentSettingsSection appSlug={a.slug} />}
 
       <ArchiveSection
         appSlug={a.slug}
@@ -325,10 +338,13 @@ export function SettingsClient({ slug }: { slug: string }) {
           the link-card to /config for the strategy itself — the manifest
           editor is still reachable via the "Edit manifest TOML" card in
           the LINK_SECTIONS list below for advanced edits. */}
-      <DeployStrategyCard app={a} />
+      {!isAgent && <DeployStrategyCard app={a} />}
 
       <div className="flex flex-col gap-3">
-        {LINK_SECTIONS.map((s) => {
+        {LINK_SECTIONS.filter(
+          (section) =>
+            !isAgent || !["deploy-tokens", "managed-services", "domains"].includes(section.key)
+        ).map((s) => {
           // Per-section "Modified N ago" (#454). Each card pulls its
           // own timestamp off the resolver-derived rollup so the
           // staleness cue is accurate per surface (deploy-tokens
@@ -359,14 +375,16 @@ export function SettingsClient({ slug }: { slug: string }) {
               <React.Fragment key="manifest-with-ci">
                 {card}
                 <CiSetupSection
+                  appId={a.id}
                   appSlug={a.slug}
                   registryUri={a.ecrRepoUri}
                   pushCredentialRef={a.ecrPushRoleArn}
                   providerPluginSlug={a.providerPluginSlug}
                   sourceWebhookInstalledAt={a.sourceWebhookInstalledAt ?? null}
                   ciWorkflowSyncStatus={a.ciWorkflowSyncStatus ?? null}
+                  agentMode={isAgent}
                 />
-                <ForceRedeploySection appSlug={a.slug} />
+                {!isAgent && <ForceRedeploySection appSlug={a.slug} />}
               </React.Fragment>
             );
           }
@@ -375,7 +393,7 @@ export function SettingsClient({ slug }: { slug: string }) {
           // the CI pipeline. Slot it directly under the manifest row
           // when the CI block is hidden so the visual hierarchy
           // matches the with-repo path.
-          if (s.key === "manifest" && !a.sourceRepo) {
+          if (s.key === "manifest" && !a.sourceRepo && !isAgent) {
             return (
               <React.Fragment key="manifest-with-force-redeploy">
                 {card}
@@ -387,7 +405,7 @@ export function SettingsClient({ slug }: { slug: string }) {
         })}
       </div>
 
-      <RunScheduledJobCard appSlug={a.slug} />
+      {!isAgent && <RunScheduledJobCard appSlug={a.slug} />}
 
       <DangerZoneCard appSlug={a.slug} appName={a.name} />
     </PageShell>
@@ -425,9 +443,11 @@ interface ResyncResp {
 function ResyncSourceSection({
   appSlug,
   lastResyncAt,
+  agentMode = false,
 }: {
   appSlug: string;
   lastResyncAt: string | null;
+  agentMode?: boolean;
 }) {
   const t = useTranslations("apps.settings.resync");
   const fmt = useFormatters();
@@ -467,8 +487,12 @@ function ResyncSourceSection({
 
   return (
     <Section
-      title={t("title")}
-      description={t("description")}
+      title={agentMode ? "Resync agent package from source" : t("title")}
+      description={
+        agentMode
+          ? "Fetch the selected manifest and source slice, resolve skills and tools, and freeze a new immutable package without starting a run."
+          : t("description")
+      }
       action={
         <Can permission="app.update">
           <Tooltip>
@@ -479,7 +503,7 @@ function ResyncSourceSection({
                 ) : (
                   <RefreshCwIcon className="size-3.5" />
                 )}
-                {loading ? t("syncing") : t("button")}
+                {loading ? t("syncing") : agentMode ? "Resync package" : t("button")}
               </Button>
             </TooltipTrigger>
             <TooltipContent className="max-w-sm">{t("buttonTooltip")}</TooltipContent>
@@ -582,18 +606,12 @@ function IngressRow({ env, appSlug }: { env: AstroliftAppEnvironment; appSlug: s
         <StatusDot status={paused ? "warn" : "ok"} />
         <span className="text-sm font-medium capitalize">{env.name}</span>
         {paused ? (
-          <Badge
-            variant="outline"
-            className="border-warning-border bg-warning/10 text-warning-fg"
-          >
+          <Badge variant="outline" className="border-warning-border bg-warning/10 text-warning-fg">
             <PauseIcon className="size-3" />
             {t("paused")}
           </Badge>
         ) : (
-          <Badge
-            variant="outline"
-            className="border-success-border bg-success/10 text-success-fg"
-          >
+          <Badge variant="outline" className="border-success-border bg-success/10 text-success-fg">
             <PlayIcon className="size-3" />
             {t("live")}
           </Badge>
@@ -824,7 +842,7 @@ function WebhookDeploysPauseSection({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <PauseIcon className="size-4 text-warning-fg" />
+              <PauseIcon className="text-warning-fg size-4" />
               {t("confirmTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>{t("confirmDescription")}</AlertDialogDescription>
@@ -1046,7 +1064,7 @@ function ForceRedeploySection({ appSlug }: { appSlug: string }) {
             </Tooltip>
           </Can>
         </Can>
-        <p className="text-muted-foreground mt-2 text-2xs">{t("hint")}</p>
+        <p className="text-muted-foreground text-2xs mt-2">{t("hint")}</p>
       </CardContent>
 
       <AlertDialog open={open} onOpenChange={setOpen}>
@@ -1282,7 +1300,7 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
       groups.set(key, arr);
     }
     return (
-      <ul className="space-y-2 text-2xs">
+      <ul className="text-2xs space-y-2">
         {Array.from(groups.entries()).map(([key, items]) => (
           <li key={key}>
             <p className="text-muted-foreground font-mono">{key}</p>
@@ -1303,7 +1321,7 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
   const managedServicesBody = React.useMemo(() => {
     if (!preview || preview.managedServices.length === 0) return null;
     return (
-      <ul className="space-y-1 text-2xs">
+      <ul className="text-2xs space-y-1">
         {preview.managedServices.map((s) => (
           <li key={s.id} className="flex items-center gap-2 font-mono">
             <span className="text-foreground">{s.name || s.kind}</span>
@@ -1321,7 +1339,7 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
   const secretsBody = React.useMemo(() => {
     if (!preview || preview.secretRefs.length === 0) return null;
     return (
-      <ul className="space-y-1 font-mono text-2xs">
+      <ul className="text-2xs space-y-1 font-mono">
         {preview.secretRefs.map((r) => (
           <li key={r.id}>
             <span className="text-foreground">{r.bundleSlug}</span>
@@ -1339,7 +1357,7 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
   const tokensBody = React.useMemo(() => {
     if (!preview || preview.deployTokens.length === 0) return null;
     return (
-      <ul className="space-y-1 font-mono text-2xs">
+      <ul className="text-2xs space-y-1 font-mono">
         {preview.deployTokens.map((tok) => (
           <li key={tok.id}>
             <span className="text-foreground">{tok.name}</span>
@@ -1353,12 +1371,12 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
   const identityBody = React.useMemo(() => {
     if (!preview || preview.identityRoles.length === 0) return null;
     return (
-      <ul className="space-y-1 font-mono text-2xs">
+      <ul className="text-2xs space-y-1 font-mono">
         {preview.identityRoles.map((r) => (
           <li key={`${r.clusterSlug}-${r.roleArnOrPrincipal}`}>
             <span className="text-muted-foreground">{r.clusterSlug}</span>{" "}
             <span className="text-foreground">{r.roleArnOrPrincipal}</span>
-            <Badge variant="outline" className="ml-1 text-2xs">
+            <Badge variant="outline" className="text-2xs ml-1">
               {r.kind}
             </Badge>
           </li>
@@ -1373,7 +1391,7 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
     const hasRegistry = !!preview.registryRepoUri;
     if (!hasWebhook && !hasRegistry) return null;
     return (
-      <ul className="space-y-1 font-mono text-2xs">
+      <ul className="text-2xs space-y-1 font-mono">
         {hasWebhook && preview.sourceWebhook ? (
           <li>
             <span className="text-muted-foreground">{tPreview("sourceWebhookLabel")} →</span>{" "}
@@ -1502,18 +1520,16 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
               <Trash2Icon className="size-4" />
               {t("button")}
               {preview && preview.totalResourceCount > 0 ? (
-                <Badge variant="secondary" className="ml-1.5 text-2xs">
+                <Badge variant="secondary" className="text-2xs ml-1.5">
                   {preview.totalResourceCount}
                 </Badge>
               ) : null}
             </Button>
           </Can>
           {stillLive.length > 0 ? (
-            <div className="mt-3 rounded-md border border-warning-border bg-warning/5 p-3 text-xs">
-              <p className="text-warning-fg">
-                {t("stillLive", { count: stillLive.length })}
-              </p>
-              <ul className="text-foreground mt-1 list-disc pl-5 font-mono text-2xs">
+            <div className="border-warning-border bg-warning/5 mt-3 rounded-md border p-3 text-xs">
+              <p className="text-warning-fg">{t("stillLive", { count: stillLive.length })}</p>
+              <ul className="text-foreground text-2xs mt-1 list-disc pl-5 font-mono">
                 {stillLive.map((r) => (
                   <li key={r}>{r}</li>
                 ))}
@@ -1536,7 +1552,7 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
               </Can>
             </div>
           ) : (
-            <p className="text-muted-foreground mt-2 text-2xs">{t("softHint")}</p>
+            <p className="text-muted-foreground text-2xs mt-2">{t("softHint")}</p>
           )}
         </CardContent>
       </Card>
@@ -1756,7 +1772,7 @@ function RunScheduledJobCard({ appSlug }: { appSlug: string }) {
                   <SelectItem key={w.slug} value={w.slug}>
                     <span className="font-mono text-xs">{w.slug}</span>
                     {w.schedule ? (
-                      <span className="text-muted-foreground ml-2 text-2xs">{w.schedule}</span>
+                      <span className="text-muted-foreground text-2xs ml-2">{w.schedule}</span>
                     ) : null}
                   </SelectItem>
                 ))}
@@ -1795,7 +1811,7 @@ function RunScheduledJobCard({ appSlug }: { appSlug: string }) {
             </Button>
           </Can>
         </div>
-        <p className="text-muted-foreground mt-3 text-2xs">
+        <p className="text-muted-foreground text-2xs mt-3">
           {t("footer")}{" "}
           <Link href={appPath(chrome, appSlug, "jobs")} className="underline">
             {t("jobsPage")}
@@ -1832,7 +1848,7 @@ function RetentionPolicySection({
 }) {
   const policyMap = React.useMemo(
     () => Object.fromEntries(policies.map((p) => [p.signal, p.retentionDays])),
-    [policies],
+    [policies]
   );
   const [saving, setSaving] = React.useState<Record<string, boolean>>({});
 
@@ -1859,7 +1875,7 @@ function RetentionPolicySection({
         return;
       }
       toast.success(
-        `${RETENTION_SIGNALS.find((s) => s.signal === signal)?.label ?? signal} retention set to ${n} days.`,
+        `${RETENTION_SIGNALS.find((s) => s.signal === signal)?.label ?? signal} retention set to ${n} days.`
       );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save retention policy.");
@@ -1878,8 +1894,8 @@ function RetentionPolicySection({
       }
       description={
         <>
-          How long observability data is kept per signal type. Defaults to{" "}
-          {RETENTION_DEFAULT_DAYS} days when no policy is set.
+          How long observability data is kept per signal type. Defaults to {RETENTION_DEFAULT_DAYS}{" "}
+          days when no policy is set.
         </>
       }
     >
@@ -1986,14 +2002,20 @@ function EnvironmentSettingsSection({ appSlug }: { appSlug: string }) {
   async function handleAdd() {
     if (!effectiveEnv) return;
     const key = newKey.trim();
-    if (!key) { toast.error("Key is required."); return; }
+    if (!key) {
+      toast.error("Key is required.");
+      return;
+    }
     setAdding(true);
     try {
       const { data: resp } = await setSetting({
         variables: { input: { environmentId: effectiveEnv.id, key, value: newValue } },
       });
       const env = resp?.setEnvironmentSetting;
-      if (!env?.ok) { toast.error(env?.errors?.[0]?.message ?? "Failed to save."); return; }
+      if (!env?.ok) {
+        toast.error(env?.errors?.[0]?.message ?? "Failed to save.");
+        return;
+      }
       toast.success(`Set ${key}`);
       setNewKey("");
       setNewValue("");
@@ -2011,7 +2033,10 @@ function EnvironmentSettingsSection({ appSlug }: { appSlug: string }) {
         variables: { input: { environmentId: effectiveEnv.id, key } },
       });
       const env = resp?.clearEnvironmentSetting;
-      if (!env?.ok) { toast.error(env?.errors?.[0]?.message ?? "Failed to clear."); return; }
+      if (!env?.ok) {
+        toast.error(env?.errors?.[0]?.message ?? "Failed to clear.");
+        return;
+      }
       toast.success(`Cleared ${key}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to clear.");
@@ -2055,9 +2080,11 @@ function EnvironmentSettingsSection({ appSlug }: { appSlug: string }) {
       ) : (
         <div className="flex flex-col gap-1">
           {settings.map((s) => (
-            <div key={s.id} className="flex items-center gap-2 rounded px-2 py-1 hover:bg-muted/40">
+            <div key={s.id} className="hover:bg-muted/40 flex items-center gap-2 rounded px-2 py-1">
               <span className="w-40 shrink-0 font-mono text-xs">{s.key}</span>
-              <span className="text-muted-foreground flex-1 truncate font-mono text-xs">{s.value || "(empty)"}</span>
+              <span className="text-muted-foreground flex-1 truncate font-mono text-xs">
+                {s.value || "(empty)"}
+              </span>
               <Can permission="app.update">
                 <Button
                   size="sm"
@@ -2077,7 +2104,7 @@ function EnvironmentSettingsSection({ appSlug }: { appSlug: string }) {
       <Can permission="app.update">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-muted-foreground mr-1 text-2xs">Suggested:</span>
+            <span className="text-muted-foreground text-2xs mr-1">Suggested:</span>
             {SUGGESTED_OVERRIDE_KEYS.map((s) => {
               const alreadySet = settings.some((row) => row.key === s.key);
               return (
@@ -2087,7 +2114,7 @@ function EnvironmentSettingsSection({ appSlug }: { appSlug: string }) {
                       type="button"
                       size="sm"
                       variant="outline"
-                      className="h-6 px-2 font-mono text-2xs"
+                      className="text-2xs h-6 px-2 font-mono"
                       disabled={alreadySet}
                       onClick={() => setNewKey(s.key)}
                     >
@@ -2140,10 +2167,20 @@ function EnvironmentSettingsSection({ appSlug }: { appSlug: string }) {
 // ─── archive / restore ───────────────────────────────────────────────────────
 
 interface ArchiveAppResp {
-  archiveApp: MutationResult<{ id: string; slug: string; isArchived: boolean; archivedAt: string | null }>;
+  archiveApp: MutationResult<{
+    id: string;
+    slug: string;
+    isArchived: boolean;
+    archivedAt: string | null;
+  }>;
 }
 interface RestoreAppResp {
-  restoreApp: MutationResult<{ id: string; slug: string; isArchived: boolean; archivedAt: string | null }>;
+  restoreApp: MutationResult<{
+    id: string;
+    slug: string;
+    isArchived: boolean;
+    archivedAt: string | null;
+  }>;
 }
 
 function ArchiveSection({
@@ -2174,7 +2211,10 @@ function ArchiveSection({
     try {
       const { data } = await archive({ variables: { input: { appSlug } } });
       const env = data?.archiveApp;
-      if (!env?.ok) { toast.error(env?.errors?.[0]?.message ?? "Archive failed."); return; }
+      if (!env?.ok) {
+        toast.error(env?.errors?.[0]?.message ?? "Archive failed.");
+        return;
+      }
       toast.success("App archived — workloads scaled to zero.");
       setConfirmOpen(false);
       router.push("/apps");
@@ -2187,7 +2227,10 @@ function ArchiveSection({
     try {
       const { data } = await restore({ variables: { input: { appSlug } } });
       const env = data?.restoreApp;
-      if (!env?.ok) { toast.error(env?.errors?.[0]?.message ?? "Restore failed."); return; }
+      if (!env?.ok) {
+        toast.error(env?.errors?.[0]?.message ?? "Restore failed.");
+        return;
+      }
       toast.success("App restored — workloads returning to pre-archive replicas.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Restore failed.");
@@ -2217,12 +2260,25 @@ function ArchiveSection({
           <Can permission="app.update">
             {isArchived ? (
               <Button size="sm" variant="default" disabled={restoring} onClick={handleRestore}>
-                {restoring ? <Loader2Icon className="size-3.5 animate-spin" /> : <PlayCircleIcon className="size-3.5" />}
+                {restoring ? (
+                  <Loader2Icon className="size-3.5 animate-spin" />
+                ) : (
+                  <PlayCircleIcon className="size-3.5" />
+                )}
                 Restore
               </Button>
             ) : (
-              <Button size="sm" variant="outline" disabled={archiving} onClick={() => setConfirmOpen(true)}>
-                {archiving ? <Loader2Icon className="size-3.5 animate-spin" /> : <ArchiveIcon className="size-3.5" />}
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={archiving}
+                onClick={() => setConfirmOpen(true)}
+              >
+                {archiving ? (
+                  <Loader2Icon className="size-3.5 animate-spin" />
+                ) : (
+                  <ArchiveIcon className="size-3.5" />
+                )}
                 Archive
               </Button>
             )}
@@ -2237,14 +2293,13 @@ function ArchiveSection({
             <AlertDialogDescription asChild>
               <div className="text-muted-foreground space-y-2 text-sm">
                 <p>
-                  Archive is a reversible alternative to deregister. It scales every workload
-                  to <span className="text-foreground font-mono">replicas=0</span>, suppresses
-                  webhook + scheduled deploys, and releases the load balancer capacity.
+                  Archive is a reversible alternative to deregister. It scales every workload to{" "}
+                  <span className="text-foreground font-mono">replicas=0</span>, suppresses webhook
+                  + scheduled deploys, and releases the load balancer capacity.
                 </p>
                 <p>
-                  Your manifest, secrets, deploy tokens, managed services, and domain bindings
-                  are preserved. Restoring returns each workload to its pre-archive replica
-                  count.
+                  Your manifest, secrets, deploy tokens, managed services, and domain bindings are
+                  preserved. Restoring returns each workload to its pre-archive replica count.
                 </p>
               </div>
             </AlertDialogDescription>
@@ -2286,10 +2341,7 @@ interface UpdateManagedServiceResp {
   updateManagedService: MutationResult<AstroliftManagedService>;
 }
 
-const SERVICE_STATUS_VARIANT: Record<
-  string,
-  "ok" | "warn" | "error" | "pending" | "muted"
-> = {
+const SERVICE_STATUS_VARIANT: Record<string, "ok" | "warn" | "error" | "pending" | "muted"> = {
   active: "ok",
   pending: "warn",
   provisioning: "pending",
@@ -2304,12 +2356,10 @@ function ManagedServicesAdminSection({ appSlug }: { appSlug: string }) {
     variables: { appSlug, environmentName: null },
     fetchPolicy: "cache-and-network",
   });
-  const services = (data?.astroliftManagedServices ?? []).filter(
-    (s) => s.status !== "deleted",
-  );
+  const services = (data?.astroliftManagedServices ?? []).filter((s) => s.status !== "deleted");
 
   const [reprovisionTarget, setReprovisionTarget] = React.useState<AstroliftManagedService | null>(
-    null,
+    null
   );
   const [editTarget, setEditTarget] = React.useState<AstroliftManagedService | null>(null);
 
@@ -2386,7 +2436,7 @@ function ManagedServiceAdminRow({
             {svc.kind}
             {svc.variant ? `/${svc.variant}` : ""}
           </Badge>
-          <Badge variant="outline" className="font-mono text-2xs">
+          <Badge variant="outline" className="text-2xs font-mono">
             {svc.environmentName}
           </Badge>
           <Badge variant="outline" className="text-2xs capitalize">
@@ -2394,9 +2444,7 @@ function ManagedServiceAdminRow({
           </Badge>
         </div>
         {svc.statusError ? (
-          <p className="text-destructive mt-0.5 max-w-md truncate text-2xs">
-            {svc.statusError}
-          </p>
+          <p className="text-destructive text-2xs mt-0.5 max-w-md truncate">{svc.statusError}</p>
         ) : null}
       </div>
       <div className="flex shrink-0 items-center gap-1">
@@ -2413,7 +2461,7 @@ function ManagedServiceAdminRow({
                 <PencilIcon className="size-3.5" />
                 Edit
                 {editableCount > 0 ? (
-                  <Badge variant="secondary" className="ml-1 text-2xs">
+                  <Badge variant="secondary" className="text-2xs ml-1">
                     {editableCount}
                   </Badge>
                 ) : null}
@@ -2442,8 +2490,8 @@ function ManagedServiceAdminRow({
             </TooltipTrigger>
             <TooltipContent className="max-w-xs">
               <p className="text-xs">
-                Tear down and recreate the cloud resource. Use when a config change is not in
-                the editable-fields set.
+                Tear down and recreate the cloud resource. Use when a config change is not in the
+                editable-fields set.
               </p>
             </TooltipContent>
           </Tooltip>
@@ -2497,8 +2545,8 @@ function ReprovisionConfirmDialog({
           <AlertDialogDescription>
             The driver tears down the backing cloud resource and recreates it from the current
             config. The service transitions to <span className="font-mono">pending</span>; the
-            lifecycle workflow picks it up. Persistent data on this kind may or may not survive
-            the teardown — check the kind&apos;s driver docs before confirming.
+            lifecycle workflow picks it up. Persistent data on this kind may or may not survive the
+            teardown — check the kind&apos;s driver docs before confirming.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -2605,8 +2653,8 @@ function ManagedServiceEditSheet({
             {target ? `Edit ${target.kind}/${target.name}` : "Edit managed service"}
           </SheetTitle>
           <SheetDescription>
-            Only hot-swappable fields are shown. Changes apply via the driver&apos;s update
-            path — no teardown. For other changes, use Re-provision.
+            Only hot-swappable fields are shown. Changes apply via the driver&apos;s update path —
+            no teardown. For other changes, use Re-provision.
           </SheetDescription>
         </SheetHeader>
 
@@ -2639,10 +2687,7 @@ function ManagedServiceEditSheet({
             Cancel
           </Button>
           <Can permission="app.deploy">
-            <Button
-              onClick={() => void handleSave()}
-              disabled={loading || editable.length === 0}
-            >
+            <Button onClick={() => void handleSave()} disabled={loading || editable.length === 0}>
               {loading ? <Loader2Icon className="size-4 animate-spin" /> : null}
               Save changes
             </Button>

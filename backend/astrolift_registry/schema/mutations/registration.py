@@ -17,6 +17,7 @@ from astrolift_registry.cron import CronValidationError, validate_cron_expressio
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.schema.mutations.helpers import (
     _bootstrap_app_environments,
+    _ensure_owner_access,
     _generate_unique_app_slug,
     _normalize_build_args,
     _resolve_approval_inputs,
@@ -108,6 +109,7 @@ class RegistrationMutations:
 
         if input.source_repo and input.manifest_path:
             if RegisteredApp.objects.filter(
+                organization=project.organization,
                 source_repo=input.source_repo,
                 manifest_path=input.manifest_path,
             ).exists():
@@ -216,6 +218,7 @@ class RegistrationMutations:
             .order_by("pk")
             .first(),
         )
+        _ensure_owner_access(app, app.team_id)
         if approval["user_ids"] is not None:
             app.approver_users.set(approval["user_ids"])
 

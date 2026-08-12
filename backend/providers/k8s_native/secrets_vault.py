@@ -53,6 +53,10 @@ class VaultConfig:
 
 
 class VaultSecretsBackend(SecretsBackend):
+    provider_id = "hashicorp-vault"
+    supports_value_reveal = True
+    value_reveal_limitation = None
+
     def __init__(self, *, config: VaultConfig) -> None:
         self._config = config
         self._client = config.http_client or _build_http_client(config)

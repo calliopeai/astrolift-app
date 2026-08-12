@@ -340,6 +340,127 @@ def _reconcile_ci_workflow(app, payload: dict) -> None:
         )
 
 
+def _sync_agent_package_on_push(app, payload: dict, *, connection=None) -> dict:
+    """Reconcile an independent member or its explicitly opted-in bundle.
+
+    The default remains the exact registered manifest. A federation may set
+    ``auto_register_new=true``; only its deterministic anchor member then
+    performs a whole-bundle scan. This prevents every member webhook from
+    repeating the same scan and prevents an ordinary monorepo push from
+    registering unrelated sibling code.
+    """
+    from django.db import transaction
+
+    from astrolift_registry.models import RegisteredApp, Workload
+
+    workload = (
+        app.workloads.filter(kind=Workload.Kind.AGENT, deleted_at__isnull=True)
+        .select_related("brief")
+        .first()
+    )
+    if workload is None:
+        return {"status": "not_agent"}
+    ref_name = str(payload.get("ref") or "")
+    branch = ref_name.removeprefix("refs/heads/") if ref_name.startswith("refs/heads/") else ""
+    deploy_branch = app.deploy_branch or app.default_branch or "main"
+    if branch != deploy_branch:
+        return {"status": "ignored_branch", "branch": branch, "deploy_branch": deploy_branch}
+    commit_sha = str(payload.get("after") or "").strip()
+    if not commit_sha or set(commit_sha) == {"0"}:
+        return {"status": "ignored_ref"}
+    if app.project_id is None:
+        return {"status": "error", "error": "agent has no project binding"}
+
+    try:
+        from astrolift_registry.services.manifest_sync import register_agent_repo
+        from astrolift_scm.providers import fetch_branch_head
+        from astrolift_scm.services.webhooks import _pick_source_connection
+
+        source_connection = connection or _pick_source_connection(app)
+        if source_connection is None:
+            return {"status": "error", "error": "agent source connection is unavailable"}
+
+        # Serialize package reconciliation across every registered member of
+        # this repo. A federation anchor can update siblings, so locking only
+        # the routed app would still allow an independent sibling delivery to
+        # race the bundle. Deterministic PK order also avoids cross-member
+        # deadlocks. GitHub may retry or reorder otherwise-valid deliveries;
+        # resolving the live head while holding these locks makes every waiter
+        # reconcile the newest source instead of letting a slow old one win.
+        with transaction.atomic():
+            repo_apps = list(
+                RegisteredApp.objects.select_for_update()
+                .filter(
+                    organization_id=app.organization_id,
+                    source_kind=app.source_kind,
+                    source_repo=app.source_repo,
+                    deleted_at__isnull=True,
+                )
+                .order_by("pk")
+            )
+            locked_app = next((candidate for candidate in repo_apps if candidate.pk == app.pk), None)
+            if locked_app is None:
+                return {"status": "error", "error": "registered agent is no longer active"}
+            locked_workload = (
+                locked_app.workloads.filter(kind=Workload.Kind.AGENT, deleted_at__isnull=True)
+                .select_related("brief")
+                .first()
+            )
+            if locked_workload is None:
+                return {"status": "not_agent"}
+
+            locked_deploy_branch = locked_app.deploy_branch or locked_app.default_branch or "main"
+            if branch != locked_deploy_branch:
+                return {
+                    "status": "ignored_branch",
+                    "branch": branch,
+                    "deploy_branch": locked_deploy_branch,
+                }
+
+            current_sha = fetch_branch_head(
+                source_connection,
+                repo_full_name=locked_app.source_repo,
+                branch=locked_deploy_branch,
+            )
+            snapshot = (
+                locked_workload.brief.manifest_snapshot
+                if locked_workload.brief_id and isinstance(locked_workload.brief.manifest_snapshot, dict)
+                else {}
+            )
+            package = snapshot.get("agent_package") if isinstance(snapshot.get("agent_package"), dict) else {}
+            federation = package.get("federation") if isinstance(package.get("federation"), dict) else {}
+            bundle_sync = (
+                bool(federation.get("auto_register_new"))
+                and str(federation.get("anchor_manifest") or "") == locked_app.manifest_path
+            )
+            manifest_paths = None if bundle_sync else [locked_app.manifest_path]
+
+            result = register_agent_repo(
+                project=locked_app.project,
+                source_kind=locked_app.source_kind,
+                source_repo=locked_app.source_repo,
+                ref=current_sha,
+                source_url=locked_app.source_url,
+                default_branch=locked_app.default_branch or "main",
+                deploy_branch=locked_deploy_branch,
+                default_cluster=locked_app.default_tenant_cluster,
+                manifest_paths=manifest_paths,
+            )
+    except Exception as exc:  # noqa: BLE001 — webhook must still ACK
+        logger.exception("agent package auto-sync failed for app=%s", app.pk)
+        return {"status": "error", "error": str(exc) or exc.__class__.__name__}
+    return {
+        "status": result.status,
+        "error": result.error or "",
+        "commit_sha": current_sha,
+        "delivery_commit_sha": commit_sha,
+        "superseded_delivery": current_sha != commit_sha,
+        "mode": "bundle" if bundle_sync else "independent",
+        "agents": [item.slug for item in result.agents],
+        "notes": [note for item in result.agents for note in item.skill_notes],
+    }
+
+
 @require_http_methods(["POST"])
 def pr_webhook(request: HttpRequest, app_guid: str) -> JsonResponse:
     """POST /api/webhooks/github/<app_guid>/ — GitHub push / PR receiver.
@@ -403,12 +524,26 @@ def pr_webhook(request: HttpRequest, app_guid: str) -> JsonResponse:
         return JsonResponse({"detail": "event not handled"}, status=200)
 
     try:
-        payload = json.loads(raw_body.decode("utf-8") or "{}")
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        payload = json.loads(
+            raw_body.decode("utf-8") or "{}",
+            parse_constant=lambda value: (_ for _ in ()).throw(
+                ValueError(f"invalid JSON constant {value}")
+            ),
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
         return JsonResponse({"detail": f"invalid JSON: {exc}"}, status=400)
 
     if not isinstance(payload, dict):
         return JsonResponse({"detail": "invalid payload shape"}, status=400)
+
+    # SourceConnection webhook secrets are organization-scoped. Bind every
+    # otherwise-valid signature to the app's exact repository so a delivery
+    # captured from (or redirected by an admin of) one repo cannot be replayed
+    # against another app URL that shares the same connection secret.
+    repository = payload.get("repository")
+    delivered_repo = str(repository.get("full_name") or "") if isinstance(repository, dict) else ""
+    if delivered_repo.casefold() != str(app.source_repo or "").casefold():
+        return JsonResponse({"detail": "repository does not match webhook target"}, status=403)
 
     # SCM → workflow trigger bridge: both push and PR deliveries fan out
     # to any WorkflowWebhook rows bound to this app. Independent of the
@@ -417,6 +552,11 @@ def pr_webhook(request: HttpRequest, app_guid: str) -> JsonResponse:
     dispatched = _dispatch_workflow_webhooks(event, app, payload)
 
     if event == "push":
+        # Agent packages have their own deploy contract: a deploy-branch push
+        # freezes a new package snapshot at the exact pushed commit. This does
+        # not build an image; CI may still publish the runtime image, and each
+        # subsequent Task pulls mutable tags such as ``latest`` with Always.
+        agent_sync = _sync_agent_package_on_push(app, payload, connection=connection)
         # Best-effort DSL sync: fetch .astrolift/workflows.yaml from the
         # pushed ref and upsert WorkflowDefinitions. Never blocks the ack.
         _sync_workflow_dsl(app, connection, payload)
@@ -427,7 +567,11 @@ def pr_webhook(request: HttpRequest, app_guid: str) -> JsonResponse:
         # Push has no preview-environment lifecycle; the workflow
         # dispatch above is the whole job. Ack so GitHub stops retrying.
         return JsonResponse(
-            {"detail": "push handled", "workflows_dispatched": dispatched},
+            {
+                "detail": "push handled",
+                "workflows_dispatched": dispatched,
+                "agent_package_sync": agent_sync,
+            },
             status=200,
         )
 

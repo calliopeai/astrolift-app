@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import {
   ChevronRightIcon,
   ExternalLinkIcon,
@@ -12,7 +12,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
+import { toast } from "sonner";
 
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
@@ -21,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { DefinitionList } from "@/components/ui/definition-list";
+import { CANCEL_TASK } from "@/graphql/agents/agents.mutations";
 import { AGENT_TASK_LOGS, GET_AGENT_TASK } from "@/graphql/agents/agents.queries";
 import type { AstroliftAgentTask } from "@/graphql/agents/agents.types";
 import { formatRelativeAge } from "@/lib/format";
@@ -32,6 +35,12 @@ interface TaskResp {
 }
 interface LogsResp {
   agentTaskLogs: string[];
+}
+interface CancelResp {
+  cancelTask: {
+    ok: boolean;
+    errors: Array<{ message: string }>;
+  };
 }
 
 // Terminal AgentTask.Status values (backend contract, mirrors agents-client):
@@ -101,6 +110,7 @@ export function AgentTaskDetail({ taskId }: { taskId: string }) {
     data: taskData,
     loading,
     error,
+    refetch: refetchTask,
     stopPolling: stopTaskPoll,
   } = useQuery<TaskResp>(GET_AGENT_TASK, {
     variables: { id: taskId },
@@ -115,6 +125,20 @@ export function AgentTaskDetail({ taskId }: { taskId: string }) {
 
   const task = taskData?.agentTask ?? null;
   const terminal = task ? TERMINAL_STATUSES.includes(task.status) : false;
+  const [killOpen, setKillOpen] = React.useState(false);
+  const [cancelTask] = useMutation<CancelResp>(CANCEL_TASK);
+
+  async function hardStopTask() {
+    const { data } = await cancelTask({ variables: { id: taskId } });
+    const result = data?.cancelTask;
+    if (!result?.ok) {
+      throw new Error(result?.errors?.[0]?.message ?? "Agent task could not be stopped");
+    }
+    await refetchTask();
+    toast.success("Agent task stopped", {
+      description: "The workload was deleted and the task is now cancelled.",
+    });
+  }
 
   // Once the run reaches a terminal state neither the task nor its logs will
   // change again — stop both polls.
@@ -181,21 +205,46 @@ export function AgentTaskDetail({ taskId }: { taskId: string }) {
         </span>
       }
       actions={
-        canWatch ? (
-          <Button asChild size="sm" variant="outline">
-            <Link
-              href={`/agents/runs/${encodeURIComponent(taskId)}/vnc`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <MonitorPlayIcon className="size-4" />
-              Watch live
-              <ExternalLinkIcon className="size-3.5" />
-            </Link>
-          </Button>
+        canWatch || !terminal ? (
+          <div className="flex items-center gap-2">
+            {canWatch && (
+              <Button asChild size="sm" variant="outline">
+                <Link
+                  href={`/agents/runs/${encodeURIComponent(taskId)}/vnc`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <MonitorPlayIcon className="size-4" />
+                  Watch live
+                  <ExternalLinkIcon className="size-3.5" />
+                </Link>
+              </Button>
+            )}
+            {!terminal && (
+              <Button size="sm" variant="destructive" onClick={() => setKillOpen(true)}>
+                <XCircleIcon className="size-4" />
+                Kill agent
+              </Button>
+            )}
+          </div>
         ) : undefined
       }
     >
+      <ConfirmDialog
+        open={killOpen}
+        onOpenChange={setKillOpen}
+        title="Kill this agent task?"
+        description={
+          <span>
+            Astrolift will delete the Kubernetes Job and its per-task Secret. The run is marked
+            cancelled only after the cluster confirms deletion; a failed deletion leaves the run
+            active and reports the error.
+          </span>
+        }
+        confirmLabel="Kill agent"
+        destructive
+        onConfirm={hardStopTask}
+      />
       <div className="space-y-6">
         {/* Spawn/dispatch failure callout — the debug payload for a run that
             failed before (or while) starting a pod. Rendered above everything
@@ -218,57 +267,57 @@ export function AgentTaskDetail({ taskId }: { taskId: string }) {
         <CollapsibleCard title="Overview" storageKey="agent-run-overview">
           <DefinitionList
             items={[
-                { term: "Status", description: <StatusBadge status={task.status} /> },
-                {
-                  term: "Run ID",
-                  description: <span className="font-mono text-xs break-all">{task.id}</span>,
-                },
-                { term: "Created", description: <Timestamp iso={task.createdAt} /> },
-                { term: "Started", description: <Timestamp iso={task.startedAt} /> },
-                { term: "Finished", description: <Timestamp iso={task.finishedAt} /> },
-                {
-                  term: "Pod",
-                  description: task.podName ? (
-                    <span className="font-mono text-xs break-all">{task.podName}</span>
+              { term: "Status", description: <StatusBadge status={task.status} /> },
+              {
+                term: "Run ID",
+                description: <span className="font-mono text-xs break-all">{task.id}</span>,
+              },
+              { term: "Created", description: <Timestamp iso={task.createdAt} /> },
+              { term: "Started", description: <Timestamp iso={task.startedAt} /> },
+              { term: "Finished", description: <Timestamp iso={task.finishedAt} /> },
+              {
+                term: "Pod",
+                description: task.podName ? (
+                  <span className="font-mono text-xs break-all">{task.podName}</span>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                ),
+              },
+              {
+                term: "Namespace",
+                description: task.namespace ? (
+                  <span className="font-mono text-xs break-all">{task.namespace}</span>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                ),
+              },
+              {
+                term: "Callback URL",
+                description: task.callbackUrl ? (
+                  <span className="font-mono text-xs break-all">{task.callbackUrl}</span>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                ),
+              },
+              {
+                term: "Live session",
+                description: task.vncEnabled ? (
+                  canWatch ? (
+                    <Link
+                      href={`/agents/runs/${encodeURIComponent(taskId)}/vnc`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-[var(--brand-primary)] hover:underline"
+                    >
+                      Watch live <ExternalLinkIcon className="size-3.5" />
+                    </Link>
                   ) : (
-                    <span className="text-muted-foreground">—</span>
-                  ),
-                },
-                {
-                  term: "Namespace",
-                  description: task.namespace ? (
-                    <span className="font-mono text-xs break-all">{task.namespace}</span>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  ),
-                },
-                {
-                  term: "Callback URL",
-                  description: task.callbackUrl ? (
-                    <span className="font-mono text-xs break-all">{task.callbackUrl}</span>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  ),
-                },
-                {
-                  term: "Live session",
-                  description: task.vncEnabled ? (
-                    canWatch ? (
-                      <Link
-                        href={`/agents/runs/${encodeURIComponent(taskId)}/vnc`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[var(--brand-primary)] inline-flex items-center gap-1 hover:underline"
-                      >
-                        Watch live <ExternalLinkIcon className="size-3.5" />
-                      </Link>
-                    ) : (
-                      <Badge variant="outline">VNC-capable</Badge>
-                    )
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  ),
-                },
+                    <Badge variant="outline">VNC-capable</Badge>
+                  )
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                ),
+              },
             ]}
           />
         </CollapsibleCard>

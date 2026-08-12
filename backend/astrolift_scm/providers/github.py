@@ -377,6 +377,70 @@ def fetch_github_file(
         raise GithubProviderError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
 
 
+def fetch_github_branch_head(
+    connection,
+    *,
+    repo_full_name: str,
+    branch: str,
+) -> str:
+    """Resolve the current immutable commit SHA for ``branch``.
+
+    Push deliveries are signed but are not ordered. Callers that reconcile
+    mutable branch state must therefore resolve the host's current head rather
+    than treating a delivery's ``after`` field as a latest-wins clock.
+    """
+    token = _token(connection)
+    base = _api_base(connection)
+    safe_repo = "/".join(urllib.parse.quote(p, safe="") for p in repo_full_name.split("/", 1))
+    safe_branch = urllib.parse.quote(branch, safe="")
+    url = f"{base}/repos/{safe_repo}/branches/{safe_branch}"
+    auth_scheme = "Bearer" if connection.kind == "github_app_install" else "token"
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"{auth_scheme} {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        if _is_rate_limited(exc):
+            raise GithubProviderError(
+                "RATE_LIMITED",
+                "GitHub rate limit hit while resolving the branch head; retry later.",
+                recoverable=True,
+            ) from exc
+        if exc.code in (401, 403):
+            raise GithubProviderError(
+                "AUTH_FAILED",
+                github_auth_error_message(exc.code, connection.kind),
+                recoverable=True,
+            ) from exc
+        raise GithubProviderError(
+            "API_ERROR",
+            f"GitHub returned {exc.code} while resolving branch {branch!r}",
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise GithubProviderError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise GithubProviderError(
+            "UNEXPECTED_SHAPE",
+            "GitHub returned an invalid branch response",
+        ) from exc
+
+    sha = ((payload or {}).get("commit") or {}).get("sha") if isinstance(payload, dict) else None
+    if not isinstance(sha, str) or not sha.strip():
+        raise GithubProviderError(
+            "UNEXPECTED_SHAPE",
+            "GitHub branch response is missing commit.sha",
+        )
+    return sha.strip()
+
+
 def fetch_github_zipball(
     connection,
     *,
@@ -405,8 +469,15 @@ def fetch_github_zipball(
         },
     )
     try:
+        from astrolift_scm.providers.archive_download import (
+            ArchiveDownloadTooLarge,
+            read_urllib_response,
+        )
+
         with urllib.request.urlopen(req, timeout=60) as resp:
-            return resp.read()
+            return read_urllib_response(resp)
+    except ArchiveDownloadTooLarge as exc:
+        raise GithubProviderError("PAYLOAD_TOO_LARGE", str(exc)) from exc
     except urllib.error.HTTPError as exc:
         if exc.code in (401, 403):
             raise GithubProviderError(

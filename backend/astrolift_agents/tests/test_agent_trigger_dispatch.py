@@ -206,6 +206,21 @@ def test_dispatch_from_webhook_empty_mapping_passes_whole_payload(agent, tempora
     assert temporal_recorder[0][1][0].trigger_payload == payload
 
 
+def test_dispatch_from_webhook_start_failure_terminalizes_task(agent, monkeypatch):
+    hook = _agent_webhook(agent, slug="agent-hook-start-fails")
+
+    def _fail_start(*_args, **_kwargs):
+        raise RuntimeError("temporal unavailable")
+
+    monkeypatch.setattr("astrolift_workflows.client.start_workflow", _fail_start)
+
+    task = dispatch_agent_task_from_webhook(hook, {"x": 1})
+
+    task.refresh_from_db()
+    assert task.status == AgentTask.Status.FAILED
+    assert "workflow failed to start" in task.failure["message"]
+
+
 def test_dispatch_from_webhook_paused_agent_is_noop(agent, temporal_recorder):
     """Acceptance (3): a paused agent's bound webhook dispatches nothing."""
     agent["workload"].run_paused = True

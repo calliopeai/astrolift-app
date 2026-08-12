@@ -26,7 +26,7 @@ from types import SimpleNamespace
 import pytest
 
 from astrolift_identity.models import Organization, Project, Team
-from astrolift_registry.models import Container, RegisteredApp, Workload
+from astrolift_registry.models import AppTeamAccess, Container, RegisteredApp, Workload
 from astrolift_registry.schema.mutations import RegisterAppRepoInput, RegistryMutation
 from astrolift_registry.services.manifest_sync import (
     discover_app_manifests,
@@ -142,6 +142,15 @@ def test_monorepo_registers_two_apps_with_own_build_context(org, with_connection
         a.manifest_path: a for a in RegisteredApp.objects.filter(organization=org, deleted_at__isnull=True)
     }
     assert set(apps) == {"apps/web/astrolift.toml", "apps/api/astrolift.toml"}
+    assert (
+        AppTeamAccess.objects.filter(
+            registered_app__in=apps.values(),
+            team=project.team,
+            access_level=AppTeamAccess.AccessLevel.OWNER.value,
+            deleted_at__isnull=True,
+        ).count()
+        == 2
+    )
     # Each service builds from its own subdir — the load-bearing #979 contract.
     assert apps["apps/web/astrolift.toml"].build_context == "apps/web"
     assert apps["apps/api/astrolift.toml"].build_context == "apps/api"
@@ -289,6 +298,66 @@ def test_registration_is_scoped_to_project_org(org, with_connection):
     app_a = RegisteredApp.objects.get(source_repo="shared/monorepo", deleted_at__isnull=True)
     assert app_a.organization_id == org.id
     assert app_a.project_id == project_a.id
+
+
+def test_same_repo_and_manifest_register_independently_per_organization(org, other_org, with_connection):
+    with_connection(org)
+    with_connection(other_org)
+    project_a = _project(org, slug="team-a")
+    project_b = _project(other_org, slug="team-b")
+    files = {"apps/web/astrolift.toml": _app_toml("web")}
+
+    first = register_app_repo(
+        project=project_a,
+        source_kind="github",
+        source_repo="shared/monorepo",
+        ref="main",
+        tree=_tree_of(files),
+    )
+    second = register_app_repo(
+        project=project_b,
+        source_kind="github",
+        source_repo="shared/monorepo",
+        ref="main",
+        tree=_tree_of(files),
+    )
+
+    assert first.status == "ok"
+    assert second.status == "ok"
+    apps = RegisteredApp.objects.filter(
+        source_repo="shared/monorepo",
+        manifest_path="apps/web/astrolift.toml",
+        deleted_at__isnull=True,
+    )
+    assert apps.count() == 2
+    assert set(apps.values_list("organization_id", flat=True)) == {org.id, other_org.id}
+
+
+def test_discovery_does_not_report_another_organizations_registration(org, other_org, with_connection):
+    with_connection(org)
+    with_connection(other_org)
+    other_project = _project(other_org, slug="other")
+    files = {"apps/web/astrolift.toml": _app_toml("web")}
+    registered = register_app_repo(
+        project=other_project,
+        source_kind="github",
+        source_repo="shared/monorepo",
+        ref="main",
+        tree=_tree_of(files),
+    )
+    assert registered.status == "ok"
+
+    preview = discover_app_manifests(
+        organization_id=org.id,
+        source_kind="github",
+        source_repo="shared/monorepo",
+        ref="main",
+        tree=_tree_of(files),
+    )
+
+    assert preview.status == "ok"
+    assert len(preview.apps) == 1
+    assert preview.apps[0].already_registered is False
 
 
 def test_discover_preview_does_not_persist(org, with_connection):

@@ -229,6 +229,44 @@ class AgentSecretStatusType:
     uri: str
     exists: bool
     error: str | None
+    provider: str = ""
+    can_reveal: bool = False
+    read_limitation: str | None = None
+
+
+@strawberry.type(name="AstroliftAgentSecretReveal")
+class AgentSecretRevealType:
+    env_var: str
+    uri: str
+    value: str
+    provider: str
+    revealed_at: dt.datetime
+
+
+@strawberry.type(name="AstroliftAgentSecretBundle")
+class AgentSecretBundleType:
+    id: GUID
+    slug: str
+    name: str
+    backend_ref: str
+    key_names: list[str]
+    provider: str
+    can_reveal: bool
+    read_limitation: str | None
+    created_at: dt.datetime
+    updated_at: dt.datetime
+
+
+@strawberry.type(name="AstroliftAgentSecretBundleAttachment")
+class AgentSecretBundleAttachmentType:
+    id: GUID
+    bundle_id: GUID
+    bundle_slug: str
+    bundle_name: str
+    environment: str
+    prefix: str
+    position: int
+    key_names: list[str]
 
 
 @strawberry.type(name="AstroliftOrgSkillRepo")
@@ -818,6 +856,37 @@ def agent_secret_status_to_type(row: dict) -> AgentSecretStatusType:
         uri=row["uri"],
         exists=bool(row["exists"]),
         error=row.get("error"),
+        provider=row.get("provider") or "unavailable",
+        can_reveal=bool(row.get("can_reveal")),
+        read_limitation=row.get("read_limitation"),
+    )
+
+
+def agent_secret_bundle_to_type(bundle, capabilities: dict) -> AgentSecretBundleType:
+    return AgentSecretBundleType(
+        id=GUID(str(bundle.guid)),
+        slug=bundle.slug,
+        name=bundle.name,
+        backend_ref=bundle.backend_ref,
+        key_names=list(bundle.last_known_keys or []),
+        provider=capabilities.get("provider") or "unavailable",
+        can_reveal=bool(capabilities.get("can_reveal")),
+        read_limitation=capabilities.get("read_limitation"),
+        created_at=bundle.created_at,
+        updated_at=bundle.updated_at,
+    )
+
+
+def agent_secret_bundle_attachment_to_type(ref) -> AgentSecretBundleAttachmentType:
+    return AgentSecretBundleAttachmentType(
+        id=GUID(str(ref.guid)),
+        bundle_id=GUID(str(ref.secret_bundle.guid)),
+        bundle_slug=ref.secret_bundle.slug,
+        bundle_name=ref.secret_bundle.name,
+        environment=ref.environment or "default",
+        prefix=ref.prefix or "",
+        position=ref.position,
+        key_names=list(ref.secret_bundle.last_known_keys or []),
     )
 
 

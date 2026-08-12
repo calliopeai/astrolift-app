@@ -6,8 +6,8 @@ Activities:
     Creates an AgentTask, assembles a Brief from config_repo if set,
     dispatches via K8sJobSpawner, polls until terminal, returns result.
 
-  cancel_agent_stage(task_guid) -> None
-    Cancels an in-flight agent task (best-effort).
+  cancel_agent_stage(task_guid) -> dict
+    Cancels an in-flight agent task and reports whether the hard stop settled.
 
 Pattern
 -------
@@ -39,6 +39,7 @@ import asyncio
 import logging
 from typing import Any
 
+from django.utils import timezone
 from temporalio import activity
 
 log = logging.getLogger("astrolift_workflows.activities.agent_stage")
@@ -224,24 +225,65 @@ def _spawn_agent_task_sync(task_pk: int) -> dict[str, Any]:
     task = AgentTask.objects.select_related("organization", "agent_definition", "brief").get(pk=task_pk)
 
     organization = task.organization
-    cluster = _resolve_managed_cluster(organization)
     namespace = _agent_namespace(organization.slug)
+    try:
+        cluster = _resolve_managed_cluster(organization)
+    except Exception as exc:  # noqa: BLE001 — a queued task must settle visibly
+        return _settle_spawn_failure(task.pk, f"cluster resolution failed: {exc}")
 
-    task.transition_to(AgentTask.Status.PROVISIONING)
+    try:
+        task.transition_to(AgentTask.Status.PROVISIONING)
+    except ValueError:
+        # Cancellation can win before the activity reaches the spawn call.
+        # Do not turn that expected race into a failed Temporal activity.
+        task.refresh_from_db()
+        return {
+            "external_id": task.external_id,
+            "ok": False,
+            "error": f"task became {task.status} before its job was created",
+        }
 
     spawner = get_spawner("k8s_job", cluster=cluster, namespace=namespace)
-    result = spawner.spawn(task)
+    try:
+        result = spawner.spawn(task)
+    except Exception as exc:  # noqa: BLE001 — renderer/driver bugs must not strand PROVISIONING
+        return _settle_spawn_failure(task.pk, f"spawn raised {type(exc).__name__}: {exc}")
+
+    # Cancellation can race the external create: the operator may cancel after
+    # we enter ``spawn()`` but before the returned Job id is persisted.  In that
+    # window the cancel path cannot see an external id to delete.  Re-read the
+    # row after the external call and tear down the just-created Job ourselves
+    # instead of resurrecting the cancelled task with a live orphan pod.
+    task.refresh_from_db()
+    if task.status in _TERMINAL_STATUSES:
+        if result.ok and result.external_id:
+            try:
+                spawner.stop(result.external_id)
+            except Exception:  # noqa: BLE001 — task remains terminal; surface via logs
+                log.exception(
+                    "execute_agent_stage: cleanup failed for job %s created after task %s became %s",
+                    result.external_id,
+                    task.guid,
+                    task.status,
+                )
+        return {
+            "external_id": result.external_id,
+            "ok": False,
+            "error": f"task became {task.status} while its job was being created",
+        }
 
     if not result.ok:
-        task.failure = {"message": f"spawn failed: {result.error}"}
-        task.save(update_fields=["failure", "updated_at", "version"])
-        task.transition_to(AgentTask.Status.FAILED)
         log.warning(
             "execute_agent_stage: spawn failed for task %s: %s",
             task.guid,
             result.error,
         )
-        return {"external_id": result.external_id, "ok": False, "error": result.error}
+        return _settle_spawn_failure(
+            task.pk,
+            f"spawn failed: {result.error}",
+            external_id=result.external_id,
+            response_error=result.error,
+        )
 
     task.external_id = result.external_id
     task.pod_name = result.external_id
@@ -254,6 +296,31 @@ def _spawn_agent_task_sync(task_pk: int) -> dict[str, Any]:
         namespace,
     )
     return {"external_id": result.external_id, "ok": True, "error": ""}
+
+
+def _settle_spawn_failure(
+    task_pk: int,
+    message: str,
+    *,
+    external_id: str = "",
+    response_error: str = "",
+) -> dict[str, Any]:
+    """Atomically make a pre-spawn failure terminal unless cancellation won."""
+    from django.db import transaction
+
+    from astrolift_agents.models import AgentTask
+
+    with transaction.atomic():
+        task = AgentTask.objects.select_for_update().get(pk=task_pk)
+        if task.status not in _TERMINAL_STATUSES:
+            task.failure = {"message": message}
+            task.save(update_fields=["failure", "updated_at", "version"])
+            task.transition_to(AgentTask.Status.FAILED)
+        return {
+            "external_id": external_id or task.external_id,
+            "ok": False,
+            "error": response_error or message,
+        }
 
 
 def _poll_agent_task_sync(task_pk: int) -> dict[str, Any]:
@@ -271,17 +338,39 @@ def _poll_agent_task_sync(task_pk: int) -> dict[str, Any]:
 
     task = AgentTask.objects.select_related("organization").get(pk=task_pk)
 
-    # Already terminal (e.g. the dispatch callback finished it) — done.
+    # Already terminal (e.g. the dispatch callback finished it). Remove only
+    # the plaintext-bearing per-task Secret; keep the completed Job/pod long
+    # enough for the operator log surface to inspect it.
     if task.status in _TERMINAL_STATUSES:
+        _cleanup_terminal_task_secret(task)
+        return {"status": task.status, "terminal": True}
+
+    # The Job also carries activeDeadlineSeconds, but enforce the same limit
+    # control-plane-side so the AgentTask reaches TIMED_OUT promptly and the
+    # per-task Secret is removed with the Job. Use provisioning_at because the
+    # deadline begins when dispatch creates the Job, including pod scheduling.
+    started = task.provisioning_at or task.started_at or task.queued_at
+    timeout_seconds = max(1, int(task.timeout_seconds or 300))
+    if started is not None and (timezone.now() - started).total_seconds() >= timeout_seconds:
+        if task.external_id:
+            try:
+                cluster = _resolve_managed_cluster(task.organization)
+                namespace = task.namespace or _agent_namespace(task.organization.slug)
+                get_spawner("k8s_job", cluster=cluster, namespace=namespace).stop(task.external_id)
+            except Exception:  # noqa: BLE001 — K8s deadline remains the backstop
+                log.warning("agent timeout: container stop failed for task %s", task.guid, exc_info=True)
+        task.failure = {"message": f"agent exceeded its {timeout_seconds}s timeout"}
+        task.save(update_fields=["failure", "updated_at", "version"])
+        _advance_to_terminal(task, AgentTask.Status.TIMED_OUT)
         return {"status": task.status, "terminal": True}
 
     if not task.external_id:
-        # No container was ever spawned — nothing to poll. Treat as failed so
-        # the workflow doesn't spin forever.
+        # Spawn may still be in flight. The deadline check above guarantees a
+        # lost worker / stuck provisioning row cannot spin forever.
         return {"status": task.status, "terminal": False}
 
     cluster = _resolve_managed_cluster(task.organization)
-    namespace = _agent_namespace(task.organization.slug)
+    namespace = task.namespace or _agent_namespace(task.organization.slug)
     spawner = get_spawner("k8s_job", cluster=cluster, namespace=namespace)
 
     status = spawner.status(task.external_id)
@@ -297,6 +386,7 @@ def _poll_agent_task_sync(task_pk: int) -> dict[str, Any]:
             task.result = {"exit_code": status.exit_code or 0}
             task.save(update_fields=["result", "updated_at", "version"])
         _advance_to_terminal(task, AgentTask.Status.COMPLETED)
+        _cleanup_terminal_task_secret(task, spawner=spawner)
         return {"status": task.status, "terminal": True}
 
     if status.failed:
@@ -307,6 +397,7 @@ def _poll_agent_task_sync(task_pk: int) -> dict[str, Any]:
             }
             task.save(update_fields=["failure", "updated_at", "version"])
         _advance_to_terminal(task, AgentTask.Status.FAILED)
+        _cleanup_terminal_task_secret(task, spawner=spawner)
         return {"status": task.status, "terminal": True}
 
     # A pod wedged in a fatal image/config waiting state never produces a Job
@@ -323,11 +414,35 @@ def _poll_agent_task_sync(task_pk: int) -> dict[str, Any]:
         if task.failure is None:
             task.failure = {"message": f"container never started: {fatal}"}
             task.save(update_fields=["failure", "updated_at", "version"])
+        # These startup states cannot recover. Delete the live Job rather than
+        # merely marking the row failed and leaving a pod until its deadline.
+        try:
+            spawner.stop(task.external_id)
+        except Exception:  # noqa: BLE001 — activeDeadlineSeconds remains the backstop
+            log.warning("agent fatal-start cleanup failed for task %s", task.guid, exc_info=True)
         _advance_to_terminal(task, AgentTask.Status.FAILED)
         return {"status": task.status, "terminal": True}
 
     # Still running / not yet terminal.
     return {"status": task.status, "terminal": False}
+
+
+def _cleanup_terminal_task_secret(task: Any, *, spawner: Any | None = None) -> None:
+    """Best-effort removal of the temporary K8s Secret after task settlement."""
+    if not getattr(task, "external_id", ""):
+        return
+    try:
+        if spawner is None:
+            from astrolift_dispatch.spawners.registry import get_spawner
+
+            cluster = _resolve_managed_cluster(task.organization)
+            namespace = task.namespace or _agent_namespace(task.organization.slug)
+            spawner = get_spawner("k8s_job", cluster=cluster, namespace=namespace)
+        cleanup = getattr(spawner, "cleanup_task_secret", None)
+        if callable(cleanup):
+            cleanup(task.external_id)
+    except Exception:  # noqa: BLE001 — terminal truth must survive cleanup trouble
+        log.warning("agent terminal secret cleanup failed for task %s", task.guid, exc_info=True)
 
 
 # Pod container-waiting reasons that never self-heal: the container will not
@@ -382,16 +497,10 @@ def _advance_to_terminal(task: Any, terminal_status: str) -> None:
     if task.status in _TERMINAL_STATUSES:
         return
     if task.status == AgentTask.Status.PROVISIONING:
-        # FAILED is legal straight from PROVISIONING; COMPLETED needs RUNNING.
+        # COMPLETED is the only terminal state that requires RUNNING first.
         if terminal_status == AgentTask.Status.COMPLETED:
             try:
                 task.transition_to(AgentTask.Status.RUNNING)
-            except ValueError:
-                pass
-        else:
-            try:
-                task.transition_to(AgentTask.Status.FAILED)
-                return
             except ValueError:
                 pass
     try:
@@ -448,65 +557,58 @@ def _capture_cancel_signal(task, *, ok: bool, from_status: str) -> None:
         )
 
 
-def _cancel_agent_task_sync(task_guid: str) -> None:
-    """Stop the container (best-effort) and move the task to CANCELLED.
+def _cancel_agent_task_sync(task_guid: str) -> dict[str, Any]:
+    """Stop the container and move the task to CANCELLED only on success.
 
-    Only QUEUED / PROVISIONING / RUNNING tasks are cancellable; anything else
+    DRAFT / QUEUED / PROVISIONING / RUNNING tasks are cancellable; anything else
     is already terminal and left untouched.
     """
+    from django.db import transaction
+
     from astrolift_agents.models import AgentTask
     from astrolift_dispatch.spawners.registry import get_spawner
 
-    task = (
-        AgentTask.objects.select_related("organization")
-        .filter(guid=task_guid, deleted_at__isnull=True)
-        .first()
-    )
-    if task is None:
-        log.warning("cancel_agent_stage: task %s not found", task_guid)
-        return
+    # Hold the row lock through the external delete. This deliberately makes a
+    # terminal callback wait until the kill decision settles, preventing a
+    # stale RUNNING instance from overwriting CANCELLED after the Job is gone.
+    with transaction.atomic():
+        task = (
+            AgentTask.objects.select_for_update()
+            .select_related("organization")
+            .filter(guid=task_guid, deleted_at__isnull=True)
+            .first()
+        )
+        if task is None:
+            log.warning("cancel_agent_stage: task %s not found", task_guid)
+            return {"ok": False, "status": "not_found", "error": "task not found"}
 
-    cancellable = {
-        AgentTask.Status.QUEUED,
-        AgentTask.Status.PROVISIONING,
-        AgentTask.Status.RUNNING,
-    }
-    if task.status not in cancellable:
-        return
+        cancellable = {
+            AgentTask.Status.DRAFT,
+            AgentTask.Status.QUEUED,
+            AgentTask.Status.PROVISIONING,
+            AgentTask.Status.RUNNING,
+        }
+        if task.status not in cancellable:
+            return {"ok": False, "status": task.status, "error": "task is already terminal"}
 
-    from_status = task.status
-    stop_ok = True
-    if task.external_id:
-        try:
-            cluster = _resolve_managed_cluster(task.organization)
-            namespace = _agent_namespace(task.organization.slug)
-            get_spawner("k8s_job", cluster=cluster, namespace=namespace).stop(task.external_id)
-        except Exception:  # noqa: BLE001 — best-effort container teardown
-            stop_ok = False
-            log.warning(
-                "cancel_agent_stage: container stop failed for task %s",
-                task_guid,
-                exc_info=True,
-            )
+        from_status = task.status
+        if task.external_id:
+            try:
+                cluster = _resolve_managed_cluster(task.organization)
+                namespace = task.namespace or _agent_namespace(task.organization.slug)
+                get_spawner("k8s_job", cluster=cluster, namespace=namespace).stop(task.external_id)
+            except Exception as exc:  # noqa: BLE001 — report a failed hard stop truthfully
+                _capture_cancel_signal(task, ok=False, from_status=from_status)
+                log.warning(
+                    "cancel_agent_stage: container stop failed for task %s",
+                    task_guid,
+                    exc_info=True,
+                )
+                return {"ok": False, "status": task.status, "error": str(exc) or "container stop failed"}
 
-    _capture_cancel_signal(task, ok=stop_ok, from_status=from_status)
-
-    # CANCELLED is not a legal transition straight from RUNNING (RUNNING only
-    # goes to COMPLETED/FAILED/TIMED_OUT). Mark it failed-as-cancelled in that
-    # case so we still record a terminal state without violating the graph.
-    if task.status == AgentTask.Status.RUNNING:
-        task.failure = {"message": "cancelled while running"}
-        task.save(update_fields=["failure", "updated_at", "version"])
-        try:
-            task.transition_to(AgentTask.Status.FAILED)
-        except ValueError:
-            pass
-        return
-
-    try:
+        _capture_cancel_signal(task, ok=True, from_status=from_status)
         task.transition_to(AgentTask.Status.CANCELLED)
-    except ValueError:
-        pass
+        return {"ok": True, "status": task.status, "error": ""}
 
 
 # ---------------------------------------------------------------------------
@@ -569,16 +671,16 @@ async def execute_agent_stage(params: dict[str, Any]) -> dict[str, Any]:
 
 
 @activity.defn(name="astrolift.agent.cancel_stage")
-async def cancel_agent_stage(task_guid: str) -> None:
-    """Cancel an in-flight agent task (best-effort).
+async def cancel_agent_stage(task_guid: str) -> dict[str, Any]:
+    """Cancel an in-flight agent task and return the hard-stop outcome.
 
     Stops the spawned container and moves the task to a terminal state. Safe to
-    call on an already-terminal task — it is a no-op in that case.
+    call on an already-terminal task; the result identifies that precondition.
     """
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    await sync_to_async(_cancel_agent_task_sync)(task_guid)
+    return await sync_to_async(_cancel_agent_task_sync)(task_guid)
 
 
 @activity.defn(name="astrolift.agent.dispatch_task")

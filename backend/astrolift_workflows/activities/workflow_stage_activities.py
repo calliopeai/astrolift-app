@@ -247,7 +247,7 @@ def _dispatch_agent_for_stage_sync(
     execution = WorkflowStageExecution.objects.select_related("workflow_run").get(pk=int(execution_id))
     if stage.agent_definition is None:
         raise RuntimeError(
-            f"stage {stage_id} is kind={stage.kind} with no agent_definition — " "cannot dispatch an agent"
+            f"stage {stage_id} is kind={stage.kind} with no agent_definition — cannot dispatch an agent"
         )
 
     run = execution.workflow_run
@@ -282,6 +282,23 @@ def _dispatch_agent_for_stage_sync(
         status=AgentTask.Status.DRAFT,
         timeout_seconds=int(stage.timeout_seconds),
     )
+    from astrolift_agents.services.task_preparation import (
+        prepare_agent_task,
+        settle_preparation_failure,
+    )
+
+    try:
+        prepare_agent_task(
+            task,
+            context={"trigger": "workflow", "workflow_stage_id": str(stage.pk)},
+        )
+    except Exception as exc:  # noqa: BLE001
+        settle_preparation_failure(task, exc)
+        agent_run.status = AgentRun.Status.FAILED
+        agent_run.ended_at = timezone.now()
+        agent_run.output = {"package_error": str(exc)}
+        agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
+        raise RuntimeError(f"agent package preparation failed for stage {stage_id}: {exc}") from exc
     task.transition_to(AgentTask.Status.QUEUED)
 
     dispatcher = _resolve_dispatcher_sync(organization_id)
@@ -291,7 +308,7 @@ def _dispatch_agent_for_stage_sync(
         # push-mode callback) can still advance the run. We do NOT fail
         # the dispatch here because registration may be in flight.
         log.warning(
-            "dispatch_agent_for_stage: no ACTIVE dispatcher for org=%s; " "AgentRun %s left PENDING",
+            "dispatch_agent_for_stage: no ACTIVE dispatcher for org=%s; AgentRun %s left PENDING",
             organization_id,
             agent_run.pk,
         )
@@ -330,7 +347,7 @@ def _dispatch_agent_for_stage_sync(
         agent_run.output = {"spawn_error": result.error}
         agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
         raise RuntimeError(
-            f"spawn failed for stage {stage_id} via dispatcher " f"{dispatcher.slug!r}: {result.error}"
+            f"spawn failed for stage {stage_id} via dispatcher {dispatcher.slug!r}: {result.error}"
         )
 
     task.transition_to(AgentTask.Status.RUNNING)

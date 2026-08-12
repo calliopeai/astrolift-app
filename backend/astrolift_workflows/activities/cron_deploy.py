@@ -406,7 +406,22 @@ def _dispatch_agent_crons_sync() -> AgentCronDispatchSummary:
                     status=AgentTask.Status.DRAFT,
                     timeout_seconds=int(workload.tool_timeout_seconds or 300),
                 )
-                task.transition_to(AgentTask.Status.QUEUED)
+            from astrolift_agents.services.task_preparation import (
+                prepare_agent_task,
+                settle_preparation_failure,
+            )
+
+            try:
+                prepare_agent_task(task, context={"trigger": "schedule"})
+            except Exception as exc:  # noqa: BLE001
+                settle_preparation_failure(task, exc)
+                log.warning(
+                    "agent-cron package preparation failed for workload %s: %s",
+                    workload.slug,
+                    exc,
+                )
+                continue
+            task.transition_to(AgentTask.Status.QUEUED)
         except Exception:
             log.warning(
                 "agent-cron create-task failed for workload %s",
@@ -620,10 +635,9 @@ def _dispatch_agent_loops_sync() -> LoopDispatchSummary:
                 continue
             to_dispatch = actions[0].to_dispatch
 
-            # Create the QUEUED Tasks exactly the way the cron tick + the
-            # mutation do: ``agent_definition`` set (the K8s Job spawner needs
-            # it to render the pod image), DRAFT→QUEUED via ``transition_to``.
-            # Loop dispatch is unattended (no env spec / VNC), like the cron tick.
+            # Reserve DRAFT Tasks under the cap lock. Package preparation may
+            # fetch a legacy source repo, so it happens after commit; DRAFT is
+            # intentionally counted as in-flight while that work proceeds.
             for _ in range(to_dispatch):
                 task = AgentTask.objects.create(
                     organization_id=app.organization_id,
@@ -631,7 +645,6 @@ def _dispatch_agent_loops_sync() -> LoopDispatchSummary:
                     status=AgentTask.Status.DRAFT,
                     timeout_seconds=int(workload.tool_timeout_seconds or 300),
                 )
-                task.transition_to(AgentTask.Status.QUEUED)
                 to_start.append((task.pk, str(task.guid)))
 
         # ---- post-commit: enqueue each created task's dispatch workflow ----
@@ -640,6 +653,24 @@ def _dispatch_agent_loops_sync() -> LoopDispatchSummary:
         # the cron tick); the cap accounting already happened under the lock.
         actor = Actor(kind="system", display="agent-loop")
         for task_pk, task_guid in to_start:
+            from astrolift_agents.services.task_preparation import (
+                prepare_agent_task,
+                settle_preparation_failure,
+            )
+
+            task = AgentTask.objects.select_related(
+                "organization",
+                "agent_definition__registered_app",
+                "agent_definition__brief",
+                "environment_spec",
+            ).get(pk=task_pk)
+            try:
+                prepare_agent_task(task, context={"trigger": "loop"})
+                task.transition_to(AgentTask.Status.QUEUED)
+            except Exception as exc:  # noqa: BLE001
+                settle_preparation_failure(task, exc)
+                log.warning("agent-loop package preparation failed for task %s: %s", task_guid, exc)
+                continue
             try:
                 wf_client.start_workflow(
                     "DispatchAgentTaskWorkflow",

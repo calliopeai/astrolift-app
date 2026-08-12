@@ -18,9 +18,22 @@ class _ApplyResult:
         return "ok"
 
 
+class _FailedApplyResult:
+    ok = False
+
+    def summary(self):
+        return "job rejected"
+
+
+class _DeleteResult:
+    ok = True
+
+
 class _RecordingDriver:
-    def __init__(self):
+    def __init__(self, *, fail_apply=False):
         self.calls: list[str] = []
+        self.fail_apply = fail_apply
+        self.deleted: list[dict] = []
 
     def ensure_namespace(self, cluster, name, labels, annotations):
         self.calls.append(f"ensure_namespace:{name}")
@@ -28,7 +41,12 @@ class _RecordingDriver:
 
     def apply_manifests(self, cluster, namespace, manifests):
         self.calls.append(f"apply_manifests:{namespace}")
-        return _ApplyResult()
+        return _FailedApplyResult() if self.fail_apply else _ApplyResult()
+
+    def delete_manifests(self, cluster, namespace, manifests):
+        self.calls.append(f"delete_manifests:{namespace}")
+        self.deleted.extend(manifests)
+        return _DeleteResult()
 
 
 class _Ctx:
@@ -59,6 +77,7 @@ class _Workload:
 
 class _Task:
     guid = "abc12345-0000-0000-0000-000000000000"
+    timeout_seconds = 900
     vnc_enabled = False
     environment_spec = None
     agent_definition = _Workload()
@@ -90,3 +109,63 @@ def test_spawn_ensures_namespace_before_applying_job(monkeypatch):
     assert driver.calls.index("ensure_namespace:astrolift-agents-steadymd") < driver.calls.index(
         "apply_manifests:astrolift-agents-steadymd"
     )
+
+
+def test_rendered_job_has_kubernetes_deadline():
+    from astrolift_dispatch.spawners.k8s_job import _render_agent_job
+
+    job = _render_agent_job(
+        job_name="agent-task-deadline",
+        workload=_Workload(),
+        namespace="astrolift-agents-steadymd",
+        task=_Task(),
+    )
+
+    assert job["spec"]["activeDeadlineSeconds"] == 900
+    assert job["spec"]["template"]["spec"]["containers"][0]["imagePullPolicy"] == "Always"
+
+
+def test_mutable_implicit_latest_image_is_always_pulled():
+    from astrolift_dispatch.spawners.k8s_job import _image_pull_policy
+
+    assert _image_pull_policy("busybox") == "Always"
+    assert _image_pull_policy("registry.example:5000/team/agent") == "Always"
+    assert _image_pull_policy("registry.example/team/agent:latest") == "Always"
+    assert _image_pull_policy("registry.example/team/agent:v1") == "IfNotPresent"
+    assert _image_pull_policy("registry.example/team/agent@sha256:abc") == "IfNotPresent"
+
+
+def test_failed_apply_cleans_up_partial_job_and_secret(monkeypatch):
+    driver = _RecordingDriver(fail_apply=True)
+    import core.cluster_management as cm
+
+    monkeypatch.setattr(cm, "_driver_for_cluster", lambda _c: driver, raising=False)
+    monkeypatch.setattr(cm, "_context_for_cluster", lambda _c: _Ctx(), raising=False)
+    import astrolift_dispatch.brief_injector as brief_injector
+    import astrolift_dispatch.snapshot_injector as snapshot_injector
+
+    monkeypatch.setattr(brief_injector, "inject_brief_into_job_spec", lambda m, t: m)
+    monkeypatch.setattr(snapshot_injector, "inject_snapshot_into_job_spec", lambda m, t: m)
+
+    result = K8sJobSpawner(cluster=object(), namespace="astrolift-agents-steadymd").spawn(_Task())
+
+    assert result.ok is False
+    assert result.error == "job rejected"
+    assert [item["kind"] for item in driver.deleted] == ["Job", "Secret"]
+    assert driver.calls.index("apply_manifests:astrolift-agents-steadymd") < driver.calls.index(
+        "delete_manifests:astrolift-agents-steadymd"
+    )
+
+
+def test_terminal_cleanup_deletes_only_temporary_secret(monkeypatch):
+    driver = _RecordingDriver()
+    import core.cluster_management as cm
+
+    monkeypatch.setattr(cm, "_driver_for_cluster", lambda _c: driver, raising=False)
+    monkeypatch.setattr(cm, "_context_for_cluster", lambda _c: _Ctx(), raising=False)
+
+    spawner = K8sJobSpawner(cluster=object(), namespace="astrolift-agents-steadymd")
+    spawner.cleanup_task_secret("agent-task-complete")
+
+    assert [item["kind"] for item in driver.deleted] == ["Secret"]
+    assert driver.deleted[0]["metadata"]["name"] == "agent-task-complete-secrets"

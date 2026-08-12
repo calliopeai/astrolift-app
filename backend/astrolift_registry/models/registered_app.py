@@ -328,7 +328,7 @@ class RegisteredApp(NamedBaseCoreModel):
                 name="registered_app_slug_unique_active_per_org",
             ),
             models.UniqueConstraint(
-                fields=["source_repo", "manifest_path"],
+                fields=["organization", "source_repo", "manifest_path"],
                 condition=models.Q(
                     deleted_at__isnull=True,
                 )

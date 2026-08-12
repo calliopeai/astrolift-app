@@ -44,6 +44,7 @@ from astrolift_scm.providers.gitea import (
 from astrolift_scm.providers.github import (
     GithubProviderError,
     delete_github_webhook,
+    fetch_github_branch_head,
     fetch_github_file,
     fetch_github_zipball,
     github_installation_includes_repo,
@@ -208,6 +209,29 @@ def fetch_file(
     raise ProviderError(
         "UNSUPPORTED",
         f"file fetch for {connection.kind!r} not implemented yet",
+    )
+
+
+def fetch_branch_head(
+    connection: SourceConnection,
+    *,
+    repo_full_name: str,
+    branch: str,
+) -> str:
+    """Resolve a mutable branch to its current immutable commit SHA."""
+    if connection.kind in _GITHUB_KINDS:
+        try:
+            return fetch_github_branch_head(
+                connection,
+                repo_full_name=repo_full_name,
+                branch=branch,
+            )
+        except GithubProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    raise ProviderError(
+        "UNSUPPORTED",
+        f"branch-head resolution for {connection.kind!r} not implemented yet",
     )
 
 

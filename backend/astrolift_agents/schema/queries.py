@@ -24,6 +24,7 @@ from strawberry.types import Info
 from astrolift_agents.models import (
     AgentEnvironmentSpec,
     AgentInteraction,
+    AgentSecretBundleRef,
     AgentTask,
     Brief,
     DispatcherInstance,
@@ -38,6 +39,8 @@ from astrolift_agents.schema.types import (
     AgentListItemType,
     AgentLiveStatusType,
     AgentRuntimeType,
+    AgentSecretBundleAttachmentType,
+    AgentSecretBundleType,
     AgentSecretStatusType,
     AgentTaskType,
     AgentTriggerType,
@@ -51,6 +54,8 @@ from astrolift_agents.schema.types import (
     agent_detail_to_type,
     agent_env_spec_to_type,
     agent_interaction_to_type,
+    agent_secret_bundle_attachment_to_type,
+    agent_secret_bundle_to_type,
     agent_secret_status_to_type,
     agent_task_to_type,
     agent_trigger_to_type,
@@ -799,7 +804,7 @@ class AgentsQuery:
             NoAgentClusterError,
             resolve_agent_cluster,
         )
-        from astrolift_dispatch.agent_secrets import probe_ref_statuses
+        from astrolift_dispatch.agent_secrets import effective_secret_refs, probe_ref_statuses
 
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
@@ -814,8 +819,62 @@ class AgentsQuery:
             cluster = resolve_agent_cluster(spec.organization)
         except NoAgentClusterError:
             cluster = None
-        rows = probe_ref_statuses(cluster=cluster, refs=spec.secret_refs)
+        rows = probe_ref_statuses(cluster=cluster, refs=effective_secret_refs(spec))
         return [agent_secret_status_to_type(r) for r in rows]
+
+    @strawberry.field
+    @require_permission(Permission.SECRET_READ, Permission.SECRET_LIST)
+    @tenant_scoped()
+    def agent_secret_bundles(self, info: Info, env_spec_slug: str) -> list[AgentSecretBundleType]:
+        """Reusable bundles visible to this agent's organization."""
+        from astrolift_agents.services.agent_cluster import resolve_agent_cluster
+        from astrolift_dispatch.agent_secrets import (
+            resolve_secrets_backend,
+            secret_backend_capabilities,
+        )
+        from astrolift_services.models import SecretBundle
+
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        spec = AgentEnvironmentSpec.objects.filter(
+            slug=env_spec_slug, organization_id=org_pk, deleted_at__isnull=True
+        ).first()
+        if spec is None:
+            return []
+        backend = None
+        try:
+            backend = resolve_secrets_backend(resolve_agent_cluster(spec.organization))
+        except Exception:  # noqa: BLE001 - capability metadata degrades in UI
+            backend = None
+        capabilities = secret_backend_capabilities(backend)
+        bundles = SecretBundle.objects.filter(
+            organization_id=org_pk,
+            team__isnull=True,
+            deleted_at__isnull=True,
+        ).order_by("name", "slug")[:200]
+        return [agent_secret_bundle_to_type(bundle, capabilities) for bundle in bundles]
+
+    @strawberry.field
+    @require_permission(Permission.SECRET_READ, Permission.SECRET_LIST)
+    @tenant_scoped()
+    def agent_environment_spec_secret_bundle_attachments(
+        self, info: Info, slug: str
+    ) -> list[AgentSecretBundleAttachmentType]:
+        """Ordered reusable-secret bundles attached to one agent spec."""
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        refs = (
+            AgentSecretBundleRef.objects.select_related("environment_spec", "secret_bundle")
+            .filter(
+                environment_spec__slug=slug,
+                environment_spec__organization_id=org_pk,
+                environment_spec__deleted_at__isnull=True,
+                secret_bundle__deleted_at__isnull=True,
+                deleted_at__isnull=True,
+            )
+            .order_by("position", "created_at", "pk")
+        )
+        return [agent_secret_bundle_attachment_to_type(ref) for ref in refs]
 
     # ----------------------------------------------------------------
     # Agent list + live status (spec 33 PR-2)

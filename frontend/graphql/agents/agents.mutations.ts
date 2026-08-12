@@ -287,6 +287,267 @@ export const DELETE_AGENT_SECRET_VALUE = gql`
   }
 `;
 
+export const UPSERT_AGENT_SECRET_REF = gql`
+  mutation UpsertAgentSecretRef($slug: String!, $envVar: String!, $uri: String!) {
+    upsertAgentSecretRef(envSpecSlug: $slug, envVar: $envVar, uri: $uri) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        envVar
+        uri
+        exists
+        provider
+        canReveal
+        readLimitation
+      }
+    }
+  }
+`;
+
+export const REMOVE_AGENT_SECRET_REF = gql`
+  mutation RemoveAgentSecretRef($slug: String!, $envVar: String!) {
+    removeAgentSecretRef(envSpecSlug: $slug, envVar: $envVar) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        envVar
+        uri
+        exists
+      }
+    }
+  }
+`;
+
+export const REVEAL_AGENT_SECRET_VALUE = gql`
+  mutation RevealAgentSecretValue($slug: String!, $envVar: String!) {
+    revealAgentSecretValue(envSpecSlug: $slug, envVar: $envVar) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        envVar
+        uri
+        value
+        provider
+        revealedAt
+      }
+    }
+  }
+`;
+
+const AGENT_BUNDLE_FIELDS = gql`
+  fragment AgentBundleFields on AstroliftAgentSecretBundle {
+    id
+    slug
+    name
+    backendRef
+    keyNames
+    provider
+    canReveal
+    readLimitation
+    createdAt
+    updatedAt
+  }
+`;
+
+const AGENT_BUNDLE_ATTACHMENT_FIELDS = gql`
+  fragment AgentBundleAttachmentFields on AstroliftAgentSecretBundleAttachment {
+    id
+    bundleId
+    bundleSlug
+    bundleName
+    environment
+    prefix
+    position
+    keyNames
+  }
+`;
+
+export const CREATE_AGENT_SECRET_BUNDLE = gql`
+  mutation CreateAgentSecretBundle(
+    $slug: String!
+    $name: String!
+    $bundleSlug: String!
+    $backendRef: String!
+  ) {
+    createAgentSecretBundle(
+      envSpecSlug: $slug
+      name: $name
+      slug: $bundleSlug
+      backendRef: $backendRef
+    ) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ...AgentBundleFields
+      }
+    }
+  }
+  ${AGENT_BUNDLE_FIELDS}
+`;
+
+export const UPDATE_AGENT_SECRET_BUNDLE = gql`
+  mutation UpdateAgentSecretBundle(
+    $slug: String!
+    $bundleId: ID!
+    $name: String!
+    $backendRef: String!
+  ) {
+    updateAgentSecretBundle(
+      envSpecSlug: $slug
+      bundleId: $bundleId
+      name: $name
+      backendRef: $backendRef
+    ) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ...AgentBundleFields
+      }
+    }
+  }
+  ${AGENT_BUNDLE_FIELDS}
+`;
+
+export const DELETE_AGENT_SECRET_BUNDLE = gql`
+  mutation DeleteAgentSecretBundle($slug: String!, $bundleId: ID!) {
+    deleteAgentSecretBundle(envSpecSlug: $slug, bundleId: $bundleId) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ...AgentBundleFields
+      }
+    }
+  }
+  ${AGENT_BUNDLE_FIELDS}
+`;
+
+export const ATTACH_AGENT_SECRET_BUNDLE = gql`
+  mutation AttachAgentSecretBundle(
+    $slug: String!
+    $bundleId: ID!
+    $prefix: String!
+    $position: Int!
+  ) {
+    attachAgentSecretBundle(
+      envSpecSlug: $slug
+      bundleId: $bundleId
+      prefix: $prefix
+      position: $position
+    ) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ...AgentBundleAttachmentFields
+      }
+    }
+  }
+  ${AGENT_BUNDLE_ATTACHMENT_FIELDS}
+`;
+
+export const DETACH_AGENT_SECRET_BUNDLE = gql`
+  mutation DetachAgentSecretBundle($slug: String!, $attachmentId: ID!) {
+    detachAgentSecretBundle(envSpecSlug: $slug, attachmentId: $attachmentId) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ...AgentBundleAttachmentFields
+      }
+    }
+  }
+  ${AGENT_BUNDLE_ATTACHMENT_FIELDS}
+`;
+
+export const SET_AGENT_BUNDLE_SECRET_VALUE = gql`
+  mutation SetAgentBundleSecretValue(
+    $slug: String!
+    $bundleId: ID!
+    $key: String!
+    $value: String!
+  ) {
+    setAgentBundleSecretValue(envSpecSlug: $slug, bundleId: $bundleId, key: $key, value: $value) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ...AgentBundleFields
+      }
+    }
+  }
+  ${AGENT_BUNDLE_FIELDS}
+`;
+
+export const DELETE_AGENT_BUNDLE_SECRET_VALUE = gql`
+  mutation DeleteAgentBundleSecretValue($slug: String!, $bundleId: ID!, $key: String!) {
+    deleteAgentBundleSecretValue(envSpecSlug: $slug, bundleId: $bundleId, key: $key) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ...AgentBundleFields
+      }
+    }
+  }
+  ${AGENT_BUNDLE_FIELDS}
+`;
+
+export const REVEAL_AGENT_BUNDLE_SECRET_VALUE = gql`
+  mutation RevealAgentBundleSecretValue($slug: String!, $bundleId: ID!, $key: String!) {
+    revealAgentBundleSecretValue(envSpecSlug: $slug, bundleId: $bundleId, key: $key) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        envVar
+        uri
+        value
+        provider
+        revealedAt
+      }
+    }
+  }
+`;
+
 // Partial update of an AgentEnvironmentSpec (only supplied fields are written; a
 // null/omitted field is left unchanged). The Manage-secrets dialog uses this to
 // flip `managedModel`: when ON, the spec's task pods use the cluster's

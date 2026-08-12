@@ -344,6 +344,18 @@ def check_permission(
     scope: PermissionScope | None = None,
 ) -> None:
     tenant = get_current_tenant() or TenantContext()
+    # API bearer scopes are a ceiling over the user's normal RBAC grants.
+    # Session-authenticated callers have no current API token and are
+    # unaffected. Imported lazily to keep this core module identity-agnostic
+    # during Django app initialization.
+    from astrolift_identity.api_tokens import (
+        get_current_api_token,
+        token_scope_allows_permission,
+    )
+
+    api_token = get_current_api_token()
+    if api_token is not None and not token_scope_allows_permission(api_token, permission.value):
+        raise PermissionDenied(permission, scope, "api token scope does not allow this permission")
     granted, reason = _resolver(tenant, permission, scope)
     if not granted:
         raise PermissionDenied(permission, scope, reason)

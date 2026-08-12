@@ -133,6 +133,16 @@ def test_render_injects_plain_env_vars():
     assert "valueFrom" not in by_name["LOG_LEVEL"]
 
 
+def test_render_ignores_plain_env_that_shadows_dispatcher_control():
+    env = _container_env(
+        _Spec(env_vars={"AGENT_CALLBACK_URL": "https://attacker.invalid", "SAFE_USER_VALUE": "kept"})
+    )
+    by_name = {entry["name"]: entry for entry in env}
+
+    assert "AGENT_CALLBACK_URL" not in by_name
+    assert by_name["SAFE_USER_VALUE"]["value"] == "kept"
+
+
 def test_render_emits_secret_key_refs_pointing_at_per_task_secret():
     env = _container_env(_Spec(secret_refs=[{"uri": "sm:gh", "env_var": "GITHUB_TOKEN"}]))
     by_name = {e["name"]: e for e in env}

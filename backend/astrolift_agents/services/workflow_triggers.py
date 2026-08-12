@@ -193,20 +193,39 @@ def dispatch_agent_task_from_webhook(webhook, payload: dict | None) -> object | 
             # surfaces it to the pod as ASTROLIFT_TRIGGER_PAYLOAD (#930).
             dispatch_input=mapped or None,
         )
+
+    from astrolift_agents.services.task_preparation import (
+        prepare_agent_task,
+        settle_dispatch_start_failure,
+        settle_preparation_failure,
+    )
+
+    try:
+        prepare_agent_task(task, context={"trigger": "webhook"})
+    except Exception as exc:  # noqa: BLE001 — settle + surface through run history
+        settle_preparation_failure(task, exc)
+        log.warning("agent webhook package preparation failed for %s: %s", workload.slug, exc)
+        return task
+
+    with transaction.atomic():
         task.transition_to(AgentTask.Status.QUEUED)
 
     actor = Actor(kind="system", display="agent-trigger")
-    start_workflow(
-        "DispatchAgentTaskWorkflow",
-        args=[
-            DispatchAgentTaskInput(
-                agent_task_id=task.pk,
-                actor=actor,
-                trigger_payload=mapped,
-            )
-        ],
-        workflow_id=f"DispatchAgentTaskWorkflow-{task.guid}",
-    )
+    try:
+        start_workflow(
+            "DispatchAgentTaskWorkflow",
+            args=[
+                DispatchAgentTaskInput(
+                    agent_task_id=task.pk,
+                    actor=actor,
+                    trigger_payload=mapped,
+                )
+            ],
+            workflow_id=f"DispatchAgentTaskWorkflow-{task.guid}",
+        )
+    except Exception as exc:  # noqa: BLE001 — webhook delivery must not leave a phantom queue row
+        settle_dispatch_start_failure(task, exc)
+        log.warning("agent webhook dispatch start failed for %s: %s", workload.slug, exc)
     return task
 
 

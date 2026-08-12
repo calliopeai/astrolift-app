@@ -18,6 +18,7 @@ have to enumerate every scope at mint time).
 
 from __future__ import annotations
 
+import contextvars
 import dataclasses
 import datetime as dt
 import hashlib
@@ -35,18 +36,83 @@ PLAINTEXT_PREFIX = "alft_at_"
 SCOPE_READ_APPS = "read:apps"
 SCOPE_WRITE_APPS = "write:apps"
 SCOPE_READ_CLUSTERS = "read:clusters"
+SCOPE_MCP_READ = "mcp:read"
+SCOPE_MCP_DISPATCH = "mcp:dispatch"
+SCOPE_MCP_WRITE = "mcp:write"
 SCOPE_ADMIN = "admin"
 
 ALLOWED_SCOPES: frozenset[str] = frozenset(
-    {SCOPE_READ_APPS, SCOPE_WRITE_APPS, SCOPE_READ_CLUSTERS, SCOPE_ADMIN}
+    {
+        SCOPE_READ_APPS,
+        SCOPE_WRITE_APPS,
+        SCOPE_READ_CLUSTERS,
+        SCOPE_MCP_READ,
+        SCOPE_MCP_DISPATCH,
+        SCOPE_MCP_WRITE,
+        SCOPE_ADMIN,
+    }
 )
 
 DEFAULT_SCOPES: tuple[str, ...] = (
     SCOPE_READ_APPS,
-    SCOPE_WRITE_APPS,
     SCOPE_READ_CLUSTERS,
-    SCOPE_ADMIN,
+    SCOPE_MCP_READ,
 )
+
+_current_api_token: contextvars.ContextVar[object | None] = contextvars.ContextVar(
+    "astrolift_api_token",
+    default=None,
+)
+
+_READ_APP_PERMISSIONS = frozenset(
+    {
+        "org.read",
+        "team.read",
+        "project.read",
+        "app.read",
+        "app.read_logs",
+        "app.read_metrics",
+        "agent.read",
+        "agent_env_spec.read",
+        "agent_task.watch",
+        "skill.read",
+        "workflow.read",
+        "secret.list",
+    }
+)
+_WRITE_APP_PREFIXES = ("app.", "agent.", "agent_env_spec.", "skill.", "workflow.")
+
+
+def set_current_api_token(token) -> contextvars.Token:
+    return _current_api_token.set(token)
+
+
+def reset_current_api_token(token: contextvars.Token) -> None:
+    _current_api_token.reset(token)
+
+
+def get_current_api_token():
+    return _current_api_token.get()
+
+
+def token_scope_allows_permission(token, permission: str) -> bool:
+    """Apply the bearer scope ceiling to one RBAC permission slug."""
+    if token is None or has_scope(token, SCOPE_ADMIN):
+        return True
+    scopes = set(token.scopes or [])
+    if SCOPE_READ_APPS in scopes and permission in _READ_APP_PERMISSIONS:
+        return True
+    if SCOPE_WRITE_APPS in scopes and permission.startswith(_WRITE_APP_PREFIXES):
+        return True
+    if SCOPE_READ_CLUSTERS in scopes and permission == "provider_plugin.read":
+        return True
+    if SCOPE_MCP_READ in scopes and permission == "agent.read":
+        return True
+    if SCOPE_MCP_DISPATCH in scopes and permission == "agent.dispatch":
+        return True
+    if SCOPE_MCP_WRITE in scopes and permission in {"agent.create", "agent.update"}:
+        return True
+    return False
 
 
 @dataclasses.dataclass(slots=True, frozen=True)

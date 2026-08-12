@@ -1,5 +1,9 @@
 from astrolift_agents.models.agent_environment_spec import AgentEnvironmentSpec
 from astrolift_agents.models.agent_interaction import AgentInteraction, record_interaction
+from astrolift_agents.models.agent_secret_binding import (
+    AgentSecretBindingOverride,
+    AgentSecretBundleRef,
+)
 from astrolift_agents.models.agent_task import AgentTask, resolve_agent_task_for_run
 from astrolift_agents.models.brief import Brief
 from astrolift_agents.models.dispatcher_instance import DispatcherInstance
@@ -19,6 +23,8 @@ from astrolift_agents.models.workflow_trigger import WorkflowSchedule, WorkflowW
 __all__ = [
     "AgentEnvironmentSpec",
     "AgentInteraction",
+    "AgentSecretBindingOverride",
+    "AgentSecretBundleRef",
     "AgentSkillRef",
     "AgentTask",
     "Brief",

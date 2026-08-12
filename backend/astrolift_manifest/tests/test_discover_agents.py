@@ -17,7 +17,9 @@ from __future__ import annotations
 import io
 import zipfile
 
-from astrolift_manifest.discover import scan_agent_manifests
+import pytest
+
+from astrolift_manifest.discover import AgentFederationError, scan_agent_manifests
 
 
 def _agent_toml(name: str, *, kind: str = "agent") -> str:
@@ -143,6 +145,96 @@ def test_empty_tree_returns_empty_list():
     assert scan_agent_manifests({}) == []
 
 
+def test_explicit_federation_selects_nested_members_and_applies_exclusions():
+    files = {
+        "astrolift.agents.toml": (
+            'schema = "astrolift.agent.federation/v1"\n'
+            'name = "care-agents"\n'
+            'include = ["services/**/astrolift.toml"]\n'
+            'exclude = ["services/experimental/**"]\n'
+            "auto_register_new = true\n"
+            "[[agents]]\n"
+            'manifest = "special/concierge/astrolift.toml"\n'
+            'alias = "concierge"\n'
+        ),
+        "services/triage/agents/emr/astrolift.toml": _agent_toml("emr"),
+        "services/experimental/lab/astrolift.toml": _agent_toml("lab"),
+        "special/concierge/astrolift.toml": _agent_toml("concierge"),
+        "agents/legacy/astrolift.toml": _agent_toml("legacy"),
+    }
+
+    found = scan_agent_manifests(files)
+
+    assert [item.manifest_path for item in found] == [
+        "services/triage/agents/emr/astrolift.toml",
+        "special/concierge/astrolift.toml",
+    ]
+    assert all(item.federation["name"] == "care-agents" for item in found)
+    assert all(item.federation["auto_register_new"] is True for item in found)
+    assert found[0].federation["anchor_manifest"] == found[0].manifest_path
+    assert found[1].federation["member"] == "concierge"
+
+
+def test_federation_can_disable_a_glob_selected_member():
+    files = {
+        "astrolift.agents.toml": (
+            'schema = "astrolift.agent.federation/v1"\n'
+            'name = "care-agents"\n'
+            "auto_register_new = true\n"
+            "[[agents]]\n"
+            'manifest = "agents/lab/astrolift.toml"\n'
+            "enabled = false\n"
+        ),
+        "agents/lab/astrolift.toml": _agent_toml("lab"),
+        "agents/emr/astrolift.toml": _agent_toml("emr"),
+    }
+    assert [item.slug for item in scan_agent_manifests(files)] == ["emr"]
+
+
+def test_federation_requires_explicit_members_when_auto_register_is_false():
+    files = {
+        "astrolift.agents.toml": (
+            'schema = "astrolift.agent.federation/v1"\n'
+            'name = "care-agents"\n'
+            'include = ["agents/*/astrolift.toml"]\n'
+            "auto_register_new = false\n"
+            "[[agents]]\n"
+            'manifest = "agents/emr/astrolift.toml"\n'
+        ),
+        "agents/emr/astrolift.toml": _agent_toml("emr"),
+        "agents/unreviewed/astrolift.toml": _agent_toml("unreviewed"),
+    }
+
+    assert [item.slug for item in scan_agent_manifests(files)] == ["emr"]
+
+
+def test_federation_explicit_member_cannot_bypass_exclusion():
+    files = {
+        "astrolift.agents.toml": (
+            'schema = "astrolift.agent.federation/v1"\n'
+            'name = "care-agents"\n'
+            'exclude = ["agents/private/**"]\n'
+            "[[agents]]\n"
+            'manifest = "agents/private/triage/astrolift.toml"\n'
+        ),
+        "agents/private/triage/astrolift.toml": _agent_toml("private-triage"),
+    }
+
+    with pytest.raises(AgentFederationError, match="is excluded"):
+        scan_agent_manifests(files)
+
+
+def test_invalid_federation_fails_closed_instead_of_using_legacy_scan():
+    files = {
+        "astrolift.agents.toml": (
+            'schema = "astrolift.agent.federation/v1"\nname = "care-agents"\ninclude = ["../private/**"]\n'
+        ),
+        "agents/emr/astrolift.toml": _agent_toml("emr"),
+    }
+    with pytest.raises(AgentFederationError, match="may not be absolute or contain"):
+        scan_agent_manifests(files)
+
+
 # ---- zipball unpacker -------------------------------------------------
 
 
@@ -174,3 +266,46 @@ def test_zipball_unpack_drops_binary_files():
     tree = repo_tree_from_zipball_bytes(buf.getvalue())
     assert "logo.png" not in tree
     assert "agents/a/astrolift.toml" in tree
+
+
+def test_zipball_unpack_rejects_too_many_entries(monkeypatch):
+    from astrolift_scm.providers import repo_tree
+
+    monkeypatch.setattr(repo_tree, "_MAX_ENTRIES", 1)
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("r-sha/first.bin", b"\xff")
+        zf.writestr("r-sha/second.bin", b"\xff")
+
+    with pytest.raises(repo_tree.RepoTreeArchiveError, match="entry limit"):
+        repo_tree.repo_tree_from_zipball_bytes(buf.getvalue())
+
+
+def test_zipball_unpack_rejects_aggregate_text_bomb(monkeypatch):
+    from astrolift_scm.providers import repo_tree
+
+    monkeypatch.setattr(repo_tree, "_MAX_RETAINED_TEXT_BYTES", 5)
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("r-sha/one.txt", "abc")
+        zf.writestr("r-sha/two.txt", "def")
+
+    with pytest.raises(repo_tree.RepoTreeArchiveError, match="retained UTF-8"):
+        repo_tree.repo_tree_from_zipball_bytes(buf.getvalue())
+
+
+def test_zipball_unpack_rejects_unsafe_and_duplicate_paths():
+    from astrolift_scm.providers import repo_tree
+
+    unsafe = io.BytesIO()
+    with zipfile.ZipFile(unsafe, "w") as zf:
+        zf.writestr("r-sha/../astrolift.toml", _agent_toml("escape"))
+    with pytest.raises(repo_tree.RepoTreeArchiveError, match="unsafe path"):
+        repo_tree.repo_tree_from_zipball_bytes(unsafe.getvalue())
+
+    duplicate = io.BytesIO()
+    with zipfile.ZipFile(duplicate, "w") as zf:
+        zf.writestr("first/astrolift.toml", _agent_toml("first"))
+        zf.writestr("second/astrolift.toml", _agent_toml("second"))
+    with pytest.raises(repo_tree.RepoTreeArchiveError, match="duplicate path"):
+        repo_tree.repo_tree_from_zipball_bytes(duplicate.getvalue())

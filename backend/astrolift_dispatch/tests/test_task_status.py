@@ -161,3 +161,20 @@ def test_terminal_status_does_not_publish_vnc_url(org, dispatcher, raw_key):
     assert task.status == AgentTask.Status.COMPLETED
     assert task.vnc_url == ""
     assert task.ended_at is not None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_running_callback_cannot_resurrect_cancelled_task(org, dispatcher, raw_key):
+    task = _make_task(org, dispatcher, vnc_enabled=False)
+    task.transition_to(AgentTask.Status.CANCELLED)
+
+    resp = Client().post(
+        STATUS.format(task.guid),
+        data=json.dumps({"status": "running"}),
+        content_type="application/json",
+        **_auth(raw_key),
+    )
+
+    assert resp.status_code == 409
+    task.refresh_from_db()
+    assert task.status == AgentTask.Status.CANCELLED

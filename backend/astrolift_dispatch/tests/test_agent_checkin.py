@@ -234,6 +234,96 @@ def test_callback_completed_persists_result(org, dispatcher, brief, raw_key):
 
 
 @pytest.mark.django_db(transaction=True)
+def test_callback_accepts_task_scoped_pod_token(org, dispatcher, brief):
+    """The credential injected into a one-shot pod can report findings even
+    though the DispatcherInstance plaintext key is not stored anywhere."""
+    callback_key = "alft_cb_test-only"
+    task = _make_task(org, dispatcher, brief, AgentTask.Status.RUNNING)
+    task.callback_token_hash = hashlib.sha256(callback_key.encode()).hexdigest()
+    task.save(update_fields=["callback_token_hash", "updated_at", "version"])
+
+    resp = Client().post(
+        CALLBACK.format(task.guid),
+        data=json.dumps({"status": "completed", "result": {"findings": ["bug-123"]}}),
+        content_type="application/json",
+        **_auth(callback_key),
+    )
+
+    assert resp.status_code == 200
+    task.refresh_from_db()
+    assert task.status == AgentTask.Status.COMPLETED
+    assert task.result == {"output": {"findings": ["bug-123"]}}
+    assert task.callback_token_hash == ""
+
+
+@pytest.mark.django_db(transaction=True)
+def test_dispatcher_callback_is_bound_to_assigned_dispatcher(org, dispatcher, brief, raw_key):
+    other_key = "z" * 64
+    other = DispatcherInstance.objects.create(
+        organization=org,
+        name="Dispatcher B",
+        slug="checkin-dispatcher-b",
+        endpoint="https://dispatch-b.example.com/",
+        api_key_hash=hashlib.sha256(other_key.encode()).hexdigest(),
+        cloud=DispatcherInstance.Cloud.K8S_NATIVE,
+        backend=DispatcherInstance.Backend.K8S_JOB,
+        status=DispatcherInstance.Status.ACTIVE,
+    )
+    task = _make_task(org, other, brief, AgentTask.Status.RUNNING)
+
+    resp = Client().post(
+        CALLBACK.format(task.guid),
+        data=json.dumps({"status": "completed", "result": "stolen"}),
+        content_type="application/json",
+        **_auth(raw_key),
+    )
+
+    assert resp.status_code == 404
+    task.refresh_from_db()
+    assert task.status == AgentTask.Status.RUNNING
+
+
+@pytest.mark.django_db(transaction=True)
+def test_fast_callback_advances_provisioning_task_before_completion(org, dispatcher, brief):
+    callback_key = "alft_cb_fast-pod"
+    task = _make_task(org, dispatcher, brief, AgentTask.Status.PROVISIONING)
+    task.callback_token_hash = hashlib.sha256(callback_key.encode()).hexdigest()
+    task.save(update_fields=["callback_token_hash", "updated_at", "version"])
+
+    resp = Client().post(
+        CALLBACK.format(task.guid),
+        data=json.dumps({"status": "completed", "result": {"findings": []}}),
+        content_type="application/json",
+        **_auth(callback_key),
+    )
+
+    assert resp.status_code == 200
+    task.refresh_from_db()
+    assert task.status == AgentTask.Status.COMPLETED
+    assert task.started_at is not None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_task_scoped_callback_token_cannot_update_another_task(org, dispatcher, brief):
+    callback_key = "alft_cb_one-task-only"
+    first = _make_task(org, dispatcher, brief, AgentTask.Status.RUNNING)
+    first.callback_token_hash = hashlib.sha256(callback_key.encode()).hexdigest()
+    first.save(update_fields=["callback_token_hash", "updated_at", "version"])
+    second = _make_task(org, dispatcher, brief, AgentTask.Status.RUNNING)
+
+    resp = Client().post(
+        CALLBACK.format(second.guid),
+        data=json.dumps({"status": "completed", "result": "stolen"}),
+        content_type="application/json",
+        **_auth(callback_key),
+    )
+
+    assert resp.status_code == 401
+    second.refresh_from_db()
+    assert second.status == AgentTask.Status.RUNNING
+
+
+@pytest.mark.django_db(transaction=True)
 def test_callback_failed_persists_failure(org, dispatcher, brief, raw_key):
     task = _make_task(org, dispatcher, brief, AgentTask.Status.RUNNING)
     resp = Client().post(
@@ -270,9 +360,68 @@ def test_callback_heartbeat_keeps_running(org, dispatcher, brief, raw_key):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_callback_already_terminal_keeps_output(org, dispatcher, brief, raw_key):
-    """A late callback on a terminal task records output without crashing."""
+def test_callback_finding_is_persisted_and_survives_terminal_result(org, dispatcher, brief, raw_key):
+    task = _make_task(org, dispatcher, brief, AgentTask.Status.RUNNING)
+    finding = {"item": "feedback-1", "decision": "filed", "jira_key": "DV-123"}
+
+    reported = Client().post(
+        CALLBACK.format(task.guid),
+        data=json.dumps({"status": "running", "finding": finding}),
+        content_type="application/json",
+        **_auth(raw_key),
+    )
+    assert reported.status_code == 200
+    assert reported.json()["continue"] is True
+    task.refresh_from_db()
+    assert task.result == {"findings": [finding]}
+
+    completed = Client().post(
+        CALLBACK.format(task.guid),
+        data=json.dumps({"status": "completed", "result": "triage complete"}),
+        content_type="application/json",
+        **_auth(raw_key),
+    )
+    assert completed.status_code == 200
+    task.refresh_from_db()
+    assert task.result == {"findings": [finding], "output": "triage complete"}
+
+
+@pytest.mark.django_db(transaction=True)
+def test_callback_rejects_non_object_finding_without_false_success(org, dispatcher, brief, raw_key):
+    task = _make_task(org, dispatcher, brief, AgentTask.Status.RUNNING)
+    resp = Client().post(
+        CALLBACK.format(task.guid),
+        data=json.dumps({"status": "running", "finding": "not structured"}),
+        content_type="application/json",
+        **_auth(raw_key),
+    )
+    assert resp.status_code == 400
+    task.refresh_from_db()
+    assert task.result is None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_callback_rejects_nonfinite_json_before_persisting_result(org, dispatcher, brief, raw_key):
+    task = _make_task(org, dispatcher, brief, AgentTask.Status.RUNNING)
+    resp = Client().post(
+        CALLBACK.format(task.guid),
+        data=b'{"status":"completed","result":NaN}',
+        content_type="application/json",
+        **_auth(raw_key),
+    )
+
+    assert resp.status_code == 400
+    task.refresh_from_db()
+    assert task.status == AgentTask.Status.RUNNING
+    assert task.result is None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_callback_already_terminal_rejects_late_output(org, dispatcher, brief, raw_key):
+    """A late callback must not overwrite the frozen terminal result."""
     task = _make_task(org, dispatcher, brief, AgentTask.Status.COMPLETED)
+    task.result = {"output": "original report"}
+    task.save(update_fields=["result", "updated_at", "version"])
     resp = Client().post(
         CALLBACK.format(task.guid),
         data=json.dumps({"status": "completed", "result": "late report"}),
@@ -280,11 +429,11 @@ def test_callback_already_terminal_keeps_output(org, dispatcher, brief, raw_key)
         **_auth(raw_key),
     )
 
-    assert resp.status_code == 200
+    assert resp.status_code == 409
     assert resp.json()["continue"] is False
     task.refresh_from_db()
     assert task.status == AgentTask.Status.COMPLETED
-    assert task.result == {"output": "late report"}
+    assert task.result == {"output": "original report"}
 
 
 @pytest.mark.django_db(transaction=True)
@@ -297,6 +446,39 @@ def test_callback_invalid_json_400(org, dispatcher, brief, raw_key):
         **_auth(raw_key),
     )
     assert resp.status_code == 400
+
+
+@pytest.mark.django_db(transaction=True)
+def test_callback_rejects_unknown_status(org, dispatcher, brief, raw_key):
+    task = _make_task(org, dispatcher, brief, AgentTask.Status.RUNNING)
+    resp = Client().post(
+        CALLBACK.format(task.guid),
+        data=json.dumps({"status": "cancelled"}),
+        content_type="application/json",
+        **_auth(raw_key),
+    )
+
+    assert resp.status_code == 400
+    task.refresh_from_db()
+    assert task.status == AgentTask.Status.RUNNING
+
+
+@pytest.mark.django_db(transaction=True)
+def test_callback_rejects_oversized_body_before_parsing(monkeypatch, org, dispatcher, brief, raw_key):
+    import astrolift_dispatch.views as views
+
+    monkeypatch.setattr(views, "_MAX_CALLBACK_BODY_BYTES", 64)
+    task = _make_task(org, dispatcher, brief, AgentTask.Status.RUNNING)
+    resp = Client().post(
+        CALLBACK.format(task.guid),
+        data=json.dumps({"status": "running", "partial": "x" * 128}),
+        content_type="application/json",
+        **_auth(raw_key),
+    )
+
+    assert resp.status_code == 413
+    task.refresh_from_db()
+    assert task.status == AgentTask.Status.RUNNING
 
 
 @pytest.mark.django_db(transaction=True)

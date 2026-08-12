@@ -53,8 +53,20 @@ def _split_backend(path: str) -> tuple[str, str]:
     return "sm", path
 
 
+def _is_pending_deletion_error(exc: Exception) -> bool:
+    error = getattr(exc, "response", {}).get("Error", {})
+    if error.get("Code") != "InvalidRequestException":
+        return False
+    message = str(error.get("Message") or "").lower()
+    return "scheduled for deletion" in message or "marked deleted" in message
+
+
 class AWSSecretsBackend(SecretsBackend):
     """Routes between Secrets Manager and SSM based on path prefix."""
+
+    provider_id = "aws-secrets-manager"
+    supports_value_reveal = True
+    value_reveal_limitation = None
 
     def __init__(
         self,
@@ -137,6 +149,8 @@ class AWSSecretsBackend(SecretsBackend):
         except self._sm.exceptions.ResourceNotFoundException:
             return None
         except Exception as exc:
+            if _is_pending_deletion_error(exc):
+                return None
             raise map_client_error(exc) from exc
 
         secret_string = response.get("SecretString", "")
@@ -165,8 +179,13 @@ class AWSSecretsBackend(SecretsBackend):
                 kwargs["KmsKeyId"] = self._config.kms_key_id
             self._sm.create_secret(**kwargs)
         except self._sm.exceptions.ResourceExistsException:
-            # Update path
+            # Update path. A delete uses AWS's recovery window, so a later
+            # operator re-set must restore the scheduled secret before putting
+            # a new version; otherwise CRUD gets wedged for seven days.
             try:
+                metadata = self._sm.describe_secret(SecretId=secret_id)
+                if metadata.get("DeletedDate") is not None:
+                    self._sm.restore_secret(SecretId=secret_id)
                 self._sm.put_secret_value(
                     SecretId=secret_id,
                     SecretString=secret_string,

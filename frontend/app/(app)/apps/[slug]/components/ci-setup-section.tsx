@@ -27,12 +27,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { AstroliftCiWorkflowSyncStatus } from "@/graphql/__generated__/schema";
 import {
   INSTALL_SOURCE_WEBHOOK,
@@ -68,6 +63,8 @@ import { appPath, useAppChrome } from "./app-chrome-context";
  */
 
 interface Props {
+  /** Public app GUID used by managed-workflow drift mutations. */
+  appId: string;
   appSlug: string;
   /** Container-registry coordinate the build pushes to. ECR repo URI on
    *  AWS, Artifact Registry path on GCP, ACR login server on Azure, or a
@@ -91,6 +88,9 @@ interface Props {
    *  resolver returned nothing (defensive — the resolver returns an
    *  `absent`-state object once the query requests the field). */
   ciWorkflowSyncStatus: AstroliftCiWorkflowSyncStatus | null;
+  /** Agent packages sync source snapshots; they do not use the app image
+   * build/deploy contract rendered by the normal CI card. */
+  agentMode?: boolean;
 }
 
 interface PlatformUrlResp {
@@ -155,8 +155,7 @@ const providerCiMeta: Record<string, ProviderCiMeta> = {
     registryEnv: "ASTROLIFT_ARTIFACT_REGISTRY",
     registryHint:
       "Google Artifact Registry path this app pushes to (e.g. us-docker.pkg.dev/PROJECT/REPO/app). Tag with the commit SHA per build.",
-    renderWorkflowSteps:
-      () => `      - name: Authenticate to Google Cloud (OIDC)
+    renderWorkflowSteps: () => `      - name: Authenticate to Google Cloud (OIDC)
         id: auth
         uses: google-github-actions/auth@v2
         with:
@@ -243,18 +242,95 @@ interface SecretRow {
 }
 
 export function CiSetupSection({
+  appId,
   appSlug,
   registryUri,
   pushCredentialRef,
   providerPluginSlug,
   sourceWebhookInstalledAt,
   ciWorkflowSyncStatus,
+  agentMode = false,
 }: Props) {
   const chrome = useAppChrome();
   const { data, loading } = useQuery<PlatformUrlResp>(GET_PLATFORM_API_URL, {
     fetchPolicy: "cache-first",
   });
   const apiUrl = data?.astroliftPlatformApiUrl ?? "";
+
+  if (agentMode) {
+    const automatic = Boolean(sourceWebhookInstalledAt);
+    return (
+      <Section
+        title={
+          <span className="flex items-center gap-2">
+            <WebhookIcon className="text-primary size-4" />
+            Agent source delivery
+          </span>
+        }
+        description={
+          <>
+            Agent pushes freeze an immutable package snapshot; they do not deploy a standing app or
+            start a run. The next dispatch uses the latest successful snapshot and the image named
+            by that package.
+          </>
+        }
+      >
+        <div className="bg-card space-y-3 rounded-md border p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">Push → package sync</p>
+              <p className="text-muted-foreground text-xs">
+                Signed source webhook · deploy branch only · exact manifest or opted-in federation
+                bundle.
+              </p>
+            </div>
+            <span
+              className={
+                automatic
+                  ? "bg-success/10 text-success-fg rounded-full px-2 py-1 text-xs font-medium"
+                  : "bg-warning/10 text-warning-fg rounded-full px-2 py-1 text-xs font-medium"
+              }
+            >
+              {automatic ? "Automatic on push" : "Webhook not installed"}
+            </span>
+          </div>
+          <div className="grid gap-2 text-xs md:grid-cols-3">
+            <div className="bg-muted/40 rounded p-2">
+              <p className="font-medium">Config and scripts</p>
+              <p className="text-muted-foreground">
+                Frozen from the selected chrooted source slice.
+              </p>
+            </div>
+            <div className="bg-muted/40 rounded p-2">
+              <p className="font-medium">Container image</p>
+              <p className="text-muted-foreground">
+                Published separately by the repo&rsquo;s image CI.
+              </p>
+            </div>
+            <div className="bg-muted/40 rounded p-2">
+              <p className="font-medium">Runs</p>
+              <p className="text-muted-foreground">Never auto-started by a source push.</p>
+            </div>
+          </div>
+        </div>
+
+        {ciWorkflowSyncStatus ? (
+          <WorkflowSyncStatusControl appId={appId} status={ciWorkflowSyncStatus} />
+        ) : null}
+
+        <Can permission="app.update">
+          <SyncWorkflowFileAction
+            appSlug={appSlug}
+            workflowPath={`.github/workflows/astrolift-agent-${appSlug}.yml`}
+          />
+          <InstallSourceWebhookAction
+            appSlug={appSlug}
+            sourceWebhookInstalledAt={sourceWebhookInstalledAt}
+          />
+        </Can>
+      </Section>
+    );
+  }
 
   const meta = resolveProviderCiMeta(providerPluginSlug);
 
@@ -310,8 +386,8 @@ export function CiSetupSection({
       description={
         <>
           Paste these values into your GitHub repo&rsquo;s Actions secrets, then drop in the
-          reference workflow below. The workflow keys off these exact names — rename one and the
-          run breaks.
+          reference workflow below. The workflow keys off these exact names — rename one and the run
+          breaks.
         </>
       }
     >
@@ -339,7 +415,7 @@ export function CiSetupSection({
           </span>
         </summary>
         <div className="border-t">
-          <pre className="bg-background overflow-x-auto p-4 font-mono text-2xs leading-relaxed">
+          <pre className="bg-background text-2xs overflow-x-auto p-4 font-mono leading-relaxed">
             {workflowYaml}
           </pre>
           <div className="flex justify-end border-t p-3">
@@ -352,7 +428,7 @@ export function CiSetupSection({
       </details>
 
       {ciWorkflowSyncStatus ? (
-        <WorkflowSyncStatusControl appSlug={appSlug} status={ciWorkflowSyncStatus} />
+        <WorkflowSyncStatusControl appId={appId} status={ciWorkflowSyncStatus} />
       ) : null}
 
       <Can permission="app.update">
@@ -420,18 +496,21 @@ const DRIFT_BADGE: Record<string, { label: string; className: string }> = {
  *  knows what the state means and which action resolves it. */
 const DRIFT_HINT: Record<string, string> = {
   in_sync: "The managed workflow file matches the current template. Nothing to do.",
-  template_stale: "The repo file is unchanged but the platform renders a newer template. Resync to update it.",
-  repo_drift: "The repo file was edited away from what the platform synced. Resync to overwrite, or adopt the repo copy.",
-  conflict: "Both the repo file and the template changed. Resync to overwrite the repo, or adopt the repo copy as the baseline.",
+  template_stale:
+    "The repo file is unchanged but the platform renders a newer template. Resync to update it.",
+  repo_drift:
+    "The repo file was edited away from what the platform synced. Resync to overwrite, or adopt the repo copy.",
+  conflict:
+    "Both the repo file and the template changed. Resync to overwrite the repo, or adopt the repo copy as the baseline.",
   absent: "No managed workflow file on the deploy branch. Resync to create one.",
   unknown: "Drift couldn't be determined on the last check. Refresh to try again.",
 };
 
 function WorkflowSyncStatusControl({
-  appSlug,
+  appId,
   status,
 }: {
-  appSlug: string;
+  appId: string;
   status: AstroliftCiWorkflowSyncStatus;
 }) {
   const [resync, { loading: resyncing }] = useMutation<ResyncResp>(RESYNC_CI_WORKFLOW, {
@@ -444,11 +523,11 @@ function WorkflowSyncStatusControl({
   });
   const [refresh, { loading: refreshing }] = useMutation<RefreshResp>(
     REFRESH_CI_WORKFLOW_SYNC_STATUS,
-    { refetchQueries: ["GetApp"], awaitRefetchQueries: true },
+    { refetchQueries: ["GetApp"], awaitRefetchQueries: true }
   );
   const [openReconcile, { loading: reconciling }] = useMutation<ReconcileResp>(
     OPEN_CI_WORKFLOW_RECONCILE_PR,
-    { refetchQueries: ["GetApp"], awaitRefetchQueries: true },
+    { refetchQueries: ["GetApp"], awaitRefetchQueries: true }
   );
   const [confirmAdoptOpen, setConfirmAdoptOpen] = React.useState(false);
 
@@ -460,7 +539,7 @@ function WorkflowSyncStatusControl({
 
   async function handleRefresh() {
     try {
-      const { data } = await refresh({ variables: { input: { appId: appSlug } } });
+      const { data } = await refresh({ variables: { input: { appId } } });
       const payload = data?.refreshCiWorkflowSyncStatus;
       if (!payload?.ok || !payload.data) {
         toast.error(payload?.errors?.[0]?.message ?? "Couldn't recompute drift.");
@@ -475,7 +554,7 @@ function WorkflowSyncStatusControl({
 
   async function handleResync() {
     try {
-      const { data } = await resync({ variables: { input: { appId: appSlug } } });
+      const { data } = await resync({ variables: { input: { appId } } });
       const payload = data?.resyncAstroliftCiWorkflow;
       if (!payload?.ok || !payload.data) {
         toast.error(payload?.errors?.[0]?.message ?? "Couldn't resync the workflow file.");
@@ -488,7 +567,7 @@ function WorkflowSyncStatusControl({
             <Link href={payload.data.prUrl} target="_blank" rel="noreferrer" className="underline">
               View PR
             </Link>
-          </span>,
+          </span>
         );
         return;
       }
@@ -500,7 +579,7 @@ function WorkflowSyncStatusControl({
 
   async function handleReconcile() {
     try {
-      const { data } = await openReconcile({ variables: { input: { appId: appSlug } } });
+      const { data } = await openReconcile({ variables: { input: { appId } } });
       const payload = data?.openCiWorkflowReconcilePr;
       if (!payload?.ok || !payload.data) {
         toast.error(payload?.errors?.[0]?.message ?? "Couldn't open the reconcile PR.");
@@ -513,7 +592,7 @@ function WorkflowSyncStatusControl({
             <Link href={payload.data.prUrl} target="_blank" rel="noreferrer" className="underline">
               View PR
             </Link>
-          </span>,
+          </span>
         );
         return;
       }
@@ -524,7 +603,7 @@ function WorkflowSyncStatusControl({
   }
 
   async function handleAdopt() {
-    const { data } = await adopt({ variables: { input: { appId: appSlug } } });
+    const { data } = await adopt({ variables: { input: { appId } } });
     const payload = data?.adoptRepoCiWorkflow;
     if (!payload?.ok || !payload.data) {
       throw new Error(payload?.errors?.[0]?.message ?? "Couldn't adopt the repo copy.");
@@ -540,7 +619,7 @@ function WorkflowSyncStatusControl({
             <p className="text-sm font-medium">Managed workflow sync</p>
             <span
               className={
-                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-medium " +
+                "text-2xs inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium " +
                 badge.className
               }
             >
@@ -555,7 +634,7 @@ function WorkflowSyncStatusControl({
           </div>
           <p className="text-muted-foreground mt-0.5 text-xs">{hint}</p>
           {status.checkedAt ? (
-            <p className="text-muted-foreground mt-0.5 text-2xs">
+            <p className="text-muted-foreground text-2xs mt-0.5">
               last checked {formatRelativeWebhookInstall(status.checkedAt)}
             </p>
           ) : null}
@@ -693,7 +772,7 @@ export function PushAndRotateButton({
     }
     const { secretNames, rotatedTokenLast4, repo } = payload.data;
     toast.success(
-      `Pushed ${secretNames.length} secrets to ${repo} — new token's last 4: ${rotatedTokenLast4}`,
+      `Pushed ${secretNames.length} secrets to ${repo} — new token's last 4: ${rotatedTokenLast4}`
     );
   }
 
@@ -806,19 +885,22 @@ function ValidateCiSecretsAction({ appSlug }: { appSlug: string }) {
       {results && results.results.length > 0 ? (
         <ul className="divide-border divide-y rounded-md border text-xs">
           {results.results.map((r) => (
-            <li key={r.secretName} className="flex items-center justify-between gap-2 px-2.5 py-1.5">
+            <li
+              key={r.secretName}
+              className="flex items-center justify-between gap-2 px-2.5 py-1.5"
+            >
               <span className="font-mono">{r.secretName}</span>
               <span className="inline-flex items-center gap-1.5">
                 {r.isSet && r.isCurrent ? (
-                  <span className="inline-flex items-center gap-1 text-success-fg">
+                  <span className="text-success-fg inline-flex items-center gap-1">
                     <CheckIcon className="size-3" /> current
                   </span>
                 ) : r.isSet ? (
-                  <span className="inline-flex items-center gap-1 text-warning-fg">
+                  <span className="text-warning-fg inline-flex items-center gap-1">
                     <CheckIcon className="size-3" /> set, stale
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-danger-fg">
+                  <span className="text-danger-fg inline-flex items-center gap-1">
                     <XIcon className="size-3" /> not set
                   </span>
                 )}
@@ -842,8 +924,8 @@ function PushAndRotateAction({ appSlug }: { appSlug: string }) {
       <div className="min-w-0">
         <p className="text-sm font-medium">Push & rotate</p>
         <p className="text-muted-foreground text-xs">
-          Seal and upload all five values to GitHub Actions secrets in one shot. Rotates the
-          deploy token as part of the round-trip.
+          Seal and upload all five values to GitHub Actions secrets in one shot. Rotates the deploy
+          token as part of the round-trip.
         </p>
       </div>
       <PushAndRotateButton appSlug={appSlug} />
@@ -863,8 +945,7 @@ function SecretRowItem({
   return (
     <div
       className={
-        "flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap" +
-        (isLast ? "" : " border-b")
+        "flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap" + (isLast ? "" : " border-b")
       }
     >
       <Tooltip>
@@ -931,16 +1012,11 @@ function SecretValue({ row, loading }: { row: SecretRow; loading: boolean }) {
   return (
     <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
       {hasValue ? (
-        <code
-          className="text-foreground truncate font-mono text-xs"
-          title={row.value}
-        >
+        <code className="text-foreground truncate font-mono text-xs" title={row.value}>
           {row.value}
         </code>
       ) : (
-        <span className="text-muted-foreground text-xs italic">
-          pending provisioning…
-        </span>
+        <span className="text-muted-foreground text-xs italic">pending provisioning…</span>
       )}
       <Button
         size="sm"
@@ -1028,7 +1104,13 @@ interface PushCiWorkflowResp {
   };
 }
 
-function SyncWorkflowFileAction({ appSlug }: { appSlug: string }) {
+function SyncWorkflowFileAction({
+  appSlug,
+  workflowPath = ".github/workflows/astrolift-ci.yml",
+}: {
+  appSlug: string;
+  workflowPath?: string;
+}) {
   const [sync, { loading }] = useMutation<PushCiWorkflowResp>(PUSH_CI_WORKFLOW_TO_REPO);
 
   async function handleClick() {
@@ -1052,7 +1134,7 @@ function SyncWorkflowFileAction({ appSlug }: { appSlug: string }) {
               <Link href={prUrl} target="_blank" rel="noreferrer" className="underline">
                 View PR
               </Link>
-            </span>,
+            </span>
           );
         } else {
           toast.success("Branch is protected — opened a PR.");
@@ -1061,10 +1143,9 @@ function SyncWorkflowFileAction({ appSlug }: { appSlug: string }) {
       }
       const verb = status === "created" ? "Created" : "Updated";
       const shortSha = (commitSha ?? "").slice(0, 7);
+      const fileName = workflowPath.split("/").at(-1) ?? workflowPath;
       toast.success(
-        shortSha
-          ? `${verb} astrolift-ci.yml (commit ${shortSha}).`
-          : `${verb} astrolift-ci.yml.`,
+        shortSha ? `${verb} ${fileName} (commit ${shortSha}).` : `${verb} ${fileName}.`
       );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't sync the workflow file.");
@@ -1076,8 +1157,8 @@ function SyncWorkflowFileAction({ appSlug }: { appSlug: string }) {
       <div className="min-w-0">
         <p className="text-sm font-medium">Sync workflow file</p>
         <p className="text-muted-foreground text-xs">
-          Commits the rendered <span className="font-mono">.github/workflows/astrolift-ci.yml</span>{" "}
-          to the deploy branch. Idempotent — re-clicks on an in-sync repo are a no-op.
+          Commits the rendered <span className="font-mono">{workflowPath}</span> to the deploy
+          branch. Idempotent — re-clicks on an in-sync repo are a no-op.
         </p>
       </div>
       <Button
@@ -1147,9 +1228,7 @@ function InstallSourceWebhookAction({
       const { status, receiverUrl } = payload.data;
       const verb = status === "created" ? "Installed" : "Refreshed";
       toast.success(
-        receiverUrl
-          ? `${verb} push webhook → ${receiverUrl}`
-          : `${verb} push webhook.`,
+        receiverUrl ? `${verb} push webhook → ${receiverUrl}` : `${verb} push webhook.`
       );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't install the source webhook.");
@@ -1167,12 +1246,12 @@ function InstallSourceWebhookAction({
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-medium">Source webhook</p>
           {installed ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-2xs font-medium text-success-fg">
+            <span className="bg-success/10 text-2xs text-success-fg inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium">
               <CheckIcon className="size-3" />
               installed · {relative}
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2 py-0.5 text-2xs font-medium text-warning-fg">
+            <span className="bg-warning/10 text-2xs text-warning-fg inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium">
               not installed
             </span>
           )}

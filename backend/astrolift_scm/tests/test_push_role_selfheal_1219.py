@@ -28,6 +28,7 @@ from astrolift_identity.models import Organization, Project, Team
 from astrolift_registry.models import RegisteredApp
 from astrolift_scm.services.workflow_sync import (
     WorkflowSyncError,
+    WorkflowSyncResult,
     ensure_ci_push_role,
     render_astrolift_ci_workflow,
     sync_workflow_file_to_repo,
@@ -201,6 +202,35 @@ def test_sync_heals_blank_ref_before_rendering(app, monkeypatch):
     assert result.status == "updated"
     assert driver.calls, "sync must attempt push-role provisioning"
     assert "role-to-assume: arn:aws:iam::111111111111:role/pr-push" in pushed["rendered"]
+
+
+def test_agent_sync_does_not_provision_an_app_image_push_role(app, monkeypatch):
+    app.is_agent = True
+    app.manifest_path = "agents/demo/astrolift.toml"
+
+    def _must_not_provision(_app):
+        raise AssertionError("agent package validation does not push an app image")
+
+    monkeypatch.setattr("astrolift_scm.services.workflow_sync.ensure_ci_push_role", _must_not_provision)
+    monkeypatch.setattr(
+        "astrolift_scm.services.workflow_sync._sync_github",
+        lambda _app, *, force_pr=False: WorkflowSyncResult(status="fetch_failed", error="expected test stop"),
+    )
+
+    result = sync_workflow_file_to_repo(app)
+
+    assert result.status == "fetch_failed"
+
+
+def test_non_github_agent_sync_fails_without_writing_app_workflow(app):
+    app.is_agent = True
+    app.source_kind = "gitlab"
+
+    with pytest.raises(WorkflowSyncError) as exc:
+        sync_workflow_file_to_repo(app)
+
+    assert exc.value.code == "AGENT_CI_UNSUPPORTED"
+    assert "left unchanged" in exc.value.message
 
 
 # ---- notify route existence (#1220) ------------------------------------

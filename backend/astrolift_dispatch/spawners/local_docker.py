@@ -73,6 +73,13 @@ class LocalDockerSpawner(ContainerSpawner):
 
     def stop(self, external_id: str) -> None:
         try:
-            subprocess.run(["docker", "rm", "-f", external_id], capture_output=True, timeout=30)
-        except Exception:  # noqa: BLE001
-            pass
+            result = subprocess.run(
+                ["docker", "rm", "-f", external_id],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(f"local container deletion failed: {exc}") from exc
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or "local container deletion failed")

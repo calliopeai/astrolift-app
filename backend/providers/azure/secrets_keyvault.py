@@ -30,6 +30,10 @@ class KeyVaultConfig:
 
 
 class KeyVaultSecretsBackend(SecretsBackend):
+    provider_id = "azure-key-vault"
+    supports_value_reveal = True
+    value_reveal_limitation = None
+
     def __init__(self, *, config: KeyVaultConfig) -> None:
         self._config = config
         if config.client is not None:

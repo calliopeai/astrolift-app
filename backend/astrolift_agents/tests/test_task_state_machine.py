@@ -63,6 +63,22 @@ def test_queued_to_provisioning_is_valid(draft_task):
     assert draft_task.provisioning_at is not None
 
 
+def test_draft_preparation_failure_can_settle(draft_task):
+    draft_task.failure = {"message": "package assembly failed"}
+    draft_task.save(update_fields=["failure", "updated_at", "version"])
+    draft_task.transition_to(AgentTask.Status.FAILED)
+    draft_task.refresh_from_db()
+    assert draft_task.status == AgentTask.Status.FAILED
+    assert draft_task.ended_at is not None
+
+
+def test_queued_workflow_start_failure_can_settle(draft_task):
+    draft_task.transition_to(AgentTask.Status.QUEUED)
+    draft_task.transition_to(AgentTask.Status.FAILED)
+    draft_task.refresh_from_db()
+    assert draft_task.status == AgentTask.Status.FAILED
+
+
 def test_running_to_completed_is_valid(draft_task):
     draft_task.transition_to(AgentTask.Status.QUEUED)
     draft_task.transition_to(AgentTask.Status.PROVISIONING)
@@ -102,6 +118,19 @@ def test_cancel_from_provisioning_is_valid(draft_task):
     draft_task.transition_to(AgentTask.Status.CANCELLED)
     draft_task.refresh_from_db()
     assert draft_task.status == AgentTask.Status.CANCELLED
+
+
+def test_stale_poll_cannot_resurrect_cancelled_task(draft_task):
+    draft_task.transition_to(AgentTask.Status.QUEUED)
+    draft_task.transition_to(AgentTask.Status.PROVISIONING)
+    stale_poll = AgentTask.all_objects.get(pk=draft_task.pk)
+
+    draft_task.transition_to(AgentTask.Status.CANCELLED)
+
+    with pytest.raises(ValueError, match="cannot transition"):
+        stale_poll.transition_to(AgentTask.Status.RUNNING)
+    stale_poll.refresh_from_db()
+    assert stale_poll.status == AgentTask.Status.CANCELLED
 
 
 # ---------------------------------------------------------------------------

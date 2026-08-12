@@ -8,6 +8,7 @@ parse path against an in-memory zipball. Only the network boundary
 from __future__ import annotations
 
 import io
+import stat
 import zipfile
 
 import pytest
@@ -144,6 +145,34 @@ def test_secrets_refs_store_uri_not_value(monkeypatch, org):
     # Table form resolves the secret_name; shorthand string form is taken as-is.
     assert refs["OPENAI_API_KEY"] == "arn:aws:secretsmanager:openai"
     assert refs["GITHUB_TOKEN"] == "vault://secret/gh-token"
+
+
+def test_legacy_config_composes_every_skill_and_collects_every_asset():
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr(
+            "owner-repo-sha/astrolift.toml",
+            "[skills.first]\n"
+            "system_prompt = 'First instruction.'\n"
+            "tools = ['read']\n"
+            "scripts = ['scripts/first.sh']\n"
+            "[skills.second]\n"
+            "system_prompt_file = 'prompts/second.md'\n"
+            "tools = ['read', 'write']\n"
+            "binaries = ['bin/second']\n",
+        )
+        zf.writestr("owner-repo-sha/prompts/second.md", "Second instruction.\n")
+        zf.writestr("owner-repo-sha/scripts/first.sh", "#!/bin/sh\n")
+        zf.writestr("owner-repo-sha/bin/second", b"binary")
+
+    manifest, _refs = brief_assembler._parse_manifest(buf.getvalue())
+
+    assert manifest["skill_slug"] == "first"
+    assert manifest["system_prompt"] == "First instruction.\n\n---\n\nSecond instruction."
+    assert manifest["tools"] == ["read", "write"]
+    assert [row["slug"] for row in manifest["skills"]] == ["first", "second"]
+    assert manifest["asset_paths"] == ["scripts/first.sh", "bin/second"]
+    assert manifest["executable_paths"] == ["scripts/first.sh", "bin/second"]
 
 
 def test_storage_key_empty_when_blob_store_unconfigured(monkeypatch, org):
@@ -483,3 +512,22 @@ def test_missing_manifest_path_raises(monkeypatch, org):
             config_repo="owner/repo",
             manifest_path="agents/does-not-exist/astrolift.toml",
         )
+
+
+def test_manifest_parser_rejects_symlink_archive_member():
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w") as archive:
+        archive.writestr("repo/astrolift.toml", _FULL_TOML)
+        info = zipfile.ZipInfo("repo/bin/helper")
+        info.external_attr = (stat.S_IFLNK | 0o777) << 16
+        archive.writestr(info, "../../outside")
+
+    with pytest.raises(brief_assembler.ManifestReferenceError, match="symlinks"):
+        brief_assembler._parse_manifest(output.getvalue())
+
+
+def test_manifest_parser_rejects_excessive_file_count(monkeypatch):
+    monkeypatch.setattr(brief_assembler, "MAX_SOURCE_FILES", 1)
+
+    with pytest.raises(brief_assembler.ManifestReferenceError, match="more than 1 files"):
+        brief_assembler._parse_manifest(_make_zipball(_FULL_TOML))

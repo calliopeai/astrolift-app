@@ -25,12 +25,14 @@ from __future__ import annotations
 
 import io
 import logging
+import stat
 import zipfile
 from collections.abc import Callable
 
 import requests
 
 from astrolift_scm.models import SourceConnection
+from astrolift_scm.providers.archive_download import read_requests_response
 
 log = logging.getLogger(__name__)
 
@@ -38,6 +40,12 @@ log = logging.getLogger(__name__)
 # larger is not a manifest and would only bloat memory. Files over the cap
 # are dropped from the map entirely (discovery never needs them).
 _MAX_FILE_BYTES = 256 * 1024
+
+# Bound the compressed response and retained UTF-8 map as well as individual
+# members. A ZIP full of thousands of just-under-the-per-file-limit entries is
+# otherwise enough to consume many gigabytes while merely scanning manifests.
+_MAX_ARCHIVE_BYTES = 256 * 1024 * 1024
+_MAX_RETAINED_TEXT_BYTES = 32 * 1024 * 1024
 
 # Unauthenticated GitHub archive endpoint for a PUBLIC repo. Unlike the
 # provider-dispatched ``fetch_zipball`` (which needs a per-org
@@ -57,6 +65,10 @@ _MAX_ENTRIES = 50_000
 _ZipballFn = Callable[..., bytes]
 
 
+class RepoTreeArchiveError(ValueError):
+    """A source archive is unsafe or too large to inspect deterministically."""
+
+
 def repo_tree_from_zipball_bytes(data: bytes) -> dict[str, str]:
     """Unpack archive ``data`` into a ``{repo_relative_path: text}`` map.
 
@@ -66,13 +78,21 @@ def repo_tree_from_zipball_bytes(data: bytes) -> dict[str, str]:
     skipped; binary / oversized / undecodable files are dropped. Pure
     in-memory; no temp files.
     """
+    if len(data) > _MAX_ARCHIVE_BYTES:
+        raise RepoTreeArchiveError(f"source archive exceeds the {_MAX_ARCHIVE_BYTES}-byte compressed limit")
+
     out: dict[str, str] = {}
+    retained_bytes = 0
     with zipfile.ZipFile(io.BytesIO(data)) as zf:
-        for info in zf.infolist():
+        infos = zf.infolist()
+        if len(infos) > _MAX_ENTRIES:
+            raise RepoTreeArchiveError(f"source archive exceeds the {_MAX_ENTRIES}-entry limit")
+        for info in infos:
             if info.is_dir():
                 continue
-            if len(out) >= _MAX_ENTRIES:
-                break
+            mode = info.external_attr >> 16
+            if stat.S_IFMT(mode) == stat.S_IFLNK:
+                raise RepoTreeArchiveError(f"source archive contains a symbolic link: {info.filename}")
             if info.file_size > _MAX_FILE_BYTES:
                 continue
             # Strip the leading ``<top-level-dir>/`` the host wraps the tree
@@ -83,16 +103,28 @@ def repo_tree_from_zipball_bytes(data: bytes) -> dict[str, str]:
             rel = name.split("/", 1)[1] if "/" in name else name
             if not rel:
                 continue
+            parts = rel.split("/")
+            if rel.startswith("/") or "\\" in rel or any(part in {"", ".", ".."} for part in parts):
+                raise RepoTreeArchiveError(f"source archive contains an unsafe path: {name}")
+            if rel in out:
+                raise RepoTreeArchiveError(f"source archive contains a duplicate path: {rel}")
             try:
                 raw = zf.read(info)
             except (RuntimeError, zipfile.BadZipFile):
                 # Encrypted / corrupt member — skip it, keep scanning the rest.
                 continue
             try:
-                out[rel] = raw.decode("utf-8")
+                decoded = raw.decode("utf-8")
             except UnicodeDecodeError:
                 # Binary file — not a manifest; drop it.
                 continue
+            retained_bytes += len(raw)
+            if retained_bytes > _MAX_RETAINED_TEXT_BYTES:
+                raise RepoTreeArchiveError(
+                    "source archive contains too much retained UTF-8 content "
+                    f"(limit {_MAX_RETAINED_TEXT_BYTES} bytes)"
+                )
+            out[rel] = decoded
     return out
 
 
@@ -143,9 +175,10 @@ def fetch_public_repo_tree(*, repo_full_name: str, ref: str) -> dict[str, str]:
         archive_url,
         timeout=_GITHUB_ARCHIVE_TIMEOUT_SECONDS,
         allow_redirects=True,
+        stream=True,
     )
     resp.raise_for_status()
-    return repo_tree_from_zipball_bytes(resp.content)
+    return repo_tree_from_zipball_bytes(read_requests_response(resp, limit=_MAX_ARCHIVE_BYTES))
 
 
 def fetch_repo_tree_with_pat(*, repo_full_name: str, ref: str) -> dict[str, str] | None:
@@ -179,6 +212,7 @@ def fetch_repo_tree_with_pat(*, repo_full_name: str, ref: str) -> dict[str, str]
         },
         timeout=_GITHUB_ARCHIVE_TIMEOUT_SECONDS,
         allow_redirects=True,
+        stream=True,
     )
     resp.raise_for_status()
-    return repo_tree_from_zipball_bytes(resp.content)
+    return repo_tree_from_zipball_bytes(read_requests_response(resp, limit=_MAX_ARCHIVE_BYTES))

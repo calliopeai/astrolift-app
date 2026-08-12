@@ -211,6 +211,32 @@ def test_callback_heartbeat_records_interaction(org, dispatcher, brief, raw_key)
 
 
 @pytest.mark.django_db(transaction=True)
+def test_callback_finding_records_queryable_telemetry(org, dispatcher, brief, raw_key):
+    task = _make_task(org, dispatcher, brief, AgentTask.Status.RUNNING)
+
+    resp = Client().post(
+        CALLBACK.format(task.guid),
+        data=json.dumps(
+            {
+                "status": "running",
+                "finding": {"item": "feedback-1", "decision": "filed", "jira_key": "DV-123"},
+            }
+        ),
+        content_type="application/json",
+        **_auth(raw_key),
+    )
+    assert resp.status_code == 200
+
+    row = AgentInteraction.objects.get(agent_task=task)
+    assert row.name == "finding"
+    assert row.detail == {
+        "new_status": "running",
+        "finding_index": 0,
+        "finding_keys": ["decision", "item", "jira_key"],
+    }
+
+
+@pytest.mark.django_db(transaction=True)
 def test_status_update_records_interaction(org, dispatcher, raw_key):
     """The dispatcher status endpoint records a control_api interaction."""
     task = _make_task(org, dispatcher, status=AgentTask.Status.QUEUED)

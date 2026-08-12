@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from astrolift_dispatch.brief_injector import (
     brief_env_vars,
     dispatch_input_env_vars,
@@ -33,8 +35,10 @@ ENV_NAME = "ASTROLIFT_TRIGGER_PAYLOAD"
 
 class _Task:
     def __init__(self, dispatch_input=None, brief_id=None):
+        self.guid = "task-no-brief"
         self.dispatch_input = dispatch_input
         self.brief_id = brief_id
+        self.callback_token_hash = ""
 
 
 def test_env_var_carries_compact_json_payload():
@@ -180,6 +184,7 @@ class _TaskWithBrief:
         self.brief_id = "brief-1"
         self.brief = _Brief(system_prompt=system_prompt, env_vars=env_vars)
         self.dispatch_input = dispatch_input
+        self.callback_token_hash = ""
 
 
 def test_brief_env_sets_oneshot_agent_prompt_and_system():
@@ -187,6 +192,8 @@ def test_brief_env_sets_oneshot_agent_prompt_and_system():
     assert env["AGENT_SYSTEM"] == "You triage bugs."
     assert env["AGENT_PROMPT"]  # non-empty -> runner selects pre-injected one-shot
     assert "ASTROLIFT_BRIEF_ID" in env  # existing identity contract preserved
+    assert env["AGENT_CALLBACK_URL"].endswith("/api/dispatch/v1/agents/task-1/callback/")
+    assert env["ASTROLIFT_CLUSTER_KEY"].startswith("alft_cb_")
 
 
 def test_kickoff_prompt_threads_trigger_payload():
@@ -199,7 +206,17 @@ def test_kickoff_prompt_threads_trigger_payload():
 
 
 def test_no_brief_no_env():
-    assert brief_env_vars(_Task(dispatch_input=None, brief_id=None)) == []
+    task = _Task(dispatch_input=None, brief_id=None)
+    env = {entry["name"]: entry["value"] for entry in brief_env_vars(task)}
+    assert env["AGENT_CALLBACK_URL"].endswith("/api/dispatch/v1/agents/task-no-brief/callback/")
+    assert "AGENT_PROMPT" not in env
+
+
+def test_callback_url_requires_absolute_platform_url(settings):
+    settings.PLATFORM_API_URL = ""
+
+    with pytest.raises(RuntimeError, match="PLATFORM_API_URL"):
+        brief_env_vars(_Task(dispatch_input=None, brief_id=None))
 
 
 def test_manifest_environment_vars_are_emitted():
@@ -225,6 +242,25 @@ def test_manifest_environment_vars_are_emitted():
     assert env["UNSET"] == ""  # None -> empty string, never the literal "None"
     # identity + one-shot contract still intact alongside the config vars
     assert env["AGENT_SYSTEM"] == "triage" and env["AGENT_PROMPT"]
+
+
+def test_manifest_environment_cannot_override_dispatcher_callback_or_auth():
+    entries = brief_env_vars(
+        _TaskWithBrief(
+            system_prompt="triage",
+            env_vars={
+                "AGENT_CALLBACK_URL": "https://attacker.invalid/collect",
+                "ASTROLIFT_CLUSTER_KEY": "attacker-controlled",
+                "SAFE_USER_VALUE": "kept",
+            },
+        )
+    )
+    by_name = {entry["name"]: entry["value"] for entry in entries}
+
+    assert by_name["AGENT_CALLBACK_URL"].endswith("/api/dispatch/v1/agents/task-1/callback/")
+    assert by_name["ASTROLIFT_CLUSTER_KEY"].startswith("alft_cb_")
+    assert by_name["SAFE_USER_VALUE"] == "kept"
+    assert [entry["name"] for entry in entries].count("AGENT_CALLBACK_URL") == 1
 
 
 def test_no_manifest_env_vars_when_absent():

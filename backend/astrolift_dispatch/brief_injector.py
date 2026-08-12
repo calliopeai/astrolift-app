@@ -18,11 +18,18 @@ This approach keeps secret values out of env vars and out of the Brief blob.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import logging
+import secrets
 from typing import TYPE_CHECKING, Any
+
+from astrolift_agents.services.agent_package import is_reserved_agent_environment_name
 
 if TYPE_CHECKING:
     from astrolift_agents.models import AgentTask, Brief
+
+logger = logging.getLogger(__name__)
 
 
 def brief_env_vars(task: AgentTask) -> list[dict[str, str]]:
@@ -30,16 +37,40 @@ def brief_env_vars(task: AgentTask) -> list[dict[str, str]]:
 
     Returns a list of K8s env var specs (name + value).
     """
-    if not task.brief_id:
-        return []
-
-    brief = task.brief
     env = [
-        {"name": "ASTROLIFT_BRIEF_ID", "value": str(brief.guid)},
-        {"name": "ASTROLIFT_BRIEF_HASH", "value": brief.content_hash},
         {"name": "ASTROLIFT_TASK_ID", "value": str(task.guid)},
         {"name": "ASTROLIFT_CONTROLLER_URL", "value": _get_controller_url()},
     ]
+
+    # One-shot pods report their terminal result directly to the Controller.
+    # Mint a task-scoped credential here because DispatcherInstance stores only
+    # its key hash, so there is no dispatcher plaintext available to inject.
+    # Rotating on every spawn also makes a token from a failed/retried render
+    # useless once the next Job starts.
+    callback_key = "alft_cb_" + secrets.token_urlsafe(32)
+    callback_hash = hashlib.sha256(callback_key.encode("utf-8")).hexdigest()
+    if getattr(task, "callback_token_hash", "") != callback_hash:
+        task.callback_token_hash = callback_hash
+        save = getattr(task, "save", None)
+        if callable(save):
+            save(update_fields=["callback_token_hash", "updated_at", "version"])
+    env.extend(
+        [
+            {"name": "AGENT_CALLBACK_URL", "value": _agent_callback_url(task)},
+            {"name": "ASTROLIFT_CLUSTER_KEY", "value": callback_key},
+        ]
+    )
+
+    if not task.brief_id:
+        return env
+
+    brief = task.brief
+    env.extend(
+        [
+            {"name": "ASTROLIFT_BRIEF_ID", "value": str(brief.guid)},
+            {"name": "ASTROLIFT_BRIEF_HASH", "value": brief.content_hash},
+        ]
+    )
 
     # One-shot (pre-injected) execution for the in-pod astrolift_runner. The
     # runner selects one-shot mode only when AGENT_PROMPT is set — it then runs
@@ -50,6 +81,7 @@ def brief_env_vars(task: AgentTask) -> list[dict[str, str]]:
     # on the Brief snapshot; the kickoff prompt carries the per-dispatch trigger
     # input.
     snapshot = brief.manifest_snapshot if isinstance(brief.manifest_snapshot, dict) else {}
+    _append_payload_env(env, task=task, brief=brief, snapshot=snapshot)
     env.append({"name": "AGENT_SYSTEM", "value": snapshot.get("system_prompt", "") or ""})
     env.append({"name": "AGENT_PROMPT", "value": _kickoff_prompt(task)})
 
@@ -61,8 +93,51 @@ def brief_env_vars(task: AgentTask) -> list[dict[str, str]]:
     manifest_env = snapshot.get("env_vars")
     if isinstance(manifest_env, dict):
         for key, value in manifest_env.items():
-            env.append({"name": str(key), "value": "" if value is None else str(value)})
+            name = str(key).strip()
+            if is_reserved_agent_environment_name(name):
+                logger.warning("ignoring dispatcher-owned manifest environment variable %r", name)
+                continue
+            env.append({"name": name, "value": "" if value is None else str(value)})
     return env
+
+
+def _append_payload_env(env: list[dict[str, str]], *, task: AgentTask, brief: Brief, snapshot: dict) -> None:
+    """Mint the read-only bundle URL used by modular TOML file references."""
+    storage_key = getattr(brief, "storage_key", "") or ""
+    payload_hash = snapshot.get("payload_sha256", "") or ""
+    required = bool(snapshot.get("requires_payload"))
+    if not storage_key or not payload_hash:
+        if required:
+            raise RuntimeError("agent Brief requires a payload bundle but has no stored bundle/hash")
+        return
+
+    try:
+        from astrolift_pipelines.artifact_store import presigned_download_url
+
+        # Cover scheduling + execution, with a 15-minute floor for normal
+        # tasks and S3's seven-day SigV4 ceiling for unusually long runs.
+        timeout = max(1, int(getattr(task, "timeout_seconds", 300) or 300))
+        expires_in = min(604800, max(900, timeout + 600))
+        url = presigned_download_url(
+            org=task.organization,
+            blob_key=storage_key,
+            expires_in=expires_in,
+        )
+    except Exception:
+        if required:
+            raise
+        logger.warning("could not mint optional agent payload URL for task %s", task.guid, exc_info=True)
+        return
+
+    env.extend(
+        [
+            {"name": "ASTROLIFT_PAYLOAD_URL", "value": url},
+            {"name": "ASTROLIFT_PAYLOAD_HASH", "value": f"sha256:{payload_hash}"},
+        ]
+    )
+    runtime_manifest = snapshot.get("manifest_path")
+    if runtime_manifest:
+        env.append({"name": "ASTROLIFT_MANIFEST_PATH", "value": str(runtime_manifest)})
 
 
 def _kickoff_prompt(task: AgentTask) -> str:
@@ -72,7 +147,7 @@ def _kickoff_prompt(task: AgentTask) -> str:
     run and threads through the per-dispatch trigger input (batch size, backfill
     mode, etc.) when one was supplied on ``runAstroliftAgent``.
     """
-    base = "Begin your task now, following your system instructions. " "Work it to completion, then stop."
+    base = "Begin your task now, following your system instructions. Work it to completion, then stop."
     payload = getattr(task, "dispatch_input", None)
     if payload:
         return f"{base} Trigger input (JSON): {json.dumps(payload, separators=(',', ':'))}"
@@ -156,4 +231,11 @@ def _get_controller_url() -> str:
     """Return the Controller API URL that agents should call back to."""
     from django.conf import settings
 
-    return getattr(settings, "PLATFORM_API_URL", "")
+    return (getattr(settings, "PLATFORM_API_URL", "") or "").rstrip("/")
+
+
+def _agent_callback_url(task: AgentTask) -> str:
+    base = _get_controller_url()
+    if not base.startswith(("https://", "http://")):
+        raise RuntimeError("PLATFORM_API_URL must be an absolute HTTP(S) URL for agent callbacks")
+    return f"{base}/api/dispatch/v1/agents/{task.guid}/callback/"

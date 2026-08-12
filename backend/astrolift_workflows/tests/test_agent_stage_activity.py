@@ -10,7 +10,10 @@ cluster.
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 import pytest
+from django.utils import timezone
 
 from astrolift_agents.models import AgentEnvironmentSpec, AgentTask, Brief, Skill
 from astrolift_agents.services import brief_assembler
@@ -31,11 +34,19 @@ class _FakeSpawner:
     entry repeats once exhausted so a poll loop converges.
     """
 
-    def __init__(self, *, spawn_result: SpawnResult, status_sequence: list[TaskStatus]):
+    def __init__(
+        self,
+        *,
+        spawn_result: SpawnResult,
+        status_sequence: list[TaskStatus],
+        stop_error: Exception | None = None,
+    ):
         self._spawn_result = spawn_result
         self._status_sequence = list(status_sequence)
         self.spawned_task = None
         self.stopped_ids: list[str] = []
+        self.cleaned_secret_ids: list[str] = []
+        self._stop_error = stop_error
 
     def spawn(self, task) -> SpawnResult:
         self.spawned_task = task
@@ -48,6 +59,11 @@ class _FakeSpawner:
 
     def stop(self, external_id: str) -> None:
         self.stopped_ids.append(external_id)
+        if self._stop_error is not None:
+            raise self._stop_error
+
+    def cleanup_task_secret(self, external_id: str) -> None:
+        self.cleaned_secret_ids.append(external_id)
 
 
 @pytest.fixture
@@ -214,14 +230,68 @@ def test_spawn_failure_marks_task_failed(org, env_spec, cluster, patch_spawner):
     assert task.failure["message"] == "spawn failed: quota exceeded"
 
 
-def test_spawn_without_managed_cluster_raises(org, env_spec, patch_spawner):
-    """No managed cluster bound to the org -> the spawn helper raises so the
-    workflow surfaces a real error instead of dispatching into the void."""
+def test_spawn_exception_marks_task_failed_instead_of_stranding_provisioning(
+    org, env_spec, cluster, patch_spawner
+):
+    class _ExplodingSpawner(_FakeSpawner):
+        def spawn(self, task) -> SpawnResult:
+            raise RuntimeError("renderer exploded")
+
+    patch_spawner(
+        _ExplodingSpawner(
+            spawn_result=SpawnResult(external_id="unused"),
+            status_sequence=[TaskStatus()],
+        )
+    )
+    task_pk = agent_stage._create_agent_task_sync(_params(org, environment_spec_slug=env_spec.slug))
+
+    spawn = agent_stage._spawn_agent_task_sync(task_pk)
+
+    task = AgentTask.objects.get(pk=task_pk)
+    assert spawn["ok"] is False
+    assert "renderer exploded" in spawn["error"]
+    assert task.status == AgentTask.Status.FAILED
+    assert "renderer exploded" in task.failure["message"]
+
+
+def test_cancel_during_spawn_deletes_just_created_job(org, env_spec, cluster, patch_spawner):
+    """Cancellation between the Kubernetes create and external-id save must
+    not leave the newly created Job running or resurrect the cancelled row."""
+
+    class _CancelDuringSpawn(_FakeSpawner):
+        def spawn(self, task) -> SpawnResult:
+            AgentTask.objects.get(pk=task.pk).transition_to(AgentTask.Status.CANCELLED)
+            return super().spawn(task)
+
+    fake = patch_spawner(
+        _CancelDuringSpawn(
+            spawn_result=SpawnResult(external_id="agent-task-raced"),
+            status_sequence=[TaskStatus(running=True)],
+        )
+    )
+    task_pk = agent_stage._create_agent_task_sync(_params(org, environment_spec_slug=env_spec.slug))
+
+    spawn = agent_stage._spawn_agent_task_sync(task_pk)
+
+    task = AgentTask.objects.get(pk=task_pk)
+    assert spawn["ok"] is False
+    assert "cancelled" in spawn["error"]
+    assert task.status == AgentTask.Status.CANCELLED
+    assert task.external_id == ""
+    assert fake.stopped_ids == ["agent-task-raced"]
+
+
+def test_spawn_without_managed_cluster_terminalizes_task(org, env_spec, patch_spawner):
+    """No cluster must produce an inspectable FAILED task, not an immortal queue row."""
     patch_spawner(_FakeSpawner(spawn_result=SpawnResult(external_id="x"), status_sequence=[TaskStatus()]))
     task_pk = agent_stage._create_agent_task_sync(_params(org, environment_spec_slug=env_spec.slug))
 
-    with pytest.raises(RuntimeError, match="no managed cluster"):
-        agent_stage._spawn_agent_task_sync(task_pk)
+    spawn = agent_stage._spawn_agent_task_sync(task_pk)
+
+    task = AgentTask.objects.get(pk=task_pk)
+    assert spawn["ok"] is False
+    assert "no managed cluster" in spawn["error"]
+    assert task.status == AgentTask.Status.FAILED
 
 
 def _shared_managed_cluster(provider_plugin):
@@ -282,7 +352,7 @@ def test_poll_running_then_success_walks_to_completed(org, env_spec, cluster, pa
     assert task.status == AgentTask.Status.COMPLETED
     assert task.result == {"exit_code": 0}
     assert task.ended_at is not None
-    del fake
+    assert fake.cleaned_secret_ids == ["agent-task-run"]
 
 
 def test_poll_fast_success_from_provisioning_steps_through_running(org, env_spec, cluster, patch_spawner):
@@ -313,7 +383,7 @@ def test_poll_fails_fast_on_imagepullbackoff(org, env_spec, cluster, patch_spawn
     condition, so the spawner reports running forever. The pod-health gate
     must fail the task rather than leave it RUNNING indefinitely (the 31-min
     hang from a missing -vnc image tag)."""
-    patch_spawner(
+    fake = patch_spawner(
         _FakeSpawner(
             spawn_result=SpawnResult(external_id="agent-task-stuck"),
             status_sequence=[TaskStatus(running=True)],
@@ -332,6 +402,7 @@ def test_poll_fails_fast_on_imagepullbackoff(org, env_spec, cluster, patch_spawn
     task = AgentTask.objects.get(pk=task_pk)
     assert task.status == AgentTask.Status.FAILED
     assert "ImagePullBackOff" in (task.failure or {}).get("message", "")
+    assert fake.stopped_ids == ["agent-task-stuck"]
 
 
 def test_poll_does_not_fail_on_transient_pod_state(org, env_spec, cluster, patch_spawner, monkeypatch):
@@ -375,18 +446,24 @@ def test_poll_failure_marks_failed_with_details(org, env_spec, cluster, patch_sp
     assert task.failure["message"] == "OOMKilled"
 
 
-def test_poll_terminal_task_is_noop(org, env_spec, cluster, patch_spawner):
-    """A task already finished by the dispatch callback is reported terminal
-    without touching the spawner again."""
-    patch_spawner(_FakeSpawner(spawn_result=SpawnResult(external_id="x"), status_sequence=[TaskStatus()]))
+def test_poll_terminal_task_cleans_secret_without_deleting_log_history(org, env_spec, cluster, patch_spawner):
+    """A callback-terminal task drops its temporary Secret but keeps its Job."""
+    fake = patch_spawner(
+        _FakeSpawner(spawn_result=SpawnResult(external_id="x"), status_sequence=[TaskStatus()])
+    )
     task_pk = agent_stage._create_agent_task_sync(_params(org, environment_spec_slug=env_spec.slug))
     task = AgentTask.objects.get(pk=task_pk)
     task.transition_to(AgentTask.Status.PROVISIONING)
+    task.external_id = "agent-task-callback"
+    task.namespace = "astrolift-agents-acme-test"
+    task.save(update_fields=["external_id", "namespace", "updated_at", "version"])
     task.transition_to(AgentTask.Status.RUNNING)
     task.transition_to(AgentTask.Status.COMPLETED)
 
     result = agent_stage._poll_agent_task_sync(task_pk)
     assert result == {"status": AgentTask.Status.COMPLETED, "terminal": True}
+    assert fake.cleaned_secret_ids == ["agent-task-callback"]
+    assert fake.stopped_ids == []
 
 
 # ---- outcome payload ---------------------------------------------------
@@ -444,10 +521,10 @@ def test_cancel_queued_task_stops_and_cancels(org, env_spec, cluster, patch_spaw
     assert fake.stopped_ids == ["agent-task-cncl"]
 
 
-def test_cancel_running_task_marks_failed_not_cancelled(org, env_spec, cluster, patch_spawner):
-    """RUNNING -> CANCELLED is not a legal transition; cancel records a
-    terminal FAILED with a cancelled note instead of crashing."""
-    patch_spawner(
+def test_cancel_running_task_stops_and_cancels(org, env_spec, cluster, patch_spawner):
+    """A running task is a real operator kill: stop its Job and settle it as
+    CANCELLED instead of rejecting the mutation or misreporting FAILED."""
+    fake = patch_spawner(
         _FakeSpawner(
             spawn_result=SpawnResult(external_id="agent-task-runc"),
             status_sequence=[TaskStatus(running=True)],
@@ -461,8 +538,78 @@ def test_cancel_running_task_marks_failed_not_cancelled(org, env_spec, cluster, 
     agent_stage._cancel_agent_task_sync(str(task.guid))
 
     task.refresh_from_db()
-    assert task.status == AgentTask.Status.FAILED
-    assert task.failure["message"] == "cancelled while running"
+    assert task.status == AgentTask.Status.CANCELLED
+    assert fake.stopped_ids == ["agent-task-runc"]
+
+
+def test_poll_timeout_stops_job_and_marks_timed_out(org, env_spec, cluster, patch_spawner):
+    fake = patch_spawner(
+        _FakeSpawner(
+            spawn_result=SpawnResult(external_id="agent-task-timeout"),
+            status_sequence=[TaskStatus(running=True)],
+        )
+    )
+    task_pk = agent_stage._create_agent_task_sync(
+        _params(org, environment_spec_slug=env_spec.slug, timeout_seconds=30)
+    )
+    agent_stage._spawn_agent_task_sync(task_pk)
+    task = AgentTask.objects.get(pk=task_pk)
+    task.provisioning_at = timezone.now() - timedelta(seconds=31)
+    task.save(update_fields=["provisioning_at", "updated_at", "version"])
+
+    result = agent_stage._poll_agent_task_sync(task_pk)
+
+    task.refresh_from_db()
+    assert result == {"status": AgentTask.Status.TIMED_OUT, "terminal": True}
+    assert task.status == AgentTask.Status.TIMED_OUT
+    assert task.failure == {"message": "agent exceeded its 30s timeout"}
+    assert fake.stopped_ids == ["agent-task-timeout"]
+
+
+def test_poll_times_out_task_stuck_before_external_id(org, env_spec, cluster, patch_spawner):
+    """A lost spawn worker must not leave a provisioning row immortal."""
+    fake = patch_spawner(
+        _FakeSpawner(spawn_result=SpawnResult(external_id="unused"), status_sequence=[TaskStatus()])
+    )
+    task_pk = agent_stage._create_agent_task_sync(
+        _params(org, environment_spec_slug=env_spec.slug, timeout_seconds=30)
+    )
+    task = AgentTask.objects.get(pk=task_pk)
+    task.transition_to(AgentTask.Status.PROVISIONING)
+    task.provisioning_at = timezone.now() - timedelta(seconds=31)
+    task.save(update_fields=["provisioning_at", "updated_at", "version"])
+
+    result = agent_stage._poll_agent_task_sync(task_pk)
+
+    task.refresh_from_db()
+    assert result == {"status": AgentTask.Status.TIMED_OUT, "terminal": True}
+    assert task.status == AgentTask.Status.TIMED_OUT
+    assert task.external_id == ""
+    assert fake.stopped_ids == []
+
+
+def test_failed_container_stop_does_not_claim_task_was_cancelled(org, env_spec, cluster, patch_spawner):
+    fake = patch_spawner(
+        _FakeSpawner(
+            spawn_result=SpawnResult(external_id="agent-task-delete-fails"),
+            status_sequence=[TaskStatus(running=True)],
+            stop_error=RuntimeError("kubernetes delete denied"),
+        )
+    )
+    task_pk = agent_stage._create_agent_task_sync(_params(org, environment_spec_slug=env_spec.slug))
+    agent_stage._spawn_agent_task_sync(task_pk)
+    task = AgentTask.objects.get(pk=task_pk)
+
+    result = agent_stage._cancel_agent_task_sync(str(task.guid))
+
+    task.refresh_from_db()
+    assert result == {
+        "ok": False,
+        "status": AgentTask.Status.PROVISIONING,
+        "error": "kubernetes delete denied",
+    }
+    assert task.status == AgentTask.Status.PROVISIONING
+    assert fake.stopped_ids == ["agent-task-delete-fails"]
 
 
 def test_cancel_terminal_task_is_noop(org, env_spec, cluster, patch_spawner):
