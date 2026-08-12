@@ -27,11 +27,10 @@ We:
      id — the true owner — and fail closed (ack + ignore) on an
      installation we don't recognise. Deliveries with no installation id
      (a per-repo OAuth/PAT hook) keep using the URL-guid connection.
-  5. Resolve the matching ``RegisteredApp`` by ``source_repo`` scoped to
-     the resolved connection's organization. If
-     ``trigger_mode==auto_on_push`` and the pushed branch matches
-     ``deploy_branch``, fire ``DeployAppWorkflow`` with
-     ``trigger_kind=push``.
+  5. Resolve every matching ``RegisteredApp`` by ``source_repo`` scoped to
+     the resolved connection's organization. Standing apps with
+     ``trigger_mode==auto_on_push`` fire ``DeployAppWorkflow``; agent apps
+     freeze a new immutable package without dispatching an agent task.
 
 What this *doesn't* do (filed for follow-up):
   - Replay protection beyond HMAC (no nonce/timestamp window). For
@@ -379,7 +378,6 @@ def _handle(
             source_repo=full_name,
             is_active=True,
             deleted_at__isnull=True,
-            trigger_mode=RegisteredApp.TriggerMode.AUTO_ON_PUSH.value,
         )
     )
     if not apps:
@@ -389,14 +387,30 @@ def _handle(
         )
 
     fired = []
+    agent_package_sync = []
     last_deploy: Deployment | None = None
+    github_payload: dict | None = None
+    sync_agent_package = None
+    if kind == "github":
+        # The GitHub parser above has already validated this exact body as a
+        # push payload. Decode it once for package reconciliation rather than
+        # once per matching app in a monorepo/federation.
+        github_payload = json.loads(body.decode("utf-8"))
+        from astrolift_scm.webhook_views import _sync_agent_package_on_push
+
+        sync_agent_package = _sync_agent_package_on_push
+
     for app in apps:
-        deploy = _fire_deploy(app, branch, head_sha)
-        if deploy is not None:
-            fired.append(
-                {"app": app.slug, "deployment": str(deploy.guid)}
-            )
-            last_deploy = deploy
+        if app.trigger_mode == RegisteredApp.TriggerMode.AUTO_ON_PUSH.value:
+            deploy = _fire_deploy(app, branch, head_sha)
+            if deploy is not None:
+                fired.append({"app": app.slug, "deployment": str(deploy.guid)})
+                last_deploy = deploy
+
+        if sync_agent_package is not None and github_payload is not None:
+            sync_result = sync_agent_package(app, github_payload, connection=conn)
+            if sync_result.get("status") != "not_agent":
+                agent_package_sync.append({"app": app.slug, **sync_result})
 
     # Stamp the delivery row with the last-fired deployment so the
     # UI can backtrack from a webhook to whatever it triggered.
@@ -430,6 +444,12 @@ def _handle(
         )
 
     return JsonResponse(
-        {"ok": True, "fired": fired, "repo": full_name, "branch": branch},
+        {
+            "ok": True,
+            "fired": fired,
+            "agent_package_sync": agent_package_sync,
+            "repo": full_name,
+            "branch": branch,
+        },
         status=202,
     )

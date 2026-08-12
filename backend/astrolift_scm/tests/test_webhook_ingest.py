@@ -199,6 +199,44 @@ def test_github_push_to_non_deploy_branch_ignored(stack, settings):
     assert Deployment.objects.count() == 0
 
 
+def test_github_app_push_syncs_agent_package_without_dispatching_run(stack, settings, monkeypatch):
+    settings.ASTROLIFT_TEMPORAL_ENABLED = False
+    stack["app"].trigger_mode = RegisteredApp.TriggerMode.MANUAL.value
+    stack["app"].save(update_fields=["trigger_mode", "updated_at", "version"])
+    calls = []
+
+    def sync_agent(app, payload, *, connection):
+        calls.append((app, payload, connection))
+        return {"status": "synced", "commit_sha": payload["after"], "agents": [app.slug]}
+
+    monkeypatch.setattr(
+        "astrolift_scm.webhook_views._sync_agent_package_on_push",
+        sync_agent,
+    )
+    body = _push_payload("acme-org/hello", sha="agent-package-sha")
+    sig = _github_sig(stack["secret"], body)
+
+    resp = Client().post(
+        f"/app/auth1/scm/github/webhook/{stack['conn'].guid}/",
+        data=body,
+        content_type="application/json",
+        HTTP_X_HUB_SIGNATURE_256=sig,
+    )
+
+    assert resp.status_code == 202, resp.content
+    assert resp.json()["fired"] == []
+    assert resp.json()["agent_package_sync"] == [
+        {
+            "app": "hello-wh",
+            "status": "synced",
+            "commit_sha": "agent-package-sha",
+            "agents": ["hello-wh"],
+        }
+    ]
+    assert calls == [(stack["app"], json.loads(body), stack["conn"])]
+    assert Deployment.objects.count() == 0
+
+
 def test_github_push_unknown_repo_ignored(stack, settings):
     settings.ASTROLIFT_TEMPORAL_ENABLED = False
     body = _push_payload("acme-org/different-repo")
