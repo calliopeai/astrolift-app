@@ -78,7 +78,14 @@ def test_package_ir_composes_brief_skills_and_compatibility_projection():
                 "instructions": "Inspect reports read-only.",
             }
         ],
-        tools=[{"slug": "agent-report", "adapter": "command"}],
+        tools=[
+            {
+                "slug": "agent-report",
+                "adapter": "command",
+                "description": "Report one structured finding",
+                "commands": ["agent-report"],
+            }
+        ],
         environment={"MAX_TICKETS_PER_RUN": "10"},
         secret_refs=[{"env_var": "JIRA_API_TOKEN", "uri": "smd-jira-agent-api-token"}],
         runtime={"image": "example/agent:sha-123"},
@@ -101,7 +108,11 @@ def test_package_ir_composes_brief_skills_and_compatibility_projection():
     assert package["source"]["root"] == "agents/triage"
     assert package["prompt"]["system"] == (
         "# Agent brief\n\nProcess one queue batch.\n\n---\n\n"
-        "# Skill: EMR Triage\n\nInspect reports read-only."
+        "# Skill: EMR Triage\n\nInspect reports read-only.\n\n---\n\n"
+        "# Available command tools\n\n"
+        "The following commands are provided by the selected agent runtime. "
+        "Use only the commands needed for this task.\n\n"
+        "- `agent-report` — Report one structured finding. Commands: `agent-report`."
     )
     assert package["imports"] == [{"format": "langflow", "path": "imports/triage.json", "mode": "workflow"}]
     assert package["federation"]["manifest_path"] == "astrolift.agents.toml"

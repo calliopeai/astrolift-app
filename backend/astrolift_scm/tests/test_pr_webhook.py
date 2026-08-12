@@ -237,9 +237,9 @@ def test_non_pull_request_event_acked(stack):
 def test_push_event_acked(stack):
     # A push with no WorkflowWebhook bound to the app is acked with a
     # zero dispatch count (the preview lifecycle never runs for push).
-    body = json.dumps(
-        {"ref": "refs/heads/main", "repository": {"full_name": "acme-org/hello"}}
-    ).encode("utf-8")
+    body = json.dumps({"ref": "refs/heads/main", "repository": {"full_name": "acme-org/hello"}}).encode(
+        "utf-8"
+    )
     resp = _post(Client(), str(stack["app"].guid), body=body, secret=stack["secret"], event="push")
     assert resp.status_code == 200
     assert resp.json()["detail"] == "push handled"

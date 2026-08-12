@@ -82,7 +82,7 @@ def brief_env_vars(task: AgentTask) -> list[dict[str, str]]:
     # input.
     snapshot = brief.manifest_snapshot if isinstance(brief.manifest_snapshot, dict) else {}
     _append_payload_env(env, task=task, brief=brief, snapshot=snapshot)
-    env.append({"name": "AGENT_SYSTEM", "value": snapshot.get("system_prompt", "") or ""})
+    env.append({"name": "AGENT_SYSTEM", "value": _runtime_system_prompt(snapshot)})
     env.append({"name": "AGENT_PROMPT", "value": _kickoff_prompt(task)})
 
     # Manifest [environment] non-secret config (assembled into
@@ -99,6 +99,29 @@ def brief_env_vars(task: AgentTask) -> list[dict[str, str]]:
                 continue
             env.append({"name": name, "value": "" if value is None else str(value)})
     return env
+
+
+def _runtime_system_prompt(snapshot: dict) -> str:
+    """Return the one-shot prompt with legacy tool declarations preserved.
+
+    Canonical packages already compose rich command details into the system
+    prompt. Older Briefs contain only a list of tool slugs; append that roster
+    so pre-injected harness runs do not silently lose it during dispatch.
+    """
+    system = str(snapshot.get("system_prompt") or "")
+    if isinstance(snapshot.get("agent_package"), dict):
+        return system
+    raw_tools = snapshot.get("tools") or []
+    if not isinstance(raw_tools, list):
+        return system
+    tools = list(
+        dict.fromkeys(str(tool).strip() for tool in raw_tools if isinstance(tool, str) and tool.strip())
+    )
+    if not tools:
+        return system
+    roster = "\n".join(f"- `{tool}`" for tool in tools)
+    tool_section = f"# Available tools\n\n{roster}"
+    return f"{system}\n\n---\n\n{tool_section}" if system else tool_section
 
 
 def _append_payload_env(env: list[dict[str, str]], *, task: AgentTask, brief: Brief, snapshot: dict) -> None:

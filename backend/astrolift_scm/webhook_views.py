@@ -526,9 +526,7 @@ def pr_webhook(request: HttpRequest, app_guid: str) -> JsonResponse:
     try:
         payload = json.loads(
             raw_body.decode("utf-8") or "{}",
-            parse_constant=lambda value: (_ for _ in ()).throw(
-                ValueError(f"invalid JSON constant {value}")
-            ),
+            parse_constant=lambda value: (_ for _ in ()).throw(ValueError(f"invalid JSON constant {value}")),
         )
     except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
         return JsonResponse({"detail": f"invalid JSON: {exc}"}, status=400)
