@@ -21,19 +21,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-// The CLI repo's GitHub Releases is the source of truth for binaries.
-// The "latest" alias resolves to whatever the most recent published
-// release is, so we don't have to keep this page in lockstep with the
-// CLI's release cadence. When the platform grows a Releases GraphQL
-// query (#TBD) we can swap these constants for live data including
-// SHA-256 sums and per-asset sizes.
+// The private CLI repo's GitHub Releases is the source of truth for binaries.
+// Use authenticated `gh release download` commands rather than anonymous asset
+// URLs: GitHub deliberately returns 404 for private release assets otherwise.
 const CLI_REPO = "calliopeai/astrolift-cli";
 const CLI_BINARY = "astro";
 const RELEASES_URL = `https://github.com/${CLI_REPO}/releases`;
 const LATEST_URL = `${RELEASES_URL}/latest`;
-const LATEST_ASSET = (asset: string) => `${RELEASES_URL}/latest/download/${asset}`;
-const INSTALL_SCRIPT =
-  "https://raw.githubusercontent.com/calliopeai/astrolift-cli/main/scripts/install.sh";
+const CHECKSUMS_FILENAME = `${CLI_BINARY}-checksums.txt`;
+const authenticatedDownload = (asset: string) =>
+  `gh release download --repo ${CLI_REPO} --pattern '${asset}' --pattern '${CHECKSUMS_FILENAME}'`;
 
 interface PlatformAsset {
   id: string;
@@ -53,7 +50,7 @@ const PLATFORMS: PlatformAsset[] = [
     label: "macOS · Apple Silicon",
     filename: `${CLI_BINARY}-darwin-arm64.tar.gz`,
     icon: AppleIcon,
-    installLine: `curl -fsSL ${INSTALL_SCRIPT} | sh`,
+    installLine: authenticatedDownload(`${CLI_BINARY}-darwin-arm64.tar.gz`),
   },
   {
     id: "macos-x64",
@@ -62,7 +59,7 @@ const PLATFORMS: PlatformAsset[] = [
     label: "macOS · Intel",
     filename: `${CLI_BINARY}-darwin-amd64.tar.gz`,
     icon: AppleIcon,
-    installLine: `curl -fsSL ${INSTALL_SCRIPT} | sh`,
+    installLine: authenticatedDownload(`${CLI_BINARY}-darwin-amd64.tar.gz`),
   },
   {
     id: "linux-x64",
@@ -71,7 +68,7 @@ const PLATFORMS: PlatformAsset[] = [
     label: "Linux · amd64",
     filename: `${CLI_BINARY}-linux-amd64.tar.gz`,
     icon: TerminalIcon,
-    installLine: `curl -fsSL ${INSTALL_SCRIPT} | sh`,
+    installLine: authenticatedDownload(`${CLI_BINARY}-linux-amd64.tar.gz`),
   },
   {
     id: "linux-arm64",
@@ -80,7 +77,7 @@ const PLATFORMS: PlatformAsset[] = [
     label: "Linux · arm64",
     filename: `${CLI_BINARY}-linux-arm64.tar.gz`,
     icon: TerminalIcon,
-    installLine: `curl -fsSL ${INSTALL_SCRIPT} | sh`,
+    installLine: authenticatedDownload(`${CLI_BINARY}-linux-arm64.tar.gz`),
   },
   {
     id: "windows-x64",
@@ -89,7 +86,7 @@ const PLATFORMS: PlatformAsset[] = [
     label: "Windows · amd64",
     filename: `${CLI_BINARY}-windows-amd64.zip`,
     icon: MonitorIcon,
-    installLine: `irm ${LATEST_ASSET(`${CLI_BINARY}-windows-amd64.zip`)} -OutFile ${CLI_BINARY}.zip; Expand-Archive ${CLI_BINARY}.zip`,
+    installLine: authenticatedDownload(`${CLI_BINARY}-windows-amd64.zip`),
   },
   {
     id: "windows-arm64",
@@ -98,11 +95,9 @@ const PLATFORMS: PlatformAsset[] = [
     label: "Windows · arm64",
     filename: `${CLI_BINARY}-windows-arm64.zip`,
     icon: MonitorIcon,
-    installLine: `irm ${LATEST_ASSET(`${CLI_BINARY}-windows-arm64.zip`)} -OutFile ${CLI_BINARY}.zip; Expand-Archive ${CLI_BINARY}.zip`,
+    installLine: authenticatedDownload(`${CLI_BINARY}-windows-arm64.zip`),
   },
 ];
-
-const CHECKSUMS_FILENAME = `${CLI_BINARY}-checksums.txt`;
 
 // Minimal typing for the User-Agent Client Hints API. As of 2026 the API
 // ships in Chromium-family browsers (Chrome/Edge/Opera) but not Firefox
@@ -196,7 +191,7 @@ export function DownloadsClient() {
   return (
     <PageShell
       title="Downloads"
-      description={`Install the ${CLI_BINARY} CLI to interact with Astrolift from your shell or CI. Pick a platform below or use a package manager.`}
+      description={`Install the ${CLI_BINARY} CLI to interact with Astrolift from your shell or CI. Native releases require an authorized GitHub identity; the container image is public.`}
       actions={
         <Button asChild variant="outline">
           <a href={RELEASES_URL} target="_blank" rel="noreferrer">
@@ -216,8 +211,8 @@ export function DownloadsClient() {
             <DownloadIcon className="size-4" /> {detected ? "Other platforms" : "Native binaries"}
           </CardTitle>
           <CardDescription>
-            Single-file static binaries. Download and run — no runtime required. The latest alias
-            always resolves to the newest published release.
+            Single-file static binaries. Run `gh auth login` with an account that can read the CLI
+            repository before using these commands.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -229,32 +224,27 @@ export function DownloadsClient() {
         </CardContent>
       </Card>
 
-      {/* ─── package managers ──────────────────────────────────────────── */}
+      {/* ─── install channels ──────────────────────────────────────────── */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <PackageIcon className="size-4" /> Package managers
+            <PackageIcon className="size-4" /> Install channels
           </CardTitle>
           <CardDescription>
-            Pinned-version installs for teams that prefer a package manager over downloading a
-            binary directly.
+            Native archives are private. Homebrew, Scoop, anonymous curl, and direct asset links
+            cannot authenticate them and are not supported yet.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <PackageRow
-            name="Homebrew"
-            command={`brew install calliopeai/tap/${CLI_BINARY}`}
-            note="Available for macOS and Linux; the formula verifies the release checksum."
-          />
-          <PackageRow
-            name="Scoop"
-            command="scoop bucket add calliopeai https://github.com/calliopeai/scoop-bucket; scoop install astro"
-            note="Windows package backed by the same release archives."
+            name="GitHub CLI"
+            command={`gh auth login; gh release view --repo ${CLI_REPO} --web`}
+            note="Authenticate first, then use the matching command above. Each command also fetches the release checksum list."
           />
           <PackageRow
             name="Docker"
-            command="docker run --rm ghcr.io/calliopeai/astrolift-cli:latest version"
-            note="Containerized run useful for CI agents that don't want to manage host installs."
+            command="docker run --rm docker.io/calliopeai/astrolift-cli:latest version"
+            note="Public multi-architecture image for CI agents that do not need a host install."
           />
         </CardContent>
       </Card>
@@ -272,8 +262,8 @@ export function DownloadsClient() {
         </CardHeader>
         <CardContent className="space-y-4">
           <CopyableCommand
-            label="Fetch checksums"
-            command={`curl -fsSLO ${LATEST_ASSET(CHECKSUMS_FILENAME)}`}
+            label="Fetch checksums (authenticated)"
+            command={`gh release download --repo ${CLI_REPO} --pattern '${CHECKSUMS_FILENAME}'`}
           />
           <CopyableCommand
             label="Verify (macOS/Linux)"
@@ -384,9 +374,9 @@ function FeaturedPlatformCallout({
             <div className="text-muted-foreground font-mono text-xs">{platform.filename}</div>
           </div>
           <Button asChild size="sm">
-            <a href={LATEST_ASSET(platform.filename)} target="_blank" rel="noreferrer">
+            <a href={LATEST_URL} target="_blank" rel="noreferrer">
               <DownloadIcon className="size-3" />
-              Download
+              Open release
             </a>
           </Button>
         </div>
@@ -414,9 +404,9 @@ function PlatformCard({ platform }: { platform: PlatformAsset }) {
       <div className="text-muted-foreground truncate font-mono text-xs">{platform.filename}</div>
       <div className="flex items-center gap-2">
         <Button asChild size="sm" className="flex-1">
-          <a href={LATEST_ASSET(platform.filename)} target="_blank" rel="noreferrer">
+          <a href={LATEST_URL} target="_blank" rel="noreferrer">
             <DownloadIcon className="size-3" />
-            Download
+            Open release
           </a>
         </Button>
         <CopyButton value={platform.installLine} label="Copy install line" />
