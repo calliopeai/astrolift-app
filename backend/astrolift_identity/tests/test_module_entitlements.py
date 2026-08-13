@@ -317,9 +317,9 @@ class TestNoAccessRegression:
             granted = {permission.value for permission in permissions}
             for app_permission, env_spec_permission in parallels.items():
                 if app_permission in granted:
-                    assert env_spec_permission in granted, (
-                        f"{role_slug} lost {env_spec_permission} while retaining {app_permission}"
-                    )
+                    assert (
+                        env_spec_permission in granted
+                    ), f"{role_slug} lost {env_spec_permission} while retaining {app_permission}"
 
     @pytest.mark.parametrize(
         "role_slug",
