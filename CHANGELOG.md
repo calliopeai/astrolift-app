@@ -27,6 +27,9 @@
 - Shard backend tests across four balanced real-Postgres jobs, retain one
   stable aggregate gate, and stop rerunning the dedicated provider suite in
   the backend pass.
+- Select coupled real-Postgres shards from pull-request impact, split the
+  slowest runtime suites for parallel execution, and reserve the full backend
+  regression matrix for `main` and manual runs.
 - Make managed GitHub workflows latest-wins and give each registered monorepo
   agent an independent package-sync workflow.
 - Clarify that agent repository pushes sync immutable packages but never start

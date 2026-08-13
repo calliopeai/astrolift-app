@@ -30,6 +30,7 @@ jobs:
     outputs:
       backend: ${{ steps.classify.outputs.backend }}
       frontend: ${{ steps.classify.outputs.frontend }}
+      backend_test_matrix: ${{ steps.classify.outputs.backend_test_matrix }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,43 +42,122 @@ jobs:
           HEAD_SHA: ${{ github.sha }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
-          backend=false
-          frontend=false
-
-          if [[ "$EVENT_NAME" == workflow_dispatch || -z "$BASE_SHA" || "$BASE_SHA" =~ ^0+$ ]]; then
-            backend=true
-            frontend=true
-          else
+          if [[ "$EVENT_NAME" != workflow_dispatch && -n "$BASE_SHA" && ! "$BASE_SHA" =~ ^0+$ ]]; then
             if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
               git fetch --no-tags --depth=1 origin "$BASE_SHA"
             fi
-
-            while IFS= read -r path; do
-              case "$path" in
-                backend/*)
-                  backend=true
-                  ;;
-                frontend/*)
-                  frontend=true
-                  ;;
-                .github/*|docker/*|Makefile|bootstrap.sh|run.sh)
-                  backend=true
-                  frontend=true
-                  ;;
-                docs/*|*.md|LICENSE|.gitignore)
-                  ;;
-                *)
-                  # Unknown root-level build/config changes run both suites.
-                  backend=true
-                  frontend=true
-                  ;;
-              esac
-            done < <(git diff --name-only --diff-filter=ACMRTD "$BASE_SHA" "$HEAD_SHA")
           fi
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
 
-          echo "backend=$backend" >> "$GITHUB_OUTPUT"
-          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
-          echo "backend=$backend frontend=$frontend"
+          shards = {
+              "workflow-runtime": {
+                  "paths": "astrolift_workflows",
+                  "temporal": True,
+              },
+              "app-lifecycle": {
+                  "paths": "astrolift_lifecycle",
+                  "temporal": True,
+              },
+              "core-identity-operations": {
+                  "paths": "astrolift_operations core astrolift_identity",
+                  "temporal": False,
+              },
+              "agent-runtime": {
+                  "paths": "astrolift_agents astrolift_dispatch",
+                  "temporal": True,
+              },
+              "registration-clusters": {
+                  "paths": "astrolift_scm astrolift_clusters astrolift_registry",
+                  "temporal": False,
+              },
+              "manifest-foundation": {
+                  "paths": "astrolift_manifest astrolift_drivers astrolift_observability workflows",
+                  "temporal": False,
+              },
+              "services-platform": {
+                  "paths": (
+                      "astrolift_services astrolift_pipelines astrolift_forms "
+                      "astrolift_billing astrolift_compliance"
+                  ),
+                  "temporal": True,
+              },
+              "control-surface": {
+                  "paths": (
+                      "auth1 astrolift_ci_convert astrolift_graphql astrolift_ci "
+                      "config testdata organization"
+                  ),
+                  "temporal": False,
+              },
+          }
+          owners = {
+              root: name
+              for name, shard in shards.items()
+              for root in shard["paths"].split()
+          }
+          impacts = {
+              "astrolift_agents": {"agent-runtime", "workflow-runtime", "services-platform"},
+              "astrolift_dispatch": {"agent-runtime", "workflow-runtime", "services-platform"},
+              "astrolift_clusters": {"registration-clusters", "app-lifecycle", "services-platform"},
+              "astrolift_identity": {"core-identity-operations", "registration-clusters"},
+              "astrolift_lifecycle": {"app-lifecycle", "workflow-runtime"},
+              "astrolift_registry": {"registration-clusters", "workflow-runtime", "services-platform"},
+              "astrolift_services": {"services-platform", "workflow-runtime", "app-lifecycle"},
+              "workflows": {"manifest-foundation", "workflow-runtime"},
+          }
+          broad_roots = {"core", "config", "astrolift_graphql", "auth1"}
+          event = os.environ["EVENT_NAME"]
+          base = os.environ.get("BASE_SHA", "")
+          head = os.environ["HEAD_SHA"]
+          full = event in {"workflow_dispatch", "push"} or not base or set(base) == {"0"}
+          paths = [] if full else subprocess.check_output(
+              ["git", "diff", "--name-only", "--diff-filter=ACMRTD", base, head],
+              text=True,
+          ).splitlines()
+
+          backend = full
+          frontend = full
+          selected = set(shards) if full else set()
+          for path in paths:
+              if path.startswith("backend/"):
+                  backend = True
+                  root = path.split("/", 2)[1]
+                  if root in broad_roots or root not in owners:
+                      selected = set(shards)
+                  else:
+                      selected |= impacts.get(root, {owners[root]})
+              elif path.startswith("frontend/"):
+                  frontend = True
+              elif path.startswith((".github/", "docker/")) or path in {
+                  "Makefile", "bootstrap.sh", "run.sh"
+              }:
+                  backend = frontend = True
+                  selected = set(shards)
+              elif path.startswith("docs/") or path.endswith(".md") or path in {
+                  "LICENSE", ".gitignore"
+              }:
+                  continue
+              else:
+                  backend = frontend = True
+                  selected = set(shards)
+
+          if backend and not selected:
+              selected = set(shards)
+          matrix = {
+              "include": [
+                  {"name": name, **shards[name]}
+                  for name in shards
+                  if name in selected
+              ]
+          }
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"backend={str(backend).lower()}\n")
+              output.write(f"frontend={str(frontend).lower()}\n")
+              output.write(f"backend_test_matrix={json.dumps(matrix, separators=(',', ':'))}\n")
+          print(f"backend={backend} frontend={frontend} shards={sorted(selected)}")
+          PY
 
   lint:
     name: lint (backend)
@@ -133,22 +213,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - name: workflow-lifecycle
-            paths: astrolift_workflows astrolift_lifecycle
-          - name: core-identity-operations
-            paths: astrolift_operations core astrolift_identity
-          - name: registration-runtime
-            paths: astrolift_scm astrolift_clusters astrolift_agents astrolift_registry
-          - name: platform-manifest
-            paths: >-
-              astrolift_manifest astrolift_drivers astrolift_observability workflows
-          - name: platform-control
-            paths: >-
-              astrolift_services astrolift_pipelines astrolift_dispatch auth1
-              astrolift_ci_convert astrolift_forms organization astrolift_billing
-              astrolift_graphql astrolift_compliance astrolift_ci config testdata
+      matrix: ${{ fromJSON(needs.changes.outputs.backend_test_matrix) }}
     defaults:
       run:
         working-directory: backend
@@ -194,6 +259,7 @@ jobs:
           cache: "pip"
           cache-dependency-path: backend/Pipfile.lock
       - name: Install Temporal CLI
+        if: ${{ matrix.temporal }}
         # Tests against real Temporal (test env) per backend/CLAUDE.md.
         # dev-server uses SQLite + in-process — boots in seconds, no
         # external state, perfect for CI.
@@ -201,6 +267,7 @@ jobs:
           curl -sSf https://temporal.download/cli.sh | sh
           echo "$HOME/.temporalio/bin" >> "$GITHUB_PATH"
       - name: Start Temporal dev server
+        if: ${{ matrix.temporal }}
         run: |
           "$HOME/.temporalio/bin/temporal" server start-dev \
             --headless --port 7233 --namespace default \
