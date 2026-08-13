@@ -20,6 +20,10 @@ def backfill_repository_workflow_projects(apps, schema_editor):
                 deleted_at__isnull=True,
                 agent_definition__registered_app__project_id__isnull=False,
             )
+            # WorkflowStage has model ordering.  Clear it before DISTINCT so
+            # PostgreSQL does not include the ordering columns and return the
+            # same project once per stage.
+            .order_by()
             .values_list("agent_definition__registered_app__project_id", flat=True)
             .distinct()[:2]
         )
