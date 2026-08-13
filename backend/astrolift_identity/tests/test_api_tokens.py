@@ -36,6 +36,7 @@ from astrolift_identity.api_tokens import (
     DEFAULT_SCOPES,
     PLAINTEXT_PREFIX,
     SCOPE_ADMIN,
+    SCOPE_AGENT_ENV_SPEC_WRITE,
     SCOPE_MCP_DISPATCH,
     SCOPE_READ_APPS,
     SCOPE_SECRET_READ,
@@ -381,15 +382,33 @@ def test_secret_scopes_map_only_to_their_exact_permissions():
     assert not token_scope_allows_permission(write_token, Permission.APP_DEPLOY)
 
 
-def test_cli_device_scopes_allow_agent_ops_and_secret_write_without_reveal_or_admin():
+def test_agent_env_spec_write_scope_maps_only_to_env_spec_mutations():
+    token = SimpleNamespace(scopes=[SCOPE_AGENT_ENV_SPEC_WRITE])
+
+    assert token_scope_allows_permission(token, Permission.AGENT_ENV_SPEC_CREATE)
+    assert token_scope_allows_permission(token, Permission.AGENT_ENV_SPEC_UPDATE)
+    assert token_scope_allows_permission(token, Permission.AGENT_ENV_SPEC_DELETE)
+    assert not token_scope_allows_permission(token, Permission.AGENT_ENV_SPEC_READ)
+    assert not token_scope_allows_permission(token, Permission.APP_CREATE)
+    assert not token_scope_allows_permission(token, Permission.APP_UPDATE)
+    assert not token_scope_allows_permission(token, Permission.APP_DELETE)
+    assert not token_scope_allows_permission(token, Permission.AGENT_DELETE)
+
+
+def test_cli_device_scopes_allow_agent_ops_env_specs_and_secret_write_without_admin():
     token = SimpleNamespace(scopes=list(CLI_DEVICE_SCOPES))
 
+    assert SCOPE_AGENT_ENV_SPEC_WRITE in token.scopes
     assert SCOPE_SECRET_WRITE in token.scopes
     assert SCOPE_MCP_DISPATCH in token.scopes
     assert token_scope_allows_permission(token, Permission.AGENT_DISPATCH)
+    assert token_scope_allows_permission(token, Permission.AGENT_ENV_SPEC_CREATE)
+    assert token_scope_allows_permission(token, Permission.AGENT_ENV_SPEC_UPDATE)
+    assert token_scope_allows_permission(token, Permission.AGENT_ENV_SPEC_DELETE)
     assert token_scope_allows_permission(token, Permission.SECRET_WRITE)
     assert not token_scope_allows_permission(token, Permission.SECRET_READ)
     assert not token_scope_allows_permission(token, Permission.APP_DEPLOY)
+    assert not token_scope_allows_permission(token, Permission.APP_DELETE)
     assert not token_scope_allows_permission(token, Permission.AGENT_UPDATE)
     assert not token_scope_allows_permission(token, Permission.ADMIN_ELEVATE)
 

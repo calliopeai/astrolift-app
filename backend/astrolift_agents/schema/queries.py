@@ -757,7 +757,7 @@ class AgentsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.AGENT_ENV_SPEC_READ)
     @tenant_scoped()
     def agent_environment_specs(self, info: Info, org_id: strawberry.ID) -> list[AgentEnvironmentSpecType]:
         """The org's AgentEnvironmentSpecs, ordered by slug.
@@ -773,7 +773,7 @@ class AgentsQuery:
         return [agent_env_spec_to_type(s) for s in qs]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.AGENT_ENV_SPEC_READ)
     @tenant_scoped()
     def agent_environment_spec(self, info: Info, slug: str) -> AgentEnvironmentSpecType | None:
         """One AgentEnvironmentSpec by slug, scoped to the caller's org.

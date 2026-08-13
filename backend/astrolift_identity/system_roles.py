@@ -39,6 +39,7 @@ _READ_ALL = (
     # (plus the platform-global skills). Write/import live on the
     # admin/developer roles below so auditors can't mutate the catalog.
     Permission.SKILL_READ,
+    Permission.AGENT_ENV_SPEC_READ,
     # Agents + Workflows modules (spec 34/36 Phase 0): the read-all /
     # auditor set sees the agent fleet + workflow surface. The agent
     # workload/run readers re-gate to ``agent.read``, so without this an
@@ -90,6 +91,12 @@ _WORKFLOW_FULL = (
     Permission.WORKFLOW_CREATE,
     Permission.WORKFLOW_UPDATE,
     Permission.WORKFLOW_DELETE,
+)
+_AGENT_ENV_SPEC_FULL = (
+    Permission.AGENT_ENV_SPEC_READ,
+    Permission.AGENT_ENV_SPEC_CREATE,
+    Permission.AGENT_ENV_SPEC_UPDATE,
+    Permission.AGENT_ENV_SPEC_DELETE,
 )
 
 # Developer level — view+create+run, NOT manage (no update/delete).
@@ -177,6 +184,7 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             Permission.SKILL_READ,
             Permission.SKILL_WRITE,
             Permission.SKILL_IMPORT,
+            *_AGENT_ENV_SPEC_FULL,
             # Agents + Workflows modules (Phase 0): full management,
             # mirroring the full app CRUD a team owner holds.
             *_AGENT_FULL,
@@ -203,6 +211,9 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             Permission.SKILL_READ,
             Permission.SKILL_WRITE,
             Permission.SKILL_IMPORT,
+            Permission.AGENT_ENV_SPEC_READ,
+            Permission.AGENT_ENV_SPEC_CREATE,
+            Permission.AGENT_ENV_SPEC_UPDATE,
             # Agents + Workflows modules (Phase 0): full management.
             *_AGENT_FULL,
             *_WORKFLOW_FULL,
@@ -226,6 +237,7 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             # stay on the admin roles.
             Permission.SKILL_READ,
             Permission.SKILL_IMPORT,
+            Permission.AGENT_ENV_SPEC_READ,
             # Agents + Workflows modules (Phase 0): view+create+run, NOT
             # manage — mirrors the developer's app baseline (deploy ops but
             # no app.update/delete); canManage stays false.
@@ -252,6 +264,7 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             # Agents + Workflows modules (Phase 0): read-only, mirroring
             # the viewer's app.read.
             Permission.AGENT_READ,
+            Permission.AGENT_ENV_SPEC_READ,
             Permission.WORKFLOW_READ,
         ),
     ),
@@ -268,6 +281,7 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             Permission.APP_UPDATE,
             Permission.APP_DELETE,
             *_DEPLOY_OPS,
+            *_AGENT_ENV_SPEC_FULL,
             # Agents + Workflows modules (Phase 0): full management.
             *_AGENT_FULL,
             *_WORKFLOW_FULL,
@@ -282,6 +296,7 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             Permission.PROJECT_READ,
             Permission.APP_READ,
             *_DEPLOY_OPS,
+            Permission.AGENT_ENV_SPEC_READ,
             # Agents + Workflows modules (Phase 0): view+create+run, NOT
             # manage — mirrors the developer's app baseline (deploy ops but
             # no app.update/delete); canManage stays false.
@@ -299,6 +314,7 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             Permission.APP_READ,
             Permission.APP_READ_LOGS,
             Permission.APP_READ_METRICS,
+            Permission.AGENT_ENV_SPEC_READ,
             # Agents + Workflows modules (Phase 0): read-only.
             Permission.AGENT_READ,
             Permission.WORKFLOW_READ,
@@ -314,6 +330,9 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             Permission.APP_UPDATE,
             Permission.APP_DELETE,
             *_DEPLOY_OPS,
+            Permission.AGENT_ENV_SPEC_READ,
+            Permission.AGENT_ENV_SPEC_UPDATE,
+            Permission.AGENT_ENV_SPEC_DELETE,
             # Agents + Workflows modules (Phase 0): full management.
             *_AGENT_FULL,
             *_WORKFLOW_FULL,
@@ -328,6 +347,7 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             Permission.APP_READ,
             Permission.APP_DEPLOY,
             Permission.APP_ROLLBACK,
+            Permission.AGENT_ENV_SPEC_READ,
             # Agents + Workflows modules (Phase 0): run-only — a deployer
             # can dispatch agents + trigger workflows, mirroring its
             # app-deploy reach, but not create or delete them.
@@ -350,6 +370,7 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             Permission.SECRET_READ,
             Permission.SECRET_WRITE,
             Permission.SECRET_LIST,
+            Permission.AGENT_ENV_SPEC_READ,
         ),
     ),
     (
@@ -361,6 +382,7 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             Permission.APP_READ,
             Permission.APP_READ_LOGS,
             Permission.APP_READ_METRICS,
+            Permission.AGENT_ENV_SPEC_READ,
             # Agents + Workflows modules (Phase 0): read-only.
             Permission.AGENT_READ,
             Permission.WORKFLOW_READ,
@@ -374,6 +396,7 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
         (
             Permission.APP_APPROVE_DEPLOY,
             Permission.APP_READ,
+            Permission.AGENT_ENV_SPEC_READ,
             # Secret-change approval (#488) — the approver role covers
             # both axes so a single grant lets a reviewer act on the
             # full approval queue without juggling two role grants.

@@ -396,6 +396,7 @@ def test_approval_page_renders_for_authed_user():
     assert r.status_code == 200
     assert b"astro cli" in r.content
     assert b"Approve" in r.content
+    assert b"agent-env-spec:write" in r.content
     assert b"secret:write" in r.content
     assert b"mcp:dispatch" in r.content
     assert b"secret:read" not in r.content
