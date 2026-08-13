@@ -455,6 +455,14 @@ def _sync_agent_repo(_request: HttpRequest, args: dict[str, Any]) -> dict[str, A
             }
             for item in result.agents
         ],
+        "workflows": [
+            {
+                "manifest_path": item.path,
+                "slug": item.slug,
+                "created": item.created,
+            }
+            for item in getattr(result, "workflows", [])
+        ],
     }
 
 

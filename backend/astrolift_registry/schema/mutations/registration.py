@@ -395,7 +395,9 @@ class RegistrationMutations:
         if result.status == "no_agents":
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
-                "no agent manifests found in this repo (looked for agents/*/astrolift.toml and a root astrolift.toml)",
+                "no agent or workflow manifests found in this repo "
+                "(looked for agents/*/astrolift.toml, a root astrolift.toml, "
+                "and workflows/**/*.toml)",
                 field="sourceRepo",
             )
         if result.status != "ok":
@@ -413,7 +415,8 @@ class RegistrationMutations:
                         skill_notes=list(a.skill_notes),
                     )
                     for a in result.agents
-                ]
+                ],
+                workflows=[workflow.slug for workflow in getattr(result, "workflows", [])],
             )
         )
 

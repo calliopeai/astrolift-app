@@ -54,6 +54,7 @@ def build_workflow_definition_run_input(
 
     run_input = WorkflowDefinitionRunInput(
         workflow_definition_slug=definition.slug,
+        workflow_definition_id=str(definition.pk),
         workflow_run_id=str(run.pk),
         trigger_payload=payload,
         actor=actor,

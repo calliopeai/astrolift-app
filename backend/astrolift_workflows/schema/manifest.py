@@ -44,12 +44,14 @@ class WorkflowManifestStageType:
     kind: str
     role: str
     agent: str | None
+    environment_spec_slug: str | None
     skills: list[str]
     on_failure: str
     timeout: int
     # Tri-state rendered as a string: "0" (none), "N" (static), "dynamic".
     fan_out: str
     prompt: str | None
+    output_key: str | None
     approvers: list[str]
 
 
@@ -108,11 +110,13 @@ def _preview_type(parsed: ParsedWorkflowManifest) -> WorkflowManifestPreviewType
                 kind=s.kind,
                 role=s.role,
                 agent=s.agent,
+                environment_spec_slug=s.environment_spec_slug,
                 skills=list(s.skills),
                 on_failure=s.on_failure,
                 timeout=s.timeout,
                 fan_out=str(s.fan_out),
                 prompt=s.prompt,
+                output_key=s.output_key,
                 approvers=list(s.approvers),
             )
             for s in parsed.stages

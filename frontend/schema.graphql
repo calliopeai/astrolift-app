@@ -2859,6 +2859,7 @@ type AstroliftQuotaUsagePoint {
 
 type AstroliftRegisterAgentRepoResult {
   agents: [AstroliftRegisteredAgent!]!
+  workflows: [String!]!
 }
 
 type AstroliftRegisterAgentRepoResultMutationResult {
@@ -5246,7 +5247,7 @@ type Mutation {
   """
   Add a stage to a writable workflow definition. order=null appends after the definition's last stage.
   """
-  createWorkflowStage(workflowSlug: String!, kind: String!, order: Int = null, role: String = null, onFailure: String! = "fail", timeoutSeconds: Int! = 300, agentDefinitionGuid: String = null, skillRefs: JSON = null, fanOutCount: Int = null, prompt: String = null, approvers: JSON = null): CreateWorkflowStageResult!
+  createWorkflowStage(workflowSlug: String!, kind: String!, order: Int = null, role: String = null, onFailure: String! = "fail", timeoutSeconds: Int! = 300, agentDefinitionGuid: String = null, agentRef: String = null, environmentSpecSlug: String = null, skillRefs: JSON = null, fanOutCount: Int = null, prompt: String = null, outputKey: String = null, approvers: JSON = null): CreateWorkflowStageResult!
 
   """
   Create an inbound webhook trigger for a workflow definition (staff only).
@@ -5281,7 +5282,7 @@ type Mutation {
   runWorkflow(workflowId: ID!, inputs: JSON = null, orgId: ID = null): RunWorkflowResult!
 
   """Update a stage's fields on a writable definition (spec 40 §6)."""
-  updateWorkflowStage(stageGuid: ID!, kind: String = null, role: String = null, onFailure: String = null, timeoutSeconds: Int = null, agentDefinitionGuid: String = null, skillRefs: JSON = null, fanOutCount: Int = null, prompt: String = null, approvers: JSON = null): MutationResult!
+  updateWorkflowStage(stageGuid: ID!, kind: String = null, role: String = null, onFailure: String = null, timeoutSeconds: Int = null, agentDefinitionGuid: String = null, agentRef: String = null, environmentSpecSlug: String = null, skillRefs: JSON = null, fanOutCount: Int = null, prompt: String = null, outputKey: String = null, approvers: JSON = null): MutationResult!
 
   """Soft-delete a stage from a writable definition (spec 40 §6)."""
   deleteWorkflowStage(stageGuid: ID!): MutationResult!
@@ -6677,6 +6678,9 @@ type WorkflowDefinitionSummary {
   isEnabled: Boolean!
   isGlobal: Boolean!
   organizationGuid: String
+  sourceRepo: String!
+  sourcePath: String!
+  sourceRef: String!
   stageCount: Int!
   createdAt: DateTime!
 }
@@ -6701,6 +6705,9 @@ type WorkflowDefinitionType {
   states: JSON!
   transitions: JSON!
   isEnabled: Boolean!
+  sourceRepo: String!
+  sourcePath: String!
+  sourceRef: String!
   createdAt: DateTime!
   organizationGuid: String
   instanceCount: Int!
@@ -6749,11 +6756,13 @@ type WorkflowManifestStageType {
   kind: String!
   role: String!
   agent: String
+  environmentSpecSlug: String
   skills: [String!]!
   onFailure: String!
   timeout: Int!
   fanOut: String!
   prompt: String
+  outputKey: String
   approvers: [String!]!
 }
 
@@ -6790,6 +6799,9 @@ type WorkflowStageType {
   kind: String!
   role: String!
   prompt: String!
+  agentRef: String!
+  environmentSpecSlug: String!
+  outputKey: String!
   approvers: JSON!
   skillRefs: JSON!
   fanOutCount: Int

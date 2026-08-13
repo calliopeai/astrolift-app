@@ -1,0 +1,44 @@
+[workflow]
+slug = "emr-triage-chain"
+name = "EMR Triage Chain"
+pattern = "chained"
+description = "Collect evidence, classify it, then prepare a triage report."
+
+[[stage]]
+kind = "agent_dispatch"
+role = "investigator"
+agent = "emr-bug-triage"
+environment_spec_slug = "emr-bug-triage"
+skills = ["emr-evidence"]
+prompt = "Collect the evidence needed to reproduce and scope the reported issue. Return structured JSON."
+output_key = "evidence"
+on_failure = "retry"
+timeout = 1200
+
+[[stage]]
+kind = "agent_dispatch"
+role = "classifier"
+agent = "emr-bug-triage"
+environment_spec_slug = "emr-bug-triage"
+skills = ["emr-classification"]
+prompt = "Classify the prior evidence, deduplicate it against known issues, and return structured JSON."
+output_key = "classification"
+timeout = 900
+
+[[stage]]
+kind = "human_gate"
+role = "clinical-review"
+prompt = "Approve sending this triage result to downstream systems?"
+output_key = "approval"
+approvers = ["team:emr-triage-reviewers"]
+timeout = 86400
+
+[[stage]]
+kind = "agent_dispatch"
+role = "reporter"
+agent = "emr-bug-triage"
+environment_spec_slug = "emr-bug-triage"
+skills = ["jira-reporting"]
+prompt = "Use the approved evidence and classification to prepare the final issue payload."
+output_key = "report"
+timeout = 900

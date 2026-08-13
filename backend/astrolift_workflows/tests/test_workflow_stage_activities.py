@@ -18,6 +18,7 @@ from astrolift_workflows.activities.workflow_stage_activities import (
     _create_stage_execution_sync,
     _dispatch_agent_for_stage_sync,
     _get_workflow_stages_sync,
+    _load_agent_run_outcome_sync,
     _mark_workflow_run_sync,
     _parent_run_pk,
     _poll_agent_run_status_sync,
@@ -74,6 +75,23 @@ def agent_workload(db, org):
 
 @pytest.fixture
 def definition(db, agent_workload):
+    from astrolift_agents.models import Skill
+
+    org = agent_workload.registered_app.organization
+    Skill.objects.create(
+        organization=org,
+        name="Lint",
+        slug="lint",
+        content="Lint the proposed change.",
+        is_active=True,
+    )
+    Skill.objects.create(
+        organization=org,
+        name="Review",
+        slug="review",
+        content="Review the proposed change.",
+        is_active=True,
+    )
     wd = WorkflowDefinition.objects.create(
         name="Stage Pipeline",
         slug="stage-pipeline",
@@ -95,6 +113,8 @@ def definition(db, agent_workload):
         timeout_seconds=120,
         agent_definition=agent_workload,
         skill_refs=["lint", "review"],
+        prompt="Review the trigger and return structured JSON.",
+        output_key="review_result",
     )
     WorkflowStage.objects.create(
         slug="stage-pipeline-s1",
@@ -147,6 +167,8 @@ def test_get_workflow_stages_returns_ordered_dicts(definition):
     assert agent_stage["on_failure"] == "retry"
     assert agent_stage["timeout_seconds"] == 120
     assert agent_stage["skill_refs"] == ["lint", "review"]
+    assert agent_stage["prompt"] == "Review the trigger and return structured JSON."
+    assert agent_stage["output_key"] == "review_result"
     assert agent_stage["has_agent_definition"] is True
     # stage_id is the DB pk as a string (the executor keys off it).
     assert agent_stage["stage_id"] == str(_stage(definition, 0).pk)
@@ -154,6 +176,41 @@ def test_get_workflow_stages_returns_ordered_dicts(definition):
     gate_stage = stages[1]
     assert gate_stage["kind"] == "human_gate"
     assert gate_stage["has_agent_definition"] is False
+    assert gate_stage["output_key"] == "stage_1"
+
+
+@pytest.mark.django_db
+def test_get_workflow_stages_applies_binding_overrides(run, definition, agent_workload):
+    from astrolift_registry.models import Workload
+
+    replacement = Workload.objects.create(
+        registered_app=agent_workload.registered_app,
+        name="Replacement Agent",
+        slug="replacement-agent",
+        kind=Workload.Kind.AGENT,
+    )
+    result = _get_workflow_stages_sync(
+        definition.slug,
+        str(run.pk),
+        {
+            "0": {
+                "agent_workload_id": str(replacement.guid),
+                "skill_refs": ["review"],
+                "params": {
+                    "environment_spec_slug": "special-runtime",
+                    "prompt": "Use the customer procedure.",
+                    "output_key": "customer_review",
+                },
+            }
+        },
+        str(definition.pk),
+    )
+    stage = result["stages"][0]
+    assert stage["agent_definition_id"] == replacement.pk
+    assert stage["skill_refs"] == ["review"]
+    assert stage["environment_spec_slug"] == "special-runtime"
+    assert stage["prompt"] == "Use the customer procedure."
+    assert stage["output_key"] == "customer_review"
 
 
 @pytest.mark.django_db
@@ -474,6 +531,52 @@ def test_dispatch_agent_creates_run_and_links_execution_without_dispatcher(run, 
     execution = WorkflowStageExecution.objects.get(pk=int(execution_id))
     assert execution.agent_run_id == agent_run.pk
 
+    from astrolift_agents.models import AgentTask
+
+    task = AgentTask.objects.get(agent_run=agent_run)
+    assert task.dispatch_input == {"trigger": "manual"}
+    assert task.brief.context["output_key"] == "review_result"
+    assert "Review the trigger and return structured JSON." in task.brief.manifest_snapshot["system_prompt"]
+
+
+@pytest.mark.django_db
+def test_dispatch_uses_resolved_agent_environment_and_packet(run, definition, agent_workload):
+    from astrolift_agents.models import AgentEnvironmentSpec, AgentTask
+    from astrolift_registry.models import Workload
+
+    replacement = Workload.objects.create(
+        registered_app=agent_workload.registered_app,
+        name="Replacement Agent",
+        slug="replacement-agent-dispatch",
+        kind=Workload.Kind.AGENT,
+    )
+    env = AgentEnvironmentSpec.objects.create(
+        organization=run.organization,
+        name="Special runtime",
+        slug="special-runtime",
+        agent_type=AgentEnvironmentSpec.AgentType.CLAUDE,
+    )
+    stage = _stage(definition, 0)
+    execution_id = _create_stage_execution_sync(str(run.pk), str(stage.pk), 1)
+    agent_run_id = _dispatch_agent_for_stage_sync(
+        str(stage.pk),
+        execution_id,
+        {"prior": {"answer": 42}},
+        {
+            "agent_definition_id": replacement.pk,
+            "environment_spec_slug": env.slug,
+            "skill_refs": ["lint"],
+            "prompt": "Use the replacement procedure.",
+            "output_key": "replacement_result",
+        },
+    )
+    task = AgentTask.objects.get(agent_run_id=int(agent_run_id))
+    assert task.agent_definition_id == replacement.pk
+    assert task.environment_spec_id == env.pk
+    assert task.brief.context["output_key"] == "replacement_result"
+    assert "Use the replacement procedure." in task.brief.manifest_snapshot["system_prompt"]
+    assert task.dispatch_input == {"prior": {"answer": 42}}
+
 
 @pytest.mark.django_db
 def test_dispatch_agent_rejects_stage_without_agent_definition(run, definition):
@@ -522,6 +625,41 @@ def test_dispatch_links_agent_task_to_agent_run(run, definition):
     assert task.agent_run_id == agent_run.pk
     # Reverse OneToOne accessor resolves back to the same task.
     assert agent_run.agent_task == task
+
+
+@pytest.mark.django_db
+def test_dispatch_activity_retry_reuses_agent_run_and_task(run, definition):
+    from astrolift_agents.models import AgentTask
+    from astrolift_lifecycle.models import AgentRun
+
+    stage = _stage(definition, 0)
+    execution_id = _create_stage_execution_sync(str(run.pk), str(stage.pk), 1)
+
+    first = _dispatch_agent_for_stage_sync(str(stage.pk), execution_id, {"issue": "EMR-1"})
+    second = _dispatch_agent_for_stage_sync(str(stage.pk), execution_id, {"issue": "EMR-1"})
+
+    assert second == first
+    assert AgentRun.objects.filter(pk=int(first)).count() == 1
+    assert AgentTask.objects.filter(agent_run_id=int(first)).count() == 1
+
+
+@pytest.mark.django_db
+def test_poll_and_outcome_preserve_callback_result(run, definition):
+    from astrolift_agents.models import AgentTask
+    from astrolift_lifecycle.models import AgentRun
+
+    agent_run, task = _dispatch_agent_stage(run, definition, 0)
+    task.transition_to(AgentTask.Status.PROVISIONING)
+    task.transition_to(AgentTask.Status.RUNNING)
+    task.result = {"output": {"findings": ["EMR-123"], "classification": "bug"}}
+    task.save(update_fields=["result", "updated_at", "version"])
+    task.transition_to(AgentTask.Status.COMPLETED)
+
+    assert _poll_agent_run_status_sync(str(agent_run.pk)) == AgentRun.Status.SUCCEEDED
+    outcome = _load_agent_run_outcome_sync(str(agent_run.pk))
+    assert outcome["result"] == {"output": {"findings": ["EMR-123"], "classification": "bug"}}
+    agent_run.refresh_from_db()
+    assert agent_run.output == outcome["result"]
 
 
 @pytest.mark.django_db

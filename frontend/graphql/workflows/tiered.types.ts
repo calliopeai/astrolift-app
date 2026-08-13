@@ -31,17 +31,24 @@ export type WorkflowDefinitionSummary = {
   isEnabled: boolean;
   isGlobal: boolean;
   organizationGuid: string | null;
+  sourceRepo: string;
+  sourcePath: string;
+  sourceRef: string;
   stageCount: number;
   createdAt: string;
 };
 
-// `workflowStages(workflowSlug)` row (WorkflowStageType). Note: `role`,
-// `prompt` and `approvers` are write-only today — settable on
-// createWorkflowStage but not exposed on the read type.
+// `workflowStages(workflowSlug)` row (WorkflowStageType).
 export type WorkflowStage = {
   guid: string;
   order: number;
   kind: string;
+  role: string;
+  prompt: string;
+  approvers: unknown;
+  agentRef: string;
+  environmentSpecSlug: string;
+  outputKey: string;
   skillRefs: unknown;
   fanOutCount: number | null;
   onFailure: string;
@@ -119,11 +126,13 @@ export type WorkflowManifestStage = {
   kind: string;
   role: string;
   agent: string | null;
+  environmentSpecSlug: string | null;
   skills: string[];
   onFailure: string;
   timeout: number;
   fanOut: string;
   prompt: string | null;
+  outputKey: string | null;
   approvers: string[];
 };
 

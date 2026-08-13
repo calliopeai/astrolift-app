@@ -2843,6 +2843,7 @@ export type AstroliftQuotaUsagePoint = {
 
 export type AstroliftRegisterAgentRepoResult = {
   agents: Array<AstroliftRegisteredAgent>;
+  workflows: Array<Scalars['String']['output']>;
 };
 
 export type AstroliftRegisterAgentRepoResultMutationResult = {
@@ -5524,11 +5525,14 @@ export type MutationCreateWorkflowDefinitionArgs = {
 
 export type MutationCreateWorkflowStageArgs = {
   agentDefinitionGuid?: InputMaybe<Scalars['String']['input']>;
+  agentRef?: InputMaybe<Scalars['String']['input']>;
   approvers?: InputMaybe<Scalars['JSON']['input']>;
+  environmentSpecSlug?: InputMaybe<Scalars['String']['input']>;
   fanOutCount?: InputMaybe<Scalars['Int']['input']>;
   kind: Scalars['String']['input'];
   onFailure?: Scalars['String']['input'];
   order?: InputMaybe<Scalars['Int']['input']>;
+  outputKey?: InputMaybe<Scalars['String']['input']>;
   prompt?: InputMaybe<Scalars['String']['input']>;
   role?: InputMaybe<Scalars['String']['input']>;
   skillRefs?: InputMaybe<Scalars['JSON']['input']>;
@@ -6735,10 +6739,13 @@ export type MutationUpdateWorkflowDefinitionArgs = {
 
 export type MutationUpdateWorkflowStageArgs = {
   agentDefinitionGuid?: InputMaybe<Scalars['String']['input']>;
+  agentRef?: InputMaybe<Scalars['String']['input']>;
   approvers?: InputMaybe<Scalars['JSON']['input']>;
+  environmentSpecSlug?: InputMaybe<Scalars['String']['input']>;
   fanOutCount?: InputMaybe<Scalars['Int']['input']>;
   kind?: InputMaybe<Scalars['String']['input']>;
   onFailure?: InputMaybe<Scalars['String']['input']>;
+  outputKey?: InputMaybe<Scalars['String']['input']>;
   prompt?: InputMaybe<Scalars['String']['input']>;
   role?: InputMaybe<Scalars['String']['input']>;
   skillRefs?: InputMaybe<Scalars['JSON']['input']>;
@@ -9485,6 +9492,9 @@ export type WorkflowDefinitionSummary = {
   organizationGuid?: Maybe<Scalars['String']['output']>;
   patternKind: Scalars['String']['output'];
   slug: Scalars['String']['output'];
+  sourcePath: Scalars['String']['output'];
+  sourceRef: Scalars['String']['output'];
+  sourceRepo: Scalars['String']['output'];
   stageCount: Scalars['Int']['output'];
 };
 
@@ -9508,6 +9518,9 @@ export type WorkflowDefinitionType = {
   organizationGuid?: Maybe<Scalars['String']['output']>;
   patternKind: Scalars['String']['output'];
   slug: Scalars['String']['output'];
+  sourcePath: Scalars['String']['output'];
+  sourceRef: Scalars['String']['output'];
+  sourceRepo: Scalars['String']['output'];
   states: Scalars['JSON']['output'];
   transitions: Scalars['JSON']['output'];
   workflowStages: Array<WorkflowStageType>;
@@ -9552,10 +9565,12 @@ export type WorkflowManifestPreviewType = {
 export type WorkflowManifestStageType = {
   agent?: Maybe<Scalars['String']['output']>;
   approvers: Array<Scalars['String']['output']>;
+  environmentSpecSlug?: Maybe<Scalars['String']['output']>;
   fanOut: Scalars['String']['output'];
   kind: Scalars['String']['output'];
   onFailure: Scalars['String']['output'];
   order: Scalars['Int']['output'];
+  outputKey?: Maybe<Scalars['String']['output']>;
   prompt?: Maybe<Scalars['String']['output']>;
   role: Scalars['String']['output'];
   skills: Array<Scalars['String']['output']>;
@@ -9592,13 +9607,16 @@ export type WorkflowStageExecutionType = {
 export type WorkflowStageType = {
   agentDefinitionGuid?: Maybe<Scalars['String']['output']>;
   agentDefinitionName?: Maybe<Scalars['String']['output']>;
+  agentRef: Scalars['String']['output'];
   approvers: Scalars['JSON']['output'];
   createdAt: Scalars['DateTime']['output'];
+  environmentSpecSlug: Scalars['String']['output'];
   fanOutCount?: Maybe<Scalars['Int']['output']>;
   guid: Scalars['ID']['output'];
   kind: Scalars['String']['output'];
   onFailure: Scalars['String']['output'];
   order: Scalars['Int']['output'];
+  outputKey: Scalars['String']['output'];
   prompt: Scalars['String']['output'];
   role: Scalars['String']['output'];
   skillRefs: Scalars['JSON']['output'];

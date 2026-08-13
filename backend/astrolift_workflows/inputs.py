@@ -377,17 +377,20 @@ class WorkflowDefinitionRunInput:
     ``stage_bindings`` carries the tier-2 ``Workflow``'s per-stage concrete
     bindings (spec 40 §2.2/§3) — ``{stage_order: {agent_workload_id,
     skill_refs, params}}`` — so a run started from a configured Workflow
-    records which agent each stage resolved to. The executor resolves agents
-    from the definition's stages today; full per-stage binding→pod injection
-    arrives with #930. The field rides along as the durable record of the
-    run mapping regardless. Empty for definition-level runs (the legacy
-    ``runWorkflowDefinition`` / webhook paths).
+    freezes which agent, environment, skills, prompt, and output key each
+    stage resolves to. Empty for definition-level runs (the legacy
+    ``runWorkflowDefinition`` / webhook paths), which use the definition's
+    stage defaults.
     """
 
     workflow_definition_slug: str
     workflow_run_id: str
     trigger_payload: dict[str, Any]
     actor: Actor
+    # Exact DB identity freezes which visible definition a configured run
+    # selected when an org definition and global template share a slug.
+    # Optional for histories created before this field existed.
+    workflow_definition_id: str | None = None
     only_stage_order: int | None = None
     fan_out_index: int | None = None
     stage_bindings: dict[str, Any] | None = None

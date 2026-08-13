@@ -86,6 +86,12 @@ def _definition_write_error(user, definition):
         return ("permission", "PERMISSION_DENIED: platform template — clone to edit")
     if definition.organization_id != _caller_org_pk():
         return ("permission", "PERMISSION_DENIED: not your organization's workflow")
+    if definition.source_repo:
+        location = f"{definition.source_repo}/{definition.source_path}"
+        return (
+            "source",
+            f"SOURCE_MANAGED: edit {location} and sync the repository instead",
+        )
     return None
 
 
@@ -581,9 +587,12 @@ class Mutation:
         on_failure: str = "fail",
         timeout_seconds: int = 300,
         agent_definition_guid: Optional[str] = None,
+        agent_ref: str | None = None,
+        environment_spec_slug: str | None = None,
         skill_refs: Optional[strawberry.scalars.JSON] = None,
         fan_out_count: Optional[int] = None,
         prompt: str | None = None,
+        output_key: str | None = None,
         approvers: strawberry.scalars.JSON | None = None,
     ) -> CreateWorkflowStageResult:
         user = info.context.user
@@ -643,6 +652,10 @@ class Mutation:
                     ],
                 )
 
+        resolved_agent_ref = (agent_ref or "").strip()
+        if agent_definition is not None:
+            resolved_agent_ref = agent_definition.slug
+
         if order is None:
             # Append after the highest order ever used — soft-deleted stages
             # still occupy the (definition, order) unique constraint.
@@ -664,9 +677,12 @@ class Mutation:
             on_failure=on_failure,
             timeout_seconds=timeout_seconds,
             agent_definition=agent_definition,
+            agent_ref=resolved_agent_ref,
+            environment_spec_slug=(environment_spec_slug or "").strip(),
             skill_refs=skill_refs or [],
             fan_out_count=fan_out_count,
             prompt=prompt or "",
+            output_key=(output_key or "").strip(),
             approvers=approvers or [],
             created_by=user,
             updated_by=user,
@@ -795,12 +811,15 @@ class Mutation:
                     # Globals carry no org agent — clear unless cloning within
                     # the same org (spec 40 §2.1/§2.4).
                     agent_definition=(stage.agent_definition if same_org else None),
+                    agent_ref=stage.agent_ref,
+                    environment_spec_slug=stage.environment_spec_slug,
                     skill_refs=list(stage.skill_refs or []),
                     fan_out_count=stage.fan_out_count,
                     fan_out_dynamic=stage.fan_out_dynamic,
                     on_failure=stage.on_failure,
                     timeout_seconds=stage.timeout_seconds,
                     prompt=stage.prompt,
+                    output_key=stage.output_key,
                     approvers=list(stage.approvers or []),
                     created_by=user,
                     updated_by=user,

@@ -513,9 +513,12 @@ class WorkflowsMutation:
         on_failure: str | None = None,
         timeout_seconds: int | None = None,
         agent_definition_guid: str | None = None,
+        agent_ref: str | None = None,
+        environment_spec_slug: str | None = None,
         skill_refs: JSON | None = None,
         fan_out_count: int | None = None,
         prompt: str | None = None,
+        output_key: str | None = None,
         approvers: JSON | None = None,
     ) -> MutationResult:
         from workflows.models import WorkflowStage
@@ -545,12 +548,18 @@ class WorkflowsMutation:
             stage.role = role
         if timeout_seconds is not None:
             stage.timeout_seconds = timeout_seconds
+        if agent_ref is not None:
+            stage.agent_ref = agent_ref.strip()
+        if environment_spec_slug is not None:
+            stage.environment_spec_slug = environment_spec_slug.strip()
         if skill_refs is not None:
             stage.skill_refs = skill_refs
         if fan_out_count is not None:
             stage.fan_out_count = fan_out_count
         if prompt is not None:
             stage.prompt = prompt
+        if output_key is not None:
+            stage.output_key = output_key.strip()
         if approvers is not None:
             stage.approvers = approvers
         if agent_definition_guid is not None:
@@ -569,6 +578,8 @@ class WorkflowsMutation:
             if agent_definition_guid and workload is None:
                 return _failure("agent_definition_guid", "Workload not found")
             stage.agent_definition = workload
+            if workload is not None:
+                stage.agent_ref = workload.slug
         stage.updated_by = info.context.user
         stage.save()
         return MutationResult.success()

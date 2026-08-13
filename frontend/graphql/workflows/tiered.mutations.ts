@@ -178,9 +178,12 @@ export const CREATE_WORKFLOW_STAGE = gql`
     $onFailure: String! = "fail"
     $timeoutSeconds: Int! = 300
     $agentDefinitionGuid: String
+    $agentRef: String
+    $environmentSpecSlug: String
     $skillRefs: JSON
     $fanOutCount: Int
     $prompt: String
+    $outputKey: String
     $approvers: JSON
   ) {
     createWorkflowStage(
@@ -191,9 +194,12 @@ export const CREATE_WORKFLOW_STAGE = gql`
       onFailure: $onFailure
       timeoutSeconds: $timeoutSeconds
       agentDefinitionGuid: $agentDefinitionGuid
+      agentRef: $agentRef
+      environmentSpecSlug: $environmentSpecSlug
       skillRefs: $skillRefs
       fanOutCount: $fanOutCount
       prompt: $prompt
+      outputKey: $outputKey
       approvers: $approvers
     ) {
       ok
@@ -202,6 +208,12 @@ export const CREATE_WORKFLOW_STAGE = gql`
         guid
         order
         kind
+        role
+        prompt
+        approvers
+        agentRef
+        environmentSpecSlug
+        outputKey
         skillRefs
         fanOutCount
         onFailure
@@ -214,9 +226,6 @@ export const CREATE_WORKFLOW_STAGE = gql`
   }
 `;
 
-// NOTE: updateWorkflowStage has no prompt/approvers args yet — human_gate
-// prompt + approvers are settable only at create time (render disabled on
-// existing gate stages).
 export const UPDATE_WORKFLOW_STAGE = gql`
   mutation UpdateWorkflowStage(
     $stageGuid: ID!
@@ -225,8 +234,13 @@ export const UPDATE_WORKFLOW_STAGE = gql`
     $onFailure: String
     $timeoutSeconds: Int
     $agentDefinitionGuid: String
+    $agentRef: String
+    $environmentSpecSlug: String
     $skillRefs: JSON
     $fanOutCount: Int
+    $prompt: String
+    $outputKey: String
+    $approvers: JSON
   ) {
     updateWorkflowStage(
       stageGuid: $stageGuid
@@ -235,8 +249,13 @@ export const UPDATE_WORKFLOW_STAGE = gql`
       onFailure: $onFailure
       timeoutSeconds: $timeoutSeconds
       agentDefinitionGuid: $agentDefinitionGuid
+      agentRef: $agentRef
+      environmentSpecSlug: $environmentSpecSlug
       skillRefs: $skillRefs
       fanOutCount: $fanOutCount
+      prompt: $prompt
+      outputKey: $outputKey
+      approvers: $approvers
     ) {
       ok
       ${VALIDATION_ERROR_FIELDS}
@@ -287,11 +306,13 @@ export const IMPORT_WORKFLOW_MANIFEST = gql`
           kind
           role
           agent
+          environmentSpecSlug
           skills
           onFailure
           timeout
           fanOut
           prompt
+          outputKey
           approvers
         }
       }

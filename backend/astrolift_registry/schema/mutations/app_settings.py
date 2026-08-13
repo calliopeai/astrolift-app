@@ -100,13 +100,19 @@ class AppSettingMutations:
                 )
                 return gql_failure(code, agent_result.error or agent_result.status)
             slugs = [row.slug for row in agent_result.agents]
+            workflow_slugs = [row.slug for row in getattr(agent_result, "workflows", [])]
+            summary_parts = []
+            if slugs:
+                summary_parts.append(f"agent package(s): {', '.join(slugs)}")
+            if workflow_slugs:
+                summary_parts.append(f"workflow(s): {', '.join(workflow_slugs)}")
             return gql_success(
                 ResyncManifestPayload(
                     sync_state="applied",
                     summary=(
-                        f"Agent package re-synced: {', '.join(slugs)}."
-                        if slugs
-                        else "Agent package is already in sync."
+                        "Re-synced " + "; ".join(summary_parts) + "."
+                        if summary_parts
+                        else "Agent package and workflows are already in sync."
                     ),
                     workloads_added=[],
                     workloads_removed=[],
