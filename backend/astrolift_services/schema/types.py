@@ -82,6 +82,14 @@ class AppSecretType:
     filtering drops rows whose scope doesn't match the queried env."""
 
 
+@strawberry.type(name="AstroliftSecretBundleConsumer")
+class SecretBundleConsumerType:
+    id: GUID
+    consumer_kind: str
+    consumer_slug: str
+    environment_name: str
+
+
 @strawberry.type(name="AstroliftSecretBundle")
 class SecretBundleType:
     id: GUID
@@ -90,9 +98,13 @@ class SecretBundleType:
     backend_ref: str
     organization_slug: str
     team_slug: str | None
+    project_slug: str | None
+    cluster_slug: str | None
     created_at: dt.datetime
+    consumers: list[SecretBundleConsumerType] = strawberry.field(default_factory=list)
 
     key_count: int = 0
+    key_names: list[str] = strawberry.field(default_factory=list)
     """Cached count of keys the bundle projects (#441).  Backed by
     the same ``SecretBundle.last_known_keys`` snapshot the attachment
     resolver consumes -- 0 when the cache has never populated."""
@@ -103,6 +115,14 @@ class SecretBundleType:
     bundle whose first ``setBundleSecret`` / scheduled refresh hasn't
     fired yet.  Operator UI surfaces this as a 'last updated'
     indicator next to ``keyCount``."""
+
+
+@strawberry.type(name="AstroliftSecretBundleReveal")
+class SecretBundleRevealType:
+    key: str
+    value: str
+    provider: str
+    revealed_at: dt.datetime
 
 
 @strawberry.type(name="AstroliftAppSecretBundleAttachment")
@@ -144,15 +164,27 @@ class ManagedServiceType:
     status_error: str
     config: JSON
     registered_app_slug: str
+    project_slug: str
+    owner_scope: str
+    cluster_slug: str
     environment_name: str
     created_at: dt.datetime
     updated_at: dt.datetime
     last_action_at: dt.datetime | None = None
     last_action_kind: str = ""
     editable_fields: list[str] = strawberry.field(default_factory=list)
+    attachments: list[ManagedServiceAttachmentType] = strawberry.field(default_factory=list)
     """Config keys the driver accepts via ``update()`` without full
     reprovision. ``["*"]`` means all fields; ``[]`` means all changes
     require ``reprovisionManagedService``."""
+
+
+@strawberry.type(name="AstroliftManagedServiceAttachment")
+class ManagedServiceAttachmentType:
+    id: GUID
+    consumer_kind: str
+    consumer_slug: str
+    environment_name: str
 
 
 @strawberry.type(name="AstroliftManagedServiceConnectionKey")
@@ -636,6 +668,31 @@ def secret_editor_from_user(user) -> SecretEditorType | None:
 
 
 def secret_bundle_to_type(b) -> SecretBundleType:
+    consumers: list[SecretBundleConsumerType] = []
+    if b.project_id:
+        consumers.extend(
+            SecretBundleConsumerType(
+                id=GUID(str(ref.guid)),
+                consumer_kind="agent",
+                consumer_slug=ref.environment_spec.slug,
+                environment_name=ref.environment or "default",
+            )
+            for ref in b.agent_refs.select_related("environment_spec").filter(
+                deleted_at__isnull=True,
+            )
+        )
+        consumers.extend(
+            SecretBundleConsumerType(
+                id=GUID(str(ref.guid)),
+                consumer_kind="app",
+                consumer_slug=ref.registered_app.slug,
+                environment_name=ref.app_environment.name,
+            )
+            for ref in b.app_refs.select_related(
+                "registered_app",
+                "app_environment",
+            ).filter(deleted_at__isnull=True)
+        )
     return SecretBundleType(
         id=GUID(str(b.guid)),
         slug=b.slug,
@@ -643,8 +700,12 @@ def secret_bundle_to_type(b) -> SecretBundleType:
         backend_ref=b.backend_ref or "",
         organization_slug=b.organization.slug,
         team_slug=b.team.slug if b.team_id else None,
+        project_slug=b.project.slug if b.project_id else None,
+        cluster_slug=b.tenant_cluster.slug if b.tenant_cluster_id else None,
         created_at=b.created_at,
+        consumers=consumers,
         key_count=len(b.last_known_keys or []),
+        key_names=list(b.last_known_keys or []),
         last_known_keys_at=b.last_key_enum_at,
     )
 
@@ -720,11 +781,7 @@ def _editable_fields_for(svc) -> list[str]:
         from astrolift_drivers.registry import DriverNotFound, plugins
         from core.cluster_observability import _config_for  # type: ignore[attr-defined]
 
-        cluster = getattr(
-            getattr(svc, "app_environment", None),
-            "tenant_cluster",
-            None,
-        )
+        cluster = svc.effective_cluster
         if cluster is None:
             return ["*"]
         plugin = getattr(cluster, "provider_plugin", None)
@@ -756,11 +813,31 @@ def managed_service_to_type(svc, *, resolve_editable_fields: bool = False) -> Ma
         status=svc.status,
         status_error=svc.status_error or "",
         config=svc.config or {},
-        registered_app_slug=svc.registered_app.slug,
-        environment_name=svc.app_environment.name,
+        registered_app_slug=svc.registered_app.slug if svc.registered_app_id else "",
+        project_slug=svc.project.slug if svc.project_id else "",
+        owner_scope=svc.owner_scope,
+        cluster_slug=(svc.effective_cluster.slug if svc.effective_cluster else ""),
+        environment_name=svc.effective_environment_name,
         created_at=svc.created_at,
         updated_at=svc.updated_at,
         last_action_at=svc.last_action_at,
         last_action_kind=svc.last_action_kind or "",
         editable_fields=editable,
+        attachments=[managed_service_attachment_to_type(row) for row in svc.attachments.all()],
+    )
+
+
+def managed_service_attachment_to_type(row) -> ManagedServiceAttachmentType:
+    if row.agent_environment_spec_id:
+        return ManagedServiceAttachmentType(
+            id=GUID(str(row.guid)),
+            consumer_kind="agent",
+            consumer_slug=row.agent_environment_spec.slug,
+            environment_name="default",
+        )
+    return ManagedServiceAttachmentType(
+        id=GUID(str(row.guid)),
+        consumer_kind="app",
+        consumer_slug=row.app_environment.registered_app.slug,
+        environment_name=row.app_environment.name,
     )

@@ -197,6 +197,28 @@ export const LIST_NAV_TREE = gql`
             primitiveKind
             primitiveSlug
           }
+          workflows {
+            id
+            slug
+            name
+            isEnabled
+            agents {
+              id
+              slug
+              name
+              status
+              primitiveKind
+              primitiveSlug
+            }
+          }
+          standaloneAgents {
+            id
+            slug
+            name
+            status
+            primitiveKind
+            primitiveSlug
+          }
         }
         unassignedApps {
           id

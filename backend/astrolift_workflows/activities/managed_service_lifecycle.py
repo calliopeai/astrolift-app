@@ -34,6 +34,15 @@ _ALREADY_GONE_MARKERS = (
 )
 
 
+def _service_cluster(svc):
+    """Provisioning cluster for either app-private or project-owned rows."""
+
+    if getattr(svc, "tenant_cluster_id", None):
+        return svc.tenant_cluster
+    env = getattr(svc, "app_environment", None)
+    return getattr(env, "tenant_cluster", None)
+
+
 def _signals_already_gone(*parts: object) -> bool:
     blob = " ".join(str(p) for p in parts if p).lower()
     return any(marker in blob for marker in _ALREADY_GONE_MARKERS)
@@ -72,8 +81,9 @@ def _deprovision_sync(
 
     svc = ManagedService.all_objects.select_related(
         "app_environment__tenant_cluster__provider_plugin",
+        "tenant_cluster__provider_plugin",
     ).get(pk=managed_service_id)
-    cluster = svc.app_environment.tenant_cluster
+    cluster = _service_cluster(svc)
     if cluster is None:
         # Already orphaned — nothing to call into; mark deleted and
         # return a soft-success so the workflow finalizes the row.
@@ -255,10 +265,12 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
 
     svc = ManagedService.all_objects.select_related(
         "registered_app__organization",
+        "project__organization",
         "app_environment__tenant_cluster__provider_plugin",
+        "tenant_cluster__provider_plugin",
     ).get(pk=managed_service_id)
     env = svc.app_environment
-    cluster = env.tenant_cluster
+    cluster = _service_cluster(svc)
     if cluster is None:
         raise RuntimeError(
             f"managed service {svc.pk} env has no tenant_cluster bound",
@@ -284,15 +296,19 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
     from _sdk.managed_service import ProvisionSpec
 
     app = svc.registered_app
-    org = app.organization
+    project = svc.project
+    owner = app or project
+    org = app.organization if app is not None else project.organization
+    environment_id = str(getattr(env, "guid", "") or getattr(cluster, "guid", "") or "")
+    environment_name = env.name if env is not None else svc.effective_environment_name
     svc_config = dict(svc.config or {})
     spec = ProvisionSpec(
         organization_id=str(getattr(org, "guid", "") or ""),
         organization_slug=getattr(org, "slug", "") or "",
-        app_id=str(getattr(app, "guid", "") or ""),
-        app_slug=app.slug,
-        environment_id=str(getattr(env, "guid", "") or ""),
-        environment_name=env.name,
+        app_id=str(getattr(owner, "guid", "") or ""),
+        app_slug=owner.slug,
+        environment_id=environment_id,
+        environment_name=environment_name,
         tenant_cluster_id=str(getattr(cluster, "guid", "") or ""),
         service_handle_hint=svc.name or svc.kind,
         size=str(svc_config.get("size", "small")),
@@ -345,8 +361,9 @@ def _check_ready_sync(managed_service_id: int, handle: str) -> str:
 
     svc = ManagedService.all_objects.select_related(
         "app_environment__tenant_cluster__provider_plugin",
+        "tenant_cluster__provider_plugin",
     ).get(pk=managed_service_id)
-    cluster = svc.app_environment.tenant_cluster
+    cluster = _service_cluster(svc)
     if cluster is None:
         return "available"  # nothing to wait on
     plugin_slug = cluster.provider_plugin.slug
@@ -422,7 +439,7 @@ def _managed_binding_for(svc: Any) -> Any:
 
     if not svc.backend_ref:
         return None
-    cluster = svc.app_environment.tenant_cluster
+    cluster = _service_cluster(svc)
     if cluster is None:
         return None
     plugin_slug = cluster.provider_plugin.slug

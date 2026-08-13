@@ -28,15 +28,38 @@ export type AstroliftManagedService = Pick<
   | "statusError"
   | "environmentName"
   | "registeredAppSlug"
+  | "projectSlug"
+  | "ownerScope"
+  | "clusterSlug"
   | "createdAt"
   | "updatedAt"
   | "lastActionAt"
   | "lastActionKind"
   | "editableFields"
+  | "attachments"
 > & {
   /** JSON scalar — opaque shape; callers cast as needed. */
   config: Record<string, unknown>;
 };
+
+export interface AstroliftProjectSecretBundle {
+  id: string;
+  slug: string;
+  name: string;
+  backendRef: string;
+  projectSlug: string | null;
+  clusterSlug: string | null;
+  keyCount: number;
+  keyNames: string[];
+  lastKnownKeysAt: string | null;
+  createdAt: string;
+  consumers: Array<{
+    id: string;
+    consumerKind: string;
+    consumerSlug: string;
+    environmentName: string;
+  }>;
+}
 
 export type AstroliftManagedServiceConnectionKey = GeneratedManagedServiceConnectionKey;
 

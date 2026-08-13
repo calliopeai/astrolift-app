@@ -163,12 +163,215 @@ const MANAGED_SERVICE_FIELDS = `
   statusError
   config
   registeredAppSlug
+  projectSlug
+  ownerScope
+  clusterSlug
   environmentName
   createdAt
   updatedAt
   lastActionAt
   lastActionKind
   editableFields
+  attachments {
+    id
+    consumerKind
+    consumerSlug
+    environmentName
+  }
+`;
+
+export const PROVISION_PROJECT_MANAGED_SERVICE = gql`
+  mutation ProvisionProjectManagedService($input: ProvisionProjectManagedServiceInput!) {
+    provisionProjectManagedService(input: $input) {
+      ok
+      errors { code message field }
+      data { ${MANAGED_SERVICE_FIELDS} }
+    }
+  }
+`;
+
+export const ATTACH_PROJECT_MANAGED_SERVICE = gql`
+  mutation AttachProjectManagedService($input: AttachProjectManagedServiceInput!) {
+    attachProjectManagedService(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        consumerKind
+        consumerSlug
+        environmentName
+      }
+    }
+  }
+`;
+
+export const DETACH_PROJECT_MANAGED_SERVICE = gql`
+  mutation DetachProjectManagedService($input: DetachProjectManagedServiceInput!) {
+    detachProjectManagedService(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        consumerKind
+        consumerSlug
+        environmentName
+      }
+    }
+  }
+`;
+
+export const REPROVISION_PROJECT_MANAGED_SERVICE = gql`
+  mutation ReprovisionProjectManagedService($input: ReprovisionManagedServiceInput!) {
+    reprovisionProjectManagedService(input: $input) {
+      ok
+      errors { code message field }
+      data { ${MANAGED_SERVICE_FIELDS} }
+    }
+  }
+`;
+
+export const DEPROVISION_PROJECT_MANAGED_SERVICE = gql`
+  mutation DeprovisionProjectManagedService($input: DeprovisionManagedServiceInput!) {
+    deprovisionProjectManagedService(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        deleted
+      }
+    }
+  }
+`;
+
+export const CREATE_PROJECT_SECRET_BUNDLE = gql`
+  mutation CreateProjectSecretBundle($input: CreateProjectSecretBundleInput!) {
+    createProjectSecretBundle(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        name
+        backendRef
+        projectSlug
+        clusterSlug
+        keyCount
+        keyNames
+        lastKnownKeysAt
+        createdAt
+      }
+    }
+  }
+`;
+
+export const SET_PROJECT_BUNDLE_SECRET = gql`
+  mutation SetProjectBundleSecret($input: ProjectSecretBundleKeyInput!) {
+    setProjectBundleSecretValue(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        name
+        backendRef
+        projectSlug
+        clusterSlug
+        keyCount
+        keyNames
+        lastKnownKeysAt
+        createdAt
+      }
+    }
+  }
+`;
+
+export const DELETE_PROJECT_BUNDLE_SECRET = gql`
+  mutation DeleteProjectBundleSecret($input: ProjectSecretBundleKeyInput!) {
+    deleteProjectBundleSecretValue(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        name
+        backendRef
+        projectSlug
+        clusterSlug
+        keyCount
+        keyNames
+        lastKnownKeysAt
+        createdAt
+      }
+    }
+  }
+`;
+
+export const REVEAL_PROJECT_BUNDLE_SECRET = gql`
+  mutation RevealProjectBundleSecret($input: ProjectSecretBundleKeyInput!) {
+    revealProjectBundleSecretValue(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        key
+        value
+        provider
+        revealedAt
+      }
+    }
+  }
+`;
+
+export const DELETE_PROJECT_SECRET_BUNDLE = gql`
+  mutation DeleteProjectSecretBundle($bundleId: GUID!) {
+    deleteProjectSecretBundle(bundleId: $bundleId) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        name
+        backendRef
+        projectSlug
+        clusterSlug
+        keyCount
+        keyNames
+        lastKnownKeysAt
+        createdAt
+      }
+    }
+  }
 `;
 
 export const PROVISION_MANAGED_SERVICE = gql`

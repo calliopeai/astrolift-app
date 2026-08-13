@@ -20,6 +20,26 @@ from temporalio import activity
 log = logging.getLogger("astrolift_workflows.activities")
 
 
+def _managed_services_for_environment(app_environment):
+    """App-private and project-shared services consumed by one app env."""
+
+    from django.db.models import Q
+
+    from astrolift_services.models import ManagedService
+
+    return ManagedService.objects.filter(
+        Q(
+            registered_app=app_environment.registered_app,
+            app_environment=app_environment,
+        )
+        | Q(
+            attachments__app_environment=app_environment,
+            attachments__deleted_at__isnull=True,
+        ),
+        deleted_at__isnull=True,
+    ).distinct()
+
+
 def _mark_app_provisioning_sync(registered_app_id: int) -> None:
     from astrolift_registry.models import RegisteredApp
 
@@ -418,7 +438,7 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
     activity.heartbeat()
 
     def _gather():
-        from astrolift_services.models import AppSecretBundleRef, ManagedService
+        from astrolift_services.models import AppSecretBundleRef
 
         d = Deployment.all_objects.select_related("registered_app", "app_environment").get(pk=deployment_id)
         app = d.registered_app
@@ -439,11 +459,7 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
                 deleted_at__isnull=True,
             ).values_list("secret_bundle__slug", flat=True),
         )
-        has_bindings = ManagedService.objects.filter(
-            registered_app=app,
-            app_environment=env,
-            deleted_at__isnull=True,
-        ).exists()
+        has_bindings = _managed_services_for_environment(env).exists()
         env_from = list(bundle_secret_names)
         if has_bindings:
             env_from.append(_bindings_secret_name(app.slug))
@@ -852,7 +868,6 @@ def _update_secrets_sync(deployment_id: int) -> int:
     from astrolift_lifecycle.models import Deployment
     from astrolift_services.models import (
         AppSecretBundleRef,
-        ManagedService,
         ManagedServiceBinding,
     )
     from core.app_deploy import (
@@ -923,11 +938,7 @@ def _update_secrets_sync(deployment_id: int) -> int:
     # surface — they don't need to know whether DATABASE_PASSWORD came
     # from Secrets Manager or was inlined.
     services = list(
-        ManagedService.objects.filter(
-            registered_app=d.registered_app,
-            app_environment=d.app_environment,
-            deleted_at__isnull=True,
-        ).order_by("kind", "name"),
+        _managed_services_for_environment(d.app_environment).order_by("kind", "name"),
     )
     if services:
         bindings_data: dict[str, str] = {}

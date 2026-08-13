@@ -36,6 +36,7 @@ from astrolift_identity.schema.types import (
     ActiveSessionType,
     ApiTokenType,
     ApproverUserType,
+    AppSummaryType,
     ElevationStatusType,
     IdentityProviderType,
     InvitationType,
@@ -44,6 +45,7 @@ from astrolift_identity.schema.types import (
     NavTreeProjectType,
     NavTreeTeamType,
     NavTreeType,
+    NavTreeWorkflowType,
     OrganizationAllowlistedDomainType,
     OrganizationType,
     PolicyType,
@@ -521,7 +523,7 @@ class IdentityQuery:
     @strawberry.field
     @tenant_scoped()
     def astrolift_nav_tree(self, info: Info) -> NavTreeType | None:
-        """Hierarchical Org -> Team -> Project -> App view for the sidebar.
+        """Permission-shaped project navigation for apps, workflows, and agents.
 
         Self-service: no ``@require_permission`` gate -- tenant scope
         already binds the request to a single organization, which is
@@ -530,7 +532,7 @@ class IdentityQuery:
         of the tenant they belong to. Resource-level reads continue to
         flow through the per-domain permission-gated resolvers.
 
-        Composes three batched queries (teams, projects, apps) and
+        Composes batched queries (teams, projects, apps, workflows) and
         groups in Python so the tree degrades to O(N) on the app count
         regardless of how nested the hierarchy gets. Soft-deleted rows
         are excluded by the default managers; ``RegisteredApp`` rows
@@ -572,6 +574,17 @@ class IdentityQuery:
             .order_by("name")
         )
 
+        from workflows.models import WorkflowDefinition
+
+        workflow_definitions = list(
+            WorkflowDefinition.objects.filter(
+                organization_id=org_id,
+                project_id__isnull=False,
+            )
+            .prefetch_related("stages__agent_definition")
+            .order_by("name")
+        )
+
         # Classify each app into a nav primitive from its workloads (one query),
         # so the sidebar picks the right icon + route: agent wins → single-kind
         # → bundle. `primitive_by_app[app_id] = (kind, slug)`.
@@ -607,6 +620,42 @@ class IdentityQuery:
             kind, slug = _nav_primitive(app)
             return app_to_summary(app, primitive_kind=kind, primitive_slug=slug)
 
+        summaries_by_app_id = {app.id: _summ(app) for app in apps}
+        agent_summaries_by_slug = {
+            summary.primitive_slug: summary
+            for app_id, summary in summaries_by_app_id.items()
+            if summary.primitive_kind == "agent"
+        }
+
+        workflow_nodes_by_project: dict[int, list[NavTreeWorkflowType]] = {}
+        bound_agent_slugs_by_project: dict[int, set[str]] = {}
+        for definition in workflow_definitions:
+            agents: list[AppSummaryType] = []
+            seen_agent_slugs: set[str] = set()
+            for stage in definition.stages.all():
+                if stage.deleted_at is not None:
+                    continue
+                agent_slug = (
+                    stage.agent_definition.slug if stage.agent_definition_id is not None else stage.agent_ref
+                )
+                if not agent_slug or agent_slug in seen_agent_slugs:
+                    continue
+                summary = agent_summaries_by_slug.get(agent_slug)
+                if summary is None:
+                    continue
+                seen_agent_slugs.add(agent_slug)
+                agents.append(summary)
+            bound_agent_slugs_by_project.setdefault(definition.project_id, set()).update(seen_agent_slugs)
+            workflow_nodes_by_project.setdefault(definition.project_id, []).append(
+                NavTreeWorkflowType(
+                    id=GUID(str(definition.guid)),
+                    slug=definition.slug or "",
+                    name=definition.name,
+                    is_enabled=definition.is_enabled,
+                    agents=agents,
+                )
+            )
+
         projects_by_team: dict[int, list] = {}
         for project in projects:
             projects_by_team.setdefault(project.team_id, []).append(project)
@@ -626,10 +675,23 @@ class IdentityQuery:
         for team in teams:
             project_nodes: list[NavTreeProjectType] = []
             for project in projects_by_team.get(team.id, []):
+                project_apps = apps_by_project.get(project.id, [])
+                bound_agent_slugs = bound_agent_slugs_by_project.get(project.id, set())
                 project_nodes.append(
                     NavTreeProjectType(
                         project=project_to_type(project),
-                        apps=[_summ(a) for a in apps_by_project.get(project.id, [])],
+                        apps=[
+                            summaries_by_app_id[a.id]
+                            for a in project_apps
+                            if summaries_by_app_id[a.id].primitive_kind != "agent"
+                        ],
+                        workflows=workflow_nodes_by_project.get(project.id, []),
+                        standalone_agents=[
+                            summaries_by_app_id[a.id]
+                            for a in project_apps
+                            if summaries_by_app_id[a.id].primitive_kind == "agent"
+                            and summaries_by_app_id[a.id].primitive_slug not in bound_agent_slugs
+                        ],
                     )
                 )
             team_nodes.append(

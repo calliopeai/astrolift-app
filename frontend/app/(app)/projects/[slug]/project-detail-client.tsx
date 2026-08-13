@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatTile } from "@/components/ui/stat-tile";
-import { WorkflowTopology } from "@/components/workflows/workflow-topology";
+import { ProjectWorkflowTopology } from "@/components/workflows/workflow-topology";
 import {
   Table,
   TableBody,
@@ -65,6 +65,7 @@ import type {
 import { LIST_APPS } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp, ProvisioningStatus } from "@/graphql/registry/registry.types";
 import { useModules } from "@/graphql/user/user.hooks";
+import { LIST_PROJECT_RESOURCES } from "@/graphql/services/services.queries";
 import {
   LIST_TIERED_WORKFLOW_DEFINITIONS,
   LIST_WORKFLOW_DEFINITION_RUNS,
@@ -104,6 +105,10 @@ interface ProjectWorkflowsResp {
 }
 interface ProjectWorkflowRunsResp {
   workflowDefinitionRuns: WorkflowDefinitionRun[];
+}
+interface ProjectResourcesResp {
+  astroliftProjectManagedServices: { id: string; status: string }[];
+  astroliftProjectSecretBundles: { id: string; keyCount: number }[];
 }
 
 export function ProjectDetailClient({ slug }: { slug: string }) {
@@ -151,6 +156,11 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
     skip: !orgId || !project?.id || modules.loading || !canViewWorkflows,
     fetchPolicy: "cache-and-network",
     pollInterval: 10_000,
+  });
+  const projectResources = useQuery<ProjectResourcesResp>(LIST_PROJECT_RESOURCES, {
+    variables: { projectId: project?.id ?? "" },
+    skip: !project?.id,
+    fetchPolicy: "cache-and-network",
   });
 
   const [softDelete, { loading: deleting }] = useMutation<{
@@ -274,6 +284,29 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
   const workflowsNeedingAttention = [...latestWorkflowRunByDefinition.values()].filter((run) =>
     ["failed", "timed_out"].includes(run.status)
   ).length;
+  const workflowStageStatuses = (workflow: WorkflowDefinitionSummary): Record<number, string> => {
+    const run = latestWorkflowRunByDefinition.get(workflow.guid);
+    if (!run) return {};
+    if (["succeeded", "completed"].includes(run.status)) {
+      return Object.fromEntries(workflow.stages.map((stage) => [stage.order, "succeeded"]));
+    }
+    const current = run.currentStageOrder;
+    if (current == null) {
+      return Object.fromEntries(workflow.stages.map((stage) => [stage.order, run.status]));
+    }
+    return Object.fromEntries(
+      workflow.stages.map((stage) => [
+        stage.order,
+        stage.order < current
+          ? "succeeded"
+          : stage.order > current
+            ? "pending"
+            : ["failed", "timed_out"].includes(run.status)
+              ? run.status
+              : "running",
+      ])
+    );
+  };
 
   return (
     <PageShell
@@ -363,6 +396,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
             label="Registered agents"
             value={projectAgents.length}
             footer={`${sourceRepoCount} source ${sourceRepoCount === 1 ? "repo" : "repos"}`}
+            href="#agents"
           />
           {canViewWorkflows && (
             <StatTile
@@ -374,6 +408,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
                   ? `${activeWorkflowRuns} active ${activeWorkflowRuns === 1 ? "run" : "runs"}`
                   : `${projectWorkflows.reduce((count, workflow) => count + workflow.stageCount, 0)} total stages`
               }
+              href="#workflows"
             />
           )}
           {mixedProject && (
@@ -383,6 +418,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
               value={projectApps.length}
               footer={failingApps > 0 ? `${failingApps} failing` : `${activeApps} ready`}
               className={failingApps > 0 ? "border-warning-border bg-warning/5" : undefined}
+              href="#apps"
             />
           )}
           <StatTile
@@ -390,6 +426,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
             label="Active agent runs"
             value={runningAgentRuns}
             footer={runningAgentRuns === 1 ? "run in progress" : "runs in progress"}
+            href={`/agents?project=${encodeURIComponent(project.slug)}`}
           />
           <StatTile
             icon={AlertTriangleIcon}
@@ -401,22 +438,47 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
                 ? "border-warning-border bg-warning/5"
                 : undefined
             }
+            href="#workflows"
+          />
+          <StatTile
+            icon={BoxIcon}
+            label="Project resources"
+            value={
+              (projectResources.data?.astroliftProjectManagedServices.length ?? 0) +
+              (projectResources.data?.astroliftProjectSecretBundles.length ?? 0)
+            }
+            footer="infrastructure and shared secret bundles"
+            loading={projectResources.loading && !projectResources.data}
+            href={`/projects/${encodeURIComponent(project.slug)}/resources`}
           />
         </div>
       ) : hasApps ? (
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatTile
             icon={RocketIcon}
             label="Registered apps"
             value={projectApps.length}
             footer={failingApps > 0 ? `${failingApps} failing` : `${activeApps} ready`}
             className={failingApps > 0 ? "border-warning-border bg-warning/5" : undefined}
+            href="#apps"
           />
           <StatTile
             icon={BoxIcon}
             label="Active deployments"
             value={activeApps}
             footer="apps with a healthy latest rollout"
+            href="#apps"
+          />
+          <StatTile
+            icon={BoxIcon}
+            label="Project resources"
+            value={
+              (projectResources.data?.astroliftProjectManagedServices.length ?? 0) +
+              (projectResources.data?.astroliftProjectSecretBundles.length ?? 0)
+            }
+            footer="infrastructure and shared secret bundles"
+            loading={projectResources.loading && !projectResources.data}
+            href={`/projects/${encodeURIComponent(project.slug)}/resources`}
           />
           {canManageMembers && (
             <StatTile
@@ -424,11 +486,12 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
               label="Direct members"
               value={directMembers.length}
               footer="users granted project-scope access"
+              href="#members"
             />
           )}
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <StatTile
             icon={FileBoxIcon}
             label={
@@ -443,6 +506,18 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
                   : "workloads available to your modules"
             }
             className={workloadQueryError ? "border-warning-border bg-warning/5" : undefined}
+            href="/apps"
+          />
+          <StatTile
+            icon={BoxIcon}
+            label="Project resources"
+            value={
+              (projectResources.data?.astroliftProjectManagedServices.length ?? 0) +
+              (projectResources.data?.astroliftProjectSecretBundles.length ?? 0)
+            }
+            footer="infrastructure and shared secret bundles"
+            loading={projectResources.loading && !projectResources.data}
+            href={`/projects/${encodeURIComponent(project.slug)}/resources`}
           />
           {canManageMembers && (
             <StatTile
@@ -450,6 +525,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
               label="Direct members"
               value={directMembers.length}
               footer="users granted project-scope access"
+              href="#members"
             />
           )}
         </div>
@@ -489,67 +565,40 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
       )}
 
       {hasWorkflows && (
-        <Card>
+        <Card id="workflows" className="scroll-mt-20">
           <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
             <div>
               <CardTitle className="flex items-center gap-2 text-base">
-                <WorkflowIcon className="size-4" /> Workflows in this project
+                <WorkflowIcon className="size-4" /> Workflow topology
               </CardTitle>
               <CardDescription>
-                Repository-declared pipelines and their ordered agent, environment, model, and
-                output bindings.
+                Repository-declared pipelines, bound agents, and latest run state.
               </CardDescription>
             </div>
             <Button asChild size="sm" variant="outline">
               <Link href="/workflows">View all</Link>
             </Button>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {projectWorkflows.map((workflow) => (
-              <section key={workflow.guid} className="rounded-lg border p-4">
-                <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold">{workflow.name}</h3>
-                      <Badge variant="outline" className="capitalize">
-                        {workflow.patternKind.replace(/_/g, " ")}
-                      </Badge>
-                      {latestWorkflowRunByDefinition.get(workflow.guid) && (
-                        <Badge
-                          variant={
-                            ["failed", "timed_out"].includes(
-                              latestWorkflowRunByDefinition.get(workflow.guid)?.status ?? ""
-                            )
-                              ? "destructive"
-                              : "secondary"
-                          }
-                          className="capitalize"
-                        >
-                          {latestWorkflowRunByDefinition
-                            .get(workflow.guid)
-                            ?.status.replace(/_/g, " ")}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-muted-foreground mt-1 font-mono text-xs">
-                      {workflow.sourcePath || workflow.slug}
-                    </p>
-                  </div>
-                  <Button asChild size="sm" variant="ghost">
-                    <Link href={`/workflows/${encodeURIComponent(workflow.slug)}/builder`}>
-                      Open <ExternalLinkIcon className="size-3" />
-                    </Link>
-                  </Button>
-                </div>
-                <WorkflowTopology stages={workflow.stages} />
-              </section>
-            ))}
+          <CardContent>
+            <ProjectWorkflowTopology
+              workflows={projectWorkflows}
+              runStatusByWorkflow={Object.fromEntries(
+                projectWorkflows.flatMap((workflow) => {
+                  const run = latestWorkflowRunByDefinition.get(workflow.guid);
+                  return run ? [[workflow.guid, run.status]] : [];
+                })
+              )}
+              stageStatusByWorkflow={Object.fromEntries(
+                projectWorkflows.map((workflow) => [workflow.guid, workflowStageStatuses(workflow)])
+              )}
+              height={230}
+            />
           </CardContent>
         </Card>
       )}
 
       {hasAgents && (
-        <Card>
+        <Card id="agents" className="scroll-mt-20">
           <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
             <div>
               <CardTitle className="flex items-center gap-2 text-base">
@@ -705,7 +754,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
 
       {/* ─── app workloads ────────────────────────────────────────────── */}
       {hasApps && (
-        <Card>
+        <Card id="apps" className="scroll-mt-20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <RocketIcon className="size-4" /> Apps in this project
@@ -778,7 +827,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
 
       {/* ─── members ───────────────────────────────────────────────────── */}
       {canManageMembers && (
-        <Card>
+        <Card id="members" className="scroll-mt-20">
           <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
             <div>
               <CardTitle className="flex items-center gap-2 text-base">

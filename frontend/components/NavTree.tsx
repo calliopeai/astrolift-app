@@ -21,11 +21,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as React from "react";
 
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -38,6 +34,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 import { useModules } from "@/graphql/user/user.hooks";
 import { LIST_NAV_TREE } from "@/graphql/identity/identity.queries";
 import type {
@@ -46,6 +43,7 @@ import type {
   AstroliftNavTree,
   AstroliftNavTreeProjectNode,
   AstroliftNavTreeTeamNode,
+  AstroliftNavTreeWorkflow,
 } from "@/graphql/identity/identity.types";
 
 interface NavTreeResp {
@@ -66,27 +64,17 @@ const STATUS_DOT_CLASS: Record<AstroliftAppStatus, string> = {
 
 function statusIcon(status: AstroliftAppStatus) {
   if (status === "provisioning") {
-    return (
-      <Loader2Icon
-        className="size-3 shrink-0 animate-spin text-warning-fg"
-        aria-hidden
-      />
-    );
+    return <Loader2Icon className="text-warning-fg size-3 shrink-0 animate-spin" aria-hidden />;
   }
   if (status === "failed") {
-    return (
-      <AlertCircleIcon
-        className="size-3 shrink-0 text-danger-fg"
-        aria-hidden
-      />
-    );
+    return <AlertCircleIcon className="text-danger-fg size-3 shrink-0" aria-hidden />;
   }
   return (
     <span
       aria-hidden
       className={cn(
         "inline-block size-1.5 shrink-0 rounded-full",
-        STATUS_DOT_CLASS[status] ?? "bg-slate-400",
+        STATUS_DOT_CLASS[status] ?? "bg-slate-400"
       )}
     />
   );
@@ -114,7 +102,7 @@ function saveOpenState(state: Record<string, boolean>) {
 }
 
 /** Stable key for a tree node so its open/closed state survives refreshes. */
-function nodeKey(kind: "org" | "team" | "project", id: string) {
+function nodeKey(kind: "org" | "team" | "project" | "workflow", id: string) {
   return `${kind}:${id}`;
 }
 
@@ -167,6 +155,11 @@ function NavTreeSkeleton({ rows = 3 }: NavTreeSkeletonProps) {
 export function NavTree() {
   const pathname = usePathname();
   const { canView, loading: modulesLoading } = useModules();
+  const permissions = useMyPermissions();
+  const canViewApps = canView("apps");
+  const canViewAgents = canView("agents");
+  const canViewWorkflows = canView("workflows");
+  const canViewResources = permissions.can("project.read");
   const { data, loading, error } = useQuery<NavTreeResp>(LIST_NAV_TREE, {
     fetchPolicy: "cache-and-network",
   });
@@ -175,6 +168,22 @@ export function NavTree() {
   // children (`/apps/<slug>/workloads/...`) light up the same leaf.
   const activeAppSlug = React.useMemo(() => {
     const match = pathname.match(/^\/apps\/([^/]+)/);
+    return match?.[1] ?? null;
+  }, [pathname]);
+  const activeAgentSlug = React.useMemo(() => {
+    const match = pathname.match(/^\/agents\/([^/]+)/);
+    return match?.[1] ?? null;
+  }, [pathname]);
+  const activeWorkflowSlug = React.useMemo(() => {
+    const match = pathname.match(/^\/workflows\/([^/]+)/);
+    return match?.[1] ?? null;
+  }, [pathname]);
+  const activeProjectSlug = React.useMemo(() => {
+    const match = pathname.match(/^\/projects\/([^/]+)/);
+    return match?.[1] ?? null;
+  }, [pathname]);
+  const activeResourceProjectSlug = React.useMemo(() => {
+    const match = pathname.match(/^\/projects\/([^/]+)\/resources(?:\/|$)/);
     return match?.[1] ?? null;
   }, [pathname]);
 
@@ -190,7 +199,12 @@ export function NavTree() {
   // without manual digging. Only flips keys that are still undefined
   // in state so the user's explicit collapses aren't reverted.
   React.useEffect(() => {
-    if (!tree || !activeAppSlug) return;
+    if (
+      !tree ||
+      (!activeAppSlug && !activeAgentSlug && !activeWorkflowSlug && !activeProjectSlug)
+    ) {
+      return;
+    }
     setOpen((prev) => {
       const next = { ...prev };
       let dirty = false;
@@ -203,12 +217,26 @@ export function NavTree() {
       ensure(nodeKey("org", tree.organization.id));
       for (const teamNode of tree.teams) {
         for (const projectNode of teamNode.projects) {
-          const hit = projectNode.apps.some(
-            (a) => a.slug === activeAppSlug,
-          );
+          const hit =
+            projectNode.project.slug === activeProjectSlug ||
+            projectNode.apps.some((a) => a.slug === activeAppSlug) ||
+            projectNode.standaloneAgents.some((a) => a.primitiveSlug === activeAgentSlug) ||
+            projectNode.workflows.some(
+              (workflow) =>
+                workflow.slug === activeWorkflowSlug ||
+                workflow.agents.some((agent) => agent.primitiveSlug === activeAgentSlug)
+            );
           if (hit) {
             ensure(nodeKey("team", teamNode.team.id));
             ensure(nodeKey("project", projectNode.project.id));
+            for (const workflow of projectNode.workflows) {
+              if (
+                workflow.slug === activeWorkflowSlug ||
+                workflow.agents.some((agent) => agent.primitiveSlug === activeAgentSlug)
+              ) {
+                ensure(nodeKey("workflow", workflow.id));
+              }
+            }
           }
         }
         if (teamNode.unassignedApps.some((a) => a.slug === activeAppSlug)) {
@@ -218,7 +246,7 @@ export function NavTree() {
       if (dirty) saveOpenState(next);
       return dirty ? next : prev;
     });
-  }, [tree, activeAppSlug]);
+  }, [tree, activeAppSlug, activeAgentSlug, activeWorkflowSlug, activeProjectSlug]);
 
   function toggle(key: string, defaultOpen: boolean) {
     setOpen((prev) => {
@@ -234,7 +262,9 @@ export function NavTree() {
   // module's server-authoritative visibility. While `me.modules` loads we
   // keep rendering to avoid a sidebar shrink-and-grow on refresh — matching
   // AstroliftNav.
-  if (!modulesLoading && !canView("apps")) return null;
+  if (!modulesLoading && !canViewApps && !canViewAgents && !canViewWorkflows) {
+    return null;
+  }
 
   if (loading && !data) {
     return <NavTreeSkeleton />;
@@ -255,45 +285,39 @@ export function NavTree() {
       (sum, t) =>
         sum +
         t.unassignedApps.length +
-        t.projects.reduce((s, p) => s + p.apps.length, 0),
-      0,
+        t.projects.reduce(
+          (s, p) =>
+            s +
+            p.apps.length +
+            p.standaloneAgents.length +
+            p.workflows.reduce((count, workflow) => count + workflow.agents.length, 0),
+          0
+        ),
+      0
     ) + tree.unassignedApps.length;
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
       <SidebarGroupLabel>Workspace</SidebarGroupLabel>
       <SidebarMenu>
-        <Collapsible
-          open={orgOpen}
-          onOpenChange={() => toggle(orgKey, true)}
-          asChild
-        >
+        <Collapsible open={orgOpen} onOpenChange={() => toggle(orgKey, true)} asChild>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              tooltip={tree.organization.name}
-              className="group/org"
-            >
+            <SidebarMenuButton asChild tooltip={tree.organization.name} className="group/org">
               <div className="flex w-full items-center">
                 <Link
                   href="/administration/organization"
-                  className="flex flex-1 items-center gap-2 min-w-0"
+                  className="flex min-w-0 flex-1 items-center gap-2"
                   title={tree.organization.name}
                 >
                   <Building2Icon className="shrink-0" />
-                  <span className="break-words font-medium">
-                    {tree.organization.name}
-                  </span>
+                  <span className="font-medium break-words">{tree.organization.name}</span>
                 </Link>
                 <CollapsibleTrigger
-                  className="ml-auto -mr-1 flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-sidebar-accent"
+                  className="hover:bg-sidebar-accent -mr-1 ml-auto flex size-5 shrink-0 items-center justify-center rounded-sm"
                   aria-label={`Toggle ${tree.organization.name}`}
                 >
                   <ChevronRightIcon
-                    className={cn(
-                      "size-3.5 transition-transform",
-                      orgOpen && "rotate-90",
-                    )}
+                    className={cn("size-3.5 transition-transform", orgOpen && "rotate-90")}
                   />
                 </CollapsibleTrigger>
               </div>
@@ -312,12 +336,19 @@ export function NavTree() {
                       key={teamNode.team.id}
                       node={teamNode}
                       activeAppSlug={activeAppSlug}
+                      activeAgentSlug={activeAgentSlug}
+                      activeWorkflowSlug={activeWorkflowSlug}
+                      activeResourceProjectSlug={activeResourceProjectSlug}
+                      canViewApps={canViewApps}
+                      canViewAgents={canViewAgents}
+                      canViewWorkflows={canViewWorkflows}
+                      canViewResources={canViewResources}
                       open={open}
                       toggle={toggle}
                     />
                   ))
                 )}
-                {tree.unassignedApps.length > 0 ? (
+                {canViewApps && tree.unassignedApps.length > 0 ? (
                   <UnassignedAppsBlock
                     label="Unassigned apps"
                     apps={tree.unassignedApps}
@@ -325,11 +356,7 @@ export function NavTree() {
                   />
                 ) : null}
                 {totalApps === 0 && tree.teams.length > 0 ? (
-                  <EmptyRow
-                    href="/apps/new"
-                    label="No apps yet"
-                    cta="Register first app"
-                  />
+                  <EmptyRow href="/apps/new" label="No apps yet" cta="Register first app" />
                 ) : null}
               </SidebarMenuSub>
             </CollapsibleContent>
@@ -343,41 +370,56 @@ export function NavTree() {
 interface TeamNodeProps {
   node: AstroliftNavTreeTeamNode;
   activeAppSlug: string | null;
+  activeAgentSlug: string | null;
+  activeWorkflowSlug: string | null;
+  activeResourceProjectSlug: string | null;
+  canViewApps: boolean;
+  canViewAgents: boolean;
+  canViewWorkflows: boolean;
+  canViewResources: boolean;
   open: Record<string, boolean>;
   toggle: (key: string, defaultOpen: boolean) => void;
 }
 
-function TeamNode({ node, activeAppSlug, open, toggle }: TeamNodeProps) {
+function TeamNode({
+  node,
+  activeAppSlug,
+  activeAgentSlug,
+  activeWorkflowSlug,
+  activeResourceProjectSlug,
+  canViewApps,
+  canViewAgents,
+  canViewWorkflows,
+  canViewResources,
+  open,
+  toggle,
+}: TeamNodeProps) {
   const key = nodeKey("team", node.team.id);
   const isOpen = open[key] ?? true;
-  const hasChildren =
-    node.projects.length > 0 || node.unassignedApps.length > 0;
+  const hasChildren = node.projects.length > 0 || node.unassignedApps.length > 0;
 
   return (
     <Collapsible open={isOpen} onOpenChange={() => toggle(key, true)} asChild>
       <SidebarMenuSubItem>
         <SidebarMenuSubButton
           asChild
-          className="group/team !flex !w-full !max-w-none !h-auto !min-h-7 !overflow-visible !whitespace-normal py-1 [&>span:last-child]:!text-clip [&>span:last-child]:!overflow-visible [&>span:last-child]:!whitespace-normal"
+          className="group/team !flex !h-auto !min-h-7 !w-full !max-w-none !overflow-visible py-1 !whitespace-normal [&>span:last-child]:!overflow-visible [&>span:last-child]:!text-clip [&>span:last-child]:!whitespace-normal"
         >
           <div className="flex w-full min-w-0 items-start gap-2">
-            <UsersIcon className="shrink-0 text-sidebar-foreground/70 mt-0.5" />
+            <UsersIcon className="text-sidebar-foreground/70 mt-0.5 shrink-0" />
             <Link
               href={`/administration/teams?team=${encodeURIComponent(node.team.slug)}`}
-              className="flex-1 min-w-0 break-words whitespace-normal text-left leading-tight"
+              className="min-w-0 flex-1 text-left leading-tight break-words whitespace-normal"
               title={node.team.name}
             >
               {node.team.name}
             </Link>
             <CollapsibleTrigger
-              className="-mr-1 translate-x-3.5 flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-sidebar-accent"
+              className="hover:bg-sidebar-accent -mr-1 flex size-5 shrink-0 translate-x-3.5 items-center justify-center rounded-sm"
               aria-label={`Toggle ${node.team.name}`}
             >
               <ChevronRightIcon
-                className={cn(
-                  "size-3 transition-transform",
-                  isOpen && "rotate-90",
-                )}
+                className={cn("size-3 transition-transform", isOpen && "rotate-90")}
               />
             </CollapsibleTrigger>
           </div>
@@ -391,11 +433,18 @@ function TeamNode({ node, activeAppSlug, open, toggle }: TeamNodeProps) {
                     key={projectNode.project.id}
                     node={projectNode}
                     activeAppSlug={activeAppSlug}
+                    activeAgentSlug={activeAgentSlug}
+                    activeWorkflowSlug={activeWorkflowSlug}
+                    activeResourceProjectSlug={activeResourceProjectSlug}
+                    canViewApps={canViewApps}
+                    canViewAgents={canViewAgents}
+                    canViewWorkflows={canViewWorkflows}
+                    canViewResources={canViewResources}
                     open={open}
                     toggle={toggle}
                   />
                 ))}
-                {node.unassignedApps.length > 0 ? (
+                {canViewApps && node.unassignedApps.length > 0 ? (
                   <UnassignedAppsBlock
                     label="Direct apps"
                     apps={node.unassignedApps}
@@ -434,7 +483,9 @@ function AddProjectRow({ teamSlug }: { teamSlug: string }) {
           href={`/administration/projects?team=${encodeURIComponent(teamSlug)}&new=1`}
           className="flex items-center gap-2 py-1 text-xs"
         >
-          <span aria-hidden className="text-sm leading-none">+</span>
+          <span aria-hidden className="text-sm leading-none">
+            +
+          </span>
           <span>Add project</span>
         </Link>
       </SidebarMenuSubButton>
@@ -445,6 +496,13 @@ function AddProjectRow({ teamSlug }: { teamSlug: string }) {
 interface ProjectNodeProps {
   node: AstroliftNavTreeProjectNode;
   activeAppSlug: string | null;
+  activeAgentSlug: string | null;
+  activeWorkflowSlug: string | null;
+  activeResourceProjectSlug: string | null;
+  canViewApps: boolean;
+  canViewAgents: boolean;
+  canViewWorkflows: boolean;
+  canViewResources: boolean;
   open: Record<string, boolean>;
   toggle: (key: string, defaultOpen: boolean) => void;
 }
@@ -452,60 +510,190 @@ interface ProjectNodeProps {
 function ProjectNode({
   node,
   activeAppSlug,
+  activeAgentSlug,
+  activeWorkflowSlug,
+  activeResourceProjectSlug,
+  canViewApps,
+  canViewAgents,
+  canViewWorkflows,
+  canViewResources,
   open,
   toggle,
 }: ProjectNodeProps) {
   const key = nodeKey("project", node.project.id);
   const isOpen = open[key] ?? true;
+  const visibleApps = canViewApps ? node.apps : [];
+  const visibleWorkflows = canViewWorkflows ? node.workflows : [];
+  const visibleStandaloneAgents = canViewAgents ? node.standaloneAgents : [];
 
   return (
     <Collapsible open={isOpen} onOpenChange={() => toggle(key, true)} asChild>
       <SidebarMenuSubItem>
         <SidebarMenuSubButton
           asChild
-          className="group/project !flex !w-full !max-w-none !h-auto !min-h-7 !overflow-visible !whitespace-normal py-1 [&>span:last-child]:!text-clip [&>span:last-child]:!overflow-visible [&>span:last-child]:!whitespace-normal"
+          className="group/project !flex !h-auto !min-h-7 !w-full !max-w-none !overflow-visible py-1 !whitespace-normal [&>span:last-child]:!overflow-visible [&>span:last-child]:!text-clip [&>span:last-child]:!whitespace-normal"
         >
           <div className="flex w-full min-w-0 items-start gap-2">
-            <FileBoxIcon className="shrink-0 text-sidebar-foreground/70 mt-0.5" />
+            <FileBoxIcon className="text-sidebar-foreground/70 mt-0.5 shrink-0" />
             <Link
               href={`/projects/${encodeURIComponent(node.project.slug)}`}
-              className="flex-1 min-w-0 break-words whitespace-normal text-left leading-tight"
+              className="min-w-0 flex-1 text-left leading-tight break-words whitespace-normal"
               title={node.project.name}
             >
               {node.project.name}
             </Link>
             <CollapsibleTrigger
-              className="-mr-1 translate-x-7 flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-sidebar-accent"
+              className="hover:bg-sidebar-accent -mr-1 flex size-5 shrink-0 translate-x-7 items-center justify-center rounded-sm"
               aria-label={`Toggle ${node.project.name}`}
             >
               <ChevronRightIcon
-                className={cn(
-                  "size-3 transition-transform",
-                  isOpen && "rotate-90",
-                )}
+                className={cn("size-3 transition-transform", isOpen && "rotate-90")}
               />
             </CollapsibleTrigger>
           </div>
         </SidebarMenuSubButton>
         <CollapsibleContent>
           <SidebarMenuSub className="mx-2 px-1.5">
-            {node.apps.length === 0 ? (
-              <EmptyRow
-                href="/apps/new"
-                label="No apps yet"
-                cta="Register first app"
-              />
+            {visibleApps.length === 0 &&
+            visibleWorkflows.length === 0 &&
+            visibleStandaloneAgents.length === 0 ? (
+              <EmptyRow href="/agents/new" label="No workloads yet" cta="Register a repo" />
             ) : (
-              node.apps.map((app) => (
-                <AppLeaf
-                  key={app.id}
-                  app={app}
-                  active={activeAppSlug === app.slug}
-                />
-              ))
+              <>
+                {visibleWorkflows.length > 0 && (
+                  <>
+                    <ProjectSectionLabel icon={WorkflowIcon} label="Workflows" />
+                    {visibleWorkflows.map((workflow) => (
+                      <WorkflowNode
+                        key={workflow.id}
+                        workflow={workflow}
+                        activeAgentSlug={activeAgentSlug}
+                        activeWorkflowSlug={activeWorkflowSlug}
+                        showAgents={canViewAgents}
+                        open={open}
+                        toggle={toggle}
+                      />
+                    ))}
+                  </>
+                )}
+                {visibleStandaloneAgents.length > 0 && (
+                  <>
+                    <ProjectSectionLabel
+                      icon={BotIcon}
+                      label={visibleWorkflows.length > 0 ? "Standalone agents" : "Agents"}
+                    />
+                    {visibleStandaloneAgents.map((agent) => (
+                      <AppLeaf
+                        key={agent.id}
+                        app={agent}
+                        active={activeAgentSlug === agent.primitiveSlug}
+                      />
+                    ))}
+                  </>
+                )}
+                {visibleApps.length > 0 && (
+                  <>
+                    <ProjectSectionLabel icon={RocketIcon} label="Apps" />
+                    {visibleApps.map((app) => (
+                      <AppLeaf key={app.id} app={app} active={activeAppSlug === app.slug} />
+                    ))}
+                  </>
+                )}
+              </>
+            )}
+            {canViewResources && (
+              <SidebarMenuSubItem>
+                <SidebarMenuSubButton
+                  asChild
+                  isActive={activeResourceProjectSlug === node.project.slug}
+                >
+                  <Link
+                    href={`/projects/${encodeURIComponent(node.project.slug)}/resources`}
+                    className="text-sidebar-foreground/70 flex items-center gap-2"
+                  >
+                    <BoxIcon className="size-3.5" />
+                    <span>Resources</span>
+                  </Link>
+                </SidebarMenuSubButton>
+              </SidebarMenuSubItem>
             )}
           </SidebarMenuSub>
         </CollapsibleContent>
+      </SidebarMenuSubItem>
+    </Collapsible>
+  );
+}
+
+function ProjectSectionLabel({ icon: Icon, label }: { icon: typeof WorkflowIcon; label: string }) {
+  return (
+    <SidebarMenuSubItem>
+      <div className="text-2xs text-sidebar-foreground/50 flex items-center gap-1.5 px-2 pt-2 pb-0.5 font-semibold tracking-wide uppercase">
+        <Icon className="size-3" aria-hidden />
+        <span>{label}</span>
+      </div>
+    </SidebarMenuSubItem>
+  );
+}
+
+function WorkflowNode({
+  workflow,
+  activeAgentSlug,
+  activeWorkflowSlug,
+  showAgents,
+  open,
+  toggle,
+}: {
+  workflow: AstroliftNavTreeWorkflow;
+  activeAgentSlug: string | null;
+  activeWorkflowSlug: string | null;
+  showAgents: boolean;
+  open: Record<string, boolean>;
+  toggle: (key: string, defaultOpen: boolean) => void;
+}) {
+  const key = nodeKey("workflow", workflow.id);
+  const isOpen = open[key] ?? true;
+  return (
+    <Collapsible open={isOpen} onOpenChange={() => toggle(key, true)} asChild>
+      <SidebarMenuSubItem>
+        <SidebarMenuSubButton asChild isActive={activeWorkflowSlug === workflow.slug}>
+          <div className="flex w-full min-w-0 items-center gap-2">
+            <Link
+              href={`/workflows/${encodeURIComponent(workflow.slug)}/observe`}
+              className="flex min-w-0 flex-1 items-center gap-2"
+            >
+              <span
+                className={cn(
+                  "size-1.5 shrink-0 rounded-full",
+                  workflow.isEnabled ? "bg-success" : "bg-slate-400"
+                )}
+              />
+              <span className="truncate">{workflow.name}</span>
+            </Link>
+            {showAgents && workflow.agents.length > 0 && (
+              <CollapsibleTrigger
+                className="hover:bg-sidebar-accent ml-auto flex size-5 shrink-0 items-center justify-center rounded-sm"
+                aria-label={`Toggle ${workflow.name} agents`}
+              >
+                <ChevronRightIcon
+                  className={cn("size-3 transition-transform", isOpen && "rotate-90")}
+                />
+              </CollapsibleTrigger>
+            )}
+          </div>
+        </SidebarMenuSubButton>
+        {showAgents && workflow.agents.length > 0 && (
+          <CollapsibleContent>
+            <SidebarMenuSub className="mr-0 ml-3 px-1">
+              {workflow.agents.map((agent) => (
+                <AppLeaf
+                  key={`${workflow.id}:${agent.id}`}
+                  app={agent}
+                  active={activeAgentSlug === agent.primitiveSlug}
+                />
+              ))}
+            </SidebarMenuSub>
+          </CollapsibleContent>
+        )}
       </SidebarMenuSubItem>
     </Collapsible>
   );
@@ -538,7 +726,7 @@ function AppLeaf({ app, active }: AppLeafProps) {
       <SidebarMenuSubButton
         asChild
         isActive={active}
-        className="!flex !w-full !max-w-none !h-auto !min-h-7 !overflow-visible !whitespace-normal py-1 [&>span:last-child]:!text-clip [&>span:last-child]:!overflow-visible [&>span:last-child]:!whitespace-normal"
+        className="!flex !h-auto !min-h-7 !w-full !max-w-none !overflow-visible py-1 !whitespace-normal [&>span:last-child]:!overflow-visible [&>span:last-child]:!text-clip [&>span:last-child]:!whitespace-normal"
       >
         <Link
           href={`${nav.prefix}/${app.primitiveSlug}`}
@@ -547,11 +735,11 @@ function AppLeaf({ app, active }: AppLeafProps) {
           title={app.name}
         >
           {statusIcon(app.status)}
-          <PrimitiveIcon className="size-3.5 shrink-0 text-sidebar-foreground/60 mt-0.5" />
+          <PrimitiveIcon className="text-sidebar-foreground/60 mt-0.5 size-3.5 shrink-0" />
           <span
             className={cn(
-              "flex-1 min-w-0 break-words whitespace-normal leading-tight",
-              active && "font-semibold text-sidebar-accent-foreground",
+              "min-w-0 flex-1 leading-tight break-words whitespace-normal",
+              active && "text-sidebar-accent-foreground font-semibold"
             )}
           >
             {app.name}
@@ -568,24 +756,16 @@ interface UnassignedAppsBlockProps {
   activeAppSlug: string | null;
 }
 
-function UnassignedAppsBlock({
-  label,
-  apps,
-  activeAppSlug,
-}: UnassignedAppsBlockProps) {
+function UnassignedAppsBlock({ label, apps, activeAppSlug }: UnassignedAppsBlockProps) {
   return (
     <SidebarMenuSubItem>
-      <div className="flex items-center gap-2 px-2 py-1 text-2xs font-medium text-sidebar-foreground/60 uppercase tracking-wide">
+      <div className="text-2xs text-sidebar-foreground/60 flex items-center gap-2 px-2 py-1 font-medium tracking-wide uppercase">
         <CircleDashedIcon className="size-3" aria-hidden />
         <span className="truncate">{label}</span>
       </div>
       <SidebarMenuSub className="mx-2 px-1.5">
         {apps.map((app) => (
-          <AppLeaf
-            key={app.id}
-            app={app}
-            active={activeAppSlug === app.slug}
-          />
+          <AppLeaf key={app.id} app={app} active={activeAppSlug === app.slug} />
         ))}
       </SidebarMenuSub>
     </SidebarMenuSubItem>
@@ -606,7 +786,7 @@ function EmptyRow({ href, label, cta }: EmptyRowProps) {
         className="text-sidebar-foreground/60 hover:text-sidebar-foreground"
       >
         <Link href={href} className="flex flex-col items-start gap-0 py-1">
-          <span className="text-2xs uppercase tracking-wide">{label}</span>
+          <span className="text-2xs tracking-wide uppercase">{label}</span>
           <span className="text-xs">{cta} &rarr;</span>
         </Link>
       </SidebarMenuSubButton>

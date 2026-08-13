@@ -88,7 +88,7 @@ def refresh_bundle_known_keys(
         # Driver predates #441's protocol bump.  Treat as
         # NotImplementedError so the cache survives.
         log.warning(
-            "secrets backend %s has no list_keys -- keeping prior " "snapshot for bundle %s",
+            "secrets backend %s has no list_keys -- keeping prior snapshot for bundle %s",
             type(secrets_backend).__name__,
             bundle.guid,
         )
@@ -97,7 +97,7 @@ def refresh_bundle_known_keys(
         keys = list_keys(bundle.backend_ref)
     except NotImplementedError:
         log.info(
-            "secrets backend %s.list_keys not implemented for " "bundle %s; keeping prior snapshot",
+            "secrets backend %s.list_keys not implemented for bundle %s; keeping prior snapshot",
             type(secrets_backend).__name__,
             bundle.guid,
         )
@@ -134,7 +134,7 @@ def maybe_refresh_bundle_known_keys(bundle) -> list[str]:
         return list(bundle.last_known_keys or [])
     except Exception as exc:  # noqa: BLE001 — resolver bug must not 500 the list page
         log.warning(
-            "lazy refresh for bundle %s: backend resolution failed: %s " "-- keeping prior snapshot",
+            "lazy refresh for bundle %s: backend resolution failed: %s -- keeping prior snapshot",
             bundle.guid,
             exc,
         )
@@ -146,7 +146,7 @@ def maybe_refresh_bundle_known_keys(bundle) -> list[str]:
         )
     except Exception as exc:  # noqa: BLE001
         log.warning(
-            "lazy refresh for bundle %s failed: %s -- keeping prior " "snapshot",
+            "lazy refresh for bundle %s failed: %s -- keeping prior snapshot",
             bundle.guid,
             exc,
         )
@@ -182,7 +182,7 @@ def force_refresh_bundle_known_keys(bundle) -> list[str]:
         return list(bundle.last_known_keys or [])
     except Exception as exc:  # noqa: BLE001 — resolver bug must not fail attach
         log.warning(
-            "eager refresh for bundle %s: backend resolution failed: %s " "-- keeping prior snapshot",
+            "eager refresh for bundle %s: backend resolution failed: %s -- keeping prior snapshot",
             bundle.guid,
             exc,
         )
@@ -194,7 +194,7 @@ def force_refresh_bundle_known_keys(bundle) -> list[str]:
         )
     except Exception as exc:  # noqa: BLE001
         log.warning(
-            "eager refresh for bundle %s failed: %s -- keeping prior " "snapshot",
+            "eager refresh for bundle %s failed: %s -- keeping prior snapshot",
             bundle.guid,
             exc,
         )
@@ -217,6 +217,14 @@ def _resolve_secrets_backend_for(bundle) -> Any:
     in the install per spec), so we pick the first one with a managed
     cluster + a 'secrets' driver-capable plugin.
     """
+    if bundle.tenant_cluster_id is not None:
+        from core.app_deploy import AppDeployError, driver_for_capability
+
+        try:
+            return driver_for_capability(bundle.tenant_cluster, "secrets")
+        except AppDeployError as exc:
+            raise _NoBackendAvailable(str(exc)) from exc
+
     from astrolift_services.models import AppSecretBundleRef
 
     ref = (

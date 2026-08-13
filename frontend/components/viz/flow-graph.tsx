@@ -37,6 +37,8 @@ export interface FlowGraphProps {
   /** Visual treatment. `"telemetry"` opts into the glow / animated-edge
    * scope in globals.css via `data-variant` on the container (#1055). */
   variant?: "default" | "telemetry";
+  /** Accessible name for the interactive canvas. */
+  ariaLabel?: string;
 }
 
 /**
@@ -66,6 +68,7 @@ export function FlowGraph({
   maxZoom = 1.8,
   showMiniMap = true,
   variant = "default",
+  ariaLabel = "Topology graph",
 }: FlowGraphProps) {
   // Fill in edge defaults (arrowhead + stroke) without clobbering caller
   // overrides. Computed once — the graph reads its initial data on mount.
@@ -77,7 +80,7 @@ export function FlowGraph({
         ...e,
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    []
   );
 
   const [flowNodes, , onNodesChange] = useNodesState(nodes);
@@ -90,13 +93,13 @@ export function FlowGraph({
 
   const handleNodeClick = React.useCallback(
     (_: React.MouseEvent, node: Node) => onNodeClick?.(node.id, node.data),
-    [onNodeClick],
+    [onNodeClick]
   );
 
   return (
     <div
       data-variant={variant}
-      className={cn("relative rounded-md border bg-card", className)}
+      className={cn("bg-card relative rounded-md border", className)}
       style={{ height: typeof height === "number" ? `${height}px` : height }}
     >
       {!isReady && (
@@ -105,6 +108,7 @@ export function FlowGraph({
         </div>
       )}
       <ReactFlow
+        aria-label={ariaLabel}
         nodes={flowNodes}
         edges={flowEdges}
         nodeTypes={nodeTypes}

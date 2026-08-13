@@ -475,17 +475,39 @@ def _load_agent_spec(env_spec_slug: str):
     return spec, None
 
 
-def _load_agent_bundle(spec, bundle_id):
+def _load_agent_bundle(spec, bundle_id, *, allow_project: bool = False):
+    from astrolift_agents.services.project_membership import agent_spec_belongs_to_project
     from astrolift_services.models import SecretBundle
 
-    bundle = SecretBundle.objects.filter(
-        guid=str(bundle_id),
-        organization_id=spec.organization_id,
-        team__isnull=True,
-        deleted_at__isnull=True,
-    ).first()
+    bundle = (
+        SecretBundle.objects.select_related("project")
+        .filter(
+            guid=str(bundle_id),
+            organization_id=spec.organization_id,
+            team__isnull=True,
+            deleted_at__isnull=True,
+        )
+        .first()
+    )
     if bundle is None:
         return None, gql_failure(ErrorCode.NOT_FOUND.value, "secret bundle not found")
+    if bundle.project_id is not None:
+        if not allow_project or not agent_spec_belongs_to_project(spec, bundle.project):
+            return None, gql_failure(ErrorCode.NOT_FOUND.value, "secret bundle not found")
+        from astrolift_agents.services.agent_cluster import (
+            NoAgentClusterError,
+            resolve_agent_cluster,
+        )
+
+        try:
+            runtime_cluster = resolve_agent_cluster(spec.organization)
+        except NoAgentClusterError:
+            runtime_cluster = None
+        if runtime_cluster is None or runtime_cluster.pk != bundle.tenant_cluster_id:
+            return None, gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "project bundle secrets cluster does not match the agent runtime cluster",
+            )
     return bundle, None
 
 
@@ -1209,7 +1231,7 @@ class AgentsMutation:
         spec, err = _load_agent_spec(env_spec_slug)
         if err is not None:
             return err
-        bundle, berr = _load_agent_bundle(spec, bundle_id)
+        bundle, berr = _load_agent_bundle(spec, bundle_id, allow_project=True)
         if berr is not None:
             return berr
         environment = (environment or "").strip() or "default"

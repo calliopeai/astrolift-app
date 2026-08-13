@@ -2288,6 +2288,8 @@ export type AstroliftManagedDomainMutationResult = {
 };
 
 export type AstroliftManagedService = {
+  attachments: Array<AstroliftManagedServiceAttachment>;
+  clusterSlug: Scalars['String']['output'];
   config: Scalars['JSON']['output'];
   createdAt: Scalars['DateTime']['output'];
   editableFields: Array<Scalars['String']['output']>;
@@ -2297,11 +2299,26 @@ export type AstroliftManagedService = {
   lastActionAt?: Maybe<Scalars['DateTime']['output']>;
   lastActionKind: Scalars['String']['output'];
   name: Scalars['String']['output'];
+  ownerScope: Scalars['String']['output'];
+  projectSlug: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
   status: Scalars['String']['output'];
   statusError: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
   variant: Scalars['String']['output'];
+};
+
+export type AstroliftManagedServiceAttachment = {
+  consumerKind: Scalars['String']['output'];
+  consumerSlug: Scalars['String']['output'];
+  environmentName: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+};
+
+export type AstroliftManagedServiceAttachmentMutationResult = {
+  data?: Maybe<AstroliftManagedServiceAttachment>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AstroliftManagedServiceConnection = {
@@ -2486,12 +2503,22 @@ export type AstroliftNavTree = {
 export type AstroliftNavTreeProject = {
   apps: Array<AstroliftAppSummary>;
   project: AstroliftProject;
+  standaloneAgents: Array<AstroliftAppSummary>;
+  workflows: Array<AstroliftNavTreeWorkflow>;
 };
 
 export type AstroliftNavTreeTeam = {
   projects: Array<AstroliftNavTreeProject>;
   team: AstroliftTeam;
   unassignedApps: Array<AstroliftAppSummary>;
+};
+
+export type AstroliftNavTreeWorkflow = {
+  agents: Array<AstroliftAppSummary>;
+  id: Scalars['GUID']['output'];
+  isEnabled: Scalars['Boolean']['output'];
+  name: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
 };
 
 export type AstroliftNotification = {
@@ -3245,18 +3272,42 @@ export type AstroliftSearchableUser = {
 
 export type AstroliftSecretBundle = {
   backendRef: Scalars['String']['output'];
+  clusterSlug?: Maybe<Scalars['String']['output']>;
+  consumers: Array<AstroliftSecretBundleConsumer>;
   createdAt: Scalars['DateTime']['output'];
   id: Scalars['GUID']['output'];
   keyCount: Scalars['Int']['output'];
+  keyNames: Array<Scalars['String']['output']>;
   lastKnownKeysAt?: Maybe<Scalars['DateTime']['output']>;
   name: Scalars['String']['output'];
   organizationSlug: Scalars['String']['output'];
+  projectSlug?: Maybe<Scalars['String']['output']>;
   slug: Scalars['String']['output'];
   teamSlug?: Maybe<Scalars['String']['output']>;
 };
 
+export type AstroliftSecretBundleConsumer = {
+  consumerKind: Scalars['String']['output'];
+  consumerSlug: Scalars['String']['output'];
+  environmentName: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+};
+
 export type AstroliftSecretBundleMutationResult = {
   data?: Maybe<AstroliftSecretBundle>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftSecretBundleReveal = {
+  key: Scalars['String']['output'];
+  provider: Scalars['String']['output'];
+  revealedAt: Scalars['DateTime']['output'];
+  value: Scalars['String']['output'];
+};
+
+export type AstroliftSecretBundleRevealMutationResult = {
+  data?: Maybe<AstroliftSecretBundleReveal>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
 };
@@ -3912,6 +3963,12 @@ export type AstroliftWorkloadScalingStatus = {
   sourcedAt: Scalars['DateTime']['output'];
 };
 
+export type AttachProjectManagedServiceInput = {
+  agentEnvironmentSpecSlug: InputMaybe<Scalars['String']['input']>;
+  appEnvironmentId: InputMaybe<Scalars['GUID']['input']>;
+  managedServiceId: Scalars['GUID']['input'];
+};
+
 export type AttachSecretBundleInput = {
   appSlug: Scalars['String']['input'];
   bundleSlug: Scalars['String']['input'];
@@ -4299,6 +4356,14 @@ export type CreateProjectInput = {
   teamId: Scalars['GUID']['input'];
 };
 
+export type CreateProjectSecretBundleInput = {
+  backendRef: InputMaybe<Scalars['String']['input']>;
+  clusterId: Scalars['GUID']['input'];
+  name: Scalars['String']['input'];
+  projectId: Scalars['GUID']['input'];
+  slug: Scalars['String']['input'];
+};
+
 export type CreateRoleInput = {
   description: Scalars['String']['input'];
   name: Scalars['String']['input'];
@@ -4446,6 +4511,10 @@ export type DeregisterAppInput = {
   confirmName: Scalars['String']['input'];
   deleteData: Scalars['Boolean']['input'];
   forceDestroy: Scalars['Boolean']['input'];
+};
+
+export type DetachProjectManagedServiceInput = {
+  attachmentId: Scalars['GUID']['input'];
 };
 
 export type DetachSecretBundleInput = {
@@ -4818,6 +4887,7 @@ export type Mutation = {
   astroliftConnectUserSourceProvider: AstroliftConnectUserSourceProviderPayloadMutationResult;
   astroliftDisconnectUserSourceProvider: AstroliftDisconnectUserSourceProviderPayloadMutationResult;
   attachAgentSecretBundle: AstroliftAgentSecretBundleAttachmentMutationResult;
+  attachProjectManagedService: AstroliftManagedServiceAttachmentMutationResult;
   attachSecretBundle: AstroliftAppSecretBundleAttachmentMutationResult;
   attestSession: AstroliftAttestationResultMutationResult;
   bringClusterIntoManagement: AstroliftTenantClusterMutationResult;
@@ -4858,6 +4928,7 @@ export type Mutation = {
   createPolicy: AstroliftPolicyMutationResult;
   createPreviewEnvironment: AstroliftPreviewEnvironmentMutationResult;
   createProject: AstroliftProjectMutationResult;
+  createProjectSecretBundle: AstroliftSecretBundleMutationResult;
   createRole: AstroliftRoleMutationResult;
   createSkill: AstroliftSkillMutationResult;
   createTeam: AstroliftTeamMutationResult;
@@ -4890,6 +4961,8 @@ export type Mutation = {
   deleteFormDefinition: AstroliftFormDefinitionMutationResult;
   deleteInvitation: AstroliftInvitationMutationResult;
   deletePipeline: AstroliftPipelineMutationResult;
+  deleteProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
+  deleteProjectSecretBundle: AstroliftSecretBundleMutationResult;
   deleteSkill: AstroliftSkillMutationResult;
   deleteSshDeployKey: AstroliftSshDeployKeyMutationResult;
   deleteToolDef: AstroliftToolDefMutationResult;
@@ -4902,8 +4975,10 @@ export type Mutation = {
   deleteWorkflowStage: MutationResult;
   deployClusterAgent: AstroliftTenantClusterMutationResult;
   deprovisionManagedService: ManagedservicedeletedpayloadMutationResult;
+  deprovisionProjectManagedService: ManagedservicedeletedpayloadMutationResult;
   deregisterAstroliftApp: AstroliftDeregisterAppPayloadMutationResult;
   detachAgentSecretBundle: AstroliftAgentSecretBundleAttachmentMutationResult;
+  detachProjectManagedService: AstroliftManagedServiceAttachmentMutationResult;
   detachSecretBundle: AttachmentremovedpayloadMutationResult;
   disconnectSource: AstroliftSourceConnectionMutationResult;
   elevateAdminSession: AstroliftElevatePayloadMutationResult;
@@ -4987,6 +5062,7 @@ export type Mutation = {
   proposeSecretChange: AstroliftSecretChangeProposalMutationResult;
   provisionManagedDomain: ProvisionManagedDomainPayloadMutationResult;
   provisionManagedService: AstroliftManagedServiceMutationResult;
+  provisionProjectManagedService: AstroliftManagedServiceMutationResult;
   publishForm: AstroliftFormDefinitionMutationResult;
   pushAstroliftCiSecretsToRepo: AstroliftPushCiSecretsPayloadMutationResult;
   pushAstroliftCiWorkflowToRepo: AstroliftPushCiWorkflowPayloadMutationResult;
@@ -5017,6 +5093,7 @@ export type Mutation = {
   /** Reorder a definition's stages (spec 40 §6). Pass stage guids in the new order. */
   reorderWorkflowStages: MutationResult;
   reprovisionManagedService: AstroliftManagedServiceMutationResult;
+  reprovisionProjectManagedService: AstroliftManagedServiceMutationResult;
   requestAttestationChallenge: AstroliftAttestationChallengePayloadMutationResult;
   requestQuotaIncrease: AstroliftQuotaIncreaseRequestMutationResult;
   resendInvitation: AstroliftInvitationCreatedMutationResult;
@@ -5034,6 +5111,7 @@ export type Mutation = {
   revealAgentSecretValue: AstroliftAgentSecretRevealMutationResult;
   revealAppSecret: AstroliftRevealedSecretMutationResult;
   revealManagedServiceConnection: AstroliftManagedServiceConnectionMutationResult;
+  revealProjectBundleSecretValue: AstroliftSecretBundleRevealMutationResult;
   revokeApiToken: SoftdeletepayloadMutationResult;
   revokeAppCertificate: AstroliftCapabilityDeprovisionPayloadMutationResult;
   revokeAstroliftSession: AstroliftRevokeAstroliftSessionPayloadMutationResult;
@@ -5071,6 +5149,7 @@ export type Mutation = {
   /** Toggle a public runtime feature flag (the admin 'feature flipper'). Platform-admin only. ``key`` is the public dotted key from ``astroliftServerInfo.featureFlags`` (e.g. ``zentinelle.enabled``); the backing Constance value is set and the updated flag is returned. Unknown / non-public keys are rejected with a VALIDATION error. Install-time features (``astroliftServerInfo.buildTimeFeatures``) are NOT settable here — they require a redeploy. */
   setFeatureFlag: FeatureFlagInfoMutationResult;
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
+  setProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
   setRetentionPolicy: AstroliftRetentionPolicyMutationResult;
   /** Cancel a sign request. Requires SIGNREQUEST_CHANGE_CANCEL permission. */
   signRequestCancel: Scalars['Boolean']['output'];
@@ -5125,6 +5204,8 @@ export type Mutation = {
   updatePipeline: AstroliftPipelineMutationResult;
   updatePolicy: AstroliftPolicyMutationResult;
   updateProject: AstroliftProjectMutationResult;
+  updateProjectManagedService: AstroliftManagedServiceMutationResult;
+  updateProjectSecretBundle: AstroliftSecretBundleMutationResult;
   updateRole: AstroliftRoleMutationResult;
   updateSkill: AstroliftSkillMutationResult;
   updateSourceConnection: AstroliftSourceConnectionMutationResult;
@@ -5265,6 +5346,11 @@ export type MutationAttachAgentSecretBundleArgs = {
   environment?: Scalars['String']['input'];
   position?: Scalars['Int']['input'];
   prefix?: Scalars['String']['input'];
+};
+
+
+export type MutationAttachProjectManagedServiceArgs = {
+  input: AttachProjectManagedServiceInput;
 };
 
 
@@ -5470,6 +5556,11 @@ export type MutationCreateProjectArgs = {
 };
 
 
+export type MutationCreateProjectSecretBundleArgs = {
+  input: CreateProjectSecretBundleInput;
+};
+
+
 export type MutationCreateRoleArgs = {
   input: CreateRoleInput;
 };
@@ -5634,6 +5725,16 @@ export type MutationDeletePipelineArgs = {
 };
 
 
+export type MutationDeleteProjectBundleSecretValueArgs = {
+  input: ProjectSecretBundleKeyInput;
+};
+
+
+export type MutationDeleteProjectSecretBundleArgs = {
+  bundleId: Scalars['GUID']['input'];
+};
+
+
 export type MutationDeleteSkillArgs = {
   id: Scalars['ID']['input'];
 };
@@ -5680,6 +5781,11 @@ export type MutationDeprovisionManagedServiceArgs = {
 };
 
 
+export type MutationDeprovisionProjectManagedServiceArgs = {
+  input: DeprovisionManagedServiceInput;
+};
+
+
 export type MutationDeregisterAstroliftAppArgs = {
   input: DeregisterAppInput;
 };
@@ -5688,6 +5794,11 @@ export type MutationDeregisterAstroliftAppArgs = {
 export type MutationDetachAgentSecretBundleArgs = {
   attachmentId: Scalars['ID']['input'];
   envSpecSlug: Scalars['String']['input'];
+};
+
+
+export type MutationDetachProjectManagedServiceArgs = {
+  input: DetachProjectManagedServiceInput;
 };
 
 
@@ -6003,6 +6114,11 @@ export type MutationProvisionManagedServiceArgs = {
 };
 
 
+export type MutationProvisionProjectManagedServiceArgs = {
+  input: ProvisionProjectManagedServiceInput;
+};
+
+
 export type MutationPublishFormArgs = {
   slug: Scalars['String']['input'];
 };
@@ -6152,6 +6268,11 @@ export type MutationReprovisionManagedServiceArgs = {
 };
 
 
+export type MutationReprovisionProjectManagedServiceArgs = {
+  input: ReprovisionManagedServiceInput;
+};
+
+
 export type MutationRequestAttestationChallengeArgs = {
   input: RequestAttestationChallengeInput;
 };
@@ -6233,6 +6354,11 @@ export type MutationRevealAppSecretArgs = {
 
 export type MutationRevealManagedServiceConnectionArgs = {
   input: RevealManagedServiceConnectionInput;
+};
+
+
+export type MutationRevealProjectBundleSecretValueArgs = {
+  input: ProjectSecretBundleKeyInput;
 };
 
 
@@ -6413,6 +6539,11 @@ export type MutationSetFeatureFlagArgs = {
 
 export type MutationSetNotificationPreferenceArgs = {
   input: SetNotificationPreferenceInput;
+};
+
+
+export type MutationSetProjectBundleSecretValueArgs = {
+  input: ProjectSecretBundleKeyInput;
 };
 
 
@@ -6670,6 +6801,16 @@ export type MutationUpdatePolicyArgs = {
 
 export type MutationUpdateProjectArgs = {
   input: UpdateProjectInput;
+};
+
+
+export type MutationUpdateProjectManagedServiceArgs = {
+  input: UpdateManagedServiceInput;
+};
+
+
+export type MutationUpdateProjectSecretBundleArgs = {
+  input: UpdateProjectSecretBundleInput;
 };
 
 
@@ -6968,6 +7109,12 @@ export type ProfileType = {
   username?: Maybe<Scalars['String']['output']>;
 };
 
+export type ProjectSecretBundleKeyInput = {
+  bundleId: Scalars['GUID']['input'];
+  key: Scalars['String']['input'];
+  value: InputMaybe<Scalars['String']['input']>;
+};
+
 export type PromoteDeploymentInput = {
   appSlug: Scalars['String']['input'];
   sourceEnvironmentName: Scalars['String']['input'];
@@ -7015,6 +7162,18 @@ export type ProvisionManagedServiceInput = {
   environmentName: Scalars['String']['input'];
   kind: Scalars['String']['input'];
   name: InputMaybe<Scalars['String']['input']>;
+  variant: InputMaybe<Scalars['String']['input']>;
+};
+
+export type ProvisionProjectManagedServiceInput = {
+  agentEnvironmentSpecSlugs: Array<Scalars['String']['input']>;
+  appEnvironmentIds: Array<Scalars['GUID']['input']>;
+  clusterId: Scalars['GUID']['input'];
+  config: InputMaybe<Scalars['JSON']['input']>;
+  environmentName: Scalars['String']['input'];
+  kind: Scalars['String']['input'];
+  name: InputMaybe<Scalars['String']['input']>;
+  projectId: Scalars['GUID']['input'];
   variant: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -7206,6 +7365,9 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st, and prices every one of them on read. Use astroliftPreviewEnvironmentsPage. */
   astroliftPreviewEnvironments: Array<AstroliftPreviewEnvironment>;
   astroliftPreviewEnvironmentsPage: AstroliftPreviewEnvironmentPage;
+  astroliftProjectManagedServices: Array<AstroliftManagedService>;
+  astroliftProjectResourceClusters: Array<AstroliftTenantCluster>;
+  astroliftProjectSecretBundles: Array<AstroliftSecretBundle>;
   astroliftProjectSlugAvailable: Scalars['Boolean']['output'];
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftProjectsPage. */
   astroliftProjects: Array<AstroliftProject>;
@@ -8150,6 +8312,21 @@ export type QueryAstroliftPreviewEnvironmentsPageArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftProjectManagedServicesArgs = {
+  projectId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftProjectResourceClustersArgs = {
+  projectId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftProjectSecretBundlesArgs = {
+  projectId: Scalars['GUID']['input'];
 };
 
 
@@ -9369,6 +9546,12 @@ export type UpdateProjectInput = {
   id: Scalars['GUID']['input'];
   name: InputMaybe<Scalars['String']['input']>;
   slug: InputMaybe<Scalars['String']['input']>;
+};
+
+export type UpdateProjectSecretBundleInput = {
+  backendRef: Scalars['String']['input'];
+  id: Scalars['GUID']['input'];
+  name: Scalars['String']['input'];
 };
 
 export type UpdateRoleInput = {

@@ -1,6 +1,14 @@
 "use client";
 
-import { Handle, Position, type Edge, type Node, type NodeProps, type NodeTypes } from "@xyflow/react";
+import {
+  Handle,
+  Position,
+  type Edge,
+  type Node,
+  type NodeProps,
+  type NodeTypes,
+} from "@xyflow/react";
+import Link from "next/link";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -69,24 +77,32 @@ function StageNode({ data }: NodeProps<Node<PipelineDagStage>>) {
   const tone = toneFor(data.status);
   const duration = formatDuration(data.startedAt, data.finishedAt);
 
-  return (
-    <div
-      className={cn(
-        "viz-node min-w-[168px] max-w-[220px] rounded-md border bg-background p-3 ring-1 shadow-sm",
-        TONE_RING[tone],
-      )}
-    >
+  const body = (
+    <>
       <Handle type="target" position={Position.Left} className="!bg-muted-foreground/30" />
       <Handle type="source" position={Position.Right} className="!bg-muted-foreground/30" />
       <div className="flex items-center gap-1.5">
         <span className={cn("viz-node-dot size-1.5 shrink-0 rounded-full", TONE_DOT[tone])} />
-        <div className="truncate text-sm font-medium leading-tight">{data.name}</div>
+        <div className="truncate text-sm leading-tight font-medium">{data.name}</div>
       </div>
-      <div className="text-muted-foreground mt-1 flex items-center justify-between gap-2 text-2xs">
+      <div className="text-muted-foreground text-2xs mt-1 flex items-center justify-between gap-2">
         <span className="capitalize">{data.status.replace(/_/g, " ")}</span>
         {duration && <span className="font-mono tabular-nums">{duration}</span>}
       </div>
-    </div>
+    </>
+  );
+  const className = cn(
+    "viz-node min-w-[168px] max-w-[220px] rounded-md border bg-background p-3 ring-1 shadow-sm",
+    data.href &&
+      "cursor-pointer hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+    TONE_RING[tone]
+  );
+  return data.href ? (
+    <Link href={data.href} className={className} title={`Open ${data.name}`}>
+      {body}
+    </Link>
+  ) : (
+    <div className={className}>{body}</div>
   );
 }
 
@@ -105,6 +121,7 @@ export interface PipelineDagProps {
    * static run graphs (deployment/pipeline) are unaffected.
    */
   animateActiveEdges?: boolean;
+  ariaLabel?: string;
 }
 
 /**
@@ -116,10 +133,20 @@ export interface PipelineDagProps {
  * by dependency depth. Remount via a `key` (e.g. the run id) to re-flow when a
  * different run is selected.
  */
-export function PipelineDag({ stages, height = 320, className, onStageClick, variant, animateActiveEdges }: PipelineDagProps) {
+export function PipelineDag({
+  stages,
+  height = 320,
+  className,
+  onStageClick,
+  variant,
+  animateActiveEdges,
+  ariaLabel,
+}: PipelineDagProps) {
   const nodes = React.useMemo<Node<PipelineDagStage>[]>(() => {
     const ids = stages.map((s) => s.id);
-    const edges = stages.flatMap((s) => (s.needs ?? []).map((dep) => ({ source: dep, target: s.id })));
+    const edges = stages.flatMap((s) =>
+      (s.needs ?? []).map((dep) => ({ source: dep, target: s.id }))
+    );
     const pos = rankLayout(ids, edges);
     return stages.map((s) => ({
       id: s.id,
@@ -140,10 +167,10 @@ export function PipelineDag({ stages, height = 320, className, onStageClick, var
             source: dep,
             target: s.id,
             animated: !!animateActiveEdges && toneFor(s.status) === "running",
-          })),
+          }))
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    []
   );
 
   const handleClick = React.useCallback(
@@ -151,7 +178,7 @@ export function PipelineDag({ stages, height = 320, className, onStageClick, var
       const stage = data as PipelineDagStage;
       if (onStageClick) onStageClick(stage);
     },
-    [onStageClick],
+    [onStageClick]
   );
 
   return (
@@ -165,6 +192,7 @@ export function PipelineDag({ stages, height = 320, className, onStageClick, var
       showMiniMap={false}
       fitViewOptions={{ padding: 0.25, maxZoom: 1.1 }}
       variant={variant}
+      ariaLabel={ariaLabel}
     />
   );
 }

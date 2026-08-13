@@ -28,6 +28,22 @@ class SecretBundle(NamedBaseCoreModel):
         blank=True,
         on_delete=models.SET_NULL,
     )
+    project = models.ForeignKey(
+        "astrolift_identity.Project",
+        related_name="secret_bundles",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        help_text="Owning project for a project-shared bundle; null for team/org bundles.",
+    )
+    tenant_cluster = models.ForeignKey(
+        "astrolift_clusters.TenantCluster",
+        related_name="project_secret_bundles",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        help_text="Secrets backend used by a project-owned bundle.",
+    )
     backend_ref = models.CharField(max_length=512)
 
     # ---- Bundle key reflector (#441) ------------------------------
@@ -53,15 +69,31 @@ class SecretBundle(NamedBaseCoreModel):
 
     class Meta:
         constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(project__isnull=True, tenant_cluster__isnull=True)
+                    | models.Q(project__isnull=False, tenant_cluster__isnull=False)
+                ),
+                name="secret_bundle_project_cluster_pair",
+            ),
             models.UniqueConstraint(
                 fields=["team", "slug"],
-                condition=models.Q(deleted_at__isnull=True),
+                condition=models.Q(project__isnull=True, deleted_at__isnull=True),
                 name="secret_bundle_slug_unique_active_per_team",
             ),
             models.UniqueConstraint(
                 fields=["organization", "slug"],
-                condition=models.Q(team__isnull=True, deleted_at__isnull=True),
+                condition=models.Q(
+                    team__isnull=True,
+                    project__isnull=True,
+                    deleted_at__isnull=True,
+                ),
                 name="secret_bundle_slug_unique_active_per_org",
+            ),
+            models.UniqueConstraint(
+                fields=["project", "slug"],
+                condition=models.Q(project__isnull=False, deleted_at__isnull=True),
+                name="secret_bundle_slug_unique_active_per_project",
             ),
         ]
 

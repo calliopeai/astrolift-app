@@ -214,6 +214,10 @@ describe("ProjectDetailClient workload-aware overview", () => {
     expect(screen.getByRole("table", { name: "Agents in this project" })).toBeInTheDocument();
     expect(screen.getByText("Registered agents")).toBeInTheDocument();
     expect(screen.getByText("Active agent runs")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /project resources/i })).toHaveAttribute(
+      "href",
+      "/projects/emr-bug-triage/resources"
+    );
     expect(screen.getByText("1 running")).toBeInTheDocument();
     expect(screen.queryByText("Registered apps")).not.toBeInTheDocument();
     expect(screen.queryByText("Active deployments")).not.toBeInTheDocument();
@@ -252,6 +256,10 @@ describe("ProjectDetailClient workload-aware overview", () => {
     expect(screen.getByText("Agents in this project")).toBeInTheDocument();
     expect(screen.getByText("Apps in this project")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /new app/i })).toHaveAttribute("href", "/apps/new");
+    expect(screen.getByRole("link", { name: /project resources/i })).toHaveAttribute(
+      "href",
+      "/projects/emr-bug-triage/resources"
+    );
   });
 
   it("renders project workflows as topology and marks standalone agents", () => {
@@ -324,12 +332,10 @@ describe("ProjectDetailClient workload-aware overview", () => {
     render(<ProjectDetailClient slug={project.slug} />);
 
     expect(screen.getByText("Agent workflow project")).toBeInTheDocument();
-    expect(screen.getByText("Workflows in this project")).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: "Workflow stage topology" })).toBeInTheDocument();
-    expect(screen.getByText("Claude Haiku 4.5")).toBeInTheDocument();
-    expect(screen.getByText("Claude Opus 4.8")).toBeInTheDocument();
-    expect(screen.getByText("jira-search")).toBeInTheDocument();
-    expect(screen.getAllByText("custom")).toHaveLength(2);
+    expect(screen.getByText("Workflow topology")).toBeInTheDocument();
+    expect(
+      screen.getByRole("application", { name: "Project workflow topology" })
+    ).toBeInTheDocument();
     expect(screen.getByText("Standalone")).toBeInTheDocument();
     expect(screen.getAllByText("emr-triage").length).toBeGreaterThan(0);
     const workflowQuery = state.calls.find(
@@ -345,6 +351,10 @@ describe("ProjectDetailClient workload-aware overview", () => {
     expect(screen.getByText("No workloads in this project")).toBeInTheDocument();
     expect(screen.queryByText("Registered apps")).not.toBeInTheDocument();
     expect(screen.queryByText("No apps in this project")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /project resources/i })).toHaveAttribute(
+      "href",
+      "/projects/emr-bug-triage/resources"
+    );
 
     const emptyCard = screen
       .getByText("No workloads in this project")

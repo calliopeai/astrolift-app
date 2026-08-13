@@ -167,8 +167,9 @@ describe("WorkflowsPage repository topology", () => {
     render(<WorkflowsPage />);
 
     expect(screen.getByText("Repository workflows")).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: "Workflow stage topology" })).toBeInTheDocument();
-    expect(screen.getByText("Claude Haiku 4.5")).toBeInTheDocument();
+    expect(
+      screen.getByRole("application", { name: "Workflow stage topology" })
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
 

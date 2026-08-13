@@ -1,8 +1,12 @@
-import { ArrowRightIcon, BotIcon, GitForkIcon, UserCheckIcon } from "lucide-react";
-import Link from "next/link";
+"use client";
 
-import { Badge } from "@/components/ui/badge";
-import type { WorkflowTopologyStage } from "@/graphql/workflows/tiered.types";
+import * as React from "react";
+
+import { PipelineDag, type PipelineDagStage } from "@/components/viz";
+import type {
+  WorkflowDefinitionSummary,
+  WorkflowTopologyStage,
+} from "@/graphql/workflows/tiered.types";
 import { cn } from "@/lib/utils";
 
 export function formatWorkflowModel(model: string): string {
@@ -14,115 +18,126 @@ export function formatWorkflowModel(model: string): string {
 }
 
 function stageLabel(stage: WorkflowTopologyStage): string {
-  if (stage.role) return stage.role.replace(/[_-]+/g, " ");
-  return stage.kind.replace(/[_-]+/g, " ");
+  const role = (stage.role || stage.kind).replace(/[_-]+/g, " ");
+  const agent = stage.agentSlug || stage.agentRef;
+  return agent ? `${role} · ${agent}` : role;
 }
 
-function StageIcon({ kind }: { kind: string }) {
-  if (kind === "human_gate") return <UserCheckIcon className="size-4" />;
-  if (kind === "aggregation") return <GitForkIcon className="size-4" />;
-  return <BotIcon className="size-4" />;
-}
-
+/**
+ * Compact, shared workflow graph. Detailed environment/model/prompt/output
+ * metadata belongs in the node inspector and workflow detail surface; project
+ * dashboards only need topology, membership, and live state at a glance.
+ */
 export function WorkflowTopology({
   stages,
   className,
+  height = 190,
+  statusByOrder,
 }: {
   stages: WorkflowTopologyStage[];
   className?: string;
+  height?: number;
+  statusByOrder?: Record<number, string>;
 }) {
-  const ordered = [...stages].sort((a, b) => a.order - b.order);
-  if (ordered.length === 0) {
+  const dagStages = React.useMemo<PipelineDagStage[]>(() => {
+    const ordered = [...stages].sort((a, b) => a.order - b.order);
+    return ordered.map((stage, index) => {
+      const id = stage.guid;
+      const row: PipelineDagStage = {
+        id,
+        name: stageLabel(stage),
+        status: statusByOrder?.[stage.order] ?? "configured",
+        needs: index > 0 ? [ordered[index - 1].guid] : [],
+        href:
+          stage.agentSlug || stage.agentRef
+            ? `/agents/${encodeURIComponent(stage.agentSlug || stage.agentRef)}/build`
+            : undefined,
+      };
+      return row;
+    });
+  }, [stages, statusByOrder]);
+
+  if (dagStages.length === 0) {
     return <p className="text-muted-foreground text-sm">No stages declared.</p>;
   }
 
+  const signature = dagStages.map((stage) => `${stage.id}:${stage.status}`).join("|");
   return (
-    <ol
-      aria-label="Workflow stage topology"
-      className={cn("flex items-stretch gap-2 overflow-x-auto pb-2", className)}
-    >
-      {ordered.map((stage, index) => {
-        const agentSlug = stage.agentSlug || stage.agentRef;
-        return (
-          <li key={stage.guid} className="flex min-w-0 items-center gap-2">
-            <div className="bg-card max-w-64 min-w-52 rounded-lg border p-3 shadow-xs">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="bg-primary/10 text-primary flex size-7 shrink-0 items-center justify-center rounded-full">
-                    <StageIcon kind={stage.kind} />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-muted-foreground text-2xs font-medium uppercase">
-                      Stage {stage.order + 1}
-                    </p>
-                    <p className="truncate text-sm font-semibold capitalize">{stageLabel(stage)}</p>
-                  </div>
-                </div>
-                <Badge variant="outline" className="text-2xs shrink-0">
-                  {stage.onFailure === "fail" ? "fail closed" : stage.onFailure}
-                </Badge>
-              </div>
+    <PipelineDag
+      key={signature}
+      stages={dagStages}
+      height={height}
+      className={cn("bg-muted/15", className)}
+      variant={Object.keys(statusByOrder ?? {}).length > 0 ? "telemetry" : "default"}
+      animateActiveEdges
+      ariaLabel="Workflow stage topology"
+    />
+  );
+}
 
-              <div className="mt-3 space-y-1.5 text-xs">
-                {agentSlug ? (
-                  <div>
-                    <span className="text-muted-foreground">Agent </span>
-                    <Link
-                      href={`/agents/${encodeURIComponent(agentSlug)}/build`}
-                      className="font-mono font-medium hover:underline"
-                    >
-                      {agentSlug}
-                    </Link>
-                  </div>
-                ) : (
-                  <div className="text-muted-foreground capitalize">
-                    {stage.kind.replace(/_/g, " ")}
-                  </div>
-                )}
-                {stage.resolvedModel && (
-                  <div title={stage.resolvedModel}>
-                    <span className="text-muted-foreground">Model </span>
-                    <span>{formatWorkflowModel(stage.resolvedModel)}</span>
-                  </div>
-                )}
-                {(stage.fanOutDynamic || stage.fanOutCount != null) && (
-                  <div>
-                    <span className="text-muted-foreground">Fan-out </span>
-                    <span>{stage.fanOutDynamic ? "dynamic" : `${stage.fanOutCount} parallel`}</span>
-                  </div>
-                )}
-                {stage.environmentSpecSlug && (
-                  <div className="truncate" title={stage.environmentSpecSlug}>
-                    <span className="text-muted-foreground">Environment </span>
-                    <span className="font-mono">{stage.environmentSpecSlug}</span>
-                  </div>
-                )}
-                {stage.hasPrompt && (
-                  <div>
-                    <span className="text-muted-foreground">Prompt </span>
-                    <span>custom</span>
-                  </div>
-                )}
-                {stage.skillRefs.length > 0 && (
-                  <div className="truncate" title={stage.skillRefs.join(", ")}>
-                    <span className="text-muted-foreground">Skills </span>
-                    <span className="font-mono">{stage.skillRefs.join(", ")}</span>
-                  </div>
-                )}
-                {stage.outputKey && (
-                  <div className="truncate" title={stage.outputKey}>
-                    <span className="text-muted-foreground">Output </span>
-                    <span className="font-mono">{stage.outputKey}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-            {index < ordered.length - 1 && (
-              <ArrowRightIcon aria-hidden className="text-muted-foreground size-4 shrink-0" />
-            )}
-          </li>
-        );
-      })}
-    </ol>
+/**
+ * One graph for the whole project packet. Workflow roots form compact lanes;
+ * their stage nodes are the actual bound agents. This avoids stacking one
+ * large card/graph per definition while keeping every workflow and agent a
+ * direct navigation target.
+ */
+export function ProjectWorkflowTopology({
+  workflows,
+  runStatusByWorkflow,
+  stageStatusByWorkflow,
+  className,
+  height = 230,
+}: {
+  workflows: WorkflowDefinitionSummary[];
+  runStatusByWorkflow?: Record<string, string>;
+  stageStatusByWorkflow?: Record<string, Record<number, string>>;
+  className?: string;
+  height?: number;
+}) {
+  const dagStages = React.useMemo<PipelineDagStage[]>(() => {
+    const rows: PipelineDagStage[] = [];
+    for (const workflow of workflows) {
+      const rootId = `workflow:${workflow.guid}`;
+      rows.push({
+        id: rootId,
+        name: workflow.name,
+        status: runStatusByWorkflow?.[workflow.guid] ?? "configured",
+        needs: [],
+        href: `/workflows/${encodeURIComponent(workflow.slug)}/observe`,
+      });
+      const ordered = [...workflow.stages].sort((a, b) => a.order - b.order);
+      ordered.forEach((stage, index) => {
+        const id = `${workflow.guid}:${stage.guid}`;
+        rows.push({
+          id,
+          name: stageLabel(stage),
+          status: stageStatusByWorkflow?.[workflow.guid]?.[stage.order] ?? "configured",
+          needs: [index === 0 ? rootId : `${workflow.guid}:${ordered[index - 1].guid}`],
+          href:
+            stage.agentSlug || stage.agentRef
+              ? `/agents/${encodeURIComponent(stage.agentSlug || stage.agentRef)}/build`
+              : undefined,
+        });
+      });
+    }
+    return rows;
+  }, [runStatusByWorkflow, stageStatusByWorkflow, workflows]);
+
+  if (dagStages.length === 0) {
+    return <p className="text-muted-foreground text-sm">No workflows declared.</p>;
+  }
+
+  const signature = dagStages.map((stage) => `${stage.id}:${stage.status}`).join("|");
+  const hasRuntimeState = Object.keys(runStatusByWorkflow ?? {}).length > 0;
+  return (
+    <PipelineDag
+      key={signature}
+      stages={dagStages}
+      height={height}
+      className={cn("bg-muted/15", className)}
+      variant={hasRuntimeState ? "telemetry" : "default"}
+      animateActiveEdges
+      ariaLabel="Project workflow topology"
+    />
   );
 }
