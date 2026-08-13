@@ -278,6 +278,7 @@ class ManagedServiceMutations:
             ).first()
             allowed = Workload.objects.filter(
                 registered_app__project=svc.project,
+                registered_app__project__organization_id=svc.project.organization_id,
                 kind=Workload.Kind.AGENT,
                 slug=input.agent_environment_spec_slug,
                 deleted_at__isnull=True,
@@ -287,6 +288,7 @@ class ManagedServiceMutations:
 
                 allowed = WorkflowStage.objects.filter(
                     definition__project=svc.project,
+                    definition__project__organization_id=svc.project.organization_id,
                     environment_spec_slug=input.agent_environment_spec_slug,
                     deleted_at__isnull=True,
                 ).exists()
@@ -314,6 +316,7 @@ class ManagedServiceMutations:
             env = AppEnvironment.objects.filter(
                 guid=str(input.app_environment_id),
                 registered_app__project=svc.project,
+                registered_app__project__organization_id=svc.project.organization_id,
                 tenant_cluster=svc.tenant_cluster,
                 deleted_at__isnull=True,
             ).first()
