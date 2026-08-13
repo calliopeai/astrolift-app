@@ -3,8 +3,6 @@ import {
   AlertTriangleIcon,
   ArrowRightIcon,
   BookOpenIcon,
-  CoinsIcon,
-  DatabaseIcon,
   ExternalLinkIcon,
   FileTextIcon,
   GitBranchIcon,
@@ -18,21 +16,13 @@ import {
   ServerCogIcon,
   SettingsIcon,
   TerminalIcon,
-  UsersIcon,
   WebhookIcon,
   ZapIcon,
 } from "lucide-react";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-// Canonical source repo for reference docs not yet rendered in-app.
-const DOCS_REPO_URL = "https://github.com/calliopeai/astrolift-docs";
+const PUBLIC_DOCS_URL = "https://astrolift.dev";
 
 interface DocCard {
   href: string;
@@ -56,8 +46,7 @@ const sections: { label: string; cards: DocCard[] }[] = [
       {
         href: "/documentation/quickstart",
         title: "Quickstart",
-        description:
-          "Zero to a live URL in under 10 minutes — cluster, source, deploy.",
+        description: "Connect a cluster and source, register a manifest, and deploy an image.",
         icon: ZapIcon,
       },
       {
@@ -69,8 +58,7 @@ const sections: { label: string; cards: DocCard[] }[] = [
       {
         href: "/documentation/tutorials",
         title: "Tutorials",
-        description:
-          "Step-by-step walkthroughs for the most common build paths.",
+        description: "Step-by-step walkthroughs for the most common build paths.",
         icon: GraduationCapIcon,
       },
     ],
@@ -88,15 +76,14 @@ const sections: { label: string; cards: DocCard[] }[] = [
       {
         href: "/documentation/custom-domains",
         title: "Custom domains",
-        description:
-          "Bind app.acme.com to an app with auto-managed TLS via cert-manager.",
+        description: "Bind app.acme.com to an app with auto-managed TLS via cert-manager.",
         icon: GlobeIcon,
       },
       {
         href: "/documentation/source-providers",
         title: "Source providers",
         description:
-          "Connect GitHub or GitLab so a git push triggers a deploy.",
+          "Connect GitHub or GitLab for repository access, managed CI, and source webhooks.",
         icon: GitBranchIcon,
       },
       {
@@ -109,15 +96,14 @@ const sections: { label: string; cards: DocCard[] }[] = [
       {
         href: "/documentation/policies",
         title: "ABAC policies",
-        description:
-          "Author fine-grained allow/deny rules on top of role bindings.",
+        description: "Author fine-grained allow/deny rules on top of role bindings.",
         icon: ScaleIcon,
       },
       {
         href: "/documentation/webhooks",
         title: "Webhooks",
         description:
-          "Subscribe external systems to Astrolift events with HMAC-signed deliveries.",
+          "Review outbound event subscriptions, availability, and the HMAC receiver contract.",
         icon: WebhookIcon,
       },
     ],
@@ -147,8 +133,7 @@ const sections: { label: string; cards: DocCard[] }[] = [
       {
         href: "/documentation/webhook-events",
         title: "Webhook events",
-        description:
-          "Payload schema and JSON examples for every outbound webhook event.",
+        description: "Payload schema and JSON examples for every outbound webhook event.",
         icon: ListTreeIcon,
       },
       {
@@ -160,13 +145,10 @@ const sections: { label: string; cards: DocCard[] }[] = [
     ],
   },
   {
-    // Curated references that live in the astrolift-docs repo until they're
-    // rendered in-app. Migrated here from the retired /resources/docs stub
-    // (#894) so nothing is lost.
-    label: "Reference (on GitHub)",
+    label: "Public reference",
     cards: [
       {
-        href: `${DOCS_REPO_URL}/blob/main/reference/manifest.md`,
+        href: `${PUBLIC_DOCS_URL}/reference/astrolift-toml/`,
         title: "astrolift.toml manifest",
         description:
           "Full schema for the per-app manifest — sections, fields, validation, examples.",
@@ -174,81 +156,63 @@ const sections: { label: string; cards: DocCard[] }[] = [
         external: true,
       },
       {
-        href: `${DOCS_REPO_URL}/blob/main/reference/providers.md`,
-        title: "Provider plugins",
-        description:
-          "How providers (aws, gcp, azure, k8s_native) advertise capabilities and which drivers they bundle.",
-        icon: ServerCogIcon,
+        href: `${PUBLIC_DOCS_URL}/reference/cli/`,
+        title: "CLI reference",
+        description: "Authentication, app and agent operations, CI, portable docs, and man pages.",
+        icon: TerminalIcon,
         external: true,
       },
       {
-        href: `${DOCS_REPO_URL}/blob/main/managed-services.md`,
-        title: "Managed services",
-        description:
-          "Provision Postgres, Redis, and object storage and inject the right env vars into your workload.",
-        icon: DatabaseIcon,
-        external: true,
-      },
-      {
-        href: `${DOCS_REPO_URL}/blob/main/ingress-dns.md`,
-        title: "Ingress and DNS",
-        description:
-          "Custom domains, wildcard zones, cert issuance, and the IngressDriver / DnsDriver split.",
-        icon: GlobeIcon,
-        external: true,
-      },
-      {
-        href: `${DOCS_REPO_URL}/blob/main/identity/rbac.md`,
-        title: "RBAC, teams, projects",
-        description:
-          "The Org → Team → Project → App scope tree and how role bindings cascade through it.",
-        icon: UsersIcon,
-        external: true,
-      },
-      {
-        href: `${DOCS_REPO_URL}/blob/main/identity/api-tokens.md`,
-        title: "API tokens",
-        description: "Mint, scope, and revoke programmatic tokens for the platform API.",
+        href: `${PUBLIC_DOCS_URL}/reference/api/`,
+        title: "Control API",
+        description: "GraphQL, focused REST routes, bearer authentication, tenancy, and errors.",
         icon: KeyRoundIcon,
         external: true,
       },
       {
-        href: `${DOCS_REPO_URL}/blob/main/observability/audit.md`,
-        title: "Audit log",
+        href: `${PUBLIC_DOCS_URL}/reference/mcp/`,
+        title: "MCP reference",
         description:
-          "Every mutation recorded with actor + variables; how to forward via webhook for SIEM.",
-        icon: ScrollIcon,
+          "Authenticated remote agent inspection, dispatch, cancellation, and source reconciliation.",
+        icon: ZapIcon,
         external: true,
       },
       {
-        href: `${DOCS_REPO_URL}/blob/main/cost.md`,
-        title: "Cost and quotas",
+        href: `${PUBLIC_DOCS_URL}/reference/agent-packages/`,
+        title: "Agent packages",
         description:
-          "Live pricing-API-driven cost estimation, org quotas, and overage handling.",
-        icon: CoinsIcon,
-        external: true,
-      },
-      {
-        href: `${DOCS_REPO_URL}/blob/main/specs/multi-cloud-topology.md`,
-        title: "Multi-cloud topology",
-        description:
-          "Modelling workloads across AWS, GCP, Azure, and self-managed clusters — placement, enforcement, federated observability.",
+          "Briefs, skills, tools, source slices, monorepos, federation, and imported formats.",
         icon: ListTreeIcon,
         external: true,
       },
       {
-        href: `${DOCS_REPO_URL}/tree/main/demo-apps`,
-        title: "Demo sample app manifests",
+        href: `${PUBLIC_DOCS_URL}/reference/workflow-toml/`,
+        title: "Workflow TOML",
         description:
-          "Example astrolift.toml files for Node.js, Python FastAPI, Go, and multi-workload apps.",
+          "Ordered agent stages, environment recipes, skill overlays, named outputs, and repo sync.",
+        icon: GitBranchIcon,
+        external: true,
+      },
+      {
+        href: `${PUBLIC_DOCS_URL}/guides/plugin-sdk-cookbook/`,
+        title: "Provider plugin SDK",
+        description: "Build and test provider extensions against the current driver contracts.",
+        icon: ServerCogIcon,
+        external: true,
+      },
+      {
+        href: `${PUBLIC_DOCS_URL}/demo-scenarios/`,
+        title: "Demo scenarios",
+        description: "Worked app, agent, workflow, and operational validation scenarios.",
         icon: RocketIcon,
         external: true,
       },
       {
-        href: `${DOCS_REPO_URL}/blob/main/cli/reference.md`,
-        title: "CLI reference",
-        description: "Every astro subcommand, flag, and exit code.",
-        icon: TerminalIcon,
+        href: `${PUBLIC_DOCS_URL}/operators/install/`,
+        title: "Install Astrolift",
+        description:
+          "Cloud and Kubernetes installation paths, prerequisites, and canonical runbooks.",
+        icon: GlobeIcon,
         external: true,
       },
     ],
@@ -265,8 +229,8 @@ export default function DocumentationIndexPage() {
       <div>
         <h1 className="text-2xl font-semibold">Documentation</h1>
         <p className="text-muted-foreground mt-2 max-w-2xl text-sm">
-          How Astrolift works, how to install it, and the operator runbooks
-          for the surfaces that need configuration.
+          How Astrolift works, how to install it, and the operator runbooks for the surfaces that
+          need configuration.
         </p>
       </div>
 
@@ -279,7 +243,7 @@ export default function DocumentationIndexPage() {
             {section.cards.map((card) => {
               const Icon = card.icon;
               const body = (
-                <Card className="flex h-full flex-col transition-colors group-hover:border-foreground/20">
+                <Card className="group-hover:border-foreground/20 flex h-full flex-col transition-colors">
                   <CardHeader className="pb-2">
                     <div className="bg-muted text-foreground/80 inline-flex size-9 items-center justify-center rounded-md">
                       <Icon className="size-4" />
@@ -289,7 +253,7 @@ export default function DocumentationIndexPage() {
                   <CardContent className="flex flex-1 flex-col justify-between gap-3">
                     <CardDescription>{card.description}</CardDescription>
                     <span className="text-muted-foreground group-hover:text-foreground flex items-center gap-1 text-xs transition-colors">
-                      {card.external ? "Read on GitHub" : "Read guide"}
+                      {card.external ? "Read public docs" : "Read guide"}
                       {card.external ? (
                         <ExternalLinkIcon className="h-3 w-3" />
                       ) : (

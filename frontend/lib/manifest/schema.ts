@@ -2,10 +2,10 @@
  * Declarative field schema + validation for the visual manifest builder (#1110).
  *
  * This is the faithful, form-facing description of the astrolift.toml contract
- * (sourced from astrolift_manifest/parser.py + types.py). The shipped
- * public/manifest-schema.json is a thin, stale docs placeholder that predates
- * the current [[workloads]]/kind/containers shape, so it can't drive a correct
- * form — this descriptor is the source of truth for generation + validation.
+ * (sourced from astrolift_manifest/parser.py + types.py). The retired
+ * public/manifest-schema.json placeholder predated the current
+ * [[workloads]]/kind/containers shape, so this descriptor is the source of
+ * truth for generation + validation.
  * Validation mirrors the backend parser's hard rules so the form flags what
  * `updateManifest` would reject before the round-trip.
  */
@@ -76,15 +76,45 @@ export const KIND_TUNING: Record<string, readonly FieldSpec[]> = {
   agent: [
     { key: "run_family", label: "Run family", widget: "select", options: RUN_FAMILIES },
     { key: "max_retries", label: "Max retries", widget: "number", placeholder: "5" },
-    { key: "tool_timeout_seconds", label: "Tool timeout (s)", widget: "number", placeholder: "300" },
+    {
+      key: "tool_timeout_seconds",
+      label: "Tool timeout (s)",
+      widget: "number",
+      placeholder: "300",
+    },
     { key: "result_ttl_hours", label: "Result TTL (h)", widget: "number", placeholder: "72" },
   ],
   workflow: [
-    { key: "workflow_type", label: "Workflow type", widget: "text", help: "Required for workflow workers." },
-    { key: "task_queue", label: "Task queue", widget: "text", help: "Required for workflow workers." },
-    { key: "temporal_namespace", label: "Temporal namespace", widget: "text", placeholder: "default" },
-    { key: "max_concurrent_activities", label: "Max concurrent activities", widget: "number", placeholder: "20" },
-    { key: "max_concurrent_workflows", label: "Max concurrent workflows", widget: "number", placeholder: "10" },
+    {
+      key: "workflow_type",
+      label: "Workflow type",
+      widget: "text",
+      help: "Required for workflow workers.",
+    },
+    {
+      key: "task_queue",
+      label: "Task queue",
+      widget: "text",
+      help: "Required for workflow workers.",
+    },
+    {
+      key: "temporal_namespace",
+      label: "Temporal namespace",
+      widget: "text",
+      placeholder: "default",
+    },
+    {
+      key: "max_concurrent_activities",
+      label: "Max concurrent activities",
+      widget: "number",
+      placeholder: "20",
+    },
+    {
+      key: "max_concurrent_workflows",
+      label: "Max concurrent workflows",
+      widget: "number",
+      placeholder: "10",
+    },
   ],
   function: [
     { key: "min_scale", label: "Min scale", widget: "number", placeholder: "0" },
@@ -93,13 +123,23 @@ export const KIND_TUNING: Record<string, readonly FieldSpec[]> = {
     { key: "timeout_seconds", label: "Timeout (s)", widget: "number", placeholder: "300" },
   ],
   static_site: [
-    { key: "static_build_command", label: "Build command", widget: "text", placeholder: "npm run build" },
+    {
+      key: "static_build_command",
+      label: "Build command",
+      widget: "text",
+      placeholder: "npm run build",
+    },
     { key: "static_output_dir", label: "Output dir", widget: "text", placeholder: "dist" },
     { key: "static_spa", label: "SPA rewrite", widget: "toggle" },
     { key: "static_index", label: "Index document", widget: "text", placeholder: "index.html" },
   ],
   faas: [
-    { key: "faas_package_type", label: "Package type", widget: "select", options: FAAS_PACKAGE_TYPES },
+    {
+      key: "faas_package_type",
+      label: "Package type",
+      widget: "select",
+      options: FAAS_PACKAGE_TYPES,
+    },
     { key: "faas_runtime", label: "Runtime", widget: "text", placeholder: "python3.12" },
     { key: "faas_handler", label: "Handler", widget: "text", placeholder: "app.handler" },
     { key: "faas_memory_mb", label: "Memory (MB)", widget: "number", placeholder: "512" },
@@ -136,27 +176,48 @@ export function validateManifest(model: ManifestModel): ManifestErr[] {
   const seen = new Set<string>();
   model.workloads.forEach((w, i) => {
     const p = `workloads[${i}]`;
-    if (w.name.trim() === "") errs.push({ path: `${p}.name`, message: "Workload name is required." });
-    else if (seen.has(w.name)) errs.push({ path: `${p}.name`, message: `Duplicate workload name "${w.name}".` });
+    if (w.name.trim() === "")
+      errs.push({ path: `${p}.name`, message: "Workload name is required." });
+    else if (seen.has(w.name))
+      errs.push({ path: `${p}.name`, message: `Duplicate workload name "${w.name}".` });
     seen.add(w.name);
 
     if (!WORKLOAD_KINDS.includes(w.kind as (typeof WORKLOAD_KINDS)[number])) {
-      errs.push({ path: `${p}.kind`, message: `Kind must be one of ${WORKLOAD_KINDS.join(", ")}.` });
+      errs.push({
+        path: `${p}.kind`,
+        message: `Kind must be one of ${WORKLOAD_KINDS.join(", ")}.`,
+      });
     }
     if (w.kind === "cronjob" && w.schedule.trim() === "") {
       errs.push({ path: `${p}.schedule`, message: "Cronjob workloads require a schedule." });
     }
-    if (w.concurrency_policy && !CONCURRENCY_POLICIES.includes(w.concurrency_policy as (typeof CONCURRENCY_POLICIES)[number])) {
-      errs.push({ path: `${p}.concurrency_policy`, message: `Concurrency policy must be one of ${CONCURRENCY_POLICIES.join(", ")}.` });
+    if (
+      w.concurrency_policy &&
+      !CONCURRENCY_POLICIES.includes(w.concurrency_policy as (typeof CONCURRENCY_POLICIES)[number])
+    ) {
+      errs.push({
+        path: `${p}.concurrency_policy`,
+        message: `Concurrency policy must be one of ${CONCURRENCY_POLICIES.join(", ")}.`,
+      });
     }
     if (w.kind === "workflow") {
       if (tuningStr(w, "workflow_type").trim() === "")
-        errs.push({ path: `${p}.workflow_type`, message: "Workflow workloads require a workflow type." });
+        errs.push({
+          path: `${p}.workflow_type`,
+          message: "Workflow workloads require a workflow type.",
+        });
       if (tuningStr(w, "task_queue").trim() === "")
         errs.push({ path: `${p}.task_queue`, message: "Workflow workloads require a task queue." });
     }
-    if (w.kind === "static_site" && tuningStr(w, "static_build_command").trim() !== "" && tuningStr(w, "static_output_dir").trim() === "") {
-      errs.push({ path: `${p}.static_output_dir`, message: "A build command requires an output dir." });
+    if (
+      w.kind === "static_site" &&
+      tuningStr(w, "static_build_command").trim() !== "" &&
+      tuningStr(w, "static_output_dir").trim() === ""
+    ) {
+      errs.push({
+        path: `${p}.static_output_dir`,
+        message: "A build command requires an output dir.",
+      });
     }
     if (w.kind === "faas") {
       const pkg = tuningStr(w, "faas_package_type") || "image";
@@ -165,25 +226,40 @@ export function validateManifest(model: ManifestModel): ManifestErr[] {
           if (tuningStr(w, k).trim() === "")
             errs.push({ path: `${p}.${k}`, message: `zip-package FaaS requires ${k}.` });
         }
-      } else if (tuningStr(w, "faas_handler").trim() !== "" || tuningStr(w, "faas_runtime").trim() !== "") {
-        errs.push({ path: `${p}.faas_handler`, message: "image-package FaaS must not set handler/runtime." });
+      } else if (
+        tuningStr(w, "faas_handler").trim() !== "" ||
+        tuningStr(w, "faas_runtime").trim() !== ""
+      ) {
+        errs.push({
+          path: `${p}.faas_handler`,
+          message: "image-package FaaS must not set handler/runtime.",
+        });
       }
     }
     if (!supportsContainers(w.kind) && w.containers.length > 0) {
-      errs.push({ path: `${p}.containers`, message: `${w.kind} workloads must declare no containers.` });
+      errs.push({
+        path: `${p}.containers`,
+        message: `${w.kind} workloads must declare no containers.`,
+      });
     }
 
     w.containers.forEach((c, ci) => {
       if (c.name.trim() === "")
         errs.push({ path: `${p}.containers[${ci}].name`, message: "Container name is required." });
       if (!HEALTHCHECK_KINDS.includes(c.healthcheck.kind as (typeof HEALTHCHECK_KINDS)[number]))
-        errs.push({ path: `${p}.containers[${ci}].healthcheck`, message: `Healthcheck kind must be one of ${HEALTHCHECK_KINDS.join(", ")}.` });
+        errs.push({
+          path: `${p}.containers[${ci}].healthcheck`,
+          message: `Healthcheck kind must be one of ${HEALTHCHECK_KINDS.join(", ")}.`,
+        });
     });
   });
 
   model.managedServices.forEach((s, i) => {
     if (s.kind.trim() === "")
-      errs.push({ path: `managedServices[${i}].kind`, message: "Managed service kind is required." });
+      errs.push({
+        path: `managedServices[${i}].kind`,
+        message: "Managed service kind is required.",
+      });
   });
 
   return errs;
