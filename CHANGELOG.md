@@ -28,6 +28,8 @@
 
 ### Fixed
 
+- Poll workflow-stage agent Jobs in the same per-organization namespace used
+  at spawn so live tasks are not failed and stripped of callback credentials.
 - Preserve workflow stage environment recipes and output keys when importing
   Langflow or Flowise definitions through the GraphQL adapter.
 - Include the narrow `mcp:write` scope in browser-approved CLI credentials so

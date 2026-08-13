@@ -690,6 +690,66 @@ def test_poll_backfills_fk_from_fuzzy_join(run, definition):
     assert task.agent_run_id == agent_run.pk
 
 
+@pytest.mark.django_db
+def test_poll_uses_the_namespace_frozen_at_stage_spawn(run, definition, monkeypatch):
+    """A stage Job lives in its per-org namespace, never ``default``.
+
+    Polling the registry default makes the provider report the live Job as
+    missing/failed. That terminalizes the task and revokes its callback token
+    while the pod is still running, so every subsequent report gets a 401.
+    """
+    from astrolift_agents.models import AgentTask, DispatcherInstance
+    from astrolift_dispatch.spawners import registry as spawner_registry
+    from astrolift_dispatch.spawners.base import TaskStatus
+    from astrolift_lifecycle.models import AgentRun
+
+    stage = _stage(definition, 0)
+    dispatcher = DispatcherInstance.objects.create(
+        organization=run.organization,
+        name="Stage dispatcher",
+        slug="stage-poll-namespace-dispatcher",
+        endpoint="https://dispatch.example.test/",
+        cloud=DispatcherInstance.Cloud.K8S_NATIVE,
+        backend=DispatcherInstance.Backend.K8S_JOB,
+        status=DispatcherInstance.Status.ACTIVE,
+    )
+    agent_run = AgentRun.objects.create(
+        workload=stage.agent_definition,
+        status=AgentRun.Status.RUNNING,
+        k8s_pod_name="agent-task-stage-namespace",
+    )
+    namespace = "astrolift-agents-stage-org-test"
+    task = AgentTask.objects.create(
+        organization=run.organization,
+        agent_definition=stage.agent_definition,
+        agent_run=agent_run,
+        dispatcher=dispatcher,
+        external_id=agent_run.k8s_pod_name,
+        namespace=namespace,
+        status=AgentTask.Status.RUNNING,
+        callback_token_hash="a" * 64,
+    )
+    captured: dict[str, object] = {}
+
+    class _RunningSpawner:
+        def status(self, external_id: str) -> TaskStatus:
+            captured["external_id"] = external_id
+            return TaskStatus(running=True)
+
+    def _get_spawner(backend: str, *, cluster=None, namespace: str = "default"):
+        captured.update(backend=backend, cluster=cluster, namespace=namespace)
+        return _RunningSpawner()
+
+    monkeypatch.setattr(spawner_registry, "get_spawner", _get_spawner)
+
+    assert _poll_agent_run_status_sync(str(agent_run.pk)) == AgentRun.Status.RUNNING
+    assert captured["namespace"] == namespace
+    assert captured["external_id"] == task.external_id
+    task.refresh_from_db()
+    assert task.status == AgentTask.Status.RUNNING
+    assert task.callback_token_hash == "a" * 64
+
+
 # ---------------------------------------------------------------------------
 # Gate interaction capture (#1217)
 # ---------------------------------------------------------------------------

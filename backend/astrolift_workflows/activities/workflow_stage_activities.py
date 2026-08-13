@@ -582,7 +582,21 @@ def _poll_agent_run_status_sync(agent_run_id: str) -> str:
         return agent_run.status
 
     dispatcher = task.dispatcher
-    spawner = get_spawner(dispatcher.backend, cluster=dispatcher.tenant_cluster)
+    # Spawn freezes the per-org namespace on the task. Poll the same location;
+    # the registry default is the literal ``default`` namespace, where this
+    # Job does not exist. A status lookup there is reported as failed and
+    # terminalizes the task, which also revokes its callback token while the
+    # real pod is still running.
+    namespace = task.namespace
+    if not namespace:
+        from astrolift_workflows.activities.agent_stage import _agent_namespace
+
+        namespace = _agent_namespace(task.organization.slug)
+    spawner = get_spawner(
+        dispatcher.backend,
+        cluster=dispatcher.tenant_cluster,
+        namespace=namespace,
+    )
     try:
         status = spawner.status(task.external_id)
     except Exception as exc:  # noqa: BLE001 — treat poll failures as transient
