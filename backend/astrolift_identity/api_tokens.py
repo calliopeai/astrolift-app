@@ -74,6 +74,7 @@ CLI_DEVICE_SCOPES: tuple[str, ...] = (
     SCOPE_AGENT_ENV_SPEC_WRITE,
     SCOPE_SECRET_WRITE,
     SCOPE_MCP_DISPATCH,
+    SCOPE_MCP_WRITE,
 )
 
 _current_api_token: contextvars.ContextVar[object | None] = contextvars.ContextVar(

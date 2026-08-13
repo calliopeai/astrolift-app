@@ -38,6 +38,7 @@ from astrolift_identity.api_tokens import (
     SCOPE_ADMIN,
     SCOPE_AGENT_ENV_SPEC_WRITE,
     SCOPE_MCP_DISPATCH,
+    SCOPE_MCP_WRITE,
     SCOPE_READ_APPS,
     SCOPE_SECRET_READ,
     SCOPE_SECRET_WRITE,
@@ -401,7 +402,10 @@ def test_cli_device_scopes_allow_agent_ops_env_specs_and_secret_write_without_ad
     assert SCOPE_AGENT_ENV_SPEC_WRITE in token.scopes
     assert SCOPE_SECRET_WRITE in token.scopes
     assert SCOPE_MCP_DISPATCH in token.scopes
+    assert SCOPE_MCP_WRITE in token.scopes
     assert token_scope_allows_permission(token, Permission.AGENT_DISPATCH)
+    assert token_scope_allows_permission(token, Permission.AGENT_CREATE)
+    assert token_scope_allows_permission(token, Permission.AGENT_UPDATE)
     assert token_scope_allows_permission(token, Permission.AGENT_ENV_SPEC_CREATE)
     assert token_scope_allows_permission(token, Permission.AGENT_ENV_SPEC_UPDATE)
     assert token_scope_allows_permission(token, Permission.AGENT_ENV_SPEC_DELETE)
@@ -409,7 +413,7 @@ def test_cli_device_scopes_allow_agent_ops_env_specs_and_secret_write_without_ad
     assert not token_scope_allows_permission(token, Permission.SECRET_READ)
     assert not token_scope_allows_permission(token, Permission.APP_DEPLOY)
     assert not token_scope_allows_permission(token, Permission.APP_DELETE)
-    assert not token_scope_allows_permission(token, Permission.AGENT_UPDATE)
+    assert not token_scope_allows_permission(token, Permission.AGENT_DELETE)
     assert not token_scope_allows_permission(token, Permission.ADMIN_ELEVATE)
 
 

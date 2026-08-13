@@ -25,6 +25,9 @@
 
 - Preserve workflow stage environment recipes and output keys when importing
   Langflow or Flowise definitions through the GraphQL adapter.
+- Include the narrow `mcp:write` scope in browser-approved CLI credentials so
+  `astro agent register-repo` can create and reconcile agent definitions after
+  login or refresh without requiring an admin bearer.
 - Authorize CLI device sessions for agent environment-spec CRUD with a narrow
   bearer scope and enforce the dedicated environment-spec RBAC permissions.
 - Replace retired Bedrock managed-agent defaults with invoked Opus 5 and

@@ -399,6 +399,7 @@ def test_approval_page_renders_for_authed_user():
     assert b"agent-env-spec:write" in r.content
     assert b"secret:write" in r.content
     assert b"mcp:dispatch" in r.content
+    assert b"mcp:write" in r.content
     assert b"secret:read" not in r.content
 
 
