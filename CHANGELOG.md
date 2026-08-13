@@ -34,6 +34,8 @@
 
 ### Fixed
 
+- Repair project affiliation for repository workflow definitions whose multiple
+  stage agents belong to the same project.
 - Stamp workflow-dispatched agent tasks with their project and team, attach
   direct definition runs to their definition, and safely backfill existing
   project ownership and execution history.
