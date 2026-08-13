@@ -29,7 +29,10 @@ description = "Implement, then gate."
 kind = "agent_dispatch"
 role = "implementer"
 agent = "my-coder"
+environment_spec_slug = "coder-large"
 skills = ["write-tests", "./skills/foo", "acme/dev-skills/lint@v2"]
+prompt = "Implement the accepted specification."
+output_key = "implementation"
 on_failure = "retry"
 timeout = 600
 fan_out = 3
@@ -65,6 +68,9 @@ def test_parse_stages_map_to_order():
     assert agent_stage.kind == "agent_dispatch"
     assert agent_stage.role == "implementer"
     assert agent_stage.agent == "my-coder"
+    assert agent_stage.environment_spec_slug == "coder-large"
+    assert agent_stage.prompt == "Implement the accepted specification."
+    assert agent_stage.output_key == "implementation"
     assert agent_stage.on_failure == "retry"
     assert agent_stage.timeout == 600
     assert agent_stage.fan_out == 3
@@ -206,6 +212,24 @@ def test_malformed_skill_ref_reports_path():
     assert exc.value.path == "stage[0].skills[0]"
 
 
+def test_duplicate_effective_output_key_reports_path():
+    toml = """\
+[workflow]
+slug = "duplicate-output"
+name = "Duplicate output"
+
+[[stage]]
+kind = "checkpoint"
+
+[[stage]]
+kind = "checkpoint"
+output_key = "stage_0"
+"""
+    with pytest.raises(ManifestError, match="output_key values must be unique") as exc:
+        parse_workflow_manifest(toml)
+    assert exc.value.path == "stage.output_key"
+
+
 # --------------------------------------------------------------------------- #
 # Model → emit → parse (real Postgres)
 # --------------------------------------------------------------------------- #
@@ -226,6 +250,9 @@ def test_definition_emit_parse_equivalent():
         kind=WorkflowStage.StageKind.AGENT_DISPATCH,
         role="triager",
         skill_refs=["write-tests", "acme/dev-skills/lint@v2"],
+        environment_spec_slug="triage-runtime",
+        prompt="Triage the report.",
+        output_key="triage",
         on_failure=WorkflowStage.OnFailure.RETRY,
         timeout_seconds=600,
         fan_out_count=3,
@@ -250,6 +277,9 @@ def test_definition_emit_parse_equivalent():
     assert s0.kind == "agent_dispatch"
     assert s0.role == "triager"
     assert s0.skills == ["write-tests", "acme/dev-skills/lint@v2"]
+    assert s0.environment_spec_slug == "triage-runtime"
+    assert s0.prompt == "Triage the report."
+    assert s0.output_key == "triage"
     assert s0.on_failure == "retry"
     assert s0.timeout == 600
     assert s0.fan_out == 3

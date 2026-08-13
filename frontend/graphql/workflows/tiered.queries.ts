@@ -42,6 +42,9 @@ const DEFINITION_SUMMARY_FIELDS = `
   isEnabled
   isGlobal
   organizationGuid
+  sourceRepo
+  sourcePath
+  sourceRef
   stageCount
   createdAt
 `;
@@ -50,6 +53,12 @@ const STAGE_FIELDS = `
   guid
   order
   kind
+  role
+  prompt
+  approvers
+  agentRef
+  environmentSpecSlug
+  outputKey
   skillRefs
   fanOutCount
   onFailure
@@ -168,11 +177,13 @@ export const PREVIEW_WORKFLOW_MANIFEST = gql`
         kind
         role
         agent
+        environmentSpecSlug
         skills
         onFailure
         timeout
         fanOut
         prompt
+        outputKey
         approvers
       }
     }

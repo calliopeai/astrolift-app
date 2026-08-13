@@ -10,9 +10,17 @@ type TagInputProps = {
   suggestions?: string[];
   placeholder?: string;
   className?: string;
+  disabled?: boolean;
 };
 
-export function TagInput({ value, onChange, suggestions = [], placeholder, className }: TagInputProps) {
+export function TagInput({
+  value,
+  onChange,
+  suggestions = [],
+  placeholder,
+  className,
+  disabled = false,
+}: TagInputProps) {
   const [input, setInput] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -22,6 +30,7 @@ export function TagInput({ value, onChange, suggestions = [], placeholder, class
   );
 
   const addTag = (tag: string) => {
+    if (disabled) return;
     const trimmed = tag.trim();
     if (trimmed && !value.includes(trimmed)) {
       onChange([...value, trimmed]);
@@ -32,6 +41,7 @@ export function TagInput({ value, onChange, suggestions = [], placeholder, class
   };
 
   const removeTag = (tag: string) => {
+    if (disabled) return;
     onChange(value.filter((t) => t !== tag));
   };
 
@@ -52,13 +62,14 @@ export function TagInput({ value, onChange, suggestions = [], placeholder, class
     <div className={`relative ${className || ""}`}>
       <div
         className="flex min-h-[32px] flex-wrap items-center gap-1 rounded-md border px-2 py-1 text-xs focus-within:ring-1 focus-within:ring-ring"
-        onClick={() => inputRef.current?.focus()}
+        onClick={() => !disabled && inputRef.current?.focus()}
       >
         {value.map((tag) => (
           <Badge key={tag} variant="secondary" className="gap-1 py-0 text-2xs">
             {tag}
             <button
               type="button"
+              disabled={disabled}
               onClick={(e) => {
                 e.stopPropagation();
                 removeTag(tag);
@@ -72,6 +83,7 @@ export function TagInput({ value, onChange, suggestions = [], placeholder, class
         <input
           ref={inputRef}
           type="text"
+          disabled={disabled}
           className="min-w-[80px] flex-1 border-none bg-transparent text-xs outline-none placeholder:text-muted-foreground"
           placeholder={value.length === 0 ? placeholder : ""}
           value={input}

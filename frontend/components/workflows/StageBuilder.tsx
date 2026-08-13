@@ -15,9 +15,9 @@
  *    TOML stages carry no stable identity, so edits cannot be mapped
  *    safely onto existing stage guids — Export + Import-as-new instead.
  *
- * Global (organization == null) definitions render read-only with a
- * "Platform template — Clone to edit" banner. All affordances are gated
- * on the server-authoritative `me.modules` workflows entry.
+ * Global (organization == null) and repository-managed definitions render
+ * read-only with an ownership banner. All affordances are gated on the
+ * server-authoritative `me.modules` workflows entry.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -159,16 +159,17 @@ function stageKindMeta(kind: string) {
 
 type StageDraft = {
   kind: string;
-  /** Also doubles as the checkpoint label. Write-only on the API today. */
+  /** Also doubles as the checkpoint label. */
   role: string;
+  agentRef: string;
   agentDefinitionGuid: string | null;
+  environmentSpecSlug: string;
   skillRefs: string[];
   fanOutCount: number | null;
   onFailure: string;
   timeoutSeconds: number;
-  /** human_gate only — settable at CREATE only (updateWorkflowStage lacks it). */
   prompt: string;
-  /** human_gate only — settable at CREATE only. */
+  outputKey: string;
   approvers: string[];
 };
 
@@ -180,14 +181,17 @@ function parseSkillRefs(raw: unknown): string[] {
 function draftFromStage(stage: WorkflowStage): StageDraft {
   return {
     kind: stage.kind,
-    role: "",
+    role: stage.role,
+    agentRef: stage.agentRef,
     agentDefinitionGuid: stage.agentDefinitionGuid,
+    environmentSpecSlug: stage.environmentSpecSlug,
     skillRefs: parseSkillRefs(stage.skillRefs),
     fanOutCount: stage.fanOutCount,
     onFailure: stage.onFailure,
     timeoutSeconds: stage.timeoutSeconds,
-    prompt: "",
-    approvers: [],
+    prompt: stage.prompt,
+    outputKey: stage.outputKey,
+    approvers: parseSkillRefs(stage.approvers),
   };
 }
 
@@ -195,12 +199,15 @@ function emptyDraft(): StageDraft {
   return {
     kind: "agent_dispatch",
     role: "",
+    agentRef: "",
     agentDefinitionGuid: null,
+    environmentSpecSlug: "",
     skillRefs: [],
     fanOutCount: null,
     onFailure: "fail",
     timeoutSeconds: 300,
     prompt: "",
+    outputKey: "",
     approvers: [],
   };
 }
@@ -225,13 +232,11 @@ function StageEditorFields({
   draft,
   onPatch,
   orgScoped,
-  isNew,
   disabled,
 }: {
   draft: StageDraft;
   onPatch: (patch: Partial<StageDraft>) => void;
   orgScoped: string | null;
-  isNew: boolean;
   disabled: boolean;
 }) {
   const kindMeta = stageKindMeta(draft.kind);
@@ -264,11 +269,24 @@ function StageEditorFields({
             <Label className="text-xs">Role</Label>
             <Input
               value={draft.role}
-              placeholder={isNew ? "e.g. reviewer" : "Write-only — set to overwrite"}
+              placeholder="e.g. reviewer"
               className="h-8 text-xs"
               disabled={disabled}
               onChange={(e) => onPatch({ role: e.target.value })}
             />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">Agent slug</Label>
+            <Input
+              value={draft.agentRef}
+              placeholder="e.g. emr-bug-triage"
+              className="h-8 text-xs"
+              disabled={disabled}
+              onChange={(e) => onPatch({ agentRef: e.target.value })}
+            />
+            <p className="text-muted-foreground text-2xs">
+              Declarative local reference; the selected workload wins when both are set.
+            </p>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs">Agent workload</Label>
@@ -280,12 +298,32 @@ function StageEditorFields({
             />
           </div>
           <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">Environment spec slug</Label>
+            <Input
+              value={draft.environmentSpecSlug}
+              placeholder="Defaults to the agent workload slug"
+              className="h-8 text-xs"
+              disabled={disabled}
+              onChange={(e) => onPatch({ environmentSpecSlug: e.target.value })}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
             <Label className="text-xs">Skills</Label>
             <SkillRefsPicker
               value={draft.skillRefs}
               onChange={(refs) => onPatch({ skillRefs: refs })}
               orgScoped={orgScoped}
               disabled={disabled}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">Stage instructions</Label>
+            <Textarea
+              value={draft.prompt}
+              placeholder="Instructions added to this stage's immutable task packet"
+              className="min-h-16 text-xs"
+              disabled={disabled}
+              onChange={(e) => onPatch({ prompt: e.target.value })}
             />
           </div>
           <div className="flex flex-col gap-1.5">
@@ -315,32 +353,34 @@ function StageEditorFields({
             <Label className="text-xs">Prompt</Label>
             <Textarea
               value={draft.prompt}
-              placeholder={isNew ? "What should the approver decide?" : ""}
+              placeholder="What should the approver decide?"
               className="min-h-16 text-xs"
-              disabled={disabled || !isNew}
+              disabled={disabled}
               onChange={(e) => onPatch({ prompt: e.target.value })}
             />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs">Approvers</Label>
-            {isNew ? (
-              <TagInput
-                value={draft.approvers}
-                onChange={(tags) => onPatch({ approvers: tags })}
-                placeholder="Type an approver and press Enter"
-              />
-            ) : (
-              <Input value="" disabled className="h-8 text-xs" />
-            )}
+            <TagInput
+              value={draft.approvers}
+              onChange={(tags) => onPatch({ approvers: tags })}
+              placeholder="Type an approver and press Enter"
+              disabled={disabled}
+            />
           </div>
-          {!isNew && (
-            <p className="text-muted-foreground text-2xs">
-              Prompt and approvers are editable only when a gate is created for now — the update
-              API doesn&apos;t accept them yet.
-            </p>
-          )}
         </>
       )}
+
+      <div className="flex flex-col gap-1.5">
+        <Label className="text-xs">Output key</Label>
+        <Input
+          value={draft.outputKey}
+          placeholder="Defaults to stage_<order>"
+          className="h-8 text-xs"
+          disabled={disabled}
+          onChange={(e) => onPatch({ outputKey: e.target.value })}
+        />
+      </div>
 
       {draft.kind === "checkpoint" && (
         <div className="flex flex-col gap-1.5">
@@ -507,7 +547,6 @@ function StageCard({
               draft={draft}
               onPatch={(patch) => setDraft((d) => ({ ...d, ...patch }))}
               orgScoped={orgScoped}
-              isNew={false}
               disabled={readOnly || saving}
             />
             {!readOnly && (
@@ -586,7 +625,6 @@ function AddStageCard({
           draft={draft}
           onPatch={(patch) => setDraft((d) => ({ ...d, ...patch }))}
           orgScoped={orgScoped}
-          isNew
           disabled={creating}
         />
         <div className="flex items-center justify-end gap-2">
@@ -847,7 +885,8 @@ export function StageBuilder({ slug }: { slug: string }) {
   const sorted = useMemo(() => [...stages].sort((a, b) => a.order - b.order), [stages]);
 
   const isGlobal = definition != null && (definition.isGlobal || definition.organizationGuid == null);
-  const readOnly = isGlobal || !canManage;
+  const isSourceManaged = Boolean(definition?.sourceRepo);
+  const readOnly = isGlobal || isSourceManaged || !canManage;
 
   const toggleExpanded = useCallback((guid: string) => {
     setExpanded((prev) => ({ ...prev, [guid]: !prev[guid] }));
@@ -865,8 +904,13 @@ export function StageBuilder({ slug }: { slug: string }) {
             onFailure: draft.onFailure,
             timeoutSeconds: draft.timeoutSeconds,
             agentDefinitionGuid: draft.agentDefinitionGuid,
+            agentRef: draft.agentRef.trim(),
+            environmentSpecSlug: draft.environmentSpecSlug.trim(),
             skillRefs: draft.skillRefs,
             fanOutCount: draft.fanOutCount,
+            prompt: draft.prompt,
+            outputKey: draft.outputKey.trim(),
+            approvers: draft.approvers,
           },
         });
         if (reportResult(data?.updateWorkflowStage, "Failed to save the stage")) {
@@ -916,7 +960,6 @@ export function StageBuilder({ slug }: { slug: string }) {
     async (draft: StageDraft) => {
       const nextOrder =
         sorted.length > 0 ? Math.max(...sorted.map((s) => s.order)) + 1 : 0;
-      const isGate = draft.kind === "human_gate";
       const { data } = await createStage({
         variables: {
           workflowSlug: slug,
@@ -926,10 +969,13 @@ export function StageBuilder({ slug }: { slug: string }) {
           onFailure: draft.onFailure,
           timeoutSeconds: draft.timeoutSeconds,
           agentDefinitionGuid: draft.agentDefinitionGuid,
+          agentRef: draft.agentRef.trim() || null,
+          environmentSpecSlug: draft.environmentSpecSlug.trim() || null,
           skillRefs: draft.skillRefs,
           fanOutCount: draft.fanOutCount,
-          prompt: isGate && draft.prompt.trim() !== "" ? draft.prompt : null,
-          approvers: isGate && draft.approvers.length > 0 ? draft.approvers : null,
+          prompt: draft.prompt.trim() !== "" ? draft.prompt : null,
+          outputKey: draft.outputKey.trim() || null,
+          approvers: draft.approvers.length > 0 ? draft.approvers : null,
         },
       });
       if (reportResult(data?.createWorkflowStage, "Failed to add the stage")) {
@@ -1078,6 +1124,17 @@ export function StageBuilder({ slug }: { slug: string }) {
             )}
             Clone to edit
           </Button>
+        </div>
+      )}
+
+      {isSourceManaged && (
+        <div className="border-info/40 bg-info/10 flex items-center gap-2 rounded-md border px-4 py-3 text-sm">
+          <LockIcon className="text-info-fg h-4 w-4 shrink-0" />
+          <span>
+            <span className="font-medium">Repository managed</span> — edit{" "}
+            <code>{definition.sourceRepo}/{definition.sourcePath}</code> and sync the agent repository.
+            {definition.sourceRef ? ` Last reconciled at ${definition.sourceRef.slice(0, 12)}.` : ""}
+          </span>
         </div>
       )}
 

@@ -242,6 +242,25 @@ def test_update_denied_without_permission(member, org):
             m.update_workflow_definition(_info(member), slug="o-upd-noperm", name="x")
 
 
+def test_source_managed_definition_rejects_ui_writes(member, org, permission_resolver):
+    permission_resolver.grant(Permission.WORKFLOW_UPDATE)
+    definition = _make_def("repo-owned", organization=org)
+    definition.source_repo = "steadymd/smd-agents"
+    definition.source_path = "workflows/triage.toml"
+    definition.source_ref = "abc123"
+    definition.save(update_fields=["source_repo", "source_path", "source_ref", "updated_at", "version"])
+
+    m = Mutation()
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        result = m.update_workflow_definition(_info(member), slug="repo-owned", name="Drift")
+
+    assert result.ok is False
+    assert result.errors[0].field == "source"
+    assert "steadymd/smd-agents/workflows/triage.toml" in result.errors[0].messages[0]
+    definition.refresh_from_db()
+    assert definition.name == "Def repo-owned"
+
+
 def test_delete_rejected_on_global(member, org, permission_resolver):
     permission_resolver.grant(Permission.WORKFLOW_DELETE)
     d = _make_def("g-del-target", organization=None)

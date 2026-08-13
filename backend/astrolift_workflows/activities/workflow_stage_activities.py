@@ -76,29 +76,112 @@ def _parent_run_pk(workflow_run_id: str) -> int:
 # ---------------------------------------------------------------------------
 
 
-def _get_workflow_stages_sync(workflow_definition_slug: str) -> list[dict]:
+def _get_workflow_stages_sync(
+    workflow_definition_slug: str,
+    workflow_run_id: str | None = None,
+    stage_bindings: dict | None = None,
+    workflow_definition_id: str | None = None,
+) -> dict:
     """Return the definition's stages as ordered plain dicts.
 
     The workflow body keys off these dicts, never the ORM objects, so the
     sandbox stays free of Django. ``stage_id`` is the DB pk used by the
     per-stage execution activities.
     """
-    from workflows.models import WorkflowDefinition
+    from django.db.models import Q
 
-    definition = (
-        WorkflowDefinition.objects.filter(
-            slug=workflow_definition_slug,
-            is_enabled=True,
-            deleted_at__isnull=True,
-        )
-        .prefetch_related("stages")
-        .first()
-    )
+    from astrolift_operations.models import WorkflowRun
+    from astrolift_registry.models import Workload
+    from workflows.models import WorkflowDefinition, WorkflowStage
+
+    run = None
+    organization_id = None
+    if workflow_run_id is not None:
+        run = WorkflowRun.objects.get(pk=_parent_run_pk(workflow_run_id))
+        organization_id = run.organization_id
+
+    definitions = WorkflowDefinition.objects.filter(
+        is_enabled=True,
+        deleted_at__isnull=True,
+    ).prefetch_related("stages")
+    if workflow_definition_id:
+        definitions = definitions.filter(pk=int(workflow_definition_id))
+    else:
+        definitions = definitions.filter(slug=workflow_definition_slug)
+    if organization_id is not None:
+        definitions = definitions.filter(Q(organization_id=organization_id) | Q(organization__isnull=True))
+        definition = definitions.filter(organization_id=organization_id).first() or definitions.first()
+    else:
+        definition = definitions.first()
     if definition is None:
         raise RuntimeError(f"WorkflowDefinition {workflow_definition_slug!r} not found, disabled, or deleted")
 
+    bindings = stage_bindings if isinstance(stage_bindings, dict) else {}
     stages: list[dict] = []
     for stage in definition.stages.filter(deleted_at__isnull=True).order_by("order"):
+        binding = bindings.get(str(stage.order), bindings.get(stage.order, {}))
+        if not isinstance(binding, dict):
+            raise RuntimeError(f"stage {stage.order} binding must be an object")
+        params = binding.get("params", {})
+        if not isinstance(params, dict):
+            raise RuntimeError(f"stage {stage.order} binding params must be an object")
+
+        workload = None
+        workload_guid = binding.get("agent_workload_id")
+        if workload_guid:
+            workload = Workload.objects.filter(
+                guid=str(workload_guid),
+                kind=Workload.Kind.AGENT,
+                deleted_at__isnull=True,
+                **(
+                    {"registered_app__organization_id": organization_id}
+                    if organization_id is not None
+                    else {}
+                ),
+            ).first()
+            if workload is None:
+                raise RuntimeError(
+                    f"stage {stage.order} binding does not resolve to a live agent in this organization"
+                )
+        elif stage.agent_definition_id is not None:
+            workload = Workload.objects.filter(
+                pk=stage.agent_definition_id,
+                kind=Workload.Kind.AGENT,
+                deleted_at__isnull=True,
+                **(
+                    {"registered_app__organization_id": organization_id}
+                    if organization_id is not None
+                    else {}
+                ),
+            ).first()
+            if workload is None and stage.kind == WorkflowStage.StageKind.AGENT_DISPATCH:
+                raise RuntimeError(
+                    f"stage {stage.order} default agent is outside the run organization or unavailable"
+                )
+        elif stage.agent_ref and organization_id is not None:
+            workload = Workload.objects.filter(
+                registered_app__organization_id=organization_id,
+                slug=stage.agent_ref,
+                kind=Workload.Kind.AGENT,
+                deleted_at__isnull=True,
+            ).first()
+
+        if stage.kind == WorkflowStage.StageKind.AGENT_DISPATCH and workload is None:
+            raise RuntimeError(
+                f"stage {stage.order} has no resolvable agent; bind agent_workload_id or register {stage.agent_ref!r}"
+            )
+
+        if "skill_refs" in binding:
+            skill_refs = binding["skill_refs"]
+            if not isinstance(skill_refs, list) or any(not isinstance(ref, str) for ref in skill_refs):
+                raise RuntimeError(f"stage {stage.order} skill_refs must be a list of strings")
+        else:
+            skill_refs = list(stage.skill_refs or [])
+        environment_spec_slug = params.get("environment_spec_slug", stage.environment_spec_slug)
+        prompt = params.get("prompt", stage.prompt)
+        output_key = params.get("output_key", stage.output_key) or f"stage_{stage.order}"
+        if not all(isinstance(value, str) for value in (environment_spec_slug, prompt, output_key)):
+            raise RuntimeError(f"stage {stage.order} runtime params must be strings")
         stages.append(
             {
                 "stage_id": str(stage.pk),
@@ -107,12 +190,20 @@ def _get_workflow_stages_sync(workflow_definition_slug: str) -> list[dict]:
                 "on_failure": stage.on_failure,
                 "timeout_seconds": int(stage.timeout_seconds),
                 "fan_out_count": stage.fan_out_count,
-                "skill_refs": list(stage.skill_refs or []),
-                "agent_definition_id": stage.agent_definition_id,
-                "has_agent_definition": stage.agent_definition_id is not None,
+                "skill_refs": list(skill_refs),
+                "agent_definition_id": workload.pk if workload is not None else None,
+                "has_agent_definition": workload is not None,
+                "environment_spec_slug": environment_spec_slug,
+                "prompt": prompt,
+                "output_key": output_key,
             }
         )
+    output_keys = [stage["output_key"] for stage in stages]
+    duplicates = sorted({key for key in output_keys if output_keys.count(key) > 1})
+    if duplicates:
+        raise RuntimeError("workflow stage output_key values must be unique: " + ", ".join(duplicates))
     return {
+        "definition_id": str(definition.pk),
         "pattern_kind": definition.pattern_kind,
         "stages": stages,
     }
@@ -227,6 +318,7 @@ def _dispatch_agent_for_stage_sync(
     stage_id: str,
     execution_id: str,
     trigger_payload: dict,
+    resolved_config: dict | None = None,
 ) -> str:
     """Create the AgentRun history row, enqueue + spawn an AgentTask, and
     link the run onto the stage execution. Returns the AgentRun pk.
@@ -236,70 +328,123 @@ def _dispatch_agent_for_stage_sync(
     spawner. The two are bridged by stamping the spawner's ``external_id``
     onto the AgentTask and keeping AgentRun status in lockstep.
     """
+    from django.db import transaction
     from django.utils import timezone
 
-    from astrolift_agents.models import AgentTask
+    from astrolift_agents.models import AgentEnvironmentSpec, AgentTask
     from astrolift_dispatch.spawners.registry import get_spawner
     from astrolift_lifecycle.models import AgentRun
+    from astrolift_registry.models import Workload
     from workflows.models import WorkflowStage, WorkflowStageExecution
 
     stage = WorkflowStage.objects.select_related("agent_definition", "definition").get(pk=int(stage_id))
     execution = WorkflowStageExecution.objects.select_related("workflow_run").get(pk=int(execution_id))
-    if stage.agent_definition is None:
-        raise RuntimeError(
-            f"stage {stage_id} is kind={stage.kind} with no agent_definition — cannot dispatch an agent"
-        )
-
     run = execution.workflow_run
     organization_id = run.organization_id
+    config = resolved_config if isinstance(resolved_config, dict) else {}
+    workload_id = config.get("agent_definition_id") or stage.agent_definition_id
+    workload = Workload.objects.filter(
+        pk=workload_id,
+        kind=Workload.Kind.AGENT,
+        deleted_at__isnull=True,
+        **({"registered_app__organization_id": organization_id} if organization_id is not None else {}),
+    ).first()
+    if workload is None:
+        raise RuntimeError(
+            f"stage {stage_id} is kind={stage.kind} with no agent_definition resolvable — cannot dispatch"
+        )
+    skill_refs = list(config.get("skill_refs", stage.skill_refs or []))
+    environment_spec_slug = str(config.get("environment_spec_slug", stage.environment_spec_slug) or "")
+    prompt = str(config.get("prompt", stage.prompt) or "")
+    output_key = str(config.get("output_key", stage.output_key) or f"stage_{stage.order}")
 
-    agent_run = AgentRun.objects.create(
-        workload=stage.agent_definition,
-        trigger_kind=AgentRun.TriggerKind.EVENT,
-        triggered_by_user_id=run.trigger_actor_user_id,
-        status=AgentRun.Status.PENDING,
-        input={
-            "stage_id": str(stage.pk),
-            "stage_order": stage.order,
-            "skill_refs": list(stage.skill_refs or []),
-            "trigger_payload": trigger_payload,
-        },
-        started_at=timezone.now(),
-    )
+    environment_spec = None
+    if environment_spec_slug:
+        environment_spec = AgentEnvironmentSpec.objects.filter(
+            organization_id=organization_id,
+            slug=environment_spec_slug,
+            deleted_at__isnull=True,
+        ).first()
+        if environment_spec is None:
+            raise RuntimeError(
+                f"environment spec {environment_spec_slug!r} not found for stage {stage.order} organization"
+            )
 
-    # Link the run onto the execution immediately so an operator polling
-    # the stage sees the dispatch even if the spawn below is slow/fails.
-    execution.agent_run = agent_run
-    execution.save(update_fields=["agent_run", "updated_at", "version"])
+    # Temporal may retry an activity after the DB commit or even after the
+    # external spawn succeeded but before the result reached the server. Lock
+    # the stage execution and reuse its durable AgentRun/AgentTask so one
+    # execution can never multiply agents merely because an activity retried.
+    with transaction.atomic():
+        execution = (
+            WorkflowStageExecution.objects.select_for_update()
+            .select_related("workflow_run")
+            .get(pk=int(execution_id))
+        )
+        agent_run = (
+            AgentRun.objects.filter(pk=execution.agent_run_id).first()
+            if execution.agent_run_id is not None
+            else None
+        )
+        if agent_run is None:
+            agent_run = AgentRun.objects.create(
+                workload=workload,
+                trigger_kind=AgentRun.TriggerKind.EVENT,
+                triggered_by_user_id=run.trigger_actor_user_id,
+                status=AgentRun.Status.PENDING,
+                input={
+                    "stage_id": str(stage.pk),
+                    "stage_order": stage.order,
+                    "skill_refs": skill_refs,
+                    "environment_spec_slug": environment_spec_slug,
+                    "prompt": prompt,
+                    "output_key": output_key,
+                    "trigger_payload": trigger_payload,
+                },
+                started_at=timezone.now(),
+            )
+            execution.agent_run = agent_run
+            execution.save(update_fields=["agent_run", "updated_at", "version"])
 
-    task = AgentTask.objects.create(
-        organization_id=organization_id,
-        agent_definition=stage.agent_definition,
-        # Explicit AgentRun linkage (#1217): both records are created here,
-        # so link them directly rather than leaning on the reconciler's
-        # historical (workload, external_id == k8s_pod_name) fuzzy join.
-        agent_run=agent_run,
-        status=AgentTask.Status.DRAFT,
-        timeout_seconds=int(stage.timeout_seconds),
-    )
+        task = AgentTask.objects.filter(agent_run=agent_run, deleted_at__isnull=True).first()
+        if task is None:
+            task = AgentTask.objects.create(
+                organization_id=organization_id,
+                agent_definition=workload,
+                environment_spec=environment_spec,
+                agent_run=agent_run,
+                status=AgentTask.Status.DRAFT,
+                timeout_seconds=int(stage.timeout_seconds),
+                dispatch_input=trigger_payload or None,
+            )
+
+    if task.status in AgentTask.TERMINAL_STATUSES or task.status == AgentTask.Status.RUNNING:
+        return str(agent_run.pk)
     from astrolift_agents.services.task_preparation import (
         prepare_agent_task,
         settle_preparation_failure,
     )
 
-    try:
-        prepare_agent_task(
-            task,
-            context={"trigger": "workflow", "workflow_stage_id": str(stage.pk)},
-        )
-    except Exception as exc:  # noqa: BLE001
-        settle_preparation_failure(task, exc)
-        agent_run.status = AgentRun.Status.FAILED
-        agent_run.ended_at = timezone.now()
-        agent_run.output = {"package_error": str(exc)}
-        agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
-        raise RuntimeError(f"agent package preparation failed for stage {stage_id}: {exc}") from exc
-    task.transition_to(AgentTask.Status.QUEUED)
+    if task.status == AgentTask.Status.DRAFT:
+        try:
+            prepare_agent_task(
+                task,
+                context={
+                    "trigger": "workflow",
+                    "workflow_stage_id": str(stage.pk),
+                    "workflow_stage_order": stage.order,
+                },
+                skill_refs=skill_refs,
+                prompt=prompt,
+                output_key=output_key,
+            )
+        except Exception as exc:  # noqa: BLE001
+            settle_preparation_failure(task, exc)
+            agent_run.status = AgentRun.Status.FAILED
+            agent_run.ended_at = timezone.now()
+            agent_run.output = {"package_error": str(exc)}
+            agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
+            raise RuntimeError(f"agent package preparation failed for stage {stage_id}: {exc}") from exc
+        task.transition_to(AgentTask.Status.QUEUED)
 
     dispatcher = _resolve_dispatcher_sync(organization_id)
     if dispatcher is None:
@@ -314,8 +459,10 @@ def _dispatch_agent_for_stage_sync(
         )
         return str(agent_run.pk)
 
-    task.transition_to(AgentTask.Status.PROVISIONING)
-    task.dispatcher = dispatcher
+    if task.status == AgentTask.Status.QUEUED:
+        task.transition_to(AgentTask.Status.PROVISIONING)
+    elif task.status != AgentTask.Status.PROVISIONING:
+        raise RuntimeError(f"agent task {task.guid} cannot resume dispatch from {task.status}")
 
     # Spawn into the per-org agent namespace (the same one execute_agent_stage
     # uses) and freeze it on the task. Previously this path took the spawner's
@@ -324,8 +471,35 @@ def _dispatch_agent_for_stage_sync(
     from astrolift_workflows.activities.agent_stage import _agent_namespace
 
     namespace = _agent_namespace(run.organization.slug)
+    task.dispatcher = dispatcher
+    task.namespace = namespace
+    task.save(update_fields=["dispatcher", "namespace", "updated_at", "version"])
+
+    # A prior attempt may have persisted the external id before losing its
+    # activity response. Resume the state transition without spawning again.
+    if task.external_id:
+        task.pod_name = task.pod_name or task.external_id
+        task.save(update_fields=["pod_name", "updated_at", "version"])
+        task.transition_to(AgentTask.Status.RUNNING)
+        agent_run.status = AgentRun.Status.RUNNING
+        agent_run.k8s_pod_name = task.external_id
+        agent_run.save(update_fields=["status", "k8s_pod_name", "updated_at", "version"])
+        return str(agent_run.pk)
+
     spawner = get_spawner(dispatcher.backend, cluster=dispatcher.tenant_cluster, namespace=namespace)
-    result = spawner.spawn(task)
+    try:
+        result = spawner.spawn(task)
+    except Exception as exc:  # noqa: BLE001 — fail this attempt; workflow policy may retry
+        task.failure = {"message": f"spawn raised: {exc}"}
+        task.save(update_fields=["failure", "updated_at", "version"])
+        task.transition_to(AgentTask.Status.FAILED)
+        agent_run.status = AgentRun.Status.FAILED
+        agent_run.ended_at = timezone.now()
+        agent_run.output = {"spawn_error": str(exc)}
+        agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
+        raise RuntimeError(
+            f"spawn failed for stage {stage_id} via dispatcher {dispatcher.slug!r}: {exc}"
+        ) from exc
     task.external_id = result.external_id
     task.namespace = namespace
     task.pod_name = result.external_id
@@ -390,6 +564,19 @@ def _poll_agent_run_status_sync(agent_run_id: str) -> str:
     if task is not None and task.agent_run_id is None:
         task.agent_run = agent_run
         task.save(update_fields=["agent_run", "updated_at", "version"])
+    if task is not None and task.status in AgentTask.TERMINAL_STATUSES:
+        if task.status == AgentTask.Status.COMPLETED:
+            agent_run.status = AgentRun.Status.SUCCEEDED
+            agent_run.output = task.result or {"exit_code": 0}
+        elif task.status == AgentTask.Status.CANCELLED:
+            agent_run.status = AgentRun.Status.CANCELLED
+            agent_run.output = task.failure
+        else:
+            agent_run.status = AgentRun.Status.FAILED
+            agent_run.output = task.failure
+        agent_run.ended_at = task.ended_at or timezone.now()
+        agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
+        return agent_run.status
     if task is None or not task.external_id or task.dispatcher_id is None:
         # Nothing to poll (no dispatcher / push-mode only). Leave as-is.
         return agent_run.status
@@ -404,10 +591,13 @@ def _poll_agent_run_status_sync(agent_run_id: str) -> str:
 
     if status.succeeded:
         if task.status == AgentTask.Status.RUNNING:
+            if task.result is None:
+                task.result = {"exit_code": status.exit_code or 0}
+                task.save(update_fields=["result", "updated_at", "version"])
             task.transition_to(AgentTask.Status.COMPLETED)
         agent_run.status = AgentRun.Status.SUCCEEDED
         agent_run.ended_at = timezone.now()
-        agent_run.output = {"exit_code": status.exit_code or 0}
+        agent_run.output = task.result or {"exit_code": status.exit_code or 0}
         agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
     elif status.failed:
         if task.status == AgentTask.Status.RUNNING:
@@ -421,6 +611,24 @@ def _poll_agent_run_status_sync(agent_run_id: str) -> str:
         agent_run.save(update_fields=["status", "ended_at", "output", "updated_at", "version"])
     # else: still running — no change.
     return agent_run.status
+
+
+def _load_agent_run_outcome_sync(agent_run_id: str) -> dict:
+    """Return the semantic callback result plus durable run metadata."""
+    from astrolift_agents.models import resolve_agent_task_for_run
+    from astrolift_lifecycle.models import AgentRun
+
+    agent_run = AgentRun.objects.get(pk=int(agent_run_id))
+    task = resolve_agent_task_for_run(agent_run)
+    result = task.result if task is not None and task.result is not None else agent_run.output
+    failure = task.failure if task is not None and task.failure is not None else None
+    return {
+        "agent_run_id": str(agent_run.pk),
+        "status": agent_run.status,
+        "result": result,
+        "failure": failure,
+        "task_guid": str(task.guid) if task is not None else None,
+    }
 
 
 def _resolve_gate_agent_tasks_sync(execution) -> tuple[list, bool]:
@@ -715,12 +923,19 @@ def _mark_workflow_run_sync(
 
 
 @activity.defn(name="astrolift.workflow_stage.get_workflow_stages")
-async def get_workflow_stages(workflow_definition_slug: str) -> dict:
+async def get_workflow_stages(params: str | dict) -> dict:
     """Return ``{pattern_kind, stages: [ordered stage dicts]}``."""
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    return await sync_to_async(_get_workflow_stages_sync)(workflow_definition_slug)
+    if isinstance(params, str):
+        return await sync_to_async(_get_workflow_stages_sync)(params)
+    return await sync_to_async(_get_workflow_stages_sync)(
+        str(params["workflow_definition_slug"]),
+        params.get("workflow_run_id"),
+        params.get("stage_bindings"),
+        params.get("workflow_definition_id"),
+    )
 
 
 @activity.defn(name="astrolift.workflow_stage.create_stage_execution")
@@ -755,12 +970,18 @@ async def dispatch_agent_for_stage(
     stage_id: str,
     execution_id: str,
     trigger_payload: dict,
+    resolved_config: dict | None = None,
 ) -> str:
     """Create an AgentRun + dispatch an AgentTask; return the AgentRun pk."""
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    return await sync_to_async(_dispatch_agent_for_stage_sync)(stage_id, execution_id, trigger_payload)
+    return await sync_to_async(_dispatch_agent_for_stage_sync)(
+        stage_id,
+        execution_id,
+        trigger_payload,
+        resolved_config,
+    )
 
 
 @activity.defn(name="astrolift.workflow_stage.poll_agent_run_status")
@@ -770,6 +991,15 @@ async def poll_agent_run_status(agent_run_id: str) -> str:
 
     activity.heartbeat()
     return await sync_to_async(_poll_agent_run_status_sync)(agent_run_id)
+
+
+@activity.defn(name="astrolift.workflow_stage.load_agent_run_outcome")
+async def load_agent_run_outcome(agent_run_id: str) -> dict:
+    """Load the terminal AgentTask callback result for stage chaining."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    return await sync_to_async(_load_agent_run_outcome_sync)(agent_run_id)
 
 
 @activity.defn(name="astrolift.workflow_stage.record_human_gate_decision")

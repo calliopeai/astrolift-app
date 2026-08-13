@@ -356,6 +356,73 @@ def test_repo_with_no_agents_returns_no_agents(org, with_connection):
     assert RegisteredApp.objects.filter(organization=org, deleted_at__isnull=True).count() == 0
 
 
+def test_workflow_only_repo_reconciles_without_agent_manifests(org, with_connection):
+    from workflows.models import WorkflowDefinition
+
+    with_connection(org)
+    project = _project(org)
+    workflow_toml = """\
+[workflow]
+slug = "snapshot-chain"
+name = "Snapshot chain"
+
+[[stage]]
+kind = "checkpoint"
+output_key = "snapshot"
+"""
+    result = register_agent_repo(
+        project=project,
+        source_kind="github",
+        source_repo="acme/workflow-config",
+        ref="abc123",
+        tree=_tree_of({"workflows/snapshot.toml": workflow_toml}),
+    )
+
+    assert result.status == "ok"
+    assert result.agents == []
+    assert [(row.slug, row.path) for row in result.workflows] == [
+        ("snapshot-chain", "workflows/snapshot.toml")
+    ]
+    definition = WorkflowDefinition.objects.get(organization=org, slug="snapshot-chain")
+    assert definition.source_repo == "acme/workflow-config"
+    assert definition.source_ref == "abc123"
+
+
+def test_agent_and_workflow_reconcile_in_one_transaction_with_eager_binding(org, with_connection):
+    from workflows.models import WorkflowDefinition
+
+    with_connection(org)
+    project = _project(org)
+    workflow_toml = """\
+[workflow]
+slug = "triage-chain"
+name = "Triage chain"
+
+[[stage]]
+kind = "agent_dispatch"
+agent = "triage"
+output_key = "triage"
+"""
+    result = register_agent_repo(
+        project=project,
+        source_kind="github",
+        source_repo="acme/agent-config",
+        ref="abc123",
+        tree=_tree_of(
+            {
+                "agents/triage/astrolift.toml": _agent_toml("triage"),
+                "workflows/triage.toml": workflow_toml,
+            }
+        ),
+    )
+
+    assert result.status == "ok"
+    definition = WorkflowDefinition.objects.get(organization=org, slug="triage-chain")
+    stage = definition.stages.get(order=0)
+    assert stage.agent_ref == "triage"
+    assert stage.agent_definition.slug == "triage"
+
+
 # ---------------------------------------------------------------------------
 # #933: manifestPaths subset registration
 # ---------------------------------------------------------------------------

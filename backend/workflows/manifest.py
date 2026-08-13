@@ -67,20 +67,22 @@ class WorkflowStageSpec:
 
     ``fan_out`` mirrors the manifest's tri-state: ``0`` (none), a positive
     ``int`` (static count), or the string ``"dynamic"`` (derive from the
-    prior stage's output). ``prompt``/``approvers`` are human-gate fields
-    persisted on ``WorkflowStage`` (#969), so :func:`definition_to_manifest`
-    emits them and a model-backed export round-trips losslessly.
+    prior stage's output). Agent stages may select an environment recipe,
+    add instructions and publish their structured result under
+    ``output_key``; human gates reuse ``prompt`` for their approval question.
     """
 
     order: int
     kind: str
     role: str = ""
     agent: str | None = None
+    environment_spec_slug: str | None = None
     skills: list[str] = dataclasses.field(default_factory=list)
     on_failure: str = _DEFAULT_ON_FAILURE
     timeout: int = _DEFAULT_TIMEOUT
     fan_out: int | str = 0
     prompt: str | None = None
+    output_key: str | None = None
     approvers: list[str] = dataclasses.field(default_factory=list)
 
 
@@ -121,6 +123,13 @@ def parse_workflow_manifest(toml_str: str) -> ParsedWorkflowManifest:
         raise ManifestError("[[stage]] must be an array of tables", path="stage")
 
     stages = [_parse_stage(item, i) for i, item in enumerate(raw_stages)]
+    output_keys = [stage.output_key or f"stage_{stage.order}" for stage in stages]
+    duplicates = sorted({key for key in output_keys if output_keys.count(key) > 1})
+    if duplicates:
+        raise ManifestError(
+            "output_key values must be unique: " + ", ".join(duplicates),
+            path="stage.output_key",
+        )
     return ParsedWorkflowManifest(definition=definition, stages=stages)
 
 
@@ -165,6 +174,15 @@ def _parse_stage(d: Any, index: int) -> WorkflowStageSpec:
             path=f"{base}.agent",
         )
 
+    environment_spec_slug = d.get("environment_spec_slug")
+    if environment_spec_slug is not None and (
+        not isinstance(environment_spec_slug, str) or not environment_spec_slug.strip()
+    ):
+        raise ManifestError(
+            "environment_spec_slug must be a non-empty string",
+            path=f"{base}.environment_spec_slug",
+        )
+
     # Reuse the spec 39 skill-ref grammar verbatim (local / catalogue /
     # org-repo). _parse_skills validates each entry and returns SkillRefs;
     # we re-canonicalize back to strings for storage + lossless emit.
@@ -188,6 +206,10 @@ def _parse_stage(d: Any, index: int) -> WorkflowStageSpec:
     if prompt is not None and not isinstance(prompt, str):
         raise ManifestError("prompt must be a string", path=f"{base}.prompt")
 
+    output_key = d.get("output_key")
+    if output_key is not None and (not isinstance(output_key, str) or not output_key.strip()):
+        raise ManifestError("output_key must be a non-empty string", path=f"{base}.output_key")
+
     approvers = d.get("approvers", [])
     if not isinstance(approvers, list) or any(not isinstance(a, str) for a in approvers):
         raise ManifestError("approvers must be a list of strings", path=f"{base}.approvers")
@@ -197,11 +219,13 @@ def _parse_stage(d: Any, index: int) -> WorkflowStageSpec:
         kind=kind,
         role=role,
         agent=agent,
+        environment_spec_slug=environment_spec_slug,
         skills=skills,
         on_failure=on_failure,
         timeout=timeout,
         fan_out=fan_out,
         prompt=prompt,
+        output_key=output_key,
         approvers=list(approvers),
     )
 
@@ -273,6 +297,8 @@ def emit_workflow_manifest(parsed: ParsedWorkflowManifest) -> str:
             row["role"] = stage.role
         if stage.agent is not None:
             row["agent"] = stage.agent
+        if stage.environment_spec_slug is not None:
+            row["environment_spec_slug"] = stage.environment_spec_slug
         if stage.skills:
             row["skills"] = list(stage.skills)
         if stage.on_failure != _DEFAULT_ON_FAILURE:
@@ -283,6 +309,8 @@ def emit_workflow_manifest(parsed: ParsedWorkflowManifest) -> str:
             row["fan_out"] = stage.fan_out
         if stage.prompt is not None:
             row["prompt"] = stage.prompt
+        if stage.output_key is not None:
+            row["output_key"] = stage.output_key
         if stage.approvers:
             row["approvers"] = list(stage.approvers)
         stages.append(row)
@@ -313,7 +341,7 @@ def definition_to_manifest(definition: WorkflowDefinition) -> ParsedWorkflowMani
     stages: list[WorkflowStageSpec] = []
     rows = definition.stages.order_by("order").select_related("agent_definition")
     for stage in rows:
-        agent_slug = stage.agent_definition.slug if stage.agent_definition else None
+        agent_slug = stage.agent_definition.slug if stage.agent_definition else (stage.agent_ref or None)
         if stage.fan_out_dynamic:
             fan_out: int | str = "dynamic"
         elif stage.fan_out_count:
@@ -326,11 +354,13 @@ def definition_to_manifest(definition: WorkflowDefinition) -> ParsedWorkflowMani
                 kind=stage.kind,
                 role=stage.role or "",
                 agent=agent_slug,
+                environment_spec_slug=stage.environment_spec_slug or None,
                 skills=list(stage.skill_refs or []),
                 on_failure=stage.on_failure,
                 timeout=stage.timeout_seconds,
                 fan_out=fan_out,
                 prompt=stage.prompt or None,
+                output_key=stage.output_key or None,
                 approvers=list(stage.approvers or []),
             )
         )
@@ -372,10 +402,11 @@ def create_definition_from_manifest(parsed: ParsedWorkflowManifest, *, organizat
     persistence rules (org scope, fan-out tri-state → two columns, role-only
     globals) live in exactly one place.
 
-    Imported definitions land disabled (``is_enabled=False``) with no concrete
-    ``agent_definition`` bindings — an operator reviews + binds agents before
-    enabling, exactly like a cloned global (spec 40 §2.1/§2.4). The slug is
-    made unique within the org on collision.
+    Imported definitions land disabled for operator review. Local ``agent``
+    slugs are retained in ``agent_ref`` and eagerly bound when the matching
+    org workload already exists; otherwise they remain late-bound and can
+    resolve after that agent is registered. The slug is made unique within
+    the org on collision.
     """
     slug = _unique_definition_slug(parsed.definition.slug, organization)
     definition = WorkflowDefinition.objects.create(
@@ -390,6 +421,16 @@ def create_definition_from_manifest(parsed: ParsedWorkflowManifest, *, organizat
         updated_by=created_by,
     )
     for stage in parsed.stages:
+        agent_definition = None
+        if stage.agent:
+            from astrolift_registry.models import Workload
+
+            agent_definition = Workload.objects.filter(
+                registered_app__organization=organization,
+                slug=stage.agent,
+                kind=Workload.Kind.AGENT,
+                deleted_at__isnull=True,
+            ).first()
         fan_out_count, fan_out_dynamic = _fan_out_columns(stage.fan_out)
         WorkflowStage.objects.create(
             definition=definition,
@@ -397,13 +438,16 @@ def create_definition_from_manifest(parsed: ParsedWorkflowManifest, *, organizat
             order=stage.order,
             kind=stage.kind,
             role=stage.role or "",
-            agent_definition=None,
+            agent_definition=agent_definition,
+            agent_ref=stage.agent or "",
+            environment_spec_slug=stage.environment_spec_slug or "",
             skill_refs=list(stage.skills),
             on_failure=stage.on_failure,
             timeout_seconds=stage.timeout,
             fan_out_count=fan_out_count,
             fan_out_dynamic=fan_out_dynamic,
             prompt=stage.prompt or "",
+            output_key=stage.output_key or "",
             approvers=list(stage.approvers),
             created_by=created_by,
             updated_by=created_by,

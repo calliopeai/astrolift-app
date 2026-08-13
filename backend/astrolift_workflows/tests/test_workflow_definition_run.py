@@ -22,10 +22,28 @@ from astrolift_workflows.workflows.workflow_definition_run import (
     STATUS_ESCALATED,
     STATUS_FAILED,
     STATUS_SKIPPED,
+    build_stage_dispatch_input,
     decide_after_agent_run,
     is_fan_out_stage,
     resolve_fan_out_count,
 )
+
+
+def test_build_stage_dispatch_input_keeps_flat_previous_and_named_context():
+    packet = build_stage_dispatch_input(
+        {"issue": "EMR-1"},
+        {"classification": "bug"},
+        {"evidence": {"reproduced": True}},
+        {"order": 2, "output_key": "report"},
+    )
+    assert packet["classification"] == "bug"
+    assert packet["_astrolift_workflow"] == {
+        "input": {"issue": "EMR-1"},
+        "previous": {"classification": "bug"},
+        "outputs": {"evidence": {"reproduced": True}},
+        "stage": {"order": 2, "output_key": "report"},
+    }
+
 
 # ---------------------------------------------------------------------------
 # decide_after_agent_run

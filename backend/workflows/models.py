@@ -60,7 +60,10 @@ class WorkflowDefinition(BaseCoreModel):
 
     model_label = models.CharField(
         max_length=100,
-        help_text='Django model this workflow applies to (e.g. "forms.FormSubmission")',
+        help_text=(
+            'Legacy state-machine target (for example "forms.FormSubmission"). '
+            "Agent pipelines leave this blank; it is not an LLM model selector."
+        ),
         db_index=True,
     )
     states = models.JSONField(
@@ -72,6 +75,24 @@ class WorkflowDefinition(BaseCoreModel):
         help_text='List of transition definitions [{from_state, to_state, label, conditions, actions, timeout_hours}]',
     )
     is_enabled = models.BooleanField(default=True)
+    source_repo = models.CharField(
+        max_length=512,
+        blank=True,
+        default="",
+        help_text="Source repository that declaratively owns this definition.",
+    )
+    source_path = models.CharField(
+        max_length=512,
+        blank=True,
+        default="",
+        help_text="Repository-relative workflow manifest path.",
+    )
+    source_ref = models.CharField(
+        max_length=128,
+        blank=True,
+        default="",
+        help_text="Last repository ref reconciled into this definition.",
+    )
 
     # Tier-1 org scope (spec 40 §2.1). NULL → platform-global template,
     # read-only to tenants (write mutations reject; superuser/staff may seed).
@@ -96,6 +117,11 @@ class WorkflowDefinition(BaseCoreModel):
                 fields=["organization", "slug"],
                 condition=models.Q(deleted_at__isnull=True),
                 name="workflowdefinition_org_slug_unique",
+            ),
+            models.UniqueConstraint(
+                fields=["organization", "source_repo", "source_path"],
+                condition=models.Q(deleted_at__isnull=True) & ~models.Q(source_repo=""),
+                name="workflowdefinition_org_source_unique",
             ),
         ]
 
@@ -464,6 +490,21 @@ class WorkflowStage(BaseCoreModel):
         on_delete=models.SET_NULL,
         help_text="Agent workload to dispatch at this stage (kind=agent_dispatch only).",
     )
+    # Stable manifest reference.  The FK above is an optional eager binding;
+    # this slug survives import before the referenced agent is registered and
+    # is resolved inside the run's organization when the workflow starts.
+    agent_ref = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Organization-local agent workload slug used by the workflow manifest.",
+    )
+    environment_spec_slug = models.CharField(
+        max_length=128,
+        blank=True,
+        default="",
+        help_text="Default org-scoped AgentEnvironmentSpec slug for this stage.",
+    )
     # Ordered list of Skill slugs injected into the agent at dispatch time.
     skill_refs = models.JSONField(
         default=list,
@@ -499,10 +540,19 @@ class WorkflowStage(BaseCoreModel):
     # the builder/binding UI when ``agent_definition`` is null (globals).
     # Optional for org definitions. (spec 40 §2.4)
     role = models.CharField(max_length=64, blank=True, default="")
-    # Human-gate / escalation fields (spec 40 §5.4 manifest ``prompt`` /
-    # ``approvers``). Empty for non-gate stages; carried on the model so a
-    # model-backed manifest export round-trips losslessly (#973 gap).
-    prompt = models.TextField(blank=True, default="")
+    # For agent stages this is an immutable per-dispatch instruction overlay;
+    # for human gates it is the question shown to approvers.
+    prompt = models.TextField(
+        blank=True,
+        default="",
+        help_text="Agent stage instruction overlay or human-gate approval prompt.",
+    )
+    output_key = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Name under which this stage's structured result is exposed to later stages.",
+    )
     approvers = models.JSONField(
         default=list,
         blank=True,
@@ -593,9 +643,54 @@ class Workflow(BaseCoreModel):
             if binding is None:
                 binding = bindings.get(stage.order)
             bound = bool(binding and binding.get("agent_workload_id"))
+            if not bound and stage.agent_definition_id is None and stage.agent_ref:
+                from astrolift_registry.models import Workload
+
+                bound = Workload.objects.filter(
+                    registered_app__organization_id=self.organization_id,
+                    slug=stage.agent_ref,
+                    kind=Workload.Kind.AGENT,
+                    deleted_at__isnull=True,
+                ).exists()
             if not bound and stage.agent_definition_id is None:
                 unbound.append((stage.order, stage.role or ""))
         return unbound
+
+    def invalid_binding_shapes(self) -> list[str]:
+        """Return deterministic validation errors for malformed stage bindings."""
+        live_orders = set(
+            self.definition.stages.filter(deleted_at__isnull=True).values_list("order", flat=True)
+        )
+        errors: list[str] = []
+        for raw_order, binding in (self.stage_bindings or {}).items():
+            try:
+                order = int(raw_order)
+            except (TypeError, ValueError):
+                errors.append(f"binding key {raw_order!r} is not a stage order")
+                continue
+            if order not in live_orders:
+                errors.append(f"stage {order} does not exist")
+            if not isinstance(binding, dict):
+                errors.append(f"stage {order} binding must be an object")
+                continue
+            if "skill_refs" in binding and (
+                not isinstance(binding["skill_refs"], list)
+                or any(
+                    not isinstance(ref, str) or not ref.strip()
+                    for ref in binding["skill_refs"]
+                )
+            ):
+                errors.append(
+                    f"stage {order} skill_refs must be a list of non-empty strings"
+                )
+            params = binding.get("params", {})
+            if not isinstance(params, dict):
+                errors.append(f"stage {order} params must be an object")
+                continue
+            for field in ("environment_spec_slug", "prompt", "output_key"):
+                if field in params and not isinstance(params[field], str):
+                    errors.append(f"stage {order} params.{field} must be a string")
+        return errors
 
     def unresolved_agent_bindings(self) -> list[str]:
         """Return the stage-order keys of ``stage_bindings`` entries whose
@@ -628,6 +723,9 @@ class Workflow(BaseCoreModel):
     def validate_bindings(self) -> None:
         """Raise ``ValidationError`` naming unbound ``agent_dispatch`` stages
         (spec 40 §2.2: validation on save/run)."""
+        malformed = self.invalid_binding_shapes()
+        if malformed:
+            raise ValidationError("Invalid stage_bindings: " + "; ".join(malformed))
         unbound = self.unbound_agent_stages()
         if unbound:
             labels = ", ".join(

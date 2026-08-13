@@ -457,6 +457,7 @@ def _sync_agent_package_on_push(app, payload: dict, *, connection=None) -> dict:
         "superseded_delivery": current_sha != commit_sha,
         "mode": "bundle" if bundle_sync else "independent",
         "agents": [item.slug for item in result.agents],
+        "workflows": [item.slug for item in getattr(result, "workflows", [])],
         "notes": [note for item in result.agents for note in item.skill_notes],
     }
 

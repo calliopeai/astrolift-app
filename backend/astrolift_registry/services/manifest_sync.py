@@ -38,6 +38,7 @@ import io
 import logging
 import zipfile
 from collections.abc import Callable
+from typing import Any
 
 from django.db import transaction
 from django.utils import timezone
@@ -734,12 +735,15 @@ class RegisterAgentRepoResult:
     ``status`` is one of ``ok`` / ``fetch_failed`` / ``no_agents`` /
     ``no_match`` / ``error``. ``no_match`` means a ``manifest_paths`` filter
     was supplied but none of the requested paths matched a discovered agent
-    manifest. ``agents`` lists what was created or matched (only on ``ok``);
-    ``error`` carries the message on the failure statuses.
+    manifest. ``agents`` and ``workflows`` list what was reconciled (only on
+    ``ok``); ``no_agents`` means neither an agent manifest nor a
+    ``workflows/**/*.toml`` definition was present. ``error`` carries the
+    message on failure statuses.
     """
 
     status: str
     agents: list[RegisteredAgent] = dataclasses.field(default_factory=list)
+    workflows: list[Any] = dataclasses.field(default_factory=list)
     error: str | None = None
 
 
@@ -802,8 +806,12 @@ def _scan_repo_for_agents(
                 pat_discovered = scan_agent_manifests(pat_files)
             except AgentFederationError as exc:
                 return None, {}, str(exc)
-            if pat_discovered:
-                return pat_discovered, pat_files, None
+            # Keep the fetched tree even when it contains only declarative
+            # ``workflows/**/*.toml`` definitions.  The caller scans those
+            # after this agent-specific discovery pass; discarding the tree
+            # here made workflow-only config repos impossible through PAT
+            # fallback.
+            return pat_discovered, pat_files, None
         conn_error = conn_error or pat_error
 
     if not discovered:
@@ -1299,7 +1307,7 @@ def register_agent_repo(
     match a discovered manifest are ignored. When omitted/empty, every
     discovered agent manifest is registered.
 
-    Returns ``no_agents`` when the repo has no agent manifests, ``no_match``
+    Returns ``no_agents`` when the repo has neither agent nor workflow manifests, ``no_match``
     when a ``manifest_paths`` filter excluded every discovered manifest,
     ``fetch_failed`` when the repo can't be fetched, ``error`` on an
     unexpected persist failure, else ``ok`` with the per-manifest outcome.
@@ -1313,14 +1321,23 @@ def register_agent_repo(
     )
     if discovered is None:
         return RegisterAgentRepoResult(status="fetch_failed", error=error)
-    if not discovered:
+    from workflows.repo_sync import (
+        discover_repository_workflows,
+        reconcile_repository_workflows,
+    )
+
+    try:
+        workflow_manifests = discover_repository_workflows(files)
+    except ManifestError as exc:
+        return RegisterAgentRepoResult(status="error", error=str(exc))
+    if not discovered and not workflow_manifests:
         return RegisterAgentRepoResult(status="no_agents")
 
     # Subset registration (#933): keep only the requested manifests. Unknown
     # paths are silently dropped (a stale wizard selection shouldn't fail the
     # whole pass); when the filter leaves nothing, surface a clear no_match so
     # the caller knows their selection matched no discovered agent.
-    if manifest_paths:
+    if manifest_paths and discovered:
         requested = set(manifest_paths)
         selected = [d for d in discovered if d.manifest_path in requested]
         if not selected:
@@ -1337,7 +1354,7 @@ def register_agent_repo(
     eff_deploy_branch = deploy_branch or default_branch or "main"
 
     source_archive: bytes | None = None
-    if _needs_package_archive(discovered):
+    if discovered and _needs_package_archive(discovered):
         source_archive, archive_error = _registration_source_archive(
             organization_id=project.organization_id,
             source_kind=source_kind,
@@ -1366,7 +1383,7 @@ def register_agent_repo(
     # repo of purely-local-skill agents never touches the network. A fetch
     # failure is non-fatal: ``catalogue_tree`` stays None and every named
     # skill records a note while local skills + the agents still register.
-    catalogue_tree = _load_catalogue_if_needed(discovered)
+    catalogue_tree = _load_catalogue_if_needed(discovered) if discovered else None
 
     # Per-pass cache of fetched org skill-repo trees (spec 39d), keyed by
     # ``"<alias>@<ref>"`` so a repo referenced by many agents / skills across
@@ -1394,11 +1411,17 @@ def register_agent_repo(
                 )
                 for d in discovered
             ]
+            workflows = reconcile_repository_workflows(
+                organization=project.organization,
+                source_repo=source_repo,
+                source_ref=ref,
+                manifests=workflow_manifests,
+            )
     except Exception as exc:  # noqa: BLE001 — surface as a clean envelope
         log.exception("agent-repo registration failed (repo=%s)", source_repo)
         return RegisterAgentRepoResult(status="error", error=str(exc) or exc.__class__.__name__)
 
-    return RegisterAgentRepoResult(status="ok", agents=agents)
+    return RegisterAgentRepoResult(status="ok", agents=agents, workflows=workflows)
 
 
 def _load_catalogue_if_needed(

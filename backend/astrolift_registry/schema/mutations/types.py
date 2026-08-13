@@ -124,12 +124,13 @@ class RegisteredAgentType:
 class RegisterAgentRepoResultType:
     """Payload of ``registerAgentRepo``.
 
-    ``agents`` lists the per-manifest outcome (created or matched). The
-    mutation envelope (ok / error) wraps this; ``agents`` is empty when the
-    repo carried no agent manifests.
+    ``agents`` lists the per-agent outcome and ``workflows`` lists reconciled
+    source-owned workflow slugs. The mutation envelope (ok / error) wraps
+    this; either list may be empty for a workflow-only or agent-only repo.
     """
 
     agents: list[RegisteredAgentType]
+    workflows: list[str]
 
 
 @strawberry.input

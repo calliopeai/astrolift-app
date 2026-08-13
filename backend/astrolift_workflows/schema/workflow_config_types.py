@@ -30,6 +30,9 @@ class WorkflowDefinitionSummaryType:
     is_enabled: bool
     is_global: bool
     organization_guid: str | None
+    source_repo: str
+    source_path: str
+    source_ref: str
     stage_count: int
     created_at: datetime
 
@@ -82,6 +85,9 @@ def definition_summary(definition) -> WorkflowDefinitionSummaryType:
         is_enabled=definition.is_enabled,
         is_global=definition.organization_id is None,
         organization_guid=(None if definition.organization_id is None else str(definition.organization.guid)),
+        source_repo=definition.source_repo or "",
+        source_path=definition.source_path or "",
+        source_ref=definition.source_ref or "",
         stage_count=definition.stages.filter(deleted_at__isnull=True).count(),
         created_at=definition.created_at,
     )

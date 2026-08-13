@@ -23,6 +23,9 @@ class WorkflowStageType:
     kind: str
     role: str
     prompt: str
+    agent_ref: str
+    environment_spec_slug: str
+    output_key: str
     approvers: strawberry.scalars.JSON
     skill_refs: strawberry.scalars.JSON
     fan_out_count: Optional[int]
@@ -94,6 +97,9 @@ class WorkflowDefinitionType:
     states: strawberry.scalars.JSON
     transitions: strawberry.scalars.JSON
     is_enabled: bool
+    source_repo: str
+    source_path: str
+    source_ref: str
     created_at: datetime
 
     @strawberry_django.field

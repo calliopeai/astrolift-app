@@ -64,6 +64,7 @@ with workflow.unsafe.imports_passed_through():
         create_stage_execution,
         dispatch_agent_for_stage,
         get_workflow_stages,
+        load_agent_run_outcome,
         mark_workflow_run,
         poll_agent_run_status,
         record_human_gate_decision,
@@ -197,6 +198,26 @@ def is_fan_out_stage(pattern_kind: str, stage: dict, already_fanned: bool) -> bo
     return pattern_kind == PATTERN_FAN_OUT and stage["kind"] == KIND_AGENT_DISPATCH and not already_fanned
 
 
+def build_stage_dispatch_input(
+    workflow_input: dict,
+    previous_output: Any,
+    named_outputs: dict[str, Any],
+    stage: dict,
+) -> dict:
+    """Preserve the prior flat payload while adding explicit chain context."""
+    payload = dict(previous_output) if isinstance(previous_output, dict) else {"value": previous_output}
+    payload["_astrolift_workflow"] = {
+        "input": workflow_input,
+        "previous": previous_output,
+        "outputs": named_outputs,
+        "stage": {
+            "order": stage["order"],
+            "output_key": stage["output_key"],
+        },
+    }
+    return payload
+
+
 # ---------------------------------------------------------------------------
 # Workflow
 # ---------------------------------------------------------------------------
@@ -261,9 +282,23 @@ class WorkflowDefinitionRunWorkflow:
         # Stash the run id so the per-kind handlers can open execution rows
         # without threading it through every signature.
         self._workflow_run_id = input.workflow_run_id
+        # This workflow is already deployed and may have durable histories in
+        # flight.  Keep replaying the exact pre-stage-runtime command sequence
+        # for histories that do not contain this marker; new runs record the
+        # marker and use the richer, source-bound dispatch packet below.
+        if not workflow.patched("workflow-agent-stage-runtime-v2"):
+            return await self._execute_legacy(input)
+        return await self._execute_v2(input)
+
+    async def _execute_v2(self, input: WorkflowDefinitionRunInput) -> dict[str, Any]:
         plan = await workflow.execute_activity(
             get_workflow_stages,
-            input.workflow_definition_slug,
+            {
+                "workflow_definition_slug": input.workflow_definition_slug,
+                "workflow_definition_id": input.workflow_definition_id,
+                "workflow_run_id": input.workflow_run_id,
+                "stage_bindings": input.stage_bindings or {},
+            },
             start_to_close_timeout=_DB_TIMEOUT,
             retry_policy=_DB_RETRY,
         )
@@ -276,12 +311,14 @@ class WorkflowDefinitionRunWorkflow:
             stages = [s for s in stages if s["order"] == input.only_stage_order]
             pattern_kind = "single"
 
-        previous_output: dict | None = dict(input.trigger_payload or {})
+        workflow_input = dict(input.trigger_payload or {})
+        previous_output: Any = workflow_input
         # Track the executions produced by the most recent fan-out so a
         # following AGGREGATION stage can merge them.
         last_fan_out_executions: list[str] = []
         already_fanned = False
         stage_outputs: list[dict] = []
+        named_outputs: dict[str, Any] = {}
 
         for stage in stages:
             if self._abort_requested:
@@ -296,15 +333,115 @@ class WorkflowDefinitionRunWorkflow:
                     "fan_out_execution_ids": last_fan_out_executions,
                     "count": len(last_fan_out_executions),
                 }
+                named_outputs[stage["output_key"]] = previous_output
+                stage_outputs.append(
+                    {
+                        "order": stage["order"],
+                        "output_key": stage["output_key"],
+                        "fan_out": previous_output,
+                    }
+                )
+                continue
+
+            if kind == KIND_AGENT_DISPATCH:
+                dispatch_input = build_stage_dispatch_input(
+                    workflow_input,
+                    previous_output,
+                    named_outputs,
+                    stage,
+                )
+                attempt_output = await self._run_agent_stage(input, stage, dispatch_input)
+                previous_output = attempt_output.get("result")
+                stage_record = {
+                    "order": stage["order"],
+                    "output_key": stage["output_key"],
+                    "output": previous_output,
+                    **{key: value for key, value in attempt_output.items() if key != "result"},
+                }
+            elif kind == KIND_HUMAN_GATE:
+                previous_output = await self._run_human_gate(stage)
+                stage_record = {
+                    "order": stage["order"],
+                    "output_key": stage["output_key"],
+                    "output": previous_output,
+                }
+            elif kind == KIND_CHECKPOINT:
+                previous_output = await self._run_checkpoint(input, stage, previous_output)
+                stage_record = {
+                    "order": stage["order"],
+                    "output_key": stage["output_key"],
+                    "output": previous_output,
+                }
+            elif kind == KIND_AGGREGATION:
+                previous_output = await self._run_aggregation(input, stage, last_fan_out_executions)
+                last_fan_out_executions = []
+                stage_record = {
+                    "order": stage["order"],
+                    "output_key": stage["output_key"],
+                    "output": previous_output,
+                }
+            else:
+                raise _WorkflowAbort(f"unknown stage kind {kind!r}")
+
+            named_outputs[stage["output_key"]] = previous_output
+            stage_outputs.append(stage_record)
+
+        return {
+            "outputs": stage_outputs,
+            "named_outputs": named_outputs,
+            "final_output": previous_output,
+        }
+
+    async def _execute_legacy(self, input: WorkflowDefinitionRunInput) -> dict[str, Any]:
+        """Replay path for histories created before the v2 stage packet.
+
+        Do not refactor this method or its legacy helpers without another
+        Temporal patch marker: their activity and child-workflow arguments
+        intentionally mirror the previously deployed implementation.
+        """
+        plan = await workflow.execute_activity(
+            get_workflow_stages,
+            input.workflow_definition_slug,
+            start_to_close_timeout=_DB_TIMEOUT,
+            retry_policy=_DB_RETRY,
+        )
+        pattern_kind: str = plan["pattern_kind"]
+        stages: list[dict] = plan["stages"]
+
+        if input.only_stage_order is not None:
+            stages = [s for s in stages if s["order"] == input.only_stage_order]
+            pattern_kind = "single"
+
+        previous_output: dict | None = dict(input.trigger_payload or {})
+        last_fan_out_executions: list[str] = []
+        already_fanned = False
+        stage_outputs: list[dict] = []
+
+        for stage in stages:
+            if self._abort_requested:
+                raise _WorkflowAbort("aborted by signal", data={"outputs": stage_outputs})
+
+            kind = stage["kind"]
+            if is_fan_out_stage(pattern_kind, stage, already_fanned):
+                last_fan_out_executions = await self._run_fan_out_legacy(
+                    input,
+                    stage,
+                    previous_output,
+                )
+                already_fanned = True
+                previous_output = {
+                    "fan_out_execution_ids": last_fan_out_executions,
+                    "count": len(last_fan_out_executions),
+                }
                 stage_outputs.append({"order": stage["order"], "fan_out": previous_output})
                 continue
 
             if kind == KIND_AGENT_DISPATCH:
-                previous_output = await self._run_agent_stage(input, stage, previous_output)
+                previous_output = await self._run_agent_stage_legacy(input, stage, previous_output)
             elif kind == KIND_HUMAN_GATE:
                 previous_output = await self._run_human_gate(stage)
             elif kind == KIND_CHECKPOINT:
-                previous_output = await self._run_checkpoint(input, stage, previous_output)
+                previous_output = await self._run_checkpoint_legacy(input, stage, previous_output)
             elif kind == KIND_AGGREGATION:
                 previous_output = await self._run_aggregation(input, stage, last_fan_out_executions)
                 last_fan_out_executions = []
@@ -317,18 +454,13 @@ class WorkflowDefinitionRunWorkflow:
 
     # ---- per-kind handlers ------------------------------------------------
 
-    async def _run_agent_stage(
+    async def _run_agent_stage_legacy(
         self,
         input: WorkflowDefinitionRunInput,
         stage: dict,
         previous_output: dict | None,
     ) -> dict:
-        """Dispatch + poll one AGENT_DISPATCH stage, honouring on_failure.
-
-        Returns the stage output dict to chain into the next stage. Aborts
-        the workflow (via ``_WorkflowAbort``) when policy says ``fail`` or
-        retries are exhausted.
-        """
+        """Pre-v2 agent dispatch path retained solely for history replay."""
         timeout_seconds = max(1, int(stage["timeout_seconds"]))
         on_failure = stage["on_failure"]
         attempt = 1
@@ -350,19 +482,139 @@ class WorkflowDefinitionRunWorkflow:
                 )
                 run_status = await self._poll_agent_to_terminal(agent_run_id, timeout_seconds)
             except ActivityError:
+                run_status = "failed"
+
+            decision = decide_after_agent_run(run_status, on_failure, attempt)
+            if decision.proceed:
+                output = {
+                    "agent_run_status": run_status,
+                    "attempt": attempt,
+                    "execution_id": execution_id,
+                }
+                await workflow.execute_activity(
+                    update_stage_execution,
+                    args=[execution_id, decision.terminal_status, output, None],
+                    start_to_close_timeout=_DB_TIMEOUT,
+                    retry_policy=_DB_RETRY,
+                )
+                return output
+
+            if decision.retry:
+                await workflow.execute_activity(
+                    update_stage_execution,
+                    args=[
+                        execution_id,
+                        STATUS_FAILED,
+                        None,
+                        f"attempt {attempt} failed ({run_status}); retrying",
+                    ],
+                    start_to_close_timeout=_DB_TIMEOUT,
+                    retry_policy=_DB_RETRY,
+                )
+                attempt += 1
+                continue
+
+            if decision.escalate:
+                await workflow.execute_activity(
+                    update_stage_execution,
+                    args=[execution_id, STATUS_ESCALATED, None, "escalated to operator"],
+                    start_to_close_timeout=_DB_TIMEOUT,
+                    retry_policy=_DB_RETRY,
+                )
+                cleared = await self._wait_escalation_cleared(execution_id, timeout_seconds)
+                if cleared:
+                    return {"agent_run_status": run_status, "escalation": "cleared"}
+                raise _WorkflowAbort(
+                    f"stage {stage['order']} escalation not cleared in time",
+                    data={"execution_id": execution_id},
+                )
+
+            await workflow.execute_activity(
+                update_stage_execution,
+                args=[execution_id, STATUS_FAILED, None, f"stage failed ({run_status})"],
+                start_to_close_timeout=_DB_TIMEOUT,
+                retry_policy=_DB_RETRY,
+            )
+            raise _WorkflowAbort(
+                f"stage {stage['order']} failed ({run_status})",
+                data={"execution_id": execution_id, "attempt": attempt},
+            )
+
+    async def _run_agent_stage(
+        self,
+        input: WorkflowDefinitionRunInput,
+        stage: dict,
+        previous_output: dict,
+    ) -> dict:
+        """Dispatch + poll one AGENT_DISPATCH stage, honouring on_failure.
+
+        Returns the stage output dict to chain into the next stage. Aborts
+        the workflow (via ``_WorkflowAbort``) when policy says ``fail`` or
+        retries are exhausted.
+        """
+        timeout_seconds = max(1, int(stage["timeout_seconds"]))
+        on_failure = stage["on_failure"]
+        attempt = 1
+
+        while True:
+            agent_run_id: str | None = None
+            execution_id = await workflow.execute_activity(
+                create_stage_execution,
+                args=[input.workflow_run_id, stage["stage_id"], attempt],
+                start_to_close_timeout=_DB_TIMEOUT,
+                retry_policy=_DB_RETRY,
+            )
+
+            try:
+                agent_run_id = await workflow.execute_activity(
+                    dispatch_agent_for_stage,
+                    args=[
+                        stage["stage_id"],
+                        execution_id,
+                        previous_output,
+                        {
+                            "agent_definition_id": stage["agent_definition_id"],
+                            "environment_spec_slug": stage["environment_spec_slug"],
+                            "skill_refs": stage["skill_refs"],
+                            "prompt": stage["prompt"],
+                            "output_key": stage["output_key"],
+                        },
+                    ],
+                    start_to_close_timeout=_DB_TIMEOUT,
+                    retry_policy=_DB_RETRY,
+                )
+                run_status = await self._poll_agent_to_terminal(agent_run_id, timeout_seconds)
+            except ActivityError:
                 # The dispatch activity itself failed (e.g. spawn error).
                 run_status = "failed"
 
             decision = decide_after_agent_run(run_status, on_failure, attempt)
 
             if decision.proceed:
+                if agent_run_id is not None:
+                    outcome = await workflow.execute_activity(
+                        load_agent_run_outcome,
+                        agent_run_id,
+                        start_to_close_timeout=_DB_TIMEOUT,
+                        retry_policy=_DB_RETRY,
+                    )
+                else:
+                    outcome = {
+                        "result": None,
+                        "failure": {"message": "agent dispatch activity failed"},
+                        "task_guid": None,
+                    }
                 # Include execution_id so a FAN_OUT parent can collect each
                 # child's stage execution (it reads final_output["execution_id"])
                 # — without it, fan-out always aggregated 0 children (#1017).
                 output = {
                     "agent_run_status": run_status,
+                    "agent_run_id": agent_run_id,
                     "attempt": attempt,
                     "execution_id": execution_id,
+                    "result": outcome.get("result"),
+                    "failure": outcome.get("failure"),
+                    "task_guid": outcome.get("task_guid"),
                 }
                 await workflow.execute_activity(
                     update_stage_execution,
@@ -487,15 +739,34 @@ class WorkflowDefinitionRunWorkflow:
         self,
         input: WorkflowDefinitionRunInput,
         stage: dict,
+        previous_output: Any,
+    ) -> dict:
+        await workflow.execute_activity(
+            snapshot_checkpoint,
+            args=[
+                input.workflow_run_id,
+                stage["stage_id"],
+                previous_output if isinstance(previous_output, dict) else {"value": previous_output},
+            ],
+            start_to_close_timeout=_DB_TIMEOUT,
+            retry_policy=_DB_RETRY,
+        )
+        # Checkpoints are transparent to chaining: the prior output flows on.
+        return previous_output
+
+    async def _run_checkpoint_legacy(
+        self,
+        input: WorkflowDefinitionRunInput,
+        stage: dict,
         previous_output: dict | None,
     ) -> dict:
+        """Pre-v2 checkpoint arguments retained solely for history replay."""
         await workflow.execute_activity(
             snapshot_checkpoint,
             args=[input.workflow_run_id, stage["stage_id"], previous_output or {}],
             start_to_close_timeout=_DB_TIMEOUT,
             retry_policy=_DB_RETRY,
         )
-        # Checkpoints are transparent to chaining: the prior output flows on.
         return previous_output or {}
 
     async def _run_aggregation(
@@ -516,11 +787,61 @@ class WorkflowDefinitionRunWorkflow:
         self,
         input: WorkflowDefinitionRunInput,
         stage: dict,
-        previous_output: dict | None,
+        previous_output: Any,
     ) -> list[str]:
         """Spawn N child runs that each execute only this stage; wait for
         all. Returns the child runs' terminal stage-execution ids so a
         following AGGREGATION stage can merge them."""
+        count = resolve_fan_out_count(
+            stage["fan_out_count"],
+            previous_output if isinstance(previous_output, dict) else None,
+        )
+        if count == 0:
+            return []
+
+        handles = []
+        for idx in range(count):
+            child_run_id = f"{input.workflow_run_id}:fanout:{stage['order']}:{idx}"
+            handle = await workflow.start_child_workflow(
+                WorkflowDefinitionRunWorkflow.run,
+                WorkflowDefinitionRunInput(
+                    workflow_definition_slug=input.workflow_definition_slug,
+                    workflow_run_id=child_run_id,
+                    trigger_payload=(
+                        previous_output if isinstance(previous_output, dict) else {"value": previous_output}
+                    ),
+                    actor=input.actor,
+                    workflow_definition_id=input.workflow_definition_id,
+                    only_stage_order=stage["order"],
+                    fan_out_index=idx,
+                    stage_bindings=input.stage_bindings,
+                ),
+                id=f"WorkflowDefinitionRunWorkflow-{child_run_id}",
+                task_timeout=timedelta(seconds=max(1, int(stage["timeout_seconds"]))),
+            )
+            handles.append(handle)
+
+        execution_ids: list[str] = []
+        for handle in handles:
+            try:
+                res = await handle
+                data = getattr(res, "data", None) or {}
+                outputs = data.get("outputs") or []
+                final_stage = outputs[-1] if outputs else {}
+                exec_id = final_stage.get("execution_id")
+                if exec_id:
+                    execution_ids.append(str(exec_id))
+            except Exception as exc:  # noqa: BLE001 — one child failing is data, not fatal
+                workflow.logger.warning("fan-out child failed: %s", exc)
+        return execution_ids
+
+    async def _run_fan_out_legacy(
+        self,
+        input: WorkflowDefinitionRunInput,
+        stage: dict,
+        previous_output: dict | None,
+    ) -> list[str]:
+        """Pre-v2 child input/result shape retained for history replay."""
         count = resolve_fan_out_count(stage["fan_out_count"], previous_output)
         if count == 0:
             return []
@@ -553,7 +874,7 @@ class WorkflowDefinitionRunWorkflow:
                 exec_id = final.get("execution_id")
                 if exec_id:
                     execution_ids.append(str(exec_id))
-            except Exception as exc:  # noqa: BLE001 — one child failing is data, not fatal
+            except Exception as exc:  # noqa: BLE001 — one child failure is data
                 workflow.logger.warning("fan-out child failed: %s", exc)
         return execution_ids
 
