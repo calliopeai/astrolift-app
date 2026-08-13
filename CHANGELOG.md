@@ -4,6 +4,8 @@
 
 ### Added
 
+- Add deterministic GraphQL SDL and MCP capability-superset exports with
+  runtime-handler, JSON-Schema, frontend-codegen, and CI drift guardrails.
 - Add source-reconciled `workflows/**/*.toml` definitions and runnable chained-agent
   stages with environment, prompt, skill, output-key defaults, configured binding
   overrides, immutable task packets, named structured outputs, and a worked example.

@@ -120,7 +120,7 @@ jobs:
         # tree into the same pipenv venv so `_sdk` + `k8s_native` +
         # the cloud plugins resolve at import time. The Docker image
         # does this in its build step; CI mirrors it.
-        run: pipenv run pip install ./providers[aws,gcp,azure,k8s]
+        run: pipenv run pip install './providers[aws,gcp,azure,k8s]'
       - name: Run migrations
         run: pipenv run python manage.py migrate --noinput
       - name: Run tests
@@ -154,9 +154,42 @@ jobs:
         # Mirrors the test job — mypy follows imports into
         # core.cluster_observability which references _sdk.cluster
         # from the providers tree.
-        run: pipenv run pip install ./providers[aws,gcp,azure,k8s]
+        run: pipenv run pip install './providers[aws,gcp,azure,k8s]'
       - name: Run mypy on the platform core
         run: pipenv run mypy core config || true
+
+  contracts:
+    name: generated contracts
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings
+      DJANGO_SECRET_KEY: ci-not-a-secret
+      FEATURE_AGENTS: "true"
+      FEATURE_WORKFLOWS: "true"
+      FEATURE_TEMPORAL: "true"
+      FEATURE_OPENSEARCH: "true"
+      FEATURE_FILE_UPLOADS: "true"
+      FEATURE_DEPLOY_PIPELINE: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/Pipfile.lock
+      - name: Install pipenv
+        run: pip install "pipenv==2026.6.1"
+      - name: Install dependencies
+        run: pipenv install --dev --deploy
+      - name: Install in-tree provider plugins
+        run: pipenv run pip install './providers[aws,gcp,azure,k8s]'
+      - name: Verify generated GraphQL and MCP contracts
+        run: |
+          pipenv run python manage.py export_contracts --check
+          cmp schema.graphql ../frontend/schema.graphql
 
   providers-test:
     # Runs the providers test suite at backend/providers/tests/.
@@ -284,3 +317,7 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
+      - name: Verify generated GraphQL client types
+        run: |
+          npm run codegen
+          git diff --exit-code -- graphql/__generated__

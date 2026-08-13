@@ -1,0 +1,245 @@
+{
+  "authorization": {
+    "rule": "token scope and user RBAC permission are both required",
+    "scheme": "bearer",
+    "token_prefix": "alft_at_"
+  },
+  "endpoint": "/api/mcp/v1/",
+  "protocol_versions": [
+    "2025-03-26",
+    "2025-06-18",
+    "2025-11-25"
+  ],
+  "schema": "astrolift.mcp.capabilities/v1",
+  "server": {
+    "name": "astrolift",
+    "protocol_implementation_version": "1.0"
+  },
+  "tools": [
+    {
+      "description": "List registered agents and their source/package delivery state.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "project_slug": {
+            "description": "Optional project slug filter.",
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "name": "astrolift_list_agents",
+      "required_permissions": [
+        "agent.read"
+      ],
+      "required_scopes": [
+        "mcp:read"
+      ]
+    },
+    {
+      "description": "Read one canonical Agent Package, including skills/tools and source slice.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "agent_slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "agent_slug"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_get_agent",
+      "required_permissions": [
+        "agent.read"
+      ],
+      "required_scopes": [
+        "mcp:read"
+      ]
+    },
+    {
+      "description": "Read one agent task's lifecycle, result, and failure telemetry.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "task_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_get_task",
+      "required_permissions": [
+        "agent.read"
+      ],
+      "required_scopes": [
+        "mcp:read"
+      ]
+    },
+    {
+      "description": "Dispatch one registered Task-family agent from its immutable package.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "agent_slug": {
+            "type": "string"
+          },
+          "environment_spec_id": {
+            "type": "string"
+          },
+          "timeout_seconds": {
+            "maximum": 604800,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "trigger_payload": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "agent_slug"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_run_agent",
+      "required_permissions": [
+        "agent.dispatch"
+      ],
+      "required_scopes": [
+        "mcp:dispatch"
+      ]
+    },
+    {
+      "description": "Hard-stop a running/queued agent and delete its spawned workload.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "task_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_cancel_task",
+      "required_permissions": [
+        "agent.dispatch"
+      ],
+      "required_scopes": [
+        "mcp:dispatch"
+      ]
+    },
+    {
+      "description": "Re-scan a single-agent or monorepo source, reconcile selected manifests, and freeze new immutable package snapshots.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "default_branch": {
+            "type": "string"
+          },
+          "deploy_branch": {
+            "type": "string"
+          },
+          "manifest_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "project_id": {
+            "description": "Target Astrolift project UUID.",
+            "type": "string"
+          },
+          "ref": {
+            "description": "Branch, tag, or immutable commit SHA.",
+            "type": "string"
+          },
+          "source_kind": {
+            "enum": [
+              "github",
+              "gitlab"
+            ],
+            "type": "string"
+          },
+          "source_repo": {
+            "description": "Host repo handle, e.g. owner/name.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "source_repo"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_sync_agent_repo",
+      "required_permissions": [
+        "agent.create",
+        "agent.update"
+      ],
+      "required_scopes": [
+        "mcp:write"
+      ]
+    },
+    {
+      "description": "Preview or persist an AGENTS.md, native Agent Package, Langflow, or Flowise definition. Returns explicit conversion gaps and never persists a non-runnable result.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "enum": [
+              "agents_md",
+              "astrolift_package",
+              "langflow",
+              "flowise"
+            ],
+            "type": "string"
+          },
+          "options": {
+            "type": "object"
+          },
+          "payload": {
+            "description": "Definition object, or raw Markdown for AGENTS.md.",
+            "oneOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "persist": {
+            "type": "boolean"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "format",
+          "payload"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_import_agent_spec",
+      "required_permissions": [
+        "agent.create"
+      ],
+      "required_scopes": [
+        "mcp:write"
+      ]
+    }
+  ],
+  "transport": "streamable-http"
+}

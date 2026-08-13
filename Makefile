@@ -9,9 +9,12 @@ COMPOSE := $(DC) -f $(COMPOSE_FILE)
 CONTAINER ?= astrolift-local
 UI_CONTAINER ?= ui
 PYTHON ?= python
+CONTRACT_ENV := -e FEATURE_AGENTS=true -e FEATURE_WORKFLOWS=true \
+                -e FEATURE_TEMPORAL=true -e FEATURE_OPENSEARCH=true \
+                -e FEATURE_FILE_UPLOADS=true -e FEATURE_DEPLOY_PIPELINE=true
 
 .PHONY: help up build down logs logs-ui shell shell-ui ps \
-        migrate migrations seed superuser schema codegen \
+        migrate migrations seed superuser schema contracts contracts-check codegen \
         test fmt lint typecheck \
         perms ui-install ui-dev ui-build
 
@@ -19,7 +22,7 @@ help:
 	@echo "Astrolift — common targets"
 	@echo
 	@echo "  Stack:     up | build | down | logs | logs-ui | shell | shell-ui | ps"
-	@echo "  Backend:   migrate | migrations | seed | superuser | schema | perms"
+	@echo "  Backend:   migrate | migrations | seed | superuser | schema | contracts | contracts-check | perms"
 	@echo "  Frontend:  ui-install | ui-dev | ui-build | codegen | codegen-all"
 	@echo "  Quality:   test | fmt | lint | typecheck"
 	@echo
@@ -68,11 +71,16 @@ superuser:
 # Dump the live Strawberry schema and copy it next to the frontend
 # so codegen can run without the backend container being up.
 schema:
-	$(COMPOSE) exec $(CONTAINER) $(PYTHON) -c "import django; django.setup(); \
-from config.schema import schema; \
-open('/astrolift/schema.graphql','w').write(schema.as_str())"
+	$(COMPOSE) exec $(CONTRACT_ENV) $(CONTAINER) $(PYTHON) manage.py export_contracts
 	cp backend/schema.graphql frontend/schema.graphql
 	@echo "→ backend/schema.graphql + frontend/schema.graphql"
+
+contracts: schema
+	@echo "→ backend/contracts/mcp-tools.json"
+
+contracts-check:
+	$(COMPOSE) exec $(CONTRACT_ENV) $(CONTAINER) $(PYTHON) manage.py export_contracts --check
+	cmp backend/schema.graphql frontend/schema.graphql
 
 # Regenerate TS types from the dumped schema. Run schema first if
 # the backend changed, then this; or `make codegen-all` for both.
