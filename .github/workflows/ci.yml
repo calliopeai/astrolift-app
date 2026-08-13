@@ -12,14 +12,77 @@ on:
   #
   # `push: [main]` matters as much as `pull_request` here, because the team
   # commits directly to main in non-overlapping scopes — gating PRs alone
-  # would leave the common path unchecked.
+  # would leave the common path unchecked. The classifier below still runs on
+  # every event, but avoids provisioning Postgres and Temporal for changes that
+  # cannot affect the backend.
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  changes:
+    name: classify changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.classify.outputs.backend }}
+      frontend: ${{ steps.classify.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Classify changed paths
+        id: classify
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          backend=false
+          frontend=false
+
+          if [[ "$EVENT_NAME" == workflow_dispatch || -z "$BASE_SHA" || "$BASE_SHA" =~ ^0+$ ]]; then
+            backend=true
+            frontend=true
+          else
+            if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+              git fetch --no-tags --depth=1 origin "$BASE_SHA"
+            fi
+
+            while IFS= read -r path; do
+              case "$path" in
+                backend/*)
+                  backend=true
+                  ;;
+                frontend/*)
+                  frontend=true
+                  ;;
+                .github/*|docker/*|Makefile|bootstrap.sh|run.sh)
+                  backend=true
+                  frontend=true
+                  ;;
+                docs/*|*.md|LICENSE|.gitignore)
+                  ;;
+                *)
+                  # Unknown root-level build/config changes run both suites.
+                  backend=true
+                  frontend=true
+                  ;;
+              esac
+            done < <(git diff --name-only --diff-filter=ACMRTD "$BASE_SHA" "$HEAD_SHA")
+          fi
+
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
+          echo "backend=$backend frontend=$frontend"
+
   lint:
     name: lint (backend)
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -65,6 +128,8 @@ jobs:
 
   backend-test-shard:
     name: test shard (${{ matrix.name }})
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -76,12 +141,14 @@ jobs:
             paths: astrolift_operations core astrolift_identity
           - name: registration-runtime
             paths: astrolift_scm astrolift_clusters astrolift_agents astrolift_registry
-          - name: platform-services
+          - name: platform-manifest
             paths: >-
-              astrolift_manifest astrolift_services astrolift_pipelines astrolift_drivers
-              astrolift_observability workflows astrolift_dispatch auth1 astrolift_ci_convert
-              astrolift_forms organization astrolift_billing astrolift_graphql
-              astrolift_compliance astrolift_ci config testdata
+              astrolift_manifest astrolift_drivers astrolift_observability workflows
+          - name: platform-control
+            paths: >-
+              astrolift_services astrolift_pipelines astrolift_dispatch auth1
+              astrolift_ci_convert astrolift_forms organization astrolift_billing
+              astrolift_graphql astrolift_compliance astrolift_ci config testdata
     defaults:
       run:
         working-directory: backend
@@ -181,16 +248,24 @@ jobs:
   test:
     name: test (real postgres)
     if: ${{ always() }}
-    needs: backend-test-shard
+    needs: [changes, backend-test-shard]
     runs-on: ubuntu-latest
     steps:
       - name: Require every real-Postgres shard
         env:
+          BACKEND_CHANGED: ${{ needs.changes.outputs.backend }}
           SHARD_RESULT: ${{ needs.backend-test-shard.result }}
-        run: test "$SHARD_RESULT" = success
+        run: |
+          if [[ "$BACKEND_CHANGED" != true ]]; then
+            echo "No backend-impacting paths changed; real-Postgres shards were not needed."
+            exit 0
+          fi
+          test "$SHARD_RESULT" = success
 
   typecheck:
     name: typecheck
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -218,6 +293,8 @@ jobs:
 
   contracts:
     name: generated contracts
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -256,6 +333,8 @@ jobs:
     # path used mock factories and the 1870-test suite never ran on PRs.
     # This job makes that mistake structurally impossible going forward.
     name: test (providers)
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -280,6 +359,8 @@ jobs:
     # NotImplementedError. This would have caught the EKS _RealK8sClient
     # bug (production install crashed on server_side_apply) at PR time.
     name: no-stub-factory gate (providers)
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -360,6 +441,8 @@ jobs:
 
   frontend-lint:
     name: lint (frontend)
+    needs: changes
+    if: ${{ needs.changes.outputs.frontend == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -375,6 +458,8 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
+      - name: Test
+        run: npm test
       - name: Verify generated GraphQL client types
         run: |
           npm run codegen
