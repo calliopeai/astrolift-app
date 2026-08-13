@@ -3,8 +3,8 @@
 Two surfaces:
 
 * ``agent_model_env`` — pure compute; returns the Bedrock env a Claude
-  Code runner reads (CLAUDE_CODE_USE_BEDROCK + region + Sonnet/Haiku ids),
-  with per-cluster overrides + region fallback.
+  Code runner reads (CLAUDE_CODE_USE_BEDROCK + region + Opus/Haiku ids),
+  with per-cluster, worker-environment, and region fallbacks.
 * ``ensure_agent_model_identity`` — mints (idempotently) the IRSA role the
   managed-model pod's ServiceAccount assumes to call bedrock:InvokeModel.
   Uses moto IAM for real role storage + a fake EKS/STS pair so the OIDC
@@ -77,8 +77,8 @@ def test_agent_model_env_defaults():
     env = _driver().agent_model_env(region="us-west-2", provider_config={})
     assert env["CLAUDE_CODE_USE_BEDROCK"] == "1"
     assert env["AWS_REGION"] == "us-west-2"
-    assert env["ANTHROPIC_MODEL"] == "us.anthropic.claude-sonnet-4-20250514-v1:0"
-    assert env["ANTHROPIC_SMALL_FAST_MODEL"] == "us.anthropic.claude-3-5-haiku-20241022-v1:0"
+    assert env["ANTHROPIC_MODEL"] == "us.anthropic.claude-opus-5"
+    assert env["ANTHROPIC_SMALL_FAST_MODEL"] == "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 
 
 def test_agent_model_env_region_falls_back_to_config():
@@ -86,7 +86,20 @@ def test_agent_model_env_region_falls_back_to_config():
     assert env["AWS_REGION"] == "eu-west-1"
 
 
-def test_agent_model_env_model_ids_overridable():
+def test_agent_model_env_worker_model_ids_overridable(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_MODEL", "us.anthropic.claude-sonnet-5")
+    monkeypatch.setenv("ANTHROPIC_SMALL_FAST_MODEL", "us.anthropic.claude-haiku-4-5")
+
+    env = _driver().agent_model_env(region="us-west-2", provider_config={})
+
+    assert env["ANTHROPIC_MODEL"] == "us.anthropic.claude-sonnet-5"
+    assert env["ANTHROPIC_SMALL_FAST_MODEL"] == "us.anthropic.claude-haiku-4-5"
+
+
+def test_agent_model_env_per_cluster_model_ids_override_worker(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_MODEL", "us.anthropic.claude-opus-5")
+    monkeypatch.setenv("ANTHROPIC_SMALL_FAST_MODEL", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
+
     env = _driver().agent_model_env(
         region="eu-west-1",
         provider_config={
@@ -96,6 +109,22 @@ def test_agent_model_env_model_ids_overridable():
     )
     assert env["ANTHROPIC_MODEL"] == "eu.anthropic.claude-sonnet-4-20250514-v1:0"
     assert env["ANTHROPIC_SMALL_FAST_MODEL"] == "eu.anthropic.claude-3-5-haiku-20241022-v1:0"
+
+
+def test_agent_model_env_ignores_blank_overrides(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_MODEL", "  ")
+    monkeypatch.setenv("ANTHROPIC_SMALL_FAST_MODEL", "")
+
+    env = _driver().agent_model_env(
+        region="us-west-2",
+        provider_config={
+            "bedrock_model_id": " ",
+            "bedrock_small_fast_model_id": None,
+        },
+    )
+
+    assert env["ANTHROPIC_MODEL"] == "us.anthropic.claude-opus-5"
+    assert env["ANTHROPIC_SMALL_FAST_MODEL"] == "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 
 
 # ---- ensure_agent_model_identity (moto IAM) -----------------------
