@@ -19,13 +19,7 @@ import { toast } from "sonner";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 // The CLI repo's GitHub Releases is the source of truth for binaries.
 // The "latest" alias resolves to whatever the most recent published
@@ -37,8 +31,9 @@ const CLI_REPO = "calliopeai/astrolift-cli";
 const CLI_BINARY = "astro";
 const RELEASES_URL = `https://github.com/${CLI_REPO}/releases`;
 const LATEST_URL = `${RELEASES_URL}/latest`;
-const LATEST_ASSET = (asset: string) =>
-  `${RELEASES_URL}/latest/download/${asset}`;
+const LATEST_ASSET = (asset: string) => `${RELEASES_URL}/latest/download/${asset}`;
+const INSTALL_SCRIPT =
+  "https://raw.githubusercontent.com/calliopeai/astrolift-cli/main/scripts/install.sh";
 
 interface PlatformAsset {
   id: string;
@@ -58,7 +53,7 @@ const PLATFORMS: PlatformAsset[] = [
     label: "macOS · Apple Silicon",
     filename: `${CLI_BINARY}-darwin-arm64.tar.gz`,
     icon: AppleIcon,
-    installLine: `curl -fsSL ${LATEST_ASSET(`${CLI_BINARY}-darwin-arm64.tar.gz`)} | tar -xz && sudo mv ${CLI_BINARY} /usr/local/bin/`,
+    installLine: `curl -fsSL ${INSTALL_SCRIPT} | sh`,
   },
   {
     id: "macos-x64",
@@ -67,7 +62,7 @@ const PLATFORMS: PlatformAsset[] = [
     label: "macOS · Intel",
     filename: `${CLI_BINARY}-darwin-amd64.tar.gz`,
     icon: AppleIcon,
-    installLine: `curl -fsSL ${LATEST_ASSET(`${CLI_BINARY}-darwin-amd64.tar.gz`)} | tar -xz && sudo mv ${CLI_BINARY} /usr/local/bin/`,
+    installLine: `curl -fsSL ${INSTALL_SCRIPT} | sh`,
   },
   {
     id: "linux-x64",
@@ -76,7 +71,7 @@ const PLATFORMS: PlatformAsset[] = [
     label: "Linux · amd64",
     filename: `${CLI_BINARY}-linux-amd64.tar.gz`,
     icon: TerminalIcon,
-    installLine: `curl -fsSL ${LATEST_ASSET(`${CLI_BINARY}-linux-amd64.tar.gz`)} | tar -xz && sudo mv ${CLI_BINARY} /usr/local/bin/`,
+    installLine: `curl -fsSL ${INSTALL_SCRIPT} | sh`,
   },
   {
     id: "linux-arm64",
@@ -85,7 +80,7 @@ const PLATFORMS: PlatformAsset[] = [
     label: "Linux · arm64",
     filename: `${CLI_BINARY}-linux-arm64.tar.gz`,
     icon: TerminalIcon,
-    installLine: `curl -fsSL ${LATEST_ASSET(`${CLI_BINARY}-linux-arm64.tar.gz`)} | tar -xz && sudo mv ${CLI_BINARY} /usr/local/bin/`,
+    installLine: `curl -fsSL ${INSTALL_SCRIPT} | sh`,
   },
   {
     id: "windows-x64",
@@ -95,6 +90,15 @@ const PLATFORMS: PlatformAsset[] = [
     filename: `${CLI_BINARY}-windows-amd64.zip`,
     icon: MonitorIcon,
     installLine: `irm ${LATEST_ASSET(`${CLI_BINARY}-windows-amd64.zip`)} -OutFile ${CLI_BINARY}.zip; Expand-Archive ${CLI_BINARY}.zip`,
+  },
+  {
+    id: "windows-arm64",
+    os: "windows",
+    arch: "arm64",
+    label: "Windows · arm64",
+    filename: `${CLI_BINARY}-windows-arm64.zip`,
+    icon: MonitorIcon,
+    installLine: `irm ${LATEST_ASSET(`${CLI_BINARY}-windows-arm64.zip`)} -OutFile ${CLI_BINARY}.zip; Expand-Archive ${CLI_BINARY}.zip`,
   },
 ];
 
@@ -125,8 +129,7 @@ interface UADataLike {
 async function detectPlatform(): Promise<PlatformAsset | null> {
   if (typeof navigator === "undefined") return null;
   const ua = navigator.userAgent || "";
-  const uaData = (navigator as Navigator & { userAgentData?: UADataLike })
-    .userAgentData;
+  const uaData = (navigator as Navigator & { userAgentData?: UADataLike }).userAgentData;
 
   let osHint: "macos" | "linux" | "windows" | null = null;
   if (uaData?.platform) {
@@ -147,10 +150,7 @@ async function detectPlatform(): Promise<PlatformAsset | null> {
   let archHint: "arm64" | "x64" | null = null;
   if (uaData?.getHighEntropyValues) {
     try {
-      const hev = await uaData.getHighEntropyValues([
-        "architecture",
-        "bitness",
-      ]);
+      const hev = await uaData.getHighEntropyValues(["architecture", "bitness"]);
       const arch = (hev.architecture || "").toLowerCase();
       if (arch === "arm" || arch === "arm64") archHint = "arm64";
       else if (arch === "x86") archHint = "x64";
@@ -169,12 +169,7 @@ async function detectPlatform(): Promise<PlatformAsset | null> {
     archHint = osHint === "macos" ? "arm64" : "x64";
   }
 
-  // Windows only ships an x64 archive today; collapse arm64 → x64.
-  if (osHint === "windows") archHint = "x64";
-
-  return (
-    PLATFORMS.find((p) => p.os === osHint && p.arch === archHint) ?? null
-  );
+  return PLATFORMS.find((p) => p.os === osHint && p.arch === archHint) ?? null;
 }
 
 export function DownloadsClient() {
@@ -195,7 +190,7 @@ export function DownloadsClient() {
 
   const otherPlatforms = React.useMemo(
     () => (detected ? PLATFORMS.filter((p) => p.id !== detected.id) : PLATFORMS),
-    [detected],
+    [detected]
   );
 
   return (
@@ -212,22 +207,17 @@ export function DownloadsClient() {
       }
     >
       {/* ─── featured (detected) platform ──────────────────────────────── */}
-      <FeaturedPlatformCallout
-        platform={detected}
-        detectionDone={detectionDone}
-      />
+      <FeaturedPlatformCallout platform={detected} detectionDone={detectionDone} />
 
       {/* ─── platform grid ─────────────────────────────────────────────── */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <DownloadIcon className="size-4" />{" "}
-            {detected ? "Other platforms" : "Native binaries"}
+            <DownloadIcon className="size-4" /> {detected ? "Other platforms" : "Native binaries"}
           </CardTitle>
           <CardDescription>
-            Single-file static binaries. Download and run — no runtime
-            required. The latest alias always resolves to the newest
-            published release.
+            Single-file static binaries. Download and run — no runtime required. The latest alias
+            always resolves to the newest published release.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -246,26 +236,24 @@ export function DownloadsClient() {
             <PackageIcon className="size-4" /> Package managers
           </CardTitle>
           <CardDescription>
-            Pinned-version installs for teams that prefer a package
-            manager over downloading a binary directly.
+            Pinned-version installs for teams that prefer a package manager over downloading a
+            binary directly.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <PackageRow
             name="Homebrew"
-            badge="coming soon"
             command={`brew install calliopeai/tap/${CLI_BINARY}`}
-            note="Tap publication tracking on the CLI side. Use the macOS binary above in the meantime."
-            disabled
+            note="Available for macOS and Linux; the formula verifies the release checksum."
           />
           <PackageRow
-            name="npm"
-            command={`npm install -g @calliopelabs/${CLI_BINARY}`}
-            note={`Cross-platform install via Node.js (≥ 20). The npm package thin-wraps the same native binaries as the direct downloads.`}
+            name="Scoop"
+            command="scoop bucket add calliopeai https://github.com/calliopeai/scoop-bucket; scoop install astro"
+            note="Windows package backed by the same release archives."
           />
           <PackageRow
             name="Docker"
-            command={`docker run --rm -v $PWD:/work calliopeai/${CLI_BINARY}:latest`}
+            command="docker run --rm ghcr.io/calliopeai/astrolift-cli:latest version"
             note="Containerized run useful for CI agents that don't want to manage host installs."
           />
         </CardContent>
@@ -278,8 +266,8 @@ export function DownloadsClient() {
             <ShieldCheckIcon className="size-4" /> Verify your download
           </CardTitle>
           <CardDescription>
-            Every release publishes a {CHECKSUMS_FILENAME} file with
-            SHA-256 sums for each archive. Verify before extracting.
+            Every release publishes a {CHECKSUMS_FILENAME} file with SHA-256 sums for each archive.
+            Verify before extracting.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -296,17 +284,11 @@ export function DownloadsClient() {
             command={`Get-FileHash ${CLI_BINARY}-windows-amd64.zip -Algorithm SHA256`}
           />
           <p className="text-muted-foreground text-xs">
-            Checksums are signed with the Astrolift release key — see the
-            release notes on{" "}
-            <a
-              href={LATEST_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="underline"
-            >
+            Compare the computed digest with the checksum published alongside the archive on{" "}
+            <a href={LATEST_URL} target="_blank" rel="noreferrer" className="underline">
               GitHub
             </a>{" "}
-            for the detached signature.
+            before installing.
           </p>
         </CardContent>
       </Card>
@@ -316,19 +298,12 @@ export function DownloadsClient() {
         <CardHeader>
           <CardTitle className="text-base">After installing</CardTitle>
           <CardDescription>
-            Log in to this Astrolift install and list your apps to confirm
-            the CLI is wired up.
+            Log in to this Astrolift install and list your apps to confirm the CLI is wired up.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <CopyableCommand
-            label="Authenticate"
-            command={`${CLI_BINARY} login`}
-          />
-          <CopyableCommand
-            label="List apps"
-            command={`${CLI_BINARY} apps list`}
-          />
+          <CopyableCommand label="Authenticate" command={`${CLI_BINARY} auth login`} />
+          <CopyableCommand label="List apps" command={`${CLI_BINARY} app list`} />
           <Link
             href="/settings"
             className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
@@ -375,8 +350,8 @@ function FeaturedPlatformCallout({
             <SparklesIcon className="size-4" /> For your system
           </CardTitle>
           <CardDescription>
-            We couldn&apos;t detect your platform automatically. Pick the
-            matching native binary below.
+            We couldn&apos;t detect your platform automatically. Pick the matching native binary
+            below.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -402,20 +377,14 @@ function FeaturedPlatformCallout({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold">{platform.label}</span>
-              <Badge className="text-2xs uppercase tracking-wide">
+              <Badge className="text-2xs tracking-wide uppercase">
                 Recommended for your system
               </Badge>
             </div>
-            <div className="text-muted-foreground font-mono text-xs">
-              {platform.filename}
-            </div>
+            <div className="text-muted-foreground font-mono text-xs">{platform.filename}</div>
           </div>
           <Button asChild size="sm">
-            <a
-              href={LATEST_ASSET(platform.filename)}
-              target="_blank"
-              rel="noreferrer"
-            >
+            <a href={LATEST_ASSET(platform.filename)} target="_blank" rel="noreferrer">
               <DownloadIcon className="size-3" />
               Download
             </a>
@@ -438,49 +407,30 @@ function PlatformCard({ platform }: { platform: PlatformAsset }) {
           </div>
           <div>
             <div className="text-sm font-medium">{platform.label}</div>
-            <div className="text-muted-foreground font-mono text-xs">
-              {platform.arch}
-            </div>
+            <div className="text-muted-foreground font-mono text-xs">{platform.arch}</div>
           </div>
         </div>
       </div>
-      <div className="text-muted-foreground truncate font-mono text-xs">
-        {platform.filename}
-      </div>
+      <div className="text-muted-foreground truncate font-mono text-xs">{platform.filename}</div>
       <div className="flex items-center gap-2">
         <Button asChild size="sm" className="flex-1">
-          <a
-            href={LATEST_ASSET(platform.filename)}
-            target="_blank"
-            rel="noreferrer"
-          >
+          <a href={LATEST_ASSET(platform.filename)} target="_blank" rel="noreferrer">
             <DownloadIcon className="size-3" />
             Download
           </a>
         </Button>
-        <CopyButton
-          value={platform.installLine}
-          label="Copy install line"
-        />
+        <CopyButton value={platform.installLine} label="Copy install line" />
       </div>
     </div>
   );
 }
 
-function CopyableCommand({
-  label,
-  command,
-}: {
-  label: string;
-  command: string;
-}) {
+function CopyableCommand({ label, command }: { label: string; command: string }) {
   return (
     <div>
-      <div className="text-muted-foreground mb-1 text-xs uppercase tracking-wide">
-        {label}
-      </div>
+      <div className="text-muted-foreground mb-1 text-xs tracking-wide uppercase">{label}</div>
       <div className="bg-muted flex items-start gap-2 rounded-md p-2">
-        <pre className="flex-1 overflow-x-auto font-mono text-xs leading-relaxed whitespace-pre-wrap break-all">
+        <pre className="flex-1 overflow-x-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
           {command}
         </pre>
         <CopyButton value={command} label={`Copy ${label}`} />
@@ -514,7 +464,7 @@ function PackageRow({
       </div>
       <div className="bg-muted flex items-start gap-2 rounded-md p-2">
         <pre
-          className={`flex-1 overflow-x-auto font-mono text-xs leading-relaxed whitespace-pre-wrap break-all ${disabled ? "opacity-60" : ""}`}
+          className={`flex-1 overflow-x-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap ${disabled ? "opacity-60" : ""}`}
         >
           {command}
         </pre>
@@ -545,11 +495,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
         }
       }}
     >
-      {copied ? (
-        <CheckIcon className="size-3.5" />
-      ) : (
-        <CopyIcon className="size-3.5" />
-      )}
+      {copied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
     </Button>
   );
 }
