@@ -4,6 +4,9 @@
 
 ### Added
 
+- Add project-owned managed databases, caches, search, object storage,
+  queues, and secret bundles with explicit app-environment and agent-recipe
+  attachments, provider-backed secret CRUD/reveal, and runtime injection.
 - Add project-owned workflow topology and execution views across project,
   workflow, history, and role-aware dashboard surfaces.
 - Add deterministic GraphQL SDL and MCP capability-superset exports with
@@ -20,6 +23,9 @@
 
 ### Changed
 
+- Make project dashboards, navigation, and repository workflow detail pages
+  workload-aware, graph-first, fully linked, and observable without requiring
+  a configured workflow wrapper.
 - Treat repository-imported workflow definitions as first-class runnable
   project workflows; configured wrappers remain optional for custom bindings,
   inputs, and triggers.

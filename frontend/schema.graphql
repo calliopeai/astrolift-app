@@ -2297,12 +2297,29 @@ type AstroliftManagedService {
   statusError: String!
   config: JSON!
   registeredAppSlug: String!
+  projectSlug: String!
+  ownerScope: String!
+  clusterSlug: String!
   environmentName: String!
   createdAt: DateTime!
   updatedAt: DateTime!
   lastActionAt: DateTime
   lastActionKind: String!
   editableFields: [String!]!
+  attachments: [AstroliftManagedServiceAttachment!]!
+}
+
+type AstroliftManagedServiceAttachment {
+  id: GUID!
+  consumerKind: String!
+  consumerSlug: String!
+  environmentName: String!
+}
+
+type AstroliftManagedServiceAttachmentMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftManagedServiceAttachment
 }
 
 type AstroliftManagedServiceConnection {
@@ -2491,12 +2508,22 @@ type AstroliftNavTree {
 type AstroliftNavTreeProject {
   project: AstroliftProject!
   apps: [AstroliftAppSummary!]!
+  workflows: [AstroliftNavTreeWorkflow!]!
+  standaloneAgents: [AstroliftAppSummary!]!
 }
 
 type AstroliftNavTreeTeam {
   team: AstroliftTeam!
   projects: [AstroliftNavTreeProject!]!
   unassignedApps: [AstroliftAppSummary!]!
+}
+
+type AstroliftNavTreeWorkflow {
+  id: GUID!
+  slug: String!
+  name: String!
+  isEnabled: Boolean!
+  agents: [AstroliftAppSummary!]!
 }
 
 type AstroliftNotification {
@@ -3272,15 +3299,39 @@ type AstroliftSecretBundle {
   backendRef: String!
   organizationSlug: String!
   teamSlug: String
+  projectSlug: String
+  clusterSlug: String
   createdAt: DateTime!
+  consumers: [AstroliftSecretBundleConsumer!]!
   keyCount: Int!
+  keyNames: [String!]!
   lastKnownKeysAt: DateTime
+}
+
+type AstroliftSecretBundleConsumer {
+  id: GUID!
+  consumerKind: String!
+  consumerSlug: String!
+  environmentName: String!
 }
 
 type AstroliftSecretBundleMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftSecretBundle
+}
+
+type AstroliftSecretBundleReveal {
+  key: String!
+  value: String!
+  provider: String!
+  revealedAt: DateTime!
+}
+
+type AstroliftSecretBundleRevealMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftSecretBundleReveal
 }
 
 type AstroliftSecretChangeApproval {
@@ -3953,6 +4004,12 @@ type AstroliftWorkloadScalingStatus {
   sourcedAt: DateTime!
 }
 
+input AttachProjectManagedServiceInput {
+  managedServiceId: GUID!
+  agentEnvironmentSpecSlug: String = null
+  appEnvironmentId: GUID = null
+}
+
 input AttachSecretBundleInput {
   appSlug: String!
   environmentName: String!
@@ -4347,6 +4404,14 @@ input CreateProjectInput {
   description: String = null
 }
 
+input CreateProjectSecretBundleInput {
+  projectId: GUID!
+  clusterId: GUID!
+  name: String!
+  slug: String!
+  backendRef: String = null
+}
+
 input CreateRoleInput {
   slug: String!
   name: String!
@@ -4500,6 +4565,10 @@ input DeregisterAppInput {
   confirmName: String!
   deleteData: Boolean! = false
   forceDestroy: Boolean! = false
+}
+
+input DetachProjectManagedServiceInput {
+  attachmentId: GUID!
 }
 
 input DetachSecretBundleInput {
@@ -5155,9 +5224,21 @@ type Mutation {
   setAppSecretMetadata(input: SetAppSecretMetadataInput!): AppsecretmetadatapayloadMutationResult!
   bulkImportAppSecrets(input: BulkImportAppSecretsInput!): BulkimportpayloadMutationResult!
   revealAppSecret(input: RevealAppSecretInput!): AstroliftRevealedSecretMutationResult!
+  createProjectSecretBundle(input: CreateProjectSecretBundleInput!): AstroliftSecretBundleMutationResult!
+  updateProjectSecretBundle(input: UpdateProjectSecretBundleInput!): AstroliftSecretBundleMutationResult!
+  deleteProjectSecretBundle(bundleId: GUID!): AstroliftSecretBundleMutationResult!
+  setProjectBundleSecretValue(input: ProjectSecretBundleKeyInput!): AstroliftSecretBundleMutationResult!
+  deleteProjectBundleSecretValue(input: ProjectSecretBundleKeyInput!): AstroliftSecretBundleMutationResult!
+  revealProjectBundleSecretValue(input: ProjectSecretBundleKeyInput!): AstroliftSecretBundleRevealMutationResult!
   attachSecretBundle(input: AttachSecretBundleInput!): AstroliftAppSecretBundleAttachmentMutationResult!
   detachSecretBundle(input: DetachSecretBundleInput!): AttachmentremovedpayloadMutationResult!
   rotateSecretBundle(input: RotateSecretBundleInput!): AstroliftSecretBundleMutationResult!
+  provisionProjectManagedService(input: ProvisionProjectManagedServiceInput!): AstroliftManagedServiceMutationResult!
+  attachProjectManagedService(input: AttachProjectManagedServiceInput!): AstroliftManagedServiceAttachmentMutationResult!
+  detachProjectManagedService(input: DetachProjectManagedServiceInput!): AstroliftManagedServiceAttachmentMutationResult!
+  updateProjectManagedService(input: UpdateManagedServiceInput!): AstroliftManagedServiceMutationResult!
+  reprovisionProjectManagedService(input: ReprovisionManagedServiceInput!): AstroliftManagedServiceMutationResult!
+  deprovisionProjectManagedService(input: DeprovisionManagedServiceInput!): ManagedservicedeletedpayloadMutationResult!
   provisionManagedService(input: ProvisionManagedServiceInput!): AstroliftManagedServiceMutationResult!
   updateManagedService(input: UpdateManagedServiceInput!): AstroliftManagedServiceMutationResult!
   reprovisionManagedService(input: ReprovisionManagedServiceInput!): AstroliftManagedServiceMutationResult!
@@ -5479,6 +5560,12 @@ type ProfileType {
   signature: UploadType
 }
 
+input ProjectSecretBundleKeyInput {
+  bundleId: GUID!
+  key: String!
+  value: String = null
+}
+
 input PromoteDeploymentInput {
   appSlug: String!
   sourceEnvironmentName: String!
@@ -5527,6 +5614,18 @@ input ProvisionManagedServiceInput {
   name: String = null
   variant: String = null
   config: JSON = null
+}
+
+input ProvisionProjectManagedServiceInput {
+  projectId: GUID!
+  clusterId: GUID!
+  environmentName: String! = "production"
+  kind: String! = ""
+  name: String = null
+  variant: String = null
+  config: JSON = null
+  agentEnvironmentSpecSlugs: [String!]! = []
+  appEnvironmentIds: [GUID!]! = []
 }
 
 input PushCiSecretsToRepoInput {
@@ -5725,6 +5824,9 @@ type Query {
   astroliftSshDeployKeysPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftSshDeployKeyPage!
   astroliftAvailableRepos(connectionId: String!, search: String = null, limit: Int! = 100): AstroliftRemoteRepoList!
   astroliftSourceFile(connectionId: String!, repoFullName: String!, path: String!, ref: String!): AstroliftSourceFile!
+  astroliftProjectResourceClusters(projectId: GUID!): [AstroliftTenantCluster!]!
+  astroliftProjectManagedServices(projectId: GUID!): [AstroliftManagedService!]!
+  astroliftProjectSecretBundles(projectId: GUID!): [AstroliftSecretBundle!]!
   astroliftAppSecrets(appSlug: String!, environmentName: String = null): [AstroliftAppSecret!]!
   astroliftAppSecretHistory(appSlug: String!, key: String!): [AstroliftSecretHistoryEntry!]!
   astroliftSecretBundles: [AstroliftSecretBundle!]!
@@ -6547,6 +6649,12 @@ input UpdateProjectInput {
   name: String = null
   slug: String = null
   description: String = null
+}
+
+input UpdateProjectSecretBundleInput {
+  id: GUID!
+  name: String!
+  backendRef: String!
 }
 
 input UpdateRoleInput {

@@ -1,0 +1,1113 @@
+"use client";
+
+import { useMutation, useQuery } from "@apollo/client/react";
+import {
+  BoxIcon,
+  ChevronRightIcon,
+  CloudIcon,
+  DatabaseIcon,
+  EyeIcon,
+  EyeOffIcon,
+  KeyRoundIcon,
+  PlusIcon,
+  RefreshCwIcon,
+  SearchIcon,
+  Trash2Icon,
+  UnplugIcon,
+  ZapIcon,
+} from "lucide-react";
+import Link from "next/link";
+import * as React from "react";
+import { toast } from "sonner";
+
+import { EmptyState } from "@/components/EmptyState";
+import { PageShell } from "@/components/PageShell";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { StatTile } from "@/components/ui/stat-tile";
+import { LIST_AGENT_WORKLOADS } from "@/graphql/agents/agents.queries";
+import {
+  ATTACH_AGENT_SECRET_BUNDLE,
+  DETACH_AGENT_SECRET_BUNDLE,
+} from "@/graphql/agents/agents.mutations";
+import type { AstroliftAgentListItem } from "@/graphql/agents/agents.types";
+import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
+import { LIST_PROJECTS } from "@/graphql/identity/identity.queries";
+import type { AstroliftProject, MutationResult } from "@/graphql/identity/identity.types";
+import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
+import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
+import { LIST_APPS } from "@/graphql/registry/registry.queries";
+import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
+import {
+  ATTACH_PROJECT_MANAGED_SERVICE,
+  ATTACH_SECRET_BUNDLE,
+  CREATE_PROJECT_SECRET_BUNDLE,
+  DELETE_PROJECT_BUNDLE_SECRET,
+  DELETE_PROJECT_SECRET_BUNDLE,
+  DEPROVISION_PROJECT_MANAGED_SERVICE,
+  DETACH_PROJECT_MANAGED_SERVICE,
+  DETACH_SECRET_BUNDLE,
+  PROVISION_PROJECT_MANAGED_SERVICE,
+  REPROVISION_PROJECT_MANAGED_SERVICE,
+  REVEAL_PROJECT_BUNDLE_SECRET,
+  SET_PROJECT_BUNDLE_SECRET,
+} from "@/graphql/services/services.mutations";
+import { LIST_PROJECT_RESOURCES } from "@/graphql/services/services.queries";
+import type {
+  AstroliftManagedService,
+  AstroliftProjectSecretBundle,
+} from "@/graphql/services/services.types";
+import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
+import { useConfirm } from "@/hooks/use-confirm";
+
+interface ProjectsData {
+  astroliftProjects: AstroliftProject[];
+}
+interface AgentsData {
+  agentWorkloads: AstroliftAgentListItem[];
+}
+interface AppsData {
+  astroliftApps: AstroliftRegisteredApp[];
+}
+interface EnvironmentsData {
+  astroliftEnvironments: AstroliftAppEnvironment[];
+}
+interface ResourcesData {
+  astroliftProjectResourceClusters: AstroliftTenantCluster[];
+  astroliftProjectManagedServices: AstroliftManagedService[];
+  astroliftProjectSecretBundles: AstroliftProjectSecretBundle[];
+}
+
+const KINDS = [
+  ["postgres", "PostgreSQL / RDS", DatabaseIcon],
+  ["redis", "Redis / cache", ZapIcon],
+  ["search", "Search index", SearchIcon],
+  ["object_store", "Object storage / S3", CloudIcon],
+  ["vector_index", "Vector index", SearchIcon],
+  ["queue", "Queue", BoxIcon],
+] as const;
+
+function firstError(result?: MutationResult<unknown> | null): string {
+  return result?.errors?.[0]?.message ?? "The operation failed";
+}
+
+export function ProjectResourcesClient({ slug }: { slug: string }) {
+  const permissions = useMyPermissions();
+  const confirm = useConfirm();
+  const projects = useQuery<ProjectsData>(LIST_PROJECTS);
+  const project = projects.data?.astroliftProjects.find((row) => row.slug === slug);
+  const projectId = project?.id ?? "";
+  const orgId = project?.organization.id ?? "";
+  const resources = useQuery<ResourcesData>(LIST_PROJECT_RESOURCES, {
+    variables: { projectId },
+    skip: !projectId,
+    fetchPolicy: "cache-and-network",
+    pollInterval: 10_000,
+  });
+  const agents = useQuery<AgentsData>(LIST_AGENT_WORKLOADS, {
+    variables: { orgId, projectSlug: slug },
+    skip: !orgId,
+  });
+  const apps = useQuery<AppsData>(LIST_APPS, { skip: !projectId });
+  const environments = useQuery<EnvironmentsData>(LIST_ENVIRONMENTS, {
+    variables: { appSlug: null },
+    skip: !projectId,
+  });
+  const refetchResources = () => resources.refetch({ projectId });
+  const [resourceOpen, setResourceOpen] = React.useState(false);
+  const [bundleOpen, setBundleOpen] = React.useState(false);
+  const [resourceKind, setResourceKind] = React.useState("postgres");
+  const [resourceName, setResourceName] = React.useState("");
+  const [clusterId, setClusterId] = React.useState("");
+  const [selectedAgents, setSelectedAgents] = React.useState<string[]>([]);
+  const [selectedAppEnvironments, setSelectedAppEnvironments] = React.useState<string[]>([]);
+  const [consumerService, setConsumerService] = React.useState<AstroliftManagedService | null>(
+    null
+  );
+  const [consumerBundle, setConsumerBundle] = React.useState<AstroliftProjectSecretBundle | null>(
+    null
+  );
+  const [bundleName, setBundleName] = React.useState("");
+  const [bundleSlug, setBundleSlug] = React.useState("");
+  const [keyInputs, setKeyInputs] = React.useState<Record<string, { key: string; value: string }>>(
+    {}
+  );
+  const [revealed, setRevealed] = React.useState<Record<string, string>>({});
+  const refreshConsumerBundle = async (bundleId: string) => {
+    const refreshed = await refetchResources();
+    setConsumerBundle(
+      refreshed.data?.astroliftProjectSecretBundles.find((row) => row.id === bundleId) ?? null
+    );
+  };
+  const canUpdate = permissions.can("project.update");
+  const canWriteSecrets = permissions.can("secret.write");
+  const canReadSecrets = permissions.can("secret.read");
+
+  const [provision, provisionState] = useMutation<{
+    provisionProjectManagedService: MutationResult<AstroliftManagedService>;
+  }>(PROVISION_PROJECT_MANAGED_SERVICE);
+  const [reprovision] = useMutation<{
+    reprovisionProjectManagedService: MutationResult<AstroliftManagedService>;
+  }>(REPROVISION_PROJECT_MANAGED_SERVICE);
+  const [attachConsumer, attachConsumerState] = useMutation<{
+    attachProjectManagedService: MutationResult<AstroliftManagedService["attachments"][number]>;
+  }>(ATTACH_PROJECT_MANAGED_SERVICE);
+  const [detachConsumer, detachConsumerState] = useMutation<{
+    detachProjectManagedService: MutationResult<AstroliftManagedService["attachments"][number]>;
+  }>(DETACH_PROJECT_MANAGED_SERVICE);
+  const [deprovision] = useMutation<{
+    deprovisionProjectManagedService: MutationResult<{ id: string; deleted: boolean }>;
+  }>(DEPROVISION_PROJECT_MANAGED_SERVICE);
+  const [createBundle, createBundleState] = useMutation<{
+    createProjectSecretBundle: MutationResult<AstroliftProjectSecretBundle>;
+  }>(CREATE_PROJECT_SECRET_BUNDLE);
+  const [setSecret] = useMutation<{
+    setProjectBundleSecretValue: MutationResult<AstroliftProjectSecretBundle>;
+  }>(SET_PROJECT_BUNDLE_SECRET);
+  const [deleteSecret] = useMutation<{
+    deleteProjectBundleSecretValue: MutationResult<AstroliftProjectSecretBundle>;
+  }>(DELETE_PROJECT_BUNDLE_SECRET);
+  const [revealSecret] = useMutation<{
+    revealProjectBundleSecretValue: MutationResult<{
+      key: string;
+      value: string;
+      provider: string;
+      revealedAt: string;
+    }>;
+  }>(REVEAL_PROJECT_BUNDLE_SECRET);
+  const [deleteBundle] = useMutation<{
+    deleteProjectSecretBundle: MutationResult<AstroliftProjectSecretBundle>;
+  }>(DELETE_PROJECT_SECRET_BUNDLE);
+  const [attachAgentBundle, attachAgentBundleState] = useMutation<{
+    attachAgentSecretBundle: MutationResult<unknown>;
+  }>(ATTACH_AGENT_SECRET_BUNDLE);
+  const [detachAgentBundle, detachAgentBundleState] = useMutation<{
+    detachAgentSecretBundle: MutationResult<unknown>;
+  }>(DETACH_AGENT_SECRET_BUNDLE);
+  const [attachAppBundle, attachAppBundleState] = useMutation<{
+    attachSecretBundle: MutationResult<unknown>;
+  }>(ATTACH_SECRET_BUNDLE);
+  const [detachAppBundle, detachAppBundleState] = useMutation<{
+    detachSecretBundle: MutationResult<unknown>;
+  }>(DETACH_SECRET_BUNDLE);
+
+  const effectiveClusterId =
+    clusterId || resources.data?.astroliftProjectResourceClusters[0]?.id || "";
+  const effectiveClusterSlug = resources.data?.astroliftProjectResourceClusters.find(
+    (row) => row.id === effectiveClusterId
+  )?.slug;
+
+  if (projects.loading && !project) {
+    return (
+      <PageShell title="Project resources">
+        <Skeleton className="h-80" />
+      </PageShell>
+    );
+  }
+  if (!project) {
+    return (
+      <PageShell title="Project not found">
+        <EmptyState
+          icon={<BoxIcon className="size-5" />}
+          title="Project not found"
+          description="This project is unavailable."
+        />
+      </PageShell>
+    );
+  }
+
+  const services = resources.data?.astroliftProjectManagedServices ?? [];
+  const bundles = resources.data?.astroliftProjectSecretBundles ?? [];
+  const activeServices = services.filter((row) => row.status === "active").length;
+  const failedServices = services.filter((row) => row.status === "failed").length;
+  const projectAppSlugs = new Set(
+    (apps.data?.astroliftApps ?? [])
+      .filter((app) => app.projectId === projectId)
+      .map((app) => app.slug)
+  );
+  const projectAppEnvironments = (environments.data?.astroliftEnvironments ?? []).filter((env) =>
+    projectAppSlugs.has(env.registeredAppSlug)
+  );
+
+  async function submitResource(event: React.FormEvent) {
+    event.preventDefault();
+    const { data } = await provision({
+      variables: {
+        input: {
+          projectId,
+          clusterId: effectiveClusterId,
+          environmentName: "production",
+          kind: resourceKind,
+          name: resourceName || resourceKind,
+          agentEnvironmentSpecSlugs: selectedAgents,
+          appEnvironmentIds: selectedAppEnvironments,
+        },
+      },
+    });
+    const result = data?.provisionProjectManagedService as MutationResult<unknown> | undefined;
+    if (!result?.ok) return toast.error(firstError(result));
+    toast.success("Project resource provisioning started");
+    setResourceOpen(false);
+    setResourceName("");
+    setSelectedAgents([]);
+    setSelectedAppEnvironments([]);
+    await refetchResources();
+  }
+
+  async function submitBundle(event: React.FormEvent) {
+    event.preventDefault();
+    const { data } = await createBundle({
+      variables: {
+        input: { projectId, clusterId: effectiveClusterId, name: bundleName, slug: bundleSlug },
+      },
+    });
+    const result = data?.createProjectSecretBundle as MutationResult<unknown> | undefined;
+    if (!result?.ok) return toast.error(firstError(result));
+    toast.success("Shared secret bundle created");
+    setBundleOpen(false);
+    setBundleName("");
+    setBundleSlug("");
+    await refetchResources();
+  }
+
+  async function setBundleKey(bundle: AstroliftProjectSecretBundle) {
+    const entry = keyInputs[bundle.id];
+    if (!entry?.key || !entry.value) return;
+    const { data } = await setSecret({
+      variables: { input: { bundleId: bundle.id, key: entry.key, value: entry.value } },
+    });
+    const result = data?.setProjectBundleSecretValue as MutationResult<unknown> | undefined;
+    if (!result?.ok) return toast.error(firstError(result));
+    setKeyInputs((current) => ({ ...current, [bundle.id]: { key: "", value: "" } }));
+    toast.success(`${entry.key} saved`);
+    await refetchResources();
+  }
+
+  return (
+    <PageShell
+      title="Project resources"
+      description={
+        <nav className="text-muted-foreground flex items-center gap-1 text-sm">
+          <Link href={`/projects/${encodeURIComponent(slug)}`} className="hover:underline">
+            {project.name}
+          </Link>
+          <ChevronRightIcon className="size-3" />
+          <span className="text-foreground">Resources</span>
+        </nav>
+      }
+      actions={
+        canUpdate ? (
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setBundleOpen(true)}
+              disabled={!canWriteSecrets}
+            >
+              <KeyRoundIcon className="size-4" /> New secret bundle
+            </Button>
+            <Button onClick={() => setResourceOpen(true)}>
+              <PlusIcon className="size-4" /> Add resource
+            </Button>
+          </>
+        ) : null
+      }
+    >
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatTile
+          icon={BoxIcon}
+          label="Managed resources"
+          value={services.length}
+          footer={`${activeServices} active`}
+        />
+        <StatTile
+          icon={KeyRoundIcon}
+          label="Shared secret bundles"
+          value={bundles.length}
+          footer={`${bundles.reduce((sum, row) => sum + row.keyCount, 0)} keys`}
+        />
+        <StatTile
+          icon={RefreshCwIcon}
+          label="Needs attention"
+          value={failedServices}
+          footer="failed provisioning or lifecycle operations"
+          className={failedServices ? "border-warning-border" : undefined}
+        />
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Managed infrastructure</CardTitle>
+          <CardDescription>
+            Project-owned databases, caches, indexes, buckets, and queues can be shared by multiple
+            apps and workflow agents.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-2">
+          {resources.loading && !resources.data ? (
+            <Skeleton className="col-span-full h-32" />
+          ) : services.length === 0 ? (
+            <div className="text-muted-foreground col-span-full rounded-lg border border-dashed p-8 text-center text-sm">
+              No project resources yet.
+            </div>
+          ) : (
+            services.map((service) => (
+              <article key={service.id} className="rounded-lg border p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-medium">{service.name}</h3>
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      {service.kind.replace(/_/g, " ")} · {service.clusterSlug}
+                    </p>
+                  </div>
+                  <Badge
+                    variant={service.status === "failed" ? "destructive" : "secondary"}
+                    className="capitalize"
+                  >
+                    {service.status}
+                  </Badge>
+                </div>
+                {service.statusError && (
+                  <p className="text-danger-fg mt-2 text-xs">{service.statusError}</p>
+                )}
+                <div className="mt-3 flex flex-wrap gap-1">
+                  {service.attachments.map((attachment) => (
+                    <Badge key={attachment.id} variant="outline">
+                      {attachment.consumerSlug}
+                    </Badge>
+                  ))}
+                  {service.attachments.length === 0 && (
+                    <span className="text-muted-foreground text-xs">Not attached yet</span>
+                  )}
+                </div>
+                {canUpdate && (
+                  <div className="mt-3 flex justify-end gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => setConsumerService(service)}>
+                      <UnplugIcon className="size-3" /> Consumers
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={async () => {
+                        const { data } = await reprovision({
+                          variables: { input: { managedServiceId: service.id } },
+                        });
+                        const result = data?.reprovisionProjectManagedService as
+                          | MutationResult<unknown>
+                          | undefined;
+                        if (result?.ok) toast.success("Reprovision started");
+                        else toast.error(firstError(result));
+                        await refetchResources();
+                      }}
+                    >
+                      <RefreshCwIcon className="size-3" /> Reprovision
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-danger-fg"
+                      onClick={async () => {
+                        const approved = await confirm({
+                          title: `Deprovision ${service.name}?`,
+                          description:
+                            "The cloud resource will be removed using the provider's safe-delete behavior; persistent data is retained by default.",
+                          confirmLabel: "Deprovision",
+                        });
+                        if (!approved) return;
+                        const { data } = await deprovision({
+                          variables: {
+                            input: { id: service.id, deleteData: false, forceDestroy: false },
+                          },
+                        });
+                        const result = data?.deprovisionProjectManagedService as
+                          | MutationResult<unknown>
+                          | undefined;
+                        if (result?.ok) toast.success("Deprovision started");
+                        else toast.error(firstError(result));
+                        await refetchResources();
+                      }}
+                    >
+                      <Trash2Icon className="size-3" /> Deprovision
+                    </Button>
+                  </div>
+                )}
+              </article>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Shared secret bundles</CardTitle>
+          <CardDescription>
+            Project-scoped credentials that can be attached to selected apps and agent environments.
+            Values are stored only in the cluster secrets backend.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {bundles.length === 0 ? (
+            <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
+              No shared secret bundles yet.
+            </div>
+          ) : (
+            bundles.map((bundle) => {
+              const entry = keyInputs[bundle.id] ?? { key: "", value: "" };
+              return (
+                <section key={bundle.id} className="rounded-lg border p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-medium">{bundle.name}</h3>
+                      <p className="text-muted-foreground font-mono text-xs">
+                        {bundle.slug} · {bundle.clusterSlug}
+                      </p>
+                    </div>
+                    {canWriteSecrets && (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setConsumerBundle(bundle)}
+                        >
+                          <UnplugIcon className="size-3" /> Consumers
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-danger-fg"
+                          onClick={async () => {
+                            const approved = await confirm({
+                              title: `Delete ${bundle.name}?`,
+                              description:
+                                "This permanently deletes the provider-side bundle values after Astrolift verifies it has no consumers.",
+                              confirmLabel: "Delete bundle",
+                            });
+                            if (!approved) return;
+                            const { data } = await deleteBundle({
+                              variables: { bundleId: bundle.id },
+                            });
+                            const result = data?.deleteProjectSecretBundle as
+                              | MutationResult<unknown>
+                              | undefined;
+                            if (result?.ok) toast.success("Bundle deleted");
+                            else toast.error(firstError(result));
+                            await refetchResources();
+                          }}
+                        >
+                          <Trash2Icon className="size-3" /> Delete
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {bundle.keyNames.map((key) => (
+                      <div
+                        key={key}
+                        className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
+                      >
+                        <span className="font-mono">{key}</span>
+                        {revealed[`${bundle.id}:${key}`] && (
+                          <code className="text-danger-fg max-w-48 truncate">
+                            {revealed[`${bundle.id}:${key}`]}
+                          </code>
+                        )}
+                        {canReadSecrets && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="size-6"
+                            onClick={async () => {
+                              const revealKey = `${bundle.id}:${key}`;
+                              if (revealed[revealKey])
+                                return setRevealed((current) => {
+                                  const next = { ...current };
+                                  delete next[revealKey];
+                                  return next;
+                                });
+                              const { data } = await revealSecret({
+                                variables: { input: { bundleId: bundle.id, key } },
+                              });
+                              const result = data?.revealProjectBundleSecretValue as
+                                | MutationResult<{ value: string }>
+                                | undefined;
+                              if (!result?.ok || !result.data)
+                                return toast.error(firstError(result));
+                              setRevealed((current) => ({
+                                ...current,
+                                [revealKey]: result.data!.value,
+                              }));
+                            }}
+                          >
+                            {revealed[`${bundle.id}:${key}`] ? (
+                              <EyeOffIcon className="size-3" />
+                            ) : (
+                              <EyeIcon className="size-3" />
+                            )}
+                          </Button>
+                        )}
+                        {canWriteSecrets && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-danger-fg size-6"
+                            onClick={async () => {
+                              const { data } = await deleteSecret({
+                                variables: { input: { bundleId: bundle.id, key } },
+                              });
+                              const result = data?.deleteProjectBundleSecretValue as
+                                | MutationResult<unknown>
+                                | undefined;
+                              if (result?.ok) toast.success(`${key} deleted`);
+                              else toast.error(firstError(result));
+                              await refetchResources();
+                            }}
+                          >
+                            <Trash2Icon className="size-3" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    {bundle.keyNames.length === 0 && (
+                      <span className="text-muted-foreground text-xs">No keys yet</span>
+                    )}
+                  </div>
+                  {canWriteSecrets && (
+                    <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_2fr_auto]">
+                      <Input
+                        placeholder="KEY_NAME"
+                        value={entry.key}
+                        onChange={(event) =>
+                          setKeyInputs((current) => ({
+                            ...current,
+                            [bundle.id]: { ...entry, key: event.target.value },
+                          }))
+                        }
+                      />
+                      <Input
+                        type="password"
+                        placeholder="Secret value"
+                        value={entry.value}
+                        onChange={(event) =>
+                          setKeyInputs((current) => ({
+                            ...current,
+                            [bundle.id]: { ...entry, value: event.target.value },
+                          }))
+                        }
+                      />
+                      <Button onClick={() => setBundleKey(bundle)}>Set key</Button>
+                    </div>
+                  )}
+                </section>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={resourceOpen} onOpenChange={setResourceOpen}>
+        <DialogContent>
+          <form onSubmit={submitResource} className="space-y-4">
+            <DialogHeader>
+              <DialogTitle>Add project resource</DialogTitle>
+              <DialogDescription>
+                Provision shared infrastructure once, then attach it to selected app environments
+                and workflow agents in this project.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="resource-kind">Kind</Label>
+              <select
+                id="resource-kind"
+                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                value={resourceKind}
+                onChange={(event) => setResourceKind(event.target.value)}
+              >
+                {KINDS.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="resource-name">Name</Label>
+              <Input
+                id="resource-name"
+                value={resourceName}
+                onChange={(event) => setResourceName(event.target.value)}
+                placeholder={resourceKind}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="resource-cluster">Cluster</Label>
+              <select
+                id="resource-cluster"
+                required
+                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                value={effectiveClusterId}
+                onChange={(event) => {
+                  setClusterId(event.target.value);
+                  setSelectedAgents([]);
+                  setSelectedAppEnvironments([]);
+                }}
+              >
+                {resources.data?.astroliftProjectResourceClusters.map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.name} · {row.region}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">Attach to agents</legend>
+              {(agents.data?.agentWorkloads ?? []).map((agent) => (
+                <label key={agent.id} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={selectedAgents.includes(agent.slug)}
+                    onChange={(event) =>
+                      setSelectedAgents((current) =>
+                        event.target.checked
+                          ? [...current, agent.slug]
+                          : current.filter((value) => value !== agent.slug)
+                      )
+                    }
+                  />
+                  {agent.name}
+                </label>
+              ))}
+            </fieldset>
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">Attach to app environments</legend>
+              {projectAppEnvironments
+                .filter((env) => !effectiveClusterSlug || env.clusterSlug === effectiveClusterSlug)
+                .map((env) => (
+                  <label key={env.id} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={selectedAppEnvironments.includes(env.id)}
+                      onChange={(event) =>
+                        setSelectedAppEnvironments((current) =>
+                          event.target.checked
+                            ? [...current, env.id]
+                            : current.filter((value) => value !== env.id)
+                        )
+                      }
+                    />
+                    {env.registeredAppSlug} · {env.name}
+                  </label>
+                ))}
+            </fieldset>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setResourceOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={!effectiveClusterId || provisionState.loading}>
+                Provision
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={consumerService !== null}
+        onOpenChange={(open) => {
+          if (!open) setConsumerService(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Resource consumers</DialogTitle>
+            <DialogDescription>
+              Attach {consumerService?.name} to multiple apps and agents inside this project.
+            </DialogDescription>
+          </DialogHeader>
+          {consumerService && (
+            <div className="max-h-[65vh] space-y-5 overflow-y-auto pr-1">
+              <div className="space-y-2">
+                <Label>Attached</Label>
+                {consumerService.attachments.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">No consumers attached.</p>
+                ) : (
+                  consumerService.attachments.map((attachment) => (
+                    <div
+                      key={attachment.id}
+                      className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                    >
+                      <span>
+                        {attachment.consumerSlug} · {attachment.environmentName}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-danger-fg"
+                        disabled={detachConsumerState.loading}
+                        onClick={async () => {
+                          const { data } = await detachConsumer({
+                            variables: { input: { attachmentId: attachment.id } },
+                          });
+                          const result = data?.detachProjectManagedService as
+                            | MutationResult<unknown>
+                            | undefined;
+                          if (!result?.ok) return toast.error(firstError(result));
+                          toast.success("Consumer detached");
+                          const refreshed = await refetchResources();
+                          setConsumerService(
+                            refreshed.data?.astroliftProjectManagedServices.find(
+                              (row) => row.id === consumerService.id
+                            ) ?? null
+                          );
+                        }}
+                      >
+                        <Trash2Icon className="size-3" /> Detach
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Available agents</Label>
+                {(agents.data?.agentWorkloads ?? [])
+                  .filter(
+                    (agent) =>
+                      !consumerService.attachments.some(
+                        (row) => row.consumerKind === "agent" && row.consumerSlug === agent.slug
+                      )
+                  )
+                  .map((agent) => (
+                    <div
+                      key={agent.id}
+                      className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                    >
+                      <span>{agent.name}</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={attachConsumerState.loading}
+                        onClick={async () => {
+                          const { data } = await attachConsumer({
+                            variables: {
+                              input: {
+                                managedServiceId: consumerService.id,
+                                agentEnvironmentSpecSlug: agent.slug,
+                                appEnvironmentId: null,
+                              },
+                            },
+                          });
+                          const result = data?.attachProjectManagedService as
+                            | MutationResult<unknown>
+                            | undefined;
+                          if (!result?.ok) return toast.error(firstError(result));
+                          const refreshed = await refetchResources();
+                          setConsumerService(
+                            refreshed.data?.astroliftProjectManagedServices.find(
+                              (row) => row.id === consumerService.id
+                            ) ?? null
+                          );
+                        }}
+                      >
+                        Attach
+                      </Button>
+                    </div>
+                  ))}
+              </div>
+              <div className="space-y-2">
+                <Label>Available app environments</Label>
+                {projectAppEnvironments
+                  .filter(
+                    (env) =>
+                      env.clusterSlug === consumerService.clusterSlug &&
+                      !consumerService.attachments.some(
+                        (row) =>
+                          row.consumerKind === "app" &&
+                          row.consumerSlug === env.registeredAppSlug &&
+                          row.environmentName === env.name
+                      )
+                  )
+                  .map((env) => (
+                    <div
+                      key={env.id}
+                      className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                    >
+                      <span>
+                        {env.registeredAppSlug} · {env.name}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={attachConsumerState.loading}
+                        onClick={async () => {
+                          const { data } = await attachConsumer({
+                            variables: {
+                              input: {
+                                managedServiceId: consumerService.id,
+                                agentEnvironmentSpecSlug: null,
+                                appEnvironmentId: env.id,
+                              },
+                            },
+                          });
+                          const result = data?.attachProjectManagedService as
+                            | MutationResult<unknown>
+                            | undefined;
+                          if (!result?.ok) return toast.error(firstError(result));
+                          const refreshed = await refetchResources();
+                          setConsumerService(
+                            refreshed.data?.astroliftProjectManagedServices.find(
+                              (row) => row.id === consumerService.id
+                            ) ?? null
+                          );
+                        }}
+                      >
+                        Attach
+                      </Button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConsumerService(null)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={consumerBundle !== null}
+        onOpenChange={(open) => {
+          if (!open) setConsumerBundle(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Secret bundle consumers</DialogTitle>
+            <DialogDescription>
+              Attach {consumerBundle?.name} to apps and agent recipes on its secrets cluster.
+            </DialogDescription>
+          </DialogHeader>
+          {consumerBundle && (
+            <div className="max-h-[65vh] space-y-5 overflow-y-auto pr-1">
+              <div className="space-y-2">
+                <Label>Attached</Label>
+                {consumerBundle.consumers.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">No consumers attached.</p>
+                ) : (
+                  consumerBundle.consumers.map((consumer) => (
+                    <div
+                      key={`${consumer.consumerKind}:${consumer.id}`}
+                      className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                    >
+                      <span>
+                        {consumer.consumerSlug} · {consumer.environmentName}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-danger-fg"
+                        disabled={detachAgentBundleState.loading || detachAppBundleState.loading}
+                        onClick={async () => {
+                          let result: MutationResult<unknown> | undefined;
+                          if (consumer.consumerKind === "agent") {
+                            const { data } = await detachAgentBundle({
+                              variables: {
+                                slug: consumer.consumerSlug,
+                                attachmentId: consumer.id,
+                              },
+                            });
+                            result = data?.detachAgentSecretBundle;
+                          } else {
+                            const { data } = await detachAppBundle({
+                              variables: { input: { attachmentId: consumer.id } },
+                            });
+                            result = data?.detachSecretBundle;
+                          }
+                          if (!result?.ok) return toast.error(firstError(result));
+                          toast.success("Bundle consumer detached");
+                          await refreshConsumerBundle(consumerBundle.id);
+                        }}
+                      >
+                        <Trash2Icon className="size-3" /> Detach
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Available agents</Label>
+                {(agents.data?.agentWorkloads ?? [])
+                  .filter(
+                    (agent) =>
+                      !consumerBundle.consumers.some(
+                        (row) => row.consumerKind === "agent" && row.consumerSlug === agent.slug
+                      )
+                  )
+                  .map((agent) => (
+                    <div
+                      key={agent.id}
+                      className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                    >
+                      <span>{agent.name}</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={attachAgentBundleState.loading}
+                        onClick={async () => {
+                          const { data } = await attachAgentBundle({
+                            variables: {
+                              slug: agent.slug,
+                              bundleId: consumerBundle.id,
+                              prefix: "",
+                              position: consumerBundle.consumers.length,
+                            },
+                          });
+                          const result = data?.attachAgentSecretBundle as
+                            | MutationResult<unknown>
+                            | undefined;
+                          if (!result?.ok) return toast.error(firstError(result));
+                          toast.success("Bundle attached to agent");
+                          await refreshConsumerBundle(consumerBundle.id);
+                        }}
+                      >
+                        Attach
+                      </Button>
+                    </div>
+                  ))}
+              </div>
+              <div className="space-y-2">
+                <Label>Available app environments</Label>
+                {projectAppEnvironments
+                  .filter(
+                    (env) =>
+                      env.clusterSlug === consumerBundle.clusterSlug &&
+                      !consumerBundle.consumers.some(
+                        (row) =>
+                          row.consumerKind === "app" &&
+                          row.consumerSlug === env.registeredAppSlug &&
+                          row.environmentName === env.name
+                      )
+                  )
+                  .map((env) => (
+                    <div
+                      key={env.id}
+                      className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                    >
+                      <span>
+                        {env.registeredAppSlug} · {env.name}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={attachAppBundleState.loading}
+                        onClick={async () => {
+                          const { data } = await attachAppBundle({
+                            variables: {
+                              input: {
+                                appSlug: env.registeredAppSlug,
+                                environmentName: env.name,
+                                bundleSlug: consumerBundle.slug,
+                                prefix: "",
+                              },
+                            },
+                          });
+                          const result = data?.attachSecretBundle as
+                            | MutationResult<unknown>
+                            | undefined;
+                          if (!result?.ok) return toast.error(firstError(result));
+                          toast.success("Bundle attached to app environment");
+                          await refreshConsumerBundle(consumerBundle.id);
+                        }}
+                      >
+                        Attach
+                      </Button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConsumerBundle(null)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={bundleOpen} onOpenChange={setBundleOpen}>
+        <DialogContent>
+          <form onSubmit={submitBundle} className="space-y-4">
+            <DialogHeader>
+              <DialogTitle>New shared secret bundle</DialogTitle>
+              <DialogDescription>
+                Create a project-owned bundle in the selected cluster secrets backend.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="bundle-name">Name</Label>
+              <Input
+                id="bundle-name"
+                required
+                value={bundleName}
+                onChange={(event) => {
+                  setBundleName(event.target.value);
+                  if (!bundleSlug)
+                    setBundleSlug(
+                      event.target.value
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]+/g, "-")
+                        .replace(/^-|-$/g, "")
+                    );
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bundle-slug">Slug</Label>
+              <Input
+                id="bundle-slug"
+                required
+                value={bundleSlug}
+                onChange={(event) => setBundleSlug(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bundle-cluster">Cluster</Label>
+              <select
+                id="bundle-cluster"
+                required
+                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                value={effectiveClusterId}
+                onChange={(event) => setClusterId(event.target.value)}
+              >
+                {resources.data?.astroliftProjectResourceClusters.map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.name} · {row.region}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setBundleOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={!effectiveClusterId || createBundleState.loading}>
+                Create bundle
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </PageShell>
+  );
+}

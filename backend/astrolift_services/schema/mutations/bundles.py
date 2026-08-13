@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 import strawberry
+from django.db import IntegrityError, transaction
+from django.db.models import Q
+from django.utils import timezone
+from django.utils.text import slugify
 from strawberry.types import Info
 
+from astrolift_clusters.models import TenantCluster
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
+from astrolift_identity.models import Project
 from astrolift_identity.step_up import requires_elevation
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_registry.models import RegisteredApp
@@ -23,12 +29,16 @@ from astrolift_services.schema.mutations.helpers import (
 )
 from astrolift_services.schema.mutations.types import (
     AttachSecretBundleInput,
+    CreateProjectSecretBundleInput,
     DetachSecretBundleInput,
+    ProjectSecretBundleKeyInput,
     RotateSecretBundleInput,
+    UpdateProjectSecretBundleInput,
     _AttachmentRemovedPayload,
 )
 from astrolift_services.schema.types import (
     AppSecretBundleAttachmentType,
+    SecretBundleRevealType,
     SecretBundleType,
     attachment_to_type,
     secret_bundle_to_type,
@@ -38,8 +48,266 @@ from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
 
 
+def _project_bundle_for_caller(bundle_id):
+    return (
+        SecretBundle.objects.select_related("organization", "project", "tenant_cluster")
+        .filter(
+            guid=str(bundle_id),
+            project__organization_id=_caller_org_id(),
+            deleted_at__isnull=True,
+        )
+        .first()
+    )
+
+
+def _project_bundle_backend(bundle):
+    from astrolift_dispatch.agent_secrets import secret_backend_capabilities
+    from core.app_deploy import AppDeployError, driver_for_capability
+
+    try:
+        backend = driver_for_capability(bundle.tenant_cluster, "secrets")
+    except AppDeployError:
+        return (
+            None,
+            None,
+            gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "the project cluster has no secrets backend",
+            ),
+        )
+    return backend, secret_backend_capabilities(backend), None
+
+
+def _project_bundle_backend_ref(project, slug: str) -> str:
+    """Canonical tenant-safe location for a project-owned bundle."""
+
+    return f"project-bundles/{project.organization.guid}/{project.guid}/{slug}"
+
+
 @strawberry.type
 class SecretBundleMutations:
+    @strawberry.field
+    @mutation_audit(action="project.secret.bundle.create")
+    @requires_elevation(action_label="project.secret.bundle.create")
+    @require_permission(Permission.PROJECT_UPDATE, Permission.SECRET_WRITE)
+    @tenant_scoped()
+    def create_project_secret_bundle(
+        self,
+        info: Info,
+        input: CreateProjectSecretBundleInput,
+    ) -> MutationResultType[SecretBundleType]:
+        project = (
+            Project.objects.select_related("organization")
+            .filter(
+                guid=str(input.project_id),
+                organization_id=_caller_org_id(),
+                deleted_at__isnull=True,
+            )
+            .first()
+        )
+        if project is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "project not found", field="projectId")
+        cluster = TenantCluster.objects.filter(
+            Q(organization_id=project.organization_id) | Q(organization_id__isnull=True),
+            guid=str(input.cluster_id),
+            deleted_at__isnull=True,
+            is_active=True,
+            lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+        ).first()
+        if cluster is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
+        name = (input.name or "").strip()
+        normalized_slug = slugify(input.slug or name)[:200]
+        if not name or not normalized_slug:
+            return gql_failure(ErrorCode.VALIDATION.value, "name and slug are required")
+        backend_ref = _project_bundle_backend_ref(project, normalized_slug)
+        requested_backend_ref = (input.backend_ref or "").strip()
+        if requested_backend_ref and requested_backend_ref != backend_ref:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "project bundle backendRef is platform managed",
+                field="backendRef",
+            )
+        try:
+            bundle = SecretBundle.objects.create(
+                organization=project.organization,
+                project=project,
+                tenant_cluster=cluster,
+                team=None,
+                name=name[:200],
+                slug=normalized_slug,
+                backend_ref=backend_ref,
+            )
+        except IntegrityError:
+            return gql_failure(ErrorCode.CONFLICT.value, "a project bundle with this slug already exists")
+        return gql_success(secret_bundle_to_type(bundle))
+
+    @strawberry.field
+    @mutation_audit(action="project.secret.bundle.update")
+    @requires_elevation(action_label="project.secret.bundle.update")
+    @require_permission(Permission.PROJECT_UPDATE, Permission.SECRET_WRITE)
+    @tenant_scoped()
+    def update_project_secret_bundle(
+        self,
+        info: Info,
+        input: UpdateProjectSecretBundleInput,
+    ) -> MutationResultType[SecretBundleType]:
+        bundle = _project_bundle_for_caller(input.id)
+        if bundle is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "project secret bundle not found")
+        name = (input.name or "").strip()
+        backend_ref = (input.backend_ref or "").strip()
+        if not name or not backend_ref:
+            return gql_failure(ErrorCode.VALIDATION.value, "name and backendRef are required")
+        if len(name) > 200 or len(backend_ref) > 512:
+            return gql_failure(ErrorCode.VALIDATION.value, "name or backendRef is too long")
+        if backend_ref != bundle.backend_ref:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "project bundle backendRef is platform managed",
+                field="backendRef",
+            )
+        bundle.name = name
+        bundle.backend_ref = backend_ref
+        bundle.save(update_fields=["name", "backend_ref", "updated_at", "version"])
+        return gql_success(secret_bundle_to_type(bundle))
+
+    @strawberry.field
+    @mutation_audit(action="project.secret.bundle.delete")
+    @requires_elevation(action_label="project.secret.bundle.delete")
+    @require_permission(Permission.PROJECT_UPDATE, Permission.SECRET_WRITE)
+    @tenant_scoped()
+    def delete_project_secret_bundle(
+        self,
+        info: Info,
+        bundle_id: GUID,
+    ) -> MutationResultType[SecretBundleType]:
+        bundle = _project_bundle_for_caller(bundle_id)
+        if bundle is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "project secret bundle not found")
+        if (
+            bundle.agent_refs.filter(deleted_at__isnull=True).exists()
+            or bundle.app_refs.filter(deleted_at__isnull=True).exists()
+        ):
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "detach this bundle from every agent and app before deleting it",
+            )
+        backend, _caps, err = _project_bundle_backend(bundle)
+        if err is not None:
+            return err
+        try:
+            if backend.get(bundle.backend_ref) is not None:
+                backend.delete(bundle.backend_ref)
+        except Exception:  # noqa: BLE001
+            return gql_failure(ErrorCode.INTERNAL.value, "secret bundle delete failed")
+        payload = secret_bundle_to_type(bundle)
+        bundle.soft_delete(by=_actor_user(info))
+        return gql_success(payload)
+
+    @strawberry.field
+    @mutation_audit(action="project.secret.bundle.key.set")
+    @requires_elevation(action_label="project.secret.bundle.key.set")
+    @require_permission(Permission.PROJECT_UPDATE, Permission.SECRET_WRITE)
+    @tenant_scoped()
+    def set_project_bundle_secret_value(
+        self,
+        info: Info,
+        input: ProjectSecretBundleKeyInput,
+    ) -> MutationResultType[SecretBundleType]:
+        from astrolift_dispatch.agent_secrets import valid_agent_env_var
+
+        bundle = _project_bundle_for_caller(input.bundle_id)
+        if bundle is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "project secret bundle not found")
+        key = (input.key or "").strip()
+        if not valid_agent_env_var(key) or len(key) > 255:
+            return gql_failure(ErrorCode.VALIDATION.value, "key must be env-var safe", field="key")
+        if input.value is None or input.value == "":
+            return gql_failure(ErrorCode.VALIDATION.value, "value must not be empty", field="value")
+        backend, _caps, err = _project_bundle_backend(bundle)
+        if err is not None:
+            return err
+        try:
+            with transaction.atomic():
+                locked = SecretBundle.objects.select_for_update().get(pk=bundle.pk)
+                payload = dict(backend.get(locked.backend_ref) or {})
+                payload[key] = input.value
+                backend.upsert(locked.backend_ref, payload)
+                locked.last_known_keys = sorted(payload)
+                locked.last_key_enum_at = timezone.now()
+                locked.save(update_fields=["last_known_keys", "last_key_enum_at", "updated_at", "version"])
+                bundle = locked
+        except Exception:  # noqa: BLE001
+            return gql_failure(ErrorCode.INTERNAL.value, "secret bundle write failed")
+        return gql_success(secret_bundle_to_type(bundle))
+
+    @strawberry.field
+    @mutation_audit(action="project.secret.bundle.key.delete")
+    @requires_elevation(action_label="project.secret.bundle.key.delete")
+    @require_permission(Permission.PROJECT_UPDATE, Permission.SECRET_WRITE)
+    @tenant_scoped()
+    def delete_project_bundle_secret_value(
+        self,
+        info: Info,
+        input: ProjectSecretBundleKeyInput,
+    ) -> MutationResultType[SecretBundleType]:
+        bundle = _project_bundle_for_caller(input.bundle_id)
+        if bundle is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "project secret bundle not found")
+        backend, _caps, err = _project_bundle_backend(bundle)
+        if err is not None:
+            return err
+        try:
+            with transaction.atomic():
+                locked = SecretBundle.objects.select_for_update().get(pk=bundle.pk)
+                payload = dict(backend.get(locked.backend_ref) or {})
+                payload.pop(input.key, None)
+                backend.upsert(locked.backend_ref, payload)
+                locked.last_known_keys = sorted(payload)
+                locked.last_key_enum_at = timezone.now()
+                locked.save(update_fields=["last_known_keys", "last_key_enum_at", "updated_at", "version"])
+                bundle = locked
+        except Exception:  # noqa: BLE001
+            return gql_failure(ErrorCode.INTERNAL.value, "secret bundle key delete failed")
+        return gql_success(secret_bundle_to_type(bundle))
+
+    @strawberry.field
+    @mutation_audit(action="project.secret.bundle.key.reveal")
+    @requires_elevation(action_label="project.secret.bundle.key.reveal")
+    @require_permission(Permission.PROJECT_READ, Permission.SECRET_READ)
+    @tenant_scoped()
+    def reveal_project_bundle_secret_value(
+        self,
+        info: Info,
+        input: ProjectSecretBundleKeyInput,
+    ) -> MutationResultType[SecretBundleRevealType]:
+        bundle = _project_bundle_for_caller(input.bundle_id)
+        if bundle is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "project secret bundle not found")
+        backend, capabilities, err = _project_bundle_backend(bundle)
+        if err is not None:
+            return err
+        if not capabilities["can_reveal"]:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                capabilities["read_limitation"] or "provider does not support reveal",
+            )
+        try:
+            payload = backend.get(bundle.backend_ref) or {}
+        except Exception:  # noqa: BLE001
+            return gql_failure(ErrorCode.INTERNAL.value, "secret bundle read failed")
+        if input.key not in payload:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "secret bundle key not found")
+        return gql_success(
+            SecretBundleRevealType(
+                key=input.key,
+                value=str(payload[input.key]),
+                provider=capabilities["provider"],
+                revealed_at=timezone.now(),
+            )
+        )
+
     @strawberry.field
     @mutation_audit(action="app.secret.bundle.attach")
     @requires_elevation(action_label="app.secret.bundle.attach")
@@ -83,6 +351,16 @@ class SecretBundleMutations:
             return gql_failure(
                 ErrorCode.PERMISSION_DENIED.value,
                 "bundle and app belong to different organizations",
+            )
+        if bundle.project_id is not None and bundle.project_id != app.project_id:
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                "project bundles can only be attached inside their owning project",
+            )
+        if bundle.project_id is not None and bundle.tenant_cluster_id != env.tenant_cluster_id:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "project bundles can only attach to environments on their secrets cluster",
             )
         # #488: gate on secret-approval policy.
         if app.requires_secret_approval:

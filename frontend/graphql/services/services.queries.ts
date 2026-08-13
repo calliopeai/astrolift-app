@@ -69,7 +69,64 @@ export const LIST_SECRET_BUNDLES = gql`
       backendRef
       createdAt
       keyCount
+      keyNames
       lastKnownKeysAt
+    }
+  }
+`;
+
+export const LIST_PROJECT_RESOURCES = gql`
+  query ListProjectResources($projectId: GUID!) {
+    astroliftProjectResourceClusters(projectId: $projectId) {
+      id
+      slug
+      name
+      providerPluginSlug
+      region
+      isActive
+      lifecycle
+    }
+    astroliftProjectManagedServices(projectId: $projectId) {
+      id
+      name
+      kind
+      variant
+      status
+      statusError
+      config
+      projectSlug
+      ownerScope
+      clusterSlug
+      environmentName
+      createdAt
+      updatedAt
+      lastActionAt
+      lastActionKind
+      editableFields
+      attachments {
+        id
+        consumerKind
+        consumerSlug
+        environmentName
+      }
+    }
+    astroliftProjectSecretBundles(projectId: $projectId) {
+      id
+      slug
+      name
+      backendRef
+      projectSlug
+      clusterSlug
+      keyCount
+      keyNames
+      lastKnownKeysAt
+      createdAt
+      consumers {
+        id
+        consumerKind
+        consumerSlug
+        environmentName
+      }
     }
   }
 `;

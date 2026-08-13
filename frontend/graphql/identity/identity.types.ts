@@ -92,6 +92,16 @@ export type AstroliftAppSummary = Omit<GeneratedAppSummary, "status"> & {
 export interface AstroliftNavTreeProjectNode {
   project: Pick<AstroliftProject, "id" | "slug" | "name">;
   apps: AstroliftAppSummary[];
+  workflows: AstroliftNavTreeWorkflow[];
+  standaloneAgents: AstroliftAppSummary[];
+}
+
+export interface AstroliftNavTreeWorkflow {
+  id: string;
+  slug: string;
+  name: string;
+  isEnabled: boolean;
+  agents: AstroliftAppSummary[];
 }
 
 export interface AstroliftNavTreeTeamNode {

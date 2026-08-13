@@ -848,6 +848,7 @@ class AgentsQuery:
     def agent_secret_bundles(self, info: Info, env_spec_slug: str) -> list[AgentSecretBundleType]:
         """Reusable bundles visible to this agent's organization."""
         from astrolift_agents.services.agent_cluster import resolve_agent_cluster
+        from astrolift_agents.services.project_membership import agent_spec_belongs_to_project
         from astrolift_dispatch.agent_secrets import (
             resolve_secrets_backend,
             secret_backend_capabilities,
@@ -867,12 +868,21 @@ class AgentsQuery:
         except Exception:  # noqa: BLE001 - capability metadata degrades in UI
             backend = None
         capabilities = secret_backend_capabilities(backend)
-        bundles = SecretBundle.objects.filter(
-            organization_id=org_pk,
-            team__isnull=True,
-            deleted_at__isnull=True,
-        ).order_by("name", "slug")[:200]
-        return [agent_secret_bundle_to_type(bundle, capabilities) for bundle in bundles]
+        bundles = (
+            SecretBundle.objects.select_related("project")
+            .filter(
+                organization_id=org_pk,
+                team__isnull=True,
+                deleted_at__isnull=True,
+            )
+            .order_by("name", "slug")[:200]
+        )
+        visible = [
+            bundle
+            for bundle in bundles
+            if bundle.project_id is None or agent_spec_belongs_to_project(spec, bundle.project)
+        ]
+        return [agent_secret_bundle_to_type(bundle, capabilities) for bundle in visible]
 
     @strawberry.field
     @require_permission(Permission.SECRET_READ, Permission.SECRET_LIST)

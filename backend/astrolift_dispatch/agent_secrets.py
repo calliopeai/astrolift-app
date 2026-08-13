@@ -91,7 +91,11 @@ def valid_agent_env_var(value: str) -> bool:
 
 def effective_secret_refs(spec) -> list[dict[str, str]]:
     """Merge manifest refs with persistent operator overrides/tombstones."""
-    refs = {row["env_var"]: row for row in normalize_secret_refs(getattr(spec, "secret_refs", None))}
+    # Project-resource bindings are defaults. Manifest refs and persistent
+    # operator overrides win on collisions so attaching a shared database can
+    # never silently replace an explicitly configured credential.
+    refs = {row["env_var"]: row for row in project_managed_service_secret_refs(spec)}
+    refs.update({row["env_var"]: row for row in normalize_secret_refs(getattr(spec, "secret_refs", None))})
     if spec is None or not getattr(spec, "pk", None):
         return list(refs.values())
     try:
@@ -104,6 +108,50 @@ def effective_secret_refs(spec) -> list[dict[str, str]]:
         elif override.uri:
             refs[override.env_var] = {"env_var": override.env_var, "uri": override.uri}
     return list(refs.values())
+
+
+def _project_managed_service_bindings(spec):
+    if spec is None or not getattr(spec, "pk", None):
+        return []
+    try:
+        attachments = (
+            spec.project_managed_service_attachments.select_related("managed_service")
+            .prefetch_related("managed_service__bindings")
+            .filter(
+                deleted_at__isnull=True,
+                managed_service__deleted_at__isnull=True,
+                managed_service__status="active",
+            )
+            .order_by("managed_service__kind", "managed_service__name", "pk")
+        )
+    except (AttributeError, TypeError):
+        return []
+    rows = []
+    for attachment in attachments:
+        for binding in attachment.managed_service.bindings.filter(
+            deleted_at__isnull=True,
+        ).order_by("env_key"):
+            rows.append(binding)
+    return rows
+
+
+def project_managed_service_secret_refs(spec) -> list[dict[str, str]]:
+    refs: dict[str, dict[str, str]] = {}
+    for binding in _project_managed_service_bindings(spec):
+        if binding.is_secret and valid_agent_env_var(binding.env_key):
+            refs[binding.env_key] = {
+                "env_var": binding.env_key,
+                "uri": binding.env_value_ref,
+            }
+    return list(refs.values())
+
+
+def project_managed_service_env_vars(spec) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for binding in _project_managed_service_bindings(spec):
+        if not binding.is_secret and valid_agent_env_var(binding.env_key):
+            values[binding.env_key] = binding.env_value_ref
+    return values
 
 
 def agent_bundle_refs(spec, *, environment: str = "default"):
@@ -284,11 +332,20 @@ def agent_container_env(spec, secret_name: str) -> list[dict]:
             env_var = f"{prefix}{key}"
             if valid_agent_env_var(env_var):
                 bundle_refs.append({"env_var": env_var, "uri": attachment.secret_bundle.backend_ref})
-    return (
-        env_var_entries(getattr(spec, "env_vars", None))
+    entries = (
+        env_var_entries(project_managed_service_env_vars(spec))
+        + env_var_entries(getattr(spec, "env_vars", None))
         + secret_env_entries(secret_name, bundle_refs)
         + secret_env_entries(secret_name, refs)
     )
+    # Kubernetes accepts duplicate env names, but relying on container-runtime
+    # ordering for precedence is both opaque and implementation-sensitive.
+    # Collapse the list here: later sources win (manifest over project
+    # defaults; secrets over plain values) while each name is emitted once.
+    by_name: dict[str, dict] = {}
+    for entry in entries:
+        by_name[entry["name"]] = entry
+    return list(by_name.values())
 
 
 def build_task_secret_manifest(

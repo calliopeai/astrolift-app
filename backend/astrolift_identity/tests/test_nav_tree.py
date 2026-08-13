@@ -111,11 +111,73 @@ def test_nav_tree_classifies_primitives():
     with tenant_context(TenantContext(organization_id=org.id)):
         tree = IdentityQuery().astrolift_nav_tree(_info())
 
-    by_slug = {a.slug: (a.primitive_kind, a.primitive_slug) for a in tree.teams[0].projects[0].apps}
+    node = tree.teams[0].projects[0]
+    all_rows = [*node.apps, *node.standalone_agents]
+    by_slug = {a.slug: (a.primitive_kind, a.primitive_slug) for a in all_rows}
     assert by_slug["hello"] == ("app", "hello")
     assert by_slug["agent-emr"] == ("agent", "emr-bug-triage")  # links by workload slug
     assert by_slug["pipeline"] == ("workflow", "pipeline")
     assert by_slug["bundle"] == ("bundle", "bundle")
+
+
+def test_nav_tree_nests_workflow_agents_and_separates_standalone_agents():
+    from astrolift_registry.models import Workload
+    from workflows.models import WorkflowDefinition, WorkflowStage
+
+    org, team, project, _app = _scaffold()
+    intake_app = RegisteredApp.objects.create(
+        organization=org,
+        team=team,
+        project=project,
+        name="Intake",
+        slug="intake-registration",
+        provisioning_status="ready",
+    )
+    intake = Workload.objects.create(
+        registered_app=intake_app,
+        name="Intake",
+        slug="intake",
+        kind=Workload.Kind.AGENT,
+    )
+    standalone_app = RegisteredApp.objects.create(
+        organization=org,
+        team=team,
+        project=project,
+        name="Standalone",
+        slug="standalone-registration",
+        provisioning_status="pending",
+    )
+    Workload.objects.create(
+        registered_app=standalone_app,
+        name="Standalone",
+        slug="standalone",
+        kind=Workload.Kind.AGENT,
+    )
+    definition = WorkflowDefinition.objects.create(
+        organization=org,
+        project=project,
+        name="Triage",
+        slug="triage",
+        model_label="",
+        states=[{"name": "start", "is_initial": True}],
+        transitions=[],
+    )
+    WorkflowStage.objects.create(
+        definition=definition,
+        order=0,
+        role="intake",
+        agent_definition=intake,
+        agent_ref="intake",
+    )
+
+    with tenant_context(TenantContext(organization_id=org.id)):
+        tree = IdentityQuery().astrolift_nav_tree(_info())
+
+    node = tree.teams[0].projects[0]
+    assert [workflow.slug for workflow in node.workflows] == ["triage"]
+    assert [agent.primitive_slug for agent in node.workflows[0].agents] == ["intake"]
+    assert [agent.primitive_slug for agent in node.standalone_agents] == ["standalone"]
+    assert all(agent.primitive_slug != "intake" for agent in node.standalone_agents)
 
 
 def test_nav_tree_returns_none_when_org_missing():

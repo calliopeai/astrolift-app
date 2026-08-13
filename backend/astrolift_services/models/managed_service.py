@@ -47,13 +47,34 @@ class ManagedService(BaseCoreModel):
     registered_app = models.ForeignKey(
         "astrolift_registry.RegisteredApp",
         related_name="managed_services",
+        null=True,
+        blank=True,
         on_delete=models.CASCADE,
     )
     app_environment = models.ForeignKey(
         "astrolift_lifecycle.AppEnvironment",
         related_name="managed_services",
+        null=True,
+        blank=True,
         on_delete=models.CASCADE,
     )
+    project = models.ForeignKey(
+        "astrolift_identity.Project",
+        related_name="managed_services",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        help_text="Owning project for a shared resource; null for app-private resources.",
+    )
+    tenant_cluster = models.ForeignKey(
+        "astrolift_clusters.TenantCluster",
+        related_name="project_managed_services",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        help_text="Provisioning target for a project-owned resource.",
+    )
+    environment_name = models.CharField(max_length=128, blank=True, default="")
     kind = models.CharField(max_length=32, choices=Kind.choices)
     name = models.CharField(max_length=128, blank=True, default="")
     variant = models.CharField(max_length=64, blank=True, default="")
@@ -77,12 +98,50 @@ class ManagedService(BaseCoreModel):
 
     class Meta:
         constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        project__isnull=True,
+                        tenant_cluster__isnull=True,
+                        registered_app__isnull=False,
+                        app_environment__isnull=False,
+                    )
+                    | models.Q(
+                        project__isnull=False,
+                        tenant_cluster__isnull=False,
+                        registered_app__isnull=True,
+                        app_environment__isnull=True,
+                    )
+                ),
+                name="msvc_exactly_one_owner_scope",
+            ),
             models.UniqueConstraint(
                 fields=["registered_app", "kind", "name"],
-                condition=models.Q(deleted_at__isnull=True),
+                condition=models.Q(registered_app__isnull=False, deleted_at__isnull=True),
                 name="msvc_unique_active_per_app_kind_name",
             ),
+            models.UniqueConstraint(
+                fields=["project", "kind", "name"],
+                condition=models.Q(project__isnull=False, deleted_at__isnull=True),
+                name="msvc_unique_active_per_project_kind_name",
+            ),
         ]
+
+    @property
+    def owner_scope(self) -> str:
+        return "project" if self.project_id else "app"
+
+    @property
+    def effective_cluster(self):
+        if self.tenant_cluster_id:
+            return self.tenant_cluster
+        return self.app_environment.tenant_cluster if self.app_environment_id else None
+
+    @property
+    def effective_environment_name(self) -> str:
+        if self.app_environment_id:
+            return self.app_environment.name
+        return self.environment_name or "default"
 
 
 class ManagedServiceBinding(BaseCoreModel):
@@ -105,5 +164,50 @@ class ManagedServiceBinding(BaseCoreModel):
                 fields=["managed_service", "env_key"],
                 condition=models.Q(deleted_at__isnull=True),
                 name="msvc_binding_env_unique_active",
+            ),
+        ]
+
+
+class ManagedServiceAttachment(BaseCoreModel):
+    """Attach one project-owned service to an app env or agent recipe."""
+
+    managed_service = models.ForeignKey(
+        "astrolift_services.ManagedService",
+        related_name="attachments",
+        on_delete=models.CASCADE,
+    )
+    app_environment = models.ForeignKey(
+        "astrolift_lifecycle.AppEnvironment",
+        related_name="project_managed_service_attachments",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+    )
+    agent_environment_spec = models.ForeignKey(
+        "astrolift_agents.AgentEnvironmentSpec",
+        related_name="project_managed_service_attachments",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(app_environment__isnull=False, agent_environment_spec__isnull=True)
+                    | models.Q(app_environment__isnull=True, agent_environment_spec__isnull=False)
+                ),
+                name="msvc_attachment_exactly_one_consumer",
+            ),
+            models.UniqueConstraint(
+                fields=["managed_service", "app_environment"],
+                condition=models.Q(app_environment__isnull=False, deleted_at__isnull=True),
+                name="msvc_attachment_unique_app_env",
+            ),
+            models.UniqueConstraint(
+                fields=["managed_service", "agent_environment_spec"],
+                condition=models.Q(agent_environment_spec__isnull=False, deleted_at__isnull=True),
+                name="msvc_attachment_unique_agent_env",
             ),
         ]

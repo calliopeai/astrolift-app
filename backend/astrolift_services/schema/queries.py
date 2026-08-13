@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import strawberry
+from django.db.models import Q
 from strawberry.types import Info
 
+from astrolift_clusters.models import TenantCluster
+from astrolift_clusters.schema.types import TenantClusterType, cluster_to_type
 from astrolift_graphql import GUID, PageType, keyset_page, search_q
+from astrolift_identity.models import Project
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_lifecycle.models.preview_environment import PreviewEnvironment
 from astrolift_manifest.env_edit import read_app_env
@@ -495,6 +499,96 @@ def _managed_services_qs(
 
 @strawberry.type
 class ServicesQuery:
+    @strawberry.field
+    @require_permission(Permission.PROJECT_READ)
+    @tenant_scoped()
+    def astrolift_project_resource_clusters(
+        self,
+        info: Info,
+        project_id: GUID,
+    ) -> list[TenantClusterType]:
+        """Managed clusters a project member may target for shared resources."""
+
+        org_id = _caller_org_id()
+        project_exists = Project.objects.filter(
+            guid=str(project_id),
+            organization_id=org_id,
+            deleted_at__isnull=True,
+        ).exists()
+        if not project_exists:
+            return []
+        rows = (
+            TenantCluster.objects.filter(
+                Q(organization_id=org_id) | Q(organization_id__isnull=True),
+                deleted_at__isnull=True,
+                is_active=True,
+                lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+            )
+            .select_related("organization", "provider_plugin")
+            .order_by("name", "guid")
+        )
+        return [cluster_to_type(row) for row in rows]
+
+    @strawberry.field
+    @require_permission(Permission.PROJECT_READ)
+    @tenant_scoped()
+    def astrolift_project_managed_services(
+        self,
+        info: Info,
+        project_id: GUID,
+    ) -> list[ManagedServiceType]:
+        """Project-owned shared infrastructure and its workload attachments."""
+
+        org_id = _caller_org_id()
+        project = Project.objects.filter(
+            guid=str(project_id),
+            organization_id=org_id,
+            deleted_at__isnull=True,
+        ).first()
+        if project is None:
+            return []
+        rows = (
+            ManagedService.objects.select_related(
+                "project",
+                "tenant_cluster__provider_plugin",
+            )
+            .prefetch_related(
+                "attachments__agent_environment_spec",
+                "attachments__app_environment__registered_app",
+            )
+            .filter(project=project, deleted_at__isnull=True)
+            .order_by("kind", "name", "guid")
+        )
+        return [managed_service_to_type(row) for row in rows]
+
+    @strawberry.field
+    @require_permission(Permission.PROJECT_READ)
+    @tenant_scoped()
+    def astrolift_project_secret_bundles(
+        self,
+        info: Info,
+        project_id: GUID,
+    ) -> list[SecretBundleType]:
+        org_id = _caller_org_id()
+        project = Project.objects.filter(
+            guid=str(project_id),
+            organization_id=org_id,
+            deleted_at__isnull=True,
+        ).first()
+        if project is None:
+            return []
+        rows = (
+            SecretBundle.objects.select_related("organization", "team", "project", "tenant_cluster")
+            .prefetch_related(
+                "agent_refs__environment_spec",
+                "app_refs__registered_app",
+                "app_refs__app_environment",
+            )
+            .filter(project=project, deleted_at__isnull=True)
+            .order_by("name", "guid")
+        )
+        return [secret_bundle_to_type(row) for row in rows]
+
     @strawberry.field
     @require_permission(Permission.APP_READ)
     @tenant_scoped()

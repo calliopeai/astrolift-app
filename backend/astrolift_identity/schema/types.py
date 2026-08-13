@@ -527,6 +527,17 @@ class AppSummaryType:
 class NavTreeProjectType:
     project: ProjectType
     apps: list[AppSummaryType]
+    workflows: list[NavTreeWorkflowType]
+    standalone_agents: list[AppSummaryType]
+
+
+@strawberry.type(name="AstroliftNavTreeWorkflow")
+class NavTreeWorkflowType:
+    id: GUID
+    slug: str
+    name: str
+    is_enabled: bool
+    agents: list[AppSummaryType]
 
 
 @strawberry.type(name="AstroliftNavTreeTeam")

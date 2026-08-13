@@ -229,6 +229,54 @@ class ProvisionManagedServiceInput:
 
 
 @strawberry.input
+class ProvisionProjectManagedServiceInput:
+    project_id: GUID
+    cluster_id: GUID
+    environment_name: str = "production"
+    kind: str = ""
+    name: str | None = None
+    variant: str | None = None
+    config: strawberry.scalars.JSON | None = None
+    agent_environment_spec_slugs: list[str] = strawberry.field(default_factory=list)
+    app_environment_ids: list[GUID] = strawberry.field(default_factory=list)
+
+
+@strawberry.input
+class AttachProjectManagedServiceInput:
+    managed_service_id: GUID
+    agent_environment_spec_slug: str | None = None
+    app_environment_id: GUID | None = None
+
+
+@strawberry.input
+class DetachProjectManagedServiceInput:
+    attachment_id: GUID
+
+
+@strawberry.input
+class CreateProjectSecretBundleInput:
+    project_id: GUID
+    cluster_id: GUID
+    name: str
+    slug: str
+    backend_ref: str | None = None
+
+
+@strawberry.input
+class UpdateProjectSecretBundleInput:
+    id: GUID
+    name: str
+    backend_ref: str
+
+
+@strawberry.input
+class ProjectSecretBundleKeyInput:
+    bundle_id: GUID
+    key: str
+    value: str | None = None
+
+
+@strawberry.input
 class UpdateManagedServiceInput:
     id: GUID
     config: strawberry.scalars.JSON | None = None
