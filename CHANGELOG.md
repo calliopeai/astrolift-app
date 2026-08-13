@@ -18,6 +18,9 @@
 
 ### Changed
 
+- Shard backend tests across four balanced real-Postgres jobs, retain one
+  stable aggregate gate, and stop rerunning the dedicated provider suite in
+  the backend pass.
 - Make managed GitHub workflows latest-wins and give each registered monorepo
   agent an independent package-sync workflow.
 - Clarify that agent repository pushes sync immutable packages but never start

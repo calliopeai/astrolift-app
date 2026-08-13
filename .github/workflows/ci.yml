@@ -30,6 +30,32 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
+      - name: Verify backend test shard coverage
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          assigned = {
+              "astrolift_agents", "astrolift_billing", "astrolift_ci",
+              "astrolift_ci_convert", "astrolift_clusters", "astrolift_compliance",
+              "astrolift_dispatch", "astrolift_drivers", "astrolift_forms",
+              "astrolift_graphql", "astrolift_identity", "astrolift_lifecycle",
+              "astrolift_manifest", "astrolift_observability", "astrolift_operations",
+              "astrolift_pipelines", "astrolift_registry", "astrolift_scm",
+              "astrolift_services", "astrolift_workflows", "auth1", "config",
+              "core", "organization", "providers", "testdata", "workflows",
+          }
+          roots = {
+              path.parts[0]
+              for pattern in ("test_*.py", "*_tests.py")
+              for path in Path(".").rglob(pattern)
+              if path.parts and ".venv" not in path.parts
+          }
+          missing = sorted(roots - assigned)
+          if missing:
+              raise SystemExit(f"Unassigned backend test roots: {', '.join(missing)}")
+          print(f"All {len(roots)} backend test roots are assigned to a CI shard")
+          PY
       - name: Install ruff
         run: pip install "ruff>=0.6,<0.7"
       - name: Format check
@@ -37,9 +63,25 @@ jobs:
       - name: Lint
         run: ruff check .
 
-  test:
-    name: test (real postgres)
+  backend-test-shard:
+    name: test shard (${{ matrix.name }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: workflow-lifecycle
+            paths: astrolift_workflows astrolift_lifecycle
+          - name: core-identity-operations
+            paths: astrolift_operations core astrolift_identity
+          - name: registration-runtime
+            paths: astrolift_scm astrolift_clusters astrolift_agents astrolift_registry
+          - name: platform-services
+            paths: >-
+              astrolift_manifest astrolift_services astrolift_pipelines astrolift_drivers
+              astrolift_observability workflows astrolift_dispatch auth1 astrolift_ci_convert
+              astrolift_forms organization astrolift_billing astrolift_graphql
+              astrolift_compliance astrolift_ci config testdata
     defaults:
       run:
         working-directory: backend
@@ -82,6 +124,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/Pipfile.lock
       - name: Install Temporal CLI
         # Tests against real Temporal (test env) per backend/CLAUDE.md.
         # dev-server uses SQLite + in-process — boots in seconds, no
@@ -121,15 +165,29 @@ jobs:
         # the cloud plugins resolve at import time. The Docker image
         # does this in its build step; CI mirrors it.
         run: pipenv run pip install './providers[aws,gcp,azure,k8s]'
-      - name: Run migrations
-        run: pipenv run python manage.py migrate --noinput
       - name: Run tests
         # Not `-x`. Halting at the first failure is why the suite's real state
         # stayed unknown for weeks: one failure masks every one behind it, so
         # each fix buys exactly one more data point. Running to completion
         # reports the whole set at once, which is what attributing the backlog
-        # in #1244 actually needs. `-rf` prints the FAILED list for diffing.
-        run: pipenv run pytest -q --tb=short -rf
+        # in #1244 actually needs. The provider tree has its own parallel job;
+        # repeating its 2,299 tests here added several minutes without adding
+        # coverage. pytest-django creates and migrates each shard's real
+        # Postgres test database, so a separate pre-test migrate was redundant.
+        # `--durations` keeps the next optimization evidence-driven.
+        run: >-
+          pipenv run pytest -q --tb=short -rf --durations=20 ${{ matrix.paths }}
+
+  test:
+    name: test (real postgres)
+    if: ${{ always() }}
+    needs: backend-test-shard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every real-Postgres shard
+        env:
+          SHARD_RESULT: ${{ needs.backend-test-shard.result }}
+        run: test "$SHARD_RESULT" = success
 
   typecheck:
     name: typecheck
