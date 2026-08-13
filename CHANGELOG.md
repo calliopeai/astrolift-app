@@ -23,6 +23,8 @@
 
 ### Fixed
 
+- Preserve workflow stage environment recipes and output keys when importing
+  Langflow or Flowise definitions through the GraphQL adapter.
 - Authorize CLI device sessions for agent environment-spec CRUD with a narrow
   bearer scope and enforce the dedicated environment-spec RBAC permissions.
 - Replace retired Bedrock managed-agent defaults with invoked Opus 5 and
