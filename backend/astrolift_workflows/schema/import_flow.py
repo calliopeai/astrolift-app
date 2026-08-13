@@ -73,11 +73,13 @@ def _stage_types(result: FlowImportResult) -> list[WorkflowManifestStageType]:
             kind=s.kind,
             role=s.role,
             agent=s.agent,
+            environment_spec_slug=s.environment_spec_slug,
             skills=list(s.skills),
             on_failure=s.on_failure,
             timeout=s.timeout,
             fan_out=str(s.fan_out),
             prompt=s.prompt,
+            output_key=s.output_key,
             approvers=list(s.approvers),
         )
         for s in result.manifest.stages

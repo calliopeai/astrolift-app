@@ -8,9 +8,11 @@ from types import SimpleNamespace
 import pytest
 from django.test import RequestFactory
 
-from astrolift_workflows.schema.import_flow import WorkflowImportMutation
+from astrolift_workflows.schema.import_flow import WorkflowImportMutation, _stage_types
 from core.permissions import Permission, PermissionDenied
 from core.tenancy import TenantContext, tenant_context
+from workflows.importers.base import FlowImportResult
+from workflows.manifest import ParsedWorkflowManifest, WorkflowDefSpec, WorkflowStageSpec
 from workflows.models import WorkflowDefinition, WorkflowStage
 from workflows.tests.importer_fixtures import flowise_gate, langflow_chained
 
@@ -62,6 +64,28 @@ def test_preview_returns_manifest_and_gaps_without_persisting(permission_resolve
     assert any(g.code == "flow_input" for g in result.gaps)
     # Preview persists nothing (count unchanged from the catalogue baseline).
     assert WorkflowDefinition.objects.count() == before
+
+
+def test_stage_types_preserve_runtime_and_output_fields():
+    result = FlowImportResult(
+        manifest=ParsedWorkflowManifest(
+            definition=WorkflowDefSpec(slug="imported", name="Imported", pattern="single"),
+            stages=[
+                WorkflowStageSpec(
+                    order=0,
+                    kind="agent_dispatch",
+                    environment_spec_slug="triage-prod",
+                    output_key="findings",
+                )
+            ],
+        ),
+        gaps=[],
+    )
+
+    stage = _stage_types(result)[0]
+
+    assert stage.environment_spec_slug == "triage-prod"
+    assert stage.output_key == "findings"
 
 
 def test_unknown_format_returns_structured_error(permission_resolver):
