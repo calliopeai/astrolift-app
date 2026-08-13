@@ -19,6 +19,10 @@
   an agent run or deploy a standing application.
 
 ### Fixed
+
+- Replace retired Bedrock managed-agent defaults with invoked Opus 5 and
+  Haiku 4.5 inference profiles, with worker-level model overrides so operators
+  can respond to future retirements without rebuilding Astrolift.
 - Issue browser-approved CLI credentials with narrow agent dispatch and secret
   write scopes so `astro agent dispatch`, `cancel`, and `secret set/rm` work
   after login or refresh without requiring an admin bearer.

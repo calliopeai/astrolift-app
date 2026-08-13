@@ -27,6 +27,7 @@ top of it.
 from __future__ import annotations
 
 import logging
+import os
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -109,15 +110,27 @@ log = logging.getLogger("astrolift_providers.aws.cluster_eks")
 #
 # Default Bedrock model ids injected on the managed-model agent path
 # (Claude Code on Bedrock reads ANTHROPIC_MODEL / ANTHROPIC_SMALL_FAST_MODEL).
-# A Claude Sonnet + Claude Haiku pair, given as cross-region *inference
+# A Claude Opus + Claude Haiku pair, given as cross-region *inference
 # profile* ids (the ``us.`` geo prefix — Bedrock's on-demand Claude models
 # are only invokable through an inference profile, not the bare model id).
 # Overridable per-cluster via ``provider_config["bedrock_model_id"]`` /
-# ``["bedrock_small_fast_model_id"]`` — operators outside the US partition
-# repoint these to their ``eu.`` / ``apac.`` profiles (and must have model
-# access enabled in the account/region).
-_DEFAULT_BEDROCK_MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
-_DEFAULT_BEDROCK_SMALL_FAST_MODEL_ID = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
+# ``["bedrock_small_fast_model_id"]``, then process-wide via
+# ``ANTHROPIC_MODEL`` / ``ANTHROPIC_SMALL_FAST_MODEL``. The environment
+# fallback lets operators replace a retired model without an Astrolift image
+# release; per-cluster settings remain the strongest override for non-US
+# partitions and installations with different model-access policy.
+_DEFAULT_BEDROCK_MODEL_ID = "us.anthropic.claude-opus-5"
+_DEFAULT_BEDROCK_SMALL_FAST_MODEL_ID = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+
+
+def _first_nonblank(*values: object) -> str:
+    """Return the first non-empty string-like configuration value."""
+    for value in values:
+        candidate = str(value or "").strip()
+        if candidate:
+            return candidate
+    return ""
+
 
 # ---- Knative Serving request-log template (#kind=function) ----------
 #
@@ -2134,17 +2147,24 @@ class EKSClusterDriver(ClusterDriver):
 
         Returns the env a Claude Code runner reads to target Bedrock
         instead of an ANTHROPIC_API_KEY: ``CLAUDE_CODE_USE_BEDROCK=1`` +
-        ``AWS_REGION`` + the Sonnet / Haiku model ids. The ids default to
+        ``AWS_REGION`` + the Opus / Haiku model ids. The ids default to
         a cross-region inference-profile pair (:data:`_DEFAULT_BEDROCK_MODEL_ID`
         / :data:`_DEFAULT_BEDROCK_SMALL_FAST_MODEL_ID`) and are overridable
         via ``provider_config["bedrock_model_id"]`` /
-        ``["bedrock_small_fast_model_id"]``. ``region`` falls back to the
-        driver's configured region. Pure — no cloud call.
+        ``["bedrock_small_fast_model_id"]``, then ``ANTHROPIC_MODEL`` /
+        ``ANTHROPIC_SMALL_FAST_MODEL`` on the worker. ``region`` falls back
+        to the driver's configured region. No cloud call.
         """
         provider_config = provider_config or {}
-        model_id = str(provider_config.get("bedrock_model_id") or _DEFAULT_BEDROCK_MODEL_ID)
-        small_fast = str(
-            provider_config.get("bedrock_small_fast_model_id") or _DEFAULT_BEDROCK_SMALL_FAST_MODEL_ID,
+        model_id = _first_nonblank(
+            provider_config.get("bedrock_model_id"),
+            os.environ.get("ANTHROPIC_MODEL"),
+            _DEFAULT_BEDROCK_MODEL_ID,
+        )
+        small_fast = _first_nonblank(
+            provider_config.get("bedrock_small_fast_model_id"),
+            os.environ.get("ANTHROPIC_SMALL_FAST_MODEL"),
+            _DEFAULT_BEDROCK_SMALL_FAST_MODEL_ID,
         )
         return {
             "CLAUDE_CODE_USE_BEDROCK": "1",

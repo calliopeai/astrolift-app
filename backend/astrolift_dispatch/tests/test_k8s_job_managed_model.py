@@ -209,7 +209,13 @@ def test_spawn_managed_model_spec_env_overrides_injected(monkeypatch):
     driver = _ManagedDriver()
     result, driver = _spawn(
         monkeypatch,
-        _Spec(managed_model=True, env_vars={"AWS_REGION": "eu-west-1"}),
+        _Spec(
+            managed_model=True,
+            env_vars={
+                "AWS_REGION": "eu-west-1",
+                "ANTHROPIC_MODEL": "eu.anthropic.claude-sonnet-5",
+            },
+        ),
         driver,
     )
     assert result.ok, result.error
@@ -220,6 +226,8 @@ def test_spawn_managed_model_spec_env_overrides_injected(monkeypatch):
         "the spec override must win and must be the sole AWS_REGION entry — "
         "a duplicate name makes server-side apply reject the Job"
     )
+    model_entries = [e for e in env if e["name"] == "ANTHROPIC_MODEL"]
+    assert [e["value"] for e in model_entries] == ["eu.anthropic.claude-sonnet-5"]
     # The invariant the dedupe exists to guarantee, stated over the whole env.
     names = [e["name"] for e in env]
     assert len(names) == len(set(names)), f"duplicate env names would fail SSA: {names}"
