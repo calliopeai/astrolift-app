@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from django.urls import path
 
+from astrolift_agents.mcp_contract import MCP_ROUTE
 from astrolift_agents.views.mcp import mcp_gateway
 from astrolift_agents.views.skill_ai_assist import skill_ai_assist
 from astrolift_agents.views.workflow_webhook import workflow_webhook
@@ -30,7 +31,7 @@ from astrolift_agents.views.workflow_webhook import workflow_webhook
 app_name = "astrolift_agents"
 
 urlpatterns = [
-    path("api/mcp/v1/", mcp_gateway, name="mcp-gateway"),
+    path(MCP_ROUTE, mcp_gateway, name="mcp-gateway"),
     # Skill AI assist (#884).
     # Calls Anthropic directly to suggest a system prompt for a new skill.
     # No agent dispatch or containers involved.
