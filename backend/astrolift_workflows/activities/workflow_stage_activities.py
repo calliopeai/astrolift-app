@@ -81,6 +81,7 @@ def _get_workflow_stages_sync(
     workflow_run_id: str | None = None,
     stage_bindings: dict | None = None,
     workflow_definition_id: str | None = None,
+    workflow_ancestry: list[str] | None = None,
 ) -> dict:
     """Return the definition's stages as ordered plain dicts.
 
@@ -92,6 +93,7 @@ def _get_workflow_stages_sync(
 
     from astrolift_operations.models import WorkflowRun
     from astrolift_registry.models import Workload
+    from workflows.composition import MAX_WORKFLOW_NESTING_DEPTH, resolve_child_definition
     from workflows.models import WorkflowDefinition, WorkflowStage
 
     run = None
@@ -115,6 +117,15 @@ def _get_workflow_stages_sync(
         definition = definitions.first()
     if definition is None:
         raise RuntimeError(f"WorkflowDefinition {workflow_definition_slug!r} not found, disabled, or deleted")
+    if run is not None and run.workflow_definition_id not in (None, definition.pk):
+        raise RuntimeError("workflow run definition does not match the requested definition")
+
+    ancestry = [str(value) for value in (workflow_ancestry or [])]
+    definition_id = str(definition.pk)
+    if definition_id in ancestry:
+        raise RuntimeError("nested workflow cycle detected at runtime")
+    if len(ancestry) > MAX_WORKFLOW_NESTING_DEPTH:
+        raise RuntimeError(f"nested workflow depth exceeds {MAX_WORKFLOW_NESTING_DEPTH}")
 
     bindings = stage_bindings if isinstance(stage_bindings, dict) else {}
     stages: list[dict] = []
@@ -171,6 +182,16 @@ def _get_workflow_stages_sync(
                 f"stage {stage.order} has no resolvable agent; bind agent_workload_id or register {stage.agent_ref!r}"
             )
 
+        nested_definition = None
+        if stage.kind == WorkflowStage.StageKind.WORKFLOW:
+            nested_definition = resolve_child_definition(definition, stage.workflow_ref)
+            if nested_definition is None:
+                raise RuntimeError(
+                    f"stage {stage.order} cannot resolve visible child workflow {stage.workflow_ref!r}"
+                )
+            if str(nested_definition.pk) in ancestry + [definition_id]:
+                raise RuntimeError("nested workflow cycle detected at runtime")
+
         if "skill_refs" in binding:
             skill_refs = binding["skill_refs"]
             if not isinstance(skill_refs, list) or any(not isinstance(ref, str) for ref in skill_refs):
@@ -196,6 +217,11 @@ def _get_workflow_stages_sync(
                 "environment_spec_slug": environment_spec_slug,
                 "prompt": prompt,
                 "output_key": output_key,
+                "workflow_ref": stage.workflow_ref or "",
+                "nested_definition_id": (
+                    str(nested_definition.pk) if nested_definition is not None else None
+                ),
+                "nested_definition_slug": (nested_definition.slug if nested_definition is not None else ""),
             }
         )
     output_keys = [stage["output_key"] for stage in stages]
@@ -207,6 +233,97 @@ def _get_workflow_stages_sync(
         "pattern_kind": definition.pattern_kind,
         "stages": stages,
     }
+
+
+def _create_nested_workflow_run_sync(
+    parent_workflow_run_id: str,
+    stage_execution_id: str,
+    child_definition_id: str,
+) -> dict:
+    """Create the child WorkflowRun mirror linked to its parent stage.
+
+    The one-to-one stage link makes the activity idempotent across Temporal
+    retries. Child visibility and project scope are re-checked at the write
+    boundary rather than trusting the workflow's earlier plan payload.
+    """
+    from django.db import transaction
+    from django.utils import timezone
+
+    from astrolift_operations.models import WorkflowRun
+    from workflows.composition import MAX_WORKFLOW_NESTING_DEPTH, resolve_child_definition
+    from workflows.models import WorkflowStage, WorkflowStageExecution
+
+    with transaction.atomic():
+        parent = WorkflowRun.objects.select_for_update().get(pk=_parent_run_pk(parent_workflow_run_id))
+        execution = WorkflowStageExecution.objects.select_related("stage__definition").get(
+            pk=int(stage_execution_id), workflow_run=parent
+        )
+        if execution.stage.kind != WorkflowStage.StageKind.WORKFLOW:
+            raise RuntimeError("nested child runs require a workflow stage execution")
+
+        expected = resolve_child_definition(
+            execution.stage.definition,
+            execution.stage.workflow_ref,
+        )
+        if expected is None or expected.pk != int(child_definition_id):
+            raise RuntimeError("nested child definition is unavailable or outside project scope")
+        depth = int(parent.nesting_depth or 0) + 1
+        if depth > MAX_WORKFLOW_NESTING_DEPTH:
+            raise RuntimeError(f"nested workflow depth exceeds {MAX_WORKFLOW_NESTING_DEPTH}")
+
+        existing = WorkflowRun.objects.filter(
+            parent_stage_execution=execution,
+            deleted_at__isnull=True,
+        ).first()
+        if existing is None:
+            child = WorkflowRun.objects.create(
+                workflow_kind="WorkflowDefinitionRunWorkflow",
+                workflow_definition=expected,
+                workflow_id="",
+                run_id="",
+                status=WorkflowRun.Status.RUNNING,
+                started_at=timezone.now(),
+                organization_id=parent.organization_id,
+                parent_run=parent,
+                parent_stage_execution=execution,
+                nesting_depth=depth,
+                trigger_actor_user_id=parent.trigger_actor_user_id,
+                trigger_actor_token_kind=parent.trigger_actor_token_kind,
+                trigger_actor_token_id=parent.trigger_actor_token_id,
+            )
+            child.workflow_id = f"WorkflowDefinitionRunWorkflow-{child.pk}"
+            child.save(update_fields=["workflow_id", "updated_at", "version"])
+        else:
+            child = existing
+
+    return {
+        "workflow_run_id": str(child.pk),
+        "workflow_run_guid": str(child.guid),
+        "workflow_id": child.workflow_id,
+        "definition_id": str(expected.pk),
+        "definition_slug": expected.slug,
+        "nesting_depth": child.nesting_depth,
+    }
+
+
+def _record_nested_workflow_start_sync(
+    child_workflow_run_id: str,
+    temporal_run_id: str,
+) -> None:
+    """Persist the Temporal run id assigned to a newly started child."""
+    from astrolift_operations.models import WorkflowRun
+
+    run = WorkflowRun.objects.get(
+        pk=int(child_workflow_run_id),
+        parent_run__isnull=False,
+        parent_stage_execution__isnull=False,
+    )
+    if run.run_id and run.run_id != temporal_run_id:
+        raise RuntimeError("nested workflow run already has a different Temporal run id")
+    if run.run_id == temporal_run_id:
+        return
+    run.run_id = temporal_run_id
+    run.save(update_fields=["run_id", "updated_at", "version"])
 
 
 def _create_stage_execution_sync(
@@ -955,6 +1072,39 @@ async def get_workflow_stages(params: str | dict) -> dict:
         params.get("workflow_run_id"),
         params.get("stage_bindings"),
         params.get("workflow_definition_id"),
+        params.get("workflow_ancestry"),
+    )
+
+
+@activity.defn(name="astrolift.workflow_stage.create_nested_workflow_run")
+async def create_nested_workflow_run(
+    parent_workflow_run_id: str,
+    stage_execution_id: str,
+    child_definition_id: str,
+) -> dict:
+    """Create or return a linked nested WorkflowRun mirror."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    return await sync_to_async(_create_nested_workflow_run_sync)(
+        parent_workflow_run_id,
+        stage_execution_id,
+        child_definition_id,
+    )
+
+
+@activity.defn(name="astrolift.workflow_stage.record_nested_workflow_start")
+async def record_nested_workflow_start(
+    child_workflow_run_id: str,
+    temporal_run_id: str,
+) -> None:
+    """Record the child handle's first execution run id for observability."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    await sync_to_async(_record_nested_workflow_start_sync)(
+        child_workflow_run_id,
+        temporal_run_id,
     )
 
 

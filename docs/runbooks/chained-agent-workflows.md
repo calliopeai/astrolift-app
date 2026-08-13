@@ -24,6 +24,7 @@ built-in templates and is not the tenant configuration path.
 | `skills` | `skill_refs` | Ordered org/global skill overlays added to a task-specific immutable Brief. |
 | `prompt` | `prompt` | Agent instruction overlay, or the approval question on a human gate. |
 | `output_key` | `output_key` | Key used in the run's `named_outputs` map. Defaults to `stage_<order>`. |
+| `workflow` | `workflow_ref` | Visible child definition invoked by a `kind = "workflow"` stage. |
 
 A configured `Workflow.stage_bindings` may override a definition without
 editing it. Bindings are keyed by stage order:
@@ -68,3 +69,34 @@ The workflow result retains the ordered `outputs` list and also exposes
 `named_outputs` plus `final_output`. Agent-stage output is the callback's real
 structured result; terminal status and execution IDs remain metadata on the
 ordered output record.
+
+## Nested workflows
+
+Use a workflow stage to package a reusable series of steps inside another
+pipeline:
+
+```toml
+[[stage]]
+kind = "workflow"
+workflow = "emr-triage-patch"
+output_key = "patch_review"
+on_failure = "retry"
+timeout = 1800
+```
+
+The parent passes the same composed stage packet shown above as the child's
+trigger input. The child's `final_output` becomes the value of the parent's
+`output_key`; its credentials, environment specs, skills, and stage bindings
+are resolved inside the child and are never inherited from the parent.
+
+Nested invocations are first-class Temporal child workflows and first-class
+`WorkflowRun` rows. The run stores its parent run, invoking stage execution,
+and nesting depth, so the Observe graph links directly to the child run.
+Cancelling or terminating a parent propagates to its active children.
+
+Repository reconciliation is atomic and order-independent: a parent manifest
+may sort before its child manifest in the same repository. Reconciliation and
+interactive edits reject missing/invisible children, cross-project references,
+cycles, and nesting deeper than eight levels. A project definition may invoke
+another definition in the same project or a reusable org/global definition
+with no project; it cannot reach into a different project packet.

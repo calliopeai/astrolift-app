@@ -18,6 +18,9 @@ export function formatWorkflowModel(model: string): string {
 }
 
 function stageLabel(stage: WorkflowTopologyStage): string {
+  if (stage.kind === "workflow" && stage.workflowRef) {
+    return `Workflow · ${stage.workflowRef}`;
+  }
   const role = (stage.role || stage.kind).replace(/[_-]+/g, " ");
   const agent = stage.agentSlug || stage.agentRef;
   return agent ? `${role} · ${agent}` : role;
@@ -49,9 +52,11 @@ export function WorkflowTopology({
         status: statusByOrder?.[stage.order] ?? "configured",
         needs: index > 0 ? [ordered[index - 1].guid] : [],
         href:
-          stage.agentSlug || stage.agentRef
-            ? `/agents/${encodeURIComponent(stage.agentSlug || stage.agentRef)}/build`
-            : undefined,
+          stage.kind === "workflow" && stage.workflowRef
+            ? `/workflows/${encodeURIComponent(stage.workflowRef)}/observe`
+            : stage.agentSlug || stage.agentRef
+              ? `/agents/${encodeURIComponent(stage.agentSlug || stage.agentRef)}/build`
+              : undefined,
       };
       return row;
     });
@@ -114,9 +119,11 @@ export function ProjectWorkflowTopology({
           status: stageStatusByWorkflow?.[workflow.guid]?.[stage.order] ?? "configured",
           needs: [index === 0 ? rootId : `${workflow.guid}:${ordered[index - 1].guid}`],
           href:
-            stage.agentSlug || stage.agentRef
-              ? `/agents/${encodeURIComponent(stage.agentSlug || stage.agentRef)}/build`
-              : undefined,
+            stage.kind === "workflow" && stage.workflowRef
+              ? `/workflows/${encodeURIComponent(stage.workflowRef)}/observe`
+              : stage.agentSlug || stage.agentRef
+                ? `/agents/${encodeURIComponent(stage.agentSlug || stage.agentRef)}/build`
+                : undefined,
         });
       });
     }

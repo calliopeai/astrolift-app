@@ -23,6 +23,7 @@ class WorkflowTopologyStageType:
     kind: str
     role: str
     agent_ref: str
+    workflow_ref: str
     agent_guid: str | None
     agent_name: str
     agent_slug: str
@@ -89,6 +90,10 @@ class WorkflowDefinitionRunType:
     temporal_run_id: str | None
     current_stage_order: int | None
     current_stage_role: str
+    parent_run_guid: str | None
+    parent_stage_execution_guid: str | None
+    nesting_depth: int
+    child_run_count: int
     started_at: datetime | None
     ended_at: datetime | None
 
@@ -182,6 +187,7 @@ def definition_summary(
                 kind=stage.kind,
                 role=stage.role or "",
                 agent_ref=stage.agent_ref or "",
+                workflow_ref=stage.workflow_ref or "",
                 agent_guid=(
                     str(stage.agent_definition.guid) if stage.agent_definition_id is not None else None
                 ),
@@ -236,6 +242,12 @@ def definition_run_to_type(run) -> WorkflowDefinitionRunType:
         temporal_run_id=run.run_id or None,
         current_stage_order=(stage.order if stage is not None else None),
         current_stage_role=((stage.role or "") if stage is not None else ""),
+        parent_run_guid=(str(run.parent_run.guid) if run.parent_run_id is not None else None),
+        parent_stage_execution_guid=(
+            str(run.parent_stage_execution.guid) if run.parent_stage_execution_id is not None else None
+        ),
+        nesting_depth=run.nesting_depth,
+        child_run_count=getattr(run, "child_run_count", 0),
         started_at=run.started_at,
         ended_at=run.ended_at,
     )

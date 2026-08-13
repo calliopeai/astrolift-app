@@ -44,6 +44,7 @@ class WorkflowManifestStageType:
     kind: str
     role: str
     agent: str | None
+    workflow: str | None
     environment_spec_slug: str | None
     skills: list[str]
     on_failure: str
@@ -110,6 +111,7 @@ def _preview_type(parsed: ParsedWorkflowManifest) -> WorkflowManifestPreviewType
                 kind=s.kind,
                 role=s.role,
                 agent=s.agent,
+                workflow=s.workflow,
                 environment_spec_slug=s.environment_spec_slug,
                 skills=list(s.skills),
                 on_failure=s.on_failure,

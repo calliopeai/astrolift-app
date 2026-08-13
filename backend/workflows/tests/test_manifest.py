@@ -118,9 +118,42 @@ def test_every_pattern_kind_parses(pattern):
 
 @pytest.mark.parametrize("kind", [c.value for c in WorkflowStage.StageKind])
 def test_every_stage_kind_parses(kind):
-    toml = f'[workflow]\nslug = "w"\nname = "W"\npattern = "single"\n\n[[stage]]\nkind = "{kind}"\n'
+    child = '\nworkflow = "child"' if kind == WorkflowStage.StageKind.WORKFLOW else ""
+    toml = f'[workflow]\nslug = "w"\nname = "W"\npattern = "single"\n\n[[stage]]\nkind = "{kind}"{child}\n'
     parsed = parse_workflow_manifest(toml)
     assert parsed.stages[0].kind == kind
+
+
+def test_nested_workflow_stage_round_trips():
+    toml = """\
+[workflow]
+slug = "outer"
+name = "Outer"
+pattern = "chained"
+
+[[stage]]
+kind = "workflow"
+workflow = "inner"
+output_key = "inner_result"
+timeout = 900
+"""
+    parsed = parse_workflow_manifest(toml)
+    assert parsed.stages[0].workflow == "inner"
+    assert parse_workflow_manifest(emit_workflow_manifest(parsed)) == parsed
+
+
+def test_nested_workflow_stage_requires_child_slug():
+    toml = '[workflow]\nslug="outer"\nname="Outer"\n\n[[stage]]\nkind="workflow"\n'
+    with pytest.raises(ManifestError) as exc:
+        parse_workflow_manifest(toml)
+    assert exc.value.path == "stage[0].workflow"
+
+
+def test_workflow_child_slug_rejected_on_other_stage_kinds():
+    toml = '[workflow]\nslug="outer"\nname="Outer"\n\n[[stage]]\nkind="checkpoint"\nworkflow="inner"\n'
+    with pytest.raises(ManifestError) as exc:
+        parse_workflow_manifest(toml)
+    assert exc.value.path == "stage[0].workflow"
 
 
 def test_fan_out_dynamic():

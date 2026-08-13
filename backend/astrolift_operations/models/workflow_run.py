@@ -46,6 +46,23 @@ class WorkflowRun(BaseCoreModel):
         on_delete=models.SET_NULL,
         help_text="Definition executed by an agent workflow run; null for non-definition operations.",
     )
+    parent_run = models.ForeignKey(
+        "self",
+        related_name="child_runs",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        help_text="Parent definition run for a nested workflow invocation.",
+    )
+    parent_stage_execution = models.OneToOneField(
+        "workflows.WorkflowStageExecution",
+        related_name="child_workflow_run",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        help_text="Parent stage execution that invoked this nested workflow run.",
+    )
+    nesting_depth = models.PositiveSmallIntegerField(default=0)
     registered_app = models.ForeignKey(
         "astrolift_registry.RegisteredApp",
         related_name="workflow_runs",

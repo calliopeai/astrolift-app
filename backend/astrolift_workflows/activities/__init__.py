@@ -160,6 +160,7 @@ from astrolift_workflows.activities.static_site import (
 from astrolift_workflows.activities.uptime import probe_uptime_tick
 from astrolift_workflows.activities.workflow_stage_activities import (
     aggregate_fan_out,
+    create_nested_workflow_run,
     create_stage_execution,
     dispatch_agent_for_stage,
     get_workflow_stages,
@@ -167,6 +168,7 @@ from astrolift_workflows.activities.workflow_stage_activities import (
     mark_workflow_run,
     poll_agent_run_status,
     record_human_gate_decision,
+    record_nested_workflow_start,
     snapshot_checkpoint,
     update_stage_execution,
 )
@@ -194,6 +196,7 @@ __all__ = [
     "cleanup_cluster_irsa_roles",
     "create_promotion_deployment",
     "create_rollback_deployment",
+    "create_nested_workflow_run",
     "create_stage_execution",
     "delete_app_namespaces",
     "delete_app_source_webhook",
@@ -279,6 +282,7 @@ __all__ = [
     "reconcile_agent_deployments",
     "reconcile_cluster_capabilities",
     "record_human_gate_decision",
+    "record_nested_workflow_start",
     "refresh_secret_bundle_in_cluster",
     "register_managed_domain_row",
     "reissue_cert",

@@ -61,6 +61,7 @@ from astrolift_workflows.inputs import WorkflowDefinitionRunInput, WorkflowResul
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities import (
         aggregate_fan_out,
+        create_nested_workflow_run,
         create_stage_execution,
         dispatch_agent_for_stage,
         get_workflow_stages,
@@ -68,6 +69,7 @@ with workflow.unsafe.imports_passed_through():
         mark_workflow_run,
         poll_agent_run_status,
         record_human_gate_decision,
+        record_nested_workflow_start,
         snapshot_checkpoint,
         update_stage_execution,
     )
@@ -79,6 +81,7 @@ KIND_AGENT_DISPATCH = "agent_dispatch"
 KIND_HUMAN_GATE = "human_gate"
 KIND_CHECKPOINT = "checkpoint"
 KIND_AGGREGATION = "aggregation"
+KIND_WORKFLOW = "workflow"
 
 ON_FAILURE_FAIL = "fail"
 ON_FAILURE_RETRY = "retry"
@@ -235,6 +238,7 @@ class WorkflowDefinitionRunWorkflow:
         # Set at the top of _execute so the per-kind handlers can open
         # execution rows without threading the run id through every call.
         self._workflow_run_id: str = ""
+        self._nested_workflows_enabled: bool = False
 
     # ---- signals ----------------------------------------------------------
 
@@ -291,14 +295,21 @@ class WorkflowDefinitionRunWorkflow:
         return await self._execute_v2(input)
 
     async def _execute_v2(self, input: WorkflowDefinitionRunInput) -> dict[str, Any]:
+        # Patch-gate every command/input-shape change for already-running
+        # durable histories. New runs record the marker and may invoke child
+        # definitions; old histories replay the exact v2 packet they started.
+        self._nested_workflows_enabled = workflow.patched("nested-workflows-v1")
+        plan_params = {
+            "workflow_definition_slug": input.workflow_definition_slug,
+            "workflow_definition_id": input.workflow_definition_id,
+            "workflow_run_id": input.workflow_run_id,
+            "stage_bindings": input.stage_bindings or {},
+        }
+        if self._nested_workflows_enabled:
+            plan_params["workflow_ancestry"] = input.workflow_ancestry or []
         plan = await workflow.execute_activity(
             get_workflow_stages,
-            {
-                "workflow_definition_slug": input.workflow_definition_slug,
-                "workflow_definition_id": input.workflow_definition_id,
-                "workflow_run_id": input.workflow_run_id,
-                "stage_bindings": input.stage_bindings or {},
-            },
+            plan_params,
             start_to_close_timeout=_DB_TIMEOUT,
             retry_policy=_DB_RETRY,
         )
@@ -379,6 +390,26 @@ class WorkflowDefinitionRunWorkflow:
                     "order": stage["order"],
                     "output_key": stage["output_key"],
                     "output": previous_output,
+                }
+            elif kind == KIND_WORKFLOW and self._nested_workflows_enabled:
+                dispatch_input = build_stage_dispatch_input(
+                    workflow_input,
+                    previous_output,
+                    named_outputs,
+                    stage,
+                )
+                nested_output = await self._run_nested_workflow(
+                    input,
+                    stage,
+                    dispatch_input,
+                    plan["definition_id"],
+                )
+                previous_output = nested_output.get("result")
+                stage_record = {
+                    "order": stage["order"],
+                    "output_key": stage["output_key"],
+                    "output": previous_output,
+                    **{key: value for key, value in nested_output.items() if key != "result"},
                 }
             else:
                 raise _WorkflowAbort(f"unknown stage kind {kind!r}")
@@ -687,6 +718,140 @@ class WorkflowDefinitionRunWorkflow:
             remaining = deadline - workflow.now()
             await workflow.sleep(min(_AGENT_POLL_INTERVAL, remaining))
 
+    async def _run_nested_workflow(
+        self,
+        input: WorkflowDefinitionRunInput,
+        stage: dict,
+        trigger_payload: dict,
+        current_definition_id: str,
+    ) -> dict:
+        """Run a child definition as a first-class, linked Temporal child."""
+        timeout_seconds = max(1, int(stage["timeout_seconds"]))
+        on_failure = stage["on_failure"]
+        attempt = 1
+
+        while True:
+            execution_id = await workflow.execute_activity(
+                create_stage_execution,
+                args=[input.workflow_run_id, stage["stage_id"], attempt],
+                start_to_close_timeout=_DB_TIMEOUT,
+                retry_policy=_DB_RETRY,
+            )
+            child = await workflow.execute_activity(
+                create_nested_workflow_run,
+                args=[
+                    input.workflow_run_id,
+                    execution_id,
+                    stage["nested_definition_id"],
+                ],
+                start_to_close_timeout=_DB_TIMEOUT,
+                retry_policy=_DB_RETRY,
+            )
+
+            result = None
+            failure_message = ""
+            try:
+                handle = await workflow.start_child_workflow(
+                    WorkflowDefinitionRunWorkflow.run,
+                    WorkflowDefinitionRunInput(
+                        workflow_definition_slug=child["definition_slug"],
+                        workflow_definition_id=child["definition_id"],
+                        workflow_run_id=child["workflow_run_id"],
+                        trigger_payload=trigger_payload,
+                        actor=input.actor,
+                        stage_bindings=None,
+                        workflow_ancestry=list(input.workflow_ancestry or []) + [str(current_definition_id)],
+                    ),
+                    id=child["workflow_id"],
+                    execution_timeout=timedelta(seconds=timeout_seconds),
+                )
+                await workflow.execute_activity(
+                    record_nested_workflow_start,
+                    args=[child["workflow_run_id"], handle.first_execution_run_id],
+                    start_to_close_timeout=_DB_TIMEOUT,
+                    retry_policy=_DB_RETRY,
+                )
+                result = await handle
+                run_status = "succeeded" if getattr(result, "ok", False) else "failed"
+                if run_status == "failed":
+                    failure_message = getattr(result, "message", "nested workflow failed")
+            except Exception as exc:  # noqa: BLE001 — policy handles child failure/timeout
+                run_status = "failed"
+                failure_message = str(exc) or "nested workflow failed"
+
+            data = getattr(result, "data", None) or {}
+            final_output = data.get("final_output") if run_status == "succeeded" else None
+            if run_status != "succeeded":
+                # A child that returns ok=false finalized itself; a child that
+                # failed to start or hit its execution timeout did not. This
+                # idempotent write closes both paths so the UI never leaves a
+                # dead child mirror in RUNNING.
+                await workflow.execute_activity(
+                    mark_workflow_run,
+                    args=[
+                        child["workflow_run_id"],
+                        RUN_FAILED,
+                        None,
+                        {"message": failure_message or "nested workflow failed"},
+                    ],
+                    start_to_close_timeout=_DB_TIMEOUT,
+                    retry_policy=_DB_RETRY,
+                )
+            persisted_output = {
+                "child_workflow_run_guid": child["workflow_run_guid"],
+                "child_workflow_id": child["workflow_id"],
+                "child_definition_slug": child["definition_slug"],
+                "child_status": run_status,
+                "attempt": attempt,
+                "result": final_output,
+            }
+            decision = decide_after_agent_run(run_status, on_failure, attempt)
+
+            if decision.proceed:
+                await workflow.execute_activity(
+                    update_stage_execution,
+                    args=[execution_id, decision.terminal_status, persisted_output, None],
+                    start_to_close_timeout=_DB_TIMEOUT,
+                    retry_policy=_DB_RETRY,
+                )
+                return persisted_output
+
+            if decision.retry:
+                await workflow.execute_activity(
+                    update_stage_execution,
+                    args=[execution_id, STATUS_FAILED, persisted_output, failure_message],
+                    start_to_close_timeout=_DB_TIMEOUT,
+                    retry_policy=_DB_RETRY,
+                )
+                attempt += 1
+                continue
+
+            if decision.escalate:
+                await workflow.execute_activity(
+                    update_stage_execution,
+                    args=[execution_id, STATUS_ESCALATED, persisted_output, failure_message],
+                    start_to_close_timeout=_DB_TIMEOUT,
+                    retry_policy=_DB_RETRY,
+                )
+                cleared = await self._wait_escalation_cleared(execution_id, timeout_seconds)
+                if cleared:
+                    return persisted_output
+                raise _WorkflowAbort(
+                    f"nested workflow at stage {stage['order']} escalation not cleared in time",
+                    data={"execution_id": execution_id, **persisted_output},
+                )
+
+            await workflow.execute_activity(
+                update_stage_execution,
+                args=[execution_id, STATUS_FAILED, persisted_output, failure_message],
+                start_to_close_timeout=_DB_TIMEOUT,
+                retry_policy=_DB_RETRY,
+            )
+            raise _WorkflowAbort(
+                f"nested workflow {child['definition_slug']!r} failed at stage {stage['order']}",
+                data={"execution_id": execution_id, **persisted_output},
+            )
+
     async def _run_human_gate(self, stage: dict) -> dict:
         """Open a gate execution and block on the decision signal."""
         execution_id = await workflow.execute_activity(
@@ -802,9 +967,8 @@ class WorkflowDefinitionRunWorkflow:
         handles = []
         for idx in range(count):
             child_run_id = f"{input.workflow_run_id}:fanout:{stage['order']}:{idx}"
-            handle = await workflow.start_child_workflow(
-                WorkflowDefinitionRunWorkflow.run,
-                WorkflowDefinitionRunInput(
+            if self._nested_workflows_enabled:
+                child_input = WorkflowDefinitionRunInput(
                     workflow_definition_slug=input.workflow_definition_slug,
                     workflow_run_id=child_run_id,
                     trigger_payload=(
@@ -815,7 +979,24 @@ class WorkflowDefinitionRunWorkflow:
                     only_stage_order=stage["order"],
                     fan_out_index=idx,
                     stage_bindings=input.stage_bindings,
-                ),
+                    workflow_ancestry=input.workflow_ancestry,
+                )
+            else:
+                child_input = WorkflowDefinitionRunInput(
+                    workflow_definition_slug=input.workflow_definition_slug,
+                    workflow_run_id=child_run_id,
+                    trigger_payload=(
+                        previous_output if isinstance(previous_output, dict) else {"value": previous_output}
+                    ),
+                    actor=input.actor,
+                    workflow_definition_id=input.workflow_definition_id,
+                    only_stage_order=stage["order"],
+                    fan_out_index=idx,
+                    stage_bindings=input.stage_bindings,
+                )
+            handle = await workflow.start_child_workflow(
+                WorkflowDefinitionRunWorkflow.run,
+                child_input,
                 id=f"WorkflowDefinitionRunWorkflow-{child_run_id}",
                 task_timeout=timedelta(seconds=max(1, int(stage["timeout_seconds"]))),
             )

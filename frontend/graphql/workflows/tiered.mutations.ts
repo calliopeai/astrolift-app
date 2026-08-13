@@ -190,6 +190,7 @@ export const CREATE_WORKFLOW_STAGE = gql`
     $timeoutSeconds: Int! = 300
     $agentDefinitionGuid: String
     $agentRef: String
+    $workflowRef: String
     $environmentSpecSlug: String
     $skillRefs: JSON
     $fanOutCount: Int
@@ -206,6 +207,7 @@ export const CREATE_WORKFLOW_STAGE = gql`
       timeoutSeconds: $timeoutSeconds
       agentDefinitionGuid: $agentDefinitionGuid
       agentRef: $agentRef
+      workflowRef: $workflowRef
       environmentSpecSlug: $environmentSpecSlug
       skillRefs: $skillRefs
       fanOutCount: $fanOutCount
@@ -223,6 +225,7 @@ export const CREATE_WORKFLOW_STAGE = gql`
         prompt
         approvers
         agentRef
+        workflowRef
         environmentSpecSlug
         outputKey
         skillRefs
@@ -246,6 +249,7 @@ export const UPDATE_WORKFLOW_STAGE = gql`
     $timeoutSeconds: Int
     $agentDefinitionGuid: String
     $agentRef: String
+    $workflowRef: String
     $environmentSpecSlug: String
     $skillRefs: JSON
     $fanOutCount: Int
@@ -261,6 +265,7 @@ export const UPDATE_WORKFLOW_STAGE = gql`
       timeoutSeconds: $timeoutSeconds
       agentDefinitionGuid: $agentDefinitionGuid
       agentRef: $agentRef
+      workflowRef: $workflowRef
       environmentSpecSlug: $environmentSpecSlug
       skillRefs: $skillRefs
       fanOutCount: $fanOutCount
@@ -317,6 +322,7 @@ export const IMPORT_WORKFLOW_MANIFEST = gql`
           kind
           role
           agent
+          workflow
           environmentSpecSlug
           skills
           onFailure

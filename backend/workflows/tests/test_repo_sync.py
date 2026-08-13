@@ -193,3 +193,74 @@ def test_reconcile_rejects_project_outside_repository_org(org, project):
             source_ref="abc123",
             manifests=discover_repository_workflows({"workflows/triage.toml": WORKFLOW}),
         )
+
+
+@pytest.mark.django_db
+def test_reconcile_supports_forward_nested_workflow_references(org, project):
+    parent = """\
+[workflow]
+slug = "outer"
+name = "Outer"
+pattern = "chained"
+[[stage]]
+kind = "workflow"
+workflow = "inner"
+output_key = "inner_result"
+"""
+    child = """\
+[workflow]
+slug = "inner"
+name = "Inner"
+pattern = "single"
+[[stage]]
+kind = "checkpoint"
+"""
+    # Parent sorts first: validation must wait until every manifest converges.
+    result = reconcile_repository_workflows(
+        organization=org,
+        project=project,
+        source_repo="steadymd/nested",
+        source_ref="abc123",
+        manifests=discover_repository_workflows(
+            {
+                "workflows/a-parent.toml": parent,
+                "workflows/z-child.toml": child,
+            }
+        ),
+    )
+    assert [row.slug for row in result] == ["outer", "inner"]
+    from workflows.models import WorkflowDefinition
+
+    assert WorkflowDefinition.objects.get(slug="outer").stages.get(order=0).workflow_ref == "inner"
+
+
+@pytest.mark.django_db
+def test_reconcile_rejects_cycle_and_rolls_back_every_definition(org, project):
+    def manifest(slug: str, child: str) -> str:
+        return f"""\
+[workflow]
+slug = "{slug}"
+name = "{slug}"
+pattern = "chained"
+[[stage]]
+kind = "workflow"
+workflow = "{child}"
+"""
+
+    with pytest.raises(ValueError, match="nested workflow cycle"):
+        reconcile_repository_workflows(
+            organization=org,
+            project=project,
+            source_repo="steadymd/cycle",
+            source_ref="abc123",
+            manifests=discover_repository_workflows(
+                {
+                    "workflows/a.toml": manifest("a", "b"),
+                    "workflows/b.toml": manifest("b", "a"),
+                }
+            ),
+        )
+
+    from workflows.models import WorkflowDefinition
+
+    assert not WorkflowDefinition.objects.filter(source_repo="steadymd/cycle").exists()

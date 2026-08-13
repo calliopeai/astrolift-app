@@ -55,6 +55,7 @@ const DEFINITION_SUMMARY_FIELDS = `
     kind
     role
     agentRef
+    workflowRef
     agentGuid
     agentName
     agentSlug
@@ -79,6 +80,7 @@ const STAGE_FIELDS = `
   prompt
   approvers
   agentRef
+  workflowRef
   environmentSpecSlug
   outputKey
   skillRefs
@@ -161,6 +163,10 @@ export const LIST_WORKFLOW_DEFINITION_RUNS = gql`
       temporalRunId
       currentStageOrder
       currentStageRole
+      parentRunGuid
+      parentStageExecutionGuid
+      nestingDepth
+      childRunCount
       startedAt
       endedAt
     }
@@ -184,6 +190,9 @@ export const LIST_WORKFLOW_STAGE_EXECUTIONS = gql`
       stageKind
       stageOrder
       agentRunGuid
+      childWorkflowRunGuid
+      childWorkflowDefinitionSlug
+      childWorkflowStatus
     }
   }
 `;
@@ -219,6 +228,7 @@ export const PREVIEW_WORKFLOW_MANIFEST = gql`
         kind
         role
         agent
+        workflow
         environmentSpecSlug
         skills
         onFailure

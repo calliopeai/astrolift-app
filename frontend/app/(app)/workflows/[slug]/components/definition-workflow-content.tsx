@@ -11,6 +11,7 @@ import {
   WorkflowIcon,
 } from "lucide-react";
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -244,8 +245,10 @@ function DefinitionRun({ definition }: { definition: WorkflowDefinitionSummary }
 
 function DefinitionObserve({ definition }: { definition: WorkflowDefinitionSummary }) {
   const { runs, loading, error, refetch } = useRuns(definition);
+  const requestedRunGuid = useSearchParams().get("run");
   const [selectedGuid, setSelectedGuid] = React.useState<string | null>(null);
-  const selected = runs.find((run) => run.guid === selectedGuid) ?? runs[0] ?? null;
+  const selected =
+    runs.find((run) => run.guid === (selectedGuid ?? requestedRunGuid)) ?? runs[0] ?? null;
 
   return (
     <Section
@@ -282,7 +285,14 @@ function DefinitionObserve({ definition }: { definition: WorkflowDefinitionSumma
                   className={`hover:bg-accent flex w-full items-center justify-between gap-2 rounded-md border p-3 text-left ${selected?.guid === run.guid ? "bg-accent" : ""}`}
                 >
                   <div className="min-w-0">
-                    <RunStateBadge state={run.status} />
+                    <div className="flex items-center gap-2">
+                      <RunStateBadge state={run.status} />
+                      {run.parentRunGuid && (
+                        <Badge variant="outline" className="text-2xs">
+                          Nested · level {run.nestingDepth}
+                        </Badge>
+                      )}
+                    </div>
                     <div className="text-muted-foreground mt-1 truncate font-mono text-xs">
                       {run.temporalWorkflowId}
                     </div>
@@ -335,6 +345,8 @@ function DefinitionRunPanel({
           <div className="text-muted-foreground mt-1 flex gap-3 text-xs">
             {run.startedAt && <span>Started {fmt.formatDateTime(run.startedAt)}</span>}
             {run.endedAt && <span>Ended {fmt.formatDateTime(run.endedAt)}</span>}
+            {run.parentRunGuid && <span>Child of run {run.parentRunGuid}</span>}
+            {run.childRunCount > 0 && <span>{run.childRunCount} child run(s)</span>}
           </div>
         </div>
         {!isTerminal(run) && entitlement.canRun && (

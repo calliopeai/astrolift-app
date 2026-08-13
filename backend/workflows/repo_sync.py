@@ -5,6 +5,8 @@ from __future__ import annotations
 import dataclasses
 from pathlib import PurePosixPath
 
+from django.db import transaction
+
 from astrolift_manifest.parser import ManifestError
 from workflows.manifest import ParsedWorkflowManifest, _fan_out_columns, parse_workflow_manifest
 from workflows.models import WorkflowDefinition, WorkflowStage
@@ -48,6 +50,7 @@ def discover_repository_workflows(files: dict[str, str]) -> list[RepositoryWorkf
     return manifests
 
 
+@transaction.atomic
 def reconcile_repository_workflows(
     *,
     organization,
@@ -145,6 +148,7 @@ def reconcile_repository_workflows(
             stage.role = spec.role
             stage.agent_definition = workload
             stage.agent_ref = spec.agent or ""
+            stage.workflow_ref = spec.workflow or ""
             stage.environment_spec_slug = spec.environment_spec_slug or ""
             stage.skill_refs = list(spec.skills)
             stage.on_failure = spec.on_failure
@@ -196,6 +200,19 @@ def reconcile_repository_workflows(
                 "version",
             ]
         )
+
+    # Validate after the entire repository has converged so references are
+    # order-independent and forward references work. The surrounding atomic
+    # transaction rolls back every definition when one edge is invalid.
+    from workflows.composition import validate_workflow_composition
+
+    definitions = WorkflowDefinition.objects.filter(
+        organization=organization,
+        source_repo=source_repo,
+        deleted_at__isnull=True,
+    )
+    for definition in definitions:
+        validate_workflow_composition(definition)
     return results
 
 

@@ -48,6 +48,7 @@ export type WorkflowTopologyStage = {
   kind: string;
   role: string;
   agentRef: string;
+  workflowRef: string;
   agentGuid: string | null;
   agentName: string;
   agentSlug: string;
@@ -71,6 +72,7 @@ export type WorkflowStage = {
   prompt: string;
   approvers: unknown;
   agentRef: string;
+  workflowRef: string;
   environmentSpecSlug: string;
   outputKey: string;
   skillRefs: unknown;
@@ -106,6 +108,10 @@ export type WorkflowDefinitionRun = {
   temporalRunId: string | null;
   currentStageOrder: number | null;
   currentStageRole: string;
+  parentRunGuid: string | null;
+  parentStageExecutionGuid: string | null;
+  nestingDepth: number;
+  childRunCount: number;
   startedAt: string | null;
   endedAt: string | null;
 };
@@ -150,6 +156,9 @@ export type WorkflowStageExecution = {
   stageKind: string;
   stageOrder: number;
   agentRunGuid: string | null;
+  childWorkflowRunGuid: string | null;
+  childWorkflowDefinitionSlug: string | null;
+  childWorkflowStatus: string | null;
 };
 
 // ─── Manifest (TOML code view) ───────────────────────────────────────────
@@ -166,6 +175,7 @@ export type WorkflowManifestStage = {
   kind: string;
   role: string;
   agent: string | null;
+  workflow: string | null;
   environmentSpecSlug: string | null;
   skills: string[];
   onFailure: string;

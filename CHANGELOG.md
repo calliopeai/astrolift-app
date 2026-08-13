@@ -9,6 +9,8 @@
   attachments, provider-backed secret CRUD/reveal, and runtime injection.
 - Add project-owned workflow topology and execution views across project,
   workflow, history, and role-aware dashboard surfaces.
+- Add composable nested workflow stages with bounded cycle-safe resolution,
+  linked Temporal child execution, run lineage, and graph drill-down.
 - Add deterministic GraphQL SDL and MCP capability-superset exports with
   runtime-handler, JSON-Schema, frontend-codegen, and CI drift guardrails.
 - Add source-reconciled `workflows/**/*.toml` definitions and runnable chained-agent

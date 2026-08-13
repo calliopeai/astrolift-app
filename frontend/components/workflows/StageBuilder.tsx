@@ -103,7 +103,7 @@ import type {
 
 // ─── Domain constants ────────────────────────────────────────────────────
 
-type StageKind = "agent_dispatch" | "human_gate" | "aggregation" | "checkpoint";
+type StageKind = "agent_dispatch" | "human_gate" | "aggregation" | "checkpoint" | "workflow";
 
 const STAGE_KINDS: {
   value: StageKind;
@@ -116,6 +116,12 @@ const STAGE_KINDS: {
     label: "Agent dispatch",
     icon: BotIcon,
     hint: "Dispatches an agent workload, optionally fanned out in parallel.",
+  },
+  {
+    value: "workflow",
+    label: "Nested workflow",
+    icon: WorkflowIcon,
+    hint: "Runs another visible workflow as a linked child run.",
   },
   {
     value: "human_gate",
@@ -162,6 +168,7 @@ type StageDraft = {
   /** Also doubles as the checkpoint label. */
   role: string;
   agentRef: string;
+  workflowRef: string;
   agentDefinitionGuid: string | null;
   environmentSpecSlug: string;
   skillRefs: string[];
@@ -183,6 +190,7 @@ function draftFromStage(stage: WorkflowStage): StageDraft {
     kind: stage.kind,
     role: stage.role,
     agentRef: stage.agentRef,
+    workflowRef: stage.workflowRef,
     agentDefinitionGuid: stage.agentDefinitionGuid,
     environmentSpecSlug: stage.environmentSpecSlug,
     skillRefs: parseSkillRefs(stage.skillRefs),
@@ -200,6 +208,7 @@ function emptyDraft(): StageDraft {
     kind: "agent_dispatch",
     role: "",
     agentRef: "",
+    workflowRef: "",
     agentDefinitionGuid: null,
     environmentSpecSlug: "",
     skillRefs: [],
@@ -212,10 +221,7 @@ function emptyDraft(): StageDraft {
   };
 }
 
-function reportResult(
-  result: TieredMutationResult | null | undefined,
-  fallback: string
-): boolean {
+function reportResult(result: TieredMutationResult | null | undefined, fallback: string): boolean {
   if (result?.ok) return true;
   const errors = result?.errors ?? [];
   if (errors.length > 0) {
@@ -246,7 +252,12 @@ function StageEditorFields({
         <Label className="text-xs">Stage kind</Label>
         <Select
           value={draft.kind}
-          onValueChange={(v) => onPatch({ kind: v })}
+          onValueChange={(v) =>
+            onPatch({
+              kind: v,
+              workflowRef: v === "workflow" ? draft.workflowRef : "",
+            })
+          }
           disabled={disabled}
         >
           <SelectTrigger className="h-8 text-xs">
@@ -371,6 +382,23 @@ function StageEditorFields({
         </>
       )}
 
+      {draft.kind === "workflow" && (
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-xs">Child workflow slug</Label>
+          <Input
+            value={draft.workflowRef}
+            placeholder="e.g. emr-triage-patch"
+            className="h-8 text-xs"
+            disabled={disabled}
+            onChange={(e) => onPatch({ workflowRef: e.target.value })}
+          />
+          <p className="text-muted-foreground text-2xs">
+            Must be in this project or a reusable org/global definition. Cycles and depth over eight
+            are rejected.
+          </p>
+        </div>
+      )}
+
       <div className="flex flex-col gap-1.5">
         <Label className="text-xs">Output key</Label>
         <Input
@@ -424,9 +452,7 @@ function StageEditorFields({
             value={draft.timeoutSeconds}
             className="h-8 text-xs"
             disabled={disabled}
-            onChange={(e) =>
-              onPatch({ timeoutSeconds: parseInt(e.target.value, 10) || 300 })
-            }
+            onChange={(e) => onPatch({ timeoutSeconds: parseInt(e.target.value, 10) || 300 })}
           />
         </div>
       </div>
@@ -471,7 +497,9 @@ function StageCard({
 
   return (
     <Card className={inGraph ? "w-80 shadow-md" : undefined}>
-      <CardContent className={inGraph ? "nodrag nowheel flex flex-col gap-3 p-4" : "flex flex-col gap-3"}>
+      <CardContent
+        className={inGraph ? "nodrag nowheel flex flex-col gap-3 p-4" : "flex flex-col gap-3"}
+      >
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -495,6 +523,9 @@ function StageCard({
               <span className="text-muted-foreground truncate text-xs">
                 {stage.agentDefinitionName}
               </span>
+            )}
+            {stage.kind === "workflow" && stage.workflowRef && (
+              <span className="text-muted-foreground truncate text-xs">{stage.workflowRef}</span>
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1">
@@ -759,7 +790,12 @@ function CodeView({
           >
             <FileDownIcon className="mr-1 h-3.5 w-3.5" /> Export .toml
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => fileRef.current?.click()}
+          >
             <FileUpIcon className="mr-1 h-3.5 w-3.5" /> Upload .toml
           </Button>
           <Button
@@ -797,7 +833,9 @@ function CodeView({
       ) : exportFailed ? (
         <div className="border-danger/40 bg-danger/10 flex items-start gap-2 rounded-md border px-3 py-2 text-sm">
           <AlertTriangleIcon className="text-danger-fg mt-0.5 h-4 w-4 shrink-0" />
-          <p>{exported?.error ?? exportResult.error?.message ?? "Failed to export the manifest."}</p>
+          <p>
+            {exported?.error ?? exportResult.error?.message ?? "Failed to export the manifest."}
+          </p>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -841,10 +879,10 @@ function CodeView({
             </div>
           )}
           <p className="text-muted-foreground text-xs">
-            Applying code edits to this definition in place isn&apos;t supported yet — TOML
-            stages carry no stable identity, so edits can&apos;t be mapped safely onto existing
-            stages. Export, edit, and use &quot;Import as new&quot; to create a definition from
-            the edited manifest.
+            Applying code edits to this definition in place isn&apos;t supported yet — TOML stages
+            carry no stable identity, so edits can&apos;t be mapped safely onto existing stages.
+            Export, edit, and use &quot;Import as new&quot; to create a definition from the edited
+            manifest.
           </p>
         </div>
       )}
@@ -856,7 +894,11 @@ function CodeView({
 
 type BuilderView = "list" | "graph" | "code";
 
-const VIEW_OPTIONS: { value: BuilderView; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+const VIEW_OPTIONS: {
+  value: BuilderView;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}[] = [
   { value: "list", label: "List", icon: ListIcon },
   { value: "graph", label: "Graph", icon: NetworkIcon },
   { value: "code", label: "Code", icon: CodeIcon },
@@ -884,7 +926,8 @@ export function StageBuilder({ slug }: { slug: string }) {
 
   const sorted = useMemo(() => [...stages].sort((a, b) => a.order - b.order), [stages]);
 
-  const isGlobal = definition != null && (definition.isGlobal || definition.organizationGuid == null);
+  const isGlobal =
+    definition != null && (definition.isGlobal || definition.organizationGuid == null);
   const isSourceManaged = Boolean(definition?.sourceRepo);
   const readOnly = isGlobal || isSourceManaged || !canManage;
 
@@ -905,6 +948,7 @@ export function StageBuilder({ slug }: { slug: string }) {
             timeoutSeconds: draft.timeoutSeconds,
             agentDefinitionGuid: draft.agentDefinitionGuid,
             agentRef: draft.agentRef.trim(),
+            workflowRef: draft.workflowRef.trim(),
             environmentSpecSlug: draft.environmentSpecSlug.trim(),
             skillRefs: draft.skillRefs,
             fanOutCount: draft.fanOutCount,
@@ -958,8 +1002,7 @@ export function StageBuilder({ slug }: { slug: string }) {
 
   const handleCreateStage = useCallback(
     async (draft: StageDraft) => {
-      const nextOrder =
-        sorted.length > 0 ? Math.max(...sorted.map((s) => s.order)) + 1 : 0;
+      const nextOrder = sorted.length > 0 ? Math.max(...sorted.map((s) => s.order)) + 1 : 0;
       const { data } = await createStage({
         variables: {
           workflowSlug: slug,
@@ -970,6 +1013,7 @@ export function StageBuilder({ slug }: { slug: string }) {
           timeoutSeconds: draft.timeoutSeconds,
           agentDefinitionGuid: draft.agentDefinitionGuid,
           agentRef: draft.agentRef.trim() || null,
+          workflowRef: draft.workflowRef.trim() || null,
           environmentSpecSlug: draft.environmentSpecSlug.trim() || null,
           skillRefs: draft.skillRefs,
           fanOutCount: draft.fanOutCount,
@@ -1106,8 +1150,8 @@ export function StageBuilder({ slug }: { slug: string }) {
           <div className="flex items-center gap-2 text-sm">
             <LockIcon className="text-info-fg h-4 w-4 shrink-0" />
             <span>
-              <span className="font-medium">Platform template</span> — read-only. Clone it to
-              create an editable copy in your organization.
+              <span className="font-medium">Platform template</span> — read-only. Clone it to create
+              an editable copy in your organization.
             </span>
           </div>
           <Button
@@ -1132,8 +1176,13 @@ export function StageBuilder({ slug }: { slug: string }) {
           <LockIcon className="text-info-fg h-4 w-4 shrink-0" />
           <span>
             <span className="font-medium">Repository managed</span> — edit{" "}
-            <code>{definition.sourceRepo}/{definition.sourcePath}</code> and sync the agent repository.
-            {definition.sourceRef ? ` Last reconciled at ${definition.sourceRef.slice(0, 12)}.` : ""}
+            <code>
+              {definition.sourceRepo}/{definition.sourcePath}
+            </code>{" "}
+            and sync the agent repository.
+            {definition.sourceRef
+              ? ` Last reconciled at ${definition.sourceRef.slice(0, 12)}.`
+              : ""}
           </span>
         </div>
       )}

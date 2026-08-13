@@ -33,9 +33,7 @@ def _visible_definition(slug):
     org's slug resolves to nothing, byte-identical to nonexistent, so no
     cross-tenant existence oracle."""
     org_pk = _caller_org_pk()
-    qs = WorkflowDefinition.objects.filter(slug=slug, deleted_at__isnull=True).filter(
-        _org_scope_q(org_pk)
-    )
+    qs = WorkflowDefinition.objects.filter(slug=slug, deleted_at__isnull=True).filter(_org_scope_q(org_pk))
     return qs.filter(organization_id=org_pk).first() or qs.first()
 
 
@@ -58,9 +56,7 @@ class Query:
         object_id: int,
         model_label: Optional[str] = None,
     ) -> list[WorkflowInstanceType]:
-        qs = WorkflowInstance.objects.filter(object_id=object_id).filter(
-            _org_scope_q(_caller_org_pk())
-        )
+        qs = WorkflowInstance.objects.filter(object_id=object_id).filter(_org_scope_q(_caller_org_pk()))
         if model_label:
             from django.contrib.contenttypes.models import ContentType
 
@@ -110,6 +106,11 @@ class Query:
             return []
         return (
             WorkflowStageExecution.objects.filter(workflow_run=run)
-            .select_related("stage", "agent_run")
+            .select_related(
+                "stage",
+                "agent_run",
+                "child_workflow_run",
+                "child_workflow_run__workflow_definition",
+            )
             .order_by("stage__order", "-created_at")
         )
