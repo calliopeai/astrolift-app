@@ -271,7 +271,7 @@ describe("ProjectDetailClient workload-aware overview", () => {
     state.workflows = [
       {
         guid: "workflow-1",
-        name: "EMR Triage",
+        name: "EMR triage — code research and review",
         slug: "emr-triage",
         description: "",
         patternKind: "chained",
@@ -338,6 +338,12 @@ describe("ProjectDetailClient workload-aware overview", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Standalone")).toBeInTheDocument();
     expect(screen.getAllByText("emr-triage").length).toBeGreaterThan(0);
+    const workflowNode = screen.getByTitle("Open EMR triage — code research and review");
+    expect(workflowNode).toHaveClass("block", "w-[220px]");
+    expect(within(workflowNode).getByText("EMR triage — code research and review")).toHaveClass(
+      "min-w-0",
+      "truncate"
+    );
     const workflowQuery = state.calls.find(
       (call) => call.operation === "ListTieredWorkflowDefinitions"
     );
