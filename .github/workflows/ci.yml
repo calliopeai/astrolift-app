@@ -137,12 +137,14 @@ jobs:
             paths: astrolift_operations core astrolift_identity
           - name: registration-runtime
             paths: astrolift_scm astrolift_clusters astrolift_agents astrolift_registry
-          - name: platform-services
+          - name: platform-manifest
             paths: >-
-              astrolift_manifest astrolift_services astrolift_pipelines astrolift_drivers
-              astrolift_observability workflows astrolift_dispatch auth1 astrolift_ci_convert
-              astrolift_forms organization astrolift_billing astrolift_graphql
-              astrolift_compliance astrolift_ci config testdata
+              astrolift_manifest astrolift_drivers astrolift_observability workflows
+          - name: platform-control
+            paths: >-
+              astrolift_services astrolift_pipelines astrolift_dispatch auth1
+              astrolift_ci_convert astrolift_forms organization astrolift_billing
+              astrolift_graphql astrolift_compliance astrolift_ci config testdata
     defaults:
       run:
         working-directory: backend
