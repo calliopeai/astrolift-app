@@ -534,6 +534,8 @@ def test_dispatch_agent_creates_run_and_links_execution_without_dispatcher(run, 
     from astrolift_agents.models import AgentTask
 
     task = AgentTask.objects.get(agent_run=agent_run)
+    assert task.team_id == stage.agent_definition.registered_app.team_id
+    assert task.project_id == stage.agent_definition.registered_app.project_id
     assert task.dispatch_input == {"trigger": "manual"}
     assert task.brief.context["output_key"] == "review_result"
     assert "Review the trigger and return structured JSON." in task.brief.manifest_snapshot["system_prompt"]

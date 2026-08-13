@@ -31,11 +31,35 @@ export type WorkflowDefinitionSummary = {
   isEnabled: boolean;
   isGlobal: boolean;
   organizationGuid: string | null;
+  projectGuid: string | null;
+  projectSlug: string;
+  projectTeamSlug: string;
   sourceRepo: string;
   sourcePath: string;
   sourceRef: string;
   stageCount: number;
+  stages: WorkflowTopologyStage[];
   createdAt: string;
+};
+
+export type WorkflowTopologyStage = {
+  guid: string;
+  order: number;
+  kind: string;
+  role: string;
+  agentRef: string;
+  agentGuid: string | null;
+  agentName: string;
+  agentSlug: string;
+  environmentSpecSlug: string;
+  resolvedModel: string;
+  hasPrompt: boolean;
+  outputKey: string;
+  skillRefs: string[];
+  fanOutCount: number | null;
+  fanOutDynamic: boolean;
+  onFailure: string;
+  timeoutSeconds: number;
 };
 
 // `workflowStages(workflowSlug)` row (WorkflowStageType).
@@ -68,6 +92,22 @@ export type TieredWorkflowRun = {
   startedAt: string;
   completedAt: string | null;
   isCompleted: boolean;
+};
+
+export type WorkflowDefinitionRun = {
+  guid: string;
+  definitionGuid: string;
+  definitionSlug: string;
+  definitionName: string;
+  projectGuid: string | null;
+  projectSlug: string;
+  status: string;
+  temporalWorkflowId: string;
+  temporalRunId: string | null;
+  currentStageOrder: number | null;
+  currentStageRole: string;
+  startedAt: string | null;
+  endedAt: string | null;
 };
 
 export type ConfiguredWorkflow = {
@@ -166,6 +206,11 @@ export type TieredWorkflowDefinitionsData = {
   workflowDefinitions: WorkflowDefinitionSummary[];
 };
 
+export type TieredWorkflowDefinitionsVars = {
+  orgId?: string | null;
+  projectId?: string | null;
+};
+
 export type TieredWorkflowDefinitionData = {
   workflowDefinition: WorkflowDefinitionSummary | null;
 };
@@ -176,6 +221,17 @@ export type TieredWorkflowStagesData = {
 
 export type TieredWorkflowRunsData = {
   workflowRuns: TieredWorkflowRun[];
+};
+
+export type WorkflowDefinitionRunsData = {
+  workflowDefinitionRuns: WorkflowDefinitionRun[];
+};
+
+export type WorkflowDefinitionRunsVars = {
+  orgId?: string | null;
+  projectId?: string | null;
+  status?: string | null;
+  limit?: number | null;
 };
 
 export type TieredWorkflowStageExecutionsData = {
@@ -237,6 +293,13 @@ export type UpdateWorkflowDefinitionTieredData = {
 
 export type DeleteWorkflowDefinitionTieredData = {
   deleteWorkflowDefinition: TieredMutationResult;
+};
+
+export type RunWorkflowDefinitionData = {
+  runWorkflowDefinition: TieredMutationResult & {
+    workflowRunId: string | null;
+    temporalWorkflowId: string | null;
+  };
 };
 
 export type CreateWorkflowStageData = {

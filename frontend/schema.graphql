@@ -413,6 +413,9 @@ type AstroliftAgentSkill {
 
 type AstroliftAgentTask {
   id: GUID!
+  agentSlug: String!
+  agentName: String!
+  projectSlug: String!
   status: String!
   callbackUrl: String!
   result: JSON
@@ -779,6 +782,7 @@ enum AstroliftAppHealthPulseStatus {
 type AstroliftAppHealthSummary {
   appSlug: String!
   appName: String!
+  primitiveKind: String!
   environmentCount: Int!
   latestDeploymentStatus: String
   latestImageTag: String!
@@ -5817,12 +5821,12 @@ type Query {
   """
   Workflow definitions visible to the caller: their org's UNION all platform-global (spec 40 §2.1).
   """
-  workflowDefinitions(orgId: ID = null): [WorkflowDefinitionSummary!]! @deprecated(reason: "Unbounded — returns every visible definition in one response. Use workflowDefinitionsPage.")
+  workflowDefinitions(orgId: ID = null, projectId: ID = null): [WorkflowDefinitionSummary!]! @deprecated(reason: "Unbounded — returns every visible definition in one response. Use workflowDefinitionsPage.")
 
   """
   Cursor-paginated page of the workflow definitions visible to the caller, by name (A→Z).
   """
-  workflowDefinitionsPage(orgId: ID = null, search: String = null, limit: Int! = 50, after: String = null): WorkflowDefinitionSummaryPage!
+  workflowDefinitionsPage(orgId: ID = null, search: String = null, projectId: ID = null, limit: Int! = 50, after: String = null): WorkflowDefinitionSummaryPage!
 
   """
   One visible workflow definition by slug (prefers the org's over a global).
@@ -5831,6 +5835,11 @@ type Query {
 
   """Runs (tier 3) of one configured Workflow, newest first."""
   workflowRuns(workflowId: ID!, orgId: ID = null): [WorkflowRun!]!
+
+  """
+  Recent runs of workflow definitions visible in the caller's organization.
+  """
+  workflowDefinitionRuns(orgId: ID = null, projectId: ID = null, status: String = null, limit: Int! = 50): [WorkflowDefinitionRun!]!
   astroliftMyConnectedAccounts: [AstroliftMyConnectedAccount!]!
 }
 
@@ -6669,6 +6678,22 @@ input WithdrawSecretChangeInput {
   proposalId: GUID!
 }
 
+type WorkflowDefinitionRun {
+  guid: String!
+  definitionGuid: String!
+  definitionSlug: String!
+  definitionName: String!
+  projectGuid: String
+  projectSlug: String!
+  status: String!
+  temporalWorkflowId: String!
+  temporalRunId: String
+  currentStageOrder: Int
+  currentStageRole: String!
+  startedAt: DateTime
+  endedAt: DateTime
+}
+
 type WorkflowDefinitionSummary {
   guid: String!
   name: String!
@@ -6678,10 +6703,14 @@ type WorkflowDefinitionSummary {
   isEnabled: Boolean!
   isGlobal: Boolean!
   organizationGuid: String
+  projectGuid: String
+  projectSlug: String!
+  projectTeamSlug: String!
   sourceRepo: String!
   sourcePath: String!
   sourceRef: String!
   stageCount: Int!
+  stages: [WorkflowTopologyStage!]!
   createdAt: DateTime!
 }
 
@@ -6710,6 +6739,8 @@ type WorkflowDefinitionType {
   sourceRef: String!
   createdAt: DateTime!
   organizationGuid: String
+  projectGuid: String
+  projectSlug: String!
   instanceCount: Int!
   activeInstanceCount: Int!
   workflowStages: [WorkflowStageType!]!
@@ -6810,4 +6841,24 @@ type WorkflowStageType {
   createdAt: DateTime!
   agentDefinitionGuid: String
   agentDefinitionName: String
+}
+
+type WorkflowTopologyStage {
+  guid: String!
+  order: Int!
+  kind: String!
+  role: String!
+  agentRef: String!
+  agentGuid: String
+  agentName: String!
+  agentSlug: String!
+  environmentSpecSlug: String!
+  resolvedModel: String!
+  hasPrompt: Boolean!
+  outputKey: String!
+  skillRefs: [String!]!
+  fanOutCount: Int
+  fanOutDynamic: Boolean!
+  onFailure: String!
+  timeoutSeconds: Int!
 }

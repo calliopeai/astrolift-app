@@ -51,6 +51,7 @@ def discover_repository_workflows(files: dict[str, str]) -> list[RepositoryWorkf
 def reconcile_repository_workflows(
     *,
     organization,
+    project,
     source_repo: str,
     source_ref: str,
     manifests: list[RepositoryWorkflowManifest],
@@ -59,6 +60,9 @@ def reconcile_repository_workflows(
     from django.utils import timezone
 
     from astrolift_registry.models import Workload
+
+    if project.organization_id != organization.pk:
+        raise ValueError("workflow project must belong to the repository organization")
 
     results: list[ReconciledWorkflow] = []
     retained_paths: set[str] = set()
@@ -84,6 +88,7 @@ def reconcile_repository_workflows(
                 )
             definition = WorkflowDefinition(
                 organization=organization,
+                project=project,
                 source_repo=source_repo,
                 source_path=item.path,
             )
@@ -108,6 +113,7 @@ def reconcile_repository_workflows(
         definition.states = []
         definition.transitions = []
         definition.is_enabled = True
+        definition.project = project
         definition.source_ref = source_ref
         definition.deleted_at = None
         definition.deleted_by = None

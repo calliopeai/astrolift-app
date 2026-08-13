@@ -1413,6 +1413,7 @@ def register_agent_repo(
             ]
             workflows = reconcile_repository_workflows(
                 organization=project.organization,
+                project=project,
                 source_repo=source_repo,
                 source_ref=ref,
                 manifests=workflow_manifests,

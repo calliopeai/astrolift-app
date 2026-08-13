@@ -103,6 +103,9 @@ export type AstroliftAgentDetail = Pick<
 export type AstroliftAgentTask = Pick<
   GeneratedAgentTask,
   | "id"
+  | "agentSlug"
+  | "agentName"
+  | "projectSlug"
   | "status"
   | "callbackUrl"
   | "result"

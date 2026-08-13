@@ -1,6 +1,6 @@
 """run_workflow_definition GraphQL mutation (#976).
 
-This mutation had ZERO test coverage. It gates on staff, validates the
+This mutation is permission- and tenant-gated, validates the visible
 WorkflowDefinition (exists / enabled / has stages), then starts the shared
 stage executor (WorkflowDefinitionRunWorkflow) via
 ``workflows.run_service.start_workflow_definition_run`` — creating the
@@ -16,9 +16,10 @@ from types import SimpleNamespace
 
 import pytest
 from django.contrib.auth import get_user_model
-from graphql import GraphQLError
 
 from astrolift_operations.models import WorkflowRun
+from core.permissions import Permission, PermissionDenied
+from core.tenancy import TenantContext, tenant_context
 from workflows.models import WorkflowDefinition, WorkflowInstance, WorkflowStage
 from workflows.schema.mutations import Mutation
 
@@ -31,16 +32,23 @@ MIN_STATES = [
 MIN_TRANSITIONS = [{"from_state": "pending", "to_state": "done", "label": "Complete"}]
 
 
-def _staff_info():
+def _info():
     User = get_user_model()
-    user = User.objects.create(username="staff@test", email="staff@test", is_staff=True)
+    user = User.objects.create(username="member@test", email="member@test")
     return SimpleNamespace(context=SimpleNamespace(user=user)), user
 
 
-def _definition(*, slug="wf-run-test", enabled=True, with_stage=True):
+def _organization(slug="run-org"):
+    from astrolift_identity.models import Organization
+
+    return Organization.objects.create(name=slug, slug=slug)
+
+
+def _definition(*, organization, slug="wf-run-test", enabled=True, with_stage=True):
     wd = WorkflowDefinition.objects.create(
         name="Run test",
         slug=slug,
+        organization=organization,
         model_label="workflows.workflowdefinition",
         pattern_kind=WorkflowDefinition.PatternKind.SINGLE,
         states=MIN_STATES,
@@ -49,7 +57,9 @@ def _definition(*, slug="wf-run-test", enabled=True, with_stage=True):
     )
     if with_stage:
         WorkflowStage.objects.create(
-            definition=wd, order=0, kind=WorkflowStage.StageKind.AGENT_DISPATCH,
+            definition=wd,
+            order=0,
+            kind=WorkflowStage.StageKind.AGENT_DISPATCH,
         )
     return wd
 
@@ -67,16 +77,21 @@ def patched_start(monkeypatch):
     return calls
 
 
-def test_happy_path_starts_executor_and_creates_rows(patched_start):
-    wd = _definition()
-    info, _user = _staff_info()
+def test_happy_path_starts_executor_and_creates_rows(patched_start, permission_resolver):
+    org = _organization()
+    wd = _definition(organization=org)
+    info, _user = _info()
+    permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
 
-    result = Mutation().run_workflow_definition(info, workflow_slug=wd.slug)
+    with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=_user.pk)):
+        result = Mutation().run_workflow_definition(info, workflow_slug=wd.slug)
 
     assert result.ok is True
     # WorkflowRun mirror created, kind + derived workflow id correct.
     run = WorkflowRun.objects.get(pk=int(result.workflow_run_id))
     assert run.workflow_kind == "WorkflowDefinitionRunWorkflow"
+    assert run.workflow_definition_id == wd.pk
+    assert run.organization_id == org.pk
     assert result.temporal_workflow_id == f"WorkflowDefinitionRunWorkflow-{run.pk}"
     assert run.workflow_id == result.temporal_workflow_id
     # The executor was actually enqueued with the right id + definition slug.
@@ -87,43 +102,69 @@ def test_happy_path_starts_executor_and_creates_rows(patched_start):
     # UI mirror instance created and pointed at the temporal id.
     inst = WorkflowInstance.objects.get(workflow=wd)
     assert inst.temporal_workflow_id == result.temporal_workflow_id
+    assert inst.organization_id == org.pk
 
 
-def test_non_staff_is_denied_and_starts_nothing(patched_start):
-    wd = _definition()
-    User = get_user_model()
-    user = User.objects.create(username="plain@test", email="plain@test", is_staff=False)
-    info = SimpleNamespace(context=SimpleNamespace(user=user))
+def test_missing_trigger_permission_is_denied_and_starts_nothing(patched_start, permission_resolver):
+    org = _organization()
+    wd = _definition(organization=org)
+    info, user = _info()
 
-    with pytest.raises(GraphQLError):
-        Mutation().run_workflow_definition(info, workflow_slug=wd.slug)
+    with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=user.pk)):
+        with pytest.raises(PermissionDenied):
+            Mutation().run_workflow_definition(info, workflow_slug=wd.slug)
 
     assert patched_start == []
     assert not WorkflowRun.objects.exists()
 
 
-def test_unknown_slug_returns_error_no_start(patched_start):
-    info, _ = _staff_info()
-    result = Mutation().run_workflow_definition(info, workflow_slug="does-not-exist")
+def test_unknown_slug_returns_error_no_start(patched_start, permission_resolver):
+    org = _organization()
+    info, user = _info()
+    permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
+    with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=user.pk)):
+        result = Mutation().run_workflow_definition(info, workflow_slug="does-not-exist")
     assert result.ok is False
     assert result.errors[0].field == "workflow_slug"
     assert patched_start == []
 
 
-def test_disabled_definition_returns_error(patched_start):
-    wd = _definition(slug="wf-disabled", enabled=False)
-    info, _ = _staff_info()
-    result = Mutation().run_workflow_definition(info, workflow_slug=wd.slug)
+def test_disabled_definition_returns_error(patched_start, permission_resolver):
+    org = _organization()
+    wd = _definition(organization=org, slug="wf-disabled", enabled=False)
+    info, user = _info()
+    permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
+    with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=user.pk)):
+        result = Mutation().run_workflow_definition(info, workflow_slug=wd.slug)
     assert result.ok is False
     assert result.errors[0].field == "workflow_slug"
     assert patched_start == []
 
 
-def test_definition_with_no_stages_returns_error(patched_start):
-    wd = _definition(slug="wf-no-stages", with_stage=False)
-    info, _ = _staff_info()
-    result = Mutation().run_workflow_definition(info, workflow_slug=wd.slug)
+def test_definition_with_no_stages_returns_error(patched_start, permission_resolver):
+    org = _organization()
+    wd = _definition(organization=org, slug="wf-no-stages", with_stage=False)
+    info, user = _info()
+    permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
+    with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=user.pk)):
+        result = Mutation().run_workflow_definition(info, workflow_slug=wd.slug)
     assert result.ok is False
     assert "no stages" in result.errors[0].messages[0].lower()
+    assert patched_start == []
+    assert not WorkflowRun.objects.exists()
+
+
+def test_foreign_org_definition_is_not_runnable(patched_start, permission_resolver):
+    caller = _organization("run-caller")
+    foreign = _organization("run-foreign")
+    wd = _definition(organization=foreign, slug="foreign-workflow")
+    info, user = _info()
+    permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
+
+    with tenant_context(TenantContext(organization_id=caller.pk, actor_user_id=user.pk)):
+        result = Mutation().run_workflow_definition(info, workflow_slug=wd.slug)
+
+    assert result.ok is False
+    assert "not found" in result.errors[0].messages[0].lower()
     assert patched_start == []
     assert not WorkflowRun.objects.exists()

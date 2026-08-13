@@ -38,6 +38,14 @@ class WorkflowRun(BaseCoreModel):
         blank=True,
         on_delete=models.SET_NULL,
     )
+    workflow_definition = models.ForeignKey(
+        "workflows.WorkflowDefinition",
+        related_name="execution_runs",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        help_text="Definition executed by an agent workflow run; null for non-definition operations.",
+    )
     registered_app = models.ForeignKey(
         "astrolift_registry.RegisteredApp",
         related_name="workflow_runs",

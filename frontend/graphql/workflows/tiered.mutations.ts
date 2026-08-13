@@ -167,6 +167,17 @@ export const DELETE_WORKFLOW_DEFINITION_TIERED = gql`
   }
 `;
 
+export const RUN_WORKFLOW_DEFINITION = gql`
+  mutation RunWorkflowDefinition($workflowSlug: String!, $triggerPayload: JSON) {
+    runWorkflowDefinition(workflowSlug: $workflowSlug, triggerPayload: $triggerPayload) {
+      ok
+      ${VALIDATION_ERROR_FIELDS}
+      workflowRunId
+      temporalWorkflowId
+    }
+  }
+`;
+
 // ─── Stages ──────────────────────────────────────────────────────────────
 
 export const CREATE_WORKFLOW_STAGE = gql`

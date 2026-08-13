@@ -4,7 +4,8 @@ Workflow surface (spec 40 §6, #968)."""
 from __future__ import annotations
 
 import strawberry
-from django.db.models import Value
+from django.core.exceptions import ValidationError
+from django.db.models import Prefetch, Value
 from django.db.models.functions import Coalesce
 from strawberry.types import Info
 
@@ -24,9 +25,12 @@ from astrolift_workflows.schema.types import (
 )
 from astrolift_workflows.schema.workflow_config_types import (
     ConfiguredWorkflowType,
+    WorkflowDefinitionRunType,
     WorkflowDefinitionSummaryType,
     WorkflowRunType,
+    definition_run_to_type,
     definition_summary,
+    environment_model_map,
     run_to_type,
     workflow_to_type,
 )
@@ -262,7 +266,12 @@ def _workflows_qs(*, org_pk: int | None, search: str | None = None):
     return qs
 
 
-def _workflow_definitions_qs(*, org_pk: int | None, search: str | None = None):
+def _workflow_definitions_qs(
+    *,
+    org_pk: int | None,
+    search: str | None = None,
+    project_id: str | None = None,
+):
     """Filtered, unordered tier-1 definition catalogue for one org.
 
     The read scope is spec 40 §2.1: the org's own definitions UNION
@@ -278,15 +287,32 @@ def _workflow_definitions_qs(*, org_pk: int | None, search: str | None = None):
     platform-global template, so the empty case is explicit (#1042
     deny-by-default).
     """
-    from workflows.models import WorkflowDefinition
+    from workflows.models import WorkflowDefinition, WorkflowStage
 
     if org_pk is None:
         return WorkflowDefinition.objects.none()
     qs = (
         WorkflowDefinition.visible_to_org(org_pk)
         .filter(deleted_at__isnull=True)
-        .select_related("organization")
+        .select_related("organization", "project", "project__team")
+        .prefetch_related(
+            Prefetch(
+                "stages",
+                queryset=WorkflowStage.objects.filter(deleted_at__isnull=True)
+                .select_related("agent_definition")
+                .order_by("order"),
+            )
+        )
     )
+    if project_id is not None:
+        try:
+            qs = qs.filter(
+                organization_id=org_pk,
+                project__guid=str(project_id),
+                project__organization_id=org_pk,
+            )
+        except (TypeError, ValueError, ValidationError):
+            return WorkflowDefinition.objects.none()
     if search:
         qs = qs.filter(search_q(search, "name", "slug", "description"))
     return qs
@@ -372,13 +398,21 @@ class WorkflowsQuery:
     @require_permission(Permission.WORKFLOW_READ)
     @tenant_scoped()
     def workflow_definitions(
-        self, info: Info, org_id: strawberry.ID | None = None
+        self,
+        info: Info,
+        org_id: strawberry.ID | None = None,
+        project_id: strawberry.ID | None = None,
     ) -> list[WorkflowDefinitionSummaryType]:
         caller, ok = _org_pk_matches(org_id)
         if not ok:
             return []
-        qs = _workflow_definitions_qs(org_pk=caller).order_by("organization_id", "name")
-        return [definition_summary(d) for d in qs]
+        qs = _workflow_definitions_qs(
+            org_pk=caller,
+            project_id=(str(project_id) if project_id is not None else None),
+        ).order_by("organization_id", "name")
+        definitions = list(qs)
+        models = environment_model_map(definitions)
+        return [definition_summary(d, environment_models=models) for d in definitions]
 
     @strawberry.field(
         description=(
@@ -392,6 +426,7 @@ class WorkflowsQuery:
         info: Info,
         org_id: strawberry.ID | None = None,
         search: str | None = None,
+        project_id: strawberry.ID | None = None,
         limit: int = 50,
         after: str | None = None,
     ) -> PageType[WorkflowDefinitionSummaryType]:
@@ -413,16 +448,19 @@ class WorkflowsQuery:
         if not ok:
             return KeysetPage.empty().map(definition_summary)
         page = keyset_page(
-            _workflow_definitions_qs(org_pk=caller, search=search).annotate(
-                sort_name=Coalesce("name", Value(""))
-            ),
+            _workflow_definitions_qs(
+                org_pk=caller,
+                search=search,
+                project_id=(str(project_id) if project_id is not None else None),
+            ).annotate(sort_name=Coalesce("name", Value(""))),
             cursor=after,
             limit=limit,
             sort_field="sort_name",
             tiebreak_field="guid",
             descending=False,
         )
-        return page.map(definition_summary)
+        models = environment_model_map(page.rows)
+        return page.map(lambda d: definition_summary(d, environment_models=models))
 
     @strawberry.field(
         description="One visible workflow definition by slug (prefers the org's over a global)."
@@ -435,15 +473,25 @@ class WorkflowsQuery:
         caller, ok = _org_pk_matches(org_id)
         if not ok:
             return None
-        from workflows.models import WorkflowDefinition
+        from workflows.models import WorkflowDefinition, WorkflowStage
 
         visible = (
             WorkflowDefinition.visible_to_org(caller)
             .filter(slug=slug, deleted_at__isnull=True)
-            .select_related("organization")
+            .select_related("organization", "project", "project__team")
+            .prefetch_related(
+                Prefetch(
+                    "stages",
+                    queryset=WorkflowStage.objects.filter(deleted_at__isnull=True)
+                    .select_related("agent_definition")
+                    .order_by("order"),
+                )
+            )
         )
         d = visible.filter(organization_id=caller).first() or visible.first()
-        return definition_summary(d) if d else None
+        if d is None:
+            return None
+        return definition_summary(d, environment_models=environment_model_map([d]))
 
     @strawberry.field(description="Runs (tier 3) of one configured Workflow, newest first.")
     @require_permission(Permission.WORKFLOW_READ)
@@ -465,3 +513,45 @@ class WorkflowsQuery:
             configured_workflow=wf, organization_id=caller, deleted_at__isnull=True
         ).order_by("-started_at")[:100]
         return [run_to_type(r) for r in runs]
+
+    @strawberry.field(description="Recent runs of workflow definitions visible in the caller's organization.")
+    @require_permission(Permission.WORKFLOW_READ)
+    @tenant_scoped()
+    def workflow_definition_runs(
+        self,
+        info: Info,
+        org_id: strawberry.ID | None = None,
+        project_id: strawberry.ID | None = None,
+        status: str | None = None,
+        limit: int = 50,
+    ) -> list[WorkflowDefinitionRunType]:
+        caller, ok = _org_pk_matches(org_id)
+        if not ok:
+            return []
+        from astrolift_operations.models import WorkflowRun
+
+        if status is not None and status not in WorkflowRun.Status.values:
+            return []
+        qs = WorkflowRun.objects.filter(
+            organization_id=caller,
+            workflow_kind="WorkflowDefinitionRunWorkflow",
+            workflow_definition_id__isnull=False,
+            workflow_definition__deleted_at__isnull=True,
+        ).select_related(
+            "workflow_definition",
+            "workflow_definition__project",
+            "current_stage_execution",
+            "current_stage_execution__stage",
+        )
+        if project_id is not None:
+            try:
+                qs = qs.filter(
+                    workflow_definition__project__guid=str(project_id),
+                    workflow_definition__project__organization_id=caller,
+                )
+            except (TypeError, ValueError, ValidationError):
+                return []
+        if status is not None:
+            qs = qs.filter(status=status)
+        rows = qs.order_by("-started_at", "-guid")[: max(1, min(int(limit), 200))]
+        return [definition_run_to_type(run) for run in rows]

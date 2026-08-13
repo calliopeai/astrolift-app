@@ -479,6 +479,7 @@ export const LIST_APP_HEALTH_SUMMARY = gql`
     astroliftAppHealthSummary {
       appSlug
       appName
+      primitiveKind
       environmentCount
       latestDeploymentStatus
       latestImageTag

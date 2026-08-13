@@ -358,6 +358,7 @@ def test_run_workflow_persists_temporal_run_id(
     # workflowStageExecutions resolves against by workflow_id + run_id).
     run = WorkflowRun.objects.get(workflow_id=inst.temporal_workflow_id)
     assert run.run_id == inst.temporal_run_id
+    assert run.workflow_definition_id == d.pk
 
 
 def test_workflow_runs_query_exposes_temporal_run_id(
@@ -486,6 +487,138 @@ def test_cross_org_workflow_query_denied(member, org, other_org, agent_workload,
     # Owner can.
     with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
         assert q.workflow(_info(member), slug="a-wf") is not None
+
+
+def test_project_workflow_query_returns_bound_topology_and_model(
+    member,
+    org,
+    agent_workload,
+    permission_resolver,
+):
+    from astrolift_agents.models import AgentEnvironmentSpec
+
+    permission_resolver.grant(Permission.WORKFLOW_READ)
+    project = agent_workload.registered_app.project
+    definition = _make_def("cw-project-topology", organization=org, agent=agent_workload)
+    definition.project = project
+    definition.source_repo = "steadymd/smd-agents"
+    definition.source_path = "workflows/cw-project-topology.toml"
+    definition.save()
+    stage = definition.stages.get(order=0)
+    stage.agent_ref = agent_workload.slug
+    stage.environment_spec_slug = "cw-project-agent"
+    stage.output_key = "evidence"
+    stage.skill_refs = ["jira-read"]
+    stage.prompt = "Inspect the issue"
+    stage.fan_out_count = 3
+    stage.save()
+    AgentEnvironmentSpec.objects.create(
+        organization=org,
+        name="Project agent",
+        slug="cw-project-agent",
+        agent_type=AgentEnvironmentSpec.AgentType.CLAUDE,
+        env_vars={
+            "ANTHROPIC_MODEL": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+            "NOT_EXPOSED": "internal value",
+        },
+    )
+    _make_def("cw-unassigned-template", organization=org, agent=agent_workload)
+
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        rows = WorkflowsQuery().workflow_definitions(
+            _info(member),
+            project_id=str(project.guid),
+        )
+
+    assert [row.slug for row in rows] == ["cw-project-topology"]
+    row = rows[0]
+    assert row.project_guid == str(project.guid)
+    assert row.project_slug == project.slug
+    assert row.project_team_slug == project.team.slug
+    assert row.stage_count == 1
+    topology = row.stages[0]
+    assert topology.agent_guid == str(agent_workload.guid)
+    assert topology.agent_slug == agent_workload.slug
+    assert topology.environment_spec_slug == "cw-project-agent"
+    assert topology.resolved_model == "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+    assert topology.output_key == "evidence"
+    assert topology.skill_refs == ["jira-read"]
+    assert topology.has_prompt is True
+    assert topology.fan_out_count == 3
+    assert topology.fan_out_dynamic is False
+    assert not hasattr(topology, "env_vars")
+
+
+def test_project_workflow_query_denies_foreign_and_malformed_project_ids(
+    member,
+    org,
+    other_org,
+    agent_workload,
+    permission_resolver,
+):
+    from astrolift_identity.models import Project, Team
+
+    permission_resolver.grant(Permission.WORKFLOW_READ)
+    definition = _make_def("cw-project-owned", organization=org, agent=agent_workload)
+    definition.project = agent_workload.registered_app.project
+    definition.save()
+    other_team = Team.objects.create(organization=other_org, name="Other", slug="cw-other-team")
+    other_project = Project.objects.create(
+        organization=other_org,
+        team=other_team,
+        name="Other",
+        slug="cw-demo-a",
+    )
+
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        query = WorkflowsQuery()
+        assert query.workflow_definitions(_info(member), project_id=str(other_project.guid)) == []
+        assert query.workflow_definitions(_info(member), project_id="not-a-guid") == []
+
+
+def test_workflow_definition_runs_are_workflow_read_and_project_scoped(
+    member,
+    org,
+    other_org,
+    agent_workload,
+    permission_resolver,
+):
+    from astrolift_operations.models import WorkflowRun
+
+    permission_resolver.grant(Permission.WORKFLOW_READ)
+    definition = _make_def("cw-project-runs", organization=org, agent=agent_workload)
+    definition.project = agent_workload.registered_app.project
+    definition.save()
+    owned = WorkflowRun.objects.create(
+        organization=org,
+        workflow_definition=definition,
+        workflow_kind="WorkflowDefinitionRunWorkflow",
+        workflow_id="WorkflowDefinitionRunWorkflow-owned",
+        run_id="temporal-run-owned",
+        status=WorkflowRun.Status.RUNNING,
+    )
+    other_definition = _make_def("cw-other-runs", organization=other_org)
+    WorkflowRun.objects.create(
+        organization=other_org,
+        workflow_definition=other_definition,
+        workflow_kind="WorkflowDefinitionRunWorkflow",
+        workflow_id="WorkflowDefinitionRunWorkflow-other",
+        run_id="temporal-run-other",
+        status=WorkflowRun.Status.FAILED,
+    )
+
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        query = WorkflowsQuery()
+        rows = query.workflow_definition_runs(_info(member))
+        project_rows = query.workflow_definition_runs(_info(member), project_id=str(definition.project.guid))
+        assert query.workflow_definition_runs(_info(member), project_id="not-a-guid") == []
+        assert query.workflow_definition_runs(_info(member), status="unknown") == []
+
+    assert [row.guid for row in rows] == [str(owned.guid)]
+    assert [row.guid for row in project_rows] == [str(owned.guid)]
+    assert rows[0].definition_slug == definition.slug
+    assert rows[0].project_slug == definition.project.slug
+    assert rows[0].status == "running"
 
 
 def test_cross_org_run_denied(member, org, other_org, agent_workload, permission_resolver, patched_start):

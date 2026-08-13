@@ -42,10 +42,32 @@ const DEFINITION_SUMMARY_FIELDS = `
   isEnabled
   isGlobal
   organizationGuid
+  projectGuid
+  projectSlug
+  projectTeamSlug
   sourceRepo
   sourcePath
   sourceRef
   stageCount
+  stages {
+    guid
+    order
+    kind
+    role
+    agentRef
+    agentGuid
+    agentName
+    agentSlug
+    environmentSpecSlug
+    resolvedModel
+    hasPrompt
+    outputKey
+    skillRefs
+    fanOutCount
+    fanOutDynamic
+    onFailure
+    timeoutSeconds
+  }
   createdAt
 `;
 
@@ -92,8 +114,8 @@ export const GET_CONFIGURED_WORKFLOW = gql`
 // ─── Tier 1 — definitions + stages ───────────────────────────────────────
 
 export const LIST_TIERED_WORKFLOW_DEFINITIONS = gql`
-  query ListTieredWorkflowDefinitions($orgId: ID) {
-    workflowDefinitions(orgId: $orgId) {
+  query ListTieredWorkflowDefinitions($orgId: ID, $projectId: ID) {
+    workflowDefinitions(orgId: $orgId, projectId: $projectId) {
       ${DEFINITION_SUMMARY_FIELDS}
     }
   }
@@ -121,6 +143,26 @@ export const LIST_WORKFLOW_RUNS = gql`
   query ListTieredWorkflowRuns($workflowId: ID!, $orgId: ID) {
     workflowRuns(workflowId: $workflowId, orgId: $orgId) {
       ${WORKFLOW_RUN_FIELDS}
+    }
+  }
+`;
+
+export const LIST_WORKFLOW_DEFINITION_RUNS = gql`
+  query ListWorkflowDefinitionRuns($orgId: ID, $projectId: ID, $status: String, $limit: Int) {
+    workflowDefinitionRuns(orgId: $orgId, projectId: $projectId, status: $status, limit: $limit) {
+      guid
+      definitionGuid
+      definitionSlug
+      definitionName
+      projectGuid
+      projectSlug
+      status
+      temporalWorkflowId
+      temporalRunId
+      currentStageOrder
+      currentStageRole
+      startedAt
+      endedAt
     }
   }
 `;

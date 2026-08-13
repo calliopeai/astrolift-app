@@ -98,6 +98,16 @@ const SCOPE_CHOICES = [
     hint: "Sync agent repositories and package definitions through remote MCP.",
   },
   {
+    value: "workflow:write",
+    label: "Write workflows",
+    hint: "Create, update, and delete workflows without broader app writes.",
+  },
+  {
+    value: "workflow:trigger",
+    label: "Run workflows",
+    hint: "Start workflow runs without granting workflow configuration writes.",
+  },
+  {
     value: "admin",
     label: "Admin",
     hint: "Full power — implies every other scope. Use sparingly.",

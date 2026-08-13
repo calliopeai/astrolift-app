@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 import strawberry
 from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
@@ -22,28 +20,28 @@ from workflows.schema.types import WorkflowDefinitionType, WorkflowStageType
 
 @strawberry.type
 class StartWorkflowResult(MutationResult):
-    instance_id: Optional[strawberry.ID] = None
+    instance_id: strawberry.ID | None = None
 
 
 @strawberry.type
 class RunWorkflowDefinitionResult(MutationResult):
     # WorkflowRun mirror pk (the executor keys stage executions to it).
-    workflow_run_id: Optional[strawberry.ID] = None
+    workflow_run_id: strawberry.ID | None = None
     # Temporal workflow id, for the viewer / signalling.
-    temporal_workflow_id: Optional[str] = None
+    temporal_workflow_id: str | None = None
 
 
 @strawberry.type
 class CreateWorkflowStageResult(MutationResult):
-    stage: Optional[WorkflowStageType] = None
+    stage: WorkflowStageType | None = None
 
 
 @strawberry.type
 class CloneWorkflowDefinitionResult(MutationResult):
     """Result of deep-copying a definition into the caller's org (spec 40 §2.1)."""
 
-    slug: Optional[str] = None
-    definition: Optional[WorkflowDefinitionType] = None
+    slug: str | None = None
+    definition: WorkflowDefinitionType | None = None
 
 
 @strawberry.type
@@ -51,9 +49,9 @@ class CreateWorkflowTriggerResult(MutationResult):
     """Inbound webhook trigger for a workflow definition (#1019).
     ``signing_secret`` is the plaintext — shown ONCE, stored only as a hash."""
 
-    slug: Optional[str] = None
-    endpoint: Optional[str] = None
-    signing_secret: Optional[str] = None
+    slug: str | None = None
+    endpoint: str | None = None
+    signing_secret: str | None = None
 
 
 def _require_staff(user):
@@ -185,7 +183,7 @@ class Mutation:
             parts = model_label.split(".")
             model = apps.get_model(parts[0], parts[-1])
         except Exception as e:
-            raise GraphQLError(f"Object not found: {model_label}:{object_id} — {e}")
+            raise GraphQLError(f"Object not found: {model_label}:{object_id} — {e}") from e
 
         # If the target model reaches an organization, require the row to be the
         # caller's (or a platform-shared null-org row, matching
@@ -216,7 +214,7 @@ class Mutation:
             instance = WorkflowInstance.start(workflow, obj, user)
             return StartWorkflowResult(ok=True, instance_id=str(instance.pk))
         except ValidationError as e:
-            raise GraphQLError(str(e))
+            raise GraphQLError(str(e)) from e
 
     @strawberry.mutation(
         description=(
@@ -225,20 +223,25 @@ class Mutation:
             "WorkflowRun mirror rows and enqueues the stage executor."
         )
     )
+    @require_permission(Permission.WORKFLOW_TRIGGER)
+    @tenant_scoped()
     def run_workflow_definition(
         self,
         info: Info,
         workflow_slug: str,
-        trigger_payload: Optional[strawberry.scalars.JSON] = None,
+        trigger_payload: strawberry.scalars.JSON | None = None,
     ) -> RunWorkflowDefinitionResult:
         user = info.context.user
-        _require_staff(user)
-
-        workflow = WorkflowDefinition.objects.filter(
+        organization_id = _caller_org_pk()
+        visible = WorkflowDefinition.visible_to_org(organization_id).filter(
             slug=workflow_slug,
             is_enabled=True,
             deleted_at__isnull=True,
-        ).first()
+        )
+        workflow = (
+            visible.filter(organization_id=organization_id).first()
+            or visible.filter(organization__isnull=True).first()
+        )
         if not workflow:
             return RunWorkflowDefinitionResult(
                 ok=False,
@@ -265,11 +268,7 @@ class Mutation:
         # the Temporal client + operations models at import time (the app is
         # feature-gated).
         from astrolift_workflows.inputs import Actor
-        from core.tenancy import get_current_tenant
         from workflows.run_service import start_workflow_definition_run
-
-        tenant = get_current_tenant()
-        organization_id = getattr(tenant, "organization_id", None) if tenant else None
 
         # Start the stage executor via the shared helper (the same path the
         # inbound webhook uses, so both actually run the stages — #1020).
@@ -291,6 +290,7 @@ class Mutation:
         # model doesn't declare).
         instance = WorkflowInstance.objects.create(
             workflow=workflow,
+            organization_id=organization_id,
             content_type=ContentType.objects.get_for_model(WorkflowDefinition),
             object_id=workflow.pk,
             current_state="running",
@@ -335,7 +335,7 @@ class Mutation:
             instance.transition(to_state, user, note)
             return MutationResult.success()
         except ValidationError as e:
-            raise GraphQLError(str(e))
+            raise GraphQLError(str(e)) from e
 
     @strawberry.mutation(description="Force a workflow instance to a specific state (admin override).")
     def override_workflow_state(
@@ -379,9 +379,9 @@ class Mutation:
         model_label: str,
         states: strawberry.scalars.JSON,
         transitions: strawberry.scalars.JSON,
-        description: Optional[str] = None,
+        description: str | None = None,
         is_enabled: bool = False,
-        pattern_kind: Optional[str] = None,
+        pattern_kind: str | None = None,
     ) -> MutationResult:
         user = info.context.user
         _require_staff(user)
@@ -427,7 +427,7 @@ class Mutation:
         try:
             workflow.save()
         except Exception as e:
-            raise GraphQLError(f"Failed to create workflow definition: {e}")
+            raise GraphQLError(f"Failed to create workflow definition: {e}") from e
 
         return MutationResult.success()
 
@@ -438,13 +438,13 @@ class Mutation:
         self,
         info: Info,
         slug: str,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        model_label: Optional[str] = None,
-        states: Optional[strawberry.scalars.JSON] = None,
-        transitions: Optional[strawberry.scalars.JSON] = None,
-        is_enabled: Optional[bool] = None,
-        pattern_kind: Optional[str] = None,
+        name: str | None = None,
+        description: str | None = None,
+        model_label: str | None = None,
+        states: strawberry.scalars.JSON | None = None,
+        transitions: strawberry.scalars.JSON | None = None,
+        is_enabled: bool | None = None,
+        pattern_kind: str | None = None,
     ) -> MutationResult:
         user = info.context.user
 
@@ -499,7 +499,7 @@ class Mutation:
         try:
             workflow.save()
         except Exception as e:
-            raise GraphQLError(f"Failed to update workflow definition: {e}")
+            raise GraphQLError(f"Failed to update workflow definition: {e}") from e
 
         return MutationResult.success()
 
@@ -586,11 +586,11 @@ class Mutation:
         role: str | None = None,
         on_failure: str = "fail",
         timeout_seconds: int = 300,
-        agent_definition_guid: Optional[str] = None,
+        agent_definition_guid: str | None = None,
         agent_ref: str | None = None,
         environment_spec_slug: str | None = None,
-        skill_refs: Optional[strawberry.scalars.JSON] = None,
-        fan_out_count: Optional[int] = None,
+        skill_refs: strawberry.scalars.JSON | None = None,
+        fan_out_count: int | None = None,
         prompt: str | None = None,
         output_key: str | None = None,
         approvers: strawberry.scalars.JSON | None = None,
@@ -691,7 +691,7 @@ class Mutation:
         try:
             stage.save()
         except Exception as e:
-            raise GraphQLError(f"Failed to create workflow stage: {e}")
+            raise GraphQLError(f"Failed to create workflow stage: {e}") from e
 
         return CreateWorkflowStageResult(ok=True, stage=stage)
 
@@ -710,7 +710,6 @@ class Mutation:
         from astrolift_agents.services.workflow_triggers import (
             create_webhook_workflow_trigger,
         )
-
         from astrolift_identity.models import Organization
         from core.tenancy import get_current_tenant
 

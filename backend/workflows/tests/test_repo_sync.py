@@ -37,15 +37,25 @@ def org(db):
 
 
 @pytest.fixture
-def agent(db, org):
+def project(db, org):
     from astrolift_identity.models import Project, Team
-    from astrolift_registry.models import RegisteredApp, Workload
 
     team = Team.objects.create(organization=org, name="Team", slug="source-team")
-    project = Project.objects.create(organization=org, team=team, name="Project", slug="source-project")
-    app = RegisteredApp.objects.create(
+    return Project.objects.create(
         organization=org,
         team=team,
+        name="Project",
+        slug="source-project",
+    )
+
+
+@pytest.fixture
+def agent(db, org, project):
+    from astrolift_registry.models import RegisteredApp, Workload
+
+    app = RegisteredApp.objects.create(
+        organization=org,
+        team=project.team,
         project=project,
         name="Triage Agent",
         slug="triage-agent",
@@ -75,12 +85,13 @@ def test_discovery_is_confined_to_workflows_directory():
 
 
 @pytest.mark.django_db
-def test_reconcile_creates_runnable_bound_definition(org, agent):
+def test_reconcile_creates_runnable_bound_definition(org, project, agent):
     from workflows.models import WorkflowDefinition
 
     manifests = discover_repository_workflows({"workflows/triage.toml": WORKFLOW})
     result = reconcile_repository_workflows(
         organization=org,
+        project=project,
         source_repo="steadymd/smd-agents",
         source_ref="abc123",
         manifests=manifests,
@@ -89,6 +100,7 @@ def test_reconcile_creates_runnable_bound_definition(org, agent):
     assert [(item.slug, item.created) for item in result] == [("triage-chain", True)]
     definition = WorkflowDefinition.objects.get(source_path="workflows/triage.toml")
     assert definition.source_repo == "steadymd/smd-agents"
+    assert definition.project == project
     assert definition.source_ref == "abc123"
     assert definition.model_label == ""
     assert definition.is_enabled is True
@@ -100,12 +112,13 @@ def test_reconcile_creates_runnable_bound_definition(org, agent):
 
 
 @pytest.mark.django_db
-def test_reconcile_updates_in_place_and_retires_removed_stages(org, agent):
+def test_reconcile_updates_in_place_and_retires_removed_stages(org, project, agent):
     from workflows.models import WorkflowDefinition, WorkflowStage
 
     first = discover_repository_workflows({"workflows/triage.toml": WORKFLOW})
     reconcile_repository_workflows(
         organization=org,
+        project=project,
         source_repo="steadymd/smd-agents",
         source_ref="one",
         manifests=first,
@@ -118,6 +131,7 @@ def test_reconcile_updates_in_place_and_retires_removed_stages(org, agent):
     second = discover_repository_workflows({"workflows/triage.toml": one_stage})
     result = reconcile_repository_workflows(
         organization=org,
+        project=project,
         source_repo="steadymd/smd-agents",
         source_ref="two",
         manifests=second,
@@ -132,12 +146,13 @@ def test_reconcile_updates_in_place_and_retires_removed_stages(org, agent):
 
 
 @pytest.mark.django_db
-def test_reconcile_retires_definition_removed_from_source_tree(org, agent):
+def test_reconcile_retires_definition_removed_from_source_tree(org, project, agent):
     from workflows.models import WorkflowDefinition
 
     manifests = discover_repository_workflows({"workflows/triage.toml": WORKFLOW})
     reconcile_repository_workflows(
         organization=org,
+        project=project,
         source_repo="steadymd/smd-agents",
         source_ref="one",
         manifests=manifests,
@@ -145,6 +160,7 @@ def test_reconcile_retires_definition_removed_from_source_tree(org, agent):
 
     reconcile_repository_workflows(
         organization=org,
+        project=project,
         source_repo="steadymd/smd-agents",
         source_ref="two",
         manifests=[],
@@ -154,3 +170,26 @@ def test_reconcile_retires_definition_removed_from_source_tree(org, agent):
     assert definition.deleted_at is not None
     assert definition.is_enabled is False
     assert definition.source_ref == "two"
+
+
+@pytest.mark.django_db
+def test_reconcile_rejects_project_outside_repository_org(org, project):
+    from astrolift_identity.models import Organization, Project, Team
+
+    other_org = Organization.objects.create(name="Other", slug="workflow-source-other")
+    other_team = Team.objects.create(organization=other_org, name="Other", slug="source-other-team")
+    other_project = Project.objects.create(
+        organization=other_org,
+        team=other_team,
+        name="Other",
+        slug="source-other-project",
+    )
+
+    with pytest.raises(ValueError, match="must belong"):
+        reconcile_repository_workflows(
+            organization=org,
+            project=other_project,
+            source_repo="steadymd/smd-agents",
+            source_ref="abc123",
+            manifests=discover_repository_workflows({"workflows/triage.toml": WORKFLOW}),
+        )

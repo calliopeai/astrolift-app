@@ -143,9 +143,10 @@ export type AstroliftDeploymentMetrics = GeneratedDeploymentMetrics;
 
 export type AstroliftAppHealthSummary = Omit<
   GeneratedAppHealthSummary,
-  "latestDeploymentStatus"
+  "latestDeploymentStatus" | "primitiveKind"
 > & {
   latestDeploymentStatus: DeploymentStatus | null;
+  primitiveKind: "app" | "agent";
 };
 
 export type ScheduledJobRunStatus = "running" | "succeeded" | "failed" | "superseded";

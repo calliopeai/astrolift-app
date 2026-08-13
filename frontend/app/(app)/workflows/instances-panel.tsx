@@ -57,14 +57,16 @@ const STATUS_OPTIONS = [
  */
 export function WorkflowInstancesPanel({
   workflowType,
+  initialStatus = "ALL",
   isAdmin = true,
 }: {
   workflowType?: string;
+  initialStatus?: string;
   isAdmin?: boolean;
 }) {
   const fmt = useFormatters();
   const [typeFilter, setTypeFilter] = useState(workflowType ?? "");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
 
   const { instances, loading, error, refetch } = useWorkflowInstances({
@@ -80,10 +82,10 @@ export function WorkflowInstancesPanel({
   if (!loading && !error && instances.length === 0 && isDefaultView) {
     return (
       <div className="text-muted-foreground rounded-md border border-dashed p-12 text-center text-sm">
-        <p className="font-medium text-foreground mb-1">No active Temporal workflows</p>
+        <p className="text-foreground mb-1 font-medium">No active Temporal workflows</p>
         <p>
-          Platform workflows (deploys, provisioning, drift detection) appear here while
-          running. The engine is idle — everything is up to date.
+          Platform workflows (deploys, provisioning, drift detection) appear here while running. The
+          engine is idle — everything is up to date.
         </p>
       </div>
     );
@@ -371,7 +373,7 @@ function ActivityFeed({ history }: { history: WorkflowHistoryEvent[] }) {
                 {ev.retryCount > 1 && <Badge variant="outline">retry {ev.retryCount}</Badge>}
               </div>
               {Object.keys(ev.payload).length > 0 && (
-                <pre className="text-muted-foreground bg-muted/40 mt-1 max-h-32 overflow-auto rounded p-2 text-2xs">
+                <pre className="text-muted-foreground bg-muted/40 text-2xs mt-1 max-h-32 overflow-auto rounded p-2">
                   {JSON.stringify(ev.payload, null, 2)}
                 </pre>
               )}
