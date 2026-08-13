@@ -6,12 +6,10 @@ resolver carries ``@mutation_audit`` + ``@require_permission`` +
 guardrail. ``@tenant_scoped`` only asserts a tenant context exists, so
 each resolver applies its own org filter / org binding explicitly.
 
-Permissions reuse the app-tier grants (Skills/Briefs/ToolDefs are
-agent-workload building blocks): ``APP_READ`` is implied by the read
-surface, writes gate on ``APP_CREATE`` / ``APP_UPDATE`` / ``APP_DELETE``,
-and Brief assemble/launch/cancel gate on ``APP_DEPLOY``. The user-facing
-agent dispatch (``run_astrolift_agent``, spec 33 PR-1) gates on the
-dedicated ``AGENT_DISPATCH`` grant instead.
+Skills/Briefs/ToolDefs reuse the app-tier grants because they are
+agent-workload building blocks. Environment-spec CRUD and user-facing agent
+dispatch use their dedicated grants so API-token scopes can authorize those
+CLI operations without granting broad app mutation authority.
 """
 
 from __future__ import annotations
@@ -684,7 +682,7 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.env_spec.create")
-    @require_permission(Permission.APP_CREATE)
+    @require_permission(Permission.AGENT_ENV_SPEC_CREATE)
     @tenant_scoped()
     def create_agent_environment_spec(
         self, info: Info, input: CreateAgentEnvironmentSpecInput, org_id: strawberry.ID
@@ -738,7 +736,7 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.env_spec.update")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.AGENT_ENV_SPEC_UPDATE)
     @tenant_scoped()
     def update_agent_environment_spec(
         self, info: Info, slug: str, input: UpdateAgentEnvironmentSpecInput
@@ -803,7 +801,7 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.env_spec.delete")
-    @require_permission(Permission.APP_DELETE)
+    @require_permission(Permission.AGENT_ENV_SPEC_DELETE)
     @tenant_scoped()
     def delete_agent_environment_spec(
         self, info: Info, slug: str

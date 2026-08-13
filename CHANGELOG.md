@@ -23,6 +23,8 @@
 
 ### Fixed
 
+- Authorize CLI device sessions for agent environment-spec CRUD with a narrow
+  bearer scope and enforce the dedicated environment-spec RBAC permissions.
 - Replace retired Bedrock managed-agent defaults with invoked Opus 5 and
   Haiku 4.5 inference profiles, with worker-level model overrides so operators
   can respond to future retirements without rebuilding Astrolift.

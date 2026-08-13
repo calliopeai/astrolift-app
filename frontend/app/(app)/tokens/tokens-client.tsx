@@ -68,6 +68,11 @@ const SCOPE_CHOICES = [
     hint: "List clusters, view kubeconfig metadata, read provider state.",
   },
   {
+    value: "agent-env-spec:write",
+    label: "Write agent environments",
+    hint: "Create, update, and delete agent environment specs without broader app writes.",
+  },
+  {
     value: "secret:read",
     label: "Reveal secrets",
     hint: "Reveal stored secret values. Sensitive; grant only when required.",

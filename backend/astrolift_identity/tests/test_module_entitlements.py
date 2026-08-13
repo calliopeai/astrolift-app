@@ -305,6 +305,22 @@ class TestModulesPerRole:
 
 
 class TestNoAccessRegression:
+    def test_env_spec_grants_preserve_legacy_app_crud_access(self):
+        """Dedicated env-spec gates preserve every system role's old app gate."""
+        parallels = {
+            Permission.APP_READ.value: Permission.AGENT_ENV_SPEC_READ.value,
+            Permission.APP_CREATE.value: Permission.AGENT_ENV_SPEC_CREATE.value,
+            Permission.APP_UPDATE.value: Permission.AGENT_ENV_SPEC_UPDATE.value,
+            Permission.APP_DELETE.value: Permission.AGENT_ENV_SPEC_DELETE.value,
+        }
+        for role_slug, _scope, _name, _description, permissions in SYSTEM_ROLES:
+            granted = {permission.value for permission in permissions}
+            for app_permission, env_spec_permission in parallels.items():
+                if app_permission in granted:
+                    assert (
+                        env_spec_permission in granted
+                    ), f"{role_slug} lost {env_spec_permission} while retaining {app_permission}"
+
     @pytest.mark.parametrize(
         "role_slug",
         [

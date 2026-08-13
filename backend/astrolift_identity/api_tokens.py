@@ -9,7 +9,7 @@ the auth integration in :mod:`astrolift_identity.auth_drf` calls
 ``verify_token`` + ``touch_token`` on every authed request.
 
 Scopes are access classes (``read:apps``, ``write:apps``,
-``secret:write``, ``read:clusters``, ``admin``). They narrow the
+``agent-env-spec:write``, ``secret:write``, ``read:clusters``, ``admin``). They narrow the
 *user's* permission set down to the subset the token may exercise —
 they never widen it. ``admin`` implies all other scopes (operators
 intentionally treat it as the "full power" wildcard so they don't
@@ -36,6 +36,7 @@ PLAINTEXT_PREFIX = "alft_at_"
 SCOPE_READ_APPS = "read:apps"
 SCOPE_WRITE_APPS = "write:apps"
 SCOPE_READ_CLUSTERS = "read:clusters"
+SCOPE_AGENT_ENV_SPEC_WRITE = "agent-env-spec:write"
 SCOPE_SECRET_READ = "secret:read"
 SCOPE_SECRET_WRITE = "secret:write"
 SCOPE_MCP_READ = "mcp:read"
@@ -48,6 +49,7 @@ ALLOWED_SCOPES: frozenset[str] = frozenset(
         SCOPE_READ_APPS,
         SCOPE_WRITE_APPS,
         SCOPE_READ_CLUSTERS,
+        SCOPE_AGENT_ENV_SPEC_WRITE,
         SCOPE_SECRET_READ,
         SCOPE_SECRET_WRITE,
         SCOPE_MCP_READ,
@@ -69,6 +71,7 @@ DEFAULT_SCOPES: tuple[str, ...] = (
 # explicitly selects a stronger scope.
 CLI_DEVICE_SCOPES: tuple[str, ...] = (
     *DEFAULT_SCOPES,
+    SCOPE_AGENT_ENV_SPEC_WRITE,
     SCOPE_SECRET_WRITE,
     SCOPE_MCP_DISPATCH,
 )
@@ -122,6 +125,12 @@ def token_scope_allows_permission(token, permission: str) -> bool:
     ):
         return True
     if SCOPE_READ_CLUSTERS in scopes and permission == "provider_plugin.read":
+        return True
+    if SCOPE_AGENT_ENV_SPEC_WRITE in scopes and permission in {
+        "agent_env_spec.create",
+        "agent_env_spec.update",
+        "agent_env_spec.delete",
+    }:
         return True
     if SCOPE_SECRET_READ in scopes and permission == "secret.read":
         return True

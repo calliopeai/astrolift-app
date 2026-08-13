@@ -20,7 +20,7 @@ Coverage:
 * createAgentEnvironmentSpec rejects an unknown agent_type (VALIDATION).
 * createAgentEnvironmentSpec rejects a duplicate slug (CONFLICT).
 * createAgentEnvironmentSpec stores secret_refs as references, not values.
-* createAgentEnvironmentSpec requires app.create.
+* createAgentEnvironmentSpec requires agent_env_spec.create.
 * updateAgentEnvironmentSpec changes only supplied fields.
 * updateAgentEnvironmentSpec is NOT_FOUND for another org's spec.
 * deleteAgentEnvironmentSpec soft-deletes.
@@ -40,6 +40,11 @@ from astrolift_agents.schema.mutations import (
     UpdateAgentEnvironmentSpecInput,
 )
 from astrolift_agents.schema.queries import AgentsQuery
+from astrolift_identity.api_tokens import (
+    SCOPE_AGENT_ENV_SPEC_WRITE,
+    reset_current_api_token,
+    set_current_api_token,
+)
 from astrolift_identity.models import Organization
 from core.permissions import Permission, PermissionDenied
 from core.tenancy import TenantContext
@@ -81,10 +86,10 @@ def with_tenant_org():
 
 def _grant_crud(resolver):
     for p in (
-        Permission.APP_READ,
-        Permission.APP_CREATE,
-        Permission.APP_UPDATE,
-        Permission.APP_DELETE,
+        Permission.AGENT_ENV_SPEC_READ,
+        Permission.AGENT_ENV_SPEC_CREATE,
+        Permission.AGENT_ENV_SPEC_UPDATE,
+        Permission.AGENT_ENV_SPEC_DELETE,
     ):
         resolver.grant(p)
 
@@ -151,11 +156,11 @@ def test_spec_detail_returns_own(permission_resolver, info, org, with_tenant_org
     assert result.slug == "claude-dev"
 
 
-def test_specs_requires_app_read(info, org, with_tenant_org):
+def test_specs_requires_env_spec_read(info, org, with_tenant_org):
     with with_tenant_org(org):
         with pytest.raises(PermissionDenied) as exc_info:
             AgentsQuery().agent_environment_specs(info(), org_id=str(org.guid))
-    assert exc_info.value.permission.value == "app.read"
+    assert exc_info.value.permission == Permission.AGENT_ENV_SPEC_READ
 
 
 # ---------------------------------------------------------------------------
@@ -291,7 +296,7 @@ def test_create_spec_rejects_malformed_environment_json(
     assert message in result.errors[0].message
 
 
-def test_create_spec_requires_app_create(info, org, with_tenant_org):
+def test_create_spec_requires_env_spec_create(info, org, with_tenant_org):
     # ``@mutation_audit`` wraps ``@require_permission`` and converts a
     # PermissionDenied into a PERMISSION_DENIED envelope (the mutation
     # contract) rather than letting it propagate — unlike the query path.
@@ -382,6 +387,21 @@ def test_delete_spec_soft_deletes(permission_resolver, info, org, with_tenant_or
     spec = _mk_spec(org, "claude-dev")
     with with_tenant_org(org):
         result = AgentsMutation().delete_agent_environment_spec(info(), slug="claude-dev")
+    assert result.ok, result.errors
+    spec.refresh_from_db()
+    assert spec.deleted_at is not None
+
+
+def test_cli_env_spec_scope_can_delete_without_app_delete(permission_resolver, info, org, with_tenant_org):
+    permission_resolver.grant(Permission.AGENT_ENV_SPEC_DELETE)
+    spec = _mk_spec(org, "cli-delete")
+    context_token = set_current_api_token(SimpleNamespace(scopes=[SCOPE_AGENT_ENV_SPEC_WRITE]))
+    try:
+        with with_tenant_org(org):
+            result = AgentsMutation().delete_agent_environment_spec(info(), slug=spec.slug)
+    finally:
+        reset_current_api_token(context_token)
+
     assert result.ok, result.errors
     spec.refresh_from_db()
     assert spec.deleted_at is not None

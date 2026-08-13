@@ -69,7 +69,7 @@ def test_converter_surfaces_managed_model(org):
 
 
 def test_create_mutation_threads_managed_model(permission_resolver, info, org, with_tenant_org):
-    permission_resolver.grant(Permission.APP_CREATE)
+    permission_resolver.grant(Permission.AGENT_ENV_SPEC_CREATE)
     with with_tenant_org(org):
         result = AgentsMutation().create_agent_environment_spec(
             info,
@@ -88,7 +88,7 @@ def test_create_mutation_threads_managed_model(permission_resolver, info, org, w
 
 
 def test_create_mutation_defaults_managed_model_off(permission_resolver, info, org, with_tenant_org):
-    permission_resolver.grant(Permission.APP_CREATE)
+    permission_resolver.grant(Permission.AGENT_ENV_SPEC_CREATE)
     with with_tenant_org(org):
         result = AgentsMutation().create_agent_environment_spec(
             info,
@@ -100,7 +100,7 @@ def test_create_mutation_defaults_managed_model_off(permission_resolver, info, o
 
 
 def test_update_mutation_toggles_managed_model(permission_resolver, info, org, with_tenant_org):
-    permission_resolver.grant(Permission.APP_UPDATE)
+    permission_resolver.grant(Permission.AGENT_ENV_SPEC_UPDATE)
     spec = _make(org, managed_model=False)
     with with_tenant_org(org):
         result = AgentsMutation().update_agent_environment_spec(
@@ -117,7 +117,7 @@ def test_update_mutation_toggles_managed_model(permission_resolver, info, org, w
 def test_update_mutation_leaves_managed_model_unchanged_when_omitted(
     permission_resolver, info, org, with_tenant_org
 ):
-    permission_resolver.grant(Permission.APP_UPDATE)
+    permission_resolver.grant(Permission.AGENT_ENV_SPEC_UPDATE)
     spec = _make(org, managed_model=True)
     with with_tenant_org(org):
         result = AgentsMutation().update_agent_environment_spec(
