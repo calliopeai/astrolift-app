@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import strawberry
 from django.core.exceptions import ValidationError
-from django.db.models import Prefetch, Value
+from django.db.models import Count, Prefetch, Q, Value
 from django.db.models.functions import Coalesce
 from strawberry.types import Info
 
@@ -532,16 +532,27 @@ class WorkflowsQuery:
 
         if status is not None and status not in WorkflowRun.Status.values:
             return []
-        qs = WorkflowRun.objects.filter(
-            organization_id=caller,
-            workflow_kind="WorkflowDefinitionRunWorkflow",
-            workflow_definition_id__isnull=False,
-            workflow_definition__deleted_at__isnull=True,
-        ).select_related(
-            "workflow_definition",
-            "workflow_definition__project",
-            "current_stage_execution",
-            "current_stage_execution__stage",
+        qs = (
+            WorkflowRun.objects.filter(
+                organization_id=caller,
+                workflow_kind="WorkflowDefinitionRunWorkflow",
+                workflow_definition_id__isnull=False,
+                workflow_definition__deleted_at__isnull=True,
+            )
+            .select_related(
+                "workflow_definition",
+                "workflow_definition__project",
+                "current_stage_execution",
+                "current_stage_execution__stage",
+                "parent_run",
+                "parent_stage_execution",
+            )
+            .annotate(
+                child_run_count=Count(
+                    "child_runs",
+                    filter=Q(child_runs__deleted_at__isnull=True),
+                )
+            )
         )
         if project_id is not None:
             try:

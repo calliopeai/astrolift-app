@@ -394,6 +394,9 @@ class WorkflowDefinitionRunInput:
     only_stage_order: int | None = None
     fan_out_index: int | None = None
     stage_bindings: dict[str, Any] | None = None
+    # Definition PKs already traversed by nested child runs. Runtime checks
+    # this immutable chain in addition to import-time graph validation.
+    workflow_ancestry: list[str] | None = None
 
 
 @dataclasses.dataclass(slots=True, frozen=True)

@@ -15,6 +15,7 @@ from django.contrib.auth import get_user_model
 from astrolift_operations.models import WorkflowRun
 from astrolift_workflows.activities.workflow_stage_activities import (
     _aggregate_fan_out_sync,
+    _create_nested_workflow_run_sync,
     _create_stage_execution_sync,
     _dispatch_agent_for_stage_sync,
     _get_workflow_stages_sync,
@@ -23,6 +24,7 @@ from astrolift_workflows.activities.workflow_stage_activities import (
     _parent_run_pk,
     _poll_agent_run_status_sync,
     _record_human_gate_decision_sync,
+    _record_nested_workflow_start_sync,
     _snapshot_checkpoint_sync,
     _update_stage_execution_sync,
 )
@@ -217,6 +219,115 @@ def test_get_workflow_stages_applies_binding_overrides(run, definition, agent_wo
 def test_get_workflow_stages_missing_definition_raises():
     with pytest.raises(RuntimeError, match="not found"):
         _get_workflow_stages_sync("does-not-exist")
+
+
+@pytest.mark.django_db
+def test_nested_stage_resolves_child_and_creates_linked_run(org, agent_workload):
+    project = agent_workload.registered_app.project
+    child = WorkflowDefinition.objects.create(
+        organization=org,
+        project=project,
+        name="Nested Child",
+        slug="nested-child",
+        pattern_kind=WorkflowDefinition.PatternKind.SINGLE,
+        is_enabled=True,
+    )
+    WorkflowStage.objects.create(
+        slug="nested-child-stage-0",
+        definition=child,
+        order=0,
+        kind=WorkflowStage.StageKind.CHECKPOINT,
+    )
+    parent = WorkflowDefinition.objects.create(
+        organization=org,
+        project=project,
+        name="Nested Parent",
+        slug="nested-parent",
+        pattern_kind=WorkflowDefinition.PatternKind.CHAINED,
+        is_enabled=True,
+    )
+    nested_stage = WorkflowStage.objects.create(
+        slug="nested-parent-stage-0",
+        definition=parent,
+        order=0,
+        kind=WorkflowStage.StageKind.WORKFLOW,
+        workflow_ref=child.slug,
+        output_key="child_result",
+    )
+    parent_run = WorkflowRun.objects.create(
+        workflow_kind="WorkflowDefinitionRunWorkflow",
+        workflow_definition=parent,
+        workflow_id="WorkflowDefinitionRunWorkflow-nested-parent-test",
+        run_id="",
+        status=WorkflowRun.Status.RUNNING,
+        organization=org,
+        nesting_depth=0,
+    )
+
+    plan = _get_workflow_stages_sync(
+        parent.slug,
+        str(parent_run.pk),
+        {},
+        str(parent.pk),
+        [],
+    )
+    assert plan["definition_id"] == str(parent.pk)
+    assert plan["stages"][0]["nested_definition_id"] == str(child.pk)
+    assert plan["stages"][0]["nested_definition_slug"] == child.slug
+
+    execution_id = _create_stage_execution_sync(
+        str(parent_run.pk),
+        str(nested_stage.pk),
+        1,
+    )
+    result = _create_nested_workflow_run_sync(
+        str(parent_run.pk),
+        execution_id,
+        str(child.pk),
+    )
+    child_run = WorkflowRun.objects.get(pk=int(result["workflow_run_id"]))
+    assert child_run.parent_run == parent_run
+    assert child_run.parent_stage_execution_id == int(execution_id)
+    assert child_run.workflow_definition == child
+    assert child_run.nesting_depth == 1
+    # Activity retry is idempotent because one parent execution owns one child.
+    repeated = _create_nested_workflow_run_sync(
+        str(parent_run.pk),
+        execution_id,
+        str(child.pk),
+    )
+    assert repeated["workflow_run_id"] == result["workflow_run_id"]
+    _record_nested_workflow_start_sync(result["workflow_run_id"], "temporal-child-run-id")
+    child_run.refresh_from_db()
+    assert child_run.run_id == "temporal-child-run-id"
+
+
+@pytest.mark.django_db
+def test_nested_stage_runtime_rejects_ancestry_cycle(org, agent_workload):
+    definition = WorkflowDefinition.objects.create(
+        organization=org,
+        project=agent_workload.registered_app.project,
+        name="Runtime Cycle",
+        slug="runtime-cycle",
+        pattern_kind=WorkflowDefinition.PatternKind.CHAINED,
+        is_enabled=True,
+    )
+    run = WorkflowRun.objects.create(
+        workflow_kind="WorkflowDefinitionRunWorkflow",
+        workflow_definition=definition,
+        workflow_id="WorkflowDefinitionRunWorkflow-runtime-cycle-test",
+        run_id="",
+        status=WorkflowRun.Status.RUNNING,
+        organization=org,
+    )
+    with pytest.raises(RuntimeError, match="cycle"):
+        _get_workflow_stages_sync(
+            definition.slug,
+            str(run.pk),
+            {},
+            str(definition.pk),
+            [str(definition.pk)],
+        )
 
 
 @pytest.mark.django_db

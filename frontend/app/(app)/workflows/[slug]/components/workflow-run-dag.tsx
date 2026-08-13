@@ -56,7 +56,11 @@ export function buildRunDagStages(
           ? -1
           : 1
     );
-    const label = def?.agentDefinitionName || humanizeKind(def?.kind ?? xs[0]?.stageKind ?? "");
+    const label =
+      def?.agentDefinitionName ||
+      (def?.kind === "workflow" && def.workflowRef
+        ? `Workflow · ${def.workflowRef}`
+        : humanizeKind(def?.kind ?? xs[0]?.stageKind ?? ""));
     const curIds: string[] = [];
 
     if (xs.length > 0) {
@@ -70,6 +74,12 @@ export function buildRunDagStages(
           needs: prevRankIds,
           startedAt: x.startedAt,
           finishedAt: x.endedAt,
+          href:
+            x.childWorkflowDefinitionSlug || def?.workflowRef
+              ? `/workflows/${encodeURIComponent(
+                  x.childWorkflowDefinitionSlug || def?.workflowRef || ""
+                )}/observe${x.childWorkflowRunGuid ? `?run=${encodeURIComponent(x.childWorkflowRunGuid)}` : ""}`
+              : undefined,
         });
       });
     } else if (def) {
@@ -81,6 +91,10 @@ export function buildRunDagStages(
         name: fanned ? `${label} ×${def.fanOutCount}` : label,
         status: "pending",
         needs: prevRankIds,
+        href:
+          def.kind === "workflow" && def.workflowRef
+            ? `/workflows/${encodeURIComponent(def.workflowRef)}/observe`
+            : undefined,
       });
     }
 

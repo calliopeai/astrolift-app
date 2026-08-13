@@ -4,6 +4,7 @@ from datetime import datetime
 
 import strawberry
 import strawberry_django
+from django.core.exceptions import ObjectDoesNotExist
 from strawberry.types import Info
 
 from workflows.models import (
@@ -22,6 +23,7 @@ class WorkflowStageType:
     role: str
     prompt: str
     agent_ref: str
+    workflow_ref: str
     environment_spec_slug: str
     output_key: str
     approvers: strawberry.scalars.JSON
@@ -83,6 +85,30 @@ class WorkflowStageExecutionType:
         if self.agent_run_id is None:
             return None
         return str(self.agent_run.guid)
+
+    @strawberry_django.field
+    def child_workflow_run_guid(self) -> str | None:
+        try:
+            child = self.child_workflow_run
+        except ObjectDoesNotExist:
+            return None
+        return str(child.guid)
+
+    @strawberry_django.field
+    def child_workflow_definition_slug(self) -> str | None:
+        try:
+            child = self.child_workflow_run
+        except ObjectDoesNotExist:
+            return None
+        definition = child.workflow_definition
+        return definition.slug if definition is not None else None
+
+    @strawberry_django.field
+    def child_workflow_status(self) -> str | None:
+        try:
+            return self.child_workflow_run.status
+        except ObjectDoesNotExist:
+            return None
 
 
 @strawberry_django.type(WorkflowDefinition)

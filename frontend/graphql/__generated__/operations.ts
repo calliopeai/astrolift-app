@@ -5632,6 +5632,7 @@ export type MutationCreateWorkflowStageArgs = {
   role?: InputMaybe<Scalars['String']['input']>;
   skillRefs?: InputMaybe<Scalars['JSON']['input']>;
   timeoutSeconds?: Scalars['Int']['input'];
+  workflowRef?: InputMaybe<Scalars['String']['input']>;
   workflowSlug: Scalars['String']['input'];
 };
 
@@ -6896,6 +6897,7 @@ export type MutationUpdateWorkflowStageArgs = {
   skillRefs?: InputMaybe<Scalars['JSON']['input']>;
   stageGuid: Scalars['ID']['input'];
   timeoutSeconds?: InputMaybe<Scalars['Int']['input']>;
+  workflowRef?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -9682,6 +9684,7 @@ export type WithdrawSecretChangeInput = {
 };
 
 export type WorkflowDefinitionRun = {
+  childRunCount: Scalars['Int']['output'];
   currentStageOrder?: Maybe<Scalars['Int']['output']>;
   currentStageRole: Scalars['String']['output'];
   definitionGuid: Scalars['String']['output'];
@@ -9689,6 +9692,9 @@ export type WorkflowDefinitionRun = {
   definitionSlug: Scalars['String']['output'];
   endedAt?: Maybe<Scalars['DateTime']['output']>;
   guid: Scalars['String']['output'];
+  nestingDepth: Scalars['Int']['output'];
+  parentRunGuid?: Maybe<Scalars['String']['output']>;
+  parentStageExecutionGuid?: Maybe<Scalars['String']['output']>;
   projectGuid?: Maybe<Scalars['String']['output']>;
   projectSlug: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -9796,6 +9802,7 @@ export type WorkflowManifestStageType = {
   role: Scalars['String']['output'];
   skills: Array<Scalars['String']['output']>;
   timeout: Scalars['Int']['output'];
+  workflow?: Maybe<Scalars['String']['output']>;
 };
 
 export type WorkflowRun = {
@@ -9811,6 +9818,9 @@ export type WorkflowRun = {
 export type WorkflowStageExecutionType = {
   agentRunGuid?: Maybe<Scalars['String']['output']>;
   attemptNumber: Scalars['Int']['output'];
+  childWorkflowDefinitionSlug?: Maybe<Scalars['String']['output']>;
+  childWorkflowRunGuid?: Maybe<Scalars['String']['output']>;
+  childWorkflowStatus?: Maybe<Scalars['String']['output']>;
   createdAt: Scalars['DateTime']['output'];
   endedAt?: Maybe<Scalars['DateTime']['output']>;
   errorMessage: Scalars['String']['output'];
@@ -9842,6 +9852,7 @@ export type WorkflowStageType = {
   role: Scalars['String']['output'];
   skillRefs: Scalars['JSON']['output'];
   timeoutSeconds: Scalars['Int']['output'];
+  workflowRef: Scalars['String']['output'];
 };
 
 export type WorkflowTopologyStage = {
@@ -9862,6 +9873,7 @@ export type WorkflowTopologyStage = {
   role: Scalars['String']['output'];
   skillRefs: Array<Scalars['String']['output']>;
   timeoutSeconds: Scalars['Int']['output'];
+  workflowRef: Scalars['String']['output'];
 };
 
 export type CreateSkillMutationVariables = Exact<{

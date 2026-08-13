@@ -482,6 +482,24 @@ class Mutation:
             workflow.states = states
         if transitions is not None:
             workflow.transitions = transitions
+        if is_enabled is False and workflow.is_enabled:
+            from workflows.composition import workflow_parent_references
+
+            parents = workflow_parent_references(workflow)
+            if parents:
+                parent_slugs = ", ".join(sorted({stage.definition.slug for stage in parents}))
+                return MutationResult(
+                    ok=False,
+                    errors=[
+                        GQLValidationError(
+                            field="is_enabled",
+                            messages=[
+                                f'Cannot disable workflow definition "{slug}" — '
+                                f"nested workflow stage(s) in {parent_slugs} still use it."
+                            ],
+                        )
+                    ],
+                )
         if is_enabled is not None:
             workflow.is_enabled = is_enabled
 
@@ -564,6 +582,27 @@ class Mutation:
                 ],
             )
 
+        # Nested workflow references are slug-based rather than FKs. Enforce
+        # the same PROTECT behavior explicitly so deleting a child cannot
+        # leave an otherwise valid parent that only fails at dispatch time.
+        from workflows.composition import workflow_parent_references
+
+        parent_refs = workflow_parent_references(workflow)
+        if parent_refs:
+            parent_slugs = ", ".join(sorted({stage.definition.slug for stage in parent_refs}))
+            return MutationResult(
+                ok=False,
+                errors=[
+                    GQLValidationError(
+                        field="slug",
+                        messages=[
+                            f'Cannot delete workflow definition "{slug}" — '
+                            f"nested workflow stage(s) in {parent_slugs} still use it."
+                        ],
+                    )
+                ],
+            )
+
         workflow.deleted_at = timezone.now()
         workflow.deleted_by = user
         workflow.save(update_fields=["deleted_at", "deleted_by", "updated_at", "version"])
@@ -588,6 +627,7 @@ class Mutation:
         timeout_seconds: int = 300,
         agent_definition_guid: str | None = None,
         agent_ref: str | None = None,
+        workflow_ref: str | None = None,
         environment_spec_slug: str | None = None,
         skill_refs: strawberry.scalars.JSON | None = None,
         fan_out_count: int | None = None,
@@ -678,6 +718,7 @@ class Mutation:
             timeout_seconds=timeout_seconds,
             agent_definition=agent_definition,
             agent_ref=resolved_agent_ref,
+            workflow_ref=(workflow_ref or "").strip(),
             environment_spec_slug=(environment_spec_slug or "").strip(),
             skill_refs=skill_refs or [],
             fan_out_count=fan_out_count,
@@ -689,7 +730,16 @@ class Mutation:
         )
 
         try:
-            stage.save()
+            with transaction.atomic():
+                stage.save()
+                from workflows.composition import validate_workflow_composition
+
+                validate_workflow_composition(workflow)
+        except ValueError as exc:
+            return CreateWorkflowStageResult(
+                ok=False,
+                errors=[GQLValidationError(field="workflow_ref", messages=[str(exc)])],
+            )
         except Exception as e:
             raise GraphQLError(f"Failed to create workflow stage: {e}") from e
 
@@ -789,6 +839,11 @@ class Mutation:
         with transaction.atomic():
             clone = WorkflowDefinition.objects.create(
                 organization=org,
+                # A project-owned parent may reference project-owned child
+                # definitions. Preserve that packet boundary when cloning
+                # within the same org; cross-org/global clones cannot carry
+                # a foreign project FK.
+                project=(source.project if same_org else None),
                 name=source.name,
                 slug=new_slug,
                 description=source.description or "",
@@ -811,6 +866,7 @@ class Mutation:
                     # the same org (spec 40 §2.1/§2.4).
                     agent_definition=(stage.agent_definition if same_org else None),
                     agent_ref=stage.agent_ref,
+                    workflow_ref=stage.workflow_ref,
                     environment_spec_slug=stage.environment_spec_slug,
                     skill_refs=list(stage.skill_refs or []),
                     fan_out_count=stage.fan_out_count,

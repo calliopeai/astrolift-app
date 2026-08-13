@@ -1,0 +1,26 @@
+[workflow]
+slug = "emr-triage-release"
+name = "EMR Triage and Patch Release"
+pattern = "chained"
+description = "Triage an issue, then invoke the reusable patch review workflow."
+
+[[stage]]
+kind = "workflow"
+workflow = "emr-triage-chain"
+output_key = "triage"
+timeout = 1800
+
+[[stage]]
+kind = "workflow"
+workflow = "emr-triage-patch"
+output_key = "patch_review"
+on_failure = "retry"
+timeout = 3600
+
+[[stage]]
+kind = "human_gate"
+role = "release-approval"
+prompt = "Approve releasing the reviewed patch?"
+output_key = "release_approval"
+approvers = ["team:emr-triage-reviewers"]
+timeout = 86400

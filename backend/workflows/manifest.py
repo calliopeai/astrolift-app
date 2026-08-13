@@ -76,6 +76,7 @@ class WorkflowStageSpec:
     kind: str
     role: str = ""
     agent: str | None = None
+    workflow: str | None = None
     environment_spec_slug: str | None = None
     skills: list[str] = dataclasses.field(default_factory=list)
     on_failure: str = _DEFAULT_ON_FAILURE
@@ -174,6 +175,23 @@ def _parse_stage(d: Any, index: int) -> WorkflowStageSpec:
             path=f"{base}.agent",
         )
 
+    workflow_ref = d.get("workflow")
+    if workflow_ref is not None and (not isinstance(workflow_ref, str) or not workflow_ref.strip()):
+        raise ManifestError(
+            "workflow must be a non-empty child workflow slug",
+            path=f"{base}.workflow",
+        )
+    if kind == WorkflowStage.StageKind.WORKFLOW and workflow_ref is None:
+        raise ManifestError(
+            'kind="workflow" requires a workflow child slug',
+            path=f"{base}.workflow",
+        )
+    if kind != WorkflowStage.StageKind.WORKFLOW and workflow_ref is not None:
+        raise ManifestError(
+            'workflow is only valid when kind="workflow"',
+            path=f"{base}.workflow",
+        )
+
     environment_spec_slug = d.get("environment_spec_slug")
     if environment_spec_slug is not None and (
         not isinstance(environment_spec_slug, str) or not environment_spec_slug.strip()
@@ -219,6 +237,7 @@ def _parse_stage(d: Any, index: int) -> WorkflowStageSpec:
         kind=kind,
         role=role,
         agent=agent,
+        workflow=workflow_ref,
         environment_spec_slug=environment_spec_slug,
         skills=skills,
         on_failure=on_failure,
@@ -297,6 +316,8 @@ def emit_workflow_manifest(parsed: ParsedWorkflowManifest) -> str:
             row["role"] = stage.role
         if stage.agent is not None:
             row["agent"] = stage.agent
+        if stage.workflow is not None:
+            row["workflow"] = stage.workflow
         if stage.environment_spec_slug is not None:
             row["environment_spec_slug"] = stage.environment_spec_slug
         if stage.skills:
@@ -354,6 +375,7 @@ def definition_to_manifest(definition: WorkflowDefinition) -> ParsedWorkflowMani
                 kind=stage.kind,
                 role=stage.role or "",
                 agent=agent_slug,
+                workflow=stage.workflow_ref or None,
                 environment_spec_slug=stage.environment_spec_slug or None,
                 skills=list(stage.skill_refs or []),
                 on_failure=stage.on_failure,
@@ -440,6 +462,7 @@ def create_definition_from_manifest(parsed: ParsedWorkflowManifest, *, organizat
             role=stage.role or "",
             agent_definition=agent_definition,
             agent_ref=stage.agent or "",
+            workflow_ref=stage.workflow or "",
             environment_spec_slug=stage.environment_spec_slug or "",
             skill_refs=list(stage.skills),
             on_failure=stage.on_failure,

@@ -15,7 +15,6 @@ from astrolift_workflows.activities import (
     apply_platform_rbac,
     apply_to_target_cluster,
     bounce_workloads_consuming_bundle,
-    build_image,
     capture_platform_cost_snapshot,
     capture_quota_usage_snapshot,
     check_managed_service_ready,
@@ -23,6 +22,7 @@ from astrolift_workflows.activities import (
     cleanup_cluster_dns_records,
     cleanup_cluster_ecr_repos,
     cleanup_cluster_irsa_roles,
+    create_nested_workflow_run,
     create_promotion_deployment,
     create_rollback_deployment,
     create_stage_execution,
@@ -105,6 +105,7 @@ from astrolift_workflows.activities import (
     reconcile_runs_tick,
     record_cluster_bootstrap_run,
     record_human_gate_decision,
+    record_nested_workflow_start,
     refresh_secret_bundle_in_cluster,
     register_managed_domain_row,
     reheal_webhook_subscriptions,
@@ -134,6 +135,7 @@ from astrolift_workflows.activities.agent_stage import (
     dispatch_agent_task,
     execute_agent_stage,
 )
+from astrolift_workflows.activities.build_image import build_image
 from astrolift_workflows.workflows import (
     AgentCronTickWorkflow,
     AgentLoopTickWorkflow,
@@ -244,6 +246,7 @@ ACTIVITIES = (
     cleanup_cluster_dns_records,
     cleanup_cluster_ecr_repos,
     cleanup_cluster_irsa_roles,
+    create_nested_workflow_run,
     create_promotion_deployment,
     create_rollback_deployment,
     create_stage_execution,
@@ -328,6 +331,7 @@ ACTIVITIES = (
     reconcile_cluster_capabilities,
     reconcile_runs_tick,
     record_human_gate_decision,
+    record_nested_workflow_start,
     refresh_secret_bundle_in_cluster,
     register_managed_domain_row,
     reissue_cert,

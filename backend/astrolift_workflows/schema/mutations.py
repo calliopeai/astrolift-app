@@ -16,6 +16,7 @@ envelope (oracle closure).
 from __future__ import annotations
 
 import strawberry
+from django.db import transaction
 from strawberry.types import Info
 
 from astrolift_workflows.client import (
@@ -514,6 +515,7 @@ class WorkflowsMutation:
         timeout_seconds: int | None = None,
         agent_definition_guid: str | None = None,
         agent_ref: str | None = None,
+        workflow_ref: str | None = None,
         environment_spec_slug: str | None = None,
         skill_refs: JSON | None = None,
         fan_out_count: int | None = None,
@@ -550,6 +552,8 @@ class WorkflowsMutation:
             stage.timeout_seconds = timeout_seconds
         if agent_ref is not None:
             stage.agent_ref = agent_ref.strip()
+        if workflow_ref is not None:
+            stage.workflow_ref = workflow_ref.strip()
         if environment_spec_slug is not None:
             stage.environment_spec_slug = environment_spec_slug.strip()
         if skill_refs is not None:
@@ -581,7 +585,14 @@ class WorkflowsMutation:
             if workload is not None:
                 stage.agent_ref = workload.slug
         stage.updated_by = info.context.user
-        stage.save()
+        try:
+            with transaction.atomic():
+                stage.save()
+                from workflows.composition import validate_workflow_composition
+
+                validate_workflow_composition(stage.definition)
+        except ValueError as exc:
+            return _failure("workflow_ref", str(exc))
         return MutationResult.success()
 
     @strawberry.mutation(description="Soft-delete a stage from a writable definition (spec 40 §6).")

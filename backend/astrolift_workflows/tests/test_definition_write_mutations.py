@@ -121,6 +121,37 @@ def test_clone_defaults_to_caller_org_when_org_id_omitted(member, org, permissio
     assert clone.organization_id == org.id
 
 
+def test_clone_same_org_preserves_project_for_nested_visibility(member, org, permission_resolver):
+    from astrolift_identity.models import Project, Team
+
+    permission_resolver.grant(Permission.WORKFLOW_CREATE)
+    team = Team.objects.create(organization=org, name="Workflow Team", slug="workflow-team")
+    project = Project.objects.create(
+        organization=org,
+        team=team,
+        name="Workflow Packet",
+        slug="workflow-packet",
+    )
+    child = _make_def("nested-child", organization=org)
+    child.project = project
+    child.save(update_fields=["project", "updated_at", "version"])
+    parent = _make_def("nested-parent", organization=org)
+    parent.project = project
+    parent.save(update_fields=["project", "updated_at", "version"])
+    _add_stage(
+        parent,
+        0,
+        WorkflowStage.StageKind.WORKFLOW,
+        workflow_ref=child.slug,
+    )
+
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        res = Mutation().clone_workflow_definition(_info(member), slug=parent.slug)
+
+    assert res.ok, res.errors
+    assert WorkflowDefinition.objects.get(slug=res.slug, organization=org).project_id == project.pk
+
+
 def test_cloned_definition_is_editable(member, org, permission_resolver):
     """The whole point of clone-to-edit: the org copy passes the write guard
     even when it shares its slug with the read-only global it came from."""
@@ -284,6 +315,51 @@ def test_delete_refused_while_configured_workflow_references(member, org, permis
     assert any("still use it" in msg for e in res.errors for msg in e.messages)
     d.refresh_from_db()
     assert d.deleted_at is None
+
+
+def test_delete_refused_while_nested_workflow_references(member, org, permission_resolver):
+    permission_resolver.grant(Permission.WORKFLOW_DELETE)
+    child = _make_def("o-del-nested-child", organization=org)
+    parent = _make_def("o-del-nested-parent", organization=org)
+    _add_stage(
+        parent,
+        0,
+        WorkflowStage.StageKind.WORKFLOW,
+        workflow_ref=child.slug,
+    )
+
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        res = Mutation().delete_workflow_definition(_info(member), slug=child.slug)
+
+    assert not res.ok
+    assert parent.slug in res.errors[0].messages[0]
+    child.refresh_from_db()
+    assert child.deleted_at is None
+
+
+def test_disable_refused_while_nested_workflow_references(member, org, permission_resolver):
+    permission_resolver.grant(Permission.WORKFLOW_UPDATE)
+    child = _make_def("o-disable-nested-child", organization=org)
+    parent = _make_def("o-disable-nested-parent", organization=org)
+    _add_stage(
+        parent,
+        0,
+        WorkflowStage.StageKind.WORKFLOW,
+        workflow_ref=child.slug,
+    )
+
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        res = Mutation().update_workflow_definition(
+            _info(member),
+            slug=child.slug,
+            is_enabled=False,
+        )
+
+    assert not res.ok
+    assert res.errors[0].field == "is_enabled"
+    assert parent.slug in res.errors[0].messages[0]
+    child.refresh_from_db()
+    assert child.is_enabled is True
 
 
 def test_delete_soft_deletes(member, org, permission_resolver):

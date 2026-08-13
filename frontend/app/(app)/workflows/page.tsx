@@ -145,6 +145,10 @@ function DefinitionRunList({ runs }: { runs: WorkflowDefinitionRun[] }) {
           >
             {run.definitionName}
           </Link>
+          {run.parentRunGuid && <Badge variant="outline">Nested · level {run.nestingDepth}</Badge>}
+          {run.childRunCount > 0 && (
+            <Badge variant="outline">{run.childRunCount} child run(s)</Badge>
+          )}
           {run.projectSlug && (
             <Link
               href={`/projects/${encodeURIComponent(run.projectSlug)}`}

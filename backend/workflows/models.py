@@ -462,6 +462,8 @@ class WorkflowStage(BaseCoreModel):
         CHECKPOINT = "checkpoint"
         # Collect and merge outputs from a preceding fan_out stage.
         AGGREGATION = "aggregation"
+        # Execute another WorkflowDefinition as a linked Temporal child run.
+        WORKFLOW = "workflow"
 
     class OnFailure(models.TextChoices):
         FAIL = "fail"
@@ -505,6 +507,12 @@ class WorkflowStage(BaseCoreModel):
         blank=True,
         default="",
         help_text="Organization-local agent workload slug used by the workflow manifest.",
+    )
+    workflow_ref = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Visible child WorkflowDefinition slug used by kind=workflow stages.",
     )
     environment_spec_slug = models.CharField(
         max_length=128,
