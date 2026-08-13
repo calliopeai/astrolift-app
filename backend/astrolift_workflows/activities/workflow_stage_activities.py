@@ -343,12 +343,16 @@ def _dispatch_agent_for_stage_sync(
     organization_id = run.organization_id
     config = resolved_config if isinstance(resolved_config, dict) else {}
     workload_id = config.get("agent_definition_id") or stage.agent_definition_id
-    workload = Workload.objects.filter(
-        pk=workload_id,
-        kind=Workload.Kind.AGENT,
-        deleted_at__isnull=True,
-        **({"registered_app__organization_id": organization_id} if organization_id is not None else {}),
-    ).first()
+    workload = (
+        Workload.objects.filter(
+            pk=workload_id,
+            kind=Workload.Kind.AGENT,
+            deleted_at__isnull=True,
+            **({"registered_app__organization_id": organization_id} if organization_id is not None else {}),
+        )
+        .select_related("registered_app")
+        .first()
+    )
     if workload is None:
         raise RuntimeError(
             f"stage {stage_id} is kind={stage.kind} with no agent_definition resolvable — cannot dispatch"
@@ -409,6 +413,8 @@ def _dispatch_agent_for_stage_sync(
         if task is None:
             task = AgentTask.objects.create(
                 organization_id=organization_id,
+                team_id=workload.registered_app.team_id,
+                project_id=workload.registered_app.project_id,
                 agent_definition=workload,
                 environment_spec=environment_spec,
                 agent_run=agent_run,

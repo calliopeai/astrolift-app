@@ -4,6 +4,8 @@
 
 ### Added
 
+- Add project-owned workflow topology and execution views across project,
+  workflow, history, and role-aware dashboard surfaces.
 - Add deterministic GraphQL SDL and MCP capability-superset exports with
   runtime-handler, JSON-Schema, frontend-codegen, and CI drift guardrails.
 - Add source-reconciled `workflows/**/*.toml` definitions and runnable chained-agent
@@ -18,6 +20,10 @@
 
 ### Changed
 
+- Treat repository-imported workflow definitions as first-class runnable
+  project workflows; configured wrappers remain optional for custom bindings,
+  inputs, and triggers.
+- Issue CLI device credentials with narrow workflow write and trigger scopes.
 - Shard backend tests across four balanced real-Postgres jobs, retain one
   stable aggregate gate, and stop rerunning the dedicated provider suite in
   the backend pass.
@@ -28,6 +34,11 @@
 
 ### Fixed
 
+- Stamp workflow-dispatched agent tasks with their project and team, attach
+  direct definition runs to their definition, and safely backfill existing
+  project ownership and execution history.
+- Prevent agent workloads from inflating application health counts and scope
+  workflow kill controls to users with workflow management capability.
 - Poll workflow-stage agent Jobs in the same per-organization namespace used
   at spawn so live tasks are not failed and stripped of callback credentials.
 - Preserve workflow stage environment recipes and output keys when importing

@@ -42,6 +42,8 @@ from astrolift_identity.api_tokens import (
     SCOPE_READ_APPS,
     SCOPE_SECRET_READ,
     SCOPE_SECRET_WRITE,
+    SCOPE_WORKFLOW_TRIGGER,
+    SCOPE_WORKFLOW_WRITE,
     SCOPE_WRITE_APPS,
     client_ip_from_request,
     enforce_scopes,
@@ -396,13 +398,15 @@ def test_agent_env_spec_write_scope_maps_only_to_env_spec_mutations():
     assert not token_scope_allows_permission(token, Permission.AGENT_DELETE)
 
 
-def test_cli_device_scopes_allow_agent_ops_env_specs_and_secret_write_without_admin():
+def test_cli_device_scopes_allow_agent_and_workflow_ops_without_admin():
     token = SimpleNamespace(scopes=list(CLI_DEVICE_SCOPES))
 
     assert SCOPE_AGENT_ENV_SPEC_WRITE in token.scopes
     assert SCOPE_SECRET_WRITE in token.scopes
     assert SCOPE_MCP_DISPATCH in token.scopes
     assert SCOPE_MCP_WRITE in token.scopes
+    assert SCOPE_WORKFLOW_WRITE in token.scopes
+    assert SCOPE_WORKFLOW_TRIGGER in token.scopes
     assert token_scope_allows_permission(token, Permission.AGENT_DISPATCH)
     assert token_scope_allows_permission(token, Permission.AGENT_CREATE)
     assert token_scope_allows_permission(token, Permission.AGENT_UPDATE)
@@ -410,11 +414,29 @@ def test_cli_device_scopes_allow_agent_ops_env_specs_and_secret_write_without_ad
     assert token_scope_allows_permission(token, Permission.AGENT_ENV_SPEC_UPDATE)
     assert token_scope_allows_permission(token, Permission.AGENT_ENV_SPEC_DELETE)
     assert token_scope_allows_permission(token, Permission.SECRET_WRITE)
+    assert token_scope_allows_permission(token, Permission.WORKFLOW_READ)
+    assert token_scope_allows_permission(token, Permission.WORKFLOW_CREATE)
+    assert token_scope_allows_permission(token, Permission.WORKFLOW_UPDATE)
+    assert token_scope_allows_permission(token, Permission.WORKFLOW_DELETE)
+    assert token_scope_allows_permission(token, Permission.WORKFLOW_TRIGGER)
     assert not token_scope_allows_permission(token, Permission.SECRET_READ)
     assert not token_scope_allows_permission(token, Permission.APP_DEPLOY)
     assert not token_scope_allows_permission(token, Permission.APP_DELETE)
     assert not token_scope_allows_permission(token, Permission.AGENT_DELETE)
     assert not token_scope_allows_permission(token, Permission.ADMIN_ELEVATE)
+
+
+def test_workflow_scopes_are_narrow_write_and_trigger_ceilings():
+    write_token = SimpleNamespace(scopes=[SCOPE_WORKFLOW_WRITE])
+    trigger_token = SimpleNamespace(scopes=[SCOPE_WORKFLOW_TRIGGER])
+
+    assert token_scope_allows_permission(write_token, Permission.WORKFLOW_CREATE)
+    assert token_scope_allows_permission(write_token, Permission.WORKFLOW_UPDATE)
+    assert token_scope_allows_permission(write_token, Permission.WORKFLOW_DELETE)
+    assert not token_scope_allows_permission(write_token, Permission.WORKFLOW_TRIGGER)
+    assert not token_scope_allows_permission(write_token, Permission.AGENT_CREATE)
+    assert token_scope_allows_permission(trigger_token, Permission.WORKFLOW_TRIGGER)
+    assert not token_scope_allows_permission(trigger_token, Permission.WORKFLOW_CREATE)
 
 
 def test_api_token_scope_is_a_ceiling_over_rbac(permission_resolver):

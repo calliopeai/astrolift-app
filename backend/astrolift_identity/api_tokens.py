@@ -9,7 +9,8 @@ the auth integration in :mod:`astrolift_identity.auth_drf` calls
 ``verify_token`` + ``touch_token`` on every authed request.
 
 Scopes are access classes (``read:apps``, ``write:apps``,
-``agent-env-spec:write``, ``secret:write``, ``read:clusters``, ``admin``). They narrow the
+``agent-env-spec:write``, ``secret:write``, ``workflow:write``,
+``workflow:trigger``, ``read:clusters``, ``admin``). They narrow the
 *user's* permission set down to the subset the token may exercise —
 they never widen it. ``admin`` implies all other scopes (operators
 intentionally treat it as the "full power" wildcard so they don't
@@ -42,6 +43,8 @@ SCOPE_SECRET_WRITE = "secret:write"
 SCOPE_MCP_READ = "mcp:read"
 SCOPE_MCP_DISPATCH = "mcp:dispatch"
 SCOPE_MCP_WRITE = "mcp:write"
+SCOPE_WORKFLOW_WRITE = "workflow:write"
+SCOPE_WORKFLOW_TRIGGER = "workflow:trigger"
 SCOPE_ADMIN = "admin"
 
 ALLOWED_SCOPES: frozenset[str] = frozenset(
@@ -55,6 +58,8 @@ ALLOWED_SCOPES: frozenset[str] = frozenset(
         SCOPE_MCP_READ,
         SCOPE_MCP_DISPATCH,
         SCOPE_MCP_WRITE,
+        SCOPE_WORKFLOW_WRITE,
+        SCOPE_WORKFLOW_TRIGGER,
         SCOPE_ADMIN,
     }
 )
@@ -75,6 +80,8 @@ CLI_DEVICE_SCOPES: tuple[str, ...] = (
     SCOPE_SECRET_WRITE,
     SCOPE_MCP_DISPATCH,
     SCOPE_MCP_WRITE,
+    SCOPE_WORKFLOW_WRITE,
+    SCOPE_WORKFLOW_TRIGGER,
 )
 
 _current_api_token: contextvars.ContextVar[object | None] = contextvars.ContextVar(
@@ -142,6 +149,14 @@ def token_scope_allows_permission(token, permission: str) -> bool:
     if SCOPE_MCP_DISPATCH in scopes and permission == "agent.dispatch":
         return True
     if SCOPE_MCP_WRITE in scopes and permission in {"agent.create", "agent.update"}:
+        return True
+    if SCOPE_WORKFLOW_WRITE in scopes and permission in {
+        "workflow.create",
+        "workflow.update",
+        "workflow.delete",
+    }:
+        return True
+    if SCOPE_WORKFLOW_TRIGGER in scopes and permission == "workflow.trigger":
         return True
     return False
 

@@ -9,10 +9,13 @@ type QueryState = {
   apps: Record<string, unknown>[];
   agents: Record<string, unknown>[];
   live: Record<string, unknown>[];
+  workflows: Record<string, unknown>[];
+  workflowRuns: Record<string, unknown>[];
   appsError?: Error;
   agentsError?: Error;
   canViewAgents: boolean;
   canCreateAgent: boolean;
+  canViewWorkflows: boolean;
   calls: Array<{ operation: string; variables: Record<string, unknown>; skip: boolean }>;
 };
 
@@ -20,8 +23,11 @@ const state = vi.hoisted<QueryState>(() => ({
   apps: [],
   agents: [],
   live: [],
+  workflows: [],
+  workflowRuns: [],
   canViewAgents: true,
   canCreateAgent: true,
+  canViewWorkflows: true,
   calls: [],
 }));
 
@@ -56,6 +62,8 @@ vi.mock("@apollo/client/react", () => ({
       ListMembers: { astroliftMembers: [] },
       ListAgentWorkloads: { agentWorkloads: state.agents },
       ListAgentLiveStatus: { agentLiveStatus: state.live },
+      ListTieredWorkflowDefinitions: { workflowDefinitions: state.workflows },
+      ListWorkflowDefinitionRuns: { workflowDefinitionRuns: state.workflowRuns },
     };
     return {
       data: data[operation],
@@ -117,8 +125,16 @@ vi.mock("@/components/ConfirmDialog", () => ({
 vi.mock("@/graphql/user/user.hooks", () => ({
   useModules: () => ({
     loading: false,
-    canView: (key: string) => key !== "agents" || state.canViewAgents,
+    canView: (key: string) =>
+      key === "agents" ? state.canViewAgents : key === "workflows" ? state.canViewWorkflows : true,
     canCreate: (key: string) => key !== "agents" || state.canCreateAgent,
+  }),
+}));
+
+vi.mock("@/lib/permissions/use-my-permissions", () => ({
+  useMyPermissions: () => ({
+    loading: false,
+    can: (permission: string) => permission === "org.manage_members",
   }),
 }));
 
@@ -157,10 +173,13 @@ describe("ProjectDetailClient workload-aware overview", () => {
     state.apps = [];
     state.agents = [];
     state.live = [];
+    state.workflows = [];
+    state.workflowRuns = [];
     state.appsError = undefined;
     state.agentsError = undefined;
     state.canViewAgents = true;
     state.canCreateAgent = true;
+    state.canViewWorkflows = true;
     state.calls = [];
   });
 
@@ -235,6 +254,90 @@ describe("ProjectDetailClient workload-aware overview", () => {
     expect(screen.getByRole("link", { name: /new app/i })).toHaveAttribute("href", "/apps/new");
   });
 
+  it("renders project workflows as topology and marks standalone agents", () => {
+    state.agents = [
+      agent("emr-triage-intake"),
+      agent("emr-triage-decide"),
+      agent("emr-bug-triage"),
+    ];
+    state.workflows = [
+      {
+        guid: "workflow-1",
+        name: "EMR Triage",
+        slug: "emr-triage",
+        description: "",
+        patternKind: "chained",
+        isEnabled: true,
+        isGlobal: false,
+        organizationGuid: "org-1",
+        projectGuid: project.id,
+        projectSlug: project.slug,
+        projectTeamSlug: project.team.slug,
+        sourceRepo: "steadymd/smd-agents",
+        sourcePath: "workflows/emr-triage.toml",
+        sourceRef: "main",
+        stageCount: 2,
+        createdAt: "2026-08-13T12:00:00Z",
+        stages: [
+          {
+            guid: "stage-1",
+            order: 0,
+            kind: "agent_dispatch",
+            role: "intake",
+            agentRef: "emr-triage-intake",
+            agentGuid: "workload-emr-triage-intake",
+            agentName: "EMR Triage Intake",
+            agentSlug: "emr-triage-intake",
+            environmentSpecSlug: "emr-triage-intake",
+            resolvedModel: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+            hasPrompt: true,
+            outputKey: "evidence",
+            skillRefs: ["jira-search"],
+            fanOutCount: null,
+            fanOutDynamic: false,
+            onFailure: "fail",
+            timeoutSeconds: 300,
+          },
+          {
+            guid: "stage-2",
+            order: 1,
+            kind: "agent_dispatch",
+            role: "decide",
+            agentRef: "emr-triage-decide",
+            agentGuid: "workload-emr-triage-decide",
+            agentName: "EMR Triage Decide",
+            agentSlug: "emr-triage-decide",
+            environmentSpecSlug: "emr-triage-decide",
+            resolvedModel: "us.anthropic.claude-opus-4-8",
+            hasPrompt: true,
+            outputKey: "decision",
+            skillRefs: [],
+            fanOutCount: null,
+            fanOutDynamic: false,
+            onFailure: "fail",
+            timeoutSeconds: 300,
+          },
+        ],
+      },
+    ];
+
+    render(<ProjectDetailClient slug={project.slug} />);
+
+    expect(screen.getByText("Agent workflow project")).toBeInTheDocument();
+    expect(screen.getByText("Workflows in this project")).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Workflow stage topology" })).toBeInTheDocument();
+    expect(screen.getByText("Claude Haiku 4.5")).toBeInTheDocument();
+    expect(screen.getByText("Claude Opus 4.8")).toBeInTheDocument();
+    expect(screen.getByText("jira-search")).toBeInTheDocument();
+    expect(screen.getAllByText("custom")).toHaveLength(2);
+    expect(screen.getByText("Standalone")).toBeInTheDocument();
+    expect(screen.getAllByText("emr-triage").length).toBeGreaterThan(0);
+    const workflowQuery = state.calls.find(
+      (call) => call.operation === "ListTieredWorkflowDefinitions"
+    );
+    expect(workflowQuery?.variables).toEqual({ orgId: "org-1", projectId: "project-1" });
+  });
+
   it("uses a neutral workload empty state when the project is truly empty", () => {
     render(<ProjectDetailClient slug={project.slug} />);
 
@@ -280,5 +383,25 @@ describe("ProjectDetailClient workload-aware overview", () => {
     expect(screen.queryByText("Hidden Agent")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /register agent repo/i })).not.toBeInTheDocument();
     expect(state.calls.find((call) => call.operation === "ListAgentWorkloads")?.skip).toBeTruthy();
+  });
+
+  it("does not query or reveal workflows when the module is unavailable", () => {
+    state.agents = [agent("triage-agent")];
+    state.workflows = [
+      {
+        guid: "hidden-workflow",
+        slug: "hidden-workflow",
+        name: "Hidden workflow",
+        stages: [],
+      },
+    ];
+    state.canViewWorkflows = false;
+
+    render(<ProjectDetailClient slug={project.slug} />);
+
+    expect(screen.queryByText("Hidden workflow")).not.toBeInTheDocument();
+    expect(
+      state.calls.find((call) => call.operation === "ListTieredWorkflowDefinitions")?.skip
+    ).toBeTruthy();
   });
 });

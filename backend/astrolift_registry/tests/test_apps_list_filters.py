@@ -799,3 +799,30 @@ def test_agent_host_apps_excluded_from_apps_page_count():
     assert scaffold.apps["ok-a"].slug not in slugs
     # 5 scaffold apps minus the 1 agent host = 4.
     assert page.total_count == 4
+
+
+def test_mixed_agent_and_application_host_remains_in_apps_list():
+    from astrolift_registry.models import Workload
+
+    scaffold = _scaffold("-agentsep-mixed")
+    user = _superuser("agentsep-mixed-user")
+    mixed = scaffold.apps["ok-a"]
+    Workload.objects.create(
+        registered_app=mixed,
+        name="Agent",
+        slug="agent-wl-agentsep-mixed",
+        kind=Workload.Kind.AGENT,
+    )
+    Workload.objects.create(
+        registered_app=mixed,
+        name="Web",
+        slug="web-wl-agentsep-mixed",
+        kind=Workload.Kind.DEPLOYMENT,
+    )
+
+    result = _run_in_tenant(
+        {"organization_id": scaffold.org.id, "actor_user_id": user.id},
+        lambda: RegistryQuery().astrolift_apps(_info()),
+    )
+
+    assert mixed.slug in {app.slug for app in result}

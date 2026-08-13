@@ -42,7 +42,7 @@ from astrolift_lifecycle.schema.mutations import (
     RotateDeployTokenInput,
 )
 from astrolift_lifecycle.schema.queries import LifecycleQuery
-from astrolift_registry.models import RegisteredApp
+from astrolift_registry.models import RegisteredApp, Workload
 from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
 
@@ -382,6 +382,44 @@ def test_app_health_summary_lists_caller_org_only(app, actor, fake_info, permiss
     slugs = {r.app_slug for r in rows}
     assert app.slug in slugs
     assert "sib-app" not in slugs, "health summary leaked another org's app"
+
+
+def test_app_health_summary_marks_agent_registered_apps(app, actor, fake_info, permission_resolver):
+    Workload.objects.create(
+        registered_app=app,
+        name="triage agent",
+        slug="triage-agent",
+        kind=Workload.Kind.AGENT,
+    )
+
+    permission_resolver.grant(Permission.APP_READ)
+    with _ctx(app.organization, actor):
+        rows = LifecycleQuery().astrolift_app_health_summary(fake_info)
+
+    row = next(row for row in rows if row.app_slug == app.slug)
+    assert row.primitive_kind == "agent"
+
+
+def test_app_health_summary_keeps_mixed_registered_apps_as_apps(app, actor, fake_info, permission_resolver):
+    Workload.objects.create(
+        registered_app=app,
+        name="web",
+        slug="web",
+        kind=Workload.Kind.DEPLOYMENT,
+    )
+    Workload.objects.create(
+        registered_app=app,
+        name="helper agent",
+        slug="helper-agent",
+        kind=Workload.Kind.AGENT,
+    )
+
+    permission_resolver.grant(Permission.APP_READ)
+    with _ctx(app.organization, actor):
+        rows = LifecycleQuery().astrolift_app_health_summary(fake_info)
+
+    row = next(row for row in rows if row.app_slug == app.slug)
+    assert row.primitive_kind == "app"
 
 
 # ---------------------------------------------------------------------------

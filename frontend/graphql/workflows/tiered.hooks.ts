@@ -14,6 +14,7 @@ import {
   IMPORT_WORKFLOW_MANIFEST,
   REORDER_WORKFLOW_STAGES,
   RUN_WORKFLOW,
+  RUN_WORKFLOW_DEFINITION,
   UPDATE_CONFIGURED_WORKFLOW,
   UPDATE_WORKFLOW_DEFINITION_TIERED,
   UPDATE_WORKFLOW_STAGE,
@@ -25,6 +26,7 @@ import {
   LIST_CONFIGURED_WORKFLOWS,
   LIST_TIERED_WORKFLOW_DEFINITIONS,
   LIST_WORKFLOW_RUNS,
+  LIST_WORKFLOW_DEFINITION_RUNS,
   LIST_WORKFLOW_STAGE_EXECUTIONS,
   LIST_WORKFLOW_STAGES,
   PREVIEW_WORKFLOW_MANIFEST,
@@ -41,10 +43,14 @@ import type {
   PreviewWorkflowManifestData,
   ReorderWorkflowStagesData,
   RunWorkflowData,
+  RunWorkflowDefinitionData,
   TieredWorkflowData,
   TieredWorkflowDefinitionData,
   TieredWorkflowDefinitionsData,
+  TieredWorkflowDefinitionsVars,
   TieredWorkflowRunsData,
+  WorkflowDefinitionRunsData,
+  WorkflowDefinitionRunsVars,
   TieredWorkflowsData,
   TieredWorkflowStageExecutionsData,
   TieredWorkflowStagesData,
@@ -117,14 +123,14 @@ export const useRunWorkflow = () =>
 
 // ─── Tier 1 — definitions ────────────────────────────────────────────────
 
-export const useWorkflowDefinitions = (orgId?: string | null) => {
-  const { data, loading, error, refetch } = useQuery<TieredWorkflowDefinitionsData>(
-    LIST_TIERED_WORKFLOW_DEFINITIONS,
-    {
-      variables: { orgId: orgId ?? null },
-      fetchPolicy: "cache-and-network",
-    }
-  );
+export const useWorkflowDefinitions = (orgId?: string | null, projectId?: string | null) => {
+  const { data, loading, error, refetch } = useQuery<
+    TieredWorkflowDefinitionsData,
+    TieredWorkflowDefinitionsVars
+  >(LIST_TIERED_WORKFLOW_DEFINITIONS, {
+    variables: { orgId: orgId ?? null, projectId: projectId ?? null },
+    fetchPolicy: "cache-and-network",
+  });
   return { definitions: data?.workflowDefinitions ?? [], loading, error, refetch };
 };
 
@@ -153,6 +159,11 @@ export const useUpdateDefinition = () =>
 export const useDeleteDefinition = () =>
   useMutation<DeleteWorkflowDefinitionTieredData>(DELETE_WORKFLOW_DEFINITION_TIERED, {
     refetchQueries: [LIST_TIERED_WORKFLOW_DEFINITIONS],
+  });
+
+export const useRunWorkflowDefinition = () =>
+  useMutation<RunWorkflowDefinitionData>(RUN_WORKFLOW_DEFINITION, {
+    refetchQueries: [LIST_WORKFLOW_DEFINITION_RUNS],
   });
 
 // ─── Stages ──────────────────────────────────────────────────────────────
@@ -202,6 +213,38 @@ export const useWorkflowRuns = (workflowId: string | null, orgId?: string | null
       skip: !workflowId,
     });
   return { runs: data?.workflowRuns ?? [], loading, error, refetch, startPolling, stopPolling };
+};
+
+export const useWorkflowDefinitionRuns = (params?: {
+  orgId?: string | null;
+  projectId?: string | null;
+  status?: string | null;
+  limit?: number;
+  pollInterval?: number;
+  skip?: boolean;
+}) => {
+  const { data, loading, error, refetch, startPolling, stopPolling } = useQuery<
+    WorkflowDefinitionRunsData,
+    WorkflowDefinitionRunsVars
+  >(LIST_WORKFLOW_DEFINITION_RUNS, {
+    variables: {
+      orgId: params?.orgId ?? null,
+      projectId: params?.projectId ?? null,
+      status: params?.status ?? null,
+      limit: params?.limit ?? 50,
+    },
+    fetchPolicy: "cache-and-network",
+    pollInterval: params?.pollInterval ?? 0,
+    skip: params?.skip ?? false,
+  });
+  return {
+    runs: data?.workflowDefinitionRuns ?? [],
+    loading,
+    error,
+    refetch,
+    startPolling,
+    stopPolling,
+  };
 };
 
 // `pollInterval` is passed straight to Apollo, which treats it reactively: a

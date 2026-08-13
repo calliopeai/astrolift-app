@@ -119,6 +119,9 @@ class AgentTaskDispatcherType:
 @strawberry.type(name="AstroliftAgentTask")
 class AgentTaskType:
     id: GUID
+    agent_slug: str
+    agent_name: str
+    project_slug: str
     status: str
     callback_url: str
     # Terminal output payload; null until the task reaches a terminal
@@ -466,6 +469,9 @@ def _agent_task_failure_message(failure) -> str | None:
 def agent_task_to_type(t) -> AgentTaskType:
     return AgentTaskType(
         id=GUID(str(t.guid)),
+        agent_slug=(t.agent_definition.slug if t.agent_definition_id is not None else ""),
+        agent_name=(t.agent_definition.name if t.agent_definition_id is not None else ""),
+        project_slug=(t.project.slug if t.project_id is not None else ""),
         status=t.status,
         callback_url=t.callback_url or "",
         result=t.result,

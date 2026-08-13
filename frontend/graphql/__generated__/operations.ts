@@ -434,6 +434,8 @@ export type AstroliftAgentSkill = {
 };
 
 export type AstroliftAgentTask = {
+  agentName: Scalars['String']['output'];
+  agentSlug: Scalars['String']['output'];
   callbackUrl: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
   dispatcher?: Maybe<AstroliftAgentTaskDispatcher>;
@@ -442,6 +444,7 @@ export type AstroliftAgentTask = {
   id: Scalars['GUID']['output'];
   namespace: Scalars['String']['output'];
   podName: Scalars['String']['output'];
+  projectSlug: Scalars['String']['output'];
   provisioningAt?: Maybe<Scalars['DateTime']['output']>;
   queuedAt?: Maybe<Scalars['DateTime']['output']>;
   result?: Maybe<Scalars['JSON']['output']>;
@@ -795,6 +798,7 @@ export type AstroliftAppHealthSummary = {
   lastDeployedAt?: Maybe<Scalars['DateTime']['output']>;
   latestDeploymentStatus?: Maybe<Scalars['String']['output']>;
   latestImageTag: Scalars['String']['output'];
+  primitiveKind: Scalars['String']['output'];
 };
 
 export type AstroliftAppIdentityBinding = {
@@ -7310,6 +7314,8 @@ export type Query = {
   workflow?: Maybe<ConfiguredWorkflow>;
   /** One visible workflow definition by slug (prefers the org's over a global). */
   workflowDefinition?: Maybe<WorkflowDefinitionSummary>;
+  /** Recent runs of workflow definitions visible in the caller's organization. */
+  workflowDefinitionRuns: Array<WorkflowDefinitionRun>;
   /**
    * Workflow definitions visible to the caller: their org's UNION all platform-global (spec 40 §2.1).
    * @deprecated Unbounded — returns every visible definition in one response. Use workflowDefinitionsPage.
@@ -8568,8 +8574,17 @@ export type QueryWorkflowDefinitionArgs = {
 };
 
 
+export type QueryWorkflowDefinitionRunsArgs = {
+  limit?: Scalars['Int']['input'];
+  orgId?: InputMaybe<Scalars['ID']['input']>;
+  projectId?: InputMaybe<Scalars['ID']['input']>;
+  status?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryWorkflowDefinitionsArgs = {
   orgId?: InputMaybe<Scalars['ID']['input']>;
+  projectId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 
@@ -8577,6 +8592,7 @@ export type QueryWorkflowDefinitionsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   orgId?: InputMaybe<Scalars['ID']['input']>;
+  projectId?: InputMaybe<Scalars['ID']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -9482,6 +9498,22 @@ export type WithdrawSecretChangeInput = {
   proposalId: Scalars['GUID']['input'];
 };
 
+export type WorkflowDefinitionRun = {
+  currentStageOrder?: Maybe<Scalars['Int']['output']>;
+  currentStageRole: Scalars['String']['output'];
+  definitionGuid: Scalars['String']['output'];
+  definitionName: Scalars['String']['output'];
+  definitionSlug: Scalars['String']['output'];
+  endedAt?: Maybe<Scalars['DateTime']['output']>;
+  guid: Scalars['String']['output'];
+  projectGuid?: Maybe<Scalars['String']['output']>;
+  projectSlug: Scalars['String']['output'];
+  startedAt?: Maybe<Scalars['DateTime']['output']>;
+  status: Scalars['String']['output'];
+  temporalRunId?: Maybe<Scalars['String']['output']>;
+  temporalWorkflowId: Scalars['String']['output'];
+};
+
 export type WorkflowDefinitionSummary = {
   createdAt: Scalars['DateTime']['output'];
   description: Scalars['String']['output'];
@@ -9491,11 +9523,15 @@ export type WorkflowDefinitionSummary = {
   name: Scalars['String']['output'];
   organizationGuid?: Maybe<Scalars['String']['output']>;
   patternKind: Scalars['String']['output'];
+  projectGuid?: Maybe<Scalars['String']['output']>;
+  projectSlug: Scalars['String']['output'];
+  projectTeamSlug: Scalars['String']['output'];
   slug: Scalars['String']['output'];
   sourcePath: Scalars['String']['output'];
   sourceRef: Scalars['String']['output'];
   sourceRepo: Scalars['String']['output'];
   stageCount: Scalars['Int']['output'];
+  stages: Array<WorkflowTopologyStage>;
 };
 
 /** One page of a cursor-paginated list. */
@@ -9517,6 +9553,8 @@ export type WorkflowDefinitionType = {
   name: Scalars['String']['output'];
   organizationGuid?: Maybe<Scalars['String']['output']>;
   patternKind: Scalars['String']['output'];
+  projectGuid?: Maybe<Scalars['String']['output']>;
+  projectSlug: Scalars['String']['output'];
   slug: Scalars['String']['output'];
   sourcePath: Scalars['String']['output'];
   sourceRef: Scalars['String']['output'];
@@ -9620,6 +9658,26 @@ export type WorkflowStageType = {
   prompt: Scalars['String']['output'];
   role: Scalars['String']['output'];
   skillRefs: Scalars['JSON']['output'];
+  timeoutSeconds: Scalars['Int']['output'];
+};
+
+export type WorkflowTopologyStage = {
+  agentGuid?: Maybe<Scalars['String']['output']>;
+  agentName: Scalars['String']['output'];
+  agentRef: Scalars['String']['output'];
+  agentSlug: Scalars['String']['output'];
+  environmentSpecSlug: Scalars['String']['output'];
+  fanOutCount?: Maybe<Scalars['Int']['output']>;
+  fanOutDynamic: Scalars['Boolean']['output'];
+  guid: Scalars['String']['output'];
+  hasPrompt: Scalars['Boolean']['output'];
+  kind: Scalars['String']['output'];
+  onFailure: Scalars['String']['output'];
+  order: Scalars['Int']['output'];
+  outputKey: Scalars['String']['output'];
+  resolvedModel: Scalars['String']['output'];
+  role: Scalars['String']['output'];
+  skillRefs: Array<Scalars['String']['output']>;
   timeoutSeconds: Scalars['Int']['output'];
 };
 
@@ -10537,7 +10595,7 @@ export type GetCommandRunQuery = { astroliftCommandRun?: { id: string, registere
 export type ListAppHealthSummaryQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ListAppHealthSummaryQuery = { astroliftAppHealthSummary: Array<{ appSlug: string, appName: string, environmentCount: number, latestDeploymentStatus?: string | null, latestImageTag: string, lastDeployedAt?: string | null, hasRecentFailure: boolean }> };
+export type ListAppHealthSummaryQuery = { astroliftAppHealthSummary: Array<{ appSlug: string, appName: string, primitiveKind: string, environmentCount: number, latestDeploymentStatus?: string | null, latestImageTag: string, lastDeployedAt?: string | null, hasRecentFailure: boolean }> };
 
 export type ListAppDomainsQueryVariables = Exact<{
   appSlug: Scalars['String']['input'];

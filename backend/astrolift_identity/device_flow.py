@@ -176,8 +176,8 @@ def normalize_client_kind(kind: str | None) -> str:
 def token_scopes_for_client_kind(client_kind: str | None) -> list[str]:
     """Return the bearer ceiling for a browser-approved client kind.
 
-    The CLI exposes environment-spec CRUD, secret rotation, and agent
-    run/stop as first-class commands, so an explicitly approved CLI session
+    The CLI exposes environment-spec CRUD, secret rotation, agent run/stop,
+    and workflow build/run as first-class commands, so an explicitly approved CLI session
     receives those narrow capabilities. Mobile, IDE, and browser enrollment
     retain the read-only baseline. RBAC remains the second gate in every case.
     """

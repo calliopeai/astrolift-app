@@ -4,8 +4,8 @@ WorkflowDefinition: DB-configurable state machine (states, transitions, conditio
 WorkflowInstance: tracks a specific object through a workflow.
 TransitionLog: immutable history of every state change.
 """
+
 import logging
-from typing import Optional
 
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -68,11 +68,11 @@ class WorkflowDefinition(BaseCoreModel):
     )
     states = models.JSONField(
         default=list,
-        help_text='List of state definitions [{name, label, is_initial, is_final, color}]',
+        help_text="List of state definitions [{name, label, is_initial, is_final, color}]",
     )
     transitions = models.JSONField(
         default=list,
-        help_text='List of transition definitions [{from_state, to_state, label, conditions, actions, timeout_hours}]',
+        help_text="List of transition definitions [{from_state, to_state, label, conditions, actions, timeout_hours}]",
     )
     is_enabled = models.BooleanField(default=True)
     source_repo = models.CharField(
@@ -104,6 +104,14 @@ class WorkflowDefinition(BaseCoreModel):
         blank=True,
         on_delete=models.PROTECT,
     )
+    project = models.ForeignKey(
+        "astrolift_identity.Project",
+        related_name="workflow_definitions",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        help_text="Project packet that owns this repository workflow; null for reusable templates.",
+    )
     # Drop the global field-level slug uniqueness inherited from the legacy
     # BaseCoreModel: a slug is unique *per org* now (and a platform-global may
     # share a slug with an org's clone), enforced by (organization, slug).
@@ -131,55 +139,53 @@ class WorkflowDefinition(BaseCoreModel):
         platform-global (null-org) definitions."""
         from django.db.models import Q
 
-        return cls.objects.filter(
-            Q(organization_id=organization_id) | Q(organization__isnull=True)
-        )
+        return cls.objects.filter(Q(organization_id=organization_id) | Q(organization__isnull=True))
 
-    def get_initial_state(self) -> Optional[str]:
+    def get_initial_state(self) -> str | None:
         for state in self.states:
-            if state.get('is_initial'):
-                return state['name']
-        return self.states[0]['name'] if self.states else None
+            if state.get("is_initial"):
+                return state["name"]
+        return self.states[0]["name"] if self.states else None
 
     def get_final_states(self) -> set[str]:
-        return {s['name'] for s in self.states if s.get('is_final')}
+        return {s["name"] for s in self.states if s.get("is_final")}
 
     def get_state_label(self, state_name: str) -> str:
         for s in self.states:
-            if s['name'] == state_name:
-                return s.get('label', state_name)
+            if s["name"] == state_name:
+                return s.get("label", state_name)
         return state_name
 
     def get_available_transitions(self, from_state: str) -> list[dict]:
-        return [t for t in self.transitions if t['from_state'] == from_state]
+        return [t for t in self.transitions if t["from_state"] == from_state]
 
-    def get_transition(self, from_state: str, to_state: str) -> Optional[dict]:
+    def get_transition(self, from_state: str, to_state: str) -> dict | None:
         for t in self.transitions:
-            if t['from_state'] == from_state and t['to_state'] == to_state:
+            if t["from_state"] == from_state and t["to_state"] == to_state:
                 return t
         return None
 
     def validate_definition(self) -> list[str]:
         """Validate the workflow definition for correctness."""
         errors = []
-        state_names = {s['name'] for s in self.states}
-        initial_count = sum(1 for s in self.states if s.get('is_initial'))
+        state_names = {s["name"] for s in self.states}
+        initial_count = sum(1 for s in self.states if s.get("is_initial"))
 
         if not self.states:
-            errors.append('Workflow must have at least one state')
+            errors.append("Workflow must have at least one state")
         if initial_count != 1:
-            errors.append(f'Workflow must have exactly one initial state (found {initial_count})')
+            errors.append(f"Workflow must have exactly one initial state (found {initial_count})")
 
         for t in self.transitions:
-            if t['from_state'] not in state_names:
-                errors.append(f'Transition from unknown state: {t["from_state"]}')
-            if t['to_state'] not in state_names:
-                errors.append(f'Transition to unknown state: {t["to_state"]}')
+            if t["from_state"] not in state_names:
+                errors.append(f"Transition from unknown state: {t['from_state']}")
+            if t["to_state"] not in state_names:
+                errors.append(f"Transition to unknown state: {t['to_state']}")
 
         return errors
 
     def __str__(self):
-        return f'{self.name} ({self.model_label})'
+        return f"{self.name} ({self.model_label})"
 
 
 class WorkflowInstance(Tracking):
@@ -187,12 +193,13 @@ class WorkflowInstance(Tracking):
 
     Uses GenericForeignKey to attach to any Django model.
     """
+
     # Legacy tier (forms state-machine): now nullable — agent runs use
     # ``configured_workflow`` instead and stop faking the GFK (spec 40 §2.3).
     workflow = models.ForeignKey(
         WorkflowDefinition,
         on_delete=models.PROTECT,
-        related_name='instances',
+        related_name="instances",
         null=True,
         blank=True,
     )
@@ -215,7 +222,7 @@ class WorkflowInstance(Tracking):
     )
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
     object_id = models.PositiveIntegerField(null=True, blank=True)
-    content_object = GenericForeignKey('content_type', 'object_id')
+    content_object = GenericForeignKey("content_type", "object_id")
 
     current_state = models.CharField(max_length=100, db_index=True)
     started_at = models.DateTimeField(auto_now_add=True)
@@ -230,8 +237,8 @@ class WorkflowInstance(Tracking):
 
     class Meta:
         indexes = [
-            models.Index(fields=['content_type', 'object_id']),
-            models.Index(fields=['workflow', 'current_state']),
+            models.Index(fields=["content_type", "object_id"]),
+            models.Index(fields=["workflow", "current_state"]),
             models.Index(fields=["organization", "current_state"]),
         ]
 
@@ -245,7 +252,7 @@ class WorkflowInstance(Tracking):
         configured_workflow: "Workflow | None" = None,
         temporal_workflow_id: str | None = None,
         temporal_run_id: str | None = None,
-    ) -> 'WorkflowInstance':
+    ) -> "WorkflowInstance":
         """Start a new workflow instance.
 
         ``configured_workflow``-first path (spec 40 §2.3): agent runs start
@@ -269,7 +276,7 @@ class WorkflowInstance(Tracking):
 
         initial_state = workflow.get_initial_state()
         if not initial_state:
-            raise ValidationError('Workflow has no initial state')
+            raise ValidationError("Workflow has no initial state")
 
         ct = ContentType.objects.get_for_model(obj)
         instance = cls.objects.create(
@@ -283,15 +290,15 @@ class WorkflowInstance(Tracking):
 
         TransitionLog.objects.create(
             instance=instance,
-            from_state='',
+            from_state="",
             to_state=initial_state,
             transitioned_by=user,
-            note='Workflow started',
+            note="Workflow started",
         )
 
         return instance
 
-    def transition(self, to_state: str, user=None, note: str = '') -> 'TransitionLog':
+    def transition(self, to_state: str, user=None, note: str = "") -> "TransitionLog":
         """Execute a state transition.
 
         Validates the transition exists and evaluates conditions.
@@ -305,12 +312,10 @@ class WorkflowInstance(Tracking):
             )
 
         # Evaluate conditions
-        conditions = transition_def.get('conditions', [])
+        conditions = transition_def.get("conditions", [])
         for condition in conditions:
             if not self._evaluate_condition(condition, user):
-                raise ValidationError(
-                    f'Condition not met: {condition.get("type", "unknown")}'
-                )
+                raise ValidationError(f"Condition not met: {condition.get('type', 'unknown')}")
 
         # Execute transition
         from_state = self.current_state
@@ -329,11 +334,11 @@ class WorkflowInstance(Tracking):
             from_state=from_state,
             to_state=to_state,
             transitioned_by=user,
-            note=note or transition_def.get('label', ''),
+            note=note or transition_def.get("label", ""),
         )
 
         # Fire actions asynchronously
-        actions = transition_def.get('actions', [])
+        actions = transition_def.get("actions", [])
         for action in actions:
             self._fire_action(action, from_state, to_state, user)
 
@@ -345,14 +350,13 @@ class WorkflowInstance(Tracking):
         available = []
         for t in transitions:
             # Check conditions
-            conditions_met = all(
-                self._evaluate_condition(c, user)
-                for c in t.get('conditions', [])
+            conditions_met = all(self._evaluate_condition(c, user) for c in t.get("conditions", []))
+            available.append(
+                {
+                    **t,
+                    "conditions_met": conditions_met,
+                }
             )
-            available.append({
-                **t,
-                'conditions_met': conditions_met,
-            })
         return available
 
     @property
@@ -361,34 +365,34 @@ class WorkflowInstance(Tracking):
 
     def _evaluate_condition(self, condition: dict, user) -> bool:
         """Evaluate a transition condition."""
-        ctype = condition.get('type', '')
+        ctype = condition.get("type", "")
 
-        if ctype == 'user_has_role':
+        if ctype == "user_has_role":
             if not user:
                 return False
-            role = condition.get('role', '')
+            role = condition.get("role", "")
             return user.groups.filter(name=role).exists() or user.is_superuser
 
-        if ctype == 'field_equals':
+        if ctype == "field_equals":
             obj = self.content_object
-            field = condition.get('field', '')
-            value = condition.get('value')
+            field = condition.get("field", "")
+            value = condition.get("value")
             return getattr(obj, field, None) == value
 
-        if ctype == 'field_in':
+        if ctype == "field_in":
             obj = self.content_object
-            field = condition.get('field', '')
-            values = condition.get('values', [])
+            field = condition.get("field", "")
+            values = condition.get("values", [])
             return getattr(obj, field, None) in values
 
-        if ctype == 'is_authenticated':
+        if ctype == "is_authenticated":
             return user and user.is_authenticated
 
-        if ctype == 'is_superuser':
+        if ctype == "is_superuser":
             return user and user.is_superuser
 
         # Unknown condition type — pass by default
-        logger.warning(f'Unknown condition type: {ctype}')
+        logger.warning(f"Unknown condition type: {ctype}")
         return True
 
     def _fire_action(self, action: dict, from_state: str, to_state: str, user):
@@ -399,6 +403,7 @@ class WorkflowInstance(Tracking):
         """
         try:
             from workflows.tasks import execute_workflow_action
+
             execute_workflow_action(
                 instance_id=self.pk,
                 action=action,
@@ -407,34 +412,36 @@ class WorkflowInstance(Tracking):
                 user_id=user.pk if user else None,
             )
         except Exception as e:
-            logger.warning(f'Failed to fire action {action}: {e}')
+            logger.warning(f"Failed to fire action {action}: {e}")
 
     def __str__(self):
-        return f'{self.workflow.name}: {self.current_state} (obj={self.object_id})'
+        return f"{self.workflow.name}: {self.current_state} (obj={self.object_id})"
 
 
 class TransitionLog(models.Model):
     """Immutable log of every state transition."""
+
     instance = models.ForeignKey(
         WorkflowInstance,
         on_delete=models.CASCADE,
-        related_name='transition_logs',
+        related_name="transition_logs",
     )
     from_state = models.CharField(max_length=100)
     to_state = models.CharField(max_length=100)
     transitioned_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        null=True, blank=True,
+        null=True,
+        blank=True,
         on_delete=models.SET_NULL,
     )
     note = models.TextField(blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-timestamp']
+        ordering = ["-timestamp"]
 
     def __str__(self):
-        return f'{self.from_state} → {self.to_state} at {self.timestamp}'
+        return f"{self.from_state} → {self.to_state} at {self.timestamp}"
 
 
 class WorkflowStage(BaseCoreModel):
@@ -675,14 +682,9 @@ class Workflow(BaseCoreModel):
                 continue
             if "skill_refs" in binding and (
                 not isinstance(binding["skill_refs"], list)
-                or any(
-                    not isinstance(ref, str) or not ref.strip()
-                    for ref in binding["skill_refs"]
-                )
+                or any(not isinstance(ref, str) or not ref.strip() for ref in binding["skill_refs"])
             ):
-                errors.append(
-                    f"stage {order} skill_refs must be a list of non-empty strings"
-                )
+                errors.append(f"stage {order} skill_refs must be a list of non-empty strings")
             params = binding.get("params", {})
             if not isinstance(params, dict):
                 errors.append(f"stage {order} params must be an object")
@@ -728,10 +730,7 @@ class Workflow(BaseCoreModel):
             raise ValidationError("Invalid stage_bindings: " + "; ".join(malformed))
         unbound = self.unbound_agent_stages()
         if unbound:
-            labels = ", ".join(
-                f"stage {order}" + (f" ({role})" if role else "")
-                for order, role in unbound
-            )
+            labels = ", ".join(f"stage {order}" + (f" ({role})" if role else "") for order, role in unbound)
             raise ValidationError(f"Unbound agent_dispatch stage(s): {labels}")
         unresolved = self.unresolved_agent_bindings()
         if unresolved:

@@ -16,6 +16,27 @@ import strawberry
 JSON = strawberry.scalars.JSON
 
 
+@strawberry.type(name="WorkflowTopologyStage")
+class WorkflowTopologyStageType:
+    guid: str
+    order: int
+    kind: str
+    role: str
+    agent_ref: str
+    agent_guid: str | None
+    agent_name: str
+    agent_slug: str
+    environment_spec_slug: str
+    resolved_model: str
+    has_prompt: bool
+    output_key: str
+    skill_refs: list[str]
+    fan_out_count: int | None
+    fan_out_dynamic: bool
+    on_failure: str
+    timeout_seconds: int
+
+
 @strawberry.type(name="WorkflowDefinitionSummary")
 class WorkflowDefinitionSummaryType:
     """A tier-1 ``WorkflowDefinition`` (template) as the catalogue + builder
@@ -30,10 +51,14 @@ class WorkflowDefinitionSummaryType:
     is_enabled: bool
     is_global: bool
     organization_guid: str | None
+    project_guid: str | None
+    project_slug: str
+    project_team_slug: str
     source_repo: str
     source_path: str
     source_ref: str
     stage_count: int
+    stages: list[WorkflowTopologyStageType]
     created_at: datetime
 
 
@@ -49,6 +74,23 @@ class WorkflowRunType:
     started_at: datetime
     completed_at: datetime | None
     is_completed: bool
+
+
+@strawberry.type(name="WorkflowDefinitionRun")
+class WorkflowDefinitionRunType:
+    guid: str
+    definition_guid: str
+    definition_slug: str
+    definition_name: str
+    project_guid: str | None
+    project_slug: str
+    status: str
+    temporal_workflow_id: str
+    temporal_run_id: str | None
+    current_stage_order: int | None
+    current_stage_role: str
+    started_at: datetime | None
+    ended_at: datetime | None
 
 
 @strawberry.type(name="ConfiguredWorkflow")
@@ -75,7 +117,48 @@ class ConfiguredWorkflowType:
     runs: list[WorkflowRunType]
 
 
-def definition_summary(definition) -> WorkflowDefinitionSummaryType:
+def environment_model_map(definitions) -> dict[tuple[int, str], str]:
+    from astrolift_agents.models import AgentEnvironmentSpec
+
+    refs = {
+        (definition.organization_id, stage.environment_spec_slug)
+        for definition in definitions
+        if definition.organization_id is not None
+        for stage in definition.stages.all()
+        if stage.deleted_at is None and stage.environment_spec_slug
+    }
+    if not refs:
+        return {}
+    org_ids = {org_id for org_id, _slug in refs}
+    slugs = {slug for _org_id, slug in refs}
+    rows = AgentEnvironmentSpec.objects.filter(
+        organization_id__in=org_ids,
+        slug__in=slugs,
+        deleted_at__isnull=True,
+    ).values_list("organization_id", "slug", "env_vars")
+    models: dict[tuple[int, str], str] = {}
+    for org_id, slug, env_vars in rows:
+        values = env_vars if isinstance(env_vars, dict) else {}
+        model = next(
+            (
+                str(values[key])
+                for key in ("ANTHROPIC_MODEL", "OPENAI_MODEL", "MODEL_ID", "MODEL")
+                if values.get(key)
+            ),
+            "",
+        )
+        models[(org_id, slug)] = model
+    return models
+
+
+def definition_summary(
+    definition,
+    *,
+    environment_models: dict[tuple[int, str], str] | None = None,
+) -> WorkflowDefinitionSummaryType:
+    stages = [stage for stage in definition.stages.all() if stage.deleted_at is None]
+    stages.sort(key=lambda stage: stage.order)
+    model_map = environment_models or {}
     return WorkflowDefinitionSummaryType(
         guid=str(definition.guid),
         name=definition.name,
@@ -85,10 +168,40 @@ def definition_summary(definition) -> WorkflowDefinitionSummaryType:
         is_enabled=definition.is_enabled,
         is_global=definition.organization_id is None,
         organization_guid=(None if definition.organization_id is None else str(definition.organization.guid)),
+        project_guid=(None if definition.project_id is None else str(definition.project.guid)),
+        project_slug=(definition.project.slug if definition.project_id is not None else ""),
+        project_team_slug=(definition.project.team.slug if definition.project_id is not None else ""),
         source_repo=definition.source_repo or "",
         source_path=definition.source_path or "",
         source_ref=definition.source_ref or "",
-        stage_count=definition.stages.filter(deleted_at__isnull=True).count(),
+        stage_count=len(stages),
+        stages=[
+            WorkflowTopologyStageType(
+                guid=str(stage.guid),
+                order=stage.order,
+                kind=stage.kind,
+                role=stage.role or "",
+                agent_ref=stage.agent_ref or "",
+                agent_guid=(
+                    str(stage.agent_definition.guid) if stage.agent_definition_id is not None else None
+                ),
+                agent_name=(stage.agent_definition.name if stage.agent_definition_id is not None else ""),
+                agent_slug=(stage.agent_definition.slug if stage.agent_definition_id is not None else ""),
+                environment_spec_slug=stage.environment_spec_slug or "",
+                resolved_model=model_map.get(
+                    (definition.organization_id, stage.environment_spec_slug),
+                    "",
+                ),
+                has_prompt=bool((stage.prompt or "").strip()),
+                output_key=stage.output_key or "",
+                skill_refs=list(stage.skill_refs or []),
+                fan_out_count=stage.fan_out_count,
+                fan_out_dynamic=stage.fan_out_dynamic,
+                on_failure=stage.on_failure,
+                timeout_seconds=stage.timeout_seconds,
+            )
+            for stage in stages
+        ],
         created_at=definition.created_at,
     )
 
@@ -104,6 +217,27 @@ def run_to_type(instance) -> WorkflowRunType:
         started_at=instance.started_at,
         completed_at=instance.completed_at,
         is_completed=instance.completed_at is not None,
+    )
+
+
+def definition_run_to_type(run) -> WorkflowDefinitionRunType:
+    definition = run.workflow_definition
+    execution = run.current_stage_execution
+    stage = execution.stage if execution is not None else None
+    return WorkflowDefinitionRunType(
+        guid=str(run.guid),
+        definition_guid=str(definition.guid),
+        definition_slug=definition.slug or "",
+        definition_name=definition.name,
+        project_guid=(None if definition.project_id is None else str(definition.project.guid)),
+        project_slug=(definition.project.slug if definition.project_id is not None else ""),
+        status=run.status,
+        temporal_workflow_id=run.workflow_id,
+        temporal_run_id=run.run_id or None,
+        current_stage_order=(stage.order if stage is not None else None),
+        current_stage_role=((stage.role or "") if stage is not None else ""),
+        started_at=run.started_at,
+        ended_at=run.ended_at,
     )
 
 

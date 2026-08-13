@@ -6,7 +6,7 @@ import logging
 from datetime import timedelta
 
 import strawberry
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.utils import timezone
 from strawberry.types import Info
 
@@ -708,9 +708,7 @@ class LifecycleQuery:
         return [app_env_to_type(e) for e in qs[:300]]
 
     @strawberry.field(
-        deprecation_reason=(
-            "Caps at 200 rows with no way to reach the 201st. " "Use astroliftDeploymentsPage."
-        )
+        deprecation_reason=("Caps at 200 rows with no way to reach the 201st. Use astroliftDeploymentsPage.")
     )
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
@@ -1350,8 +1348,24 @@ class LifecycleQuery:
         if not apps:
             return []
         app_ids = [a.id for a in apps]
+        from astrolift_registry.models import Workload
 
-        # Four queries total rather than three per app (#1237). This is a
+        workload_kinds = (
+            Workload.objects.filter(
+                registered_app_id__in=app_ids,
+                deleted_at__isnull=True,
+            )
+            .values("registered_app_id")
+            .annotate(
+                workload_count=Count("id"),
+                agent_count=Count("id", filter=Q(kind=Workload.Kind.AGENT)),
+            )
+        )
+        agent_app_ids = {
+            row["registered_app_id"] for row in workload_kinds if row["workload_count"] == row["agent_count"]
+        }
+
+        # Five queries total rather than three per app (#1237). This is a
         # dashboard-path resolver capped at 300 apps, so the loop form was
         # up to 901 round-trips on one page render. Each rollup is gathered
         # in one pass and joined in Python; separate queries rather than
@@ -1393,6 +1407,7 @@ class LifecycleQuery:
                 AppHealthSummaryType(
                     app_slug=app.slug,
                     app_name=app.name,
+                    primitive_kind=("agent" if app.id in agent_app_ids else "app"),
                     environment_count=env_counts.get(app.id, 0),
                     latest_deployment_status=(latest.status if latest else None),
                     latest_image_tag=(latest.image_tag if latest else ""),

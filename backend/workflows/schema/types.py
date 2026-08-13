@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 import strawberry
 import strawberry_django
 from strawberry.types import Info
 
 from workflows.models import (
-    TransitionLog,
     WorkflowDefinition,
     WorkflowInstance,
     WorkflowStage,
@@ -28,19 +26,19 @@ class WorkflowStageType:
     output_key: str
     approvers: strawberry.scalars.JSON
     skill_refs: strawberry.scalars.JSON
-    fan_out_count: Optional[int]
+    fan_out_count: int | None
     on_failure: str
     timeout_seconds: int
     created_at: datetime
 
     @strawberry_django.field
-    def agent_definition_guid(self) -> Optional[str]:
+    def agent_definition_guid(self) -> str | None:
         if self.agent_definition_id is None:
             return None
         return str(self.agent_definition.guid)
 
     @strawberry_django.field
-    def agent_definition_name(self) -> Optional[str]:
+    def agent_definition_name(self) -> str | None:
         if self.agent_definition_id is None:
             return None
         return self.agent_definition.name
@@ -51,10 +49,10 @@ class WorkflowStageExecutionType:
     guid: strawberry.ID
     status: str
     attempt_number: int
-    started_at: Optional[datetime]
-    ended_at: Optional[datetime]
-    output: Optional[strawberry.scalars.JSON]
-    failure: Optional[strawberry.scalars.JSON]
+    started_at: datetime | None
+    ended_at: datetime | None
+    output: strawberry.scalars.JSON | None
+    failure: strawberry.scalars.JSON | None
     error_message: str
     created_at: datetime
 
@@ -81,7 +79,7 @@ class WorkflowStageExecutionType:
         return self.stage.order
 
     @strawberry_django.field
-    def agent_run_guid(self) -> Optional[str]:
+    def agent_run_guid(self) -> str | None:
         if self.agent_run_id is None:
             return None
         return str(self.agent_run.guid)
@@ -91,7 +89,7 @@ class WorkflowStageExecutionType:
 class WorkflowDefinitionType:
     name: str
     slug: str
-    description: Optional[str]
+    description: str | None
     model_label: str
     pattern_kind: str
     states: strawberry.scalars.JSON
@@ -103,11 +101,21 @@ class WorkflowDefinitionType:
     created_at: datetime
 
     @strawberry_django.field
-    def organization_guid(self) -> Optional[str]:
+    def organization_guid(self) -> str | None:
         """Owning org's guid, or null for a platform-global template (spec 40 §2.1)."""
         if self.organization_id is None:
             return None
         return str(self.organization.guid)
+
+    @strawberry_django.field
+    def project_guid(self) -> str | None:
+        if self.project_id is None:
+            return None
+        return str(self.project.guid)
+
+    @strawberry_django.field
+    def project_slug(self) -> str:
+        return self.project.slug if self.project_id is not None else ""
 
     @strawberry_django.field
     def instance_count(self) -> int:
@@ -136,15 +144,15 @@ class TransitionLogEntry:
     to_state: str
     note: str
     timestamp: datetime
-    username: Optional[str]
+    username: str | None
 
 
 @strawberry_django.type(WorkflowInstance)
 class WorkflowInstanceType:
     current_state: str
     started_at: datetime
-    completed_at: Optional[datetime]
-    object_id: Optional[int]
+    completed_at: datetime | None
+    object_id: int | None
 
     @strawberry_django.field
     def workflow_name(self) -> str:
@@ -168,10 +176,10 @@ class WorkflowInstanceType:
         transitions = self.get_available_transitions(user)
         return [
             AvailableTransition(
-                from_state=t['from_state'],
-                to_state=t['to_state'],
-                label=t.get('label', ''),
-                conditions_met=t.get('conditions_met', True),
+                from_state=t["from_state"],
+                to_state=t["to_state"],
+                label=t.get("label", ""),
+                conditions_met=t.get("conditions_met", True),
             )
             for t in transitions
         ]
@@ -186,5 +194,5 @@ class WorkflowInstanceType:
                 timestamp=log.timestamp,
                 username=log.transitioned_by.username if log.transitioned_by else None,
             )
-            for log in self.transition_logs.select_related('transitioned_by').all()[:50]
+            for log in self.transition_logs.select_related("transitioned_by").all()[:50]
         ]

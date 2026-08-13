@@ -86,6 +86,9 @@ export const LIST_AGENT_TASKS = gql`
   query ListAgentTasks($orgId: ID!, $status: String, $workloadId: ID) {
     agentTasks(orgId: $orgId, status: $status, workloadId: $workloadId) {
       id
+      agentSlug
+      agentName
+      projectSlug
       status
       callbackUrl
       result

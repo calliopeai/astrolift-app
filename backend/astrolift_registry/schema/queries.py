@@ -129,18 +129,29 @@ def _apply_apps_list_filters(
     if source_kind and source_kind is not AstroliftAppSourceKindFilter.ALL:
         qs = qs.filter(source_kind=source_kind.value)
     # Apps and Agents are separate entity-modules (specs 34-36). An app that
-    # exists to host an agent (has a kind=agent Workload) belongs in the Agents
-    # list — exclude such agent-host apps here so they don't bleed into the
-    # Apps list (a regular app has no agent workloads and is unaffected). Both
+    # exists only to host agents belongs in the Agents list — exclude those
+    # agent-only hosts here so they don't bleed into the Apps list. A mixed
+    # registration with an application workload remains an app. Both
     # app-list resolvers + the page totalCount route through this helper, so
     # the separation holds uniformly.
     from astrolift_registry.models import Workload
 
-    agent_host_app_ids = Workload.objects.filter(
-        kind=Workload.Kind.AGENT,
-        deleted_at__isnull=True,
-    ).values("registered_app_id")
-    qs = qs.exclude(pk__in=agent_host_app_ids)
+    non_agent_host_app_ids = (
+        Workload.objects.filter(
+            deleted_at__isnull=True,
+        )
+        .exclude(kind=Workload.Kind.AGENT)
+        .values("registered_app_id")
+    )
+    agent_only_host_app_ids = (
+        Workload.objects.filter(
+            kind=Workload.Kind.AGENT,
+            deleted_at__isnull=True,
+        )
+        .exclude(registered_app_id__in=non_agent_host_app_ids)
+        .values("registered_app_id")
+    )
+    qs = qs.exclude(pk__in=agent_only_host_app_ids)
     return qs
 
 
@@ -1202,7 +1213,7 @@ class RegistryQuery:
 
     @strawberry.field(
         deprecation_reason=(
-            "Returns every grant in one unbounded response. " "Use astroliftAppTeamAccessesPage."
+            "Returns every grant in one unbounded response. Use astroliftAppTeamAccessesPage."
         )
     )
     @require_permission(Permission.APP_READ)
@@ -1260,7 +1271,7 @@ class RegistryQuery:
         return page.map(lambda r: app_team_access_to_type(r, home_team_id=r.registered_app.team_id))
 
     @strawberry.field(
-        deprecation_reason=("Caps at 200 rows with no way to reach the 201st. " "Use astroliftWorkloadsPage.")
+        deprecation_reason=("Caps at 200 rows with no way to reach the 201st. Use astroliftWorkloadsPage.")
     )
     @require_permission(Permission.APP_READ)
     @tenant_scoped()

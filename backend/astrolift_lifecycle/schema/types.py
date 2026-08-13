@@ -712,6 +712,7 @@ class DeploymentMetricsType:
 class AppHealthSummaryType:
     app_slug: str
     app_name: str
+    primitive_kind: str
     environment_count: int
     latest_deployment_status: str | None
     latest_image_tag: str

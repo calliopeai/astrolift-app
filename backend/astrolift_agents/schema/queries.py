@@ -505,9 +505,13 @@ class AgentsQuery:
         # select_related the org (snapshot_url presigning) plus the dispatcher
         # + its cluster, which the node-layer projection (#1091) reads — so the
         # list stays a bounded number of queries with no per-task N+1.
-        qs = qs.select_related("organization", "dispatcher", "dispatcher__tenant_cluster").order_by(
-            "-created_at"
-        )[:200]
+        qs = qs.select_related(
+            "organization",
+            "project",
+            "agent_definition",
+            "dispatcher",
+            "dispatcher__tenant_cluster",
+        ).order_by("-created_at")[:200]
         return [agent_task_to_type(t) for t in qs]
 
     @strawberry.field
@@ -534,7 +538,13 @@ class AgentsQuery:
                 deleted_at__isnull=True,
             )
             .exclude(vnc_url="")
-            .select_related("organization", "dispatcher", "dispatcher__tenant_cluster")
+            .select_related(
+                "organization",
+                "project",
+                "agent_definition",
+                "dispatcher",
+                "dispatcher__tenant_cluster",
+            )
             .order_by("-started_at", "-created_at")[:200]
         )
         return [agent_task_to_type(t) for t in qs]
@@ -551,7 +561,13 @@ class AgentsQuery:
         org_pk = tenant.organization_id if tenant else None
         row = (
             AgentTask.objects.filter(guid=guid, organization_id=org_pk, deleted_at__isnull=True)
-            .select_related("organization", "dispatcher", "dispatcher__tenant_cluster")
+            .select_related(
+                "organization",
+                "project",
+                "agent_definition",
+                "dispatcher",
+                "dispatcher__tenant_cluster",
+            )
             .first()
         )
         return agent_task_to_type(row) if row is not None else None
@@ -594,9 +610,13 @@ class AgentsQuery:
         qs = AgentTask.objects.filter(organization_id=org_pk, deleted_at__isnull=True)
         if since is not None:
             qs = qs.filter(updated_at__gt=since)
-        qs = qs.select_related("organization", "dispatcher", "dispatcher__tenant_cluster").order_by(
-            "updated_at"
-        )[:capped]
+        qs = qs.select_related(
+            "organization",
+            "project",
+            "agent_definition",
+            "dispatcher",
+            "dispatcher__tenant_cluster",
+        ).order_by("updated_at")[:capped]
         return [agent_task_to_type(t) for t in qs]
 
     @strawberry.field

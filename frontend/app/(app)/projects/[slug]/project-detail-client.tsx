@@ -16,6 +16,7 @@ import {
   ShieldIcon,
   Trash2Icon,
   UsersIcon,
+  WorkflowIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -40,6 +41,7 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatTile } from "@/components/ui/stat-tile";
+import { WorkflowTopology } from "@/components/workflows/workflow-topology";
 import {
   Table,
   TableBody,
@@ -63,8 +65,17 @@ import type {
 import { LIST_APPS } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp, ProvisioningStatus } from "@/graphql/registry/registry.types";
 import { useModules } from "@/graphql/user/user.hooks";
+import {
+  LIST_TIERED_WORKFLOW_DEFINITIONS,
+  LIST_WORKFLOW_DEFINITION_RUNS,
+} from "@/graphql/workflows/tiered.queries";
+import type {
+  WorkflowDefinitionRun,
+  WorkflowDefinitionSummary,
+} from "@/graphql/workflows/tiered.types";
 import { formatRelativeAge } from "@/lib/format";
 import { useFormatters } from "@/lib/i18n/formatters";
+import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 const statusDot: Record<ProvisioningStatus, "ok" | "warn" | "error" | "pending"> = {
   ready: "ok",
@@ -88,6 +99,12 @@ interface AgentWorkloadsResp {
 interface AgentLiveStatusResp {
   agentLiveStatus: AstroliftAgentLiveStatus[];
 }
+interface ProjectWorkflowsResp {
+  workflowDefinitions: WorkflowDefinitionSummary[];
+}
+interface ProjectWorkflowRunsResp {
+  workflowDefinitionRuns: WorkflowDefinitionRun[];
+}
 
 export function ProjectDetailClient({ slug }: { slug: string }) {
   const router = useRouter();
@@ -95,12 +112,21 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const modules = useModules();
+  const permissions = useMyPermissions();
+  const canViewApps = modules.canView("apps");
+  const canCreateApp = modules.canCreate("apps");
   const canViewAgents = modules.canView("agents");
   const canCreateAgent = modules.canCreate("agents");
+  const canViewWorkflows = modules.canView("workflows");
+  const canManageMembers = permissions.can("org.manage_members");
 
   const projects = useQuery<ProjectsResp>(LIST_PROJECTS);
-  const apps = useQuery<AppsResp>(LIST_APPS);
-  const members = useQuery<MembersResp>(LIST_MEMBERS);
+  const apps = useQuery<AppsResp>(LIST_APPS, {
+    skip: modules.loading || !canViewApps,
+  });
+  const members = useQuery<MembersResp>(LIST_MEMBERS, {
+    skip: permissions.loading || !canManageMembers,
+  });
 
   const project = projects.data?.astroliftProjects.find((p) => p.slug === slug);
   const orgId = project?.organization.id ?? "";
@@ -114,6 +140,17 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
     skip: !orgId || modules.loading || !canViewAgents,
     fetchPolicy: "cache-and-network",
     pollInterval: 15_000,
+  });
+  const workflows = useQuery<ProjectWorkflowsResp>(LIST_TIERED_WORKFLOW_DEFINITIONS, {
+    variables: { orgId, projectId: project?.id ?? null },
+    skip: !orgId || !project?.id || modules.loading || !canViewWorkflows,
+    fetchPolicy: "cache-and-network",
+  });
+  const workflowRuns = useQuery<ProjectWorkflowRunsResp>(LIST_WORKFLOW_DEFINITION_RUNS, {
+    variables: { orgId, projectId: project?.id ?? null, status: null, limit: 50 },
+    skip: !orgId || !project?.id || modules.loading || !canViewWorkflows,
+    fetchPolicy: "cache-and-network",
+    pollInterval: 10_000,
   });
 
   const [softDelete, { loading: deleting }] = useMutation<{
@@ -129,6 +166,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
   // matter for orgs with hundreds of projects (#TBD backend ticket).
   const projectApps = apps.data?.astroliftApps.filter((a) => a.projectSlug === slug) ?? [];
   const projectAgents = canViewAgents ? (agents.data?.agentWorkloads ?? []) : [];
+  const projectWorkflows = canViewWorkflows ? (workflows.data?.workflowDefinitions ?? []) : [];
   const liveByWorkloadId = React.useMemo(() => {
     const map = new Map<string, AstroliftAgentLiveStatus>();
     for (const row of liveAgents.data?.agentLiveStatus ?? []) {
@@ -186,12 +224,17 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
   const failingApps = projectApps.filter((a) => a.provisioningStatus === "failed").length;
   const hasAgents = projectAgents.length > 0;
   const hasApps = projectApps.length > 0;
+  const hasWorkflows = projectWorkflows.length > 0;
   const agentQueryError = canViewAgents ? agents.error : undefined;
-  const workloadQueryError = apps.error ?? agentQueryError;
-  const agentOnlyProject = hasAgents && !hasApps && !apps.error;
+  const appsQueryError = canViewApps ? apps.error : undefined;
+  const workloadQueryError = appsQueryError ?? agentQueryError;
+  const agentOnlyProject = hasAgents && canViewApps && !hasApps && !apps.error;
   const mixedProject = hasAgents && hasApps;
   const workloadQueriesLoading =
-    apps.loading || modules.loading || (canViewAgents && agents.loading && !agents.data);
+    (canViewApps && apps.loading && !apps.data) ||
+    modules.loading ||
+    (canViewAgents && agents.loading && !agents.data) ||
+    (canViewWorkflows && workflows.loading && !workflows.data);
   const runningAgentRuns = projectAgents.reduce(
     (total, agent) => total + (liveByWorkloadId.get(agent.id)?.runningCount ?? agent.runningCount),
     0
@@ -203,6 +246,34 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
   }).length;
   const sourceRepoCount = new Set(projectAgents.map((agent) => agent.sourceRepo).filter(Boolean))
     .size;
+  const workflowMembershipByAgent = (() => {
+    const membership = new Map<string, WorkflowDefinitionSummary[]>();
+    for (const workflow of projectWorkflows) {
+      for (const stage of workflow.stages) {
+        const agentSlug = stage.agentSlug || stage.agentRef;
+        if (!agentSlug) continue;
+        const workflowsForAgent = membership.get(agentSlug) ?? [];
+        if (!workflowsForAgent.some((candidate) => candidate.guid === workflow.guid)) {
+          workflowsForAgent.push(workflow);
+        }
+        membership.set(agentSlug, workflowsForAgent);
+      }
+    }
+    return membership;
+  })();
+  const latestWorkflowRunByDefinition = (() => {
+    const latest = new Map<string, WorkflowDefinitionRun>();
+    for (const run of workflowRuns.data?.workflowDefinitionRuns ?? []) {
+      if (!latest.has(run.definitionGuid)) latest.set(run.definitionGuid, run);
+    }
+    return latest;
+  })();
+  const activeWorkflowRuns = (workflowRuns.data?.workflowDefinitionRuns ?? []).filter(
+    (run) => run.status === "running"
+  ).length;
+  const workflowsNeedingAttention = [...latestWorkflowRunByDefinition.values()].filter((run) =>
+    ["failed", "timed_out"].includes(run.status)
+  ).length;
 
   return (
     <PageShell
@@ -211,7 +282,9 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
           {agentOnlyProject ? <BotIcon className="size-5" /> : <FileBoxIcon className="size-5" />}
           {project.name}
           {!workloadQueriesLoading && agentOnlyProject && (
-            <Badge variant="secondary">Agent project</Badge>
+            <Badge variant="secondary">
+              {hasWorkflows ? "Agent workflow project" : "Agent project"}
+            </Badge>
           )}
           {!workloadQueriesLoading && mixedProject && (
             <Badge variant="secondary">Apps + agents</Badge>
@@ -250,13 +323,20 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
               </Link>
             </Button>
           )}
+          {!workloadQueriesLoading && hasWorkflows && (
+            <Button asChild variant="outline">
+              <Link href="/workflows">
+                <WorkflowIcon className="size-4" /> Workflows
+              </Link>
+            </Button>
+          )}
           {!workloadQueriesLoading && agentOnlyProject && canCreateAgent ? (
             <Button asChild>
               <Link href="/agents/new">
                 <PlusIcon className="size-4" /> Register agent repo
               </Link>
             </Button>
-          ) : !workloadQueriesLoading && hasApps ? (
+          ) : !workloadQueriesLoading && hasApps && canCreateApp ? (
             <Button asChild variant="outline">
               <Link href="/apps/new">
                 <PlusIcon className="size-4" /> New app
@@ -276,14 +356,26 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
           <Skeleton className="h-36 w-full" />
           <Skeleton className="h-36 w-full" />
         </div>
-      ) : hasAgents ? (
-        <div className={`grid gap-4 sm:grid-cols-3 ${mixedProject ? "xl:grid-cols-4" : ""}`}>
+      ) : hasAgents || hasWorkflows ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatTile
             icon={BotIcon}
             label="Registered agents"
             value={projectAgents.length}
             footer={`${sourceRepoCount} source ${sourceRepoCount === 1 ? "repo" : "repos"}`}
           />
+          {canViewWorkflows && (
+            <StatTile
+              icon={WorkflowIcon}
+              label="Workflows"
+              value={projectWorkflows.length}
+              footer={
+                activeWorkflowRuns > 0
+                  ? `${activeWorkflowRuns} active ${activeWorkflowRuns === 1 ? "run" : "runs"}`
+                  : `${projectWorkflows.reduce((count, workflow) => count + workflow.stageCount, 0)} total stages`
+              }
+            />
+          )}
           {mixedProject && (
             <StatTile
               icon={RocketIcon}
@@ -302,10 +394,12 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
           <StatTile
             icon={AlertTriangleIcon}
             label="Needs attention"
-            value={agentsNeedingAttention}
-            footer="paused or latest run failed"
+            value={agentsNeedingAttention + workflowsNeedingAttention}
+            footer="paused or latest agent/workflow run failed"
             className={
-              agentsNeedingAttention > 0 ? "border-warning-border bg-warning/5" : undefined
+              agentsNeedingAttention + workflowsNeedingAttention > 0
+                ? "border-warning-border bg-warning/5"
+                : undefined
             }
           />
         </div>
@@ -324,12 +418,14 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
             value={activeApps}
             footer="apps with a healthy latest rollout"
           />
-          <StatTile
-            icon={UsersIcon}
-            label="Direct members"
-            value={directMembers.length}
-            footer="users granted project-scope access"
-          />
+          {canManageMembers && (
+            <StatTile
+              icon={UsersIcon}
+              label="Direct members"
+              value={directMembers.length}
+              footer="users granted project-scope access"
+            />
+          )}
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
@@ -348,12 +444,14 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
             }
             className={workloadQueryError ? "border-warning-border bg-warning/5" : undefined}
           />
-          <StatTile
-            icon={UsersIcon}
-            label="Direct members"
-            value={directMembers.length}
-            footer="users granted project-scope access"
-          />
+          {canManageMembers && (
+            <StatTile
+              icon={UsersIcon}
+              label="Direct members"
+              value={directMembers.length}
+              footer="users granted project-scope access"
+            />
+          )}
         </div>
       )}
 
@@ -365,13 +463,87 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
             <div>
               <p className="text-danger-fg font-medium">Workload summary incomplete</p>
               <p className="text-muted-foreground mt-1 text-sm">
-                {apps.error && agentQueryError
+                {appsQueryError && agentQueryError
                   ? "Astrolift could not load application or agent workloads for this project."
-                  : apps.error
+                  : appsQueryError
                     ? "Application workloads could not be loaded. Agent data is shown, but this project has not been classified as agent-only."
                     : "Agent workloads could not be loaded. Application data is shown, but this project has not been classified as app-only."}
               </p>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {canViewWorkflows && workflows.error && (
+        <Card className="border-danger-border bg-danger-bg">
+          <CardContent className="flex items-start gap-3 p-6">
+            <AlertTriangleIcon className="text-danger-fg mt-0.5 size-5 shrink-0" />
+            <div>
+              <p className="text-danger-fg font-medium">Workflow topology unavailable</p>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Agents are still shown, but Astrolift could not load their workflow membership.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {hasWorkflows && (
+        <Card>
+          <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <WorkflowIcon className="size-4" /> Workflows in this project
+              </CardTitle>
+              <CardDescription>
+                Repository-declared pipelines and their ordered agent, environment, model, and
+                output bindings.
+              </CardDescription>
+            </div>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/workflows">View all</Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {projectWorkflows.map((workflow) => (
+              <section key={workflow.guid} className="rounded-lg border p-4">
+                <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold">{workflow.name}</h3>
+                      <Badge variant="outline" className="capitalize">
+                        {workflow.patternKind.replace(/_/g, " ")}
+                      </Badge>
+                      {latestWorkflowRunByDefinition.get(workflow.guid) && (
+                        <Badge
+                          variant={
+                            ["failed", "timed_out"].includes(
+                              latestWorkflowRunByDefinition.get(workflow.guid)?.status ?? ""
+                            )
+                              ? "destructive"
+                              : "secondary"
+                          }
+                          className="capitalize"
+                        >
+                          {latestWorkflowRunByDefinition
+                            .get(workflow.guid)
+                            ?.status.replace(/_/g, " ")}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-muted-foreground mt-1 font-mono text-xs">
+                      {workflow.sourcePath || workflow.slug}
+                    </p>
+                  </div>
+                  <Button asChild size="sm" variant="ghost">
+                    <Link href={`/workflows/${encodeURIComponent(workflow.slug)}/builder`}>
+                      Open <ExternalLinkIcon className="size-3" />
+                    </Link>
+                  </Button>
+                </div>
+                <WorkflowTopology stages={workflow.stages} />
+              </section>
+            ))}
           </CardContent>
         </Card>
       )}
@@ -401,6 +573,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
               <TableHeader>
                 <TableRow>
                   <TableHead>Agent</TableHead>
+                  <TableHead>Used by</TableHead>
                   <TableHead>Source</TableHead>
                   <TableHead>Run mode</TableHead>
                   <TableHead>Live status</TableHead>
@@ -419,6 +592,23 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
                         {agent.name}
                       </Link>
                       <div className="text-muted-foreground font-mono text-xs">{agent.slug}</div>
+                    </TableCell>
+                    <TableCell>
+                      {(workflowMembershipByAgent.get(agent.slug) ?? []).length > 0 ? (
+                        <div className="flex max-w-64 flex-wrap gap-1">
+                          {(workflowMembershipByAgent.get(agent.slug) ?? []).map((workflow) => (
+                            <Badge key={workflow.guid} variant="secondary" asChild>
+                              <Link
+                                href={`/workflows/${encodeURIComponent(workflow.slug)}/builder`}
+                              >
+                                {workflow.slug}
+                              </Link>
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <Badge variant="outline">Standalone</Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       {agent.sourceRepo ? (
@@ -473,39 +663,45 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
         </Card>
       )}
 
-      {!workloadQueriesLoading && !hasAgents && !hasApps && !workloadQueryError && (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
-            <div className="bg-muted flex size-11 items-center justify-center rounded-full">
-              <FileBoxIcon className="text-muted-foreground size-5" />
-            </div>
-            <div>
-              <h2 className="font-semibold">
-                {canViewAgents ? "No workloads in this project" : "No visible workloads"}
-              </h2>
-              <p className="text-muted-foreground mt-1 max-w-lg text-sm">
-                {canViewAgents
-                  ? "Connect an agent repository or register an application. Astrolift will adapt this overview to the workload types you add."
-                  : "No application workloads are visible in this project. Other workload types may be hidden by your module access."}
-              </p>
-            </div>
-            <div className="flex flex-wrap justify-center gap-2">
-              {canCreateAgent && (
-                <Button asChild>
-                  <Link href="/agents/new">
-                    <BotIcon className="size-4" /> Register agent repo
-                  </Link>
-                </Button>
-              )}
-              <Button asChild variant="outline">
-                <Link href="/apps/new">
-                  <RocketIcon className="size-4" /> Register app
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {!workloadQueriesLoading &&
+        !hasAgents &&
+        !hasApps &&
+        !hasWorkflows &&
+        !workloadQueryError && (
+          <Card>
+            <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
+              <div className="bg-muted flex size-11 items-center justify-center rounded-full">
+                <FileBoxIcon className="text-muted-foreground size-5" />
+              </div>
+              <div>
+                <h2 className="font-semibold">
+                  {canViewAgents ? "No workloads in this project" : "No visible workloads"}
+                </h2>
+                <p className="text-muted-foreground mt-1 max-w-lg text-sm">
+                  {canViewAgents
+                    ? "Connect an agent repository or register an application. Astrolift will adapt this overview to the workload types you add."
+                    : "No application workloads are visible in this project. Other workload types may be hidden by your module access."}
+                </p>
+              </div>
+              <div className="flex flex-wrap justify-center gap-2">
+                {canCreateAgent && (
+                  <Button asChild>
+                    <Link href="/agents/new">
+                      <BotIcon className="size-4" /> Register agent repo
+                    </Link>
+                  </Button>
+                )}
+                {canCreateApp && (
+                  <Button asChild variant="outline">
+                    <Link href="/apps/new">
+                      <RocketIcon className="size-4" /> Register app
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
       {/* ─── app workloads ────────────────────────────────────────────── */}
       {hasApps && (
@@ -581,60 +777,62 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
       )}
 
       {/* ─── members ───────────────────────────────────────────────────── */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <ShieldIcon className="size-4" /> Project members
-            </CardTitle>
-            <CardDescription>
-              Members with explicit access granted at the project scope. Org-wide and team-wide
-              members are not listed here.
-            </CardDescription>
-          </div>
-          <Can permission="org.manage_members">
-            <Button asChild size="sm">
-              <Link href="/administration/members">
-                <PlusIcon className="size-4" /> Invite
-              </Link>
-            </Button>
-          </Can>
-        </CardHeader>
-        <CardContent className="p-0">
-          {members.loading && directMembers.length === 0 ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
+      {canManageMembers && (
+        <Card>
+          <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ShieldIcon className="size-4" /> Project members
+              </CardTitle>
+              <CardDescription>
+                Members with explicit access granted at the project scope. Org-wide and team-wide
+                members are not listed here.
+              </CardDescription>
             </div>
-          ) : directMembers.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<UsersIcon className="size-5" />}
-                title="No direct project members"
-                description="Anyone with team or org-wide access already sees this project. Grant explicit project-scope access from the Members page."
-                actionHref="/administration/members"
-                actionLabel="Manage members"
-              />
-            </div>
-          ) : (
-            <ul className="divide-y">
-              {directMembers.map((m) => (
-                <li key={m.id} className="flex items-center justify-between px-6 py-3">
-                  <div>
-                    <div className="font-medium">{m.user.username || m.user.email}</div>
-                    <div className="text-muted-foreground text-xs">
-                      {m.user.email} · joined {m.joinedAt ? fmt.formatDate(m.joinedAt) : "—"}
+            <Can permission="org.manage_members">
+              <Button asChild size="sm">
+                <Link href="/administration/members">
+                  <PlusIcon className="size-4" /> Invite
+                </Link>
+              </Button>
+            </Can>
+          </CardHeader>
+          <CardContent className="p-0">
+            {members.loading && directMembers.length === 0 ? (
+              <div className="space-y-2 p-6">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : directMembers.length === 0 ? (
+              <div className="p-6">
+                <EmptyState
+                  icon={<UsersIcon className="size-5" />}
+                  title="No direct project members"
+                  description="Anyone with team or org-wide access already sees this project. Grant explicit project-scope access from the Members page."
+                  actionHref="/administration/members"
+                  actionLabel="Manage members"
+                />
+              </div>
+            ) : (
+              <ul className="divide-y">
+                {directMembers.map((m) => (
+                  <li key={m.id} className="flex items-center justify-between px-6 py-3">
+                    <div>
+                      <div className="font-medium">{m.user.username || m.user.email}</div>
+                      <div className="text-muted-foreground text-xs">
+                        {m.user.email} · joined {m.joinedAt ? fmt.formatDate(m.joinedAt) : "—"}
+                      </div>
                     </div>
-                  </div>
-                  <Badge variant="outline" className="text-xs uppercase">
-                    {m.scopeKind}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+                    <Badge variant="outline" className="text-xs uppercase">
+                      {m.scopeKind}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* ─── settings sheet ────────────────────────────────────────────── */}
       <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>

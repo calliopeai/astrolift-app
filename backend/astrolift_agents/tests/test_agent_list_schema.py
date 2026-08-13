@@ -451,7 +451,12 @@ def test_agent_tasks_filtered_by_workload(permission_resolver, info, with_tenant
     permission_resolver.grant(Permission.AGENT_READ)
     agent_a = _agent_workload(app, "agent-a")
     agent_b = _agent_workload(app, "agent-b")
-    task_a = AgentTask.objects.create(organization=org, agent_definition=agent_a, status="queued")
+    task_a = AgentTask.objects.create(
+        organization=org,
+        project=project,
+        agent_definition=agent_a,
+        status="queued",
+    )
     AgentTask.objects.create(organization=org, agent_definition=agent_b, status="queued")
 
     with with_tenant_org(org):
@@ -459,6 +464,9 @@ def test_agent_tasks_filtered_by_workload(permission_resolver, info, with_tenant
 
     assert len(rows) == 1
     assert str(rows[0].id) == str(task_a.guid)
+    assert rows[0].agent_slug == "agent-a"
+    assert rows[0].agent_name == "Agent-A"
+    assert rows[0].project_slug == "demo"
 
 
 def test_agent_tasks_foreign_workload_returns_empty(permission_resolver, info, with_tenant_org):

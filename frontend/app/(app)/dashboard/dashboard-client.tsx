@@ -26,6 +26,7 @@ import {
   ArrowDownIcon,
   ArrowRightIcon,
   ArrowUpIcon,
+  BotIcon,
   BoxIcon,
   CheckCircle2Icon,
   CircleXIcon,
@@ -35,6 +36,7 @@ import {
   HeartPulseIcon,
   RocketIcon,
   UsersIcon,
+  WorkflowIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -49,6 +51,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GET_COST_FORECAST } from "@/graphql/billing/billing.queries";
+import { LIST_AGENT_FLEET, LIST_AGENT_TASKS } from "@/graphql/agents/agents.queries";
+import type { AstroliftAgentListItem, AstroliftAgentTask } from "@/graphql/agents/agents.types";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import type { AstroliftCostForecast } from "@/graphql/billing/billing.types";
 import {
   GET_DEPLOYMENT_METRICS,
@@ -60,6 +65,16 @@ import type {
 } from "@/graphql/lifecycle/lifecycle.types";
 import { LIST_PROJECTS, LIST_TEAMS } from "@/graphql/identity/identity.queries";
 import type { AstroliftProject, AstroliftTeam } from "@/graphql/identity/identity.types";
+import { useModules } from "@/graphql/user/user.hooks";
+import {
+  LIST_TIERED_WORKFLOW_DEFINITIONS,
+  LIST_WORKFLOW_DEFINITION_RUNS,
+} from "@/graphql/workflows/tiered.queries";
+import type {
+  WorkflowDefinitionRun,
+  WorkflowDefinitionSummary,
+} from "@/graphql/workflows/tiered.types";
+import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 interface TeamsResp {
   astroliftTeams: AstroliftTeam[];
@@ -76,9 +91,29 @@ interface MetricsResp {
 interface CostForecastResp {
   astroliftCostForecast: AstroliftCostForecast;
 }
+interface AgentFleetResp {
+  agentFleet: AstroliftAgentListItem[];
+}
+interface AgentTasksResp {
+  agentTasks: AstroliftAgentTask[];
+}
+interface WorkflowDefinitionsResp {
+  workflowDefinitions: WorkflowDefinitionSummary[];
+}
+interface WorkflowDefinitionRunsResp {
+  workflowDefinitionRuns: WorkflowDefinitionRun[];
+}
 
 /** Canonical KPI tile ids — also the default left-to-right order. */
-const KPI_TILE_IDS = ["teams", "projects", "apps", "deployments", "costMtd"] as const;
+const KPI_TILE_IDS = [
+  "teams",
+  "projects",
+  "apps",
+  "deployments",
+  "agents",
+  "workflows",
+  "costMtd",
+] as const;
 type KpiTileId = (typeof KPI_TILE_IDS)[number];
 
 const KPI_ORDER_KEY = "astrolift.dashboard.kpiOrder.v1";
@@ -118,11 +153,28 @@ function saveTileOrder(order: KpiTileId[]) {
 
 export function DashboardClient() {
   const t = useTranslations("overview");
-  const teams = useQuery<TeamsResp>(LIST_TEAMS);
-  const projects = useQuery<ProjectsResp>(LIST_PROJECTS);
-  const health = useQuery<HealthResp>(LIST_APP_HEALTH_SUMMARY);
+  const modules = useModules();
+  const permissions = useMyPermissions();
+  const { org } = useActiveOrg();
+  const orgId = org?.id ?? "";
+  const canViewApps = modules.canView("apps");
+  const canViewAgents = modules.canView("agents");
+  const canViewWorkflows = modules.canView("workflows");
+  const canViewTeams = permissions.can("team.read");
+  const canViewProjects = permissions.can("project.read");
+  const canViewBilling = permissions.can("billing.read");
+  const canViewAudit = permissions.can("audit_log.read");
+
+  const teams = useQuery<TeamsResp>(LIST_TEAMS, { skip: permissions.loading || !canViewTeams });
+  const projects = useQuery<ProjectsResp>(LIST_PROJECTS, {
+    skip: permissions.loading || !canViewProjects,
+  });
+  const health = useQuery<HealthResp>(LIST_APP_HEALTH_SUMMARY, {
+    skip: modules.loading || !canViewApps,
+  });
   const metrics = useQuery<MetricsResp>(GET_DEPLOYMENT_METRICS, {
     variables: { windowDays: 30 },
+    skip: modules.loading || !canViewApps,
   });
   // Cost MTD pulls from the live aggregator (#432) — no client-side
   // estimation, all numbers come from the cloud's billing API via
@@ -130,14 +182,47 @@ export function DashboardClient() {
   // gating the rest of the dashboard.
   const costForecast = useQuery<CostForecastResp>(GET_COST_FORECAST, {
     fetchPolicy: "cache-and-network",
+    skip: permissions.loading || !canViewBilling,
   });
+  const agentFleet = useQuery<AgentFleetResp>(LIST_AGENT_FLEET, {
+    variables: { orgId },
+    skip: !orgId || modules.loading || !canViewAgents,
+    fetchPolicy: "cache-and-network",
+  });
+  const agentTasks = useQuery<AgentTasksResp>(LIST_AGENT_TASKS, {
+    variables: { orgId, status: null, workloadId: null },
+    skip: !orgId || modules.loading || !canViewAgents,
+    fetchPolicy: "cache-and-network",
+    pollInterval: 10_000,
+  });
+  const workflowDefinitions = useQuery<WorkflowDefinitionsResp>(LIST_TIERED_WORKFLOW_DEFINITIONS, {
+    variables: { orgId: orgId || null, projectId: null },
+    skip: !orgId || modules.loading || !canViewWorkflows,
+    fetchPolicy: "cache-and-network",
+  });
+  const workflowRuns = useQuery<WorkflowDefinitionRunsResp>(LIST_WORKFLOW_DEFINITION_RUNS, {
+    variables: { orgId: orgId || null, projectId: null, status: null, limit: 100 },
+    skip: !orgId || modules.loading || !canViewWorkflows,
+    fetchPolicy: "cache-and-network",
+    pollInterval: 10_000,
+  });
+  const [dashboardNow, setDashboardNow] = useState(0);
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setDashboardNow(Date.now()));
+    const interval = window.setInterval(() => setDashboardNow(Date.now()), 60_000);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearInterval(interval);
+    };
+  }, []);
 
   // Tile order is per-operator, persisted in localStorage (#1056a). SSR and
   // first client paint use the default order; the saved order applies after
   // mount so hydration stays consistent.
   const [tileOrder, setTileOrder] = useState<KpiTileId[]>([...KPI_TILE_IDS]);
   useEffect(() => {
-    setTileOrder(loadTileOrder());
+    const frame = window.requestAnimationFrame(() => setTileOrder(loadTileOrder()));
+    return () => window.cancelAnimationFrame(frame);
   }, []);
   // The distance constraint keeps plain clicks navigating the tile's Link;
   // a drag only starts after 8px of pointer travel.
@@ -168,7 +253,35 @@ export function DashboardClient() {
     ? 0
     : projects.data?.astroliftProjects.length;
 
-  const apps = health.data?.astroliftAppHealthSummary ?? [];
+  const apps = (health.data?.astroliftAppHealthSummary ?? []).filter(
+    (app) => app.primitiveKind !== "agent"
+  );
+  const agents = agentFleet.data?.agentFleet ?? [];
+  const agentTaskRows = agentTasks.data?.agentTasks ?? [];
+  const runnableWorkflows = (workflowDefinitions.data?.workflowDefinitions ?? []).filter(
+    (workflow) =>
+      !workflow.isGlobal && Boolean(workflow.sourceRepo) && Boolean(workflow.projectGuid)
+  );
+  const workflowRunRows = workflowRuns.data?.workflowDefinitionRuns ?? [];
+  const activeAgentTasks = agentTaskRows.filter((task) =>
+    ["queued", "provisioning", "running"].includes(task.status)
+  );
+  const runningAgentTasks = activeAgentTasks.filter((task) => task.status === "running").length;
+  const queuedAgentTasks = activeAgentTasks.length - runningAgentTasks;
+  const activeWorkflowRuns = workflowRunRows.filter((run) => run.status === "running");
+  const recentCutoff = dashboardNow - 24 * 60 * 60 * 1000;
+  const recentAgentFailures = agentTaskRows.filter(
+    (task) =>
+      dashboardNow > 0 &&
+      ["failed", "timed_out"].includes(task.status) &&
+      Date.parse(task.finishedAt ?? task.createdAt) >= recentCutoff
+  ).length;
+  const recentWorkflowFailures = workflowRunRows.filter(
+    (run) =>
+      dashboardNow > 0 &&
+      ["failed", "timed_out"].includes(run.status) &&
+      Date.parse(run.endedAt ?? run.startedAt ?? "") >= recentCutoff
+  ).length;
   // Composite health badge: an app counts as healthy when its latest
   // deploy status is 'running' AND there's been no terminal failure
   // in the recent window. ``recentFailureCount`` deliberately scopes
@@ -188,10 +301,19 @@ export function DashboardClient() {
   // (includes apps that had a recent hiccup but are currently up — those
   // apps ARE running even if they had a failure in the recent window).
   // inFlight is preserved for the deployment-metrics chart below.
-  const deployedCount = apps.filter(
-    (a) => a.latestDeploymentStatus === "running"
-  ).length;
+  const deployedCount = apps.filter((a) => a.latestDeploymentStatus === "running").length;
   const inFlightCount = metrics.data?.astroliftDeploymentMetrics.inFlight ?? 0;
+  const operationalIssueCount =
+    failingCount + recentFailureCount + recentAgentFailures + recentWorkflowFailures;
+  const hasOperationalModules = canViewApps || canViewAgents || canViewWorkflows;
+  const visibleTileIds = tileOrder.filter((id) => {
+    if (id === "teams") return canViewTeams;
+    if (id === "projects") return canViewProjects;
+    if (id === "apps" || id === "deployments") return canViewApps;
+    if (id === "agents") return canViewAgents;
+    if (id === "workflows") return canViewWorkflows;
+    return canViewBilling;
+  });
 
   const recentProjects = projects.data?.astroliftProjects.slice(0, 5) ?? [];
   const teamsBannerError = isEmptyListError(teams.error) ? null : teams.error;
@@ -250,6 +372,26 @@ export function DashboardClient() {
         emptyCta={t("tiles.deployments.emptyCta")}
       />
     ),
+    agents: (
+      <KpiTile
+        label="Agents"
+        icon={BotIcon}
+        value={agents.length}
+        loading={agentFleet.loading}
+        href="/agents"
+        emptyCta="No registered agents"
+      />
+    ),
+    workflows: (
+      <KpiTile
+        label="Workflows"
+        icon={WorkflowIcon}
+        value={runnableWorkflows.length}
+        loading={workflowDefinitions.loading}
+        href="/workflows"
+        emptyCta="No repository workflows"
+      />
+    ),
     costMtd: (
       <KpiTile
         label={t("tiles.costMtd.label")}
@@ -280,10 +422,14 @@ export function DashboardClient() {
         </Card>
       )}
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleTileDragEnd}>
-        <SortableContext items={tileOrder} strategy={rectSortingStrategy}>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            {tileOrder.map((id) => (
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleTileDragEnd}
+      >
+        <SortableContext items={visibleTileIds} strategy={rectSortingStrategy}>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+            {visibleTileIds.map((id) => (
               <SortableKpiTile key={id} id={id} tourId={id === "apps" ? "apps-tile" : undefined}>
                 {kpiTiles[id]}
               </SortableKpiTile>
@@ -292,134 +438,265 @@ export function DashboardClient() {
         </SortableContext>
       </DndContext>
 
-      <Section
-        title={
-          <span className="flex items-center gap-2">
-            <HeartPulseIcon className="size-4" /> {t("fleetHealth.title")}
-          </span>
-        }
-        description={t("fleetHealth.description")}
-        action={
-          health.loading ? (
-            <Skeleton className="h-6 w-20" />
-          ) : failingCount === 0 && recentFailureCount === 0 ? (
-            <Badge className="gap-1 bg-success/15 text-success-fg">
-              <CheckCircle2Icon className="size-3" /> {t("fleetHealth.healthy")}
-            </Badge>
-          ) : failingCount > 0 ? (
-            <Badge variant="destructive" className="gap-1 bg-danger/15 text-danger-fg">
-              <CircleXIcon className="size-3" />
-              {t("fleetHealth.failing", { count: failingCount })}
-            </Badge>
-          ) : (
-            <Badge className="gap-1 bg-warning/15 text-warning-fg">
-              <AlertTriangleIcon className="size-3" />
-              {t("fleetHealth.hiccup", { count: recentFailureCount })}
-            </Badge>
-          )
-        }
-      >
-        {health.loading ? (
-          <Skeleton className="h-12 w-full" />
-        ) : apps.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t("fleetHealth.empty")}</p>
-        ) : (
+      {hasOperationalModules && (
+        <Section
+          title={
+            <span className="flex items-center gap-2">
+              <ActivityIcon className="size-4" /> Operational state
+            </span>
+          }
+          description="Live state from the apps, agents, and workflows your current role can read."
+          action={
+            operationalIssueCount > 0 ? (
+              <Badge className="bg-warning/15 text-warning-fg gap-1">
+                <AlertTriangleIcon className="size-3" /> {operationalIssueCount} need attention
+              </Badge>
+            ) : (
+              <Badge className="bg-success/15 text-success-fg gap-1">
+                <CheckCircle2Icon className="size-3" /> No current alerts
+              </Badge>
+            )
+          }
+        >
           <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            {canViewApps && (
+              <FleetTile
+                label="Deployments in flight"
+                value={inFlightCount}
+                tone={inFlightCount > 0 ? "pending" : "muted"}
+                href="/deployments"
+              />
+            )}
+            {canViewAgents && (
+              <FleetTile
+                label="Active agent tasks"
+                value={activeAgentTasks.length}
+                detail={
+                  activeAgentTasks.length > 0
+                    ? `${runningAgentTasks} running · ${queuedAgentTasks} queued or provisioning`
+                    : undefined
+                }
+                tone={activeAgentTasks.length > 0 ? "pending" : "muted"}
+                href="/agents"
+              />
+            )}
+            {canViewWorkflows && (
+              <FleetTile
+                label="Active workflow runs"
+                value={activeWorkflowRuns.length}
+                tone={activeWorkflowRuns.length > 0 ? "pending" : "muted"}
+                href="/workflows?tab=running"
+              />
+            )}
             <FleetTile
-              label={t("fleetHealth.tiles.running")}
-              value={runningCount}
-              tone="ok"
-              href="/deployments"
-            />
-            <FleetTile
-              label={t("fleetHealth.tiles.recentFailure")}
-              value={recentFailureCount}
-              tone="warn"
-              href="/deployments"
-            />
-            <FleetTile
-              label={t("fleetHealth.tiles.failing")}
-              value={failingCount}
-              tone="error"
-              href="/deployments"
-            />
-            <FleetTile
-              label={t("fleetHealth.tiles.noDeploys")}
-              value={noDeployCount}
-              tone="muted"
-              href="/apps"
+              label="Failures in 24h"
+              value={recentAgentFailures + recentWorkflowFailures + recentFailureCount}
+              tone={
+                recentAgentFailures + recentWorkflowFailures + recentFailureCount > 0
+                  ? "error"
+                  : "ok"
+              }
+              href={
+                canViewAgents
+                  ? "/agents?tab=history"
+                  : canViewWorkflows
+                    ? "/workflows?tab=history"
+                    : "/deployments"
+              }
             />
           </div>
-        )}
-      </Section>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>{t("recentProjects.title")}</CardTitle>
-            <CardDescription>{t("recentProjects.description")}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {projects.loading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-            ) : recentProjects.length === 0 ? (
-              <EmptyState
-                icon={<FileBoxIcon className="size-5" />}
-                title={t("recentProjects.emptyTitle")}
-                description={t("recentProjects.emptyDescription")}
-                actionHref="/administration/teams"
-                actionLabel={t("recentProjects.emptyAction")}
-              />
+          {(activeAgentTasks.length > 0 || activeWorkflowRuns.length > 0) && (
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              {canViewAgents && activeAgentTasks.length > 0 && (
+                <div className="rounded-lg border">
+                  <div className="border-b px-4 py-3">
+                    <h3 className="font-medium">Agents running now</h3>
+                  </div>
+                  <ul className="divide-y">
+                    {activeAgentTasks.slice(0, 5).map((task) => (
+                      <li
+                        key={task.id}
+                        className="flex items-center justify-between gap-3 px-4 py-3"
+                      >
+                        <div className="min-w-0">
+                          <Link
+                            href={`/agents/runs/${encodeURIComponent(task.id)}`}
+                            className="truncate font-medium hover:underline"
+                          >
+                            {task.agentName || task.agentSlug || task.id}
+                          </Link>
+                          <p className="text-muted-foreground truncate font-mono text-xs">
+                            {task.projectSlug || "unassigned"} · {task.id}
+                          </p>
+                        </div>
+                        <Badge variant="secondary" className="capitalize">
+                          {task.status}
+                        </Badge>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {canViewWorkflows && activeWorkflowRuns.length > 0 && (
+                <div className="rounded-lg border">
+                  <div className="border-b px-4 py-3">
+                    <h3 className="font-medium">Workflows running now</h3>
+                  </div>
+                  <ul className="divide-y">
+                    {activeWorkflowRuns.slice(0, 5).map((run) => (
+                      <li
+                        key={run.guid}
+                        className="flex items-center justify-between gap-3 px-4 py-3"
+                      >
+                        <div className="min-w-0">
+                          <Link
+                            href={`/workflows/${encodeURIComponent(run.definitionSlug)}/builder`}
+                            className="truncate font-medium hover:underline"
+                          >
+                            {run.definitionName}
+                          </Link>
+                          <p className="text-muted-foreground truncate text-xs">
+                            {run.projectSlug || "Reusable template"}
+                            {run.currentStageOrder != null
+                              ? ` · stage ${run.currentStageOrder + 1}${run.currentStageRole ? ` ${run.currentStageRole}` : ""}`
+                              : ""}
+                          </p>
+                        </div>
+                        <Badge>Running</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </Section>
+      )}
+
+      {canViewApps && (
+        <Section
+          title={
+            <span className="flex items-center gap-2">
+              <HeartPulseIcon className="size-4" /> {t("fleetHealth.title")}
+            </span>
+          }
+          description={t("fleetHealth.description")}
+          action={
+            health.loading ? (
+              <Skeleton className="h-6 w-20" />
+            ) : failingCount === 0 && recentFailureCount === 0 ? (
+              <Badge className="bg-success/15 text-success-fg gap-1">
+                <CheckCircle2Icon className="size-3" /> {t("fleetHealth.healthy")}
+              </Badge>
+            ) : failingCount > 0 ? (
+              <Badge variant="destructive" className="bg-danger/15 text-danger-fg gap-1">
+                <CircleXIcon className="size-3" />
+                {t("fleetHealth.failing", { count: failingCount })}
+              </Badge>
             ) : (
-              <ul className="divide-y">
-                {recentProjects.map((p) => (
-                  <li key={p.id} className="flex items-center justify-between py-3">
-                    <div>
-                      <Link href="/administration/projects" className="font-medium hover:underline">
-                        {p.team.slug}/{p.slug}
-                      </Link>
-                      <p className="text-muted-foreground text-xs">{p.name}</p>
-                    </div>
-                    <Badge variant="outline">{p.team.slug}</Badge>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+              <Badge className="bg-warning/15 text-warning-fg gap-1">
+                <AlertTriangleIcon className="size-3" />
+                {t("fleetHealth.hiccup", { count: recentFailureCount })}
+              </Badge>
+            )
+          }
+        >
+          {health.loading ? (
+            <Skeleton className="h-12 w-full" />
+          ) : apps.length === 0 ? (
+            <p className="text-muted-foreground text-sm">{t("fleetHealth.empty")}</p>
+          ) : (
+            <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <FleetTile
+                label={t("fleetHealth.tiles.running")}
+                value={runningCount}
+                tone="ok"
+                href="/deployments"
+              />
+              <FleetTile
+                label={t("fleetHealth.tiles.recentFailure")}
+                value={recentFailureCount}
+                tone="warn"
+                href="/deployments"
+              />
+              <FleetTile
+                label={t("fleetHealth.tiles.failing")}
+                value={failingCount}
+                tone="error"
+                href="/deployments"
+              />
+              <FleetTile
+                label={t("fleetHealth.tiles.noDeploys")}
+                value={noDeployCount}
+                tone="muted"
+                href="/apps"
+              />
+            </div>
+          )}
+        </Section>
+      )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ActivityIcon className="size-4" /> {t("activity.title")}
-            </CardTitle>
-            <CardDescription>{t("activity.description")}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ActivityFeed />
-          </CardContent>
-        </Card>
-      </div>
+      {(canViewProjects || canViewAudit) && (
+        <div className="grid gap-4 lg:grid-cols-3">
+          {canViewProjects && (
+            <Card className={canViewAudit ? "lg:col-span-2" : "lg:col-span-3"}>
+              <CardHeader>
+                <CardTitle>{t("recentProjects.title")}</CardTitle>
+                <CardDescription>{t("recentProjects.description")}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {projects.loading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                ) : recentProjects.length === 0 ? (
+                  <EmptyState
+                    icon={<FileBoxIcon className="size-5" />}
+                    title={t("recentProjects.emptyTitle")}
+                    description={t("recentProjects.emptyDescription")}
+                    actionHref="/administration/teams"
+                    actionLabel={t("recentProjects.emptyAction")}
+                  />
+                ) : (
+                  <ul className="divide-y">
+                    {recentProjects.map((p) => (
+                      <li key={p.id} className="flex items-center justify-between py-3">
+                        <div>
+                          <Link
+                            href={`/projects/${encodeURIComponent(p.slug)}`}
+                            className="font-medium hover:underline"
+                          >
+                            {p.team.slug}/{p.slug}
+                          </Link>
+                          <p className="text-muted-foreground text-xs">{p.name}</p>
+                        </div>
+                        <Badge variant="outline">{p.team.slug}</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
-      <Card data-onboarding-tour="apps-nav">
-        <CardHeader>
-          <CardTitle>{t("registeredApps.title")}</CardTitle>
-          <CardDescription>{t("registeredApps.description")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <EmptyState
-            icon={<BoxIcon className="size-5" />}
-            title={t("registeredApps.emptyTitle")}
-            description={t("registeredApps.emptyDescription")}
-            actionHref="/apps"
-            actionLabel={t("registeredApps.emptyAction")}
-          />
-        </CardContent>
-      </Card>
+          {canViewAudit && (
+            <Card className={canViewProjects ? undefined : "lg:col-span-3"}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ActivityIcon className="size-4" /> {t("activity.title")}
+                </CardTitle>
+                <CardDescription>{t("activity.description")}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ActivityFeed />
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
     </PageShell>
   );
 }
@@ -477,10 +754,11 @@ function SortableKpiTile({
   );
 }
 
-const FLEET_TONE: Record<"ok" | "warn" | "error" | "muted", string> = {
+const FLEET_TONE: Record<"ok" | "warn" | "error" | "pending" | "muted", string> = {
   ok: "border-success-border bg-success/5",
   warn: "border-warning-border bg-warning/5",
   error: "border-danger-border bg-danger/5",
+  pending: "border-primary/30 bg-primary/5",
   muted: "border-muted bg-muted/20",
 };
 
@@ -489,11 +767,13 @@ function FleetTile({
   value,
   tone,
   href,
+  detail,
 }: {
   label: string;
   value: number;
-  tone: "ok" | "warn" | "error" | "muted";
+  tone: "ok" | "warn" | "error" | "pending" | "muted";
   href: string;
+  detail?: string;
 }) {
   return (
     <Link
@@ -502,6 +782,7 @@ function FleetTile({
     >
       <div className="text-muted-foreground text-xs tracking-wide uppercase">{label}</div>
       <div className="mt-1 text-2xl font-bold tabular-nums">{value}</div>
+      {detail && <div className="text-muted-foreground mt-1 text-xs">{detail}</div>}
     </Link>
   );
 }
@@ -521,11 +802,7 @@ function CostMtdDelta({ forecast, t }: CostMtdDeltaProps) {
   const delta = forecast.deltaPct;
   const Direction = delta > 0 ? ArrowUpIcon : delta < 0 ? ArrowDownIcon : ArrowRightIcon;
   const tone =
-    delta > 0
-      ? "text-warning-fg"
-      : delta < 0
-        ? "text-success-fg"
-        : "text-muted-foreground";
+    delta > 0 ? "text-warning-fg" : delta < 0 ? "text-success-fg" : "text-muted-foreground";
   // Zero previous-month spend → no comparable signal; render the
   // neutral label rather than "0.0% vs prev month".
   if (forecast.previousMonthCents === 0) {

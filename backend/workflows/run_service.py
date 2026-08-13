@@ -41,6 +41,7 @@ def build_workflow_definition_run_input(
 
     run = WorkflowRun.objects.create(
         workflow_kind="WorkflowDefinitionRunWorkflow",
+        workflow_definition=definition,
         workflow_id="",
         run_id="",
         status=WorkflowRun.Status.RUNNING,
