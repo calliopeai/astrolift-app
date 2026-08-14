@@ -35,6 +35,7 @@ class FakePoller:
 class FakeSecretClient:
     def __init__(self) -> None:
         self.secrets: dict[str, str] = {}
+        self.last_tags: dict[str, str] | None = None
 
     def get_secret(self, name: str) -> FakeSecret:
         if name not in self.secrets:
@@ -49,6 +50,7 @@ class FakeSecretClient:
         tags: dict[str, str] | None = None,
     ) -> FakeSecret:
         self.secrets[name] = value
+        self.last_tags = tags
         return FakeSecret(name=name, value=value)
 
     def begin_delete_secret(self, name: str) -> FakePoller:
@@ -85,6 +87,7 @@ def test_upsert_writes_json_payload(
     assert "astrolift-database--url" in fake_client.secrets
     parsed = json.loads(fake_client.secrets["astrolift-database--url"])
     assert parsed == {"url": "postgres://..."}
+    assert fake_client.last_tags == {"astrolift-managed-by": "platform"}
 
 
 def test_get_returns_kvs(

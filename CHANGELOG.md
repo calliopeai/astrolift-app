@@ -115,6 +115,9 @@
 
 ### Fixed
 
+- Serialize Azure ownership, billing, and custom ARM tags through one
+  collision-safe codec so tag names satisfy Azure restrictions and cost
+  actuals group by the same `astrolift-binding` key drivers emit.
 - Make GKE workload identity reconcile project IAM roles on every deploy,
   annotate workload ServiceAccounts with canonical length-safe Google service
   accounts, include attached project resources, and reject inert raw grants.
