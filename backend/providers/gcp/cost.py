@@ -55,6 +55,8 @@ SERVICE_ID_BY_VARIANT: dict[tuple[str, str], str] = {
     ("redis", "memorystore"): "F25A-3A0D-5DDB",  # Memorystore
     ("nosql", "firestore"): "F17B-412E-CB64",  # Firestore
     ("nosql", "bigtable"): "FD83-CFB8-A3CB",  # Bigtable
+    ("kv_store", "bigtable"): "FD83-CFB8-A3CB",  # Bigtable (portable kind)
+    ("encryption_key", "cloud_kms"): "EE2F-D110-890C",  # Cloud KMS
     # Cluster compute capacity (#440). The Compute Engine service ID;
     # the driver walks N2 SKUs (core + ram line items) and sums them
     # for the cluster's region.
