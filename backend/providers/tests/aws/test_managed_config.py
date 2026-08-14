@@ -252,6 +252,29 @@ def test_sns_topic_variants_share_operator_defaults_but_distinct_runtime_drivers
     assert cfg.tracing_config_default == "Active"
 
 
+def test_eventbridge_config_resolves_project_defaults_and_protection():
+    from aws.managed.event_bus_eventbridge import EventBridgeConfig
+
+    cfg = managed_config_for(
+        "aws",
+        _cluster(
+            {
+                "account_id": "123456789012",
+                "eventbridge_name_prefix": "platform",
+                "eventbridge_kms_key_id": "arn:aws:kms:us-west-2:123456789012:key/key-1",
+                "deletion_protection_default": False,
+            },
+        ),
+        kind="event_bus",
+        variant="eventbridge",
+    )
+
+    assert isinstance(cfg, EventBridgeConfig)
+    assert cfg.event_bus_name_prefix == "platform"
+    assert cfg.kms_key_id.endswith("key/key-1")
+    assert cfg.deletion_protection_default is False
+
+
 def test_search_config_defaults_and_overrides():
     from aws.managed.search_opensearch import OpenSearchSearchConfig
 

@@ -622,8 +622,14 @@ MATRIX = AvailabilityMatrix(
             kind="event_bus",
             variant="eventbridge",
             plugin_id="aws",
-            status="planned",
+            status="preview",
             description="Amazon EventBridge custom bus, rules, and targets",
+            binding_envs=(
+                "EVENT_BUS_NAME",
+                "EVENT_BUS_ARN",
+                "EVENT_BUS_REGION",
+                "AWS_REGION",
+            ),
             issue_url=_AWS_EVENTING_ISSUE,
         ),
         ManagedServiceEntry(
