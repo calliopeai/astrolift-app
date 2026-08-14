@@ -65,8 +65,20 @@ jobs:
                   "paths": "astrolift_operations core astrolift_identity",
                   "temporal": False,
               },
-              "agent-runtime": {
-                  "paths": "astrolift_agents astrolift_dispatch",
+              "agent-control-a": {
+                  "paths": "astrolift_agents",
+                  "partition": 0,
+                  "partitions": 2,
+                  "temporal": True,
+              },
+              "agent-control-b": {
+                  "paths": "astrolift_agents",
+                  "partition": 1,
+                  "partitions": 2,
+                  "temporal": True,
+              },
+              "agent-dispatch": {
+                  "paths": "astrolift_dispatch",
                   "temporal": True,
               },
               "registration-clusters": {
@@ -98,8 +110,14 @@ jobs:
               for root in shard["paths"].split()
           }
           impacts = {
-              "astrolift_agents": {"agent-runtime", "workflow-runtime", "services-platform"},
-              "astrolift_dispatch": {"agent-runtime", "workflow-runtime", "services-platform"},
+              "astrolift_agents": {
+                  "agent-control-a", "agent-control-b", "agent-dispatch",
+                  "workflow-runtime", "services-platform",
+              },
+              "astrolift_dispatch": {
+                  "agent-control-a", "agent-control-b", "agent-dispatch",
+                  "workflow-runtime", "services-platform",
+              },
               "astrolift_clusters": {"registration-clusters", "app-lifecycle", "services-platform"},
               "astrolift_identity": {"core-identity-operations", "registration-clusters"},
               "astrolift_lifecycle": {"app-lifecycle", "workflow-runtime"},
@@ -145,13 +163,30 @@ jobs:
 
           if backend and not selected:
               selected = set(shards)
-          matrix = {
-              "include": [
-                  {"name": name, **shards[name]}
-                  for name in shards
-                  if name in selected
-              ]
-          }
+          include = [
+              {
+                  "name": name,
+                  "mode": "tests",
+                  "partition": 0,
+                  "partitions": 1,
+                  **shards[name],
+              }
+              for name in shards
+              if name in selected
+          ]
+          if backend:
+              # Apply the real migration graph once instead of repeating it in
+              # every test shard. Ordinary shards still use real Postgres;
+              # pytest-django creates their current model schema directly.
+              include.append({
+                  "name": "schema-migrations",
+                  "mode": "migrations",
+                  "paths": ".",
+                  "partition": 0,
+                  "partitions": 1,
+                  "temporal": False,
+              })
+          matrix = {"include": include}
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"backend={str(backend).lower()}\n")
               output.write(f"frontend={str(frontend).lower()}\n")
@@ -226,7 +261,8 @@ jobs:
           POSTGRES_DB: astrolift_test
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U dbadmin"
+          --tmpfs /var/lib/postgresql/data:rw
+          --health-cmd "pg_isready -U dbadmin -d astrolift_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -248,6 +284,9 @@ jobs:
       POSTGRES_DB: astrolift_test
       POSTGRES_USER: dbadmin
       POSTGRES_PASSWORD: Password123
+      # Every database is disposable. Avoid waiting for durable commits while
+      # preserving PostgreSQL SQL, locking, constraint, and transaction behavior.
+      PGOPTIONS: "-c synchronous_commit=off"
       DJANGO_CACHE_URL: redis://127.0.0.1:6379/1
       TEMPORAL_ADDRESS: 127.0.0.1:7233
       TEMPORAL_NAMESPACE: default
@@ -299,6 +338,21 @@ jobs:
         # the cloud plugins resolve at import time. The Docker image
         # does this in its build step; CI mirrors it.
         run: pipenv run pip install './providers[aws,gcp,azure,k8s]'
+      - name: Tune disposable PostgreSQL
+        env:
+          PGPASSWORD: Password123
+        run: |
+          psql -h 127.0.0.1 -U dbadmin -d astrolift_test -v ON_ERROR_STOP=1 <<'SQL'
+          ALTER SYSTEM SET fsync = 'off';
+          ALTER SYSTEM SET full_page_writes = 'off';
+          ALTER SYSTEM SET synchronous_commit = 'off';
+          ALTER SYSTEM SET checkpoint_timeout = '30min';
+          ALTER SYSTEM SET max_wal_size = '4GB';
+          ALTER SYSTEM SET autovacuum = 'off';
+          SELECT pg_reload_conf();
+          SQL
+          psql -h 127.0.0.1 -U dbadmin -d astrolift_test -Atc \
+            "SELECT name || '=' || setting FROM pg_settings WHERE name IN ('fsync', 'full_page_writes', 'synchronous_commit', 'checkpoint_timeout', 'max_wal_size', 'autovacuum') ORDER BY name"
       - name: Run tests
         # Not `-x`. Halting at the first failure is why the suite's real state
         # stayed unknown for weeks: one failure masks every one behind it, so
@@ -306,11 +360,39 @@ jobs:
         # reports the whole set at once, which is what attributing the backlog
         # in #1244 actually needs. The provider tree has its own parallel job;
         # repeating its 2,299 tests here added several minutes without adding
-        # coverage. pytest-django creates and migrates each shard's real
-        # Postgres test database, so a separate pre-test migrate was redundant.
-        # `--durations` keeps the next optimization evidence-driven.
-        run: >-
-          pipenv run pytest -q --tb=short -rf --durations=20 ${{ matrix.paths }}
+        # coverage. Schema migrations run once in their own matrix row.
+        # Ordinary shards use pytest-django's --nomigrations path to materialize
+        # the same current models in real Postgres without replaying hundreds of
+        # migration operations per runner. The two agent-control rows split test
+        # files deterministically because that suite was the remaining
+        # nine-minute critical path. `--durations` keeps future tuning
+        # evidence-driven.
+        run: |
+          set -euo pipefail
+          if [[ "${{ matrix.mode }}" == migrations ]]; then
+            pipenv run pytest -q --tb=short -rf --durations=20 \
+              -m migration ${{ matrix.paths }}
+            exit 0
+          fi
+
+          if (( ${{ matrix.partitions }} > 1 )); then
+            mapfile -t TEST_FILES < <(
+              find ${{ matrix.paths }} -type f \
+                \( -name 'test_*.py' -o -name '*_tests.py' \) -print \
+                | sort \
+                | awk -v partition=${{ matrix.partition }} \
+                      -v partitions=${{ matrix.partitions }} \
+                      '(NR - 1) % partitions == partition'
+            )
+            printf 'partition %s/%s: %s test files\n' \
+              "${{ matrix.partition }}" "${{ matrix.partitions }}" "${#TEST_FILES[@]}"
+            test "${#TEST_FILES[@]}" -gt 0
+            pipenv run pytest -q --tb=short -rf --durations=20 \
+              --nomigrations -m 'not migration' "${TEST_FILES[@]}"
+          else
+            pipenv run pytest -q --tb=short -rf --durations=20 \
+              --nomigrations -m 'not migration' ${{ matrix.paths }}
+          fi
 
   test:
     name: test (real postgres)

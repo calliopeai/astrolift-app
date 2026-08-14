@@ -334,6 +334,7 @@ def test_instance_start_configured_denormalizes_org(org, agent_workload):
 # --------------------------------------------------------------------------
 
 
+@pytest.mark.migration
 @pytest.mark.django_db(transaction=True)
 def test_migration_0004_backfills_existing_rows_org_null():
     from django.contrib.contenttypes.models import ContentType
