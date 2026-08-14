@@ -97,6 +97,7 @@ def test_secret_bundles_apply_in_order():
 def test_envelope_keys_for_known_kinds():
     assert "DATABASE_URL" in envelope_keys_for("postgres")
     assert "REDIS_URL" in envelope_keys_for("redis")
+    assert "CACHE_PROTOCOL" in envelope_keys_for("cache")
     assert "DATABASE_PROXY_TLS" in envelope_keys_for("database_proxy")
     assert "DATABASE_PROXY_AUTH_MODE" in envelope_keys_for("database_proxy")
     assert envelope_keys_for("totally-unknown") == ()

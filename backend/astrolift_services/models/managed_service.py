@@ -23,6 +23,7 @@ class ManagedService(BaseCoreModel):
         MYSQL = "mysql"
         MSSQL = "mssql"
         REDIS = "redis"
+        CACHE = "cache"
         OBJECT_STORE = "object_store"
         QUEUE = "queue"
         TOPIC = "topic"

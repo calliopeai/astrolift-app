@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add AWS ElastiCache Serverless for Valkey, Redis OSS, and Memcached,
+  node-based Valkey and Memcached, and durable MemoryDB with portable cache/Redis bindings, private
+  networking, RBAC/password/IAM authentication, sizing, updates, snapshots
+  where supported, and convergent teardown.
 - Add AWS Aurora PostgreSQL/MySQL provisioned and Serverless v2 clusters,
   every supported RDS SQL Server edition, and RDS Proxy with secret or
   end-to-end IAM authentication, pool tuning, portable bindings, and

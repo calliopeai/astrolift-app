@@ -55,6 +55,7 @@ const CAPABILITIES = [
 const MANAGED_SERVICE_KINDS = [
   "postgres",
   "redis",
+  "cache",
   "object_storage",
   "kafka",
   "search",

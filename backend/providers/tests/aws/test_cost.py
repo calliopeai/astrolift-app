@@ -177,6 +177,10 @@ def test_service_code_table_covers_core_kinds() -> None:
     assert ("object_store", "s3") in SERVICE_CODE_BY_VARIANT
     assert ("queue", "sqs") in SERVICE_CODE_BY_VARIANT
     assert ("postgres", "rds") in SERVICE_CODE_BY_VARIANT
+    assert SERVICE_CODE_BY_VARIANT[("redis", "memorydb")] == "AmazonMemoryDB"
+    assert SERVICE_CODE_BY_VARIANT[("cache", "elasticache_serverless_memcached")] == ("AmazonElastiCache")
+    assert SERVICE_CODE_BY_VARIANT[("postgres", "aurora_postgres_serverless_v2")] == "AmazonRDS"
+    assert SERVICE_CODE_BY_VARIANT[("kv_store", "dynamodb")] == "AmazonDynamoDB"
 
 
 # ---- compute / node_hour (#440) -----------------------------------

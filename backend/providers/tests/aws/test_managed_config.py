@@ -15,7 +15,7 @@ from unittest.mock import MagicMock
 import pytest
 from core.cluster_observability import managed_config_for
 
-from aws.managed._networking import ensure_db_networking
+from aws.managed._networking import ensure_db_networking, ensure_memorydb_networking
 
 
 def _cluster(provider_config=None, *, slug="aws-prod", region="us-west-2"):
@@ -168,6 +168,32 @@ def test_rds_proxy_config_uses_raw_private_network_ids():
     assert cfg.role_arn.endswith("role/proxy")
 
 
+def test_memorydb_config_uses_pinned_private_networking_and_engine_options():
+    from aws.managed.memorydb import MemoryDBConfig
+
+    cfg = managed_config_for(
+        "aws",
+        _cluster(
+            {
+                "memorydb_subnet_group": "durable-cache-subnets",
+                "memorydb_security_group_ids": ["sg-memorydb"],
+                "memorydb_engine": "redis",
+                "memorydb_engine_version": "7.0",
+                "memorydb_auth_mode": "iam",
+            },
+        ),
+        kind="redis",
+        variant="memorydb",
+    )
+
+    assert isinstance(cfg, MemoryDBConfig)
+    assert cfg.subnet_group == "durable-cache-subnets"
+    assert cfg.security_group_ids == ["sg-memorydb"]
+    assert cfg.engine == "redis"
+    assert cfg.engine_version == "7.0"
+    assert cfg.auth_mode_default == "iam"
+
+
 # ---- managed_config_for: the non-VPC kinds wired in #1037 -------------
 #
 # plugin.py registers managed-service drivers for these (kind, variant)
@@ -313,6 +339,10 @@ def test_every_registered_managed_service_driver_has_a_config_builder():
             "db_security_group_ids": ["sg-1"],
             "db_proxy_subnet_ids": ["subnet-a", "subnet-b"],
             "db_proxy_security_group_ids": ["sg-proxy"],
+            "serverless_cache_subnet_ids": ["subnet-a", "subnet-b"],
+            "serverless_cache_security_group_ids": ["sg-cache"],
+            "memorydb_subnet_group": "memorydb-subnets",
+            "memorydb_security_group_ids": ["sg-memorydb"],
         },
     )
     for kind, variant in PLUGIN.managed_service_drivers:
@@ -383,3 +413,42 @@ def test_ensure_db_networking_override_short_circuits():
     assert grp == "pinned"
     assert sgs == ["sg-x"]
     ec2.describe_vpcs.assert_not_called()  # no discovery when pinned
+
+
+def test_ensure_memorydb_networking_discovers_and_creates():
+    from botocore.session import Session
+    from botocore.validate import validate_parameters
+
+    ec2 = MagicMock()
+    eks = MagicMock()
+    memorydb = MagicMock()
+    eks.describe_cluster.return_value = {
+        "cluster": {"resourcesVpcConfig": {"vpcId": "vpc-abc"}},
+    }
+    ec2.describe_vpcs.return_value = {"Vpcs": [{"CidrBlock": "10.0.0.0/16"}]}
+    ec2.describe_subnets.return_value = {
+        "Subnets": [
+            {"SubnetId": "subnet-a", "AvailabilityZone": "us-west-2a", "MapPublicIpOnLaunch": False},
+            {"SubnetId": "subnet-b", "AvailabilityZone": "us-west-2b", "MapPublicIpOnLaunch": False},
+        ],
+    }
+    ec2.describe_security_groups.return_value = {"SecurityGroups": []}
+    ec2.create_security_group.return_value = {"GroupId": "sg-memorydb"}
+
+    group, security_groups = ensure_memorydb_networking(
+        _cluster(slug="aws-prod"),
+        region="us-west-2",
+        clients=(ec2, memorydb, eks),
+    )
+
+    assert group == "astrolift-aws-prod-memorydb"
+    assert security_groups == ["sg-memorydb"]
+    subnet_call = memorydb.create_subnet_group.call_args.kwargs
+    assert subnet_call["SubnetIds"] == ["subnet-a", "subnet-b"]
+    service = Session().get_service_model("memorydb")
+    validate_parameters(
+        subnet_call,
+        service.operation_model("CreateSubnetGroup").input_shape,
+    )
+    ingress = ec2.authorize_security_group_ingress.call_args.kwargs
+    assert ingress["IpPermissions"][0]["FromPort"] == 6379

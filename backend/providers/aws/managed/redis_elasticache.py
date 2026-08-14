@@ -81,6 +81,9 @@ class ElastiCacheConfig:
 
     security_group_ids: list[str] = field(default_factory=list)
 
+    engine: str = "redis"
+    """Protocol-compatible engine: ``redis`` for compatibility or ``valkey``."""
+
     replication_group_prefix: str = "astrolift"
     """Prefix on the replication-group ID. ElastiCache replication-
     group ids must be ``[a-zA-Z][a-zA-Z0-9-]{0,39}`` so we sanitize
@@ -183,8 +186,10 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
 
         create_kwargs: dict[str, Any] = {
             "ReplicationGroupId": rg_id,
-            "ReplicationGroupDescription": (f"Astrolift Redis for {spec.app_slug}/{spec.environment_name}"),
-            "Engine": "redis",
+            "ReplicationGroupDescription": (
+                f"Astrolift {self._config.engine} for {spec.app_slug}/{spec.environment_name}"
+            ),
+            "Engine": self._config.engine,
             "EngineVersion": engine_version,
             "CacheNodeType": node_type,
             "NumNodeGroups": num_node_groups,

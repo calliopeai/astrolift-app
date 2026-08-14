@@ -126,6 +126,45 @@ def test_provision_creates_replication_group(
     assert rg["TransitEncryptionEnabled"] is True
 
 
+def test_valkey_variant_emits_current_create_replication_group_shape() -> None:
+    from botocore.session import Session
+    from botocore.validate import validate_parameters
+
+    class RecordingElastiCache:
+        def __init__(self) -> None:
+            self.request: dict[str, Any] = {}
+
+        def describe_replication_groups(self, **_kwargs):
+            raise type("ReplicationGroupNotFoundFault", (Exception,), {})("not found")
+
+        def create_replication_group(self, **kwargs):
+            self.request = kwargs
+
+    subject_client = RecordingElastiCache()
+    subject = ElastiCacheRedisDriver(
+        config=ElastiCacheConfig(
+            region="us-east-1",
+            cache_subnet_group="private-cache",
+            security_group_ids=["sg-cache"],
+            engine="valkey",
+        ),
+        elasticache_client=subject_client,
+        secrets_client=object(),
+    )
+
+    result = subject.provision(
+        _spec(config={"transit_encryption": False, "engine_version": "8.0"}),
+    )
+
+    assert result.ok
+    assert subject_client.request["Engine"] == "valkey"
+    service = Session().get_service_model("elasticache")
+    validate_parameters(
+        subject_client.request,
+        service.operation_model("CreateReplicationGroup").input_shape,
+    )
+
+
 def test_provision_idempotent(driver: ElastiCacheRedisDriver) -> None:
     a = driver.provision(_spec())
     b = driver.provision(_spec())

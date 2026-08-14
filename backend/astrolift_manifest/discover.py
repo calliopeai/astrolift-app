@@ -128,7 +128,7 @@ _COMPOSE_SERVICE_HINTS: dict[str, str] = {
     "mongo": "mongodb",
     "elasticsearch": "opensearch",
     "opensearch": "opensearch",
-    "memcached": "memcached",
+    "memcached": "cache",
 }
 
 
