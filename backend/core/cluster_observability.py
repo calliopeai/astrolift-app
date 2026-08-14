@@ -337,6 +337,29 @@ def _gcp_managed_config_for(
         )
 
     pair = (kind, variant)
+    if pair == ("api_gateway", "api_gateway") or (kind == "api_gateway" and not variant):
+        from gcp.managed.api_gateway import APIGatewayConfig
+
+        return APIGatewayConfig(
+            project_id=project_id,
+            region=str(pc.get("api_gateway_region") or region),
+            api_id_prefix=str(pc.get("api_gateway_api_id_prefix", "astrolift")),
+            gateway_id_prefix=str(pc.get("api_gateway_gateway_id_prefix", "astrolift")),
+            config_id_prefix=str(pc.get("api_gateway_config_id_prefix", "cfg")),
+            api_endpoint=str(
+                pc.get("api_gateway_api_endpoint", "https://apigateway.googleapis.com/v1"),
+            ),
+            deletion_protection_default=bool(
+                pc.get("api_gateway_deletion_protection_default", True),
+            ),
+            operation_timeout_seconds=float(
+                pc.get("api_gateway_operation_timeout_seconds", 1800),
+            ),
+            poll_interval_seconds=float(
+                pc.get("api_gateway_operation_poll_interval_seconds", 5),
+            ),
+        )
+
     if pair == ("object_store", "gcs") or (kind == "object_store" and not variant):
         from gcp.managed.object_store_gcs import GCSConfig
 
