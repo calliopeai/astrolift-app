@@ -275,6 +275,62 @@ def test_eventbridge_config_resolves_project_defaults_and_protection():
     assert cfg.deletion_protection_default is False
 
 
+def test_kinesis_config_resolves_stream_capacity_encryption_and_retention_defaults():
+    from aws.managed.stream_kinesis import KinesisConfig
+
+    cfg = managed_config_for(
+        "aws",
+        _cluster(
+            {
+                "account_id": "123456789012",
+                "kinesis_stream_name_prefix": "platform",
+                "kinesis_kms_key_id": "arn:aws:kms:us-west-2:123456789012:key/key-1",
+                "kinesis_stream_mode_default": "PROVISIONED",
+                "kinesis_retention_hours_default": 72,
+                "deletion_protection_default": False,
+            },
+        ),
+        kind="stream",
+        variant="kinesis",
+    )
+
+    assert isinstance(cfg, KinesisConfig)
+    assert cfg.account_id == "123456789012"
+    assert cfg.stream_name_prefix == "platform"
+    assert cfg.kms_key_id.endswith("key/key-1")
+    assert cfg.stream_mode_default == "PROVISIONED"
+    assert cfg.retention_hours_default == 72
+    assert cfg.deletion_protection_default is False
+
+
+def test_firehose_config_resolves_delivery_encryption_and_polling_defaults():
+    from aws.managed.stream_firehose import FirehoseConfig
+
+    cfg = managed_config_for(
+        "aws",
+        _cluster(
+            {
+                "account_id": "123456789012",
+                "firehose_delivery_stream_name_prefix": "platform",
+                "firehose_kms_key_id": "arn:aws:kms:us-west-2:123456789012:key/key-1",
+                "firehose_poll_delay_seconds": 2,
+                "firehose_max_poll_attempts": 90,
+                "deletion_protection_default": False,
+            },
+        ),
+        kind="stream",
+        variant="firehose",
+    )
+
+    assert isinstance(cfg, FirehoseConfig)
+    assert cfg.account_id == "123456789012"
+    assert cfg.delivery_stream_name_prefix == "platform"
+    assert cfg.kms_key_id.endswith("key/key-1")
+    assert cfg.poll_delay_seconds == 2
+    assert cfg.max_poll_attempts == 90
+    assert cfg.deletion_protection_default is False
+
+
 def test_search_config_defaults_and_overrides():
     from aws.managed.search_opensearch import OpenSearchSearchConfig
 

@@ -63,6 +63,8 @@ from aws.managed.redis_elasticache import ElastiCacheRedisDriver
 from aws.managed.redshift import RedshiftProvisionedDriver
 from aws.managed.redshift_serverless import RedshiftServerlessDriver
 from aws.managed.search_opensearch import OpenSearchSearchDriver
+from aws.managed.stream_firehose import FirehoseDriver
+from aws.managed.stream_kinesis import KinesisDriver
 from aws.managed.timeseries_timestream import TimestreamDriver
 from aws.managed.topic_sns import SNSFifoTopicDriver, SNSStandardTopicDriver
 from aws.managed.vector_opensearch import OpenSearchVectorDriver
@@ -97,6 +99,8 @@ PLUGIN = ProviderPlugin(
         ("topic", "sns_standard"): SNSStandardTopicDriver,
         ("topic", "sns_fifo"): SNSFifoTopicDriver,
         ("event_bus", "eventbridge"): EventBridgeDriver,
+        ("stream", "kinesis"): KinesisDriver,
+        ("stream", "firehose"): FirehoseDriver,
         ("postgres", "rds"): RDSPostgresDriver,
         ("postgres", "aurora_postgres"): AuroraPostgresDriver,
         ("postgres", "aurora_postgres_serverless_v2"): AuroraPostgresDriver,

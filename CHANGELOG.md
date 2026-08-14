@@ -4,6 +4,14 @@
 
 ### Added
 
+- Add Amazon Kinesis Data Streams lifecycle with on-demand and provisioned
+  capacity, retention, encryption, enhanced monitoring, warm throughput,
+  large records, policies, enhanced fan-out consumers, portable bindings,
+  and protected data-loss-aware teardown.
+- Add Amazon Data Firehose lifecycle with every current AWS source and
+  destination request shape, mutable destination updates, customer-managed
+  encryption rotation, scoped role grants, portable bindings, and protected
+  buffered-record-aware teardown.
 - Add Amazon EventBridge custom event-bus lifecycle with KMS/DLQ/log
   controls, resource policies, declarative rules and full target parameters,
   archives, pruning, portable publisher bindings, and protected teardown.
