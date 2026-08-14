@@ -114,6 +114,15 @@ PLUGIN = ProviderPlugin(
                 "type": "string",
                 "description": ("Optional CMEK KMS key resource for Secret Manager + Artifact Registry encryption."),
             },
+            "secret_id_prefix": {
+                "type": "string",
+                "default": "astrolift",
+                "description": "Physical Secret Manager id prefix used by operator and managed-service secrets.",
+            },
+            "secret_manager_kms_key": {
+                "type": "string",
+                "description": "Optional CMEK resource name for Secret Manager replication.",
+            },
             "cloud_kms_location": {
                 "type": "string",
                 "description": (
@@ -152,6 +161,71 @@ PLUGIN = ProviderPlugin(
                 "type": "string",
                 "default": "astrolift",
                 "description": "Prefix for platform-managed Pub/Sub topics.",
+            },
+            "cloudsql_private_network": {
+                "type": "string",
+                "description": "VPC self-link used for private Cloud SQL connectivity.",
+            },
+            "cloudsql_instance_name_prefix": {
+                "type": "string",
+                "default": "astrolift",
+            },
+            "cloudsql_postgres_engine_version": {
+                "type": "string",
+                "default": "POSTGRES_16",
+            },
+            "cloudsql_mysql_engine_version": {
+                "type": "string",
+                "default": "MYSQL_8_0",
+            },
+            "cloudsql_backup_retention_days": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 35,
+                "default": 7,
+            },
+            "cloudsql_high_availability_default": {
+                "type": "boolean",
+                "default": False,
+            },
+            "cloudsql_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "cloudsql_secret_manager_prefix": {
+                "type": "string",
+                "default": "astrolift/cloudsql",
+                "description": "Logical path prefix for Cloud SQL credential and connection URL secrets.",
+            },
+            "memorystore_authorized_network": {
+                "type": "string",
+                "description": "VPC self-link authorized for Memorystore connectivity.",
+            },
+            "memorystore_instance_name_prefix": {
+                "type": "string",
+                "default": "astrolift",
+            },
+            "memorystore_redis_version": {
+                "type": "string",
+                "default": "REDIS_7_2",
+            },
+            "memorystore_tier_default": {
+                "type": "string",
+                "enum": ["BASIC", "STANDARD_HA"],
+                "default": "BASIC",
+            },
+            "memorystore_transit_encryption_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "memorystore_auth_enabled_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "memorystore_secret_manager_prefix": {
+                "type": "string",
+                "default": "astrolift/memorystore",
+                "description": "Logical path prefix for Memorystore authentication and URL secrets.",
             },
         },
     },

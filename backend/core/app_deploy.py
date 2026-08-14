@@ -236,6 +236,79 @@ def _config_for_capability(plugin_slug: str, cluster: TenantCluster, capability:
     ac = cluster.auth_config or {}
     region = str(pc.get("region", ac.get("region", cluster.region or "")))
 
+    if plugin_slug == "gcp":
+        project_id = str(
+            pc.get("project_id")
+            or pc.get("gcp_project_id")
+            or ac.get("project_id")
+            or ac.get("gcp_project_id")
+            or ""
+        )
+        if not project_id:
+            raise AppDeployError(
+                f"cluster {cluster.slug}: GCP capability {capability!r} requires provider_config.project_id",
+            )
+        if capability == "registry":
+            from gcp.registry_artifact import ArtifactRegistryConfig
+
+            return ArtifactRegistryConfig(
+                project_id=project_id,
+                location=str(pc.get("artifact_registry_location", region)),
+                repository_id=str(pc.get("artifact_registry_repo", "astrolift")),
+                immutable_tags=bool(pc.get("artifact_registry_immutable_tags", True)),
+                encryption_kms_key_name=(
+                    str(
+                        pc.get("artifact_registry_kms_key") or pc.get("kms_key") or "",
+                    )
+                    or None
+                ),
+            )
+        if capability == "identity":
+            from gcp.identity_wi import GCPWIConfig
+
+            return GCPWIConfig(project_id=project_id)
+        if capability == "secrets":
+            from gcp.secrets import GCPSecretsConfig
+
+            return GCPSecretsConfig(
+                project_id=project_id,
+                secret_id_prefix=str(pc.get("secret_id_prefix", "astrolift")),
+                kms_key_name=(str(pc.get("secret_manager_kms_key") or pc.get("kms_key") or "") or None),
+            )
+        if capability == "dns":
+            from gcp.dns_clouddns import CloudDNSConfig
+
+            return CloudDNSConfig(project_id=project_id)
+        if capability == "tls":
+            from gcp.tls_managed import ManagedCertConfig
+
+            return ManagedCertConfig(
+                project_id=project_id,
+                cert_name_prefix=str(pc.get("managed_cert_name_prefix", "astrolift")),
+            )
+        if capability == "ingress":
+            from gcp.ingress import GCPIngressConfig
+
+            return GCPIngressConfig(
+                variant=str(pc.get("ingress_variant", "gce_ingress")),
+                static_ip_name=(str(pc.get("static_ip_name") or "") or None),
+                managed_cert_name=(str(pc.get("managed_cert_name") or "") or None),
+                gateway_class=str(
+                    pc.get("gateway_class", "gke-l7-global-external-managed"),
+                ),
+            )
+        if capability == "notification":
+            from gcp.notification_fcm import FCMConfig
+
+            return FCMConfig(
+                project_id=project_id,
+                access_token=str(ac.get("fcm_access_token", "")),
+                timeout_seconds=int(pc.get("fcm_timeout_seconds", 10)),
+            )
+        raise AppDeployError(
+            f"cluster {cluster.slug}: no GCP config builder for capability {capability!r}",
+        )
+
     if plugin_slug == "aws":
         if capability == "registry":
             from aws.registry_ecr import ECRConfig

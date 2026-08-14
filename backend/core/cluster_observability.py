@@ -372,6 +372,7 @@ def _gcp_managed_config_for(
             high_availability_default=bool(pc.get("cloudsql_high_availability_default", False)),
             deletion_protection_default=bool(pc.get("cloudsql_deletion_protection_default", True)),
             secret_manager_prefix=str(pc.get("cloudsql_secret_manager_prefix", "astrolift/cloudsql")),
+            secret_id_prefix=str(pc.get("secret_id_prefix", "astrolift")),
         )
 
     if pair == ("mysql", "cloudsql") or (kind == "mysql" and not variant):
@@ -387,6 +388,7 @@ def _gcp_managed_config_for(
             high_availability_default=bool(pc.get("cloudsql_high_availability_default", False)),
             deletion_protection_default=bool(pc.get("cloudsql_deletion_protection_default", True)),
             secret_manager_prefix=str(pc.get("cloudsql_secret_manager_prefix", "astrolift/cloudsql")),
+            secret_id_prefix=str(pc.get("secret_id_prefix", "astrolift")),
         )
 
     if pair == ("redis", "memorystore") or (kind == "redis" and not variant):
@@ -404,6 +406,7 @@ def _gcp_managed_config_for(
             secret_manager_prefix=str(
                 pc.get("memorystore_secret_manager_prefix", "astrolift/memorystore"),
             ),
+            secret_id_prefix=str(pc.get("secret_id_prefix", "astrolift")),
         )
 
     if pair == ("kv_store", "bigtable") or (kind == "kv_store" and not variant):
