@@ -122,6 +122,24 @@ def test_planned_service_does_not_require_an_installed_driver() -> None:
     assert report.ok is True
 
 
+def test_matrix_rejects_provider_specific_unknown_kind() -> None:
+    matrix = AvailabilityMatrix(
+        managed_services=(
+            ManagedServiceEntry(
+                kind="aws_magic_database",
+                variant="v1",
+                plugin_id="aws",
+                status="planned",
+            ),
+        ),
+    )
+
+    report = check_matrix(plugins=[], matrix=matrix)
+
+    assert report.ok is False
+    assert any(issue.code == "matrix_unknown_kind" for issue in report.issues)
+
+
 def test_live_canonical_matrix_in_sync() -> None:
     """The canonical MATRIX must stay in sync with all real
     PLUGIN manifests. Future driver additions must touch both."""

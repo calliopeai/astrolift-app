@@ -1,10 +1,10 @@
-"""Managed-service plugin SDK -- adding new kinds (#16).
+"""Portable managed-service kinds shared by every provider.
 
-The set of kinds shipped today (postgres, redis, object_store,
-queue) covers the MVP. New kinds (vector_db, search, kafka, etc.)
-land via this SDK — a plugin declares the kind's required binding
-envs + runtime expectations, and the matrix-check picks up new
-entries on the next CI run.
+``kind`` is the cloud-neutral contract exposed through GraphQL, MCP, the CLI,
+and ``astrolift.toml``.  ``variant`` is the provider-specific implementation
+(``postgres/rds``, ``postgres/cloudsql``, and so on).  New variants may be
+added without changing clients; a genuinely new resource shape must land in
+this catalogue before it can appear in the availability matrix.
 
 This file deliberately keeps the kind definitions in code (typed,
 immutable) rather than data; that lets the matrix check (#26)
@@ -48,8 +48,9 @@ class KindCatalog:
         return None
 
 
-# Canonical kind catalog. New kinds land here at the same time as
-# their first variant's plugin registration.
+# Canonical kind catalog. Keep names in lockstep with
+# ``astrolift_services.ManagedService.Kind``. Binding variables describe the
+# portable envelope; drivers may additionally emit provider-native variables.
 KINDS = KindCatalog(
     kinds=(
         ManagedServiceKind(
@@ -81,6 +82,20 @@ KINDS = KindCatalog(
             cross_region_replicate_supported=True,
         ),
         ManagedServiceKind(
+            name="mssql",
+            description="Microsoft SQL Server-compatible relational database",
+            binding_envs_required=(
+                "MSSQL_HOST",
+                "MSSQL_PORT",
+                "MSSQL_DB",
+                "MSSQL_USER",
+                "MSSQL_PASSWORD",
+            ),
+            binding_envs_optional=("MSSQL_ENCRYPT", "DATABASE_URL"),
+            snapshot_supported=True,
+            cross_region_replicate_supported=True,
+        ),
+        ManagedServiceKind(
             name="redis",
             description="Key-value store (Redis-compatible)",
             binding_envs_required=("REDIS_HOST", "REDIS_PORT"),
@@ -96,6 +111,14 @@ KINDS = KindCatalog(
         ManagedServiceKind(
             name="queue",
             description="Message queue (FIFO or best-effort)",
+            binding_envs_required=("QUEUE_URL",),
+            binding_envs_optional=("QUEUE_NAME", "QUEUE_ARN", "QUEUE_REGION"),
+        ),
+        ManagedServiceKind(
+            name="topic",
+            description="Publish/subscribe topic with fan-out subscriptions",
+            binding_envs_required=("TOPIC_ARN_OR_ID", "TOPIC_NAME"),
+            binding_envs_optional=("TOPIC_REGION",),
         ),
         ManagedServiceKind(
             name="event_stream",
@@ -121,41 +144,39 @@ KINDS = KindCatalog(
             cross_region_replicate_supported=True,
         ),
         ManagedServiceKind(
-            name="key_value",
+            name="kv_store",
             description=("Key-value store with predictable single-key latency (DynamoDB / Cosmos Table / Bigtable)"),
             binding_envs_required=("KV_TABLE_NAME", "KV_REGION"),
             binding_envs_optional=("KV_ENDPOINT_OVERRIDE",),
             snapshot_supported=True,
         ),
         ManagedServiceKind(
-            name="vector_db",
+            name="vector_index",
             description=("Vector similarity search store (pgvector, Weaviate, Qdrant, Pinecone-compatible)"),
             binding_envs_required=(
-                "VECTOR_DB_URL",
-                "VECTOR_DB_API_KEY",
+                "VECTOR_ENDPOINT",
+                "VECTOR_INDEX_NAME",
             ),
-            binding_envs_optional=("VECTOR_DB_INDEX",),
+            binding_envs_optional=("VECTOR_API_KEY", "VECTOR_NAMESPACE"),
             snapshot_supported=True,
         ),
         ManagedServiceKind(
             name="search",
             description=("Full-text search index (Elasticsearch / OpenSearch / Typesense / Meilisearch)"),
-            binding_envs_required=(
-                "SEARCH_URL",
-                "SEARCH_API_KEY",
-            ),
-            binding_envs_optional=("SEARCH_INDEX_PREFIX",),
+            binding_envs_required=("SEARCH_ENDPOINT",),
+            binding_envs_optional=("SEARCH_USER", "SEARCH_PASSWORD", "SEARCH_INDEX_PREFIX"),
             snapshot_supported=True,
         ),
         ManagedServiceKind(
             name="time_series",
             description=("Time-series database (Prometheus, Thanos, Mimir, InfluxDB, TimescaleDB, Managed Prometheus)"),
-            binding_envs_required=("TIME_SERIES_URL",),
+            binding_envs_required=("TS_ENDPOINT",),
             binding_envs_optional=(
-                "TIME_SERIES_USERNAME",
-                "TIME_SERIES_PASSWORD",
-                "TIME_SERIES_ORG",
-                "TIME_SERIES_BUCKET",
+                "TS_DB",
+                "TS_USER",
+                "TS_PASSWORD",
+                "TS_TOKEN",
+                "TS_ORG",
             ),
             snapshot_supported=False,
         ),
@@ -172,11 +193,9 @@ KINDS = KindCatalog(
         ManagedServiceKind(
             name="email",
             description=("Transactional email sender (SES, SendGrid, Postmark, Mailgun, Resend)"),
-            binding_envs_required=(
-                "EMAIL_PROVIDER",
-                "EMAIL_API_KEY",
-            ),
+            binding_envs_required=("EMAIL_PROVIDER",),
             binding_envs_optional=(
+                "EMAIL_API_KEY",
                 "EMAIL_FROM_ADDRESS",
                 "EMAIL_REGION",
             ),
@@ -185,15 +204,118 @@ KINDS = KindCatalog(
         ManagedServiceKind(
             name="model_endpoint",
             description=("Hosted ML model endpoint (Azure OpenAI, Bedrock, Vertex AI, Together, OpenAI)"),
-            binding_envs_required=(
-                "MODEL_ENDPOINT_URL",
-                "MODEL_API_KEY",
-            ),
+            binding_envs_required=("MODEL_ENDPOINT_URL",),
             binding_envs_optional=(
+                "MODEL_API_KEY",
                 "MODEL_DEPLOYMENT_NAME",
                 "MODEL_REGION",
             ),
             snapshot_supported=False,
+        ),
+        ManagedServiceKind(
+            name="mq",
+            description="Managed AMQP/JMS message broker",
+            binding_envs_required=("MQ_ENDPOINT",),
+            binding_envs_optional=("MQ_USERNAME", "MQ_PASSWORD", "MQ_PROTOCOL"),
+            snapshot_supported=False,
+        ),
+        ManagedServiceKind(
+            name="nfs",
+            description="Legacy NFS-compatible shared filesystem alias",
+            binding_envs_required=("NFS_SERVER", "NFS_PATH"),
+            snapshot_supported=True,
+        ),
+        ManagedServiceKind(
+            name="cdn",
+            description="Content-delivery network and edge cache",
+            binding_envs_required=("CDN_URL",),
+            binding_envs_optional=("CDN_DISTRIBUTION_ID", "CDN_DOMAIN"),
+        ),
+        ManagedServiceKind(
+            name="faas",
+            description="Cloud function / functions-as-a-service runtime",
+            binding_envs_required=("FUNCTION_NAME",),
+            binding_envs_optional=("FUNCTION_ARN", "FUNCTION_URL", "FUNCTION_REGION"),
+        ),
+        ManagedServiceKind(
+            name="api_gateway",
+            description="Managed HTTP, REST, or WebSocket API gateway",
+            binding_envs_required=("API_GATEWAY_URL",),
+            binding_envs_optional=("API_GATEWAY_ID", "API_GATEWAY_STAGE"),
+        ),
+        ManagedServiceKind(
+            name="sms",
+            description="Transactional SMS delivery capability",
+            binding_envs_required=("SMS_PROVIDER",),
+            binding_envs_optional=("SMS_SENDER_ID", "SMS_REGION"),
+        ),
+        ManagedServiceKind(
+            name="database_proxy",
+            description="Managed database connection pool and proxy",
+            binding_envs_required=("DATABASE_PROXY_HOST", "DATABASE_PROXY_PORT"),
+            binding_envs_optional=("DATABASE_PROXY_ARN",),
+        ),
+        ManagedServiceKind(
+            name="graph_db",
+            description="Property-graph or RDF graph database",
+            binding_envs_required=("GRAPH_DB_URL",),
+            binding_envs_optional=("GRAPH_DB_USER", "GRAPH_DB_PASSWORD", "GRAPH_DB_PROTOCOL"),
+            snapshot_supported=True,
+            cross_region_replicate_supported=True,
+        ),
+        ManagedServiceKind(
+            name="wide_column",
+            description="Wide-column database (Cassandra/Bigtable-compatible)",
+            binding_envs_required=("WIDE_COLUMN_ENDPOINT",),
+            binding_envs_optional=("WIDE_COLUMN_KEYSPACE", "WIDE_COLUMN_REGION"),
+            snapshot_supported=True,
+        ),
+        ManagedServiceKind(
+            name="warehouse",
+            description="Analytical data warehouse",
+            binding_envs_required=("WAREHOUSE_ENDPOINT",),
+            binding_envs_optional=(
+                "WAREHOUSE_DATABASE",
+                "WAREHOUSE_USER",
+                "WAREHOUSE_PASSWORD",
+            ),
+            snapshot_supported=True,
+        ),
+        ManagedServiceKind(
+            name="event_bus",
+            description="Event routing bus with rules, filters, and targets",
+            binding_envs_required=("EVENT_BUS_NAME",),
+            binding_envs_optional=("EVENT_BUS_ARN", "EVENT_BUS_REGION"),
+        ),
+        ManagedServiceKind(
+            name="stream",
+            description="Provider-native real-time data or delivery stream",
+            binding_envs_required=("STREAM_NAME",),
+            binding_envs_optional=("STREAM_ARN", "STREAM_ENDPOINT", "STREAM_REGION"),
+        ),
+        ManagedServiceKind(
+            name="workflow_engine",
+            description="Managed state-machine and workflow orchestration service",
+            binding_envs_required=("WORKFLOW_ENGINE_ID",),
+            binding_envs_optional=("WORKFLOW_ENGINE_ARN", "WORKFLOW_ENGINE_REGION"),
+        ),
+        ManagedServiceKind(
+            name="encryption_key",
+            description="Customer-managed encryption/signing key",
+            binding_envs_required=("ENCRYPTION_KEY_ID",),
+            binding_envs_optional=("ENCRYPTION_KEY_ARN", "ENCRYPTION_KEY_ALIAS"),
+        ),
+        ManagedServiceKind(
+            name="private_endpoint",
+            description="Private network endpoint to a cloud or managed service",
+            binding_envs_required=("PRIVATE_ENDPOINT_ID",),
+            binding_envs_optional=("PRIVATE_ENDPOINT_DNS", "PRIVATE_ENDPOINT_IPS"),
+        ),
+        ManagedServiceKind(
+            name="observability",
+            description="Managed logs, metrics, alarms, and dashboards",
+            binding_envs_required=("OBSERVABILITY_PROVIDER",),
+            binding_envs_optional=("LOG_GROUP", "METRICS_ENDPOINT", "DASHBOARD_URL"),
         ),
     )
 )

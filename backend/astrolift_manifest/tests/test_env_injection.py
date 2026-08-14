@@ -100,6 +100,18 @@ def test_envelope_keys_for_known_kinds():
     assert envelope_keys_for("totally-unknown") == ()
 
 
+def test_every_portable_resource_kind_has_an_environment_envelope():
+    from _sdk.managed_service_kinds import KINDS
+
+    missing = {
+        kind.name
+        for kind in KINDS.kinds
+        if not envelope_keys_for(kind.name)
+    }
+
+    assert missing == set()
+
+
 def test_envelope_catalog_covers_full_spec_11_set():
     """Spec 11 §6.1-§6.16 — every kind in the catalogue must
     expose its declared envelope. Lock-test so additions stay in
