@@ -387,6 +387,20 @@ def managed_config_for(
             ),
         )
 
+    if kind == "encryption_key":
+        from aws.managed.encryption_kms import KMSConfig
+
+        return KMSConfig(
+            region=region,
+            alias_name_prefix=str(pc.get("kms_alias_name_prefix", "alias/astrolift")),
+            deletion_protection_default=bool(
+                pc.get("kms_deletion_protection_default", True),
+            ),
+            pending_window_days_default=int(
+                pc.get("kms_pending_window_days_default", 30),
+            ),
+        )
+
     if kind == "workflow_engine":
         from aws.managed.workflow_step_functions import StepFunctionsConfig
 
