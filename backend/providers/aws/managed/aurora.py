@@ -313,6 +313,7 @@ class AuroraDriver(ManagedServiceDriver):
                 spec.handle,
                 "Aurora instance deletion is still in progress; retry cluster deletion",
                 ["instance_deletion_in_progress"],
+                retryable=True,
             )
 
         kwargs: dict[str, Any] = {

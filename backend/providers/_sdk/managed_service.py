@@ -84,6 +84,14 @@ class DeprovisionResult:
     handle: str
     message: str
     errors: list[str] = field(default_factory=list)
+    retryable: bool = True
+    """Whether the workflow should call ``deprovision`` again.
+
+    Retry by default for backwards compatibility: existing drivers use a
+    failed result for transient provider errors. Drivers must opt out for a
+    permanent validation or safety refusal so Temporal does not spend the
+    cloud-delete window on an operator-actionable error.
+    """
 
 
 @dataclass(frozen=True)
