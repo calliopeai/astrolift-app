@@ -59,6 +59,7 @@ from aws.managed.mssql_rds import RDSSqlServerDriver
 from aws.managed.mysql_rds import RDSMySQLDriver
 from aws.managed.neptune import NeptuneProvisionedDriver, NeptuneServerlessDriver
 from aws.managed.object_store_s3 import S3Driver
+from aws.managed.observability_cloudwatch import CloudWatchDriver
 from aws.managed.opensearch_serverless import (
     OpenSearchServerlessSearchDriver,
     OpenSearchServerlessVectorDriver,
@@ -156,6 +157,7 @@ PLUGIN = ProviderPlugin(
         ("email", "ses"): AmazonSESDriver,
         ("model_endpoint", "bedrock"): AmazonBedrockDriver,
         ("encryption_key", "kms"): KMSDriver,
+        ("observability", "cloudwatch"): CloudWatchDriver,
         ("workflow_engine", "step_functions_standard"): StepFunctionsStandardDriver,
         ("workflow_engine", "step_functions_express"): StepFunctionsExpressDriver,
         ("private_endpoint", "vpc_endpoint"): VpcEndpointDriver,
