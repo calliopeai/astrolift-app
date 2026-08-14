@@ -14,6 +14,7 @@ Executable managed services:
 - GCSDriver — object_store/gcs
 - PubSubDriver — queue/pubsub
 - CloudSQLPostgresDriver — postgres/cloudsql
+- AlloyDBPostgresDriver — postgres/alloydb
 - CloudSQLMySQLDriver — mysql/cloudsql
 - MemorystoreRedisDriver — redis/memorystore
 - BigtableDriver — kv_store/bigtable
@@ -38,6 +39,7 @@ from gcp.managed.encryption_cloud_kms import CloudKMSDriver
 from gcp.managed.model_endpoint_vertex import VertexAIEndpointDriver
 from gcp.managed.mysql_cloudsql import CloudSQLMySQLDriver
 from gcp.managed.object_store_gcs import GCSDriver
+from gcp.managed.postgres_alloydb import AlloyDBPostgresDriver
 from gcp.managed.postgres_cloudsql import CloudSQLPostgresDriver
 from gcp.managed.queue_pubsub import PubSubDriver
 from gcp.managed.redis_memorystore import MemorystoreRedisDriver
@@ -66,6 +68,7 @@ PLUGIN = ProviderPlugin(
         ("object_store", "gcs"): GCSDriver,
         ("queue", "pubsub"): PubSubDriver,
         ("postgres", "cloudsql"): CloudSQLPostgresDriver,
+        ("postgres", "alloydb"): AlloyDBPostgresDriver,
         ("mysql", "cloudsql"): CloudSQLMySQLDriver,
         ("redis", "memorystore"): MemorystoreRedisDriver,
         ("kv_store", "bigtable"): BigtableDriver,
@@ -196,6 +199,64 @@ PLUGIN = ProviderPlugin(
                 "type": "string",
                 "default": "astrolift/cloudsql",
                 "description": "Logical path prefix for Cloud SQL credential and connection URL secrets.",
+            },
+            "alloydb_network": {
+                "type": "string",
+                "description": "VPC resource name used for private AlloyDB connectivity.",
+            },
+            "alloydb_allocated_ip_range": {
+                "type": "string",
+                "description": "Optional private services access range for AlloyDB.",
+            },
+            "alloydb_cluster_name_prefix": {
+                "type": "string",
+                "default": "astrolift",
+            },
+            "alloydb_primary_instance_id": {
+                "type": "string",
+                "default": "primary",
+            },
+            "alloydb_database_version": {
+                "type": "string",
+                "enum": ["POSTGRES_14", "POSTGRES_15", "POSTGRES_16", "POSTGRES_17", "POSTGRES_18"],
+                "default": "POSTGRES_16",
+            },
+            "alloydb_machine_type_default": {
+                "type": "string",
+                "default": "n2-highmem-2",
+            },
+            "alloydb_high_availability_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "alloydb_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "alloydb_backup_retention_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 35,
+                "default": 14,
+            },
+            "alloydb_secret_manager_prefix": {
+                "type": "string",
+                "default": "astrolift/alloydb",
+                "description": "Logical path prefix for AlloyDB credentials and connection URLs.",
+            },
+            "alloydb_operation_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 1200,
+            },
+            "alloydb_operation_poll_interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 5,
+            },
+            "alloydb_api_endpoint": {
+                "type": "string",
+                "default": "https://alloydb.googleapis.com/v1",
             },
             "memorystore_authorized_network": {
                 "type": "string",
