@@ -11,8 +11,8 @@ dependencies = []
 
 [project.optional-dependencies]
 aws = [
-    "boto3>=1.34",
-    "botocore>=1.34",
+    "boto3>=1.43.71",
+    "botocore>=1.43.71",
     # Pinned: 36.0.0 introduced a regression where ApiClient drops the
     # Authorization header for inline Bearer tokens against EKS (reproducible
     # with raw urllib + Bearer = 200 but ApiClient + same token = 401).
