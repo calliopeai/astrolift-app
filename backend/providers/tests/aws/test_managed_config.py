@@ -228,6 +228,30 @@ def test_queue_config_defaults_and_overrides():
     assert pinned.fifo_default is True
 
 
+def test_sns_topic_variants_share_operator_defaults_but_distinct_runtime_drivers():
+    from aws.managed.topic_sns import SNSConfig
+
+    cfg = managed_config_for(
+        "aws",
+        _cluster(
+            {
+                "account_id": "123456789012",
+                "sns_topic_name_prefix": "platform",
+                "sns_kms_key_id": "arn:aws:kms:us-west-2:123456789012:key/key-1",
+                "sns_tracing_config_default": "Active",
+            },
+        ),
+        kind="topic",
+        variant="sns_fifo",
+    )
+
+    assert isinstance(cfg, SNSConfig)
+    assert cfg.account_id == "123456789012"
+    assert cfg.topic_name_prefix == "platform"
+    assert cfg.kms_key_id.endswith("key/key-1")
+    assert cfg.tracing_config_default == "Active"
+
+
 def test_search_config_defaults_and_overrides():
     from aws.managed.search_opensearch import OpenSearchSearchConfig
 

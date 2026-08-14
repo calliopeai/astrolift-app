@@ -156,6 +156,16 @@ def test_warehouse_contract_carries_modern_iam_and_deployment_identity() -> None
     assert "WAREHOUSE_RESOURCE_ARN" in warehouse.binding_envs_optional
 
 
+def test_messaging_contracts_use_portable_provider_neutral_identity() -> None:
+    queue = KINDS.get("queue")
+    topic = KINDS.get("topic")
+
+    assert queue is not None and topic is not None
+    assert queue.binding_envs_required == ("QUEUE_URL",)
+    assert "QUEUE_ARN_OR_ID" in queue.binding_envs_optional
+    assert topic.binding_envs_required == ("TOPIC_ARN_OR_ID", "TOPIC_NAME")
+
+
 def test_validate_unknown_kind_returns_empty() -> None:
     """Unknown kinds skip validation (operator-defined kinds may
     not yet be in the canonical catalog)."""

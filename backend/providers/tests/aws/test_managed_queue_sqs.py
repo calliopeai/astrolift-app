@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from unittest.mock import MagicMock
 
 import boto3
 import pytest
+from botocore.session import Session
+from botocore.validate import validate_parameters
 
 from _sdk.managed_service import (
     DeprovisionSpec,
@@ -123,6 +126,47 @@ def test_provision_explicit_visibility_in_config(
     assert attrs["Attributes"]["VisibilityTimeout"] == "120"
 
 
+def test_provision_exposes_full_fifo_encryption_redrive_and_long_poll_surface() -> None:
+    client = MagicMock()
+    client.create_queue.return_value = {
+        "QueueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/platform.fifo",
+    }
+    subject = SQSDriver(
+        config=SQSConfig(region="us-east-1", account_id="123456789012"),
+        client=client,
+    )
+
+    result = subject.provision(
+        _spec(
+            config={
+                "fifo": True,
+                "content_based_deduplication": True,
+                "deduplication_scope": "messageGroup",
+                "fifo_throughput_limit": "perMessageGroupId",
+                "kms_master_key_id": "arn:aws:kms:us-east-1:123456789012:key/key-1",
+                "kms_data_key_reuse_period_seconds": 300,
+                "receive_message_wait_time_seconds": 20,
+                "maximum_message_size": 1048576,
+                "dead_letter_queue_arn": "arn:aws:sqs:us-east-1:123456789012:work-dlq.fifo",
+                "max_receive_count": 7,
+                "policy": {"Version": "2012-10-17", "Statement": []},
+            },
+        ),
+    )
+
+    assert result.ok and result.ready
+    request = client.create_queue.call_args.kwargs
+    attrs = request["Attributes"]
+    assert attrs["FifoQueue"] == "true"
+    assert attrs["DeduplicationScope"] == "messageGroup"
+    assert attrs["FifoThroughputLimit"] == "perMessageGroupId"
+    assert attrs["KmsMasterKeyId"].endswith("key/key-1")
+    assert attrs["ReceiveMessageWaitTimeSeconds"] == "20"
+    assert '"maxReceiveCount":"7"' in attrs["RedrivePolicy"]
+    service = Session().get_service_model("sqs")
+    validate_parameters(request, service.operation_model("CreateQueue").input_shape)
+
+
 # ---- status ----------------------------------------------------
 
 
@@ -148,6 +192,8 @@ def test_binding_emits_env_vars(driver: SQSDriver) -> None:
     assert "SQS_QUEUE_NAME" in binding.env_vars
     assert "SQS_QUEUE_URL" in binding.env_vars
     assert "SQS_QUEUE_ARN" in binding.env_vars
+    assert binding.env_vars["QUEUE_URL"].literal == binding.env_vars["SQS_QUEUE_URL"].literal
+    assert binding.env_vars["QUEUE_ARN_OR_ID"].literal == binding.env_vars["SQS_QUEUE_ARN"].literal
 
 
 def test_binding_emits_iam_grants(driver: SQSDriver) -> None:
@@ -157,6 +203,11 @@ def test_binding_emits_iam_grants(driver: SQSDriver) -> None:
     grant = binding.iam_grants[0]
     assert "sqs:SendMessage" in grant.actions
     assert "sqs:ReceiveMessage" in grant.actions
+
+
+def test_binding_lookup_failure_is_not_replaced_with_fabricated_credentials(driver: SQSDriver) -> None:
+    with pytest.raises(ManagedServiceError, match="cannot bind SQS queue"):
+        driver.binding(ServiceHandle(handle="queue/never-existed"))
 
 
 # ---- update ---------------------------------------------------
@@ -174,6 +225,30 @@ def test_update_changes_visibility(driver: SQSDriver, sqs_client) -> None:
         AttributeNames=["VisibilityTimeout"],
     )
     assert int(attrs["Attributes"]["VisibilityTimeout"]) >= 60
+
+
+def test_update_accepts_documented_snake_case_attribute_names(driver: SQSDriver, sqs_client) -> None:
+    result = driver.provision(_spec())
+
+    update = driver.update(
+        UpdateSpec(
+            handle=result.handle,
+            config={
+                "visibility_timeout_seconds": 121,
+                "receive_message_wait_time_seconds": 20,
+            },
+        ),
+    )
+
+    assert update.ok
+    _, queue_name = parse_handle(result.handle)
+    queue_url = sqs_client.get_queue_url(QueueName=queue_name)["QueueUrl"]
+    attrs = sqs_client.get_queue_attributes(
+        QueueUrl=queue_url,
+        AttributeNames=["VisibilityTimeout", "ReceiveMessageWaitTimeSeconds"],
+    )["Attributes"]
+    assert attrs["VisibilityTimeout"] == "121"
+    assert attrs["ReceiveMessageWaitTimeSeconds"] == "20"
 
 
 def test_update_no_op_when_no_changes(driver: SQSDriver) -> None:
@@ -211,6 +286,52 @@ def test_deprovision_already_gone_idempotent(driver: SQSDriver) -> None:
         delete_data=True,
     )
     assert deprov.ok is True
+
+
+def test_safe_deprovision_refuses_to_discard_messages(driver: SQSDriver, sqs_client) -> None:
+    result = driver.provision(_spec())
+    _, queue_name = parse_handle(result.handle)
+    queue_url = sqs_client.get_queue_url(QueueName=queue_name)["QueueUrl"]
+    sqs_client.send_message(QueueUrl=queue_url, MessageBody="important")
+
+    safe = driver.deprovision(DeprovisionSpec(result.handle))
+    destructive = driver.deprovision(DeprovisionSpec(result.handle), delete_data=True)
+
+    assert not safe.ok and not safe.retryable
+    assert "drain it" in safe.message
+    assert destructive.ok
+
+
+def test_deletion_protection_requires_force_destroy(driver: SQSDriver) -> None:
+    result = driver.provision(_spec())
+    spec = DeprovisionSpec(result.handle, config={"deletion_protection": True})
+
+    protected = driver.deprovision(spec, delete_data=True)
+    forced = driver.deprovision(spec, delete_data=True, force_destroy=True)
+
+    assert not protected.ok and not protected.retryable
+    assert forced.ok
+
+
+@pytest.mark.parametrize(
+    ("config", "message"),
+    [
+        ({"deduplication_scope": "messageGroup"}, "fifo=true"),
+        (
+            {"fifo": True, "deduplication_scope": "queue", "fifo_throughput_limit": "perMessageGroupId"},
+            "requires deduplication_scope=messageGroup",
+        ),
+        ({"fifo": True, "dead_letter_queue_arn": "arn:aws:sqs:us-east-1:123:standard"}, "both be FIFO"),
+        ({"visibility_timeout_seconds": 50000}, "0 through 43200"),
+        ({"kms_master_key_id": "arn:key", "sqs_managed_sse_enabled": True}, "mutually exclusive"),
+        ({"redrive_policy": [], "fifo": False}, "JSON object"),
+    ],
+)
+def test_invalid_queue_configuration_is_rejected(driver: SQSDriver, config, message) -> None:
+    result = driver.provision(_spec(config=config))
+
+    assert not result.ok
+    assert message in result.message
 
 
 # ---- snapshot rejection ---------------------------------------

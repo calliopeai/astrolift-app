@@ -55,6 +55,8 @@ AWS_BINDING_TAG_KEY = "astrolift.io/binding"
 SERVICE_CODE_BY_VARIANT: dict[tuple[str, str], str] = {
     ("object_store", "s3"): "AmazonS3",
     ("queue", "sqs"): "AWSQueueService",
+    ("topic", "sns_standard"): "AmazonSNS",
+    ("topic", "sns_fifo"): "AmazonSNS",
     ("postgres", "rds"): "AmazonRDS",
     ("postgres", "aurora"): "AmazonRDS",
     ("postgres", "aurora_postgres"): "AmazonRDS",

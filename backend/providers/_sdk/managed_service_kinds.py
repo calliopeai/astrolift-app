@@ -129,7 +129,7 @@ KINDS = KindCatalog(
             name="queue",
             description="Message queue (FIFO or best-effort)",
             binding_envs_required=("QUEUE_URL",),
-            binding_envs_optional=("QUEUE_NAME", "QUEUE_ARN", "QUEUE_REGION"),
+            binding_envs_optional=("QUEUE_ARN_OR_ID", "QUEUE_NAME", "QUEUE_REGION"),
         ),
         ManagedServiceKind(
             name="topic",
