@@ -98,10 +98,14 @@ class AWSSecretsBackend(SecretsBackend):
 
     @driver_op(cloud="aws", driver="secrets", audit=True, sensitive_kind="secret.read")
     def get(self, path: str) -> dict[str, str] | None:
-        backend, sub = _split_backend(path)
-        if backend == "sm":
-            return self._sm_get(sub)
-        return self._ssm_get(sub)
+        base_path, separator, field = path.partition("#")
+        backend, sub = _split_backend(base_path)
+        result = self._sm_get(sub) if backend == "sm" else self._ssm_get(sub)
+        if not separator or result is None:
+            return result
+        if field not in result:
+            return None
+        return {field: result[field]}
 
     @driver_op(cloud="aws", driver="secrets", audit=True, sensitive_kind="secret.write", redact_args=("kvs",))
     def upsert(self, path: str, kvs: dict[str, str]) -> None:
@@ -137,6 +141,8 @@ class AWSSecretsBackend(SecretsBackend):
         # "astrolift/astrolift/rds/..." and the lookup 404s.
         prefix = self._config.secrets_manager_prefix
         p = path.lstrip("/")
+        if p.startswith("arn:"):
+            return p
         if p == prefix or p.startswith(f"{prefix}/"):
             return p
         return f"{prefix}/{p}"

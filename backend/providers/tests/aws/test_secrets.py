@@ -43,6 +43,13 @@ def test_sm_upsert_then_get_round_trip(sm_backend: AWSSecretsBackend) -> None:
     assert got == {"DATABASE_URL": "postgres://x"}
 
 
+def test_sm_fragment_selects_one_bundle_field(sm_backend: AWSSecretsBackend) -> None:
+    sm_backend.upsert("my-app/bundle", {"username": "agent", "password": "secret"})
+
+    assert sm_backend.get("my-app/bundle#password") == {"password": "secret"}
+    assert sm_backend.get("my-app/bundle#missing") is None
+
+
 def test_sm_get_missing_returns_none(sm_backend: AWSSecretsBackend) -> None:
     """Get-missing is None, NOT an exception. Workflow uses None
     to detect first-time bind."""
@@ -190,3 +197,6 @@ def test_sm_name_no_double_prefix():
     assert b._sm_name("astrolift/rds/inst/url") == "astrolift/rds/inst/url"
     assert b._sm_name("/astrolift/rds/inst/url") == "astrolift/rds/inst/url"
     assert b._sm_name("astrolift") == "astrolift"
+    # Full Secrets Manager ARNs are already absolute provider references.
+    arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:external/value-AbCd"
+    assert b._sm_name(arn) == arn
