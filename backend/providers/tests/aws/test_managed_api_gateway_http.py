@@ -347,6 +347,9 @@ def test_binding_emits_public_execute_api_url():
     binding = drv.binding(ServiceHandle(handle=f"{KIND}/{api_id}"))
     url = binding.env_vars["FAAS_INVOKE_URL"].literal
     assert url == f"https://{api_id}.execute-api.us-east-1.amazonaws.com"
+    assert binding.env_vars["API_GATEWAY_URL"].literal == url
+    assert binding.env_vars["API_GATEWAY_ID"].literal == api_id
+    assert binding.env_vars["API_GATEWAY_STAGE"].literal == "$default"
     # The invoke surface is public on its own URL -- no IAM grant the consumer
     # must hold to reach it (distinguishes it from the dead Function-URL model).
     assert binding.iam_grants == []

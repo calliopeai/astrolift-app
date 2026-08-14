@@ -379,7 +379,13 @@ def managed_config_for(
     if kind == "api_gateway":
         from aws.managed.api_gateway_http import ApiGatewayHttpConfig
 
-        return ApiGatewayHttpConfig(region=region)
+        return ApiGatewayHttpConfig(
+            region=region,
+            account_id=str(pc.get("account_id", ac.get("account_id", ""))),
+            deletion_protection_default=bool(
+                pc.get("api_gateway_deletion_protection_default", False),
+            ),
+        )
 
     if kind == "database_proxy":
         from aws.managed._networking import ensure_db_proxy_networking
