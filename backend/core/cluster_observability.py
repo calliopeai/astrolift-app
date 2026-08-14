@@ -367,6 +367,27 @@ def _gcp_managed_config_for(
             topic_prefix=str(pc.get("pubsub_topic_prefix", "astrolift")),
         )
 
+    if pair == ("warehouse", "bigquery") or (kind == "warehouse" and not variant):
+        from gcp.managed.warehouse_bigquery import BigQueryWarehouseConfig
+
+        return BigQueryWarehouseConfig(
+            project_id=project_id,
+            location=str(pc.get("bigquery_location") or region),
+            dataset_prefix=str(pc.get("bigquery_dataset_prefix", "astrolift")),
+            deletion_protection_default=bool(
+                pc.get("bigquery_deletion_protection_default", True),
+            ),
+            dataset_api_endpoint=str(
+                pc.get("bigquery_dataset_api_endpoint", "https://bigquery.googleapis.com/bigquery/v2"),
+            ),
+            reservation_api_endpoint=str(
+                pc.get(
+                    "bigquery_reservation_api_endpoint",
+                    "https://bigqueryreservation.googleapis.com/v1",
+                ),
+            ),
+        )
+
     if pair == ("postgres", "cloudsql") or (kind == "postgres" and not variant):
         from gcp.managed.postgres_cloudsql import CloudSQLConfig
 

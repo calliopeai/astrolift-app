@@ -23,6 +23,7 @@ Executable managed services:
 - GCPManagedPrometheusDriver — time_series/gcp_managed_prometheus
 - VertexAIEndpointDriver — model_endpoint/vertex_ai
 - CloudKMSDriver — encryption_key/cloud_kms
+- BigQueryWarehouseDriver — warehouse/bigquery
 
 The availability catalogue is authoritative for the remaining planned GCP
 resources. Placeholder email/search classes are registered only so callers get
@@ -48,6 +49,7 @@ from gcp.managed.search_elastic_cloud import GCPElasticCloudStubDriver
 from gcp.managed.timeseries_managed_prometheus import GCPManagedPrometheusDriver
 from gcp.managed.topic_pubsub import PubSubTopicDriver
 from gcp.managed.vector_vertex import VertexMatchingEngineDriver
+from gcp.managed.warehouse_bigquery import BigQueryWarehouseDriver
 from gcp.notification_fcm import FCMNotificationDriver
 from gcp.registry_artifact import ArtifactRegistryDriver
 from gcp.secrets import GCPSecretsBackend
@@ -81,6 +83,7 @@ PLUGIN = ProviderPlugin(
         ("email", "gcp_thirdparty"): GCPEmailStubDriver,
         ("model_endpoint", "vertex_ai"): VertexAIEndpointDriver,
         ("encryption_key", "cloud_kms"): CloudKMSDriver,
+        ("warehouse", "bigquery"): BigQueryWarehouseDriver,
     },
     config_schema={
         "type": "object",
@@ -167,6 +170,26 @@ PLUGIN = ProviderPlugin(
                 "type": "string",
                 "default": "astrolift",
                 "description": "Prefix for platform-managed Pub/Sub topics.",
+            },
+            "bigquery_location": {
+                "type": "string",
+                "description": "BigQuery dataset and capacity location; falls back to region.",
+            },
+            "bigquery_dataset_prefix": {
+                "type": "string",
+                "default": "astrolift",
+            },
+            "bigquery_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "bigquery_dataset_api_endpoint": {
+                "type": "string",
+                "default": "https://bigquery.googleapis.com/bigquery/v2",
+            },
+            "bigquery_reservation_api_endpoint": {
+                "type": "string",
+                "default": "https://bigqueryreservation.googleapis.com/v1",
             },
             "cloudsql_private_network": {
                 "type": "string",
