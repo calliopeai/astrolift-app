@@ -1091,9 +1091,21 @@ MATRIX = AvailabilityMatrix(
             kind="mssql",
             variant="cloudsql_sqlserver",
             plugin_id="gcp",
-            status="planned",
-            description="Cloud SQL for SQL Server",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            description=(
+                "Cloud SQL for SQL Server 2017-2025 Express/Web/Standard/Enterprise, "
+                "including Enterprise Plus, PITR, HA, data cache, CMEK, exact backups, and restore"
+            ),
+            binding_envs=(
+                "MSSQL_HOST",
+                "MSSQL_PORT",
+                "MSSQL_DB",
+                "MSSQL_USER",
+                "MSSQL_PASSWORD",
+                "MSSQL_ENCRYPT",
+                "DATABASE_URL",
+                "GCP_CLOUDSQL_INSTANCE",
+                "GCP_CLOUDSQL_CONNECTION_NAME",
+            ),
         ),
         ManagedServiceEntry(
             kind="document_db",

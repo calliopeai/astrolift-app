@@ -116,6 +116,12 @@ POLICIES: dict[tuple[str, str, str], EncryptionPolicy] = {
         cmek_required_for_compliance=("pci", "hipaa"),
         notes="Firestore CMEK is immutable after database creation; changing keys requires a replacement database.",
     ),
+    ("gcp", "mssql", "cloudsql_sqlserver"): EncryptionPolicy(
+        mode="cloud_kms",
+        cmek_supported=True,
+        cmek_required_for_compliance=("pci", "hipaa"),
+        notes="Cloud SQL CMEK is selected at instance creation; transport bindings require TLS encryption.",
+    ),
     # Azure
     ("azure", "object_store", "blob"): EncryptionPolicy(
         mode="cloud_kms",

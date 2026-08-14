@@ -104,6 +104,7 @@ def test_unknown_gcp_capability_fails_instead_of_using_gke_config() -> None:
         ("postgres", "cloudsql"),
         ("postgres", "alloydb"),
         ("mysql", "cloudsql"),
+        ("mssql", "cloudsql_sqlserver"),
         ("redis", "memorystore"),
     ],
 )
@@ -220,3 +221,39 @@ def test_firestore_runtime_config_preserves_operator_controls() -> None:
     assert config.operation_timeout_seconds == 600
     assert config.poll_interval_seconds == 1
     assert config.api_endpoint == "https://firestore.example.test/v1"
+
+
+def test_sqlserver_runtime_config_preserves_operator_controls() -> None:
+    from core.cluster_observability import managed_config_for
+
+    config = managed_config_for(
+        "gcp",
+        _cluster(
+            cloudsql_private_network="projects/acme-prod/global/networks/data",
+            cloudsql_instance_name_prefix="smd",
+            cloudsql_sqlserver_engine_version="SQLSERVER_2025_ENTERPRISE",
+            cloudsql_sqlserver_backup_retention_days=21,
+            cloudsql_high_availability_default=True,
+            cloudsql_deletion_protection_default=False,
+            cloudsql_secret_manager_prefix="managed/cloudsql",
+            cloudsql_api_endpoint="https://sql.example.test/v1",
+            cloudsql_operation_timeout_seconds=1200,
+            cloudsql_operation_poll_interval_seconds=2,
+        ),
+        kind="mssql",
+        variant="cloudsql_sqlserver",
+    )
+    assert type(config).__name__ == "CloudSQLServerConfig"
+    assert config.project_id == "acme-prod"
+    assert config.region == "us-central1"
+    assert config.private_network == "projects/acme-prod/global/networks/data"
+    assert config.instance_name_prefix == "smd"
+    assert config.engine_version == "SQLSERVER_2025_ENTERPRISE"
+    assert config.backup_retention_days == 21
+    assert config.high_availability_default is True
+    assert config.deletion_protection_default is False
+    assert config.secret_manager_prefix == "managed/cloudsql"
+    assert config.secret_id_prefix == "smd"
+    assert config.api_endpoint == "https://sql.example.test/v1"
+    assert config.operation_timeout_seconds == 1200
+    assert config.poll_interval_seconds == 2

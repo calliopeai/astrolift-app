@@ -30,6 +30,7 @@ def test_managed_services_have_object_store_and_queue() -> None:
     assert ("topic", "pubsub_topic") in keys
     assert ("warehouse", "bigquery") in keys
     assert ("document_db", "firestore_native") in keys
+    assert ("mssql", "cloudsql_sqlserver") in keys
 
 
 def test_managed_services_have_full_gcp_coverage() -> None:
@@ -39,6 +40,7 @@ def test_managed_services_have_full_gcp_coverage() -> None:
     assert ("postgres", "cloudsql") in keys
     assert ("postgres", "alloydb") in keys
     assert ("mysql", "cloudsql") in keys
+    assert ("mssql", "cloudsql_sqlserver") in keys
     assert ("redis", "memorystore") in keys
 
 
@@ -88,5 +90,17 @@ def test_firestore_operator_controls_are_exposed() -> None:
         "firestore_operation_timeout_seconds",
         "firestore_operation_poll_interval_seconds",
         "firestore_api_endpoint",
+    ):
+        assert field in properties
+
+
+def test_sqlserver_operator_controls_are_exposed() -> None:
+    properties = PLUGIN.config_schema["properties"]
+    for field in (
+        "cloudsql_sqlserver_engine_version",
+        "cloudsql_sqlserver_backup_retention_days",
+        "cloudsql_api_endpoint",
+        "cloudsql_operation_timeout_seconds",
+        "cloudsql_operation_poll_interval_seconds",
     ):
         assert field in properties

@@ -25,6 +25,7 @@ Executable managed services:
 - CloudKMSDriver — encryption_key/cloud_kms
 - BigQueryWarehouseDriver — warehouse/bigquery
 - FirestoreNativeDriver — document_db/firestore_native
+- CloudSQLServerDriver — mssql/cloudsql_sqlserver
 
 The availability catalogue is authoritative for the remaining planned GCP
 resources. Placeholder email/search classes are registered only so callers get
@@ -41,6 +42,7 @@ from gcp.managed.document_firestore import FirestoreNativeDriver
 from gcp.managed.email_thirdparty import GCPEmailStubDriver
 from gcp.managed.encryption_cloud_kms import CloudKMSDriver
 from gcp.managed.model_endpoint_vertex import VertexAIEndpointDriver
+from gcp.managed.mssql_cloudsql import CloudSQLServerDriver
 from gcp.managed.mysql_cloudsql import CloudSQLMySQLDriver
 from gcp.managed.object_store_gcs import GCSDriver
 from gcp.managed.postgres_alloydb import AlloyDBPostgresDriver
@@ -87,6 +89,7 @@ PLUGIN = ProviderPlugin(
         ("encryption_key", "cloud_kms"): CloudKMSDriver,
         ("warehouse", "bigquery"): BigQueryWarehouseDriver,
         ("document_db", "firestore_native"): FirestoreNativeDriver,
+        ("mssql", "cloudsql_sqlserver"): CloudSQLServerDriver,
     },
     config_schema={
         "type": "object",
@@ -240,6 +243,33 @@ PLUGIN = ProviderPlugin(
                 "type": "string",
                 "default": "MYSQL_8_0",
             },
+            "cloudsql_sqlserver_engine_version": {
+                "type": "string",
+                "enum": [
+                    "SQLSERVER_2017_EXPRESS",
+                    "SQLSERVER_2017_WEB",
+                    "SQLSERVER_2017_STANDARD",
+                    "SQLSERVER_2017_ENTERPRISE",
+                    "SQLSERVER_2019_EXPRESS",
+                    "SQLSERVER_2019_WEB",
+                    "SQLSERVER_2019_STANDARD",
+                    "SQLSERVER_2019_ENTERPRISE",
+                    "SQLSERVER_2022_EXPRESS",
+                    "SQLSERVER_2022_WEB",
+                    "SQLSERVER_2022_STANDARD",
+                    "SQLSERVER_2022_ENTERPRISE",
+                    "SQLSERVER_2025_EXPRESS",
+                    "SQLSERVER_2025_STANDARD",
+                    "SQLSERVER_2025_ENTERPRISE",
+                ],
+                "default": "SQLSERVER_2025_EXPRESS",
+            },
+            "cloudsql_sqlserver_backup_retention_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 35,
+                "default": 7,
+            },
             "cloudsql_backup_retention_days": {
                 "type": "integer",
                 "minimum": 0,
@@ -258,6 +288,20 @@ PLUGIN = ProviderPlugin(
                 "type": "string",
                 "default": "astrolift/cloudsql",
                 "description": "Logical path prefix for Cloud SQL credential and connection URL secrets.",
+            },
+            "cloudsql_api_endpoint": {
+                "type": "string",
+                "default": "https://sqladmin.googleapis.com/v1",
+            },
+            "cloudsql_operation_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 1800,
+            },
+            "cloudsql_operation_poll_interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 3,
             },
             "alloydb_network": {
                 "type": "string",
