@@ -36,6 +36,7 @@ from astrolift_services.schema.types import (
     EmailServiceDetailType,
     EmailSuppressionEntryType,
     EmailTemplateType,
+    ManagedServiceCatalogEntryType,
     ManagedServiceObjectsType,
     ManagedServiceObjectType,
     ManagedServiceQueueDepthType,
@@ -46,6 +47,7 @@ from astrolift_services.schema.types import (
     SecretHistoryEntryType,
     TemplateSendStatPointType,
     attachment_to_type,
+    managed_service_catalog_entry_to_type,
     managed_service_to_type,
     secret_bundle_to_type,
     secret_change_proposal_to_type,
@@ -528,6 +530,43 @@ class ServicesQuery:
             .order_by("name", "guid")
         )
         return [cluster_to_type(row) for row in rows]
+
+    @strawberry.field
+    @require_permission(Permission.PROJECT_READ)
+    @tenant_scoped()
+    def astrolift_project_managed_service_catalog(
+        self,
+        info: Info,
+        project_id: GUID,
+        cluster_id: GUID,
+    ) -> list[ManagedServiceCatalogEntryType]:
+        """All executable and planned variants for the selected cluster."""
+
+        org_id = _caller_org_id()
+        if not Project.objects.filter(
+            guid=str(project_id),
+            organization_id=org_id,
+            deleted_at__isnull=True,
+        ).exists():
+            return []
+        cluster = (
+            TenantCluster.objects.select_related("provider_plugin")
+            .filter(
+                Q(organization_id=org_id) | Q(organization_id__isnull=True),
+                guid=str(cluster_id),
+                deleted_at__isnull=True,
+                is_active=True,
+                lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+            )
+            .first()
+        )
+        if cluster is None:
+            return []
+        from astrolift_services.managed_service_catalog import list_catalog
+
+        return [
+            managed_service_catalog_entry_to_type(row) for row in list_catalog(cluster.provider_plugin.slug)
+        ]
 
     @strawberry.field
     @require_permission(Permission.PROJECT_READ)

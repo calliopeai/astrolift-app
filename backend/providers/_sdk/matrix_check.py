@@ -2,10 +2,10 @@
 
 Walks every PLUGIN registered via the `astrolift.providers`
 entry-point and confirms the availability matrix has a matching
-entry for each driver + managed-service. The reverse direction
-also holds: every matrix entry must have a real PLUGIN behind it.
+entry for each driver + managed-service. The reverse direction also holds
+for executable entries; planned roadmap entries need no installed driver.
 
-Drift is a deploy-time bug — silent omission of a matrix entry
+Drift is a deploy-time bug — silent omission of an executable matrix entry
 hides a capability from the bind validator; a stale matrix entry
 makes the validator green-light bindings that fail at runtime.
 
@@ -69,11 +69,17 @@ def check_matrix(
                     )
                 )
         for kind, variant in plugin.managed_service_drivers:
-            if not matrix.has_managed(
-                plugin_id=plugin.id,
-                kind=kind,
-                variant=variant,
-            ):
+            # Stub drivers may stay registered while their matrix entry is
+            # ``planned`` so the catalogue can explain the roadmap.  They
+            # count as documented here, but ``has_managed`` deliberately
+            # excludes them from runtime capability negotiation.
+            documented = any(
+                entry.plugin_id == plugin.id
+                and entry.kind == kind
+                and entry.variant == variant
+                for entry in matrix.managed_services
+            )
+            if not documented:
                 issues.append(
                     DriftIssue(
                         code="manifest_not_in_matrix",
@@ -86,7 +92,7 @@ def check_matrix(
                     )
                 )
 
-    # reverse direction: every matrix entry must back a real PLUGIN
+    # reverse direction: every executable matrix entry must back a real PLUGIN
     plugin_index = {p.id: p for p in plugins}
     for entry in matrix.drivers:
         plugin = plugin_index.get(entry.plugin_id)
@@ -116,6 +122,8 @@ def check_matrix(
                 )
             )
     for entry in matrix.managed_services:
+        if entry.status == "planned":
+            continue
         plugin = plugin_index.get(entry.plugin_id)
         if plugin is None:
             issues.append(

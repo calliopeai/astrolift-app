@@ -61,6 +61,37 @@ export interface AstroliftProjectSecretBundle {
   }>;
 }
 
+export interface AstroliftManagedServiceCatalogEntry {
+  id: string;
+  providerPluginSlug: string;
+  kind: string;
+  variant: string;
+  displayName: string;
+  description: string;
+  status: "ga" | "preview" | "experimental" | "deprecated" | "planned";
+  available: boolean;
+  unavailableReason: string;
+  isDefaultForKind: boolean;
+  sizeOptions: string[];
+  configSchema: {
+    type?: string;
+    required?: string[];
+    properties?: Record<
+      string,
+      {
+        type?: string;
+        enum?: Array<string | number>;
+        default?: unknown;
+        description?: string;
+        minimum?: number;
+        maximum?: number;
+      }
+    >;
+  };
+  bindingEnvs: string[];
+  issueUrl: string;
+}
+
 export type AstroliftManagedServiceConnectionKey = GeneratedManagedServiceConnectionKey;
 
 export type AstroliftManagedServiceConnection = GeneratedManagedServiceConnection;

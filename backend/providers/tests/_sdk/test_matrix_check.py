@@ -95,6 +95,33 @@ def test_matrix_with_unknown_plugin() -> None:
     assert "matrix_unknown_plugin" in codes
 
 
+def test_planned_service_does_not_require_an_installed_driver() -> None:
+    plugin = _aws_plugin()
+    matrix = AvailabilityMatrix(
+        drivers=tuple(
+            DriverEntry(role=role, plugin_id="aws")
+            for role in ("cluster", "ingress", "dns", "tls", "secrets", "identity", "registry")
+        ),
+        managed_services=(
+            ManagedServiceEntry(
+                kind="object_store",
+                variant="s3",
+                plugin_id="aws",
+            ),
+            ManagedServiceEntry(
+                kind="postgres",
+                variant="aurora_serverless_v2",
+                plugin_id="aws",
+                status="planned",
+            ),
+        ),
+    )
+
+    report = check_matrix(plugins=[plugin], matrix=matrix)
+
+    assert report.ok is True
+
+
 def test_live_canonical_matrix_in_sync() -> None:
     """The canonical MATRIX must stay in sync with all real
     PLUGIN manifests. Future driver additions must touch both."""

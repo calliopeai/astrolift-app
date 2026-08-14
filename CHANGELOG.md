@@ -7,6 +7,9 @@
 - Add project-owned managed databases, caches, search, object storage,
   queues, and secret bundles with explicit app-environment and agent-recipe
   attachments, provider-backed secret CRUD/reveal, and runtime injection.
+- Add a cluster-derived, multi-cloud project resource catalogue that exposes
+  executable provider options and visible, issue-linked roadmap capabilities
+  with portable sizing, native configuration schemas, and fail-closed validation.
 - Add project-owned workflow topology and execution views across project,
   workflow, history, and role-aware dashboard surfaces.
 - Add composable nested workflow stages with bounded cycle-safe resolution,

@@ -4,17 +4,13 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import {
   BoxIcon,
   ChevronRightIcon,
-  CloudIcon,
-  DatabaseIcon,
   EyeIcon,
   EyeOffIcon,
   KeyRoundIcon,
   PlusIcon,
   RefreshCwIcon,
-  SearchIcon,
   Trash2Icon,
   UnplugIcon,
-  ZapIcon,
 } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
@@ -37,6 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatTile } from "@/components/ui/stat-tile";
+import { Textarea } from "@/components/ui/textarea";
 import { LIST_AGENT_WORKLOADS } from "@/graphql/agents/agents.queries";
 import {
   ATTACH_AGENT_SECRET_BUNDLE,
@@ -64,8 +61,12 @@ import {
   REVEAL_PROJECT_BUNDLE_SECRET,
   SET_PROJECT_BUNDLE_SECRET,
 } from "@/graphql/services/services.mutations";
-import { LIST_PROJECT_RESOURCES } from "@/graphql/services/services.queries";
+import {
+  LIST_PROJECT_MANAGED_SERVICE_CATALOG,
+  LIST_PROJECT_RESOURCES,
+} from "@/graphql/services/services.queries";
 import type {
+  AstroliftManagedServiceCatalogEntry,
   AstroliftManagedService,
   AstroliftProjectSecretBundle,
 } from "@/graphql/services/services.types";
@@ -89,15 +90,9 @@ interface ResourcesData {
   astroliftProjectManagedServices: AstroliftManagedService[];
   astroliftProjectSecretBundles: AstroliftProjectSecretBundle[];
 }
-
-const KINDS = [
-  ["postgres", "PostgreSQL / RDS", DatabaseIcon],
-  ["redis", "Redis / cache", ZapIcon],
-  ["search", "Search index", SearchIcon],
-  ["object_store", "Object storage / S3", CloudIcon],
-  ["vector_index", "Vector index", SearchIcon],
-  ["queue", "Queue", BoxIcon],
-] as const;
+interface CatalogData {
+  astroliftProjectManagedServiceCatalog: AstroliftManagedServiceCatalogEntry[];
+}
 
 function firstError(result?: MutationResult<unknown> | null): string {
   return result?.errors?.[0]?.message ?? "The operation failed";
@@ -128,8 +123,11 @@ export function ProjectResourcesClient({ slug }: { slug: string }) {
   const refetchResources = () => resources.refetch({ projectId });
   const [resourceOpen, setResourceOpen] = React.useState(false);
   const [bundleOpen, setBundleOpen] = React.useState(false);
-  const [resourceKind, setResourceKind] = React.useState("postgres");
+  const [resourceCatalogId, setResourceCatalogId] = React.useState("");
   const [resourceName, setResourceName] = React.useState("");
+  const [resourceSize, setResourceSize] = React.useState("small");
+  const [resourceConfig, setResourceConfig] = React.useState<Record<string, unknown>>({});
+  const [resourceAdvancedConfig, setResourceAdvancedConfig] = React.useState("{}");
   const [clusterId, setClusterId] = React.useState("");
   const [selectedAgents, setSelectedAgents] = React.useState<string[]>([]);
   const [selectedAppEnvironments, setSelectedAppEnvironments] = React.useState<string[]>([]);
@@ -208,6 +206,16 @@ export function ProjectResourcesClient({ slug }: { slug: string }) {
   const effectiveClusterSlug = resources.data?.astroliftProjectResourceClusters.find(
     (row) => row.id === effectiveClusterId
   )?.slug;
+  const catalog = useQuery<CatalogData>(LIST_PROJECT_MANAGED_SERVICE_CATALOG, {
+    variables: { projectId, clusterId: effectiveClusterId },
+    skip: !projectId || !effectiveClusterId,
+  });
+  const catalogEntries = catalog.data?.astroliftProjectManagedServiceCatalog ?? [];
+  const selectedCatalogEntry =
+    catalogEntries.find((row) => row.id === resourceCatalogId) ??
+    catalogEntries.find((row) => row.available && row.isDefaultForKind) ??
+    catalogEntries.find((row) => row.available) ??
+    catalogEntries[0];
 
   if (projects.loading && !project) {
     return (
@@ -243,14 +251,30 @@ export function ProjectResourcesClient({ slug }: { slug: string }) {
 
   async function submitResource(event: React.FormEvent) {
     event.preventDefault();
+    if (!selectedCatalogEntry?.available) {
+      return toast.error("Choose an available resource variant");
+    }
+    let advancedConfig: Record<string, unknown>;
+    try {
+      advancedConfig = JSON.parse(resourceAdvancedConfig || "{}") as Record<string, unknown>;
+    } catch {
+      return toast.error("Advanced provider config must be valid JSON");
+    }
+    const config = {
+      ...advancedConfig,
+      ...resourceConfig,
+      ...(selectedCatalogEntry.sizeOptions.length ? { size: resourceSize } : {}),
+    };
     const { data } = await provision({
       variables: {
         input: {
           projectId,
           clusterId: effectiveClusterId,
           environmentName: "production",
-          kind: resourceKind,
-          name: resourceName || resourceKind,
+          kind: selectedCatalogEntry.kind,
+          variant: selectedCatalogEntry.variant,
+          name: resourceName || selectedCatalogEntry.kind,
+          config,
           agentEnvironmentSpecSlugs: selectedAgents,
           appEnvironmentIds: selectedAppEnvironments,
         },
@@ -261,6 +285,8 @@ export function ProjectResourcesClient({ slug }: { slug: string }) {
     toast.success("Project resource provisioning started");
     setResourceOpen(false);
     setResourceName("");
+    setResourceConfig({});
+    setResourceAdvancedConfig("{}");
     setSelectedAgents([]);
     setSelectedAppEnvironments([]);
     await refetchResources();
@@ -299,13 +325,13 @@ export function ProjectResourcesClient({ slug }: { slug: string }) {
     <PageShell
       title="Project resources"
       description={
-        <nav className="text-muted-foreground flex items-center gap-1 text-sm">
+        <span className="text-muted-foreground flex items-center gap-1 text-sm">
           <Link href={`/projects/${encodeURIComponent(slug)}`} className="hover:underline">
             {project.name}
           </Link>
           <ChevronRightIcon className="size-3" />
           <span className="text-foreground">Resources</span>
-        </nav>
+        </span>
       }
       actions={
         canUpdate ? (
@@ -626,19 +652,64 @@ export function ProjectResourcesClient({ slug }: { slug: string }) {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-2">
-              <Label htmlFor="resource-kind">Kind</Label>
+              <Label htmlFor="resource-kind">Provider resource</Label>
               <select
                 id="resource-kind"
                 className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-                value={resourceKind}
-                onChange={(event) => setResourceKind(event.target.value)}
+                value={selectedCatalogEntry?.id ?? ""}
+                onChange={(event) => {
+                  const next = catalogEntries.find((row) => row.id === event.target.value);
+                  setResourceCatalogId(event.target.value);
+                  setResourceSize(next?.sizeOptions[0] ?? "small");
+                  setResourceConfig({});
+                  setResourceAdvancedConfig("{}");
+                }}
               >
-                {KINDS.map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
+                {catalogEntries.length === 0 && <option value="">No catalogue entries</option>}
+                {catalogEntries.map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.kind.replaceAll("_", " ")} · {entry.displayName} · {entry.variant}
+                    {!entry.available ? ` (${entry.status})` : ""}
                   </option>
                 ))}
               </select>
+              {catalog.loading && (
+                <p className="text-muted-foreground text-xs">Loading cluster catalogue…</p>
+              )}
+              {catalog.error && (
+                <p className="text-danger-fg text-xs">The cluster catalogue could not be loaded.</p>
+              )}
+              {selectedCatalogEntry && (
+                <div className="bg-muted/40 space-y-2 rounded-md border p-3 text-xs">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">{selectedCatalogEntry.providerPluginSlug}</Badge>
+                    <Badge variant="secondary">{selectedCatalogEntry.status}</Badge>
+                    {selectedCatalogEntry.isDefaultForKind && <Badge>default</Badge>}
+                  </div>
+                  <p className="text-muted-foreground">{selectedCatalogEntry.description}</p>
+                  {!selectedCatalogEntry.available && (
+                    <p className="text-warning-fg">
+                      {selectedCatalogEntry.unavailableReason ||
+                        "This provider capability is not available yet."}
+                    </p>
+                  )}
+                  {selectedCatalogEntry.issueUrl && (
+                    <a
+                      href={selectedCatalogEntry.issueUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary inline-flex underline-offset-4 hover:underline"
+                    >
+                      View implementation issue
+                    </a>
+                  )}
+                  {selectedCatalogEntry.bindingEnvs.length > 0 && (
+                    <p className="text-muted-foreground">
+                      Bindings: {selectedCatalogEntry.bindingEnvs.join(", ")}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="resource-name">Name</Label>
@@ -646,7 +717,7 @@ export function ProjectResourcesClient({ slug }: { slug: string }) {
                 id="resource-name"
                 value={resourceName}
                 onChange={(event) => setResourceName(event.target.value)}
-                placeholder={resourceKind}
+                placeholder={selectedCatalogEntry?.kind ?? "resource"}
               />
             </div>
             <div className="space-y-2">
@@ -658,6 +729,9 @@ export function ProjectResourcesClient({ slug }: { slug: string }) {
                 value={effectiveClusterId}
                 onChange={(event) => {
                   setClusterId(event.target.value);
+                  setResourceCatalogId("");
+                  setResourceConfig({});
+                  setResourceAdvancedConfig("{}");
                   setSelectedAgents([]);
                   setSelectedAppEnvironments([]);
                 }}
@@ -669,6 +743,134 @@ export function ProjectResourcesClient({ slug }: { slug: string }) {
                 ))}
               </select>
             </div>
+            {selectedCatalogEntry?.sizeOptions.length ? (
+              <div className="space-y-2">
+                <Label htmlFor="resource-size">Size preset</Label>
+                <select
+                  id="resource-size"
+                  className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                  value={resourceSize}
+                  onChange={(event) => setResourceSize(event.target.value)}
+                >
+                  {selectedCatalogEntry.sizeOptions.map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+            {selectedCatalogEntry && (
+              <fieldset className="space-y-3 rounded-md border p-3">
+                <legend className="px-1 text-sm font-medium">Provider options</legend>
+                {Object.entries(selectedCatalogEntry.configSchema.properties ?? {})
+                  .filter(
+                    ([key, schema]) =>
+                      key !== "size" &&
+                      ["string", "integer", "number", "boolean"].includes(schema.type ?? "")
+                  )
+                  .map(([key, schema]) => {
+                    const value = resourceConfig[key] ?? schema.default ?? "";
+                    if (schema.type === "boolean") {
+                      return (
+                        <label key={key} className="flex items-start gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(value)}
+                            onChange={(event) =>
+                              setResourceConfig((current) => ({
+                                ...current,
+                                [key]: event.target.checked,
+                              }))
+                            }
+                          />
+                          <span>
+                            {key.replaceAll("_", " ")}
+                            {schema.description && (
+                              <span className="text-muted-foreground block text-xs">
+                                {schema.description}
+                              </span>
+                            )}
+                          </span>
+                        </label>
+                      );
+                    }
+                    return (
+                      <div key={key} className="space-y-1">
+                        <Label htmlFor={`resource-config-${key}`}>{key.replaceAll("_", " ")}</Label>
+                        {schema.enum ? (
+                          <select
+                            id={`resource-config-${key}`}
+                            className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                            value={String(value)}
+                            onChange={(event) => {
+                              const next = event.target.value;
+                              setResourceConfig((current) => {
+                                const updated = { ...current };
+                                if (!next) delete updated[key];
+                                else
+                                  updated[key] =
+                                    schema.type === "integer" || schema.type === "number"
+                                      ? Number(next)
+                                      : next;
+                                return updated;
+                              });
+                            }}
+                          >
+                            <option value="">Provider default</option>
+                            {schema.enum.map((option) => (
+                              <option key={String(option)} value={String(option)}>
+                                {String(option)}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <Input
+                            id={`resource-config-${key}`}
+                            type={
+                              schema.type === "integer" || schema.type === "number"
+                                ? "number"
+                                : "text"
+                            }
+                            min={schema.minimum}
+                            max={schema.maximum}
+                            value={String(value)}
+                            onChange={(event) => {
+                              const next = event.target.value;
+                              setResourceConfig((current) => {
+                                const updated = { ...current };
+                                if (!next) delete updated[key];
+                                else
+                                  updated[key] =
+                                    schema.type === "integer" || schema.type === "number"
+                                      ? Number(next)
+                                      : next;
+                                return updated;
+                              });
+                            }}
+                          />
+                        )}
+                        {schema.description && (
+                          <p className="text-muted-foreground text-xs">{schema.description}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                <div className="space-y-1">
+                  <Label htmlFor="resource-advanced-config">Advanced config JSON</Label>
+                  <Textarea
+                    id="resource-advanced-config"
+                    className="min-h-24 font-mono text-xs"
+                    value={resourceAdvancedConfig}
+                    onChange={(event) => setResourceAdvancedConfig(event.target.value)}
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    Arrays, nested objects, and provider-native overrides. Generated fields above
+                    win on conflicts.
+                  </p>
+                </div>
+              </fieldset>
+            )}
             <fieldset className="space-y-2">
               <legend className="text-sm font-medium">Attach to agents</legend>
               {(agents.data?.agentWorkloads ?? []).map((agent) => (
@@ -713,7 +915,12 @@ export function ProjectResourcesClient({ slug }: { slug: string }) {
               <Button type="button" variant="outline" onClick={() => setResourceOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={!effectiveClusterId || provisionState.loading}>
+              <Button
+                type="submit"
+                disabled={
+                  !effectiveClusterId || !selectedCatalogEntry?.available || provisionState.loading
+                }
+              >
                 Provision
               </Button>
             </DialogFooter>

@@ -20,6 +20,8 @@ from core.models.base import BaseCoreModel
 class ManagedService(BaseCoreModel):
     class Kind(models.TextChoices):
         POSTGRES = "postgres"
+        MYSQL = "mysql"
+        MSSQL = "mssql"
         REDIS = "redis"
         OBJECT_STORE = "object_store"
         QUEUE = "queue"
@@ -35,6 +37,20 @@ class ManagedService(BaseCoreModel):
         MODEL_ENDPOINT = "model_endpoint"
         CDN = "cdn"
         FAAS = "faas"
+        API_GATEWAY = "api_gateway"
+        EVENT_STREAM = "event_stream"
+        FILESYSTEM = "filesystem"
+        SMS = "sms"
+        DATABASE_PROXY = "database_proxy"
+        GRAPH_DB = "graph_db"
+        WIDE_COLUMN = "wide_column"
+        WAREHOUSE = "warehouse"
+        EVENT_BUS = "event_bus"
+        STREAM = "stream"
+        WORKFLOW_ENGINE = "workflow_engine"
+        ENCRYPTION_KEY = "encryption_key"
+        PRIVATE_ENDPOINT = "private_endpoint"
+        OBSERVABILITY = "observability"
 
     class Status(models.TextChoices):
         PENDING = "pending"
