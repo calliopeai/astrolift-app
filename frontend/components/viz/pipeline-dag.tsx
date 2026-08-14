@@ -79,8 +79,16 @@ function StageNode({ data }: NodeProps<Node<PipelineDagStage>>) {
 
   const body = (
     <>
-      <Handle type="target" position={Position.Left} className="!bg-muted-foreground/30" />
-      <Handle type="source" position={Position.Right} className="!bg-muted-foreground/30" />
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!border-background !bg-muted-foreground/50 !-left-1.5 !size-2.5 !border-2"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!border-background !bg-muted-foreground/50 !-right-1.5 !size-2.5 !border-2"
+      />
       <div className="flex min-w-0 items-center gap-1.5">
         <span className={cn("viz-node-dot size-1.5 shrink-0 rounded-full", TONE_DOT[tone])} />
         <div className="min-w-0 truncate text-sm leading-tight font-medium">{data.name}</div>
@@ -92,7 +100,7 @@ function StageNode({ data }: NodeProps<Node<PipelineDagStage>>) {
     </>
   );
   const className = cn(
-    "viz-node block w-[220px] rounded-md border bg-background p-3 ring-1 shadow-sm",
+    "viz-node relative flex h-16 w-56 flex-col justify-center overflow-visible rounded-md border bg-background px-3 py-2 ring-1 shadow-sm",
     data.href &&
       "cursor-pointer hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
     TONE_RING[tone]
@@ -147,7 +155,7 @@ export function PipelineDag({
     const edges = stages.flatMap((s) =>
       (s.needs ?? []).map((dep) => ({ source: dep, target: s.id }))
     );
-    const pos = rankLayout(ids, edges);
+    const pos = rankLayout(ids, edges, { colWidth: 304, rowHeight: 96 });
     return stages.map((s) => ({
       id: s.id,
       type: "stage",
@@ -166,6 +174,7 @@ export function PipelineDag({
             id: `${dep}->${s.id}`,
             source: dep,
             target: s.id,
+            type: "smoothstep",
             animated: !!animateActiveEdges && toneFor(s.status) === "running",
           }))
       ),
