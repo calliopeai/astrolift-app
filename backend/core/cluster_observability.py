@@ -401,6 +401,23 @@ def managed_config_for(
             ),
         )
 
+    if kind == "observability":
+        from aws.managed.observability_cloudwatch import CloudWatchConfig
+
+        return CloudWatchConfig(
+            region=region,
+            account_id=str(pc.get("account_id", ac.get("account_id", ""))),
+            log_group_prefix=str(pc.get("cloudwatch_log_group_prefix", "/astrolift")),
+            retention_days_default=int(pc.get("cloudwatch_retention_days_default", 30)),
+            log_group_class_default=str(pc.get("cloudwatch_log_group_class_default", "STANDARD")),
+            deletion_protection_default=bool(
+                pc.get("cloudwatch_deletion_protection_default", True),
+            ),
+            dashboard_enabled_default=bool(
+                pc.get("cloudwatch_dashboard_enabled_default", True),
+            ),
+        )
+
     if kind == "workflow_engine":
         from aws.managed.workflow_step_functions import StepFunctionsConfig
 
