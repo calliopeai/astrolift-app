@@ -64,6 +64,7 @@ from aws.managed.opensearch_serverless import (
     OpenSearchServerlessVectorDriver,
 )
 from aws.managed.postgres_rds import RDSPostgresDriver
+from aws.managed.private_endpoint_vpc import VpcEndpointDriver
 from aws.managed.queue_sqs import SQSDriver
 from aws.managed.rds_proxy import RDSProxyDriver
 from aws.managed.redis_elasticache import ElastiCacheRedisDriver
@@ -157,6 +158,7 @@ PLUGIN = ProviderPlugin(
         ("encryption_key", "kms"): KMSDriver,
         ("workflow_engine", "step_functions_standard"): StepFunctionsStandardDriver,
         ("workflow_engine", "step_functions_express"): StepFunctionsExpressDriver,
+        ("private_endpoint", "vpc_endpoint"): VpcEndpointDriver,
     },
     config_schema={
         "type": "object",
