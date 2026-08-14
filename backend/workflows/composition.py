@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from django.db.models import Q
 
 from workflows.models import WorkflowDefinition, WorkflowStage
@@ -11,6 +13,47 @@ MAX_WORKFLOW_NESTING_DEPTH = 8
 
 class WorkflowCompositionError(ValueError):
     """A nested workflow reference is missing, invisible, cyclic, or too deep."""
+
+
+def resolve_child_definition_from_candidates(
+    parent: WorkflowDefinition,
+    workflow_ref: str,
+    candidates: Iterable[WorkflowDefinition],
+) -> WorkflowDefinition | None:
+    """Resolve a child from preloaded definitions with runtime visibility rules."""
+    ref = (workflow_ref or "").strip()
+    if not ref:
+        return None
+
+    visible = [
+        candidate
+        for candidate in candidates
+        if candidate.slug == ref
+        and candidate.is_enabled
+        and candidate.deleted_at is None
+        and (
+            (parent.organization_id is None and candidate.organization_id is None)
+            or (
+                parent.organization_id is not None
+                and candidate.organization_id in {parent.organization_id, None}
+            )
+        )
+        and (
+            (parent.project_id is None and candidate.project_id is None)
+            or (parent.project_id is not None and candidate.project_id in {parent.project_id, None})
+        )
+    ]
+    if parent.organization_id is not None:
+        owned = next(
+            (candidate for candidate in visible if candidate.organization_id == parent.organization_id),
+            None,
+        )
+        if owned is not None:
+            return owned
+    return next(
+        (candidate for candidate in visible if candidate.organization_id is None),
+        None,
+    )
 
 
 def resolve_child_definition(parent: WorkflowDefinition, workflow_ref: str) -> WorkflowDefinition | None:
@@ -41,11 +84,7 @@ def resolve_child_definition(parent: WorkflowDefinition, workflow_ref: str) -> W
     else:
         definitions = definitions.filter(Q(project_id=parent.project_id) | Q(project__isnull=True))
 
-    if parent.organization_id is not None:
-        owned = definitions.filter(organization_id=parent.organization_id).first()
-        if owned is not None:
-            return owned
-    return definitions.filter(organization__isnull=True).first()
+    return resolve_child_definition_from_candidates(parent, ref, definitions)
 
 
 def validate_workflow_composition(
@@ -134,6 +173,7 @@ __all__ = [
     "MAX_WORKFLOW_NESTING_DEPTH",
     "WorkflowCompositionError",
     "resolve_child_definition",
+    "resolve_child_definition_from_candidates",
     "validate_workflow_composition",
     "workflow_parent_references",
 ]

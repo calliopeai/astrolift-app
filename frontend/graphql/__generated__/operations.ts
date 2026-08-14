@@ -2515,6 +2515,7 @@ export type AstroliftNavTreeTeam = {
 
 export type AstroliftNavTreeWorkflow = {
   agents: Array<AstroliftAppSummary>;
+  childWorkflowIds: Array<Scalars['GUID']['output']>;
   id: Scalars['GUID']['output'];
   isEnabled: Scalars['Boolean']['output'];
   name: Scalars['String']['output'];
@@ -10487,7 +10488,7 @@ export type ProjectSlugAvailableQuery = { astroliftProjectSlugAvailable: boolean
 export type ListNavTreeQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ListNavTreeQuery = { astroliftNavTree?: { organization: { id: string, slug: string, name: string }, teams: Array<{ team: { id: string, slug: string, name: string }, projects: Array<{ project: { id: string, slug: string, name: string }, apps: Array<{ id: string, slug: string, name: string, status: string, primitiveKind: string, primitiveSlug: string }>, workflows: Array<{ id: string, slug: string, name: string, isEnabled: boolean, agents: Array<{ id: string, slug: string, name: string, status: string, primitiveKind: string, primitiveSlug: string }> }>, standaloneAgents: Array<{ id: string, slug: string, name: string, status: string, primitiveKind: string, primitiveSlug: string }> }>, unassignedApps: Array<{ id: string, slug: string, name: string, status: string, primitiveKind: string, primitiveSlug: string }> }>, unassignedApps: Array<{ id: string, slug: string, name: string, status: string, primitiveKind: string, primitiveSlug: string }> } | null };
+export type ListNavTreeQuery = { astroliftNavTree?: { organization: { id: string, slug: string, name: string }, teams: Array<{ team: { id: string, slug: string, name: string }, projects: Array<{ project: { id: string, slug: string, name: string }, apps: Array<{ id: string, slug: string, name: string, status: string, primitiveKind: string, primitiveSlug: string }>, workflows: Array<{ id: string, slug: string, name: string, isEnabled: boolean, childWorkflowIds: Array<string>, agents: Array<{ id: string, slug: string, name: string, status: string, primitiveKind: string, primitiveSlug: string }> }>, standaloneAgents: Array<{ id: string, slug: string, name: string, status: string, primitiveKind: string, primitiveSlug: string }> }>, unassignedApps: Array<{ id: string, slug: string, name: string, status: string, primitiveKind: string, primitiveSlug: string }> }>, unassignedApps: Array<{ id: string, slug: string, name: string, status: string, primitiveKind: string, primitiveSlug: string }> } | null };
 
 export type GetOrganizationQueryVariables = Exact<{
   slug: Scalars['String']['input'];

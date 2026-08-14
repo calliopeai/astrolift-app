@@ -202,6 +202,7 @@ export const LIST_NAV_TREE = gql`
             slug
             name
             isEnabled
+            childWorkflowIds
             agents {
               id
               slug

@@ -2515,6 +2515,7 @@ export type AstroliftNavTreeTeam = {
 
 export type AstroliftNavTreeWorkflow = {
   agents: Array<AstroliftAppSummary>;
+  childWorkflowIds: Array<Scalars['GUID']['output']>;
   id: Scalars['GUID']['output'];
   isEnabled: Scalars['Boolean']['output'];
   name: Scalars['String']['output'];

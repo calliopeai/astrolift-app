@@ -180,6 +180,66 @@ def test_nav_tree_nests_workflow_agents_and_separates_standalone_agents():
     assert all(agent.primitive_slug != "intake" for agent in node.standalone_agents)
 
 
+def test_nav_tree_exposes_nested_workflow_edges_in_stage_order():
+    from workflows.models import WorkflowDefinition, WorkflowStage
+
+    org, _team, project, _app = _scaffold()
+    intake = WorkflowDefinition.objects.create(
+        organization=org,
+        project=project,
+        name="Intake",
+        slug="intake-workflow",
+        model_label="",
+        states=[],
+        transitions=[],
+    )
+    decide = WorkflowDefinition.objects.create(
+        organization=org,
+        project=project,
+        name="Decide",
+        slug="decide-workflow",
+        model_label="",
+        states=[],
+        transitions=[],
+    )
+    full_path = WorkflowDefinition.objects.create(
+        organization=org,
+        project=project,
+        name="Full path",
+        slug="full-path",
+        model_label="",
+        states=[],
+        transitions=[],
+    )
+    WorkflowStage.objects.create(
+        definition=full_path,
+        order=0,
+        kind=WorkflowStage.StageKind.WORKFLOW,
+        role="intake",
+        workflow_ref=intake.slug,
+    )
+    WorkflowStage.objects.create(
+        definition=full_path,
+        order=1,
+        kind=WorkflowStage.StageKind.WORKFLOW,
+        role="decide",
+        workflow_ref=decide.slug,
+    )
+
+    with tenant_context(TenantContext(organization_id=org.id)):
+        tree = IdentityQuery().astrolift_nav_tree(_info())
+
+    workflows = tree.teams[0].projects[0].workflows
+    by_slug = {workflow.slug: workflow for workflow in workflows}
+    assert set(by_slug) == {"intake-workflow", "decide-workflow", "full-path"}
+    assert by_slug["full-path"].child_workflow_ids == [
+        str(intake.guid),
+        str(decide.guid),
+    ]
+    assert by_slug["intake-workflow"].child_workflow_ids == []
+    assert by_slug["decide-workflow"].child_workflow_ids == []
+
+
 def test_nav_tree_returns_none_when_org_missing():
     """Tenant context with no resolvable org row should yield None
     rather than fabricate an empty tree -- that lets the UI fall back
