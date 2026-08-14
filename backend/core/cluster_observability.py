@@ -665,6 +665,59 @@ def managed_config_for(
             max_poll_attempts=int(pc.get("firehose_max_poll_attempts", 60)),
         )
 
+    if kind == "event_stream" and variant in {"msk", "msk_serverless"}:
+        from aws.managed._networking import ensure_msk_networking
+        from aws.managed.event_stream_msk import MSKConfig
+
+        subnet_ids, security_group_ids = ensure_msk_networking(
+            cluster,
+            region=region,
+        )
+        return MSKConfig(
+            region=region,
+            account_id=str(pc.get("account_id", "")),
+            cluster_name_prefix=str(pc.get("msk_cluster_name_prefix", "astrolift")),
+            subnet_ids=tuple(subnet_ids),
+            security_group_ids=tuple(security_group_ids),
+            kms_key_arn=str(pc.get("msk_kms_key_arn") or pc.get("kms_key_id") or ""),
+            kafka_version_default=str(pc.get("msk_kafka_version", "")),
+            deletion_protection_default=bool(
+                pc.get("deletion_protection_default", True),
+            ),
+            poll_delay_seconds=float(pc.get("msk_poll_delay_seconds", 15)),
+            max_poll_attempts=int(pc.get("msk_max_poll_attempts", 80)),
+        )
+
+    if kind == "mq" and variant in {"amazon_mq_rabbitmq", "amazon_mq_activemq"}:
+        from aws.managed._networking import ensure_mq_networking
+        from aws.managed.mq_amazon import AmazonMQConfig
+
+        subnet_ids, security_group_ids = ensure_mq_networking(
+            cluster,
+            region=region,
+        )
+        engine_key = "rabbitmq" if variant == "amazon_mq_rabbitmq" else "activemq"
+        return AmazonMQConfig(
+            region=region,
+            account_id=str(pc.get("account_id", "")),
+            broker_name_prefix=str(pc.get("amazon_mq_broker_name_prefix", "astrolift")),
+            subnet_ids=tuple(subnet_ids),
+            security_group_ids=tuple(security_group_ids),
+            kms_key_id=str(pc.get("amazon_mq_kms_key_id") or pc.get("kms_key_id") or ""),
+            engine_version_default=str(
+                pc.get(f"amazon_mq_{engine_key}_engine_version") or pc.get("amazon_mq_engine_version") or ""
+            ),
+            secrets_manager_prefix=str(
+                pc.get("amazon_mq_secrets_manager_prefix", "astrolift/mq"),
+            ),
+            admin_username=str(pc.get("amazon_mq_admin_username", "astrolift")),
+            deletion_protection_default=bool(
+                pc.get("deletion_protection_default", True),
+            ),
+            poll_delay_seconds=float(pc.get("amazon_mq_poll_delay_seconds", 10)),
+            max_poll_attempts=int(pc.get("amazon_mq_max_poll_attempts", 90)),
+        )
+
     if kind in ("search", "vector_index") and variant.startswith("opensearch_serverless"):
         from aws.managed._networking import ensure_opensearch_serverless_networking
         from aws.managed.opensearch_serverless import OpenSearchServerlessConfig

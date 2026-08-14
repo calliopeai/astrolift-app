@@ -587,6 +587,12 @@ def test_every_registered_managed_service_driver_has_a_config_builder():
             "redshift_subnet_group": "redshift-subnets",
             "redshift_subnet_ids": ["subnet-a", "subnet-b", "subnet-c"],
             "redshift_security_group_ids": ["sg-redshift"],
+            "msk_subnet_ids": ["subnet-a", "subnet-b", "subnet-c"],
+            "msk_security_group_ids": ["sg-msk"],
+            "msk_kafka_version": "3.9.x",
+            "mq_subnet_ids": ["subnet-a", "subnet-b", "subnet-c"],
+            "mq_security_group_ids": ["sg-mq"],
+            "amazon_mq_engine_version": "3.13",
         },
     )
     for kind, variant in PLUGIN.managed_service_drivers:

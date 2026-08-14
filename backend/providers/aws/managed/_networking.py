@@ -598,6 +598,135 @@ def ensure_redshift_networking(
     return subnet_group, subnet_ids, security_group_ids
 
 
+def ensure_msk_networking(
+    cluster,
+    *,
+    region: str,
+    clients: Any | None = None,
+) -> tuple[list[str], list[str]]:
+    """Resolve private subnets and a Kafka access SG for Amazon MSK.
+
+    The four ingress ports cover provisioned plaintext/TLS/SCRAM/IAM and
+    Serverless IAM bootstrap traffic. Operators can pin both lists to use
+    narrower pre-created network policy.
+    """
+
+    pc = cluster.provider_config or {}
+    pinned_subnets = list(pc.get("msk_subnet_ids") or [])
+    pinned_groups = list(pc.get("msk_security_group_ids") or [])
+    if pinned_subnets and pinned_groups:
+        return pinned_subnets, pinned_groups
+    if clients is None:
+        import boto3
+
+        ec2 = boto3.client("ec2", region_name=region)
+        eks = boto3.client("eks", region_name=region)
+    else:
+        ec2, eks = clients
+    vpc_id, discovered_subnets, vpc_cidr = discover_vpc(
+        cluster,
+        region=region,
+        ec2=ec2,
+        eks=eks,
+    )
+    # Provisioned MSK accepts two or three client subnets. Keep explicit
+    # operator pins intact so invalid policy fails visibly, but choose three
+    # AZs from broad EKS VPC discovery by default.
+    subnet_ids = pinned_subnets or discovered_subnets[:3]
+    if len(set(subnet_ids)) < 2:
+        raise RuntimeError("Amazon MSK requires private subnets in at least two Availability Zones")
+    security_group_ids = pinned_groups
+    if not security_group_ids:
+        sg_id = ensure_security_group(
+            vpc_id=vpc_id,
+            vpc_cidr=vpc_cidr,
+            port=9092,
+            name=f"astrolift-{cluster.slug}-msk"[:255],
+            ec2=ec2,
+        )
+        for port in (9094, 9096, 9098):
+            try:
+                ec2.authorize_security_group_ingress(
+                    GroupId=sg_id,
+                    IpPermissions=[
+                        {
+                            "IpProtocol": "tcp",
+                            "FromPort": port,
+                            "ToPort": port,
+                            "IpRanges": [
+                                {"CidrIp": vpc_cidr, "Description": "astrolift Kafka clients"},
+                            ],
+                        },
+                    ],
+                )
+            except Exception as exc:
+                if "InvalidPermission.Duplicate" not in str(exc):
+                    raise
+        security_group_ids = [sg_id]
+    return subnet_ids, security_group_ids
+
+
+def ensure_mq_networking(
+    cluster,
+    *,
+    region: str,
+    clients: Any | None = None,
+) -> tuple[list[str], list[str]]:
+    """Resolve private multi-AZ subnets and TLS broker ingress for Amazon MQ."""
+
+    pc = cluster.provider_config or {}
+    pinned_subnets = list(pc.get("mq_subnet_ids") or [])
+    pinned_groups = list(pc.get("mq_security_group_ids") or [])
+    if pinned_subnets and pinned_groups:
+        return pinned_subnets, pinned_groups
+    if clients is None:
+        import boto3
+
+        ec2 = boto3.client("ec2", region_name=region)
+        eks = boto3.client("eks", region_name=region)
+    else:
+        ec2, eks = clients
+    vpc_id, discovered_subnets, vpc_cidr = discover_vpc(
+        cluster,
+        region=region,
+        ec2=ec2,
+        eks=eks,
+    )
+    subnet_ids = pinned_subnets or discovered_subnets[:3]
+    if not subnet_ids:
+        raise RuntimeError("Amazon MQ requires at least one subnet")
+    security_group_ids = pinned_groups
+    if not security_group_ids:
+        ports = (443, 5671, 61614, 61617, 61619, 8883)
+        sg_id = ensure_security_group(
+            vpc_id=vpc_id,
+            vpc_cidr=vpc_cidr,
+            port=ports[0],
+            name=f"astrolift-{cluster.slug}-mq"[:255],
+            ec2=ec2,
+        )
+        for port in ports[1:]:
+            try:
+                ec2.authorize_security_group_ingress(
+                    GroupId=sg_id,
+                    IpPermissions=[
+                        {
+                            "IpProtocol": "tcp",
+                            "FromPort": port,
+                            "ToPort": port,
+                            "IpRanges": [
+                                {"CidrIp": vpc_cidr, "Description": "astrolift MQ clients"},
+                            ],
+                        },
+                    ],
+                )
+            except Exception as exc:
+                if "InvalidPermission.Duplicate" not in str(exc):
+                    raise
+        security_group_ids = [sg_id]
+    return subnet_ids, security_group_ids
+
+
 def ensure_keyspaces_networking(
     cluster,
     *,
