@@ -78,6 +78,8 @@ class ApiGatewayHttpConfig:
     """Driver-instance config bound from the cluster's plugin config."""
 
     region: str = "us-east-1"
+    account_id: str = ""
+    deletion_protection_default: bool = False
 
 
 class ApiGatewayHttpDriver:
@@ -216,7 +218,13 @@ class ApiGatewayHttpDriver:
         _, api_id = parse_handle(handle.handle)
         endpoint = self._api.get_api(ApiId=api_id).get("ApiEndpoint", "")
         return Binding(
-            env_vars={"FAAS_INVOKE_URL": ValueRef(literal=endpoint)},
+            env_vars={
+                "API_GATEWAY_URL": ValueRef(literal=endpoint),
+                "API_GATEWAY_ID": ValueRef(literal=api_id),
+                "API_GATEWAY_STAGE": ValueRef(literal=_DEFAULT_STAGE_NAME),
+                "FAAS_INVOKE_URL": ValueRef(literal=endpoint),
+                "AWS_REGION": ValueRef(literal=self._config.region),
+            },
             notes="Public API Gateway HTTP API endpoint that proxies to the function.",
         )
 
@@ -254,7 +262,13 @@ class ApiGatewayHttpDriver:
     @driver_op(cloud="aws", driver="api_gateway_http", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
-            env_vars={"FAAS_INVOKE_URL": "Public HTTP API endpoint that invokes the function"},
+            env_vars={
+                "API_GATEWAY_URL": "Public HTTP API endpoint",
+                "API_GATEWAY_ID": "HTTP API identifier",
+                "API_GATEWAY_STAGE": "Deployed stage name",
+                "FAAS_INVOKE_URL": "Public HTTP API endpoint that invokes the function",
+                "AWS_REGION": "AWS region",
+            },
         )
 
     def editable_fields(self) -> list[str]:
