@@ -102,6 +102,7 @@ def test_unknown_gcp_capability_fails_instead_of_using_gke_config() -> None:
     ("kind", "variant"),
     [
         ("postgres", "cloudsql"),
+        ("postgres", "alloydb"),
         ("mysql", "cloudsql"),
         ("redis", "memorystore"),
     ],
@@ -114,3 +115,42 @@ def test_gcp_managed_credentials_share_cluster_secret_prefix(
 
     config = managed_config_for("gcp", _cluster(), kind=kind, variant=variant)
     assert config.secret_id_prefix == "smd"
+
+
+def test_alloydb_runtime_config_preserves_operator_controls() -> None:
+    from core.cluster_observability import managed_config_for
+
+    config = managed_config_for(
+        "gcp",
+        _cluster(
+            alloydb_network="projects/123/global/networks/data",
+            alloydb_allocated_ip_range="alloydb-private",
+            alloydb_cluster_name_prefix="smd",
+            alloydb_primary_instance_id="writer",
+            alloydb_database_version="POSTGRES_18",
+            alloydb_machine_type_default="c4a-highmem-4-lssd",
+            alloydb_high_availability_default=False,
+            alloydb_deletion_protection_default=False,
+            alloydb_backup_retention_days=21,
+            alloydb_secret_manager_prefix="managed/alloydb",
+            alloydb_operation_timeout_seconds=900,
+            alloydb_operation_poll_interval_seconds=2,
+            alloydb_api_endpoint="https://alloydb.example.test/v1",
+        ),
+        kind="postgres",
+        variant="alloydb",
+    )
+    assert config.network == "projects/123/global/networks/data"
+    assert config.allocated_ip_range == "alloydb-private"
+    assert config.cluster_name_prefix == "smd"
+    assert config.primary_instance_id == "writer"
+    assert config.database_version == "POSTGRES_18"
+    assert config.machine_type_default == "c4a-highmem-4-lssd"
+    assert config.high_availability_default is False
+    assert config.deletion_protection_default is False
+    assert config.backup_retention_days == 21
+    assert config.secret_manager_prefix == "managed/alloydb"
+    assert config.secret_id_prefix == "smd"
+    assert config.operation_timeout_seconds == 900
+    assert config.operation_poll_interval_seconds == 2
+    assert config.api_endpoint == "https://alloydb.example.test/v1"

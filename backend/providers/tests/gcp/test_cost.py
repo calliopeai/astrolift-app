@@ -74,6 +74,7 @@ def estimator(fake_billing: FakeBillingClient) -> GCPCostEstimator:
 def test_supported_known_variants(estimator: GCPCostEstimator) -> None:
     assert estimator.supported(kind="object_store", variant="gcs")
     assert estimator.supported(kind="queue", variant="pubsub")
+    assert estimator.supported(kind="postgres", variant="alloydb")
 
 
 def test_unsupported_returns_unavailable(

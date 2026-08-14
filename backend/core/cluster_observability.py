@@ -375,6 +375,36 @@ def _gcp_managed_config_for(
             secret_id_prefix=str(pc.get("secret_id_prefix", "astrolift")),
         )
 
+    if pair == ("postgres", "alloydb"):
+        from gcp.managed.postgres_alloydb import AlloyDBConfig
+
+        return AlloyDBConfig(
+            project_id=project_id,
+            region=region,
+            network=_optional_string(pc.get("alloydb_network")),
+            allocated_ip_range=_optional_string(pc.get("alloydb_allocated_ip_range")),
+            cluster_name_prefix=str(pc.get("alloydb_cluster_name_prefix", "astrolift")),
+            primary_instance_id=str(pc.get("alloydb_primary_instance_id", "primary")),
+            database_version=str(pc.get("alloydb_database_version", "POSTGRES_16")),
+            machine_type_default=str(pc.get("alloydb_machine_type_default", "n2-highmem-2")),
+            high_availability_default=bool(pc.get("alloydb_high_availability_default", True)),
+            deletion_protection_default=bool(
+                pc.get("alloydb_deletion_protection_default", True),
+            ),
+            backup_retention_days=int(pc.get("alloydb_backup_retention_days", 14)),
+            secret_manager_prefix=str(
+                pc.get("alloydb_secret_manager_prefix", "astrolift/alloydb"),
+            ),
+            secret_id_prefix=str(pc.get("secret_id_prefix", "astrolift")),
+            operation_timeout_seconds=float(pc.get("alloydb_operation_timeout_seconds", 1200)),
+            operation_poll_interval_seconds=float(
+                pc.get("alloydb_operation_poll_interval_seconds", 5),
+            ),
+            api_endpoint=str(
+                pc.get("alloydb_api_endpoint", "https://alloydb.googleapis.com/v1"),
+            ),
+        )
+
     if pair == ("mysql", "cloudsql") or (kind == "mysql" and not variant):
         from gcp.managed.mysql_cloudsql import CloudSQLMySQLConfig
 
