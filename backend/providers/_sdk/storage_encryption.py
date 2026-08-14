@@ -67,6 +67,12 @@ POLICIES: dict[tuple[str, str, str], EncryptionPolicy] = {
         mode="cloud_kms",
         cmek_supported=True,
     ),
+    ("aws", "filesystem", "efs"): EncryptionPolicy(
+        mode="cloud_kms",
+        cmek_supported=True,
+        cmek_required_for_compliance=("pci", "hipaa", "fedramp_high"),
+        notes="EFS encryption is immutable after creation; the driver enables it by default.",
+    ),
     # GCP
     ("gcp", "object_store", "gcs"): EncryptionPolicy(
         mode="cloud_kms",

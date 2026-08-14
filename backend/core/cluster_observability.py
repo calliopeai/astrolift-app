@@ -705,9 +705,7 @@ def managed_config_for(
             security_group_ids=tuple(security_group_ids),
             kms_key_id=str(pc.get("amazon_mq_kms_key_id") or pc.get("kms_key_id") or ""),
             engine_version_default=str(
-                pc.get(f"amazon_mq_{engine_key}_engine_version")
-                or pc.get("amazon_mq_engine_version")
-                or ""
+                pc.get(f"amazon_mq_{engine_key}_engine_version") or pc.get("amazon_mq_engine_version") or ""
             ),
             secrets_manager_prefix=str(
                 pc.get("amazon_mq_secrets_manager_prefix", "astrolift/mq"),
@@ -718,6 +716,26 @@ def managed_config_for(
             ),
             poll_delay_seconds=float(pc.get("amazon_mq_poll_delay_seconds", 10)),
             max_poll_attempts=int(pc.get("amazon_mq_max_poll_attempts", 90)),
+        )
+
+    if kind == "filesystem" and variant == "efs":
+        from aws.managed._networking import ensure_efs_networking
+        from aws.managed.filesystem_efs import EFSConfig
+
+        subnet_ids, security_group_ids = ensure_efs_networking(
+            cluster,
+            region=region,
+        )
+        return EFSConfig(
+            region=region,
+            account_id=str(pc.get("account_id", "")),
+            subnet_ids=tuple(subnet_ids),
+            security_group_ids=tuple(security_group_ids),
+            kms_key_id=str(pc.get("efs_kms_key_id") or pc.get("kms_key_id") or ""),
+            creation_token_prefix=str(pc.get("efs_creation_token_prefix", "astrolift")),
+            deletion_protection_default=bool(pc.get("deletion_protection_default", True)),
+            poll_delay_seconds=float(pc.get("efs_poll_delay_seconds", 5)),
+            max_poll_attempts=int(pc.get("efs_max_poll_attempts", 120)),
         )
 
     if kind in ("search", "vector_index") and variant.startswith("opensearch_serverless"):

@@ -45,6 +45,7 @@ from aws.managed.email_ses import AmazonSESDriver
 from aws.managed.event_bus_eventbridge import EventBridgeDriver
 from aws.managed.event_stream_msk import MSKProvisionedDriver, MSKServerlessDriver
 from aws.managed.faas_lambda import LambdaDriver
+from aws.managed.filesystem_efs import EFSDriver
 from aws.managed.keyspaces import KeyspacesDriver
 from aws.managed.memcached_elasticache import ElastiCacheMemcachedDriver
 from aws.managed.memorydb import MemoryDBDriver
@@ -107,6 +108,7 @@ PLUGIN = ProviderPlugin(
         ("event_stream", "msk_serverless"): MSKServerlessDriver,
         ("mq", "amazon_mq_rabbitmq"): AmazonMQRabbitMQDriver,
         ("mq", "amazon_mq_activemq"): AmazonMQActiveMQDriver,
+        ("filesystem", "efs"): EFSDriver,
         ("postgres", "rds"): RDSPostgresDriver,
         ("postgres", "aurora_postgres"): AuroraPostgresDriver,
         ("postgres", "aurora_postgres_serverless_v2"): AuroraPostgresDriver,
