@@ -28,6 +28,7 @@ def test_managed_services_have_object_store_and_queue() -> None:
     assert ("object_store", "gcs") in keys
     assert ("queue", "pubsub") in keys
     assert ("topic", "pubsub_topic") in keys
+    assert ("warehouse", "bigquery") in keys
 
 
 def test_managed_services_have_full_gcp_coverage() -> None:
@@ -60,5 +61,17 @@ def test_alloydb_operator_controls_are_exposed() -> None:
         "alloydb_machine_type_default",
         "alloydb_deletion_protection_default",
         "alloydb_secret_manager_prefix",
+    ):
+        assert field in properties
+
+
+def test_bigquery_operator_controls_are_exposed() -> None:
+    properties = PLUGIN.config_schema["properties"]
+    for field in (
+        "bigquery_location",
+        "bigquery_dataset_prefix",
+        "bigquery_deletion_protection_default",
+        "bigquery_dataset_api_endpoint",
+        "bigquery_reservation_api_endpoint",
     ):
         assert field in properties

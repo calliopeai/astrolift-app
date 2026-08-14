@@ -168,3 +168,27 @@ def test_pubsub_topic_runtime_config_preserves_operator_prefix() -> None:
     assert type(config).__name__ == "PubSubTopicConfig"
     assert config.project_id == "acme-prod"
     assert config.topic_prefix == "smd-events"
+
+
+def test_bigquery_runtime_config_preserves_operator_controls() -> None:
+    from core.cluster_observability import managed_config_for
+
+    config = managed_config_for(
+        "gcp",
+        _cluster(
+            bigquery_location="US",
+            bigquery_dataset_prefix="smd_warehouse",
+            bigquery_deletion_protection_default=False,
+            bigquery_dataset_api_endpoint="https://bigquery.example.test/v2",
+            bigquery_reservation_api_endpoint="https://reservations.example.test/v1",
+        ),
+        kind="warehouse",
+        variant="bigquery",
+    )
+    assert type(config).__name__ == "BigQueryWarehouseConfig"
+    assert config.project_id == "acme-prod"
+    assert config.location == "US"
+    assert config.dataset_prefix == "smd_warehouse"
+    assert config.deletion_protection_default is False
+    assert config.dataset_api_endpoint == "https://bigquery.example.test/v2"
+    assert config.reservation_api_endpoint == "https://reservations.example.test/v1"

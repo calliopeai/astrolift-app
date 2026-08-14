@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add Google BigQuery warehouse lifecycle for datasets, native dataset
+  controls and CMEK defaults, reservations, assignments, explicit capacity
+  commitments, workload-identity bindings, billing estimation, health, and
+  ownership/data-safe teardown.
 - Add GCP Pub/Sub topic lifecycle with rotatable CMEK, retention and
   residency, schemas, managed ingestion, message transforms, declarative
   pull/push/BigQuery/Bigtable/Cloud Storage subscriptions, workload bindings,

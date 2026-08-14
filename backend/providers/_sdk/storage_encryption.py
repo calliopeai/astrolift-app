@@ -104,6 +104,12 @@ POLICIES: dict[tuple[str, str, str], EncryptionPolicy] = {
         mode="cloud_kms",
         cmek_supported=True,
     ),
+    ("gcp", "warehouse", "bigquery"): EncryptionPolicy(
+        mode="cloud_kms",
+        cmek_supported=True,
+        cmek_required_for_compliance=("pci", "hipaa"),
+        notes="Dataset CMEK applies by default to newly created tables; existing tables retain their configured keys.",
+    ),
     # Azure
     ("azure", "object_store", "blob"): EncryptionPolicy(
         mode="cloud_kms",
