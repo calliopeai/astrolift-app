@@ -104,6 +104,13 @@ def test_validate_binding_envs_complete_returns_empty() -> None:
     assert missing == []
 
 
+def test_database_proxy_declares_portable_tls_mode() -> None:
+    proxy = KINDS.get("database_proxy")
+
+    assert proxy is not None
+    assert "DATABASE_PROXY_TLS" in proxy.binding_envs_optional
+
+
 def test_validate_unknown_kind_returns_empty() -> None:
     """Unknown kinds skip validation (operator-defined kinds may
     not yet be in the canonical catalog)."""

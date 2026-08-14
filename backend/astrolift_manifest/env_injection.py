@@ -187,6 +187,7 @@ _ENVELOPES: dict[str, tuple[str, ...]] = {
         "DATABASE_PROXY_HOST",
         "DATABASE_PROXY_PORT",
         "DATABASE_PROXY_ARN",
+        "DATABASE_PROXY_TLS",
     ),
     "graph_db": (
         "GRAPH_DB_URL",

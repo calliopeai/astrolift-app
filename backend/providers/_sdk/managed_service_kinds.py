@@ -253,7 +253,7 @@ KINDS = KindCatalog(
             name="database_proxy",
             description="Managed database connection pool and proxy",
             binding_envs_required=("DATABASE_PROXY_HOST", "DATABASE_PROXY_PORT"),
-            binding_envs_optional=("DATABASE_PROXY_ARN",),
+            binding_envs_optional=("DATABASE_PROXY_ARN", "DATABASE_PROXY_TLS"),
         ),
         ManagedServiceKind(
             name="graph_db",
