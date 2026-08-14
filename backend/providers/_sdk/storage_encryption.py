@@ -73,6 +73,23 @@ POLICIES: dict[tuple[str, str, str], EncryptionPolicy] = {
         cmek_required_for_compliance=("pci", "hipaa", "fedramp_high"),
         notes="EFS encryption is immutable after creation; the driver enables it by default.",
     ),
+    ("aws", "filesystem", "fsx_lustre"): EncryptionPolicy(
+        mode="cloud_kms",
+        cmek_supported=True,
+        cmek_required_for_compliance=("pci", "hipaa", "fedramp_high"),
+        notes="CMEK is supported by persistent Lustre; scratch deployments use the AWS-owned FSx key.",
+    ),
+    ("aws", "filesystem", "fsx_openzfs"): EncryptionPolicy(
+        mode="cloud_kms",
+        cmek_supported=True,
+        cmek_required_for_compliance=("pci", "hipaa", "fedramp_high"),
+    ),
+    ("aws", "filesystem", "fsx_windows"): EncryptionPolicy(
+        mode="cloud_kms",
+        cmek_supported=True,
+        cmek_required_for_compliance=("pci", "hipaa", "fedramp_high"),
+        notes="SMB 3 encryption protects traffic in transit on supported clients.",
+    ),
     # GCP
     ("gcp", "object_store", "gcs"): EncryptionPolicy(
         mode="cloud_kms",

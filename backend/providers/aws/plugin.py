@@ -48,6 +48,7 @@ from aws.managed.event_bus_eventbridge import EventBridgeDriver
 from aws.managed.event_stream_msk import MSKProvisionedDriver, MSKServerlessDriver
 from aws.managed.faas_lambda import LambdaDriver
 from aws.managed.filesystem_efs import EFSDriver
+from aws.managed.filesystem_fsx import FSxLustreDriver, FSxOpenZFSDriver, FSxWindowsDriver
 from aws.managed.keyspaces import KeyspacesDriver
 from aws.managed.memcached_elasticache import ElastiCacheMemcachedDriver
 from aws.managed.memorydb import MemoryDBDriver
@@ -113,6 +114,9 @@ PLUGIN = ProviderPlugin(
         ("mq", "amazon_mq_rabbitmq"): AmazonMQRabbitMQDriver,
         ("mq", "amazon_mq_activemq"): AmazonMQActiveMQDriver,
         ("filesystem", "efs"): EFSDriver,
+        ("filesystem", "fsx_lustre"): FSxLustreDriver,
+        ("filesystem", "fsx_openzfs"): FSxOpenZFSDriver,
+        ("filesystem", "fsx_windows"): FSxWindowsDriver,
         ("postgres", "rds"): RDSPostgresDriver,
         ("postgres", "aurora_postgres"): AuroraPostgresDriver,
         ("postgres", "aurora_postgres_serverless_v2"): AuroraPostgresDriver,
