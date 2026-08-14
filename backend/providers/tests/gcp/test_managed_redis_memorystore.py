@@ -8,6 +8,7 @@ canned responses. Test surface mirrors AWS ElastiCache (#352).
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any, ClassVar
 
 import pytest
@@ -24,6 +25,7 @@ from gcp.managed.redis_memorystore import (
     _generate_auth_token,
     _parse_handle,
 )
+from gcp.secrets import GCPSecretsBackend, GCPSecretsConfig
 
 # ---- fakes -----------------------------------------------------------
 
@@ -101,6 +103,14 @@ class FakeSecretClient:
         sid = request["parent"].split("/secrets/")[-1]
         self.secrets.setdefault(sid, []).append(request["payload"]["data"])
 
+    def access_secret_version(self, *, request=None, name=None):
+        full_name = (request or {}).get("name") or name
+        sid = full_name.split("/secrets/", 1)[-1].split("/versions/", 1)[0]
+        versions = self.secrets.get(sid)
+        if not versions:
+            raise RuntimeError("404 not found")
+        return SimpleNamespace(payload=SimpleNamespace(data=versions[-1]))
+
     def delete_secret(self, *, request):
         sid = request["name"].split("/secrets/")[-1]
         self.secrets.pop(sid, None)
@@ -155,7 +165,7 @@ def test_provision_idempotent(driver):
 def test_provision_stores_auth_token_in_secret_manager(driver):
     result = driver.provision(_spec())
     instance_id = _parse_handle(result.handle)
-    sid = f"astrolift/memorystore/{instance_id}/auth".replace("/", "_")
+    sid = f"astrolift-memorystore-{instance_id}-auth"
     versions = driver._sm.secrets[sid]  # type: ignore[attr-defined]
     assert versions and len(versions[0]) >= 16
 
@@ -163,7 +173,7 @@ def test_provision_stores_auth_token_in_secret_manager(driver):
 def test_provision_no_auth_token_when_auth_disabled(driver):
     result = driver.provision(_spec(config={"auth_enabled": False}))
     instance_id = _parse_handle(result.handle)
-    sid = f"astrolift/memorystore/{instance_id}/auth".replace("/", "_")
+    sid = f"astrolift-memorystore-{instance_id}-auth"
     assert sid not in driver._sm.secrets  # type: ignore[attr-defined]
 
 
@@ -246,13 +256,17 @@ def test_deprovision_idempotent_when_already_gone(driver):
 def test_deprovision_delete_data_drops_auth_secret(driver):
     provisioned = driver.provision(_spec())
     instance_id = _parse_handle(provisioned.handle)
-    sid = f"astrolift/memorystore/{instance_id}/auth".replace("/", "_")
-    assert sid in driver._sm.secrets  # type: ignore[attr-defined]
+    driver.binding(ServiceHandle(handle=provisioned.handle))
+    secret_ids = {
+        f"astrolift-memorystore-{instance_id}-auth",
+        f"astrolift-memorystore-{instance_id}-url",
+    }
+    assert secret_ids <= driver._sm.secrets.keys()  # type: ignore[attr-defined]
     driver.deprovision(
         DeprovisionSpec(handle=provisioned.handle),
         delete_data=True,
     )
-    assert sid not in driver._sm.secrets  # type: ignore[attr-defined]
+    assert not (secret_ids & driver._sm.secrets.keys())  # type: ignore[attr-defined]
 
 
 def test_deprovision_force_destroy_retries_on_failed_precondition():
@@ -313,9 +327,25 @@ def test_binding_with_auth_uses_secret_refs(driver):
     binding = driver.binding(ServiceHandle(handle=provisioned.handle))
     env = binding.env_vars
     assert env["REDIS_TLS"].literal == "1"
-    assert env["REDIS_AUTH_TOKEN"].secret_ref is not None
+    assert env["REDIS_USER"].literal == "default"
+    assert env["REDIS_PASSWORD"].secret_ref is not None
+    assert env["REDIS_AUTH_MODE"].literal == "password"
     assert env["REDIS_URL"].secret_ref is not None
-    assert len(binding.iam_grants) == 1
+    assert binding.iam_grants == []
+
+    backend = GCPSecretsBackend(
+        config=GCPSecretsConfig(
+            project_id="acme-prod",
+            client=driver._sm,  # type: ignore[attr-defined]
+        ),
+    )
+    password_ref = env["REDIS_PASSWORD"].secret_ref
+    url_ref = env["REDIS_URL"].secret_ref
+    assert password_ref and backend.get(password_ref)
+    assert url_ref
+    url = backend.get(url_ref)
+    assert url and next(iter(url.values())).startswith("rediss://default:")
+    assert "@10.0.0.10:6379" in next(iter(url.values()))
 
 
 def test_binding_without_auth_uses_literal_url(driver):
@@ -325,9 +355,20 @@ def test_binding_without_auth_uses_literal_url(driver):
     binding = driver.binding(ServiceHandle(handle=provisioned.handle))
     env = binding.env_vars
     assert env["REDIS_TLS"].literal == "0"
-    assert "REDIS_AUTH_TOKEN" not in env
+    assert "REDIS_PASSWORD" not in env
+    assert env["REDIS_AUTH_MODE"].literal == "open"
     assert env["REDIS_URL"].literal is not None
     assert env["REDIS_URL"].literal.startswith("redis://")
+
+
+def test_existing_auth_instance_without_token_is_not_reported_healthy(driver):
+    provisioned = driver.provision(_spec())
+    instance_id = _parse_handle(provisioned.handle)
+    driver._sm.secrets.clear()  # type: ignore[attr-defined]
+    retried = driver.provision(_spec())
+    assert not retried.ok
+    assert retried.errors == ["missing_auth_token_secret"]
+    assert instance_id in retried.handle
 
 
 # ---- snapshot + restore ----------------------------------------
@@ -386,8 +427,11 @@ def test_binding_schema_lists_all_env_vars(driver):
     for key in (
         "REDIS_HOST",
         "REDIS_PORT",
+        "REDIS_USER",
         "REDIS_TLS",
-        "REDIS_AUTH_TOKEN",
+        "REDIS_PASSWORD",
         "REDIS_URL",
+        "REDIS_AUTH_MODE",
+        "REDIS_RESOURCE_ARN",
     ):
         assert key in schema.env_vars

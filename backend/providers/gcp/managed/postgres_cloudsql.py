@@ -37,6 +37,7 @@ import secrets
 import string
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import quote
 
 from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
@@ -44,7 +45,6 @@ from _sdk.managed_service import (
     BindingSchema,
     DeprovisionResult,
     DeprovisionSpec,
-    Grant,
     ManagedServiceDriver,
     ProvisionResult,
     ProvisionSpec,
@@ -55,6 +55,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from gcp.managed._secret_store import ManagedSecretStore, ManagedSecretStoreError
 
 KIND = "postgres"
 
@@ -106,6 +107,7 @@ class CloudSQLConfig:
     deletion_protection_default: bool = True
 
     secret_manager_prefix: str = "astrolift/cloudsql"
+    secret_id_prefix: str = "astrolift"
 
 
 class CloudSQLPostgresDriver(ManagedServiceDriver):
@@ -129,6 +131,11 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             from google.cloud import secretmanager
 
             self._sm = secretmanager.SecretManagerServiceClient()
+        self._secret_store = ManagedSecretStore(
+            project_id=config.project_id,
+            secret_id_prefix=config.secret_id_prefix,
+            client=self._sm,
+        )
 
     # ---- lifecycle ----------------------------------------------------
 
@@ -144,6 +151,13 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
 
         existing = self._describe(instance_id)
         if existing is not None:
+            if self._secret_store.get(self._master_secret_for(instance_id=instance_id)) is None:
+                return ProvisionResult(
+                    ok=False,
+                    handle=_handle_for(instance_id),
+                    message=(f"cloudsql {instance_id} exists but its Astrolift master-password secret is missing"),
+                    errors=["missing_master_password_secret"],
+                )
             return ProvisionResult(
                 ok=True,
                 handle=_handle_for(instance_id),
@@ -220,7 +234,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
                 body=instance_body,
             )
         except Exception as exc:
-            self._delete_master_password_secret(instance_id)
+            self._delete_connection_secrets(instance_id)
             return ProvisionResult(
                 ok=False,
                 handle="",
@@ -297,7 +311,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
 
         existing = self._describe(instance_id)
         if existing is None:
-            self._delete_master_password_secret(instance_id)
+            self._delete_connection_secrets(instance_id)
             return DeprovisionResult(
                 ok=True,
                 handle=spec.handle,
@@ -360,7 +374,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             )
 
         if delete_data:
-            self._delete_master_password_secret(instance_id)
+            self._delete_connection_secrets(instance_id)
 
         return DeprovisionResult(
             ok=True,
@@ -411,25 +425,38 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             host = _get(ip_addrs[0], "ipAddress", "") or ""
 
         secret_name = self._master_secret_for(instance_id=instance_id)
+        password = self._secret_store.get(secret_name)
+        if password is None:
+            raise _ManagedServiceError(
+                f"binding requested for {instance_id}, but master-password secret {secret_name!r} is missing",
+            )
+        if not host:
+            raise _ManagedServiceError(
+                f"binding requested for {instance_id}, but CloudSQL has no reachable endpoint",
+            )
+        url_secret = self._url_secret_for(instance_id=instance_id)
+        try:
+            self._secret_store.upsert(
+                url_secret,
+                f"postgresql://postgres:{quote(password, safe='')}@{host}:5432/postgres?sslmode=require",
+            )
+        except ManagedSecretStoreError as exc:
+            raise _ManagedServiceError(str(exc)) from exc
         return Binding(
             env_vars={
-                "DATABASE_HOST": ValueRef(literal=host),
-                "DATABASE_PORT": ValueRef(literal="5432"),
-                "DATABASE_NAME": ValueRef(literal="postgres"),
-                "DATABASE_USER": ValueRef(literal="postgres"),
-                "DATABASE_PASSWORD": ValueRef(secret_ref=secret_name),
-                "DATABASE_URL": ValueRef(
-                    secret_ref=self._url_secret_for(
-                        instance_id=instance_id,
-                    ),
-                ),
+                "POSTGRES_HOST": ValueRef(literal=host),
+                "POSTGRES_PORT": ValueRef(literal="5432"),
+                "POSTGRES_DB": ValueRef(literal="postgres"),
+                "POSTGRES_USER": ValueRef(literal="postgres"),
+                "POSTGRES_PASSWORD": ValueRef(secret_ref=secret_name),
+                "POSTGRES_SSL_MODE": ValueRef(literal="require"),
+                "POSTGRES_MASTER_SECRET_REF": ValueRef(literal=secret_name),
+                "DATABASE_URL": ValueRef(secret_ref=url_secret),
             },
-            iam_grants=[
-                Grant(
-                    resource=secret_name,
-                    actions=["secretmanager.versions.access"],
-                ),
-            ],
+            # The control plane resolves these refs into the synthesized
+            # Kubernetes binding Secret.  The workload never calls Secret
+            # Manager directly and therefore needs no secretAccessor role.
+            iam_grants=[],
             notes=(
                 "DATABASE_URL is a derived secret holding the "
                 "postgres:// connection string; the split components "
@@ -467,6 +494,24 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
     ) -> ProvisionResult:
         target_id = self._instance_id_for(spec=target)
         source_id = _parse_handle(snapshot.handle)
+        source_password = self._secret_store.get(
+            self._master_secret_for(instance_id=source_id),
+        )
+        if source_password is None:
+            return ProvisionResult(
+                ok=False,
+                handle="",
+                message=f"clone source {source_id} has no Astrolift master-password secret",
+                errors=["missing_master_password_secret"],
+            )
+        try:
+            self._secret_store.upsert(
+                self._master_secret_for(instance_id=target_id),
+                source_password,
+                labels=_tags_for(target),
+            )
+        except ManagedSecretStoreError as exc:
+            return ProvisionResult(ok=False, handle="", message=str(exc), errors=[str(exc)])
         try:
             self._sql.clone(
                 project=self._config.project_id,
@@ -479,6 +524,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
                 },
             )
         except Exception as exc:
+            self._delete_connection_secrets(target_id)
             return ProvisionResult(
                 ok=False,
                 handle="",
@@ -515,11 +561,13 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={
-                "DATABASE_HOST": "CloudSQL private/public IP",
-                "DATABASE_PORT": "5432 (Postgres default)",
-                "DATABASE_NAME": "Initial database name (postgres)",
-                "DATABASE_USER": "Master user (postgres)",
-                "DATABASE_PASSWORD": ("Secret Manager ref to the master password"),
+                "POSTGRES_HOST": "CloudSQL private/public IP",
+                "POSTGRES_PORT": "5432 (Postgres default)",
+                "POSTGRES_DB": "Initial database name (postgres)",
+                "POSTGRES_USER": "Master user (postgres)",
+                "POSTGRES_PASSWORD": ("Secret Manager ref to the master password"),
+                "POSTGRES_SSL_MODE": "require",
+                "POSTGRES_MASTER_SECRET_REF": "Logical Secret Manager ref for the master password",
                 "DATABASE_URL": ("Secret Manager ref to the fully-formed postgres:// connection string"),
             },
         )
@@ -572,43 +620,18 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
         spec: ProvisionSpec,
     ) -> str:
         name = self._master_secret_for(instance_id=instance_id)
-        parent = f"projects/{self._config.project_id}"
-        # Create the secret (idempotent — AlreadyExists or similar falls
-        # through to add_version).
-        with contextlib.suppress(Exception):
-            self._sm.create_secret(
-                request={
-                    "parent": parent,
-                    "secret_id": name.replace("/", "_"),
-                    "secret": {
-                        "replication": {"automatic": {}},
-                        "labels": _tags_for(spec),
-                    },
-                },
-            )
         try:
-            self._sm.add_secret_version(
-                request={
-                    "parent": f"{parent}/secrets/{name.replace('/', '_')}",
-                    "payload": {"data": password.encode("utf-8")},
-                },
-            )
-            return name
-        except Exception as exc:
-            raise _ManagedServiceError(
-                f"add_secret_version for {name}: {exc}",
-            ) from exc
+            return self._secret_store.upsert(name, password, labels=_tags_for(spec))
+        except ManagedSecretStoreError as exc:
+            raise _ManagedServiceError(str(exc)) from exc
 
-    def _delete_master_password_secret(self, instance_id: str) -> None:
-        name = self._master_secret_for(instance_id=instance_id)
-        try:
-            self._sm.delete_secret(
-                request={
-                    "name": (f"projects/{self._config.project_id}/secrets/{name.replace('/', '_')}"),
-                },
-            )
-        except Exception:
-            return
+    def _delete_connection_secrets(self, instance_id: str) -> None:
+        for path in (
+            self._master_secret_for(instance_id=instance_id),
+            self._url_secret_for(instance_id=instance_id),
+        ):
+            with contextlib.suppress(ManagedSecretStoreError):
+                self._secret_store.delete(path)
 
 
 # ----- module-level helpers --------------------------------------------

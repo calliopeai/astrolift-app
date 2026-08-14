@@ -8,6 +8,7 @@ four-corner deprovision matrix, same handle/secret semantics.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -24,6 +25,7 @@ from gcp.managed.mysql_cloudsql import (
     _generate_master_password,
     _parse_handle,
 )
+from gcp.secrets import GCPSecretsBackend, GCPSecretsConfig
 
 # ---- fakes -----------------------------------------------------------
 
@@ -131,6 +133,14 @@ class FakeSecretClient:
             self.secrets[sid] = []
         self.secrets[sid].append(request["payload"]["data"])
 
+    def access_secret_version(self, *, request=None, name=None):
+        full_name = (request or {}).get("name") or name
+        sid = full_name.split("/secrets/", 1)[-1].split("/versions/", 1)[0]
+        versions = self.secrets.get(sid)
+        if not versions:
+            raise RuntimeError("404 not found")
+        return SimpleNamespace(payload=SimpleNamespace(data=versions[-1]))
+
     def delete_secret(self, *, request):
         self.calls.append(("delete_secret", request))
         name = request["name"]
@@ -199,7 +209,7 @@ def test_provision_idempotent(driver):
 def test_provision_stores_master_password_in_secret_manager(driver):
     result = driver.provision(_spec())
     instance_id = _parse_handle(result.handle)
-    secret_id = f"astrolift/cloudsql/{instance_id}/master".replace("/", "_")
+    secret_id = f"astrolift-cloudsql-{instance_id}-master"
     versions = driver._sm.secrets[secret_id]  # type: ignore[attr-defined]
     assert len(versions) == 1
     assert len(versions[0]) >= 16
@@ -336,13 +346,17 @@ def test_deprovision_delete_data_drops_master_secret(driver):
         _spec(config={"deletion_protection": False}),
     )
     instance_id = _parse_handle(provisioned.handle)
-    secret_id = f"astrolift/cloudsql/{instance_id}/master".replace("/", "_")
-    assert secret_id in driver._sm.secrets  # type: ignore[attr-defined]
+    driver.binding(ServiceHandle(handle=provisioned.handle))
+    secret_ids = {
+        f"astrolift-cloudsql-{instance_id}-master",
+        f"astrolift-cloudsql-{instance_id}-url",
+    }
+    assert secret_ids <= driver._sm.secrets.keys()  # type: ignore[attr-defined]
     driver.deprovision(
         DeprovisionSpec(handle=provisioned.handle),
         delete_data=True,
     )
-    assert secret_id not in driver._sm.secrets  # type: ignore[attr-defined]
+    assert not (secret_ids & driver._sm.secrets.keys())  # type: ignore[attr-defined]
 
 
 # ---- status / binding ------------------------------------------
@@ -372,24 +386,46 @@ def test_binding_returns_mysql_envelope(driver):
     binding = driver.binding(ServiceHandle(handle=provisioned.handle))
     env = binding.env_vars
     for key in (
-        "DATABASE_HOST",
-        "DATABASE_PORT",
-        "DATABASE_NAME",
-        "DATABASE_USER",
-        "DATABASE_PASSWORD",
+        "MYSQL_HOST",
+        "MYSQL_PORT",
+        "MYSQL_DB",
+        "MYSQL_USER",
+        "MYSQL_PASSWORD",
         "DATABASE_URL",
     ):
         assert key in env
-    assert env["DATABASE_PASSWORD"].secret_ref is not None
-    assert env["DATABASE_USER"].literal == "root"
-    assert env["DATABASE_PORT"].literal == "3306"
+    assert env["MYSQL_PASSWORD"].secret_ref is not None
+    assert env["MYSQL_USER"].literal == "root"
+    assert env["MYSQL_PORT"].literal == "3306"
 
 
-def test_binding_iam_grant_scoped_to_secret(driver):
+def test_binding_secrets_resolve_through_cluster_backend(driver):
     provisioned = driver.provision(_spec())
     binding = driver.binding(ServiceHandle(handle=provisioned.handle))
-    assert len(binding.iam_grants) == 1
-    assert "secretmanager.versions.access" in binding.iam_grants[0].actions
+    backend = GCPSecretsBackend(
+        config=GCPSecretsConfig(
+            project_id="acme-prod",
+            client=driver._sm,  # type: ignore[attr-defined]
+        ),
+    )
+    password_ref = binding.env_vars["MYSQL_PASSWORD"].secret_ref
+    url_ref = binding.env_vars["DATABASE_URL"].secret_ref
+    assert password_ref and backend.get(password_ref)
+    assert url_ref
+    url = backend.get(url_ref)
+    assert url and next(iter(url.values())).startswith("mysql://root:")
+    assert "@10.0.0.7:3306/mysql?ssl-mode=REQUIRED" in next(iter(url.values()))
+    assert binding.iam_grants == []
+
+
+def test_binding_url_secret_is_idempotent(driver):
+    provisioned = driver.provision(_spec())
+    handle = ServiceHandle(handle=provisioned.handle)
+    driver.binding(handle)
+    driver.binding(handle)
+    instance_id = _parse_handle(provisioned.handle)
+    versions = driver._sm.secrets[f"astrolift-cloudsql-{instance_id}-url"]  # type: ignore[attr-defined]
+    assert len(versions) == 1
 
 
 # ---- snapshot + restore ----------------------------------------
@@ -408,6 +444,18 @@ def test_restore_clones_instance(driver):
     restore_spec = _spec(service_handle_hint="restored")
     result = driver.restore(snap, restore_spec)
     assert result.ok
+    target_id = _parse_handle(result.handle)
+    assert f"astrolift-cloudsql-{target_id}-master" in driver._sm.secrets  # type: ignore[attr-defined]
+
+
+def test_existing_instance_without_password_is_not_reported_healthy(driver):
+    provisioned = driver.provision(_spec())
+    instance_id = _parse_handle(provisioned.handle)
+    driver._sm.secrets.clear()  # type: ignore[attr-defined]
+    retried = driver.provision(_spec())
+    assert not retried.ok
+    assert retried.errors == ["missing_master_password_secret"]
+    assert instance_id in retried.handle
 
 
 # ---- module helpers --------------------------------------------
@@ -455,11 +503,11 @@ def test_config_schema_shape(driver):
 def test_binding_schema_lists_all_env_vars(driver):
     schema = driver.binding_schema()
     for key in (
-        "DATABASE_HOST",
-        "DATABASE_PORT",
-        "DATABASE_NAME",
-        "DATABASE_USER",
-        "DATABASE_PASSWORD",
+        "MYSQL_HOST",
+        "MYSQL_PORT",
+        "MYSQL_DB",
+        "MYSQL_USER",
+        "MYSQL_PASSWORD",
         "DATABASE_URL",
     ):
         assert key in schema.env_vars

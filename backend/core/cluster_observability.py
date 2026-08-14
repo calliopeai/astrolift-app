@@ -306,6 +306,223 @@ def _config_for(plugin_slug: str, cluster: TenantCluster) -> Any:
     )
 
 
+def _gcp_managed_config_for(
+    cluster: TenantCluster,
+    *,
+    kind: str,
+    variant: str,
+    provider_config: dict[str, Any],
+    auth_config: dict[str, Any],
+    region: str,
+) -> Any:
+    """Build configs for every executable GCP managed-service driver.
+
+    Registered placeholder drivers remain intentionally unavailable here.  A
+    catalogue row must not become lifecycle-addressable until its driver can
+    actually provision a cloud resource.
+    """
+
+    pc = provider_config
+    ac = auth_config
+    project_id = str(
+        pc.get("project_id")
+        or pc.get("gcp_project_id")
+        or ac.get("project_id")
+        or ac.get("gcp_project_id")
+        or ""
+    )
+    if not project_id:
+        raise ClusterObservabilityError(
+            f"cluster {cluster.slug}: GCP managed service {kind!r} requires provider_config.project_id",
+        )
+
+    pair = (kind, variant)
+    if pair == ("object_store", "gcs") or (kind == "object_store" and not variant):
+        from gcp.managed.object_store_gcs import GCSConfig
+
+        return GCSConfig(
+            project_id=project_id,
+            bucket_name_prefix=str(pc.get("bucket_name_prefix", "astrolift")),
+            versioning_enabled=bool(pc.get("gcs_versioning_enabled", True)),
+            uniform_bucket_level_access=bool(
+                pc.get("gcs_uniform_bucket_level_access", True),
+            ),
+            location=str(pc.get("gcs_location", region or "US")),
+            storage_class=str(pc.get("gcs_storage_class", "STANDARD")),
+        )
+
+    if pair == ("queue", "pubsub") or (kind == "queue" and not variant):
+        from gcp.managed.queue_pubsub import PubSubConfig
+
+        return PubSubConfig(
+            project_id=project_id,
+            topic_prefix=str(pc.get("pubsub_topic_prefix", "astrolift")),
+        )
+
+    if pair == ("postgres", "cloudsql") or (kind == "postgres" and not variant):
+        from gcp.managed.postgres_cloudsql import CloudSQLConfig
+
+        return CloudSQLConfig(
+            project_id=project_id,
+            region=region,
+            private_network=_optional_string(pc.get("cloudsql_private_network")),
+            instance_name_prefix=str(pc.get("cloudsql_instance_name_prefix", "astrolift")),
+            engine_version=str(pc.get("cloudsql_postgres_engine_version", "POSTGRES_16")),
+            backup_retention_days=int(pc.get("cloudsql_backup_retention_days", 7)),
+            high_availability_default=bool(pc.get("cloudsql_high_availability_default", False)),
+            deletion_protection_default=bool(pc.get("cloudsql_deletion_protection_default", True)),
+            secret_manager_prefix=str(pc.get("cloudsql_secret_manager_prefix", "astrolift/cloudsql")),
+            secret_id_prefix=str(pc.get("secret_id_prefix", "astrolift")),
+        )
+
+    if pair == ("mysql", "cloudsql") or (kind == "mysql" and not variant):
+        from gcp.managed.mysql_cloudsql import CloudSQLMySQLConfig
+
+        return CloudSQLMySQLConfig(
+            project_id=project_id,
+            region=region,
+            private_network=_optional_string(pc.get("cloudsql_private_network")),
+            instance_name_prefix=str(pc.get("cloudsql_instance_name_prefix", "astrolift")),
+            engine_version=str(pc.get("cloudsql_mysql_engine_version", "MYSQL_8_0")),
+            backup_retention_days=int(pc.get("cloudsql_backup_retention_days", 7)),
+            high_availability_default=bool(pc.get("cloudsql_high_availability_default", False)),
+            deletion_protection_default=bool(pc.get("cloudsql_deletion_protection_default", True)),
+            secret_manager_prefix=str(pc.get("cloudsql_secret_manager_prefix", "astrolift/cloudsql")),
+            secret_id_prefix=str(pc.get("secret_id_prefix", "astrolift")),
+        )
+
+    if pair == ("redis", "memorystore") or (kind == "redis" and not variant):
+        from gcp.managed.redis_memorystore import MemorystoreConfig
+
+        return MemorystoreConfig(
+            project_id=project_id,
+            region=region,
+            authorized_network=_optional_string(pc.get("memorystore_authorized_network")),
+            instance_name_prefix=str(pc.get("memorystore_instance_name_prefix", "astrolift")),
+            redis_version=str(pc.get("memorystore_redis_version", "REDIS_7_2")),
+            tier_default=str(pc.get("memorystore_tier_default", "BASIC")),
+            transit_encryption_default=bool(pc.get("memorystore_transit_encryption_default", True)),
+            auth_enabled_default=bool(pc.get("memorystore_auth_enabled_default", True)),
+            secret_manager_prefix=str(
+                pc.get("memorystore_secret_manager_prefix", "astrolift/memorystore"),
+            ),
+            secret_id_prefix=str(pc.get("secret_id_prefix", "astrolift")),
+        )
+
+    if pair == ("kv_store", "bigtable") or (kind == "kv_store" and not variant):
+        from gcp.managed.bigtable import BigtableConfig
+
+        return BigtableConfig(
+            project_id=project_id,
+            region=region,
+            instance_name_prefix=str(pc.get("bigtable_instance_name_prefix", "astrolift")),
+            storage_type_default=str(pc.get("bigtable_storage_type_default", "SSD")),
+            cluster_count_default=int(pc.get("bigtable_cluster_count_default", 1)),
+            column_family_default=str(pc.get("bigtable_column_family_default", "cf1")),
+        )
+
+    if pair == ("vector_index", "vertex_matching_engine") or (kind == "vector_index" and not variant):
+        from gcp.managed.vector_vertex import VertexMatchingEngineConfig
+
+        return VertexMatchingEngineConfig(
+            project_id=project_id,
+            region=region,
+            name_prefix=str(pc.get("vertex_matching_engine_name_prefix", "astrolift-vec")),
+            embedding_dimension_default=int(
+                pc.get("vertex_matching_engine_embedding_dimension_default", 768),
+            ),
+            distance_measure_default=str(
+                pc.get("vertex_matching_engine_distance_measure_default", "DOT_PRODUCT_DISTANCE"),
+            ),
+            algorithm_default=str(
+                pc.get("vertex_matching_engine_algorithm_default", "BRUTE_FORCE"),
+            ),
+            shard_bucket_prefix=str(
+                pc.get("vertex_matching_engine_shard_bucket_prefix", "astrolift-vec-shards"),
+            ),
+            public_endpoint_enabled_default=bool(
+                pc.get("vertex_matching_engine_public_endpoint_enabled_default", False),
+            ),
+        )
+
+    if pair == ("time_series", "gcp_managed_prometheus") or (kind == "time_series" and not variant):
+        from gcp.managed.timeseries_managed_prometheus import GCPManagedPrometheusConfig
+
+        return GCPManagedPrometheusConfig(
+            project_id=project_id,
+            region=region,
+            workspace_name_prefix=str(
+                pc.get("managed_prometheus_workspace_name_prefix", "astrolift-tsdb"),
+            ),
+            retention_months_default=int(
+                pc.get("managed_prometheus_retention_months_default", 24),
+            ),
+            rule_group_check_enabled=bool(
+                pc.get("managed_prometheus_rule_group_check_enabled", True),
+            ),
+        )
+
+    if pair == ("model_endpoint", "vertex_ai") or (kind == "model_endpoint" and not variant):
+        from gcp.managed.model_endpoint_vertex import VertexAIEndpointConfig
+
+        return VertexAIEndpointConfig(
+            project_id=project_id,
+            region=region,
+            name_prefix=str(pc.get("vertex_ai_endpoint_name_prefix", "astrolift-model")),
+            default_model_artifact=str(
+                pc.get(
+                    "vertex_ai_default_model_artifact",
+                    "publishers/google/models/text-bison",
+                ),
+            ),
+            public_endpoint_enabled_default=bool(
+                pc.get("vertex_ai_public_endpoint_enabled_default", False),
+            ),
+            default_traffic_percentage=int(pc.get("vertex_ai_default_traffic_percentage", 100)),
+        )
+
+    if pair == ("encryption_key", "cloud_kms") or (kind == "encryption_key" and not variant):
+        from gcp.managed.encryption_cloud_kms import CloudKMSConfig
+
+        return CloudKMSConfig(
+            project_id=project_id,
+            location=str(pc.get("cloud_kms_location", pc.get("kms_location", region or "global"))),
+            key_ring_name_prefix=str(
+                pc.get("cloud_kms_key_ring_name_prefix", "astrolift"),
+            ),
+            key_name_prefix=str(pc.get("cloud_kms_key_name_prefix", "astrolift")),
+            deletion_protection_default=bool(
+                pc.get("cloud_kms_deletion_protection_default", True),
+            ),
+            rotation_period_default=str(
+                pc.get("cloud_kms_rotation_period_default", "7776000s"),
+            ),
+            destroy_scheduled_duration_default=str(
+                pc.get("cloud_kms_destroy_scheduled_duration_default", "2592000s"),
+            ),
+            api_endpoint=str(
+                pc.get("cloud_kms_api_endpoint", "https://cloudkms.googleapis.com/v1"),
+            ),
+        )
+
+    if pair in {
+        ("search", "gcp_elastic_cloud"),
+        ("email", "gcp_thirdparty"),
+    }:
+        raise ClusterObservabilityError(
+            f"cluster {cluster.slug}: GCP managed service {kind!r}/{variant!r} is a planned "
+            "placeholder and cannot be provisioned",
+        )
+    raise ClusterObservabilityError(
+        f"cluster {cluster.slug}: no GCP managed-service config builder for "
+        f"kind={kind!r}, variant={variant!r}",
+    )
+
+
+def _optional_string(value: Any) -> str | None:
+    return str(value) if value not in (None, "") else None
+
+
 def managed_config_for(
     plugin_slug: str,
     cluster: TenantCluster,
@@ -329,6 +546,16 @@ def managed_config_for(
     pc = cluster.provider_config or {}
     ac = cluster.auth_config or {}
     region = str(pc.get("region", ac.get("region", cluster.region or "")))
+
+    if plugin_slug == "gcp":
+        return _gcp_managed_config_for(
+            cluster,
+            kind=kind,
+            variant=variant,
+            provider_config=pc,
+            auth_config=ac,
+            region=region,
+        )
 
     if plugin_slug != "aws":
         raise ClusterObservabilityError(
