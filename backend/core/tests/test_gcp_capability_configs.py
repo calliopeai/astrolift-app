@@ -257,3 +257,42 @@ def test_sqlserver_runtime_config_preserves_operator_controls() -> None:
     assert config.api_endpoint == "https://sql.example.test/v1"
     assert config.operation_timeout_seconds == 1200
     assert config.poll_interval_seconds == 2
+
+
+def test_spanner_graph_runtime_config_preserves_operator_controls() -> None:
+    from core.cluster_observability import managed_config_for
+
+    config = managed_config_for(
+        "gcp",
+        _cluster(
+            spanner_instance_name_prefix="smd-graph",
+            spanner_shared_instance_id="shared-graph",
+            spanner_instance_config="nam6",
+            spanner_edition="ENTERPRISE_PLUS",
+            spanner_processing_units=1000,
+            spanner_automatic_backup_schedule=False,
+            spanner_deletion_protection_default=False,
+            spanner_backup_retention_days=90,
+            spanner_api_endpoint="https://spanner.example.test/v1",
+            spanner_operation_timeout_seconds=900,
+            spanner_operation_poll_interval_seconds=1,
+            spanner_adopt_existing_instance=True,
+        ),
+        kind="graph_db",
+        variant="spanner_graph",
+    )
+    assert type(config).__name__ == "SpannerGraphConfig"
+    assert config.project_id == "acme-prod"
+    assert config.region == "us-central1"
+    assert config.instance_name_prefix == "smd-graph"
+    assert config.shared_instance_id == "shared-graph"
+    assert config.instance_config == "nam6"
+    assert config.edition == "ENTERPRISE_PLUS"
+    assert config.processing_units == 1000
+    assert config.automatic_backup_schedule is False
+    assert config.deletion_protection_default is False
+    assert config.backup_retention_days == 90
+    assert config.api_endpoint == "https://spanner.example.test/v1"
+    assert config.operation_timeout_seconds == 900
+    assert config.poll_interval_seconds == 1
+    assert config.adopt_existing_instance is True

@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add Cloud Spanner Graph lifecycle on Enterprise and Enterprise Plus with
+  GoogleSQL/GQL property graphs, fixed or autoscaled capacity, atomic custom
+  schemas, replay-safe DDL, CMEK, exact backups and restore, portable IAM
+  bindings, database ownership markers, and adoption-safe teardown.
 - Add Google Cloud SQL for SQL Server 2017–2025 across Express, Web,
   Standard, Enterprise, and Enterprise Plus configurations with real Admin API
   operation polling, provisioned databases, PITR, HA, data cache, CMEK, exact

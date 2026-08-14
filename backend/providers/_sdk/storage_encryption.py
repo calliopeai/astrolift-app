@@ -122,6 +122,12 @@ POLICIES: dict[tuple[str, str, str], EncryptionPolicy] = {
         cmek_required_for_compliance=("pci", "hipaa"),
         notes="Cloud SQL CMEK is selected at instance creation; transport bindings require TLS encryption.",
     ),
+    ("gcp", "graph_db", "spanner_graph"): EncryptionPolicy(
+        mode="cloud_kms",
+        cmek_supported=True,
+        cmek_required_for_compliance=("pci", "hipaa"),
+        notes=("Spanner database CMEK is selected at creation; restored databases can select replacement keys."),
+    ),
     # Azure
     ("azure", "object_store", "blob"): EncryptionPolicy(
         mode="cloud_kms",
