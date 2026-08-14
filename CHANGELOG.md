@@ -4,6 +4,11 @@
 
 ### Added
 
+- Add a project-shared Google Eventarc event fabric across Advanced message
+  buses, pipelines, enrollments, Google API sources, direct publishing, event
+  transformation and format conversion, plus Standard triggers and partner
+  channels, with CMEK, IAM bindings, guarded adoption, ownership-safe pruning,
+  and dependency-aware teardown.
 - Add Cloud Spanner Graph lifecycle on Enterprise and Enterprise Plus with
   GoogleSQL/GQL property graphs, fixed or autoscaled capacity, atomic custom
   schemas, replay-safe DDL, CMEK, exact backups and restore, portable IAM
