@@ -620,6 +620,19 @@ def managed_config_for(
             tracing_config_default=str(pc.get("sns_tracing_config_default", "PassThrough")),
         )
 
+    if kind == "event_bus" and variant == "eventbridge":
+        from aws.managed.event_bus_eventbridge import EventBridgeConfig
+
+        return EventBridgeConfig(
+            region=region,
+            account_id=str(pc.get("account_id", "")),
+            event_bus_name_prefix=str(pc.get("eventbridge_name_prefix", "astrolift")),
+            kms_key_id=str(pc.get("eventbridge_kms_key_id") or pc.get("kms_key_id") or ""),
+            deletion_protection_default=bool(
+                pc.get("deletion_protection_default", True),
+            ),
+        )
+
     if kind in ("search", "vector_index") and variant.startswith("opensearch_serverless"):
         from aws.managed._networking import ensure_opensearch_serverless_networking
         from aws.managed.opensearch_serverless import OpenSearchServerlessConfig

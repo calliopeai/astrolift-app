@@ -4,6 +4,9 @@
 
 ### Added
 
+- Add Amazon EventBridge custom event-bus lifecycle with KMS/DLQ/log
+  controls, resource policies, declarative rules and full target parameters,
+  archives, pruning, portable publisher bindings, and protected teardown.
 - Add Amazon SNS standard and FIFO topic lifecycle with KMS encryption,
   high-throughput FIFO, archives, declarative subscriptions, filtering,
   dead-letter queues, replay, and least-privilege portable bindings.

@@ -181,6 +181,7 @@ def test_service_code_table_covers_core_kinds() -> None:
     assert SERVICE_CODE_BY_VARIANT[("cache", "elasticache_serverless_memcached")] == ("AmazonElastiCache")
     assert SERVICE_CODE_BY_VARIANT[("postgres", "aurora_postgres_serverless_v2")] == "AmazonRDS"
     assert SERVICE_CODE_BY_VARIANT[("kv_store", "dynamodb")] == "AmazonDynamoDB"
+    assert SERVICE_CODE_BY_VARIANT[("event_bus", "eventbridge")] == "AWSEvents"
 
 
 # ---- compute / node_hour (#440) -----------------------------------

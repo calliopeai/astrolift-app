@@ -106,6 +106,11 @@ def test_has_managed_lookup() -> None:
         kind="topic",
         variant="sns_fifo",
     )
+    assert MATRIX.has_managed(
+        plugin_id="aws",
+        kind="event_bus",
+        variant="eventbridge",
+    )
 
 
 def test_status_field_defaults_to_ga() -> None:
