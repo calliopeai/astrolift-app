@@ -166,7 +166,6 @@ jobs:
           include = [
               {
                   "name": name,
-                  "mode": "tests",
                   "partition": 0,
                   "partitions": 1,
                   **shards[name],
@@ -174,18 +173,6 @@ jobs:
               for name in shards
               if name in selected
           ]
-          if backend:
-              # Apply the real migration graph once instead of repeating it in
-              # every test shard. Ordinary shards still use real Postgres;
-              # pytest-django creates their current model schema directly.
-              include.append({
-                  "name": "schema-migrations",
-                  "mode": "migrations",
-                  "paths": ".",
-                  "partition": 0,
-                  "partitions": 1,
-                  "temporal": False,
-              })
           matrix = {"include": include}
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"backend={str(backend).lower()}\n")
@@ -360,21 +347,14 @@ jobs:
         # reports the whole set at once, which is what attributing the backlog
         # in #1244 actually needs. The provider tree has its own parallel job;
         # repeating its 2,299 tests here added several minutes without adding
-        # coverage. Schema migrations run once in their own matrix row.
-        # Ordinary shards use pytest-django's --nomigrations path to materialize
-        # the same current models in real Postgres without replaying hundreds of
-        # migration operations per runner. The two agent-control rows split test
-        # files deterministically because that suite was the remaining
-        # nine-minute critical path. `--durations` keeps future tuning
-        # evidence-driven.
+        # coverage. The two agent-control rows split test files deterministically
+        # because that suite was the remaining nine-minute critical path. Each
+        # shard still applies the real migration graph: a few models are defined
+        # outside conventional models modules, so pytest-django's --nomigrations
+        # model discovery cannot reproduce the production schema. `--durations`
+        # keeps future tuning evidence-driven.
         run: |
           set -euo pipefail
-          if [[ "${{ matrix.mode }}" == migrations ]]; then
-            pipenv run pytest -q --tb=short -rf --durations=20 \
-              -m migration ${{ matrix.paths }}
-            exit 0
-          fi
-
           if (( ${{ matrix.partitions }} > 1 )); then
             mapfile -t TEST_FILES < <(
               find ${{ matrix.paths }} -type f \
@@ -388,10 +368,10 @@ jobs:
               "${{ matrix.partition }}" "${{ matrix.partitions }}" "${#TEST_FILES[@]}"
             test "${#TEST_FILES[@]}" -gt 0
             pipenv run pytest -q --tb=short -rf --durations=20 \
-              --nomigrations -m 'not migration' "${TEST_FILES[@]}"
+              "${TEST_FILES[@]}"
           else
             pipenv run pytest -q --tb=short -rf --durations=20 \
-              --nomigrations -m 'not migration' ${{ matrix.paths }}
+              ${{ matrix.paths }}
           fi
 
   test:

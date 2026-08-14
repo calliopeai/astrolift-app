@@ -38,8 +38,8 @@
 - Issue CLI device credentials with narrow project write scope for shared
   resource lifecycle and attachment management.
 - Keep backend CI below its ten-minute ceiling by running the migration graph
-  once, materializing current models in real Postgres for parallel test shards,
-  tuning disposable database durability, and splitting agent tests by file.
+  against tuned disposable Postgres instances and splitting agent tests by file
+  while retaining production-faithful schema setup in every shard.
 - Select coupled real-Postgres shards from pull-request impact, split the
   slowest runtime suites for parallel execution, and reserve the full backend
   regression matrix for `main` and manual runs.
