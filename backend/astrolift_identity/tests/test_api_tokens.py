@@ -39,6 +39,7 @@ from astrolift_identity.api_tokens import (
     SCOPE_AGENT_ENV_SPEC_WRITE,
     SCOPE_MCP_DISPATCH,
     SCOPE_MCP_WRITE,
+    SCOPE_PROJECT_WRITE,
     SCOPE_READ_APPS,
     SCOPE_SECRET_READ,
     SCOPE_SECRET_WRITE,
@@ -405,6 +406,7 @@ def test_cli_device_scopes_allow_agent_and_workflow_ops_without_admin():
     assert SCOPE_SECRET_WRITE in token.scopes
     assert SCOPE_MCP_DISPATCH in token.scopes
     assert SCOPE_MCP_WRITE in token.scopes
+    assert SCOPE_PROJECT_WRITE in token.scopes
     assert SCOPE_WORKFLOW_WRITE in token.scopes
     assert SCOPE_WORKFLOW_TRIGGER in token.scopes
     assert token_scope_allows_permission(token, Permission.AGENT_DISPATCH)
@@ -413,6 +415,7 @@ def test_cli_device_scopes_allow_agent_and_workflow_ops_without_admin():
     assert token_scope_allows_permission(token, Permission.AGENT_ENV_SPEC_CREATE)
     assert token_scope_allows_permission(token, Permission.AGENT_ENV_SPEC_UPDATE)
     assert token_scope_allows_permission(token, Permission.AGENT_ENV_SPEC_DELETE)
+    assert token_scope_allows_permission(token, Permission.PROJECT_UPDATE)
     assert token_scope_allows_permission(token, Permission.SECRET_WRITE)
     assert token_scope_allows_permission(token, Permission.WORKFLOW_READ)
     assert token_scope_allows_permission(token, Permission.WORKFLOW_CREATE)

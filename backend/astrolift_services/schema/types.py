@@ -179,6 +179,24 @@ class ManagedServiceType:
     require ``reprovisionManagedService``."""
 
 
+@strawberry.type(name="AstroliftManagedServiceCatalogEntry")
+class ManagedServiceCatalogEntryType:
+    id: str
+    provider_plugin_slug: str
+    kind: str
+    variant: str
+    display_name: str
+    description: str
+    status: str
+    available: bool
+    unavailable_reason: str
+    is_default_for_kind: bool
+    size_options: list[str]
+    config_schema: JSON
+    binding_envs: list[str]
+    issue_url: str
+
+
 @strawberry.type(name="AstroliftManagedServiceAttachment")
 class ManagedServiceAttachmentType:
     id: GUID
@@ -824,6 +842,25 @@ def managed_service_to_type(svc, *, resolve_editable_fields: bool = False) -> Ma
         last_action_kind=svc.last_action_kind or "",
         editable_fields=editable,
         attachments=[managed_service_attachment_to_type(row) for row in svc.attachments.all()],
+    )
+
+
+def managed_service_catalog_entry_to_type(row) -> ManagedServiceCatalogEntryType:
+    return ManagedServiceCatalogEntryType(
+        id=row.id,
+        provider_plugin_slug=row.provider_plugin_slug,
+        kind=row.kind,
+        variant=row.variant,
+        display_name=row.display_name,
+        description=row.description,
+        status=row.status,
+        available=row.available,
+        unavailable_reason=row.unavailable_reason,
+        is_default_for_kind=row.is_default_for_kind,
+        size_options=list(row.size_options),
+        config_schema=row.config_schema,
+        binding_envs=list(row.binding_envs),
+        issue_url=row.issue_url,
     )
 
 

@@ -2321,6 +2321,23 @@ export type AstroliftManagedServiceAttachmentMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftManagedServiceCatalogEntry = {
+  available: Scalars['Boolean']['output'];
+  bindingEnvs: Array<Scalars['String']['output']>;
+  configSchema: Scalars['JSON']['output'];
+  description: Scalars['String']['output'];
+  displayName: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  isDefaultForKind: Scalars['Boolean']['output'];
+  issueUrl: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  providerPluginSlug: Scalars['String']['output'];
+  sizeOptions: Array<Scalars['String']['output']>;
+  status: Scalars['String']['output'];
+  unavailableReason: Scalars['String']['output'];
+  variant: Scalars['String']['output'];
+};
+
 export type AstroliftManagedServiceConnection = {
   connectionSecretRef: Scalars['String']['output'];
   environmentName: Scalars['String']['output'];
@@ -7368,6 +7385,7 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st, and prices every one of them on read. Use astroliftPreviewEnvironmentsPage. */
   astroliftPreviewEnvironments: Array<AstroliftPreviewEnvironment>;
   astroliftPreviewEnvironmentsPage: AstroliftPreviewEnvironmentPage;
+  astroliftProjectManagedServiceCatalog: Array<AstroliftManagedServiceCatalogEntry>;
   astroliftProjectManagedServices: Array<AstroliftManagedService>;
   astroliftProjectResourceClusters: Array<AstroliftTenantCluster>;
   astroliftProjectSecretBundles: Array<AstroliftSecretBundle>;
@@ -8315,6 +8333,12 @@ export type QueryAstroliftPreviewEnvironmentsPageArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftProjectManagedServiceCatalogArgs = {
+  clusterId: Scalars['GUID']['input'];
+  projectId: Scalars['GUID']['input'];
 };
 
 
@@ -11449,6 +11473,14 @@ export type ListProjectResourcesQueryVariables = Exact<{
 
 
 export type ListProjectResourcesQuery = { astroliftProjectResourceClusters: Array<{ id: string, slug: string, name: string, providerPluginSlug: string, region: string, isActive: boolean, lifecycle: string }>, astroliftProjectManagedServices: Array<{ id: string, name: string, kind: string, variant: string, status: string, statusError: string, config: Record<string, unknown>, projectSlug: string, ownerScope: string, clusterSlug: string, environmentName: string, createdAt: string, updatedAt: string, lastActionAt?: string | null, lastActionKind: string, editableFields: Array<string>, attachments: Array<{ id: string, consumerKind: string, consumerSlug: string, environmentName: string }> }>, astroliftProjectSecretBundles: Array<{ id: string, slug: string, name: string, backendRef: string, projectSlug?: string | null, clusterSlug?: string | null, keyCount: number, keyNames: Array<string>, lastKnownKeysAt?: string | null, createdAt: string, consumers: Array<{ id: string, consumerKind: string, consumerSlug: string, environmentName: string }> }> };
+
+export type ListProjectManagedServiceCatalogQueryVariables = Exact<{
+  projectId: Scalars['GUID']['input'];
+  clusterId: Scalars['GUID']['input'];
+}>;
+
+
+export type ListProjectManagedServiceCatalogQuery = { astroliftProjectManagedServiceCatalog: Array<{ id: string, providerPluginSlug: string, kind: string, variant: string, displayName: string, description: string, status: string, available: boolean, unavailableReason: string, isDefaultForKind: boolean, sizeOptions: Array<string>, configSchema: Record<string, unknown>, bindingEnvs: Array<string>, issueUrl: string }> };
 
 export type ListManagedServicesQueryVariables = Exact<{
   appSlug: Scalars['String']['input'];

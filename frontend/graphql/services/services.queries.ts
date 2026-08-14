@@ -131,6 +131,27 @@ export const LIST_PROJECT_RESOURCES = gql`
   }
 `;
 
+export const LIST_PROJECT_MANAGED_SERVICE_CATALOG = gql`
+  query ListProjectManagedServiceCatalog($projectId: GUID!, $clusterId: GUID!) {
+    astroliftProjectManagedServiceCatalog(projectId: $projectId, clusterId: $clusterId) {
+      id
+      providerPluginSlug
+      kind
+      variant
+      displayName
+      description
+      status
+      available
+      unavailableReason
+      isDefaultForKind
+      sizeOptions
+      configSchema
+      bindingEnvs
+      issueUrl
+    }
+  }
+`;
+
 export const LIST_MANAGED_SERVICES = gql`
   query ListManagedServices($appSlug: String!, $environmentName: String) {
     astroliftManagedServices(appSlug: $appSlug, environmentName: $environmentName) {

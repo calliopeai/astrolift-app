@@ -2321,6 +2321,23 @@ export type AstroliftManagedServiceAttachmentMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftManagedServiceCatalogEntry = {
+  available: Scalars['Boolean']['output'];
+  bindingEnvs: Array<Scalars['String']['output']>;
+  configSchema: Scalars['JSON']['output'];
+  description: Scalars['String']['output'];
+  displayName: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  isDefaultForKind: Scalars['Boolean']['output'];
+  issueUrl: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  providerPluginSlug: Scalars['String']['output'];
+  sizeOptions: Array<Scalars['String']['output']>;
+  status: Scalars['String']['output'];
+  unavailableReason: Scalars['String']['output'];
+  variant: Scalars['String']['output'];
+};
+
 export type AstroliftManagedServiceConnection = {
   connectionSecretRef: Scalars['String']['output'];
   environmentName: Scalars['String']['output'];
@@ -7368,6 +7385,7 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st, and prices every one of them on read. Use astroliftPreviewEnvironmentsPage. */
   astroliftPreviewEnvironments: Array<AstroliftPreviewEnvironment>;
   astroliftPreviewEnvironmentsPage: AstroliftPreviewEnvironmentPage;
+  astroliftProjectManagedServiceCatalog: Array<AstroliftManagedServiceCatalogEntry>;
   astroliftProjectManagedServices: Array<AstroliftManagedService>;
   astroliftProjectResourceClusters: Array<AstroliftTenantCluster>;
   astroliftProjectSecretBundles: Array<AstroliftSecretBundle>;
@@ -8315,6 +8333,12 @@ export type QueryAstroliftPreviewEnvironmentsPageArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftProjectManagedServiceCatalogArgs = {
+  clusterId: Scalars['GUID']['input'];
+  projectId: Scalars['GUID']['input'];
 };
 
 

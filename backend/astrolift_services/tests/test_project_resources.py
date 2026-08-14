@@ -17,6 +17,7 @@ from astrolift_dispatch.agent_secrets import (
     effective_secret_refs,
     project_managed_service_env_vars,
 )
+from astrolift_drivers.registry import PluginManifest, plugins
 from astrolift_graphql import GUID
 from astrolift_identity.models import Organization, Project, Team
 from astrolift_lifecycle.models import AppEnvironment
@@ -185,6 +186,48 @@ def test_project_service_requires_exactly_one_owner_scope():
             kind=ManagedService.Kind.POSTGRES,
             name="invalid",
         )
+
+
+def test_project_catalog_is_cluster_derived_and_tenant_scoped(permission_resolver, monkeypatch):
+    class _Driver:
+        def config_schema(self):
+            return {"type": "object", "properties": {}}
+
+        def binding_schema(self):
+            return SimpleNamespace(env_vars={"SERVICE_URL": "Endpoint"})
+
+    owner = _graph("catalog-owner")
+    other = _graph("catalog-other")
+    plugin_slug = owner.cluster.provider_plugin.slug
+    monkeypatch.setattr(
+        plugins,
+        "_plugins",
+        {
+            plugin_slug: PluginManifest(
+                plugin_id=plugin_slug,
+                display_name="Test provider",
+                version="test",
+                drivers={"managed:queue:custom_queue": _Driver},
+            )
+        },
+    )
+    permission_resolver.grant(Permission.PROJECT_READ)
+
+    with _tenant(owner):
+        visible = ServicesQuery().astrolift_project_managed_service_catalog(
+            _info(),
+            project_id=GUID(str(owner.project.guid)),
+            cluster_id=GUID(str(owner.cluster.guid)),
+        )
+        hidden = ServicesQuery().astrolift_project_managed_service_catalog(
+            _info(),
+            project_id=GUID(str(owner.project.guid)),
+            cluster_id=GUID(str(other.cluster.guid)),
+        )
+
+    assert [(row.kind, row.variant, row.available) for row in visible] == [("queue", "custom_queue", True)]
+    assert visible[0].binding_envs == ["SERVICE_URL"]
+    assert hidden == []
 
 
 def test_provision_project_service_creates_shared_attachments_and_starts_workflow(

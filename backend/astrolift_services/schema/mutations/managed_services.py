@@ -147,13 +147,31 @@ class ManagedServiceMutations:
         ).first()
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
-        valid_kinds = {kind for kind, _label in ManagedService.Kind.choices}
-        if input.kind not in valid_kinds:
-            return gql_failure(
-                ErrorCode.VALIDATION.value,
-                f"kind must be one of {sorted(valid_kinds)}",
-                field="kind",
+        from astrolift_services.managed_service_catalog import (
+            CatalogResolutionError,
+            resolve_variant,
+            validate_config,
+        )
+
+        try:
+            catalog_item = resolve_variant(
+                plugin_slug=cluster.provider_plugin.slug,
+                kind=input.kind,
+                requested_variant=input.variant,
             )
+            if catalog_item is not None:
+                validate_config(catalog_item, dict(input.config or {}))
+        except CatalogResolutionError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc), field=exc.field)
+        if catalog_item is None:
+            valid_kinds = {kind for kind, _label in ManagedService.Kind.choices}
+            if input.kind not in valid_kinds:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"kind must be one of {sorted(valid_kinds)}",
+                    field="kind",
+                )
+        resolved_variant = catalog_item.variant if catalog_item is not None else (input.variant or "")
         name = (input.name or input.kind).strip()
         if ManagedService.objects.filter(
             project=project,
@@ -236,7 +254,7 @@ class ManagedServiceMutations:
             environment_name=(input.environment_name or "production").strip(),
             kind=input.kind,
             name=name,
-            variant=input.variant or "",
+            variant=resolved_variant,
             config=dict(input.config or {}),
             status=ManagedService.Status.PENDING,
         )
@@ -477,13 +495,31 @@ class ManagedServiceMutations:
                 f"environment {input.environment_name!r} not found",
                 field="environmentName",
             )
-        valid_kinds = {k for k, _ in ManagedService.Kind.choices}
-        if input.kind not in valid_kinds:
-            return gql_failure(
-                ErrorCode.VALIDATION.value,
-                f"kind must be one of {sorted(valid_kinds)}",
-                field="kind",
+        from astrolift_services.managed_service_catalog import (
+            CatalogResolutionError,
+            resolve_variant,
+            validate_config,
+        )
+
+        try:
+            catalog_item = resolve_variant(
+                plugin_slug=env.tenant_cluster.provider_plugin.slug,
+                kind=input.kind,
+                requested_variant=input.variant,
             )
+            if catalog_item is not None:
+                validate_config(catalog_item, dict(input.config or {}))
+        except CatalogResolutionError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc), field=exc.field)
+        if catalog_item is None:
+            valid_kinds = {k for k, _ in ManagedService.Kind.choices}
+            if input.kind not in valid_kinds:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"kind must be one of {sorted(valid_kinds)}",
+                    field="kind",
+                )
+        resolved_variant = catalog_item.variant if catalog_item is not None else (input.variant or "")
         name = (input.name or input.kind).strip()
         if ManagedService.objects.filter(
             registered_app=app,
@@ -501,7 +537,7 @@ class ManagedServiceMutations:
             app_environment=env,
             kind=input.kind,
             name=name,
-            variant=input.variant or "",
+            variant=resolved_variant,
             config=dict(input.config or {}),
             status=ManagedService.Status.PENDING,
         )

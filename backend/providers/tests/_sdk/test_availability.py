@@ -56,6 +56,11 @@ def test_has_managed_lookup() -> None:
         kind="object_store",
         variant="gcs",
     )
+    assert not MATRIX.has_managed(
+        plugin_id="aws",
+        kind="postgres",
+        variant="aurora_postgres_serverless_v2",
+    )
 
 
 def test_status_field_defaults_to_ga() -> None:
@@ -66,6 +71,19 @@ def test_status_field_defaults_to_ga() -> None:
 def test_managed_service_binding_envs_recorded() -> None:
     s3 = next(m for m in MATRIX.managed_services if m.plugin_id == "aws" and m.variant == "s3")
     assert "S3_BUCKET_NAME" in s3.binding_envs
+
+
+def test_managed_service_keys_are_unique() -> None:
+    keys = [(entry.plugin_id, entry.kind, entry.variant) for entry in MATRIX.managed_services]
+
+    assert len(keys) == len(set(keys))
+
+
+def test_every_planned_service_links_to_its_delivery_issue() -> None:
+    planned = [entry for entry in MATRIX.managed_services if entry.status == "planned"]
+
+    assert planned
+    assert all(entry.issue_url.startswith("https://github.com/calliopeai/astrolift-app/issues/") for entry in planned)
 
 
 def test_optional_roles_disjoint_from_required() -> None:
