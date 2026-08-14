@@ -387,6 +387,19 @@ def managed_config_for(
             ),
         )
 
+    if kind == "workflow_engine":
+        from aws.managed.workflow_step_functions import StepFunctionsConfig
+
+        return StepFunctionsConfig(
+            region=region,
+            state_machine_name_prefix=str(
+                pc.get("step_functions_name_prefix", "astrolift"),
+            ),
+            deletion_protection_default=bool(
+                pc.get("step_functions_deletion_protection_default", True),
+            ),
+        )
+
     if kind == "database_proxy":
         from aws.managed._networking import ensure_db_proxy_networking
         from aws.managed.rds_proxy import RDSProxyConfig
