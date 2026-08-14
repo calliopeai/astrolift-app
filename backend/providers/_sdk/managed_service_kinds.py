@@ -292,7 +292,14 @@ KINDS = KindCatalog(
             name="wide_column",
             description="Wide-column database (Cassandra/Bigtable-compatible)",
             binding_envs_required=("WIDE_COLUMN_ENDPOINT",),
-            binding_envs_optional=("WIDE_COLUMN_KEYSPACE", "WIDE_COLUMN_REGION"),
+            binding_envs_optional=(
+                "WIDE_COLUMN_KEYSPACE",
+                "WIDE_COLUMN_TABLE",
+                "WIDE_COLUMN_REGION",
+                "WIDE_COLUMN_PORT",
+                "WIDE_COLUMN_AUTH_MODE",
+                "WIDE_COLUMN_RESOURCE_ARN",
+            ),
             snapshot_supported=True,
         ),
         ManagedServiceKind(

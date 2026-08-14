@@ -43,6 +43,7 @@ from aws.managed.elasticache_serverless import (
 )
 from aws.managed.email_ses import AmazonSESDriver
 from aws.managed.faas_lambda import LambdaDriver
+from aws.managed.keyspaces import KeyspacesDriver
 from aws.managed.memcached_elasticache import ElastiCacheMemcachedDriver
 from aws.managed.memorydb import MemoryDBDriver
 from aws.managed.model_endpoint_bedrock import AmazonBedrockDriver
@@ -101,6 +102,7 @@ PLUGIN = ProviderPlugin(
         ("database_proxy", "rds_proxy"): RDSProxyDriver,
         ("document_db", "documentdb"): DocumentDBProvisionedDriver,
         ("document_db", "documentdb_serverless_v2"): DocumentDBServerlessV2Driver,
+        ("wide_column", "keyspaces"): KeyspacesDriver,
         ("redis", "elasticache"): ElastiCacheRedisDriver,
         ("redis", "elasticache_valkey"): ElastiCacheRedisDriver,
         ("redis", "elasticache_serverless_valkey"): ElastiCacheServerlessRedisDriver,

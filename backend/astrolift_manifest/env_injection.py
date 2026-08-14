@@ -214,7 +214,11 @@ _ENVELOPES: dict[str, tuple[str, ...]] = {
     "wide_column": (
         "WIDE_COLUMN_ENDPOINT",
         "WIDE_COLUMN_KEYSPACE",
+        "WIDE_COLUMN_TABLE",
         "WIDE_COLUMN_REGION",
+        "WIDE_COLUMN_PORT",
+        "WIDE_COLUMN_AUTH_MODE",
+        "WIDE_COLUMN_RESOURCE_ARN",
     ),
     "warehouse": (
         "WAREHOUSE_ENDPOINT",

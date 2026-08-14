@@ -403,8 +403,17 @@ MATRIX = AvailabilityMatrix(
             kind="wide_column",
             variant="keyspaces",
             plugin_id="aws",
-            status="planned",
+            status="preview",
             description="Amazon Keyspaces Cassandra-compatible table",
+            binding_envs=(
+                "WIDE_COLUMN_ENDPOINT",
+                "WIDE_COLUMN_KEYSPACE",
+                "WIDE_COLUMN_TABLE",
+                "WIDE_COLUMN_REGION",
+                "WIDE_COLUMN_PORT",
+                "WIDE_COLUMN_AUTH_MODE",
+                "WIDE_COLUMN_RESOURCE_ARN",
+            ),
             issue_url=_AWS_DATA_SEARCH_ISSUE,
         ),
         ManagedServiceEntry(

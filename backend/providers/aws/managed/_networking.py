@@ -481,3 +481,72 @@ def ensure_documentdb_networking(
             )
         ]
     return subnet_group, security_group_ids
+
+
+def ensure_keyspaces_networking(
+    cluster,
+    *,
+    region: str,
+    clients: Any | None = None,
+) -> str:
+    """Find or create a private Amazon Keyspaces interface VPC endpoint."""
+
+    pc = cluster.provider_config or {}
+    if pc.get("keyspaces_vpc_endpoint_id"):
+        return str(pc["keyspaces_vpc_endpoint_id"])
+    if clients is None:
+        import boto3
+
+        ec2 = boto3.client("ec2", region_name=region)
+        eks = boto3.client("eks", region_name=region)
+    else:
+        ec2, eks = clients
+    vpc_id, subnet_ids, vpc_cidr = discover_vpc(
+        cluster,
+        region=region,
+        ec2=ec2,
+        eks=eks,
+    )
+    security_group_ids = list(pc.get("keyspaces_security_group_ids") or [])
+    if not security_group_ids:
+        security_group_ids = [
+            ensure_security_group(
+                vpc_id=vpc_id,
+                vpc_cidr=vpc_cidr,
+                port=9142,
+                name=f"astrolift-{cluster.slug}-keyspaces"[:255],
+                ec2=ec2,
+            ),
+        ]
+    service_name = f"com.amazonaws.{region}.cassandra"
+    endpoint_name = f"astrolift-{cluster.slug}-keyspaces"[:255]
+    existing = ec2.describe_vpc_endpoints(
+        Filters=[
+            {"Name": "vpc-id", "Values": [vpc_id]},
+            {"Name": "service-name", "Values": [service_name]},
+        ],
+    ).get("VpcEndpoints", [])
+    for endpoint in existing:
+        if endpoint.get("State") not in {"deleted", "deleting", "failed", "rejected"}:
+            return str(endpoint["VpcEndpointId"])
+    response = ec2.create_vpc_endpoint(
+        VpcEndpointType="Interface",
+        VpcId=vpc_id,
+        ServiceName=service_name,
+        SubnetIds=list(pc.get("keyspaces_subnet_ids") or subnet_ids),
+        SecurityGroupIds=security_group_ids,
+        PrivateDnsEnabled=True,
+        TagSpecifications=[
+            {
+                "ResourceType": "vpc-endpoint",
+                "Tags": [
+                    *_MANAGED_TAGS,
+                    {"Key": "Name", "Value": endpoint_name},
+                ],
+            },
+        ],
+    )
+    endpoint_id = str((response.get("VpcEndpoint") or {}).get("VpcEndpointId") or "")
+    if not endpoint_id:
+        raise RuntimeError("Amazon Keyspaces create_vpc_endpoint returned no endpoint id")
+    return endpoint_id

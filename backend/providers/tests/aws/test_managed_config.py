@@ -18,6 +18,7 @@ from core.cluster_observability import managed_config_for
 from aws.managed._networking import (
     ensure_db_networking,
     ensure_documentdb_networking,
+    ensure_keyspaces_networking,
     ensure_memorydb_networking,
     ensure_opensearch_serverless_networking,
 )
@@ -355,6 +356,31 @@ def test_documentdb_config_selects_provisioned_and_serverless_variants():
     assert serverless.backup_retention_days == 14
 
 
+def test_keyspaces_config_uses_cloud_identity_and_portable_defaults():
+    from aws.managed.keyspaces import KeyspacesConfig
+
+    cfg = managed_config_for(
+        "aws",
+        _cluster(
+            {
+                "account_id": "123456789012",
+                "keyspaces_name_prefix": "platform",
+                "keyspaces_throughput_mode_default": "PROVISIONED",
+                "keyspaces_vpc_endpoint_id": "vpce-keyspaces",
+            },
+        ),
+        kind="wide_column",
+        variant="keyspaces",
+    )
+
+    assert isinstance(cfg, KeyspacesConfig)
+    assert cfg.region == "us-west-2"
+    assert cfg.account_id == "123456789012"
+    assert cfg.name_prefix == "platform"
+    assert cfg.throughput_mode_default == "PROVISIONED"
+    assert cfg.vpc_endpoint_id == "vpce-keyspaces"
+
+
 def test_every_registered_managed_service_driver_has_a_config_builder():
     """Regression guard for #1037 / #982: every (kind, variant) the AWS
     plugin registers a managed-service driver for MUST resolve through
@@ -382,6 +408,7 @@ def test_every_registered_managed_service_driver_has_a_config_builder():
             "documentdb_security_group_ids": ["sg-documentdb"],
             "account_id": "123456789012",
             "opensearch_serverless_vpc_endpoint_ids": ["vpce-aoss"],
+            "keyspaces_vpc_endpoint_id": "vpce-keyspaces",
         },
     )
     for kind, variant in PLUGIN.managed_service_drivers:
@@ -575,3 +602,53 @@ def test_ensure_documentdb_networking_discovers_and_creates():
     )
     ingress = ec2.authorize_security_group_ingress.call_args.kwargs
     assert ingress["IpPermissions"][0]["FromPort"] == 27017
+
+
+def test_ensure_keyspaces_networking_creates_private_interface_endpoint():
+    from botocore.session import Session
+    from botocore.validate import validate_parameters
+
+    ec2 = MagicMock()
+    eks = MagicMock()
+    eks.describe_cluster.return_value = {
+        "cluster": {"resourcesVpcConfig": {"vpcId": "vpc-abc"}},
+    }
+    ec2.describe_vpcs.return_value = {"Vpcs": [{"CidrBlock": "10.0.0.0/16"}]}
+    ec2.describe_subnets.return_value = {
+        "Subnets": [
+            {
+                "SubnetId": "subnet-a",
+                "AvailabilityZone": "us-west-2a",
+                "MapPublicIpOnLaunch": False,
+            },
+            {
+                "SubnetId": "subnet-b",
+                "AvailabilityZone": "us-west-2b",
+                "MapPublicIpOnLaunch": False,
+            },
+        ],
+    }
+    ec2.describe_security_groups.return_value = {"SecurityGroups": []}
+    ec2.create_security_group.return_value = {"GroupId": "sg-keyspaces"}
+    ec2.describe_vpc_endpoints.return_value = {"VpcEndpoints": []}
+    ec2.create_vpc_endpoint.return_value = {
+        "VpcEndpoint": {"VpcEndpointId": "vpce-keyspaces"},
+    }
+
+    endpoint_id = ensure_keyspaces_networking(
+        _cluster(slug="aws-prod"),
+        region="us-west-2",
+        clients=(ec2, eks),
+    )
+
+    assert endpoint_id == "vpce-keyspaces"
+    create = ec2.create_vpc_endpoint.call_args.kwargs
+    assert create["VpcEndpointType"] == "Interface"
+    assert create["ServiceName"] == "com.amazonaws.us-west-2.cassandra"
+    assert create["SubnetIds"] == ["subnet-a", "subnet-b"]
+    assert create["SecurityGroupIds"] == ["sg-keyspaces"]
+    assert create["PrivateDnsEnabled"] is True
+    service = Session().get_service_model("ec2")
+    validate_parameters(create, service.operation_model("CreateVpcEndpoint").input_shape)
+    ingress = ec2.authorize_security_group_ingress.call_args.kwargs
+    assert ingress["IpPermissions"][0]["FromPort"] == 9142

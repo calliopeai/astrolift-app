@@ -666,6 +666,31 @@ def managed_config_for(
             master_username=str(pc.get("documentdb_master_username", "astrolift")),
         )
 
+    if kind == "wide_column" and variant == "keyspaces":
+        from aws.managed._networking import ensure_keyspaces_networking
+        from aws.managed.keyspaces import KeyspacesConfig
+
+        public_endpoint = bool(pc.get("keyspaces_public_endpoint", False))
+        return KeyspacesConfig(
+            region=region,
+            account_id=str(pc.get("account_id", "")),
+            name_prefix=str(pc.get("keyspaces_name_prefix", "astrolift")),
+            throughput_mode_default=str(
+                pc.get("keyspaces_throughput_mode_default", "PAY_PER_REQUEST"),
+            ),
+            point_in_time_recovery_default=bool(
+                pc.get("keyspaces_point_in_time_recovery_default", True),
+            ),
+            vpc_endpoint_id=(
+                ""
+                if public_endpoint
+                else ensure_keyspaces_networking(
+                    cluster,
+                    region=region,
+                )
+            ),
+        )
+
     if kind == "search":
         from aws.managed.search_opensearch import OpenSearchSearchConfig
 
