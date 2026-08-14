@@ -381,6 +381,24 @@ def managed_config_for(
 
         return ApiGatewayHttpConfig(region=region)
 
+    if kind == "database_proxy":
+        from aws.managed._networking import ensure_db_proxy_networking
+        from aws.managed.rds_proxy import RDSProxyConfig
+
+        subnet_ids, security_group_ids = ensure_db_proxy_networking(
+            cluster,
+            region=region,
+        )
+        return RDSProxyConfig(
+            region=region,
+            vpc_subnet_ids=subnet_ids,
+            vpc_security_group_ids=security_group_ids,
+            role_arn=str(pc.get("db_proxy_role_arn", "")),
+            proxy_name_prefix=str(pc.get("db_proxy_name_prefix", "astrolift")),
+            idle_client_timeout=int(pc.get("db_proxy_idle_client_timeout", 1800)),
+            require_tls_default=bool(pc.get("db_proxy_require_tls", True)),
+        )
+
     if kind in ("postgres", "mysql", "mssql"):
         from aws.managed._networking import ensure_db_networking
 

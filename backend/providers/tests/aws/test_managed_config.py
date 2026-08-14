@@ -146,6 +146,28 @@ def test_aurora_and_sql_server_variants_resolve_distinct_runtime_configs():
     assert sql_express.engine == "sqlserver-ex"
 
 
+def test_rds_proxy_config_uses_raw_private_network_ids():
+    from aws.managed.rds_proxy import RDSProxyConfig
+
+    cfg = managed_config_for(
+        "aws",
+        _cluster(
+            {
+                "db_proxy_subnet_ids": ["subnet-a", "subnet-b"],
+                "db_proxy_security_group_ids": ["sg-proxy"],
+                "db_proxy_role_arn": "arn:aws:iam::123:role/proxy",
+            },
+        ),
+        kind="database_proxy",
+        variant="rds_proxy",
+    )
+
+    assert isinstance(cfg, RDSProxyConfig)
+    assert cfg.vpc_subnet_ids == ["subnet-a", "subnet-b"]
+    assert cfg.vpc_security_group_ids == ["sg-proxy"]
+    assert cfg.role_arn.endswith("role/proxy")
+
+
 # ---- managed_config_for: the non-VPC kinds wired in #1037 -------------
 #
 # plugin.py registers managed-service drivers for these (kind, variant)
@@ -289,6 +311,8 @@ def test_every_registered_managed_service_driver_has_a_config_builder():
             "db_subnet_group": "subnets",
             "cache_subnet_group": "subnets",
             "db_security_group_ids": ["sg-1"],
+            "db_proxy_subnet_ids": ["subnet-a", "subnet-b"],
+            "db_proxy_security_group_ids": ["sg-proxy"],
         },
     )
     for kind, variant in PLUGIN.managed_service_drivers:

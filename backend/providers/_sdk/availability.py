@@ -307,7 +307,7 @@ MATRIX = AvailabilityMatrix(
             kind="database_proxy",
             variant="rds_proxy",
             plugin_id="aws",
-            status="planned",
+            status="preview",
             description="Amazon RDS Proxy",
             issue_url=_AWS_RELATIONAL_CACHE_ISSUE,
         ),

@@ -41,6 +41,7 @@ from aws.managed.mysql_rds import RDSMySQLDriver
 from aws.managed.object_store_s3 import S3Driver
 from aws.managed.postgres_rds import RDSPostgresDriver
 from aws.managed.queue_sqs import SQSDriver
+from aws.managed.rds_proxy import RDSProxyDriver
 from aws.managed.redis_elasticache import ElastiCacheRedisDriver
 from aws.managed.search_opensearch import OpenSearchSearchDriver
 from aws.managed.timeseries_timestream import TimestreamDriver
@@ -83,6 +84,7 @@ PLUGIN = ProviderPlugin(
         ("mssql", "rds_sqlserver_web"): RDSSqlServerDriver,
         ("mssql", "rds_sqlserver_standard"): RDSSqlServerDriver,
         ("mssql", "rds_sqlserver_enterprise"): RDSSqlServerDriver,
+        ("database_proxy", "rds_proxy"): RDSProxyDriver,
         ("redis", "elasticache"): ElastiCacheRedisDriver,
         ("vector_index", "opensearch_vector"): OpenSearchVectorDriver,
         ("search", "opensearch"): OpenSearchSearchDriver,

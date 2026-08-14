@@ -63,8 +63,8 @@ def test_has_managed_lookup() -> None:
     )
     assert not MATRIX.has_managed(
         plugin_id="aws",
-        kind="database_proxy",
-        variant="rds_proxy",
+        kind="document_db",
+        variant="documentdb",
     )
 
 

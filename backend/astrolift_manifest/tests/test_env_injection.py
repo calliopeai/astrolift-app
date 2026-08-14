@@ -97,17 +97,15 @@ def test_secret_bundles_apply_in_order():
 def test_envelope_keys_for_known_kinds():
     assert "DATABASE_URL" in envelope_keys_for("postgres")
     assert "REDIS_URL" in envelope_keys_for("redis")
+    assert "DATABASE_PROXY_TLS" in envelope_keys_for("database_proxy")
+    assert "DATABASE_PROXY_AUTH_MODE" in envelope_keys_for("database_proxy")
     assert envelope_keys_for("totally-unknown") == ()
 
 
 def test_every_portable_resource_kind_has_an_environment_envelope():
     from _sdk.managed_service_kinds import KINDS
 
-    missing = {
-        kind.name
-        for kind in KINDS.kinds
-        if not envelope_keys_for(kind.name)
-    }
+    missing = {kind.name for kind in KINDS.kinds if not envelope_keys_for(kind.name)}
 
     assert missing == set()
 
