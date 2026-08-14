@@ -74,9 +74,7 @@ def check_matrix(
             # count as documented here, but ``has_managed`` deliberately
             # excludes them from runtime capability negotiation.
             documented = any(
-                entry.plugin_id == plugin.id
-                and entry.kind == kind
-                and entry.variant == variant
+                entry.plugin_id == plugin.id and entry.kind == kind and entry.variant == variant
                 for entry in matrix.managed_services
             )
             if not documented:

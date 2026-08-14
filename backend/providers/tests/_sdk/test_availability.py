@@ -74,10 +74,7 @@ def test_managed_service_binding_envs_recorded() -> None:
 
 
 def test_managed_service_keys_are_unique() -> None:
-    keys = [
-        (entry.plugin_id, entry.kind, entry.variant)
-        for entry in MATRIX.managed_services
-    ]
+    keys = [(entry.plugin_id, entry.kind, entry.variant) for entry in MATRIX.managed_services]
 
     assert len(keys) == len(set(keys))
 
