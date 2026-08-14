@@ -179,6 +179,18 @@ def test_email_and_sms_envelopes_split_provider_from_creds():
     assert {"EMAIL_PROVIDER", "EMAIL_API_KEY", "EMAIL_DOMAIN", "EMAIL_FROM"} <= set(email)
     sms = envelope_keys_for("sms")
     assert {"SMS_PROVIDER", "SMS_API_KEY", "SMS_FROM"} <= set(sms)
+    assert {
+        "SMS_REGION",
+        "SMS_SENDER_ID",
+        "SMS_ORIGINATION_NUMBER",
+        "SMS_TYPE",
+        "SMS_MAX_PRICE_USD",
+        "SMS_ENTITY_ID",
+        "SMS_TEMPLATE_ID",
+        "SMS_DELIVERY_MODE",
+        "SMS_TOPIC_ARN",
+        "SMS_SANDBOX",
+    } <= set(sms)
 
 
 def test_managed_service_keys_pull_from_connection_secret():
