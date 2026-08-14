@@ -63,6 +63,7 @@ from aws.managed.redshift import RedshiftProvisionedDriver
 from aws.managed.redshift_serverless import RedshiftServerlessDriver
 from aws.managed.search_opensearch import OpenSearchSearchDriver
 from aws.managed.timeseries_timestream import TimestreamDriver
+from aws.managed.topic_sns import SNSFifoTopicDriver, SNSStandardTopicDriver
 from aws.managed.vector_opensearch import OpenSearchVectorDriver
 from aws.notification_sns import SNSNotificationDriver
 from aws.registry_ecr import ECRDriver
@@ -92,6 +93,8 @@ PLUGIN = ProviderPlugin(
         ("faas", "lambda"): LambdaDriver,
         ("api_gateway", "http_api"): ApiGatewayHttpDriver,
         ("queue", "sqs"): SQSDriver,
+        ("topic", "sns_standard"): SNSStandardTopicDriver,
+        ("topic", "sns_fifo"): SNSFifoTopicDriver,
         ("postgres", "rds"): RDSPostgresDriver,
         ("postgres", "aurora_postgres"): AuroraPostgresDriver,
         ("postgres", "aurora_postgres_serverless_v2"): AuroraPostgresDriver,

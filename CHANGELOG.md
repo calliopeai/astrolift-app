@@ -4,6 +4,12 @@
 
 ### Added
 
+- Add Amazon SNS standard and FIFO topic lifecycle with KMS encryption,
+  high-throughput FIFO, archives, declarative subscriptions, filtering,
+  dead-letter queues, replay, and least-privilege portable bindings.
+- Expand Amazon SQS lifecycle with portable bindings, KMS or SQS-managed
+  encryption, policies, dead-letter/redrive controls, long polling, FIFO
+  throughput settings, safe non-empty teardown, and access-mode IAM grants.
 - Add Amazon Redshift provisioned and Serverless warehouses with private
   networking, IAM-first bindings, managed admin secrets, capacity controls,
   Data API grants, snapshots, restore, and protected teardown.

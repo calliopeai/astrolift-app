@@ -96,6 +96,16 @@ def test_has_managed_lookup() -> None:
         kind="warehouse",
         variant="redshift_serverless",
     )
+    assert MATRIX.has_managed(
+        plugin_id="aws",
+        kind="topic",
+        variant="sns_standard",
+    )
+    assert MATRIX.has_managed(
+        plugin_id="aws",
+        kind="topic",
+        variant="sns_fifo",
+    )
 
 
 def test_status_field_defaults_to_ga() -> None:

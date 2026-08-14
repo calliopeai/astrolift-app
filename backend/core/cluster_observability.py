@@ -596,6 +596,7 @@ def managed_config_for(
 
         return SQSConfig(
             region=region,
+            account_id=str(pc.get("account_id", "")),
             queue_name_prefix=str(pc.get("queue_name_prefix", "astrolift")),
             default_visibility_timeout_seconds=int(
                 pc.get("sqs_default_visibility_timeout_seconds", 30),
@@ -604,6 +605,19 @@ def managed_config_for(
                 pc.get("sqs_default_message_retention_seconds", 4 * 86400),
             ),
             fifo_default=bool(pc.get("sqs_fifo_default", False)),
+            kms_key_id=str(pc.get("sqs_kms_key_id") or pc.get("kms_key_id") or ""),
+            sqs_managed_sse_default=bool(pc.get("sqs_managed_sse_default", True)),
+        )
+
+    if kind == "topic" and variant.startswith("sns_"):
+        from aws.managed.topic_sns import SNSConfig
+
+        return SNSConfig(
+            region=region,
+            account_id=str(pc.get("account_id", "")),
+            topic_name_prefix=str(pc.get("sns_topic_name_prefix", "astrolift")),
+            kms_key_id=str(pc.get("sns_kms_key_id") or pc.get("kms_key_id") or ""),
+            tracing_config_default=str(pc.get("sns_tracing_config_default", "PassThrough")),
         )
 
     if kind in ("search", "vector_index") and variant.startswith("opensearch_serverless"):
