@@ -27,6 +27,7 @@ Executable managed services:
 - FirestoreNativeDriver — document_db/firestore_native
 - CloudSQLServerDriver — mssql/cloudsql_sqlserver
 - SpannerGraphDriver — graph_db/spanner_graph
+- CloudOperationsDriver — observability/cloud_operations
 
 The availability catalogue is authoritative for the remaining planned GCP
 resources. Placeholder email/search classes are registered only so callers get
@@ -47,6 +48,7 @@ from gcp.managed.model_endpoint_vertex import VertexAIEndpointDriver
 from gcp.managed.mssql_cloudsql import CloudSQLServerDriver
 from gcp.managed.mysql_cloudsql import CloudSQLMySQLDriver
 from gcp.managed.object_store_gcs import GCSDriver
+from gcp.managed.observability_cloud_operations import CloudOperationsDriver
 from gcp.managed.postgres_alloydb import AlloyDBPostgresDriver
 from gcp.managed.postgres_cloudsql import CloudSQLPostgresDriver
 from gcp.managed.queue_pubsub import PubSubDriver
@@ -93,6 +95,7 @@ PLUGIN = ProviderPlugin(
         ("document_db", "firestore_native"): FirestoreNativeDriver,
         ("mssql", "cloudsql_sqlserver"): CloudSQLServerDriver,
         ("graph_db", "spanner_graph"): SpannerGraphDriver,
+        ("observability", "cloud_operations"): CloudOperationsDriver,
     },
     config_schema={
         "type": "object",
@@ -284,6 +287,47 @@ PLUGIN = ProviderPlugin(
             "spanner_adopt_existing_instance": {
                 "type": "boolean",
                 "default": False,
+            },
+            "cloud_operations_location": {
+                "type": "string",
+                "description": "Default Cloud Logging location; falls back to global.",
+                "default": "global",
+            },
+            "cloud_operations_name_prefix": {
+                "type": "string",
+                "default": "astrolift-observability",
+            },
+            "cloud_operations_retention_days_default": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 30,
+            },
+            "cloud_operations_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "cloud_operations_logging_api_endpoint": {
+                "type": "string",
+                "default": "https://logging.googleapis.com",
+            },
+            "cloud_operations_monitoring_api_endpoint": {
+                "type": "string",
+                "default": "https://monitoring.googleapis.com",
+            },
+            "cloud_operations_request_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 30,
+            },
+            "cloud_operations_operation_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 900,
+            },
+            "cloud_operations_operation_poll_interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 2,
             },
             "cloudsql_private_network": {
                 "type": "string",

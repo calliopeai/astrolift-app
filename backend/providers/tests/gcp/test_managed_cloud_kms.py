@@ -538,6 +538,7 @@ def test_registration_catalog_cost_and_runtime_config_are_wired() -> None:
         ("time_series", "gcp_managed_prometheus", "GCPManagedPrometheusConfig"),
         ("model_endpoint", "vertex_ai", "VertexAIEndpointConfig"),
         ("encryption_key", "cloud_kms", "CloudKMSConfig"),
+        ("observability", "cloud_operations", "CloudOperationsConfig"),
     ],
 )
 def test_every_executable_gcp_driver_has_a_runtime_config(

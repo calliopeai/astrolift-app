@@ -440,6 +440,45 @@ def _gcp_managed_config_for(
             adopt_existing_instance=bool(pc.get("spanner_adopt_existing_instance", False)),
         )
 
+    if pair == ("observability", "cloud_operations") or (kind == "observability" and not variant):
+        from gcp.managed.observability_cloud_operations import CloudOperationsConfig
+
+        return CloudOperationsConfig(
+            project_id=project_id,
+            location=str(pc.get("cloud_operations_location") or "global"),
+            name_prefix=str(
+                pc.get("cloud_operations_name_prefix", "astrolift-observability"),
+            ),
+            retention_days_default=int(
+                pc.get("cloud_operations_retention_days_default", 30),
+            ),
+            deletion_protection_default=bool(
+                pc.get("cloud_operations_deletion_protection_default", True),
+            ),
+            secret_id_prefix=str(pc.get("secret_id_prefix", "astrolift")),
+            logging_api_endpoint=str(
+                pc.get(
+                    "cloud_operations_logging_api_endpoint",
+                    "https://logging.googleapis.com",
+                ),
+            ),
+            monitoring_api_endpoint=str(
+                pc.get(
+                    "cloud_operations_monitoring_api_endpoint",
+                    "https://monitoring.googleapis.com",
+                ),
+            ),
+            request_timeout_seconds=float(
+                pc.get("cloud_operations_request_timeout_seconds", 30),
+            ),
+            operation_timeout_seconds=float(
+                pc.get("cloud_operations_operation_timeout_seconds", 900),
+            ),
+            operation_poll_interval_seconds=float(
+                pc.get("cloud_operations_operation_poll_interval_seconds", 2),
+            ),
+        )
+
     if pair == ("postgres", "cloudsql") or (kind == "postgres" and not variant):
         from gcp.managed.postgres_cloudsql import CloudSQLConfig
 

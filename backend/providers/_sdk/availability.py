@@ -1286,8 +1286,24 @@ MATRIX = AvailabilityMatrix(
             kind="observability",
             variant="cloud_operations",
             plugin_id="gcp",
-            status="planned",
-            description="Cloud Logging, Monitoring, and alert policies",
+            status="preview",
+            description=(
+                "Cloud Logging buckets, views, routing, metrics, and analytics links with Cloud "
+                "Monitoring dashboards, channels, alerts, groups, uptime checks, services, and SLOs"
+            ),
+            binding_envs=(
+                "OBSERVABILITY_PROVIDER",
+                "LOG_GROUP",
+                "METRICS_ENDPOINT",
+                "DASHBOARD_URL",
+                "GCP_PROJECT_ID",
+                "GCP_CLOUD_OPERATIONS_BUNDLE",
+                "GCP_LOG_BUCKET",
+                "GCP_LOGGING_LOCATION",
+                "GCP_LOGGING_ENDPOINT",
+                "GCP_MONITORING_ENDPOINT",
+                "GCP_MONITORING_DASHBOARD",
+            ),
             issue_url=_CROSS_CLOUD_PARITY_ISSUE,
         ),
         # Azure

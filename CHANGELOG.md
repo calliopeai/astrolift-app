@@ -4,6 +4,13 @@
 
 ### Added
 
+- Add Google Cloud Operations observability bundles with declarative Cloud
+  Logging buckets, views, sinks, log metrics, exclusions, scopes, and saved
+  queries and Log Analytics links plus Cloud Monitoring dashboards,
+  notification channels, alert policies, nested resource groups, uptime
+  checks, metric descriptors, services, and SLOs. Preserve provider-native
+  request bodies, resolve credentials and verification codes from Secret
+  Manager, and enforce ownership-, dependency-, and data-safe teardown.
 - Add Cloud Spanner Graph lifecycle on Enterprise and Enterprise Plus with
   GoogleSQL/GQL property graphs, fixed or autoscaled capacity, atomic custom
   schemas, replay-safe DDL, CMEK, exact backups and restore, portable IAM
