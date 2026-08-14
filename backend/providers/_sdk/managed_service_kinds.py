@@ -357,6 +357,7 @@ KINDS = KindCatalog(
             description="Managed state-machine and workflow orchestration service",
             binding_envs_required=("WORKFLOW_ENGINE_ID",),
             binding_envs_optional=("WORKFLOW_ENGINE_ARN", "WORKFLOW_ENGINE_REGION"),
+            snapshot_supported=True,
         ),
         ManagedServiceKind(
             name="encryption_key",

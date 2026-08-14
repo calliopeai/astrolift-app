@@ -72,6 +72,10 @@ from aws.managed.stream_kinesis import KinesisDriver
 from aws.managed.timeseries_timestream import TimestreamDriver
 from aws.managed.topic_sns import SNSFifoTopicDriver, SNSStandardTopicDriver
 from aws.managed.vector_opensearch import OpenSearchVectorDriver
+from aws.managed.workflow_step_functions import (
+    StepFunctionsExpressDriver,
+    StepFunctionsStandardDriver,
+)
 from aws.notification_sns import SNSNotificationDriver
 from aws.registry_ecr import ECRDriver
 from aws.secrets import AWSSecretsBackend
@@ -145,6 +149,8 @@ PLUGIN = ProviderPlugin(
         ("time_series", "timestream"): TimestreamDriver,
         ("email", "ses"): AmazonSESDriver,
         ("model_endpoint", "bedrock"): AmazonBedrockDriver,
+        ("workflow_engine", "step_functions_standard"): StepFunctionsStandardDriver,
+        ("workflow_engine", "step_functions_express"): StepFunctionsExpressDriver,
     },
     config_schema={
         "type": "object",
