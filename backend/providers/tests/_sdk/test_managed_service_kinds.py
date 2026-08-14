@@ -128,6 +128,15 @@ def test_document_database_contract_includes_tls_and_resource_identity() -> None
     assert "DOCDB_RESOURCE_ARN" in document_db.binding_envs_optional
 
 
+def test_wide_column_contract_carries_table_auth_and_port() -> None:
+    wide_column = KINDS.get("wide_column")
+
+    assert wide_column is not None
+    assert "WIDE_COLUMN_TABLE" in wide_column.binding_envs_optional
+    assert "WIDE_COLUMN_PORT" in wide_column.binding_envs_optional
+    assert "WIDE_COLUMN_AUTH_MODE" in wide_column.binding_envs_optional
+
+
 def test_validate_unknown_kind_returns_empty() -> None:
     """Unknown kinds skip validation (operator-defined kinds may
     not yet be in the canonical catalog)."""

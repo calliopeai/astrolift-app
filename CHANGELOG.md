@@ -4,6 +4,9 @@
 
 ### Added
 
+- Add Amazon Keyspaces Cassandra-compatible tables with on-demand or
+  provisioned capacity, multi-Region keyspaces, IAM SigV4 bindings, encryption,
+  TTL/CDC controls, 35-day point-in-time recovery, and restore lifecycle.
 - Add AWS DocumentDB provisioned and Serverless v2 clusters with private
   networking, encrypted storage, portable Mongo-compatible bindings, scaling,
   backups, snapshot restore, deletion protection, and convergent teardown.

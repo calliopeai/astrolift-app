@@ -82,6 +82,7 @@ SERVICE_CODE_BY_VARIANT: dict[tuple[str, str], str] = {
     ("vector_index", "opensearch_serverless_vector"): "AmazonES",
     ("document_db", "documentdb"): "AmazonDocDB",
     ("document_db", "documentdb_serverless_v2"): "AmazonDocDB",
+    ("wide_column", "keyspaces"): "AmazonMCS",
     ("filesystem", "efs"): "AmazonEFS",
     # Cluster compute capacity (#440). Translates a (cpu_cores,
     # memory_gib) request into the cheapest matching EC2 on-demand

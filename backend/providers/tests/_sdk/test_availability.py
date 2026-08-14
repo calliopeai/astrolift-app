@@ -71,6 +71,11 @@ def test_has_managed_lookup() -> None:
         kind="document_db",
         variant="documentdb_serverless_v2",
     )
+    assert MATRIX.has_managed(
+        plugin_id="aws",
+        kind="wide_column",
+        variant="keyspaces",
+    )
 
 
 def test_status_field_defaults_to_ga() -> None:
