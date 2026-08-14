@@ -65,6 +65,15 @@ _ENVELOPES: dict[str, tuple[str, ...]] = {
         "MYSQL_PASSWORD",
         "DATABASE_URL",
     ),
+    "mssql": (
+        "MSSQL_HOST",
+        "MSSQL_PORT",
+        "MSSQL_DB",
+        "MSSQL_USER",
+        "MSSQL_PASSWORD",
+        "MSSQL_ENCRYPT",
+        "DATABASE_URL",
+    ),
     "redis": (
         "REDIS_HOST",
         "REDIS_PORT",
@@ -74,6 +83,10 @@ _ENVELOPES: dict[str, tuple[str, ...]] = {
         "REDIS_URL",
     ),
     "mq": (
+        "MQ_ENDPOINT",
+        "MQ_USERNAME",
+        "MQ_PASSWORD",
+        "MQ_PROTOCOL",
         "KAFKA_BOOTSTRAP_SERVERS",
         "KAFKA_SECURITY_PROTOCOL",
         "KAFKA_SASL_MECHANISM",
@@ -91,6 +104,13 @@ _ENVELOPES: dict[str, tuple[str, ...]] = {
         "TOPIC_ARN_OR_ID",
         "TOPIC_NAME",
         "TOPIC_REGION",
+    ),
+    "event_stream": (
+        "EVENT_STREAM_BROKERS",
+        "EVENT_STREAM_USERNAME",
+        "EVENT_STREAM_PASSWORD",
+        "EVENT_STREAM_TLS",
+        "EVENT_STREAM_TOPIC_PREFIX",
     ),
     "kv_store": (
         "KV_TABLE_NAME",
@@ -131,6 +151,11 @@ _ENVELOPES: dict[str, tuple[str, ...]] = {
         "BUCKET_PREFIX",
     ),
     "nfs": ("NFS_VOLUME",),
+    "filesystem": (
+        "FILESYSTEM_HANDLE",
+        "FILESYSTEM_MOUNT_PATH",
+        "FILESYSTEM_TLS",
+    ),
     "cdn": (
         "CDN_DISTRIBUTION_ID",
         "CDN_DOMAIN_NAME",
@@ -146,6 +171,78 @@ _ENVELOPES: dict[str, tuple[str, ...]] = {
         "SMS_PROVIDER",
         "SMS_API_KEY",
         "SMS_FROM",
+    ),
+    "faas": (
+        "FUNCTION_NAME",
+        "FUNCTION_ARN",
+        "FUNCTION_URL",
+        "FUNCTION_REGION",
+    ),
+    "api_gateway": (
+        "API_GATEWAY_URL",
+        "API_GATEWAY_ID",
+        "API_GATEWAY_STAGE",
+    ),
+    "database_proxy": (
+        "DATABASE_PROXY_HOST",
+        "DATABASE_PROXY_PORT",
+        "DATABASE_PROXY_ARN",
+        "DATABASE_PROXY_TLS",
+    ),
+    "graph_db": (
+        "GRAPH_DB_URL",
+        "GRAPH_DB_USER",
+        "GRAPH_DB_PASSWORD",
+        "GRAPH_DB_PROTOCOL",
+    ),
+    "wide_column": (
+        "WIDE_COLUMN_ENDPOINT",
+        "WIDE_COLUMN_KEYSPACE",
+        "WIDE_COLUMN_REGION",
+    ),
+    "warehouse": (
+        "WAREHOUSE_ENDPOINT",
+        "WAREHOUSE_DATABASE",
+        "WAREHOUSE_USER",
+        "WAREHOUSE_PASSWORD",
+    ),
+    "event_bus": (
+        "EVENT_BUS_NAME",
+        "EVENT_BUS_ARN",
+        "EVENT_BUS_REGION",
+    ),
+    "stream": (
+        "STREAM_NAME",
+        "STREAM_ARN",
+        "STREAM_ENDPOINT",
+        "STREAM_REGION",
+    ),
+    "workflow_engine": (
+        "WORKFLOW_ENGINE_ID",
+        "WORKFLOW_ENGINE_ARN",
+        "WORKFLOW_ENGINE_REGION",
+    ),
+    "encryption_key": (
+        "ENCRYPTION_KEY_ID",
+        "ENCRYPTION_KEY_ARN",
+        "ENCRYPTION_KEY_ALIAS",
+    ),
+    "private_endpoint": (
+        "PRIVATE_ENDPOINT_ID",
+        "PRIVATE_ENDPOINT_DNS",
+        "PRIVATE_ENDPOINT_IPS",
+    ),
+    "observability": (
+        "OBSERVABILITY_PROVIDER",
+        "LOG_GROUP",
+        "METRICS_ENDPOINT",
+        "DASHBOARD_URL",
+    ),
+    "model_endpoint": (
+        "MODEL_ENDPOINT_URL",
+        "MODEL_API_KEY",
+        "MODEL_DEPLOYMENT_NAME",
+        "MODEL_REGION",
     ),
 }
 

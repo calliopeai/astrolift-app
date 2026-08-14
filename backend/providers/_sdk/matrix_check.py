@@ -20,6 +20,7 @@ from importlib.metadata import entry_points
 
 from _sdk.availability import MATRIX, AvailabilityMatrix
 from _sdk.base import ProviderPlugin
+from _sdk.managed_service_kinds import KINDS
 
 
 @dataclass(frozen=True)
@@ -55,6 +56,19 @@ def check_matrix(
     if plugins is None:
         plugins = load_plugins()
     issues: list[DriftIssue] = []
+
+    # Every matrix entry, including roadmap entries, must use a portable kind.
+    # This prevents provider-specific nouns from leaking into API/TOML before a
+    # driver is implemented and catches catalogue/model drift early in CI.
+    for entry in matrix.managed_services:
+        if KINDS.get(entry.kind) is None:
+            issues.append(
+                DriftIssue(
+                    code="matrix_unknown_kind",
+                    plugin_id=entry.plugin_id,
+                    detail=(f"matrix lists unknown managed-service kind {entry.kind!r} for variant {entry.variant!r}"),
+                )
+            )
 
     # forward direction: every PLUGIN driver/managed-service must
     # appear in the matrix

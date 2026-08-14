@@ -95,3 +95,12 @@ def test_portable_model_kind_enum_covers_the_full_provider_matrix():
     catalog_kinds = {entry.kind for entry in MATRIX.managed_services}
 
     assert catalog_kinds <= model_kinds
+
+
+def test_model_and_provider_sdk_share_one_portable_kind_vocabulary():
+    from _sdk.managed_service_kinds import KINDS
+
+    model_kinds = {value for value, _label in ManagedService.Kind.choices}
+    sdk_kinds = {kind.name for kind in KINDS.kinds}
+
+    assert sdk_kinds == model_kinds

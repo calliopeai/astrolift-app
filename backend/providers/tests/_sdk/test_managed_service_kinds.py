@@ -21,8 +21,8 @@ def test_canonical_catalog_has_extended_kinds() -> None:
     names = {k.name for k in KINDS.kinds}
     assert "mysql" in names
     assert "document_db" in names
-    assert "key_value" in names
-    assert "vector_db" in names
+    assert "kv_store" in names
+    assert "vector_index" in names
     assert "search" in names
     assert "time_series" in names
     assert "filesystem" in names
@@ -31,12 +31,37 @@ def test_canonical_catalog_has_extended_kinds() -> None:
     assert "event_stream" in names
 
 
+def test_catalog_covers_every_platform_resource_kind() -> None:
+    names = {kind.name for kind in KINDS.kinds}
+    assert {
+        "api_gateway",
+        "cdn",
+        "database_proxy",
+        "encryption_key",
+        "event_bus",
+        "faas",
+        "graph_db",
+        "mq",
+        "mssql",
+        "observability",
+        "private_endpoint",
+        "sms",
+        "stream",
+        "topic",
+        "warehouse",
+        "wide_column",
+        "workflow_engine",
+    } <= names
+
+
 def test_email_kind_uses_provider_name_env() -> None:
     email = KINDS.get("email")
     assert email is not None
     # Apps need to know which provider's SDK to load
     assert "EMAIL_PROVIDER" in email.binding_envs_required
-    assert "EMAIL_API_KEY" in email.binding_envs_required
+    # Workload-identity providers such as SES need no API key, while SaaS
+    # variants may emit one.
+    assert "EMAIL_API_KEY" in email.binding_envs_optional
 
 
 def test_model_endpoint_kind_separate_from_search() -> None:
@@ -79,6 +104,13 @@ def test_validate_binding_envs_complete_returns_empty() -> None:
     assert missing == []
 
 
+def test_database_proxy_declares_portable_tls_mode() -> None:
+    proxy = KINDS.get("database_proxy")
+
+    assert proxy is not None
+    assert "DATABASE_PROXY_TLS" in proxy.binding_envs_optional
+
+
 def test_validate_unknown_kind_returns_empty() -> None:
     """Unknown kinds skip validation (operator-defined kinds may
     not yet be in the canonical catalog)."""
@@ -99,14 +131,14 @@ def test_custom_catalog_extension() -> None:
     custom = KindCatalog(
         kinds=(
             ManagedServiceKind(
-                name="vector_db",
+                name="vector_index",
                 description="Vector similarity search store",
                 binding_envs_required=("VECTOR_DB_URL", "VECTOR_DB_TOKEN"),
             ),
         )
     )
     missing = validate_binding_envs(
-        kind="vector_db",
+        kind="vector_index",
         emitted_envs=["VECTOR_DB_URL"],
         catalog=custom,
     )
