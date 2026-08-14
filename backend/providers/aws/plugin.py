@@ -30,6 +30,8 @@ from aws.dns_route53 import Route53Driver
 from aws.identity_irsa import IRSADriver
 from aws.ingress_alb import ALBIngressDriver
 from aws.managed.api_gateway_http import ApiGatewayHttpDriver
+from aws.managed.api_gateway_rest import ApiGatewayRestDriver
+from aws.managed.api_gateway_websocket import ApiGatewayWebSocketDriver
 from aws.managed.aurora import AuroraMySQLDriver, AuroraPostgresDriver
 from aws.managed.cdn_cloudfront import CloudFrontDriver
 from aws.managed.documentdb import (
@@ -103,6 +105,8 @@ PLUGIN = ProviderPlugin(
         ("cdn", "cloudfront"): CloudFrontDriver,
         ("faas", "lambda"): LambdaDriver,
         ("api_gateway", "http_api"): ApiGatewayHttpDriver,
+        ("api_gateway", "rest_api"): ApiGatewayRestDriver,
+        ("api_gateway", "websocket_api"): ApiGatewayWebSocketDriver,
         ("queue", "sqs"): SQSDriver,
         ("topic", "sns_standard"): SNSStandardTopicDriver,
         ("topic", "sns_fifo"): SNSFifoTopicDriver,
