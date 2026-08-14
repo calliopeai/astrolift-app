@@ -9,7 +9,7 @@ the auth integration in :mod:`astrolift_identity.auth_drf` calls
 ``verify_token`` + ``touch_token`` on every authed request.
 
 Scopes are access classes (``read:apps``, ``write:apps``,
-``agent-env-spec:write``, ``secret:write``, ``workflow:write``,
+``agent-env-spec:write``, ``project:write``, ``secret:write``, ``workflow:write``,
 ``workflow:trigger``, ``read:clusters``, ``admin``). They narrow the
 *user's* permission set down to the subset the token may exercise —
 they never widen it. ``admin`` implies all other scopes (operators
@@ -38,6 +38,7 @@ SCOPE_READ_APPS = "read:apps"
 SCOPE_WRITE_APPS = "write:apps"
 SCOPE_READ_CLUSTERS = "read:clusters"
 SCOPE_AGENT_ENV_SPEC_WRITE = "agent-env-spec:write"
+SCOPE_PROJECT_WRITE = "project:write"
 SCOPE_SECRET_READ = "secret:read"
 SCOPE_SECRET_WRITE = "secret:write"
 SCOPE_MCP_READ = "mcp:read"
@@ -53,6 +54,7 @@ ALLOWED_SCOPES: frozenset[str] = frozenset(
         SCOPE_WRITE_APPS,
         SCOPE_READ_CLUSTERS,
         SCOPE_AGENT_ENV_SPEC_WRITE,
+        SCOPE_PROJECT_WRITE,
         SCOPE_SECRET_READ,
         SCOPE_SECRET_WRITE,
         SCOPE_MCP_READ,
@@ -77,6 +79,7 @@ DEFAULT_SCOPES: tuple[str, ...] = (
 CLI_DEVICE_SCOPES: tuple[str, ...] = (
     *DEFAULT_SCOPES,
     SCOPE_AGENT_ENV_SPEC_WRITE,
+    SCOPE_PROJECT_WRITE,
     SCOPE_SECRET_WRITE,
     SCOPE_MCP_DISPATCH,
     SCOPE_MCP_WRITE,
@@ -139,6 +142,8 @@ def token_scope_allows_permission(token, permission: str) -> bool:
         "agent_env_spec.update",
         "agent_env_spec.delete",
     }:
+        return True
+    if SCOPE_PROJECT_WRITE in scopes and permission == "project.update":
         return True
     if SCOPE_SECRET_READ in scopes and permission == "secret.read":
         return True

@@ -73,6 +73,11 @@ const SCOPE_CHOICES = [
     hint: "Create, update, and delete agent environment specs without broader app writes.",
   },
   {
+    value: "project:write",
+    label: "Write project resources",
+    hint: "Provision and manage project-owned shared resources without broader app writes.",
+  },
+  {
     value: "secret:read",
     label: "Reveal secrets",
     hint: "Reveal stored secret values. Sensitive; grant only when required.",

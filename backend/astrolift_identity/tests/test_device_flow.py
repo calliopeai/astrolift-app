@@ -400,6 +400,7 @@ def test_approval_page_renders_for_authed_user():
     assert b"secret:write" in r.content
     assert b"mcp:dispatch" in r.content
     assert b"mcp:write" in r.content
+    assert b"project:write" in r.content
     assert b"workflow:write" in r.content
     assert b"workflow:trigger" in r.content
     assert b"secret:read" not in r.content

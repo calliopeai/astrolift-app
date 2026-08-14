@@ -35,6 +35,8 @@
   project workflows; configured wrappers remain optional for custom bindings,
   inputs, and triggers.
 - Issue CLI device credentials with narrow workflow write and trigger scopes.
+- Issue CLI device credentials with narrow project write scope for shared
+  resource lifecycle and attachment management.
 - Shard backend tests across four balanced real-Postgres jobs, retain one
   stable aggregate gate, and stop rerunning the dedicated provider suite in
   the backend pass.
