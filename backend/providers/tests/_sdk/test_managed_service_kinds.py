@@ -146,6 +146,16 @@ def test_graph_database_contract_carries_reader_auth_and_resource_identity() -> 
     assert "GRAPH_DB_RESOURCE_ARN" in graph_db.binding_envs_optional
 
 
+def test_warehouse_contract_carries_modern_iam_and_deployment_identity() -> None:
+    warehouse = KINDS.get("warehouse")
+
+    assert warehouse is not None
+    assert "WAREHOUSE_PORT" in warehouse.binding_envs_optional
+    assert "WAREHOUSE_AUTH_MODE" in warehouse.binding_envs_optional
+    assert "WAREHOUSE_DEPLOYMENT" in warehouse.binding_envs_optional
+    assert "WAREHOUSE_RESOURCE_ARN" in warehouse.binding_envs_optional
+
+
 def test_validate_unknown_kind_returns_empty() -> None:
     """Unknown kinds skip validation (operator-defined kinds may
     not yet be in the canonical catalog)."""

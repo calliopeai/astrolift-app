@@ -59,6 +59,8 @@ from aws.managed.postgres_rds import RDSPostgresDriver
 from aws.managed.queue_sqs import SQSDriver
 from aws.managed.rds_proxy import RDSProxyDriver
 from aws.managed.redis_elasticache import ElastiCacheRedisDriver
+from aws.managed.redshift import RedshiftProvisionedDriver
+from aws.managed.redshift_serverless import RedshiftServerlessDriver
 from aws.managed.search_opensearch import OpenSearchSearchDriver
 from aws.managed.timeseries_timestream import TimestreamDriver
 from aws.managed.vector_opensearch import OpenSearchVectorDriver
@@ -106,6 +108,8 @@ PLUGIN = ProviderPlugin(
         ("wide_column", "keyspaces"): KeyspacesDriver,
         ("graph_db", "neptune"): NeptuneProvisionedDriver,
         ("graph_db", "neptune_serverless"): NeptuneServerlessDriver,
+        ("warehouse", "redshift"): RedshiftProvisionedDriver,
+        ("warehouse", "redshift_serverless"): RedshiftServerlessDriver,
         ("redis", "elasticache"): ElastiCacheRedisDriver,
         ("redis", "elasticache_valkey"): ElastiCacheRedisDriver,
         ("redis", "elasticache_serverless_valkey"): ElastiCacheServerlessRedisDriver,

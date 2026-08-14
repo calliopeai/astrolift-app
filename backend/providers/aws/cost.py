@@ -85,6 +85,8 @@ SERVICE_CODE_BY_VARIANT: dict[tuple[str, str], str] = {
     ("wide_column", "keyspaces"): "AmazonMCS",
     ("graph_db", "neptune"): "AmazonNeptune",
     ("graph_db", "neptune_serverless"): "AmazonNeptune",
+    ("warehouse", "redshift"): "AmazonRedshift",
+    ("warehouse", "redshift_serverless"): "AmazonRedshift",
     ("filesystem", "efs"): "AmazonEFS",
     # Cluster compute capacity (#440). Translates a (cpu_cores,
     # memory_gib) request into the cheapest matching EC2 on-demand

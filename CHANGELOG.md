@@ -4,6 +4,9 @@
 
 ### Added
 
+- Add Amazon Redshift provisioned and Serverless warehouses with private
+  networking, IAM-first bindings, managed admin secrets, capacity controls,
+  Data API grants, snapshots, restore, and protected teardown.
 - Add Amazon Neptune provisioned and Serverless graph databases with private
   networking, IAM SigV4 bindings, Gremlin/SPARQL/openCypher endpoints, scaling,
   snapshots, restore, global-cluster inputs, and protected teardown.
