@@ -738,6 +738,30 @@ def managed_config_for(
             max_poll_attempts=int(pc.get("efs_max_poll_attempts", 120)),
         )
 
+    if kind == "filesystem" and variant in {"fsx_lustre", "fsx_openzfs", "fsx_windows"}:
+        from aws.managed._networking import ensure_fsx_networking
+        from aws.managed.filesystem_fsx import FSxConfig
+
+        subnet_ids, security_group_ids = ensure_fsx_networking(
+            cluster,
+            region=region,
+            variant=variant,
+        )
+        suffix = variant.removeprefix("fsx_")
+        return FSxConfig(
+            region=region,
+            account_id=str(pc.get("account_id", "")),
+            subnet_ids=tuple(subnet_ids),
+            security_group_ids=tuple(security_group_ids),
+            kms_key_id=str(
+                pc.get(f"fsx_{suffix}_kms_key_id") or pc.get("fsx_kms_key_id") or pc.get("kms_key_id") or ""
+            ),
+            client_token_prefix=str(pc.get("fsx_client_token_prefix", "astrolift")),
+            deletion_protection_default=bool(pc.get("deletion_protection_default", True)),
+            poll_delay_seconds=float(pc.get("fsx_poll_delay_seconds", 10)),
+            max_poll_attempts=int(pc.get("fsx_max_poll_attempts", 120)),
+        )
+
     if kind in ("search", "vector_index") and variant.startswith("opensearch_serverless"):
         from aws.managed._networking import ensure_opensearch_serverless_networking
         from aws.managed.opensearch_serverless import OpenSearchServerlessConfig

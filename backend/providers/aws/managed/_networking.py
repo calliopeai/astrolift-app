@@ -128,6 +128,55 @@ def ensure_security_group(
     return sg_id
 
 
+def _ensure_security_group_rules(
+    *,
+    vpc_id: str,
+    vpc_cidr: str,
+    rules: list[tuple[str, int, int]],
+    name: str,
+    description: str,
+    ec2,
+) -> str:
+    existing = ec2.describe_security_groups(
+        Filters=[
+            {"Name": "group-name", "Values": [name]},
+            {"Name": "vpc-id", "Values": [vpc_id]},
+        ],
+    ).get("SecurityGroups", [])
+    if existing:
+        group_id = str(existing[0]["GroupId"])
+    else:
+        group_id = str(
+            ec2.create_security_group(
+                GroupName=name,
+                Description=description,
+                VpcId=vpc_id,
+                TagSpecifications=[
+                    {"ResourceType": "security-group", "Tags": _MANAGED_TAGS},
+                ],
+            )["GroupId"],
+        )
+    permissions = [
+        {
+            "IpProtocol": protocol,
+            "FromPort": start,
+            "ToPort": end,
+            "IpRanges": [{"CidrIp": vpc_cidr, "Description": "astrolift clients"}],
+        }
+        for protocol, start, end in rules
+    ]
+    for permission in permissions:
+        try:
+            ec2.authorize_security_group_ingress(
+                GroupId=group_id,
+                IpPermissions=[permission],
+            )
+        except Exception as exc:
+            if "InvalidPermission.Duplicate" not in str(exc):
+                raise
+    return group_id
+
+
 def ensure_rds_subnet_group(*, name: str, subnet_ids: list[str], rds) -> str:
     try:
         rds.create_db_subnet_group(
@@ -764,6 +813,78 @@ def ensure_efs_networking(
                 vpc_cidr=vpc_cidr,
                 port=2049,
                 name=f"astrolift-{cluster.slug}-efs"[:255],
+                ec2=ec2,
+            ),
+        ]
+    return subnet_ids, security_group_ids
+
+
+def ensure_fsx_networking(
+    cluster,
+    *,
+    region: str,
+    variant: str,
+    clients: Any | None = None,
+) -> tuple[list[str], list[str]]:
+    """Resolve private subnets and protocol ingress for an FSx variant."""
+
+    suffix = {
+        "fsx_lustre": "lustre",
+        "fsx_openzfs": "openzfs",
+        "fsx_windows": "windows",
+    }.get(variant)
+    if suffix is None:
+        raise RuntimeError(f"unsupported Amazon FSx variant {variant!r}")
+    pc = cluster.provider_config or {}
+    pinned_subnets = list(pc.get(f"fsx_{suffix}_subnet_ids") or pc.get("fsx_subnet_ids") or [])
+    pinned_groups = list(
+        pc.get(f"fsx_{suffix}_security_group_ids") or pc.get("fsx_security_group_ids") or [],
+    )
+    if pinned_subnets and pinned_groups:
+        return pinned_subnets, pinned_groups
+    if clients is None:
+        import boto3
+
+        ec2 = boto3.client("ec2", region_name=region)
+        eks = boto3.client("eks", region_name=region)
+    else:
+        ec2, eks = clients
+    vpc_id, discovered_subnets, vpc_cidr = discover_vpc(
+        cluster,
+        region=region,
+        ec2=ec2,
+        eks=eks,
+    )
+    subnet_ids = pinned_subnets or discovered_subnets[:3]
+    if not subnet_ids:
+        raise RuntimeError(f"Amazon FSx for {suffix} requires at least one subnet")
+    security_group_ids = pinned_groups
+    if not security_group_ids:
+        rules = {
+            "lustre": [("tcp", 988, 988), ("tcp", 1018, 1023)],
+            "openzfs": [
+                ("tcp", 111, 111),
+                ("udp", 111, 111),
+                ("tcp", 635, 635),
+                ("udp", 635, 635),
+                ("tcp", 2049, 2049),
+                ("udp", 2049, 2049),
+                ("tcp", 4045, 4046),
+                ("udp", 4045, 4046),
+                ("tcp", 4049, 4049),
+                ("udp", 4049, 4049),
+                ("tcp", 20001, 20003),
+                ("udp", 20001, 20003),
+            ],
+            "windows": [("tcp", 445, 445)],
+        }[suffix]
+        security_group_ids = [
+            _ensure_security_group_rules(
+                vpc_id=vpc_id,
+                vpc_cidr=vpc_cidr,
+                rules=rules,
+                name=f"astrolift-{cluster.slug}-fsx-{suffix}"[:255],
+                description=f"astrolift managed FSx for {suffix} client access",
                 ec2=ec2,
             ),
         ]

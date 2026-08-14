@@ -97,6 +97,9 @@ SERVICE_CODE_BY_VARIANT: dict[tuple[str, str], str] = {
     ("warehouse", "redshift"): "AmazonRedshift",
     ("warehouse", "redshift_serverless"): "AmazonRedshift",
     ("filesystem", "efs"): "AmazonEFS",
+    ("filesystem", "fsx_lustre"): "AmazonFSx",
+    ("filesystem", "fsx_openzfs"): "AmazonFSx",
+    ("filesystem", "fsx_windows"): "AmazonFSx",
     # Cluster compute capacity (#440). Translates a (cpu_cores,
     # memory_gib) request into the cheapest matching EC2 on-demand
     # SKU in the cluster's region.

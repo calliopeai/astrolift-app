@@ -595,6 +595,8 @@ def test_every_registered_managed_service_driver_has_a_config_builder():
             "amazon_mq_engine_version": "3.13",
             "efs_subnet_ids": ["subnet-12345678", "subnet-23456789", "subnet-34567890"],
             "efs_security_group_ids": ["sg-12345678"],
+            "fsx_subnet_ids": ["subnet-12345678", "subnet-23456789"],
+            "fsx_security_group_ids": ["sg-12345678"],
         },
     )
     for kind, variant in PLUGIN.managed_service_drivers:
