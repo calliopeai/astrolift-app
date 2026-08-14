@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add Google Cloud Run functions (Cloud Functions v2) lifecycle with Cloud
+  Build source declarations, HTTP and Eventarc triggers, Secret Manager
+  environment/volumes, scaling, private networking, Binary Authorization,
+  CMEK, authenticated IAM bindings, adoption, and guarded teardown.
 - Add Cloud Spanner Graph lifecycle on Enterprise and Enterprise Plus with
   GoogleSQL/GQL property graphs, fixed or autoscaled capacity, atomic custom
   schemas, replay-safe DDL, CMEK, exact backups and restore, portable IAM

@@ -337,6 +337,27 @@ def _gcp_managed_config_for(
         )
 
     pair = (kind, variant)
+    if pair == ("faas", "cloud_functions_gen2") or (kind == "faas" and not variant):
+        from gcp.managed.faas_cloud_functions import CloudFunctionsConfig
+
+        return CloudFunctionsConfig(
+            project_id=project_id,
+            region=str(pc.get("cloud_functions_region") or region),
+            function_name_prefix=str(pc.get("cloud_functions_name_prefix", "astrolift")),
+            api_endpoint=str(
+                pc.get("cloud_functions_api_endpoint", "https://cloudfunctions.googleapis.com/v2"),
+            ),
+            deletion_protection_default=bool(
+                pc.get("cloud_functions_deletion_protection_default", True),
+            ),
+            operation_timeout_seconds=float(
+                pc.get("cloud_functions_operation_timeout_seconds", 1800),
+            ),
+            poll_interval_seconds=float(
+                pc.get("cloud_functions_operation_poll_interval_seconds", 5),
+            ),
+        )
+
     if pair == ("object_store", "gcs") or (kind == "object_store" and not variant):
         from gcp.managed.object_store_gcs import GCSConfig
 
