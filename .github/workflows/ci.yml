@@ -61,20 +61,40 @@ jobs:
                   "paths": "astrolift_lifecycle",
                   "temporal": True,
               },
-              "core-identity-operations": {
+              "core-identity-operations-a": {
                   "paths": "astrolift_operations core astrolift_identity",
+                  "partition": 0,
+                  "partitions": 2,
+                  "temporal": False,
+              },
+              "core-identity-operations-b": {
+                  "paths": "astrolift_operations core astrolift_identity",
+                  "partition": 1,
+                  "partitions": 2,
                   "temporal": False,
               },
               "agent-control-a": {
                   "paths": "astrolift_agents",
                   "partition": 0,
-                  "partitions": 2,
+                  "partitions": 4,
                   "temporal": True,
               },
               "agent-control-b": {
                   "paths": "astrolift_agents",
                   "partition": 1,
-                  "partitions": 2,
+                  "partitions": 4,
+                  "temporal": True,
+              },
+              "agent-control-c": {
+                  "paths": "astrolift_agents",
+                  "partition": 2,
+                  "partitions": 4,
+                  "temporal": True,
+              },
+              "agent-control-d": {
+                  "paths": "astrolift_agents",
+                  "partition": 3,
+                  "partitions": 4,
                   "temporal": True,
               },
               "agent-dispatch": {
@@ -111,15 +131,23 @@ jobs:
           }
           impacts = {
               "astrolift_agents": {
-                  "agent-control-a", "agent-control-b", "agent-dispatch",
+                  "agent-control-a", "agent-control-b", "agent-control-c",
+                  "agent-control-d", "agent-dispatch",
                   "workflow-runtime", "services-platform",
               },
               "astrolift_dispatch": {
-                  "agent-control-a", "agent-control-b", "agent-dispatch",
+                  "agent-control-a", "agent-control-b", "agent-control-c",
+                  "agent-control-d", "agent-dispatch",
                   "workflow-runtime", "services-platform",
               },
               "astrolift_clusters": {"registration-clusters", "app-lifecycle", "services-platform"},
-              "astrolift_identity": {"core-identity-operations", "registration-clusters"},
+              "astrolift_operations": {
+                  "core-identity-operations-a", "core-identity-operations-b",
+              },
+              "astrolift_identity": {
+                  "core-identity-operations-a", "core-identity-operations-b",
+                  "registration-clusters",
+              },
               "astrolift_lifecycle": {"app-lifecycle", "workflow-runtime"},
               "astrolift_registry": {"registration-clusters", "workflow-runtime", "services-platform"},
               "astrolift_services": {"services-platform", "workflow-runtime", "app-lifecycle"},
@@ -347,8 +375,8 @@ jobs:
         # reports the whole set at once, which is what attributing the backlog
         # in #1244 actually needs. The provider tree has its own parallel job;
         # repeating its 2,299 tests here added several minutes without adding
-        # coverage. The two agent-control rows split test files deterministically
-        # because that suite was the remaining nine-minute critical path. Each
+        # coverage. The agent-control and core/identity rows split test files
+        # deterministically because they were the remaining critical path. Each
         # shard still applies the real migration graph: a few models are defined
         # outside conventional models modules, so pytest-django's --nomigrations
         # model discovery cannot reproduce the production schema. `--durations`
