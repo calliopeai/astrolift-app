@@ -102,6 +102,7 @@ export interface AstroliftNavTreeWorkflow {
   name: string;
   isEnabled: boolean;
   agents: AstroliftAppSummary[];
+  childWorkflowIds: string[];
 }
 
 export interface AstroliftNavTreeTeamNode {
@@ -252,11 +253,7 @@ export interface AstroliftBulkAssignTeamMemberRolesPayload {
 
 // ---- #487 step-up auth ------------------------------------------------
 
-export type AstroliftElevationMethod =
-  | "password"
-  | "otp"
-  | "webauthn"
-  | "magic_link";
+export type AstroliftElevationMethod = "password" | "otp" | "webauthn" | "magic_link";
 
 export interface ElevateAdminSessionInput {
   method: AstroliftElevationMethod;

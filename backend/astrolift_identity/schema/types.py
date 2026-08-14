@@ -538,6 +538,7 @@ class NavTreeWorkflowType:
     name: str
     is_enabled: bool
     agents: list[AppSummaryType]
+    child_workflow_ids: list[GUID]
 
 
 @strawberry.type(name="AstroliftNavTreeTeam")

@@ -574,16 +574,23 @@ class IdentityQuery:
             .order_by("name")
         )
 
-        from workflows.models import WorkflowDefinition
+        from workflows.composition import resolve_child_definition_from_candidates
+        from workflows.models import WorkflowDefinition, WorkflowStage
 
+        project_ids = [project.id for project in projects]
         workflow_definitions = list(
             WorkflowDefinition.objects.filter(
-                organization_id=org_id,
-                project_id__isnull=False,
+                Q(organization_id=org_id) | Q(organization__isnull=True),
+                Q(project_id__in=project_ids) | Q(project__isnull=True),
             )
             .prefetch_related("stages__agent_definition")
             .order_by("name")
         )
+        project_workflow_definitions = [
+            definition
+            for definition in workflow_definitions
+            if definition.organization_id == org_id and definition.project_id is not None
+        ]
 
         # Classify each app into a nav primitive from its workloads (one query),
         # so the sidebar picks the right icon + route: agent wins → single-kind
@@ -627,34 +634,81 @@ class IdentityQuery:
             if summary.primitive_kind == "agent"
         }
 
+        definitions_by_slug: dict[str, list[WorkflowDefinition]] = {}
+        for definition in workflow_definitions:
+            if definition.slug:
+                definitions_by_slug.setdefault(definition.slug, []).append(definition)
+
+        def _resolve_loaded_child(
+            parent: WorkflowDefinition,
+            workflow_ref: str,
+        ) -> WorkflowDefinition | None:
+            return resolve_child_definition_from_candidates(
+                parent,
+                workflow_ref,
+                definitions_by_slug.get((workflow_ref or "").strip(), []),
+            )
+
+        workflow_definitions_by_project: dict[int, list[WorkflowDefinition]] = {}
+        for definition in project_workflow_definitions:
+            workflow_definitions_by_project.setdefault(definition.project_id, []).append(definition)
+
         workflow_nodes_by_project: dict[int, list[NavTreeWorkflowType]] = {}
         bound_agent_slugs_by_project: dict[int, set[str]] = {}
-        for definition in workflow_definitions:
-            agents: list[AppSummaryType] = []
-            seen_agent_slugs: set[str] = set()
-            for stage in definition.stages.all():
-                if stage.deleted_at is not None:
-                    continue
-                agent_slug = (
-                    stage.agent_definition.slug if stage.agent_definition_id is not None else stage.agent_ref
+        for project_id, root_definitions in workflow_definitions_by_project.items():
+            included: dict[int, WorkflowDefinition] = {
+                definition.id: definition for definition in root_definitions
+            }
+            pending = list(root_definitions)
+            while pending:
+                definition = pending.pop()
+                for stage in sorted(definition.stages.all(), key=lambda item: item.order):
+                    if stage.deleted_at is not None or stage.kind != WorkflowStage.StageKind.WORKFLOW:
+                        continue
+                    child = _resolve_loaded_child(definition, stage.workflow_ref)
+                    if child is not None and child.id not in included:
+                        included[child.id] = child
+                        pending.append(child)
+
+            nodes: list[NavTreeWorkflowType] = []
+            for definition in sorted(included.values(), key=lambda item: item.name):
+                agents: list[AppSummaryType] = []
+                child_workflow_ids: list[GUID] = []
+                seen_agent_slugs: set[str] = set()
+                seen_child_ids: set[int] = set()
+                for stage in sorted(definition.stages.all(), key=lambda item: item.order):
+                    if stage.deleted_at is not None:
+                        continue
+                    if stage.kind == WorkflowStage.StageKind.WORKFLOW:
+                        child = _resolve_loaded_child(definition, stage.workflow_ref)
+                        if child is not None and child.id in included and child.id not in seen_child_ids:
+                            child_workflow_ids.append(GUID(str(child.guid)))
+                            seen_child_ids.add(child.id)
+                        continue
+                    agent_slug = (
+                        stage.agent_definition.slug
+                        if stage.agent_definition_id is not None
+                        else stage.agent_ref
+                    )
+                    if not agent_slug or agent_slug in seen_agent_slugs:
+                        continue
+                    summary = agent_summaries_by_slug.get(agent_slug)
+                    if summary is None:
+                        continue
+                    seen_agent_slugs.add(agent_slug)
+                    agents.append(summary)
+                bound_agent_slugs_by_project.setdefault(project_id, set()).update(seen_agent_slugs)
+                nodes.append(
+                    NavTreeWorkflowType(
+                        id=GUID(str(definition.guid)),
+                        slug=definition.slug or "",
+                        name=definition.name,
+                        is_enabled=definition.is_enabled,
+                        agents=agents,
+                        child_workflow_ids=child_workflow_ids,
+                    )
                 )
-                if not agent_slug or agent_slug in seen_agent_slugs:
-                    continue
-                summary = agent_summaries_by_slug.get(agent_slug)
-                if summary is None:
-                    continue
-                seen_agent_slugs.add(agent_slug)
-                agents.append(summary)
-            bound_agent_slugs_by_project.setdefault(definition.project_id, set()).update(seen_agent_slugs)
-            workflow_nodes_by_project.setdefault(definition.project_id, []).append(
-                NavTreeWorkflowType(
-                    id=GUID(str(definition.guid)),
-                    slug=definition.slug or "",
-                    name=definition.name,
-                    is_enabled=definition.is_enabled,
-                    agents=agents,
-                )
-            )
+            workflow_nodes_by_project[project_id] = nodes
 
         projects_by_team: dict[int, list] = {}
         for project in projects:

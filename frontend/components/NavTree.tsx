@@ -106,6 +106,54 @@ function nodeKey(kind: "org" | "team" | "project" | "workflow", id: string) {
   return `${kind}:${id}`;
 }
 
+interface WorkflowGraph {
+  byId: Map<string, AstroliftNavTreeWorkflow>;
+  roots: AstroliftNavTreeWorkflow[];
+}
+
+function buildWorkflowGraph(workflows: AstroliftNavTreeWorkflow[]): WorkflowGraph {
+  const byId = new Map(workflows.map((workflow) => [workflow.id, workflow]));
+  const referenced = new Set(
+    workflows.flatMap((workflow) =>
+      workflow.childWorkflowIds.filter((childId) => byId.has(childId))
+    )
+  );
+  const roots = workflows.filter((workflow) => !referenced.has(workflow.id));
+  return { byId, roots: roots.length > 0 ? roots : workflows };
+}
+
+function findWorkflowTrail(
+  workflows: AstroliftNavTreeWorkflow[],
+  activeWorkflowSlug: string | null,
+  activeAgentSlug: string | null
+): string[] | null {
+  const graph = buildWorkflowGraph(workflows);
+
+  const visit = (workflow: AstroliftNavTreeWorkflow, ancestry: Set<string>): string[] | null => {
+    if (ancestry.has(workflow.id)) return null;
+    const nextAncestry = new Set(ancestry).add(workflow.id);
+    if (
+      workflow.slug === activeWorkflowSlug ||
+      workflow.agents.some((agent) => agent.primitiveSlug === activeAgentSlug)
+    ) {
+      return [workflow.id];
+    }
+    for (const childId of workflow.childWorkflowIds) {
+      const child = graph.byId.get(childId);
+      if (!child) continue;
+      const childTrail = visit(child, nextAncestry);
+      if (childTrail) return [workflow.id, ...childTrail];
+    }
+    return null;
+  };
+
+  for (const root of graph.roots) {
+    const trail = visit(root, new Set());
+    if (trail) return trail;
+  }
+  return null;
+}
+
 interface NavTreeSkeletonProps {
   rows?: number;
 }
@@ -217,25 +265,23 @@ export function NavTree() {
       ensure(nodeKey("org", tree.organization.id));
       for (const teamNode of tree.teams) {
         for (const projectNode of teamNode.projects) {
+          const workflowTrail = findWorkflowTrail(
+            projectNode.workflows,
+            activeWorkflowSlug,
+            activeAgentSlug
+          );
           const hit =
             projectNode.project.slug === activeProjectSlug ||
             projectNode.apps.some((a) => a.slug === activeAppSlug) ||
             projectNode.standaloneAgents.some((a) => a.primitiveSlug === activeAgentSlug) ||
-            projectNode.workflows.some(
-              (workflow) =>
-                workflow.slug === activeWorkflowSlug ||
-                workflow.agents.some((agent) => agent.primitiveSlug === activeAgentSlug)
-            );
+            workflowTrail !== null;
           if (hit) {
             ensure(nodeKey("team", teamNode.team.id));
             ensure(nodeKey("project", projectNode.project.id));
-            for (const workflow of projectNode.workflows) {
-              if (
-                workflow.slug === activeWorkflowSlug ||
-                workflow.agents.some((agent) => agent.primitiveSlug === activeAgentSlug)
-              ) {
-                ensure(nodeKey("workflow", workflow.id));
-              }
+            const workflowPath: string[] = [];
+            for (const workflowId of workflowTrail ?? []) {
+              workflowPath.push(workflowId);
+              ensure(nodeKey("workflow", workflowPath.join(":")));
             }
           }
         }
@@ -523,7 +569,11 @@ function ProjectNode({
   const key = nodeKey("project", node.project.id);
   const isOpen = open[key] ?? true;
   const visibleApps = canViewApps ? node.apps : [];
-  const visibleWorkflows = canViewWorkflows ? node.workflows : [];
+  const workflowGraph = React.useMemo(
+    () => buildWorkflowGraph(canViewWorkflows ? node.workflows : []),
+    [canViewWorkflows, node.workflows]
+  );
+  const visibleWorkflows = workflowGraph.roots;
   const visibleStandaloneAgents = canViewAgents ? node.standaloneAgents : [];
 
   return (
@@ -570,8 +620,11 @@ function ProjectNode({
                         activeAgentSlug={activeAgentSlug}
                         activeWorkflowSlug={activeWorkflowSlug}
                         showAgents={canViewAgents}
+                        workflowGraph={workflowGraph}
                         open={open}
                         toggle={toggle}
+                        ancestry={new Set()}
+                        path={[]}
                       />
                     ))}
                   </>
@@ -640,18 +693,33 @@ function WorkflowNode({
   activeAgentSlug,
   activeWorkflowSlug,
   showAgents,
+  workflowGraph,
   open,
   toggle,
+  ancestry,
+  path,
 }: {
   workflow: AstroliftNavTreeWorkflow;
   activeAgentSlug: string | null;
   activeWorkflowSlug: string | null;
   showAgents: boolean;
+  workflowGraph: WorkflowGraph;
   open: Record<string, boolean>;
   toggle: (key: string, defaultOpen: boolean) => void;
+  ancestry: Set<string>;
+  path: string[];
 }) {
-  const key = nodeKey("workflow", workflow.id);
+  const nextPath = [...path, workflow.id];
+  const key = nodeKey("workflow", nextPath.join(":"));
   const isOpen = open[key] ?? true;
+  const nextAncestry = new Set(ancestry).add(workflow.id);
+  const childWorkflows = workflow.childWorkflowIds
+    .map((childId) => workflowGraph.byId.get(childId))
+    .filter(
+      (child): child is AstroliftNavTreeWorkflow =>
+        child !== undefined && !nextAncestry.has(child.id)
+    );
+  const hasChildren = childWorkflows.length > 0 || (showAgents && workflow.agents.length > 0);
   return (
     <Collapsible open={isOpen} onOpenChange={() => toggle(key, true)} asChild>
       <SidebarMenuSubItem>
@@ -669,10 +737,10 @@ function WorkflowNode({
               />
               <span className="truncate">{workflow.name}</span>
             </Link>
-            {showAgents && workflow.agents.length > 0 && (
+            {hasChildren && (
               <CollapsibleTrigger
                 className="hover:bg-sidebar-accent ml-auto flex size-5 shrink-0 items-center justify-center rounded-sm"
-                aria-label={`Toggle ${workflow.name} agents`}
+                aria-label={`Toggle ${workflow.name}`}
               >
                 <ChevronRightIcon
                   className={cn("size-3 transition-transform", isOpen && "rotate-90")}
@@ -681,16 +749,31 @@ function WorkflowNode({
             )}
           </div>
         </SidebarMenuSubButton>
-        {showAgents && workflow.agents.length > 0 && (
+        {hasChildren && (
           <CollapsibleContent>
             <SidebarMenuSub className="mr-0 ml-3 px-1">
-              {workflow.agents.map((agent) => (
-                <AppLeaf
-                  key={`${workflow.id}:${agent.id}`}
-                  app={agent}
-                  active={activeAgentSlug === agent.primitiveSlug}
+              {childWorkflows.map((child) => (
+                <WorkflowNode
+                  key={`${workflow.id}:${child.id}`}
+                  workflow={child}
+                  activeAgentSlug={activeAgentSlug}
+                  activeWorkflowSlug={activeWorkflowSlug}
+                  showAgents={showAgents}
+                  workflowGraph={workflowGraph}
+                  open={open}
+                  toggle={toggle}
+                  ancestry={nextAncestry}
+                  path={nextPath}
                 />
               ))}
+              {showAgents &&
+                workflow.agents.map((agent) => (
+                  <AppLeaf
+                    key={`${workflow.id}:${agent.id}`}
+                    app={agent}
+                    active={activeAgentSlug === agent.primitiveSlug}
+                  />
+                ))}
             </SidebarMenuSub>
           </CollapsibleContent>
         )}
