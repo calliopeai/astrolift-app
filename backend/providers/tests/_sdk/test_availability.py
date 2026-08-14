@@ -111,6 +111,16 @@ def test_has_managed_lookup() -> None:
         kind="event_bus",
         variant="eventbridge",
     )
+    assert MATRIX.has_managed(
+        plugin_id="aws",
+        kind="stream",
+        variant="kinesis",
+    )
+    assert MATRIX.has_managed(
+        plugin_id="aws",
+        kind="stream",
+        variant="firehose",
+    )
 
 
 def test_status_field_defaults_to_ga() -> None:

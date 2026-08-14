@@ -633,6 +633,38 @@ def managed_config_for(
             ),
         )
 
+    if kind == "stream" and variant == "kinesis":
+        from aws.managed.stream_kinesis import KinesisConfig
+
+        return KinesisConfig(
+            region=region,
+            account_id=str(pc.get("account_id", "")),
+            stream_name_prefix=str(pc.get("kinesis_stream_name_prefix", "astrolift")),
+            kms_key_id=str(pc.get("kinesis_kms_key_id") or pc.get("kms_key_id") or ""),
+            stream_mode_default=str(pc.get("kinesis_stream_mode_default", "ON_DEMAND")),
+            retention_hours_default=int(pc.get("kinesis_retention_hours_default", 24)),
+            deletion_protection_default=bool(
+                pc.get("deletion_protection_default", True),
+            ),
+        )
+
+    if kind == "stream" and variant == "firehose":
+        from aws.managed.stream_firehose import FirehoseConfig
+
+        return FirehoseConfig(
+            region=region,
+            account_id=str(pc.get("account_id", "")),
+            delivery_stream_name_prefix=str(
+                pc.get("firehose_delivery_stream_name_prefix", "astrolift"),
+            ),
+            kms_key_id=str(pc.get("firehose_kms_key_id") or pc.get("kms_key_id") or ""),
+            deletion_protection_default=bool(
+                pc.get("deletion_protection_default", True),
+            ),
+            poll_delay_seconds=float(pc.get("firehose_poll_delay_seconds", 5)),
+            max_poll_attempts=int(pc.get("firehose_max_poll_attempts", 60)),
+        )
+
     if kind in ("search", "vector_index") and variant.startswith("opensearch_serverless"):
         from aws.managed._networking import ensure_opensearch_serverless_networking
         from aws.managed.opensearch_serverless import OpenSearchServerlessConfig
