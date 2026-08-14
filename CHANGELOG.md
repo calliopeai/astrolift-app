@@ -50,6 +50,8 @@
 
 ### Fixed
 
+- Render nested workflow definitions beneath their composed parent execution
+  path instead of presenting parent and child pipelines as unrelated peers.
 - Repair project affiliation for repository workflow definitions whose multiple
   stage agents belong to the same project.
 - Stamp workflow-dispatched agent tasks with their project and team, attach

@@ -29,6 +29,8 @@ export interface PipelineDagStage extends Record<string, unknown> {
   finishedAt?: string | null;
   /** Optional click target. */
   href?: string;
+  /** Optional topology role used to distinguish container nodes from steps. */
+  topologyKind?: "workflow" | "subflow";
 }
 
 // Collapse the many backend status spellings onto the #A1 status tokens.
@@ -76,6 +78,12 @@ function formatDuration(startedAt?: string | null, finishedAt?: string | null): 
 function StageNode({ data }: NodeProps<Node<PipelineDagStage>>) {
   const tone = toneFor(data.status);
   const duration = formatDuration(data.startedAt, data.finishedAt);
+  const topologyLabel =
+    data.topologyKind === "workflow"
+      ? "Workflow"
+      : data.topologyKind === "subflow"
+        ? "Nested workflow"
+        : null;
 
   const body = (
     <>
@@ -89,6 +97,11 @@ function StageNode({ data }: NodeProps<Node<PipelineDagStage>>) {
         position={Position.Right}
         className="!border-background !bg-muted-foreground/50 !-right-1.5 !size-2.5 !border-2"
       />
+      {topologyLabel && (
+        <div className="text-primary text-2xs mb-1 font-medium tracking-wide uppercase">
+          {topologyLabel}
+        </div>
+      )}
       <div className="flex min-w-0 items-center gap-1.5">
         <span className={cn("viz-node-dot size-1.5 shrink-0 rounded-full", TONE_DOT[tone])} />
         <div className="min-w-0 truncate text-sm leading-tight font-medium">{data.name}</div>
@@ -100,7 +113,8 @@ function StageNode({ data }: NodeProps<Node<PipelineDagStage>>) {
     </>
   );
   const className = cn(
-    "viz-node relative flex h-16 w-56 flex-col justify-center overflow-visible rounded-md border bg-background px-3 py-2 ring-1 shadow-sm",
+    "viz-node relative flex min-h-16 w-56 flex-col justify-center overflow-visible rounded-md border bg-background px-3 py-2 ring-1 shadow-sm",
+    topologyLabel && "h-20",
     data.href &&
       "cursor-pointer hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
     TONE_RING[tone]

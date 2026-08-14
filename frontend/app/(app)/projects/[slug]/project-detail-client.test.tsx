@@ -339,7 +339,15 @@ describe("ProjectDetailClient workload-aware overview", () => {
     expect(screen.getByText("Standalone")).toBeInTheDocument();
     expect(screen.getAllByText("emr-triage").length).toBeGreaterThan(0);
     const workflowNode = screen.getByTitle("Open EMR triage — code research and review");
-    expect(workflowNode).toHaveClass("relative", "flex", "h-16", "w-56", "overflow-visible");
+    expect(workflowNode).toHaveClass(
+      "relative",
+      "flex",
+      "min-h-16",
+      "h-20",
+      "w-56",
+      "overflow-visible"
+    );
+    expect(within(workflowNode).getByText("Workflow")).toBeInTheDocument();
     expect(within(workflowNode).getByText("EMR triage — code research and review")).toHaveClass(
       "min-w-0",
       "truncate"
