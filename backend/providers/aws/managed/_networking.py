@@ -727,6 +727,49 @@ def ensure_mq_networking(
     return subnet_ids, security_group_ids
 
 
+def ensure_efs_networking(
+    cluster,
+    *,
+    region: str,
+    clients: Any | None = None,
+) -> tuple[list[str], list[str]]:
+    """Resolve private multi-AZ subnets and NFS ingress for Amazon EFS."""
+
+    pc = cluster.provider_config or {}
+    pinned_subnets = list(pc.get("efs_subnet_ids") or [])
+    pinned_groups = list(pc.get("efs_security_group_ids") or [])
+    if pinned_subnets and pinned_groups:
+        return pinned_subnets, pinned_groups
+    if clients is None:
+        import boto3
+
+        ec2 = boto3.client("ec2", region_name=region)
+        eks = boto3.client("eks", region_name=region)
+    else:
+        ec2, eks = clients
+    vpc_id, discovered_subnets, vpc_cidr = discover_vpc(
+        cluster,
+        region=region,
+        ec2=ec2,
+        eks=eks,
+    )
+    subnet_ids = pinned_subnets or discovered_subnets[:3]
+    if not subnet_ids:
+        raise RuntimeError("Amazon EFS requires at least one subnet")
+    security_group_ids = pinned_groups
+    if not security_group_ids:
+        security_group_ids = [
+            ensure_security_group(
+                vpc_id=vpc_id,
+                vpc_cidr=vpc_cidr,
+                port=2049,
+                name=f"astrolift-{cluster.slug}-efs"[:255],
+                ec2=ec2,
+            ),
+        ]
+    return subnet_ids, security_group_ids
+
+
 def ensure_keyspaces_networking(
     cluster,
     *,

@@ -16,6 +16,7 @@ def test_every_data_variant_has_policy() -> None:
     expected_keys = {
         ("aws", "object_store", "s3"),
         ("aws", "queue", "sqs"),
+        ("aws", "filesystem", "efs"),
         ("gcp", "object_store", "gcs"),
         ("gcp", "queue", "pubsub"),
         ("azure", "object_store", "blob"),

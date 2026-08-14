@@ -718,6 +718,26 @@ def managed_config_for(
             max_poll_attempts=int(pc.get("amazon_mq_max_poll_attempts", 90)),
         )
 
+    if kind == "filesystem" and variant == "efs":
+        from aws.managed._networking import ensure_efs_networking
+        from aws.managed.filesystem_efs import EFSConfig
+
+        subnet_ids, security_group_ids = ensure_efs_networking(
+            cluster,
+            region=region,
+        )
+        return EFSConfig(
+            region=region,
+            account_id=str(pc.get("account_id", "")),
+            subnet_ids=tuple(subnet_ids),
+            security_group_ids=tuple(security_group_ids),
+            kms_key_id=str(pc.get("efs_kms_key_id") or pc.get("kms_key_id") or ""),
+            creation_token_prefix=str(pc.get("efs_creation_token_prefix", "astrolift")),
+            deletion_protection_default=bool(pc.get("deletion_protection_default", True)),
+            poll_delay_seconds=float(pc.get("efs_poll_delay_seconds", 5)),
+            max_poll_attempts=int(pc.get("efs_max_poll_attempts", 120)),
+        )
+
     if kind in ("search", "vector_index") and variant.startswith("opensearch_serverless"):
         from aws.managed._networking import ensure_opensearch_serverless_networking
         from aws.managed.opensearch_serverless import OpenSearchServerlessConfig
