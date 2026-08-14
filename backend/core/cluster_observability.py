@@ -705,9 +705,7 @@ def managed_config_for(
             security_group_ids=tuple(security_group_ids),
             kms_key_id=str(pc.get("amazon_mq_kms_key_id") or pc.get("kms_key_id") or ""),
             engine_version_default=str(
-                pc.get(f"amazon_mq_{engine_key}_engine_version")
-                or pc.get("amazon_mq_engine_version")
-                or ""
+                pc.get(f"amazon_mq_{engine_key}_engine_version") or pc.get("amazon_mq_engine_version") or ""
             ),
             secrets_manager_prefix=str(
                 pc.get("amazon_mq_secrets_manager_prefix", "astrolift/mq"),
