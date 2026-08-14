@@ -4,6 +4,11 @@
 
 ### Added
 
+- Add Azure Managed Redis lifecycle for Balanced, Memory Optimized,
+  Compute Optimized, and Flash Optimized tiers with TLS-only bindings,
+  Key Vault-backed access keys, persistence/modules, CMK rotation,
+  geo-replication links, additive Entra access assignments, scaling, status,
+  and fail-closed private-networking and data-preserving teardown semantics.
 - Add Cloud Spanner Graph lifecycle on Enterprise and Enterprise Plus with
   GoogleSQL/GQL property graphs, fixed or autoscaled capacity, atomic custom
   schemas, replay-safe DDL, CMEK, exact backups and restore, portable IAM

@@ -813,6 +813,32 @@ def _azure_managed_config_for(
             ),
         )
 
+    if pair == ("redis", "azure_managed_redis"):
+        from azure.managed.managed_redis import AzureManagedRedisConfig
+
+        return AzureManagedRedisConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            location=location,
+            cluster_name_prefix=str(pc.get("managed_redis_cluster_name_prefix", "astrolift-amr")),
+            database_name=str(pc.get("managed_redis_database_name", "default")),
+            default_sku=str(pc.get("managed_redis_default_sku", "Balanced_B3")),
+            high_availability_default=str(
+                pc.get("managed_redis_high_availability_default", "Enabled"),
+            ),
+            public_network_access_default=str(
+                pc.get("managed_redis_public_network_access_default", "Enabled"),
+            ),
+            clustering_policy_default=str(
+                pc.get("managed_redis_clustering_policy_default", "OSSCluster"),
+            ),
+            eviction_policy_default=str(
+                pc.get("managed_redis_eviction_policy_default", "AllKeysLRU"),
+            ),
+            keyvault_url=vault_url,
+            secret_name_prefix=str(pc.get("managed_redis_secret_name_prefix", "astrolift-amr")),
+        )
+
     if pair == ("kv_store", "cosmos") or (kind == "kv_store" and not variant):
         from azure.managed.cosmos import AzureCosmosConfig
 
