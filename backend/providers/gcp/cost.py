@@ -50,6 +50,7 @@ GCP_BINDING_LABEL_KEY = "astrolift_io_binding"
 SERVICE_ID_BY_VARIANT: dict[tuple[str, str], str] = {
     ("object_store", "gcs"): "95FF-2EF5-5EA1",  # Cloud Storage
     ("queue", "pubsub"): "A1E8-BE35-7EBC",  # Pub/Sub
+    ("topic", "pubsub_topic"): "A1E8-BE35-7EBC",  # Pub/Sub
     ("postgres", "cloudsql"): "9662-B51E-5089",  # Cloud SQL
     ("postgres", "alloydb"): "70A4-7A89-3F8F",  # AlloyDB
     ("redis", "memorystore"): "F25A-3A0D-5DDB",  # Memorystore

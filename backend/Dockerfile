@@ -64,10 +64,12 @@ COPY . .
 # site-packages metadata and the loader can find them via
 # importlib.metadata.entry_points(). Extras pulled:
 # - aws  -> boto3 (already pinned in Pipfile) + kubernetes + PyYAML
+# - gcp  -> GKE, Secret Manager, Cloud DNS, Pub/Sub + kubernetes + PyYAML
 # - k8s  -> kubernetes + PyYAML
-# gcp/azure are intentionally omitted to keep the image small; add them as
-# additional `[gcp,azure]` extras when those clouds are wanted.
-RUN pip install --no-cache-dir ./providers[aws,k8s]
+# Azure remains an environment-specific extra until the Azure controller is
+# promoted to the same runtime support tier. GCP is installed in the standard
+# control-plane image because its managed-service catalogue is executable.
+RUN pip install --no-cache-dir ./providers[aws,gcp,k8s]
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1

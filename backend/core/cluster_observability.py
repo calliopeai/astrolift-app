@@ -359,6 +359,14 @@ def _gcp_managed_config_for(
             topic_prefix=str(pc.get("pubsub_topic_prefix", "astrolift")),
         )
 
+    if pair == ("topic", "pubsub_topic") or (kind == "topic" and not variant):
+        from gcp.managed.topic_pubsub import PubSubTopicConfig
+
+        return PubSubTopicConfig(
+            project_id=project_id,
+            topic_prefix=str(pc.get("pubsub_topic_prefix", "astrolift")),
+        )
+
     if pair == ("postgres", "cloudsql") or (kind == "postgres" and not variant):
         from gcp.managed.postgres_cloudsql import CloudSQLConfig
 

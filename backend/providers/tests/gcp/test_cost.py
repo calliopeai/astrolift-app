@@ -74,6 +74,7 @@ def estimator(fake_billing: FakeBillingClient) -> GCPCostEstimator:
 def test_supported_known_variants(estimator: GCPCostEstimator) -> None:
     assert estimator.supported(kind="object_store", variant="gcs")
     assert estimator.supported(kind="queue", variant="pubsub")
+    assert estimator.supported(kind="topic", variant="pubsub_topic")
     assert estimator.supported(kind="postgres", variant="alloydb")
 
 
@@ -251,6 +252,7 @@ def test_provenance_url(
 def test_service_id_table_covers_core_kinds() -> None:
     assert ("object_store", "gcs") in SERVICE_ID_BY_VARIANT
     assert ("queue", "pubsub") in SERVICE_ID_BY_VARIANT
+    assert ("topic", "pubsub_topic") in SERVICE_ID_BY_VARIANT
     assert ("postgres", "cloudsql") in SERVICE_ID_BY_VARIANT
 
 
