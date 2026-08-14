@@ -18,8 +18,9 @@ annotated ServiceAccount + sets ``serviceAccountName`` on the pods, using the
 same name (``workload_identity_role_name``) and account/role-path config, so
 the SA annotation points at exactly the role this activity creates.
 
-Password-authed services (postgres/redis) declare no ``iam_grants``, so an app
-with only those produces no permissions and the activity is a no-op for it.
+Password-authed services (postgres/redis) declare no ``iam_grants``. Apps with
+only those still receive an empty cloud identity because deploy rendering is
+deterministic and cannot depend on an activity's transient return value.
 """
 
 from __future__ import annotations
@@ -32,15 +33,19 @@ from temporalio import activity
 log = logging.getLogger("astrolift_workflows.activities.workload_identity")
 
 
-def _permissions_from_bindings(bindings: list[Any]) -> list[dict[str, Any]]:
-    """Flatten every binding's ``iam_grants`` into IAM policy statements.
+def _permissions_from_bindings(
+    bindings: list[Any],
+    *,
+    plugin_slug: str = "aws",
+) -> list[dict[str, Any]]:
+    """Translate portable binding grants into the provider identity shape.
 
-    One ``{"Effect": "Allow", "Action": [...], "Resource": ...}`` per grant.
-    Grants with no actions or no resource are dropped (defensive — a driver
-    shouldn't emit those). Pure so the aggregation is unit-testable without a
-    DB or a live driver.
+    AWS consumes policy statements. GCP consumes predefined/custom IAM roles;
+    accepting a raw GCP permission here would make provisioning appear to work
+    while granting nothing, so that path fails closed.
     """
     permissions: list[dict[str, Any]] = []
+    gcp_roles: set[str] = set()
     for binding in bindings:
         if binding is None:
             continue
@@ -48,6 +53,20 @@ def _permissions_from_bindings(bindings: list[Any]) -> list[dict[str, Any]]:
             actions = list(getattr(grant, "actions", None) or [])
             resource = getattr(grant, "resource", None)
             if not actions or not resource:
+                continue
+            if plugin_slug == "gcp":
+                for action in actions:
+                    if not (
+                        action.startswith("roles/")
+                        or (action.startswith(("projects/", "organizations/")) and "/roles/" in action)
+                    ):
+                        raise ValueError(
+                            "GCP managed-service grants must declare IAM roles, "
+                            f"not raw permissions; received {action!r} for {resource!r}",
+                        )
+                    if action not in gcp_roles:
+                        permissions.append({"role": action})
+                        gcp_roles.add(action)
                 continue
             permissions.append(
                 {
@@ -90,8 +109,11 @@ def _ensure_workload_identity_sync(
     registered_app_id: int,
     app_environment_id: int,
 ) -> dict[str, Any]:
+    from astrolift_lifecycle.models import AppEnvironment
     from astrolift_registry.models import RegisteredApp
-    from astrolift_services.models import ManagedService
+    from astrolift_workflows.activities.app_lifecycle import (
+        _managed_services_for_environment,
+    )
     from astrolift_workflows.activities.capability_deprovision import (
         _resolve_capability_driver,
     )
@@ -104,33 +126,29 @@ def _ensure_workload_identity_sync(
         pk=registered_app_id,
     )
 
+    environment = AppEnvironment.all_objects.select_related(
+        "registered_app",
+        "tenant_cluster__provider_plugin",
+    ).get(
+        pk=app_environment_id,
+        registered_app_id=registered_app_id,
+        deleted_at__isnull=True,
+    )
     services = list(
-        ManagedService.objects.filter(
-            registered_app_id=registered_app_id,
-            app_environment_id=app_environment_id,
-            deleted_at__isnull=True,
-        ).select_related(
+        _managed_services_for_environment(environment).select_related(
             "app_environment__tenant_cluster__provider_plugin",
+            "tenant_cluster__provider_plugin",
         ),
     )
 
-    # One {Effect, Action, Resource} statement per grant across all services.
-    permissions = _permissions_from_bindings(
-        [_managed_binding_for(svc) for svc in services],
-    )
-
-    if not permissions:
-        # No IAM-authed services (or only password-authed ones) — nothing to
-        # bind. The bindings Secret env path already covers postgres/redis.
+    if not services:
         return {
             "skipped": True,
-            "reason": "no IAM-authed managed services",
+            "reason": "no managed services",
             "registered_app_id": registered_app_id,
         }
 
-    # The pod runs on the env's tenant cluster, so the OIDC trust must be
-    # against that cluster's issuer. All filtered services share the env.
-    cluster = services[0].app_environment.tenant_cluster
+    cluster = environment.tenant_cluster
     if cluster is None:
         return {
             "skipped": True,
@@ -138,6 +156,11 @@ def _ensure_workload_identity_sync(
             "registered_app_id": registered_app_id,
         }
 
+    plugin_slug = getattr(getattr(cluster, "provider_plugin", None), "slug", "")
+    permissions = _permissions_from_bindings(
+        [_managed_binding_for(svc) for svc in services],
+        plugin_slug=plugin_slug,
+    )
     # Self-sufficient: the IRSA trust policy needs the cluster's OIDC issuer.
     # Discover it from EKS + cache on the cluster row when absent, so the
     # trust isn't malformed by an empty issuer (which yields a broken

@@ -467,9 +467,10 @@ def test_binding_iam_grants_cover_workspace(
 ) -> None:
     provisioned = driver.provision(_spec())
     binding = driver.binding(ServiceHandle(handle=provisioned.handle))
-    actions = {a for g in binding.iam_grants for a in g.actions}
-    assert "monitoring.timeSeries.create" in actions
-    assert "monitoring.timeSeries.list" in actions
+    assert [grant.actions for grant in binding.iam_grants] == [
+        ["roles/monitoring.metricWriter"],
+        ["roles/monitoring.viewer"],
+    ]
 
 
 def test_binding_for_missing_raises(

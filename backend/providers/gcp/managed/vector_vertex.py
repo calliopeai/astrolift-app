@@ -512,18 +512,8 @@ class VertexMatchingEngineDriver(ManagedServiceDriver):
             },
             iam_grants=[
                 Grant(
-                    resource=self._endpoint_name(base_name),
-                    actions=[
-                        "aiplatform.indexEndpoints.queryVectors",
-                        "aiplatform.indexEndpoints.get",
-                    ],
-                ),
-                Grant(
-                    resource=self._index_name(base_name),
-                    actions=[
-                        "aiplatform.indexes.get",
-                        "aiplatform.indexes.update",
-                    ],
+                    resource=f"projects/{self._config.project_id}",
+                    actions=["roles/aiplatform.user"],
                 ),
             ],
             notes=(

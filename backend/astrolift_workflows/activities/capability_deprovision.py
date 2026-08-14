@@ -288,8 +288,6 @@ def _identity_role_name_for(app) -> str:
 def _deprovision_identity_role_sync(*, registered_app_id: int) -> dict[str, Any]:
     """Delete the cloud IAM/identity role bound to the app's
     ServiceAccount via the cluster's WorkloadIdentityDriver."""
-    from aws._errors import NotFoundError
-
     from astrolift_registry.models import RegisteredApp
 
     app = RegisteredApp.all_objects.select_related(
@@ -329,7 +327,9 @@ def _deprovision_identity_role_sync(*, registered_app_id: int) -> dict[str, Any]
             raise CapabilityDeprovisionError(
                 f"identity driver delete_identity_role not implemented for cluster {cluster.slug!r}: {exc}",
             ) from exc
-        except NotFoundError:
+        except Exception as exc:
+            if type(exc).__name__ != "NotFoundError":
+                raise
             # Idempotent (#1100): role already absent — desired end state.
             skipped.append(name)
             log.info(

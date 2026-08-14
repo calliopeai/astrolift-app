@@ -90,6 +90,9 @@
 
 ### Fixed
 
+- Make GKE workload identity reconcile project IAM roles on every deploy,
+  annotate workload ServiceAccounts with canonical length-safe Google service
+  accounts, include attached project resources, and reject inert raw grants.
 - Render nested workflow definitions beneath their composed parent execution
   path instead of presenting parent and child pipelines as unrelated peers.
 - Repair project affiliation for repository workflow definitions whose multiple

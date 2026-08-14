@@ -548,9 +548,9 @@ def test_binding_iam_grants_cover_endpoint_and_index(
 ) -> None:
     provisioned = driver.provision(_spec())
     binding = driver.binding(ServiceHandle(handle=provisioned.handle))
-    actions = {a for g in binding.iam_grants for a in g.actions}
-    assert "aiplatform.indexEndpoints.queryVectors" in actions
-    assert "aiplatform.indexes.update" in actions
+    assert [grant.actions for grant in binding.iam_grants] == [
+        ["roles/aiplatform.user"],
+    ]
 
 
 def test_binding_for_missing_raises(

@@ -524,8 +524,9 @@ def test_binding_iam_grants_cover_predict(
     binding = driver.binding(
         ServiceHandle(handle=provisioned.handle),
     )
-    actions = {a for g in binding.iam_grants for a in g.actions}
-    assert "aiplatform.endpoints.predict" in actions
+    assert [grant.actions for grant in binding.iam_grants] == [
+        ["roles/aiplatform.user"],
+    ]
 
 
 def test_binding_for_missing_raises(

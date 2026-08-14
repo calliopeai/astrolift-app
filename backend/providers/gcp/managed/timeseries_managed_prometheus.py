@@ -448,18 +448,11 @@ class GCPManagedPrometheusDriver(ManagedServiceDriver):
                     resource=self._workspace_resource(
                         workspace_name=workspace_name,
                     ),
-                    actions=[
-                        "monitoring.timeSeries.create",
-                        "monitoring.timeSeries.list",
-                        "monitoring.metricDescriptors.get",
-                        "monitoring.metricDescriptors.list",
-                    ],
+                    actions=["roles/monitoring.metricWriter"],
                 ),
                 Grant(
                     resource=f"projects/{self._config.project_id}",
-                    actions=[
-                        "monitoring.viewer",
-                    ],
+                    actions=["roles/monitoring.viewer"],
                 ),
             ],
             notes=(

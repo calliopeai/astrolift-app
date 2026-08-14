@@ -12,10 +12,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import pytest
+from gcp.identity_wi import service_account_email_for
+
 from astrolift_workflows.activities.workload_identity import (
     _permissions_from_bindings,
 )
-from core.app_deploy import _inject_workload_identity
+from core.app_deploy import (
+    _inject_workload_identity,
+    _workload_identity_annotations,
+)
 
 
 @dataclass
@@ -66,6 +72,42 @@ def test_permissions_drop_empty_actions_or_resource():
         _Binding(iam_grants=[_Grant(resource="", actions=["s3:GetObject"])]),
     ]
     assert _permissions_from_bindings(bindings) == []
+
+
+def test_gcp_permissions_translate_roles_and_deduplicate():
+    bindings = [
+        _Binding(
+            iam_grants=[
+                _Grant(
+                    resource="projects/acme/topics/events",
+                    actions=["roles/pubsub.publisher"],
+                ),
+                _Grant(
+                    resource="projects/acme/subscriptions/jobs",
+                    actions=["roles/pubsub.subscriber", "roles/pubsub.publisher"],
+                ),
+            ],
+        ),
+    ]
+    assert _permissions_from_bindings(bindings, plugin_slug="gcp") == [
+        {"role": "roles/pubsub.publisher"},
+        {"role": "roles/pubsub.subscriber"},
+    ]
+
+
+def test_gcp_permissions_fail_closed_for_raw_permission():
+    bindings = [
+        _Binding(
+            iam_grants=[
+                _Grant(
+                    resource="projects/acme/topics/events",
+                    actions=["pubsub.topics.publish"],
+                ),
+            ],
+        ),
+    ]
+    with pytest.raises(ValueError, match="must declare IAM roles"):
+        _permissions_from_bindings(bindings, plugin_slug="gcp")
 
 
 # ---- render post-process ------------------------------------------------
@@ -120,6 +162,37 @@ def test_inject_handles_cronjob_nested_pod_spec():
 
     cj = next(r for r in out if r["kind"] == "CronJob")
     assert cj["spec"]["jobTemplate"]["spec"]["template"]["spec"]["serviceAccountName"] == "sa"
+
+
+def test_inject_accepts_gcp_workload_identity_annotation():
+    annotations = {
+        "iam.gke.io/gcp-service-account": "runtime@acme.iam.gserviceaccount.com",
+    }
+    out = _inject_workload_identity(
+        [_deployment()],
+        sa_name="runtime",
+        namespace="org-app",
+        annotations=annotations,
+    )
+    service_account = next(r for r in out if r["kind"] == "ServiceAccount")
+    deployment = next(r for r in out if r["kind"] == "Deployment")
+    assert service_account["metadata"]["annotations"] == annotations
+    assert deployment["spec"]["template"]["spec"]["serviceAccountName"] == "runtime"
+
+
+def test_gcp_annotations_use_same_canonical_service_account_as_driver():
+    role_name = "astrolift-very-long-organization-very-long-application"
+    assert _workload_identity_annotations(
+        plugin_slug="gcp",
+        provider_config={"project_id": "acme-prod"},
+        auth_config={},
+        role_name=role_name,
+    ) == {
+        "iam.gke.io/gcp-service-account": service_account_email_for(
+            role_name,
+            "acme-prod",
+        ),
+    }
 
 
 def test_inject_leaves_non_workload_kinds_untouched():

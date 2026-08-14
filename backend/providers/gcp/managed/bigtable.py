@@ -391,13 +391,7 @@ class BigtableDriver(ManagedServiceDriver):
             iam_grants=[
                 Grant(
                     resource=(f"projects/{self._config.project_id}/instances/{instance_id}"),
-                    actions=[
-                        "bigtable.tables.readRows",
-                        "bigtable.tables.mutateRows",
-                        "bigtable.tables.sampleRowKeys",
-                        "bigtable.tables.checkAndMutateRow",
-                        "bigtable.tables.get",
-                    ],
+                    actions=["roles/bigtable.user"],
                 ),
             ],
             notes=(
