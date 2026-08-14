@@ -70,6 +70,7 @@ SERVICE_CODE_BY_VARIANT: dict[tuple[str, str], str] = {
     ("api_gateway", "rest_api"): "AmazonApiGateway",
     ("api_gateway", "websocket_api"): "AmazonApiGateway",
     ("private_endpoint", "vpc_endpoint"): "AmazonVPC",
+    ("encryption_key", "kms"): "awskms",
     ("postgres", "rds"): "AmazonRDS",
     ("postgres", "aurora"): "AmazonRDS",
     ("postgres", "aurora_postgres"): "AmazonRDS",

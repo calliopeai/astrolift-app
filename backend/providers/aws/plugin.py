@@ -44,6 +44,7 @@ from aws.managed.elasticache_serverless import (
     ElastiCacheServerlessRedisDriver,
 )
 from aws.managed.email_ses import AmazonSESDriver
+from aws.managed.encryption_kms import KMSDriver
 from aws.managed.event_bus_eventbridge import EventBridgeDriver
 from aws.managed.event_stream_msk import MSKProvisionedDriver, MSKServerlessDriver
 from aws.managed.faas_lambda import LambdaDriver
@@ -154,6 +155,7 @@ PLUGIN = ProviderPlugin(
         ("time_series", "timestream"): TimestreamDriver,
         ("email", "ses"): AmazonSESDriver,
         ("model_endpoint", "bedrock"): AmazonBedrockDriver,
+        ("encryption_key", "kms"): KMSDriver,
         ("workflow_engine", "step_functions_standard"): StepFunctionsStandardDriver,
         ("workflow_engine", "step_functions_express"): StepFunctionsExpressDriver,
         ("private_endpoint", "vpc_endpoint"): VpcEndpointDriver,
