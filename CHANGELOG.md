@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add Azure Event Grid Standard namespace topics with CloudEvents publishing,
+  pull and supported push subscriptions, retention, filters, dead-lettering,
+  workload-identity delivery, Key Vault-backed pull credentials, explicit
+  ownership, and guarded lifecycle management.
 - Add an Azure Event Grid custom-topic event-bus driver with Entra workload
   bindings, push destinations, event and advanced filters, batching, retries,
   dead-lettering, selected-network controls, identity delivery, and guarded

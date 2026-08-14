@@ -139,6 +139,15 @@ def test_managed_service_binding_envs_recorded() -> None:
     assert event_grid.issue_url.endswith("/1354")
     assert "EVENT_BUS_ENDPOINT" in event_grid.binding_envs
 
+    event_grid_namespace = next(
+        entry
+        for entry in MATRIX.managed_services
+        if entry.plugin_id == "azure" and entry.variant == "event_grid_namespace"
+    )
+    assert event_grid_namespace.status == "preview"
+    assert event_grid_namespace.issue_url.endswith("/1355")
+    assert "EVENT_GRID_NAMESPACE_RECEIVE_ENDPOINT" in event_grid_namespace.binding_envs
+
 
 def test_managed_service_keys_are_unique() -> None:
     keys = [(entry.plugin_id, entry.kind, entry.variant) for entry in MATRIX.managed_services]
