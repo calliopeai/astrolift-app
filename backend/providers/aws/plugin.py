@@ -49,6 +49,7 @@ from aws.managed.memorydb import MemoryDBDriver
 from aws.managed.model_endpoint_bedrock import AmazonBedrockDriver
 from aws.managed.mssql_rds import RDSSqlServerDriver
 from aws.managed.mysql_rds import RDSMySQLDriver
+from aws.managed.neptune import NeptuneProvisionedDriver, NeptuneServerlessDriver
 from aws.managed.object_store_s3 import S3Driver
 from aws.managed.opensearch_serverless import (
     OpenSearchServerlessSearchDriver,
@@ -103,6 +104,8 @@ PLUGIN = ProviderPlugin(
         ("document_db", "documentdb"): DocumentDBProvisionedDriver,
         ("document_db", "documentdb_serverless_v2"): DocumentDBServerlessV2Driver,
         ("wide_column", "keyspaces"): KeyspacesDriver,
+        ("graph_db", "neptune"): NeptuneProvisionedDriver,
+        ("graph_db", "neptune_serverless"): NeptuneServerlessDriver,
         ("redis", "elasticache"): ElastiCacheRedisDriver,
         ("redis", "elasticache_valkey"): ElastiCacheRedisDriver,
         ("redis", "elasticache_serverless_valkey"): ElastiCacheServerlessRedisDriver,

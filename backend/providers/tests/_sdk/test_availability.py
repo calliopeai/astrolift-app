@@ -76,6 +76,16 @@ def test_has_managed_lookup() -> None:
         kind="wide_column",
         variant="keyspaces",
     )
+    assert MATRIX.has_managed(
+        plugin_id="aws",
+        kind="graph_db",
+        variant="neptune",
+    )
+    assert MATRIX.has_managed(
+        plugin_id="aws",
+        kind="graph_db",
+        variant="neptune_serverless",
+    )
 
 
 def test_status_field_defaults_to_ga() -> None:

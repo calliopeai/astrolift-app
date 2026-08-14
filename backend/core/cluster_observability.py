@@ -666,6 +666,29 @@ def managed_config_for(
             master_username=str(pc.get("documentdb_master_username", "astrolift")),
         )
 
+    if kind == "graph_db" and variant.startswith("neptune"):
+        from aws.managed._networking import ensure_neptune_networking
+        from aws.managed.neptune import NeptuneConfig
+
+        subnet_group, security_group_ids = ensure_neptune_networking(
+            cluster,
+            region=region,
+        )
+        return NeptuneConfig(
+            region=region,
+            account_id=str(pc.get("account_id", "")),
+            db_subnet_group=subnet_group,
+            security_group_ids=security_group_ids,
+            cluster_name_prefix=str(pc.get("neptune_cluster_name_prefix", "astrolift")),
+            engine_version=str(pc.get("neptune_engine_version", "")),
+            serverless_v2=variant == "neptune_serverless",
+            backup_retention_days=int(pc.get("neptune_backup_retention_days", 7)),
+            deletion_protection_default=bool(
+                pc.get("deletion_protection_default", True),
+            ),
+            iam_auth_default=bool(pc.get("neptune_iam_auth_default", True)),
+        )
+
     if kind == "wide_column" and variant == "keyspaces":
         from aws.managed._networking import ensure_keyspaces_networking
         from aws.managed.keyspaces import KeyspacesConfig

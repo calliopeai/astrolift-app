@@ -4,6 +4,9 @@
 
 ### Added
 
+- Add Amazon Neptune provisioned and Serverless graph databases with private
+  networking, IAM SigV4 bindings, Gremlin/SPARQL/openCypher endpoints, scaling,
+  snapshots, restore, global-cluster inputs, and protected teardown.
 - Add Amazon Keyspaces Cassandra-compatible tables with on-demand or
   provisioned capacity, multi-Region keyspaces, IAM SigV4 bindings, encryption,
   TTL/CDC controls, 35-day point-in-time recovery, and restore lifecycle.

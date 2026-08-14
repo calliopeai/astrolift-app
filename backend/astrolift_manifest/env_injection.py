@@ -207,9 +207,16 @@ _ENVELOPES: dict[str, tuple[str, ...]] = {
     ),
     "graph_db": (
         "GRAPH_DB_URL",
+        "GRAPH_DB_READER_URL",
+        "GRAPH_DB_ENDPOINT",
+        "GRAPH_DB_PORT",
         "GRAPH_DB_USER",
         "GRAPH_DB_PASSWORD",
         "GRAPH_DB_PROTOCOL",
+        "GRAPH_DB_TLS",
+        "GRAPH_DB_AUTH_MODE",
+        "GRAPH_DB_REGION",
+        "GRAPH_DB_RESOURCE_ARN",
     ),
     "wide_column": (
         "WIDE_COLUMN_ENDPOINT",
