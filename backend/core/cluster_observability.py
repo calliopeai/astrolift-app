@@ -431,6 +431,37 @@ def managed_config_for(
             ),
         )
 
+    if kind == "private_endpoint":
+        from aws.managed._networking import discover_vpc
+        from aws.managed.private_endpoint_vpc import VpcEndpointConfig
+
+        vpc_id = str(pc.get("vpc_endpoint_vpc_id") or pc.get("vpc_id") or "")
+        subnet_ids = list(pc.get("vpc_endpoint_subnet_ids") or [])
+        if not vpc_id:
+            import boto3
+
+            vpc_id, discovered_subnets, _ = discover_vpc(
+                cluster,
+                region=region,
+                ec2=boto3.client("ec2", region_name=region),
+                eks=boto3.client("eks", region_name=region),
+            )
+            if not subnet_ids:
+                subnet_ids = discovered_subnets
+        return VpcEndpointConfig(
+            region=region,
+            vpc_id=vpc_id,
+            subnet_ids=subnet_ids,
+            security_group_ids=list(pc.get("vpc_endpoint_security_group_ids") or []),
+            route_table_ids=list(pc.get("vpc_endpoint_route_table_ids") or []),
+            private_dns_enabled_default=bool(
+                pc.get("vpc_endpoint_private_dns_enabled_default", False),
+            ),
+            deletion_protection_default=bool(
+                pc.get("vpc_endpoint_deletion_protection_default", True),
+            ),
+        )
+
     if kind == "database_proxy":
         from aws.managed._networking import ensure_db_proxy_networking
         from aws.managed.rds_proxy import RDSProxyConfig
