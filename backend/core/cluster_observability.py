@@ -559,9 +559,7 @@ def _gcp_managed_config_for(
             token_auth_rotation_generation=int(
                 pc.get("memorystore_valkey_token_auth_rotation_generation", 1)
             ),
-            token_auth_retire_generation=int(
-                pc.get("memorystore_valkey_token_auth_retire_generation", 0)
-            ),
+            token_auth_retire_generation=int(pc.get("memorystore_valkey_token_auth_retire_generation", 0)),
             transit_encryption_default=bool(
                 pc.get("memorystore_valkey_transit_encryption_default", True),
             ),
