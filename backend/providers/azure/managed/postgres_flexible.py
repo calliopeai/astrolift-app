@@ -204,6 +204,18 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
+        requested_extensions = sorted(set(spec.desired_extensions))
+        if requested_extensions:
+            return ProvisionResult(
+                ok=False,
+                handle="",
+                message=(
+                    "Azure PostgreSQL extension reconciliation is not "
+                    "implemented; refusing to silently ignore requested "
+                    f"extensions: {', '.join(requested_extensions)}"
+                ),
+                errors=["unsupported_extensions", *requested_extensions],
+            )
         if self._secrets is None:
             return ProvisionResult(
                 ok=False,

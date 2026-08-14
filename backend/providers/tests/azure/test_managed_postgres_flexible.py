@@ -369,6 +369,19 @@ def test_provision_without_keyvault_returns_error() -> None:
     assert "Key Vault" in result.message
 
 
+def test_provision_refuses_to_silently_drop_extensions(
+    driver: AzurePostgresFlexibleDriver,
+    mgmt: FakeMgmtClient,
+) -> None:
+    result = driver.provision(
+        _spec(desired_extensions=["vector", "pg_trgm", "vector"]),
+    )
+    assert not result.ok
+    assert result.errors == ["unsupported_extensions", "pg_trgm", "vector"]
+    assert "refusing to silently ignore" in result.message
+    assert not mgmt.servers_obj.create_calls
+
+
 # ---- update -----------------------------------------------------
 
 
