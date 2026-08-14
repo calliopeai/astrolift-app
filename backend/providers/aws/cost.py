@@ -57,6 +57,7 @@ SERVICE_CODE_BY_VARIANT: dict[tuple[str, str], str] = {
     ("queue", "sqs"): "AWSQueueService",
     ("topic", "sns_standard"): "AmazonSNS",
     ("topic", "sns_fifo"): "AmazonSNS",
+    ("sms", "sns_sms"): "AmazonSNS",
     ("event_bus", "eventbridge"): "AWSEvents",
     ("stream", "kinesis"): "AmazonKinesis",
     ("stream", "firehose"): "AmazonKinesisFirehose",
