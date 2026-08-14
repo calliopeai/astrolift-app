@@ -81,9 +81,9 @@ function StageNode({ data }: NodeProps<Node<PipelineDagStage>>) {
     <>
       <Handle type="target" position={Position.Left} className="!bg-muted-foreground/30" />
       <Handle type="source" position={Position.Right} className="!bg-muted-foreground/30" />
-      <div className="flex items-center gap-1.5">
+      <div className="flex min-w-0 items-center gap-1.5">
         <span className={cn("viz-node-dot size-1.5 shrink-0 rounded-full", TONE_DOT[tone])} />
-        <div className="truncate text-sm leading-tight font-medium">{data.name}</div>
+        <div className="min-w-0 truncate text-sm leading-tight font-medium">{data.name}</div>
       </div>
       <div className="text-muted-foreground text-2xs mt-1 flex items-center justify-between gap-2">
         <span className="capitalize">{data.status.replace(/_/g, " ")}</span>
@@ -92,7 +92,7 @@ function StageNode({ data }: NodeProps<Node<PipelineDagStage>>) {
     </>
   );
   const className = cn(
-    "viz-node min-w-[168px] max-w-[220px] rounded-md border bg-background p-3 ring-1 shadow-sm",
+    "viz-node block w-[220px] rounded-md border bg-background p-3 ring-1 shadow-sm",
     data.href &&
       "cursor-pointer hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
     TONE_RING[tone]
