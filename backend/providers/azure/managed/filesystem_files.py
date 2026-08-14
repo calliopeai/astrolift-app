@@ -819,9 +819,9 @@ class AzureFilesDriver(ManagedServiceDriver):
 def _tags(spec: ProvisionSpec) -> dict[str, str]:
     tags = {
         _MANAGED_BY_TAG: "platform",
-        "astrolift-organization": spec.organization_slug,
+        "astrolift-org": spec.organization_slug,
         "astrolift-app": spec.app_slug,
-        "astrolift-environment": spec.environment_name,
+        "astrolift-env": spec.environment_name,
         "astrolift-cluster": spec.tenant_cluster_id,
         "astrolift-isolation": spec.isolation,
     }
