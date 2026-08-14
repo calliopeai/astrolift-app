@@ -98,6 +98,7 @@ def test_envelope_keys_for_known_kinds():
     assert "DATABASE_URL" in envelope_keys_for("postgres")
     assert "REDIS_URL" in envelope_keys_for("redis")
     assert "DATABASE_PROXY_TLS" in envelope_keys_for("database_proxy")
+    assert "DATABASE_PROXY_AUTH_MODE" in envelope_keys_for("database_proxy")
     assert envelope_keys_for("totally-unknown") == ()
 
 

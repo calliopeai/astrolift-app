@@ -69,8 +69,12 @@ _STATUS_RETRY = RetryPolicy(
 # throttle and 5xx; back off and try again. Driver is idempotent.
 _DEPROVISION_RETRY = RetryPolicy(
     initial_interval=timedelta(seconds=5),
-    maximum_interval=timedelta(seconds=60),
-    maximum_attempts=4,
+    maximum_interval=timedelta(seconds=30),
+    # Multi-resource services (Aurora cluster members, RDS Proxy IAM cleanup)
+    # can legitimately take several minutes. Permanent driver failures are
+    # raised non-retryable by the activity, so this budget is only consumed by
+    # explicit in-progress results and transient cloud errors.
+    maximum_attempts=40,
 )
 
 
@@ -115,9 +119,7 @@ class DeprovisionManagedServiceWorkflow:
             retry_policy=_STATUS_RETRY,
         )
 
-        driver_message = (
-            result.get("message", "") if isinstance(result, dict) else ""
-        )
+        driver_message = result.get("message", "") if isinstance(result, dict) else ""
         message = "managed service deprovisioned"
         if driver_message:
             message = f"{message}; {driver_message}"

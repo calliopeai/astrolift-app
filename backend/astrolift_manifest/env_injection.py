@@ -188,6 +188,10 @@ _ENVELOPES: dict[str, tuple[str, ...]] = {
         "DATABASE_PROXY_PORT",
         "DATABASE_PROXY_ARN",
         "DATABASE_PROXY_TLS",
+        "DATABASE_PROXY_AUTH_MODE",
+        "DATABASE_PROXY_CREDENTIALS",
+        "DATABASE_PROXY_CREDENTIALS_REF",
+        "DATABASE_PROXY_DB_USER",
     ),
     "graph_db": (
         "GRAPH_DB_URL",

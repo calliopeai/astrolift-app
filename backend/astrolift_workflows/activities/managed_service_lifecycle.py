@@ -142,6 +142,7 @@ def _deprovision_sync(
     ok = bool(getattr(result, "ok", False))
     message = str(getattr(result, "message", ""))
     errors = list(getattr(result, "errors", []) or [])
+    retryable = bool(getattr(result, "retryable", True))
     if not ok and _signals_already_gone(message, *errors):
         # Driver REPORTED a not-found failure (e.g. S3 "empty failed:
         # NoSuchBucket") — the resource is already gone, so deprovision is
@@ -158,6 +159,7 @@ def _deprovision_sync(
         "message": message,
         "errors": errors,
         "handle": str(getattr(result, "handle", "")),
+        "retryable": retryable,
     }
 
 
@@ -193,8 +195,11 @@ async def deprovision_managed_service(
         },
     )
     if not result["ok"]:
-        raise RuntimeError(
+        from temporalio.exceptions import ApplicationError
+
+        raise ApplicationError(
             result["message"] or "driver.deprovision returned ok=False",
+            non_retryable=not bool(result.get("retryable", False)),
         )
     return result
 

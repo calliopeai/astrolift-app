@@ -27,6 +27,7 @@ from astrolift_workflows.activities.managed_service_lifecycle import (
     _deprovision_sync,
     _finalize_sync,
     _signals_already_gone,
+    deprovision_managed_service,
 )
 
 pytestmark = pytest.mark.django_db
@@ -155,7 +156,7 @@ def test_deprovision_treats_reported_not_found_as_success():
 
 def test_real_error_still_fails():
     """A genuine non-not-found driver failure must still surface ok=False so
-    Temporal retries — we don't swallow real errors."""
+    the activity can classify it without swallowing the error."""
 
     class _AccessDeniedDriver:
         def __init__(self, *, config) -> None:  # noqa: ANN001
@@ -167,6 +168,7 @@ def test_real_error_still_fails():
                 handle=spec.handle,
                 message="AccessDenied: not authorized to delete bucket",
                 errors=["AccessDenied"],
+                retryable=False,
             )
 
     _, _, _, svc = _scaffold()
@@ -174,6 +176,58 @@ def test_real_error_still_fails():
     with p_get, p_cfg:
         result = _deprovision_sync(svc.pk, delete_data=True, force_destroy=False)
     assert result["ok"] is False
+    assert result["retryable"] is False
+
+
+def test_retryable_in_progress_result_survives_activity_adapter():
+    class _InProgressDriver:
+        def __init__(self, *, config) -> None:  # noqa: ANN001
+            pass
+
+        def deprovision(self, spec, *, delete_data=False, force_destroy=False):  # noqa: ANN001
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message="cloud delete still in progress",
+                errors=["deletion_in_progress"],
+                retryable=True,
+            )
+
+    _, _, _, svc = _scaffold()
+    p_get, p_cfg = _patch_driver(_InProgressDriver)
+    with p_get, p_cfg:
+        result = _deprovision_sync(svc.pk, delete_data=True, force_destroy=False)
+
+    assert result["ok"] is False
+    assert result["retryable"] is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("retryable,non_retryable", [(True, False), (False, True)])
+async def test_activity_marks_only_permanent_failures_non_retryable(
+    retryable,
+    non_retryable,
+):
+    from temporalio.exceptions import ApplicationError
+
+    result = {
+        "ok": False,
+        "message": "not done",
+        "errors": ["test"],
+        "handle": "x/y",
+        "retryable": retryable,
+    }
+    with (
+        patch("astrolift_workflows.activities.managed_service_lifecycle.activity.heartbeat"),
+        patch(
+            "astrolift_workflows.activities.managed_service_lifecycle._deprovision_sync",
+            return_value=result,
+        ),
+        pytest.raises(ApplicationError) as raised,
+    ):
+        await deprovision_managed_service(1, False, False)
+
+    assert raised.value.non_retryable is non_retryable
 
 
 def test_finalize_converges_and_is_idempotent():

@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add AWS Aurora PostgreSQL/MySQL provisioned and Serverless v2 clusters,
+  every supported RDS SQL Server edition, and RDS Proxy with secret or
+  end-to-end IAM authentication, pool tuning, portable bindings, and
+  convergent teardown.
 - Add project-owned managed databases, caches, search, object storage,
   queues, and secret bundles with explicit app-environment and agent-recipe
   attachments, provider-backed secret CRUD/reveal, and runtime injection.

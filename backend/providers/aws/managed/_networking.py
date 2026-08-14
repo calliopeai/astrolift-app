@@ -217,3 +217,45 @@ def ensure_db_networking(
         sg_id,
     )
     return grp_name, [sg_id]
+
+
+def ensure_db_proxy_networking(
+    cluster,
+    *,
+    region: str,
+    clients: Any | None = None,
+) -> tuple[list[str], list[str]]:
+    """Resolve private subnet and security-group IDs for RDS Proxy.
+
+    RDS Proxy consumes raw subnet IDs rather than an RDS subnet-group name.
+    The shared proxy SG admits the three portable relational protocols from
+    inside the VPC. Operators can pin both lists in locked-down installs with
+    ``db_proxy_subnet_ids`` / ``db_proxy_security_group_ids``.
+    """
+
+    pc = cluster.provider_config or {}
+    if pc.get("db_proxy_subnet_ids") and pc.get("db_proxy_security_group_ids"):
+        return list(pc["db_proxy_subnet_ids"]), list(pc["db_proxy_security_group_ids"])
+
+    ec2, _rds, _elasticache, eks = clients or _clients(region)
+    vpc_id, subnet_ids, vpc_cidr = discover_vpc(
+        cluster,
+        region=region,
+        ec2=ec2,
+        eks=eks,
+    )
+    sg_name = f"astrolift-{cluster.slug}-db-proxy"[:255]
+    if pc.get("db_proxy_security_group_ids"):
+        security_group_ids = list(pc["db_proxy_security_group_ids"])
+    else:
+        sg_id = ""
+        for port in (5432, 3306, 1433):
+            sg_id = ensure_security_group(
+                vpc_id=vpc_id,
+                vpc_cidr=vpc_cidr,
+                port=port,
+                name=sg_name,
+                ec2=ec2,
+            )
+        security_group_ids = [sg_id]
+    return list(pc.get("db_proxy_subnet_ids") or subnet_ids), security_group_ids

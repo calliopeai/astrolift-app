@@ -63,7 +63,9 @@ def test_catalog_joins_executable_drivers_and_planned_roadmap():
     assert rds.binding_envs == ("DATABASE_URL",)
     assert rds.config_schema["properties"]["size"]["default"] == "small"
     assert aurora.available is False
-    assert aurora.status == "planned"
+    # This synthetic registry only installs the legacy RDS driver. Preview
+    # metadata remains visible but is correctly unavailable in this process.
+    assert aurora.status == "preview"
     assert aurora.issue_url.endswith("/1283")
     assert sql_server.size_options[0] == "small"
     assert sql_server.issue_url.endswith("/1284")

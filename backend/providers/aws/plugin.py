@@ -30,15 +30,18 @@ from aws.dns_route53 import Route53Driver
 from aws.identity_irsa import IRSADriver
 from aws.ingress_alb import ALBIngressDriver
 from aws.managed.api_gateway_http import ApiGatewayHttpDriver
+from aws.managed.aurora import AuroraMySQLDriver, AuroraPostgresDriver
 from aws.managed.cdn_cloudfront import CloudFrontDriver
 from aws.managed.dynamodb import DynamoDBDriver
 from aws.managed.email_ses import AmazonSESDriver
 from aws.managed.faas_lambda import LambdaDriver
 from aws.managed.model_endpoint_bedrock import AmazonBedrockDriver
+from aws.managed.mssql_rds import RDSSqlServerDriver
 from aws.managed.mysql_rds import RDSMySQLDriver
 from aws.managed.object_store_s3 import S3Driver
 from aws.managed.postgres_rds import RDSPostgresDriver
 from aws.managed.queue_sqs import SQSDriver
+from aws.managed.rds_proxy import RDSProxyDriver
 from aws.managed.redis_elasticache import ElastiCacheRedisDriver
 from aws.managed.search_opensearch import OpenSearchSearchDriver
 from aws.managed.timeseries_timestream import TimestreamDriver
@@ -64,9 +67,7 @@ PLUGIN = ProviderPlugin(
         "notification": SNSNotificationDriver,
     },
     managed_service_drivers={
-        # #35 + #351 + #352 — high-traffic kinds (web app + queue +
-        # bucket + relational DB + cache). Pending per backlog tickets:
-        # postgres/aurora, nosql/dynamodb, pubsub/sns, filesystem/efs.
+        # Cloud-neutral kinds map to provider-specific executable variants.
         ("object_store", "s3"): S3Driver,
         ("kv_store", "dynamodb"): DynamoDBDriver,
         ("cdn", "cloudfront"): CloudFrontDriver,
@@ -74,7 +75,16 @@ PLUGIN = ProviderPlugin(
         ("api_gateway", "http_api"): ApiGatewayHttpDriver,
         ("queue", "sqs"): SQSDriver,
         ("postgres", "rds"): RDSPostgresDriver,
+        ("postgres", "aurora_postgres"): AuroraPostgresDriver,
+        ("postgres", "aurora_postgres_serverless_v2"): AuroraPostgresDriver,
         ("mysql", "rds_mysql"): RDSMySQLDriver,
+        ("mysql", "aurora_mysql"): AuroraMySQLDriver,
+        ("mysql", "aurora_mysql_serverless_v2"): AuroraMySQLDriver,
+        ("mssql", "rds_sqlserver_express"): RDSSqlServerDriver,
+        ("mssql", "rds_sqlserver_web"): RDSSqlServerDriver,
+        ("mssql", "rds_sqlserver_standard"): RDSSqlServerDriver,
+        ("mssql", "rds_sqlserver_enterprise"): RDSSqlServerDriver,
+        ("database_proxy", "rds_proxy"): RDSProxyDriver,
         ("redis", "elasticache"): ElastiCacheRedisDriver,
         ("vector_index", "opensearch_vector"): OpenSearchVectorDriver,
         ("search", "opensearch"): OpenSearchSearchDriver,
