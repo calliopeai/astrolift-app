@@ -86,6 +86,16 @@ def test_has_managed_lookup() -> None:
         kind="graph_db",
         variant="neptune_serverless",
     )
+    assert MATRIX.has_managed(
+        plugin_id="aws",
+        kind="warehouse",
+        variant="redshift",
+    )
+    assert MATRIX.has_managed(
+        plugin_id="aws",
+        kind="warehouse",
+        variant="redshift_serverless",
+    )
 
 
 def test_status_field_defaults_to_ga() -> None:

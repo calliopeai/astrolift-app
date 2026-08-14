@@ -689,6 +689,55 @@ def managed_config_for(
             iam_auth_default=bool(pc.get("neptune_iam_auth_default", True)),
         )
 
+    if kind == "warehouse" and variant.startswith("redshift"):
+        from aws.managed._networking import ensure_redshift_networking
+
+        serverless = variant == "redshift_serverless"
+        subnet_group, subnet_ids, security_group_ids = ensure_redshift_networking(
+            cluster,
+            region=region,
+            serverless=serverless,
+        )
+        if serverless:
+            from aws.managed.redshift_serverless import RedshiftServerlessConfig
+
+            return RedshiftServerlessConfig(
+                region=region,
+                account_id=str(pc.get("account_id", "")),
+                subnet_ids=subnet_ids,
+                security_group_ids=security_group_ids,
+                name_prefix=str(pc.get("redshift_name_prefix", "astrolift")),
+                base_capacity_default=int(pc.get("redshift_serverless_base_capacity", 8)),
+                snapshot_retention_days=int(pc.get("redshift_snapshot_retention_days", 30)),
+                deletion_protection_default=bool(
+                    pc.get("deletion_protection_default", True),
+                ),
+                manage_admin_password_default=True,
+                admin_username=str(pc.get("redshift_admin_username", "astrolift")),
+            )
+
+        from aws.managed.redshift import RedshiftConfig
+
+        return RedshiftConfig(
+            region=region,
+            account_id=str(pc.get("account_id", "")),
+            cluster_subnet_group=subnet_group,
+            security_group_ids=security_group_ids,
+            cluster_name_prefix=str(pc.get("redshift_name_prefix", "astrolift")),
+            node_type_default=str(pc.get("redshift_node_type_default", "ra3.xlplus")),
+            automated_snapshot_retention_days=int(
+                pc.get("redshift_automated_snapshot_retention_days", 7),
+            ),
+            manual_snapshot_retention_days=int(
+                pc.get("redshift_snapshot_retention_days", 30),
+            ),
+            deletion_protection_default=bool(
+                pc.get("deletion_protection_default", True),
+            ),
+            manage_admin_password_default=True,
+            master_username=str(pc.get("redshift_admin_username", "astrolift")),
+        )
+
     if kind == "wide_column" and variant == "keyspaces":
         from aws.managed._networking import ensure_keyspaces_networking
         from aws.managed.keyspaces import KeyspacesConfig

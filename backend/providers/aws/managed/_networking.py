@@ -534,6 +534,70 @@ def ensure_neptune_networking(
     return subnet_group, security_group_ids
 
 
+def ensure_redshift_networking(
+    cluster,
+    *,
+    region: str,
+    serverless: bool,
+    clients: Any | None = None,
+) -> tuple[str, list[str], list[str]]:
+    """Resolve private Redshift subnet and security-group resources."""
+
+    pc = cluster.provider_config or {}
+    pinned_subnets = list(pc.get("redshift_subnet_ids") or [])
+    pinned_groups = list(pc.get("redshift_security_group_ids") or [])
+    pinned_subnet_group = str(pc.get("redshift_subnet_group") or "")
+    if pinned_subnets and pinned_groups and (serverless or pinned_subnet_group):
+        if serverless and len(set(pinned_subnets)) < 3:
+            raise RuntimeError("Redshift Serverless requires at least three distinct subnets")
+        return pinned_subnet_group, pinned_subnets, pinned_groups
+    if clients is None:
+        import boto3
+
+        ec2 = boto3.client("ec2", region_name=region)
+        redshift = boto3.client("redshift", region_name=region)
+        eks = boto3.client("eks", region_name=region)
+    else:
+        ec2, redshift, eks = clients
+    vpc_id, discovered_subnets, vpc_cidr = discover_vpc(
+        cluster,
+        region=region,
+        ec2=ec2,
+        eks=eks,
+    )
+    subnet_ids = pinned_subnets or discovered_subnets
+    minimum_subnets = 3 if serverless else 2
+    if len(set(subnet_ids)) < minimum_subnets:
+        raise RuntimeError(
+            f"Redshift {'Serverless' if serverless else 'provisioned'} requires subnets "
+            f"in at least {minimum_subnets} Availability Zones",
+        )
+    security_group_ids = pinned_groups
+    if not security_group_ids:
+        security_group_ids = [
+            ensure_security_group(
+                vpc_id=vpc_id,
+                vpc_cidr=vpc_cidr,
+                port=5439,
+                name=f"astrolift-{cluster.slug}-redshift"[:255],
+                ec2=ec2,
+            ),
+        ]
+    subnet_group = pinned_subnet_group or f"astrolift-{cluster.slug}-redshift"[:255]
+    if not serverless and not pinned_subnet_group:
+        try:
+            redshift.create_cluster_subnet_group(
+                ClusterSubnetGroupName=subnet_group,
+                Description="astrolift managed Redshift subnets",
+                SubnetIds=subnet_ids,
+                Tags=_MANAGED_TAGS,
+            )
+        except Exception as exc:
+            if "ClusterSubnetGroupAlreadyExists" not in type(exc).__name__ and "already exists" not in str(exc).lower():
+                raise
+    return subnet_group, subnet_ids, security_group_ids
+
+
 def ensure_keyspaces_networking(
     cluster,
     *,

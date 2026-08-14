@@ -22,6 +22,7 @@ from aws.managed._networking import (
     ensure_memorydb_networking,
     ensure_neptune_networking,
     ensure_opensearch_serverless_networking,
+    ensure_redshift_networking,
 )
 
 
@@ -414,6 +415,42 @@ def test_neptune_variants_use_private_networking_and_cloud_identity():
     assert serverless.backup_retention_days == 14
 
 
+def test_redshift_variants_resolve_distinct_private_runtime_configs():
+    from aws.managed.redshift import RedshiftConfig
+    from aws.managed.redshift_serverless import RedshiftServerlessConfig
+
+    provider_config = {
+        "account_id": "123456789012",
+        "redshift_subnet_group": "redshift-private",
+        "redshift_subnet_ids": ["subnet-a", "subnet-b", "subnet-c"],
+        "redshift_security_group_ids": ["sg-redshift"],
+        "redshift_name_prefix": "platform",
+        "redshift_snapshot_retention_days": 60,
+        "redshift_serverless_base_capacity": 32,
+    }
+    provisioned = managed_config_for(
+        "aws",
+        _cluster(provider_config),
+        kind="warehouse",
+        variant="redshift",
+    )
+    serverless = managed_config_for(
+        "aws",
+        _cluster(provider_config),
+        kind="warehouse",
+        variant="redshift_serverless",
+    )
+
+    assert isinstance(provisioned, RedshiftConfig)
+    assert provisioned.cluster_subnet_group == "redshift-private"
+    assert provisioned.manual_snapshot_retention_days == 60
+    assert isinstance(serverless, RedshiftServerlessConfig)
+    assert serverless.subnet_ids == ["subnet-a", "subnet-b", "subnet-c"]
+    assert serverless.security_group_ids == ["sg-redshift"]
+    assert serverless.base_capacity_default == 32
+    assert serverless.snapshot_retention_days == 60
+
+
 def test_every_registered_managed_service_driver_has_a_config_builder():
     """Regression guard for #1037 / #982: every (kind, variant) the AWS
     plugin registers a managed-service driver for MUST resolve through
@@ -444,6 +481,9 @@ def test_every_registered_managed_service_driver_has_a_config_builder():
             "keyspaces_vpc_endpoint_id": "vpce-keyspaces",
             "neptune_subnet_group": "neptune-subnets",
             "neptune_security_group_ids": ["sg-neptune"],
+            "redshift_subnet_group": "redshift-subnets",
+            "redshift_subnet_ids": ["subnet-a", "subnet-b", "subnet-c"],
+            "redshift_security_group_ids": ["sg-redshift"],
         },
     )
     for kind, variant in PLUGIN.managed_service_drivers:
@@ -734,3 +774,61 @@ def test_ensure_neptune_networking_creates_private_subnet_group_and_sg():
     )
     ingress = ec2.authorize_security_group_ingress.call_args.kwargs
     assert ingress["IpPermissions"][0]["FromPort"] == 8182
+
+
+def test_ensure_redshift_networking_creates_provisioned_subnet_group_and_sg():
+    from botocore.session import Session
+    from botocore.validate import validate_parameters
+
+    ec2 = MagicMock()
+    eks = MagicMock()
+    redshift = MagicMock()
+    eks.describe_cluster.return_value = {
+        "cluster": {"resourcesVpcConfig": {"vpcId": "vpc-abc"}},
+    }
+    ec2.describe_vpcs.return_value = {"Vpcs": [{"CidrBlock": "10.0.0.0/16"}]}
+    ec2.describe_subnets.return_value = {
+        "Subnets": [
+            {
+                "SubnetId": f"subnet-{suffix}",
+                "AvailabilityZone": f"us-west-2{suffix}",
+                "MapPublicIpOnLaunch": False,
+            }
+            for suffix in ("a", "b", "c")
+        ],
+    }
+    ec2.describe_security_groups.return_value = {"SecurityGroups": []}
+    ec2.create_security_group.return_value = {"GroupId": "sg-redshift"}
+
+    group, subnets, security_groups = ensure_redshift_networking(
+        _cluster(slug="aws-prod"),
+        region="us-west-2",
+        serverless=False,
+        clients=(ec2, redshift, eks),
+    )
+
+    assert group == "astrolift-aws-prod-redshift"
+    assert subnets == ["subnet-a", "subnet-b", "subnet-c"]
+    assert security_groups == ["sg-redshift"]
+    subnet_call = redshift.create_cluster_subnet_group.call_args.kwargs
+    service = Session().get_service_model("redshift")
+    validate_parameters(
+        subnet_call,
+        service.operation_model("CreateClusterSubnetGroup").input_shape,
+    )
+    ingress = ec2.authorize_security_group_ingress.call_args.kwargs
+    assert ingress["IpPermissions"][0]["FromPort"] == 5439
+
+
+def test_redshift_serverless_networking_requires_three_distinct_subnets():
+    with pytest.raises(RuntimeError, match="three distinct subnets"):
+        ensure_redshift_networking(
+            _cluster(
+                {
+                    "redshift_subnet_ids": ["subnet-a", "subnet-b"],
+                    "redshift_security_group_ids": ["sg-redshift"],
+                },
+            ),
+            region="us-west-2",
+            serverless=True,
+        )
