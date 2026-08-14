@@ -120,6 +120,14 @@ def test_cache_is_distinct_from_redis_and_has_protocol_envelope() -> None:
     assert "CACHE_NODES" in cache.binding_envs_optional
 
 
+def test_document_database_contract_includes_tls_and_resource_identity() -> None:
+    document_db = KINDS.get("document_db")
+
+    assert document_db is not None
+    assert "DOCDB_TLS" in document_db.binding_envs_optional
+    assert "DOCDB_RESOURCE_ARN" in document_db.binding_envs_optional
+
+
 def test_validate_unknown_kind_returns_empty() -> None:
     """Unknown kinds skip validation (operator-defined kinds may
     not yet be in the canonical catalog)."""

@@ -15,7 +15,12 @@ from unittest.mock import MagicMock
 import pytest
 from core.cluster_observability import managed_config_for
 
-from aws.managed._networking import ensure_db_networking, ensure_memorydb_networking
+from aws.managed._networking import (
+    ensure_db_networking,
+    ensure_documentdb_networking,
+    ensure_memorydb_networking,
+    ensure_opensearch_serverless_networking,
+)
 
 
 def _cluster(provider_config=None, *, slug="aws-prod", region="us-west-2"):
@@ -320,6 +325,36 @@ def test_time_series_config_defaults_and_overrides():
     assert pinned.kms_key_id == "arn:aws:kms:::key/abc"
 
 
+def test_documentdb_config_selects_provisioned_and_serverless_variants():
+    from aws.managed.documentdb import DocumentDBConfig
+
+    provider_config = {
+        "documentdb_subnet_group": "documentdb-private",
+        "documentdb_security_group_ids": ["sg-documentdb"],
+        "documentdb_engine_version": "5.0.0",
+        "documentdb_backup_retention_days": 14,
+    }
+    provisioned = managed_config_for(
+        "aws",
+        _cluster(provider_config),
+        kind="document_db",
+        variant="documentdb",
+    )
+    serverless = managed_config_for(
+        "aws",
+        _cluster(provider_config),
+        kind="document_db",
+        variant="documentdb_serverless_v2",
+    )
+
+    assert isinstance(provisioned, DocumentDBConfig)
+    assert provisioned.serverless_v2 is False
+    assert serverless.serverless_v2 is True
+    assert serverless.db_subnet_group == "documentdb-private"
+    assert serverless.security_group_ids == ["sg-documentdb"]
+    assert serverless.backup_retention_days == 14
+
+
 def test_every_registered_managed_service_driver_has_a_config_builder():
     """Regression guard for #1037 / #982: every (kind, variant) the AWS
     plugin registers a managed-service driver for MUST resolve through
@@ -343,6 +378,10 @@ def test_every_registered_managed_service_driver_has_a_config_builder():
             "serverless_cache_security_group_ids": ["sg-cache"],
             "memorydb_subnet_group": "memorydb-subnets",
             "memorydb_security_group_ids": ["sg-memorydb"],
+            "documentdb_subnet_group": "documentdb-subnets",
+            "documentdb_security_group_ids": ["sg-documentdb"],
+            "account_id": "123456789012",
+            "opensearch_serverless_vpc_endpoint_ids": ["vpce-aoss"],
         },
     )
     for kind, variant in PLUGIN.managed_service_drivers:
@@ -452,3 +491,87 @@ def test_ensure_memorydb_networking_discovers_and_creates():
     )
     ingress = ec2.authorize_security_group_ingress.call_args.kwargs
     assert ingress["IpPermissions"][0]["FromPort"] == 6379
+
+
+def test_ensure_opensearch_serverless_networking_discovers_and_creates():
+    from botocore.session import Session
+    from botocore.validate import validate_parameters
+
+    ec2 = MagicMock()
+    eks = MagicMock()
+    aoss = MagicMock()
+    eks.describe_cluster.return_value = {
+        "cluster": {"resourcesVpcConfig": {"vpcId": "vpc-abc"}},
+    }
+    ec2.describe_vpcs.return_value = {"Vpcs": [{"CidrBlock": "10.0.0.0/16"}]}
+    ec2.describe_subnets.return_value = {
+        "Subnets": [
+            {"SubnetId": "subnet-a", "AvailabilityZone": "us-west-2a", "MapPublicIpOnLaunch": False},
+            {"SubnetId": "subnet-b", "AvailabilityZone": "us-west-2b", "MapPublicIpOnLaunch": False},
+        ],
+    }
+    ec2.describe_security_groups.return_value = {"SecurityGroups": []}
+    ec2.create_security_group.return_value = {"GroupId": "sg-aoss"}
+    aoss.list_vpc_endpoints.return_value = {"vpcEndpointSummaries": []}
+    aoss.create_vpc_endpoint.return_value = {"createVpcEndpointDetail": {"id": "vpce-aoss"}}
+
+    endpoint_ids = ensure_opensearch_serverless_networking(
+        _cluster(slug="aws-prod"),
+        region="us-west-2",
+        clients=(ec2, aoss, eks),
+    )
+
+    assert endpoint_ids == ["vpce-aoss"]
+    create = aoss.create_vpc_endpoint.call_args.kwargs
+    assert create["vpcId"] == "vpc-abc"
+    assert create["subnetIds"] == ["subnet-a", "subnet-b"]
+    assert create["securityGroupIds"] == ["sg-aoss"]
+    service = Session().get_service_model("opensearchserverless")
+    validate_parameters(create, service.operation_model("CreateVpcEndpoint").input_shape)
+
+
+def test_ensure_documentdb_networking_discovers_and_creates():
+    from botocore.session import Session
+    from botocore.validate import validate_parameters
+
+    ec2 = MagicMock()
+    eks = MagicMock()
+    docdb = MagicMock()
+    eks.describe_cluster.return_value = {
+        "cluster": {"resourcesVpcConfig": {"vpcId": "vpc-abc"}},
+    }
+    ec2.describe_vpcs.return_value = {"Vpcs": [{"CidrBlock": "10.0.0.0/16"}]}
+    ec2.describe_subnets.return_value = {
+        "Subnets": [
+            {
+                "SubnetId": "subnet-a",
+                "AvailabilityZone": "us-west-2a",
+                "MapPublicIpOnLaunch": False,
+            },
+            {
+                "SubnetId": "subnet-b",
+                "AvailabilityZone": "us-west-2b",
+                "MapPublicIpOnLaunch": False,
+            },
+        ],
+    }
+    ec2.describe_security_groups.return_value = {"SecurityGroups": []}
+    ec2.create_security_group.return_value = {"GroupId": "sg-documentdb"}
+
+    group, security_groups = ensure_documentdb_networking(
+        _cluster(slug="aws-prod"),
+        region="us-west-2",
+        clients=(ec2, docdb, eks),
+    )
+
+    assert group == "astrolift-aws-prod-docdb"
+    assert security_groups == ["sg-documentdb"]
+    subnet_call = docdb.create_db_subnet_group.call_args.kwargs
+    assert subnet_call["SubnetIds"] == ["subnet-a", "subnet-b"]
+    service = Session().get_service_model("docdb")
+    validate_parameters(
+        subnet_call,
+        service.operation_model("CreateDBSubnetGroup").input_shape,
+    )
+    ingress = ec2.authorize_security_group_ingress.call_args.kwargs
+    assert ingress["IpPermissions"][0]["FromPort"] == 27017

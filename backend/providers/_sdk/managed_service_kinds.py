@@ -157,6 +157,7 @@ KINDS = KindCatalog(
                 "DOCDB_USER",
                 "DOCDB_PASSWORD",
             ),
+            binding_envs_optional=("DOCDB_TLS", "DOCDB_RESOURCE_ARN"),
             snapshot_supported=True,
             cross_region_replicate_supported=True,
         ),

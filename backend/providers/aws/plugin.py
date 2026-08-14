@@ -32,6 +32,10 @@ from aws.ingress_alb import ALBIngressDriver
 from aws.managed.api_gateway_http import ApiGatewayHttpDriver
 from aws.managed.aurora import AuroraMySQLDriver, AuroraPostgresDriver
 from aws.managed.cdn_cloudfront import CloudFrontDriver
+from aws.managed.documentdb import (
+    DocumentDBProvisionedDriver,
+    DocumentDBServerlessV2Driver,
+)
 from aws.managed.dynamodb import DynamoDBDriver
 from aws.managed.elasticache_serverless import (
     ElastiCacheServerlessMemcachedDriver,
@@ -45,6 +49,10 @@ from aws.managed.model_endpoint_bedrock import AmazonBedrockDriver
 from aws.managed.mssql_rds import RDSSqlServerDriver
 from aws.managed.mysql_rds import RDSMySQLDriver
 from aws.managed.object_store_s3 import S3Driver
+from aws.managed.opensearch_serverless import (
+    OpenSearchServerlessSearchDriver,
+    OpenSearchServerlessVectorDriver,
+)
 from aws.managed.postgres_rds import RDSPostgresDriver
 from aws.managed.queue_sqs import SQSDriver
 from aws.managed.rds_proxy import RDSProxyDriver
@@ -91,6 +99,8 @@ PLUGIN = ProviderPlugin(
         ("mssql", "rds_sqlserver_standard"): RDSSqlServerDriver,
         ("mssql", "rds_sqlserver_enterprise"): RDSSqlServerDriver,
         ("database_proxy", "rds_proxy"): RDSProxyDriver,
+        ("document_db", "documentdb"): DocumentDBProvisionedDriver,
+        ("document_db", "documentdb_serverless_v2"): DocumentDBServerlessV2Driver,
         ("redis", "elasticache"): ElastiCacheRedisDriver,
         ("redis", "elasticache_valkey"): ElastiCacheRedisDriver,
         ("redis", "elasticache_serverless_valkey"): ElastiCacheServerlessRedisDriver,
@@ -99,7 +109,9 @@ PLUGIN = ProviderPlugin(
         ("cache", "elasticache_serverless_memcached"): ElastiCacheServerlessMemcachedDriver,
         ("cache", "elasticache_memcached"): ElastiCacheMemcachedDriver,
         ("vector_index", "opensearch_vector"): OpenSearchVectorDriver,
+        ("vector_index", "opensearch_serverless_vector"): OpenSearchServerlessVectorDriver,
         ("search", "opensearch"): OpenSearchSearchDriver,
+        ("search", "opensearch_serverless"): OpenSearchServerlessSearchDriver,
         ("time_series", "timestream"): TimestreamDriver,
         ("email", "ses"): AmazonSESDriver,
         ("model_endpoint", "bedrock"): AmazonBedrockDriver,

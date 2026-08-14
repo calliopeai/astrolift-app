@@ -4,6 +4,12 @@
 
 ### Added
 
+- Add AWS DocumentDB provisioned and Serverless v2 clusters with private
+  networking, encrypted storage, portable Mongo-compatible bindings, scaling,
+  backups, snapshot restore, deletion protection, and convergent teardown.
+- Add private-by-default OpenSearch Serverless search and vector collections
+  with cluster-scoped VPC endpoints, encryption/network/data policies,
+  SigV4 workload grants, and explicit destructive-delete acknowledgement.
 - Add AWS ElastiCache Serverless for Valkey, Redis OSS, and Memcached,
   node-based Valkey and Memcached, and durable MemoryDB with portable cache/Redis bindings, private
   networking, RBAC/password/IAM authentication, sizing, updates, snapshots
