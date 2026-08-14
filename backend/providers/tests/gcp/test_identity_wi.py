@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from gcp._errors import NotFoundError
+from gcp._errors import NotFoundError, ProviderError
 from gcp.identity_wi import (
     GCPWIConfig,
     GCPWorkloadIdentityDriver,
@@ -117,6 +117,11 @@ class FakeProjectIAMClient:
         return policy
 
 
+class FailingProjectIAMClient:
+    def get_project_iam_policy(self, *, project_id: str) -> dict[str, Any]:
+        raise RuntimeError("resource manager unavailable")
+
+
 @pytest.fixture
 def fake_iam() -> FakeIAMClient:
     _NotFound.__name__ = "NotFound"
@@ -205,6 +210,23 @@ def test_create_identity_role_deduplicates_project_roles(
         permissions=[{"role": "roles/storage.objectViewer"}],
     )
     assert len(project_iam.set_calls) == 1
+
+
+def test_create_identity_role_surfaces_project_iam_failure(
+    fake_iam: FakeIAMClient,
+) -> None:
+    driver = GCPWorkloadIdentityDriver(
+        config=GCPWIConfig(
+            project_id="acme",
+            iam_client=fake_iam,
+            project_iam_client=FailingProjectIAMClient(),
+        ),
+    )
+    with pytest.raises(ProviderError, match="resource manager unavailable"):
+        driver.create_identity_role(
+            "service-account",
+            permissions=[{"role": "roles/pubsub.subscriber"}],
+        )
 
 
 @pytest.mark.parametrize(

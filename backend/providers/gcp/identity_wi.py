@@ -36,8 +36,8 @@ def service_account_id_for(name: str) -> str:
     if normalized == name and _ACCOUNT_ID_RE.fullmatch(normalized):
         return normalized
 
-    digest = hashlib.sha256(name.encode("utf-8")).hexdigest()[:8]
-    prefix = (normalized or "astrolift")[:21].rstrip("-") or "astrolift"
+    digest = hashlib.sha256(name.encode("utf-8")).hexdigest()[:10]
+    prefix = (normalized or "astrolift")[:19].rstrip("-") or "astrolift"
     candidate = f"{prefix}-{digest}"
     if not candidate[0].isalpha():
         candidate = f"a-{candidate}"[:30].rstrip("-")
