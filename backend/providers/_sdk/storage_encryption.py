@@ -128,6 +128,15 @@ POLICIES: dict[tuple[str, str, str], EncryptionPolicy] = {
         cmek_required_for_compliance=("pci", "hipaa"),
         notes=("Spanner database CMEK is selected at creation; restored databases can select replacement keys."),
     ),
+    ("gcp", "event_stream", "managed_kafka"): EncryptionPolicy(
+        mode="cloud_kms",
+        cmek_supported=True,
+        cmek_required_for_compliance=("pci", "hipaa"),
+        notes=(
+            "Managed Kafka supports an immutable regional Cloud KMS key at cluster creation; "
+            "transport is TLS and optional CA Service trust enables mTLS."
+        ),
+    ),
     # Azure
     ("azure", "object_store", "blob"): EncryptionPolicy(
         mode="cloud_kms",

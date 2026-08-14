@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add Google Managed Service for Apache Kafka lifecycle across clusters,
+  topics, ACLs, consumer offsets, Schema Registry, Connect clusters and
+  connectors, including PSC networking, CMEK, mTLS, IAM/portable bindings,
+  guarded adoption, data-loss confirmations, and integration observability.
 - Add Cloud Spanner Graph lifecycle on Enterprise and Enterprise Plus with
   GoogleSQL/GQL property graphs, fixed or autoscaled capacity, atomic custom
   schemas, replay-safe DDL, CMEK, exact backups and restore, portable IAM
