@@ -20,6 +20,7 @@ from aws.managed._networking import (
     ensure_documentdb_networking,
     ensure_keyspaces_networking,
     ensure_memorydb_networking,
+    ensure_neptune_networking,
     ensure_opensearch_serverless_networking,
 )
 
@@ -381,6 +382,38 @@ def test_keyspaces_config_uses_cloud_identity_and_portable_defaults():
     assert cfg.vpc_endpoint_id == "vpce-keyspaces"
 
 
+def test_neptune_variants_use_private_networking_and_cloud_identity():
+    from aws.managed.neptune import NeptuneConfig
+
+    provider_config = {
+        "account_id": "123456789012",
+        "neptune_subnet_group": "neptune-private",
+        "neptune_security_group_ids": ["sg-neptune"],
+        "neptune_cluster_name_prefix": "platform",
+        "neptune_backup_retention_days": 14,
+    }
+    provisioned = managed_config_for(
+        "aws",
+        _cluster(provider_config),
+        kind="graph_db",
+        variant="neptune",
+    )
+    serverless = managed_config_for(
+        "aws",
+        _cluster(provider_config),
+        kind="graph_db",
+        variant="neptune_serverless",
+    )
+
+    assert isinstance(provisioned, NeptuneConfig)
+    assert provisioned.serverless_v2 is False
+    assert serverless.serverless_v2 is True
+    assert serverless.account_id == "123456789012"
+    assert serverless.db_subnet_group == "neptune-private"
+    assert serverless.security_group_ids == ["sg-neptune"]
+    assert serverless.backup_retention_days == 14
+
+
 def test_every_registered_managed_service_driver_has_a_config_builder():
     """Regression guard for #1037 / #982: every (kind, variant) the AWS
     plugin registers a managed-service driver for MUST resolve through
@@ -409,6 +442,8 @@ def test_every_registered_managed_service_driver_has_a_config_builder():
             "account_id": "123456789012",
             "opensearch_serverless_vpc_endpoint_ids": ["vpce-aoss"],
             "keyspaces_vpc_endpoint_id": "vpce-keyspaces",
+            "neptune_subnet_group": "neptune-subnets",
+            "neptune_security_group_ids": ["sg-neptune"],
         },
     )
     for kind, variant in PLUGIN.managed_service_drivers:
@@ -652,3 +687,50 @@ def test_ensure_keyspaces_networking_creates_private_interface_endpoint():
     validate_parameters(create, service.operation_model("CreateVpcEndpoint").input_shape)
     ingress = ec2.authorize_security_group_ingress.call_args.kwargs
     assert ingress["IpPermissions"][0]["FromPort"] == 9142
+
+
+def test_ensure_neptune_networking_creates_private_subnet_group_and_sg():
+    from botocore.session import Session
+    from botocore.validate import validate_parameters
+
+    ec2 = MagicMock()
+    eks = MagicMock()
+    neptune = MagicMock()
+    eks.describe_cluster.return_value = {
+        "cluster": {"resourcesVpcConfig": {"vpcId": "vpc-abc"}},
+    }
+    ec2.describe_vpcs.return_value = {"Vpcs": [{"CidrBlock": "10.0.0.0/16"}]}
+    ec2.describe_subnets.return_value = {
+        "Subnets": [
+            {
+                "SubnetId": "subnet-a",
+                "AvailabilityZone": "us-west-2a",
+                "MapPublicIpOnLaunch": False,
+            },
+            {
+                "SubnetId": "subnet-b",
+                "AvailabilityZone": "us-west-2b",
+                "MapPublicIpOnLaunch": False,
+            },
+        ],
+    }
+    ec2.describe_security_groups.return_value = {"SecurityGroups": []}
+    ec2.create_security_group.return_value = {"GroupId": "sg-neptune"}
+
+    group, security_groups = ensure_neptune_networking(
+        _cluster(slug="aws-prod"),
+        region="us-west-2",
+        clients=(ec2, neptune, eks),
+    )
+
+    assert group == "astrolift-aws-prod-neptune"
+    assert security_groups == ["sg-neptune"]
+    subnet_call = neptune.create_db_subnet_group.call_args.kwargs
+    assert subnet_call["SubnetIds"] == ["subnet-a", "subnet-b"]
+    service = Session().get_service_model("neptune")
+    validate_parameters(
+        subnet_call,
+        service.operation_model("CreateDBSubnetGroup").input_shape,
+    )
+    ingress = ec2.authorize_security_group_ingress.call_args.kwargs
+    assert ingress["IpPermissions"][0]["FromPort"] == 8182

@@ -483,6 +483,57 @@ def ensure_documentdb_networking(
     return subnet_group, security_group_ids
 
 
+def ensure_neptune_networking(
+    cluster,
+    *,
+    region: str,
+    clients: Any | None = None,
+) -> tuple[str, list[str]]:
+    """Find or create a Neptune-specific subnet group and access SG."""
+
+    pc = cluster.provider_config or {}
+    if pc.get("neptune_subnet_group") and pc.get("neptune_security_group_ids"):
+        return str(pc["neptune_subnet_group"]), list(pc["neptune_security_group_ids"])
+    if clients is None:
+        import boto3
+
+        ec2 = boto3.client("ec2", region_name=region)
+        neptune = boto3.client("neptune", region_name=region)
+        eks = boto3.client("eks", region_name=region)
+    else:
+        ec2, neptune, eks = clients
+    vpc_id, subnet_ids, vpc_cidr = discover_vpc(
+        cluster,
+        region=region,
+        ec2=ec2,
+        eks=eks,
+    )
+    subnet_group = str(pc.get("neptune_subnet_group") or f"astrolift-{cluster.slug}-neptune")[:63]
+    if not pc.get("neptune_subnet_group"):
+        try:
+            neptune.create_db_subnet_group(
+                DBSubnetGroupName=subnet_group,
+                DBSubnetGroupDescription="astrolift managed Neptune subnets",
+                SubnetIds=list(pc.get("neptune_subnet_ids") or subnet_ids),
+                Tags=_MANAGED_TAGS,
+            )
+        except Exception as exc:
+            if "DBSubnetGroupAlreadyExists" not in type(exc).__name__ and "already exists" not in str(exc).lower():
+                raise
+    security_group_ids = list(pc.get("neptune_security_group_ids") or [])
+    if not security_group_ids:
+        security_group_ids = [
+            ensure_security_group(
+                vpc_id=vpc_id,
+                vpc_cidr=vpc_cidr,
+                port=8182,
+                name=f"astrolift-{cluster.slug}-neptune"[:255],
+                ec2=ec2,
+            ),
+        ]
+    return subnet_group, security_group_ids
+
+
 def ensure_keyspaces_networking(
     cluster,
     *,

@@ -137,6 +137,15 @@ def test_wide_column_contract_carries_table_auth_and_port() -> None:
     assert "WIDE_COLUMN_AUTH_MODE" in wide_column.binding_envs_optional
 
 
+def test_graph_database_contract_carries_reader_auth_and_resource_identity() -> None:
+    graph_db = KINDS.get("graph_db")
+
+    assert graph_db is not None
+    assert "GRAPH_DB_READER_URL" in graph_db.binding_envs_optional
+    assert "GRAPH_DB_AUTH_MODE" in graph_db.binding_envs_optional
+    assert "GRAPH_DB_RESOURCE_ARN" in graph_db.binding_envs_optional
+
+
 def test_validate_unknown_kind_returns_empty() -> None:
     """Unknown kinds skip validation (operator-defined kinds may
     not yet be in the canonical catalog)."""
