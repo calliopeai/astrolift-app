@@ -103,11 +103,7 @@ def test_envelope_keys_for_known_kinds():
 def test_every_portable_resource_kind_has_an_environment_envelope():
     from _sdk.managed_service_kinds import KINDS
 
-    missing = {
-        kind.name
-        for kind in KINDS.kinds
-        if not envelope_keys_for(kind.name)
-    }
+    missing = {kind.name for kind in KINDS.kinds if not envelope_keys_for(kind.name)}
 
     assert missing == set()
 
