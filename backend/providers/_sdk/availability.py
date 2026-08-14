@@ -215,6 +215,14 @@ MATRIX = AvailabilityMatrix(
             description="Amazon ElastiCache for Redis",
         ),
         ManagedServiceEntry(
+            kind="redis",
+            variant="elasticache_valkey",
+            plugin_id="aws",
+            status="preview",
+            description="Amazon ElastiCache node-based replication group for Valkey",
+            issue_url=_AWS_RELATIONAL_CACHE_ISSUE,
+        ),
+        ManagedServiceEntry(
             kind="kv_store",
             variant="dynamodb",
             plugin_id="aws",
@@ -427,7 +435,7 @@ MATRIX = AvailabilityMatrix(
             kind="redis",
             variant="memorydb",
             plugin_id="aws",
-            status="planned",
+            status="preview",
             description="Amazon MemoryDB durable Valkey/Redis-compatible database",
             issue_url=_AWS_RELATIONAL_CACHE_ISSUE,
         ),

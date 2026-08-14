@@ -303,3 +303,61 @@ def ensure_serverless_cache_networking(
             )
         security_group_ids = [sg_id]
     return list(pc.get("serverless_cache_subnet_ids") or subnet_ids), security_group_ids
+
+
+def ensure_memorydb_networking(
+    cluster,
+    *,
+    region: str,
+    clients: Any | None = None,
+) -> tuple[str, list[str]]:
+    """Find or create the private subnet group and access group for MemoryDB."""
+
+    pc = cluster.provider_config or {}
+    if pc.get("memorydb_subnet_group") and pc.get("memorydb_security_group_ids"):
+        return str(pc["memorydb_subnet_group"]), list(pc["memorydb_security_group_ids"])
+
+    if clients is None:
+        import boto3
+
+        ec2 = boto3.client("ec2", region_name=region)
+        memorydb = boto3.client("memorydb", region_name=region)
+        eks = boto3.client("eks", region_name=region)
+    else:
+        ec2, memorydb, eks = clients
+    vpc_id, subnet_ids, vpc_cidr = discover_vpc(
+        cluster,
+        region=region,
+        ec2=ec2,
+        eks=eks,
+    )
+    subnet_group = str(pc.get("memorydb_subnet_group") or f"astrolift-{cluster.slug}-memorydb")[:40]
+    if not pc.get("memorydb_subnet_group"):
+        try:
+            memorydb.create_subnet_group(
+                SubnetGroupName=subnet_group,
+                Description="astrolift managed MemoryDB subnets",
+                SubnetIds=subnet_ids,
+                Tags=_MANAGED_TAGS,
+            )
+        except Exception as exc:
+            if (
+                "SubnetGroupAlreadyExists" not in type(exc).__name__
+                and "already exists"
+                not in str(
+                    exc,
+                ).lower()
+            ):
+                raise
+    security_group_ids = list(pc.get("memorydb_security_group_ids") or [])
+    if not security_group_ids:
+        security_group_ids = [
+            ensure_security_group(
+                vpc_id=vpc_id,
+                vpc_cidr=vpc_cidr,
+                port=6379,
+                name=f"astrolift-{cluster.slug}-memorydb"[:255],
+                ec2=ec2,
+            )
+        ]
+    return subnet_group, security_group_ids

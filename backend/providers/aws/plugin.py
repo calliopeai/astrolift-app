@@ -40,6 +40,7 @@ from aws.managed.elasticache_serverless import (
 from aws.managed.email_ses import AmazonSESDriver
 from aws.managed.faas_lambda import LambdaDriver
 from aws.managed.memcached_elasticache import ElastiCacheMemcachedDriver
+from aws.managed.memorydb import MemoryDBDriver
 from aws.managed.model_endpoint_bedrock import AmazonBedrockDriver
 from aws.managed.mssql_rds import RDSSqlServerDriver
 from aws.managed.mysql_rds import RDSMySQLDriver
@@ -91,8 +92,10 @@ PLUGIN = ProviderPlugin(
         ("mssql", "rds_sqlserver_enterprise"): RDSSqlServerDriver,
         ("database_proxy", "rds_proxy"): RDSProxyDriver,
         ("redis", "elasticache"): ElastiCacheRedisDriver,
+        ("redis", "elasticache_valkey"): ElastiCacheRedisDriver,
         ("redis", "elasticache_serverless_valkey"): ElastiCacheServerlessRedisDriver,
         ("redis", "elasticache_serverless_redis"): ElastiCacheServerlessRedisDriver,
+        ("redis", "memorydb"): MemoryDBDriver,
         ("cache", "elasticache_serverless_memcached"): ElastiCacheServerlessMemcachedDriver,
         ("cache", "elasticache_memcached"): ElastiCacheMemcachedDriver,
         ("vector_index", "opensearch_vector"): OpenSearchVectorDriver,

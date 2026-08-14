@@ -545,6 +545,30 @@ def managed_config_for(
             transit_encryption_default=bool(pc.get("transit_encryption_default", True)),
         )
 
+    if kind == "redis" and variant == "memorydb":
+        from aws.managed._networking import ensure_memorydb_networking
+        from aws.managed.memorydb import MemoryDBConfig
+
+        subnet_group, sg_ids = ensure_memorydb_networking(
+            cluster,
+            region=region,
+        )
+        return MemoryDBConfig(
+            region=region,
+            subnet_group=subnet_group,
+            security_group_ids=sg_ids,
+            engine=str(pc.get("memorydb_engine", "valkey")),
+            cluster_name_prefix=str(pc.get("instance_name_prefix", "astrolift")),
+            engine_version=str(pc.get("memorydb_engine_version", "")),
+            snapshot_retention_days=int(pc.get("snapshot_retention_days", 7)),
+            kms_key_arn=str(pc.get("kms_key_id", "")),
+            tls_enabled_default=bool(pc.get("transit_encryption_default", True)),
+            secrets_manager_prefix=str(
+                pc.get("managed_service_secrets_prefix", "astrolift/managed"),
+            ),
+            auth_mode_default=str(pc.get("memorydb_auth_mode", "password")),
+        )
+
     if kind == "redis":
         from aws.managed._networking import ensure_db_networking
         from aws.managed.redis_elasticache import ElastiCacheConfig
@@ -559,6 +583,7 @@ def managed_config_for(
             region=region,
             cache_subnet_group=subnet_group,
             security_group_ids=sg_ids,
+            engine="valkey" if variant == "elasticache_valkey" else "redis",
             replication_group_prefix=str(pc.get("instance_name_prefix", "astrolift")),
             engine_version=str(pc.get("redis_engine_version", "")),
             transit_encryption_default=bool(pc.get("transit_encryption_default", True)),
