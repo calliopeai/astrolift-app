@@ -508,6 +508,25 @@ def test_deprovision_default_retains_via_continuous_backup(
     assert mgmt.database_accounts_obj.backup_policy_updates
 
 
+def test_deprovision_backup_failure_does_not_delete_account(
+    driver: AzureCosmosDriver,
+    mgmt: FakeMgmtClient,
+) -> None:
+    provisioned = driver.provision(_spec())
+    account_name = provisioned.handle.split("/", 1)[1]
+
+    def boom(**_kwargs):
+        raise RuntimeError("continuous backup unavailable")
+
+    mgmt.database_accounts_obj.begin_update = boom  # type: ignore[assignment]
+    result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle))
+    assert not result.ok
+    assert result.retryable is False
+    assert "continuous backup" in result.message
+    assert account_name in mgmt.database_accounts_obj.accounts
+    assert account_name not in mgmt.database_accounts_obj.delete_calls
+
+
 def test_deprovision_delete_data_skips_backup_enable(
     driver: AzureCosmosDriver,
     mgmt: FakeMgmtClient,

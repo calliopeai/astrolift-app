@@ -65,11 +65,12 @@ COPY . .
 # importlib.metadata.entry_points(). Extras pulled:
 # - aws  -> boto3 (already pinned in Pipfile) + kubernetes + PyYAML
 # - gcp  -> GKE, Secret Manager, Cloud DNS, Pub/Sub + kubernetes + PyYAML
-# - k8s  -> kubernetes + PyYAML
-# Azure remains an environment-specific extra until the Azure controller is
-# promoted to the same runtime support tier. GCP is installed in the standard
-# control-plane image because its managed-service catalogue is executable.
-RUN pip install --no-cache-dir ./providers[aws,gcp,k8s]
+# - azure -> Azure control-plane/data clients + kubernetes + PyYAML
+# - k8s   -> kubernetes + PyYAML
+# Every provider advertised by the runtime catalogue must be constructible in
+# the standard image; otherwise an Azure lifecycle request reaches the plugin
+# registry and fails only when the optional SDK import runs.
+RUN pip install --no-cache-dir ./providers[aws,gcp,azure,k8s]
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1

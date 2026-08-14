@@ -18,6 +18,7 @@ from typing import Any
 
 import pytest
 
+from _sdk import UnsupportedOperationError
 from _sdk.managed_service import (
     DeprovisionSpec,
     ProvisionSpec,
@@ -111,14 +112,14 @@ class FakeDomainsOperations:
         self.domains[domain_name] = d
         return FakePoller(value=d)
 
-    def update(
+    def begin_update(
         self,
         *,
         resource_group_name: str,
         email_service_name: str,
         domain_name: str,
         parameters: dict[str, Any],
-    ) -> FakeDomain:
+    ) -> FakePoller:
         self.update_calls.append(
             {"name": domain_name, "parameters": parameters},
         )
@@ -127,7 +128,7 @@ class FakeDomainsOperations:
             raise _NotFound(domain_name)
         props = parameters.get("properties") or {}
         d.properties.update(props)
-        return d
+        return FakePoller(value=d)
 
     def begin_delete(
         self,
@@ -706,34 +707,21 @@ def test_binding_for_missing_raises(
 # ---- snapshot + restore -----------------------------------------
 
 
-def test_snapshot_returns_deterministic_id(
+def test_snapshot_is_explicitly_unsupported(
     driver: AzureCommunicationEmailDriver,
 ) -> None:
-    provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
-    domain_name = provisioned.handle.split("/", 1)[1]
-    assert snap.snapshot_id.startswith(_safe(domain_name))
+    with pytest.raises(UnsupportedOperationError, match="no snapshot API"):
+        driver.snapshot(ServiceHandle(handle="email/anything"))
 
 
-def test_snapshot_for_missing_raises(
+def test_restore_is_explicitly_unsupported(
     driver: AzureCommunicationEmailDriver,
 ) -> None:
-    with pytest.raises(AzureCommunicationEmailError):
-        driver.snapshot(ServiceHandle(handle="email/missing"))
+    from _sdk.managed_service import SnapshotHandle
 
-
-def test_restore_provisions_target_domain(
-    driver: AzureCommunicationEmailDriver,
-    mgmt: FakeMgmtClient,
-) -> None:
-    provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
-
-    restore_spec = _spec(service_handle_hint="restored")
-    result = driver.restore(snap, restore_spec)
-    assert result.ok
-    target_name = result.handle.split("/", 1)[1]
-    assert target_name in mgmt.domains_obj.domains
+    snapshot = SnapshotHandle("email/source", "not-a-backup", "2026-08-14T00:00:00Z")
+    with pytest.raises(UnsupportedOperationError, match="cannot be restored"):
+        driver.restore(snapshot, _spec(service_handle_hint="restored"))
 
 
 # ---- naming + helpers -------------------------------------------

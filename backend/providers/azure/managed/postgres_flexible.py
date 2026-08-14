@@ -20,8 +20,8 @@ across clouds. Differences that matter:
   driver respects the lock unless ``force_destroy=True`` is passed.
 * Azure's delete operation does not have a built-in
   "skip final snapshot" toggle. To preserve the data path on
-  ``delete_data=False``, the driver triggers a manual long-term
-  backup (``server_backups.begin_put``) before the delete call. On
+  ``delete_data=False``, the driver triggers an on-demand backup
+  (``backups_automatic_and_on_demand.begin_create``) before the delete call. On
   ``delete_data=True`` the backup is skipped and the server is
   deleted directly.
 * Master credentials are persisted to Azure Key Vault. The driver
@@ -176,9 +176,7 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
             self._mgmt = config.mgmt_client
         else:
             from azure.identity import DefaultAzureCredential
-            from azure.mgmt.rdbms.postgresql_flexibleservers import (
-                PostgreSQLManagementClient,
-            )
+            from azure.mgmt.postgresqlflexibleservers import PostgreSQLManagementClient
 
             self._mgmt = PostgreSQLManagementClient(
                 credential=DefaultAzureCredential(),
@@ -291,7 +289,7 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
             }
 
         try:
-            poller = self._mgmt.servers.begin_create(
+            poller = self._mgmt.servers.begin_create_or_update(
                 resource_group_name=self._config.resource_group,
                 server_name=server_name,
                 parameters=parameters,
@@ -453,7 +451,7 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
         snapshot_taken = False
         if not delete_data:
             try:
-                self._mgmt.backups.begin_put(
+                self._mgmt.backups_automatic_and_on_demand.begin_create(
                     resource_group_name=self._config.resource_group,
                     server_name=server_name,
                     backup_name=_final_backup_name(
@@ -578,14 +576,14 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
         server_name = self._server_name_from_handle(handle.handle)
         backup_name = f"{server_name}-snap-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
         try:
-            self._mgmt.backups.begin_put(
+            self._mgmt.backups_automatic_and_on_demand.begin_create(
                 resource_group_name=self._config.resource_group,
                 server_name=server_name,
                 backup_name=backup_name,
             ).result()
         except Exception as exc:
             raise AzurePostgresError(
-                f"backups.begin_put: {exc}",
+                f"backups_automatic_and_on_demand.begin_create: {exc}",
             ) from exc
         return SnapshotHandle(
             handle=handle.handle,
@@ -602,7 +600,7 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
         target_server = self._server_name_for(spec=target)
         source_server = self._server_name_from_handle(snapshot.handle)
         try:
-            poller = self._mgmt.servers.begin_create(
+            poller = self._mgmt.servers.begin_create_or_update(
                 resource_group_name=self._config.resource_group,
                 server_name=target_server,
                 parameters={

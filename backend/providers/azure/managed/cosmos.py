@@ -173,7 +173,7 @@ class AzureCosmosDriver(ManagedServiceDriver):
         else:
             try:
                 from azure.identity import DefaultAzureCredential
-                from azure.mgmt.resource import ManagementLockClient
+                from azure.mgmt.resource.locks import ManagementLockClient
 
                 self._locks = ManagementLockClient(
                     credential=DefaultAzureCredential(),
@@ -456,9 +456,18 @@ class AzureCosmosDriver(ManagedServiceDriver):
             try:
                 self._ensure_continuous_backup(account_name=account_name)
                 retained = True
-            except Exception:
-                # Best-effort: don't block delete on backup config.
-                retained = False
+            except Exception as exc:
+                return DeprovisionResult(
+                    ok=False,
+                    handle=spec.handle,
+                    message=(
+                        f"cosmos account {account_name} cannot be removed "
+                        f"safely because continuous backup could not be "
+                        f"enabled: {exc}"
+                    ),
+                    errors=["backup_required", str(exc)],
+                    retryable=False,
+                )
 
         try:
             poller = self._mgmt.database_accounts.begin_delete(

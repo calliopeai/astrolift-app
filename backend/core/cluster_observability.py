@@ -655,6 +655,276 @@ def _optional_string(value: Any) -> str | None:
     return str(value) if value not in (None, "") else None
 
 
+def _azure_managed_config_for(
+    cluster: TenantCluster,
+    *,
+    kind: str,
+    variant: str,
+    provider_config: dict[str, Any],
+    auth_config: dict[str, Any],
+    region: str,
+) -> Any:
+    """Build configs for every executable Azure managed-service driver.
+
+    Azure's provider package has shipped managed-service drivers for several
+    releases, but the lifecycle resolver historically rejected every Azure
+    request before constructing one.  Keep all install-scoped controls here so
+    provisioning, update, status, binding, snapshot, and teardown instantiate
+    the same driver configuration.
+    """
+
+    pc = provider_config
+    ac = auth_config
+    subscription_id = str(pc.get("subscription_id") or ac.get("subscription_id") or "")
+    resource_group = str(pc.get("resource_group") or ac.get("resource_group") or "")
+    location = str(pc.get("location") or region or "eastus")
+    if not subscription_id:
+        raise ClusterObservabilityError(
+            f"cluster {cluster.slug}: Azure managed service {kind!r} requires "
+            "provider_config.subscription_id",
+        )
+    if not resource_group:
+        raise ClusterObservabilityError(
+            f"cluster {cluster.slug}: Azure managed service {kind!r} requires provider_config.resource_group",
+        )
+
+    pair = (kind, variant)
+    storage_account = str(pc.get("storage_account") or "")
+    servicebus_namespace = str(pc.get("servicebus_namespace") or "")
+    vault_url = str(pc.get("vault_url") or pc.get("keyvault_url") or "")
+
+    if pair == ("object_store", "blob"):
+        from azure.managed.object_store_blob import BlobStorageConfig
+
+        if not storage_account:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: Azure object_store/blob requires provider_config.storage_account",
+            )
+        return BlobStorageConfig(
+            storage_account=storage_account,
+            container_name_prefix=str(pc.get("blob_container_name_prefix", "astrolift")),
+            versioning_enabled=bool(pc.get("blob_versioning_enabled", True)),
+        )
+
+    if pair == ("object_store", "azure_blob") or (kind == "object_store" and not variant):
+        from azure.managed.object_store_blob import AzureBlobConfig
+
+        if not storage_account:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: Azure object_store/azure_blob requires "
+                "provider_config.storage_account",
+            )
+        return AzureBlobConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            storage_account=storage_account,
+            container_name_prefix=str(pc.get("blob_container_name_prefix", "astrolift")),
+            versioning_enabled=bool(pc.get("blob_versioning_enabled", True)),
+        )
+
+    if pair == ("queue", "servicebus"):
+        from azure.managed.queue_servicebus import ServiceBusConfig
+
+        if not servicebus_namespace:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: Azure queue/servicebus requires "
+                "provider_config.servicebus_namespace",
+            )
+        return ServiceBusConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            namespace_name=servicebus_namespace,
+            queue_name_prefix=str(pc.get("servicebus_queue_name_prefix", "astrolift")),
+            max_size_in_megabytes=int(pc.get("servicebus_max_size_in_megabytes", 1024)),
+            enable_partitioning=bool(pc.get("servicebus_enable_partitioning", False)),
+        )
+
+    if pair == ("queue", "azure_servicebus") or (kind == "queue" and not variant):
+        from azure.managed.queue_servicebus import AzureServiceBusConfig
+
+        if not servicebus_namespace:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: Azure queue/azure_servicebus requires "
+                "provider_config.servicebus_namespace",
+            )
+        return AzureServiceBusConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            namespace_name=servicebus_namespace,
+            topic_name_prefix=str(pc.get("servicebus_topic_name_prefix", "astrolift")),
+            default_message_ttl=str(pc.get("servicebus_default_message_ttl", "P14D")),
+            max_size_in_megabytes=int(pc.get("servicebus_max_size_in_megabytes", 1024)),
+            enable_partitioning=bool(pc.get("servicebus_enable_partitioning", False)),
+            dead_lettering_on_message_expiration=bool(
+                pc.get("servicebus_dead_lettering_on_message_expiration", True),
+            ),
+            max_delivery_count=int(pc.get("servicebus_max_delivery_count", 10)),
+            lock_duration=str(pc.get("servicebus_lock_duration", "PT30S")),
+        )
+
+    if pair == ("postgres", "azure_pg_flex") or (kind == "postgres" and not variant):
+        from azure.managed.postgres_flexible import AzurePostgresConfig
+
+        return AzurePostgresConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            location=location,
+            server_name_prefix=str(pc.get("postgres_server_name_prefix", "astrolift")),
+            engine_version=str(pc.get("postgres_engine_version", "16")),
+            backup_retention_days=int(pc.get("postgres_backup_retention_days", 7)),
+            high_availability_default=str(pc.get("postgres_high_availability_default", "Disabled")),
+            deletion_protection_default=bool(pc.get("postgres_deletion_protection_default", True)),
+            keyvault_url=vault_url,
+            secret_name_prefix=str(pc.get("postgres_secret_name_prefix", "astrolift-pg")),
+        )
+
+    if pair == ("mysql", "azure_mysql_flex") or (kind == "mysql" and not variant):
+        from azure.managed.mysql_flexible import AzureMySQLConfig
+
+        return AzureMySQLConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            location=location,
+            server_name_prefix=str(pc.get("mysql_server_name_prefix", "astrolift")),
+            engine_version=str(pc.get("mysql_engine_version", "8.0.21")),
+            backup_retention_days=int(pc.get("mysql_backup_retention_days", 7)),
+            high_availability_default=str(pc.get("mysql_high_availability_default", "Disabled")),
+            deletion_protection_default=bool(pc.get("mysql_deletion_protection_default", True)),
+            keyvault_url=vault_url,
+            secret_name_prefix=str(pc.get("mysql_secret_name_prefix", "astrolift-mysql")),
+        )
+
+    if pair == ("redis", "azure_cache_redis") or (kind == "redis" and not variant):
+        from azure.managed.cache_redis import AzureCacheRedisConfig
+
+        return AzureCacheRedisConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            location=location,
+            cache_name_prefix=str(pc.get("redis_cache_name_prefix", "astrolift")),
+            default_sku=str(pc.get("redis_default_sku", "Standard_C1")),
+            minimum_tls_version_default=str(pc.get("redis_minimum_tls_version_default", "1.2")),
+            enable_non_ssl_port_default=bool(pc.get("redis_enable_non_ssl_port_default", False)),
+            keyvault_url=vault_url,
+            secret_name_prefix=str(pc.get("redis_secret_name_prefix", "astrolift-redis")),
+            backup_container_uri=str(pc.get("redis_backup_container_uri", "")),
+            backup_storage_subscription_id=str(
+                pc.get("redis_backup_storage_subscription_id", ""),
+            ),
+        )
+
+    if pair == ("kv_store", "cosmos") or (kind == "kv_store" and not variant):
+        from azure.managed.cosmos import AzureCosmosConfig
+
+        return AzureCosmosConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            location=location,
+            account_name_prefix=str(pc.get("cosmos_account_name_prefix", "astrolift")),
+            database_name_default=str(pc.get("cosmos_database_name_default", "astrolift")),
+            default_api_kind=str(pc.get("cosmos_default_api_kind", "MongoDB")),
+            backup_policy_default=str(pc.get("cosmos_backup_policy_default", "Continuous")),
+            keyvault_url=vault_url,
+            secret_name_prefix=str(pc.get("cosmos_secret_name_prefix", "astrolift-cosmos")),
+        )
+
+    if pair == ("search", "azure_ai_search_fulltext") or (kind == "search" and not variant):
+        from azure.managed.search_aisearch import AzureAISearchConfig
+
+        return AzureAISearchConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            location=location,
+            service_name_prefix=str(pc.get("ai_search_service_name_prefix", "astrolift")),
+            default_sku=str(pc.get("ai_search_default_sku", "basic")),
+            replica_count_default=int(pc.get("ai_search_replica_count_default", 1)),
+            partition_count_default=int(pc.get("ai_search_partition_count_default", 1)),
+            public_network_access_default=str(
+                pc.get("ai_search_public_network_access_default", "enabled"),
+            ),
+            keyvault_url=vault_url,
+            secret_name_prefix=str(pc.get("ai_search_secret_name_prefix", "astrolift-search")),
+        )
+
+    if pair == ("vector_index", "azure_ai_search_vector") or (kind == "vector_index" and not variant):
+        from azure.managed.vector_search import AzureAISearchVectorConfig
+
+        return AzureAISearchVectorConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            location=location,
+            service_name_prefix=str(pc.get("ai_search_vector_service_name_prefix", "astrolift-vec")),
+            default_sku=str(pc.get("ai_search_vector_default_sku", "basic")),
+            embedding_dimension_default=int(pc.get("ai_search_embedding_dimension_default", 1536)),
+            vector_search_profile_default=str(
+                pc.get("ai_search_vector_profile_default", "default-profile"),
+            ),
+            algorithm_default=str(pc.get("ai_search_vector_algorithm_default", "hnsw")),
+            keyvault_url=vault_url,
+            secret_name_prefix=str(pc.get("ai_search_vector_secret_name_prefix", "astrolift-aisearch")),
+        )
+
+    if pair == ("time_series", "azure_monitor_prometheus") or (kind == "time_series" and not variant):
+        from azure.managed.timeseries_monitor import AzureMonitorPrometheusConfig
+
+        return AzureMonitorPrometheusConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            location=location,
+            workspace_name_prefix=str(pc.get("monitor_workspace_name_prefix", "astrolift-tsdb")),
+            create_linked_log_analytics_default=bool(
+                pc.get("monitor_create_linked_log_analytics_default", True),
+            ),
+            public_network_access_default=str(pc.get("monitor_public_network_access_default", "Enabled")),
+        )
+
+    if pair == ("email", "azure_acs") or (kind == "email" and not variant):
+        from azure.managed.email_acs import AzureCommunicationEmailConfig
+
+        communication_resource_id = str(pc.get("acs_communication_resource_id") or "")
+        if not communication_resource_id:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: Azure email/azure_acs requires "
+                "provider_config.acs_communication_resource_id",
+            )
+        return AzureCommunicationEmailConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            location=str(pc.get("acs_email_location", "global")),
+            email_service_name=str(pc.get("acs_email_service_name", "astrolift-email")),
+            communication_resource_id=communication_resource_id,
+            default_domain_management=str(pc.get("acs_email_domain_management", "AzureManaged")),
+            keyvault_url=vault_url,
+            secret_name_prefix=str(pc.get("acs_email_secret_name_prefix", "astrolift-acs-email")),
+            delete_data_default=bool(pc.get("acs_email_delete_data_default", False)),
+        )
+
+    if pair == ("model_endpoint", "azure_openai") or (kind == "model_endpoint" and not variant):
+        from azure.managed.model_endpoint_aoai import AzureOpenAIConfig
+
+        account_name = str(pc.get("azure_openai_account_name") or pc.get("openai_account_name") or "")
+        if not account_name:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: Azure model_endpoint/azure_openai requires "
+                "provider_config.azure_openai_account_name",
+            )
+        return AzureOpenAIConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            account_name=account_name,
+            location=location,
+            deployment_name_prefix=str(pc.get("azure_openai_deployment_name_prefix", "astrolift")),
+            api_version=str(pc.get("azure_openai_api_version", "2024-02-15-preview")),
+            keyvault_url=vault_url,
+            secret_name_prefix=str(pc.get("azure_openai_secret_name_prefix", "astrolift-aoai")),
+        )
+
+    raise ClusterObservabilityError(
+        f"cluster {cluster.slug}: no Azure managed-service config builder for "
+        f"kind={kind!r}, variant={variant!r}",
+    )
+
+
 def managed_config_for(
     plugin_slug: str,
     cluster: TenantCluster,
@@ -681,6 +951,16 @@ def managed_config_for(
 
     if plugin_slug == "gcp":
         return _gcp_managed_config_for(
+            cluster,
+            kind=kind,
+            variant=variant,
+            provider_config=pc,
+            auth_config=ac,
+            region=region,
+        )
+
+    if plugin_slug == "azure":
+        return _azure_managed_config_for(
             cluster,
             kind=kind,
             variant=variant,

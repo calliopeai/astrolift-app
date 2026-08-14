@@ -101,13 +101,13 @@ class FakeRedisOperations:
         self.caches[name] = cache
         return FakePoller(value=cache)
 
-    def update(
+    def begin_update(
         self,
         *,
         resource_group_name: str,
         name: str,
         parameters: dict[str, Any],
-    ) -> FakeCache:
+    ) -> FakePoller:
         self.update_calls.append({"name": name, "parameters": parameters})
         cache = self.caches.get(name)
         if cache is None:
@@ -116,7 +116,7 @@ class FakeRedisOperations:
             cache.sku = dict(parameters["sku"])
         if "enable_non_ssl_port" in parameters:
             cache.port = 6379 if parameters["enable_non_ssl_port"] else 0
-        return cache
+        return FakePoller(value=cache)
 
     def begin_delete(
         self,
@@ -128,17 +128,6 @@ class FakeRedisOperations:
         if name not in self.caches:
             raise _NotFound(name)
         del self.caches[name]
-        return FakePoller(value=None)
-
-    def begin_purge(
-        self,
-        *,
-        resource_group_name: str,
-        name: str,
-    ) -> FakePoller:
-        if not self.purge_supported:
-            raise RuntimeError("purge not available in this region")
-        self.purge_calls.append(name)
         return FakePoller(value=None)
 
     def list_keys(
@@ -228,6 +217,25 @@ def driver(
             resource_group="rg-test",
             location="eastus",
             keyvault_url="https://kv.vault.azure.net",
+            mgmt_client=mgmt,
+            secret_client=secrets_client,
+        ),
+    )
+
+
+@pytest.fixture
+def backup_driver(
+    mgmt: FakeMgmtClient,
+    secrets_client: FakeSecretClient,
+) -> AzureCacheRedisDriver:
+    return AzureCacheRedisDriver(
+        config=AzureCacheRedisConfig(
+            subscription_id="sub-1",
+            resource_group="rg-test",
+            location="eastus",
+            keyvault_url="https://kv.vault.azure.net",
+            backup_container_uri=("https://backupstore.blob.core.windows.net/redis-backups"),
+            backup_storage_subscription_id="backup-sub",
             mgmt_client=mgmt,
             secret_client=secrets_client,
         ),
@@ -419,18 +427,17 @@ def test_update_noop_when_nothing_to_change(
 # ---- deprovision four-corner matrix -----------------------------
 
 
-def test_deprovision_default_takes_export_keeps_soft_delete(
+def test_deprovision_default_refuses_without_guaranteed_snapshot(
     driver: AzureCacheRedisDriver,
     mgmt: FakeMgmtClient,
 ) -> None:
     provisioned = driver.provision(_spec())
     cache_name = provisioned.handle.split("/", 1)[1]
     result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle))
-    assert result.ok
-    assert "export=taken" in result.message
-    assert "purged=soft-delete" in result.message
-    assert cache_name in mgmt.redis_obj.delete_calls
-    assert cache_name not in mgmt.redis_obj.purge_calls
+    assert not result.ok
+    assert result.retryable is False
+    assert "delete_data=True" in result.message
+    assert cache_name not in mgmt.redis_obj.delete_calls
 
 
 def test_deprovision_delete_data_only_skips_export(
@@ -444,13 +451,31 @@ def test_deprovision_delete_data_only_skips_export(
         delete_data=True,
     )
     assert result.ok
-    assert "export=skipped" in result.message
+    assert "data=dropped" in result.message
     # No export call for the cache when delete_data=True
     cache_exports = [c for c in mgmt.redis_obj.export_calls if c["name"] == cache_name]
     assert not cache_exports
 
 
-def test_deprovision_force_destroy_only_purges(
+def test_deprovision_exports_before_safe_delete(
+    backup_driver: AzureCacheRedisDriver,
+    mgmt: FakeMgmtClient,
+) -> None:
+    provisioned = backup_driver.provision(_spec(size="xlarge"))
+    cache_name = provisioned.handle.split("/", 1)[1]
+    result = backup_driver.deprovision(
+        DeprovisionSpec(handle=provisioned.handle),
+    )
+    assert result.ok
+    assert "data=retained in" in result.message
+    assert cache_name in mgmt.redis_obj.delete_calls
+    export = mgmt.redis_obj.export_calls[0]["parameters"]
+    assert export["container"].endswith("/redis-backups")
+    assert export["preferred_data_archive_auth_method"] == "ManagedIdentity"
+    assert export["storage_subscription_id"] == "backup-sub"
+
+
+def test_deprovision_force_destroy_does_not_override_data_guard(
     driver: AzureCacheRedisDriver,
     mgmt: FakeMgmtClient,
 ) -> None:
@@ -461,10 +486,9 @@ def test_deprovision_force_destroy_only_purges(
         delete_data=False,
         force_destroy=True,
     )
-    assert result.ok
-    assert "export=taken" in result.message
-    assert "purged=yes" in result.message
-    assert cache_name in mgmt.redis_obj.purge_calls
+    assert not result.ok
+    assert result.retryable is False
+    assert cache_name not in mgmt.redis_obj.delete_calls
 
 
 def test_deprovision_atomic_both_flags(
@@ -479,9 +503,8 @@ def test_deprovision_atomic_both_flags(
         force_destroy=True,
     )
     assert result.ok
-    assert "export=skipped" in result.message
-    assert "purged=yes" in result.message
-    assert cache_name in mgmt.redis_obj.purge_calls
+    assert "data=dropped" in result.message
+    assert cache_name in mgmt.redis_obj.delete_calls
 
 
 def test_deprovision_idempotent_when_already_gone(
@@ -525,18 +548,16 @@ def test_deprovision_keeps_secrets_on_data_retained_path(
     assert primary in secrets_client.secrets
 
 
-def test_deprovision_handles_export_failure_gracefully(
+def test_deprovision_guard_does_not_attempt_unsupported_export(
     driver: AzureCacheRedisDriver,
     mgmt: FakeMgmtClient,
 ) -> None:
-    """Standard-tier caches don't support export; we should NOT block
-    delete on the export failure (matches Memorystore + ElastiCache
-    best-effort posture)."""
     mgmt.redis_obj.export_supported = False
     provisioned = driver.provision(_spec())
     result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle))
-    assert result.ok
-    assert "export=skipped" in result.message
+    assert not result.ok
+    assert result.retryable is False
+    assert not mgmt.redis_obj.export_calls
 
 
 def test_deprovision_treats_mid_modify_as_retryable_without_force(
@@ -549,7 +570,10 @@ def test_deprovision_treats_mid_modify_as_retryable_without_force(
         raise RuntimeError("CacheNotInDesiredState: scaling")
 
     mgmt.redis_obj.begin_delete = boom  # type: ignore[assignment]
-    result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle))
+    result = driver.deprovision(
+        DeprovisionSpec(handle=provisioned.handle),
+        delete_data=True,
+    )
     assert not result.ok
     assert "mid-modify" in result.message
 
@@ -566,6 +590,7 @@ def test_deprovision_force_destroy_bypasses_mid_modify(
     mgmt.redis_obj.begin_delete = boom  # type: ignore[assignment]
     result = driver.deprovision(
         DeprovisionSpec(handle=provisioned.handle),
+        delete_data=True,
         force_destroy=True,
     )
     assert not result.ok
@@ -668,42 +693,42 @@ def test_binding_for_missing_raises(
 
 
 def test_snapshot_creates_handle(
-    driver: AzureCacheRedisDriver,
+    backup_driver: AzureCacheRedisDriver,
     mgmt: FakeMgmtClient,
 ) -> None:
-    provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
+    provisioned = backup_driver.provision(_spec())
+    snap = backup_driver.snapshot(ServiceHandle(handle=provisioned.handle))
     cache_name = provisioned.handle.split("/", 1)[1]
     assert snap.snapshot_id.startswith(cache_name)
     assert mgmt.redis_obj.export_calls
 
 
 def test_snapshot_surfaces_driver_error(
-    driver: AzureCacheRedisDriver,
+    backup_driver: AzureCacheRedisDriver,
     mgmt: FakeMgmtClient,
 ) -> None:
-    provisioned = driver.provision(_spec())
+    provisioned = backup_driver.provision(_spec())
     mgmt.redis_obj.export_supported = False
     with pytest.raises(AzureCacheRedisError):
-        driver.snapshot(ServiceHandle(handle=provisioned.handle))
+        backup_driver.snapshot(ServiceHandle(handle=provisioned.handle))
 
 
 def test_restore_from_snapshot_creates_new_cache(
-    driver: AzureCacheRedisDriver,
+    backup_driver: AzureCacheRedisDriver,
     mgmt: FakeMgmtClient,
 ) -> None:
-    provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
+    provisioned = backup_driver.provision(_spec())
+    snap = backup_driver.snapshot(ServiceHandle(handle=provisioned.handle))
 
     restore_spec = _spec(service_handle_hint="restored")
-    result = driver.restore(snap, restore_spec)
+    result = backup_driver.restore(snap, restore_spec)
     assert result.ok
     target_name = result.handle.split("/", 1)[1]
     assert target_name in mgmt.redis_obj.caches
 
 
 def test_restore_surfaces_error_on_failure(
-    driver: AzureCacheRedisDriver,
+    backup_driver: AzureCacheRedisDriver,
     mgmt: FakeMgmtClient,
 ) -> None:
     def boom(**_kwargs):
@@ -715,9 +740,28 @@ def test_restore_surfaces_error_on_failure(
         snapshot_id="snap-1",
         created_at="2026-05-15T00:00:00+00:00",
     )
-    result = driver.restore(snap, _spec(service_handle_hint="failed"))
+    result = backup_driver.restore(snap, _spec(service_handle_hint="failed"))
     assert not result.ok
     assert "begin_import_data" in result.message
+
+
+def test_snapshot_rejects_sas_in_provider_config(
+    mgmt: FakeMgmtClient,
+    secrets_client: FakeSecretClient,
+) -> None:
+    driver = AzureCacheRedisDriver(
+        config=AzureCacheRedisConfig(
+            subscription_id="sub-1",
+            resource_group="rg-test",
+            keyvault_url="https://kv.vault.azure.net",
+            backup_container_uri=("https://backupstore.blob.core.windows.net/redis?sig=secret"),
+            mgmt_client=mgmt,
+            secret_client=secrets_client,
+        ),
+    )
+    provisioned = driver.provision(_spec())
+    with pytest.raises(AzureCacheRedisError, match="non-secret HTTPS"):
+        driver.snapshot(ServiceHandle(handle=provisioned.handle))
 
 
 # ---- naming + helpers -------------------------------------------

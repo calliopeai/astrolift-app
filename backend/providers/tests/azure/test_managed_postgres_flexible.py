@@ -77,7 +77,7 @@ class FakeServersClient:
             raise _NotFound(server_name)
         return self.servers[server_name]
 
-    def begin_create(
+    def begin_create_or_update(
         self,
         *,
         resource_group_name: str,
@@ -145,7 +145,7 @@ class FakeBackupsClient:
     backups: dict[str, list[str]] = field(default_factory=dict)
     fail_next: bool = False
 
-    def begin_put(
+    def begin_create(
         self,
         *,
         resource_group_name: str,
@@ -169,7 +169,7 @@ class FakeMgmtClient:
         return self.servers_obj
 
     @property
-    def backups(self) -> FakeBackupsClient:
+    def backups_automatic_and_on_demand(self) -> FakeBackupsClient:
         return self.backups_obj
 
 
@@ -716,7 +716,7 @@ def test_restore_surfaces_error_on_failed_create(
     def boom(**_kwargs):
         raise RuntimeError("subscription quota exceeded")
 
-    mgmt.servers_obj.begin_create = boom  # type: ignore[assignment]
+    mgmt.servers_obj.begin_create_or_update = boom  # type: ignore[assignment]
 
     snap = SnapshotHandle(
         handle="postgres/some-source",

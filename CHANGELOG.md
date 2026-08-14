@@ -93,6 +93,10 @@
 
 ### Changed
 
+- Enable every registered Azure managed-service driver in the production image
+  and lifecycle resolver, install its current management/data SDKs, preserve
+  provider controls at runtime, and fail closed when snapshot or retained-data
+  semantics cannot be fulfilled.
 - Make project dashboards, navigation, and repository workflow detail pages
   workload-aware, graph-first, fully linked, and observable without requiring
   a configured workflow wrapper.
