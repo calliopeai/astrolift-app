@@ -245,7 +245,7 @@ def test_reveal_without_connection_ref_uses_placeholder(permission_resolver):
     assert all(k.value.startswith("placeholder:") for k in result.data.keys if k.is_secret)
 
 
-def test_reveal_kind_without_envelope_rejected(permission_resolver):
+def test_reveal_model_endpoint_returns_portable_envelope(permission_resolver):
     org, app, env = _scaffold()
     permission_resolver.grant(Permission.APP_READ)
     permission_resolver.grant(Permission.MANAGED_SERVICE_UPDATE)
@@ -263,8 +263,16 @@ def test_reveal_kind_without_envelope_rejected(permission_resolver):
                 managed_service_id=GUID(str(svc.guid)),
             ),
         )
-    assert not result.ok
-    assert result.errors[0].code == "PRECONDITION"
+    assert result.ok, result.errors
+    assert result.data is not None
+    assert {item.key for item in result.data.keys} == {
+        "MODEL_API_KEY",
+        "MODEL_DEPLOYMENT_NAME",
+        "MODEL_ENDPOINT_URL",
+        "MODEL_REGION",
+    }
+    secret_keys = {item.key for item in result.data.keys if item.is_secret}
+    assert secret_keys == {"MODEL_API_KEY", "MODEL_ENDPOINT_URL"}
 
 
 def test_reveal_missing_managed_service_not_found(permission_resolver):
