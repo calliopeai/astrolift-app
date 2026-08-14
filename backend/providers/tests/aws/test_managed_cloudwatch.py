@@ -661,14 +661,40 @@ def test_delete_data_respects_both_protection_layers_and_force() -> None:
     ("config", "message"),
     [
         ({"log_group": "bad"}, "boolean or object"),
+        ({"log_group": {"enabled": "yes"}}, "enabled must be a boolean"),
+        ({"log_group": {"name": 123}}, "name must be a string"),
         ({"log_group": {"name": "aws/reserved"}}, "reserved"),
         ({"log_group": {"name": "bad name"}}, "invalid"),
         ({"log_group": {"class": "ARCHIVE"}}, "class"),
         ({"log_group": {"retention_days": 2}}, "not supported"),
         ({"log_group": {"retention_days": "later"}}, "integer"),
+        ({"log_group": {"retention_days": True}}, "integer"),
         ({"log_group": {"class": "DELIVERY", "retention_days": 30}}, "exactly one"),
         ({"log_group": {"class": "INFREQUENT_ACCESS", "index_policy": {"Fields": ["x"]}}}, "STANDARD"),
+        ({"log_group": {"class": "INFREQUENT_ACCESS", "transformer": [{"parseJSON": {}}]}}, "STANDARD"),
+        (
+            {
+                "log_group": {
+                    "class": "INFREQUENT_ACCESS",
+                    "metric_filters": [
+                        {
+                            "name": "count",
+                            "request": {"filterPattern": "", "metricTransformations": []},
+                        },
+                    ],
+                },
+            },
+            "STANDARD",
+        ),
+        (
+            {"log_group": {"class": "DELIVERY", "retention_days": 1, "data_protection_policy": {}}},
+            "not supported",
+        ),
+        ({"log_group": {"enabled": False, "name": "/ignored"}, "dashboard": False}, "cannot declare"),
         ({"log_group": {"create": {"logGroupName": "escape"}}}, "Astrolift-owned"),
+        ({"log_group": {"deletion_protection": "yes"}}, "must be a boolean"),
+        ({"log_group": {"kms_key_id": 123}}, "must be a string"),
+        ({"log_group": {"transformer": []}}, "1-20"),
         ({"log_group": {"data_protection_policy": "bad"}}, "valid JSON"),
         (
             {
@@ -683,6 +709,7 @@ def test_delete_data_respects_both_protection_layers_and_force() -> None:
             "at most two",
         ),
         ({"metric_alarms": "bad"}, "array"),
+        ({"metric_alarms": [{"name": 1, "request": {}}]}, "requires name and request"),
         ({"metric_alarms": [{"name": "x", "request": {"AlarmName": "escape"}}]}, "Astrolift-owned"),
         ({"metric_alarms": [{"name": "x", "request": {}}, {"name": "x", "request": {}}]}, "unique"),
         ({"metric_alarms": [{"name": "x" * 256, "request": {}}]}, "exceeds 255"),
@@ -703,9 +730,12 @@ def test_delete_data_respects_both_protection_layers_and_force() -> None:
             "name is invalid",
         ),
         ({"dashboard": {"name": "bad.name"}}, "dashboard.name"),
+        ({"dashboard": {"name": 123}}, "name must be a string"),
+        ({"dashboard": {"allow_validation_messages": "yes"}}, "must be a boolean"),
         ({"dashboard": "bad"}, "boolean or object"),
         ({"dashboard": {"body": "bad-json"}}, "valid JSON"),
         ({"access_mode": "admin"}, "access_mode"),
+        ({"deletion_protection": "yes"}, "deletion_protection must be a boolean"),
         ({"log_group": False, "dashboard": False}, "at least one"),
     ],
 )
@@ -729,6 +759,20 @@ def test_access_modes_emit_least_privilege_grants() -> None:
     assert driver.binding(ServiceHandle(result.handle), {"access_mode": "none"}).iam_grants == []
 
 
+def test_infrequent_access_binding_uses_queries_instead_of_unsupported_event_apis() -> None:
+    driver, _, _ = _driver()
+    result = driver.provision(
+        _spec({"log_group": {"class": "INFREQUENT_ACCESS"}, "dashboard": False}),
+    )
+    assert result.ok
+    read = driver.binding(ServiceHandle(result.handle), {"access_mode": "read"})
+    assert [grant.actions for grant in read.iam_grants] == [
+        ["logs:StartQuery"],
+        ["logs:DescribeQueries", "logs:GetQueryResults", "logs:StopQuery"],
+        ["cloudwatch:GetMetricData", "cloudwatch:GetMetricStatistics", "cloudwatch:ListMetrics"],
+    ]
+
+
 def test_snapshot_and_restore_are_explicitly_unsupported() -> None:
     driver, _, _ = _driver()
     with pytest.raises(Exception, match="cannot be snapshotted"):
@@ -743,6 +787,39 @@ def test_snapshot_and_restore_are_explicitly_unsupported() -> None:
 def test_native_requests_match_current_botocore_shapes() -> None:
     driver, logs, cw = _driver()
     config = {
+        "log_group": {
+            "name": "/apps/native-shapes",
+            "retention_days": 90,
+            "kms_key_id": "arn:aws:kms:us-east-1:123456789012:key/original",
+            "data_protection_policy": {"Name": "mask"},
+            "index_policy": {"Fields": ["requestId"]},
+            "transformer": [{"parseJSON": {}}],
+            "metric_filters": [
+                {
+                    "name": "errors",
+                    "request": {
+                        "filterPattern": "ERROR",
+                        "metricTransformations": [
+                            {
+                                "metricName": "Errors",
+                                "metricNamespace": "Test",
+                                "metricValue": "1",
+                            },
+                        ],
+                    },
+                },
+            ],
+            "subscription_filters": [
+                {
+                    "name": "archive",
+                    "request": {
+                        "filterPattern": "",
+                        "destinationArn": "arn:aws:firehose:us-east-1:123456789012:deliverystream/logs",
+                        "roleArn": "arn:aws:iam::123456789012:role/logs",
+                    },
+                },
+            ],
+        },
         "metric_alarms": [
             {
                 "name": "errors",
@@ -755,23 +832,55 @@ def test_native_requests_match_current_botocore_shapes() -> None:
                 },
             },
         ],
+        "composite_alarms": [
+            {"name": "unhealthy", "request": {"AlarmRule": 'ALARM("errors")'}},
+        ],
         "dashboard": {"name": "dash", "body": {"widgets": []}},
+        "insight_rules": [
+            {"name": "top-errors", "request": {"RuleDefinition": "{}", "RuleState": "ENABLED"}},
+        ],
+        "metric_streams": [
+            {
+                "name": "all-metrics",
+                "request": {
+                    "FirehoseArn": "arn:aws:firehose:us-east-1:123456789012:deliverystream/metrics",
+                    "RoleArn": "arn:aws:iam::123456789012:role/metrics",
+                    "OutputFormat": "json",
+                },
+            },
+        ],
     }
-    assert driver.provision(_spec(config)).ok
+    result = driver.provision(_spec(config))
+    assert result.ok
+    updated_log = {
+        **config["log_group"],
+        "deletion_protection": False,
+        "kms_key_id": "arn:aws:kms:us-east-1:123456789012:key/replacement",
+    }
+    assert driver.update(UpdateSpec(result.handle, config={**config, "log_group": updated_log})).ok
     logs_model = Session().get_service_model("logs")
     cw_model = Session().get_service_model("cloudwatch")
-    validate_parameters(
-        logs.kwargs_for("create_log_group"),
-        logs_model.operation_model("CreateLogGroup").input_shape,
-    )
-    validate_parameters(
-        cw.kwargs_for("put_metric_alarm"),
-        cw_model.operation_model("PutMetricAlarm").input_shape,
-    )
-    validate_parameters(
-        cw.kwargs_for("put_dashboard"),
-        cw_model.operation_model("PutDashboard").input_shape,
-    )
+    for method, operation in {
+        "create_log_group": "CreateLogGroup",
+        "put_log_group_deletion_protection": "PutLogGroupDeletionProtection",
+        "associate_kms_key": "AssociateKmsKey",
+        "put_retention_policy": "PutRetentionPolicy",
+        "put_data_protection_policy": "PutDataProtectionPolicy",
+        "put_index_policy": "PutIndexPolicy",
+        "put_transformer": "PutTransformer",
+        "put_metric_filter": "PutMetricFilter",
+        "put_subscription_filter": "PutSubscriptionFilter",
+    }.items():
+        validate_parameters(logs.kwargs_for(method), logs_model.operation_model(operation).input_shape)
+    for method, operation in {
+        "put_metric_alarm": "PutMetricAlarm",
+        "put_composite_alarm": "PutCompositeAlarm",
+        "put_dashboard": "PutDashboard",
+        "put_insight_rule": "PutInsightRule",
+        "put_metric_stream": "PutMetricStream",
+        "tag_resource": "TagResource",
+    }.items():
+        validate_parameters(cw.kwargs_for(method), cw_model.operation_model(operation).input_shape)
 
 
 def test_registration_catalogue_cost_and_runtime_config() -> None:

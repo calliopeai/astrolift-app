@@ -227,6 +227,7 @@ class CloudWatchDriver(ManagedServiceDriver):
         group = next(iter(self._owned_log_groups(bundle_id)), None)
         group_name = str((group or {}).get("logGroupName") or "")
         group_arn = _log_group_arn(group or {})
+        log_class = str((group or {}).get("logGroupClass") or "STANDARD")
         dashboard = next(iter(self._owned_dashboards(bundle_id)), None)
         dashboard_name = str((dashboard or {}).get("DashboardName") or "")
         dashboard_url = _dashboard_url(self._config.region, dashboard_name)
@@ -247,7 +248,7 @@ class CloudWatchDriver(ManagedServiceDriver):
                 "CLOUDWATCH_BUNDLE_ID": ValueRef(literal=bundle_id),
                 "AWS_REGION": ValueRef(literal=self._config.region),
             },
-            iam_grants=_binding_grants(group_arn, cfg),
+            iam_grants=_binding_grants(group_arn, cfg, log_class=log_class),
             notes="CloudWatch Logs and metrics bundle. Log data is retained unless delete_data=true.",
         )
 
@@ -351,6 +352,10 @@ class CloudWatchDriver(ManagedServiceDriver):
         log_cfg = _log_config(cfg, self._config)
         if not isinstance(log_cfg, dict):
             return "config.log_group must be a boolean or object"
+        if "enabled" in log_cfg and not isinstance(log_cfg["enabled"], bool):
+            return "log_group.enabled must be a boolean"
+        if not log_cfg.get("enabled", True) and set(log_cfg) - {"enabled"}:
+            return "disabled config.log_group cannot declare log-group settings"
         for collection in (
             "metric_alarms",
             "composite_alarms",
@@ -367,6 +372,8 @@ class CloudWatchDriver(ManagedServiceDriver):
             if error:
                 return error
         if log_cfg.get("enabled", True):
+            if "name" in log_cfg and not isinstance(log_cfg["name"], str):
+                return "log_group.name must be a string"
             name = str(log_cfg.get("name") or self._default_log_group("validation"))
             if not _LOG_GROUP_RE.fullmatch(name) or name.startswith("aws/"):
                 return "log_group.name is invalid or uses the reserved aws/ prefix"
@@ -375,6 +382,8 @@ class CloudWatchDriver(ManagedServiceDriver):
                 return "log_group.class must be STANDARD, INFREQUENT_ACCESS, or DELIVERY"
             retention = log_cfg.get("retention_days", self._config.retention_days_default)
             if retention is not None:
+                if isinstance(retention, bool):
+                    return "log_group.retention_days must be an integer"
                 try:
                     retention_value = int(retention)
                 except (TypeError, ValueError):
@@ -383,11 +392,28 @@ class CloudWatchDriver(ManagedServiceDriver):
                     return "log_group.retention_days is not supported by CloudWatch Logs"
                 if log_class == "DELIVERY" and retention_value != 1:
                     return "DELIVERY log groups retain events for exactly one day"
-            if log_class != "STANDARD" and (
-                ("index_policy" in log_cfg and log_cfg.get("index_policy") is not None)
-                or ("transformer" in log_cfg and log_cfg.get("transformer"))
+            standard_only = {
+                "index_policy": log_cfg.get("index_policy") is not None,
+                "transformer": bool(log_cfg.get("transformer")),
+                "metric_filters": bool(log_cfg.get("metric_filters")),
+                "subscription_filters": bool(log_cfg.get("subscription_filters")),
+            }
+            unsupported = sorted(name for name, present in standard_only.items() if present)
+            if log_class != "STANDARD" and unsupported:
+                return f"log_group.{', '.join(unsupported)} require the STANDARD log class"
+            if log_class == "DELIVERY" and log_cfg.get("data_protection_policy") is not None:
+                return "log_group.data_protection_policy is not supported by the DELIVERY log class"
+            if "deletion_protection" in log_cfg and not isinstance(log_cfg["deletion_protection"], bool):
+                return "log_group.deletion_protection must be a boolean"
+            if "kms_key_id" in log_cfg and not isinstance(log_cfg["kms_key_id"], str):
+                return "log_group.kms_key_id must be a string"
+            transformer = log_cfg.get("transformer")
+            if transformer is not None and (
+                not isinstance(transformer, list)
+                or not 1 <= len(transformer) <= 20
+                or not all(isinstance(item, dict) for item in transformer)
             ):
-                return "log_group.index_policy and transformer require the STANDARD log class"
+                return "log_group.transformer must contain 1-20 processor objects or be null"
             create = log_cfg.get("create") or {}
             if not isinstance(create, dict):
                 return "log_group.create must be an object"
@@ -414,12 +440,21 @@ class CloudWatchDriver(ManagedServiceDriver):
                 return "dashboard.body must encode an object"
         if dashboard is not False:
             dashboard_cfg = dashboard if isinstance(dashboard, dict) else {}
+            if "name" in dashboard_cfg and not isinstance(dashboard_cfg["name"], str):
+                return "dashboard.name must be a string"
+            if "allow_validation_messages" in dashboard_cfg and not isinstance(
+                dashboard_cfg["allow_validation_messages"],
+                bool,
+            ):
+                return "dashboard.allow_validation_messages must be a boolean"
             dashboard_name = str(dashboard_cfg.get("name") or "astrolift-validation")
             if not _DASHBOARD_RE.fullmatch(dashboard_name):
                 return "dashboard.name must be 1-255 letters, digits, hyphens, or underscores"
         access_mode = str(cfg.get("access_mode") or "write")
         if access_mode not in {"write", "read", "both", "logs", "metrics", "none"}:
             return "access_mode must be write, read, both, logs, metrics, or none"
+        if "deletion_protection" in cfg and not isinstance(cfg["deletion_protection"], bool):
+            return "deletion_protection must be a boolean"
         if (
             not log_cfg.get("enabled", True)
             and dashboard is False
@@ -610,16 +645,20 @@ class CloudWatchDriver(ManagedServiceDriver):
         existing = self._dashboard_entry(name)
         if existing is not None:
             self._assert_cw_owned(str(existing.get("DashboardArn") or ""), name, bundle_id)
-        body = dashboard.get("body") or _default_dashboard(
-            log_group,
-            self._config.region,
-            log_class=log_class,
-            alarm_names=[
-                str(item["name"])
-                for collection in ("metric_alarms", "composite_alarms")
-                for item in cfg.get(collection) or []
-            ],
-            account_id=self._config.account_id,
+        body = (
+            dashboard["body"]
+            if dashboard.get("body") is not None
+            else _default_dashboard(
+                log_group,
+                self._config.region,
+                log_class=log_class,
+                alarm_names=[
+                    str(item["name"])
+                    for collection in ("metric_alarms", "composite_alarms")
+                    for item in cfg.get(collection) or []
+                ],
+                account_id=self._config.account_id,
+            )
         )
         response = self._cw.put_dashboard(
             DashboardName=name,
@@ -876,9 +915,10 @@ def _validate_declarations(collection: str, value: Any) -> str:
     for index, declaration in enumerate(value):
         if not isinstance(declaration, dict):
             return f"config.{collection}[{index}] must be an object"
-        name = str(declaration.get("name") or "")
-        if not name or not isinstance(declaration.get("request"), dict):
+        raw_name = declaration.get("name")
+        if not isinstance(raw_name, str) or not raw_name or not isinstance(declaration.get("request"), dict):
             return f"config.{collection}[{index}] requires name and request"
+        name = raw_name
         if name in names:
             return f"config.{collection} names must be unique"
         names.add(name)
@@ -1040,21 +1080,24 @@ def _dashboard_url(region: str, name: str) -> str:
     )
 
 
-def _binding_grants(log_group_arn: str, cfg: dict[str, Any]) -> list[Grant]:
+def _binding_grants(log_group_arn: str, cfg: dict[str, Any], *, log_class: str) -> list[Grant]:
     mode = str(cfg.get("access_mode") or "write")
     grants: list[Grant] = []
-    if mode in {"write", "both", "logs"} and log_group_arn:
+    if mode in {"write", "both", "logs"} and log_group_arn and log_class != "DELIVERY":
         grants.append(
             Grant(
                 resource=f"{log_group_arn}:*",
                 actions=["logs:CreateLogStream", "logs:DescribeLogStreams", "logs:PutLogEvents"],
             ),
         )
-    if mode in {"read", "both"} and log_group_arn:
+    if mode in {"read", "both"} and log_group_arn and log_class in {"STANDARD", "INFREQUENT_ACCESS"}:
+        group_actions = ["logs:StartQuery"]
+        if log_class == "STANDARD":
+            group_actions = ["logs:FilterLogEvents", "logs:GetLogEvents", *group_actions]
         grants.append(
             Grant(
                 resource=log_group_arn,
-                actions=["logs:FilterLogEvents", "logs:GetLogEvents", "logs:StartQuery"],
+                actions=group_actions,
             ),
         )
         grants.append(
