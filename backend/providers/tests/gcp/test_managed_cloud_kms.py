@@ -530,6 +530,7 @@ def test_registration_catalog_cost_and_runtime_config_are_wired() -> None:
         ("object_store", "gcs", "GCSConfig"),
         ("queue", "pubsub", "PubSubConfig"),
         ("postgres", "cloudsql", "CloudSQLConfig"),
+        ("postgres", "alloydb", "AlloyDBConfig"),
         ("mysql", "cloudsql", "CloudSQLMySQLConfig"),
         ("redis", "memorystore", "MemorystoreConfig"),
         ("kv_store", "bigtable", "BigtableConfig"),

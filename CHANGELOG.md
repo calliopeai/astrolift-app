@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add Google Cloud AlloyDB for PostgreSQL lifecycle with private, PSC, and
+  public connectivity, primary and read-pool sizing, native cluster/instance
+  controls, continuous and on-demand backups, restore, Secret Manager-backed
+  portable bindings, and protected teardown.
 - Add Amazon Kinesis Data Streams lifecycle with on-demand and provisioned
   capacity, retention, encryption, enhanced monitoring, warm throughput,
   large records, policies, enhanced fan-out consumers, portable bindings,
