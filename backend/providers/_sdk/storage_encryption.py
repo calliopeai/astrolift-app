@@ -110,6 +110,12 @@ POLICIES: dict[tuple[str, str, str], EncryptionPolicy] = {
         cmek_required_for_compliance=("pci", "hipaa"),
         notes="Dataset CMEK applies by default to newly created tables; existing tables retain their configured keys.",
     ),
+    ("gcp", "document_db", "firestore_native"): EncryptionPolicy(
+        mode="cloud_kms",
+        cmek_supported=True,
+        cmek_required_for_compliance=("pci", "hipaa"),
+        notes="Firestore CMEK is immutable after database creation; changing keys requires a replacement database.",
+    ),
     # Azure
     ("azure", "object_store", "blob"): EncryptionPolicy(
         mode="cloud_kms",

@@ -56,6 +56,7 @@ SERVICE_ID_BY_VARIANT: dict[tuple[str, str], str] = {
     ("postgres", "alloydb"): "70A4-7A89-3F8F",  # AlloyDB
     ("redis", "memorystore"): "F25A-3A0D-5DDB",  # Memorystore
     ("nosql", "firestore"): "F17B-412E-CB64",  # Firestore
+    ("document_db", "firestore_native"): "F17B-412E-CB64",  # Firestore (portable kind)
     ("nosql", "bigtable"): "FD83-CFB8-A3CB",  # Bigtable
     ("kv_store", "bigtable"): "FD83-CFB8-A3CB",  # Bigtable (portable kind)
     ("encryption_key", "cloud_kms"): "EE2F-D110-890C",  # Cloud KMS

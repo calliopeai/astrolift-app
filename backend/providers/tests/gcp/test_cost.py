@@ -77,6 +77,7 @@ def test_supported_known_variants(estimator: GCPCostEstimator) -> None:
     assert estimator.supported(kind="topic", variant="pubsub_topic")
     assert estimator.supported(kind="warehouse", variant="bigquery")
     assert estimator.supported(kind="postgres", variant="alloydb")
+    assert estimator.supported(kind="document_db", variant="firestore_native")
 
 
 def test_unsupported_returns_unavailable(
@@ -255,6 +256,7 @@ def test_service_id_table_covers_core_kinds() -> None:
     assert ("queue", "pubsub") in SERVICE_ID_BY_VARIANT
     assert ("topic", "pubsub_topic") in SERVICE_ID_BY_VARIANT
     assert ("warehouse", "bigquery") in SERVICE_ID_BY_VARIANT
+    assert ("document_db", "firestore_native") in SERVICE_ID_BY_VARIANT
     assert ("postgres", "cloudsql") in SERVICE_ID_BY_VARIANT
 
 

@@ -1099,9 +1099,23 @@ MATRIX = AvailabilityMatrix(
             kind="document_db",
             variant="firestore_native",
             plugin_id="gcp",
-            status="planned",
-            description="Firestore in Native mode",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            description=(
+                "Firestore Native database with Standard/Enterprise editions, PITR, "
+                "CMEK, backup schedules, composite/vector/search indexes, TTL, export, and restore"
+            ),
+            binding_envs=(
+                "DOCDB_URI",
+                "DOCDB_DB",
+                "DOCDB_AUTH_MODE",
+                "DOCDB_TLS",
+                "DOCDB_RESOURCE_ARN",
+                "GCP_FIRESTORE_PROJECT",
+                "GCP_FIRESTORE_DATABASE",
+                "GCP_FIRESTORE_UID",
+                "GCP_FIRESTORE_LOCATION",
+                "GCP_FIRESTORE_EDITION",
+                "GCP_FIRESTORE_CLIENT_API",
+            ),
         ),
         ManagedServiceEntry(
             kind="graph_db",

@@ -388,6 +388,30 @@ def _gcp_managed_config_for(
             ),
         )
 
+    if pair == ("document_db", "firestore_native") or (kind == "document_db" and not variant):
+        from gcp.managed.document_firestore import FirestoreConfig
+
+        return FirestoreConfig(
+            project_id=project_id,
+            location=str(pc.get("firestore_location") or region),
+            database_name_prefix=str(
+                pc.get("firestore_database_name_prefix", "astrolift"),
+            ),
+            deletion_protection_default=bool(
+                pc.get("firestore_deletion_protection_default", True),
+            ),
+            api_endpoint=str(
+                pc.get("firestore_api_endpoint", "https://firestore.googleapis.com/v1"),
+            ),
+            snapshot_bucket=str(pc.get("firestore_snapshot_bucket", "")),
+            operation_timeout_seconds=float(
+                pc.get("firestore_operation_timeout_seconds", 900),
+            ),
+            poll_interval_seconds=float(
+                pc.get("firestore_operation_poll_interval_seconds", 2),
+            ),
+        )
+
     if pair == ("postgres", "cloudsql") or (kind == "postgres" and not variant):
         from gcp.managed.postgres_cloudsql import CloudSQLConfig
 

@@ -24,6 +24,7 @@ Executable managed services:
 - VertexAIEndpointDriver — model_endpoint/vertex_ai
 - CloudKMSDriver — encryption_key/cloud_kms
 - BigQueryWarehouseDriver — warehouse/bigquery
+- FirestoreNativeDriver — document_db/firestore_native
 
 The availability catalogue is authoritative for the remaining planned GCP
 resources. Placeholder email/search classes are registered only so callers get
@@ -36,6 +37,7 @@ from gcp.dns_clouddns import CloudDNSDriver
 from gcp.identity_wi import GCPWorkloadIdentityDriver
 from gcp.ingress import GCPIngressDriver
 from gcp.managed.bigtable import BigtableDriver
+from gcp.managed.document_firestore import FirestoreNativeDriver
 from gcp.managed.email_thirdparty import GCPEmailStubDriver
 from gcp.managed.encryption_cloud_kms import CloudKMSDriver
 from gcp.managed.model_endpoint_vertex import VertexAIEndpointDriver
@@ -84,6 +86,7 @@ PLUGIN = ProviderPlugin(
         ("model_endpoint", "vertex_ai"): VertexAIEndpointDriver,
         ("encryption_key", "cloud_kms"): CloudKMSDriver,
         ("warehouse", "bigquery"): BigQueryWarehouseDriver,
+        ("document_db", "firestore_native"): FirestoreNativeDriver,
     },
     config_schema={
         "type": "object",
@@ -190,6 +193,36 @@ PLUGIN = ProviderPlugin(
             "bigquery_reservation_api_endpoint": {
                 "type": "string",
                 "default": "https://bigqueryreservation.googleapis.com/v1",
+            },
+            "firestore_location": {
+                "type": "string",
+                "description": "Firestore database location; falls back to region.",
+            },
+            "firestore_database_name_prefix": {
+                "type": "string",
+                "default": "astrolift",
+            },
+            "firestore_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "firestore_snapshot_bucket": {
+                "type": "string",
+                "description": "GCS bucket or gs:// URI used for on-demand exports and safe deletion retention.",
+            },
+            "firestore_operation_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 900,
+            },
+            "firestore_operation_poll_interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 2,
+            },
+            "firestore_api_endpoint": {
+                "type": "string",
+                "default": "https://firestore.googleapis.com/v1",
             },
             "cloudsql_private_network": {
                 "type": "string",
