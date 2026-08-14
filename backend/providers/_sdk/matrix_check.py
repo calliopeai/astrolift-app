@@ -66,10 +66,7 @@ def check_matrix(
                 DriftIssue(
                     code="matrix_unknown_kind",
                     plugin_id=entry.plugin_id,
-                    detail=(
-                        f"matrix lists unknown managed-service kind {entry.kind!r} "
-                        f"for variant {entry.variant!r}"
-                    ),
+                    detail=(f"matrix lists unknown managed-service kind {entry.kind!r} for variant {entry.variant!r}"),
                 )
             )
 
