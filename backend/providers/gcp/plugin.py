@@ -13,6 +13,7 @@ Drivers shipped:
 Executable managed services:
 - GCSDriver — object_store/gcs
 - PubSubDriver — queue/pubsub
+- PubSubTopicDriver — topic/pubsub_topic
 - CloudSQLPostgresDriver — postgres/cloudsql
 - AlloyDBPostgresDriver — postgres/alloydb
 - CloudSQLMySQLDriver — mysql/cloudsql
@@ -45,6 +46,7 @@ from gcp.managed.queue_pubsub import PubSubDriver
 from gcp.managed.redis_memorystore import MemorystoreRedisDriver
 from gcp.managed.search_elastic_cloud import GCPElasticCloudStubDriver
 from gcp.managed.timeseries_managed_prometheus import GCPManagedPrometheusDriver
+from gcp.managed.topic_pubsub import PubSubTopicDriver
 from gcp.managed.vector_vertex import VertexMatchingEngineDriver
 from gcp.notification_fcm import FCMNotificationDriver
 from gcp.registry_artifact import ArtifactRegistryDriver
@@ -67,6 +69,7 @@ PLUGIN = ProviderPlugin(
     managed_service_drivers={
         ("object_store", "gcs"): GCSDriver,
         ("queue", "pubsub"): PubSubDriver,
+        ("topic", "pubsub_topic"): PubSubTopicDriver,
         ("postgres", "cloudsql"): CloudSQLPostgresDriver,
         ("postgres", "alloydb"): AlloyDBPostgresDriver,
         ("mysql", "cloudsql"): CloudSQLMySQLDriver,

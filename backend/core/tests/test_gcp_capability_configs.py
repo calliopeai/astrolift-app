@@ -154,3 +154,17 @@ def test_alloydb_runtime_config_preserves_operator_controls() -> None:
     assert config.operation_timeout_seconds == 900
     assert config.operation_poll_interval_seconds == 2
     assert config.api_endpoint == "https://alloydb.example.test/v1"
+
+
+def test_pubsub_topic_runtime_config_preserves_operator_prefix() -> None:
+    from core.cluster_observability import managed_config_for
+
+    config = managed_config_for(
+        "gcp",
+        _cluster(pubsub_topic_prefix="smd-events"),
+        kind="topic",
+        variant="pubsub_topic",
+    )
+    assert type(config).__name__ == "PubSubTopicConfig"
+    assert config.project_id == "acme-prod"
+    assert config.topic_prefix == "smd-events"

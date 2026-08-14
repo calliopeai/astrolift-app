@@ -24,6 +24,7 @@ gcp = [
     "google-cloud-container>=2.40",
     "google-cloud-secret-manager>=2.20",
     "google-cloud-dns>=0.34",
+    "google-cloud-pubsub>=2.39",
     # Pinned: 36.0.0 introduced a regression where ApiClient drops the
     # Authorization header for inline Bearer tokens against EKS (reproducible
     # with raw urllib + Bearer = 200 but ApiClient + same token = 401).

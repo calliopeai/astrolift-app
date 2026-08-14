@@ -100,6 +100,10 @@ POLICIES: dict[tuple[str, str, str], EncryptionPolicy] = {
         mode="cloud_kms",
         cmek_supported=True,
     ),
+    ("gcp", "topic", "pubsub_topic"): EncryptionPolicy(
+        mode="cloud_kms",
+        cmek_supported=True,
+    ),
     # Azure
     ("azure", "object_store", "blob"): EncryptionPolicy(
         mode="cloud_kms",

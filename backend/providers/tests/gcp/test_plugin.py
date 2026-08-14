@@ -27,6 +27,7 @@ def test_managed_services_have_object_store_and_queue() -> None:
     keys = set(PLUGIN.managed_service_drivers.keys())
     assert ("object_store", "gcs") in keys
     assert ("queue", "pubsub") in keys
+    assert ("topic", "pubsub_topic") in keys
 
 
 def test_managed_services_have_full_gcp_coverage() -> None:

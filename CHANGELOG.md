@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add GCP Pub/Sub topic lifecycle with rotatable CMEK, retention and
+  residency, schemas, managed ingestion, message transforms, declarative
+  pull/push/BigQuery/Bigtable/Cloud Storage subscriptions, workload bindings,
+  export health, ownership-safe pruning and teardown, and full reconciliation.
 - Add Google Cloud AlloyDB for PostgreSQL lifecycle with private, PSC, and
   public connectivity, primary and read-pool sizing, native cluster/instance
   controls, continuous and on-demand backups, restore, Secret Manager-backed
