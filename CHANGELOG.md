@@ -37,9 +37,9 @@
 - Issue CLI device credentials with narrow workflow write and trigger scopes.
 - Issue CLI device credentials with narrow project write scope for shared
   resource lifecycle and attachment management.
-- Shard backend tests across four balanced real-Postgres jobs, retain one
-  stable aggregate gate, and stop rerunning the dedicated provider suite in
-  the backend pass.
+- Keep backend CI below its ten-minute ceiling by running the migration graph
+  against tuned disposable Postgres instances and splitting agent tests by file
+  while retaining production-faithful schema setup in every shard.
 - Select coupled real-Postgres shards from pull-request impact, split the
   slowest runtime suites for parallel execution, and reserve the full backend
   regression matrix for `main` and manual runs.
