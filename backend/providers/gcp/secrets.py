@@ -11,6 +11,26 @@ from _sdk.secrets import SecretsBackend
 from gcp._errors import NotFoundError, map_api_error
 
 
+def secret_id_for(path: str, *, prefix: str = "astrolift") -> str:
+    """Return the physical Secret Manager id for a logical secret path.
+
+    Managed-service drivers return logical paths in ``ValueRef.secret_ref``;
+    the deployment resolver must map those paths to exactly the same physical
+    ids the drivers created.  Keep the historical leading-slash behaviour for
+    existing operator secrets, but do not apply ``prefix`` twice when a
+    logical managed-service path already begins with it.
+    """
+
+    clean = path.replace("/", "-").lstrip("/")
+    clean = "".join(c if c.isalnum() or c in "-_" else "-" for c in clean)
+    clean_prefix = "".join(c if c.isalnum() or c in "-_" else "-" for c in prefix)
+    if not clean_prefix:
+        return clean
+    if clean == clean_prefix or clean.startswith(f"{clean_prefix}-"):
+        return clean
+    return f"{clean_prefix}-{clean}"
+
+
 @dataclass(frozen=True)
 class GCPSecretsConfig:
     project_id: str
@@ -42,16 +62,17 @@ class GCPSecretsBackend(SecretsBackend):
 
     @driver_op(cloud="gcp", driver="secrets", audit=True, sensitive_kind="secret.read")
     def get(self, path: str) -> dict[str, str] | None:
-        secret_name = self._secret_name(path)
-        version_path = f"projects/{self._config.project_id}/secrets/{secret_name}/versions/latest"
-        try:
-            response = self._client.access_secret_version(
-                name=version_path,
-            )
-        except Exception as exc:
-            if type(exc).__name__ == "NotFound":
-                return None
-            raise map_api_error(exc) from exc
+        response = None
+        for secret_name in self._candidate_secret_names(path):
+            version_path = f"projects/{self._config.project_id}/secrets/{secret_name}/versions/latest"
+            try:
+                response = self._client.access_secret_version(name=version_path)
+                break
+            except Exception as exc:
+                if type(exc).__name__ != "NotFound":
+                    raise map_api_error(exc) from exc
+        if response is None:
+            return None
         payload = response.payload.data.decode("utf-8")
         try:
             parsed = json.loads(payload)
@@ -64,15 +85,23 @@ class GCPSecretsBackend(SecretsBackend):
     @driver_op(cloud="gcp", driver="secrets", audit=True, sensitive_kind="secret.write", redact_args=("kvs",))
     def upsert(self, path: str, kvs: dict[str, str]) -> None:
         secret_name = self._secret_name(path)
-        secret_path = f"projects/{self._config.project_id}/secrets/{secret_name}"
+        secret_path = ""
         # Create the parent secret if missing, then add a new
-        # version with the payload.
-        try:
-            self._client.get_secret(name=secret_path)
-        except Exception as exc:
-            if type(exc).__name__ != "NotFound":
-                raise map_api_error(exc) from exc
+        # version with the payload. Prefer the canonical id, but continue
+        # updating a pre-fix legacy id if that is where the path already
+        # lives; this avoids forking a user's secret during rotation.
+        for candidate in self._candidate_secret_names(path):
+            candidate_path = f"projects/{self._config.project_id}/secrets/{candidate}"
+            try:
+                self._client.get_secret(name=candidate_path)
+                secret_path = candidate_path
+                break
+            except Exception as exc:
+                if type(exc).__name__ != "NotFound":
+                    raise map_api_error(exc) from exc
+        if not secret_path:
             self._create_secret(secret_name=secret_name)
+            secret_path = f"projects/{self._config.project_id}/secrets/{secret_name}"
 
         try:
             self._client.add_secret_version(
@@ -84,13 +113,15 @@ class GCPSecretsBackend(SecretsBackend):
 
     @driver_op(cloud="gcp", driver="secrets", audit=True, sensitive_kind="secret.delete")
     def delete(self, path: str) -> None:
-        secret_path = f"projects/{self._config.project_id}/secrets/{self._secret_name(path)}"
-        try:
-            self._client.delete_secret(name=secret_path)
-        except Exception as exc:
-            if type(exc).__name__ == "NotFound":
-                raise NotFoundError(f"secret {path} not found") from exc
-            raise map_api_error(exc) from exc
+        for secret_name in self._candidate_secret_names(path):
+            secret_path = f"projects/{self._config.project_id}/secrets/{secret_name}"
+            try:
+                self._client.delete_secret(name=secret_path)
+                return
+            except Exception as exc:
+                if type(exc).__name__ != "NotFound":
+                    raise map_api_error(exc) from exc
+        raise NotFoundError(f"secret {path} not found")
 
     @driver_op(cloud="gcp", driver="secrets", audit=True, sensitive_kind="secret.list")
     def list(self, prefix: str) -> list[str]:
@@ -118,9 +149,17 @@ class GCPSecretsBackend(SecretsBackend):
     def _secret_name(self, path: str) -> str:
         # GCP Secret IDs: ASCII letters, digits, hyphens,
         # underscores; max 255 chars; can't start with a number.
+        return secret_id_for(path, prefix=self._config.secret_id_prefix)
+
+    def _candidate_secret_names(self, path: str) -> tuple[str, ...]:
+        canonical = self._secret_name(path)
+        # Before managed-service refs were made canonical, a logical path
+        # already beginning with ``secret_id_prefix`` received that prefix a
+        # second time. Read/update/delete that legacy id as a fallback.
         clean = path.replace("/", "-").lstrip("/")
         clean = "".join(c if c.isalnum() or c in "-_" else "-" for c in clean)
-        return f"{self._config.secret_id_prefix}-{clean}"
+        legacy = f"{self._config.secret_id_prefix}-{clean}"
+        return (canonical,) if legacy == canonical else (canonical, legacy)
 
     def _create_secret(self, *, secret_name: str) -> None:
         replication: dict[str, Any] = {"automatic": {}}

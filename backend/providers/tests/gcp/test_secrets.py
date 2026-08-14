@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from gcp._errors import NotFoundError
-from gcp.secrets import GCPSecretsBackend, GCPSecretsConfig
+from gcp.secrets import GCPSecretsBackend, GCPSecretsConfig, secret_id_for
 
 
 class _NotFound(Exception):
@@ -186,3 +186,28 @@ def test_secret_name_canonicalization() -> None:
     assert backend._secret_name("/a/b/c") == "astrolift--a-b-c"
     # Bad characters replaced
     assert backend._secret_name("a@b!c") == "astrolift-a-b-c"
+
+
+def test_managed_path_does_not_double_apply_default_prefix() -> None:
+    assert secret_id_for("astrolift/cloudsql/app/master", prefix="astrolift") == "astrolift-cloudsql-app-master"
+
+
+def test_operator_prefix_is_applied_to_managed_logical_path() -> None:
+    assert secret_id_for("astrolift/cloudsql/app/master", prefix="smd") == "smd-astrolift-cloudsql-app-master"
+
+
+def test_prefixed_legacy_secret_remains_readable_rotatable_and_deletable(
+    backend: GCPSecretsBackend,
+    fake_sm_client: FakeSMClient,
+) -> None:
+    path = "astrolift/legacy/key"
+    legacy_id = "astrolift-astrolift-legacy-key"
+    fake_sm_client.secrets[legacy_id] = [b'{"value":"old"}']
+
+    assert backend.get(path) == {"value": "old"}
+    backend.upsert(path, {"value": "new"})
+    assert len(fake_sm_client.secrets[legacy_id]) == 2
+    assert "astrolift-legacy-key" not in fake_sm_client.secrets
+
+    backend.delete(path)
+    assert legacy_id not in fake_sm_client.secrets

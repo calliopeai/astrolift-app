@@ -19,6 +19,7 @@ import secrets
 import string
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import quote
 
 from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
@@ -26,7 +27,6 @@ from _sdk.managed_service import (
     BindingSchema,
     DeprovisionResult,
     DeprovisionSpec,
-    Grant,
     ManagedServiceDriver,
     ProvisionResult,
     ProvisionSpec,
@@ -37,6 +37,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from gcp.managed._secret_store import ManagedSecretStore, ManagedSecretStoreError
 
 KIND = "redis"
 
@@ -71,6 +72,7 @@ class MemorystoreConfig:
     auth_enabled_default: bool = True
 
     secret_manager_prefix: str = "astrolift/memorystore"
+    secret_id_prefix: str = "astrolift"
 
 
 class MemorystoreRedisDriver(ManagedServiceDriver):
@@ -94,6 +96,11 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             from google.cloud import secretmanager
 
             self._sm = secretmanager.SecretManagerServiceClient()
+        self._secret_store = ManagedSecretStore(
+            project_id=config.project_id,
+            secret_id_prefix=config.secret_id_prefix,
+            client=self._sm,
+        )
 
     # ---- lifecycle ----------------------------------------------------
 
@@ -109,6 +116,21 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
 
         existing = self._describe(instance_id)
         if existing is not None:
+            if (
+                bool(_get(existing, "auth_enabled", False))
+                and self._secret_store.get(
+                    self._auth_secret_for(instance_id=instance_id),
+                )
+                is None
+            ):
+                return ProvisionResult(
+                    ok=False,
+                    handle=_handle_for(instance_id),
+                    message=(
+                        f"memorystore {instance_id} exists with AUTH enabled but its Astrolift token secret is missing"
+                    ),
+                    errors=["missing_auth_token_secret"],
+                )
             return ProvisionResult(
                 ok=True,
                 handle=_handle_for(instance_id),
@@ -162,7 +184,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             )
         except Exception as exc:
             if secret_name is not None:
-                self._delete_auth_secret(instance_id)
+                self._delete_connection_secrets(instance_id)
             return ProvisionResult(
                 ok=False,
                 handle="",
@@ -238,7 +260,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
 
         existing = self._describe(instance_id)
         if existing is None:
-            self._delete_auth_secret(instance_id)
+            self._delete_connection_secrets(instance_id)
             return DeprovisionResult(
                 ok=True,
                 handle=spec.handle,
@@ -285,7 +307,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             )
 
         if delete_data:
-            self._delete_auth_secret(instance_id)
+            self._delete_connection_secrets(instance_id)
 
         return DeprovisionResult(
             ok=True,
@@ -336,23 +358,31 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
         env_vars: dict[str, ValueRef] = {
             "REDIS_HOST": ValueRef(literal=host),
             "REDIS_PORT": ValueRef(literal=port),
+            "REDIS_USER": ValueRef(literal="default"),
             "REDIS_TLS": ValueRef(literal="1" if tls_on else "0"),
+            "REDIS_AUTH_MODE": ValueRef(literal="password" if auth_enabled else "open"),
+            # Portable field name retained by the cross-cloud envelope; GCP
+            # contributes its full resource name rather than an AWS ARN.
+            "REDIS_RESOURCE_ARN": ValueRef(literal=self._full_name(instance_id)),
         }
-        iam_grants: list[Grant] = []
         if auth_enabled:
             secret_name = self._auth_secret_for(instance_id=instance_id)
-            env_vars["REDIS_AUTH_TOKEN"] = ValueRef(
-                secret_ref=secret_name,
-            )
-            env_vars["REDIS_URL"] = ValueRef(
-                secret_ref=self._url_secret_for(instance_id=instance_id),
-            )
-            iam_grants.append(
-                Grant(
-                    resource=secret_name,
-                    actions=["secretmanager.versions.access"],
-                ),
-            )
+            token = self._secret_store.get(secret_name)
+            if token is None:
+                raise _ManagedServiceError(
+                    f"binding requested for {instance_id}, but AUTH token secret {secret_name!r} is missing",
+                )
+            url_secret = self._url_secret_for(instance_id=instance_id)
+            scheme = "rediss" if tls_on else "redis"
+            try:
+                self._secret_store.upsert(
+                    url_secret,
+                    f"{scheme}://default:{quote(token, safe='')}@{host}:{port}",
+                )
+            except ManagedSecretStoreError as exc:
+                raise _ManagedServiceError(str(exc)) from exc
+            env_vars["REDIS_PASSWORD"] = ValueRef(secret_ref=secret_name)
+            env_vars["REDIS_URL"] = ValueRef(secret_ref=url_secret)
         else:
             scheme = "rediss" if tls_on else "redis"
             env_vars["REDIS_URL"] = ValueRef(
@@ -360,11 +390,11 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             )
         return Binding(
             env_vars=env_vars,
-            iam_grants=iam_grants,
+            iam_grants=[],
             notes=(
                 "REDIS_URL is a literal when auth_enabled is off; "
                 "with auth on it's a secret_ref to "
-                "``rediss://:<token>@<host>:<port>``."
+                "``rediss://default:<token>@<host>:<port>``."
             ),
         )
 
@@ -444,9 +474,12 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             env_vars={
                 "REDIS_HOST": "Memorystore primary endpoint host",
                 "REDIS_PORT": "Memorystore primary endpoint port (6379)",
+                "REDIS_USER": "Redis ACL username (default)",
                 "REDIS_TLS": "1 if TLS is enabled, 0 otherwise",
-                "REDIS_AUTH_TOKEN": ("Secret Manager ref to the AUTH token (auth_enabled only)"),
+                "REDIS_PASSWORD": ("Secret Manager ref to the AUTH token (auth_enabled only)"),
                 "REDIS_URL": ("Literal redis(s):// URL when auth is off; Secret Manager ref to rediss:// URL when on"),
+                "REDIS_AUTH_MODE": "password when AUTH is enabled, otherwise open",
+                "REDIS_RESOURCE_ARN": "Full GCP Memorystore resource name",
             },
         )
 
@@ -492,43 +525,18 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
         spec: ProvisionSpec,
     ) -> str:
         name = self._auth_secret_for(instance_id=instance_id)
-        parent = f"projects/{self._config.project_id}"
-        sid = name.replace("/", "_")
-        with contextlib.suppress(Exception):
-            self._sm.create_secret(
-                request={
-                    "parent": parent,
-                    "secret_id": sid,
-                    "secret": {
-                        "replication": {"automatic": {}},
-                        "labels": _labels_for(spec),
-                    },
-                },
-            )
         try:
-            self._sm.add_secret_version(
-                request={
-                    "parent": f"{parent}/secrets/{sid}",
-                    "payload": {"data": token.encode("utf-8")},
-                },
-            )
-            return name
-        except Exception as exc:
-            raise _ManagedServiceError(
-                f"add_secret_version for {name}: {exc}",
-            ) from exc
+            return self._secret_store.upsert(name, token, labels=_labels_for(spec))
+        except ManagedSecretStoreError as exc:
+            raise _ManagedServiceError(str(exc)) from exc
 
-    def _delete_auth_secret(self, instance_id: str) -> None:
-        name = self._auth_secret_for(instance_id=instance_id)
-        sid = name.replace("/", "_")
-        try:
-            self._sm.delete_secret(
-                request={
-                    "name": (f"projects/{self._config.project_id}/secrets/{sid}"),
-                },
-            )
-        except Exception:
-            return
+    def _delete_connection_secrets(self, instance_id: str) -> None:
+        for path in (
+            self._auth_secret_for(instance_id=instance_id),
+            self._url_secret_for(instance_id=instance_id),
+        ):
+            with contextlib.suppress(ManagedSecretStoreError):
+                self._secret_store.delete(path)
 
 
 # ----- module-level helpers --------------------------------------------

@@ -36,6 +36,7 @@ import secrets
 import string
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import quote
 
 from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
@@ -43,7 +44,6 @@ from _sdk.managed_service import (
     BindingSchema,
     DeprovisionResult,
     DeprovisionSpec,
-    Grant,
     ManagedServiceDriver,
     ProvisionResult,
     ProvisionSpec,
@@ -54,6 +54,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from gcp.managed._secret_store import ManagedSecretStore, ManagedSecretStoreError
 
 KIND = "mysql"
 
@@ -105,6 +106,7 @@ class CloudSQLMySQLConfig:
     """Shared prefix with the postgres driver: instance ids are
     globally unique within the project so no collision risk, and
     the operator gets one consistent place to find DB secrets."""
+    secret_id_prefix: str = "astrolift"
 
 
 class CloudSQLMySQLDriver(ManagedServiceDriver):
@@ -128,6 +130,11 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
             from google.cloud import secretmanager
 
             self._sm = secretmanager.SecretManagerServiceClient()
+        self._secret_store = ManagedSecretStore(
+            project_id=config.project_id,
+            secret_id_prefix=config.secret_id_prefix,
+            client=self._sm,
+        )
 
     # ---- lifecycle ----------------------------------------------------
 
@@ -143,6 +150,15 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
 
         existing = self._describe(instance_id)
         if existing is not None:
+            if self._secret_store.get(self._master_secret_for(instance_id=instance_id)) is None:
+                return ProvisionResult(
+                    ok=False,
+                    handle=_handle_for(instance_id),
+                    message=(
+                        f"cloudsql-mysql {instance_id} exists but its Astrolift master-password secret is missing"
+                    ),
+                    errors=["missing_master_password_secret"],
+                )
             return ProvisionResult(
                 ok=True,
                 handle=_handle_for(instance_id),
@@ -225,7 +241,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
                 body=instance_body,
             )
         except Exception as exc:
-            self._delete_master_password_secret(instance_id)
+            self._delete_connection_secrets(instance_id)
             return ProvisionResult(
                 ok=False,
                 handle="",
@@ -302,7 +318,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
 
         existing = self._describe(instance_id)
         if existing is None:
-            self._delete_master_password_secret(instance_id)
+            self._delete_connection_secrets(instance_id)
             return DeprovisionResult(
                 ok=True,
                 handle=spec.handle,
@@ -369,7 +385,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
             )
 
         if delete_data:
-            self._delete_master_password_secret(instance_id)
+            self._delete_connection_secrets(instance_id)
 
         return DeprovisionResult(
             ok=True,
@@ -420,25 +436,33 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
             host = _get(ip_addrs[0], "ipAddress", "") or ""
 
         secret_name = self._master_secret_for(instance_id=instance_id)
+        password = self._secret_store.get(secret_name)
+        if password is None:
+            raise _ManagedServiceError(
+                f"binding requested for {instance_id}, but master-password secret {secret_name!r} is missing",
+            )
+        if not host:
+            raise _ManagedServiceError(
+                f"binding requested for {instance_id}, but CloudSQL has no reachable endpoint",
+            )
+        url_secret = self._url_secret_for(instance_id=instance_id)
+        try:
+            self._secret_store.upsert(
+                url_secret,
+                f"mysql://root:{quote(password, safe='')}@{host}:3306/mysql?ssl-mode=REQUIRED",
+            )
+        except ManagedSecretStoreError as exc:
+            raise _ManagedServiceError(str(exc)) from exc
         return Binding(
             env_vars={
-                "DATABASE_HOST": ValueRef(literal=host),
-                "DATABASE_PORT": ValueRef(literal="3306"),
-                "DATABASE_NAME": ValueRef(literal="mysql"),
-                "DATABASE_USER": ValueRef(literal="root"),
-                "DATABASE_PASSWORD": ValueRef(secret_ref=secret_name),
-                "DATABASE_URL": ValueRef(
-                    secret_ref=self._url_secret_for(
-                        instance_id=instance_id,
-                    ),
-                ),
+                "MYSQL_HOST": ValueRef(literal=host),
+                "MYSQL_PORT": ValueRef(literal="3306"),
+                "MYSQL_DB": ValueRef(literal="mysql"),
+                "MYSQL_USER": ValueRef(literal="root"),
+                "MYSQL_PASSWORD": ValueRef(secret_ref=secret_name),
+                "DATABASE_URL": ValueRef(secret_ref=url_secret),
             },
-            iam_grants=[
-                Grant(
-                    resource=secret_name,
-                    actions=["secretmanager.versions.access"],
-                ),
-            ],
+            iam_grants=[],
             notes=(
                 "DATABASE_URL is a derived secret holding the "
                 "mysql:// connection string; the split components "
@@ -476,6 +500,24 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
     ) -> ProvisionResult:
         target_id = self._instance_id_for(spec=target)
         source_id = _parse_handle(snapshot.handle)
+        source_password = self._secret_store.get(
+            self._master_secret_for(instance_id=source_id),
+        )
+        if source_password is None:
+            return ProvisionResult(
+                ok=False,
+                handle="",
+                message=f"clone source {source_id} has no Astrolift master-password secret",
+                errors=["missing_master_password_secret"],
+            )
+        try:
+            self._secret_store.upsert(
+                self._master_secret_for(instance_id=target_id),
+                source_password,
+                labels=_tags_for(target),
+            )
+        except ManagedSecretStoreError as exc:
+            return ProvisionResult(ok=False, handle="", message=str(exc), errors=[str(exc)])
         try:
             self._sql.clone(
                 project=self._config.project_id,
@@ -488,6 +530,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
                 },
             )
         except Exception as exc:
+            self._delete_connection_secrets(target_id)
             return ProvisionResult(
                 ok=False,
                 handle="",
@@ -524,11 +567,11 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={
-                "DATABASE_HOST": "CloudSQL private/public IP",
-                "DATABASE_PORT": "3306 (MySQL default)",
-                "DATABASE_NAME": "Initial database name (mysql)",
-                "DATABASE_USER": "Master user (root)",
-                "DATABASE_PASSWORD": ("Secret Manager ref to the master password"),
+                "MYSQL_HOST": "CloudSQL private/public IP",
+                "MYSQL_PORT": "3306 (MySQL default)",
+                "MYSQL_DB": "Initial database name (mysql)",
+                "MYSQL_USER": "Master user (root)",
+                "MYSQL_PASSWORD": ("Secret Manager ref to the master password"),
                 "DATABASE_URL": ("Secret Manager ref to the fully-formed mysql:// connection string"),
             },
         )
@@ -584,42 +627,18 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
         spec: ProvisionSpec,
     ) -> str:
         name = self._master_secret_for(instance_id=instance_id)
-        parent = f"projects/{self._config.project_id}"
-        # AlreadyExists or similar — fall through to add_version.
-        with contextlib.suppress(Exception):
-            self._sm.create_secret(
-                request={
-                    "parent": parent,
-                    "secret_id": name.replace("/", "_"),
-                    "secret": {
-                        "replication": {"automatic": {}},
-                        "labels": _tags_for(spec),
-                    },
-                },
-            )
         try:
-            self._sm.add_secret_version(
-                request={
-                    "parent": (f"{parent}/secrets/{name.replace('/', '_')}"),
-                    "payload": {"data": password.encode("utf-8")},
-                },
-            )
-            return name
-        except Exception as exc:
-            raise _ManagedServiceError(
-                f"add_secret_version for {name}: {exc}",
-            ) from exc
+            return self._secret_store.upsert(name, password, labels=_tags_for(spec))
+        except ManagedSecretStoreError as exc:
+            raise _ManagedServiceError(str(exc)) from exc
 
-    def _delete_master_password_secret(self, instance_id: str) -> None:
-        name = self._master_secret_for(instance_id=instance_id)
-        try:
-            self._sm.delete_secret(
-                request={
-                    "name": (f"projects/{self._config.project_id}/secrets/{name.replace('/', '_')}"),
-                },
-            )
-        except Exception:
-            return
+    def _delete_connection_secrets(self, instance_id: str) -> None:
+        for path in (
+            self._master_secret_for(instance_id=instance_id),
+            self._url_secret_for(instance_id=instance_id),
+        ):
+            with contextlib.suppress(ManagedSecretStoreError):
+                self._secret_store.delete(path)
 
 
 # ----- module-level helpers --------------------------------------------
