@@ -18,6 +18,7 @@ Managed services:
 - AzureBlobStorageDriver — object_store/azure_blob
 - AzureServiceBusDriver — queue/azure_servicebus
 - AzureFilesDriver — filesystem/azure_files
+- AzureFilesClassicDriver — filesystem/azure_files_classic
 - AzurePostgresFlexibleDriver — postgres/azure_pg_flex
 - AzureMySQLFlexibleDriver — mysql/azure_mysql_flex
 - AzureCacheRedisDriver — redis/azure_cache_redis
@@ -38,6 +39,7 @@ from azure.managed.cache_redis import AzureCacheRedisDriver
 from azure.managed.cosmos import AzureCosmosDriver
 from azure.managed.email_acs import AzureCommunicationEmailDriver
 from azure.managed.filesystem_files import AzureFilesDriver
+from azure.managed.filesystem_files_classic import AzureFilesClassicDriver
 from azure.managed.model_endpoint_aoai import AzureOpenAIDriver
 from azure.managed.mysql_flexible import AzureMySQLFlexibleDriver
 from azure.managed.object_store_blob import (
@@ -83,6 +85,54 @@ _MANAGED_CONFIG_PROPERTIES = {
     "files_encryption_in_transit_required_default": {"type": "boolean", "default": True},
     "files_allowed_subnet_ids": {"type": "array", "minItems": 1, "items": {"type": "string"}},
     "files_deletion_protection_default": {"type": "boolean", "default": True},
+    "files_classic_account_name_prefix": {
+        "type": "string",
+        "pattern": "^[a-z0-9]{3,14}$",
+        "default": "astroliftfs",
+    },
+    "files_classic_share_name_prefix": {
+        "type": "string",
+        "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$",
+        "maxLength": 50,
+        "default": "astrolift-files",
+    },
+    "files_classic_default_protocol": {
+        "type": "string",
+        "enum": ["SMB", "NFS"],
+        "default": "SMB",
+    },
+    "files_classic_default_sku": {
+        "type": "string",
+        "enum": [
+            "Standard_LRS",
+            "Standard_GRS",
+            "Standard_RAGRS",
+            "Standard_ZRS",
+            "Standard_GZRS",
+            "Standard_RAGZRS",
+            "Premium_LRS",
+            "Premium_ZRS",
+        ],
+        "default": "Standard_LRS",
+    },
+    "files_classic_default_quota_gib": {"type": "integer", "minimum": 1, "maximum": 102400, "default": 100},
+    "files_classic_default_access_tier": {
+        "type": "string",
+        "enum": ["TransactionOptimized", "Hot", "Cool", "Premium"],
+        "default": "TransactionOptimized",
+    },
+    "files_classic_soft_delete_retention_days": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 365,
+        "default": 14,
+    },
+    "files_classic_allow_public_access_default": {"type": "boolean", "default": False},
+    "files_classic_secret_name_prefix": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9-]{1,92}$",
+        "default": "astrolift-files",
+    },
     "postgres_server_name_prefix": {"type": "string", "default": "astrolift"},
     "postgres_engine_version": {"type": "string", "default": "16"},
     "postgres_backup_retention_days": {"type": "integer", "minimum": 1, "maximum": 35, "default": 7},
@@ -192,6 +242,7 @@ PLUGIN = ProviderPlugin(
         ("object_store", "azure_blob"): AzureBlobStorageDriver,
         ("queue", "azure_servicebus"): AzureServiceBusDriver,
         ("filesystem", "azure_files"): AzureFilesDriver,
+        ("filesystem", "azure_files_classic"): AzureFilesClassicDriver,
         ("kv_store", "cosmos"): AzureCosmosDriver,
         ("search", "azure_ai_search_fulltext"): AzureAISearchFullTextDriver,
         ("vector_index", "azure_ai_search_vector"): AzureAISearchVectorDriver,

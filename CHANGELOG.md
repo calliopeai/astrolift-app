@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add the preview `filesystem/azure_files_classic` driver for storage-account
+  Azure Files SMB/NFS shares, including network ACLs, per-protocol encryption,
+  dual Key Vault-backed SMB rotation keys, snapshots, soft delete, guarded
+  teardown, and portable mount metadata.
 - Add Microsoft.FileShares provisioned-v2 NFS lifecycle with SSD capacity,
   Local or Zone redundancy, provisioned performance, root-squash and encrypted
   mount controls, subnet allowlists, portable AZNFS bindings, child snapshots,

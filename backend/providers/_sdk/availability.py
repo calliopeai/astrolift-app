@@ -34,6 +34,7 @@ _AWS_DATA_SEARCH_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/128
 _AWS_EVENTING_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1285"
 _AWS_PLATFORM_RESOURCES_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1286"
 _CROSS_CLOUD_PARITY_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1287"
+_AZURE_FILES_CLASSIC_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1361"
 
 
 @dataclass(frozen=True)
@@ -1479,9 +1480,27 @@ MATRIX = AvailabilityMatrix(
             kind="filesystem",
             variant="azure_files_classic",
             plugin_id="azure",
-            status="planned",
-            description="Classic storage-account Azure Files SMB/NFS share",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            status="preview",
+            description="Classic Azure Files storage-key SMB or network-authorized NFS share",
+            issue_url=_AZURE_FILES_CLASSIC_ISSUE,
+            binding_envs=(
+                "FILESYSTEM_HANDLE",
+                "FILESYSTEM_MOUNT_PATH",
+                "FILESYSTEM_TLS",
+                "FILESYSTEM_PROTOCOL",
+                "FILESYSTEM_ENDPOINT",
+                "FILESYSTEM_EXPORT_PATH",
+                "FILESYSTEM_SOURCE",
+                "FILESYSTEM_MOUNT_OPTIONS",
+                "FILESYSTEM_READ_ONLY",
+                "FILESYSTEM_USERNAME",
+                "FILESYSTEM_PASSWORD",
+                "FILESYSTEM_PASSWORD_SECONDARY",
+                "AZURE_STORAGE_ACCOUNT",
+                "AZURE_FILE_SHARE_NAME",
+                "AZURE_RESOURCE_GROUP",
+                "AZURE_LOCATION",
+            ),
         ),
         ManagedServiceEntry(
             kind="filesystem",

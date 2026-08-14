@@ -44,6 +44,7 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
         ("queue", "servicebus", "ServiceBusConfig"),
         ("queue", "azure_servicebus", "AzureServiceBusConfig"),
         ("filesystem", "azure_files", "AzureFilesConfig"),
+        ("filesystem", "azure_files_classic", "AzureFilesClassicConfig"),
         ("postgres", "azure_pg_flex", "AzurePostgresConfig"),
         ("mysql", "azure_mysql_flex", "AzureMySQLConfig"),
         ("redis", "azure_cache_redis", "AzureCacheRedisConfig"),
@@ -155,6 +156,33 @@ def test_messaging_and_search_controls_are_preserved() -> None:
     assert files.encryption_in_transit_required_default is False
     assert files.allowed_subnet_ids[0].endswith("/subnets/aks")
     assert files.deletion_protection_default is False
+
+    classic_files = managed_config_for(
+        "azure",
+        _cluster(
+            files_classic_account_name_prefix="smdfiles",
+            files_classic_share_name_prefix="shared",
+            files_classic_default_protocol="NFS",
+            files_classic_default_sku="Premium_ZRS",
+            files_classic_default_quota_gib=1024,
+            files_classic_default_access_tier="Premium",
+            files_classic_soft_delete_retention_days=30,
+            files_classic_allow_public_access_default=False,
+            files_classic_secret_name_prefix="smd-file-key",
+        ),
+        kind="filesystem",
+        variant="azure_files_classic",
+    )
+    assert classic_files.account_name_prefix == "smdfiles"
+    assert classic_files.share_name_prefix == "shared"
+    assert classic_files.default_protocol == "NFS"
+    assert classic_files.default_sku == "Premium_ZRS"
+    assert classic_files.default_quota_gib == 1024
+    assert classic_files.default_access_tier == "Premium"
+    assert classic_files.allowed_subnet_ids[0].endswith("/subnets/aks")
+    assert classic_files.soft_delete_retention_days == 30
+    assert classic_files.keyvault_url == "https://platform-prod.vault.azure.net"
+    assert classic_files.secret_name_prefix == "smd-file-key"
 
     search = managed_config_for(
         "azure",

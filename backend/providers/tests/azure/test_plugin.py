@@ -38,6 +38,7 @@ def test_managed_services_have_full_364_set() -> None:
     assert ("object_store", "azure_blob") in keys
     assert ("queue", "azure_servicebus") in keys
     assert ("filesystem", "azure_files") in keys
+    assert ("filesystem", "azure_files_classic") in keys
 
 
 def test_config_schema_requires_core_fields() -> None:
@@ -60,6 +61,9 @@ def test_managed_runtime_controls_are_exposed_in_provider_schema() -> None:
         "blob_versioning_enabled",
         "servicebus_dead_lettering_on_message_expiration",
         "files_allowed_subnet_ids",
+        "files_classic_default_protocol",
+        "files_classic_default_sku",
+        "files_classic_default_access_tier",
         "postgres_backup_retention_days",
         "mysql_backup_retention_days",
         "redis_minimum_tls_version_default",
@@ -81,8 +85,10 @@ def test_astrolift_azure_package_extends_official_sdk_namespace() -> None:
     from azure.mgmt.mysqlflexibleservers import MySQLManagementClient
     from azure.mgmt.postgresqlflexibleservers import PostgreSQLManagementClient
     from azure.mgmt.resource.locks import ManagementLockClient
+    from azure.mgmt.storage import StorageManagementClient
     from azure.search.documents.indexes import SearchIndexClient
     from azure.storage.blob import BlobServiceClient
+    from azure.storage.fileshare import ShareClient
 
     assert all(
         value is not None
@@ -93,8 +99,10 @@ def test_astrolift_azure_package_extends_official_sdk_namespace() -> None:
             MySQLManagementClient,
             PostgreSQLManagementClient,
             ManagementLockClient,
+            StorageManagementClient,
             SearchIndexClient,
             BlobServiceClient,
+            ShareClient,
         )
     )
 
@@ -114,6 +122,7 @@ def test_registered_managed_drivers_target_current_sdk_operation_groups() -> Non
     from azure.mgmt.resource.locks import ManagementLockClient
     from azure.mgmt.search import SearchManagementClient
     from azure.mgmt.servicebus import ServiceBusManagementClient
+    from azure.mgmt.storage import StorageManagementClient
 
     subscription_id = "00000000-1111-2222-3333-444444444444"
     credential = DefaultAzureCredential()
@@ -128,6 +137,14 @@ def test_registered_managed_drivers_target_current_sdk_operation_groups() -> Non
                     "list_by_file_share",
                 },
                 "private_endpoint_connections": {"begin_delete", "list_by_file_share"},
+            },
+        ),
+        (
+            StorageManagementClient(credential, subscription_id),
+            {
+                "storage_accounts": {"begin_create", "delete", "get_properties", "list_keys", "update"},
+                "file_services": {"get_service_properties", "set_service_properties"},
+                "file_shares": {"create", "delete", "get", "list", "update"},
             },
         ),
         (
