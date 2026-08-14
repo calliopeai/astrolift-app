@@ -17,6 +17,7 @@ Managed services:
 - ServiceBusDriver — queue/servicebus
 - AzureBlobStorageDriver — object_store/azure_blob
 - AzureServiceBusDriver — queue/azure_servicebus
+- AzureEventGridDriver — event_bus/event_grid
 - AzurePostgresFlexibleDriver — postgres/azure_pg_flex
 - AzureMySQLFlexibleDriver — mysql/azure_mysql_flex
 - AzureCacheRedisDriver — redis/azure_cache_redis
@@ -36,6 +37,7 @@ from azure.ingress_appgw import AzureAppGatewayIngressDriver
 from azure.managed.cache_redis import AzureCacheRedisDriver
 from azure.managed.cosmos import AzureCosmosDriver
 from azure.managed.email_acs import AzureCommunicationEmailDriver
+from azure.managed.event_grid import AzureEventGridDriver
 from azure.managed.model_endpoint_aoai import AzureOpenAIDriver
 from azure.managed.mysql_flexible import AzureMySQLFlexibleDriver
 from azure.managed.object_store_blob import (
@@ -66,6 +68,17 @@ _MANAGED_CONFIG_PROPERTIES = {
     "servicebus_dead_lettering_on_message_expiration": {"type": "boolean", "default": True},
     "servicebus_max_delivery_count": {"type": "integer", "minimum": 1, "default": 10},
     "servicebus_lock_duration": {"type": "string", "default": "PT30S"},
+    "eventgrid_topic_name_prefix": {"type": "string", "default": "astrolift-eg"},
+    "eventgrid_default_input_schema": {
+        "type": "string",
+        "enum": ["CloudEventSchemaV1_0", "EventGridSchema"],
+        "default": "CloudEventSchemaV1_0",
+    },
+    "eventgrid_public_network_access_default": {
+        "type": "string",
+        "enum": ["Enabled", "Disabled"],
+        "default": "Enabled",
+    },
     "postgres_server_name_prefix": {"type": "string", "default": "astrolift"},
     "postgres_engine_version": {"type": "string", "default": "16"},
     "postgres_backup_retention_days": {"type": "integer", "minimum": 1, "maximum": 35, "default": 7},
@@ -174,6 +187,7 @@ PLUGIN = ProviderPlugin(
         ("redis", "azure_cache_redis"): AzureCacheRedisDriver,
         ("object_store", "azure_blob"): AzureBlobStorageDriver,
         ("queue", "azure_servicebus"): AzureServiceBusDriver,
+        ("event_bus", "event_grid"): AzureEventGridDriver,
         ("kv_store", "cosmos"): AzureCosmosDriver,
         ("search", "azure_ai_search_fulltext"): AzureAISearchFullTextDriver,
         ("vector_index", "azure_ai_search_vector"): AzureAISearchVectorDriver,

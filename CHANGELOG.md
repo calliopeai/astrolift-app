@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add an Azure Event Grid custom-topic event-bus driver with Entra workload
+  bindings, push destinations, event and advanced filters, batching, retries,
+  dead-lettering, selected-network controls, identity delivery, and guarded
+  destructive teardown.
 - Add Cloud Spanner Graph lifecycle on Enterprise and Enterprise Plus with
   GoogleSQL/GQL property graphs, fixed or autoscaled capacity, atomic custom
   schemas, replay-safe DDL, CMEK, exact backups and restore, portable IAM

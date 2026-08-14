@@ -34,6 +34,7 @@ _AWS_DATA_SEARCH_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/128
 _AWS_EVENTING_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1285"
 _AWS_PLATFORM_RESOURCES_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1286"
 _CROSS_CLOUD_PARITY_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1287"
+_AZURE_EVENT_GRID_CERTIFICATION_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1354"
 
 
 @dataclass(frozen=True)
@@ -1479,9 +1480,19 @@ MATRIX = AvailabilityMatrix(
             kind="event_bus",
             variant="event_grid",
             plugin_id="azure",
-            status="planned",
+            status="preview",
             description="Azure Event Grid topic and subscriptions",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            issue_url=_AZURE_EVENT_GRID_CERTIFICATION_ISSUE,
+            binding_envs=(
+                "EVENT_BUS_NAME",
+                "EVENT_BUS_ARN",
+                "EVENT_BUS_REGION",
+                "EVENT_BUS_ENDPOINT",
+                "EVENT_GRID_TOPIC_NAME",
+                "EVENT_GRID_TOPIC_ENDPOINT",
+                "EVENT_GRID_TOPIC_RESOURCE_ID",
+                "EVENT_GRID_INPUT_SCHEMA",
+            ),
         ),
         ManagedServiceEntry(
             kind="stream",

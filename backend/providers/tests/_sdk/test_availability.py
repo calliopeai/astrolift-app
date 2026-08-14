@@ -132,6 +132,13 @@ def test_managed_service_binding_envs_recorded() -> None:
     s3 = next(m for m in MATRIX.managed_services if m.plugin_id == "aws" and m.variant == "s3")
     assert "S3_BUCKET_NAME" in s3.binding_envs
 
+    event_grid = next(
+        entry for entry in MATRIX.managed_services if entry.plugin_id == "azure" and entry.variant == "event_grid"
+    )
+    assert event_grid.status == "preview"
+    assert event_grid.issue_url.endswith("/1354")
+    assert "EVENT_BUS_ENDPOINT" in event_grid.binding_envs
+
 
 def test_managed_service_keys_are_unique() -> None:
     keys = [(entry.plugin_id, entry.kind, entry.variant) for entry in MATRIX.managed_services]

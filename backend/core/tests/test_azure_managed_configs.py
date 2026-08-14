@@ -38,6 +38,7 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
         ("object_store", "azure_blob", "AzureBlobConfig"),
         ("queue", "servicebus", "ServiceBusConfig"),
         ("queue", "azure_servicebus", "AzureServiceBusConfig"),
+        ("event_bus", "event_grid", "AzureEventGridConfig"),
         ("postgres", "azure_pg_flex", "AzurePostgresConfig"),
         ("mysql", "azure_mysql_flex", "AzureMySQLConfig"),
         ("redis", "azure_cache_redis", "AzureCacheRedisConfig"),
@@ -129,6 +130,20 @@ def test_messaging_and_search_controls_are_preserved() -> None:
     assert bus.max_delivery_count == 25
     assert bus.lock_duration == "PT1M"
 
+    event_grid = managed_config_for(
+        "azure",
+        _cluster(
+            eventgrid_topic_name_prefix="platform-events",
+            eventgrid_default_input_schema="EventGridSchema",
+            eventgrid_public_network_access_default="Enabled",
+        ),
+        kind="event_bus",
+        variant="event_grid",
+    )
+    assert event_grid.topic_name_prefix == "platform-events"
+    assert event_grid.default_input_schema == "EventGridSchema"
+    assert event_grid.public_network_access_default == "Enabled"
+
     search = managed_config_for(
         "azure",
         _cluster(
@@ -165,8 +180,10 @@ def test_redis_backup_controls_are_preserved() -> None:
 def test_default_variant_selects_the_richer_azure_drivers() -> None:
     blob = managed_config_for("azure", _cluster(), kind="object_store")
     bus = managed_config_for("azure", _cluster(), kind="queue")
+    event_bus = managed_config_for("azure", _cluster(), kind="event_bus")
     assert type(blob).__name__ == "AzureBlobConfig"
     assert type(bus).__name__ == "AzureServiceBusConfig"
+    assert type(event_bus).__name__ == "AzureEventGridConfig"
 
 
 @pytest.mark.parametrize(

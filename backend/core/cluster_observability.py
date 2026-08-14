@@ -762,6 +762,20 @@ def _azure_managed_config_for(
             lock_duration=str(pc.get("servicebus_lock_duration", "PT30S")),
         )
 
+    if pair == ("event_bus", "event_grid") or (kind == "event_bus" and not variant):
+        from azure.managed.event_grid import AzureEventGridConfig
+
+        return AzureEventGridConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            location=location,
+            topic_name_prefix=str(pc.get("eventgrid_topic_name_prefix", "astrolift-eg")),
+            default_input_schema=str(pc.get("eventgrid_default_input_schema", "CloudEventSchemaV1_0")),
+            public_network_access_default=str(
+                pc.get("eventgrid_public_network_access_default", "Enabled"),
+            ),
+        )
+
     if pair == ("postgres", "azure_pg_flex") or (kind == "postgres" and not variant):
         from azure.managed.postgres_flexible import AzurePostgresConfig
 

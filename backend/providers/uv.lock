@@ -83,6 +83,7 @@ azure = [
     { name = "azure-mgmt-containerservice" },
     { name = "azure-mgmt-cosmosdb" },
     { name = "azure-mgmt-dns" },
+    { name = "azure-mgmt-eventgrid" },
     { name = "azure-mgmt-loganalytics" },
     { name = "azure-mgmt-monitor" },
     { name = "azure-mgmt-msi" },
@@ -131,6 +132,7 @@ requires-dist = [
     { name = "azure-mgmt-containerservice", marker = "extra == 'azure'", specifier = ">=30.0" },
     { name = "azure-mgmt-cosmosdb", marker = "extra == 'azure'", specifier = ">=10.0" },
     { name = "azure-mgmt-dns", marker = "extra == 'azure'", specifier = ">=8.1" },
+    { name = "azure-mgmt-eventgrid", marker = "extra == 'azure'", specifier = ">=10.4" },
     { name = "azure-mgmt-loganalytics", marker = "extra == 'azure'", specifier = ">=13.0" },
     { name = "azure-mgmt-monitor", marker = "extra == 'azure'", specifier = ">=6.0" },
     { name = "azure-mgmt-msi", marker = "extra == 'azure'", specifier = ">=7.0" },
@@ -315,6 +317,21 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/9e/a8/990635b8b73252ad70b0c25f95db62d7927a32a4561d8c57bba0818a4a63/azure_mgmt_dns-9.0.0.tar.gz", hash = "sha256:89f8c4e467a94224b97bf16dd76d5bd616bf11cefe727f776618a57cc5486e37", size = 56953, upload-time = "2025-07-14T10:15:48.528Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b8/09/caa99f4d506ff0e07d158e526bb3142dcb6e759a65c27975fd045302f258/azure_mgmt_dns-9.0.0-py3-none-any.whl", hash = "sha256:00bd1d9d679d77aeba9178782d03c833549a4077147c9d78fedbfcd5909be633", size = 65319, upload-time = "2025-07-14T10:15:49.916Z" },
+]
+
+[[package]]
+name = "azure-mgmt-eventgrid"
+version = "10.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "azure-common" },
+    { name = "azure-mgmt-core" },
+    { name = "isodate" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/bb/68/24a2921b66827a571a3da75cc12289b7029a7c436087c0c5b2b4ca387aa3/azure_mgmt_eventgrid-10.4.0.tar.gz", hash = "sha256:303e5e27cf4bb5ec833ba4e5a9ef70b5bc410e190412ec47cde59d82e413fb7e", size = 258796, upload-time = "2025-03-24T03:32:20.39Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8d/c7/6dfac325b4b081038aa3495e048740b44d0a68b7da97d922e0aa47a67351/azure_mgmt_eventgrid-10.4.0-py3-none-any.whl", hash = "sha256:5e4637245bbff33298d5f427971b870dbb03d873a3ef68f328190a7b7a38c56f", size = 353207, upload-time = "2025-03-24T03:32:22.847Z" },
 ]
 
 [[package]]
