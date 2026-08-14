@@ -61,10 +61,15 @@ def test_has_managed_lookup() -> None:
         kind="postgres",
         variant="aurora_postgres_serverless_v2",
     )
-    assert not MATRIX.has_managed(
+    assert MATRIX.has_managed(
         plugin_id="aws",
         kind="document_db",
         variant="documentdb",
+    )
+    assert MATRIX.has_managed(
+        plugin_id="aws",
+        kind="document_db",
+        variant="documentdb_serverless_v2",
     )
 
 

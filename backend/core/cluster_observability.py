@@ -606,6 +606,66 @@ def managed_config_for(
             fifo_default=bool(pc.get("sqs_fifo_default", False)),
         )
 
+    if kind in ("search", "vector_index") and variant.startswith("opensearch_serverless"):
+        from aws.managed._networking import ensure_opensearch_serverless_networking
+        from aws.managed.opensearch_serverless import OpenSearchServerlessConfig
+
+        public_access = bool(pc.get("opensearch_serverless_public_access", False))
+        vpc_endpoint_ids = (
+            []
+            if public_access
+            else ensure_opensearch_serverless_networking(
+                cluster,
+                region=region,
+            )
+        )
+        return OpenSearchServerlessConfig(
+            region=region,
+            account_id=str(pc.get("account_id", "")),
+            collection_type="VECTORSEARCH" if kind == "vector_index" else "SEARCH",
+            collection_name_prefix=str(
+                pc.get("opensearch_serverless_collection_prefix", "astrolift"),
+            ),
+            vpc_endpoint_ids=vpc_endpoint_ids,
+            public_access_default=public_access,
+            kms_key_arn=str(pc.get("kms_key_id", "")),
+            standby_replicas_default=str(
+                pc.get("opensearch_serverless_standby_replicas", "DISABLED"),
+            ),
+            deletion_protection_default=bool(
+                pc.get("deletion_protection_default", True),
+            ),
+            data_access_principals=list(
+                pc.get("opensearch_serverless_data_access_principals") or [],
+            ),
+            source_services=list(pc.get("opensearch_serverless_source_services") or []),
+        )
+
+    if kind == "document_db" and variant.startswith("documentdb"):
+        from aws.managed._networking import ensure_documentdb_networking
+        from aws.managed.documentdb import DocumentDBConfig
+
+        subnet_group, security_group_ids = ensure_documentdb_networking(
+            cluster,
+            region=region,
+        )
+        return DocumentDBConfig(
+            region=region,
+            db_subnet_group=subnet_group,
+            security_group_ids=security_group_ids,
+            cluster_name_prefix=str(pc.get("documentdb_cluster_name_prefix", "astrolift")),
+            engine_version=str(pc.get("documentdb_engine_version", "5.0.0")),
+            serverless_v2=variant == "documentdb_serverless_v2",
+            backup_retention_days=int(pc.get("documentdb_backup_retention_days", 7)),
+            deletion_protection_default=bool(
+                pc.get("deletion_protection_default", True),
+            ),
+            secrets_manager_prefix=str(
+                pc.get("documentdb_secrets_manager_prefix", "astrolift/documentdb"),
+            ),
+            master_username=str(pc.get("documentdb_master_username", "astrolift")),
+        )
+
     if kind == "search":
         from aws.managed.search_opensearch import OpenSearchSearchConfig
 

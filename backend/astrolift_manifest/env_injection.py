@@ -133,6 +133,8 @@ _ENVELOPES: dict[str, tuple[str, ...]] = {
         "DOCDB_DB",
         "DOCDB_USER",
         "DOCDB_PASSWORD",
+        "DOCDB_TLS",
+        "DOCDB_RESOURCE_ARN",
     ),
     "search": (
         "SEARCH_ENDPOINT",

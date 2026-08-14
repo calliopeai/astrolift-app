@@ -361,3 +361,123 @@ def ensure_memorydb_networking(
             )
         ]
     return subnet_group, security_group_ids
+
+
+def ensure_opensearch_serverless_networking(
+    cluster,
+    *,
+    region: str,
+    clients: Any | None = None,
+) -> list[str]:
+    """Find or create the cluster-scoped OpenSearch Serverless VPC endpoint."""
+
+    pc = cluster.provider_config or {}
+    if pc.get("opensearch_serverless_vpc_endpoint_ids"):
+        return list(pc["opensearch_serverless_vpc_endpoint_ids"])
+
+    if clients is None:
+        import boto3
+
+        ec2 = boto3.client("ec2", region_name=region)
+        aoss = boto3.client("opensearchserverless", region_name=region)
+        eks = boto3.client("eks", region_name=region)
+    else:
+        ec2, aoss, eks = clients
+    vpc_id, subnet_ids, vpc_cidr = discover_vpc(
+        cluster,
+        region=region,
+        ec2=ec2,
+        eks=eks,
+    )
+    security_group_ids = list(pc.get("opensearch_serverless_security_group_ids") or [])
+    if not security_group_ids:
+        security_group_ids = [
+            ensure_security_group(
+                vpc_id=vpc_id,
+                vpc_cidr=vpc_cidr,
+                port=443,
+                name=f"astrolift-{cluster.slug}-aoss"[:255],
+                ec2=ec2,
+            )
+        ]
+    endpoint_name = f"astrolift-{cluster.slug}-aoss"[:32].rstrip("-")
+    next_token = ""
+    while True:
+        kwargs: dict[str, Any] = {"maxResults": 100}
+        if next_token:
+            kwargs["nextToken"] = next_token
+        response = aoss.list_vpc_endpoints(**kwargs)
+        for endpoint in response.get("vpcEndpointSummaries", []):
+            if endpoint.get("name") == endpoint_name and endpoint.get("status") != "DELETING":
+                return [str(endpoint["id"])]
+        next_token = str(response.get("nextToken") or "")
+        if not next_token:
+            break
+    response = aoss.create_vpc_endpoint(
+        name=endpoint_name,
+        vpcId=vpc_id,
+        subnetIds=list(pc.get("opensearch_serverless_subnet_ids") or subnet_ids),
+        securityGroupIds=security_group_ids,
+    )
+    detail = response.get("createVpcEndpointDetail") or {}
+    endpoint_id = str(detail.get("id") or "")
+    if not endpoint_id:
+        raise RuntimeError("OpenSearch Serverless create_vpc_endpoint returned no endpoint id")
+    return [endpoint_id]
+
+
+def ensure_documentdb_networking(
+    cluster,
+    *,
+    region: str,
+    clients: Any | None = None,
+) -> tuple[str, list[str]]:
+    """Find or create a DocumentDB-specific subnet group and access SG."""
+
+    pc = cluster.provider_config or {}
+    if pc.get("documentdb_subnet_group") and pc.get("documentdb_security_group_ids"):
+        return str(pc["documentdb_subnet_group"]), list(pc["documentdb_security_group_ids"])
+    if clients is None:
+        import boto3
+
+        ec2 = boto3.client("ec2", region_name=region)
+        docdb = boto3.client("docdb", region_name=region)
+        eks = boto3.client("eks", region_name=region)
+    else:
+        ec2, docdb, eks = clients
+    vpc_id, subnet_ids, vpc_cidr = discover_vpc(
+        cluster,
+        region=region,
+        ec2=ec2,
+        eks=eks,
+    )
+    subnet_group = str(pc.get("documentdb_subnet_group") or f"astrolift-{cluster.slug}-docdb")[:63]
+    if not pc.get("documentdb_subnet_group"):
+        try:
+            docdb.create_db_subnet_group(
+                DBSubnetGroupName=subnet_group,
+                DBSubnetGroupDescription="astrolift managed DocumentDB subnets",
+                SubnetIds=subnet_ids,
+                Tags=_MANAGED_TAGS,
+            )
+        except Exception as exc:
+            if (
+                "DBSubnetGroupAlreadyExists" not in type(exc).__name__
+                and "already exists"
+                not in str(
+                    exc,
+                ).lower()
+            ):
+                raise
+    security_group_ids = list(pc.get("documentdb_security_group_ids") or [])
+    if not security_group_ids:
+        security_group_ids = [
+            ensure_security_group(
+                vpc_id=vpc_id,
+                vpc_cidr=vpc_cidr,
+                port=27017,
+                name=f"astrolift-{cluster.slug}-docdb"[:255],
+                ec2=ec2,
+            )
+        ]
+    return subnet_group, security_group_ids

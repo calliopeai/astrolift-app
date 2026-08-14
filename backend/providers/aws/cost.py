@@ -76,6 +76,12 @@ SERVICE_CODE_BY_VARIANT: dict[tuple[str, str], str] = {
     ("cache", "elasticache_memcached"): "AmazonElastiCache",
     ("nosql", "dynamodb"): "AmazonDynamoDB",
     ("kv_store", "dynamodb"): "AmazonDynamoDB",
+    ("search", "opensearch"): "AmazonES",
+    ("search", "opensearch_serverless"): "AmazonES",
+    ("vector_index", "opensearch_vector"): "AmazonES",
+    ("vector_index", "opensearch_serverless_vector"): "AmazonES",
+    ("document_db", "documentdb"): "AmazonDocDB",
+    ("document_db", "documentdb_serverless_v2"): "AmazonDocDB",
     ("filesystem", "efs"): "AmazonEFS",
     # Cluster compute capacity (#440). Translates a (cpu_cores,
     # memory_gib) request into the cheapest matching EC2 on-demand
