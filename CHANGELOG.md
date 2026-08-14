@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add Microsoft.FileShares provisioned-v2 NFS lifecycle with SSD capacity,
+  Local or Zone redundancy, provisioned performance, root-squash and encrypted
+  mount controls, subnet allowlists, portable AZNFS bindings, child snapshots,
+  ownership-safe reconciliation, and protected data-loss-aware teardown.
 - Add Cloud Spanner Graph lifecycle on Enterprise and Enterprise Plus with
   GoogleSQL/GQL property graphs, fixed or autoscaled capacity, atomic custom
   schemas, replay-safe DDL, CMEK, exact backups and restore, portable IAM

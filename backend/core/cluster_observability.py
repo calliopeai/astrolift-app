@@ -762,6 +762,24 @@ def _azure_managed_config_for(
             lock_duration=str(pc.get("servicebus_lock_duration", "PT30S")),
         )
 
+    if pair == ("filesystem", "azure_files") or (kind == "filesystem" and not variant):
+        from azure.managed.filesystem_files import AzureFilesConfig
+
+        return AzureFilesConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            location=location,
+            name_prefix=str(pc.get("files_name_prefix", "astrolift-files")),
+            default_storage_gib=int(pc.get("files_default_storage_gib", 32)),
+            default_redundancy=str(pc.get("files_default_redundancy", "Local")),
+            default_root_squash=str(pc.get("files_default_root_squash", "RootSquash")),
+            encryption_in_transit_required_default=bool(
+                pc.get("files_encryption_in_transit_required_default", True),
+            ),
+            allowed_subnet_ids=tuple(str(value) for value in pc.get("files_allowed_subnet_ids", []) or []),
+            deletion_protection_default=bool(pc.get("files_deletion_protection_default", True)),
+        )
+
     if pair == ("postgres", "azure_pg_flex") or (kind == "postgres" and not variant):
         from azure.managed.postgres_flexible import AzurePostgresConfig
 
