@@ -92,6 +92,7 @@ azure = [
     { name = "azure-mgmt-resource-locks" },
     { name = "azure-mgmt-search" },
     { name = "azure-mgmt-servicebus" },
+    { name = "azure-mgmt-sql" },
     { name = "azure-search-documents" },
     { name = "azure-storage-blob" },
     { name = "kubernetes" },
@@ -140,6 +141,7 @@ requires-dist = [
     { name = "azure-mgmt-resource-locks", marker = "extra == 'azure'", specifier = ">=1.0.0b1" },
     { name = "azure-mgmt-search", marker = "extra == 'azure'", specifier = ">=9.1" },
     { name = "azure-mgmt-servicebus", marker = "extra == 'azure'", specifier = ">=8.2" },
+    { name = "azure-mgmt-sql", marker = "extra == 'azure'", specifier = ">=4.0" },
     { name = "azure-search-documents", marker = "extra == 'azure'", specifier = ">=11.6" },
     { name = "azure-storage-blob", marker = "extra == 'azure'", specifier = ">=12.19" },
     { name = "boto3", marker = "extra == 'aws'", specifier = ">=1.43.71" },
@@ -445,6 +447,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/05/0b/b2afa78493e474a6f4dd550e2a804b1d14d7e2ea06671f08b2839729edda/azure_mgmt_servicebus-10.0.0.tar.gz", hash = "sha256:3d87a8860b72437597c33dfab0360fb4b776a678c70fd68bd2aa9d00853e7698", size = 143858, upload-time = "2026-07-20T09:01:37.061Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d6/d8/233c5edb622b8f07f3cc81759203dc23da9d01e54a3a1cc321918e6d1563/azure_mgmt_servicebus-10.0.0-py3-none-any.whl", hash = "sha256:a3e243b8114000cc8a72d69d10d64c5939680b2fcb7108c92b536880fea262f2", size = 124330, upload-time = "2026-07-20T09:01:38.423Z" },
+]
+
+[[package]]
+name = "azure-mgmt-sql"
+version = "4.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "azure-mgmt-core" },
+    { name = "isodate" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/83/b0/a99bf130e8cf3b9d7e43464fa5fe30deccee43605846c02be517c12a17ed/azure_mgmt_sql-4.0.0.tar.gz", hash = "sha256:b39756f9cf8acee72764f1c745211c6c635fa5f6bfc27174de2a58690917262b", size = 640741, upload-time = "2026-07-01T06:58:53.626Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e0/49/a4cf9be81368756ee2fe3188003bdca6c8da6b036b123c0aef753b12200a/azure_mgmt_sql-4.0.0-py3-none-any.whl", hash = "sha256:479cb5c3ef5b3cee8911965c1312038537801f564543e773227d9ad1600c630c", size = 507188, upload-time = "2026-07-01T06:58:56.169Z" },
 ]
 
 [[package]]
