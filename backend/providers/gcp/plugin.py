@@ -27,6 +27,7 @@ Executable managed services:
 - FirestoreNativeDriver — document_db/firestore_native
 - CloudSQLServerDriver — mssql/cloudsql_sqlserver
 - SpannerGraphDriver — graph_db/spanner_graph
+- PrivateServiceConnectDriver — private_endpoint/private_service_connect
 
 The availability catalogue is authoritative for the remaining planned GCP
 resources. Placeholder email/search classes are registered only so callers get
@@ -49,6 +50,7 @@ from gcp.managed.mysql_cloudsql import CloudSQLMySQLDriver
 from gcp.managed.object_store_gcs import GCSDriver
 from gcp.managed.postgres_alloydb import AlloyDBPostgresDriver
 from gcp.managed.postgres_cloudsql import CloudSQLPostgresDriver
+from gcp.managed.private_endpoint_psc import PrivateServiceConnectDriver
 from gcp.managed.queue_pubsub import PubSubDriver
 from gcp.managed.redis_memorystore import MemorystoreRedisDriver
 from gcp.managed.search_elastic_cloud import GCPElasticCloudStubDriver
@@ -93,6 +95,7 @@ PLUGIN = ProviderPlugin(
         ("document_db", "firestore_native"): FirestoreNativeDriver,
         ("mssql", "cloudsql_sqlserver"): CloudSQLServerDriver,
         ("graph_db", "spanner_graph"): SpannerGraphDriver,
+        ("private_endpoint", "private_service_connect"): PrivateServiceConnectDriver,
     },
     config_schema={
         "type": "object",
@@ -169,6 +172,41 @@ PLUGIN = ProviderPlugin(
                 "type": "string",
                 "default": "2592000s",
                 "description": "Immutable provider waiting period; 2592000s is 30 days.",
+            },
+            "private_service_connect_network": {
+                "type": "string",
+                "description": "Default VPC network name or resource URI for PSC endpoints.",
+            },
+            "private_service_connect_subnetwork": {
+                "type": "string",
+                "description": "Default regional subnetwork name or resource URI for published-service endpoints.",
+            },
+            "private_service_connect_name_prefix": {
+                "type": "string",
+                "default": "astrolift",
+            },
+            "private_service_connect_labels": {
+                "type": "object",
+                "additionalProperties": {"type": "string"},
+                "description": "Operator labels merged into every managed PSC address and forwarding rule.",
+            },
+            "private_service_connect_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "private_service_connect_api_endpoint": {
+                "type": "string",
+                "default": "https://compute.googleapis.com/compute/v1",
+            },
+            "private_service_connect_operation_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 900,
+            },
+            "private_service_connect_operation_poll_interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 2,
             },
             "bucket_name_prefix": {
                 "type": "string",

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add executable Google Cloud Private Service Connect consumer endpoints for
+  regional published services and global Google APIs/VPC Service Controls,
+  with managed or external addresses, Shared VPC references, Service Directory
+  registration, global access, portable bindings, adoption, and protected
+  teardown.
+
 ### Added
 
 - Add Cloud Spanner Graph lifecycle on Enterprise and Enterprise Plus with

@@ -1278,8 +1278,30 @@ MATRIX = AvailabilityMatrix(
             kind="private_endpoint",
             variant="private_service_connect",
             plugin_id="gcp",
-            status="planned",
-            description="Private Service Connect endpoint",
+            status="preview",
+            description=(
+                "Private Service Connect consumer endpoint for regional published "
+                "services or global Google APIs and VPC Service Controls bundles"
+            ),
+            binding_envs=(
+                "PRIVATE_ENDPOINT_ID",
+                "PRIVATE_ENDPOINT_URL",
+                "PRIVATE_ENDPOINT_DNS",
+                "PRIVATE_ENDPOINT_IPS",
+                "PRIVATE_ENDPOINT_TYPE",
+                "PRIVATE_ENDPOINT_SERVICE_NAME",
+                "PRIVATE_ENDPOINT_DNS_NAME",
+                "PRIVATE_ENDPOINT_DNS_NAMES",
+                "PRIVATE_ENDPOINT_NETWORK_INTERFACE_IDS",
+                "PRIVATE_ENDPOINT_PREFIX_LIST_ID",
+                "GCP_PSC_PROJECT",
+                "GCP_PSC_REGION",
+                "GCP_PSC_ENDPOINT",
+                "GCP_PSC_ENDPOINT_URI",
+                "GCP_PSC_IP_ADDRESS",
+                "GCP_PSC_TARGET",
+                "GCP_PSC_CONNECTION_STATUS",
+            ),
             issue_url=_CROSS_CLOUD_PARITY_ISSUE,
         ),
         ManagedServiceEntry(

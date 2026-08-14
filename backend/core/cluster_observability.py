@@ -637,6 +637,40 @@ def _gcp_managed_config_for(
             ),
         )
 
+    if pair == ("private_endpoint", "private_service_connect") or (
+        kind == "private_endpoint" and not variant
+    ):
+        from gcp.managed.private_endpoint_psc import PrivateServiceConnectConfig
+
+        return PrivateServiceConnectConfig(
+            project_id=project_id,
+            region=region,
+            network=str(pc.get("private_service_connect_network", "")),
+            subnetwork=str(pc.get("private_service_connect_subnetwork", "")),
+            name_prefix=str(pc.get("private_service_connect_name_prefix", "astrolift")),
+            labels={
+                str(key): str(value)
+                for key, value in dict(
+                    pc.get("private_service_connect_labels") or {},
+                ).items()
+            },
+            deletion_protection_default=bool(
+                pc.get("private_service_connect_deletion_protection_default", True),
+            ),
+            api_endpoint=str(
+                pc.get(
+                    "private_service_connect_api_endpoint",
+                    "https://compute.googleapis.com/compute/v1",
+                ),
+            ),
+            operation_timeout_seconds=float(
+                pc.get("private_service_connect_operation_timeout_seconds", 900),
+            ),
+            poll_interval_seconds=float(
+                pc.get("private_service_connect_operation_poll_interval_seconds", 2),
+            ),
+        )
+
     if pair in {
         ("search", "gcp_elastic_cloud"),
         ("email", "gcp_thirdparty"),
