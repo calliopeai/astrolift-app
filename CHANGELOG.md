@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add Firestore Native managed document databases with Standard and Enterprise
+  editions, IAM-first portable bindings, CMEK and deletion protection, PITR
+  cloning, scheduled backups, GCS exports, restore, composite/vector/search
+  indexes, field index overrides, TTL, and adoption-safe teardown.
 - Add Google BigQuery warehouse lifecycle for datasets, native dataset
   controls and CMEK defaults, reservations, assignments, explicit capacity
   commitments, workload-identity bindings, billing estimation, health, and

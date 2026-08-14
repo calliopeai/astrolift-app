@@ -21,6 +21,7 @@ def test_every_data_variant_has_policy() -> None:
         ("gcp", "queue", "pubsub"),
         ("gcp", "topic", "pubsub_topic"),
         ("gcp", "warehouse", "bigquery"),
+        ("gcp", "document_db", "firestore_native"),
         ("azure", "object_store", "blob"),
         ("azure", "queue", "servicebus"),
         ("k8s_native", "postgres", "cnpg"),

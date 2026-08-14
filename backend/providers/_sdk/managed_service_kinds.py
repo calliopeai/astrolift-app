@@ -154,14 +154,18 @@ KINDS = KindCatalog(
         ),
         ManagedServiceKind(
             name="document_db",
-            description=("Document database (MongoDB / DocumentDB / Cosmos Mongo API)"),
+            description=("Document database (Firestore / MongoDB / DocumentDB / Cosmos Mongo API)"),
             binding_envs_required=(
                 "DOCDB_URI",
                 "DOCDB_DB",
+            ),
+            binding_envs_optional=(
                 "DOCDB_USER",
                 "DOCDB_PASSWORD",
+                "DOCDB_AUTH_MODE",
+                "DOCDB_TLS",
+                "DOCDB_RESOURCE_ARN",
             ),
-            binding_envs_optional=("DOCDB_TLS", "DOCDB_RESOURCE_ARN"),
             snapshot_supported=True,
             cross_region_replicate_supported=True,
         ),

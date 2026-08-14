@@ -137,6 +137,16 @@ def test_wide_column_contract_carries_table_auth_and_port() -> None:
     assert "WIDE_COLUMN_AUTH_MODE" in wide_column.binding_envs_optional
 
 
+def test_document_database_contract_supports_iam_and_password_auth() -> None:
+    document_db = KINDS.get("document_db")
+
+    assert document_db is not None
+    assert document_db.binding_envs_required == ("DOCDB_URI", "DOCDB_DB")
+    assert {"DOCDB_USER", "DOCDB_PASSWORD", "DOCDB_AUTH_MODE"}.issubset(
+        document_db.binding_envs_optional,
+    )
+
+
 def test_graph_database_contract_carries_reader_auth_and_resource_identity() -> None:
     graph_db = KINDS.get("graph_db")
 

@@ -192,3 +192,31 @@ def test_bigquery_runtime_config_preserves_operator_controls() -> None:
     assert config.deletion_protection_default is False
     assert config.dataset_api_endpoint == "https://bigquery.example.test/v2"
     assert config.reservation_api_endpoint == "https://reservations.example.test/v1"
+
+
+def test_firestore_runtime_config_preserves_operator_controls() -> None:
+    from core.cluster_observability import managed_config_for
+
+    config = managed_config_for(
+        "gcp",
+        _cluster(
+            firestore_location="nam5",
+            firestore_database_name_prefix="smd-documents",
+            firestore_deletion_protection_default=False,
+            firestore_snapshot_bucket="gs://smd-firestore-exports",
+            firestore_operation_timeout_seconds=600,
+            firestore_operation_poll_interval_seconds=1,
+            firestore_api_endpoint="https://firestore.example.test/v1",
+        ),
+        kind="document_db",
+        variant="firestore_native",
+    )
+    assert type(config).__name__ == "FirestoreConfig"
+    assert config.project_id == "acme-prod"
+    assert config.location == "nam5"
+    assert config.database_name_prefix == "smd-documents"
+    assert config.deletion_protection_default is False
+    assert config.snapshot_bucket == "gs://smd-firestore-exports"
+    assert config.operation_timeout_seconds == 600
+    assert config.poll_interval_seconds == 1
+    assert config.api_endpoint == "https://firestore.example.test/v1"
