@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add Google Cloud Workflows lifecycle with YAML/JSON definitions, revision
+  snapshots and rollback, service identities, CMEK, environment variables,
+  call logging, execution history, invocation bindings, execution controls,
+  boundary-safe adoption, and destructive-history-aware teardown.
 - Add Cloud Spanner Graph lifecycle on Enterprise and Enterprise Plus with
   GoogleSQL/GQL property graphs, fixed or autoscaled capacity, atomic custom
   schemas, replay-safe DDL, CMEK, exact backups and restore, portable IAM
