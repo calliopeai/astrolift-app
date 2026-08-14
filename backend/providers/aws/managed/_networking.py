@@ -259,3 +259,47 @@ def ensure_db_proxy_networking(
             )
         security_group_ids = [sg_id]
     return list(pc.get("db_proxy_subnet_ids") or subnet_ids), security_group_ids
+
+
+def ensure_serverless_cache_networking(
+    cluster,
+    *,
+    region: str,
+    clients: Any | None = None,
+) -> tuple[list[str], list[str]]:
+    """Resolve raw private network IDs for ElastiCache Serverless.
+
+    A single per-cluster group admits both Redis-compatible and Memcached
+    protocols. Operators can pin either list without giving up automatic
+    discovery of the other.
+    """
+
+    pc = cluster.provider_config or {}
+    if pc.get("serverless_cache_subnet_ids") and pc.get(
+        "serverless_cache_security_group_ids",
+    ):
+        return list(pc["serverless_cache_subnet_ids"]), list(
+            pc["serverless_cache_security_group_ids"],
+        )
+
+    ec2, _rds, _elasticache, eks = clients or _clients(region)
+    vpc_id, subnet_ids, vpc_cidr = discover_vpc(
+        cluster,
+        region=region,
+        ec2=ec2,
+        eks=eks,
+    )
+    security_group_ids = list(pc.get("serverless_cache_security_group_ids") or [])
+    if not security_group_ids:
+        sg_name = f"astrolift-{cluster.slug}-serverless-cache"[:255]
+        sg_id = ""
+        for port in (6379, 11211):
+            sg_id = ensure_security_group(
+                vpc_id=vpc_id,
+                vpc_cidr=vpc_cidr,
+                port=port,
+                name=sg_name,
+                ec2=ec2,
+            )
+        security_group_ids = [sg_id]
+    return list(pc.get("serverless_cache_subnet_ids") or subnet_ids), security_group_ids

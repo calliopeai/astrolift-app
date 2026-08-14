@@ -33,8 +33,13 @@ from aws.managed.api_gateway_http import ApiGatewayHttpDriver
 from aws.managed.aurora import AuroraMySQLDriver, AuroraPostgresDriver
 from aws.managed.cdn_cloudfront import CloudFrontDriver
 from aws.managed.dynamodb import DynamoDBDriver
+from aws.managed.elasticache_serverless import (
+    ElastiCacheServerlessMemcachedDriver,
+    ElastiCacheServerlessRedisDriver,
+)
 from aws.managed.email_ses import AmazonSESDriver
 from aws.managed.faas_lambda import LambdaDriver
+from aws.managed.memcached_elasticache import ElastiCacheMemcachedDriver
 from aws.managed.model_endpoint_bedrock import AmazonBedrockDriver
 from aws.managed.mssql_rds import RDSSqlServerDriver
 from aws.managed.mysql_rds import RDSMySQLDriver
@@ -86,6 +91,10 @@ PLUGIN = ProviderPlugin(
         ("mssql", "rds_sqlserver_enterprise"): RDSSqlServerDriver,
         ("database_proxy", "rds_proxy"): RDSProxyDriver,
         ("redis", "elasticache"): ElastiCacheRedisDriver,
+        ("redis", "elasticache_serverless_valkey"): ElastiCacheServerlessRedisDriver,
+        ("redis", "elasticache_serverless_redis"): ElastiCacheServerlessRedisDriver,
+        ("cache", "elasticache_serverless_memcached"): ElastiCacheServerlessMemcachedDriver,
+        ("cache", "elasticache_memcached"): ElastiCacheMemcachedDriver,
         ("vector_index", "opensearch_vector"): OpenSearchVectorDriver,
         ("search", "opensearch"): OpenSearchSearchDriver,
         ("time_series", "timestream"): TimestreamDriver,

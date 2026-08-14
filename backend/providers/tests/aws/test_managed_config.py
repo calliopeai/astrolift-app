@@ -313,6 +313,8 @@ def test_every_registered_managed_service_driver_has_a_config_builder():
             "db_security_group_ids": ["sg-1"],
             "db_proxy_subnet_ids": ["subnet-a", "subnet-b"],
             "db_proxy_security_group_ids": ["sg-proxy"],
+            "serverless_cache_subnet_ids": ["subnet-a", "subnet-b"],
+            "serverless_cache_security_group_ids": ["sg-cache"],
         },
     )
     for kind, variant in PLUGIN.managed_service_drivers:

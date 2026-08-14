@@ -81,6 +81,16 @@ _ENVELOPES: dict[str, tuple[str, ...]] = {
         "REDIS_PASSWORD",
         "REDIS_TLS",
         "REDIS_URL",
+        "REDIS_AUTH_MODE",
+        "REDIS_RESOURCE_ARN",
+    ),
+    "cache": (
+        "CACHE_HOST",
+        "CACHE_PORT",
+        "CACHE_PROTOCOL",
+        "CACHE_NODES",
+        "CACHE_TLS",
+        "CACHE_RESOURCE_ARN",
     ),
     "mq": (
         "MQ_ENDPOINT",

@@ -12,7 +12,7 @@ from _sdk.managed_service_kinds import (
 
 def test_canonical_catalog_has_core_kinds() -> None:
     names = {k.name for k in KINDS.kinds}
-    assert {"postgres", "redis", "object_store", "queue"} <= names
+    assert {"postgres", "redis", "cache", "object_store", "queue"} <= names
 
 
 def test_canonical_catalog_has_extended_kinds() -> None:
@@ -109,6 +109,15 @@ def test_database_proxy_declares_portable_tls_mode() -> None:
 
     assert proxy is not None
     assert "DATABASE_PROXY_TLS" in proxy.binding_envs_optional
+
+
+def test_cache_is_distinct_from_redis_and_has_protocol_envelope() -> None:
+    cache = KINDS.get("cache")
+
+    assert cache is not None
+    assert cache is not KINDS.get("redis")
+    assert "CACHE_PROTOCOL" in cache.binding_envs_required
+    assert "CACHE_NODES" in cache.binding_envs_optional
 
 
 def test_validate_unknown_kind_returns_empty() -> None:

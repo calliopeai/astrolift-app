@@ -32,6 +32,7 @@ export const FAAS_PACKAGE_TYPES = ["image", "zip"] as const;
 export const MANAGED_SERVICE_KINDS = [
   "postgres",
   "redis",
+  "cache",
   "object_storage",
   "kafka",
   "mysql",

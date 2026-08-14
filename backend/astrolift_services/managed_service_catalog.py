@@ -23,6 +23,7 @@ _SIZED_KINDS = {
     "mysql",
     "mssql",
     "redis",
+    "cache",
     "queue",
     "kv_store",
     "document_db",
@@ -42,8 +43,10 @@ _SIZED_KINDS = {
 # This table is intentionally provider-neutral infrastructure metadata, not UI
 # branching; future serverless drivers can become the default in one line.
 _DEFAULT_VARIANTS: dict[tuple[str, str], str] = {
+    ("aws", "cache"): "elasticache_serverless_memcached",
     ("aws", "mysql"): "rds_mysql",
     ("aws", "postgres"): "rds",
+    ("aws", "redis"): "elasticache_serverless_valkey",
     ("azure", "object_store"): "azure_blob",
     ("azure", "queue"): "azure_servicebus",
     ("k8s_native", "event_stream"): "kafka_strimzi",

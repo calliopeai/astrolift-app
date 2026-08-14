@@ -99,8 +99,25 @@ KINDS = KindCatalog(
             name="redis",
             description="Key-value store (Redis-compatible)",
             binding_envs_required=("REDIS_HOST", "REDIS_PORT"),
-            binding_envs_optional=("REDIS_PASSWORD", "REDIS_TLS"),
+            binding_envs_optional=(
+                "REDIS_USER",
+                "REDIS_PASSWORD",
+                "REDIS_TLS",
+                "REDIS_URL",
+                "REDIS_AUTH_MODE",
+                "REDIS_RESOURCE_ARN",
+            ),
             snapshot_supported=True,
+        ),
+        ManagedServiceKind(
+            name="cache",
+            description="Protocol-neutral ephemeral application cache",
+            binding_envs_required=("CACHE_HOST", "CACHE_PORT", "CACHE_PROTOCOL"),
+            binding_envs_optional=(
+                "CACHE_NODES",
+                "CACHE_TLS",
+                "CACHE_RESOURCE_ARN",
+            ),
         ),
         ManagedServiceKind(
             name="object_store",
