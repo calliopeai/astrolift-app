@@ -474,6 +474,27 @@ def _gcp_managed_config_for(
             secret_id_prefix=str(pc.get("secret_id_prefix", "astrolift")),
         )
 
+    if pair == ("mssql", "cloudsql_sqlserver") or (kind == "mssql" and not variant):
+        from gcp.managed.mssql_cloudsql import CloudSQLServerConfig
+
+        return CloudSQLServerConfig(
+            project_id=project_id,
+            region=region,
+            private_network=_optional_string(pc.get("cloudsql_private_network")),
+            instance_name_prefix=str(pc.get("cloudsql_instance_name_prefix", "astrolift")),
+            engine_version=str(
+                pc.get("cloudsql_sqlserver_engine_version", "SQLSERVER_2025_EXPRESS"),
+            ),
+            backup_retention_days=int(pc.get("cloudsql_sqlserver_backup_retention_days", 7)),
+            high_availability_default=bool(pc.get("cloudsql_high_availability_default", False)),
+            deletion_protection_default=bool(pc.get("cloudsql_deletion_protection_default", True)),
+            secret_manager_prefix=str(pc.get("cloudsql_secret_manager_prefix", "astrolift/cloudsql")),
+            secret_id_prefix=str(pc.get("secret_id_prefix", "astrolift")),
+            api_endpoint=str(pc.get("cloudsql_api_endpoint", "https://sqladmin.googleapis.com/v1")),
+            operation_timeout_seconds=float(pc.get("cloudsql_operation_timeout_seconds", 1800)),
+            poll_interval_seconds=float(pc.get("cloudsql_operation_poll_interval_seconds", 3)),
+        )
+
     if pair == ("redis", "memorystore") or (kind == "redis" and not variant):
         from gcp.managed.redis_memorystore import MemorystoreConfig
 

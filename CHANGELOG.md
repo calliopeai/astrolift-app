@@ -4,6 +4,11 @@
 
 ### Added
 
+- Add Google Cloud SQL for SQL Server 2017–2025 across Express, Web,
+  Standard, Enterprise, and Enterprise Plus configurations with real Admin API
+  operation polling, provisioned databases, PITR, HA, data cache, CMEK, exact
+  backups and restore, guarded storage shrink, Secret Manager-backed portable
+  bindings, and adoption-safe teardown.
 - Add Firestore Native managed document databases with Standard and Enterprise
   editions, IAM-first portable bindings, CMEK and deletion protection, PITR
   cloning, scheduled backups, GCS exports, restore, composite/vector/search
