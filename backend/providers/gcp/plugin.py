@@ -26,6 +26,7 @@ Executable managed services:
 - BigQueryWarehouseDriver — warehouse/bigquery
 - FirestoreNativeDriver — document_db/firestore_native
 - CloudSQLServerDriver — mssql/cloudsql_sqlserver
+- SpannerGraphDriver — graph_db/spanner_graph
 
 The availability catalogue is authoritative for the remaining planned GCP
 resources. Placeholder email/search classes are registered only so callers get
@@ -41,6 +42,7 @@ from gcp.managed.bigtable import BigtableDriver
 from gcp.managed.document_firestore import FirestoreNativeDriver
 from gcp.managed.email_thirdparty import GCPEmailStubDriver
 from gcp.managed.encryption_cloud_kms import CloudKMSDriver
+from gcp.managed.graph_spanner import SpannerGraphDriver
 from gcp.managed.model_endpoint_vertex import VertexAIEndpointDriver
 from gcp.managed.mssql_cloudsql import CloudSQLServerDriver
 from gcp.managed.mysql_cloudsql import CloudSQLMySQLDriver
@@ -90,6 +92,7 @@ PLUGIN = ProviderPlugin(
         ("warehouse", "bigquery"): BigQueryWarehouseDriver,
         ("document_db", "firestore_native"): FirestoreNativeDriver,
         ("mssql", "cloudsql_sqlserver"): CloudSQLServerDriver,
+        ("graph_db", "spanner_graph"): SpannerGraphDriver,
     },
     config_schema={
         "type": "object",
@@ -226,6 +229,61 @@ PLUGIN = ProviderPlugin(
             "firestore_api_endpoint": {
                 "type": "string",
                 "default": "https://firestore.googleapis.com/v1",
+            },
+            "spanner_instance_name_prefix": {
+                "type": "string",
+                "default": "astrolift",
+            },
+            "spanner_shared_instance_id": {
+                "type": "string",
+                "description": "Optional existing or shared Spanner instance for graph databases.",
+            },
+            "spanner_instance_config": {
+                "type": "string",
+                "description": "Spanner regional or multi-region instance configuration resource.",
+            },
+            "spanner_edition": {
+                "type": "string",
+                "enum": ["ENTERPRISE", "ENTERPRISE_PLUS"],
+                "default": "ENTERPRISE",
+            },
+            "spanner_processing_units": {
+                "type": "integer",
+                "minimum": 100,
+                "multipleOf": 100,
+                "default": 100,
+            },
+            "spanner_automatic_backup_schedule": {
+                "type": "boolean",
+                "default": True,
+            },
+            "spanner_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "spanner_backup_retention_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 366,
+                "default": 30,
+            },
+            "spanner_api_endpoint": {
+                "type": "string",
+                "default": "https://spanner.googleapis.com/v1",
+            },
+            "spanner_operation_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 1800,
+            },
+            "spanner_operation_poll_interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 2,
+            },
+            "spanner_adopt_existing_instance": {
+                "type": "boolean",
+                "default": False,
             },
             "cloudsql_private_network": {
                 "type": "string",

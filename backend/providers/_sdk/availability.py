@@ -1133,9 +1133,24 @@ MATRIX = AvailabilityMatrix(
             kind="graph_db",
             variant="spanner_graph",
             plugin_id="gcp",
-            status="planned",
-            description="Spanner Graph property graph",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            description=(
+                "Cloud Spanner Graph on Enterprise or Enterprise Plus with GoogleSQL, "
+                "GQL property graphs, autoscaling, CMEK, backups, restore, and IAM bindings"
+            ),
+            binding_envs=(
+                "GRAPH_DB_URL",
+                "GRAPH_DB_ENDPOINT",
+                "GRAPH_DB_PROTOCOL",
+                "GRAPH_DB_TLS",
+                "GRAPH_DB_AUTH_MODE",
+                "GRAPH_DB_REGION",
+                "GRAPH_DB_RESOURCE_ARN",
+                "GCP_SPANNER_PROJECT",
+                "GCP_SPANNER_INSTANCE",
+                "GCP_SPANNER_DATABASE",
+                "GCP_SPANNER_GRAPH",
+                "GCP_SPANNER_DIALECT",
+            ),
         ),
         ManagedServiceEntry(
             kind="warehouse",

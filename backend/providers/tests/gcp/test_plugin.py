@@ -31,6 +31,7 @@ def test_managed_services_have_object_store_and_queue() -> None:
     assert ("warehouse", "bigquery") in keys
     assert ("document_db", "firestore_native") in keys
     assert ("mssql", "cloudsql_sqlserver") in keys
+    assert ("graph_db", "spanner_graph") in keys
 
 
 def test_managed_services_have_full_gcp_coverage() -> None:
@@ -102,5 +103,24 @@ def test_sqlserver_operator_controls_are_exposed() -> None:
         "cloudsql_api_endpoint",
         "cloudsql_operation_timeout_seconds",
         "cloudsql_operation_poll_interval_seconds",
+    ):
+        assert field in properties
+
+
+def test_spanner_graph_operator_controls_are_exposed() -> None:
+    properties = PLUGIN.config_schema["properties"]
+    for field in (
+        "spanner_instance_name_prefix",
+        "spanner_shared_instance_id",
+        "spanner_instance_config",
+        "spanner_edition",
+        "spanner_processing_units",
+        "spanner_automatic_backup_schedule",
+        "spanner_deletion_protection_default",
+        "spanner_backup_retention_days",
+        "spanner_api_endpoint",
+        "spanner_operation_timeout_seconds",
+        "spanner_operation_poll_interval_seconds",
+        "spanner_adopt_existing_instance",
     ):
         assert field in properties

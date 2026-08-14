@@ -412,6 +412,34 @@ def _gcp_managed_config_for(
             ),
         )
 
+    if pair == ("graph_db", "spanner_graph") or (kind == "graph_db" and not variant):
+        from gcp.managed.graph_spanner import SpannerGraphConfig
+
+        return SpannerGraphConfig(
+            project_id=project_id,
+            region=region,
+            instance_name_prefix=str(pc.get("spanner_instance_name_prefix", "astrolift")),
+            shared_instance_id=str(pc.get("spanner_shared_instance_id", "")),
+            instance_config=str(pc.get("spanner_instance_config", "")),
+            edition=str(pc.get("spanner_edition", "ENTERPRISE")),
+            processing_units=int(pc.get("spanner_processing_units", 100)),
+            automatic_backup_schedule=bool(pc.get("spanner_automatic_backup_schedule", True)),
+            deletion_protection_default=bool(
+                pc.get("spanner_deletion_protection_default", True),
+            ),
+            backup_retention_days=int(pc.get("spanner_backup_retention_days", 30)),
+            api_endpoint=str(
+                pc.get("spanner_api_endpoint", "https://spanner.googleapis.com/v1"),
+            ),
+            operation_timeout_seconds=float(
+                pc.get("spanner_operation_timeout_seconds", 1800),
+            ),
+            poll_interval_seconds=float(
+                pc.get("spanner_operation_poll_interval_seconds", 2),
+            ),
+            adopt_existing_instance=bool(pc.get("spanner_adopt_existing_instance", False)),
+        )
+
     if pair == ("postgres", "cloudsql") or (kind == "postgres" and not variant):
         from gcp.managed.postgres_cloudsql import CloudSQLConfig
 
