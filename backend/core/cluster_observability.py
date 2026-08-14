@@ -381,16 +381,69 @@ def managed_config_for(
 
         return ApiGatewayHttpConfig(region=region)
 
-    if kind in ("postgres", "mysql"):
+    if kind in ("postgres", "mysql", "mssql"):
         from aws.managed._networking import ensure_db_networking
 
-        port = 3306 if kind == "mysql" else 5432
+        port = {"postgres": 5432, "mysql": 3306, "mssql": 1433}[kind]
         subnet_group, sg_ids = ensure_db_networking(
             cluster,
             region=region,
             port=port,
             service="rds",
         )
+        if variant.startswith("aurora_"):
+            from aws.managed.aurora import AuroraConfig
+
+            engine = "aurora-postgresql" if kind == "postgres" else "aurora-mysql"
+            return AuroraConfig(
+                region=region,
+                db_subnet_group=subnet_group,
+                security_group_ids=sg_ids,
+                engine=engine,
+                serverless_v2=variant.endswith("_serverless_v2"),
+                cluster_name_prefix=str(pc.get("instance_name_prefix", "astrolift")),
+                engine_version=str(
+                    pc.get("postgres_engine_version" if kind == "postgres" else "mysql_engine_version", ""),
+                ),
+                backup_retention_days=int(pc.get("backup_retention_days", 7)),
+                deletion_protection_default=bool(
+                    pc.get("deletion_protection_default", True),
+                ),
+                secrets_manager_prefix=str(
+                    pc.get("managed_service_secrets_prefix", "astrolift/managed"),
+                ),
+            )
+        if kind == "mssql":
+            from aws.managed.mssql_rds import RDSSqlServerConfig
+
+            engines = {
+                "rds_sqlserver_express": "sqlserver-ex",
+                "rds_sqlserver_web": "sqlserver-web",
+                "rds_sqlserver_standard": "sqlserver-se",
+                "rds_sqlserver_enterprise": "sqlserver-ee",
+            }
+            try:
+                engine = engines[variant]
+            except KeyError as exc:
+                raise ClusterObservabilityError(
+                    f"cluster {cluster.slug}: unknown AWS mssql variant {variant!r}",
+                ) from exc
+            return RDSSqlServerConfig(
+                region=region,
+                db_subnet_group=subnet_group,
+                security_group_ids=sg_ids,
+                engine=engine,
+                instance_name_prefix=str(pc.get("instance_name_prefix", "astrolift")),
+                engine_version=str(pc.get("mssql_engine_version", "")),
+                backup_retention_days=int(pc.get("backup_retention_days", 7)),
+                multi_az_default=bool(pc.get("multi_az_default", False)),
+                deletion_protection_default=bool(
+                    pc.get("deletion_protection_default", True),
+                ),
+                secrets_manager_prefix=str(
+                    pc.get("managed_service_secrets_prefix", "astrolift/managed"),
+                ),
+            )
         if kind == "mysql":
             from aws.managed.mysql_rds import RDSMySQLConfig
 

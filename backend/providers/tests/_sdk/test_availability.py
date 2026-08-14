@@ -56,10 +56,15 @@ def test_has_managed_lookup() -> None:
         kind="object_store",
         variant="gcs",
     )
-    assert not MATRIX.has_managed(
+    assert MATRIX.has_managed(
         plugin_id="aws",
         kind="postgres",
         variant="aurora_postgres_serverless_v2",
+    )
+    assert not MATRIX.has_managed(
+        plugin_id="aws",
+        kind="database_proxy",
+        variant="rds_proxy",
     )
 
 

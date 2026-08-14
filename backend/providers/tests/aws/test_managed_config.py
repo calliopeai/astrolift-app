@@ -108,6 +108,44 @@ def test_postgres_config_uses_pinned_networking_no_discovery():
     assert cfg.multi_az_default is True
 
 
+def test_aurora_and_sql_server_variants_resolve_distinct_runtime_configs():
+    from aws.managed.aurora import AuroraConfig
+    from aws.managed.mssql_rds import RDSSqlServerConfig
+
+    cluster = _cluster(
+        {
+            "db_subnet_group": "private-db",
+            "db_security_group_ids": ["sg-db"],
+        },
+    )
+    aurora_pg = managed_config_for(
+        "aws",
+        cluster,
+        kind="postgres",
+        variant="aurora_postgres_serverless_v2",
+    )
+    aurora_mysql = managed_config_for(
+        "aws",
+        cluster,
+        kind="mysql",
+        variant="aurora_mysql",
+    )
+    sql_express = managed_config_for(
+        "aws",
+        cluster,
+        kind="mssql",
+        variant="rds_sqlserver_express",
+    )
+
+    assert isinstance(aurora_pg, AuroraConfig)
+    assert aurora_pg.engine == "aurora-postgresql"
+    assert aurora_pg.serverless_v2 is True
+    assert aurora_mysql.engine == "aurora-mysql"
+    assert aurora_mysql.serverless_v2 is False
+    assert isinstance(sql_express, RDSSqlServerConfig)
+    assert sql_express.engine == "sqlserver-ex"
+
+
 # ---- managed_config_for: the non-VPC kinds wired in #1037 -------------
 #
 # plugin.py registers managed-service drivers for these (kind, variant)

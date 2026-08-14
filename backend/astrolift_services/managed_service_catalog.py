@@ -42,6 +42,8 @@ _SIZED_KINDS = {
 # This table is intentionally provider-neutral infrastructure metadata, not UI
 # branching; future serverless drivers can become the default in one line.
 _DEFAULT_VARIANTS: dict[tuple[str, str], str] = {
+    ("aws", "mysql"): "rds_mysql",
+    ("aws", "postgres"): "rds",
     ("azure", "object_store"): "azure_blob",
     ("azure", "queue"): "azure_servicebus",
     ("k8s_native", "event_stream"): "kafka_strimzi",
