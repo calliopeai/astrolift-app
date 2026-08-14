@@ -828,6 +828,65 @@ def _azure_managed_config_for(
             secret_name_prefix=str(pc.get("cosmos_secret_name_prefix", "astrolift-cosmos")),
         )
 
+    cosmos_api_pairs = {
+        ("document_db", "cosmos_nosql"),
+        ("document_db", "cosmos_mongodb"),
+        ("graph_db", "cosmos_gremlin"),
+        ("wide_column", "cosmos_cassandra"),
+        ("kv_store", "cosmos_table"),
+    }
+    default_cosmos_api_variants = {
+        "document_db": "cosmos_nosql",
+        "graph_db": "cosmos_gremlin",
+        "wide_column": "cosmos_cassandra",
+    }
+    if pair in cosmos_api_pairs or (kind in default_cosmos_api_variants and not variant):
+        from azure.managed.cosmos_api import AzureCosmosApiConfig
+
+        if not vault_url:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: Azure {kind}/{variant or default_cosmos_api_variants[kind]} "
+                "requires provider_config.vault_url",
+            )
+        resolved_variant = variant or default_cosmos_api_variants[kind]
+        return AzureCosmosApiConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            variant=resolved_variant,
+            location=location,
+            account_name_prefix=str(
+                pc.get(
+                    "cosmos_api_account_name_prefix",
+                    pc.get("cosmos_account_name_prefix", "astrolift-cosmos"),
+                ),
+            ),
+            database_name_default=str(
+                pc.get(
+                    "cosmos_api_database_name_default",
+                    pc.get("cosmos_database_name_default", "astrolift"),
+                ),
+            ),
+            backup_policy_default=str(
+                pc.get(
+                    "cosmos_api_backup_policy_default",
+                    pc.get("cosmos_backup_policy_default", "Continuous"),
+                ),
+            ),
+            continuous_backup_tier_default=str(
+                pc.get("cosmos_api_continuous_backup_tier_default", "Continuous30Days"),
+            ),
+            public_network_access_default=str(
+                pc.get("cosmos_api_public_network_access_default", "Enabled"),
+            ),
+            consistency_level_default=str(
+                pc.get("cosmos_api_consistency_level_default", "Session"),
+            ),
+            keyvault_url=vault_url,
+            secret_name_prefix=str(
+                pc.get("cosmos_api_secret_name_prefix", "astrolift-cosmos-api"),
+            ),
+        )
+
     if pair == ("search", "azure_ai_search_fulltext") or (kind == "search" and not variant):
         from azure.managed.search_aisearch import AzureAISearchConfig
 

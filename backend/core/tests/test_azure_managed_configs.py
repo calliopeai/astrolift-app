@@ -42,6 +42,11 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
         ("mysql", "azure_mysql_flex", "AzureMySQLConfig"),
         ("redis", "azure_cache_redis", "AzureCacheRedisConfig"),
         ("kv_store", "cosmos", "AzureCosmosConfig"),
+        ("document_db", "cosmos_nosql", "AzureCosmosApiConfig"),
+        ("document_db", "cosmos_mongodb", "AzureCosmosApiConfig"),
+        ("graph_db", "cosmos_gremlin", "AzureCosmosApiConfig"),
+        ("wide_column", "cosmos_cassandra", "AzureCosmosApiConfig"),
+        ("kv_store", "cosmos_table", "AzureCosmosApiConfig"),
         ("search", "azure_ai_search_fulltext", "AzureAISearchConfig"),
         ("vector_index", "azure_ai_search_vector", "AzureAISearchVectorConfig"),
         ("time_series", "azure_monitor_prometheus", "AzureMonitorPrometheusConfig"),
@@ -103,6 +108,28 @@ def test_database_controls_are_preserved() -> None:
     assert cosmos.database_name_default == "triage"
     assert cosmos.default_api_kind == "Gremlin"
     assert cosmos.backup_policy_default == "Periodic"
+
+    cosmos_api = managed_config_for(
+        "azure",
+        _cluster(
+            cosmos_api_account_name_prefix="smd-api",
+            cosmos_api_database_name_default="agents",
+            cosmos_api_backup_policy_default="Continuous",
+            cosmos_api_continuous_backup_tier_default="Continuous7Days",
+            cosmos_api_public_network_access_default="Enabled",
+            cosmos_api_consistency_level_default="Strong",
+            cosmos_api_secret_name_prefix="managed-cosmos",
+        ),
+        kind="graph_db",
+        variant="cosmos_gremlin",
+    )
+    assert cosmos_api.variant == "cosmos_gremlin"
+    assert cosmos_api.account_name_prefix == "smd-api"
+    assert cosmos_api.database_name_default == "agents"
+    assert cosmos_api.continuous_backup_tier_default == "Continuous7Days"
+    assert cosmos_api.public_network_access_default == "Enabled"
+    assert cosmos_api.consistency_level_default == "Strong"
+    assert cosmos_api.secret_name_prefix == "managed-cosmos"
 
 
 def test_messaging_and_search_controls_are_preserved() -> None:
@@ -167,6 +194,29 @@ def test_default_variant_selects_the_richer_azure_drivers() -> None:
     bus = managed_config_for("azure", _cluster(), kind="queue")
     assert type(blob).__name__ == "AzureBlobConfig"
     assert type(bus).__name__ == "AzureServiceBusConfig"
+
+
+@pytest.mark.parametrize(
+    ("kind", "variant"),
+    [
+        ("document_db", "cosmos_nosql"),
+        ("graph_db", "cosmos_gremlin"),
+        ("wide_column", "cosmos_cassandra"),
+    ],
+)
+def test_default_cosmos_api_variant_matches_portable_kind(kind: str, variant: str) -> None:
+    config = managed_config_for("azure", _cluster(), kind=kind)
+    assert config.variant == variant
+
+
+def test_cosmos_api_requires_key_vault_at_runtime_resolution() -> None:
+    with pytest.raises(ClusterObservabilityError, match="vault_url"):
+        managed_config_for(
+            "azure",
+            _cluster(vault_url=""),
+            kind="document_db",
+            variant="cosmos_nosql",
+        )
 
 
 @pytest.mark.parametrize(

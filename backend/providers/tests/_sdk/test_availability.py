@@ -132,6 +132,24 @@ def test_managed_service_binding_envs_recorded() -> None:
     s3 = next(m for m in MATRIX.managed_services if m.plugin_id == "aws" and m.variant == "s3")
     assert "S3_BUCKET_NAME" in s3.binding_envs
 
+    cosmos = {
+        entry.variant: entry
+        for entry in MATRIX.managed_services
+        if entry.plugin_id == "azure" and entry.variant.startswith("cosmos_")
+    }
+    assert {
+        "cosmos_nosql",
+        "cosmos_mongodb",
+        "cosmos_gremlin",
+        "cosmos_cassandra",
+        "cosmos_table",
+    } <= set(cosmos)
+    assert all(cosmos[variant].status == "preview" for variant in cosmos)
+    assert "DOCDB_URI" in cosmos["cosmos_nosql"].binding_envs
+    assert "GRAPH_DB_URL" in cosmos["cosmos_gremlin"].binding_envs
+    assert "WIDE_COLUMN_ENDPOINT" in cosmos["cosmos_cassandra"].binding_envs
+    assert "KV_TABLE_NAME" in cosmos["cosmos_table"].binding_envs
+
 
 def test_managed_service_keys_are_unique() -> None:
     keys = [(entry.plugin_id, entry.kind, entry.variant) for entry in MATRIX.managed_services]
