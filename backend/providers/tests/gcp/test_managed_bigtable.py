@@ -493,12 +493,9 @@ def test_binding_iam_grants_cover_table_ops(
     binding = driver.binding(
         ServiceHandle(handle=provisioned.handle),
     )
-    actions = {a for grant in binding.iam_grants for a in grant.actions}
-    for required in (
-        "bigtable.tables.readRows",
-        "bigtable.tables.mutateRows",
-    ):
-        assert required in actions
+    assert [grant.actions for grant in binding.iam_grants] == [
+        ["roles/bigtable.user"],
+    ]
 
 
 def test_binding_for_missing_raises(

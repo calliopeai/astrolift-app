@@ -146,17 +146,15 @@ def _inject_workload_identity(
     resources: list[dict[str, Any]],
     *,
     sa_name: str,
-    role_arn: str,
     namespace: str,
+    role_arn: str | None = None,
+    annotations: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Set ``serviceAccountName`` on every pod template in ``resources`` and
-    append a ServiceAccount annotated with the IRSA role ARN (#1011).
-
-    The EKS pod-identity webhook reads ``eks.amazonaws.com/role-arn`` off the
-    SA and injects STS credentials into pods that use it — so IAM-authed
-    managed services (S3) work without static keys. The caller gates this on
-    the app actually having managed services + a resolvable AWS account.
-    """
+    """Inject a provider-annotated Kubernetes ServiceAccount into workloads."""
+    if annotations is None:
+        if not role_arn:
+            raise AppDeployError("workload identity requires provider annotations")
+        annotations = {"eks.amazonaws.com/role-arn": role_arn}
     for r in resources:
         kind = r.get("kind", "")
         if kind == "CronJob":
@@ -179,13 +177,51 @@ def _inject_workload_identity(
             "name": sa_name,
             "namespace": namespace,
             "labels": {"astrolift.io/managed-by": "platform"},
-            "annotations": {"eks.amazonaws.com/role-arn": role_arn},
+            "annotations": annotations,
         },
     }
     return sorted(
         [*resources, service_account],
         key=lambda r: (r.get("kind", ""), r["metadata"]["name"]),
     )
+
+
+def _workload_identity_annotations(
+    *,
+    plugin_slug: str,
+    provider_config: dict[str, Any],
+    auth_config: dict[str, Any],
+    role_name: str,
+) -> dict[str, str]:
+    """Build the deterministic pod-identity annotation for a cloud plugin."""
+    if plugin_slug == "aws":
+        account_id = str(provider_config.get("account_id", ""))
+        if not account_id:
+            return {}
+        role_path = str(provider_config.get("irsa_role_path", "/")).strip("/")
+        segment = f"{role_path}/" if role_path else ""
+        return {
+            "eks.amazonaws.com/role-arn": (f"arn:aws:iam::{account_id}:role/{segment}{role_name}"),
+        }
+    if plugin_slug == "gcp":
+        project_id = str(
+            provider_config.get("project_id")
+            or provider_config.get("gcp_project_id")
+            or auth_config.get("project_id")
+            or auth_config.get("gcp_project_id")
+            or ""
+        )
+        if not project_id:
+            return {}
+        from gcp.identity_wi import service_account_email_for
+
+        return {
+            "iam.gke.io/gcp-service-account": service_account_email_for(
+                role_name,
+                project_id,
+            ),
+        }
+    return {}
 
 
 def cluster_for_deployment(deployment: Deployment) -> TenantCluster:
@@ -481,7 +517,10 @@ def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, An
     # Temporal activity computes the same env_from but its output isn't what
     # gets applied (#1003). update_secrets creates the bindings Secret
     # between apply_manifests and poll_rollout, so it exists before rollout.
-    from astrolift_services.models import AppSecretBundleRef, ManagedService
+    from astrolift_services.models import AppSecretBundleRef
+    from astrolift_workflows.activities.app_lifecycle import (
+        _managed_services_for_environment,
+    )
 
     env_from = sorted(
         AppSecretBundleRef.objects.filter(
@@ -490,11 +529,7 @@ def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, An
             deleted_at__isnull=True,
         ).values_list("secret_bundle__slug", flat=True),
     )
-    has_managed = ManagedService.objects.filter(
-        registered_app=app,
-        app_environment=env,
-        deleted_at__isnull=True,
-    ).exists()
+    has_managed = _managed_services_for_environment(env).exists()
     if has_managed:
         env_from.append(f"astrolift-bindings-{app.slug}")
 
@@ -532,28 +567,25 @@ def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, An
     # it so stateful apps bind without the operator knowing the SC name.
     _stamp_storage_class_for_claims(deployment, resources)
 
-    # Workload identity (#1011): apps with managed services get a
-    # ServiceAccount annotated with their IRSA role ARN so IAM-authed
-    # services (S3) get STS credentials without static keys. The role +
-    # OIDC trust are created by the ensure_workload_identity activity,
-    # which uses the same name (workload_identity_role_name) and the same
-    # account_id/role_path config, so this ARN matches IRSADriver._role_arn.
-    # Only AWS clusters with a known account_id can form the ARN; others
-    # skip (postgres/redis bind via password env and don't need IRSA).
+    # Workload identity (#1011): IAM-authed managed services run through a
+    # provider-annotated Kubernetes ServiceAccount, never static credentials.
     if has_managed and cluster is not None:
         pc = getattr(cluster, "provider_config", None) or {}
-        account_id = str(pc.get("account_id", ""))
+        ac = getattr(cluster, "auth_config", None) or {}
         plugin_slug = getattr(getattr(cluster, "provider_plugin", None), "slug", "")
-        if plugin_slug == "aws" and account_id:
-            role_path = str(pc.get("irsa_role_path", "/")).strip("/")
-            seg = f"{role_path}/" if role_path else ""
-            sa_name = workload_identity_role_name(app)
-            role_arn = f"arn:aws:iam::{account_id}:role/{seg}{sa_name}"
+        sa_name = workload_identity_role_name(app)
+        annotations = _workload_identity_annotations(
+            plugin_slug=plugin_slug,
+            provider_config=pc,
+            auth_config=ac,
+            role_name=sa_name,
+        )
+        if annotations:
             resources = _inject_workload_identity(
                 resources,
                 sa_name=sa_name,
-                role_arn=role_arn,
                 namespace=namespace,
+                annotations=annotations,
             )
 
     log.info(

@@ -473,10 +473,7 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
             iam_grants=[
                 Grant(
                     resource=self._endpoint_name(base_name),
-                    actions=[
-                        "aiplatform.endpoints.predict",
-                        "aiplatform.endpoints.get",
-                    ],
+                    actions=["roles/aiplatform.user"],
                 ),
             ],
             notes=(

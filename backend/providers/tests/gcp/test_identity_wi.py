@@ -7,8 +7,14 @@ from typing import Any
 
 import pytest
 
-from gcp._errors import NotFoundError
-from gcp.identity_wi import GCPWIConfig, GCPWorkloadIdentityDriver
+from gcp._errors import NotFoundError, ProviderError
+from gcp.identity_wi import (
+    GCPWIConfig,
+    GCPWorkloadIdentityDriver,
+    _ResourceManagerIAMClient,
+    service_account_email_for,
+    service_account_id_for,
+)
 
 
 class _NotFound(Exception):
@@ -87,6 +93,35 @@ class FakeIAMClient:
         del self.service_accounts[sa_id]
 
 
+@dataclass
+class FakeProjectIAMClient:
+    policy: dict[str, Any] = field(
+        default_factory=lambda: {"version": 1, "etag": "etag-1", "bindings": []},
+    )
+    set_calls: list[dict[str, Any]] = field(default_factory=list)
+
+    def get_project_iam_policy(self, *, project_id: str) -> dict[str, Any]:
+        return {
+            **self.policy,
+            "bindings": [dict(binding) for binding in self.policy["bindings"]],
+        }
+
+    def set_project_iam_policy(
+        self,
+        *,
+        project_id: str,
+        policy: dict[str, Any],
+    ) -> dict[str, Any]:
+        self.policy = policy
+        self.set_calls.append(policy)
+        return policy
+
+
+class FailingProjectIAMClient:
+    def get_project_iam_policy(self, *, project_id: str) -> dict[str, Any]:
+        raise RuntimeError("resource manager unavailable")
+
+
 @pytest.fixture
 def fake_iam() -> FakeIAMClient:
     _NotFound.__name__ = "NotFound"
@@ -97,7 +132,11 @@ def fake_iam() -> FakeIAMClient:
 @pytest.fixture
 def driver(fake_iam: FakeIAMClient) -> GCPWorkloadIdentityDriver:
     return GCPWorkloadIdentityDriver(
-        config=GCPWIConfig(project_id="acme", iam_client=fake_iam),
+        config=GCPWIConfig(
+            project_id="acme",
+            iam_client=fake_iam,
+            project_iam_client=FakeProjectIAMClient(),
+        ),
     )
 
 
@@ -116,7 +155,94 @@ def test_create_identity_role_idempotent(
     driver.create_identity_role("dupe", permissions=[])
     # Second call hits AlreadyExists path → returns email
     email = driver.create_identity_role("dupe", permissions=[])
-    assert email == "dupe@acme.iam.gserviceaccount.com"
+    assert email == service_account_email_for("dupe", "acme")
+
+
+def test_create_identity_role_reconciles_project_roles_after_already_exists(
+    fake_iam: FakeIAMClient,
+) -> None:
+    project_iam = FakeProjectIAMClient()
+    driver = GCPWorkloadIdentityDriver(
+        config=GCPWIConfig(
+            project_id="acme",
+            iam_client=fake_iam,
+            project_iam_client=project_iam,
+        ),
+    )
+    driver.create_identity_role("service-account", permissions=[])
+    driver.create_identity_role(
+        "service-account",
+        permissions=[{"role": "roles/pubsub.subscriber"}],
+    )
+
+    assert project_iam.policy["etag"] == "etag-1"
+    assert project_iam.policy["version"] == 3
+    assert project_iam.policy["bindings"] == [
+        {
+            "role": "roles/pubsub.subscriber",
+            "members": [
+                "serviceAccount:service-account@acme.iam.gserviceaccount.com",
+            ],
+        },
+    ]
+
+
+def test_create_identity_role_deduplicates_project_roles(
+    fake_iam: FakeIAMClient,
+) -> None:
+    project_iam = FakeProjectIAMClient()
+    driver = GCPWorkloadIdentityDriver(
+        config=GCPWIConfig(
+            project_id="acme",
+            iam_client=fake_iam,
+            project_iam_client=project_iam,
+        ),
+    )
+    driver.create_identity_role(
+        "service-account",
+        permissions=[
+            {"role": "roles/storage.objectViewer"},
+            {"role": "roles/storage.objectViewer"},
+        ],
+    )
+    driver.create_identity_role(
+        "service-account",
+        permissions=[{"role": "roles/storage.objectViewer"}],
+    )
+    assert len(project_iam.set_calls) == 1
+
+
+def test_create_identity_role_surfaces_project_iam_failure(
+    fake_iam: FakeIAMClient,
+) -> None:
+    driver = GCPWorkloadIdentityDriver(
+        config=GCPWIConfig(
+            project_id="acme",
+            iam_client=fake_iam,
+            project_iam_client=FailingProjectIAMClient(),
+        ),
+    )
+    with pytest.raises(ProviderError, match="resource manager unavailable"):
+        driver.create_identity_role(
+            "service-account",
+            permissions=[{"role": "roles/pubsub.subscriber"}],
+        )
+
+
+@pytest.mark.parametrize(
+    "permission",
+    [
+        {"Action": ["pubsub.subscriptions.consume"]},
+        {"role": "pubsub.subscriptions.consume"},
+        {"role": "roles/with spaces"},
+    ],
+)
+def test_create_identity_role_rejects_non_role_permissions(
+    driver: GCPWorkloadIdentityDriver,
+    permission: dict[str, Any],
+) -> None:
+    with pytest.raises(ValueError, match="valid predefined or custom IAM role"):
+        driver.create_identity_role("invalid-role-test", permissions=[permission])
 
 
 def test_bind_service_account_returns_annotation(
@@ -130,7 +256,10 @@ def test_bind_service_account_returns_annotation(
         sa_name="api-sa",
         identity_role="api",
     )
-    assert annotations["iam.gke.io/gcp-service-account"] == ("api@acme.iam.gserviceaccount.com")
+    assert annotations["iam.gke.io/gcp-service-account"] == service_account_email_for(
+        "api",
+        "acme",
+    )
 
 
 def test_bind_creates_workload_identity_user_binding(
@@ -144,7 +273,7 @@ def test_bind_creates_workload_identity_user_binding(
         sa_name="sa",
         identity_role="api",
     )
-    sa_resource = "projects/-/serviceAccounts/api@acme.iam.gserviceaccount.com"
+    sa_resource = f"projects/-/serviceAccounts/{service_account_email_for('api', 'acme')}"
     policy = fake_iam.policies[sa_resource]
     binding = next(b for b in policy.bindings if b.role == "roles/iam.workloadIdentityUser")
     assert "serviceAccount:acme.svc.id.goog[ns/sa]" in binding.members
@@ -167,7 +296,7 @@ def test_bind_appends_to_existing_binding(
         sa_name="sa2",
         identity_role="api",
     )
-    sa_resource = "projects/-/serviceAccounts/api@acme.iam.gserviceaccount.com"
+    sa_resource = f"projects/-/serviceAccounts/{service_account_email_for('api', 'acme')}"
     policy = fake_iam.policies[sa_resource]
     bindings = [b for b in policy.bindings if b.role == "roles/iam.workloadIdentityUser"]
     assert len(bindings) == 1
@@ -197,4 +326,47 @@ def test_sa_email_format() -> None:
             iam_client=FakeIAMClient(),
         ),
     )
-    assert driver._sa_email(name="x") == ("x@proj-123.iam.gserviceaccount.com")
+    assert driver._sa_email(name="x") == service_account_email_for("x", "proj-123")
+
+
+def test_service_account_id_preserves_valid_names_and_hashes_long_names() -> None:
+    assert service_account_id_for("valid-service-account") == "valid-service-account"
+    first = service_account_id_for("astrolift-very-long-organization-first-app")
+    second = service_account_id_for("astrolift-very-long-organization-second-app")
+    assert len(first) <= 30
+    assert len(second) <= 30
+    assert first != second
+    assert first[0].isalpha() and first[-1].isalnum()
+
+
+@dataclass
+class _Response:
+    payload: dict[str, Any]
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self) -> dict[str, Any]:
+        return self.payload
+
+
+@dataclass
+class _Session:
+    calls: list[dict[str, Any]] = field(default_factory=list)
+
+    def post(self, url: str, **kwargs: Any) -> _Response:
+        self.calls.append({"url": url, **kwargs})
+        return _Response({"version": 3, "etag": "etag", "bindings": []})
+
+
+def test_resource_manager_adapter_uses_authenticated_iam_action_endpoints() -> None:
+    session = _Session()
+    client = _ResourceManagerIAMClient(session=session)
+    policy = client.get_project_iam_policy(project_id="acme")
+    client.set_project_iam_policy(project_id="acme", policy=policy)
+
+    assert session.calls[0]["url"].endswith("/projects/acme:getIamPolicy")
+    assert session.calls[0]["json"]["options"]["requestedPolicyVersion"] == 3
+    assert session.calls[1]["url"].endswith("/projects/acme:setIamPolicy")
+    assert session.calls[1]["json"]["policy"]["etag"] == "etag"
+    assert session.calls[1]["json"]["updateMask"] == "bindings,etag,version"
