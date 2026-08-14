@@ -132,6 +132,16 @@ def test_managed_service_binding_envs_recorded() -> None:
     s3 = next(m for m in MATRIX.managed_services if m.plugin_id == "aws" and m.variant == "s3")
     assert "S3_BUCKET_NAME" in s3.binding_envs
 
+    service_bus_topic = next(
+        entry
+        for entry in MATRIX.managed_services
+        if entry.plugin_id == "azure" and entry.variant == "service_bus_topic"
+    )
+    assert service_bus_topic.status == "ga"
+    assert {"TOPIC_ARN_OR_ID", "SERVICEBUS_SUBSCRIPTION"} <= set(
+        service_bus_topic.binding_envs,
+    )
+
 
 def test_managed_service_keys_are_unique() -> None:
     keys = [(entry.plugin_id, entry.kind, entry.variant) for entry in MATRIX.managed_services]

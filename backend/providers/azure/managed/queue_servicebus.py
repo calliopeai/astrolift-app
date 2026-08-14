@@ -227,7 +227,12 @@ class ServiceBusDriver(ManagedServiceDriver):
         )
 
     @driver_op(cloud="azure", driver="queue_servicebus")
-    def binding(self, handle: ServiceHandle) -> Binding:
+    def binding(
+        self,
+        handle: ServiceHandle,
+        config: dict[str, Any] | None = None,
+    ) -> Binding:
+        del config
         _, _, queue_name = handle.handle.partition("/")
         endpoint = f"sb://{self._config.namespace_name}.servicebus.windows.net/"
         return Binding(
@@ -256,7 +261,7 @@ class ServiceBusDriver(ManagedServiceDriver):
         )
 
     @driver_op(cloud="azure", driver="queue_servicebus")
-    def snapshot(self, handle):
+    def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         from _sdk import UnsupportedOperationError
 
         raise UnsupportedOperationError(
@@ -265,7 +270,7 @@ class ServiceBusDriver(ManagedServiceDriver):
         )
 
     @driver_op(cloud="azure", driver="queue_servicebus")
-    def restore(self, snapshot, target):
+    def restore(self, snapshot: SnapshotHandle, target: ProvisionSpec) -> ProvisionResult:
         from _sdk import UnsupportedOperationError
 
         raise UnsupportedOperationError(
@@ -273,7 +278,7 @@ class ServiceBusDriver(ManagedServiceDriver):
         )
 
     @driver_op(cloud="azure", driver="queue_servicebus", heartbeat=False)
-    def config_schema(self):
+    def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -286,7 +291,7 @@ class ServiceBusDriver(ManagedServiceDriver):
         }
 
     @driver_op(cloud="azure", driver="queue_servicebus", heartbeat=False)
-    def binding_schema(self):
+    def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={
                 "SERVICEBUS_NAMESPACE": "Service Bus namespace name",
@@ -332,6 +337,13 @@ class AzureServiceBusConfig:
     subscription within it."""
 
     topic_name_prefix: str = "astrolift"
+    handle_kind: str = "queue"
+    """Portable handle kind. ``queue`` preserves the legacy alias;
+    ``topic`` exposes the same Azure resource through the correct topic
+    contract."""
+
+    location: str = ""
+    """Namespace region used by the portable topic binding."""
     default_message_ttl: str = "P14D"
     """ISO-8601 duration; 14 days matches the AWS SQS / GCP Pub/Sub
     defaults for cross-cloud symmetry."""
@@ -344,6 +356,10 @@ class AzureServiceBusConfig:
 
     client: Any | None = None
     """Injected ``ServiceBusManagementClient`` for tests."""
+
+    def __post_init__(self) -> None:
+        if self.handle_kind not in {"queue", "topic"}:
+            raise ValueError("Service Bus handle_kind must be queue or topic")
 
 
 def _tags_for(spec: ProvisionSpec) -> dict[str, str]:
@@ -627,7 +643,12 @@ class AzureServiceBusDriver(ManagedServiceDriver):
         )
 
     @driver_op(cloud="azure", driver="queue_servicebus_v2")
-    def binding(self, handle: ServiceHandle) -> Binding:
+    def binding(
+        self,
+        handle: ServiceHandle,
+        config: dict[str, Any] | None = None,
+    ) -> Binding:
+        del config
         topic_name = self._topic_name_from_handle(handle.handle)
         sub_name = self._default_sub_name(topic_name=topic_name)
         endpoint = f"sb://{self._config.namespace_name}.servicebus.windows.net/"
@@ -638,15 +659,22 @@ class AzureServiceBusDriver(ManagedServiceDriver):
             f"/{self._config.namespace_name}/topics/{topic_name}"
         )
         subscription_resource = f"{topic_resource}/subscriptions/{sub_name}"
+        env_vars = {
+            "SERVICEBUS_NAMESPACE": ValueRef(
+                literal=self._config.namespace_name,
+            ),
+            "SERVICEBUS_TOPIC": ValueRef(literal=topic_name),
+            "SERVICEBUS_SUBSCRIPTION": ValueRef(literal=sub_name),
+            "SERVICEBUS_ENDPOINT": ValueRef(literal=endpoint),
+        }
+        if self._config.handle_kind == "topic":
+            env_vars.update(
+                TOPIC_ARN_OR_ID=ValueRef(literal=topic_resource),
+                TOPIC_NAME=ValueRef(literal=topic_name),
+                TOPIC_REGION=ValueRef(literal=self._config.location),
+            )
         return Binding(
-            env_vars={
-                "SERVICEBUS_NAMESPACE": ValueRef(
-                    literal=self._config.namespace_name,
-                ),
-                "SERVICEBUS_TOPIC": ValueRef(literal=topic_name),
-                "SERVICEBUS_SUBSCRIPTION": ValueRef(literal=sub_name),
-                "SERVICEBUS_ENDPOINT": ValueRef(literal=endpoint),
-            },
+            env_vars=env_vars,
             iam_grants=[
                 Grant(
                     resource=topic_resource,
@@ -709,14 +737,19 @@ class AzureServiceBusDriver(ManagedServiceDriver):
 
     @driver_op(cloud="azure", driver="queue_servicebus_v2", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
-        return BindingSchema(
-            env_vars={
-                "SERVICEBUS_NAMESPACE": "Service Bus namespace name",
-                "SERVICEBUS_TOPIC": "Topic name (publisher endpoint)",
-                "SERVICEBUS_SUBSCRIPTION": ("Default subscription name (consumer endpoint)"),
-                "SERVICEBUS_ENDPOINT": "sb:// fully qualified namespace",
-            }
-        )
+        env_vars = {
+            "SERVICEBUS_NAMESPACE": "Service Bus namespace name",
+            "SERVICEBUS_TOPIC": "Topic name (publisher endpoint)",
+            "SERVICEBUS_SUBSCRIPTION": "Default subscription name (consumer endpoint)",
+            "SERVICEBUS_ENDPOINT": "sb:// fully qualified namespace",
+        }
+        if self._config.handle_kind == "topic":
+            env_vars.update(
+                TOPIC_ARN_OR_ID="Azure topic resource ID",
+                TOPIC_NAME="Portable topic name",
+                TOPIC_REGION="Azure namespace region",
+            )
+        return BindingSchema(env_vars=env_vars)
 
     # ---- internals ----------------------------------------------------
 
@@ -760,7 +793,7 @@ class AzureServiceBusDriver(ManagedServiceDriver):
         return f"{topic_name[:max_topic]}{suffix}"
 
     def _handle_for(self, *, topic_name: str) -> str:
-        return f"{KIND}/{topic_name}"
+        return f"{self._config.handle_kind}/{topic_name}"
 
     def _topic_name_from_handle(self, handle: str) -> str:
         if "/" not in handle:
@@ -768,9 +801,9 @@ class AzureServiceBusDriver(ManagedServiceDriver):
                 f"handle {handle!r} must be '<kind>/<topic>'",
             )
         kind, _, topic_name = handle.partition("/")
-        if not kind or not topic_name:
+        if kind != self._config.handle_kind or not topic_name:
             raise AzureServiceBusError(
-                f"handle {handle!r} has empty component",
+                f"handle {handle!r} must use kind {self._config.handle_kind!r}",
             )
         return topic_name
 

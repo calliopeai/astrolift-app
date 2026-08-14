@@ -588,3 +588,52 @@ def test_binding_schema_lists_all_env_vars(
         "SERVICEBUS_ENDPOINT",
     ):
         assert key in schema.env_vars
+
+
+def test_topic_registration_uses_portable_handle_and_binding(fake_client: FakeSBClient) -> None:
+    topic_driver = AzureServiceBusDriver(
+        config=AzureServiceBusConfig(
+            subscription_id="sub-1",
+            resource_group="rg-test",
+            namespace_name="acme-prod-sb",
+            handle_kind="topic",
+            location="eastus2",
+            client=fake_client,
+        ),
+    )
+
+    result = topic_driver.provision(_spec())
+    binding = topic_driver.binding(ServiceHandle(result.handle))
+
+    assert result.ok and result.handle.startswith("topic/")
+    assert binding.env_vars["TOPIC_NAME"].literal == result.handle.split("/", 1)[1]
+    assert binding.env_vars["TOPIC_REGION"].literal == "eastus2"
+    assert binding.env_vars["TOPIC_ARN_OR_ID"].literal.endswith(
+        f"/topics/{binding.env_vars['TOPIC_NAME'].literal}",
+    )
+    assert set(topic_driver.binding_schema().env_vars) == set(binding.env_vars)
+
+
+def test_handle_rejects_wrong_portable_kind(fake_client: FakeSBClient) -> None:
+    topic_driver = AzureServiceBusDriver(
+        config=AzureServiceBusConfig(
+            subscription_id="sub-1",
+            resource_group="rg-test",
+            namespace_name="acme-prod-sb",
+            handle_kind="topic",
+            client=fake_client,
+        ),
+    )
+    with pytest.raises(AzureServiceBusError, match="must use kind"):
+        topic_driver.status(ServiceHandle("queue/not-a-topic-handle"))
+
+
+def test_config_rejects_unknown_handle_kind(fake_client: FakeSBClient) -> None:
+    with pytest.raises(ValueError, match="handle_kind"):
+        AzureServiceBusConfig(
+            subscription_id="sub-1",
+            resource_group="rg-test",
+            namespace_name="acme-prod-sb",
+            handle_kind="event_bus",
+            client=fake_client,
+        )

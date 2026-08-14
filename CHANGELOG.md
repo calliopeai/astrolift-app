@@ -4,6 +4,9 @@
 
 ### Added
 
+- Expose Azure Service Bus topics and default subscriptions through the
+  cloud-neutral `topic/service_bus_topic` lifecycle and portable topic binding,
+  while retaining the existing queue-shaped alias.
 - Add Cloud Spanner Graph lifecycle on Enterprise and Enterprise Plus with
   GoogleSQL/GQL property graphs, fixed or autoscaled capacity, atomic custom
   schemas, replay-safe DDL, CMEK, exact backups and restore, portable IAM
