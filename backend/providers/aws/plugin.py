@@ -43,6 +43,7 @@ from aws.managed.elasticache_serverless import (
 )
 from aws.managed.email_ses import AmazonSESDriver
 from aws.managed.event_bus_eventbridge import EventBridgeDriver
+from aws.managed.event_stream_msk import MSKProvisionedDriver, MSKServerlessDriver
 from aws.managed.faas_lambda import LambdaDriver
 from aws.managed.keyspaces import KeyspacesDriver
 from aws.managed.memcached_elasticache import ElastiCacheMemcachedDriver
@@ -101,6 +102,8 @@ PLUGIN = ProviderPlugin(
         ("event_bus", "eventbridge"): EventBridgeDriver,
         ("stream", "kinesis"): KinesisDriver,
         ("stream", "firehose"): FirehoseDriver,
+        ("event_stream", "msk"): MSKProvisionedDriver,
+        ("event_stream", "msk_serverless"): MSKServerlessDriver,
         ("postgres", "rds"): RDSPostgresDriver,
         ("postgres", "aurora_postgres"): AuroraPostgresDriver,
         ("postgres", "aurora_postgres_serverless_v2"): AuroraPostgresDriver,

@@ -665,6 +665,29 @@ def managed_config_for(
             max_poll_attempts=int(pc.get("firehose_max_poll_attempts", 60)),
         )
 
+    if kind == "event_stream" and variant in {"msk", "msk_serverless"}:
+        from aws.managed._networking import ensure_msk_networking
+        from aws.managed.event_stream_msk import MSKConfig
+
+        subnet_ids, security_group_ids = ensure_msk_networking(
+            cluster,
+            region=region,
+        )
+        return MSKConfig(
+            region=region,
+            account_id=str(pc.get("account_id", "")),
+            cluster_name_prefix=str(pc.get("msk_cluster_name_prefix", "astrolift")),
+            subnet_ids=tuple(subnet_ids),
+            security_group_ids=tuple(security_group_ids),
+            kms_key_arn=str(pc.get("msk_kms_key_arn") or pc.get("kms_key_id") or ""),
+            kafka_version_default=str(pc.get("msk_kafka_version", "")),
+            deletion_protection_default=bool(
+                pc.get("deletion_protection_default", True),
+            ),
+            poll_delay_seconds=float(pc.get("msk_poll_delay_seconds", 15)),
+            max_poll_attempts=int(pc.get("msk_max_poll_attempts", 80)),
+        )
+
     if kind in ("search", "vector_index") and variant.startswith("opensearch_serverless"):
         from aws.managed._networking import ensure_opensearch_serverless_networking
         from aws.managed.opensearch_serverless import OpenSearchServerlessConfig
