@@ -701,6 +701,20 @@ def managed_config_for(
             tracing_config_default=str(pc.get("sns_tracing_config_default", "PassThrough")),
         )
 
+    if kind == "sms" and variant == "sns_sms":
+        from aws.managed.sms_sns import SNSSmsConfig
+
+        return SNSSmsConfig(
+            region=region,
+            account_id=str(pc.get("account_id", "")),
+            topic_name_prefix=str(pc.get("sns_sms_topic_name_prefix", "astrolift-sms")),
+            kms_key_id=str(pc.get("sns_sms_kms_key_id") or pc.get("sns_kms_key_id") or ""),
+            sender_id_default=str(pc.get("sns_sms_sender_id_default", "")),
+            sms_type_default=str(pc.get("sns_sms_type_default", "Transactional")),
+            deletion_protection_default=bool(pc.get("deletion_protection_default", True)),
+            tracing_config_default=str(pc.get("sns_tracing_config_default", "PassThrough")),
+        )
+
     if kind == "event_bus" and variant == "eventbridge":
         from aws.managed.event_bus_eventbridge import EventBridgeConfig
 
