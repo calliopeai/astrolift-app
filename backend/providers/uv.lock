@@ -83,6 +83,7 @@ azure = [
     { name = "azure-mgmt-containerservice" },
     { name = "azure-mgmt-cosmosdb" },
     { name = "azure-mgmt-dns" },
+    { name = "azure-mgmt-eventhub" },
     { name = "azure-mgmt-loganalytics" },
     { name = "azure-mgmt-monitor" },
     { name = "azure-mgmt-msi" },
@@ -131,6 +132,7 @@ requires-dist = [
     { name = "azure-mgmt-containerservice", marker = "extra == 'azure'", specifier = ">=30.0" },
     { name = "azure-mgmt-cosmosdb", marker = "extra == 'azure'", specifier = ">=10.0" },
     { name = "azure-mgmt-dns", marker = "extra == 'azure'", specifier = ">=8.1" },
+    { name = "azure-mgmt-eventhub", marker = "extra == 'azure'", specifier = ">=12.0" },
     { name = "azure-mgmt-loganalytics", marker = "extra == 'azure'", specifier = ">=13.0" },
     { name = "azure-mgmt-monitor", marker = "extra == 'azure'", specifier = ">=6.0" },
     { name = "azure-mgmt-msi", marker = "extra == 'azure'", specifier = ">=7.0" },
@@ -315,6 +317,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/9e/a8/990635b8b73252ad70b0c25f95db62d7927a32a4561d8c57bba0818a4a63/azure_mgmt_dns-9.0.0.tar.gz", hash = "sha256:89f8c4e467a94224b97bf16dd76d5bd616bf11cefe727f776618a57cc5486e37", size = 56953, upload-time = "2025-07-14T10:15:48.528Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b8/09/caa99f4d506ff0e07d158e526bb3142dcb6e759a65c27975fd045302f258/azure_mgmt_dns-9.0.0-py3-none-any.whl", hash = "sha256:00bd1d9d679d77aeba9178782d03c833549a4077147c9d78fedbfcd5909be633", size = 65319, upload-time = "2025-07-14T10:15:49.916Z" },
+]
+
+[[package]]
+name = "azure-mgmt-eventhub"
+version = "12.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "azure-mgmt-core" },
+    { name = "isodate" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/32/f5/3c7e0ba5318ca889aabc53fafb23473dbcb6009a492a65759a02726f3d78/azure_mgmt_eventhub-12.0.0.tar.gz", hash = "sha256:86b1e5aa64eabaa6b78a679c7911f162d5dc1633f369c71e0f642ffb889ba19f", size = 144656, upload-time = "2026-07-30T02:27:08.843Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/eb/5b/bbdaab2f5f725fe56c1e152e6a460e58b25b2876ab97cb6da91978ee6958/azure_mgmt_eventhub-12.0.0-py3-none-any.whl", hash = "sha256:2292fb6c0affdccce19ef63bba3c8add35a7fdcf1848d21f73560408c4bf4c30", size = 131847, upload-time = "2026-07-30T02:27:10.675Z" },
 ]
 
 [[package]]

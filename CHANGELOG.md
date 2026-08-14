@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add Azure Event Hubs native-stream and Kafka-compatible variants with
+  namespace/event-hub lifecycle, Entra workload bindings, consumer groups,
+  retention and compaction, Capture, scaling, networking, CMK, and guarded
+  destructive teardown.
 - Add Cloud Spanner Graph lifecycle on Enterprise and Enterprise Plus with
   GoogleSQL/GQL property graphs, fixed or autoscaled capacity, atomic custom
   schemas, replay-safe DDL, CMEK, exact backups and restore, portable IAM

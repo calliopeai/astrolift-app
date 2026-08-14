@@ -38,6 +38,8 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
         ("object_store", "azure_blob", "AzureBlobConfig"),
         ("queue", "servicebus", "ServiceBusConfig"),
         ("queue", "azure_servicebus", "AzureServiceBusConfig"),
+        ("stream", "event_hubs", "AzureEventHubsConfig"),
+        ("event_stream", "event_hubs_kafka", "AzureEventHubsConfig"),
         ("postgres", "azure_pg_flex", "AzurePostgresConfig"),
         ("mysql", "azure_mysql_flex", "AzureMySQLConfig"),
         ("redis", "azure_cache_redis", "AzureCacheRedisConfig"),
@@ -128,6 +130,26 @@ def test_messaging_and_search_controls_are_preserved() -> None:
     assert bus.dead_lettering_on_message_expiration is False
     assert bus.max_delivery_count == 25
     assert bus.lock_duration == "PT1M"
+
+    event_hubs = managed_config_for(
+        "azure",
+        _cluster(
+            eventhubs_namespace_name_prefix="stream",
+            eventhubs_event_hub_name_prefix="topic",
+            eventhubs_default_sku="Premium",
+            eventhubs_default_capacity=2,
+            eventhubs_default_consumer_group="workers",
+            eventhubs_public_network_access_default="Enabled",
+        ),
+        kind="event_stream",
+        variant="event_hubs_kafka",
+    )
+    assert event_hubs.variant == "event_hubs_kafka"
+    assert event_hubs.namespace_name_prefix == "stream"
+    assert event_hubs.event_hub_name_prefix == "topic"
+    assert event_hubs.default_sku == "Premium"
+    assert event_hubs.default_capacity == 2
+    assert event_hubs.default_consumer_group == "workers"
 
     search = managed_config_for(
         "azure",

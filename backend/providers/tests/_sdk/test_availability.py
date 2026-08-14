@@ -132,6 +132,18 @@ def test_managed_service_binding_envs_recorded() -> None:
     s3 = next(m for m in MATRIX.managed_services if m.plugin_id == "aws" and m.variant == "s3")
     assert "S3_BUCKET_NAME" in s3.binding_envs
 
+    native = next(
+        entry for entry in MATRIX.managed_services if entry.plugin_id == "azure" and entry.variant == "event_hubs"
+    )
+    kafka = next(
+        entry for entry in MATRIX.managed_services if entry.plugin_id == "azure" and entry.variant == "event_hubs_kafka"
+    )
+    assert native.status == kafka.status == "preview"
+    assert native.issue_url == kafka.issue_url
+    assert native.issue_url.endswith("/1350")
+    assert "STREAM_NAME" in native.binding_envs
+    assert "EVENT_STREAM_BROKERS" in kafka.binding_envs
+
 
 def test_managed_service_keys_are_unique() -> None:
     keys = [(entry.plugin_id, entry.kind, entry.variant) for entry in MATRIX.managed_services]

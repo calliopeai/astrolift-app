@@ -37,6 +37,8 @@ def test_managed_services_have_full_364_set() -> None:
     assert ("redis", "azure_cache_redis") in keys
     assert ("object_store", "azure_blob") in keys
     assert ("queue", "azure_servicebus") in keys
+    assert ("stream", "event_hubs") in keys
+    assert ("event_stream", "event_hubs_kafka") in keys
 
 
 def test_config_schema_requires_core_fields() -> None:
@@ -58,6 +60,8 @@ def test_managed_runtime_controls_are_exposed_in_provider_schema() -> None:
         "servicebus_namespace",
         "blob_versioning_enabled",
         "servicebus_dead_lettering_on_message_expiration",
+        "eventhubs_default_sku",
+        "eventhubs_public_network_access_default",
         "postgres_backup_retention_days",
         "mysql_backup_retention_days",
         "redis_minimum_tls_version_default",
@@ -75,6 +79,7 @@ def test_astrolift_azure_package_extends_official_sdk_namespace() -> None:
     """The local ``azure`` package must not shadow Microsoft's SDKs."""
     from azure.identity import DefaultAzureCredential
     from azure.mgmt.cosmosdb import CosmosDBManagementClient
+    from azure.mgmt.eventhub import EventHubManagementClient
     from azure.mgmt.mysqlflexibleservers import MySQLManagementClient
     from azure.mgmt.postgresqlflexibleservers import PostgreSQLManagementClient
     from azure.mgmt.resource.locks import ManagementLockClient
@@ -86,6 +91,7 @@ def test_astrolift_azure_package_extends_official_sdk_namespace() -> None:
         for value in (
             DefaultAzureCredential,
             CosmosDBManagementClient,
+            EventHubManagementClient,
             MySQLManagementClient,
             PostgreSQLManagementClient,
             ManagementLockClient,
@@ -101,6 +107,7 @@ def test_registered_managed_drivers_target_current_sdk_operation_groups() -> Non
     from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
     from azure.mgmt.communication import CommunicationServiceManagementClient
     from azure.mgmt.cosmosdb import CosmosDBManagementClient
+    from azure.mgmt.eventhub import EventHubManagementClient
     from azure.mgmt.loganalytics import LogAnalyticsManagementClient
     from azure.mgmt.monitor import MonitorManagementClient
     from azure.mgmt.mysqlflexibleservers import MySQLManagementClient
@@ -200,6 +207,20 @@ def test_registered_managed_drivers_target_current_sdk_operation_groups() -> Non
                 "queues": {"create_or_update", "delete", "get"},
                 "topics": {"create_or_update", "delete", "get"},
                 "subscriptions": {"create_or_update", "delete"},
+            },
+        ),
+        (
+            EventHubManagementClient(credential, subscription_id),
+            {
+                "namespaces": {
+                    "begin_create_or_update",
+                    "begin_delete",
+                    "create_or_update_network_rule_set",
+                    "get",
+                    "update",
+                },
+                "event_hubs": {"create_or_update", "delete", "get"},
+                "consumer_groups": {"create_or_update", "delete", "get"},
             },
         ),
         (

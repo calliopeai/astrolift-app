@@ -17,6 +17,7 @@ Managed services:
 - ServiceBusDriver — queue/servicebus
 - AzureBlobStorageDriver — object_store/azure_blob
 - AzureServiceBusDriver — queue/azure_servicebus
+- AzureEventHubsDriver — stream/event_hubs and event_stream/event_hubs_kafka
 - AzurePostgresFlexibleDriver — postgres/azure_pg_flex
 - AzureMySQLFlexibleDriver — mysql/azure_mysql_flex
 - AzureCacheRedisDriver — redis/azure_cache_redis
@@ -36,6 +37,7 @@ from azure.ingress_appgw import AzureAppGatewayIngressDriver
 from azure.managed.cache_redis import AzureCacheRedisDriver
 from azure.managed.cosmos import AzureCosmosDriver
 from azure.managed.email_acs import AzureCommunicationEmailDriver
+from azure.managed.event_hubs import AzureEventHubsDriver
 from azure.managed.model_endpoint_aoai import AzureOpenAIDriver
 from azure.managed.mysql_flexible import AzureMySQLFlexibleDriver
 from azure.managed.object_store_blob import (
@@ -66,6 +68,20 @@ _MANAGED_CONFIG_PROPERTIES = {
     "servicebus_dead_lettering_on_message_expiration": {"type": "boolean", "default": True},
     "servicebus_max_delivery_count": {"type": "integer", "minimum": 1, "default": 10},
     "servicebus_lock_duration": {"type": "string", "default": "PT30S"},
+    "eventhubs_namespace_name_prefix": {"type": "string", "default": "astrolift-eh"},
+    "eventhubs_event_hub_name_prefix": {"type": "string", "default": "astrolift"},
+    "eventhubs_default_sku": {
+        "type": "string",
+        "enum": ["Basic", "Standard", "Premium"],
+        "default": "Standard",
+    },
+    "eventhubs_default_capacity": {"type": "integer", "minimum": 1, "maximum": 40, "default": 1},
+    "eventhubs_default_consumer_group": {"type": "string", "default": "astrolift"},
+    "eventhubs_public_network_access_default": {
+        "type": "string",
+        "enum": ["Enabled", "Disabled", "SecuredByPerimeter"],
+        "default": "Enabled",
+    },
     "postgres_server_name_prefix": {"type": "string", "default": "astrolift"},
     "postgres_engine_version": {"type": "string", "default": "16"},
     "postgres_backup_retention_days": {"type": "integer", "minimum": 1, "maximum": 35, "default": 7},
@@ -174,6 +190,8 @@ PLUGIN = ProviderPlugin(
         ("redis", "azure_cache_redis"): AzureCacheRedisDriver,
         ("object_store", "azure_blob"): AzureBlobStorageDriver,
         ("queue", "azure_servicebus"): AzureServiceBusDriver,
+        ("stream", "event_hubs"): AzureEventHubsDriver,
+        ("event_stream", "event_hubs_kafka"): AzureEventHubsDriver,
         ("kv_store", "cosmos"): AzureCosmosDriver,
         ("search", "azure_ai_search_fulltext"): AzureAISearchFullTextDriver,
         ("vector_index", "azure_ai_search_vector"): AzureAISearchVectorDriver,

@@ -44,6 +44,7 @@ azure = [
     "azure-mgmt-cosmosdb>=10.0",
     "azure-mgmt-containerservice>=30.0",
     "azure-mgmt-dns>=8.1",
+    "azure-mgmt-eventhub>=12.0",
     "azure-mgmt-loganalytics>=13.0",
     "azure-mgmt-monitor>=6.0",
     "azure-mgmt-mysqlflexibleservers>=1.0",
