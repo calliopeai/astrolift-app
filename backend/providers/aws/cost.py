@@ -62,6 +62,8 @@ SERVICE_CODE_BY_VARIANT: dict[tuple[str, str], str] = {
     ("stream", "firehose"): "AmazonKinesisFirehose",
     ("event_stream", "msk"): "AmazonMSK",
     ("event_stream", "msk_serverless"): "AmazonMSK",
+    ("mq", "amazon_mq_rabbitmq"): "AmazonMQ",
+    ("mq", "amazon_mq_activemq"): "AmazonMQ",
     ("postgres", "rds"): "AmazonRDS",
     ("postgres", "aurora"): "AmazonRDS",
     ("postgres", "aurora_postgres"): "AmazonRDS",
