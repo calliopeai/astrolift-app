@@ -100,6 +100,19 @@
   checks, metric descriptors, services, and SLOs. Preserve provider-native
   request bodies, resolve credentials and verification codes from Secret
   Manager, and enforce ownership-, dependency-, and data-safe teardown.
+- Add Azure Managed Redis lifecycle for Balanced, Memory Optimized,
+  Compute Optimized, and Flash Optimized tiers with TLS-only bindings,
+  Key Vault-backed access keys, persistence/modules, CMK rotation,
+  geo-replication links, additive Entra access assignments, scaling, status,
+  and fail-closed private-networking and data-preserving teardown semantics.
+- Add Azure SQL Database provisioned, serverless, and Hyperscale variants plus
+  Azure SQL Managed Instance with typed ARM requests, VNet/subnet isolation,
+  Key Vault-backed portable bindings, retention controls, database-copy
+  snapshot/restore, and fail-closed teardown semantics.
+- Add Microsoft.FileShares provisioned-v2 NFS lifecycle with SSD capacity,
+  Local or Zone redundancy, provisioned performance, root-squash and encrypted
+  mount controls, subnet allowlists, portable AZNFS bindings, child snapshots,
+  ownership-safe reconciliation, and protected data-loss-aware teardown.
 - Add Google Cloud API Gateway lifecycle with immutable OpenAPI and gRPC
   config revisions, zero-downtime gateway retargeting, backend service
   identity, revision retention, portable endpoint bindings, adoption,
@@ -217,6 +230,10 @@
 - Mark the archived community MinIO Operator as deprecated in the Kubernetes
   resource catalogue and expose commercial AIStor and existing
   S3-compatible endpoint adoption as explicit planned variants.
+- Enable every registered Azure managed-service driver in the production image
+  and lifecycle resolver, install its current management/data SDKs, preserve
+  provider controls at runtime, and fail closed when snapshot or retained-data
+  semantics cannot be fulfilled.
 - Enable every registered Azure managed-service driver in the production image
   and lifecycle resolver, install its current management/data SDKs, preserve
   provider controls at runtime, and fail closed when snapshot or retained-data

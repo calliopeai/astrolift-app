@@ -1867,6 +1867,32 @@ def _azure_managed_config_for(
             backup_retention_days_default=int(pc.get("mssql_backup_retention_days_default", 7)),
         )
 
+    if pair == ("redis", "azure_managed_redis"):
+        from azure.managed.managed_redis import AzureManagedRedisConfig
+
+        return AzureManagedRedisConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            location=location,
+            cluster_name_prefix=str(pc.get("managed_redis_cluster_name_prefix", "astrolift-amr")),
+            database_name=str(pc.get("managed_redis_database_name", "default")),
+            default_sku=str(pc.get("managed_redis_default_sku", "Balanced_B3")),
+            high_availability_default=str(
+                pc.get("managed_redis_high_availability_default", "Enabled"),
+            ),
+            public_network_access_default=str(
+                pc.get("managed_redis_public_network_access_default", "Enabled"),
+            ),
+            clustering_policy_default=str(
+                pc.get("managed_redis_clustering_policy_default", "OSSCluster"),
+            ),
+            eviction_policy_default=str(
+                pc.get("managed_redis_eviction_policy_default", "AllKeysLRU"),
+            ),
+            keyvault_url=vault_url,
+            secret_name_prefix=str(pc.get("managed_redis_secret_name_prefix", "astrolift-amr")),
+        )
+
     raise ClusterObservabilityError(
         f"cluster {cluster.slug}: no Azure managed-service config builder for "
         f"kind={kind!r}, variant={variant!r}",

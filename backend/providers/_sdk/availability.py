@@ -1610,9 +1610,8 @@ MATRIX = AvailabilityMatrix(
             kind="redis",
             variant="azure_managed_redis",
             plugin_id="azure",
-            status="planned",
+            status="preview",
             description="Azure Managed Redis",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
         ),
         ManagedServiceEntry(
             kind="document_db",

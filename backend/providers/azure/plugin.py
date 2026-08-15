@@ -21,6 +21,7 @@ Managed services:
 - AzurePostgresFlexibleDriver — postgres/azure_pg_flex
 - AzureMySQLFlexibleDriver — mysql/azure_mysql_flex
 - AzureCacheRedisDriver — redis/azure_cache_redis
+- AzureManagedRedisDriver — redis/azure_managed_redis
 - AzureCosmosDriver — kv_store/cosmos
 - AzureAISearchFullTextDriver — search/azure_ai_search_fulltext
 - AzureAISearchVectorDriver — vector_index/azure_ai_search_vector
@@ -41,6 +42,7 @@ from azure.managed.cache_redis import AzureCacheRedisDriver
 from azure.managed.cosmos import AzureCosmosDriver
 from azure.managed.email_acs import AzureCommunicationEmailDriver
 from azure.managed.filesystem_files import AzureFilesDriver
+from azure.managed.managed_redis import AzureManagedRedisDriver
 from azure.managed.model_endpoint_aoai import AzureOpenAIDriver
 from azure.managed.mssql_sql import AzureSQLDatabaseDriver, AzureSQLManagedInstanceDriver
 from azure.managed.mysql_flexible import AzureMySQLFlexibleDriver
@@ -118,6 +120,26 @@ _MANAGED_CONFIG_PROPERTIES = {
         "description": ("Non-secret HTTPS Blob container URI for Premium Redis RDB exports using managed identity."),
     },
     "redis_backup_storage_subscription_id": {"type": "string"},
+    "managed_redis_cluster_name_prefix": {"type": "string", "default": "astrolift-amr"},
+    "managed_redis_database_name": {"type": "string", "default": "default"},
+    "managed_redis_default_sku": {"type": "string", "default": "Balanced_B3"},
+    "managed_redis_high_availability_default": {
+        "type": "string",
+        "enum": ["Enabled", "Disabled"],
+        "default": "Enabled",
+    },
+    "managed_redis_public_network_access_default": {
+        "type": "string",
+        "enum": ["Enabled", "Disabled"],
+        "default": "Enabled",
+    },
+    "managed_redis_clustering_policy_default": {
+        "type": "string",
+        "enum": ["EnterpriseCluster", "OSSCluster", "NoCluster"],
+        "default": "OSSCluster",
+    },
+    "managed_redis_eviction_policy_default": {"type": "string", "default": "AllKeysLRU"},
+    "managed_redis_secret_name_prefix": {"type": "string", "default": "astrolift-amr"},
     "cosmos_account_name_prefix": {"type": "string", "default": "astrolift"},
     "cosmos_database_name_default": {"type": "string", "default": "astrolift"},
     "cosmos_default_api_kind": {
@@ -227,6 +249,7 @@ PLUGIN = ProviderPlugin(
         ("mysql", "azure_mysql_flex"): AzureMySQLFlexibleDriver,
         ("postgres", "azure_pg_flex"): AzurePostgresFlexibleDriver,
         ("redis", "azure_cache_redis"): AzureCacheRedisDriver,
+        ("redis", "azure_managed_redis"): AzureManagedRedisDriver,
         ("object_store", "azure_blob"): AzureBlobStorageDriver,
         ("queue", "azure_servicebus"): AzureServiceBusDriver,
         ("filesystem", "azure_files"): AzureFilesDriver,
