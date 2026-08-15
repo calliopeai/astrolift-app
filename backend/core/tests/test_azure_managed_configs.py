@@ -56,6 +56,8 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
         ("topic", "service_bus_topic", "AzureServiceBusConfig"),
         ("stream", "event_hubs", "AzureEventHubsConfig"),
         ("event_stream", "event_hubs_kafka", "AzureEventHubsConfig"),
+        ("event_bus", "event_grid", "AzureEventGridConfig"),
+        ("event_bus", "event_grid_namespace", "AzureEventGridNamespaceConfig"),
         ("filesystem", "azure_files", "AzureFilesConfig"),
         ("postgres", "azure_pg_flex", "AzurePostgresConfig"),
         ("mysql", "azure_mysql_flex", "AzureMySQLConfig"),
@@ -242,6 +244,35 @@ def test_messaging_and_search_controls_are_preserved() -> None:
     assert event_hubs.default_sku == "Premium"
     assert event_hubs.default_capacity == 2
     assert event_hubs.default_consumer_group == "workers"
+    event_grid = managed_config_for(
+        "azure",
+        _cluster(
+            eventgrid_topic_name_prefix="platform-events",
+            eventgrid_default_input_schema="EventGridSchema",
+            eventgrid_public_network_access_default="Enabled",
+        ),
+        kind="event_bus",
+        variant="event_grid",
+    )
+    assert event_grid.topic_name_prefix == "platform-events"
+    assert event_grid.default_input_schema == "EventGridSchema"
+    assert event_grid.public_network_access_default == "Enabled"
+
+    event_grid_namespace = managed_config_for(
+        "azure",
+        _cluster(
+            eventgrid_namespace_name_prefix="platform-egns",
+            eventgrid_namespace_topic_name_prefix="platform-events",
+            eventgrid_namespace_secret_name_prefix="egns",
+            eventgrid_namespace_default_capacity=4,
+        ),
+        kind="event_bus",
+        variant="event_grid_namespace",
+    )
+    assert event_grid_namespace.namespace_name_prefix == "platform-egns"
+    assert event_grid_namespace.topic_name_prefix == "platform-events"
+    assert event_grid_namespace.secret_name_prefix == "egns"
+    assert event_grid_namespace.default_capacity == 4
 
     files = managed_config_for(
         "azure",
@@ -353,8 +384,10 @@ def test_managed_redis_controls_are_preserved() -> None:
 def test_default_variant_selects_the_richer_azure_drivers() -> None:
     blob = managed_config_for("azure", _cluster(), kind="object_store")
     bus = managed_config_for("azure", _cluster(), kind="queue")
+    event_bus = managed_config_for("azure", _cluster(), kind="event_bus")
     assert type(blob).__name__ == "AzureBlobConfig"
     assert type(bus).__name__ == "AzureServiceBusConfig"
+    assert type(event_bus).__name__ == "AzureEventGridConfig"
     sql = managed_config_for("azure", _cluster(), kind="mssql")
     assert type(sql).__name__ == "AzureSQLDatabaseConfig"
     assert sql.variant == "azure_sql_database"

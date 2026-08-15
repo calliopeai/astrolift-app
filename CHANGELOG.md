@@ -117,6 +117,13 @@
 - Add Azure Event Hubs native-stream and Kafka-compatible variants with
   namespace/event-hub lifecycle, Entra workload bindings, consumer groups,
   retention and compaction, Capture, scaling, networking, CMK, and guarded
+- Add Azure Event Grid Standard namespace topics with CloudEvents publishing,
+  pull and supported push subscriptions, retention, filters, dead-lettering,
+  workload-identity delivery, Key Vault-backed pull credentials, explicit
+  ownership, and guarded lifecycle management.
+- Add an Azure Event Grid custom-topic event-bus driver with Entra workload
+  bindings, push destinations, event and advanced filters, batching, retries,
+  dead-lettering, selected-network controls, identity delivery, and guarded
   destructive teardown.
 - Add the preview `filesystem/azure_files_classic` driver for storage-account
   Azure Files SMB/NFS shares, including network ACLs, per-protocol encryption,

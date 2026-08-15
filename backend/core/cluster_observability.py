@@ -1620,6 +1620,20 @@ def _azure_managed_config_for(
             lock_duration=str(pc.get("servicebus_lock_duration", "PT30S")),
         )
 
+    if pair == ("event_bus", "event_grid") or (kind == "event_bus" and not variant):
+        from azure.managed.event_grid import AzureEventGridConfig
+
+        return AzureEventGridConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            location=location,
+            topic_name_prefix=str(pc.get("eventgrid_topic_name_prefix", "astrolift-eg")),
+            default_input_schema=str(pc.get("eventgrid_default_input_schema", "CloudEventSchemaV1_0")),
+            public_network_access_default=str(
+                pc.get("eventgrid_public_network_access_default", "Enabled"),
+            ),
+        )
+
     event_hubs_pairs = {
         ("stream", "event_hubs"),
         ("event_stream", "event_hubs_kafka"),
@@ -1684,6 +1698,26 @@ def _azure_managed_config_for(
             deletion_protection_default=bool(pc.get("files_deletion_protection_default", True)),
             keyvault_url=vault_url,
             secret_name_prefix=str(pc.get("files_classic_secret_name_prefix", "astrolift-files")),
+        )
+    if pair == ("event_bus", "event_grid_namespace"):
+        from azure.managed.event_grid_namespace import AzureEventGridNamespaceConfig
+
+        if not vault_url:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: Azure event_bus/event_grid_namespace requires "
+                "provider_config.keyvault_url",
+            )
+        return AzureEventGridNamespaceConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            keyvault_url=vault_url,
+            location=location,
+            namespace_name_prefix=str(pc.get("eventgrid_namespace_name_prefix", "astrolift-egns")),
+            topic_name_prefix=str(pc.get("eventgrid_namespace_topic_name_prefix", "events")),
+            secret_name_prefix=str(
+                pc.get("eventgrid_namespace_secret_name_prefix", "event-grid-namespace"),
+            ),
+            default_capacity=int(pc.get("eventgrid_namespace_default_capacity", 1)),
         )
 
     if pair == ("postgres", "azure_pg_flex") or (kind == "postgres" and not variant):
