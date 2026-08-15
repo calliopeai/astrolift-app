@@ -305,6 +305,12 @@ def test_ensure_ci_push_role_creates_new(
 
     # MI was created with the expected name template
     assert "astrolift-api-acr-push" in msi_client.user_assigned_identities_obj.identities
+    identity_tags = msi_client.user_assigned_identities_obj.create_calls[0][2]["tags"]
+    assert identity_tags == {
+        "astrolift-managed-by": "platform",
+        "astrolift-scm-repo": "acme/api-repo",
+        "astrolift-registry-repo": "api",
+    }
     # FIC named 'github-push' bound to the correct issuer + subject
     fic_key = ("astrolift-api-acr-push", "github-push")
     assert fic_key in msi_client.federated_identity_credentials_obj.credentials

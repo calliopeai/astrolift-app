@@ -221,7 +221,7 @@ def test_unexpected_columns_maps_to_api_error():
 
 def test_request_carries_correct_scope_and_grouping():
     """Lock the wire shape: scope flows through verbatim, grouping
-    is TagKey on astrolift.io/binding."""
+    is TagKey on the Azure-safe astrolift-binding key."""
     cm = _FakeCostMgmt(response=_build_response(rows=[]))
     client = AzureBillingActuals(
         config=AzureBillingActualsConfig(
