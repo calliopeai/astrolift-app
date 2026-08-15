@@ -8,6 +8,11 @@
   snapshots and rollback, service identities, CMEK, environment variables,
   call logging, execution history, invocation bindings, execution controls,
   boundary-safe adoption, and destructive-history-aware teardown.
+- Add a project-shared Google Eventarc event fabric across Advanced message
+  buses, pipelines, enrollments, Google API sources, direct publishing, event
+  transformation and format conversion, plus Standard triggers and partner
+  channels, with CMEK, IAM bindings, guarded adoption, ownership-safe pruning,
+  and dependency-aware teardown.
 - Add Memorystore for Valkey lifecycle with private PSC endpoints, IAM and
   Preview token authentication, Secret Manager-backed two-phase token
   rotation, TLS CA bindings, every current node type, cluster and non-cluster

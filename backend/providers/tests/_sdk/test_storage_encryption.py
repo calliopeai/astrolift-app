@@ -25,6 +25,7 @@ def test_every_data_variant_has_policy() -> None:
         ("gcp", "mssql", "cloudsql_sqlserver"),
         ("gcp", "graph_db", "spanner_graph"),
         ("gcp", "workflow_engine", "workflows"),
+        ("gcp", "event_bus", "eventarc"),
         ("azure", "object_store", "blob"),
         ("azure", "queue", "servicebus"),
         ("k8s_native", "postgres", "cnpg"),
