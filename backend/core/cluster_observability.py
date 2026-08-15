@@ -578,6 +578,58 @@ def _gcp_managed_config_for(
             secret_id_prefix=str(pc.get("secret_id_prefix", "astrolift")),
         )
 
+    if pair == ("redis", "memorystore_valkey"):
+        from gcp.managed.redis_memorystore_valkey import MemorystoreValkeyConfig
+
+        return MemorystoreValkeyConfig(
+            project_id=project_id,
+            region=region,
+            network=str(pc.get("memorystore_valkey_network", "")),
+            instance_name_prefix=str(pc.get("memorystore_valkey_instance_name_prefix", "astrolift")),
+            engine_version=str(pc.get("memorystore_valkey_engine_version", "VALKEY_9_0")),
+            node_type=str(pc.get("memorystore_valkey_node_type", "HIGHMEM_MEDIUM")),
+            mode=str(pc.get("memorystore_valkey_mode", "CLUSTER")),
+            shard_count=int(pc.get("memorystore_valkey_shard_count", 1)),
+            replica_count=int(pc.get("memorystore_valkey_replica_count", 1)),
+            authorization_mode=str(pc.get("memorystore_valkey_authorization_mode", "IAM_AUTH")),
+            token_auth_user=str(pc.get("memorystore_valkey_token_auth_user", "default")),
+            token_auth_rotation_generation=int(
+                pc.get("memorystore_valkey_token_auth_rotation_generation", 1)
+            ),
+            token_auth_retire_generation=int(pc.get("memorystore_valkey_token_auth_retire_generation", 0)),
+            transit_encryption_default=bool(
+                pc.get("memorystore_valkey_transit_encryption_default", True),
+            ),
+            persistence_mode=str(pc.get("memorystore_valkey_persistence_mode", "RDB")),
+            automated_backup_default=bool(
+                pc.get("memorystore_valkey_automated_backup_default", True),
+            ),
+            backup_retention_days=int(pc.get("memorystore_valkey_backup_retention_days", 35)),
+            deletion_protection_default=bool(
+                pc.get("memorystore_valkey_deletion_protection_default", True),
+            ),
+            kms_key=str(pc.get("memorystore_valkey_kms_key", "")),
+            server_ca_mode=str(pc.get("memorystore_valkey_server_ca_mode", "")),
+            server_ca_pool=str(pc.get("memorystore_valkey_server_ca_pool", "")),
+            secret_manager_prefix=str(
+                pc.get("memorystore_valkey_secret_manager_prefix", "astrolift/memorystore-valkey")
+            ),
+            secret_id_prefix=str(pc.get("secret_id_prefix", "astrolift")),
+            allow_preview_features=bool(
+                pc.get("memorystore_valkey_allow_preview_features", False),
+            ),
+            api_endpoint=str(
+                pc.get("memorystore_valkey_api_endpoint", "https://memorystore.googleapis.com/v1"),
+            ),
+            operation_timeout_seconds=float(
+                pc.get("memorystore_valkey_operation_timeout_seconds", 1800),
+            ),
+            poll_interval_seconds=float(pc.get("memorystore_valkey_poll_interval_seconds", 3)),
+            adopt_existing_instance=bool(
+                pc.get("memorystore_valkey_adopt_existing_instance", False),
+            ),
+        )
+
     if pair == ("kv_store", "bigtable") or (kind == "kv_store" and not variant):
         from gcp.managed.bigtable import BigtableConfig
 

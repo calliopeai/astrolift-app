@@ -32,9 +32,11 @@ from astrolift_services.models import (
 from astrolift_services.schema.mutations import (
     AttachSecretBundleInput,
     CreateProjectSecretBundleInput,
+    DetachProjectManagedServiceInput,
     ProjectSecretBundleKeyInput,
     ProvisionProjectManagedServiceInput,
     ServicesMutation,
+    UpdateManagedServiceInput,
 )
 from astrolift_services.schema.queries import ServicesQuery
 from astrolift_workflows.activities.app_lifecycle import _managed_services_for_environment
@@ -575,3 +577,62 @@ def test_project_resource_query_exposes_mount_readiness_without_secret_refs(perm
     assert mount.csi_driver == "smb.csi.k8s.io"
     assert mount.credential_reference_count == 2
     assert "secret/path" not in repr(mount)
+
+
+def test_project_resource_graphql_is_scoped_to_the_active_team(permission_resolver):
+    graph = _graph("team-scope")
+    other = _project_agent(graph, "team-scope-other")
+    other_team = Team.objects.create(
+        organization=graph.org,
+        name="Other engineering",
+        slug="other-eng-team-scope",
+    )
+    other.project.team = other_team
+    other.project.save(update_fields=["team", "updated_at", "version"])
+    other.app.team = other_team
+    other.app.save(update_fields=["team", "updated_at", "version"])
+    service = ManagedService.objects.create(
+        project=other.project,
+        tenant_cluster=graph.cluster,
+        kind=ManagedService.Kind.OBJECT_STORE,
+        name="other-team-bucket",
+    )
+    attachment = ManagedServiceAttachment.objects.create(
+        managed_service=service,
+        agent_environment_spec=other.spec,
+    )
+    for permission in (Permission.PROJECT_READ, Permission.PROJECT_UPDATE):
+        permission_resolver.grant(permission)
+
+    with tenant_context(
+        TenantContext(
+            organization_id=graph.org.pk,
+            team_id=graph.team.pk,
+        )
+    ):
+        listed = ServicesQuery().astrolift_project_managed_services(
+            _info(), project_id=GUID(str(other.project.guid))
+        )
+        updated = ServicesMutation().update_project_managed_service(
+            _info(),
+            input=UpdateManagedServiceInput(
+                id=GUID(str(service.guid)),
+                name="cross-team-write",
+            ),
+        )
+        detached = ServicesMutation().detach_project_managed_service(
+            _info(),
+            input=DetachProjectManagedServiceInput(
+                attachment_id=GUID(str(attachment.guid)),
+            ),
+        )
+
+    assert listed == []
+    assert updated.ok is False
+    assert updated.errors[0].code == ErrorCode.NOT_FOUND.value
+    assert detached.ok is False
+    assert detached.errors[0].code == ErrorCode.NOT_FOUND.value
+    service.refresh_from_db()
+    attachment.refresh_from_db()
+    assert service.name == "other-team-bucket"
+    assert attachment.deleted_at is None
