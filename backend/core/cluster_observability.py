@@ -359,6 +359,33 @@ def _gcp_managed_config_for(
             ),
         )
 
+    if pair == ("event_bus", "eventarc") or (kind == "event_bus" and not variant):
+        from gcp.managed.event_bus_eventarc import EventarcConfig
+
+        return EventarcConfig(
+            project_id=project_id,
+            location=str(pc.get("eventarc_location") or region),
+            message_bus_id=str(pc.get("eventarc_message_bus_id", "astrolift")),
+            api_endpoint=str(
+                pc.get("eventarc_api_endpoint", "https://eventarc.googleapis.com/v1"),
+            ),
+            publishing_endpoint=str(
+                pc.get(
+                    "eventarc_publishing_endpoint",
+                    "https://eventarcpublishing.googleapis.com/v1",
+                ),
+            ),
+            deletion_protection_default=bool(
+                pc.get("eventarc_deletion_protection_default", True),
+            ),
+            operation_timeout_seconds=float(
+                pc.get("eventarc_operation_timeout_seconds", 900),
+            ),
+            poll_interval_seconds=float(
+                pc.get("eventarc_operation_poll_interval_seconds", 5),
+            ),
+        )
+
     if pair == ("object_store", "gcs") or (kind == "object_store" and not variant):
         from gcp.managed.object_store_gcs import GCSConfig
 
