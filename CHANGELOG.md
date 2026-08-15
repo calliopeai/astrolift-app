@@ -15,6 +15,10 @@
 
 ### Added
 
+- Add Azure Private Endpoint lifecycle with explicit target, subnet, Private
+  DNS, and manual-approval policy gates; keyless bindings on the canonical
+  `private_endpoint` envelope shared with the AWS and GCP drivers;
+  ownership-safe reconciliation; and deletion-protected teardown.
 - Add Google Cloud Workflows lifecycle with YAML/JSON definitions, revision
   snapshots and rollback, service identities, CMEK, environment variables,
   call logging, execution history, invocation bindings, execution controls,

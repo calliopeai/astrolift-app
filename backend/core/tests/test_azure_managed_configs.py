@@ -37,6 +37,23 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
             "Microsoft.Communication/communicationServices/platform-prod"
         ),
         "apim_publisher_email": "platform@example.com",
+        "private_link_default_subnet_id": (
+            "/subscriptions/00000000-1111-2222-3333-444444444444/"
+            "resourceGroups/rg-network/providers/Microsoft.Network/"
+            "virtualNetworks/platform/subnets/private-endpoints"
+        ),
+        "private_link_allowed_subnet_ids": [
+            "/subscriptions/00000000-1111-2222-3333-444444444444/"
+            "resourceGroups/rg-network/providers/Microsoft.Network/"
+            "virtualNetworks/platform/subnets/private-endpoints"
+        ],
+        "private_link_allowed_service_id_prefixes": [
+            "/subscriptions/00000000-1111-2222-3333-444444444444/resourceGroups/rg-data"
+        ],
+        "private_link_allowed_private_dns_zone_id_prefixes": [
+            "/subscriptions/00000000-1111-2222-3333-444444444444/"
+            "resourceGroups/rg-network/providers/Microsoft.Network/privateDnsZones"
+        ],
     }
     provider_config.update(provider_overrides)
     return SimpleNamespace(
@@ -81,6 +98,7 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
         ("mssql", "azure_sql_hyperscale", "AzureSQLDatabaseConfig"),
         ("mssql", "azure_sql_managed_instance", "AzureSQLManagedInstanceConfig"),
         ("api_gateway", "api_management", "AzureAPIMConfig"),
+        ("private_endpoint", "private_link", "AzurePrivateEndpointConfig"),
     ],
 )
 def test_every_registered_azure_managed_service_has_runtime_config(
@@ -435,6 +453,31 @@ def test_api_management_controls_are_preserved() -> None:
     )
 
 
+def test_private_link_install_policy_is_preserved() -> None:
+    config = managed_config_for(
+        "azure",
+        _cluster(
+            private_link_name_prefix="smd-pe",
+            private_link_allow_manual_approval=True,
+            private_link_max_group_ids=4,
+            private_link_max_private_dns_zones=3,
+            private_link_deletion_protection_default=False,
+        ),
+        kind="private_endpoint",
+        variant="private_link",
+    )
+
+    assert config.name_prefix == "smd-pe"
+    assert config.default_subnet_id.endswith("/private-endpoints")
+    assert config.allowed_subnet_ids[0].endswith("/private-endpoints")
+    assert config.allowed_service_id_prefixes[0].endswith("/rg-data")
+    assert config.allowed_private_dns_zone_id_prefixes[0].endswith("/privateDnsZones")
+    assert config.allow_manual_approval is True
+    assert config.max_group_ids == 4
+    assert config.max_private_dns_zones == 3
+    assert config.deletion_protection_default is False
+
+
 def test_default_variant_selects_the_richer_azure_drivers() -> None:
     blob = managed_config_for("azure", _cluster(), kind="object_store")
     bus = managed_config_for("azure", _cluster(), kind="queue")
@@ -485,6 +528,8 @@ def test_cosmos_api_requires_key_vault_at_runtime_resolution() -> None:
         ("mssql_managed_instance_subnet_id", "mssql", "azure_sql_managed_instance"),
         ("mssql_virtual_network_subnet_id", "mssql", "azure_sql_database"),
         ("apim_publisher_email", "api_gateway", "api_management"),
+        ("private_link_allowed_subnet_ids", "private_endpoint", "private_link"),
+        ("private_link_allowed_service_id_prefixes", "private_endpoint", "private_link"),
     ],
 )
 def test_required_install_controls_fail_before_driver_construction(

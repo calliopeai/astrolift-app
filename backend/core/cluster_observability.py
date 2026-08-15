@@ -2109,6 +2109,44 @@ def _azure_managed_config_for(
             poll_interval_seconds=float(pc.get("apim_poll_interval_seconds", 5)),
         )
 
+    if pair == ("private_endpoint", "private_link") or (kind == "private_endpoint" and not variant):
+        from azure.managed.private_endpoint import AzurePrivateEndpointConfig
+
+        allowed_subnet_ids = tuple(
+            str(value) for value in pc.get("private_link_allowed_subnet_ids", []) or []
+        )
+        allowed_service_prefixes = tuple(
+            str(value) for value in pc.get("private_link_allowed_service_id_prefixes", []) or []
+        )
+        if not allowed_subnet_ids:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: Azure private_endpoint/private_link requires "
+                "provider_config.private_link_allowed_subnet_ids",
+            )
+        if not allowed_service_prefixes:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: Azure private_endpoint/private_link requires "
+                "provider_config.private_link_allowed_service_id_prefixes",
+            )
+        return AzurePrivateEndpointConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            location=location,
+            name_prefix=str(pc.get("private_link_name_prefix", "astrolift-pe")),
+            default_subnet_id=str(pc.get("private_link_default_subnet_id") or ""),
+            allowed_subnet_ids=allowed_subnet_ids,
+            allowed_service_id_prefixes=allowed_service_prefixes,
+            allowed_private_dns_zone_id_prefixes=tuple(
+                str(value) for value in pc.get("private_link_allowed_private_dns_zone_id_prefixes", []) or []
+            ),
+            allow_manual_approval=bool(pc.get("private_link_allow_manual_approval", False)),
+            max_group_ids=int(pc.get("private_link_max_group_ids", 8)),
+            max_private_dns_zones=int(pc.get("private_link_max_private_dns_zones", 8)),
+            deletion_protection_default=bool(
+                pc.get("private_link_deletion_protection_default", True),
+            ),
+        )
+
     raise ClusterObservabilityError(
         f"cluster {cluster.slug}: no Azure managed-service config builder for "
         f"kind={kind!r}, variant={variant!r}",

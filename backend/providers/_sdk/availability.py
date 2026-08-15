@@ -39,6 +39,7 @@ _AZURE_EVENT_HUBS_CERTIFICATION_ISSUE = "https://github.com/calliopeai/astrolift
 _AZURE_EVENT_GRID_CERTIFICATION_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1354"
 _AZURE_EVENT_GRID_NAMESPACE_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1355"
 _AZURE_FILES_CLASSIC_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1361"
+_AZURE_PRIVATE_LINK_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1335"
 
 
 @dataclass(frozen=True)
@@ -1933,9 +1934,22 @@ MATRIX = AvailabilityMatrix(
             kind="private_endpoint",
             variant="private_link",
             plugin_id="azure",
-            status="planned",
-            description="Azure Private Link endpoint",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            status="preview",
+            description="Azure Private Endpoint with optional Private DNS zone group",
+            issue_url=_AZURE_PRIVATE_LINK_ISSUE,
+            binding_envs=(
+                "PRIVATE_ENDPOINT_ID",
+                "PRIVATE_ENDPOINT_NAME",
+                "PRIVATE_ENDPOINT_DNS",
+                "PRIVATE_ENDPOINT_IPS",
+                "PRIVATE_ENDPOINT_TYPE",
+                "PRIVATE_ENDPOINT_SERVICE_NAME",
+                "PRIVATE_ENDPOINT_DNS_NAME",
+                "PRIVATE_ENDPOINT_DNS_NAMES",
+                "PRIVATE_ENDPOINT_NETWORK_INTERFACE_IDS",
+                "AZURE_SUBSCRIPTION_ID",
+                "AZURE_RESOURCE_GROUP",
+            ),
         ),
         ManagedServiceEntry(
             kind="observability",
