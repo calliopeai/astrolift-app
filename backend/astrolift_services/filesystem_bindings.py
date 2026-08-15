@@ -7,6 +7,8 @@ import re
 from collections.abc import Iterable
 from typing import Any
 
+from _sdk.secrets import SecretReferenceError, resolve_secret_reference
+
 
 class FilesystemBindingError(ValueError):
     """A persisted volume binding cannot be attached safely."""
@@ -155,34 +157,27 @@ def resolve_binding_secret_manifests(
             continue
         volume_data: dict[str, str] = {str(key): str(value) for key, value in secret_literals.items()}
         for secret_key, backend_ref in sorted(secret_refs.items()):
-            raw_ref = str(backend_ref)
-            base_ref, separator, selected_field = raw_ref.partition("#")
-            query_ref = base_ref if separator else raw_ref
             try:
-                resolved = secrets_backend.get(query_ref)
+                raw_value = resolve_secret_reference(
+                    secrets_backend,
+                    str(backend_ref),
+                    default_key=str(secret_key),
+                )
+            except SecretReferenceError as exc:
+                raise FilesystemBindingError(
+                    f"filesystem binding {binding.managed_service.kind}/{binding.managed_service.name}#"
+                    f"{binding.name} credential reference is invalid or ambiguous",
+                ) from exc
             except Exception as exc:
                 raise FilesystemBindingError(
                     f"filesystem binding {binding.managed_service.kind}/{binding.managed_service.name}#"
                     f"{binding.name} could not read its credential reference",
                 ) from exc
-            if resolved is None:
+            if raw_value is None:
                 raise FilesystemBindingError(
                     f"filesystem binding {binding.managed_service.kind}/{binding.managed_service.name}#"
                     f"{binding.name} references a missing credential",
                 )
-            if isinstance(resolved, dict):
-                requested_field = selected_field or str(secret_key)
-                if requested_field in resolved:
-                    raw_value = str(resolved[requested_field])
-                elif not selected_field and len(resolved) == 1:
-                    raw_value = str(next(iter(resolved.values())))
-                else:
-                    raise FilesystemBindingError(
-                        f"filesystem binding {binding.managed_service.kind}/{binding.managed_service.name}#"
-                        f"{binding.name} credential does not contain the requested field",
-                    )
-            else:
-                raw_value = str(resolved)
             if not raw_value:
                 raise FilesystemBindingError(
                     f"filesystem binding {binding.managed_service.kind}/{binding.managed_service.name}#"
