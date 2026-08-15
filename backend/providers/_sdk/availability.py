@@ -1234,9 +1234,18 @@ MATRIX = AvailabilityMatrix(
             kind="event_bus",
             variant="eventarc",
             plugin_id="gcp",
-            status="planned",
-            description="Eventarc triggers and destinations",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            description=(
+                "Eventarc Advanced shared bus, pipelines, enrollments, Google API sources, "
+                "and Eventarc Standard triggers and partner channels"
+            ),
+            binding_envs=(
+                "EVENT_BUS_NAME",
+                "EVENT_BUS_ID",
+                "EVENT_BUS_REGION",
+                "EVENT_BUS_PUBLISH_URL",
+                "EVENT_BUS_PROVIDER",
+                "GOOGLE_CLOUD_PROJECT",
+            ),
         ),
         ManagedServiceEntry(
             kind="event_stream",
