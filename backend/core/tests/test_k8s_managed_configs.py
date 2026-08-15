@@ -3,9 +3,33 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+from astrolift_drivers.registry import PluginManifest, plugins
 from k8s_native.plugin import PLUGIN
 
 from core.cluster_observability import ClusterObservabilityError, managed_config_for
+
+
+@pytest.fixture(autouse=True)
+def _k8s_registry(monkeypatch):
+    drivers = dict(PLUGIN.drivers)
+    drivers.update(
+        {
+            f"managed:{kind}:{variant}": driver
+            for (kind, variant), driver in PLUGIN.managed_service_drivers.items()
+        }
+    )
+    monkeypatch.setattr(
+        plugins,
+        "_plugins",
+        {
+            "k8s_native": PluginManifest(
+                plugin_id="k8s_native",
+                display_name=PLUGIN.display_name,
+                version="test",
+                drivers=drivers,
+            )
+        },
+    )
 
 
 def _cluster(**provider_overrides):
@@ -17,6 +41,10 @@ def _cluster(**provider_overrides):
         "kafka_storage_class": "stream-rwo",
         "nats_storage_class": "stream-rwo",
         "rabbitmq_storage_class": "queue-rwo",
+        "seaweed_namespace": "storage-system",
+        "seaweed_cluster_name": "shared-store",
+        "seaweed_s3_endpoint": "https://objects.example.test",
+        "seaweed_s3_region": "local-1",
         "nfs_storage_class_name": "nfs-rwx",
         "filesystem_pvc_storage_class_name": "standard-rwo",
         "rook_cephfs_storage_class_name": "rook-shared",
@@ -28,16 +56,23 @@ def _cluster(**provider_overrides):
         region="",
         provider_config=provider_config,
         auth_config={},
+        provider_plugin=SimpleNamespace(slug="k8s_native"),
     )
 
 
 def test_every_registered_k8s_managed_driver_has_live_config(monkeypatch) -> None:
     cluster_driver = object()
+    secrets_backend = object()
     monkeypatch.setattr("core.cluster_observability._driver_for_cluster", lambda _cluster: cluster_driver)
+    monkeypatch.setattr(
+        "core.app_deploy.driver_for_capability", lambda _cluster, _capability: secrets_backend
+    )
 
     for kind, variant in PLUGIN.managed_service_drivers:
         config = managed_config_for("k8s_native", _cluster(), kind=kind, variant=variant)
         assert config.cluster_driver is cluster_driver, (kind, variant)
+        if (kind, variant) == ("object_store", "seaweedfs_operator"):
+            assert config.secrets_backend is secrets_backend
 
 
 def test_dynamic_filesystem_config_preserves_operator_defaults(monkeypatch) -> None:
@@ -94,6 +129,15 @@ def test_k8s_operator_defaults_are_exposed_in_provider_schema() -> None:
         "nats_enable_jetstream",
         "rabbitmq_storage_class",
         "rabbitmq_namespace",
+        "seaweed_namespace",
+        "seaweed_cluster_name",
+        "seaweed_s3_endpoint",
+        "seaweed_s3_scheme",
+        "seaweed_s3_port",
+        "seaweed_s3_region",
+        "seaweed_credential_path_prefix",
+        "seaweed_verify_crds",
+        "seaweed_deletion_timeout_seconds",
         "nfs_storage_class_name",
         "nfs_server_address",
         "nfs_server_export",
@@ -109,6 +153,29 @@ def test_k8s_operator_defaults_are_exposed_in_provider_schema() -> None:
     assert expected <= set(properties)
 
 
+def test_seaweedfs_config_preserves_shared_cluster_and_secret_backend(monkeypatch) -> None:
+    cluster_driver = object()
+    secrets_backend = object()
+    monkeypatch.setattr("core.cluster_observability._driver_for_cluster", lambda _cluster: cluster_driver)
+    monkeypatch.setattr(
+        "core.app_deploy.driver_for_capability", lambda _cluster, _capability: secrets_backend
+    )
+
+    config = managed_config_for(
+        "k8s_native",
+        _cluster(),
+        kind="object_store",
+        variant="seaweedfs_operator",
+    )
+
+    assert config.namespace == "storage-system"
+    assert config.seaweed_name == "shared-store"
+    assert config.endpoint == "https://objects.example.test"
+    assert config.region == "local-1"
+    assert config.cluster_driver is cluster_driver
+    assert config.secrets_backend is secrets_backend
+
+
 def test_dynamic_filesystems_are_executable_preview_catalog_entries() -> None:
     from astrolift_services.managed_service_catalog import list_catalog
 
@@ -120,3 +187,17 @@ def test_dynamic_filesystems_are_executable_preview_catalog_entries() -> None:
         assert row.status == "preview"
         assert row.config_schema["required"] == ["storage_class_name"]
         assert "FILESYSTEM_TLS" not in row.binding_envs
+
+
+def test_seaweedfs_is_the_only_executable_k8s_object_store() -> None:
+    from astrolift_services.managed_service_catalog import list_catalog
+
+    rows = {row.variant: row for row in list_catalog("k8s_native") if row.kind == "object_store"}
+
+    assert rows["seaweedfs_operator"].available is True
+    assert rows["seaweedfs_operator"].status == "preview"
+    assert rows["minio_operator"].available is False
+    assert rows["minio_operator"].status == "deprecated"
+    assert "retired" in rows["minio_operator"].unavailable_reason
+    assert rows["minio_aistor_operator"].available is False
+    assert rows["s3_compatible_existing"].available is False

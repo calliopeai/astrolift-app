@@ -272,6 +272,19 @@ def _config_for_capability(plugin_slug: str, cluster: TenantCluster, capability:
     ac = cluster.auth_config or {}
     region = str(pc.get("region", ac.get("region", cluster.region or "")))
 
+    if plugin_slug == "k8s_native" and capability == "secrets":
+        from k8s_native.secrets_vault import VaultConfig
+
+        return VaultConfig(
+            address=str(pc.get("vault_address", "")),
+            token=str(ac.get("vault_token", "")),
+            kv_mount=str(pc.get("vault_kv_mount", "secret")),
+            kv_path_prefix=str(pc.get("vault_path_prefix", "astrolift")),
+            namespace=str(pc.get("vault_namespace", "")),
+            auth_method=str(pc.get("vault_auth_method", "token")),
+            sa_role=str(pc.get("vault_sa_role", "")),
+        )
+
     if plugin_slug == "gcp":
         project_id = str(
             pc.get("project_id")

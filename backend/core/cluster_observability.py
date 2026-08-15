@@ -729,6 +729,34 @@ def _k8s_managed_config_for(
             namespace=_optional_string(pc.get("rabbitmq_namespace")),
             cluster_driver=cluster_driver,
         )
+    if pair == ("object_store", "seaweedfs_operator"):
+        from k8s_native.managed.object_store_seaweedfs import SeaweedFSObjectStoreConfig
+
+        from core.app_deploy import AppDeployError, driver_for_capability
+
+        try:
+            secrets_backend = driver_for_capability(cluster, "secrets")
+        except AppDeployError as exc:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: cannot resolve the secrets backend required by SeaweedFS: {exc}",
+            ) from exc
+        return SeaweedFSObjectStoreConfig(
+            namespace=str(pc.get("seaweed_namespace", "astrolift-storage")),
+            seaweed_name=str(pc.get("seaweed_cluster_name", "astrolift-object-store")),
+            endpoint=str(pc.get("seaweed_s3_endpoint", "")),
+            endpoint_scheme=str(pc.get("seaweed_s3_scheme", "http")),
+            endpoint_port=int(pc.get("seaweed_s3_port", 8333)),
+            region=str(pc.get("seaweed_s3_region", "us-east-1")),
+            credential_path_prefix=str(
+                pc.get("seaweed_credential_path_prefix", "managed/object_store"),
+            ),
+            verify_crds=bool(pc.get("seaweed_verify_crds", True)),
+            deletion_timeout_seconds=float(
+                pc.get("seaweed_deletion_timeout_seconds", 120),
+            ),
+            cluster_driver=cluster_driver,
+            secrets_backend=secrets_backend,
+        )
     if pair in {
         ("filesystem", "nfs_csi"),
         ("filesystem", "nfs_subdir_provisioner"),

@@ -22,6 +22,7 @@ Drivers shipped:
 """
 
 from _sdk.base import ProviderPlugin
+
 from k8s_native.cluster import K8sNativeClusterDriver
 from k8s_native.dns_external import ExternalDnsDriver
 from k8s_native.identity_projected import ProjectedSaTokenDriver
@@ -32,6 +33,7 @@ from k8s_native.managed.filesystem_nfs import NFSDriver
 from k8s_native.managed.filesystem_pvc import RookCephFSDriver, StorageClassPVCDriver
 from k8s_native.managed.mongodb_operator import MongoDBOperatorDriver
 from k8s_native.managed.mysql_operator import MySQLOperatorDriver
+from k8s_native.managed.object_store_seaweedfs import SeaweedFSObjectStoreDriver
 from k8s_native.managed.postgres_cnpg import CNPGPostgresDriver
 from k8s_native.managed.queue_rabbitmq import RabbitMQOperatorDriver
 from k8s_native.managed.redis_operator import RedisOperatorDriver
@@ -61,6 +63,7 @@ PLUGIN = ProviderPlugin(
         ("event_stream", "kafka_strimzi"): StrimziKafkaDriver,
         ("event_stream", "nats"): NATSDriver,
         ("queue", "rabbitmq_operator"): RabbitMQOperatorDriver,
+        ("object_store", "seaweedfs_operator"): SeaweedFSObjectStoreDriver,
         ("filesystem", "nfs_csi"): NFSDriver,
         ("filesystem", "storage_class_pvc"): StorageClassPVCDriver,
         ("filesystem", "rook_cephfs"): RookCephFSDriver,
@@ -89,11 +92,19 @@ PLUGIN = ProviderPlugin(
             "vault_address": {
                 "type": "string",
                 "description": (
-                    "Vault address. Required when 'secrets' driver is "
-                    "selected. Empty falls back to k8s Secrets via the "
-                    "External Secrets Operator (separate ticket)."
+                    "Vault address. Required when the Vault secrets driver is selected; "
+                    "there is no implicit Kubernetes-Secret fallback."
                 ),
             },
+            "vault_kv_mount": {"type": "string", "default": "secret"},
+            "vault_path_prefix": {"type": "string", "default": "astrolift"},
+            "vault_namespace": {"type": "string"},
+            "vault_auth_method": {
+                "type": "string",
+                "enum": ["token", "kubernetes"],
+                "default": "token",
+            },
+            "vault_sa_role": {"type": "string"},
             "oci_registry_url": {
                 "type": "string",
                 "description": ("Generic OCI registry URL (Harbor/Zot/GHCR)."),
@@ -121,6 +132,41 @@ PLUGIN = ProviderPlugin(
             "nats_enable_jetstream": {"type": "boolean", "default": True},
             "rabbitmq_storage_class": {"type": "string"},
             "rabbitmq_namespace": {"type": "string"},
+            "seaweed_namespace": {
+                "type": "string",
+                "default": "astrolift-storage",
+                "description": "Namespace of the shared operator-managed Seaweed cluster.",
+            },
+            "seaweed_cluster_name": {
+                "type": "string",
+                "default": "astrolift-object-store",
+            },
+            "seaweed_s3_endpoint": {
+                "type": "string",
+                "description": "Explicit S3 gateway URL; defaults to the in-cluster Service FQDN.",
+            },
+            "seaweed_s3_scheme": {
+                "type": "string",
+                "enum": ["http", "https"],
+                "default": "http",
+            },
+            "seaweed_s3_port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535,
+                "default": 8333,
+            },
+            "seaweed_s3_region": {"type": "string", "default": "us-east-1"},
+            "seaweed_credential_path_prefix": {
+                "type": "string",
+                "default": "managed/object_store",
+            },
+            "seaweed_verify_crds": {"type": "boolean", "default": True},
+            "seaweed_deletion_timeout_seconds": {
+                "type": "number",
+                "minimum": 1,
+                "default": 120,
+            },
             "nfs_storage_class_name": {"type": "string"},
             "nfs_server_address": {"type": "string"},
             "nfs_server_export": {"type": "string", "default": "/export"},
