@@ -40,6 +40,7 @@ from k8s_native.managed.mssql_express import SQLServerExpressDriver
 from k8s_native.managed.mysql_operator import MySQLOperatorDriver
 from k8s_native.managed.object_store_existing_s3 import ExistingS3ObjectStoreDriver
 from k8s_native.managed.object_store_seaweedfs import SeaweedFSObjectStoreDriver
+from k8s_native.managed.observability_kube_prometheus import KubePrometheusStackDriver
 from k8s_native.managed.opensearch_operator import (
     DEFAULT_BOOTSTRAP_IMAGE as DEFAULT_OPENSEARCH_BOOTSTRAP_IMAGE,
 )
@@ -83,6 +84,7 @@ PLUGIN = ProviderPlugin(
         ("event_bus", "knative_eventing"): KnativeEventingDriver,
         ("workflow_engine", "argo_workflows"): ArgoWorkflowsDriver,
         ("model_endpoint", "kserve"): KServeDriver,
+        ("observability", "kube_prometheus_stack"): KubePrometheusStackDriver,
         ("object_store", "s3_compatible_existing"): ExistingS3ObjectStoreDriver,
         ("object_store", "seaweedfs_operator"): SeaweedFSObjectStoreDriver,
         ("mssql", "sqlserver_express"): SQLServerExpressDriver,
@@ -418,6 +420,67 @@ PLUGIN = ProviderPlugin(
                 "default": ["hpa", "none"],
             },
             "kserve_max_replicas": {"type": "integer", "minimum": 0, "default": 100},
+            "kube_prometheus_namespace": {"type": "string", "default": "astrolift-system"},
+            "kube_prometheus_prometheus_service_name": {
+                "type": "string",
+                "default": "astrolift-kube-prometheus-stack-prometheus",
+            },
+            "kube_prometheus_alertmanager_service_name": {
+                "type": "string",
+                "default": "astrolift-kube-prometheus-stack-alertmanager",
+            },
+            "kube_prometheus_grafana_service_name": {
+                "type": "string",
+                "default": "astrolift-kube-prometheus-stack-grafana",
+            },
+            "kube_prometheus_prometheus_url": {"type": "string"},
+            "kube_prometheus_alertmanager_url": {"type": "string"},
+            "kube_prometheus_grafana_url": {"type": "string"},
+            "kube_prometheus_verify_crds": {"type": "boolean", "default": True},
+            "kube_prometheus_verify_services": {"type": "boolean", "default": True},
+            "kube_prometheus_allow_cross_namespace": {"type": "boolean", "default": False},
+            "kube_prometheus_allowed_target_namespaces": {
+                "type": "array",
+                "items": {"type": "string"},
+                "default": [],
+            },
+            "kube_prometheus_allow_custom_rules": {"type": "boolean", "default": False},
+            "kube_prometheus_allow_custom_dashboards": {"type": "boolean", "default": False},
+            "kube_prometheus_allow_honor_labels": {"type": "boolean", "default": False},
+            "kube_prometheus_min_scrape_interval_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 15,
+            },
+            "kube_prometheus_max_monitors": {"type": "integer", "minimum": 0, "default": 20},
+            "kube_prometheus_max_endpoints_per_monitor": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 10,
+            },
+            "kube_prometheus_max_samples_per_scrape": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 50000,
+            },
+            "kube_prometheus_max_targets_per_monitor": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 100,
+            },
+            "kube_prometheus_max_rule_groups": {"type": "integer", "minimum": 0, "default": 20},
+            "kube_prometheus_max_rules": {"type": "integer", "minimum": 0, "default": 100},
+            "kube_prometheus_max_dashboards": {"type": "integer", "minimum": 0, "default": 10},
+            "kube_prometheus_max_dashboard_bytes": {
+                "type": "integer",
+                "minimum": 1024,
+                "default": 512000,
+            },
+            "kube_prometheus_dashboard_label_key": {
+                "type": "string",
+                "default": "grafana_dashboard",
+            },
+            "kube_prometheus_dashboard_label_value": {"type": "string", "default": "1"},
             "s3_existing_namespace": {
                 "type": "string",
                 "description": "Optional fixed namespace for external S3 adoption records.",

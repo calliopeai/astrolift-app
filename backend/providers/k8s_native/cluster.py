@@ -787,7 +787,15 @@ class K8sNativeClusterDriver(ClusterDriver):
                     "external Prometheus / Mimir / Datadog instead."
                 ),
                 helm_values={
-                    "grafana": {"enabled": True},
+                    "grafana": {
+                        "enabled": True,
+                        "sidecar": {
+                            "dashboards": {
+                                "enabled": True,
+                                "searchNamespace": "ALL",
+                            },
+                        },
+                    },
                     "prometheus": {
                         "prometheusSpec": {
                             # Watch ALL ServiceMonitors — sibling addons
@@ -796,6 +804,10 @@ class K8sNativeClusterDriver(ClusterDriver):
                             # without per-monitor release labeling.
                             "serviceMonitorSelectorNilUsesHelmValues": False,
                             "podMonitorSelectorNilUsesHelmValues": False,
+                            "ruleSelectorNilUsesHelmValues": False,
+                            "serviceMonitorNamespaceSelector": {},
+                            "podMonitorNamespaceSelector": {},
+                            "ruleNamespaceSelector": {},
                         },
                     },
                 },

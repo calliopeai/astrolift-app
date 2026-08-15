@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add preview project observability bundles on a shared
+  kube-prometheus-stack with namespace-scoped ServiceMonitor and PodMonitor
+  targets, safe standard alerts and dashboards, policy-gated custom content,
+  portable endpoints, ownership-safe updates, and non-destructive teardown.
 - Add preview adoption of existing S3-compatible buckets on Kubernetes with
   project-scoped ownership records, org-scoped external credential bundles,
   portable S3 bindings, endpoint/TLS/path policy gates, safe update/unlink,
