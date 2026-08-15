@@ -104,8 +104,8 @@ def test_astrolift_azure_package_extends_official_sdk_namespace() -> None:
     """The local ``azure`` package must not shadow Microsoft's SDKs."""
     from azure.identity import DefaultAzureCredential
     from azure.mgmt.cosmosdb import CosmosDBManagementClient
-    from azure.mgmt.eventhub import EventHubManagementClient
     from azure.mgmt.eventgrid import EventGridManagementClient
+    from azure.mgmt.eventhub import EventHubManagementClient
     from azure.mgmt.fileshares import FileSharesMgmtClient
     from azure.mgmt.mysqlflexibleservers import MySQLManagementClient
     from azure.mgmt.postgresqlflexibleservers import PostgreSQLManagementClient
@@ -136,8 +136,8 @@ def test_registered_managed_drivers_target_current_sdk_operation_groups() -> Non
     from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
     from azure.mgmt.communication import CommunicationServiceManagementClient
     from azure.mgmt.cosmosdb import CosmosDBManagementClient
-    from azure.mgmt.eventhub import EventHubManagementClient
     from azure.mgmt.eventgrid import EventGridManagementClient
+    from azure.mgmt.eventhub import EventHubManagementClient
     from azure.mgmt.fileshares import FileSharesMgmtClient
     from azure.mgmt.loganalytics import LogAnalyticsManagementClient
     from azure.mgmt.monitor import MonitorManagementClient

@@ -46,9 +46,9 @@ from azure.managed.cache_redis import AzureCacheRedisDriver
 from azure.managed.cosmos import AzureCosmosDriver
 from azure.managed.cosmos_api import AzureCosmosApiDriver
 from azure.managed.email_acs import AzureCommunicationEmailDriver
-from azure.managed.event_hubs import AzureEventHubsDriver
 from azure.managed.event_grid import AzureEventGridDriver
 from azure.managed.event_grid_namespace import AzureEventGridNamespaceDriver
+from azure.managed.event_hubs import AzureEventHubsDriver
 from azure.managed.filesystem_files import AzureFilesDriver
 from azure.managed.managed_redis import AzureManagedRedisDriver
 from azure.managed.model_endpoint_aoai import AzureOpenAIDriver
