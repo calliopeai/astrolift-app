@@ -30,6 +30,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
     VolumeMount,
+    VolumeSourceKind,
 )
 from azure.managed.filesystem_files import _field, _not_found, _slug, _string_value, _tag_error, _tags
 
@@ -438,9 +439,40 @@ class AzureFilesClassicDriver(ManagedServiceDriver):
                 options.append(value)
         env_vars["FILESYSTEM_SOURCE"] = ValueRef(literal=source)
         env_vars["FILESYSTEM_MOUNT_OPTIONS"] = ValueRef(literal=",".join(options))
+
+        # Static CSI attachment for the share. NFS is network-authorized, so it
+        # carries no secret; SMB authenticates with the storage-account key.
+        volume_attributes: dict[str, str] = {"shareName": share_name}
+        volume_secret_refs: dict[str, str] = {}
+        volume_secret_literals: dict[str, str] = {}
+        if protocol == "NFS":
+            volume_attributes["protocol"] = "nfs"
+            volume_attributes["server"] = hostname
+        else:
+            volume_secret_literals["azurestorageaccountname"] = account_name
+            volume_secret_refs["azurestorageaccountkey"] = self._key_secret(account_name, "primary")
         return Binding(
             env_vars=env_vars,
-            pod_volume_mounts=[VolumeMount(name=_slug(share_name), mount_path=mount_path)],
+            pod_volume_mounts=[
+                VolumeMount(
+                    name=_slug(share_name),
+                    mount_path=mount_path,
+                    source_kind=VolumeSourceKind.CSI,
+                    protocol=("nfs4.1" if protocol == "NFS" else "smb3.1.1"),
+                    csi_driver="file.csi.azure.com",
+                    # Static-provisioning handle for the Azure Files CSI driver;
+                    # must be unique per share.
+                    volume_handle=f"{self._config.resource_group}#{account_name}#{share_name}",
+                    volume_attributes=volume_attributes,
+                    # SMB mounts authenticate with the storage-account key. The
+                    # account name is identity, not a credential, so it goes in
+                    # secret_literals; only the key is a backend reference.
+                    secret_refs=volume_secret_refs,
+                    secret_literals=volume_secret_literals,
+                    mount_options=options,
+                    read_only=read_only,
+                )
+            ],
             iam_grants=grants,
             notes=(
                 "Classic Microsoft.Storage Azure Files share. SMB credentials are rotating Key Vault refs; "
