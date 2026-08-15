@@ -178,15 +178,14 @@ def test_gcp_truncates_to_63_chars():
 # ---- Azure serialization -------------------------------------------
 
 
-def test_azure_preserves_keys_unchanged():
-    """Azure allows mixed case + symbols in keys; platform tags
-    pass through unchanged."""
+def test_azure_serializes_canonical_keys_to_arm_safe_names():
     out = to_azure(_base())
-    assert TAG_APP in out
-    assert out[TAG_APP] == "api"
+    assert "astrolift-app" in out
+    assert out["astrolift-app"] == "api"
+    assert all("/" not in key for key in out)
 
 
-def test_azure_truncates_to_256():
+def test_azure_rejects_values_over_256():
     tags = CloudTagSet(
         install_slug="acme",
         org_slug="acme",
@@ -194,8 +193,8 @@ def test_azure_truncates_to_256():
         env_slug="prod",
         extra={"long": "x" * 500},
     )
-    out = to_azure(tags)
-    assert len(out["long"]) == 256
+    with pytest.raises(ValueError, match="256"):
+        to_azure(tags)
 
 
 # ---- enforcement ---------------------------------------------------
