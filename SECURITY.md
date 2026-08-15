@@ -2,18 +2,32 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in Astrolift, please report it responsibly.
+**This repository is private.** Everyone who can read this file already has
+repository access, so the reliable channel today is a new issue in this
+repository, titled with a `[security]` prefix. While the repository is
+private that issue is not publicly visible.
 
-**Do not open a public issue.**
-
-Instead, email **security@astrolift.app** with:
+Include:
 
 - Description of the vulnerability
 - Steps to reproduce
 - Potential impact
 - Suggested fix (if any)
 
-We will acknowledge your report within 48 hours and aim to release a fix within 7 days for critical issues.
+We aim to acknowledge a report within 48 hours, and to release a fix within
+7 days for critical issues.
+
+### Before this repository becomes public
+
+A repository issue stops being confidential the moment the repository is
+public. Ahead of that, this policy has to move to GitHub private
+vulnerability reporting, which is only available on public repositories.
+Tracked in calliopeai/astrolift-app#1404.
+
+Earlier revisions of this policy directed reports to an address on a domain
+with no nameserver delegation and no MX record, so mail to it could never be
+delivered and reports were lost silently. Do not reintroduce an email contact
+here without first confirming the domain resolves and accepts mail.
 
 ## Supported Versions
 
