@@ -152,11 +152,26 @@ def test_deprovision_deletes_queue(
     assert fake_client.queues_obj.queues == {}
 
 
+def test_deprovision_refuses_to_drop_messages_by_default(
+    driver: ServiceBusDriver,
+    fake_client: FakeSBClient,
+) -> None:
+    res = driver.provision(_spec())
+    deprov = driver.deprovision(DeprovisionSpec(handle=res.handle))
+    assert not deprov.ok
+    assert deprov.retryable is False
+    assert "delete_data=True" in deprov.message
+    assert fake_client.queues_obj.queues
+
+
 def test_deprovision_idempotent_when_already_gone(
     driver: ServiceBusDriver,
 ) -> None:
     res = driver.provision(_spec())
-    driver.deprovision(DeprovisionSpec(handle=res.handle))
+    driver.deprovision(
+        DeprovisionSpec(handle=res.handle),
+        delete_data=True,
+    )
     deprov = driver.deprovision(DeprovisionSpec(handle=res.handle))
     assert deprov.ok
 

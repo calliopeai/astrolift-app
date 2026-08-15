@@ -13,6 +13,7 @@ from typing import Any
 
 import pytest
 
+from _sdk import UnsupportedOperationError
 from _sdk.managed_service import (
     DeprovisionSpec,
     ProvisionSpec,
@@ -370,21 +371,23 @@ def test_binding_iam_grants_scoped_to_container_resource(
 # ---- snapshot + restore -----------------------------------------
 
 
-def test_snapshot_returns_marker(driver: AzureBlobStorageDriver) -> None:
-    res = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=res.handle))
-    assert snap.snapshot_id.startswith("v-")
-    assert snap.handle == res.handle
+def test_snapshot_is_explicitly_unsupported(driver: AzureBlobStorageDriver) -> None:
+    with pytest.raises(UnsupportedOperationError, match="per-blob versions"):
+        driver.snapshot(ServiceHandle(handle="object_store/container"))
 
 
-def test_restore_returns_not_implemented(
+def test_restore_is_explicitly_unsupported(
     driver: AzureBlobStorageDriver,
 ) -> None:
-    res = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=res.handle))
-    restore = driver.restore(snap, _spec(service_handle_hint="restored"))
-    assert not restore.ok
-    assert "not_implemented" in restore.errors
+    from _sdk.managed_service import SnapshotHandle
+
+    snapshot = SnapshotHandle(
+        "object_store/source",
+        "not-an-atomic-snapshot",
+        "2026-08-14T00:00:00Z",
+    )
+    with pytest.raises(UnsupportedOperationError, match="copy workflow"):
+        driver.restore(snapshot, _spec(service_handle_hint="restored"))
 
 
 # ---- naming + helpers -------------------------------------------

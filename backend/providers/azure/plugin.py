@@ -12,26 +12,22 @@ Drivers shipped:
 - AzureAppGatewayIngressDriver (#43) — IngressDriver, multi-variant
   (agic / gateway_api)
 
-Managed services (#47 MVP — symmetry with AWS S3 + SQS,
-GCP GCS + Pub/Sub):
+Managed services:
 - BlobStorageDriver — object_store/blob
 - ServiceBusDriver — queue/servicebus
-
-Managed services (#370 — MySQL across clouds):
-- AzureMySQLFlexibleDriver — mysql/azure_mysql_flex
-
-Managed services (#364 — cross-cloud parity with the GCP
-managed-services completion):
-- AzurePostgresFlexibleDriver — postgres/azure_pg_flex
-- AzureCacheRedisDriver — redis/azure_cache_redis
 - AzureBlobStorageDriver — object_store/azure_blob
 - AzureServiceBusDriver — queue/azure_servicebus
-
-Pending (separate tickets, follow-on managed services):
-- Cosmos DB (Mongo / Cassandra / SQL APIs)
-- Azure Files (filesystem)
-- Event Hubs (event-stream)
-- Azure OpenAI (model endpoint)
+- AzureFilesDriver — filesystem/azure_files
+- AzureFilesClassicDriver — filesystem/azure_files_classic
+- AzurePostgresFlexibleDriver — postgres/azure_pg_flex
+- AzureMySQLFlexibleDriver — mysql/azure_mysql_flex
+- AzureCacheRedisDriver — redis/azure_cache_redis
+- AzureCosmosDriver — kv_store/cosmos
+- AzureAISearchFullTextDriver — search/azure_ai_search_fulltext
+- AzureAISearchVectorDriver — vector_index/azure_ai_search_vector
+- AzureMonitorPrometheusDriver — time_series/azure_monitor_prometheus
+- AzureCommunicationEmailDriver — email/azure_acs
+- AzureOpenAIDriver — model_endpoint/azure_openai
 """
 
 from _sdk.base import ProviderPlugin
@@ -42,6 +38,8 @@ from azure.ingress_appgw import AzureAppGatewayIngressDriver
 from azure.managed.cache_redis import AzureCacheRedisDriver
 from azure.managed.cosmos import AzureCosmosDriver
 from azure.managed.email_acs import AzureCommunicationEmailDriver
+from azure.managed.filesystem_files import AzureFilesDriver
+from azure.managed.filesystem_files_classic import AzureFilesClassicDriver
 from azure.managed.model_endpoint_aoai import AzureOpenAIDriver
 from azure.managed.mysql_flexible import AzureMySQLFlexibleDriver
 from azure.managed.object_store_blob import (
@@ -60,6 +58,167 @@ from azure.notification_anh import AzureNotificationHubsDriver
 from azure.registry_acr import ACRDriver
 from azure.secrets_keyvault import KeyVaultSecretsBackend
 from azure.tls_appgw import AzureAppGatewayTlsDriver
+
+_MANAGED_CONFIG_PROPERTIES = {
+    "blob_container_name_prefix": {"type": "string", "default": "astrolift"},
+    "blob_versioning_enabled": {"type": "boolean", "default": True},
+    "servicebus_queue_name_prefix": {"type": "string", "default": "astrolift"},
+    "servicebus_topic_name_prefix": {"type": "string", "default": "astrolift"},
+    "servicebus_default_message_ttl": {"type": "string", "default": "P14D"},
+    "servicebus_max_size_in_megabytes": {"type": "integer", "minimum": 1024, "default": 1024},
+    "servicebus_enable_partitioning": {"type": "boolean", "default": False},
+    "servicebus_dead_lettering_on_message_expiration": {"type": "boolean", "default": True},
+    "servicebus_max_delivery_count": {"type": "integer", "minimum": 1, "default": 10},
+    "servicebus_lock_duration": {"type": "string", "default": "PT30S"},
+    "files_name_prefix": {"type": "string", "default": "astrolift-files"},
+    "files_default_storage_gib": {"type": "integer", "minimum": 32, "maximum": 262144, "default": 32},
+    "files_default_redundancy": {
+        "type": "string",
+        "enum": ["Local", "Zone"],
+        "default": "Local",
+    },
+    "files_default_root_squash": {
+        "type": "string",
+        "enum": ["NoRootSquash", "RootSquash", "AllSquash"],
+        "default": "RootSquash",
+    },
+    "files_encryption_in_transit_required_default": {"type": "boolean", "default": True},
+    "files_allowed_subnet_ids": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "files_deletion_protection_default": {"type": "boolean", "default": True},
+    "files_classic_account_name_prefix": {
+        "type": "string",
+        "pattern": "^[a-z0-9]{3,14}$",
+        "default": "astroliftfs",
+    },
+    "files_classic_share_name_prefix": {
+        "type": "string",
+        "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$",
+        "maxLength": 50,
+        "default": "astrolift-files",
+    },
+    "files_classic_default_protocol": {
+        "type": "string",
+        "enum": ["SMB", "NFS"],
+        "default": "SMB",
+    },
+    "files_classic_default_sku": {
+        "type": "string",
+        "enum": [
+            "Standard_LRS",
+            "Standard_GRS",
+            "Standard_RAGRS",
+            "Standard_ZRS",
+            "Standard_GZRS",
+            "Standard_RAGZRS",
+            "Premium_LRS",
+            "Premium_ZRS",
+        ],
+        "default": "Standard_LRS",
+    },
+    "files_classic_default_quota_gib": {"type": "integer", "minimum": 1, "maximum": 102400, "default": 100},
+    "files_classic_default_access_tier": {
+        "type": "string",
+        "enum": ["TransactionOptimized", "Hot", "Cool", "Premium"],
+        "default": "TransactionOptimized",
+    },
+    "files_classic_soft_delete_retention_days": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 365,
+        "default": 14,
+    },
+    "files_classic_allow_public_access_default": {"type": "boolean", "default": False},
+    "files_classic_secret_name_prefix": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9-]{1,92}$",
+        "default": "astrolift-files",
+    },
+    "postgres_server_name_prefix": {"type": "string", "default": "astrolift"},
+    "postgres_engine_version": {"type": "string", "default": "16"},
+    "postgres_backup_retention_days": {"type": "integer", "minimum": 1, "maximum": 35, "default": 7},
+    "postgres_high_availability_default": {
+        "type": "string",
+        "enum": ["Disabled", "SameZone", "ZoneRedundant"],
+        "default": "Disabled",
+    },
+    "postgres_deletion_protection_default": {"type": "boolean", "default": True},
+    "postgres_secret_name_prefix": {"type": "string", "default": "astrolift-pg"},
+    "mysql_server_name_prefix": {"type": "string", "default": "astrolift"},
+    "mysql_engine_version": {"type": "string", "default": "8.0.21"},
+    "mysql_backup_retention_days": {"type": "integer", "minimum": 1, "maximum": 35, "default": 7},
+    "mysql_high_availability_default": {
+        "type": "string",
+        "enum": ["Disabled", "SameZone", "ZoneRedundant"],
+        "default": "Disabled",
+    },
+    "mysql_deletion_protection_default": {"type": "boolean", "default": True},
+    "mysql_secret_name_prefix": {"type": "string", "default": "astrolift-mysql"},
+    "redis_cache_name_prefix": {"type": "string", "default": "astrolift"},
+    "redis_default_sku": {"type": "string", "default": "Standard_C1"},
+    "redis_minimum_tls_version_default": {"type": "string", "default": "1.2"},
+    "redis_enable_non_ssl_port_default": {"type": "boolean", "default": False},
+    "redis_secret_name_prefix": {"type": "string", "default": "astrolift-redis"},
+    "redis_backup_container_uri": {
+        "type": "string",
+        "format": "uri",
+        "description": ("Non-secret HTTPS Blob container URI for Premium Redis RDB exports using managed identity."),
+    },
+    "redis_backup_storage_subscription_id": {"type": "string"},
+    "cosmos_account_name_prefix": {"type": "string", "default": "astrolift"},
+    "cosmos_database_name_default": {"type": "string", "default": "astrolift"},
+    "cosmos_default_api_kind": {
+        "type": "string",
+        "enum": ["MongoDB", "GlobalDocumentDB", "Cassandra", "Table", "Gremlin"],
+        "default": "MongoDB",
+    },
+    "cosmos_backup_policy_default": {
+        "type": "string",
+        "enum": ["Continuous", "Periodic"],
+        "default": "Continuous",
+    },
+    "cosmos_secret_name_prefix": {"type": "string", "default": "astrolift-cosmos"},
+    "ai_search_service_name_prefix": {"type": "string", "default": "astrolift"},
+    "ai_search_default_sku": {"type": "string", "default": "basic"},
+    "ai_search_replica_count_default": {"type": "integer", "minimum": 1, "default": 1},
+    "ai_search_partition_count_default": {"type": "integer", "minimum": 1, "default": 1},
+    "ai_search_public_network_access_default": {
+        "type": "string",
+        "enum": ["enabled", "disabled"],
+        "default": "enabled",
+    },
+    "ai_search_secret_name_prefix": {"type": "string", "default": "astrolift-search"},
+    "ai_search_vector_service_name_prefix": {"type": "string", "default": "astrolift-vec"},
+    "ai_search_vector_default_sku": {"type": "string", "default": "basic"},
+    "ai_search_embedding_dimension_default": {"type": "integer", "minimum": 1, "default": 1536},
+    "ai_search_vector_profile_default": {"type": "string", "default": "default-profile"},
+    "ai_search_vector_algorithm_default": {
+        "type": "string",
+        "enum": ["hnsw", "exhaustiveKnn"],
+        "default": "hnsw",
+    },
+    "ai_search_vector_secret_name_prefix": {"type": "string", "default": "astrolift-aisearch"},
+    "monitor_workspace_name_prefix": {"type": "string", "default": "astrolift-tsdb"},
+    "monitor_create_linked_log_analytics_default": {"type": "boolean", "default": True},
+    "monitor_public_network_access_default": {
+        "type": "string",
+        "enum": ["Enabled", "Disabled"],
+        "default": "Enabled",
+    },
+    "acs_email_location": {"type": "string", "default": "global"},
+    "acs_email_service_name": {"type": "string", "default": "astrolift-email"},
+    "acs_communication_resource_id": {"type": "string"},
+    "acs_email_domain_management": {
+        "type": "string",
+        "enum": ["AzureManaged", "CustomerManaged"],
+        "default": "AzureManaged",
+    },
+    "acs_email_secret_name_prefix": {"type": "string", "default": "astrolift-acs-email"},
+    "acs_email_delete_data_default": {"type": "boolean", "default": False},
+    "azure_openai_account_name": {"type": "string"},
+    "azure_openai_deployment_name_prefix": {"type": "string", "default": "astrolift"},
+    "azure_openai_api_version": {"type": "string", "default": "2024-02-15-preview"},
+    "azure_openai_secret_name_prefix": {"type": "string", "default": "astrolift-aoai"},
+}
 
 PLUGIN = ProviderPlugin(
     id="azure",
@@ -82,6 +241,8 @@ PLUGIN = ProviderPlugin(
         ("redis", "azure_cache_redis"): AzureCacheRedisDriver,
         ("object_store", "azure_blob"): AzureBlobStorageDriver,
         ("queue", "azure_servicebus"): AzureServiceBusDriver,
+        ("filesystem", "azure_files"): AzureFilesDriver,
+        ("filesystem", "azure_files_classic"): AzureFilesClassicDriver,
         ("kv_store", "cosmos"): AzureCosmosDriver,
         ("search", "azure_ai_search_fulltext"): AzureAISearchFullTextDriver,
         ("vector_index", "azure_ai_search_vector"): AzureAISearchVectorDriver,
@@ -130,6 +291,7 @@ PLUGIN = ProviderPlugin(
                 "type": "string",
                 "description": ("Service Bus namespace name for queue managed-service binding."),
             },
+            **_MANAGED_CONFIG_PROPERTIES,
             "ingress_variant": {
                 "type": "string",
                 "enum": ["agic", "gateway_api"],

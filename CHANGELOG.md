@@ -8,6 +8,14 @@
   agent Jobs, including CSI/PVC preflight, credential-reference projection,
   provider-specific EFS/FSx/NFS mounts, owned storage cleanup, and safe mount
   readiness metadata in the project resources UI and GraphQL API.
+- Add the preview `filesystem/azure_files_classic` driver for storage-account
+  Azure Files SMB/NFS shares, including network ACLs, per-protocol encryption,
+  dual Key Vault-backed SMB rotation keys, snapshots, soft delete, guarded
+  teardown, and portable mount metadata.
+- Add Microsoft.FileShares provisioned-v2 NFS lifecycle with SSD capacity,
+  Local or Zone redundancy, provisioned performance, root-squash and encrypted
+  mount controls, subnet allowlists, portable AZNFS bindings, child snapshots,
+  ownership-safe reconciliation, and protected data-loss-aware teardown.
 - Add Cloud Spanner Graph lifecycle on Enterprise and Enterprise Plus with
   GoogleSQL/GQL property graphs, fixed or autoscaled capacity, atomic custom
   schemas, replay-safe DDL, CMEK, exact backups and restore, portable IAM
@@ -97,6 +105,10 @@
 
 ### Changed
 
+- Enable every registered Azure managed-service driver in the production image
+  and lifecycle resolver, install its current management/data SDKs, preserve
+  provider controls at runtime, and fail closed when snapshot or retained-data
+  semantics cannot be fulfilled.
 - Make project dashboards, navigation, and repository workflow detail pages
   workload-aware, graph-first, fully linked, and observable without requiring
   a configured workflow wrapper.

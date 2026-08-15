@@ -173,9 +173,7 @@ class AzureMySQLFlexibleDriver(ManagedServiceDriver):
             self._mgmt = config.mgmt_client
         else:
             from azure.identity import DefaultAzureCredential
-            from azure.mgmt.rdbms.mysql_flexibleservers import (
-                MySQLManagementClient,
-            )
+            from azure.mgmt.mysqlflexibleservers import MySQLManagementClient
 
             self._mgmt = MySQLManagementClient(
                 credential=DefaultAzureCredential(),
@@ -433,13 +431,13 @@ class AzureMySQLFlexibleDriver(ManagedServiceDriver):
         snapshot_taken = False
         if not delete_data:
             try:
-                self._mgmt.backups.begin_put(
+                self._mgmt.backups.put(
                     resource_group_name=self._config.resource_group,
                     server_name=server_name,
                     backup_name=_final_backup_name(
                         server_name=server_name,
                     ),
-                ).result()
+                )
                 snapshot_taken = True
             except Exception as exc:
                 return DeprovisionResult(
@@ -558,14 +556,14 @@ class AzureMySQLFlexibleDriver(ManagedServiceDriver):
         server_name = self._server_name_from_handle(handle.handle)
         backup_name = f"{server_name}-snap-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
         try:
-            self._mgmt.backups.begin_put(
+            self._mgmt.backups.put(
                 resource_group_name=self._config.resource_group,
                 server_name=server_name,
                 backup_name=backup_name,
-            ).result()
+            )
         except Exception as exc:
             raise AzureMySQLError(
-                f"backups.begin_put: {exc}",
+                f"backups.put: {exc}",
             ) from exc
         return SnapshotHandle(
             handle=handle.handle,

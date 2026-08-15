@@ -17,6 +17,7 @@ from typing import Any
 
 import pytest
 
+from _sdk import UnsupportedOperationError
 from _sdk.managed_service import (
     DeprovisionSpec,
     ProvisionSpec,
@@ -133,28 +134,16 @@ class FakeServicesOperations:
             svc.public_network_access = service["public_network_access"]
         return svc
 
-    def begin_delete(
+    def delete(
         self,
         *,
         resource_group_name: str,
         search_service_name: str,
-    ) -> FakePoller:
+    ) -> None:
         self.delete_calls.append(search_service_name)
         if search_service_name not in self.services:
             raise _NotFound(search_service_name)
         del self.services[search_service_name]
-        return FakePoller(value=None)
-
-    def begin_purge(
-        self,
-        *,
-        resource_group_name: str,
-        search_service_name: str,
-    ) -> FakePoller:
-        if not self.purge_supported:
-            raise RuntimeError("purge not available in this region")
-        self.purge_calls.append(search_service_name)
-        return FakePoller(value=None)
 
 
 @dataclass
@@ -424,7 +413,7 @@ def test_update_noop_when_nothing_to_change(
 # ---- deprovision four-corner matrix -----------------------------
 
 
-def test_deprovision_default_keeps_soft_delete_and_keys(
+def test_deprovision_default_refuses_without_snapshot_and_keeps_keys(
     driver: AzureAISearchFullTextDriver,
     secrets_client: FakeSecretClient,
     mgmt: FakeMgmtClient,
@@ -435,17 +424,17 @@ def test_deprovision_default_keeps_soft_delete_and_keys(
     result = driver.deprovision(
         DeprovisionSpec(handle=provisioned.handle),
     )
-    assert result.ok
-    assert "purged=soft-delete" in result.message
-    # Admin keys retained on retained-data path
+    assert not result.ok
+    assert result.retryable is False
+    assert "delete_data=True" in result.message
     assert primary in secrets_client.secrets
-    assert service_name in mgmt.services_obj.delete_calls
-    assert service_name not in mgmt.services_obj.purge_calls
+    assert service_name not in mgmt.services_obj.delete_calls
 
 
-def test_deprovision_delete_data_purges_keys(
+def test_deprovision_delete_data_deletes_service_and_keys(
     driver: AzureAISearchFullTextDriver,
     secrets_client: FakeSecretClient,
+    mgmt: FakeMgmtClient,
 ) -> None:
     provisioned = driver.provision(_spec())
     service_name = provisioned.handle.split("/", 1)[1]
@@ -458,11 +447,12 @@ def test_deprovision_delete_data_purges_keys(
         delete_data=True,
     )
     assert result.ok
+    assert service_name in mgmt.services_obj.delete_calls
     assert primary not in secrets_client.secrets
     assert secondary not in secrets_client.secrets
 
 
-def test_deprovision_force_destroy_only_purges_soft_delete(
+def test_deprovision_force_destroy_does_not_override_data_guard(
     driver: AzureAISearchFullTextDriver,
     secrets_client: FakeSecretClient,
     mgmt: FakeMgmtClient,
@@ -475,10 +465,9 @@ def test_deprovision_force_destroy_only_purges_soft_delete(
         delete_data=False,
         force_destroy=True,
     )
-    assert result.ok
-    assert "purged=yes" in result.message
-    assert service_name in mgmt.services_obj.purge_calls
-    # Keys retained on the retained-data path even under force_destroy
+    assert not result.ok
+    assert result.retryable is False
+    assert service_name not in mgmt.services_obj.delete_calls
     assert primary in secrets_client.secrets
 
 
@@ -496,8 +485,7 @@ def test_deprovision_atomic_both_flags(
         force_destroy=True,
     )
     assert result.ok
-    assert "purged=yes" in result.message
-    assert service_name in mgmt.services_obj.purge_calls
+    assert service_name in mgmt.services_obj.delete_calls
     assert primary not in secrets_client.secrets
 
 
@@ -520,9 +508,10 @@ def test_deprovision_treats_mid_modify_as_retryable_without_force(
     def boom(**_kwargs):
         raise RuntimeError("ServiceNotInDesiredState: scaling")
 
-    mgmt.services_obj.begin_delete = boom  # type: ignore[assignment]
+    mgmt.services_obj.delete = boom  # type: ignore[assignment]
     result = driver.deprovision(
         DeprovisionSpec(handle=provisioned.handle),
+        delete_data=True,
     )
     assert not result.ok
     assert "mid-modify" in result.message
@@ -537,29 +526,29 @@ def test_deprovision_force_destroy_bypasses_mid_modify_message(
     def boom(**_kwargs):
         raise RuntimeError("ServiceNotInDesiredState: scaling")
 
-    mgmt.services_obj.begin_delete = boom  # type: ignore[assignment]
+    mgmt.services_obj.delete = boom  # type: ignore[assignment]
     result = driver.deprovision(
         DeprovisionSpec(handle=provisioned.handle),
+        delete_data=True,
         force_destroy=True,
     )
     assert not result.ok
     assert "mid-modify" not in result.message
 
 
-def test_deprovision_handles_purge_unavailable(
+def test_deprovision_does_not_depend_on_fictional_purge_api(
     driver: AzureAISearchFullTextDriver,
     mgmt: FakeMgmtClient,
 ) -> None:
-    """Some regions / SDK versions don't expose begin_purge.
-    Force-destroy must still succeed at the delete step."""
     mgmt.services_obj.purge_supported = False
     provisioned = driver.provision(_spec())
     result = driver.deprovision(
         DeprovisionSpec(handle=provisioned.handle),
+        delete_data=True,
         force_destroy=True,
     )
     assert result.ok
-    assert "purged=soft-delete" in result.message
+    assert "and indexes deleted" in result.message
 
 
 # ---- status -----------------------------------------------------
@@ -641,34 +630,21 @@ def test_binding_for_missing_raises(
 # ---- snapshot + restore -----------------------------------------
 
 
-def test_snapshot_returns_deterministic_id(
+def test_snapshot_is_explicitly_unsupported(
     driver: AzureAISearchFullTextDriver,
 ) -> None:
-    provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
-    service_name = provisioned.handle.split("/", 1)[1]
-    assert snap.snapshot_id.startswith(service_name)
+    with pytest.raises(UnsupportedOperationError, match="no service-level snapshot"):
+        driver.snapshot(ServiceHandle(handle="search/anything"))
 
 
-def test_snapshot_for_missing_raises(
+def test_restore_is_explicitly_unsupported(
     driver: AzureAISearchFullTextDriver,
 ) -> None:
-    with pytest.raises(AzureAISearchError):
-        driver.snapshot(ServiceHandle(handle="search/missing"))
+    from _sdk.managed_service import SnapshotHandle
 
-
-def test_restore_provisions_target_service(
-    driver: AzureAISearchFullTextDriver,
-    mgmt: FakeMgmtClient,
-) -> None:
-    provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
-
-    restore_spec = _spec(service_handle_hint="restored")
-    result = driver.restore(snap, restore_spec)
-    assert result.ok
-    target_name = result.handle.split("/", 1)[1]
-    assert target_name in mgmt.services_obj.services
+    snapshot = SnapshotHandle("search/source", "not-a-backup", "2026-08-14T00:00:00Z")
+    with pytest.raises(UnsupportedOperationError, match="explicit index export"):
+        driver.restore(snapshot, _spec(service_handle_hint="restored"))
 
 
 # ---- naming + helpers -------------------------------------------

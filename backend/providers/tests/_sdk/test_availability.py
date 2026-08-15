@@ -132,6 +132,16 @@ def test_managed_service_binding_envs_recorded() -> None:
     s3 = next(m for m in MATRIX.managed_services if m.plugin_id == "aws" and m.variant == "s3")
     assert "S3_BUCKET_NAME" in s3.binding_envs
 
+    azure_files = next(m for m in MATRIX.managed_services if m.plugin_id == "azure" and m.variant == "azure_files")
+    assert azure_files.status == "preview"
+    assert "FILESYSTEM_SOURCE" in azure_files.binding_envs
+    assert "FILESYSTEM_READ_ONLY" in azure_files.binding_envs
+    assert "AZURE_RESOURCE_GROUP" in azure_files.binding_envs
+
+    classic = next(m for m in MATRIX.managed_services if m.plugin_id == "azure" and m.variant == "azure_files_classic")
+    assert classic.status == "preview"
+    assert "FILESYSTEM_PASSWORD_SECONDARY" in classic.binding_envs
+
 
 def test_managed_service_keys_are_unique() -> None:
     keys = [(entry.plugin_id, entry.kind, entry.variant) for entry in MATRIX.managed_services]

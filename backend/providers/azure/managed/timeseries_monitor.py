@@ -16,26 +16,23 @@ Concept map:
   - **Data Collection Rule (DCR)** = the transform/filter pipeline
     that routes scraped/remote-written samples into the workspace.
     Has an ``immutable_id`` that the client SDKs key off.
-  - **Linked Log Analytics workspace** = optional sidecar for
-    long-term retention beyond the Monitor workspace's TTL. The
-    driver creates / links one by default; ``delete_data=False``
-    preserves it on tear-down.
+  - **Companion Log Analytics workspace** = optional sidecar for
+    logs and Kusto queries. It is not a backup of managed Prometheus
+    metrics and cannot restore an Azure Monitor workspace.
 
 Four-corner deprovision matrix:
 
   delete_data=False, force_destroy=False (default):
-    Delete the Monitor workspace + DCE + DCR. KEEP the linked Log
-    Analytics workspace (long-term retention story stays alive so
-    operators can restore by name from LA). Resource locks on the
-    workspace are RESPECTED -- refuses cleanly when present.
+    Refuse. Azure exposes no snapshot/restore path for managed
+    Prometheus workspace data, and the companion Log Analytics
+    workspace is not a metric backup.
 
   delete_data=True, force_destroy=False:
     Delete everything INCLUDING the linked Log Analytics workspace.
     Resource locks still respected.
 
   delete_data=False, force_destroy=True:
-    Delete Monitor workspace + DCE + DCR. Keep linked LA. Remove
-    blocking resource locks first.
+    Refuse for the same reason; force never bypasses data retention.
 
   delete_data=True, force_destroy=True:
     --atomic. Remove locks, delete everything including linked LA.
@@ -130,10 +127,11 @@ class AzureMonitorPrometheusConfig:
     workspace_name_prefix: str = "astrolift-tsdb"
 
     create_linked_log_analytics_default: bool = True
-    """Default-on: a linked Log Analytics workspace gives long-term
-    retention (configurable up to 730 days) so the delete_data=False
-    path actually preserves something meaningful past the Monitor
-    workspace's short window."""
+    """Default-on companion Log Analytics workspace for logs/Kusto.
+
+    Despite the historical field name, this is not a managed Prometheus
+    snapshot or restore destination.
+    """
 
     public_network_access_default: str = "Enabled"
     """``Enabled`` (default) or ``Disabled``. Disabled forces
@@ -183,7 +181,7 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
         else:
             try:
                 from azure.identity import DefaultAzureCredential
-                from azure.mgmt.resource import ManagementLockClient
+                from azure.mgmt.resource.locks import ManagementLockClient
 
                 self._locks = ManagementLockClient(
                     credential=DefaultAzureCredential(),
@@ -248,17 +246,16 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
             },
         }
         try:
-            poller = self._monitor.azure_monitor_workspaces.begin_create(
+            self._monitor.azure_monitor_workspaces.create(
                 resource_group_name=self._config.resource_group,
                 azure_monitor_workspace_name=workspace_name,
                 azure_monitor_workspace_properties=workspace_parameters,
             )
-            poller.result()
         except Exception as exc:
             return ProvisionResult(
                 ok=False,
                 handle="",
-                message=f"workspaces.begin_create: {exc}",
+                message=f"workspaces.create: {exc}",
                 errors=[str(exc)],
             )
 
@@ -331,10 +328,8 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
                 errors=[str(exc)],
             )
 
-        # 4. Optional: linked Log Analytics workspace for long-term
-        # retention. The Monitor workspace's own retention is short;
-        # the LA workspace is what backs the delete_data=False
-        # "preserve linked LA workspace" semantic.
+        # 4. Optional companion Log Analytics workspace for logs and
+        # Kusto queries. It does not back up managed Prometheus data.
         if create_linked_la:
             la_name = self._la_name_for(workspace_name=workspace_name)
             try:
@@ -462,6 +457,20 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
                 ok=True,
                 handle=spec.handle,
                 message=(f"azure monitor workspace {workspace_name} already gone"),
+            )
+
+        if not delete_data:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=(
+                    f"azure monitor workspace {workspace_name} cannot be "
+                    "removed without deleting its managed Prometheus data; "
+                    "a linked Log Analytics workspace is not a metric backup. "
+                    "Pass delete_data=True to destroy it"
+                ),
+                errors=["delete_data_required"],
+                retryable=False,
             )
 
         # Resource-lock guard: enumerate CanNotDelete / ReadOnly locks
@@ -626,24 +635,11 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
 
     @driver_op(cloud="azure", driver="timeseries_monitor")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
-        """Azure Monitor managed Prometheus has no first-party
-        snapshot API. The linked Log Analytics workspace is the
-        durability story (queryable retention up to ``retention_days``
-        on the LA side). We return a synthetic snapshot id so callers
-        can persist a marker for restore-from-LA via Kusto."""
-        from datetime import UTC, datetime
+        from _sdk import UnsupportedOperationError
 
-        workspace_name = self._workspace_name_from_handle(handle.handle)
-        existing = self._describe(workspace_name)
-        if existing is None:
-            raise AzureMonitorPrometheusError(
-                f"snapshot for missing workspace {workspace_name}",
-            )
-        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-        return SnapshotHandle(
-            handle=handle.handle,
-            snapshot_id=f"{workspace_name}-pit-{stamp}",
-            created_at=datetime.now(UTC).isoformat(),
+        raise UnsupportedOperationError(
+            "Azure Monitor managed Prometheus has no snapshot/restore API; "
+            "Log Analytics linkage does not preserve workspace metric data",
         )
 
     @driver_op(cloud="azure", driver="timeseries_monitor")
@@ -652,17 +648,10 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
         snapshot: SnapshotHandle,
         target: ProvisionSpec,
     ) -> ProvisionResult:
-        provisioned = self.provision(target)
-        if not provisioned.ok:
-            return provisioned
-        return ProvisionResult(
-            ok=True,
-            handle=provisioned.handle,
-            message=(
-                f"target workspace provisioned; metrics at "
-                f"{snapshot.snapshot_id} stay queryable on the source's "
-                f"linked Log Analytics workspace within retention"
-            ),
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            "Azure Monitor managed Prometheus cannot restore workspace metric data from a Log Analytics marker",
         )
 
     @driver_op(cloud="azure", driver="timeseries_monitor", heartbeat=False)
