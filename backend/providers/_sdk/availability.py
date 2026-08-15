@@ -1763,9 +1763,16 @@ MATRIX = AvailabilityMatrix(
             kind="topic",
             variant="service_bus_topic",
             plugin_id="azure",
-            status="planned",
             description="Azure Service Bus topic and subscriptions",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            binding_envs=(
+                "TOPIC_ARN_OR_ID",
+                "TOPIC_NAME",
+                "TOPIC_REGION",
+                "SERVICEBUS_NAMESPACE",
+                "SERVICEBUS_TOPIC",
+                "SERVICEBUS_SUBSCRIPTION",
+                "SERVICEBUS_ENDPOINT",
+            ),
         ),
         ManagedServiceEntry(
             kind="event_bus",

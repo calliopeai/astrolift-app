@@ -38,6 +38,7 @@ def test_managed_services_have_full_364_set() -> None:
     assert ("redis", "azure_managed_redis") in keys
     assert ("object_store", "azure_blob") in keys
     assert ("queue", "azure_servicebus") in keys
+    assert ("topic", "service_bus_topic") in keys
     assert ("filesystem", "azure_files") in keys
 
 
@@ -69,6 +70,7 @@ def test_managed_runtime_controls_are_exposed_in_provider_schema() -> None:
     expected = {
         "storage_account",
         "servicebus_namespace",
+        "servicebus_location",
         "blob_versioning_enabled",
         "servicebus_dead_lettering_on_message_expiration",
         "files_allowed_subnet_ids",

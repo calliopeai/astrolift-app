@@ -105,6 +105,9 @@
   Key Vault-backed access keys, persistence/modules, CMK rotation,
   geo-replication links, additive Entra access assignments, scaling, status,
   and fail-closed private-networking and data-preserving teardown semantics.
+- Expose Azure Service Bus topics and default subscriptions through the
+  cloud-neutral `topic/service_bus_topic` lifecycle and portable topic binding,
+  while retaining the existing queue-shaped alias.
 - Add explicit Azure Cosmos DB for NoSQL, MongoDB RU, Gremlin,
   Cassandra, and Table API variants with API-correct resource lifecycle,
   throughput and autoscale controls, multi-region placement, continuous or
