@@ -44,6 +44,17 @@ def test_managed_services_have_full_364_set() -> None:
     assert ("filesystem", "azure_files") in keys
 
 
+def test_managed_services_register_explicit_cosmos_api_variants() -> None:
+    keys = set(PLUGIN.managed_service_drivers)
+    assert {
+        ("document_db", "cosmos_nosql"),
+        ("document_db", "cosmos_mongodb"),
+        ("graph_db", "cosmos_gremlin"),
+        ("wide_column", "cosmos_cassandra"),
+        ("kv_store", "cosmos_table"),
+    } <= keys
+
+
 def test_config_schema_requires_core_fields() -> None:
     required = PLUGIN.config_schema.get("required", [])
     assert "subscription_id" in required
@@ -71,6 +82,10 @@ def test_managed_runtime_controls_are_exposed_in_provider_schema() -> None:
         "mysql_backup_retention_days",
         "redis_minimum_tls_version_default",
         "cosmos_default_api_kind",
+        "cosmos_api_account_name_prefix",
+        "cosmos_api_continuous_backup_tier_default",
+        "cosmos_api_public_network_access_default",
+        "cosmos_api_consistency_level_default",
         "ai_search_public_network_access_default",
         "ai_search_vector_algorithm_default",
         "monitor_public_network_access_default",
@@ -178,14 +193,31 @@ def test_registered_managed_drivers_target_current_sdk_operation_groups() -> Non
                     "get",
                     "list_connection_strings",
                 },
-                "cassandra_resources": {"begin_create_update_cassandra_keyspace"},
-                "gremlin_resources": {"begin_create_update_gremlin_database"},
+                "cassandra_resources": {
+                    "begin_create_update_cassandra_keyspace",
+                    "begin_update_cassandra_keyspace_throughput",
+                    "get_cassandra_keyspace",
+                },
+                "gremlin_resources": {
+                    "begin_create_update_gremlin_database",
+                    "begin_update_gremlin_database_throughput",
+                    "get_gremlin_database",
+                },
                 "mongo_db_resources": {
                     "begin_create_update_mongo_db_database",
                     "begin_update_mongo_db_database_throughput",
+                    "get_mongo_db_database",
                 },
-                "sql_resources": {"begin_create_update_sql_database"},
-                "table_resources": {"begin_create_update_table"},
+                "sql_resources": {
+                    "begin_create_update_sql_database",
+                    "begin_update_sql_database_throughput",
+                    "get_sql_database",
+                },
+                "table_resources": {
+                    "begin_create_update_table",
+                    "begin_update_table_throughput",
+                    "get_table",
+                },
             },
         ),
         (
