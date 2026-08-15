@@ -351,6 +351,43 @@ def _gcp_managed_config_for(
             storage_class=str(pc.get("gcs_storage_class", "STANDARD")),
         )
 
+    if pair == ("filesystem", "filestore") or (kind == "filesystem" and not variant):
+        from gcp.managed.filesystem_filestore import FilestoreConfig
+
+        return FilestoreConfig(
+            project_id=project_id,
+            location=str(pc.get("filestore_location") or region),
+            network=str(pc.get("filestore_network") or pc.get("network") or ac.get("network") or ""),
+            instance_name_prefix=str(
+                pc.get("filestore_instance_name_prefix", "astrolift"),
+            ),
+            share_name_default=str(pc.get("filestore_share_name_default", "data")),
+            tier_default=str(pc.get("filestore_tier_default", "REGIONAL")),
+            protocol_default=str(pc.get("filestore_protocol_default", "NFS_V3")),
+            connect_mode_default=str(
+                pc.get("filestore_connect_mode_default", "PRIVATE_SERVICE_CONNECT"),
+            ),
+            reserved_ip_range=str(pc.get("filestore_reserved_ip_range", "")),
+            psc_endpoint_project=str(pc.get("filestore_psc_endpoint_project", "")),
+            kms_key_name=str(
+                pc.get("filestore_kms_key_name") or pc.get("kms_key") or "",
+            ),
+            deletion_protection_default=bool(
+                pc.get("filestore_deletion_protection_default", True),
+            ),
+            backup_location=str(pc.get("filestore_backup_location", "")),
+            backup_kms_key=str(pc.get("filestore_backup_kms_key", "")),
+            api_endpoint=str(
+                pc.get("filestore_api_endpoint", "https://file.googleapis.com/v1"),
+            ),
+            operation_timeout_seconds=float(
+                pc.get("filestore_operation_timeout_seconds", 3600),
+            ),
+            poll_interval_seconds=float(
+                pc.get("filestore_operation_poll_interval_seconds", 5),
+            ),
+        )
+
     if pair == ("queue", "pubsub") or (kind == "queue" and not variant):
         from gcp.managed.queue_pubsub import PubSubConfig
 
