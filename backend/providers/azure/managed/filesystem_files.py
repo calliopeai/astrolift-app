@@ -23,6 +23,8 @@ from _sdk.managed_service import (
     UpdateResult,
     UpdateSpec,
     ValueRef,
+    VolumeMount,
+    VolumeSourceKind,
 )
 
 KIND = "filesystem"
@@ -325,7 +327,7 @@ class AzureFilesDriver(ManagedServiceDriver):
         if not mount_path.startswith("/"):
             raise AzureFilesError("Azure Files mount_path must be absolute")
         encrypted = (
-            str(
+            _string_value(
                 _field(
                     _field(properties, "nfs_protocol_properties"),
                     "encryption_in_transit_required",
@@ -357,6 +359,12 @@ class AzureFilesDriver(ManagedServiceDriver):
                 options.append(value)
         export_path = f"/{mount_name}/{name}"
         resource_id = str(_field(share, "id", default=self._resource_id(name)))
+        try:
+            capacity_gib = int(_field(properties, "provisioned_storage_gi_b", default=0))
+        except (TypeError, ValueError) as exc:
+            raise AzureFilesError("Azure Files share has invalid provisioned capacity") from exc
+        if capacity_gib < 1:
+            raise AzureFilesError("Azure Files share has invalid provisioned capacity")
         return Binding(
             env_vars={
                 "FILESYSTEM_HANDLE": ValueRef(literal=resource_id),
@@ -374,6 +382,27 @@ class AzureFilesDriver(ManagedServiceDriver):
                 "AZURE_RESOURCE_GROUP": ValueRef(literal=self._config.resource_group),
                 "AZURE_LOCATION": ValueRef(literal=str(_field(share, "location", default=self._config.location))),
             },
+            pod_volume_mounts=[
+                VolumeMount(
+                    name=_slug(name),
+                    mount_path=mount_path,
+                    source_kind=VolumeSourceKind.CSI,
+                    protocol="nfs4.1",
+                    csi_driver="file.csi.azure.com",
+                    volume_handle=resource_id,
+                    volume_attributes={
+                        "resourceGroup": self._config.resource_group,
+                        "storageAccount": mount_name,
+                        "shareName": name,
+                        "server": hostname,
+                        "protocol": "nfs",
+                        "encryptInTransit": str(encrypted).lower(),
+                    },
+                    mount_options=_csi_nfs_mount_options(options),
+                    read_only=read_only,
+                    capacity=f"{capacity_gib}Gi",
+                ),
+            ],
             notes=(
                 "Microsoft.FileShares provisioned-v2 NFS 4.1 share; access is network-authorized. "
                 "Encrypted mounts require the AZNFS mount helper on the workload node."
@@ -868,6 +897,18 @@ def _validate_subnet_id(value: str) -> None:
 
 def _slug(value: str) -> str:
     return re.sub(r"-+", "-", re.sub(r"[^a-z0-9-]", "-", value.lower())).strip("-") or "share"
+
+
+def _csi_nfs_mount_options(options: list[str]) -> list[str]:
+    """Drop fstab and driver-owned flags before handing options to Azure CSI."""
+
+    exact_driver_owned = {"nolock", "proto=tcp", "nofail", "_netdev", "notls", "ro"}
+    prefixes_driver_owned = ("sec=", "vers=", "nfsvers=", "minorversion=")
+    return [
+        option
+        for option in options
+        if option not in exact_driver_owned and not option.startswith(prefixes_driver_owned)
+    ]
 
 
 def _field(value: Any, name: str, *, default: Any = None) -> Any:

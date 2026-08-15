@@ -263,12 +263,33 @@ def test_provisions_top_level_nfs_share_and_emits_portable_binding() -> None:
     )
     assert binding.env_vars["FILESYSTEM_HANDLE"].literal == share.id
     assert binding.env_vars["FILESYSTEM_PROTOCOL"].literal == "nfs4.1"
+    assert binding.env_vars["FILESYSTEM_TLS"].literal == "true"
     assert binding.env_vars["FILESYSTEM_SOURCE"].literal.endswith(f":/triage-data/{name}")
     assert "nconnect=4" in binding.env_vars["FILESYSTEM_MOUNT_OPTIONS"].literal
     assert "actimeo=30" in binding.env_vars["FILESYSTEM_MOUNT_OPTIONS"].literal
     assert "ro" in binding.env_vars["FILESYSTEM_MOUNT_OPTIONS"].literal
     assert binding.env_vars["FILESYSTEM_READ_ONLY"].literal == "true"
     assert binding.iam_grants == []
+    assert len(binding.pod_volume_mounts) == 1
+    volume = binding.pod_volume_mounts[0]
+    assert volume.csi_driver == "file.csi.azure.com"
+    assert volume.volume_handle == share.id
+    assert volume.volume_attributes == {
+        "resourceGroup": RESOURCE_GROUP,
+        "storageAccount": "triage-data",
+        "shareName": name,
+        "server": share.properties.host_name,
+        "protocol": "nfs",
+        "encryptInTransit": "true",
+    }
+    assert volume.mount_options == [
+        "nconnect=4",
+        "rsize=1048576",
+        "wsize=1048576",
+        "actimeo=30",
+    ]
+    assert volume.read_only is True
+    assert volume.capacity == "1024Gi"
     assert "AZNFS" in binding.notes
 
     from _sdk.availability import MATRIX

@@ -30,8 +30,17 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
     VolumeMount,
+    VolumeSourceKind,
 )
-from azure.managed.filesystem_files import _field, _not_found, _slug, _string_value, _tag_error, _tags
+from azure.managed.filesystem_files import (
+    _csi_nfs_mount_options,
+    _field,
+    _not_found,
+    _slug,
+    _string_value,
+    _tag_error,
+    _tags,
+)
 
 KIND = "filesystem"
 VARIANT = "azure_files_classic"
@@ -438,9 +447,46 @@ class AzureFilesClassicDriver(ManagedServiceDriver):
                 options.append(value)
         env_vars["FILESYSTEM_SOURCE"] = ValueRef(literal=source)
         env_vars["FILESYSTEM_MOUNT_OPTIONS"] = ValueRef(literal=",".join(options))
+        try:
+            capacity_gib = int(_field(share, "share_quota", default=0))
+        except (TypeError, ValueError) as exc:
+            raise AzureFilesClassicError("classic Azure Files share has invalid quota") from exc
+        if capacity_gib < 1:
+            raise AzureFilesClassicError("classic Azure Files share has invalid quota")
+        volume_attributes = {
+            "resourceGroup": self._config.resource_group,
+            "storageAccount": account_name,
+            "shareName": share_name,
+            "server": hostname,
+            "protocol": protocol.lower(),
+        }
+        secret_refs: dict[str, str] = {}
+        secret_literals: dict[str, str] = {}
+        csi_mount_options = options
+        if protocol == "NFS":
+            volume_attributes["encryptInTransit"] = str(encrypted).lower()
+            csi_mount_options = _csi_nfs_mount_options(options)
+        else:
+            secret_refs["azurestorageaccountkey"] = self._key_secret(account_name, "primary")
+            secret_literals["azurestorageaccountname"] = account_name
         return Binding(
             env_vars=env_vars,
-            pod_volume_mounts=[VolumeMount(name=_slug(share_name), mount_path=mount_path)],
+            pod_volume_mounts=[
+                VolumeMount(
+                    name=_slug(share_name),
+                    mount_path=mount_path,
+                    source_kind=VolumeSourceKind.CSI,
+                    protocol="nfs4.1" if protocol == "NFS" else "smb3.1.1",
+                    csi_driver="file.csi.azure.com",
+                    volume_handle=f"{self._config.resource_group}#{account_name}#{share_name}",
+                    volume_attributes=volume_attributes,
+                    secret_refs=secret_refs,
+                    secret_literals=secret_literals,
+                    mount_options=csi_mount_options,
+                    read_only=read_only,
+                    capacity=f"{capacity_gib}Gi",
+                ),
+            ],
             iam_grants=grants,
             notes=(
                 "Classic Microsoft.Storage Azure Files share. SMB credentials are rotating Key Vault refs; "

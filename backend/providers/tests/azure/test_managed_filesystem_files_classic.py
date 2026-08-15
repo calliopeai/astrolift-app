@@ -292,7 +292,22 @@ def test_smb_provisions_hardened_account_share_keys_and_binding() -> None:
     assert binding.env_vars["FILESYSTEM_PROTOCOL"].literal == "smb3.1.1"
     assert binding.env_vars["FILESYSTEM_PASSWORD"].secret_ref == f"astrolift-files-{account}-primary"
     assert binding.env_vars["FILESYSTEM_PASSWORD_SECONDARY"].secret_ref.endswith("-secondary")
-    assert binding.pod_volume_mounts[0].mount_path == "/mnt/shared"
+    volume = binding.pod_volume_mounts[0]
+    assert volume.mount_path == "/mnt/shared"
+    assert volume.csi_driver == "file.csi.azure.com"
+    assert volume.volume_handle == f"{RESOURCE_GROUP}#{account}#{share}"
+    assert volume.volume_attributes == {
+        "resourceGroup": RESOURCE_GROUP,
+        "storageAccount": account,
+        "shareName": share,
+        "server": f"{account}.file.core.windows.net",
+        "protocol": "smb",
+    }
+    assert volume.secret_refs == {
+        "azurestorageaccountkey": f"astrolift-files-{account}-primary",
+    }
+    assert volume.secret_literals == {"azurestorageaccountname": account}
+    assert volume.capacity == "2048Gi"
     assert len(binding.iam_grants) == 2
 
 
@@ -320,6 +335,19 @@ def test_nfs_requires_premium_uses_network_auth_and_aznfs_shape() -> None:
     assert "notls" in str(binding.env_vars["FILESYSTEM_MOUNT_OPTIONS"].literal)
     assert "FILESYSTEM_PASSWORD" not in binding.env_vars
     assert binding.iam_grants == []
+    volume = binding.pod_volume_mounts[0]
+    assert volume.csi_driver == "file.csi.azure.com"
+    assert volume.volume_attributes == {
+        "resourceGroup": RESOURCE_GROUP,
+        "storageAccount": account,
+        "shareName": share,
+        "server": f"{account}.file.core.windows.net",
+        "protocol": "nfs",
+        "encryptInTransit": "false",
+    }
+    assert "notls" not in volume.mount_options
+    assert volume.secret_refs == {}
+    assert volume.secret_literals == {}
 
 
 def test_provision_is_idempotent_and_refuses_account_or_share_collision() -> None:
