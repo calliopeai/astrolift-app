@@ -613,6 +613,7 @@ def test_binding_returns_connection_envelope(
     ):
         assert key in env
     assert env["SEARCH_API_KEY"].secret_ref is not None
+    assert env["SEARCH_API_KEY"].secret_ref.startswith("azure-kv://kv.vault.azure.net/secrets/")
     assert env["SEARCH_API_KEY"].literal is None
     assert env["AZURE_SEARCH_SECONDARY_ADMIN_KEY"].secret_ref is not None
     assert env["SEARCH_URL"].literal.startswith("https://")

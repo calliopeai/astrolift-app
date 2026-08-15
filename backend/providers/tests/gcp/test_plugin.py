@@ -33,6 +33,7 @@ def test_managed_services_have_object_store_and_queue() -> None:
     assert ("mssql", "cloudsql_sqlserver") in keys
     assert ("graph_db", "spanner_graph") in keys
     assert ("event_bus", "eventarc") in keys
+    assert ("redis", "memorystore_valkey") in keys
 
 
 def test_managed_services_have_full_gcp_coverage() -> None:
@@ -139,3 +140,37 @@ def test_eventarc_operator_controls_are_exposed() -> None:
         "eventarc_operation_poll_interval_seconds",
     ):
         assert field in properties
+
+
+def test_memorystore_valkey_operator_controls_are_exposed() -> None:
+    properties = PLUGIN.config_schema["properties"]
+    for field in (
+        "memorystore_valkey_network",
+        "memorystore_valkey_instance_name_prefix",
+        "memorystore_valkey_engine_version",
+        "memorystore_valkey_node_type",
+        "memorystore_valkey_mode",
+        "memorystore_valkey_shard_count",
+        "memorystore_valkey_replica_count",
+        "memorystore_valkey_authorization_mode",
+        "memorystore_valkey_token_auth_user",
+        "memorystore_valkey_token_auth_rotation_generation",
+        "memorystore_valkey_token_auth_retire_generation",
+        "memorystore_valkey_secret_manager_prefix",
+        "memorystore_valkey_transit_encryption_default",
+        "memorystore_valkey_persistence_mode",
+        "memorystore_valkey_automated_backup_default",
+        "memorystore_valkey_backup_retention_days",
+        "memorystore_valkey_server_ca_mode",
+        "memorystore_valkey_server_ca_pool",
+        "memorystore_valkey_deletion_protection_default",
+        "memorystore_valkey_kms_key",
+        "memorystore_valkey_allow_preview_features",
+        "memorystore_valkey_api_endpoint",
+        "memorystore_valkey_operation_timeout_seconds",
+        "memorystore_valkey_poll_interval_seconds",
+        "memorystore_valkey_adopt_existing_instance",
+    ):
+        assert field in properties
+    assert properties["memorystore_valkey_token_auth_user"]["default"] == "default"
+    assert properties["managed_cert_name_prefix"]["default"] == "astrolift"
