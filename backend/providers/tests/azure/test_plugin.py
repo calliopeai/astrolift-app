@@ -300,6 +300,8 @@ def test_registered_managed_drivers_target_current_sdk_operation_groups() -> Non
                     "list_by_namespace_topic",
                 },
             },
+        ),
+        (
             EventHubManagementClient(credential, subscription_id),
             {
                 "namespaces": {
