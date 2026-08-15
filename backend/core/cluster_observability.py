@@ -951,6 +951,79 @@ def _k8s_managed_config_for(
             ),
             allowed_broker_classes=tuple(str(value) for value in allowed_classes),
         )
+    if pair == ("workflow_engine", "argo_workflows"):
+        from k8s_native.managed.workflow_argo import ArgoWorkflowsConfig
+
+        return ArgoWorkflowsConfig(
+            cluster_driver=cluster_driver,
+            namespace=_optional_string(pc.get("argo_workflows_namespace")),
+            watch_all_namespaces=bool(
+                pc.get("argo_workflows_watch_all_namespaces", True),
+            ),
+            managed_namespaces=tuple(str(value) for value in pc.get("argo_workflows_managed_namespaces", [])),
+            argo_server_url=str(pc.get("argo_workflows_server_url", "")),
+            service_account_name=str(
+                pc.get("argo_workflows_service_account_name", "argo-workflow"),
+            ),
+            allow_service_account_override=bool(
+                pc.get("argo_workflows_allow_service_account_override", False),
+            ),
+            allowed_service_accounts=tuple(
+                str(value) for value in pc.get("argo_workflows_allowed_service_accounts", [])
+            ),
+            allow_workflow_template_refs=bool(
+                pc.get("argo_workflows_allow_workflow_template_refs", False),
+            ),
+            allow_cluster_template_refs=bool(
+                pc.get("argo_workflows_allow_cluster_template_refs", False),
+            ),
+            trusted_workflow_template_uids={
+                str(key): str(value)
+                for key, value in dict(
+                    pc.get("argo_workflows_trusted_template_uids", {}),
+                ).items()
+            },
+            allow_resource_templates=bool(
+                pc.get("argo_workflows_allow_resource_templates", False),
+            ),
+            allow_executor_plugins=bool(
+                pc.get("argo_workflows_allow_executor_plugins", False),
+            ),
+            allow_external_http_templates=bool(
+                pc.get("argo_workflows_allow_external_http_templates", False),
+            ),
+            allow_host_access=bool(
+                pc.get("argo_workflows_allow_host_access", False),
+            ),
+            allow_privileged_pods=bool(
+                pc.get("argo_workflows_allow_privileged_pods", False),
+            ),
+            allow_pod_spec_patch=bool(
+                pc.get("argo_workflows_allow_pod_spec_patch", False),
+            ),
+            allow_tagged_images=bool(
+                pc.get("argo_workflows_allow_tagged_images", False),
+            ),
+            allowed_image_prefixes=tuple(
+                str(value) for value in pc.get("argo_workflows_allowed_image_prefixes", [])
+            ),
+            default_parallelism=int(
+                pc.get("argo_workflows_default_parallelism", 10),
+            ),
+            max_parallelism=int(pc.get("argo_workflows_max_parallelism", 50)),
+            default_active_deadline_seconds=int(
+                pc.get("argo_workflows_default_active_deadline_seconds", 3600),
+            ),
+            max_active_deadline_seconds=int(
+                pc.get("argo_workflows_max_active_deadline_seconds", 86400),
+            ),
+            default_ttl_seconds=int(
+                pc.get("argo_workflows_default_ttl_seconds", 86400),
+            ),
+            max_ttl_seconds=int(
+                pc.get("argo_workflows_max_ttl_seconds", 604800),
+            ),
+        )
     if pair == ("object_store", "seaweedfs_operator"):
         from k8s_native.managed.object_store_seaweedfs import SeaweedFSObjectStoreConfig
 

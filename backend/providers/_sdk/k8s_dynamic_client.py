@@ -471,6 +471,7 @@ class KubernetesDynamicClient:
         kind: str,
         namespace: str | None,
         name: str,
+        propagation_policy: str | None = None,
     ) -> bool:
         """Delete a resource by ``kind``/``namespace``/``name``.
 
@@ -485,7 +486,17 @@ class KubernetesDynamicClient:
         resource = self._resource_for(api_version, resolved_kind)
         request_namespace = namespace if bool(getattr(resource, "namespaced", namespace is not None)) else None
         try:
-            resource.delete(name=name, namespace=request_namespace)
+            kwargs: dict[str, Any] = {
+                "name": name,
+                "namespace": request_namespace,
+            }
+            if propagation_policy:
+                kwargs["body"] = {
+                    "apiVersion": "v1",
+                    "kind": "DeleteOptions",
+                    "propagationPolicy": propagation_policy,
+                }
+            resource.delete(**kwargs)
         except DynNotFound:
             return False
         return True

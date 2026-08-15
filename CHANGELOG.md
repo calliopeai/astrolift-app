@@ -4,6 +4,12 @@
 
 ### Added
 
+- Add preview Argo Workflows 4.1 WorkflowTemplate resources for Kubernetes
+  installs with native DAG/step/template specs, managed CronWorkflows and event
+  bindings, least-privilege executor bootstrap, bounded parallelism/deadlines,
+  portable submit bindings, UID-pinned modular references, declarative
+  snapshots, run-retaining teardown, ownership-safe pruning, and install-policy
+  security gates.
 - Add preview Knative Eventing brokers for Kubernetes installs with
   declarative Triggers, CloudEvents ingress bindings, delivery and dead-letter
   policy, broker-class and destination guardrails, live readiness, explicit

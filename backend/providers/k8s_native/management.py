@@ -147,6 +147,9 @@ class ManagementBackend(Protocol):
         """Return pod summaries (``{"name", "labels", "image"}``) in
         ``namespace``. Empty list when the namespace doesn't exist."""
 
+    def list_cluster_pods(self, *, auth: ClusterAuth) -> list[dict[str, Any]]:
+        """Return pod summaries across namespaces for configurable operators."""
+
     def list_storage_classes(self, *, auth: ClusterAuth) -> list[str]:
         """Return storage class names. Empty list when none defined."""
 
@@ -497,6 +500,7 @@ PROBE_NAMESPACES: tuple[str, ...] = (
     "rabbitmq-system",
     "rook-ceph",
     "opensearch-operator-system",
+    "argo",
 )
 
 
@@ -509,6 +513,7 @@ _OPERATOR_NAMESPACES: dict[str, tuple[str, ...]] = {
     "rabbitmq-cluster-operator": ("rabbitmq-system",),
     "rook-ceph-operator": ("rook-ceph",),
     "opensearch-operator": ("opensearch-operator-system",),
+    "argo-workflows": ("argo", "*"),
 }
 
 _OPERATOR_POD_TOKENS: dict[str, tuple[str, ...]] = {
@@ -520,6 +525,7 @@ _OPERATOR_POD_TOKENS: dict[str, tuple[str, ...]] = {
     "rabbitmq-cluster-operator": ("rabbitmq",),
     "rook-ceph-operator": ("rook-ceph",),
     "opensearch-operator": ("opensearch-operator",),
+    "argo-workflows": ("workflow-controller",),
 }
 
 
@@ -569,7 +575,7 @@ def _managed_service_operator_inventory(
     for operator_id, requirement in sorted(requirements_by_operator.items()):
         pods = [pod for pod in platform_pods if _pod_matches_operator(pod, operator_id)]
         for namespace in _OPERATOR_NAMESPACES.get(operator_id, ()):
-            pods.extend(pods_by_namespace.get(namespace, []))
+            pods.extend(pod for pod in pods_by_namespace.get(namespace, []) if _pod_matches_operator(pod, operator_id))
         missing_crds = sorted(set(requirement.required_crds) - crd_set)
         version = _operator_version(pods)
         if version:
@@ -610,6 +616,13 @@ def probe_cluster_capabilities(
             # commonly surfaces as a 404 wrapped in an SDK exception.
             log.debug("probe: skipping namespace %s: %s", ns, exc)
             pods_by_namespace[ns] = []
+    cluster_pod_probe = getattr(backend, "list_cluster_pods", None)
+    if callable(cluster_pod_probe):
+        try:
+            pods_by_namespace["*"] = cluster_pod_probe(auth=auth)
+        except Exception as exc:
+            log.debug("probe: cluster-wide pod discovery unavailable: %s", exc)
+            pods_by_namespace["*"] = []
 
     storage_classes = backend.list_storage_classes(auth=auth)
 
@@ -995,6 +1008,31 @@ class LiveManagementBackend:
                     "image": image,
                     "pod_ip": (pod.get("status") or {}).get("podIP"),
                 }
+            )
+        return out
+
+    def list_cluster_pods(self, *, auth: ClusterAuth) -> list[dict[str, Any]]:
+        from k8s_native._api_client_helpers import list_cluster_pod_dicts
+        from k8s_native.observability import build_api_client
+
+        try:
+            pods = list_cluster_pod_dicts(build_api_client(auth))
+        except Exception:
+            return []
+        out: list[dict[str, Any]] = []
+        for pod in pods:
+            metadata = pod.get("metadata") or {}
+            spec = pod.get("spec") or {}
+            containers = spec.get("containers") or []
+            image = containers[0].get("image", "") if containers else ""
+            out.append(
+                {
+                    "name": metadata.get("name", ""),
+                    "labels": dict(metadata.get("labels") or {}),
+                    "image": image,
+                    "pod_ip": (pod.get("status") or {}).get("podIP"),
+                    "namespace": metadata.get("namespace", ""),
+                },
             )
         return out
 
