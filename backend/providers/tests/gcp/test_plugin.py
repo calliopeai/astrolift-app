@@ -32,7 +32,11 @@ def test_managed_services_have_object_store_and_queue() -> None:
     assert ("document_db", "firestore_native") in keys
     assert ("mssql", "cloudsql_sqlserver") in keys
     assert ("graph_db", "spanner_graph") in keys
+    assert ("workflow_engine", "workflows") in keys
+    assert ("cdn", "cloud_cdn") in keys
+    assert ("private_endpoint", "private_service_connect") in keys
     assert ("faas", "cloud_functions_gen2") in keys
+    assert ("filesystem", "filestore") in keys
     assert ("api_gateway", "api_gateway") in keys
     assert ("event_stream", "managed_kafka") in keys
     assert ("event_bus", "eventarc") in keys
@@ -131,6 +135,54 @@ def test_spanner_graph_operator_controls_are_exposed() -> None:
         assert field in properties
 
 
+def test_cloud_cdn_operator_controls_are_exposed() -> None:
+    properties = PLUGIN.config_schema["properties"]
+    for field in (
+        "cloud_cdn_name_prefix",
+        "cloud_cdn_deletion_protection_default",
+        "cloud_cdn_cache_mode_default",
+        "cloud_cdn_default_ttl_seconds",
+        "cloud_cdn_max_ttl_seconds",
+        "cloud_cdn_client_ttl_seconds",
+        "cloud_cdn_serve_while_stale_seconds",
+        "cloud_cdn_invalidation_role",
+        "cloud_cdn_api_endpoint",
+        "cloud_cdn_operation_timeout_seconds",
+        "cloud_cdn_operation_poll_interval_seconds",
+    ):
+        assert field in properties
+
+
+def test_workflows_operator_controls_are_exposed() -> None:
+    properties = PLUGIN.config_schema["properties"]
+    for field in (
+        "workflows_name_prefix",
+        "workflows_deletion_protection_default",
+        "workflows_call_log_level_default",
+        "workflows_execution_history_level_default",
+        "workflows_api_endpoint",
+        "workflow_executions_api_endpoint",
+        "workflows_operation_timeout_seconds",
+        "workflows_operation_poll_interval_seconds",
+    ):
+        assert field in properties
+
+
+def test_private_service_connect_operator_controls_are_exposed() -> None:
+    properties = PLUGIN.config_schema["properties"]
+    for field in (
+        "private_service_connect_network",
+        "private_service_connect_subnetwork",
+        "private_service_connect_name_prefix",
+        "private_service_connect_labels",
+        "private_service_connect_deletion_protection_default",
+        "private_service_connect_api_endpoint",
+        "private_service_connect_operation_timeout_seconds",
+        "private_service_connect_operation_poll_interval_seconds",
+    ):
+        assert field in properties
+
+
 def test_cloud_functions_operator_controls_are_exposed() -> None:
     properties = PLUGIN.config_schema["properties"]
     for field in (
@@ -140,6 +192,29 @@ def test_cloud_functions_operator_controls_are_exposed() -> None:
         "cloud_functions_api_endpoint",
         "cloud_functions_operation_timeout_seconds",
         "cloud_functions_operation_poll_interval_seconds",
+    ):
+        assert field in properties
+
+
+def test_filestore_operator_controls_are_exposed() -> None:
+    properties = PLUGIN.config_schema["properties"]
+    for field in (
+        "filestore_location",
+        "filestore_network",
+        "filestore_instance_name_prefix",
+        "filestore_share_name_default",
+        "filestore_tier_default",
+        "filestore_protocol_default",
+        "filestore_connect_mode_default",
+        "filestore_reserved_ip_range",
+        "filestore_psc_endpoint_project",
+        "filestore_kms_key_name",
+        "filestore_deletion_protection_default",
+        "filestore_backup_location",
+        "filestore_backup_kms_key",
+        "filestore_api_endpoint",
+        "filestore_operation_timeout_seconds",
+        "filestore_operation_poll_interval_seconds",
     ):
         assert field in properties
 

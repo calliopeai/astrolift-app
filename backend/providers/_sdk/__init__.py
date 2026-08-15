@@ -179,6 +179,7 @@ from _sdk.instrumentation import (
     compose_instrumentation,
     inject_sidecar,
 )
+from _sdk.k8s_naming import app_namespace, dns_label
 from _sdk.managed_service_kinds import (
     KINDS,
     KindCatalog,
@@ -298,12 +299,14 @@ __all__ = [
     "VariantExtensionPolicy",
     "WafPolicy",
     "WorkloadIdentityDriver",
+    "app_namespace",
     "artifact_blob_key",
     "build_simple_chain",
     "check_encryption",
     "check_plugin_parity",
     "classify_apply_error",
     "compose_instrumentation",
+    "dns_label",
     "driver_op",
     "get_blob_driver",
     "inject_sidecar",

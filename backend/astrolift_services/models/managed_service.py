@@ -96,8 +96,17 @@ class ManagedService(BaseCoreModel):
     name = models.CharField(max_length=128, blank=True, default="")
     variant = models.CharField(max_length=64, blank=True, default="")
     config = models.JSONField(default=dict, blank=True)
+    # Desired config can move ahead of the real resource while an asynchronous
+    # update runs. Keep the last provider-confirmed config separately so the UI,
+    # retries, and operators never mistake requested state for applied state.
+    applied_config = models.JSONField(null=True, blank=True, default=None)
     status = models.CharField(max_length=32, choices=Status.choices, default=Status.PENDING)
     status_error = models.TextField(blank=True, default="")
+    operation_kind = models.CharField(max_length=32, blank=True, default="")
+    operation_workflow_id = models.CharField(max_length=512, blank=True, default="")
+    operation_run_id = models.CharField(max_length=128, blank=True, default="")
+    operation_started_at = models.DateTimeField(null=True, blank=True)
+    operation_completed_at = models.DateTimeField(null=True, blank=True)
     connection_secret_ref = models.CharField(max_length=512, blank=True, default="")
     # Provider-side resource handle (e.g. "rds/<instance-id>",
     # "object_store/<bucket>") returned by the driver's provision() and
@@ -181,6 +190,77 @@ class ManagedServiceBinding(BaseCoreModel):
                 fields=["managed_service", "env_key"],
                 condition=models.Q(deleted_at__isnull=True),
                 name="msvc_binding_env_unique_active",
+            ),
+        ]
+
+
+class ManagedServiceVolumeBinding(BaseCoreModel):
+    """Durable, credential-free workload attachment for a filesystem."""
+
+    class SourceKind(models.TextChoices):
+        EXISTING_PVC = "existing_pvc"
+        CSI = "csi"
+        DYNAMIC_PVC = "dynamic_pvc"
+
+    managed_service = models.ForeignKey(
+        "astrolift_services.ManagedService",
+        related_name="volume_bindings",
+        on_delete=models.CASCADE,
+    )
+    name = models.CharField(max_length=63)
+    mount_path = models.CharField(max_length=512)
+    sub_path = models.CharField(max_length=512, blank=True, default="")
+    source_kind = models.CharField(max_length=32, choices=SourceKind.choices)
+    protocol = models.CharField(max_length=32)
+    claim_name = models.CharField(max_length=253, blank=True, default="")
+    claim_namespace = models.CharField(max_length=253, blank=True, default="")
+    storage_class_name = models.CharField(max_length=253, blank=True, default="")
+    csi_driver = models.CharField(max_length=253, blank=True, default="")
+    volume_handle = models.CharField(max_length=1024, blank=True, default="")
+    volume_attributes = models.JSONField(default=dict, blank=True)
+    secret_refs = models.JSONField(default=dict, blank=True)
+    secret_literals = models.JSONField(default=dict, blank=True)
+    mount_options = models.JSONField(default=list, blank=True)
+    read_only = models.BooleanField(default=False)
+    capacity = models.CharField(max_length=32, default="1Gi")
+    access_modes = models.JSONField(default=list, blank=True)
+    workload_names = models.JSONField(default=list, blank=True)
+    container_names = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["managed_service", "name"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="msvc_volume_name_unique_active",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        source_kind="existing_pvc",
+                        claim_name__gt="",
+                        claim_namespace__gt="",
+                        storage_class_name="",
+                        csi_driver="",
+                        volume_handle="",
+                    )
+                    | models.Q(
+                        source_kind="csi",
+                        csi_driver__gt="",
+                        volume_handle__gt="",
+                        claim_name="",
+                        claim_namespace="",
+                        storage_class_name="",
+                    )
+                    | models.Q(
+                        source_kind="dynamic_pvc",
+                        storage_class_name__gt="",
+                        claim_name="",
+                        claim_namespace="",
+                        volume_handle="",
+                    )
+                ),
+                name="msvc_volume_source_fields_valid",
             ),
         ]
 

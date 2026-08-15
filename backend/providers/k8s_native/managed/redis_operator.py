@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.k8s_naming import app_namespace, dns_label
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -81,7 +82,10 @@ class RedisOperatorDriver(ManagedServiceDriver):
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         cluster_name = self._cluster_name(spec=spec)
-        namespace = f"{spec.organization_slug}-{spec.app_slug}"
+        namespace = app_namespace(
+            organization_slug=spec.organization_slug,
+            app_slug=spec.app_slug,
+        )
         manifest = self._render_cluster(
             spec=spec,
             cluster_name=cluster_name,
@@ -262,14 +266,12 @@ class RedisOperatorDriver(ManagedServiceDriver):
         )
 
     def _cluster_name(self, *, spec: ProvisionSpec) -> str:
-        parts = [spec.app_slug, spec.environment_name]
-        if spec.service_handle_hint:
-            parts.append(spec.service_handle_hint)
-        raw = "-".join(p for p in parts if p)
-        clean = "".join(c if c.isalnum() or c == "-" else "-" for c in raw.lower())
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        return clean.strip("-")[:60]
+        return dns_label(
+            spec.app_slug,
+            spec.environment_name,
+            spec.service_handle_hint,
+            max_length=60,
+        )
 
     def _render_cluster(
         self,

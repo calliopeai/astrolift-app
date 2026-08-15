@@ -132,6 +132,10 @@ def _delete_app_namespaces_sync(registered_app_id: int) -> list[str]:
     """
     from astrolift_lifecycle.models import AppEnvironment
     from astrolift_registry.models import RegisteredApp
+    from astrolift_services.filesystem_bindings import cleanup_binding_resources
+    from astrolift_services.models import ManagedServiceVolumeBinding
+    from astrolift_workflows.activities.app_lifecycle import _managed_services_for_environment
+    from core.app_deploy import namespace_for_app
     from core.cluster_management import (
         _context_for_cluster,  # type: ignore[attr-defined]
         _driver_for_cluster,  # type: ignore[attr-defined]
@@ -149,11 +153,34 @@ def _delete_app_namespaces_sync(registered_app_id: int) -> list[str]:
         cluster = env.tenant_cluster
         if cluster is None:
             continue
-        namespace = app.k8s_namespace or (f"{app.organization.slug}-{app.slug}")
+        namespace = namespace_for_app(app)
         try:
             driver = _driver_for_cluster(cluster)
             ctx = _context_for_cluster(cluster)
+            service_ids = _managed_services_for_environment(env).values_list("pk", flat=True)
+            volume_bindings = list(
+                ManagedServiceVolumeBinding.objects.filter(
+                    managed_service_id__in=service_ids,
+                    deleted_at__isnull=True,
+                ).order_by("name"),
+            )
             driver.delete_namespace(ctx.slug, namespace, wait=True)
+            pv_refs = [
+                ref
+                for ref in cleanup_binding_resources(
+                    volume_bindings,
+                    namespace=namespace,
+                    consumer_key=str(env.guid),
+                )
+                if ref["kind"] == "PersistentVolume"
+            ]
+            if pv_refs:
+                result = driver.delete_manifests(ctx.slug, namespace, pv_refs)
+                if result is not None and not getattr(result, "ok", True):
+                    detail = (
+                        result.summary() if hasattr(result, "summary") else "persistent-volume delete failed"
+                    )
+                    raise RuntimeError(str(detail))
             deleted.append(f"{cluster.slug}/{namespace}")
         except Exception as exc:  # noqa: BLE001 — log + continue
             log.warning(

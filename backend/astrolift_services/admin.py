@@ -6,6 +6,7 @@ from astrolift_services.models import (
     AppSecretBundleRef,
     ManagedService,
     ManagedServiceBinding,
+    ManagedServiceVolumeBinding,
     SecretBundle,
     SecretChangeApproval,
     SecretChangeProposal,
@@ -27,6 +28,12 @@ class ManagedServiceAdmin(_AllObjectsAdmin):
 class ManagedServiceBindingAdmin(_AllObjectsAdmin):
     list_display = ("managed_service", "env_key", "is_secret")
     list_filter = ("is_secret",)
+
+
+@admin.register(ManagedServiceVolumeBinding)
+class ManagedServiceVolumeBindingAdmin(_AllObjectsAdmin):
+    list_display = ("managed_service", "name", "source_kind", "protocol", "mount_path", "read_only")
+    list_filter = ("source_kind", "protocol", "read_only")
 
 
 @admin.register(SecretBundle)

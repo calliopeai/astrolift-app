@@ -68,7 +68,47 @@ vi.mock("@apollo/client/react", () => ({
             lifecycle: "managed",
           },
         ],
-        astroliftProjectManagedServices: [],
+        astroliftProjectManagedServices: [
+          {
+            id: "filesystem-1",
+            name: "agent-workspace",
+            kind: "filesystem",
+            variant: "rook_cephfs",
+            status: "active",
+            statusError: "",
+            config: {},
+            projectSlug: "emr-bug-triage",
+            ownerScope: "project",
+            clusterSlug: "production",
+            environmentName: "shared",
+            createdAt: "2026-08-14T00:00:00Z",
+            updatedAt: "2026-08-14T00:00:00Z",
+            lastActionAt: null,
+            lastActionKind: "",
+            editableFields: [],
+            attachments: [],
+            volumeBindings: [
+              {
+                id: "binding-1",
+                name: "agent-workspace",
+                mountPath: "/workspace",
+                subPath: "",
+                sourceKind: "dynamic_pvc",
+                protocol: "cephfs",
+                claimName: "",
+                claimNamespace: "",
+                storageClassName: "rook-cephfs",
+                csiDriver: "rook-ceph.cephfs.csi.ceph.com",
+                readOnly: false,
+                capacity: "100Gi",
+                accessModes: ["ReadWriteMany"],
+                workloadNames: [],
+                containerNames: [],
+                credentialReferenceCount: 0,
+              },
+            ],
+          },
+        ],
         astroliftProjectSecretBundles: [],
       },
       ListProjectManagedServiceCatalog: {
@@ -126,5 +166,12 @@ describe("ProjectResourcesClient provider catalogue", () => {
       "https://github.com/calliopeai/astrolift-app/issues/1283"
     );
     expect(submit).toBeDisabled();
+  });
+
+  it("shows the StorageClass behind a dynamic filesystem mount", () => {
+    render(<ProjectResourcesClient slug="emr-bug-triage" />);
+
+    expect(screen.getByText("StorageClass rook-cephfs")).toBeVisible();
+    expect(screen.getByText("/workspace")).toBeVisible();
   });
 });
