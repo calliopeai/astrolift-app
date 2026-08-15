@@ -133,6 +133,11 @@
   Azure Files SMB/NFS shares, including network ACLs, per-protocol encryption,
   dual Key Vault-backed SMB rotation keys, snapshots, soft delete, guarded
   teardown, and portable mount metadata.
+- Add preview Azure API Management lifecycle with explicit SKU/capacity,
+  public or allowlisted internal networking, managed identities, typed APIs,
+  operations, backends, subscriptions and Key Vault-backed custom domains,
+  generated policy allowlists, keyless portable bindings, ownership-safe
+  pruning/adoption, and protected declarative teardown.
 - Add Azure SQL Database provisioned, serverless, and Hyperscale variants plus
   Azure SQL Managed Instance with typed ARM requests, VNet/subnet isolation,
   Key Vault-backed portable bindings, retention controls, database-copy
