@@ -8,6 +8,10 @@
   snapshots and rollback, service identities, CMEK, environment variables,
   call logging, execution history, invocation bindings, execution controls,
   boundary-safe adoption, and destructive-history-aware teardown.
+- Add Google Managed Service for Apache Kafka lifecycle across clusters,
+  topics, ACLs, consumer offsets, Schema Registry, Connect clusters and
+  connectors, including PSC networking, CMEK, mTLS, IAM/portable bindings,
+  guarded adoption, data-loss confirmations, and integration observability.
 - Add a project-shared Google Eventarc event fabric across Advanced message
   buses, pipelines, enrollments, Google API sources, direct publishing, event
   transformation and format conversion, plus Standard triggers and partner
