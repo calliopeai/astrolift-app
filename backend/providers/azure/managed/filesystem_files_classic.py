@@ -32,7 +32,15 @@ from _sdk.managed_service import (
     VolumeMount,
     VolumeSourceKind,
 )
-from azure.managed.filesystem_files import _field, _not_found, _slug, _string_value, _tag_error, _tags
+from azure.managed.filesystem_files import (
+    _csi_nfs_mount_options,
+    _field,
+    _not_found,
+    _slug,
+    _string_value,
+    _tag_error,
+    _tags,
+)
 
 KIND = "filesystem"
 VARIANT = "azure_files_classic"
@@ -445,12 +453,24 @@ class AzureFilesClassicDriver(ManagedServiceDriver):
         volume_attributes: dict[str, str] = {"shareName": share_name}
         volume_secret_refs: dict[str, str] = {}
         volume_secret_literals: dict[str, str] = {}
+        # SMB options are cifs options the CSI driver forwards as-is; only the
+        # NFS list is fstab-shaped and has to be reduced for a CSI mount.
+        csi_mount_options = options
         if protocol == "NFS":
             volume_attributes["protocol"] = "nfs"
             volume_attributes["server"] = hostname
+            csi_mount_options = _csi_nfs_mount_options(options)
         else:
             volume_secret_literals["azurestorageaccountname"] = account_name
             volume_secret_refs["azurestorageaccountkey"] = self._key_secret(account_name, "primary")
+        # Sizes the rendered PV and PVC, so it has to be the real share quota
+        # rather than the portable default.
+        try:
+            capacity_gib = int(_field(share, "share_quota", default=0))
+        except (TypeError, ValueError) as exc:
+            raise AzureFilesClassicError("classic Azure Files share has an invalid quota") from exc
+        if capacity_gib < 1:
+            raise AzureFilesClassicError("classic Azure Files share has an invalid quota")
         return Binding(
             env_vars=env_vars,
             pod_volume_mounts=[
@@ -469,8 +489,9 @@ class AzureFilesClassicDriver(ManagedServiceDriver):
                     # secret_literals; only the key is a backend reference.
                     secret_refs=volume_secret_refs,
                     secret_literals=volume_secret_literals,
-                    mount_options=options,
+                    mount_options=csi_mount_options,
                     read_only=read_only,
+                    capacity=f"{capacity_gib}Gi",
                 )
             ],
             iam_grants=grants,

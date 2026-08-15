@@ -36,6 +36,24 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
             "resourceGroups/rg-platform-prod/providers/"
             "Microsoft.Communication/communicationServices/platform-prod"
         ),
+        "apim_publisher_email": "platform@example.com",
+        "private_link_default_subnet_id": (
+            "/subscriptions/00000000-1111-2222-3333-444444444444/"
+            "resourceGroups/rg-network/providers/Microsoft.Network/"
+            "virtualNetworks/platform/subnets/private-endpoints"
+        ),
+        "private_link_allowed_subnet_ids": [
+            "/subscriptions/00000000-1111-2222-3333-444444444444/"
+            "resourceGroups/rg-network/providers/Microsoft.Network/"
+            "virtualNetworks/platform/subnets/private-endpoints"
+        ],
+        "private_link_allowed_service_id_prefixes": [
+            "/subscriptions/00000000-1111-2222-3333-444444444444/resourceGroups/rg-data"
+        ],
+        "private_link_allowed_private_dns_zone_id_prefixes": [
+            "/subscriptions/00000000-1111-2222-3333-444444444444/"
+            "resourceGroups/rg-network/providers/Microsoft.Network/privateDnsZones"
+        ],
     }
     provider_config.update(provider_overrides)
     return SimpleNamespace(
@@ -80,6 +98,8 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
         ("mssql", "azure_sql_hyperscale", "AzureSQLDatabaseConfig"),
         ("mssql", "azure_sql_managed_instance", "AzureSQLManagedInstanceConfig"),
         ("faas", "azure_functions", "AzureFunctionsConfig"),
+        ("api_gateway", "api_management", "AzureAPIMConfig"),
+        ("private_endpoint", "private_link", "AzurePrivateEndpointConfig"),
     ],
 )
 def test_every_registered_azure_managed_service_has_runtime_config(
@@ -423,6 +443,83 @@ def test_functions_runtime_config_preserves_operator_policy() -> None:
     assert config.max_instances == 40
 
 
+def test_api_management_controls_are_preserved() -> None:
+    config = managed_config_for(
+        "azure",
+        _cluster(
+            apim_publisher_email="apim@example.com",
+            apim_publisher_name="Platform API",
+            apim_service_name_prefix="smd",
+            apim_allowed_skus=["StandardV2", "Premium"],
+            apim_max_capacity=6,
+            apim_allowed_policy_kinds=["backend", "cors", "managed_identity"],
+            apim_allowed_backend_host_suffixes=[".internal.example.com"],
+            apim_allowed_backend_identity_resources=["api://backend"],
+            apim_allowed_user_assigned_identity_ids=["/subscriptions/sub/resourceGroups/rg/providers/id"],
+            apim_allowed_subnet_ids=["/subscriptions/sub/resourceGroups/rg/providers/subnet"],
+            apim_allowed_custom_domain_suffixes=[".example.com"],
+            apim_allowed_key_vault_secret_prefixes=["https://vault.vault.azure.net/secrets/apim-"],
+            apim_allow_internal_network=True,
+            apim_allow_custom_domains=True,
+            apim_allow_subscriptions=True,
+            apim_allow_child_pruning=True,
+            apim_allow_adoption=True,
+            apim_deletion_protection_default=False,
+            apim_max_apis=25,
+            apim_max_routes_per_api=40,
+            apim_max_backends=15,
+            apim_max_subscriptions=5,
+        ),
+        kind="api_gateway",
+        variant="api_management",
+    )
+    assert config.publisher_email == "apim@example.com"
+    assert config.publisher_name == "Platform API"
+    assert config.service_name_prefix == "smd"
+    assert config.allowed_skus == ("StandardV2", "Premium")
+    assert config.max_capacity == 6
+    assert config.allowed_policy_kinds == ("backend", "cors", "managed_identity")
+    assert config.allowed_backend_host_suffixes == (".internal.example.com",)
+    assert config.allowed_backend_identity_resources == ("api://backend",)
+    assert config.allow_internal_network is True
+    assert config.allow_custom_domains is True
+    assert config.allow_subscriptions is True
+    assert config.allow_child_pruning is True
+    assert config.allow_adoption is True
+    assert config.deletion_protection_default is False
+    assert (config.max_apis, config.max_routes_per_api, config.max_backends, config.max_subscriptions) == (
+        25,
+        40,
+        15,
+        5,
+    )
+
+
+def test_private_link_install_policy_is_preserved() -> None:
+    config = managed_config_for(
+        "azure",
+        _cluster(
+            private_link_name_prefix="smd-pe",
+            private_link_allow_manual_approval=True,
+            private_link_max_group_ids=4,
+            private_link_max_private_dns_zones=3,
+            private_link_deletion_protection_default=False,
+        ),
+        kind="private_endpoint",
+        variant="private_link",
+    )
+
+    assert config.name_prefix == "smd-pe"
+    assert config.default_subnet_id.endswith("/private-endpoints")
+    assert config.allowed_subnet_ids[0].endswith("/private-endpoints")
+    assert config.allowed_service_id_prefixes[0].endswith("/rg-data")
+    assert config.allowed_private_dns_zone_id_prefixes[0].endswith("/privateDnsZones")
+    assert config.allow_manual_approval is True
+    assert config.max_group_ids == 4
+    assert config.max_private_dns_zones == 3
+    assert config.deletion_protection_default is False
+
+
 def test_default_variant_selects_the_richer_azure_drivers() -> None:
     blob = managed_config_for("azure", _cluster(), kind="object_store")
     bus = managed_config_for("azure", _cluster(), kind="queue")
@@ -435,6 +532,8 @@ def test_default_variant_selects_the_richer_azure_drivers() -> None:
     assert sql.variant == "azure_sql_database"
     faas = managed_config_for("azure", _cluster(), kind="faas")
     assert type(faas).__name__ == "AzureFunctionsConfig"
+    gateway = managed_config_for("azure", _cluster(), kind="api_gateway")
+    assert type(gateway).__name__ == "AzureAPIMConfig"
 
 
 @pytest.mark.parametrize(
@@ -472,6 +571,9 @@ def test_cosmos_api_requires_key_vault_at_runtime_resolution() -> None:
         ("acs_communication_resource_id", "email", "azure_acs"),
         ("mssql_managed_instance_subnet_id", "mssql", "azure_sql_managed_instance"),
         ("mssql_virtual_network_subnet_id", "mssql", "azure_sql_database"),
+        ("apim_publisher_email", "api_gateway", "api_management"),
+        ("private_link_allowed_subnet_ids", "private_endpoint", "private_link"),
+        ("private_link_allowed_service_id_prefixes", "private_endpoint", "private_link"),
     ],
 )
 def test_required_install_controls_fail_before_driver_construction(

@@ -4,12 +4,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
+from enum import Enum
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from astrolift_manifest.env_injection import envelope_keys_for
 
-from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, SnapshotHandle, UpdateSpec
+from _sdk.managed_service import (
+    DeprovisionSpec,
+    ProvisionSpec,
+    ServiceHandle,
+    SnapshotHandle,
+    UpdateSpec,
+    VolumeSourceKind,
+)
 from azure.managed.filesystem_files import AzureFilesConfig, AzureFilesDriver, AzureFilesError
 
 SUBSCRIPTION_ID = "00000000-1111-2222-3333-444444444444"
@@ -19,6 +28,17 @@ SUBNET_ID = (
     "Microsoft.Network/virtualNetworks/platform/subnets/aks"
 )
 NOW = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
+
+
+class SdkEncryptionInTransit(str, Enum):  # noqa: UP042 (mirrors the generated SDK's str/Enum mixin)
+    """Shaped like the generated SDK's string enums, which mix in ``str``.
+
+    Deliberately not a ``StrEnum``: ``str()`` on a ``StrEnum`` member returns
+    the wire value, which is precisely the difference under test.
+    """
+
+    ENABLED = "Enabled"
+    DISABLED = "Disabled"
 
 
 class ResourceNotFoundError(Exception):
@@ -263,6 +283,7 @@ def test_provisions_top_level_nfs_share_and_emits_portable_binding() -> None:
     )
     assert binding.env_vars["FILESYSTEM_HANDLE"].literal == share.id
     assert binding.env_vars["FILESYSTEM_PROTOCOL"].literal == "nfs4.1"
+    assert binding.env_vars["FILESYSTEM_TLS"].literal == "true"
     assert binding.env_vars["FILESYSTEM_SOURCE"].literal.endswith(f":/triage-data/{name}")
     assert "nconnect=4" in binding.env_vars["FILESYSTEM_MOUNT_OPTIONS"].literal
     assert "actimeo=30" in binding.env_vars["FILESYSTEM_MOUNT_OPTIONS"].literal
@@ -270,6 +291,41 @@ def test_provisions_top_level_nfs_share_and_emits_portable_binding() -> None:
     assert binding.env_vars["FILESYSTEM_READ_ONLY"].literal == "true"
     assert binding.iam_grants == []
     assert "AZNFS" in binding.notes
+    # #1003: only the canonical envelope keys reach a workload's environment,
+    # so a driver that drops one binds successfully and then no-ops at runtime.
+    assert set(envelope_keys_for("filesystem")) <= set(binding.env_vars)
+
+    assert len(binding.pod_volume_mounts) == 1
+    volume = binding.pod_volume_mounts[0]
+    assert volume.name == name
+    assert volume.mount_path == "/data"
+    assert volume.source_kind is VolumeSourceKind.CSI
+    assert volume.protocol == "nfs4.1"
+    assert volume.csi_driver == "file.csi.azure.com"
+    assert volume.volume_handle == share.id
+    assert volume.volume_attributes == {
+        "shareName": name,
+        "protocol": "nfs",
+        "server": share.properties.host_name,
+        "storageAccount": "triage-data",
+    }
+    # file.csi.azure.com composes the NFS source as
+    # "<server>:/<storageAccount>/<shareName>", which has to land on the same
+    # export path the environment contract publishes.
+    attributes = volume.volume_attributes
+    assert (
+        f"{attributes['server']}:/{attributes['storageAccount']}/{attributes['shareName']}"
+        == binding.env_vars["FILESYSTEM_SOURCE"].literal
+    )
+    # The CSI list drops the fstab-only and driver-owned flags that
+    # FILESYSTEM_MOUNT_OPTIONS keeps for manual mounts, and read-only travels
+    # as the portable flag rather than as an "ro" option.
+    assert volume.mount_options == ["nconnect=4", "rsize=1048576", "wsize=1048576", "actimeo=30"]
+    assert volume.read_only is True
+    assert volume.capacity == "1024Gi"
+    # NFS here is network-authorized; nothing about the mount is a credential.
+    assert volume.secret_refs == {}
+    assert volume.secret_literals == {}
 
     from _sdk.availability import MATRIX
 
@@ -286,9 +342,49 @@ def test_unencrypted_binding_adds_notls_and_missing_hostname_fails() -> None:
     binding = driver.binding(ServiceHandle(handle))
     assert binding.env_vars["FILESYSTEM_TLS"].literal == "false"
     assert "notls" in binding.env_vars["FILESYSTEM_MOUNT_OPTIONS"].literal
+    # notls is an AZNFS mount-helper flag that plain mount.nfs rejects, so it
+    # stays in the manual-mount contract and out of the CSI attachment.
+    assert "notls" not in binding.pod_volume_mounts[0].mount_options
 
     mgmt.file_shares.values[name].properties.host_name = ""
     with pytest.raises(AzureFilesError, match="no mount hostname"):
+        driver.binding(ServiceHandle(handle))
+
+
+def test_binding_reads_sdk_enum_encryption_state() -> None:
+    """The generated SDK deserializes this field into a string-mixin enum.
+
+    ``str()`` on such a member renders the member path rather than the wire
+    value, so reading it with ``str()`` reports every encrypted share as
+    unencrypted and injects ``notls`` into its mount options.
+    """
+    driver, mgmt, _ = _driver()
+    handle = _provisioned(driver, provisioned_storage_gib=512)
+    share = mgmt.file_shares.values[handle.split("/")[1]]
+    assert str(SdkEncryptionInTransit.ENABLED) != SdkEncryptionInTransit.ENABLED.value
+    share.properties.nfs_protocol_properties.encryption_in_transit_required = SdkEncryptionInTransit.ENABLED
+
+    binding = driver.binding(ServiceHandle(handle))
+    assert binding.env_vars["FILESYSTEM_TLS"].literal == "true"
+    assert "notls" not in binding.env_vars["FILESYSTEM_MOUNT_OPTIONS"].literal
+
+    volume = binding.pod_volume_mounts[0]
+    assert volume.mount_options == ["nconnect=4", "rsize=1048576", "wsize=1048576"]
+    assert volume.read_only is False
+    assert volume.capacity == "512Gi"
+
+
+def test_binding_refuses_a_share_without_usable_provisioned_capacity() -> None:
+    driver, mgmt, _ = _driver()
+    handle = _provisioned(driver)
+    properties = mgmt.file_shares.values[handle.split("/")[1]].properties
+
+    properties.provisioned_storage_gi_b = 0
+    with pytest.raises(AzureFilesError, match="invalid provisioned capacity"):
+        driver.binding(ServiceHandle(handle))
+
+    properties.provisioned_storage_gi_b = "unbounded"
+    with pytest.raises(AzureFilesError, match="invalid provisioned capacity"):
         driver.binding(ServiceHandle(handle))
 
 

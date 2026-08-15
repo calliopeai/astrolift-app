@@ -36,6 +36,7 @@ Managed services:
 - AzureSQLDatabaseDriver — mssql/azure_sql_database,
   mssql/azure_sql_serverless, mssql/azure_sql_hyperscale
 - AzureSQLManagedInstanceDriver — mssql/azure_sql_managed_instance
+- AzureAPIMDriver — api_gateway/api_management
 - AzureFunctionsDriver — faas/azure_functions
 """
 
@@ -44,6 +45,7 @@ from azure.cluster_aks import AKSClusterDriver
 from azure.dns_azuredns import AzureDNSDriver
 from azure.identity_federated import AzureFederatedIdentityDriver
 from azure.ingress_appgw import AzureAppGatewayIngressDriver
+from azure.managed.api_management import AzureAPIMDriver
 from azure.managed.cache_redis import AzureCacheRedisDriver
 from azure.managed.cosmos import AzureCosmosDriver
 from azure.managed.cosmos_api import AzureCosmosApiDriver
@@ -63,6 +65,7 @@ from azure.managed.object_store_blob import (
     BlobStorageDriver,
 )
 from azure.managed.postgres_flexible import AzurePostgresFlexibleDriver
+from azure.managed.private_endpoint import AzurePrivateEndpointDriver
 from azure.managed.queue_servicebus import (
     AzureServiceBusDriver,
     ServiceBusDriver,
@@ -76,6 +79,98 @@ from azure.secrets_keyvault import KeyVaultSecretsBackend
 from azure.tls_appgw import AzureAppGatewayTlsDriver
 
 _MANAGED_CONFIG_PROPERTIES = {
+    "apim_publisher_email": {
+        "type": "string",
+        "format": "email",
+        "description": "Required publisher email for managed API Management services.",
+    },
+    "apim_publisher_name": {"type": "string", "default": "Astrolift"},
+    "apim_service_name_prefix": {
+        "type": "string",
+        "pattern": "^[A-Za-z](?:[A-Za-z0-9-]{0,47}[A-Za-z0-9])?$",
+        "default": "astrolift",
+    },
+    "apim_allowed_skus": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": True,
+        "items": {
+            "type": "string",
+            "enum": [
+                "Basic",
+                "BasicV2",
+                "Consumption",
+                "Developer",
+                "Premium",
+                "PremiumV2",
+                "Standard",
+                "StandardV2",
+            ],
+        },
+        "default": ["Developer", "Basic", "Standard", "Premium"],
+    },
+    "apim_max_capacity": {"type": "integer", "minimum": 1, "maximum": 12, "default": 4},
+    "apim_allowed_policy_kinds": {
+        "type": "array",
+        "uniqueItems": True,
+        "items": {"type": "string", "enum": ["backend", "cors", "managed_identity"]},
+        "default": ["backend", "cors"],
+        "description": "Only these typed policy builders may emit APIM XML; arbitrary XML is never accepted.",
+    },
+    "apim_allowed_backend_host_suffixes": {
+        "type": "array",
+        "uniqueItems": True,
+        "items": {"type": "string", "pattern": "^\\.[a-z0-9.-]+$"},
+        "default": [".azurecontainerapps.io", ".azurewebsites.net"],
+    },
+    "apim_allowed_backend_identity_resources": {
+        "type": "array",
+        "uniqueItems": True,
+        "items": {"type": "string"},
+    },
+    "apim_allowed_user_assigned_identity_ids": {
+        "type": "array",
+        "uniqueItems": True,
+        "items": {"type": "string"},
+    },
+    "apim_allowed_subnet_ids": {
+        "type": "array",
+        "uniqueItems": True,
+        "items": {"type": "string"},
+    },
+    "apim_allowed_custom_domain_suffixes": {
+        "type": "array",
+        "uniqueItems": True,
+        "items": {"type": "string", "pattern": "^\\.[a-z0-9.-]+$"},
+    },
+    "apim_allowed_key_vault_secret_prefixes": {
+        "type": "array",
+        "uniqueItems": True,
+        "items": {"type": "string", "format": "uri"},
+    },
+    "apim_allow_internal_network": {"type": "boolean", "default": False},
+    "apim_allow_custom_domains": {"type": "boolean", "default": False},
+    "apim_allow_subscriptions": {"type": "boolean", "default": False},
+    "apim_allow_child_pruning": {"type": "boolean", "default": False},
+    "apim_allow_adoption": {"type": "boolean", "default": False},
+    "apim_deletion_protection_default": {"type": "boolean", "default": True},
+    "apim_max_apis": {"type": "integer", "minimum": 1, "maximum": 1000, "default": 50},
+    "apim_max_routes_per_api": {"type": "integer", "minimum": 1, "maximum": 1000, "default": 100},
+    "apim_max_backends": {"type": "integer", "minimum": 1, "maximum": 1000, "default": 50},
+    "apim_max_subscriptions": {"type": "integer", "minimum": 1, "maximum": 1000, "default": 25},
+    "apim_api_endpoint": {
+        "type": "string",
+        "const": "https://management.azure.com",
+        "default": "https://management.azure.com",
+    },
+    "apim_request_timeout_seconds": {"type": "number", "minimum": 1, "maximum": 120, "default": 30},
+    "apim_operation_timeout_seconds": {
+        "type": "number",
+        "minimum": 60,
+        "maximum": 7200,
+        "default": 3600,
+    },
+    "apim_poll_interval_seconds": {"type": "number", "minimum": 0.1, "maximum": 30, "default": 5},
     "blob_container_name_prefix": {"type": "string", "default": "astrolift"},
     "blob_versioning_enabled": {"type": "boolean", "default": True},
     "servicebus_queue_name_prefix": {"type": "string", "default": "astrolift"},
@@ -397,6 +492,30 @@ _MANAGED_CONFIG_PROPERTIES = {
         "default": "LicenseIncluded",
     },
     "mssql_managed_instance_public_data_endpoint_enabled_default": {"type": "boolean", "default": False},
+    "private_link_name_prefix": {"type": "string", "default": "astrolift-pe"},
+    "private_link_default_subnet_id": {"type": "string"},
+    "private_link_allowed_subnet_ids": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": True,
+        "items": {"type": "string"},
+    },
+    "private_link_allowed_service_id_prefixes": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": True,
+        "items": {"type": "string"},
+    },
+    "private_link_allowed_private_dns_zone_id_prefixes": {
+        "type": "array",
+        "uniqueItems": True,
+        "items": {"type": "string"},
+        "default": [],
+    },
+    "private_link_allow_manual_approval": {"type": "boolean", "default": False},
+    "private_link_max_group_ids": {"type": "integer", "minimum": 1, "maximum": 64, "default": 8},
+    "private_link_max_private_dns_zones": {"type": "integer", "minimum": 0, "maximum": 64, "default": 8},
+    "private_link_deletion_protection_default": {"type": "boolean", "default": True},
 }
 
 PLUGIN = ProviderPlugin(
@@ -444,6 +563,8 @@ PLUGIN = ProviderPlugin(
         ("mssql", "azure_sql_hyperscale"): AzureSQLDatabaseDriver,
         ("mssql", "azure_sql_managed_instance"): AzureSQLManagedInstanceDriver,
         ("faas", "azure_functions"): AzureFunctionsDriver,
+        ("api_gateway", "api_management"): AzureAPIMDriver,
+        ("private_endpoint", "private_link"): AzurePrivateEndpointDriver,
     },
     config_schema={
         "type": "object",

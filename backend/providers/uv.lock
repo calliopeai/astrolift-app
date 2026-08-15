@@ -113,6 +113,7 @@ azure = [
     { name = "azure-mgmt-monitor" },
     { name = "azure-mgmt-msi" },
     { name = "azure-mgmt-mysqlflexibleservers" },
+    { name = "azure-mgmt-network" },
     { name = "azure-mgmt-postgresqlflexibleservers" },
     { name = "azure-mgmt-redis" },
     { name = "azure-mgmt-redisenterprise" },
@@ -169,6 +170,7 @@ requires-dist = [
     { name = "azure-mgmt-monitor", marker = "extra == 'azure'", specifier = ">=6.0" },
     { name = "azure-mgmt-msi", marker = "extra == 'azure'", specifier = ">=7.0" },
     { name = "azure-mgmt-mysqlflexibleservers", marker = "extra == 'azure'", specifier = ">=1.0" },
+    { name = "azure-mgmt-network", marker = "extra == 'azure'", specifier = ">=31.0.1" },
     { name = "azure-mgmt-postgresqlflexibleservers", marker = "extra == 'azure'", specifier = ">=2.0" },
     { name = "azure-mgmt-redis", marker = "extra == 'azure'", specifier = ">=14.4" },
     { name = "azure-mgmt-redisenterprise", marker = "extra == 'azure'", specifier = ">=3.1" },
@@ -464,6 +466,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/eb/7f/47f8bc5fe5c82dfe8027e5e40e8893ff99d926fc39538c5aae39ac98bb66/azure_mgmt_mysqlflexibleservers-1.0.0.tar.gz", hash = "sha256:d077a656888a5c5977f479a244a64ac4a1d351002e99a7eddaf6a49a82192e56", size = 108286, upload-time = "2025-11-18T08:05:19.883Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ce/9b/9ce1fa52b5dd95db464e376ca33a7491d8900b6c9214871f77d80d89937c/azure_mgmt_mysqlflexibleservers-1.0.0-py3-none-any.whl", hash = "sha256:283f4f7140c5d94b5ca542fa8ebbd3b442263e770e1961590977a5cebcf9c4ad", size = 214758, upload-time = "2025-11-18T08:05:21.559Z" },
+]
+
+[[package]]
+name = "azure-mgmt-network"
+version = "31.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "azure-mgmt-core" },
+    { name = "isodate" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/07/10/0c6e043eaaa21574464cd36ee15f9acd71f81c647ad89f72bd3e938d071b/azure_mgmt_network-31.0.1.tar.gz", hash = "sha256:2112f720eedca76173be4d47acb8bc58af16a90debc7b601bf11b37faaaed137", size = 902532, upload-time = "2026-07-02T05:44:23.634Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d6/60/2e473151925f893b0629e3cb913bf4fce82edbc5da884607b9a5e636b8d2/azure_mgmt_network-31.0.1-py3-none-any.whl", hash = "sha256:cb36bff1a08237211093b0c3b900cadfd344d08d4a437d526c1239fee3331d0c", size = 725755, upload-time = "2026-07-02T05:44:25.803Z" },
 ]
 
 [[package]]

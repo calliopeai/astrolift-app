@@ -106,6 +106,8 @@ def test_managed_runtime_controls_are_exposed_in_provider_schema() -> None:
         "monitor_public_network_access_default",
         "acs_email_domain_management",
         "azure_openai_account_name",
+        "private_link_allowed_subnet_ids",
+        "private_link_allowed_service_id_prefixes",
     }
     assert expected <= set(properties)
 
@@ -118,6 +120,7 @@ def test_astrolift_azure_package_extends_official_sdk_namespace() -> None:
     from azure.mgmt.eventhub import EventHubManagementClient
     from azure.mgmt.fileshares import FileSharesMgmtClient
     from azure.mgmt.mysqlflexibleservers import MySQLManagementClient
+    from azure.mgmt.network import NetworkManagementClient
     from azure.mgmt.postgresqlflexibleservers import PostgreSQLManagementClient
     from azure.mgmt.resource.locks import ManagementLockClient
     from azure.mgmt.storage import StorageManagementClient
@@ -134,6 +137,7 @@ def test_astrolift_azure_package_extends_official_sdk_namespace() -> None:
             EventGridManagementClient,
             FileSharesMgmtClient,
             MySQLManagementClient,
+            NetworkManagementClient,
             PostgreSQLManagementClient,
             ManagementLockClient,
             SearchIndexClient,
@@ -156,6 +160,7 @@ def test_registered_managed_drivers_target_current_sdk_operation_groups() -> Non
     from azure.mgmt.loganalytics import LogAnalyticsManagementClient
     from azure.mgmt.monitor import MonitorManagementClient
     from azure.mgmt.mysqlflexibleservers import MySQLManagementClient
+    from azure.mgmt.network import NetworkManagementClient
     from azure.mgmt.postgresqlflexibleservers import PostgreSQLManagementClient
     from azure.mgmt.redis import RedisManagementClient
     from azure.mgmt.resource.locks import ManagementLockClient
@@ -336,6 +341,13 @@ def test_registered_managed_drivers_target_current_sdk_operation_groups() -> Non
                 },
                 "event_hubs": {"create_or_update", "delete", "get"},
                 "consumer_groups": {"create_or_update", "delete", "get"},
+            },
+        ),
+        (
+            NetworkManagementClient(credential, subscription_id),
+            {
+                "private_endpoints": {"begin_create_or_update", "begin_delete", "get"},
+                "private_dns_zone_groups": {"begin_create_or_update", "begin_delete", "get"},
             },
         ),
         (

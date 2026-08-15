@@ -15,6 +15,10 @@
 
 ### Added
 
+- Add Azure Private Endpoint lifecycle with explicit target, subnet, Private
+  DNS, and manual-approval policy gates; keyless bindings on the canonical
+  `private_endpoint` envelope shared with the AWS and GCP drivers;
+  ownership-safe reconciliation; and deletion-protected teardown.
 - Add Google Cloud Workflows lifecycle with YAML/JSON definitions, revision
   snapshots and rollback, service identities, CMEK, environment variables,
   call logging, execution history, invocation bindings, execution controls,
@@ -134,6 +138,11 @@
   container deployment, immutable digest-pinned artifacts, exact dependency
   allowlists, least-privilege storage/ACR grants, credential-free portable
   bindings, deletion protection, and convergent ownership-safe lifecycle.
+- Add preview Azure API Management lifecycle with explicit SKU/capacity,
+  public or allowlisted internal networking, managed identities, typed APIs,
+  operations, backends, subscriptions and Key Vault-backed custom domains,
+  generated policy allowlists, keyless portable bindings, ownership-safe
+  pruning/adoption, and protected declarative teardown.
 - Add Azure SQL Database provisioned, serverless, and Hyperscale variants plus
   Azure SQL Managed Instance with typed ARM requests, VNet/subnet isolation,
   Key Vault-backed portable bindings, retention controls, database-copy
@@ -293,6 +302,11 @@
 
 ### Fixed
 
+- Attach Microsoft.FileShares NFS shares to workloads as real CSI volumes, read
+  their encryption-in-transit state through the generated SDK's string enums so
+  encrypted shares no longer publish `notls`, size classic Azure Files volumes
+  from the actual share quota instead of the portable 1Gi default, and reduce
+  fstab-only and CSI-driver-owned NFS options out of the CSI mount.
 - Probe live Kubernetes versions, CRDs, and operator releases before managed
   service provision/update; fail closed with exact remediation, make readiness
   timeouts terminal, and generate collision-safe names for long tenant,
