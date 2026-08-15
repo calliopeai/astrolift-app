@@ -26,6 +26,7 @@ from uuid import uuid4
 
 from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op, maybe_heartbeat
+from _sdk.k8s_naming import app_namespace, dns_label
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -1472,15 +1473,22 @@ class SQLServerExpressDriver(ManagedServiceDriver):
             time.sleep(max(self._config.deletion_poll_seconds, 0))
 
     def _name(self, spec: ProvisionSpec) -> str:
-        parts = ["mssql", spec.app_slug, spec.environment_name, spec.service_handle_hint]
-        value = re.sub(r"-+", "-", re.sub(r"[^a-z0-9-]+", "-", "-".join(parts).lower())).strip("-")
-        value = value[:50].rstrip("-")
-        if not value or not _DNS_LABEL.fullmatch(value):
-            raise ValueError("SQL Server resource name could not be normalized to a DNS label")
-        return value
+        return dns_label(
+            "mssql",
+            spec.app_slug,
+            spec.environment_name,
+            spec.service_handle_hint,
+            max_length=50,
+        )
 
     def _namespace(self, spec: ProvisionSpec) -> str:
-        value = self._config.namespace or f"{spec.organization_slug}-{spec.app_slug}".lower()
+        if self._config.namespace:
+            value = self._config.namespace
+        else:
+            value = app_namespace(
+                organization_slug=spec.organization_slug,
+                app_slug=spec.app_slug,
+            )
         if len(value) > 63 or not _DNS_LABEL.fullmatch(value):
             raise ValueError("SQL Server namespace must be a Kubernetes DNS label")
         return value

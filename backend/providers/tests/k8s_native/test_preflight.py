@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from _sdk.cluster_capabilities import ClusterCapabilities
 from k8s_native.managed.opensearch_operator import MINIMUM_OPERATOR_VERSION
-from k8s_native.preflight import REQUIREMENTS, preflight
+from k8s_native.preflight import REQUIREMENTS, capabilities_from_payload, preflight
 
 
 def test_cnpg_preflight_passes_when_installed() -> None:
@@ -145,6 +145,58 @@ def test_opensearch_preflight_requires_secure_operator_release() -> None:
     assert stale_report.failures[0].code == "operator_too_old"
     assert "3.0.2" in stale_report.install_hints[0]
     assert current_report.ok is True
+
+
+def test_live_crd_inventory_reports_each_missing_api() -> None:
+    required = REQUIREMENTS[("search", "opensearch_operator")].required_crds
+    caps = ClusterCapabilities(
+        cluster_id="x",
+        kubernetes_version="1.30.7",
+        installed_crds=frozenset(required[:-1]),
+        crd_inventory_probed=True,
+        operator_versions={"opensearch-operator": "3.0.2"},
+    )
+
+    report = preflight(kind="search", variant="opensearch_operator", capabilities=caps)
+
+    assert report.ok is False
+    assert [(failure.code, failure.message) for failure in report.failures] == [
+        ("missing_crd", f"cluster 'x' is missing required CRD {required[-1]!r} for OpenSearch Kubernetes Operator")
+    ]
+    assert "helm install opensearch-operator" in report.install_hints[0]
+
+
+def test_minimum_version_fails_closed_when_probe_cannot_identify_release() -> None:
+    required = REQUIREMENTS[("search", "opensearch_operator")].required_crds
+    caps = ClusterCapabilities(
+        cluster_id="x",
+        kubernetes_version="1.30.7",
+        installed_crds=frozenset(required),
+        crd_inventory_probed=True,
+    )
+
+    report = preflight(kind="search", variant="opensearch_operator", capabilities=caps)
+
+    assert report.failures[0].code == "operator_version_unknown"
+
+
+def test_probe_payload_conversion_preserves_live_inventory_and_versions() -> None:
+    caps = capabilities_from_payload(
+        cluster_id="cluster-1",
+        payload={
+            "kubernetes_version": "1.31.2",
+            "installed_crds": ["clusters.postgresql.cnpg.io"],
+            "managed_service_operators": {
+                "cnpg": {"version": "cloudnative-pg-1.25.1"},
+            },
+        },
+    )
+
+    assert caps.kubernetes_version == "1.31.2"
+    assert caps.crd_inventory_probed is True
+    assert caps.installed_crds == frozenset({"clusters.postgresql.cnpg.io"})
+    assert caps.cnpg_installed is True
+    assert caps.operator_versions == {"cnpg": "cloudnative-pg-1.25.1"}
 
 
 def test_all_registered_requirements_have_install_hints() -> None:

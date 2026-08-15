@@ -36,6 +36,10 @@ _ALREADY_GONE_MARKERS = (
 _DYNAMIC_PVC_VARIANTS = frozenset({"storage_class_pvc", "rook_cephfs"})
 
 
+class ManagedServicePreflightError(ValueError):
+    """A live cluster cannot satisfy a Kubernetes service requirement."""
+
+
 def _service_cluster(svc):
     """Provisioning cluster for either app-private or project-owned rows."""
 
@@ -48,6 +52,57 @@ def _service_cluster(svc):
 def _signals_already_gone(*parts: object) -> bool:
     blob = " ".join(str(p) for p in parts if p).lower()
     return any(marker in blob for marker in _ALREADY_GONE_MARKERS)
+
+
+def _run_managed_service_preflight(svc: Any, cluster: Any) -> None:
+    """Refresh live capabilities and fail before a Kubernetes-backed driver
+    mutates the cluster when its required APIs are absent/incompatible."""
+    from django.utils import timezone
+    from k8s_native.preflight import (
+        REQUIREMENTS,
+        capabilities_from_payload,
+        preflight,
+    )
+
+    from core.cluster_management import probe_cluster_capabilities_dispatch
+
+    variant = str(getattr(svc, "variant", "") or "")
+    if (str(svc.kind), variant) not in REQUIREMENTS:
+        return
+
+    try:
+        payload = probe_cluster_capabilities_dispatch(cluster=cluster)
+    except Exception as exc:
+        raise ManagedServicePreflightError(
+            f"cluster {cluster.slug}: live managed-service preflight probe failed: {exc}",
+        ) from exc
+
+    cluster.capabilities = payload or {}
+    cluster.capabilities_probed_at = timezone.now()
+    cluster.save(
+        update_fields=[
+            "capabilities",
+            "capabilities_probed_at",
+            "updated_at",
+            "version",
+        ]
+    )
+    report = preflight(
+        kind=str(svc.kind),
+        variant=variant,
+        capabilities=capabilities_from_payload(
+            cluster_id=str(getattr(cluster, "guid", "") or cluster.slug),
+            payload=cluster.capabilities,
+        ),
+    )
+    if report.ok:
+        return
+    details = "; ".join(f"{failure.code}: {failure.message}" for failure in report.failures)
+    hints = "; ".join(dict.fromkeys(report.install_hints))
+    suffix = f"; remediation: {hints}" if hints else ""
+    raise ManagedServicePreflightError(
+        f"cluster {cluster.slug}: managed-service preflight failed: {details}{suffix}",
+    )
 
 
 def _delete_dynamic_pvc_data(svc: Any, cluster: Any, *, force_destroy: bool) -> tuple[bool, str]:
@@ -399,6 +454,7 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
         )
     plugin_slug = cluster.provider_plugin.slug
     variant = getattr(svc, "variant", "") or ""
+    _run_managed_service_preflight(svc, cluster)
     try:
         driver_cls = plugins.get(plugin_slug, f"managed:{svc.kind}:{variant}")
     except DriverNotFound:
@@ -449,6 +505,82 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
     }
 
 
+def _update_sync(managed_service_id: int) -> dict[str, Any]:
+    from astrolift_drivers.registry import DriverNotFound, plugins
+    from astrolift_services.models import ManagedService
+    from core.cluster_observability import managed_config_for
+
+    svc = ManagedService.all_objects.select_related(
+        "app_environment__tenant_cluster__provider_plugin",
+        "tenant_cluster__provider_plugin",
+    ).get(pk=managed_service_id)
+    cluster = _service_cluster(svc)
+    if cluster is None:
+        raise RuntimeError(f"managed service {svc.pk} has no tenant cluster")
+    if not svc.backend_ref:
+        raise ValueError("managed service has no backend handle; reprovision it instead")
+
+    plugin_slug = cluster.provider_plugin.slug
+    variant = getattr(svc, "variant", "") or ""
+    _run_managed_service_preflight(svc, cluster)
+    try:
+        driver_cls = plugins.get(plugin_slug, f"managed:{svc.kind}:{variant}")
+    except DriverNotFound:
+        try:
+            driver_cls = plugins.get(plugin_slug, f"managed:{svc.kind}:")
+        except DriverNotFound as exc:
+            raise ValueError(
+                f"cluster {cluster.slug}: plugin {plugin_slug!r} has no managed-service "
+                f"driver for kind={svc.kind!r} variant={variant!r}",
+            ) from exc
+
+    cfg = managed_config_for(plugin_slug, cluster, kind=svc.kind, variant=variant)
+    driver = driver_cls(config=cfg)
+
+    from _sdk.managed_service import UpdateSpec
+
+    desired = dict(svc.config or {})
+    result = driver.update(
+        UpdateSpec(
+            handle=svc.backend_ref,
+            size=str(desired["size"]) if "size" in desired else None,
+            config=desired,
+        ),
+    )
+    return {
+        "ok": bool(getattr(result, "ok", False)),
+        "handle": str(getattr(result, "handle", "") or svc.backend_ref),
+        "message": str(getattr(result, "message", "")),
+        "errors": list(getattr(result, "errors", []) or []),
+        "retryable": bool(getattr(result, "retryable", False)),
+    }
+
+
+@activity.defn(name="astrolift.managed_service.update")
+async def update_managed_service(managed_service_id: int) -> dict[str, Any]:
+    """Apply the row's desired config through ``ManagedServiceDriver.update``."""
+    from asgiref.sync import sync_to_async
+    from temporalio.exceptions import ApplicationError
+
+    activity.heartbeat()
+    try:
+        result = await sync_to_async(_update_sync)(managed_service_id)
+    except (TypeError, ValueError) as exc:
+        raise ApplicationError(str(exc), non_retryable=True) from exc
+    log.info(
+        "update_managed_service result=%s",
+        result,
+        extra={"managed_service_id": managed_service_id},
+    )
+    if not result["ok"]:
+        detail = result["message"] or "; ".join(result["errors"])
+        raise ApplicationError(
+            detail or "driver.update returned ok=False",
+            non_retryable=not result["retryable"],
+        )
+    return result
+
+
 @activity.defn(name="astrolift.managed_service.provision")
 async def provision_managed_service(
     managed_service_id: int,
@@ -461,7 +593,12 @@ async def provision_managed_service(
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    result = await sync_to_async(_provision_sync)(managed_service_id)
+    from temporalio.exceptions import ApplicationError
+
+    try:
+        result = await sync_to_async(_provision_sync)(managed_service_id)
+    except ManagedServicePreflightError as exc:
+        raise ApplicationError(str(exc), non_retryable=True) from exc
     log.info(
         "provision_managed_service result=%s",
         result,
@@ -528,11 +665,13 @@ def _finalize_provision_sync(managed_service_id: int, handle: str) -> None:
     svc = ManagedService.all_objects.get(pk=managed_service_id)
     if handle:
         svc.backend_ref = handle
+    svc.applied_config = dict(svc.config or {})
     svc.status = ManagedService.Status.ACTIVE
     svc.status_error = ""
     svc.save(
         update_fields=[
             "backend_ref",
+            "applied_config",
             "status",
             "status_error",
             "updated_at",
@@ -545,6 +684,39 @@ def _finalize_provision_sync(managed_service_id: int, handle: str) -> None:
     # mounts it via envFrom — without them a provisioned service injects no
     # env and the app can't consume it.
     _sync_binding_rows(svc)
+
+
+def _finalize_update_sync(managed_service_id: int, handle: str) -> None:
+    from django.utils import timezone
+
+    from astrolift_services.models import ManagedService
+
+    svc = ManagedService.all_objects.get(pk=managed_service_id)
+    if handle:
+        svc.backend_ref = handle
+    svc.applied_config = dict(svc.config or {})
+    svc.status = ManagedService.Status.ACTIVE
+    svc.status_error = ""
+    svc.operation_completed_at = timezone.now()
+    svc.save(
+        update_fields=[
+            "backend_ref",
+            "applied_config",
+            "status",
+            "status_error",
+            "operation_completed_at",
+            "updated_at",
+            "version",
+        ],
+    )
+    _sync_binding_rows(svc)
+
+
+@activity.defn(name="astrolift.managed_service.finalize_update")
+async def finalize_managed_service_update(managed_service_id: int, handle: str) -> None:
+    from asgiref.sync import sync_to_async
+
+    await sync_to_async(_finalize_update_sync)(managed_service_id, handle)
 
 
 def _managed_binding_for(svc: Any) -> Any:
@@ -683,19 +855,18 @@ async def finalize_managed_service_provision(
 
 
 def _mark_failed_sync(managed_service_id: int, error: str) -> None:
+    from django.utils import timezone
+
     from astrolift_services.models import ManagedService
 
     svc = ManagedService.all_objects.get(pk=managed_service_id)
     svc.status = ManagedService.Status.FAILED
     svc.status_error = error[:4000]
-    svc.save(
-        update_fields=[
-            "status",
-            "status_error",
-            "updated_at",
-            "version",
-        ],
-    )
+    update_fields = ["status", "status_error", "updated_at", "version"]
+    if svc.operation_kind:
+        svc.operation_completed_at = timezone.now()
+        update_fields.append("operation_completed_at")
+    svc.save(update_fields=update_fields)
 
 
 @activity.defn(name="astrolift.managed_service.mark_failed")

@@ -8,6 +8,7 @@ from typing import Any
 
 from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op
+from _sdk.k8s_naming import app_namespace, dns_label
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -342,16 +343,18 @@ class _DynamicPVCDriver(ManagedServiceDriver):
 
     def _volume_name(self, spec: ProvisionSpec) -> str:
         prefix = "cephfs" if self.protocol == "cephfs" else "pvc"
-        parts = [prefix, spec.app_slug, spec.environment_name, spec.service_handle_hint]
-        value = "-".join(str(part) for part in parts if part).lower()
-        value = re.sub(r"[^a-z0-9-]+", "-", value)
-        value = re.sub(r"-+", "-", value).strip("-")
-        if not value:
-            raise ValueError("could not derive a managed volume name")
-        return value[:63].rstrip("-")
+        return dns_label(
+            prefix,
+            spec.app_slug,
+            spec.environment_name,
+            spec.service_handle_hint,
+        )
 
     def _namespace_for(self, spec: ProvisionSpec) -> str:
-        return f"{spec.organization_slug}-{spec.app_slug}".lower()
+        return app_namespace(
+            organization_slug=spec.organization_slug,
+            app_slug=spec.app_slug,
+        )
 
 
 class StorageClassPVCDriver(_DynamicPVCDriver):

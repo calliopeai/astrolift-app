@@ -407,6 +407,22 @@ export function ProjectResourcesClient({ slug }: { slug: string }) {
                 {service.statusError && (
                   <p className="text-danger-fg mt-2 text-xs">{service.statusError}</p>
                 )}
+                {service.operationKind && (
+                  <div className="text-muted-foreground mt-2 space-y-0.5 text-xs">
+                    <p>
+                      Last operation: <span className="font-medium">{service.operationKind}</span>
+                      {service.operationCompletedAt
+                        ? ` · completed ${new Date(service.operationCompletedAt).toLocaleString()}`
+                        : " · running"}
+                    </p>
+                    {service.operationWorkflowId && (
+                      <p className="truncate font-mono" title={service.operationWorkflowId}>
+                        {service.operationWorkflowId}
+                        {service.operationRunId ? ` · ${service.operationRunId}` : ""}
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div className="mt-3 flex flex-wrap gap-1">
                   {service.attachments.map((attachment) => (
                     <Badge key={attachment.id} variant="outline">

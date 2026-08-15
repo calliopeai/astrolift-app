@@ -22,6 +22,7 @@ from urllib.parse import urlsplit
 
 from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op, maybe_heartbeat
+from _sdk.k8s_naming import dns_label
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -896,11 +897,11 @@ class SeaweedFSObjectStoreDriver(ManagedServiceDriver):
 
     def _resource_names(self, bucket_name: str) -> dict[str, str]:
         return {
-            "Secret": f"{bucket_name}-credentials",
-            "S3Identity": f"{bucket_name}-identity",
-            "S3Credentials": f"{bucket_name}-credentials",
-            "S3Policy": f"{bucket_name}-policy",
-            "S3PolicyBinding": f"{bucket_name}-policy-binding",
+            "Secret": dns_label(bucket_name, "credentials"),
+            "S3Identity": dns_label(bucket_name, "identity"),
+            "S3Credentials": dns_label(bucket_name, "credentials"),
+            "S3Policy": dns_label(bucket_name, "policy"),
+            "S3PolicyBinding": dns_label(bucket_name, "policy", "binding"),
         }
 
     def _labels(self, spec: ProvisionSpec) -> dict[str, str]:

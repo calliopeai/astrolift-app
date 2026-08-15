@@ -163,6 +163,12 @@ class ManagedServiceType:
     status: str
     status_error: str
     config: JSON
+    applied_config: JSON | None
+    operation_kind: str
+    operation_workflow_id: str
+    operation_run_id: str
+    operation_started_at: dt.datetime | None
+    operation_completed_at: dt.datetime | None
     registered_app_slug: str
     project_slug: str
     owner_scope: str
@@ -854,6 +860,12 @@ def managed_service_to_type(svc, *, resolve_editable_fields: bool = False) -> Ma
         status=svc.status,
         status_error=svc.status_error or "",
         config=svc.config or {},
+        applied_config=svc.applied_config,
+        operation_kind=svc.operation_kind or "",
+        operation_workflow_id=svc.operation_workflow_id or "",
+        operation_run_id=svc.operation_run_id or "",
+        operation_started_at=svc.operation_started_at,
+        operation_completed_at=svc.operation_completed_at,
         registered_app_slug=svc.registered_app.slug if svc.registered_app_id else "",
         project_slug=svc.project.slug if svc.project_id else "",
         owner_scope=svc.owner_scope,

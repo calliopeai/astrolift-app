@@ -50,6 +50,7 @@ class FakeManagementBackend:
     crds: list[str] = field(default_factory=list)
     pods_by_namespace: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     storage_classes: list[str] = field(default_factory=list)
+    kubernetes_version: str = "1.30.7"
     apply_raises_on: set[str] = field(default_factory=set)
     """Set of ``Kind/name`` refs the apply call should raise on."""
 
@@ -76,6 +77,9 @@ class FakeManagementBackend:
 
     def list_cluster_crds(self, *, auth: ClusterAuth) -> list[str]:
         return list(self.crds)
+
+    def get_server_version(self, *, auth: ClusterAuth) -> str:
+        return self.kubernetes_version
 
     def list_namespaced_pods(
         self,
@@ -176,6 +180,73 @@ def test_probe_returns_default_shape_on_empty_cluster():
     assert caps["external_dns"] == {"installed": False, "provider": None}
     assert caps["metrics_server"] is False
     assert caps["prometheus"] is False
+    assert caps["kubernetes_version"] == "1.30.7"
+    assert caps["installed_crds"] == []
+
+
+def test_probe_inventories_opensearch_crds_and_chart_version():
+    crds = [
+        "opensearchclusters.opensearch.org",
+        "opensearchusers.opensearch.org",
+        "opensearchroles.opensearch.org",
+        "opensearchuserrolebindings.opensearch.org",
+    ]
+    backend = FakeManagementBackend(
+        crds=crds,
+        pods_by_namespace={
+            "opensearch-operator-system": [
+                {
+                    "name": "opensearch-operator-controller-manager-abc",
+                    "labels": {
+                        "app.kubernetes.io/name": "opensearch-operator",
+                        "helm.sh/chart": "opensearch-operator-3.0.2",
+                    },
+                    "image": "opensearchproject/opensearch-operator:3.0.0-alpha1",
+                }
+            ]
+        },
+    )
+
+    caps = probe_cluster_capabilities(backend=backend, cluster=_ctx())
+
+    assert caps["installed_crds"] == sorted(crds)
+    assert caps["operator_versions"]["opensearch-operator"] == "opensearch-operator-3.0.2"
+    assert caps["managed_service_operators"]["opensearch-operator"] == {
+        "installed": True,
+        "version": "opensearch-operator-3.0.2",
+        "required_crds": crds,
+        "missing_crds": [],
+    }
+
+
+def test_platform_namespace_operator_version_ignores_unrelated_charts():
+    required = [
+        "opensearchclusters.opensearch.org",
+        "opensearchusers.opensearch.org",
+        "opensearchroles.opensearch.org",
+        "opensearchuserrolebindings.opensearch.org",
+    ]
+    backend = FakeManagementBackend(
+        crds=required,
+        pods_by_namespace={
+            "astrolift-system": [
+                {
+                    "name": "cert-manager-abc",
+                    "labels": {"helm.sh/chart": "cert-manager-v1.16.2"},
+                    "image": "quay.io/jetstack/cert-manager-controller:v1.16.2",
+                },
+                {
+                    "name": "opensearch-operator-controller-manager-abc",
+                    "labels": {"helm.sh/chart": "opensearch-operator-3.0.2"},
+                    "image": "opensearchproject/opensearch-operator:3.0.0-alpha1",
+                },
+            ]
+        },
+    )
+
+    caps = probe_cluster_capabilities(backend=backend, cluster=_ctx())
+
+    assert caps["operator_versions"]["opensearch-operator"] == "opensearch-operator-3.0.2"
 
 
 def test_probe_detects_cert_manager_via_crd_and_version_from_pod_image():

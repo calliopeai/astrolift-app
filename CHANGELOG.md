@@ -133,6 +133,9 @@
 
 ### Changed
 
+- Apply managed-service configuration changes through durable Temporal update
+  workflows, retain the last provider-confirmed configuration, and expose the
+  current operation/run identifiers and timestamps in GraphQL and project UI.
 - Make managed-service secret bundle selectors portable across AWS Secrets
   Manager, Google Secret Manager, Azure Key Vault, and Vault, and fail closed
   instead of choosing an arbitrary value from a multi-key bundle.
@@ -165,6 +168,10 @@
 
 ### Fixed
 
+- Probe live Kubernetes versions, CRDs, and operator releases before managed
+  service provision/update; fail closed with exact remediation, make readiness
+  timeouts terminal, and generate collision-safe names for long tenant,
+  project, application, and service identifiers.
 - Make GKE workload identity reconcile project IAM roles on every deploy,
   annotate workload ServiceAccounts with canonical length-safe Google service
   accounts, include attached project resources, and reject inert raw grants.
