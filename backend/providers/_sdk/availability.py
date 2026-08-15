@@ -113,7 +113,10 @@ class AvailabilityMatrix:
         variant: str,
     ) -> bool:
         return any(
-            m.plugin_id == plugin_id and m.kind == kind and m.variant == variant and m.status != "planned"
+            m.plugin_id == plugin_id
+            and m.kind == kind
+            and m.variant == variant
+            and m.status in {"ga", "preview", "experimental"}
             for m in self.managed_services
         )
 
