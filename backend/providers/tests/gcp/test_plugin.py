@@ -34,7 +34,9 @@ def test_managed_services_have_object_store_and_queue() -> None:
     assert ("graph_db", "spanner_graph") in keys
     assert ("workflow_engine", "workflows") in keys
     assert ("cdn", "cloud_cdn") in keys
+    assert ("private_endpoint", "private_service_connect") in keys
     assert ("faas", "cloud_functions_gen2") in keys
+    assert ("filesystem", "filestore") in keys
     assert ("observability", "cloud_operations") in keys
     assert ("api_gateway", "api_gateway") in keys
     assert ("event_stream", "managed_kafka") in keys
@@ -167,6 +169,21 @@ def test_workflows_operator_controls_are_exposed() -> None:
         assert field in properties
 
 
+def test_private_service_connect_operator_controls_are_exposed() -> None:
+    properties = PLUGIN.config_schema["properties"]
+    for field in (
+        "private_service_connect_network",
+        "private_service_connect_subnetwork",
+        "private_service_connect_name_prefix",
+        "private_service_connect_labels",
+        "private_service_connect_deletion_protection_default",
+        "private_service_connect_api_endpoint",
+        "private_service_connect_operation_timeout_seconds",
+        "private_service_connect_operation_poll_interval_seconds",
+    ):
+        assert field in properties
+
+
 def test_cloud_functions_operator_controls_are_exposed() -> None:
     properties = PLUGIN.config_schema["properties"]
     for field in (
@@ -176,6 +193,29 @@ def test_cloud_functions_operator_controls_are_exposed() -> None:
         "cloud_functions_api_endpoint",
         "cloud_functions_operation_timeout_seconds",
         "cloud_functions_operation_poll_interval_seconds",
+    ):
+        assert field in properties
+
+
+def test_filestore_operator_controls_are_exposed() -> None:
+    properties = PLUGIN.config_schema["properties"]
+    for field in (
+        "filestore_location",
+        "filestore_network",
+        "filestore_instance_name_prefix",
+        "filestore_share_name_default",
+        "filestore_tier_default",
+        "filestore_protocol_default",
+        "filestore_connect_mode_default",
+        "filestore_reserved_ip_range",
+        "filestore_psc_endpoint_project",
+        "filestore_kms_key_name",
+        "filestore_deletion_protection_default",
+        "filestore_backup_location",
+        "filestore_backup_kms_key",
+        "filestore_api_endpoint",
+        "filestore_operation_timeout_seconds",
+        "filestore_operation_poll_interval_seconds",
     ):
         assert field in properties
 

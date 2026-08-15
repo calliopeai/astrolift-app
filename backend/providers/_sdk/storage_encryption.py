@@ -146,6 +146,15 @@ POLICIES: dict[tuple[str, str, str], EncryptionPolicy] = {
             "source artifacts and custom Artifact Registry repositories need compatible encryption policy."
         ),
     ),
+    ("gcp", "filesystem", "filestore"): EncryptionPolicy(
+        mode="cloud_kms",
+        cmek_supported=True,
+        cmek_required_for_compliance=("pci", "hipaa"),
+        notes=(
+            "Filestore data and backups support CMEK. In-transit privacy requires "
+            "NFSv4.1 with Kerberos krb5p; NFSv3 is not encrypted in transit."
+        ),
+    ),
     ("gcp", "event_stream", "managed_kafka"): EncryptionPolicy(
         mode="cloud_kms",
         cmek_supported=True,

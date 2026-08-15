@@ -30,7 +30,9 @@ Executable managed services:
 - SpannerGraphDriver — graph_db/spanner_graph
 - WorkflowsDriver — workflow_engine/workflows
 - CloudCdnDriver — cdn/cloud_cdn
+- PrivateServiceConnectDriver — private_endpoint/private_service_connect
 - CloudFunctionsDriver — faas/cloud_functions_gen2
+- FilestoreDriver — filesystem/filestore
 - CloudOperationsDriver — observability/cloud_operations
 - APIGatewayDriver — api_gateway/api_gateway
 - ManagedKafkaDriver — event_stream/managed_kafka
@@ -55,6 +57,7 @@ from gcp.managed.encryption_cloud_kms import CloudKMSDriver
 from gcp.managed.event_bus_eventarc import EventarcDriver
 from gcp.managed.event_stream_managed_kafka import ManagedKafkaDriver
 from gcp.managed.faas_cloud_functions import CloudFunctionsDriver
+from gcp.managed.filesystem_filestore import FilestoreDriver
 from gcp.managed.graph_spanner import SpannerGraphDriver
 from gcp.managed.model_endpoint_vertex import VertexAIEndpointDriver
 from gcp.managed.mssql_cloudsql import CloudSQLServerDriver
@@ -63,6 +66,7 @@ from gcp.managed.object_store_gcs import GCSDriver
 from gcp.managed.observability_cloud_operations import CloudOperationsDriver
 from gcp.managed.postgres_alloydb import AlloyDBPostgresDriver
 from gcp.managed.postgres_cloudsql import CloudSQLPostgresDriver
+from gcp.managed.private_endpoint_psc import PrivateServiceConnectDriver
 from gcp.managed.queue_pubsub import PubSubDriver
 from gcp.managed.redis_memorystore import MemorystoreRedisDriver
 from gcp.managed.redis_memorystore_valkey import MemorystoreValkeyDriver
@@ -112,7 +116,9 @@ PLUGIN = ProviderPlugin(
         ("graph_db", "spanner_graph"): SpannerGraphDriver,
         ("workflow_engine", "workflows"): WorkflowsDriver,
         ("cdn", "cloud_cdn"): CloudCdnDriver,
+        ("private_endpoint", "private_service_connect"): PrivateServiceConnectDriver,
         ("faas", "cloud_functions_gen2"): CloudFunctionsDriver,
+        ("filesystem", "filestore"): FilestoreDriver,
         ("observability", "cloud_operations"): CloudOperationsDriver,
         ("api_gateway", "api_gateway"): APIGatewayDriver,
         ("event_stream", "managed_kafka"): ManagedKafkaDriver,
@@ -255,10 +261,112 @@ PLUGIN = ProviderPlugin(
                 "exclusiveMinimum": 0,
                 "default": 2,
             },
+            "private_service_connect_network": {
+                "type": "string",
+                "description": "Default VPC network name or resource URI for PSC endpoints.",
+            },
+            "private_service_connect_subnetwork": {
+                "type": "string",
+                "description": "Default regional subnetwork name or resource URI for published-service endpoints.",
+            },
+            "private_service_connect_name_prefix": {
+                "type": "string",
+                "default": "astrolift",
+            },
+            "private_service_connect_labels": {
+                "type": "object",
+                "additionalProperties": {"type": "string"},
+                "description": "Operator labels merged into every managed PSC address and forwarding rule.",
+            },
+            "private_service_connect_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "private_service_connect_api_endpoint": {
+                "type": "string",
+                "default": "https://compute.googleapis.com/compute/v1",
+            },
+            "private_service_connect_operation_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 900,
+            },
+            "private_service_connect_operation_poll_interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 2,
+            },
             "bucket_name_prefix": {
                 "type": "string",
                 "default": "astrolift",
                 "description": "Prefix for platform-managed GCS buckets.",
+            },
+            "filestore_location": {
+                "type": "string",
+                "description": "Default Filestore zone or region; falls back to the cluster region.",
+            },
+            "filestore_network": {
+                "type": "string",
+                "description": "VPC network name or full resource name used by Filestore instances.",
+            },
+            "filestore_instance_name_prefix": {
+                "type": "string",
+                "default": "astrolift",
+            },
+            "filestore_share_name_default": {
+                "type": "string",
+                "default": "data",
+            },
+            "filestore_tier_default": {
+                "type": "string",
+                "enum": [
+                    "BASIC_HDD",
+                    "BASIC_SSD",
+                    "ENTERPRISE",
+                    "HIGH_SCALE_SSD",
+                    "PREMIUM",
+                    "REGIONAL",
+                    "STANDARD",
+                    "ZONAL",
+                ],
+                "default": "REGIONAL",
+            },
+            "filestore_protocol_default": {
+                "type": "string",
+                "enum": ["NFS_V3", "NFS_V4_1"],
+                "default": "NFS_V3",
+            },
+            "filestore_connect_mode_default": {
+                "type": "string",
+                "enum": [
+                    "DIRECT_PEERING",
+                    "PRIVATE_SERVICE_ACCESS",
+                    "PRIVATE_SERVICE_CONNECT",
+                ],
+                "default": "PRIVATE_SERVICE_CONNECT",
+            },
+            "filestore_reserved_ip_range": {"type": "string"},
+            "filestore_psc_endpoint_project": {"type": "string"},
+            "filestore_kms_key_name": {"type": "string"},
+            "filestore_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "filestore_backup_location": {"type": "string"},
+            "filestore_backup_kms_key": {"type": "string"},
+            "filestore_api_endpoint": {
+                "type": "string",
+                "default": "https://file.googleapis.com/v1",
+            },
+            "filestore_operation_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 3600,
+            },
+            "filestore_operation_poll_interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 5,
             },
             "pubsub_topic_prefix": {
                 "type": "string",

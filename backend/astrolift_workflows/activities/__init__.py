@@ -110,10 +110,12 @@ from astrolift_workflows.activities.managed_service_lifecycle import (
     deprovision_managed_service,
     finalize_managed_service_deletion,
     finalize_managed_service_provision,
+    finalize_managed_service_update,
     mark_managed_service_deprovisioning,
     mark_managed_service_failed,
     mark_managed_service_provisioning,
     provision_managed_service,
+    update_managed_service,
 )
 from astrolift_workflows.activities.migration import (
     apply_to_target_cluster,
@@ -228,6 +230,7 @@ __all__ = [
     "fetch_app_build_strategy",
     "finalize_managed_service_deletion",
     "finalize_managed_service_provision",
+    "finalize_managed_service_update",
     "gc_stale_previews",
     "get_workflow_stages",
     "load_agent_run_outcome",
@@ -272,6 +275,7 @@ __all__ = [
     "provision_dev_environment",
     "provision_dns_zone",
     "provision_managed_service",
+    "update_managed_service",
     "provision_managed_services_initial",
     "provision_namespace",
     "provision_preview_namespace",

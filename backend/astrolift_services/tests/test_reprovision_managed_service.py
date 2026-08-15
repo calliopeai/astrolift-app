@@ -19,6 +19,7 @@ from astrolift_services.schema.mutations import (
     ServicesMutation,
     UpdateManagedServiceInput,
 )
+from astrolift_workflows.client import WorkflowHandle
 from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
 
@@ -254,8 +255,14 @@ def test_update_managed_service_config_allowed_when_no_driver(permission_resolve
         name="primary",
         config={"max_connections": 100},
         status=ManagedService.Status.ACTIVE,
+        backend_ref="postgres/primary",
     )
-    with _ctx(org):
+    handle = WorkflowHandle(
+        workflow_id=f"UpdateManagedServiceWorkflow-{svc.guid}",
+        run_id="run-update-1",
+        enqueued=True,
+    )
+    with _ctx(org), patch("astrolift_workflows.client.start_workflow", return_value=handle) as start_wf:
         result = ServicesMutation().update_managed_service(
             _info(user=_make_user()),
             input=UpdateManagedServiceInput(
@@ -267,3 +274,128 @@ def test_update_managed_service_config_allowed_when_no_driver(permission_resolve
     svc.refresh_from_db()
     assert svc.config["max_connections"] == 200
     assert svc.status == ManagedService.Status.UPDATING
+    assert svc.applied_config == {"max_connections": 100}
+    assert svc.operation_workflow_id == f"UpdateManagedServiceWorkflow-{svc.guid}"
+    assert svc.operation_run_id == "run-update-1"
+    start_wf.assert_called_once()
+    assert start_wf.call_args.args[0] == "UpdateManagedServiceWorkflow"
+
+
+def test_update_managed_service_noop_does_not_start_workflow(permission_resolver):
+    org, app, env = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    svc = ManagedService.objects.create(
+        registered_app=app,
+        app_environment=env,
+        kind=ManagedService.Kind.POSTGRES,
+        name="primary",
+        config={"max_connections": 100},
+        applied_config={"max_connections": 100},
+        status=ManagedService.Status.ACTIVE,
+        backend_ref="postgres/primary",
+    )
+    with _ctx(org), patch("astrolift_workflows.client.start_workflow") as start_wf:
+        result = ServicesMutation().update_managed_service(
+            _info(user=_make_user()),
+            input=UpdateManagedServiceInput(
+                id=GUID(str(svc.guid)),
+                config={"max_connections": 100},
+            ),
+        )
+    assert result.ok, result.errors
+    svc.refresh_from_db()
+    assert svc.status == ManagedService.Status.ACTIVE
+    start_wf.assert_not_called()
+
+
+def test_update_managed_service_fails_closed_when_temporal_is_disabled(permission_resolver):
+    org, app, env = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    svc = ManagedService.objects.create(
+        registered_app=app,
+        app_environment=env,
+        kind=ManagedService.Kind.POSTGRES,
+        name="primary",
+        config={"max_connections": 100},
+        status=ManagedService.Status.ACTIVE,
+        backend_ref="postgres/primary",
+    )
+    disabled = WorkflowHandle(
+        workflow_id=f"UpdateManagedServiceWorkflow-{svc.guid}",
+        run_id="",
+        enqueued=False,
+    )
+    with _ctx(org), patch("astrolift_workflows.client.start_workflow", return_value=disabled):
+        result = ServicesMutation().update_managed_service(
+            _info(user=_make_user()),
+            input=UpdateManagedServiceInput(
+                id=GUID(str(svc.guid)),
+                config={"max_connections": 200},
+            ),
+        )
+
+    assert result.ok is False
+    svc.refresh_from_db()
+    assert svc.status == ManagedService.Status.FAILED
+    assert "not enqueued" in svc.status_error
+
+
+def test_update_managed_service_rejects_concurrent_update(permission_resolver):
+    org, app, env = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    svc = ManagedService.objects.create(
+        registered_app=app,
+        app_environment=env,
+        kind=ManagedService.Kind.POSTGRES,
+        name="primary",
+        config={"max_connections": 100},
+        applied_config={"max_connections": 50},
+        status=ManagedService.Status.UPDATING,
+        backend_ref="postgres/primary",
+    )
+    with _ctx(org), patch("astrolift_workflows.client.start_workflow") as start_wf:
+        result = ServicesMutation().update_managed_service(
+            _info(user=_make_user()),
+            input=UpdateManagedServiceInput(
+                id=GUID(str(svc.guid)),
+                config={"max_connections": 200},
+            ),
+        )
+    assert not result.ok
+    assert result.errors[0].code == "PRECONDITION"
+    start_wf.assert_not_called()
+
+
+def test_update_project_service_uses_update_workflow(permission_resolver):
+    org, app, env = _scaffold()
+    permission_resolver.grant(Permission.PROJECT_UPDATE)
+    svc = ManagedService.objects.create(
+        project=app.project,
+        tenant_cluster=env.tenant_cluster,
+        environment_name="production",
+        kind=ManagedService.Kind.REDIS,
+        variant="operator",
+        name="cache",
+        config={"size": "small"},
+        status=ManagedService.Status.ACTIVE,
+        backend_ref="redis/cache",
+    )
+    handle = WorkflowHandle(
+        workflow_id=f"UpdateManagedServiceWorkflow-{svc.guid}",
+        run_id="run-project-update",
+        enqueued=True,
+    )
+    with _ctx(org), patch("astrolift_workflows.client.start_workflow", return_value=handle) as start_wf:
+        result = ServicesMutation().update_project_managed_service(
+            _info(user=_make_user()),
+            input=UpdateManagedServiceInput(
+                id=GUID(str(svc.guid)),
+                config={"size": "medium"},
+            ),
+        )
+    assert result.ok, result.errors
+    svc.refresh_from_db()
+    assert svc.status == ManagedService.Status.UPDATING
+    assert svc.applied_config == {"size": "small"}
+    assert svc.operation_run_id == "run-project-update"
+    assert start_wf.call_args.args[0] == "UpdateManagedServiceWorkflow"
