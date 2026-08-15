@@ -133,6 +133,11 @@
   Azure Files SMB/NFS shares, including network ACLs, per-protocol encryption,
   dual Key Vault-backed SMB rotation keys, snapshots, soft delete, guarded
   teardown, and portable mount metadata.
+- Add the preview `faas/azure_functions` driver for Linux Azure Function Apps
+  on operator-owned plans, with identity-first Flex zip and Premium/Dedicated
+  container deployment, immutable digest-pinned artifacts, exact dependency
+  allowlists, least-privilege storage/ACR grants, credential-free portable
+  bindings, deletion protection, and convergent ownership-safe lifecycle.
 - Add preview Azure API Management lifecycle with explicit SKU/capacity,
   public or allowlisted internal networking, managed identities, typed APIs,
   operations, backends, subscriptions and Key Vault-backed custom domains,

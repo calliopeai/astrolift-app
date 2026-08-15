@@ -1936,6 +1936,59 @@ def _azure_managed_config_for(
             secret_name_prefix=str(pc.get("azure_openai_secret_name_prefix", "astrolift-aoai")),
         )
 
+    if pair == ("faas", "azure_functions") or (kind == "faas" and not variant):
+        from azure.managed.faas_functions import AzureFunctionsConfig
+
+        return AzureFunctionsConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            location=location,
+            function_name_prefix=str(pc.get("faas_function_name_prefix", "astrolift")),
+            default_plan_resource_id=str(pc.get("faas_default_plan_resource_id", "")),
+            default_identity_resource_id=str(
+                pc.get("faas_default_identity_resource_id", ""),
+            ),
+            allowed_plan_resource_ids=tuple(
+                str(value) for value in pc.get("faas_allowed_plan_resource_ids", [])
+            ),
+            allowed_identity_resource_ids=tuple(
+                str(value) for value in pc.get("faas_allowed_identity_resource_ids", [])
+            ),
+            allowed_storage_resource_ids=tuple(
+                str(value) for value in pc.get("faas_allowed_storage_resource_ids", [])
+            ),
+            allowed_registry_resource_ids=tuple(
+                str(value) for value in pc.get("faas_allowed_registry_resource_ids", [])
+            ),
+            allowed_subnet_resource_ids=tuple(
+                str(value) for value in pc.get("faas_allowed_subnet_resource_ids", [])
+            ),
+            allow_public_network=bool(pc.get("faas_allow_public_network", False)),
+            deletion_protection_default=bool(
+                pc.get("faas_deletion_protection_default", True),
+            ),
+            storage_blob_endpoint_suffix=str(
+                pc.get("faas_storage_blob_endpoint_suffix", "blob.core.windows.net"),
+            ),
+            registry_login_server_suffix=str(
+                pc.get("faas_registry_login_server_suffix", "azurecr.io"),
+            ),
+            site_api_version=str(pc.get("faas_site_api_version", "2024-11-01")),
+            identity_api_version=str(
+                pc.get("faas_identity_api_version", "2023-01-31"),
+            ),
+            storage_api_version=str(pc.get("faas_storage_api_version", "2023-05-01")),
+            registry_api_version=str(pc.get("faas_registry_api_version", "2023-07-01")),
+            authorization_api_version=str(
+                pc.get("faas_authorization_api_version", "2022-04-01"),
+            ),
+            operation_timeout_seconds=float(
+                pc.get("faas_operation_timeout_seconds", 900),
+            ),
+            poll_interval_seconds=float(pc.get("faas_poll_interval_seconds", 3)),
+            max_instances=int(pc.get("faas_max_instances", 100)),
+        )
+
     if pair in {
         ("mssql", "azure_sql_database"),
         ("mssql", "azure_sql_serverless"),
