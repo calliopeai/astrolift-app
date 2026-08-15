@@ -492,6 +492,7 @@ class AzureFunctionsDriver(ManagedServiceDriver):
                 "image_uri": {"type": "string", "pattern": _IMAGE_RE.pattern},
                 "environment": environment,
                 "public_network_access": {"type": "boolean", "default": False},
+                "disable_default_hostnames": {"type": "boolean", "default": False},
                 "virtual_network_subnet_id": resource_id,
                 "deletion_protection": {"type": "boolean", "default": True},
             },
@@ -817,7 +818,11 @@ class AzureFunctionsDriver(ManagedServiceDriver):
             "serverFarmId": str(resources["plan"]["id"]),
             "httpsOnly": True,
             "publicNetworkAccess": "Enabled" if public else "Disabled",
-            "hostNamesDisabled": not public,
+            # Independent of publicNetworkAccess: disabling the network path already
+            # blocks public traffic, while hostNamesDisabled removes the default
+            # hostname outright and leaves a private endpoint with nothing to
+            # resolve through privatelink.azurewebsites.net. Opt in explicitly.
+            "hostNamesDisabled": bool(cfg.get("disable_default_hostnames", False)),
             "siteConfig": site_config,
         }
         if cfg.get("virtual_network_subnet_id"):
@@ -936,6 +941,7 @@ class AzureFunctionsDriver(ManagedServiceDriver):
             ),
             "runtime_name": str(settings.get("FUNCTIONS_WORKER_RUNTIME") or ""),
             "public_network_access": str(properties.get("publicNetworkAccess") or "Disabled") == "Enabled",
+            "disable_default_hostnames": bool(properties.get("hostNamesDisabled") or False),
             "deletion_protection": (
                 str((current.get("tags") or {}).get("astrolift-deletion-protection") or "true") == "true"
             ),

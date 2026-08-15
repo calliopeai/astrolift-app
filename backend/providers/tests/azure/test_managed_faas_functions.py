@@ -328,6 +328,23 @@ def test_public_network_requires_install_policy() -> None:
     assert _site(allowed_client)["properties"]["hostNamesDisabled"] is False
 
 
+def test_private_site_keeps_default_hostname_for_private_endpoint() -> None:
+    client = _client()
+    assert _driver(client).provision(_spec(_zip_config())).ok
+    properties = _site(client)["properties"]
+    # Blocking the public network path must not remove the default hostname:
+    # a Private Endpoint resolves that name through privatelink.azurewebsites.net,
+    # so hostNamesDisabled would leave it with nothing to point at.
+    assert properties["publicNetworkAccess"] == "Disabled"
+    assert properties["hostNamesDisabled"] is False
+
+
+def test_default_hostnames_can_be_disabled_explicitly() -> None:
+    client = _client()
+    assert _driver(client).provision(_spec(_zip_config(disable_default_hostnames=True))).ok
+    assert _site(client)["properties"]["hostNamesDisabled"] is True
+
+
 def test_flex_requires_fc1_and_container_rejects_fc1() -> None:
     flex_on_premium = _driver().provision(_spec(_zip_config(plan_resource_id=PREMIUM_PLAN_ID)))
     container_on_flex = _driver().provision(_spec(_container_config(plan_resource_id=PLAN_ID)))
