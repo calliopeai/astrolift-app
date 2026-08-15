@@ -45,6 +45,7 @@ def _cluster(**provider_overrides):
         "gateway_api_namespace": "gateway-system",
         "gateway_api_class_name": "envoy-gateway",
         "knative_eventing_namespace": "eventing-system",
+        "argo_workflows_namespace": "workflows-system",
         "seaweed_namespace": "storage-system",
         "seaweed_cluster_name": "shared-store",
         "seaweed_s3_endpoint": "https://objects.example.test",
@@ -218,6 +219,68 @@ def test_knative_eventing_config_preserves_install_security_policy(monkeypatch) 
     assert config.allowed_broker_classes == ("Kafka",)
 
 
+def test_argo_workflows_config_preserves_install_security_policy(monkeypatch) -> None:
+    cluster_driver = object()
+    monkeypatch.setattr("core.cluster_observability._driver_for_cluster", lambda _cluster: cluster_driver)
+
+    config = managed_config_for(
+        "k8s_native",
+        _cluster(
+            argo_workflows_server_url="https://argo.example.test",
+            argo_workflows_watch_all_namespaces=False,
+            argo_workflows_managed_namespaces=["workflows-system"],
+            argo_workflows_service_account_name="workflow-runner",
+            argo_workflows_allow_service_account_override=True,
+            argo_workflows_allowed_service_accounts=["workflow-runner", "gpu-runner"],
+            argo_workflows_allow_workflow_template_refs=True,
+            argo_workflows_allow_cluster_template_refs=True,
+            argo_workflows_trusted_template_uids={"cluster/shared": "uid-1"},
+            argo_workflows_allow_resource_templates=True,
+            argo_workflows_allow_executor_plugins=True,
+            argo_workflows_allow_external_http_templates=True,
+            argo_workflows_allow_host_access=True,
+            argo_workflows_allow_privileged_pods=True,
+            argo_workflows_allow_pod_spec_patch=True,
+            argo_workflows_allow_tagged_images=True,
+            argo_workflows_allowed_image_prefixes=["registry.example.test/"],
+            argo_workflows_default_parallelism=5,
+            argo_workflows_max_parallelism=25,
+            argo_workflows_default_active_deadline_seconds=900,
+            argo_workflows_max_active_deadline_seconds=7200,
+            argo_workflows_default_ttl_seconds=3600,
+            argo_workflows_max_ttl_seconds=86400,
+        ),
+        kind="workflow_engine",
+        variant="argo_workflows",
+    )
+
+    assert config.cluster_driver is cluster_driver
+    assert config.namespace == "workflows-system"
+    assert config.argo_server_url == "https://argo.example.test"
+    assert config.watch_all_namespaces is False
+    assert config.managed_namespaces == ("workflows-system",)
+    assert config.service_account_name == "workflow-runner"
+    assert config.allow_service_account_override is True
+    assert config.allowed_service_accounts == ("workflow-runner", "gpu-runner")
+    assert config.allow_workflow_template_refs is True
+    assert config.allow_cluster_template_refs is True
+    assert config.trusted_workflow_template_uids == {"cluster/shared": "uid-1"}
+    assert config.allow_resource_templates is True
+    assert config.allow_executor_plugins is True
+    assert config.allow_external_http_templates is True
+    assert config.allow_host_access is True
+    assert config.allow_privileged_pods is True
+    assert config.allow_pod_spec_patch is True
+    assert config.allow_tagged_images is True
+    assert config.allowed_image_prefixes == ("registry.example.test/",)
+    assert config.default_parallelism == 5
+    assert config.max_parallelism == 25
+    assert config.default_active_deadline_seconds == 900
+    assert config.max_active_deadline_seconds == 7200
+    assert config.default_ttl_seconds == 3600
+    assert config.max_ttl_seconds == 86400
+
+
 def test_unknown_k8s_managed_pair_fails_closed(monkeypatch) -> None:
     monkeypatch.setattr("core.cluster_observability._driver_for_cluster", lambda _cluster: object())
 
@@ -273,6 +336,29 @@ def test_k8s_operator_defaults_are_exposed_in_provider_schema() -> None:
         "knative_eventing_allow_cross_namespace_subscribers",
         "knative_eventing_allow_alpha_delivery_fields",
         "knative_eventing_allowed_broker_classes",
+        "argo_workflows_namespace",
+        "argo_workflows_watch_all_namespaces",
+        "argo_workflows_managed_namespaces",
+        "argo_workflows_server_url",
+        "argo_workflows_service_account_name",
+        "argo_workflows_allow_service_account_override",
+        "argo_workflows_allowed_service_accounts",
+        "argo_workflows_allow_workflow_template_refs",
+        "argo_workflows_allow_cluster_template_refs",
+        "argo_workflows_allow_resource_templates",
+        "argo_workflows_allow_executor_plugins",
+        "argo_workflows_allow_external_http_templates",
+        "argo_workflows_allow_host_access",
+        "argo_workflows_allow_privileged_pods",
+        "argo_workflows_allow_pod_spec_patch",
+        "argo_workflows_allow_tagged_images",
+        "argo_workflows_allowed_image_prefixes",
+        "argo_workflows_default_parallelism",
+        "argo_workflows_max_parallelism",
+        "argo_workflows_default_active_deadline_seconds",
+        "argo_workflows_max_active_deadline_seconds",
+        "argo_workflows_default_ttl_seconds",
+        "argo_workflows_max_ttl_seconds",
         "seaweed_namespace",
         "seaweed_cluster_name",
         "seaweed_s3_endpoint",

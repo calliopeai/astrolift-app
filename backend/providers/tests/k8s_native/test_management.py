@@ -90,6 +90,10 @@ class FakeManagementBackend:
     ) -> list[dict[str, Any]]:
         return list(self.pods_by_namespace.get(namespace, []))
 
+    def list_cluster_pods(self, *, auth: ClusterAuth) -> list[dict[str, Any]]:
+        del auth
+        return [{**pod, "namespace": namespace} for namespace, pods in self.pods_by_namespace.items() for pod in pods]
+
     def list_storage_classes(self, *, auth: ClusterAuth) -> list[str]:
         return list(self.storage_classes)
 
@@ -217,6 +221,79 @@ def test_probe_inventories_opensearch_crds_and_chart_version():
         "required_crds": crds,
         "missing_crds": [],
     }
+
+
+def test_probe_inventories_argo_workflows_v4_controller() -> None:
+    crds = [
+        "workflows.argoproj.io",
+        "workflowtemplates.argoproj.io",
+        "cronworkflows.argoproj.io",
+        "workfloweventbindings.argoproj.io",
+    ]
+    backend = FakeManagementBackend(
+        crds=crds,
+        pods_by_namespace={
+            "argo": [
+                {
+                    "name": "workflow-controller-abc",
+                    "labels": {
+                        "app.kubernetes.io/name": "workflow-controller",
+                        "app.kubernetes.io/version": "v4.1.1",
+                    },
+                    "image": "quay.io/argoproj/workflow-controller:v4.1.1",
+                },
+            ],
+        },
+    )
+
+    caps = probe_cluster_capabilities(backend=backend, cluster=_ctx())
+
+    assert caps["operator_versions"]["argo-workflows"] == "v4.1.1"
+    assert caps["managed_service_operators"]["argo-workflows"] == {
+        "installed": True,
+        "version": "v4.1.1",
+        "required_crds": crds,
+        "missing_crds": [],
+    }
+
+
+def test_probe_finds_argo_controller_in_custom_namespace_and_ignores_server_only() -> None:
+    crds = [
+        "workflows.argoproj.io",
+        "workflowtemplates.argoproj.io",
+        "cronworkflows.argoproj.io",
+        "workfloweventbindings.argoproj.io",
+    ]
+    custom = FakeManagementBackend(
+        crds=crds,
+        pods_by_namespace={
+            "tenant-automation": [
+                {
+                    "name": "workflow-controller-custom",
+                    "labels": {"app.kubernetes.io/version": "v4.1.2"},
+                    "image": "quay.io/argoproj/workflow-controller:v4.1.2",
+                },
+            ],
+        },
+    )
+    server_only = FakeManagementBackend(
+        crds=crds,
+        pods_by_namespace={
+            "argo": [
+                {
+                    "name": "argo-server",
+                    "labels": {"app.kubernetes.io/version": "v4.1.2"},
+                    "image": "quay.io/argoproj/argocli:v4.1.2",
+                },
+            ],
+        },
+    )
+
+    custom_caps = probe_cluster_capabilities(backend=custom, cluster=_ctx())
+    server_caps = probe_cluster_capabilities(backend=server_only, cluster=_ctx())
+
+    assert custom_caps["operator_versions"]["argo-workflows"] == "v4.1.2"
+    assert "argo-workflows" not in server_caps["operator_versions"]
 
 
 def test_platform_namespace_operator_version_ignores_unrelated_charts():

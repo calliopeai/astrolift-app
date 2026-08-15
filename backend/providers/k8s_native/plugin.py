@@ -49,6 +49,7 @@ from k8s_native.managed.opensearch_operator import (
 from k8s_native.managed.postgres_cnpg import CNPGPostgresDriver
 from k8s_native.managed.queue_rabbitmq import RabbitMQOperatorDriver
 from k8s_native.managed.redis_operator import RedisOperatorDriver
+from k8s_native.managed.workflow_argo import ArgoWorkflowsDriver
 from k8s_native.notification_otlp import WebhookSMTPNotificationDriver
 from k8s_native.registry_oci import OCIRegistryDriver
 from k8s_native.secrets_vault import VaultSecretsBackend
@@ -78,6 +79,7 @@ PLUGIN = ProviderPlugin(
         ("faas", "knative_service"): KnativeServiceDriver,
         ("api_gateway", "gateway_api"): GatewayAPIDriver,
         ("event_bus", "knative_eventing"): KnativeEventingDriver,
+        ("workflow_engine", "argo_workflows"): ArgoWorkflowsDriver,
         ("object_store", "seaweedfs_operator"): SeaweedFSObjectStoreDriver,
         ("mssql", "sqlserver_express"): SQLServerExpressDriver,
         ("search", "opensearch_operator"): OpenSearchSearchDriver,
@@ -228,6 +230,122 @@ PLUGIN = ProviderPlugin(
                     "Kafka",
                     "RabbitMQBroker",
                 ],
+            },
+            "argo_workflows_namespace": {
+                "type": "string",
+                "description": (
+                    "Optional fixed managed namespace; otherwise each project uses its normal tenant namespace."
+                ),
+            },
+            "argo_workflows_watch_all_namespaces": {
+                "type": "boolean",
+                "default": True,
+                "description": "Whether the installed Argo controller watches every namespace.",
+            },
+            "argo_workflows_managed_namespaces": {
+                "type": "array",
+                "items": {"type": "string"},
+                "default": [],
+                "description": "Namespaces watched by a namespace-scoped or managed-namespace controller.",
+            },
+            "argo_workflows_server_url": {"type": "string"},
+            "argo_workflows_service_account_name": {
+                "type": "string",
+                "default": "argo-workflow",
+                "description": (
+                    "Baseline workflow-pod ServiceAccount. Astrolift creates it with "
+                    "workflowtaskresults create/patch RBAC when absent; a pre-existing "
+                    "account remains operator-managed."
+                ),
+            },
+            "argo_workflows_allow_service_account_override": {
+                "type": "boolean",
+                "default": False,
+            },
+            "argo_workflows_allowed_service_accounts": {
+                "type": "array",
+                "items": {"type": "string"},
+                "default": [],
+            },
+            "argo_workflows_allow_cluster_template_refs": {
+                "type": "boolean",
+                "default": False,
+            },
+            "argo_workflows_allow_workflow_template_refs": {
+                "type": "boolean",
+                "default": False,
+            },
+            "argo_workflows_trusted_template_uids": {
+                "type": "object",
+                "additionalProperties": {"type": "string"},
+                "default": {},
+                "description": (
+                    "Exact UID pins for non-Astrolift WorkflowTemplate references, keyed by "
+                    "'<namespace>/<name>' or 'cluster/<name>'."
+                ),
+            },
+            "argo_workflows_allow_resource_templates": {
+                "type": "boolean",
+                "default": False,
+            },
+            "argo_workflows_allow_executor_plugins": {
+                "type": "boolean",
+                "default": False,
+            },
+            "argo_workflows_allow_external_http_templates": {
+                "type": "boolean",
+                "default": False,
+            },
+            "argo_workflows_allow_host_access": {
+                "type": "boolean",
+                "default": False,
+            },
+            "argo_workflows_allow_privileged_pods": {
+                "type": "boolean",
+                "default": False,
+            },
+            "argo_workflows_allow_pod_spec_patch": {
+                "type": "boolean",
+                "default": False,
+            },
+            "argo_workflows_allow_tagged_images": {
+                "type": "boolean",
+                "default": False,
+            },
+            "argo_workflows_allowed_image_prefixes": {
+                "type": "array",
+                "items": {"type": "string"},
+                "default": [],
+            },
+            "argo_workflows_default_parallelism": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 10,
+            },
+            "argo_workflows_max_parallelism": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 50,
+            },
+            "argo_workflows_default_active_deadline_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 3600,
+            },
+            "argo_workflows_max_active_deadline_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 86400,
+            },
+            "argo_workflows_default_ttl_seconds": {
+                "type": "integer",
+                "minimum": 0,
+                "default": 86400,
+            },
+            "argo_workflows_max_ttl_seconds": {
+                "type": "integer",
+                "minimum": 0,
+                "default": 604800,
             },
             "seaweed_namespace": {
                 "type": "string",

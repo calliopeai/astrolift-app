@@ -167,6 +167,21 @@ REQUIREMENTS: dict[tuple[str, str], OperatorRequirement] = {
             "operator.knative.dev/v1beta1 KnativeEventing resource"
         ),
     ),
+    ("workflow_engine", "argo_workflows"): OperatorRequirement(
+        operator_id="argo-workflows",
+        display_name="Argo Workflows",
+        required_crds=(
+            "workflows.argoproj.io",
+            "workflowtemplates.argoproj.io",
+            "cronworkflows.argoproj.io",
+            "workfloweventbindings.argoproj.io",
+        ),
+        install_hint=(
+            "kubectl create namespace argo; kubectl apply --server-side -n argo -f "
+            "https://github.com/argoproj/argo-workflows/releases/download/v4.1.1/install.yaml"
+        ),
+        minimum_operator_version="4.1.0",
+    ),
     ("filesystem", "nfs_csi"): OperatorRequirement(
         operator_id="nfs-csi",
         display_name="NFS CSI Driver",

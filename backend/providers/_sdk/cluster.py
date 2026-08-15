@@ -847,6 +847,8 @@ class ClusterDriver(Protocol):
         cluster: str,
         namespace: str,
         manifests: list[dict[str, Any]],
+        *,
+        propagation_policy: str | None = None,
     ) -> DeleteResult: ...
 
     def get_namespace(self, cluster: str, name: str) -> NamespaceState | None: ...
@@ -893,6 +895,15 @@ class ClusterDriver(Protocol):
         client form ``group/version/Kind`` used for custom resources.
         """
         return None
+
+    def list_manifests(
+        self,
+        cluster: str,
+        namespace: str | None,
+        kind: str,
+    ) -> list[dict[str, Any]]:
+        """Return Kubernetes objects of ``kind`` in a namespace."""
+        return []
 
     def get_workload_status(
         self,

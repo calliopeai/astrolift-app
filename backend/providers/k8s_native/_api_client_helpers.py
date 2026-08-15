@@ -126,3 +126,35 @@ def list_namespaced_pod_dicts(
         _preload_content=True,
     )
     return list((response or {}).get("items") or [])
+
+
+def list_cluster_pod_dicts(
+    api_client: Any,
+    *,
+    timeout_seconds: int = 10,
+) -> list[dict[str, Any]]:
+    """List pods across all namespaces through the explicit bearer-auth path.
+
+    Capability discovery uses this for operators whose controller namespace is
+    configurable.  The platform ClusterRole already grants cluster-wide pod
+    listing; callers still treat an unavailable/forbidden read as an empty
+    optional discovery result.
+    """
+    response = api_client.call_api(
+        "/api/v1/pods",
+        "GET",
+        path_params={},
+        query_params=[("timeoutSeconds", timeout_seconds)],
+        header_params={
+            "Accept": api_client.select_header_accept(["application/json"]),
+        },
+        body=None,
+        post_params=[],
+        files={},
+        response_type="object",
+        auth_settings=["BearerToken"],
+        async_req=False,
+        _return_http_data_only=True,
+        _preload_content=True,
+    )
+    return list((response or {}).get("items") or [])

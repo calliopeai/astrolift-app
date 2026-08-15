@@ -11,7 +11,7 @@ from __future__ import annotations
 import contextlib
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from _sdk._telemetry import driver_op, maybe_heartbeat
 from _sdk.cluster import (
@@ -246,7 +246,7 @@ class GKEClusterDriver(ClusterDriver):
         )
 
     @driver_op(cloud="gcp", driver="cluster")
-    def delete_manifests(self, cluster, namespace, manifests):
+    def delete_manifests(self, cluster, namespace, manifests, *, propagation_policy=None):
         client = self._k8s(cluster)
         deleted, not_found, errors = [], [], []
         for m in manifests:
@@ -258,7 +258,12 @@ class GKEClusterDriver(ClusterDriver):
             name = m.get("metadata", {}).get("name", "")
             ref = f"{kind}/{name}"
             try:
-                client.delete(kind=kind, namespace=namespace, name=name)
+                client.delete(
+                    kind=kind,
+                    namespace=namespace,
+                    name=name,
+                    propagation_policy=propagation_policy,
+                )
                 deleted.append(ref)
             except _NotFound:
                 not_found.append(ref)
@@ -349,6 +354,18 @@ class GKEClusterDriver(ClusterDriver):
         name: str,
     ) -> dict[str, Any] | None:
         return self._k8s(cluster).get(kind=kind, namespace=namespace, name=name)
+
+    @driver_op(cloud="gcp", driver="cluster")
+    def list_manifests(
+        self,
+        cluster: str,
+        namespace: str | None,
+        kind: str,
+    ) -> list[dict[str, Any]]:
+        return cast(
+            "list[dict[str, Any]]",
+            self._k8s(cluster).list(kind=kind, namespace=namespace),
+        )
 
     @driver_op(cloud="gcp", driver="cluster")
     def get_workload_status(self, cluster, namespace, kind, name):
