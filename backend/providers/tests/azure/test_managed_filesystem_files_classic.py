@@ -292,8 +292,28 @@ def test_smb_provisions_hardened_account_share_keys_and_binding() -> None:
     assert binding.env_vars["FILESYSTEM_PROTOCOL"].literal == "smb3.1.1"
     assert binding.env_vars["FILESYSTEM_PASSWORD"].secret_ref == f"astrolift-files-{account}-primary"
     assert binding.env_vars["FILESYSTEM_PASSWORD_SECONDARY"].secret_ref.endswith("-secondary")
-    assert binding.pod_volume_mounts[0].mount_path == "/mnt/shared"
     assert len(binding.iam_grants) == 2
+
+    volume = binding.pod_volume_mounts[0]
+    assert volume.mount_path == "/mnt/shared"
+    assert volume.csi_driver == "file.csi.azure.com"
+    assert volume.volume_handle == f"{RESOURCE_GROUP}#{account}#{share}"
+    assert volume.volume_attributes == {"shareName": share}
+    assert volume.secret_refs == {"azurestorageaccountkey": f"astrolift-files-{account}-primary"}
+    assert volume.secret_literals == {"azurestorageaccountname": account}
+    # SMB options are cifs options the CSI driver forwards as-is; the NFS
+    # option filter must not reach this branch or the mount loses its dialect
+    # and security flavour.
+    assert volume.mount_options == [
+        "vers=3.1.1",
+        "sec=ntlmssp",
+        "serverino",
+        "nosharesock",
+        "mfsymlinks",
+        "actimeo=30",
+    ]
+    # Sizes the rendered PV and PVC, so it tracks the share quota.
+    assert volume.capacity == "2048Gi"
 
 
 def test_nfs_requires_premium_uses_network_auth_and_aznfs_shape() -> None:
@@ -320,6 +340,37 @@ def test_nfs_requires_premium_uses_network_auth_and_aznfs_shape() -> None:
     assert "notls" in str(binding.env_vars["FILESYSTEM_MOUNT_OPTIONS"].literal)
     assert "FILESYSTEM_PASSWORD" not in binding.env_vars
     assert binding.iam_grants == []
+
+    volume = binding.pod_volume_mounts[0]
+    assert volume.csi_driver == "file.csi.azure.com"
+    assert volume.volume_handle == f"{RESOURCE_GROUP}#{account}#{share}"
+    assert volume.volume_attributes == {
+        "shareName": share,
+        "protocol": "nfs",
+        "server": f"{account}.file.core.windows.net",
+    }
+    # The fstab-shaped list stays in FILESYSTEM_MOUNT_OPTIONS; the CSI mount
+    # only keeps what file.csi.azure.com does not own itself.
+    assert volume.mount_options == ["nconnect=4"]
+    # Network-authorized, so the CSI attachment references no secret at all.
+    assert volume.secret_refs == {}
+    assert volume.secret_literals == {}
+    assert volume.capacity == "512Gi"
+
+
+def test_binding_refuses_a_share_without_a_usable_quota() -> None:
+    driver, mgmt, _, _ = _driver()
+    handle = _provisioned(driver)
+    _, account, share = handle.split("/")
+    stored = mgmt.file_shares.values[(account, share)]
+
+    stored.share_quota = 0
+    with pytest.raises(AzureFilesClassicError, match="invalid quota"):
+        driver.binding(ServiceHandle(handle))
+
+    stored.share_quota = "unlimited"
+    with pytest.raises(AzureFilesClassicError, match="invalid quota"):
+        driver.binding(ServiceHandle(handle))
 
 
 def test_provision_is_idempotent_and_refuses_account_or_share_collision() -> None:

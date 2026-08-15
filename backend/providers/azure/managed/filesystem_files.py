@@ -23,6 +23,8 @@ from _sdk.managed_service import (
     UpdateResult,
     UpdateSpec,
     ValueRef,
+    VolumeMount,
+    VolumeSourceKind,
 )
 
 KIND = "filesystem"
@@ -325,7 +327,7 @@ class AzureFilesDriver(ManagedServiceDriver):
         if not mount_path.startswith("/"):
             raise AzureFilesError("Azure Files mount_path must be absolute")
         encrypted = (
-            str(
+            _string_value(
                 _field(
                     _field(properties, "nfs_protocol_properties"),
                     "encryption_in_transit_required",
@@ -357,6 +359,12 @@ class AzureFilesDriver(ManagedServiceDriver):
                 options.append(value)
         export_path = f"/{mount_name}/{name}"
         resource_id = str(_field(share, "id", default=self._resource_id(name)))
+        try:
+            capacity_gib = int(_field(properties, "provisioned_storage_gi_b", default=0))
+        except (TypeError, ValueError) as exc:
+            raise AzureFilesError("Azure Files share has invalid provisioned capacity") from exc
+        if capacity_gib < 1:
+            raise AzureFilesError("Azure Files share has invalid provisioned capacity")
         return Binding(
             env_vars={
                 "FILESYSTEM_HANDLE": ValueRef(literal=resource_id),
@@ -374,6 +382,35 @@ class AzureFilesDriver(ManagedServiceDriver):
                 "AZURE_RESOURCE_GROUP": ValueRef(literal=self._config.resource_group),
                 "AZURE_LOCATION": ValueRef(literal=str(_field(share, "location", default=self._config.location))),
             },
+            pod_volume_mounts=[
+                VolumeMount(
+                    name=_slug(name),
+                    mount_path=mount_path,
+                    source_kind=VolumeSourceKind.CSI,
+                    protocol="nfs4.1",
+                    csi_driver="file.csi.azure.com",
+                    # The ARM resource id is unique per share and is what the
+                    # binding already publishes as FILESYSTEM_HANDLE.
+                    volume_handle=resource_id,
+                    # file.csi.azure.com builds the NFS source as
+                    # "<server>:/<storageAccount>/<shareName>". This resource
+                    # provider has no storage account; its export path is
+                    # "/<mount name>/<share>", so the mount name takes that
+                    # slot and reproduces FILESYSTEM_SOURCE exactly. The
+                    # classic driver instead carries the account in its
+                    # "<rg>#<account>#<share>" volume handle.
+                    volume_attributes={
+                        "shareName": name,
+                        "protocol": "nfs",
+                        "server": hostname,
+                        "storageAccount": mount_name,
+                    },
+                    # Network-authorized: no secret_refs, nothing to mount with.
+                    mount_options=_csi_nfs_mount_options(options),
+                    read_only=read_only,
+                    capacity=f"{capacity_gib}Gi",
+                ),
+            ],
             notes=(
                 "Microsoft.FileShares provisioned-v2 NFS 4.1 share; access is network-authorized. "
                 "Encrypted mounts require the AZNFS mount helper on the workload node."
@@ -868,6 +905,31 @@ def _validate_subnet_id(value: str) -> None:
 
 def _slug(value: str) -> str:
     return re.sub(r"-+", "-", re.sub(r"[^a-z0-9-]", "-", value.lower())).strip("-") or "share"
+
+
+def _csi_nfs_mount_options(options: list[str]) -> list[str]:
+    """Reduce an fstab-shaped NFS option list to what file.csi.azure.com accepts.
+
+    ``FILESYSTEM_MOUNT_OPTIONS`` describes a manual ``mount``/fstab line and is
+    published unfiltered. A CSI attachment is a different contract, and three
+    families of option do not belong in it:
+
+    * ``nofail`` and ``_netdev`` are fstab automount directives. The kubelet
+      never reads fstab, so they only risk being rejected as unknown options.
+    * ``sec=``, ``vers=``, ``nfsvers=`` and ``minorversion=`` are negotiated by
+      the CSI driver from the volume's ``protocol``; passing our own values
+      conflicts with what it already sets.
+    * ``nolock`` and ``proto=tcp`` are the driver's own defaults for Azure Files
+      NFS, and ``notls`` is an AZNFS mount-helper flag that plain ``mount.nfs``
+      rejects. Encryption in transit is a node-level AZNFS concern.
+
+    ``ro`` is dropped because read-only travels portably as
+    ``VolumeMount.read_only``, which the renderer stamps on the CSI source, the
+    pod volume, and the container mount.
+    """
+    driver_owned = {"nolock", "proto=tcp", "nofail", "_netdev", "notls", "ro"}
+    driver_owned_prefixes = ("sec=", "vers=", "nfsvers=", "minorversion=")
+    return [option for option in options if option not in driver_owned and not option.startswith(driver_owned_prefixes)]
 
 
 def _field(value: Any, name: str, *, default: Any = None) -> Any:

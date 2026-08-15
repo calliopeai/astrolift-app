@@ -288,6 +288,11 @@
 
 ### Fixed
 
+- Attach Microsoft.FileShares NFS shares to workloads as real CSI volumes, read
+  their encryption-in-transit state through the generated SDK's string enums so
+  encrypted shares no longer publish `notls`, size classic Azure Files volumes
+  from the actual share quota instead of the portable 1Gi default, and reduce
+  fstab-only and CSI-driver-owned NFS options out of the CSI mount.
 - Probe live Kubernetes versions, CRDs, and operator releases before managed
   service provision/update; fail closed with exact remediation, make readiness
   timeouts terminal, and generate collision-safe names for long tenant,
