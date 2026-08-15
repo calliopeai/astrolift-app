@@ -1309,16 +1309,47 @@ MATRIX = AvailabilityMatrix(
             kind="workflow_engine",
             variant="workflows",
             plugin_id="gcp",
-            status="planned",
-            description="Google Cloud Workflows",
+            status="preview",
+            description=(
+                "Google Cloud Workflows definitions, immutable revisions, executions, "
+                "CMEK, service identity, environment, logging, history, IAM bindings, "
+                "rollback, adoption, and protected teardown"
+            ),
+            binding_envs=(
+                "WORKFLOW_ENGINE_ID",
+                "WORKFLOW_ENGINE_ARN",
+                "WORKFLOW_ENGINE_REGION",
+                "WORKFLOW_ENGINE_TYPE",
+                "GCP_WORKFLOWS_NAME",
+                "GCP_WORKFLOWS_PROJECT",
+                "GCP_WORKFLOWS_LOCATION",
+                "GCP_WORKFLOWS_EXECUTIONS_URL",
+                "GCP_WORKFLOWS_CONSOLE_URL",
+            ),
             issue_url=_CROSS_CLOUD_PARITY_ISSUE,
         ),
         ManagedServiceEntry(
             kind="cdn",
             variant="cloud_cdn",
             plugin_id="gcp",
-            status="planned",
-            description="Cloud CDN backend and cache policy",
+            status="preview",
+            description=(
+                "Cloud CDN cache policy and global load balancer with Cloud Storage, "
+                "NEG, instance-group, or existing backend-service origins"
+            ),
+            binding_envs=(
+                "CDN_URL",
+                "CDN_DISTRIBUTION_ID",
+                "CDN_DOMAIN",
+                "CDN_DOMAIN_NAME",
+                "CDN_IP_ADDRESS",
+                "CDN_INVALIDATION_ROLE",
+                "GCP_CLOUD_CDN_PROJECT",
+                "GCP_CLOUD_CDN_BACKEND_KIND",
+                "GCP_CLOUD_CDN_BACKEND",
+                "GCP_CLOUD_CDN_URL_MAP",
+                "GCP_CLOUD_CDN_CONSOLE_URL",
+            ),
             issue_url=_CROSS_CLOUD_PARITY_ISSUE,
         ),
         ManagedServiceEntry(

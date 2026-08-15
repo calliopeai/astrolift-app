@@ -533,6 +533,42 @@ def _gcp_managed_config_for(
             adopt_existing_instance=bool(pc.get("spanner_adopt_existing_instance", False)),
         )
 
+    if pair == ("workflow_engine", "workflows") or (kind == "workflow_engine" and not variant):
+        from gcp.managed.workflow_workflows import WorkflowsConfig
+
+        return WorkflowsConfig(
+            project_id=project_id,
+            region=region,
+            workflow_name_prefix=str(pc.get("workflows_name_prefix", "astrolift")),
+            deletion_protection_default=bool(
+                pc.get("workflows_deletion_protection_default", True),
+            ),
+            call_log_level_default=str(
+                pc.get("workflows_call_log_level_default", "LOG_ERRORS_ONLY"),
+            ),
+            execution_history_level_default=str(
+                pc.get(
+                    "workflows_execution_history_level_default",
+                    "EXECUTION_HISTORY_BASIC",
+                ),
+            ),
+            api_endpoint=str(
+                pc.get("workflows_api_endpoint", "https://workflows.googleapis.com/v1"),
+            ),
+            executions_api_endpoint=str(
+                pc.get(
+                    "workflow_executions_api_endpoint",
+                    "https://workflowexecutions.googleapis.com/v1",
+                ),
+            ),
+            operation_timeout_seconds=float(
+                pc.get("workflows_operation_timeout_seconds", 900),
+            ),
+            poll_interval_seconds=float(
+                pc.get("workflows_operation_poll_interval_seconds", 2),
+            ),
+        )
+
     if pair == ("postgres", "cloudsql") or (kind == "postgres" and not variant):
         from gcp.managed.postgres_cloudsql import CloudSQLConfig
 
@@ -779,6 +815,41 @@ def _gcp_managed_config_for(
             ),
             api_endpoint=str(
                 pc.get("cloud_kms_api_endpoint", "https://cloudkms.googleapis.com/v1"),
+            ),
+        )
+
+    if pair == ("cdn", "cloud_cdn") or (kind == "cdn" and not variant):
+        from gcp.managed.cdn_cloud import CloudCdnConfig
+
+        return CloudCdnConfig(
+            project_id=project_id,
+            name_prefix=str(pc.get("cloud_cdn_name_prefix", "astrolift")),
+            deletion_protection_default=bool(
+                pc.get("cloud_cdn_deletion_protection_default", True),
+            ),
+            cache_mode_default=str(
+                pc.get("cloud_cdn_cache_mode_default", "CACHE_ALL_STATIC"),
+            ),
+            default_ttl_seconds=int(pc.get("cloud_cdn_default_ttl_seconds", 3600)),
+            max_ttl_seconds=int(pc.get("cloud_cdn_max_ttl_seconds", 86400)),
+            client_ttl_seconds=int(pc.get("cloud_cdn_client_ttl_seconds", 3600)),
+            serve_while_stale_seconds=int(
+                pc.get("cloud_cdn_serve_while_stale_seconds", 86400),
+            ),
+            invalidation_role=str(
+                pc.get("cloud_cdn_invalidation_role", "roles/compute.loadBalancerAdmin"),
+            ),
+            api_endpoint=str(
+                pc.get(
+                    "cloud_cdn_api_endpoint",
+                    "https://compute.googleapis.com/compute/v1",
+                ),
+            ),
+            operation_timeout_seconds=float(
+                pc.get("cloud_cdn_operation_timeout_seconds", 900),
+            ),
+            poll_interval_seconds=float(
+                pc.get("cloud_cdn_operation_poll_interval_seconds", 2),
             ),
         )
 
