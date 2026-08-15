@@ -3,9 +3,9 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
-from astrolift_drivers.registry import PluginManifest, plugins
 from k8s_native.plugin import PLUGIN
 
+from astrolift_drivers.registry import PluginManifest, plugins
 from core.cluster_observability import ClusterObservabilityError, managed_config_for
 
 

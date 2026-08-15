@@ -22,7 +22,6 @@ Drivers shipped:
 """
 
 from _sdk.base import ProviderPlugin
-
 from k8s_native.cluster import K8sNativeClusterDriver
 from k8s_native.dns_external import ExternalDnsDriver
 from k8s_native.identity_projected import ProjectedSaTokenDriver

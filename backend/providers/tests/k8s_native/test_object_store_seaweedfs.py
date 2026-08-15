@@ -4,6 +4,7 @@ import base64
 import copy
 
 import pytest
+
 from _sdk.cluster import ApplyResult, DeleteResult
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, UpdateSpec
 from k8s_native.managed.object_store_seaweedfs import (
@@ -334,9 +335,7 @@ def test_secret_backend_failure_is_a_safe_terminal_status() -> None:
     status = driver.status(ServiceHandle(result.handle))
 
     assert status.state == "error"
-    assert status.message == (
-        "SeaweedFS credentials could not be synchronized to the external secrets backend"
-    )
+    assert status.message == ("SeaweedFS credentials could not be synchronized to the external secrets backend")
     assert "sensitive" not in status.message
 
 
@@ -394,9 +393,7 @@ def test_deprovision_sets_reclaim_policy_then_revokes_iam_and_secret(
     deleted = driver.deprovision(DeprovisionSpec(result.handle), delete_data=delete_data)
 
     assert deleted.ok is True
-    bucket_reconciles = [
-        manifest for batch in cluster.applied for manifest in batch if manifest["kind"] == "Bucket"
-    ]
+    bucket_reconciles = [manifest for batch in cluster.applied for manifest in batch if manifest["kind"] == "Bucket"]
     assert bucket_reconciles[-1]["spec"]["reclaimPolicy"] == policy
     if not delete_data:
         assert bucket_reconciles[-1]["spec"]["owner"] == ""
@@ -462,6 +459,4 @@ def test_object_lock_retention_stops_teardown_before_iam_revocation() -> None:
 
 
 def test_plugin_registers_preview_seaweedfs_driver() -> None:
-    assert (
-        PLUGIN.managed_service_drivers[("object_store", "seaweedfs_operator")] is SeaweedFSObjectStoreDriver
-    )
+    assert PLUGIN.managed_service_drivers[("object_store", "seaweedfs_operator")] is SeaweedFSObjectStoreDriver

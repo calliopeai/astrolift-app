@@ -36,7 +36,6 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
 
@@ -658,7 +657,7 @@ class SeaweedFSObjectStoreDriver(ManagedServiceDriver):
             current = self._config.secrets_backend.get(path)
             if current != credentials:
                 self._config.secrets_backend.upsert(path, credentials)
-        except Exception:  # noqa: BLE001 — driver boundary returns a safe status
+        except Exception:
             return (
                 "error",
                 "SeaweedFS credentials could not be synchronized to the external secrets backend",
@@ -996,6 +995,4 @@ class SeaweedFSObjectStoreDriver(ManagedServiceDriver):
         )
 
     def _condition_messages(self, status: dict[str, Any]) -> list[str]:
-        return [
-            str(row.get("message", "")) for row in status.get("conditions", []) or [] if row.get("message")
-        ]
+        return [str(row.get("message", "")) for row in status.get("conditions", []) or [] if row.get("message")]

@@ -14,6 +14,7 @@ from collections import defaultdict
 from typing import Any
 
 from _sdk.availability import MATRIX, ManagedServiceEntry
+
 from astrolift_drivers.registry import plugins
 
 _SIZE_OPTIONS = ("small", "medium", "large", "xlarge", "custom")
