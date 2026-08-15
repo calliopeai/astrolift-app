@@ -109,6 +109,23 @@ export const LIST_PROJECT_RESOURCES = gql`
         consumerSlug
         environmentName
       }
+      volumeBindings {
+        id
+        name
+        mountPath
+        subPath
+        sourceKind
+        protocol
+        claimName
+        claimNamespace
+        csiDriver
+        readOnly
+        capacity
+        accessModes
+        workloadNames
+        containerNames
+        credentialReferenceCount
+      }
     }
     astroliftProjectSecretBundles(projectId: $projectId) {
       id
@@ -169,6 +186,23 @@ export const LIST_MANAGED_SERVICES = gql`
       lastActionAt
       lastActionKind
       editableFields
+      volumeBindings {
+        id
+        name
+        mountPath
+        subPath
+        sourceKind
+        protocol
+        claimName
+        claimNamespace
+        csiDriver
+        readOnly
+        capacity
+        accessModes
+        workloadNames
+        containerNames
+        credentialReferenceCount
+      }
     }
   }
 `;

@@ -2307,6 +2307,7 @@ type AstroliftManagedService {
   lastActionKind: String!
   editableFields: [String!]!
   attachments: [AstroliftManagedServiceAttachment!]!
+  volumeBindings: [AstroliftManagedServiceVolumeBinding!]!
 }
 
 type AstroliftManagedServiceAttachment {
@@ -2429,6 +2430,24 @@ type AstroliftManagedServiceTestEmailResultMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftManagedServiceTestEmailResult
+}
+
+type AstroliftManagedServiceVolumeBinding {
+  id: GUID!
+  name: String!
+  mountPath: String!
+  subPath: String!
+  sourceKind: String!
+  protocol: String!
+  claimName: String!
+  claimNamespace: String!
+  csiDriver: String!
+  readOnly: Boolean!
+  capacity: String!
+  accessModes: [String!]!
+  workloadNames: [String!]!
+  containerNames: [String!]!
+  credentialReferenceCount: Int!
 }
 
 type AstroliftManifestDiffEntry {

@@ -478,10 +478,14 @@ def _managed_services_qs(
     org_id = _caller_org_id()
     if org_id is None:
         return ManagedService.objects.none()
-    qs = ManagedService.objects.select_related("registered_app", "app_environment").filter(
-        registered_app__slug=app_slug,
-        registered_app__organization_id=org_id,
-        deleted_at__isnull=True,
+    qs = (
+        ManagedService.objects.select_related("registered_app", "app_environment")
+        .prefetch_related("attachments", "volume_bindings")
+        .filter(
+            registered_app__slug=app_slug,
+            registered_app__organization_id=org_id,
+            deleted_at__isnull=True,
+        )
     )
     if environment_name:
         qs = qs.filter(app_environment__name=environment_name)
@@ -594,6 +598,7 @@ class ServicesQuery:
             .prefetch_related(
                 "attachments__agent_environment_spec",
                 "attachments__app_environment__registered_app",
+                "volume_bindings",
             )
             .filter(project=project, deleted_at__isnull=True)
             .order_by("kind", "name", "guid")

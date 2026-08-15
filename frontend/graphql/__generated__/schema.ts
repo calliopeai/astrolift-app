@@ -2306,6 +2306,7 @@ export type AstroliftManagedService = {
   statusError: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
   variant: Scalars['String']['output'];
+  volumeBindings: Array<AstroliftManagedServiceVolumeBinding>;
 };
 
 export type AstroliftManagedServiceAttachment = {
@@ -2426,6 +2427,24 @@ export type AstroliftManagedServiceTestEmailResultMutationResult = {
   data?: Maybe<AstroliftManagedServiceTestEmailResult>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftManagedServiceVolumeBinding = {
+  accessModes: Array<Scalars['String']['output']>;
+  capacity: Scalars['String']['output'];
+  claimName: Scalars['String']['output'];
+  claimNamespace: Scalars['String']['output'];
+  containerNames: Array<Scalars['String']['output']>;
+  credentialReferenceCount: Scalars['Int']['output'];
+  csiDriver: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  mountPath: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  protocol: Scalars['String']['output'];
+  readOnly: Scalars['Boolean']['output'];
+  sourceKind: Scalars['String']['output'];
+  subPath: Scalars['String']['output'];
+  workloadNames: Array<Scalars['String']['output']>;
 };
 
 export type AstroliftManifestDiffEntry = {

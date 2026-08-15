@@ -37,6 +37,7 @@ export type AstroliftManagedService = Pick<
   | "lastActionKind"
   | "editableFields"
   | "attachments"
+  | "volumeBindings"
 > & {
   /** JSON scalar — opaque shape; callers cast as needed. */
   config: Record<string, unknown>;

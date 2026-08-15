@@ -174,6 +174,7 @@ class ManagedServiceType:
     last_action_kind: str = ""
     editable_fields: list[str] = strawberry.field(default_factory=list)
     attachments: list[ManagedServiceAttachmentType] = strawberry.field(default_factory=list)
+    volume_bindings: list[ManagedServiceVolumeBindingType] = strawberry.field(default_factory=list)
     """Config keys the driver accepts via ``update()`` without full
     reprovision. ``["*"]`` means all fields; ``[]`` means all changes
     require ``reprovisionManagedService``."""
@@ -203,6 +204,27 @@ class ManagedServiceAttachmentType:
     consumer_kind: str
     consumer_slug: str
     environment_name: str
+
+
+@strawberry.type(name="AstroliftManagedServiceVolumeBinding")
+class ManagedServiceVolumeBindingType:
+    """Credential-free runtime mount metadata for a managed filesystem."""
+
+    id: GUID
+    name: str
+    mount_path: str
+    sub_path: str
+    source_kind: str
+    protocol: str
+    claim_name: str
+    claim_namespace: str
+    csi_driver: str
+    read_only: bool
+    capacity: str
+    access_modes: list[str]
+    workload_names: list[str]
+    container_names: list[str]
+    credential_reference_count: int
 
 
 @strawberry.type(name="AstroliftManagedServiceConnectionKey")
@@ -842,6 +864,11 @@ def managed_service_to_type(svc, *, resolve_editable_fields: bool = False) -> Ma
         last_action_kind=svc.last_action_kind or "",
         editable_fields=editable,
         attachments=[managed_service_attachment_to_type(row) for row in svc.attachments.all()],
+        volume_bindings=[
+            managed_service_volume_binding_to_type(row)
+            for row in svc.volume_bindings.all()
+            if row.deleted_at is None
+        ],
     )
 
 
@@ -877,4 +904,24 @@ def managed_service_attachment_to_type(row) -> ManagedServiceAttachmentType:
         consumer_kind="app",
         consumer_slug=row.app_environment.registered_app.slug,
         environment_name=row.app_environment.name,
+    )
+
+
+def managed_service_volume_binding_to_type(row) -> ManagedServiceVolumeBindingType:
+    return ManagedServiceVolumeBindingType(
+        id=GUID(str(row.guid)),
+        name=row.name,
+        mount_path=row.mount_path,
+        sub_path=row.sub_path or "",
+        source_kind=row.source_kind,
+        protocol=row.protocol,
+        claim_name=row.claim_name or "",
+        claim_namespace=row.claim_namespace or "",
+        csi_driver=row.csi_driver or "",
+        read_only=row.read_only,
+        capacity=row.capacity,
+        access_modes=list(row.access_modes or []),
+        workload_names=list(row.workload_names or []),
+        container_names=list(row.container_names or []),
+        credential_reference_count=len(row.secret_refs or {}),
     )

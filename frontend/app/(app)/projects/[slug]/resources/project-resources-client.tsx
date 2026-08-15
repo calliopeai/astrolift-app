@@ -417,6 +417,33 @@ export function ProjectResourcesClient({ slug }: { slug: string }) {
                     <span className="text-muted-foreground text-xs">Not attached yet</span>
                   )}
                 </div>
+                {service.volumeBindings.length > 0 && (
+                  <div className="bg-muted/30 mt-3 space-y-2 rounded-md border p-3">
+                    <p className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+                      Runtime mounts
+                    </p>
+                    {service.volumeBindings.map((binding) => (
+                      <div
+                        key={binding.id}
+                        className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
+                      >
+                        <code>{binding.mountPath}</code>
+                        <Badge variant="outline">{binding.protocol}</Badge>
+                        <span className="text-muted-foreground">
+                          {binding.sourceKind === "csi"
+                            ? binding.csiDriver
+                            : `${binding.claimNamespace}/${binding.claimName}`}
+                        </span>
+                        {binding.readOnly && <Badge variant="secondary">read only</Badge>}
+                        {binding.credentialReferenceCount > 0 && (
+                          <span className="text-muted-foreground">
+                            {binding.credentialReferenceCount} credential refs
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {canUpdate && (
                   <div className="mt-3 flex justify-end gap-2">
                     <Button size="sm" variant="ghost" onClick={() => setConsumerService(service)}>
