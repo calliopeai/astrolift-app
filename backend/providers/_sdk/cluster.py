@@ -870,6 +870,14 @@ class ClusterDriver(Protocol):
         claim's storageClassName unset (same as before)."""
         return []
 
+    def list_csi_drivers(self, cluster: str) -> list[str]:
+        """Return installed ``CSIDriver.metadata.name`` values."""
+        return []
+
+    def persistent_volume_claim_exists(self, cluster: str, namespace: str, name: str) -> bool:
+        """Whether a provider-created claim exists in the consumer namespace."""
+        return False
+
     def get_workload_status(
         self,
         cluster: str,

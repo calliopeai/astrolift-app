@@ -504,11 +504,29 @@ def test_size_only_update_scales_storage_and_is_idempotent():
 def test_binding_is_portable_and_protocol_specific(driver_class, file_system_type, protocol, source_suffix):
     client = _client(file_system_type, existing=True)
     driver = driver_class(config=_config(), client=client)
-    binding = driver.binding(ServiceHandle(f"filesystem/{FS_ID}"))
+    config = (
+        {
+            "mount_username_secret_ref": "astrolift/fsx/client#username",
+            "mount_password_secret_ref": "astrolift/fsx/client#password",
+        }
+        if file_system_type == "WINDOWS"
+        else None
+    )
+    binding = driver.binding(ServiceHandle(f"filesystem/{FS_ID}"), config)
     assert binding.env_vars["FILESYSTEM_PROTOCOL"].literal == protocol
     assert binding.env_vars["FILESYSTEM_MOUNT_SOURCE"].literal.endswith(source_suffix)
     assert binding.env_vars["FSX_FILE_SYSTEM_TYPE"].literal == file_system_type
     assert binding.env_vars["FILESYSTEM_TLS"].literal == "true"
+    volume = binding.pod_volume_mounts[0]
+    assert volume.protocol == protocol
+    assert (
+        volume.csi_driver
+        == {
+            "LUSTRE": "fsx.csi.aws.com",
+            "OPENZFS": "nfs.csi.k8s.io",
+            "WINDOWS": "smb.csi.k8s.io",
+        }[file_system_type]
+    )
 
 
 def test_windows_binding_can_reference_mount_credentials_without_reading_them():
@@ -523,6 +541,21 @@ def test_windows_binding_can_reference_mount_credentials_without_reading_them():
     )
     assert binding.env_vars["FILESYSTEM_USERNAME"].secret_ref == "astrolift/fsx/client#username"
     assert binding.env_vars["FILESYSTEM_PASSWORD"].secret_ref == "astrolift/fsx/client#password"
+    volume = binding.pod_volume_mounts[0]
+    assert volume.volume_attributes == {
+        "source": f"//{FS_ID}.fsx.us-west-2.amazonaws.com/share",
+    }
+    assert volume.secret_refs == {
+        "username": "astrolift/fsx/client#username",
+        "password": "astrolift/fsx/client#password",
+    }
+
+
+def test_windows_binding_refuses_unmountable_credentials() -> None:
+    driver = FSxWindowsDriver(config=_config(), client=_client("WINDOWS", existing=True))
+
+    with pytest.raises(ManagedServiceError, match="workload attachment requires"):
+        driver.binding(ServiceHandle(f"filesystem/{FS_ID}"))
 
 
 def test_status_includes_administrative_action_state_and_failures():

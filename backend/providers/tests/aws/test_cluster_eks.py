@@ -75,6 +75,21 @@ def driver(fake_k8s_client) -> EKSClusterDriver:
         yield d
 
 
+def test_filesystem_preflight_inventory(driver: EKSClusterDriver, fake_k8s_client) -> None:
+    fake_k8s_client.list.return_value = [
+        {"metadata": {"name": "efs.csi.aws.com"}},
+        {"metadata": {"name": "ebs.csi.aws.com"}},
+    ]
+
+    assert driver.list_csi_drivers("test-cluster") == ["ebs.csi.aws.com", "efs.csi.aws.com"]
+    assert driver.persistent_volume_claim_exists("test-cluster", "acme-api", "shared") is True
+    fake_k8s_client.get.assert_called_with(
+        kind="PersistentVolumeClaim",
+        namespace="acme-api",
+        name="shared",
+    )
+
+
 # ---- describe + auth ---------------------------------------------
 
 

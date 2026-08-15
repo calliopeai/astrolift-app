@@ -328,6 +328,19 @@ class GKEClusterDriver(ClusterDriver):
         raise TimeoutError(f"namespace {name} did not delete within 10m")
 
     @driver_op(cloud="gcp", driver="cluster")
+    def list_csi_drivers(self, cluster: str) -> list[str]:
+        client = self._k8s(cluster)
+        return sorted(
+            str((row.get("metadata", {}) or {}).get("name") or "")
+            for row in client.list(kind="storage.k8s.io/v1/CSIDriver")
+            if (row.get("metadata", {}) or {}).get("name")
+        )
+
+    @driver_op(cloud="gcp", driver="cluster")
+    def persistent_volume_claim_exists(self, cluster: str, namespace: str, name: str) -> bool:
+        return self._k8s(cluster).get(kind="PersistentVolumeClaim", namespace=namespace, name=name) is not None
+
+    @driver_op(cloud="gcp", driver="cluster")
     def get_workload_status(self, cluster, namespace, kind, name):
         client = self._k8s(cluster)
         try:

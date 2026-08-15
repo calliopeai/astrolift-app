@@ -34,6 +34,8 @@ from _sdk.managed_service import (
     UpdateResult,
     UpdateSpec,
     ValueRef,
+    VolumeMount,
+    VolumeSourceKind,
 )
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
@@ -187,18 +189,53 @@ class NFSDriver(ManagedServiceDriver):
         )
 
     @driver_op(cloud="k8s_native", driver="filesystem_nfs")
-    def binding(self, handle: ServiceHandle) -> Binding:
-        name = _unpack_handle(handle.handle).name
+    def binding(self, handle: ServiceHandle, config: dict[str, Any] | None = None) -> Binding:
+        parsed = _unpack_handle(handle.handle)
+        name = parsed.name
+        cfg = config or {}
+        mount_path = str(cfg.get("mount_path") or f"/data/{name}")
+        server = str(cfg.get("server_address") or self._config.server_address)
+        share = str(cfg.get("server_export") or self._config.server_export)
+        options = list(cfg.get("mount_options") or [])
+        if server and not any(option.startswith("nfsvers=") for option in options):
+            options.append("nfsvers=4.1")
+        if server:
+            volume = VolumeMount(
+                name=name,
+                mount_path=mount_path,
+                source_kind=VolumeSourceKind.CSI,
+                protocol="nfs4.1",
+                csi_driver="nfs.csi.k8s.io",
+                volume_handle=f"{server}#{share}#{name}",
+                volume_attributes={"server": server, "share": share},
+                mount_options=options,
+                read_only=bool(cfg.get("read_only", False)),
+            )
+        else:
+            claim_namespace = str(cfg.get("claim_namespace") or parsed.namespace)
+            if not claim_namespace:
+                raise ValueError(
+                    "legacy NFS handle has no claim namespace; set claim_namespace in the service config "
+                    "or reprovision it to refresh the handle",
+                )
+            volume = VolumeMount(
+                name=name,
+                mount_path=mount_path,
+                source_kind=VolumeSourceKind.EXISTING_PVC,
+                protocol="pvc",
+                claim_name=name,
+                claim_namespace=claim_namespace,
+                read_only=bool(cfg.get("read_only", False)),
+            )
         return Binding(
             env_vars={
                 "FILESYSTEM_HANDLE": ValueRef(literal=name),
-                "FILESYSTEM_MOUNT_PATH": ValueRef(
-                    literal=f"/data/{name}",
-                ),
+                "FILESYSTEM_MOUNT_PATH": ValueRef(literal=mount_path),
                 "FILESYSTEM_TLS": ValueRef(literal="false"),
             },
+            pod_volume_mounts=[volume],
             iam_grants=[],
-            notes=("PVC mount; workload manifests must reference the PVC by name in volumes + volumeMounts."),
+            notes="NFS workload mount through an existing claim or the NFS CSI driver",
         )
 
     @driver_op(cloud="k8s_native", driver="filesystem_nfs")
@@ -228,6 +265,13 @@ class NFSDriver(ManagedServiceDriver):
                 "storage_class_name": {"type": "string"},
                 "server_address": {"type": "string"},
                 "server_export": {"type": "string"},
+                "claim_namespace": {
+                    "type": "string",
+                    "description": "Consumer namespace for a pre-existing PVC; required for legacy handles.",
+                },
+                "mount_path": {"type": "string"},
+                "mount_options": {"type": "array", "items": {"type": "string"}},
+                "read_only": {"type": "boolean", "default": False},
             },
         }
 

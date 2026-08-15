@@ -206,6 +206,32 @@ def test_ssa_returns_created_when_pre_get_404() -> None:
     assert token_provider.call_count >= 2
 
 
+def test_ssa_ignores_caller_namespace_for_cluster_scoped_resource() -> None:
+    with patch(
+        "kubernetes.dynamic.exceptions.NotFoundError",
+        _FakeDynNotFoundError,
+    ):
+        client, fake_resource, _token_provider = _ssa_test_setup(
+            pre_get_payload=None,
+            post_apply_payload={"metadata": {"name": "shared-pv", "generation": 1}},
+            pre_get_raises_404=True,
+        )
+        fake_resource.namespaced = False
+        client.server_side_apply(
+            namespace="consumer-ns",
+            manifest={
+                "apiVersion": "v1",
+                "kind": "PersistentVolume",
+                "metadata": {"name": "shared-pv"},
+                "spec": {},
+            },
+            dry_run=False,
+        )
+
+    fake_resource.get.assert_called_once_with(name="shared-pv", namespace=None)
+    assert fake_resource.server_side_apply.call_args.kwargs["namespace"] is None
+
+
 def test_ssa_forces_conflicts_by_default() -> None:
     """Regression for the agent-deploy 409 ``FieldManagerConflict``.
 
@@ -392,6 +418,17 @@ def test_get_returns_dict_on_success() -> None:
     assert result == {"metadata": {"name": "api"}, "spec": {"replicas": 3}}
 
 
+def test_get_ignores_namespace_for_cluster_scoped_resource() -> None:
+    client = _make_client()
+    fake_resource = MagicMock(namespaced=False)
+    fake_resource.get.return_value = _resource_instance({"metadata": {"name": "shared-pv"}})
+    _install_fake_dynamic(client, fake_resource)
+
+    client.get(kind="PersistentVolume", namespace="consumer-ns", name="shared-pv")
+
+    fake_resource.get.assert_called_once_with(name="shared-pv", namespace=None)
+
+
 def test_get_returns_none_on_404() -> None:
     with patch(
         "kubernetes.dynamic.exceptions.NotFoundError",
@@ -432,6 +469,15 @@ def test_delete_returns_true_on_success() -> None:
     _install_fake_dynamic(client, fake_resource)
     assert client.delete(kind="Pod", namespace="ns", name="x") is True
     fake_resource.delete.assert_called_with(name="x", namespace="ns")
+
+
+def test_delete_ignores_namespace_for_cluster_scoped_resource() -> None:
+    client = _make_client()
+    fake_resource = MagicMock(namespaced=False)
+    _install_fake_dynamic(client, fake_resource)
+
+    assert client.delete(kind="PersistentVolume", namespace="consumer-ns", name="shared-pv") is True
+    fake_resource.delete.assert_called_once_with(name="shared-pv", namespace=None)
 
 
 def test_delete_returns_false_on_404() -> None:

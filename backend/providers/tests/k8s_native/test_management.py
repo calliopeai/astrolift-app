@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -459,6 +460,19 @@ def test_driver_delegates_bring_into_management_to_management_backend():
     assert report.success is True
     assert report.rbac_applied is True
     assert len(backend.applied) == 4
+
+
+def test_driver_inventories_filesystem_runtime_dependencies():
+    client = MagicMock()
+    client.list.return_value = [{"metadata": {"name": "nfs.csi.k8s.io"}}]
+    client.get.return_value = {"metadata": {"name": "shared"}}
+    driver = K8sNativeClusterDriver(
+        config=K8sNativeConfig(),
+        k8s_client_factory=lambda **_kwargs: client,
+    )
+
+    assert driver.list_csi_drivers("native") == ["nfs.csi.k8s.io"]
+    assert driver.persistent_volume_claim_exists("native", "acme-api", "shared") is True
 
 
 # ---- read_job_status (run reconciler) -----------------------------

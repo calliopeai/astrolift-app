@@ -300,6 +300,19 @@ class K8sNativeClusterDriver(ClusterDriver):
             )
         return out
 
+    @driver_op(cloud="k8s_native", driver="cluster")
+    def list_csi_drivers(self, cluster: str) -> list[str]:
+        client = self._k8s(cluster)
+        return sorted(
+            str((row.get("metadata", {}) or {}).get("name") or "")
+            for row in client.list(kind="storage.k8s.io/v1/CSIDriver")
+            if (row.get("metadata", {}) or {}).get("name")
+        )
+
+    @driver_op(cloud="k8s_native", driver="cluster")
+    def persistent_volume_claim_exists(self, cluster: str, namespace: str, name: str) -> bool:
+        return self._k8s(cluster).get(kind="PersistentVolumeClaim", namespace=namespace, name=name) is not None
+
     # ---- workload status ------------------------------------------
 
     @driver_op(cloud="k8s_native", driver="cluster")
