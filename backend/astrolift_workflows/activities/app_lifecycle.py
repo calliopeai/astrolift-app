@@ -468,7 +468,9 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
 
     manifest, app, env, d, env_from = await sync_to_async(_gather)()
 
-    namespace = app.k8s_namespace or f"{app.organization.slug}-{app.slug}"
+    from core.app_deploy import namespace_for_app
+
+    namespace = namespace_for_app(app)
     resources = _render(
         manifest,
         app_slug=app.slug,
@@ -869,6 +871,7 @@ def _update_secrets_sync(deployment_id: int) -> int:
     from astrolift_services.models import (
         AppSecretBundleRef,
         ManagedServiceBinding,
+        ManagedServiceVolumeBinding,
     )
     from core.app_deploy import (
         AppDeployError,
@@ -963,25 +966,23 @@ def _update_secrets_sync(deployment_id: int) -> int:
                 if binding.is_secret:
                     # env_value_ref is a secrets-backend reference (ARN
                     # or path); resolve via the cluster's secrets driver.
-                    resolved = secrets_backend.get(binding.env_value_ref)
-                    if resolved is None:
+                    from _sdk.secrets import SecretReferenceError, resolve_secret_reference
+
+                    try:
+                        raw_value = resolve_secret_reference(
+                            secrets_backend,
+                            binding.env_value_ref,
+                        )
+                    except SecretReferenceError as exc:
+                        raise AppDeployError(
+                            f"binding {svc.kind}/{svc.name}#{env_key} has an invalid or ambiguous secret reference",
+                        ) from exc
+                    if raw_value is None:
                         raise AppDeployError(
                             f"binding {svc.kind}/{svc.name}#{env_key} "
                             f"references missing secret "
                             f"{binding.env_value_ref!r}",
                         )
-                    # ``get`` returns a dict for bundles; for a single
-                    # binding we expect either a single-key dict or a
-                    # str-stringifiable value. Take the value verbatim
-                    # if it's a string; otherwise pick the first value.
-                    if isinstance(resolved, dict):
-                        if not resolved:
-                            raise AppDeployError(
-                                f"binding {env_key} resolved to an empty secret",
-                            )
-                        raw_value = str(next(iter(resolved.values())))
-                    else:
-                        raw_value = str(resolved)
                     if not raw_value:
                         raise AppDeployError(
                             f"binding {svc.kind}/{svc.name}#{env_key} resolved to an empty secret value",
@@ -1012,6 +1013,32 @@ def _update_secrets_sync(deployment_id: int) -> int:
                 "data": bindings_data,
             },
         )
+
+        from astrolift_services.filesystem_bindings import (
+            FilesystemBindingError,
+            resolve_binding_secret_manifests,
+        )
+
+        volume_bindings = list(
+            ManagedServiceVolumeBinding.objects.filter(
+                managed_service__in=services,
+                managed_service__status__in=["active", "updating"],
+                deleted_at__isnull=True,
+            )
+            .select_related("managed_service")
+            .order_by("managed_service__name", "name"),
+        )
+        try:
+            resources.extend(
+                resolve_binding_secret_manifests(
+                    volume_bindings,
+                    secrets_backend=secrets_backend,
+                    namespace=namespace,
+                    consumer_key=str(d.app_environment.guid),
+                ),
+            )
+        except FilesystemBindingError as exc:
+            raise AppDeployError(str(exc)) from exc
 
     if not resources:
         return 0

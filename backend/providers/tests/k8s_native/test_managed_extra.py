@@ -347,7 +347,44 @@ def test_nfs_size_storage_mapping() -> None:
 def test_nfs_binding_carries_pvc_name() -> None:
     driver = NFSDriver(config=NFSConfig(storage_class_name="nfs-csi"))
     binding = driver.binding(
-        ServiceHandle(handle="filesystem/nfs-api-prod"),
+        ServiceHandle(handle="filesystem/cluster-1/acme-api/nfs-api-prod"),
     )
     assert binding.env_vars["FILESYSTEM_HANDLE"].literal == "nfs-api-prod"
     assert binding.env_vars["FILESYSTEM_TLS"].literal == "false"
+    volume = binding.pod_volume_mounts[0]
+    assert volume.claim_name == "nfs-api-prod"
+    assert volume.claim_namespace == "acme-api"
+
+
+def test_nfs_legacy_binding_requires_explicit_claim_namespace() -> None:
+    driver = NFSDriver(config=NFSConfig(storage_class_name="nfs-csi"))
+
+    with pytest.raises(ValueError, match="claim_namespace"):
+        driver.binding(ServiceHandle(handle="filesystem/nfs-api-prod"))
+
+    binding = driver.binding(
+        ServiceHandle(handle="filesystem/nfs-api-prod"),
+        {"claim_namespace": "acme-api"},
+    )
+    assert binding.pod_volume_mounts[0].claim_namespace == "acme-api"
+
+
+def test_nfs_binding_emits_static_csi_mount_for_shared_server() -> None:
+    driver = NFSDriver(
+        config=NFSConfig(
+            storage_class_name="nfs-csi",
+            server_address="nfs.internal",
+            server_export="/shared",
+        ),
+    )
+
+    binding = driver.binding(
+        ServiceHandle(handle="filesystem/cluster-1/shared/nfs-api-prod"),
+        {"mount_path": "/workspace"},
+    )
+
+    volume = binding.pod_volume_mounts[0]
+    assert volume.csi_driver == "nfs.csi.k8s.io"
+    assert volume.volume_handle == "nfs.internal#/shared#nfs-api-prod"
+    assert volume.volume_attributes == {"server": "nfs.internal", "share": "/shared"}
+    assert volume.mount_options == ["nfsvers=4.1"]

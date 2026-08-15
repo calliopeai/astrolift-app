@@ -8,12 +8,12 @@ values; the dispatcher resolves them from the per-cluster
 per-task K8s Secret the pod mounts via ``secretKeyRef`` (mirrors the
 pipeline secret plumbing in ``astrolift_pipelines.secret_plumbing``).
 
-Write/read symmetry (the property the whole feature turns on): every
-value is stored under a single conventional key, :data:`SECRET_VALUE_KEY`,
-at the ref's ``uri`` path. ``setAgentSecretValue`` writes
-``upsert(uri, {"value": <value>})``; this reader reads
-``get(uri)["value"]``. The two paths MUST agree on that key, and both
-resolve the store from the *same* cluster (see
+Write/read symmetry (the property the whole feature turns on): direct agent
+values are stored under a single conventional key, :data:`SECRET_VALUE_KEY`,
+at the ref's ``uri`` path. Managed-resource bundle refs may select a different
+key with ``uri#field``. The portable selector is stripped before the backend
+read so the same ref works across cloud stores. Both paths resolve the store
+from the *same* cluster (see
 :func:`astrolift_agents.services.agent_cluster.resolve_agent_cluster`), so
 a value set through the platform lands in the exact store the pod reads at
 launch. A plain-string secret pre-created out-of-band also resolves,
@@ -25,6 +25,8 @@ from __future__ import annotations
 import logging
 import re
 from typing import Any
+
+from _sdk.secrets import resolve_secret_reference
 
 from astrolift_agents.services.agent_package import is_reserved_agent_environment_name
 
@@ -258,10 +260,11 @@ def read_secret_value(backend, uri: str) -> str | None:
     empty shell with no current version) — both are "not usable at spawn"
     and the preflight treats them the same.
     """
-    payload = backend.get(uri)
-    if not payload:
-        return None
-    value = payload.get(SECRET_VALUE_KEY)
+    value = resolve_secret_reference(
+        backend,
+        uri,
+        default_key=SECRET_VALUE_KEY,
+    )
     return value or None
 
 

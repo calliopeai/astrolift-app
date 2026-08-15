@@ -2296,6 +2296,12 @@ type AstroliftManagedService {
   status: String!
   statusError: String!
   config: JSON!
+  appliedConfig: JSON
+  operationKind: String!
+  operationWorkflowId: String!
+  operationRunId: String!
+  operationStartedAt: DateTime
+  operationCompletedAt: DateTime
   registeredAppSlug: String!
   projectSlug: String!
   ownerScope: String!
@@ -2307,6 +2313,7 @@ type AstroliftManagedService {
   lastActionKind: String!
   editableFields: [String!]!
   attachments: [AstroliftManagedServiceAttachment!]!
+  volumeBindings: [AstroliftManagedServiceVolumeBinding!]!
 }
 
 type AstroliftManagedServiceAttachment {
@@ -2429,6 +2436,25 @@ type AstroliftManagedServiceTestEmailResultMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftManagedServiceTestEmailResult
+}
+
+type AstroliftManagedServiceVolumeBinding {
+  id: GUID!
+  name: String!
+  mountPath: String!
+  subPath: String!
+  sourceKind: String!
+  protocol: String!
+  claimName: String!
+  claimNamespace: String!
+  storageClassName: String!
+  csiDriver: String!
+  readOnly: Boolean!
+  capacity: String!
+  accessModes: [String!]!
+  workloadNames: [String!]!
+  containerNames: [String!]!
+  credentialReferenceCount: Int!
 }
 
 type AstroliftManifestDiffEntry {

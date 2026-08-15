@@ -35,6 +35,7 @@ def test_managed_services_have_full_364_set() -> None:
     keys = set(PLUGIN.managed_service_drivers.keys())
     assert ("postgres", "azure_pg_flex") in keys
     assert ("redis", "azure_cache_redis") in keys
+    assert ("redis", "azure_managed_redis") in keys
     assert ("object_store", "azure_blob") in keys
     assert ("queue", "azure_servicebus") in keys
     assert ("topic", "service_bus_topic") in keys

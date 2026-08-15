@@ -40,6 +40,7 @@ import zipfile
 from collections.abc import Callable
 from typing import Any
 
+from _sdk.k8s_naming import app_namespace
 from django.db import transaction
 from django.utils import timezone
 
@@ -970,7 +971,10 @@ def _register_one_agent(
             manifest_raw=discovered.raw_text,
             default_branch=default_branch,
             deploy_branch=deploy_branch,
-            k8s_namespace=f"{org.slug}-{app_slug}",
+            k8s_namespace=app_namespace(
+                organization_slug=org.slug,
+                app_slug=app_slug,
+            ),
             subdomain=app_slug,
             default_tenant_cluster=default_cluster,
         )
@@ -1775,7 +1779,10 @@ def _register_one_app(
             # Each service builds from its own subdir (build_image.py reads
             # RegisteredApp.build_context as the context path in the source tree).
             build_context=discovered.build_context,
-            k8s_namespace=f"{org.slug}-{app_slug}",
+            k8s_namespace=app_namespace(
+                organization_slug=org.slug,
+                app_slug=app_slug,
+            ),
             subdomain=app_slug,
             default_tenant_cluster=default_cluster,
         )

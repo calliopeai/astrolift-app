@@ -78,6 +78,12 @@ class ProvisionManagedServiceInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class UpdateManagedServiceInput:
+    managed_service_id: int
+    actor: Actor
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class DeprovisionManagedServiceInput:
     """Input for ``DeprovisionManagedServiceWorkflow`` (#320).
 

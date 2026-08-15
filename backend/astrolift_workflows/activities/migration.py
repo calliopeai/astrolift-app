@@ -67,6 +67,7 @@ async def validate_migration_target(app_environment_id: int, target_cluster_id: 
 
 
 def _apply_to_target_cluster_sync(deployment_id: int, target_cluster_id: int) -> dict[str, list[str]]:
+    from astrolift_clusters.models import TenantCluster
     from astrolift_lifecycle.models import Deployment
     from core.app_deploy import (
         AppDeployError,
@@ -79,6 +80,7 @@ def _apply_to_target_cluster_sync(deployment_id: int, target_cluster_id: int) ->
         "app_environment",
     ).get(pk=deployment_id)
     driver, ctx, namespace = driver_for_target_cluster(d, target_cluster_id)
+    target_cluster = TenantCluster.all_objects.get(pk=target_cluster_id)
     # Ensure the namespace exists on the target.
     driver.ensure_namespace(
         ctx.slug,
@@ -90,7 +92,7 @@ def _apply_to_target_cluster_sync(deployment_id: int, target_cluster_id: int) ->
         },
         {"astrolift.io/registered-app-id": str(d.registered_app.pk)},
     )
-    resources = render_resources_for_deployment(d)
+    resources = render_resources_for_deployment(d, cluster_override=target_cluster)
     if not resources:
         raise AppDeployError(
             f"migrate: manifest for app {d.registered_app.slug!r} rendered to zero resources",
@@ -133,6 +135,7 @@ async def apply_to_target_cluster(
 
 
 def _poll_rollout_on_target_sync(deployment_id: int, target_cluster_id: int) -> bool:
+    from astrolift_clusters.models import TenantCluster
     from astrolift_lifecycle.models import Deployment
     from core.app_deploy import (
         AppDeployError,
@@ -146,7 +149,8 @@ def _poll_rollout_on_target_sync(deployment_id: int, target_cluster_id: int) -> 
         "app_environment",
     ).get(pk=deployment_id)
     driver, ctx, namespace = driver_for_target_cluster(d, target_cluster_id)
-    resources = render_resources_for_deployment(d)
+    target_cluster = TenantCluster.all_objects.get(pk=target_cluster_id)
+    resources = render_resources_for_deployment(d, cluster_override=target_cluster)
     workloads = workloads_from_resources(resources)
     if not workloads:
         return True
@@ -257,7 +261,15 @@ def _drain_source_cluster_sync(
     ctx = _context_for_cluster(source)
     namespace = namespace_for_app(app)
     try:
-        resources = render_resources_for_deployment(deployment)
+        # The environment FK already points at the target by this phase. A
+        # project filesystem is deliberately cluster-bound, so re-running its
+        # mount preflight against the old source would reject the drain render.
+        # Draining only needs workload identities; omit storage attachments.
+        resources = render_resources_for_deployment(
+            deployment,
+            cluster_override=source,
+            include_managed_filesystems=False,
+        )
     except AppDeployError as exc:
         return [str(exc)]
     if not resources:
