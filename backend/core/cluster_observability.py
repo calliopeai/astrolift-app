@@ -839,6 +839,30 @@ def _k8s_managed_config_for(
                 pc.get("knative_default_container_concurrency", 0),
             ),
         )
+    if pair == ("api_gateway", "gateway_api"):
+        from k8s_native.managed.api_gateway import GatewayAPIConfig
+
+        return GatewayAPIConfig(
+            cluster_driver=cluster_driver,
+            namespace=_optional_string(pc.get("gateway_api_namespace")),
+            gateway_class_name=str(pc.get("gateway_api_class_name", "")),
+            allow_class_override=bool(pc.get("gateway_api_allow_class_override", False)),
+            allow_cross_namespace_routes=bool(
+                pc.get("gateway_api_allow_cross_namespace_routes", False),
+            ),
+            allow_cross_namespace_backends=bool(
+                pc.get("gateway_api_allow_cross_namespace_backends", False),
+            ),
+            allow_cross_namespace_certificates=bool(
+                pc.get("gateway_api_allow_cross_namespace_certificates", False),
+            ),
+            allow_custom_backends=bool(pc.get("gateway_api_allow_custom_backends", False)),
+            allow_extension_refs=bool(pc.get("gateway_api_allow_extension_refs", False)),
+            allow_experimental_routes=bool(
+                pc.get("gateway_api_allow_experimental_routes", False),
+            ),
+            allow_listener_sets=bool(pc.get("gateway_api_allow_listener_sets", False)),
+        )
     if pair == ("object_store", "seaweedfs_operator"):
         from k8s_native.managed.object_store_seaweedfs import SeaweedFSObjectStoreConfig
 

@@ -26,6 +26,7 @@ from k8s_native.cluster import K8sNativeClusterDriver
 from k8s_native.dns_external import ExternalDnsDriver
 from k8s_native.identity_projected import ProjectedSaTokenDriver
 from k8s_native.ingress import K8sIngressDriver
+from k8s_native.managed.api_gateway import GatewayAPIDriver
 from k8s_native.managed.event_stream_nats import NATSDriver
 from k8s_native.managed.event_stream_strimzi import StrimziKafkaDriver
 from k8s_native.managed.faas_knative import KnativeServiceDriver
@@ -74,6 +75,7 @@ PLUGIN = ProviderPlugin(
         ("event_stream", "nats"): NATSDriver,
         ("queue", "rabbitmq_operator"): RabbitMQOperatorDriver,
         ("faas", "knative_service"): KnativeServiceDriver,
+        ("api_gateway", "gateway_api"): GatewayAPIDriver,
         ("object_store", "seaweedfs_operator"): SeaweedFSObjectStoreDriver,
         ("mssql", "sqlserver_express"): SQLServerExpressDriver,
         ("search", "opensearch_operator"): OpenSearchSearchDriver,
@@ -167,6 +169,28 @@ PLUGIN = ProviderPlugin(
                 "minimum": 0,
                 "default": 0,
             },
+            "gateway_api_namespace": {"type": "string"},
+            "gateway_api_class_name": {"type": "string"},
+            "gateway_api_allow_class_override": {"type": "boolean", "default": False},
+            "gateway_api_allow_cross_namespace_routes": {
+                "type": "boolean",
+                "default": False,
+            },
+            "gateway_api_allow_cross_namespace_backends": {
+                "type": "boolean",
+                "default": False,
+            },
+            "gateway_api_allow_cross_namespace_certificates": {
+                "type": "boolean",
+                "default": False,
+            },
+            "gateway_api_allow_custom_backends": {"type": "boolean", "default": False},
+            "gateway_api_allow_extension_refs": {"type": "boolean", "default": False},
+            "gateway_api_allow_experimental_routes": {
+                "type": "boolean",
+                "default": False,
+            },
+            "gateway_api_allow_listener_sets": {"type": "boolean", "default": False},
             "seaweed_namespace": {
                 "type": "string",
                 "default": "astrolift-storage",

@@ -1833,9 +1833,16 @@ MATRIX = AvailabilityMatrix(
             kind="api_gateway",
             variant="gateway_api",
             plugin_id="k8s_native",
-            status="planned",
-            description="Kubernetes Gateway API resources",
+            status="preview",
+            description="Kubernetes Gateway API 1.5 gateway and protocol routes",
             issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            binding_envs=(
+                "API_GATEWAY_ID",
+                "API_GATEWAY_URL",
+                "API_GATEWAY_HOST",
+                "API_GATEWAY_PORT",
+                "API_GATEWAY_NAMESPACE",
+            ),
         ),
         ManagedServiceEntry(
             kind="workflow_engine",
