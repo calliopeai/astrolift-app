@@ -32,6 +32,7 @@ _SIZED_KINDS = {
     "time_series",
     "model_endpoint",
     "event_stream",
+    "faas",
     "filesystem",
     "graph_db",
     "wide_column",

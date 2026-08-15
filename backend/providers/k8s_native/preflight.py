@@ -131,6 +131,16 @@ REQUIREMENTS: dict[tuple[str, str], OperatorRequirement] = {
             "-operator/releases/latest/download/cluster-operator.yml"
         ),
     ),
+    ("faas", "knative_service"): OperatorRequirement(
+        operator_id="knative-serving",
+        display_name="Knative Serving",
+        required_crds=("services.serving.knative.dev",),
+        install_hint=(
+            "helm repo add knative-operator https://knative.github.io/operator && "
+            "helm install knative-operator knative-operator/knative-operator "
+            "--namespace knative-operator --create-namespace; then create a KnativeServing resource"
+        ),
+    ),
     ("filesystem", "nfs_csi"): OperatorRequirement(
         operator_id="nfs-csi",
         display_name="NFS CSI Driver",

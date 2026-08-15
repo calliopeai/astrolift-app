@@ -28,6 +28,7 @@ from k8s_native.identity_projected import ProjectedSaTokenDriver
 from k8s_native.ingress import K8sIngressDriver
 from k8s_native.managed.event_stream_nats import NATSDriver
 from k8s_native.managed.event_stream_strimzi import StrimziKafkaDriver
+from k8s_native.managed.faas_knative import KnativeServiceDriver
 from k8s_native.managed.filesystem_nfs import NFSDriver
 from k8s_native.managed.filesystem_pvc import RookCephFSDriver, StorageClassPVCDriver
 from k8s_native.managed.mongodb_operator import MongoDBOperatorDriver
@@ -72,6 +73,7 @@ PLUGIN = ProviderPlugin(
         ("event_stream", "kafka_strimzi"): StrimziKafkaDriver,
         ("event_stream", "nats"): NATSDriver,
         ("queue", "rabbitmq_operator"): RabbitMQOperatorDriver,
+        ("faas", "knative_service"): KnativeServiceDriver,
         ("object_store", "seaweedfs_operator"): SeaweedFSObjectStoreDriver,
         ("mssql", "sqlserver_express"): SQLServerExpressDriver,
         ("search", "opensearch_operator"): OpenSearchSearchDriver,
@@ -144,6 +146,27 @@ PLUGIN = ProviderPlugin(
             "nats_enable_jetstream": {"type": "boolean", "default": True},
             "rabbitmq_storage_class": {"type": "string"},
             "rabbitmq_namespace": {"type": "string"},
+            "knative_namespace": {"type": "string"},
+            "knative_allow_public": {"type": "boolean", "default": False},
+            "knative_allow_tagged_images": {"type": "boolean", "default": False},
+            "knative_allow_unsafe_pod_spec": {"type": "boolean", "default": False},
+            "knative_default_port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535,
+                "default": 8080,
+            },
+            "knative_default_timeout_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3600,
+                "default": 300,
+            },
+            "knative_default_container_concurrency": {
+                "type": "integer",
+                "minimum": 0,
+                "default": 0,
+            },
             "seaweed_namespace": {
                 "type": "string",
                 "default": "astrolift-storage",
