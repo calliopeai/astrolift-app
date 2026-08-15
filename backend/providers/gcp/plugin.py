@@ -28,6 +28,7 @@ Executable managed services:
 - FirestoreNativeDriver — document_db/firestore_native
 - CloudSQLServerDriver — mssql/cloudsql_sqlserver
 - SpannerGraphDriver — graph_db/spanner_graph
+- ManagedKafkaDriver — event_stream/managed_kafka
 - EventarcDriver — event_bus/eventarc
 
 The availability catalogue is authoritative for the remaining planned GCP
@@ -45,6 +46,7 @@ from gcp.managed.document_firestore import FirestoreNativeDriver
 from gcp.managed.email_thirdparty import GCPEmailStubDriver
 from gcp.managed.encryption_cloud_kms import CloudKMSDriver
 from gcp.managed.event_bus_eventarc import EventarcDriver
+from gcp.managed.event_stream_managed_kafka import ManagedKafkaDriver
 from gcp.managed.graph_spanner import SpannerGraphDriver
 from gcp.managed.model_endpoint_vertex import VertexAIEndpointDriver
 from gcp.managed.mssql_cloudsql import CloudSQLServerDriver
@@ -98,6 +100,7 @@ PLUGIN = ProviderPlugin(
         ("document_db", "firestore_native"): FirestoreNativeDriver,
         ("mssql", "cloudsql_sqlserver"): CloudSQLServerDriver,
         ("graph_db", "spanner_graph"): SpannerGraphDriver,
+        ("event_stream", "managed_kafka"): ManagedKafkaDriver,
         ("event_bus", "eventarc"): EventarcDriver,
     },
     config_schema={
@@ -185,6 +188,38 @@ PLUGIN = ProviderPlugin(
                 "type": "string",
                 "default": "astrolift",
                 "description": "Prefix for platform-managed Pub/Sub topics.",
+            },
+            "managed_kafka_location": {
+                "type": "string",
+                "description": "Managed Kafka location; falls back to the cluster region.",
+            },
+            "managed_kafka_cluster_id_prefix": {
+                "type": "string",
+                "default": "astrolift",
+            },
+            "managed_kafka_subnet_names": {
+                "type": "array",
+                "maxItems": 10,
+                "items": {"type": "string"},
+                "description": "Default PSC subnets for Managed Kafka clusters.",
+            },
+            "managed_kafka_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "managed_kafka_api_endpoint": {
+                "type": "string",
+                "default": "https://managedkafka.googleapis.com/v1",
+            },
+            "managed_kafka_operation_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 1800,
+            },
+            "managed_kafka_operation_poll_interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 5,
             },
             "eventarc_location": {
                 "type": "string",
