@@ -8,10 +8,18 @@
   Azure Files SMB/NFS shares, including network ACLs, per-protocol encryption,
   dual Key Vault-backed SMB rotation keys, snapshots, soft delete, guarded
   teardown, and portable mount metadata.
+- Add Azure SQL Database provisioned, serverless, and Hyperscale variants plus
+  Azure SQL Managed Instance with typed ARM requests, VNet/subnet isolation,
+  Key Vault-backed portable bindings, retention controls, database-copy
+  snapshot/restore, and fail-closed teardown semantics.
 - Add Microsoft.FileShares provisioned-v2 NFS lifecycle with SSD capacity,
   Local or Zone redundancy, provisioned performance, root-squash and encrypted
   mount controls, subnet allowlists, portable AZNFS bindings, child snapshots,
   ownership-safe reconciliation, and protected data-loss-aware teardown.
+- Add Google Cloud API Gateway lifecycle with immutable OpenAPI and gRPC
+  config revisions, zero-downtime gateway retargeting, backend service
+  identity, revision retention, portable endpoint bindings, adoption,
+  snapshots, and guarded dependency teardown.
 - Add Google Managed Service for Apache Kafka lifecycle across clusters,
   topics, ACLs, consumer offsets, Schema Registry, Connect clusters and
   connectors, including PSC networking, CMEK, mTLS, IAM/portable bindings,
@@ -146,6 +154,9 @@
 
 ### Fixed
 
+- Serialize Azure ownership, billing, and custom ARM tags through one
+  collision-safe codec so tag names satisfy Azure restrictions and cost
+  actuals group by the same `astrolift-binding` key drivers emit.
 - Make GKE workload identity reconcile project IAM roles on every deploy,
   annotate workload ServiceAccounts with canonical length-safe Google service
   accounts, include attached project resources, and reject inert raw grants.

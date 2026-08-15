@@ -50,6 +50,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from azure.managed.tags import arm_tags_for as _tags_for
 
 KIND = "queue"
 
@@ -344,26 +345,6 @@ class AzureServiceBusConfig:
 
     client: Any | None = None
     """Injected ``ServiceBusManagementClient`` for tests."""
-
-
-def _tags_for(spec: ProvisionSpec) -> dict[str, str]:
-    base = {
-        "astrolift.io/managed-by": "platform",
-        "astrolift.io/organization": spec.organization_slug,
-        "astrolift.io/app": spec.app_slug,
-        "astrolift.io/environment": spec.environment_name,
-        "astrolift.io/cluster": spec.tenant_cluster_id,
-        "astrolift.io/isolation": spec.isolation,
-    }
-    # Per-binding cost-attribution keys (#438). Azure allows the
-    # slash + dot form so keys stay identical to the canonical
-    # platform schema.
-    if spec.binding_id:
-        base["astrolift.io/binding"] = spec.binding_id
-    if spec.managed_service_id:
-        base["astrolift.io/managed_service_id"] = spec.managed_service_id
-    base.update({f"astrolift.io/extra/{k}": v for k, v in (spec.tags or {}).items()})
-    return base
 
 
 class AzureServiceBusDriver(ManagedServiceDriver):

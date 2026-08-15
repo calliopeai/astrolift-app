@@ -57,6 +57,7 @@ azure = [
     "azure-mgmt-search>=9.1",
     "azure-mgmt-servicebus>=8.2",
     "azure-mgmt-storage>=25.1,<26",
+    "azure-mgmt-sql>=4.0",
     "azure-search-documents>=11.6",
     "azure-storage-file-share>=12.26,<13",
     "azure-storage-blob>=12.19",
