@@ -18,6 +18,8 @@ Managed services:
 - AzureBlobStorageDriver — object_store/azure_blob
 - AzureServiceBusDriver — queue/azure_servicebus and topic/service_bus_topic
 - AzureEventHubsDriver — stream/event_hubs and event_stream/event_hubs_kafka
+- AzureEventGridDriver — event_bus/event_grid
+- AzureEventGridNamespaceDriver — event_bus/event_grid_namespace
 - AzureFilesDriver — filesystem/azure_files
 - AzurePostgresFlexibleDriver — postgres/azure_pg_flex
 - AzureMySQLFlexibleDriver — mysql/azure_mysql_flex
@@ -44,6 +46,8 @@ from azure.managed.cache_redis import AzureCacheRedisDriver
 from azure.managed.cosmos import AzureCosmosDriver
 from azure.managed.cosmos_api import AzureCosmosApiDriver
 from azure.managed.email_acs import AzureCommunicationEmailDriver
+from azure.managed.event_grid import AzureEventGridDriver
+from azure.managed.event_grid_namespace import AzureEventGridNamespaceDriver
 from azure.managed.event_hubs import AzureEventHubsDriver
 from azure.managed.filesystem_files import AzureFilesDriver
 from azure.managed.managed_redis import AzureManagedRedisDriver
@@ -95,6 +99,26 @@ _MANAGED_CONFIG_PROPERTIES = {
         "type": "string",
         "enum": ["Enabled", "Disabled", "SecuredByPerimeter"],
         "default": "Enabled",
+    },
+    "eventgrid_topic_name_prefix": {"type": "string", "default": "astrolift-eg"},
+    "eventgrid_default_input_schema": {
+        "type": "string",
+        "enum": ["CloudEventSchemaV1_0", "EventGridSchema"],
+        "default": "CloudEventSchemaV1_0",
+    },
+    "eventgrid_public_network_access_default": {
+        "type": "string",
+        "enum": ["Enabled", "Disabled"],
+        "default": "Enabled",
+    },
+    "eventgrid_namespace_name_prefix": {"type": "string", "default": "astrolift-egns"},
+    "eventgrid_namespace_topic_name_prefix": {"type": "string", "default": "events"},
+    "eventgrid_namespace_secret_name_prefix": {"type": "string", "default": "event-grid-namespace"},
+    "eventgrid_namespace_default_capacity": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 40,
+        "default": 1,
     },
     "files_name_prefix": {"type": "string", "default": "astrolift-files"},
     "files_default_storage_gib": {"type": "integer", "minimum": 32, "maximum": 262144, "default": 32},
@@ -300,6 +324,8 @@ PLUGIN = ProviderPlugin(
         ("topic", "service_bus_topic"): AzureServiceBusDriver,
         ("stream", "event_hubs"): AzureEventHubsDriver,
         ("event_stream", "event_hubs_kafka"): AzureEventHubsDriver,
+        ("event_bus", "event_grid"): AzureEventGridDriver,
+        ("event_bus", "event_grid_namespace"): AzureEventGridNamespaceDriver,
         ("filesystem", "azure_files"): AzureFilesDriver,
         ("kv_store", "cosmos"): AzureCosmosDriver,
         ("document_db", "cosmos_nosql"): AzureCosmosApiDriver,

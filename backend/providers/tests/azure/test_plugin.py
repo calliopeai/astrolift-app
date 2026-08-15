@@ -41,6 +41,8 @@ def test_managed_services_have_full_364_set() -> None:
     assert ("topic", "service_bus_topic") in keys
     assert ("stream", "event_hubs") in keys
     assert ("event_stream", "event_hubs_kafka") in keys
+    assert ("event_bus", "event_grid") in keys
+    assert ("event_bus", "event_grid_namespace") in keys
     assert ("filesystem", "azure_files") in keys
 
 
@@ -77,6 +79,9 @@ def test_managed_runtime_controls_are_exposed_in_provider_schema() -> None:
         "servicebus_dead_lettering_on_message_expiration",
         "eventhubs_default_sku",
         "eventhubs_public_network_access_default",
+        "eventgrid_default_input_schema",
+        "eventgrid_public_network_access_default",
+        "eventgrid_namespace_default_capacity",
         "files_allowed_subnet_ids",
         "postgres_backup_retention_days",
         "mysql_backup_retention_days",
@@ -99,6 +104,7 @@ def test_astrolift_azure_package_extends_official_sdk_namespace() -> None:
     """The local ``azure`` package must not shadow Microsoft's SDKs."""
     from azure.identity import DefaultAzureCredential
     from azure.mgmt.cosmosdb import CosmosDBManagementClient
+    from azure.mgmt.eventgrid import EventGridManagementClient
     from azure.mgmt.eventhub import EventHubManagementClient
     from azure.mgmt.fileshares import FileSharesMgmtClient
     from azure.mgmt.mysqlflexibleservers import MySQLManagementClient
@@ -113,6 +119,7 @@ def test_astrolift_azure_package_extends_official_sdk_namespace() -> None:
             DefaultAzureCredential,
             CosmosDBManagementClient,
             EventHubManagementClient,
+            EventGridManagementClient,
             FileSharesMgmtClient,
             MySQLManagementClient,
             PostgreSQLManagementClient,
@@ -129,6 +136,7 @@ def test_registered_managed_drivers_target_current_sdk_operation_groups() -> Non
     from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
     from azure.mgmt.communication import CommunicationServiceManagementClient
     from azure.mgmt.cosmosdb import CosmosDBManagementClient
+    from azure.mgmt.eventgrid import EventGridManagementClient
     from azure.mgmt.eventhub import EventHubManagementClient
     from azure.mgmt.fileshares import FileSharesMgmtClient
     from azure.mgmt.loganalytics import LogAnalyticsManagementClient
@@ -259,6 +267,38 @@ def test_registered_managed_drivers_target_current_sdk_operation_groups() -> Non
                 "queues": {"create_or_update", "delete", "get"},
                 "topics": {"create_or_update", "delete", "get"},
                 "subscriptions": {"create_or_update", "delete"},
+            },
+        ),
+        (
+            EventGridManagementClient(credential, subscription_id),
+            {
+                "topics": {"begin_create_or_update", "begin_delete", "begin_update", "get"},
+                "topic_event_subscriptions": {
+                    "begin_create_or_update",
+                    "begin_delete",
+                    "get",
+                    "list",
+                },
+                "namespaces": {
+                    "begin_create_or_update",
+                    "begin_delete",
+                    "begin_update",
+                    "get",
+                    "list_shared_access_keys",
+                },
+                "namespace_topics": {
+                    "begin_create_or_update",
+                    "begin_delete",
+                    "begin_update",
+                    "get",
+                    "list_by_namespace",
+                },
+                "namespace_topic_event_subscriptions": {
+                    "begin_create_or_update",
+                    "begin_delete",
+                    "get",
+                    "list_by_namespace_topic",
+                },
             },
         ),
         (
