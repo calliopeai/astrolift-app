@@ -818,6 +818,41 @@ def _gcp_managed_config_for(
             ),
         )
 
+    if pair == ("cdn", "cloud_cdn") or (kind == "cdn" and not variant):
+        from gcp.managed.cdn_cloud import CloudCdnConfig
+
+        return CloudCdnConfig(
+            project_id=project_id,
+            name_prefix=str(pc.get("cloud_cdn_name_prefix", "astrolift")),
+            deletion_protection_default=bool(
+                pc.get("cloud_cdn_deletion_protection_default", True),
+            ),
+            cache_mode_default=str(
+                pc.get("cloud_cdn_cache_mode_default", "CACHE_ALL_STATIC"),
+            ),
+            default_ttl_seconds=int(pc.get("cloud_cdn_default_ttl_seconds", 3600)),
+            max_ttl_seconds=int(pc.get("cloud_cdn_max_ttl_seconds", 86400)),
+            client_ttl_seconds=int(pc.get("cloud_cdn_client_ttl_seconds", 3600)),
+            serve_while_stale_seconds=int(
+                pc.get("cloud_cdn_serve_while_stale_seconds", 86400),
+            ),
+            invalidation_role=str(
+                pc.get("cloud_cdn_invalidation_role", "roles/compute.loadBalancerAdmin"),
+            ),
+            api_endpoint=str(
+                pc.get(
+                    "cloud_cdn_api_endpoint",
+                    "https://compute.googleapis.com/compute/v1",
+                ),
+            ),
+            operation_timeout_seconds=float(
+                pc.get("cloud_cdn_operation_timeout_seconds", 900),
+            ),
+            poll_interval_seconds=float(
+                pc.get("cloud_cdn_operation_poll_interval_seconds", 2),
+            ),
+        )
+
     if pair in {
         ("search", "gcp_elastic_cloud"),
         ("email", "gcp_thirdparty"),

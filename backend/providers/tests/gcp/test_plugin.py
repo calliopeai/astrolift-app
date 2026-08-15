@@ -33,6 +33,7 @@ def test_managed_services_have_object_store_and_queue() -> None:
     assert ("mssql", "cloudsql_sqlserver") in keys
     assert ("graph_db", "spanner_graph") in keys
     assert ("workflow_engine", "workflows") in keys
+    assert ("cdn", "cloud_cdn") in keys
     assert ("faas", "cloud_functions_gen2") in keys
     assert ("api_gateway", "api_gateway") in keys
     assert ("event_stream", "managed_kafka") in keys
@@ -128,6 +129,24 @@ def test_spanner_graph_operator_controls_are_exposed() -> None:
         "spanner_operation_timeout_seconds",
         "spanner_operation_poll_interval_seconds",
         "spanner_adopt_existing_instance",
+    ):
+        assert field in properties
+
+
+def test_cloud_cdn_operator_controls_are_exposed() -> None:
+    properties = PLUGIN.config_schema["properties"]
+    for field in (
+        "cloud_cdn_name_prefix",
+        "cloud_cdn_deletion_protection_default",
+        "cloud_cdn_cache_mode_default",
+        "cloud_cdn_default_ttl_seconds",
+        "cloud_cdn_max_ttl_seconds",
+        "cloud_cdn_client_ttl_seconds",
+        "cloud_cdn_serve_while_stale_seconds",
+        "cloud_cdn_invalidation_role",
+        "cloud_cdn_api_endpoint",
+        "cloud_cdn_operation_timeout_seconds",
+        "cloud_cdn_operation_poll_interval_seconds",
     ):
         assert field in properties
 

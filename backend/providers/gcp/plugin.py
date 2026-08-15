@@ -29,6 +29,7 @@ Executable managed services:
 - CloudSQLServerDriver — mssql/cloudsql_sqlserver
 - SpannerGraphDriver — graph_db/spanner_graph
 - WorkflowsDriver — workflow_engine/workflows
+- CloudCdnDriver — cdn/cloud_cdn
 - CloudFunctionsDriver — faas/cloud_functions_gen2
 - APIGatewayDriver — api_gateway/api_gateway
 - ManagedKafkaDriver — event_stream/managed_kafka
@@ -46,6 +47,7 @@ from gcp.identity_wi import GCPWorkloadIdentityDriver
 from gcp.ingress import GCPIngressDriver
 from gcp.managed.api_gateway import APIGatewayDriver
 from gcp.managed.bigtable import BigtableDriver
+from gcp.managed.cdn_cloud import CloudCdnDriver
 from gcp.managed.document_firestore import FirestoreNativeDriver
 from gcp.managed.email_thirdparty import GCPEmailStubDriver
 from gcp.managed.encryption_cloud_kms import CloudKMSDriver
@@ -107,6 +109,7 @@ PLUGIN = ProviderPlugin(
         ("mssql", "cloudsql_sqlserver"): CloudSQLServerDriver,
         ("graph_db", "spanner_graph"): SpannerGraphDriver,
         ("workflow_engine", "workflows"): WorkflowsDriver,
+        ("cdn", "cloud_cdn"): CloudCdnDriver,
         ("faas", "cloud_functions_gen2"): CloudFunctionsDriver,
         ("api_gateway", "api_gateway"): APIGatewayDriver,
         ("event_stream", "managed_kafka"): ManagedKafkaDriver,
@@ -187,6 +190,67 @@ PLUGIN = ProviderPlugin(
                 "type": "string",
                 "default": "2592000s",
                 "description": "Immutable provider waiting period; 2592000s is 30 days.",
+            },
+            "cloud_cdn_name_prefix": {
+                "type": "string",
+                "default": "astrolift",
+                "description": "Prefix for the Cloud CDN load-balancer resource graph.",
+            },
+            "cloud_cdn_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "cloud_cdn_cache_mode_default": {
+                "type": "string",
+                "enum": ["CACHE_ALL_STATIC", "USE_ORIGIN_HEADERS"],
+                "default": "CACHE_ALL_STATIC",
+                "description": "Safe default cache mode. FORCE_CACHE_ALL requires an explicit service-level opt-in.",
+            },
+            "cloud_cdn_default_ttl_seconds": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 31622400,
+                "default": 3600,
+            },
+            "cloud_cdn_max_ttl_seconds": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 31622400,
+                "default": 86400,
+            },
+            "cloud_cdn_client_ttl_seconds": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 31622400,
+                "default": 3600,
+            },
+            "cloud_cdn_serve_while_stale_seconds": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 604800,
+                "default": 86400,
+            },
+            "cloud_cdn_invalidation_role": {
+                "type": "string",
+                "default": "roles/compute.loadBalancerAdmin",
+                "description": (
+                    "IAM role emitted in the binding for cache invalidation; "
+                    "a custom least-privilege role is recommended."
+                ),
+            },
+            "cloud_cdn_api_endpoint": {
+                "type": "string",
+                "default": "https://compute.googleapis.com/compute/v1",
+            },
+            "cloud_cdn_operation_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 900,
+            },
+            "cloud_cdn_operation_poll_interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 2,
             },
             "bucket_name_prefix": {
                 "type": "string",

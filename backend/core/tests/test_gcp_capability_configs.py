@@ -172,6 +172,42 @@ def test_pubsub_topic_runtime_config_preserves_operator_prefix() -> None:
     assert config.topic_prefix == "smd-events"
 
 
+def test_cloud_cdn_runtime_config_preserves_operator_controls() -> None:
+    from core.cluster_observability import managed_config_for
+
+    config = managed_config_for(
+        "gcp",
+        _cluster(
+            cloud_cdn_name_prefix="smd-edge",
+            cloud_cdn_deletion_protection_default=False,
+            cloud_cdn_cache_mode_default="USE_ORIGIN_HEADERS",
+            cloud_cdn_default_ttl_seconds=60,
+            cloud_cdn_max_ttl_seconds=3600,
+            cloud_cdn_client_ttl_seconds=30,
+            cloud_cdn_serve_while_stale_seconds=120,
+            cloud_cdn_invalidation_role="projects/acme-prod/roles/cdnInvalidator",
+            cloud_cdn_api_endpoint="https://compute.example.test/compute/v1",
+            cloud_cdn_operation_timeout_seconds=120,
+            cloud_cdn_operation_poll_interval_seconds=0.5,
+        ),
+        kind="cdn",
+        variant="cloud_cdn",
+    )
+    assert type(config).__name__ == "CloudCdnConfig"
+    assert config.project_id == "acme-prod"
+    assert config.name_prefix == "smd-edge"
+    assert config.deletion_protection_default is False
+    assert config.cache_mode_default == "USE_ORIGIN_HEADERS"
+    assert config.default_ttl_seconds == 60
+    assert config.max_ttl_seconds == 3600
+    assert config.client_ttl_seconds == 30
+    assert config.serve_while_stale_seconds == 120
+    assert config.invalidation_role == "projects/acme-prod/roles/cdnInvalidator"
+    assert config.api_endpoint == "https://compute.example.test/compute/v1"
+    assert config.operation_timeout_seconds == 120
+    assert config.poll_interval_seconds == 0.5
+
+
 def test_bigquery_runtime_config_preserves_operator_controls() -> None:
     from core.cluster_observability import managed_config_for
 

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add executable Google Cloud CDN lifecycle support, including Cloud Storage,
+  NEG, instance-group, and existing backend-service origins; safe cache policy
+  controls; a managed global HTTP(S) load-balancer graph; managed or external
+  TLS; Cloud Armor policies; invalidation; signed-URL key rotation; portable
+  bindings; ownership/adoption; and protected deletion.
+
 ### Added
 
 - Add Google Cloud Workflows lifecycle with YAML/JSON definitions, revision
