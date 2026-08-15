@@ -64,6 +64,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from azure.managed.tags import arm_tags_for as tags_for
 
 KIND = "time_series"
 
@@ -92,31 +93,6 @@ _SIZE_TO_RETENTION_DAYS = {
     "large": 365,
     "xlarge": 730,
 }
-
-
-def tags_for(spec: ProvisionSpec) -> dict[str, str]:
-    """Standard Azure tag set the platform applies to every
-    managed-service resource. Mirrors the cosmos / cache-redis
-    drivers' helper to keep the cross-driver shape identical."""
-    base = {
-        "astrolift.io/managed-by": "platform",
-        "astrolift.io/organization": spec.organization_slug,
-        "astrolift.io/app": spec.app_slug,
-        "astrolift.io/environment": spec.environment_name,
-        "astrolift.io/cluster": spec.tenant_cluster_id,
-        "astrolift.io/isolation": spec.isolation,
-    }
-    # Per-binding cost-attribution keys (#438). Azure allows the
-    # slash + dot form so keys stay identical to the canonical
-    # platform schema.
-    if spec.binding_id:
-        base["astrolift.io/binding"] = spec.binding_id
-    if spec.managed_service_id:
-        base["astrolift.io/managed_service_id"] = spec.managed_service_id
-    base.update(
-        {f"astrolift.io/extra/{k}": v for k, v in (spec.tags or {}).items()},
-    )
-    return base
 
 
 @dataclass(frozen=True)
@@ -235,9 +211,13 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
             ),
         )
 
-        tags = tags_for(spec)
-        tags["astrolift.io/ingestion-cap-millions"] = str(ingestion_cap)
-        tags["astrolift.io/retention-days"] = str(retention_days)
+        tags = tags_for(
+            spec,
+            platform_tags={
+                "ingestion-cap-millions": ingestion_cap,
+                "retention-days": retention_days,
+            },
+        )
 
         # 1. Create the Azure Monitor workspace.
         workspace_parameters: dict[str, Any] = {
@@ -374,14 +354,14 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
 
         tags_patch: dict[str, str] = {}
         if spec.size:
-            tags_patch["astrolift.io/ingestion-cap-millions"] = str(
+            tags_patch["astrolift-ingestion-cap-millions"] = str(
                 _SIZE_TO_INGESTION_CAP_MILLIONS.get(spec.size, 10),
             )
-            tags_patch["astrolift.io/retention-days"] = str(
+            tags_patch["astrolift-retention-days"] = str(
                 _SIZE_TO_RETENTION_DAYS.get(spec.size, 30),
             )
         if "ingestion_cap_millions" in cfg:
-            tags_patch["astrolift.io/ingestion-cap-millions"] = str(
+            tags_patch["astrolift-ingestion-cap-millions"] = str(
                 int(cfg["ingestion_cap_millions"]),
             )
 
