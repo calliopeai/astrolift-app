@@ -56,6 +56,7 @@ def test_managed_services_register_explicit_cosmos_api_variants() -> None:
         ("kv_store", "cosmos_table"),
     } <= keys
     assert ("filesystem", "azure_files_classic") in keys
+    assert ("faas", "azure_functions") in keys
 
 
 def test_config_schema_requires_core_fields() -> None:
@@ -87,6 +88,11 @@ def test_managed_runtime_controls_are_exposed_in_provider_schema() -> None:
         "files_classic_default_protocol",
         "files_classic_default_sku",
         "files_classic_default_access_tier",
+        "faas_allowed_plan_resource_ids",
+        "faas_allowed_identity_resource_ids",
+        "faas_allowed_storage_resource_ids",
+        "faas_allow_public_network",
+        "faas_deletion_protection_default",
         "postgres_backup_retention_days",
         "mysql_backup_retention_days",
         "redis_minimum_tls_version_default",

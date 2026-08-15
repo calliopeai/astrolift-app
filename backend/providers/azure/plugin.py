@@ -36,6 +36,7 @@ Managed services:
 - AzureSQLDatabaseDriver — mssql/azure_sql_database,
   mssql/azure_sql_serverless, mssql/azure_sql_hyperscale
 - AzureSQLManagedInstanceDriver — mssql/azure_sql_managed_instance
+- AzureFunctionsDriver — faas/azure_functions
 """
 
 from _sdk.base import ProviderPlugin
@@ -50,6 +51,7 @@ from azure.managed.email_acs import AzureCommunicationEmailDriver
 from azure.managed.event_grid import AzureEventGridDriver
 from azure.managed.event_grid_namespace import AzureEventGridNamespaceDriver
 from azure.managed.event_hubs import AzureEventHubsDriver
+from azure.managed.faas_functions import AzureFunctionsDriver
 from azure.managed.filesystem_files import AzureFilesDriver
 from azure.managed.filesystem_files_classic import AzureFilesClassicDriver
 from azure.managed.managed_redis import AzureManagedRedisDriver
@@ -185,6 +187,54 @@ _MANAGED_CONFIG_PROPERTIES = {
         "pattern": "^[A-Za-z0-9-]{1,92}$",
         "default": "astrolift-files",
     },
+    "faas_function_name_prefix": {"type": "string", "default": "astrolift"},
+    "faas_default_plan_resource_id": {"type": "string"},
+    "faas_default_identity_resource_id": {"type": "string"},
+    "faas_allowed_plan_resource_ids": {
+        "type": "array",
+        "minItems": 1,
+        "items": {"type": "string"},
+        "description": "Exact operator-approved Microsoft.Web/serverfarms resource IDs.",
+    },
+    "faas_allowed_identity_resource_ids": {
+        "type": "array",
+        "minItems": 1,
+        "items": {"type": "string"},
+        "description": "Exact operator-approved user-assigned managed identity resource IDs.",
+    },
+    "faas_allowed_storage_resource_ids": {
+        "type": "array",
+        "minItems": 1,
+        "items": {"type": "string"},
+        "description": "Exact operator-approved host/deployment Storage Account resource IDs.",
+    },
+    "faas_allowed_registry_resource_ids": {
+        "type": "array",
+        "minItems": 1,
+        "items": {"type": "string"},
+        "description": "Exact operator-approved ACR resource IDs for container functions.",
+    },
+    "faas_allowed_subnet_resource_ids": {
+        "type": "array",
+        "minItems": 1,
+        "items": {"type": "string"},
+        "description": "Exact operator-approved Function App VNet integration subnet IDs.",
+    },
+    "faas_allow_public_network": {"type": "boolean", "default": False},
+    "faas_deletion_protection_default": {"type": "boolean", "default": True},
+    "faas_storage_blob_endpoint_suffix": {
+        "type": "string",
+        "default": "blob.core.windows.net",
+    },
+    "faas_registry_login_server_suffix": {"type": "string", "default": "azurecr.io"},
+    "faas_site_api_version": {"type": "string", "default": "2024-11-01"},
+    "faas_identity_api_version": {"type": "string", "default": "2023-01-31"},
+    "faas_storage_api_version": {"type": "string", "default": "2023-05-01"},
+    "faas_registry_api_version": {"type": "string", "default": "2023-07-01"},
+    "faas_authorization_api_version": {"type": "string", "default": "2022-04-01"},
+    "faas_operation_timeout_seconds": {"type": "number", "minimum": 1, "default": 900},
+    "faas_poll_interval_seconds": {"type": "number", "minimum": 0.1, "default": 3},
+    "faas_max_instances": {"type": "integer", "minimum": 1, "default": 100},
     "postgres_server_name_prefix": {"type": "string", "default": "astrolift"},
     "postgres_engine_version": {"type": "string", "default": "16"},
     "postgres_backup_retention_days": {"type": "integer", "minimum": 1, "maximum": 35, "default": 7},
@@ -393,6 +443,7 @@ PLUGIN = ProviderPlugin(
         ("mssql", "azure_sql_serverless"): AzureSQLDatabaseDriver,
         ("mssql", "azure_sql_hyperscale"): AzureSQLDatabaseDriver,
         ("mssql", "azure_sql_managed_instance"): AzureSQLManagedInstanceDriver,
+        ("faas", "azure_functions"): AzureFunctionsDriver,
     },
     config_schema={
         "type": "object",

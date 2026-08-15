@@ -39,6 +39,7 @@ _AZURE_EVENT_HUBS_CERTIFICATION_ISSUE = "https://github.com/calliopeai/astrolift
 _AZURE_EVENT_GRID_CERTIFICATION_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1354"
 _AZURE_EVENT_GRID_NAMESPACE_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1355"
 _AZURE_FILES_CLASSIC_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1361"
+_AZURE_FUNCTIONS_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1392"
 
 
 @dataclass(frozen=True)
@@ -1876,9 +1877,19 @@ MATRIX = AvailabilityMatrix(
             kind="faas",
             variant="azure_functions",
             plugin_id="azure",
-            status="planned",
-            description="Azure Functions application",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            status="preview",
+            description="Azure Function App with identity-backed package or container deployment",
+            issue_url=_AZURE_FUNCTIONS_ISSUE,
+            binding_envs=(
+                "FUNCTION_NAME",
+                "FUNCTION_URL",
+                "FUNCTION_PROVIDER",
+                "FUNCTION_REGION",
+                "FUNCTION_RESOURCE_ID",
+                "AZURE_FUNCTION_APP_NAME",
+                "AZURE_FUNCTION_APP_URL",
+                "AZURE_FUNCTION_IDENTITY_RESOURCE_ID",
+            ),
         ),
         ManagedServiceEntry(
             kind="api_gateway",

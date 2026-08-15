@@ -79,6 +79,7 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
         ("mssql", "azure_sql_serverless", "AzureSQLDatabaseConfig"),
         ("mssql", "azure_sql_hyperscale", "AzureSQLDatabaseConfig"),
         ("mssql", "azure_sql_managed_instance", "AzureSQLManagedInstanceConfig"),
+        ("faas", "azure_functions", "AzureFunctionsConfig"),
     ],
 )
 def test_every_registered_azure_managed_service_has_runtime_config(
@@ -381,6 +382,47 @@ def test_managed_redis_controls_are_preserved() -> None:
     assert redis.secret_name_prefix == "managed-amr"
 
 
+def test_functions_runtime_config_preserves_operator_policy() -> None:
+    subscription = "11111111-1111-4111-8111-111111111111"
+    base = f"/subscriptions/{subscription}/resourceGroups/rg-functions/providers"
+    plan = f"{base}/Microsoft.Web/serverfarms/functions-plan"
+    identity = f"{base}/Microsoft.ManagedIdentity/userAssignedIdentities/functions"
+    storage = f"{base}/Microsoft.Storage/storageAccounts/functionstorage"
+    registry = f"{base}/Microsoft.ContainerRegistry/registries/functionregistry"
+    subnet = f"{base}/Microsoft.Network/virtualNetworks/platform/subnets/functions"
+    config = managed_config_for(
+        "azure",
+        _cluster(
+            subscription_id=subscription,
+            resource_group="rg-functions",
+            faas_function_name_prefix="smd-function",
+            faas_default_plan_resource_id=plan,
+            faas_default_identity_resource_id=identity,
+            faas_allowed_plan_resource_ids=[plan],
+            faas_allowed_identity_resource_ids=[identity],
+            faas_allowed_storage_resource_ids=[storage],
+            faas_allowed_registry_resource_ids=[registry],
+            faas_allowed_subnet_resource_ids=[subnet],
+            faas_allow_public_network=True,
+            faas_deletion_protection_default=False,
+            faas_storage_api_version="2023-05-01",
+            faas_registry_api_version="2023-07-01",
+            faas_max_instances=40,
+        ),
+        kind="faas",
+        variant="azure_functions",
+    )
+    assert config.function_name_prefix == "smd-function"
+    assert config.default_plan_resource_id == plan
+    assert config.default_identity_resource_id == identity
+    assert config.allowed_storage_resource_ids == (storage,)
+    assert config.allowed_registry_resource_ids == (registry,)
+    assert config.allowed_subnet_resource_ids == (subnet,)
+    assert config.allow_public_network is True
+    assert config.deletion_protection_default is False
+    assert config.max_instances == 40
+
+
 def test_default_variant_selects_the_richer_azure_drivers() -> None:
     blob = managed_config_for("azure", _cluster(), kind="object_store")
     bus = managed_config_for("azure", _cluster(), kind="queue")
@@ -391,6 +433,8 @@ def test_default_variant_selects_the_richer_azure_drivers() -> None:
     sql = managed_config_for("azure", _cluster(), kind="mssql")
     assert type(sql).__name__ == "AzureSQLDatabaseConfig"
     assert sql.variant == "azure_sql_database"
+    faas = managed_config_for("azure", _cluster(), kind="faas")
+    assert type(faas).__name__ == "AzureFunctionsConfig"
 
 
 @pytest.mark.parametrize(
