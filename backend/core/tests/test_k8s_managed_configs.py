@@ -42,6 +42,8 @@ def _cluster(**provider_overrides):
         "nats_storage_class": "stream-rwo",
         "rabbitmq_storage_class": "queue-rwo",
         "knative_namespace": "functions-system",
+        "gateway_api_namespace": "gateway-system",
+        "gateway_api_class_name": "envoy-gateway",
         "seaweed_namespace": "storage-system",
         "seaweed_cluster_name": "shared-store",
         "seaweed_s3_endpoint": "https://objects.example.test",
@@ -140,6 +142,39 @@ def test_knative_config_preserves_install_security_policy(monkeypatch) -> None:
     assert config.default_container_concurrency == 50
 
 
+def test_gateway_api_config_preserves_install_security_policy(monkeypatch) -> None:
+    cluster_driver = object()
+    monkeypatch.setattr("core.cluster_observability._driver_for_cluster", lambda _cluster: cluster_driver)
+
+    config = managed_config_for(
+        "k8s_native",
+        _cluster(
+            gateway_api_allow_class_override=True,
+            gateway_api_allow_cross_namespace_routes=True,
+            gateway_api_allow_cross_namespace_backends=True,
+            gateway_api_allow_cross_namespace_certificates=True,
+            gateway_api_allow_custom_backends=True,
+            gateway_api_allow_extension_refs=True,
+            gateway_api_allow_experimental_routes=True,
+            gateway_api_allow_listener_sets=True,
+        ),
+        kind="api_gateway",
+        variant="gateway_api",
+    )
+
+    assert config.cluster_driver is cluster_driver
+    assert config.namespace == "gateway-system"
+    assert config.gateway_class_name == "envoy-gateway"
+    assert config.allow_class_override is True
+    assert config.allow_cross_namespace_routes is True
+    assert config.allow_cross_namespace_backends is True
+    assert config.allow_cross_namespace_certificates is True
+    assert config.allow_custom_backends is True
+    assert config.allow_extension_refs is True
+    assert config.allow_experimental_routes is True
+    assert config.allow_listener_sets is True
+
+
 def test_unknown_k8s_managed_pair_fails_closed(monkeypatch) -> None:
     monkeypatch.setattr("core.cluster_observability._driver_for_cluster", lambda _cluster: object())
 
@@ -176,6 +211,16 @@ def test_k8s_operator_defaults_are_exposed_in_provider_schema() -> None:
         "knative_default_port",
         "knative_default_timeout_seconds",
         "knative_default_container_concurrency",
+        "gateway_api_namespace",
+        "gateway_api_class_name",
+        "gateway_api_allow_class_override",
+        "gateway_api_allow_cross_namespace_routes",
+        "gateway_api_allow_cross_namespace_backends",
+        "gateway_api_allow_cross_namespace_certificates",
+        "gateway_api_allow_custom_backends",
+        "gateway_api_allow_extension_refs",
+        "gateway_api_allow_experimental_routes",
+        "gateway_api_allow_listener_sets",
         "seaweed_namespace",
         "seaweed_cluster_name",
         "seaweed_s3_endpoint",

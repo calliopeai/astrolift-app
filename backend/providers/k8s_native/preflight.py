@@ -141,6 +141,18 @@ REQUIREMENTS: dict[tuple[str, str], OperatorRequirement] = {
             "--namespace knative-operator --create-namespace; then create a KnativeServing resource"
         ),
     ),
+    ("api_gateway", "gateway_api"): OperatorRequirement(
+        operator_id="gateway-api",
+        display_name="Kubernetes Gateway API",
+        required_crds=(
+            "gateways.gateway.networking.k8s.io",
+            "httproutes.gateway.networking.k8s.io",
+        ),
+        install_hint=(
+            "kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/"
+            "releases/download/v1.5.0/standard-install.yaml; then install a conformant GatewayClass controller"
+        ),
+    ),
     ("filesystem", "nfs_csi"): OperatorRequirement(
         operator_id="nfs-csi",
         display_name="NFS CSI Driver",

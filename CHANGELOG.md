@@ -4,6 +4,12 @@
 
 ### Added
 
+- Add preview Kubernetes Gateway API 1.5 managed gateways with complete
+  listener, address, infrastructure, HTTP, gRPC, TLS, TCP, and UDP route
+  shapes; Backend TLS policies and ListenerSets; live Programmed and route
+  state; portable bindings; explicit adoption and pruning; and install-level
+  cross-namespace, extension, custom backend, and experimental-protocol
+  guardrails that preserve destination-owned ReferenceGrant boundaries.
 - Add preview Knative Serving functions for Kubernetes installs with
   scale-to-zero presets, revision traffic splitting, private-by-default routes,
   digest-pinned images, secret and workload controls, live readiness and route
