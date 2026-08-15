@@ -100,6 +100,11 @@
   checks, metric descriptors, services, and SLOs. Preserve provider-native
   request bodies, resolve credentials and verification codes from Secret
   Manager, and enforce ownership-, dependency-, and data-safe teardown.
+- Add Azure Managed Redis lifecycle for Balanced, Memory Optimized,
+  Compute Optimized, and Flash Optimized tiers with TLS-only bindings,
+  Key Vault-backed access keys, persistence/modules, CMK rotation,
+  geo-replication links, additive Entra access assignments, scaling, status,
+  and fail-closed private-networking and data-preserving teardown semantics.
 - Add explicit Azure Cosmos DB for NoSQL, MongoDB RU, Gremlin,
   Cassandra, and Table API variants with API-correct resource lifecycle,
   throughput and autoscale controls, multi-region placement, continuous or
