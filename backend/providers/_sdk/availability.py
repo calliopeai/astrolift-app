@@ -1292,9 +1292,18 @@ MATRIX = AvailabilityMatrix(
             kind="faas",
             variant="cloud_functions_gen2",
             plugin_id="gcp",
-            status="planned",
-            description="Cloud Run functions (2nd gen)",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            description=(
+                "Cloud Run functions (2nd gen) with Cloud Build source, HTTP or Eventarc triggers, "
+                "Secret Manager, scaling, private networking, Binary Authorization, and CMEK"
+            ),
+            binding_envs=(
+                "FUNCTION_NAME",
+                "FUNCTION_URL",
+                "GCP_CLOUD_FUNCTION_NAME",
+                "GCP_CLOUD_FUNCTION_URL",
+                "GOOGLE_CLOUD_PROJECT",
+                "GOOGLE_CLOUD_REGION",
+            ),
         ),
         ManagedServiceEntry(
             kind="api_gateway",
@@ -1318,16 +1327,47 @@ MATRIX = AvailabilityMatrix(
             kind="workflow_engine",
             variant="workflows",
             plugin_id="gcp",
-            status="planned",
-            description="Google Cloud Workflows",
+            status="preview",
+            description=(
+                "Google Cloud Workflows definitions, immutable revisions, executions, "
+                "CMEK, service identity, environment, logging, history, IAM bindings, "
+                "rollback, adoption, and protected teardown"
+            ),
+            binding_envs=(
+                "WORKFLOW_ENGINE_ID",
+                "WORKFLOW_ENGINE_ARN",
+                "WORKFLOW_ENGINE_REGION",
+                "WORKFLOW_ENGINE_TYPE",
+                "GCP_WORKFLOWS_NAME",
+                "GCP_WORKFLOWS_PROJECT",
+                "GCP_WORKFLOWS_LOCATION",
+                "GCP_WORKFLOWS_EXECUTIONS_URL",
+                "GCP_WORKFLOWS_CONSOLE_URL",
+            ),
             issue_url=_CROSS_CLOUD_PARITY_ISSUE,
         ),
         ManagedServiceEntry(
             kind="cdn",
             variant="cloud_cdn",
             plugin_id="gcp",
-            status="planned",
-            description="Cloud CDN backend and cache policy",
+            status="preview",
+            description=(
+                "Cloud CDN cache policy and global load balancer with Cloud Storage, "
+                "NEG, instance-group, or existing backend-service origins"
+            ),
+            binding_envs=(
+                "CDN_URL",
+                "CDN_DISTRIBUTION_ID",
+                "CDN_DOMAIN",
+                "CDN_DOMAIN_NAME",
+                "CDN_IP_ADDRESS",
+                "CDN_INVALIDATION_ROLE",
+                "GCP_CLOUD_CDN_PROJECT",
+                "GCP_CLOUD_CDN_BACKEND_KIND",
+                "GCP_CLOUD_CDN_BACKEND",
+                "GCP_CLOUD_CDN_URL_MAP",
+                "GCP_CLOUD_CDN_CONSOLE_URL",
+            ),
             issue_url=_CROSS_CLOUD_PARITY_ISSUE,
         ),
         ManagedServiceEntry(
@@ -1355,8 +1395,30 @@ MATRIX = AvailabilityMatrix(
             kind="private_endpoint",
             variant="private_service_connect",
             plugin_id="gcp",
-            status="planned",
-            description="Private Service Connect endpoint",
+            status="preview",
+            description=(
+                "Private Service Connect consumer endpoint for regional published "
+                "services or global Google APIs and VPC Service Controls bundles"
+            ),
+            binding_envs=(
+                "PRIVATE_ENDPOINT_ID",
+                "PRIVATE_ENDPOINT_URL",
+                "PRIVATE_ENDPOINT_DNS",
+                "PRIVATE_ENDPOINT_IPS",
+                "PRIVATE_ENDPOINT_TYPE",
+                "PRIVATE_ENDPOINT_SERVICE_NAME",
+                "PRIVATE_ENDPOINT_DNS_NAME",
+                "PRIVATE_ENDPOINT_DNS_NAMES",
+                "PRIVATE_ENDPOINT_NETWORK_INTERFACE_IDS",
+                "PRIVATE_ENDPOINT_PREFIX_LIST_ID",
+                "GCP_PSC_PROJECT",
+                "GCP_PSC_REGION",
+                "GCP_PSC_ENDPOINT",
+                "GCP_PSC_ENDPOINT_URI",
+                "GCP_PSC_IP_ADDRESS",
+                "GCP_PSC_TARGET",
+                "GCP_PSC_CONNECTION_STATUS",
+            ),
             issue_url=_CROSS_CLOUD_PARITY_ISSUE,
         ),
         ManagedServiceEntry(

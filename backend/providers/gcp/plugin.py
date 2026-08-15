@@ -28,6 +28,11 @@ Executable managed services:
 - FirestoreNativeDriver — document_db/firestore_native
 - CloudSQLServerDriver — mssql/cloudsql_sqlserver
 - SpannerGraphDriver — graph_db/spanner_graph
+- WorkflowsDriver — workflow_engine/workflows
+- CloudCdnDriver — cdn/cloud_cdn
+- PrivateServiceConnectDriver — private_endpoint/private_service_connect
+- CloudFunctionsDriver — faas/cloud_functions_gen2
+- FilestoreDriver — filesystem/filestore
 - FilestoreDriver — filesystem/filestore
 - APIGatewayDriver — api_gateway/api_gateway
 - ManagedKafkaDriver — event_stream/managed_kafka
@@ -45,11 +50,14 @@ from gcp.identity_wi import GCPWorkloadIdentityDriver
 from gcp.ingress import GCPIngressDriver
 from gcp.managed.api_gateway import APIGatewayDriver
 from gcp.managed.bigtable import BigtableDriver
+from gcp.managed.cdn_cloud import CloudCdnDriver
 from gcp.managed.document_firestore import FirestoreNativeDriver
 from gcp.managed.email_thirdparty import GCPEmailStubDriver
 from gcp.managed.encryption_cloud_kms import CloudKMSDriver
 from gcp.managed.event_bus_eventarc import EventarcDriver
 from gcp.managed.event_stream_managed_kafka import ManagedKafkaDriver
+from gcp.managed.faas_cloud_functions import CloudFunctionsDriver
+from gcp.managed.filesystem_filestore import FilestoreDriver
 from gcp.managed.filesystem_filestore import FilestoreDriver
 from gcp.managed.graph_spanner import SpannerGraphDriver
 from gcp.managed.model_endpoint_vertex import VertexAIEndpointDriver
@@ -58,6 +66,7 @@ from gcp.managed.mysql_cloudsql import CloudSQLMySQLDriver
 from gcp.managed.object_store_gcs import GCSDriver
 from gcp.managed.postgres_alloydb import AlloyDBPostgresDriver
 from gcp.managed.postgres_cloudsql import CloudSQLPostgresDriver
+from gcp.managed.private_endpoint_psc import PrivateServiceConnectDriver
 from gcp.managed.queue_pubsub import PubSubDriver
 from gcp.managed.redis_memorystore import MemorystoreRedisDriver
 from gcp.managed.redis_memorystore_valkey import MemorystoreValkeyDriver
@@ -66,6 +75,7 @@ from gcp.managed.timeseries_managed_prometheus import GCPManagedPrometheusDriver
 from gcp.managed.topic_pubsub import PubSubTopicDriver
 from gcp.managed.vector_vertex import VertexMatchingEngineDriver
 from gcp.managed.warehouse_bigquery import BigQueryWarehouseDriver
+from gcp.managed.workflow_workflows import WorkflowsDriver
 from gcp.notification_fcm import FCMNotificationDriver
 from gcp.registry_artifact import ArtifactRegistryDriver
 from gcp.secrets import GCPSecretsBackend
@@ -104,6 +114,11 @@ PLUGIN = ProviderPlugin(
         ("document_db", "firestore_native"): FirestoreNativeDriver,
         ("mssql", "cloudsql_sqlserver"): CloudSQLServerDriver,
         ("graph_db", "spanner_graph"): SpannerGraphDriver,
+        ("workflow_engine", "workflows"): WorkflowsDriver,
+        ("cdn", "cloud_cdn"): CloudCdnDriver,
+        ("private_endpoint", "private_service_connect"): PrivateServiceConnectDriver,
+        ("faas", "cloud_functions_gen2"): CloudFunctionsDriver,
+        ("filesystem", "filestore"): FilestoreDriver,
         ("filesystem", "filestore"): FilestoreDriver,
         ("api_gateway", "api_gateway"): APIGatewayDriver,
         ("event_stream", "managed_kafka"): ManagedKafkaDriver,
@@ -185,6 +200,102 @@ PLUGIN = ProviderPlugin(
                 "default": "2592000s",
                 "description": "Immutable provider waiting period; 2592000s is 30 days.",
             },
+            "cloud_cdn_name_prefix": {
+                "type": "string",
+                "default": "astrolift",
+                "description": "Prefix for the Cloud CDN load-balancer resource graph.",
+            },
+            "cloud_cdn_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "cloud_cdn_cache_mode_default": {
+                "type": "string",
+                "enum": ["CACHE_ALL_STATIC", "USE_ORIGIN_HEADERS"],
+                "default": "CACHE_ALL_STATIC",
+                "description": "Safe default cache mode. FORCE_CACHE_ALL requires an explicit service-level opt-in.",
+            },
+            "cloud_cdn_default_ttl_seconds": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 31622400,
+                "default": 3600,
+            },
+            "cloud_cdn_max_ttl_seconds": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 31622400,
+                "default": 86400,
+            },
+            "cloud_cdn_client_ttl_seconds": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 31622400,
+                "default": 3600,
+            },
+            "cloud_cdn_serve_while_stale_seconds": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 604800,
+                "default": 86400,
+            },
+            "cloud_cdn_invalidation_role": {
+                "type": "string",
+                "default": "roles/compute.loadBalancerAdmin",
+                "description": (
+                    "IAM role emitted in the binding for cache invalidation; "
+                    "a custom least-privilege role is recommended."
+                ),
+            },
+            "cloud_cdn_api_endpoint": {
+                "type": "string",
+                "default": "https://compute.googleapis.com/compute/v1",
+            },
+            "cloud_cdn_operation_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 900,
+            },
+            "cloud_cdn_operation_poll_interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 2,
+            },
+            "private_service_connect_network": {
+                "type": "string",
+                "description": "Default VPC network name or resource URI for PSC endpoints.",
+            },
+            "private_service_connect_subnetwork": {
+                "type": "string",
+                "description": "Default regional subnetwork name or resource URI for published-service endpoints.",
+            },
+            "private_service_connect_name_prefix": {
+                "type": "string",
+                "default": "astrolift",
+            },
+            "private_service_connect_labels": {
+                "type": "object",
+                "additionalProperties": {"type": "string"},
+                "description": "Operator labels merged into every managed PSC address and forwarding rule.",
+            },
+            "private_service_connect_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "private_service_connect_api_endpoint": {
+                "type": "string",
+                "default": "https://compute.googleapis.com/compute/v1",
+            },
+            "private_service_connect_operation_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 900,
+            },
+            "private_service_connect_operation_poll_interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 2,
+            },
             "bucket_name_prefix": {
                 "type": "string",
                 "default": "astrolift",
@@ -261,6 +372,32 @@ PLUGIN = ProviderPlugin(
                 "type": "string",
                 "default": "astrolift",
                 "description": "Prefix for platform-managed Pub/Sub topics.",
+            },
+            "cloud_functions_region": {
+                "type": "string",
+                "description": "Cloud Run functions region; falls back to the cluster region.",
+            },
+            "cloud_functions_name_prefix": {
+                "type": "string",
+                "default": "astrolift",
+            },
+            "cloud_functions_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "cloud_functions_api_endpoint": {
+                "type": "string",
+                "default": "https://cloudfunctions.googleapis.com/v2",
+            },
+            "cloud_functions_operation_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 1800,
+            },
+            "cloud_functions_operation_poll_interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 5,
             },
             "api_gateway_region": {
                 "type": "string",
@@ -463,6 +600,51 @@ PLUGIN = ProviderPlugin(
             "spanner_adopt_existing_instance": {
                 "type": "boolean",
                 "default": False,
+            },
+            "workflows_name_prefix": {
+                "type": "string",
+                "default": "astrolift",
+            },
+            "workflows_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "workflows_call_log_level_default": {
+                "type": "string",
+                "enum": [
+                    "CALL_LOG_LEVEL_UNSPECIFIED",
+                    "LOG_ALL_CALLS",
+                    "LOG_ERRORS_ONLY",
+                    "LOG_NONE",
+                ],
+                "default": "LOG_ERRORS_ONLY",
+            },
+            "workflows_execution_history_level_default": {
+                "type": "string",
+                "enum": [
+                    "EXECUTION_HISTORY_LEVEL_UNSPECIFIED",
+                    "EXECUTION_HISTORY_BASIC",
+                    "EXECUTION_HISTORY_DETAILED",
+                ],
+                "default": "EXECUTION_HISTORY_BASIC",
+            },
+            "workflows_api_endpoint": {
+                "type": "string",
+                "default": "https://workflows.googleapis.com/v1",
+            },
+            "workflow_executions_api_endpoint": {
+                "type": "string",
+                "default": "https://workflowexecutions.googleapis.com/v1",
+            },
+            "workflows_operation_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 900,
+            },
+            "workflows_operation_poll_interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 2,
             },
             "cloudsql_private_network": {
                 "type": "string",
