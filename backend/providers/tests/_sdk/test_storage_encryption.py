@@ -24,6 +24,7 @@ def test_every_data_variant_has_policy() -> None:
         ("gcp", "document_db", "firestore_native"),
         ("gcp", "mssql", "cloudsql_sqlserver"),
         ("gcp", "graph_db", "spanner_graph"),
+        ("gcp", "event_stream", "managed_kafka"),
         ("gcp", "event_bus", "eventarc"),
         ("azure", "object_store", "blob"),
         ("azure", "queue", "servicebus"),
