@@ -1591,12 +1591,16 @@ def _azure_managed_config_for(
             enable_partitioning=bool(pc.get("servicebus_enable_partitioning", False)),
         )
 
-    if pair == ("queue", "azure_servicebus") or (kind == "queue" and not variant):
+    servicebus_topic_pairs = {
+        ("queue", "azure_servicebus"),
+        ("topic", "service_bus_topic"),
+    }
+    if pair in servicebus_topic_pairs or (kind in {"queue", "topic"} and not variant):
         from azure.managed.queue_servicebus import AzureServiceBusConfig
 
         if not servicebus_namespace:
             raise ClusterObservabilityError(
-                f"cluster {cluster.slug}: Azure queue/azure_servicebus requires "
+                f"cluster {cluster.slug}: Azure {kind}/{variant or ('service_bus_topic' if kind == 'topic' else 'azure_servicebus')} requires "
                 "provider_config.servicebus_namespace",
             )
         return AzureServiceBusConfig(
@@ -1604,6 +1608,8 @@ def _azure_managed_config_for(
             resource_group=resource_group,
             namespace_name=servicebus_namespace,
             topic_name_prefix=str(pc.get("servicebus_topic_name_prefix", "astrolift")),
+            handle_kind="topic" if kind == "topic" else "queue",
+            location=str(pc.get("servicebus_location", location)),
             default_message_ttl=str(pc.get("servicebus_default_message_ttl", "P14D")),
             max_size_in_megabytes=int(pc.get("servicebus_max_size_in_megabytes", 1024)),
             enable_partitioning=bool(pc.get("servicebus_enable_partitioning", False)),
@@ -1625,6 +1631,29 @@ def _azure_managed_config_for(
             default_input_schema=str(pc.get("eventgrid_default_input_schema", "CloudEventSchemaV1_0")),
             public_network_access_default=str(
                 pc.get("eventgrid_public_network_access_default", "Enabled"),
+            ),
+        )
+
+    event_hubs_pairs = {
+        ("stream", "event_hubs"),
+        ("event_stream", "event_hubs_kafka"),
+    }
+    if pair in event_hubs_pairs or (kind in {"stream", "event_stream"} and not variant):
+        from azure.managed.event_hubs import AzureEventHubsConfig
+
+        resolved_variant = variant or ("event_hubs_kafka" if kind == "event_stream" else "event_hubs")
+        return AzureEventHubsConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            variant=resolved_variant,
+            location=location,
+            namespace_name_prefix=str(pc.get("eventhubs_namespace_name_prefix", "astrolift-eh")),
+            event_hub_name_prefix=str(pc.get("eventhubs_event_hub_name_prefix", "astrolift")),
+            default_sku=str(pc.get("eventhubs_default_sku", "Standard")),
+            default_capacity=int(pc.get("eventhubs_default_capacity", 1)),
+            default_consumer_group=str(pc.get("eventhubs_default_consumer_group", "astrolift")),
+            public_network_access_default=str(
+                pc.get("eventhubs_public_network_access_default", "Enabled"),
             ),
         )
 
@@ -1731,6 +1760,65 @@ def _azure_managed_config_for(
             backup_policy_default=str(pc.get("cosmos_backup_policy_default", "Continuous")),
             keyvault_url=vault_url,
             secret_name_prefix=str(pc.get("cosmos_secret_name_prefix", "astrolift-cosmos")),
+        )
+
+    cosmos_api_pairs = {
+        ("document_db", "cosmos_nosql"),
+        ("document_db", "cosmos_mongodb"),
+        ("graph_db", "cosmos_gremlin"),
+        ("wide_column", "cosmos_cassandra"),
+        ("kv_store", "cosmos_table"),
+    }
+    default_cosmos_api_variants = {
+        "document_db": "cosmos_nosql",
+        "graph_db": "cosmos_gremlin",
+        "wide_column": "cosmos_cassandra",
+    }
+    if pair in cosmos_api_pairs or (kind in default_cosmos_api_variants and not variant):
+        from azure.managed.cosmos_api import AzureCosmosApiConfig
+
+        if not vault_url:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: Azure {kind}/{variant or default_cosmos_api_variants[kind]} "
+                "requires provider_config.vault_url",
+            )
+        resolved_variant = variant or default_cosmos_api_variants[kind]
+        return AzureCosmosApiConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            variant=resolved_variant,
+            location=location,
+            account_name_prefix=str(
+                pc.get(
+                    "cosmos_api_account_name_prefix",
+                    pc.get("cosmos_account_name_prefix", "astrolift-cosmos"),
+                ),
+            ),
+            database_name_default=str(
+                pc.get(
+                    "cosmos_api_database_name_default",
+                    pc.get("cosmos_database_name_default", "astrolift"),
+                ),
+            ),
+            backup_policy_default=str(
+                pc.get(
+                    "cosmos_api_backup_policy_default",
+                    pc.get("cosmos_backup_policy_default", "Continuous"),
+                ),
+            ),
+            continuous_backup_tier_default=str(
+                pc.get("cosmos_api_continuous_backup_tier_default", "Continuous30Days"),
+            ),
+            public_network_access_default=str(
+                pc.get("cosmos_api_public_network_access_default", "Enabled"),
+            ),
+            consistency_level_default=str(
+                pc.get("cosmos_api_consistency_level_default", "Session"),
+            ),
+            keyvault_url=vault_url,
+            secret_name_prefix=str(
+                pc.get("cosmos_api_secret_name_prefix", "astrolift-cosmos-api"),
+            ),
         )
 
     if pair == ("search", "azure_ai_search_fulltext") or (kind == "search" and not variant):

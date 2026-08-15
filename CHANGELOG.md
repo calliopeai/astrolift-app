@@ -105,6 +105,18 @@
   Key Vault-backed access keys, persistence/modules, CMK rotation,
   geo-replication links, additive Entra access assignments, scaling, status,
   and fail-closed private-networking and data-preserving teardown semantics.
+- Expose Azure Service Bus topics and default subscriptions through the
+  cloud-neutral `topic/service_bus_topic` lifecycle and portable topic binding,
+  while retaining the existing queue-shaped alias.
+- Add explicit Azure Cosmos DB for NoSQL, MongoDB RU, Gremlin,
+  Cassandra, and Table API variants with API-correct resource lifecycle,
+  throughput and autoscale controls, multi-region placement, continuous or
+  periodic backup, point-in-time restore, CMK encryption, network rules,
+  Key Vault-backed portable bindings, ownership-safe reconciliation, and
+  protected teardown.
+- Add Azure Event Hubs native-stream and Kafka-compatible variants with
+  namespace/event-hub lifecycle, Entra workload bindings, consumer groups,
+  retention and compaction, Capture, scaling, networking, CMK, and guarded
 - Add Azure Event Grid Standard namespace topics with CloudEvents publishing,
   pull and supported push subscriptions, retention, filters, dead-lettering,
   workload-identity delivery, Key Vault-backed pull credentials, explicit

@@ -45,6 +45,7 @@ azure = [
     "azure-mgmt-containerservice>=30.0",
     "azure-mgmt-dns>=8.1",
     "azure-mgmt-eventgrid>=10.4",
+    "azure-mgmt-eventhub>=12.0",
     # Microsoft.FileShares is the top-level provisioned-v2 NFS resource
     # provider. Keep the beta pinned until its first stable release because
     # generated management-client signatures may still change.
