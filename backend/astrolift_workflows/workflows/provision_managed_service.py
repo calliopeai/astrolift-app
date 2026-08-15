@@ -139,6 +139,15 @@ class ProvisionManagedServiceWorkflow:
                     )
                     return WorkflowResult(ok=False, message=msg)
                 await workflow.sleep(timedelta(seconds=20))
+            else:
+                msg = "managed service backend timed out waiting for available state"
+                await workflow.execute_activity(
+                    mark_managed_service_failed,
+                    args=[svc_id, msg],
+                    start_to_close_timeout=_QUICK_TIMEOUT,
+                    retry_policy=_STATUS_RETRY,
+                )
+                return WorkflowResult(ok=False, message=msg)
 
         await workflow.execute_activity(
             finalize_managed_service_provision,
@@ -147,9 +156,7 @@ class ProvisionManagedServiceWorkflow:
             retry_policy=_STATUS_RETRY,
         )
 
-        driver_message = (
-            result.get("message", "") if isinstance(result, dict) else ""
-        )
+        driver_message = result.get("message", "") if isinstance(result, dict) else ""
         message = "managed service provisioned"
         if driver_message:
             message = f"{message}; {driver_message}"

@@ -8,6 +8,7 @@ from _sdk.availability import (
     REQUIRED_ROLES,
     AvailabilityMatrix,
     DriverEntry,
+    ManagedServiceEntry,
 )
 
 
@@ -120,6 +121,25 @@ def test_has_managed_lookup() -> None:
         plugin_id="aws",
         kind="stream",
         variant="firehose",
+    )
+
+
+def test_deprecated_service_is_not_runtime_available() -> None:
+    matrix = AvailabilityMatrix(
+        managed_services=(
+            ManagedServiceEntry(
+                kind="object_store",
+                variant="retired_operator",
+                plugin_id="k8s_native",
+                status="deprecated",
+            ),
+        ),
+    )
+
+    assert not matrix.has_managed(
+        plugin_id="k8s_native",
+        kind="object_store",
+        variant="retired_operator",
     )
 
 

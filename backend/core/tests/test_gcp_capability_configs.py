@@ -172,6 +172,73 @@ def test_pubsub_topic_runtime_config_preserves_operator_prefix() -> None:
     assert config.topic_prefix == "smd-events"
 
 
+def test_cloud_cdn_runtime_config_preserves_operator_controls() -> None:
+    from core.cluster_observability import managed_config_for
+
+    config = managed_config_for(
+        "gcp",
+        _cluster(
+            cloud_cdn_name_prefix="smd-edge",
+            cloud_cdn_deletion_protection_default=False,
+            cloud_cdn_cache_mode_default="USE_ORIGIN_HEADERS",
+            cloud_cdn_default_ttl_seconds=60,
+            cloud_cdn_max_ttl_seconds=3600,
+            cloud_cdn_client_ttl_seconds=30,
+            cloud_cdn_serve_while_stale_seconds=120,
+            cloud_cdn_invalidation_role="projects/acme-prod/roles/cdnInvalidator",
+            cloud_cdn_api_endpoint="https://compute.example.test/compute/v1",
+            cloud_cdn_operation_timeout_seconds=120,
+            cloud_cdn_operation_poll_interval_seconds=0.5,
+        ),
+        kind="cdn",
+        variant="cloud_cdn",
+    )
+    assert type(config).__name__ == "CloudCdnConfig"
+    assert config.project_id == "acme-prod"
+    assert config.name_prefix == "smd-edge"
+    assert config.deletion_protection_default is False
+    assert config.cache_mode_default == "USE_ORIGIN_HEADERS"
+    assert config.default_ttl_seconds == 60
+    assert config.max_ttl_seconds == 3600
+    assert config.client_ttl_seconds == 30
+    assert config.serve_while_stale_seconds == 120
+    assert config.invalidation_role == "projects/acme-prod/roles/cdnInvalidator"
+    assert config.api_endpoint == "https://compute.example.test/compute/v1"
+    assert config.operation_timeout_seconds == 120
+    assert config.poll_interval_seconds == 0.5
+
+
+def test_private_service_connect_runtime_config_preserves_operator_controls() -> None:
+    from core.cluster_observability import managed_config_for
+
+    config = managed_config_for(
+        "gcp",
+        _cluster(
+            private_service_connect_network="projects/host/global/networks/shared",
+            private_service_connect_subnetwork=("projects/host/regions/us-central1/subnetworks/apps"),
+            private_service_connect_name_prefix="smd-psc",
+            private_service_connect_labels={"team": "network"},
+            private_service_connect_deletion_protection_default=False,
+            private_service_connect_api_endpoint=("https://compute.example.test/compute/v1"),
+            private_service_connect_operation_timeout_seconds=120,
+            private_service_connect_operation_poll_interval_seconds=0.5,
+        ),
+        kind="private_endpoint",
+        variant="private_service_connect",
+    )
+    assert type(config).__name__ == "PrivateServiceConnectConfig"
+    assert config.project_id == "acme-prod"
+    assert config.region == "us-central1"
+    assert config.network == "projects/host/global/networks/shared"
+    assert config.subnetwork.endswith("/subnetworks/apps")
+    assert config.name_prefix == "smd-psc"
+    assert config.labels == {"team": "network"}
+    assert config.deletion_protection_default is False
+    assert config.api_endpoint == "https://compute.example.test/compute/v1"
+    assert config.operation_timeout_seconds == 120
+    assert config.poll_interval_seconds == 0.5
+
+
 def test_bigquery_runtime_config_preserves_operator_controls() -> None:
     from core.cluster_observability import managed_config_for
 
@@ -297,6 +364,71 @@ def test_spanner_graph_runtime_config_preserves_operator_controls() -> None:
     assert config.operation_timeout_seconds == 900
     assert config.poll_interval_seconds == 1
     assert config.adopt_existing_instance is True
+
+
+def test_workflows_runtime_config_preserves_operator_controls() -> None:
+    from core.cluster_observability import managed_config_for
+
+    config = managed_config_for(
+        "gcp",
+        _cluster(
+            workflows_name_prefix="smd-flow",
+            workflows_deletion_protection_default=False,
+            workflows_call_log_level_default="LOG_NONE",
+            workflows_execution_history_level_default="EXECUTION_HISTORY_DETAILED",
+            workflows_api_endpoint="https://workflows.example.test/v1",
+            workflow_executions_api_endpoint="https://executions.example.test/v1",
+            workflows_operation_timeout_seconds=300,
+            workflows_operation_poll_interval_seconds=0.5,
+        ),
+        kind="workflow_engine",
+        variant="workflows",
+    )
+    assert type(config).__name__ == "WorkflowsConfig"
+    assert config.project_id == "acme-prod"
+    assert config.region == "us-central1"
+    assert config.workflow_name_prefix == "smd-flow"
+    assert config.deletion_protection_default is False
+    assert config.call_log_level_default == "LOG_NONE"
+    assert config.execution_history_level_default == "EXECUTION_HISTORY_DETAILED"
+    assert config.api_endpoint == "https://workflows.example.test/v1"
+    assert config.executions_api_endpoint == "https://executions.example.test/v1"
+    assert config.operation_timeout_seconds == 300
+    assert config.poll_interval_seconds == 0.5
+
+
+def test_cloud_operations_runtime_config_preserves_operator_controls() -> None:
+    from core.cluster_observability import managed_config_for
+
+    config = managed_config_for(
+        "gcp",
+        _cluster(
+            cloud_operations_location="us",
+            cloud_operations_name_prefix="smd-observability",
+            cloud_operations_retention_days_default=365,
+            cloud_operations_deletion_protection_default=False,
+            cloud_operations_logging_api_endpoint="https://logging.example.test",
+            cloud_operations_monitoring_api_endpoint="https://monitoring.example.test",
+            cloud_operations_request_timeout_seconds=9,
+            cloud_operations_operation_timeout_seconds=600,
+            cloud_operations_operation_poll_interval_seconds=0.5,
+            secret_id_prefix="smd",
+        ),
+        kind="observability",
+        variant="cloud_operations",
+    )
+    assert type(config).__name__ == "CloudOperationsConfig"
+    assert config.project_id == "acme-prod"
+    assert config.location == "us"
+    assert config.name_prefix == "smd-observability"
+    assert config.retention_days_default == 365
+    assert config.deletion_protection_default is False
+    assert config.secret_id_prefix == "smd"
+    assert config.logging_api_endpoint == "https://logging.example.test"
+    assert config.monitoring_api_endpoint == "https://monitoring.example.test"
+    assert config.request_timeout_seconds == 9
+    assert config.operation_timeout_seconds == 600
+    assert config.operation_poll_interval_seconds == 0.5
 
 
 def test_memorystore_valkey_runtime_config_preserves_operator_controls() -> None:

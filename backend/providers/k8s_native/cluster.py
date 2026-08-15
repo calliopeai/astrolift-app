@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from _sdk._telemetry import driver_op, maybe_heartbeat
 from _sdk.cluster import (
@@ -181,6 +181,8 @@ class K8sNativeClusterDriver(ClusterDriver):
         cluster: str,
         namespace: str,
         manifests: list[dict[str, Any]],
+        *,
+        propagation_policy: str | None = None,
     ) -> DeleteResult:
         client = self._k8s(cluster)
         deleted: list[str] = []
@@ -195,7 +197,12 @@ class K8sNativeClusterDriver(ClusterDriver):
             name = manifest.get("metadata", {}).get("name", "")
             ref = f"{kind}/{name}"
             try:
-                client.delete(kind=kind, namespace=namespace, name=name)
+                client.delete(
+                    kind=kind,
+                    namespace=namespace,
+                    name=name,
+                    propagation_policy=propagation_policy,
+                )
                 deleted.append(ref)
             except _NotFound:
                 not_found.append(ref)
@@ -296,9 +303,46 @@ class K8sNativeClusterDriver(ClusterDriver):
                 StorageClassInfo(
                     name=meta.get("name", ""),
                     is_default=(ann.get("storageclass.kubernetes.io/is-default-class") == "true"),
+                    provisioner=str(sc.get("provisioner") or ""),
+                    reclaim_policy=str(sc.get("reclaimPolicy") or "Delete"),
                 )
             )
         return out
+
+    @driver_op(cloud="k8s_native", driver="cluster")
+    def list_csi_drivers(self, cluster: str) -> list[str]:
+        client = self._k8s(cluster)
+        return sorted(
+            str((row.get("metadata", {}) or {}).get("name") or "")
+            for row in client.list(kind="storage.k8s.io/v1/CSIDriver")
+            if (row.get("metadata", {}) or {}).get("name")
+        )
+
+    @driver_op(cloud="k8s_native", driver="cluster")
+    def persistent_volume_claim_exists(self, cluster: str, namespace: str, name: str) -> bool:
+        return self._k8s(cluster).get(kind="PersistentVolumeClaim", namespace=namespace, name=name) is not None
+
+    @driver_op(cloud="k8s_native", driver="cluster")
+    def get_manifest(
+        self,
+        cluster: str,
+        namespace: str | None,
+        kind: str,
+        name: str,
+    ) -> dict[str, Any] | None:
+        return self._k8s(cluster).get(kind=kind, namespace=namespace, name=name)
+
+    @driver_op(cloud="k8s_native", driver="cluster")
+    def list_manifests(
+        self,
+        cluster: str,
+        namespace: str | None,
+        kind: str,
+    ) -> list[dict[str, Any]]:
+        return cast(
+            "list[dict[str, Any]]",
+            self._k8s(cluster).list(kind=kind, namespace=namespace),
+        )
 
     # ---- workload status ------------------------------------------
 
@@ -743,7 +787,15 @@ class K8sNativeClusterDriver(ClusterDriver):
                     "external Prometheus / Mimir / Datadog instead."
                 ),
                 helm_values={
-                    "grafana": {"enabled": True},
+                    "grafana": {
+                        "enabled": True,
+                        "sidecar": {
+                            "dashboards": {
+                                "enabled": True,
+                                "searchNamespace": "ALL",
+                            },
+                        },
+                    },
                     "prometheus": {
                         "prometheusSpec": {
                             # Watch ALL ServiceMonitors — sibling addons
@@ -752,8 +804,76 @@ class K8sNativeClusterDriver(ClusterDriver):
                             # without per-monitor release labeling.
                             "serviceMonitorSelectorNilUsesHelmValues": False,
                             "podMonitorSelectorNilUsesHelmValues": False,
+                            "ruleSelectorNilUsesHelmValues": False,
+                            "serviceMonitorNamespaceSelector": {},
+                            "podMonitorNamespaceSelector": {},
+                            "ruleNamespaceSelector": {},
                         },
                     },
+                    "extraManifests": [
+                        {
+                            "apiVersion": "networking.k8s.io/v1",
+                            "kind": "NetworkPolicy",
+                            "metadata": {"name": "astrolift-prometheus-trusted-ingress"},
+                            "spec": {
+                                "podSelector": {
+                                    "matchLabels": {
+                                        "app.kubernetes.io/name": "prometheus",
+                                        "prometheus": "astrolift-kube-prometheus-prometheus",
+                                    },
+                                },
+                                "policyTypes": ["Ingress"],
+                                "ingress": [
+                                    {
+                                        "from": [
+                                            {
+                                                "namespaceSelector": {
+                                                    "matchLabels": {
+                                                        "kubernetes.io/metadata.name": "astrolift-system",
+                                                    },
+                                                },
+                                            },
+                                            {
+                                                "namespaceSelector": {
+                                                    "matchLabels": {
+                                                        "astrolift.io/trusted-observability-access": "true",
+                                                    },
+                                                },
+                                            },
+                                        ],
+                                        "ports": [{"port": 9090, "protocol": "TCP"}],
+                                    },
+                                ],
+                            },
+                        },
+                        {
+                            "apiVersion": "networking.k8s.io/v1",
+                            "kind": "NetworkPolicy",
+                            "metadata": {"name": "astrolift-alertmanager-operator-ingress"},
+                            "spec": {
+                                "podSelector": {
+                                    "matchLabels": {
+                                        "alertmanager": "astrolift-kube-prometheus-alertmanager",
+                                        "app.kubernetes.io/name": "alertmanager",
+                                    },
+                                },
+                                "policyTypes": ["Ingress"],
+                                "ingress": [
+                                    {
+                                        "from": [
+                                            {
+                                                "namespaceSelector": {
+                                                    "matchLabels": {
+                                                        "kubernetes.io/metadata.name": "astrolift-system",
+                                                    },
+                                                },
+                                            },
+                                        ],
+                                    },
+                                ],
+                            },
+                        },
+                    ],
                 },
                 requires=["storage:rwo for Prom + Grafana PVs"],
                 options=[],

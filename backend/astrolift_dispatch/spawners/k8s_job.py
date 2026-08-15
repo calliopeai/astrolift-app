@@ -32,6 +32,7 @@ class K8sJobSpawner(ContainerSpawner):
     def __init__(self, cluster, namespace: str) -> None:
         self._cluster = cluster
         self._namespace = namespace
+        self._spawn_cleanup_refs: dict[str, list[dict]] = {}
 
     def spawn(self, task: AgentTask) -> SpawnResult:
         """Create a K8s Job for the given AgentTask."""
@@ -44,6 +45,11 @@ class K8sJobSpawner(ContainerSpawner):
             return SpawnResult(external_id="", ok=False, error="task has no agent_definition")
 
         job_name = f"agent-task-{str(task.guid).replace('-', '')[:12]}"
+        # Mark the in-process cleanup plan before any ancillary resolution.
+        # A credential/backend failure before manifests are applied must not
+        # fall through to a database lookup that can mask the original error
+        # or delay deletion of the Job and per-task Secret.
+        self._spawn_cleanup_refs[job_name] = []
 
         # Managed model: when the spec's ``managed_model`` switch is on, the
         # pod uses the cluster's cloud-native model provider (AWS→Bedrock,
@@ -131,17 +137,6 @@ class K8sJobSpawner(ContainerSpawner):
         # at the same merged per-task Secret.
         _dedupe_job_container_env(job_manifest)
 
-        # Order: model SA (annotated with the cloud identity) first so it
-        # exists before the pod it binds, then the per-task Secret, then the
-        # Job. A non-managed / non-secret spec applies just the Job (the
-        # unchanged path).
-        manifests = []
-        if model_sa_manifest is not None:
-            manifests.append(model_sa_manifest)
-        if secret_manifest:
-            manifests.append(secret_manifest)
-        manifests.append(job_manifest)
-
         try:
             driver = _driver_for_cluster(self._cluster)
             ctx = _context_for_cluster(self._cluster)
@@ -157,6 +152,65 @@ class K8sJobSpawner(ContainerSpawner):
                     {"astrolift.io/managed-by": "platform", "astrolift.io/component": "agents"},
                     {},
                 )
+            from astrolift_services.filesystem_bindings import (
+                agent_volume_bindings,
+                cleanup_binding_resources,
+                inject_bindings_into_workloads,
+                preflight_bindings,
+                resolve_binding_secret_manifests,
+            )
+
+            volume_bindings = agent_volume_bindings(spec)
+            storage_manifests: list[dict] = []
+            volume_secret_manifests: list[dict] = []
+            if volume_bindings:
+                preflight_bindings(
+                    volume_bindings,
+                    cluster_driver=driver,
+                    cluster_slug=ctx.slug,
+                    namespace=self._namespace,
+                )
+                rendered = inject_bindings_into_workloads(
+                    [job_manifest],
+                    volume_bindings,
+                    namespace=self._namespace,
+                    consumer_key=job_name,
+                )
+                job_manifest = next(row for row in rendered if row.get("kind") == "Job")
+                storage_manifests = [row for row in rendered if row.get("kind") != "Job"]
+                if any(binding.secret_refs for binding in volume_bindings):
+                    from astrolift_dispatch.agent_secrets import resolve_secrets_backend
+
+                    volume_secret_manifests = resolve_binding_secret_manifests(
+                        volume_bindings,
+                        secrets_backend=resolve_secrets_backend(self._cluster),
+                        namespace=self._namespace,
+                        consumer_key=job_name,
+                    )
+                self._spawn_cleanup_refs[job_name] = cleanup_binding_resources(
+                    volume_bindings,
+                    namespace=self._namespace,
+                    consumer_key=job_name,
+                )
+            # The identity and credential objects must exist before the PV/PVC
+            # and Job that reference them. Static PVs precede their pre-bound
+            # claims; the Job is always last.
+            manifests = []
+            if model_sa_manifest is not None:
+                manifests.append(model_sa_manifest)
+            if secret_manifest:
+                manifests.append(secret_manifest)
+            manifests.extend(volume_secret_manifests)
+            manifests.extend(
+                sorted(
+                    storage_manifests,
+                    key=lambda row: {"PersistentVolume": 0, "PersistentVolumeClaim": 1}.get(
+                        str(row.get("kind")),
+                        2,
+                    ),
+                ),
+            )
+            manifests.append(job_manifest)
             result = driver.apply_manifests(ctx.slug, self._namespace, manifests)
             if not getattr(result, "ok", False):
                 error = result.summary() if hasattr(result, "summary") else "apply failed"
@@ -234,6 +288,9 @@ class K8sJobSpawner(ContainerSpawner):
                 "metadata": {"name": task_secret_name(external_id), "namespace": self._namespace},
             },
         ]
+        spawn_refs = self._spawn_cleanup_refs.pop(external_id, None)
+        if spawn_refs is not None:
+            refs.extend(spawn_refs)
         try:
             driver = _driver_for_cluster(self._cluster)
             ctx = _context_for_cluster(self._cluster)
@@ -246,6 +303,47 @@ class K8sJobSpawner(ContainerSpawner):
             logger.exception("k8s_job_spawner: failed to delete Job %s", external_id)
             raise
 
+        if spawn_refs is None:
+            try:
+                # After a worker restart the in-memory plan is gone. Recover
+                # ancillary storage only after the Job kill has reached the
+                # cluster; a database outage must never delay runaway-agent
+                # termination.
+                from astrolift_services.filesystem_bindings import (
+                    agent_volume_bindings,
+                    cleanup_binding_resources,
+                )
+
+                task = _task_for_external_id(external_id)
+                if task is not None:
+                    storage_refs = cleanup_binding_resources(
+                        agent_volume_bindings(task.environment_spec),
+                        namespace=self._namespace,
+                        consumer_key=external_id,
+                    )
+                    if storage_refs:
+                        storage_result = driver.delete_manifests(
+                            ctx.slug,
+                            self._namespace,
+                            storage_refs,
+                        )
+                        if storage_result is not None and not getattr(storage_result, "ok", True):
+                            detail = (
+                                storage_result.summary()
+                                if hasattr(storage_result, "summary")
+                                else "storage delete failed"
+                            )
+                            raise RuntimeError(str(detail))
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "k8s_job_spawner: Job %s was deleted but filesystem cleanup failed",
+                    external_id,
+                    exc_info=True,
+                )
+                raise RuntimeError(
+                    f"Job {external_id} was deleted but filesystem cleanup failed: {exc}",
+                ) from exc
+
     def cleanup_task_secret(self, external_id: str) -> None:
         """Delete only the plaintext-bearing per-task Secret.
 
@@ -256,21 +354,76 @@ class K8sJobSpawner(ContainerSpawner):
         from astrolift_dispatch.agent_secrets import task_secret_name
         from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
-        ref = {
-            "apiVersion": "v1",
-            "kind": "Secret",
-            "metadata": {
-                "name": task_secret_name(external_id),
-                "namespace": self._namespace,
+        refs = [
+            {
+                "apiVersion": "v1",
+                "kind": "Secret",
+                "metadata": {
+                    "name": task_secret_name(external_id),
+                    "namespace": self._namespace,
+                },
             },
-        }
+        ]
         driver = _driver_for_cluster(self._cluster)
         ctx = _context_for_cluster(self._cluster)
-        result = driver.delete_manifests(ctx.slug, self._namespace, [ref])
+        result = driver.delete_manifests(ctx.slug, self._namespace, refs)
         if result is not None and not getattr(result, "ok", True):
             detail = result.summary() if hasattr(result, "summary") else "secret delete failed"
             raise RuntimeError(str(detail))
         logger.info("k8s_job_spawner: deleted per-task Secret for Job %s", external_id)
+        from astrolift_services.filesystem_bindings import (
+            agent_volume_bindings,
+            cleanup_binding_resources,
+        )
+
+        task = _task_for_external_id(external_id)
+        if task is not None:
+            volume_secret_refs = cleanup_binding_resources(
+                agent_volume_bindings(task.environment_spec),
+                namespace=self._namespace,
+                consumer_key=external_id,
+                include_storage=False,
+            )
+            if volume_secret_refs:
+                volume_result = driver.delete_manifests(
+                    ctx.slug,
+                    self._namespace,
+                    volume_secret_refs,
+                )
+                if volume_result is not None and not getattr(volume_result, "ok", True):
+                    detail = (
+                        volume_result.summary()
+                        if hasattr(volume_result, "summary")
+                        else "volume secret delete failed"
+                    )
+                    raise RuntimeError(str(detail))
+
+
+def _task_for_external_id(external_id: str):
+    """Resolve new full-guid Job names and legacy persisted external ids."""
+
+    from uuid import UUID
+
+    from django.core.exceptions import ImproperlyConfigured
+
+    from astrolift_agents.models import AgentTask
+
+    query = AgentTask.objects.select_related("environment_spec").filter(deleted_at__isnull=True)
+    try:
+        task = query.filter(external_id=external_id).first()
+    except ImproperlyConfigured:
+        return None
+    if task is not None:
+        return task
+    prefix = "agent-task-"
+    encoded = external_id.removeprefix(prefix)
+    if not external_id.startswith(prefix) or len(encoded) != 32:
+        return None
+    try:
+        task_guid = UUID(hex=encoded)
+    except ValueError:
+        return None
+    return query.filter(guid=task_guid).first()
 
 
 def _vnc_image(image: str) -> str:

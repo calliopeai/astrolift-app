@@ -11,7 +11,7 @@ from __future__ import annotations
 import contextlib
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from _sdk._telemetry import driver_op, maybe_heartbeat
 from _sdk.cluster import (
@@ -246,7 +246,7 @@ class GKEClusterDriver(ClusterDriver):
         )
 
     @driver_op(cloud="gcp", driver="cluster")
-    def delete_manifests(self, cluster, namespace, manifests):
+    def delete_manifests(self, cluster, namespace, manifests, *, propagation_policy=None):
         client = self._k8s(cluster)
         deleted, not_found, errors = [], [], []
         for m in manifests:
@@ -258,7 +258,12 @@ class GKEClusterDriver(ClusterDriver):
             name = m.get("metadata", {}).get("name", "")
             ref = f"{kind}/{name}"
             try:
-                client.delete(kind=kind, namespace=namespace, name=name)
+                client.delete(
+                    kind=kind,
+                    namespace=namespace,
+                    name=name,
+                    propagation_policy=propagation_policy,
+                )
                 deleted.append(ref)
             except _NotFound:
                 not_found.append(ref)
@@ -326,6 +331,41 @@ class GKEClusterDriver(ClusterDriver):
                 return
             time.sleep(2)
         raise TimeoutError(f"namespace {name} did not delete within 10m")
+
+    @driver_op(cloud="gcp", driver="cluster")
+    def list_csi_drivers(self, cluster: str) -> list[str]:
+        client = self._k8s(cluster)
+        return sorted(
+            str((row.get("metadata", {}) or {}).get("name") or "")
+            for row in client.list(kind="storage.k8s.io/v1/CSIDriver")
+            if (row.get("metadata", {}) or {}).get("name")
+        )
+
+    @driver_op(cloud="gcp", driver="cluster")
+    def persistent_volume_claim_exists(self, cluster: str, namespace: str, name: str) -> bool:
+        return self._k8s(cluster).get(kind="PersistentVolumeClaim", namespace=namespace, name=name) is not None
+
+    @driver_op(cloud="gcp", driver="cluster")
+    def get_manifest(
+        self,
+        cluster: str,
+        namespace: str | None,
+        kind: str,
+        name: str,
+    ) -> dict[str, Any] | None:
+        return self._k8s(cluster).get(kind=kind, namespace=namespace, name=name)
+
+    @driver_op(cloud="gcp", driver="cluster")
+    def list_manifests(
+        self,
+        cluster: str,
+        namespace: str | None,
+        kind: str,
+    ) -> list[dict[str, Any]]:
+        return cast(
+            "list[dict[str, Any]]",
+            self._k8s(cluster).list(kind=kind, namespace=namespace),
+        )
 
     @driver_op(cloud="gcp", driver="cluster")
     def get_workload_status(self, cluster, namespace, kind, name):

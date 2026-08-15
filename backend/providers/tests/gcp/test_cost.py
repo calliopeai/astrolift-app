@@ -267,6 +267,7 @@ def test_service_id_table_covers_core_kinds() -> None:
     assert ("document_db", "firestore_native") in SERVICE_ID_BY_VARIANT
     assert ("event_bus", "eventarc") in SERVICE_ID_BY_VARIANT
     assert ("postgres", "cloudsql") in SERVICE_ID_BY_VARIANT
+    assert ("filesystem", "filestore") in SERVICE_ID_BY_VARIANT
     assert SERVICE_DISPLAY_NAME_BY_VARIANT[("event_stream", "managed_kafka")] == ("Managed Service for Apache Kafka")
 
 
