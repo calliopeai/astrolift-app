@@ -173,12 +173,40 @@ def test_terminal_cleanup_deletes_only_temporary_secret(monkeypatch):
 
     monkeypatch.setattr(cm, "_driver_for_cluster", lambda _c: driver, raising=False)
     monkeypatch.setattr(cm, "_context_for_cluster", lambda _c: _Ctx(), raising=False)
+    monkeypatch.setattr(
+        "astrolift_dispatch.spawners.k8s_job._task_for_external_id",
+        lambda _external_id: None,
+    )
 
     spawner = K8sJobSpawner(cluster=object(), namespace="astrolift-agents-steadymd")
     spawner.cleanup_task_secret("agent-task-complete")
 
     assert [item["kind"] for item in driver.deleted] == ["Secret"]
     assert driver.deleted[0]["metadata"]["name"] == "agent-task-complete-secrets"
+
+
+def test_stop_kills_job_before_attachment_recovery(monkeypatch):
+    driver = _RecordingDriver()
+    import core.cluster_management as cm
+
+    monkeypatch.setattr(cm, "_driver_for_cluster", lambda _c: driver, raising=False)
+    monkeypatch.setattr(cm, "_context_for_cluster", lambda _c: _Ctx(), raising=False)
+    monkeypatch.setattr(
+        "astrolift_dispatch.spawners.k8s_job._task_for_external_id",
+        lambda _external_id: (_ for _ in ()).throw(RuntimeError("database unavailable")),
+    )
+    spawner = K8sJobSpawner(cluster=object(), namespace="astrolift-agents-steadymd")
+
+    try:
+        spawner.stop("agent-task-restarted")
+    except RuntimeError as exc:
+        assert str(exc) == (
+            "Job agent-task-restarted was deleted but filesystem cleanup failed: database unavailable"
+        )
+    else:  # pragma: no cover - the recovery failure must remain visible
+        raise AssertionError("stop should surface attachment recovery failure")
+
+    assert [item["kind"] for item in driver.deleted] == ["Job", "Secret"]
 
 
 def test_agent_filesystem_mount_materializes_credentials_and_owned_storage(monkeypatch):
@@ -223,8 +251,7 @@ def test_agent_filesystem_mount_materializes_credentials_and_owned_storage(monke
         "resolve_secrets_backend",
         lambda _cluster: SimpleNamespace(
             get=lambda ref: {
-                "secret/fsx#username": {"username": "agent-user"},
-                "secret/fsx#password": {"password": "not-persisted"},
+                "secret/fsx": {"username": "agent-user", "password": "not-persisted"},
             }[ref],
         ),
     )
