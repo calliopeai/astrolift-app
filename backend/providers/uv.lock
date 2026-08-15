@@ -93,8 +93,10 @@ azure = [
     { name = "azure-mgmt-resource-locks" },
     { name = "azure-mgmt-search" },
     { name = "azure-mgmt-servicebus" },
+    { name = "azure-mgmt-storage" },
     { name = "azure-search-documents" },
     { name = "azure-storage-blob" },
+    { name = "azure-storage-file-share" },
     { name = "kubernetes" },
     { name = "pyyaml" },
 ]
@@ -142,8 +144,10 @@ requires-dist = [
     { name = "azure-mgmt-resource-locks", marker = "extra == 'azure'", specifier = ">=1.0.0b1" },
     { name = "azure-mgmt-search", marker = "extra == 'azure'", specifier = ">=9.1" },
     { name = "azure-mgmt-servicebus", marker = "extra == 'azure'", specifier = ">=8.2" },
+    { name = "azure-mgmt-storage", marker = "extra == 'azure'", specifier = ">=25.1,<26" },
     { name = "azure-search-documents", marker = "extra == 'azure'", specifier = ">=11.6" },
     { name = "azure-storage-blob", marker = "extra == 'azure'", specifier = ">=12.19" },
+    { name = "azure-storage-file-share", marker = "extra == 'azure'", specifier = ">=12.26,<13" },
     { name = "boto3", marker = "extra == 'aws'", specifier = ">=1.43.71" },
     { name = "botocore", marker = "extra == 'aws'", specifier = ">=1.43.71" },
     { name = "google-cloud-bigquery", marker = "extra == 'gcp'", specifier = ">=3.40" },
@@ -464,6 +468,20 @@ wheels = [
 ]
 
 [[package]]
+name = "azure-mgmt-storage"
+version = "25.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "azure-mgmt-core" },
+    { name = "isodate" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/49/6c/b7a06a0e128bd1587ad48a0cd80a1d619ec63d34523f5cdd43950f2fa8d0/azure_mgmt_storage-25.1.0.tar.gz", hash = "sha256:cc4bd2158fd0dd80639142af06dc70c119bbfd6f79d53da4482e0b2c849af7ca", size = 234508, upload-time = "2026-07-20T06:13:18.8Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f0/c6/efd6ad6216ec63cf606032c3fb62f2d52f852906a68a32251e1127026949/azure_mgmt_storage-25.1.0-py3-none-any.whl", hash = "sha256:46b51cb0491f9aac303436c28bd18954d0c3aca39d4882e7d332e6ad0605b25e", size = 220873, upload-time = "2026-07-20T06:13:20.22Z" },
+]
+
+[[package]]
 name = "azure-search-documents"
 version = "12.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -490,6 +508,21 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/3b/48/84a820d898267f662b5c06f7cd76fdb8a9e272b44aa9376cef3ec0f6a294/azure_storage_blob-12.30.0.tar.gz", hash = "sha256:2cd74d4d5731e5eb6b8d5c5056ee115a5e88f8fdf22517b739836fda685018be", size = 618229, upload-time = "2026-06-08T11:45:35.575Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5e/0b/e106f0fd7fa785867d9ffcc47dc9e6237c0e58f51058473b777487a98edc/azure_storage_blob-12.30.0-py3-none-any.whl", hash = "sha256:d415ac50b67a8da6b3ae7e9f1014b1b55cd7aafa0b8d4ca9b380568dc7360423", size = 435610, upload-time = "2026-06-08T11:45:37.213Z" },
+]
+
+[[package]]
+name = "azure-storage-file-share"
+version = "12.26.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "azure-core" },
+    { name = "cryptography" },
+    { name = "isodate" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/80/35/50eb9772dba52fe921f75858ec5a5f0bf43cc5544b7247936bddf56dc976/azure_storage_file_share-12.26.0.tar.gz", hash = "sha256:08cf8bc436df532cdb9bfdfce7bb10c5f1d83d51360954cd8eef56cbccf4300a", size = 383344, upload-time = "2026-06-08T12:45:38.107Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b1/99/90b557d7ab2601f9d313cfa9d166bd2e892881d69fbbff4ad3454a128dae/azure_storage_file_share-12.26.0-py3-none-any.whl", hash = "sha256:c4117d311ed0fe15a963118fe934f33db0c91d706a13a45c7c8dcb969b2e9578", size = 319081, upload-time = "2026-06-08T12:45:39.827Z" },
 ]
 
 [[package]]

@@ -647,6 +647,8 @@ def test_binding_returns_connection_envelope(
     ):
         assert key in env
     assert env["REDIS_AUTH_TOKEN"].secret_ref is not None
+    assert env["REDIS_AUTH_TOKEN"].secret_ref.startswith("azure-kv://kv.vault.azure.net/secrets/")
+    assert env["REDIS_URL"].secret_ref.startswith("azure-kv://kv.vault.azure.net/secrets/")
     assert env["REDIS_AUTH_TOKEN"].literal is None
     assert env["REDIS_PORT"].literal == "6380"
     assert env["REDIS_TLS"].literal == "1"
