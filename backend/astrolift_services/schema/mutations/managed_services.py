@@ -51,7 +51,7 @@ from core.tenancy import get_current_tenant
 
 
 def _project_service_for_caller(service_id):
-    return (
+    rows = (
         ManagedService.objects.select_related("project", "tenant_cluster")
         .prefetch_related(
             "attachments__agent_environment_spec",
@@ -62,25 +62,40 @@ def _project_service_for_caller(service_id):
             project__organization_id=_caller_org_id(),
             deleted_at__isnull=True,
         )
-        .first()
+    )
+    tenant = get_current_tenant()
+    if tenant is not None and tenant.team_id is not None:
+        rows = rows.filter(project__team_id=tenant.team_id)
+    return rows.first()
+
+
+def _workflow_actor(info: Info):
+    from astrolift_workflows.inputs import Actor
+
+    request = info.context.request  # type: ignore[attr-defined]
+    token = getattr(request, "_api_token", None)
+    if token is not None:
+        return Actor(
+            kind="api_token",
+            user_id=token.user_id,
+            token_id=token.pk,
+            display=token.name,
+        )
+    user = getattr(request, "user", None)
+    return Actor(
+        kind="user",
+        user_id=getattr(user, "pk", None) if user is not None else None,
+        display=str(getattr(user, "email", "") or getattr(user, "username", "")),
     )
 
 
 def _start_project_service_provision(info: Info, svc: ManagedService) -> None:
     from astrolift_workflows.client import start_workflow
-    from astrolift_workflows.inputs import Actor
     from astrolift_workflows.inputs import ProvisionManagedServiceInput as ProvisionInput
 
-    request = info.context.request  # type: ignore[attr-defined]
-    user = getattr(request, "user", None)
-    actor = Actor(
-        kind="user",
-        user_id=getattr(user, "pk", None) if user is not None else None,
-        display=str(getattr(user, "email", "") or getattr(user, "username", "")),
-    )
     start_workflow(
         "ProvisionManagedServiceWorkflow",
-        args=[ProvisionInput(managed_service_id=svc.pk, actor=actor)],
+        args=[ProvisionInput(managed_service_id=svc.pk, actor=_workflow_actor(info))],
         workflow_id=f"ProvisionManagedServiceWorkflow-{svc.guid}",
     )
 
@@ -93,22 +108,14 @@ def _start_project_service_deprovision(
     force_destroy: bool,
 ) -> None:
     from astrolift_workflows.client import start_workflow
-    from astrolift_workflows.inputs import Actor
     from astrolift_workflows.inputs import DeprovisionManagedServiceInput as DeprovisionInput
 
-    request = info.context.request  # type: ignore[attr-defined]
-    user = getattr(request, "user", None)
-    actor = Actor(
-        kind="user",
-        user_id=getattr(user, "pk", None) if user is not None else None,
-        display=str(getattr(user, "email", "") or getattr(user, "username", "")),
-    )
     start_workflow(
         "DeprovisionManagedServiceWorkflow",
         args=[
             DeprovisionInput(
                 managed_service_id=svc.pk,
-                actor=actor,
+                actor=_workflow_actor(info),
                 delete_data=delete_data,
                 force_destroy=force_destroy,
             )
@@ -131,11 +138,15 @@ class ManagedServiceMutations:
         input: ProvisionProjectManagedServiceInput,
     ) -> MutationResultType[ManagedServiceType]:
         org_id = _caller_org_id()
-        project = Project.objects.filter(
+        project_rows = Project.objects.filter(
             guid=str(input.project_id),
             organization_id=org_id,
             deleted_at__isnull=True,
-        ).first()
+        )
+        tenant = get_current_tenant()
+        if tenant is not None and tenant.team_id is not None:
+            project_rows = project_rows.filter(team_id=tenant.team_id)
+        project = project_rows.first()
         if project is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "project not found", field="projectId")
         cluster = TenantCluster.objects.filter(
@@ -355,19 +366,19 @@ class ManagedServiceMutations:
         info: Info,
         input: DetachProjectManagedServiceInput,
     ) -> MutationResultType[ManagedServiceAttachmentType]:
-        row = (
-            ManagedServiceAttachment.objects.select_related(
-                "managed_service__project",
-                "agent_environment_spec",
-                "app_environment__registered_app",
-            )
-            .filter(
-                guid=str(input.attachment_id),
-                managed_service__project__organization_id=_caller_org_id(),
-                deleted_at__isnull=True,
-            )
-            .first()
+        rows = ManagedServiceAttachment.objects.select_related(
+            "managed_service__project",
+            "agent_environment_spec",
+            "app_environment__registered_app",
+        ).filter(
+            guid=str(input.attachment_id),
+            managed_service__project__organization_id=_caller_org_id(),
+            deleted_at__isnull=True,
         )
+        tenant = get_current_tenant()
+        if tenant is not None and tenant.team_id is not None:
+            rows = rows.filter(managed_service__project__team_id=tenant.team_id)
+        row = rows.first()
         if row is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "attachment not found")
         payload = managed_service_attachment_to_type(row)

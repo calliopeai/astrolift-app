@@ -83,6 +83,7 @@ azure = [
     { name = "azure-mgmt-containerservice" },
     { name = "azure-mgmt-cosmosdb" },
     { name = "azure-mgmt-dns" },
+    { name = "azure-mgmt-fileshares" },
     { name = "azure-mgmt-loganalytics" },
     { name = "azure-mgmt-monitor" },
     { name = "azure-mgmt-msi" },
@@ -132,6 +133,7 @@ requires-dist = [
     { name = "azure-mgmt-containerservice", marker = "extra == 'azure'", specifier = ">=30.0" },
     { name = "azure-mgmt-cosmosdb", marker = "extra == 'azure'", specifier = ">=10.0" },
     { name = "azure-mgmt-dns", marker = "extra == 'azure'", specifier = ">=8.1" },
+    { name = "azure-mgmt-fileshares", marker = "extra == 'azure'", specifier = "==1.0.0b1" },
     { name = "azure-mgmt-loganalytics", marker = "extra == 'azure'", specifier = ">=13.0" },
     { name = "azure-mgmt-monitor", marker = "extra == 'azure'", specifier = ">=6.0" },
     { name = "azure-mgmt-msi", marker = "extra == 'azure'", specifier = ">=7.0" },
@@ -317,6 +319,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/9e/a8/990635b8b73252ad70b0c25f95db62d7927a32a4561d8c57bba0818a4a63/azure_mgmt_dns-9.0.0.tar.gz", hash = "sha256:89f8c4e467a94224b97bf16dd76d5bd616bf11cefe727f776618a57cc5486e37", size = 56953, upload-time = "2025-07-14T10:15:48.528Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b8/09/caa99f4d506ff0e07d158e526bb3142dcb6e759a65c27975fd045302f258/azure_mgmt_dns-9.0.0-py3-none-any.whl", hash = "sha256:00bd1d9d679d77aeba9178782d03c833549a4077147c9d78fedbfcd5909be633", size = 65319, upload-time = "2025-07-14T10:15:49.916Z" },
+]
+
+[[package]]
+name = "azure-mgmt-fileshares"
+version = "1.0.0b1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "azure-mgmt-core" },
+    { name = "isodate" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/08/e5/ed4e1108e2d713b63d2ab35924669726ecf74b1e38c796dc95eee8b9de95/azure_mgmt_fileshares-1.0.0b1.tar.gz", hash = "sha256:bed8eca391a27c3d8cf5ab0f3ee4d7145f57de423efa53e854b77c9886cc3aee", size = 77993, upload-time = "2026-05-12T04:32:33.123Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d5/5a/f1562d59599358957658f7dd6d73e0eee11a5e3b6f57fa3522e6116be003/azure_mgmt_fileshares-1.0.0b1-py3-none-any.whl", hash = "sha256:2be507e415c926d8cfcdd209616bd32457db3dc2b7a4745bf0dba1fde5bd2e82", size = 79857, upload-time = "2026-05-12T04:32:34.629Z" },
 ]
 
 [[package]]

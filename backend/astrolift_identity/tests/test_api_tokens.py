@@ -38,6 +38,7 @@ from astrolift_identity.api_tokens import (
     SCOPE_ADMIN,
     SCOPE_AGENT_ENV_SPEC_WRITE,
     SCOPE_MCP_DISPATCH,
+    SCOPE_MCP_READ,
     SCOPE_MCP_WRITE,
     SCOPE_PROJECT_WRITE,
     SCOPE_READ_APPS,
@@ -440,6 +441,21 @@ def test_workflow_scopes_are_narrow_write_and_trigger_ceilings():
     assert not token_scope_allows_permission(write_token, Permission.AGENT_CREATE)
     assert token_scope_allows_permission(trigger_token, Permission.WORKFLOW_TRIGGER)
     assert not token_scope_allows_permission(trigger_token, Permission.WORKFLOW_CREATE)
+
+
+def test_mcp_scopes_do_not_grant_project_permissions_by_themselves():
+    read_token = SimpleNamespace(scopes=[SCOPE_MCP_READ])
+    write_token = SimpleNamespace(scopes=[SCOPE_MCP_WRITE])
+
+    assert token_scope_allows_permission(read_token, Permission.AGENT_READ)
+    assert not token_scope_allows_permission(read_token, Permission.PROJECT_READ)
+    assert not token_scope_allows_permission(read_token, Permission.PROJECT_UPDATE)
+    assert not token_scope_allows_permission(read_token, Permission.APP_READ)
+    assert token_scope_allows_permission(write_token, Permission.AGENT_CREATE)
+    assert token_scope_allows_permission(write_token, Permission.AGENT_UPDATE)
+    assert not token_scope_allows_permission(write_token, Permission.PROJECT_UPDATE)
+    assert not token_scope_allows_permission(write_token, Permission.PROJECT_READ)
+    assert not token_scope_allows_permission(write_token, Permission.APP_UPDATE)
 
 
 def test_api_token_scope_is_a_ceiling_over_rbac(permission_resolver):
