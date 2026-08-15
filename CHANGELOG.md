@@ -25,6 +25,10 @@
   Kerberos directory integration, CMEK, custom performance, deletion
   protection, replication health and promotion, native snapshots, regional
   backups, restore, portable bindings, and adoption-safe teardown.
+- Add Google Managed Service for Apache Kafka lifecycle across clusters,
+  topics, ACLs, consumer offsets, Schema Registry, Connect clusters and
+  connectors, including PSC networking, CMEK, mTLS, IAM/portable bindings,
+  guarded adoption, data-loss confirmations, and integration observability.
 - Add a project-shared Google Eventarc event fabric across Advanced message
   buses, pipelines, enrollments, Google API sources, direct publishing, event
   transformation and format conversion, plus Standard triggers and partner
