@@ -61,6 +61,7 @@ SERVICE_ID_BY_VARIANT: dict[tuple[str, str], str] = {
     ("kv_store", "bigtable"): "FD83-CFB8-A3CB",  # Bigtable (portable kind)
     ("encryption_key", "cloud_kms"): "EE2F-D110-890C",  # Cloud KMS
     ("filesystem", "filestore"): "D97E-AB26-5D95",  # Cloud Filestore
+    ("event_bus", "eventarc"): "BA71-906B-95A8",  # Eventarc
     # Cluster compute capacity (#440). The Compute Engine service ID;
     # the driver walks N2 SKUs (core + ram line items) and sums them
     # for the cluster's region.

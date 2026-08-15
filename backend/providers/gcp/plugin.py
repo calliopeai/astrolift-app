@@ -29,6 +29,7 @@ Executable managed services:
 - CloudSQLServerDriver — mssql/cloudsql_sqlserver
 - SpannerGraphDriver — graph_db/spanner_graph
 - FilestoreDriver — filesystem/filestore
+- EventarcDriver — event_bus/eventarc
 
 The availability catalogue is authoritative for the remaining planned GCP
 resources. Placeholder email/search classes are registered only so callers get
@@ -44,6 +45,7 @@ from gcp.managed.bigtable import BigtableDriver
 from gcp.managed.document_firestore import FirestoreNativeDriver
 from gcp.managed.email_thirdparty import GCPEmailStubDriver
 from gcp.managed.encryption_cloud_kms import CloudKMSDriver
+from gcp.managed.event_bus_eventarc import EventarcDriver
 from gcp.managed.filesystem_filestore import FilestoreDriver
 from gcp.managed.graph_spanner import SpannerGraphDriver
 from gcp.managed.model_endpoint_vertex import VertexAIEndpointDriver
@@ -99,6 +101,7 @@ PLUGIN = ProviderPlugin(
         ("mssql", "cloudsql_sqlserver"): CloudSQLServerDriver,
         ("graph_db", "spanner_graph"): SpannerGraphDriver,
         ("filesystem", "filestore"): FilestoreDriver,
+        ("event_bus", "eventarc"): EventarcDriver,
     },
     config_schema={
         "type": "object",
@@ -252,6 +255,37 @@ PLUGIN = ProviderPlugin(
                 "type": "string",
                 "default": "astrolift",
                 "description": "Prefix for platform-managed Pub/Sub topics.",
+            },
+            "eventarc_location": {
+                "type": "string",
+                "description": "Eventarc Advanced location; falls back to the cluster region.",
+            },
+            "eventarc_message_bus_id": {
+                "type": "string",
+                "default": "astrolift",
+                "description": ("Shared Eventarc Advanced bus ID. Google allows one bus per project and region."),
+            },
+            "eventarc_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "eventarc_api_endpoint": {
+                "type": "string",
+                "default": "https://eventarc.googleapis.com/v1",
+            },
+            "eventarc_publishing_endpoint": {
+                "type": "string",
+                "default": "https://eventarcpublishing.googleapis.com/v1",
+            },
+            "eventarc_operation_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 900,
+            },
+            "eventarc_operation_poll_interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 5,
             },
             "bigquery_location": {
                 "type": "string",
