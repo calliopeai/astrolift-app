@@ -2434,7 +2434,6 @@ export type AstroliftManagedServiceVolumeBinding = {
   capacity: Scalars['String']['output'];
   claimName: Scalars['String']['output'];
   claimNamespace: Scalars['String']['output'];
-  storageClassName: Scalars['String']['output'];
   containerNames: Array<Scalars['String']['output']>;
   credentialReferenceCount: Scalars['Int']['output'];
   csiDriver: Scalars['String']['output'];
@@ -2444,6 +2443,7 @@ export type AstroliftManagedServiceVolumeBinding = {
   protocol: Scalars['String']['output'];
   readOnly: Scalars['Boolean']['output'];
   sourceKind: Scalars['String']['output'];
+  storageClassName: Scalars['String']['output'];
   subPath: Scalars['String']['output'];
   workloadNames: Array<Scalars['String']['output']>;
 };
