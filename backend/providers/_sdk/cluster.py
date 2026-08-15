@@ -880,6 +880,20 @@ class ClusterDriver(Protocol):
         """Whether a provider-created claim exists in the consumer namespace."""
         return False
 
+    def get_manifest(
+        self,
+        cluster: str,
+        namespace: str | None,
+        kind: str,
+        name: str,
+    ) -> dict[str, Any] | None:
+        """Return one Kubernetes object, or ``None`` when it does not exist.
+
+        ``kind`` accepts either a core kind such as ``Secret`` or the dynamic
+        client form ``group/version/Kind`` used for custom resources.
+        """
+        return None
+
     def get_workload_status(
         self,
         cluster: str,

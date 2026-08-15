@@ -620,6 +620,16 @@ class EKSClusterDriver(ClusterDriver):
     def persistent_volume_claim_exists(self, cluster: str, namespace: str, name: str) -> bool:
         return self._k8s(cluster).get(kind="PersistentVolumeClaim", namespace=namespace, name=name) is not None
 
+    @driver_op(cloud="aws", driver="cluster")
+    def get_manifest(
+        self,
+        cluster: str,
+        namespace: str | None,
+        kind: str,
+        name: str,
+    ) -> dict[str, Any] | None:
+        return self._k8s(cluster).get(kind=kind, namespace=namespace, name=name)
+
     # ---- workload status ------------------------------------------
 
     @driver_op(cloud="aws", driver="cluster")

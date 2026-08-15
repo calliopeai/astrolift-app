@@ -473,6 +473,12 @@ def test_driver_inventories_filesystem_runtime_dependencies():
 
     assert driver.list_csi_drivers("native") == ["nfs.csi.k8s.io"]
     assert driver.persistent_volume_claim_exists("native", "acme-api", "shared") is True
+    assert driver.get_manifest(
+        "native",
+        "storage",
+        "seaweed.seaweedfs.com/v1/Bucket",
+        "uploads",
+    ) == {"metadata": {"name": "shared"}}
 
 
 # ---- read_job_status (run reconciler) -----------------------------
