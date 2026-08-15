@@ -1180,17 +1180,57 @@ MATRIX = AvailabilityMatrix(
             kind="redis",
             variant="memorystore_valkey",
             plugin_id="gcp",
-            status="planned",
-            description="Memorystore for Valkey",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            description=(
+                "Memorystore for Valkey with PSC, IAM or token authentication, TLS, RDB/AOF persistence, "
+                "scaling, CMEK, managed or custom CAs, ACL policies, managed backups, restore, "
+                "and cross-instance replication"
+            ),
+            binding_envs=(
+                "REDIS_HOST",
+                "REDIS_PORT",
+                "REDIS_USER",
+                "REDIS_PASSWORD",
+                "REDIS_TLS",
+                "REDIS_URL",
+                "REDIS_READER_URL",
+                "REDIS_CA_CERT",
+                "REDIS_AUTH_MODE",
+                "REDIS_RESOURCE_ARN",
+                "GCP_MEMORYSTORE_PROJECT",
+                "GCP_MEMORYSTORE_REGION",
+                "GCP_MEMORYSTORE_INSTANCE",
+                "GCP_MEMORYSTORE_UID",
+                "GCP_MEMORYSTORE_MODE",
+                "GCP_MEMORYSTORE_ENGINE_VERSION",
+                "GCP_MEMORYSTORE_ENDPOINTS",
+                "GCP_MEMORYSTORE_SERVER_CA_MODE",
+                "GCP_MEMORYSTORE_SERVER_CA_POOL",
+                "GCP_MEMORYSTORE_ACL_POLICY",
+                "GCP_MEMORYSTORE_ACL_POLICY_IN_SYNC",
+            ),
         ),
         ManagedServiceEntry(
             kind="filesystem",
             variant="filestore",
             plugin_id="gcp",
-            status="planned",
-            description="Google Cloud Filestore instance",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            description=(
+                "Google Cloud Filestore with all public tiers, NFSv3/v4.1, PSC, "
+                "CMEK, backups, snapshots, and replication"
+            ),
+            binding_envs=(
+                "FILESYSTEM_HANDLE",
+                "FILESYSTEM_MOUNT_PATH",
+                "FILESYSTEM_TLS",
+                "FILESYSTEM_PROTOCOL",
+                "FILESYSTEM_ENDPOINT",
+                "FILESYSTEM_EXPORT",
+                "FILESYSTEM_MOUNT_OPTIONS",
+                "FILESTORE_INSTANCE",
+                "FILESTORE_SHARE",
+                "FILESTORE_IP",
+                "GCP_PROJECT_ID",
+                "GCP_LOCATION",
+            ),
         ),
         ManagedServiceEntry(
             kind="topic",

@@ -53,6 +53,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from azure.secrets_keyvault import key_vault_secret_ref
 
 KIND = "postgres"
 
@@ -539,10 +540,13 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
                 "DATABASE_PORT": ValueRef(literal="5432"),
                 "DATABASE_NAME": ValueRef(literal="postgres"),
                 "DATABASE_USER": ValueRef(literal="astrolift"),
-                "DATABASE_PASSWORD": ValueRef(secret_ref=secret_name),
+                "DATABASE_PASSWORD": ValueRef(
+                    secret_ref=key_vault_secret_ref(self._config.keyvault_url, secret_name),
+                ),
                 "DATABASE_URL": ValueRef(
-                    secret_ref=self._secret_name_for_url(
-                        server_name=server_name,
+                    secret_ref=key_vault_secret_ref(
+                        self._config.keyvault_url,
+                        self._secret_name_for_url(server_name=server_name),
                     ),
                 ),
             },

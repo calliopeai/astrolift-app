@@ -20,6 +20,16 @@
   agent Jobs, including CSI/PVC preflight, credential-reference projection,
   provider-specific EFS/FSx/NFS mounts, owned storage cleanup, and safe mount
   readiness metadata in the project resources UI and GraphQL API.
+- Add Google Cloud Filestore shared filesystems across Basic, Zonal,
+  Regional, and Enterprise tiers with NFSv3/v4.1, PSC and IPv6, export ACLs,
+  Kerberos directory integration, CMEK, custom performance, deletion
+  protection, replication health and promotion, native snapshots, regional
+  backups, restore, portable bindings, and adoption-safe teardown.
+- Add Memorystore for Valkey lifecycle with private PSC endpoints, IAM and
+  Preview token authentication, Secret Manager-backed two-phase token
+  rotation, TLS CA bindings, every current node type, cluster and non-cluster
+  modes, scaling, RDB/AOF persistence, CMEK, scheduled and on-demand backups,
+  exact restore, cross-instance replication, adoption, and protected teardown.
 - Add Cloud Spanner Graph lifecycle on Enterprise and Enterprise Plus with
   GoogleSQL/GQL property graphs, fixed or autoscaled capacity, atomic custom
   schemas, replay-safe DDL, CMEK, exact backups and restore, portable IAM
@@ -101,7 +111,8 @@
   stages with environment, prompt, skill, output-key defaults, configured binding
   overrides, immutable task packets, named structured outputs, and a worked example.
 - Add canonical modular agent packages, repository slice/federation discovery,
-  AGENTS.md/Langflow/Flowise imports, and authenticated MCP agent operations.
+  AGENTS.md/Langflow/Flowise imports, and authenticated MCP agent and shared
+  project-resource operations.
 - Add agent secret-reference CRUD, explicit reveal, reusable secret bundles,
   attachment precedence, provider capability reporting, and management UI.
 - Add operator kill controls, task deadlines, callback authentication, and
@@ -115,6 +126,10 @@
 - Mark the archived community MinIO Operator as deprecated in the Kubernetes
   resource catalogue and expose commercial AIStor and existing
   S3-compatible endpoint adoption as explicit planned variants.
+- Build every Azure non-cluster capability with its driver-specific config,
+  make managed-service Key Vault references unambiguous and same-vault, keep
+  legacy managed bindings readable, and fail workload rendering closed when a
+  managed credential resolves missing or empty.
 - Make project dashboards, navigation, and repository workflow detail pages
   workload-aware, graph-first, fully linked, and observable without requiring
   a configured workflow wrapper.

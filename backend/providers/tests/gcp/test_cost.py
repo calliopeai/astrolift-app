@@ -258,6 +258,7 @@ def test_service_id_table_covers_core_kinds() -> None:
     assert ("warehouse", "bigquery") in SERVICE_ID_BY_VARIANT
     assert ("document_db", "firestore_native") in SERVICE_ID_BY_VARIANT
     assert ("postgres", "cloudsql") in SERVICE_ID_BY_VARIANT
+    assert ("filesystem", "filestore") in SERVICE_ID_BY_VARIANT
 
 
 # ---- compute / node_hour (#440) -----------------------------------

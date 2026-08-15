@@ -389,9 +389,131 @@ def _config_for_capability(plugin_slug: str, cluster: TenantCluster, capability:
                 ssm_prefix=str(pc.get("ssm_prefix", "/astrolift")),
             )
 
+    if plugin_slug == "azure":
+        subscription_id = str(pc.get("subscription_id") or ac.get("subscription_id") or "")
+        resource_group = str(pc.get("resource_group") or ac.get("resource_group") or "")
+        tenant_id = str(pc.get("tenant_id") or ac.get("tenant_id") or "")
+        vault_url = str(pc.get("vault_url") or pc.get("keyvault_url") or "")
+        if capability == "registry":
+            from azure.registry_acr import ACRConfig
+
+            registry_name = str(pc.get("registry_name") or "")
+            _require_azure_config(cluster, capability, subscription_id=subscription_id)
+            _require_azure_config(cluster, capability, resource_group=resource_group)
+            _require_azure_config(cluster, capability, registry_name=registry_name)
+            return ACRConfig(
+                subscription_id=subscription_id,
+                resource_group=resource_group,
+                registry_name=registry_name,
+                location=str(pc.get("location") or region or "eastus"),
+                sku=str(pc.get("acr_sku", "Standard")),
+                admin_enabled=bool(pc.get("acr_admin_enabled", False)),
+                immutable_tags=bool(pc.get("acr_immutable_tags", True)),
+                tenant_id=tenant_id or None,
+            )
+        if capability == "identity":
+            from azure.identity_federated import FederatedIdentityConfig
+
+            issuer = str(pc.get("cluster_oidc_issuer") or ac.get("cluster_oidc_issuer") or "")
+            for key, value in (
+                ("tenant_id", tenant_id),
+                ("subscription_id", subscription_id),
+                ("resource_group", resource_group),
+                ("cluster_oidc_issuer", issuer),
+            ):
+                _require_azure_config(cluster, capability, **{key: value})
+            return FederatedIdentityConfig(
+                tenant_id=tenant_id,
+                subscription_id=subscription_id,
+                resource_group=resource_group,
+                cluster_oidc_issuer=issuer,
+            )
+        if capability == "secrets":
+            from azure.secrets_keyvault import KeyVaultConfig
+
+            _require_azure_config(cluster, capability, vault_url=vault_url)
+            managed_prefixes = tuple(
+                sorted(
+                    {
+                        str(value)
+                        for key, value in pc.items()
+                        if key.endswith("_secret_name_prefix") and value
+                    },
+                ),
+            )
+            try:
+                return KeyVaultConfig(
+                    vault_url=vault_url,
+                    secret_name_prefix=str(pc.get("keyvault_secret_name_prefix", "astrolift")),
+                    managed_secret_name_prefixes=managed_prefixes,
+                )
+            except ValueError as exc:
+                raise AppDeployError(
+                    f"cluster {cluster.slug}: invalid Azure Key Vault config: {exc}"
+                ) from exc
+        if capability == "dns":
+            from azure.dns_azuredns import AzureDNSConfig
+
+            _require_azure_config(cluster, capability, subscription_id=subscription_id)
+            _require_azure_config(cluster, capability, resource_group=resource_group)
+            return AzureDNSConfig(subscription_id=subscription_id, resource_group=resource_group)
+        if capability == "tls":
+            from azure.tls_appgw import AppGatewayTlsConfig
+
+            _require_azure_config(cluster, capability, subscription_id=subscription_id)
+            _require_azure_config(cluster, capability, resource_group=resource_group)
+            _require_azure_config(cluster, capability, vault_url=vault_url)
+            return AppGatewayTlsConfig(
+                subscription_id=subscription_id,
+                resource_group=resource_group,
+                vault_url=vault_url,
+                cert_name_prefix=str(pc.get("managed_cert_name_prefix", "astrolift")),
+            )
+        if capability == "ingress":
+            from azure.ingress_appgw import AppGatewayIngressConfig
+
+            return AppGatewayIngressConfig(
+                variant=str(pc.get("ingress_variant", "agic")),
+                appgw_id=(str(pc.get("appgw_id") or "") or None),
+                akv_secret_id=(str(pc.get("akv_secret_id_for_tls") or "") or None),
+            )
+        if capability == "notification":
+            from azure.notification_anh import AzureNotificationHubsConfig
+
+            namespace = str(pc.get("notification_hubs_namespace") or "")
+            hub_name = str(pc.get("notification_hub_name") or "")
+            key_name = str(ac.get("notification_hubs_shared_access_key_name") or "")
+            key = str(ac.get("notification_hubs_shared_access_key") or "")
+            for config_key, value in (
+                ("notification_hubs_namespace", namespace),
+                ("notification_hub_name", hub_name),
+                ("auth_config.notification_hubs_shared_access_key_name", key_name),
+                ("auth_config.notification_hubs_shared_access_key", key),
+            ):
+                _require_azure_config(cluster, capability, **{config_key: value})
+            return AzureNotificationHubsConfig(
+                namespace=namespace,
+                hub_name=hub_name,
+                shared_access_key_name=key_name,
+                shared_access_key=key,
+                api_version=str(pc.get("notification_hubs_api_version", "2020-06")),
+                timeout_seconds=int(pc.get("notification_hubs_timeout_seconds", 10)),
+            )
+        raise AppDeployError(
+            f"cluster {cluster.slug}: no Azure config builder for capability {capability!r}",
+        )
+
     # Fallback: cluster-level config (EKSConfig / GKEConfig / AKSConfig) for
     # dns, tls, and any capability without a dedicated entry above.
     return _config_for(plugin_slug, cluster)
+
+
+def _require_azure_config(cluster: TenantCluster, capability: str, **values: str) -> None:
+    key, value = next(iter(values.items()))
+    if not value:
+        raise AppDeployError(
+            f"cluster {cluster.slug}: Azure capability {capability!r} requires {key}",
+        )
 
 
 def driver_for_capability(cluster: TenantCluster, capability: str) -> Any:
