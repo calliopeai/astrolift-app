@@ -357,14 +357,9 @@ def test_network_policy_allows_only_same_tenant_managed_and_agent_namespaces() -
             }
         }
     } in peers
-    assert {
-        "namespaceSelector": {
-            "matchLabels": {"kubernetes.io/metadata.name": "astrolift-agents-acme"}
-        }
-    } in peers
+    assert {"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "astrolift-agents-acme"}}} in peers
     assert all(
-        peer.get("namespaceSelector", {}).get("matchLabels", {}).get("astrolift.io/organization")
-        != "other-tenant"
+        peer.get("namespaceSelector", {}).get("matchLabels", {}).get("astrolift.io/organization") != "other-tenant"
         for peer in peers
     )
 
