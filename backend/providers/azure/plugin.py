@@ -16,7 +16,7 @@ Managed services:
 - BlobStorageDriver — object_store/blob
 - ServiceBusDriver — queue/servicebus
 - AzureBlobStorageDriver — object_store/azure_blob
-- AzureServiceBusDriver — queue/azure_servicebus
+- AzureServiceBusDriver — queue/azure_servicebus and topic/service_bus_topic
 - AzureFilesDriver — filesystem/azure_files
 - AzurePostgresFlexibleDriver — postgres/azure_pg_flex
 - AzureMySQLFlexibleDriver — mysql/azure_mysql_flex
@@ -68,6 +68,10 @@ _MANAGED_CONFIG_PROPERTIES = {
     "blob_versioning_enabled": {"type": "boolean", "default": True},
     "servicebus_queue_name_prefix": {"type": "string", "default": "astrolift"},
     "servicebus_topic_name_prefix": {"type": "string", "default": "astrolift"},
+    "servicebus_location": {
+        "type": "string",
+        "description": "Region of the operator-managed Service Bus namespace.",
+    },
     "servicebus_default_message_ttl": {"type": "string", "default": "P14D"},
     "servicebus_max_size_in_megabytes": {"type": "integer", "minimum": 1024, "default": 1024},
     "servicebus_enable_partitioning": {"type": "boolean", "default": False},
@@ -252,6 +256,7 @@ PLUGIN = ProviderPlugin(
         ("redis", "azure_managed_redis"): AzureManagedRedisDriver,
         ("object_store", "azure_blob"): AzureBlobStorageDriver,
         ("queue", "azure_servicebus"): AzureServiceBusDriver,
+        ("topic", "service_bus_topic"): AzureServiceBusDriver,
         ("filesystem", "azure_files"): AzureFilesDriver,
         ("kv_store", "cosmos"): AzureCosmosDriver,
         ("search", "azure_ai_search_fulltext"): AzureAISearchFullTextDriver,
@@ -316,7 +321,7 @@ PLUGIN = ProviderPlugin(
             },
             "servicebus_namespace": {
                 "type": "string",
-                "description": ("Service Bus namespace name for queue managed-service binding."),
+                "description": ("Service Bus namespace name for queue and topic managed-service bindings."),
             },
             **_MANAGED_CONFIG_PROPERTIES,
             "ingress_variant": {

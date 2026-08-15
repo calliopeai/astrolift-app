@@ -1591,12 +1591,16 @@ def _azure_managed_config_for(
             enable_partitioning=bool(pc.get("servicebus_enable_partitioning", False)),
         )
 
-    if pair == ("queue", "azure_servicebus") or (kind == "queue" and not variant):
+    servicebus_topic_pairs = {
+        ("queue", "azure_servicebus"),
+        ("topic", "service_bus_topic"),
+    }
+    if pair in servicebus_topic_pairs or (kind in {"queue", "topic"} and not variant):
         from azure.managed.queue_servicebus import AzureServiceBusConfig
 
         if not servicebus_namespace:
             raise ClusterObservabilityError(
-                f"cluster {cluster.slug}: Azure queue/azure_servicebus requires "
+                f"cluster {cluster.slug}: Azure {kind}/{variant or ('service_bus_topic' if kind == 'topic' else 'azure_servicebus')} requires "
                 "provider_config.servicebus_namespace",
             )
         return AzureServiceBusConfig(
@@ -1604,6 +1608,8 @@ def _azure_managed_config_for(
             resource_group=resource_group,
             namespace_name=servicebus_namespace,
             topic_name_prefix=str(pc.get("servicebus_topic_name_prefix", "astrolift")),
+            handle_kind="topic" if kind == "topic" else "queue",
+            location=str(pc.get("servicebus_location", location)),
             default_message_ttl=str(pc.get("servicebus_default_message_ttl", "P14D")),
             max_size_in_megabytes=int(pc.get("servicebus_max_size_in_megabytes", 1024)),
             enable_partitioning=bool(pc.get("servicebus_enable_partitioning", False)),

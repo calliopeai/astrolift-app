@@ -105,6 +105,9 @@
   Key Vault-backed access keys, persistence/modules, CMK rotation,
   geo-replication links, additive Entra access assignments, scaling, status,
   and fail-closed private-networking and data-preserving teardown semantics.
+- Expose Azure Service Bus topics and default subscriptions through the
+  cloud-neutral `topic/service_bus_topic` lifecycle and portable topic binding,
+  while retaining the existing queue-shaped alias.
 - Add Azure SQL Database provisioned, serverless, and Hyperscale variants plus
   Azure SQL Managed Instance with typed ARM requests, VNet/subnet isolation,
   Key Vault-backed portable bindings, retention controls, database-copy

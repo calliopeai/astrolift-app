@@ -53,6 +53,7 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
         ("object_store", "azure_blob", "AzureBlobConfig"),
         ("queue", "servicebus", "ServiceBusConfig"),
         ("queue", "azure_servicebus", "AzureServiceBusConfig"),
+        ("topic", "service_bus_topic", "AzureServiceBusConfig"),
         ("filesystem", "azure_files", "AzureFilesConfig"),
         ("postgres", "azure_pg_flex", "AzurePostgresConfig"),
         ("mysql", "azure_mysql_flex", "AzureMySQLConfig"),
@@ -185,6 +186,15 @@ def test_messaging_and_search_controls_are_preserved() -> None:
     assert bus.max_delivery_count == 25
     assert bus.lock_duration == "PT1M"
 
+    topic = managed_config_for(
+        "azure",
+        _cluster(servicebus_location="westus3"),
+        kind="topic",
+        variant="service_bus_topic",
+    )
+    assert topic.handle_kind == "topic"
+    assert topic.location == "westus3"
+
     files = managed_config_for(
         "azure",
         _cluster(
@@ -282,6 +292,7 @@ def test_default_variant_selects_the_richer_azure_drivers() -> None:
         ("resource_group", "postgres", "azure_pg_flex"),
         ("storage_account", "object_store", "azure_blob"),
         ("servicebus_namespace", "queue", "azure_servicebus"),
+        ("servicebus_namespace", "topic", "service_bus_topic"),
         ("azure_openai_account_name", "model_endpoint", "azure_openai"),
         ("acs_communication_resource_id", "email", "azure_acs"),
         ("mssql_managed_instance_subnet_id", "mssql", "azure_sql_managed_instance"),
