@@ -69,6 +69,7 @@ azure = [
     # AcrPush role assignment + GitHub OIDC Federated Identity Credential.
     "azure-mgmt-msi>=7.0",
     "azure-mgmt-authorization>=4.0",
+    "azure-mgmt-network>=31.0.1",
     # Pinned: 36.0.0 introduced a regression where ApiClient drops the
     # Authorization header for inline Bearer tokens against EKS (reproducible
     # with raw urllib + Bearer = 200 but ApiClient + same token = 401).

@@ -61,6 +61,7 @@ from azure.managed.object_store_blob import (
     BlobStorageDriver,
 )
 from azure.managed.postgres_flexible import AzurePostgresFlexibleDriver
+from azure.managed.private_endpoint import AzurePrivateEndpointDriver
 from azure.managed.queue_servicebus import (
     AzureServiceBusDriver,
     ServiceBusDriver,
@@ -347,6 +348,30 @@ _MANAGED_CONFIG_PROPERTIES = {
         "default": "LicenseIncluded",
     },
     "mssql_managed_instance_public_data_endpoint_enabled_default": {"type": "boolean", "default": False},
+    "private_link_name_prefix": {"type": "string", "default": "astrolift-pe"},
+    "private_link_default_subnet_id": {"type": "string"},
+    "private_link_allowed_subnet_ids": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": True,
+        "items": {"type": "string"},
+    },
+    "private_link_allowed_service_id_prefixes": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": True,
+        "items": {"type": "string"},
+    },
+    "private_link_allowed_private_dns_zone_id_prefixes": {
+        "type": "array",
+        "uniqueItems": True,
+        "items": {"type": "string"},
+        "default": [],
+    },
+    "private_link_allow_manual_approval": {"type": "boolean", "default": False},
+    "private_link_max_group_ids": {"type": "integer", "minimum": 1, "maximum": 64, "default": 8},
+    "private_link_max_private_dns_zones": {"type": "integer", "minimum": 0, "maximum": 64, "default": 8},
+    "private_link_deletion_protection_default": {"type": "boolean", "default": True},
 }
 
 PLUGIN = ProviderPlugin(
@@ -393,6 +418,7 @@ PLUGIN = ProviderPlugin(
         ("mssql", "azure_sql_serverless"): AzureSQLDatabaseDriver,
         ("mssql", "azure_sql_hyperscale"): AzureSQLDatabaseDriver,
         ("mssql", "azure_sql_managed_instance"): AzureSQLManagedInstanceDriver,
+        ("private_endpoint", "private_link"): AzurePrivateEndpointDriver,
     },
     config_schema={
         "type": "object",
