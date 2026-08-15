@@ -1819,9 +1819,15 @@ MATRIX = AvailabilityMatrix(
             kind="faas",
             variant="knative_service",
             plugin_id="k8s_native",
-            status="planned",
-            description="Knative serverless service",
+            status="preview",
+            description="Knative Serving function with scale-to-zero and revision traffic control",
             issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            binding_envs=(
+                "FUNCTION_NAME",
+                "FUNCTION_ARN",
+                "FUNCTION_URL",
+                "FUNCTION_REGION",
+            ),
         ),
         ManagedServiceEntry(
             kind="api_gateway",

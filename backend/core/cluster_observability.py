@@ -820,6 +820,25 @@ def _k8s_managed_config_for(
             namespace=_optional_string(pc.get("rabbitmq_namespace")),
             cluster_driver=cluster_driver,
         )
+    if pair == ("faas", "knative_service"):
+        from k8s_native.managed.faas_knative import KnativeServiceConfig
+
+        return KnativeServiceConfig(
+            cluster_driver=cluster_driver,
+            namespace=_optional_string(pc.get("knative_namespace")),
+            allow_public=bool(pc.get("knative_allow_public", False)),
+            allow_tagged_images=bool(pc.get("knative_allow_tagged_images", False)),
+            allow_unsafe_pod_spec=bool(
+                pc.get("knative_allow_unsafe_pod_spec", False),
+            ),
+            default_port=int(pc.get("knative_default_port", 8080)),
+            default_timeout_seconds=int(
+                pc.get("knative_default_timeout_seconds", 300),
+            ),
+            default_container_concurrency=int(
+                pc.get("knative_default_container_concurrency", 0),
+            ),
+        )
     if pair == ("object_store", "seaweedfs_operator"):
         from k8s_native.managed.object_store_seaweedfs import SeaweedFSObjectStoreConfig
 

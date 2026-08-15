@@ -4,6 +4,11 @@
 
 ### Added
 
+- Add preview Knative Serving functions for Kubernetes installs with
+  scale-to-zero presets, revision traffic splitting, private-by-default routes,
+  digest-pinned images, secret and workload controls, live readiness and route
+  bindings, install-policy guardrails, explicit adoption, and ownership-safe
+  teardown.
 - Add preview OpenSearch Operator search and vector services for Kubernetes
   installs with OpenSearch 3.8, secure 3.x CRDs, tenant-scoped users and
   NetworkPolicies, digest-pinned non-root vector-index bootstrapping, explicit

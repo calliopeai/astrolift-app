@@ -41,6 +41,7 @@ def _cluster(**provider_overrides):
         "kafka_storage_class": "stream-rwo",
         "nats_storage_class": "stream-rwo",
         "rabbitmq_storage_class": "queue-rwo",
+        "knative_namespace": "functions-system",
         "seaweed_namespace": "storage-system",
         "seaweed_cluster_name": "shared-store",
         "seaweed_s3_endpoint": "https://objects.example.test",
@@ -111,6 +112,34 @@ def test_dynamic_filesystem_config_preserves_operator_defaults(monkeypatch) -> N
     assert rook.csi_driver == "rook-ceph.cephfs.csi.ceph.com"
 
 
+def test_knative_config_preserves_install_security_policy(monkeypatch) -> None:
+    cluster_driver = object()
+    monkeypatch.setattr("core.cluster_observability._driver_for_cluster", lambda _cluster: cluster_driver)
+
+    config = managed_config_for(
+        "k8s_native",
+        _cluster(
+            knative_allow_public=True,
+            knative_allow_tagged_images=True,
+            knative_allow_unsafe_pod_spec=True,
+            knative_default_port=9090,
+            knative_default_timeout_seconds=600,
+            knative_default_container_concurrency=50,
+        ),
+        kind="faas",
+        variant="knative_service",
+    )
+
+    assert config.cluster_driver is cluster_driver
+    assert config.namespace == "functions-system"
+    assert config.allow_public is True
+    assert config.allow_tagged_images is True
+    assert config.allow_unsafe_pod_spec is True
+    assert config.default_port == 9090
+    assert config.default_timeout_seconds == 600
+    assert config.default_container_concurrency == 50
+
+
 def test_unknown_k8s_managed_pair_fails_closed(monkeypatch) -> None:
     monkeypatch.setattr("core.cluster_observability._driver_for_cluster", lambda _cluster: object())
 
@@ -140,6 +169,13 @@ def test_k8s_operator_defaults_are_exposed_in_provider_schema() -> None:
         "nats_enable_jetstream",
         "rabbitmq_storage_class",
         "rabbitmq_namespace",
+        "knative_namespace",
+        "knative_allow_public",
+        "knative_allow_tagged_images",
+        "knative_allow_unsafe_pod_spec",
+        "knative_default_port",
+        "knative_default_timeout_seconds",
+        "knative_default_container_concurrency",
         "seaweed_namespace",
         "seaweed_cluster_name",
         "seaweed_s3_endpoint",
