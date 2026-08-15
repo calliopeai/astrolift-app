@@ -51,6 +51,7 @@ def test_sync_persists_portable_volume_contract_without_secret_values() -> None:
             "username": "secret/fsx#username",
             "password": "secret/fsx#password",
         },
+        secret_literals={"account": "files-account"},
         mount_options=["vers=3.0"],
         capacity="100Gi",
     )
@@ -68,6 +69,7 @@ def test_sync_persists_portable_volume_contract_without_secret_values() -> None:
         "username": "secret/fsx#username",
         "password": "secret/fsx#password",
     }
+    assert persisted.secret_literals == {"account": "files-account"}
     assert "agent-user" not in str(persisted.secret_refs)
     password = ManagedServiceBinding.objects.get(
         managed_service=service,

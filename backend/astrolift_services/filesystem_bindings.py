@@ -95,9 +95,10 @@ def resolve_binding_secret_manifests(
     resources: list[dict[str, Any]] = []
     for binding in bindings:
         secret_refs = dict(binding.secret_refs or {})
-        if not secret_refs:
+        secret_literals = dict(getattr(binding, "secret_literals", None) or {})
+        if not secret_refs and not secret_literals:
             continue
-        volume_data: dict[str, str] = {}
+        volume_data: dict[str, str] = {str(key): str(value) for key, value in secret_literals.items()}
         for secret_key, backend_ref in sorted(secret_refs.items()):
             raw_ref = str(backend_ref)
             base_ref, separator, selected_field = raw_ref.partition("#")
@@ -163,7 +164,7 @@ def cleanup_binding_resources(
 
     refs: list[dict[str, Any]] = []
     for binding in bindings:
-        if binding.secret_refs:
+        if binding.secret_refs or getattr(binding, "secret_literals", None):
             refs.append(
                 {
                     "apiVersion": "v1",
@@ -259,13 +260,14 @@ def render_binding_storage(
         }
     elif source_kind == "csi":
         secret_refs = dict(binding.secret_refs or {})
+        secret_literals = dict(getattr(binding, "secret_literals", None) or {})
         csi: dict[str, Any] = {
             "driver": str(binding.csi_driver),
             "volumeHandle": str(binding.volume_handle),
             "volumeAttributes": {str(k): str(v) for k, v in dict(binding.volume_attributes or {}).items()},
             "readOnly": bool(binding.read_only),
         }
-        if secret_refs:
+        if secret_refs or secret_literals:
             secret_ref = {
                 "name": binding_secret_name(binding, consumer_key),
                 "namespace": namespace,
@@ -390,6 +392,11 @@ def _validate_persisted_binding(binding: Any) -> None:
         raise FilesystemBindingError(f"filesystem {binding.name!r} has an incomplete CSI source")
     if any(not str(key) or not str(ref) for key, ref in dict(binding.secret_refs or {}).items()):
         raise FilesystemBindingError(f"filesystem {binding.name!r} has an empty credential reference")
+    secret_literals = dict(getattr(binding, "secret_literals", None) or {})
+    if any(not str(key) or not str(value) for key, value in secret_literals.items()):
+        raise FilesystemBindingError(f"filesystem {binding.name!r} has an empty CSI identity literal")
+    if dict(binding.secret_refs or {}).keys() & secret_literals.keys():
+        raise FilesystemBindingError(f"filesystem {binding.name!r} has conflicting CSI Secret keys")
     if not re.fullmatch(r"[1-9][0-9]*(?:[EPTGMK]i?|m)?", str(binding.capacity)):
         raise FilesystemBindingError(f"filesystem {binding.name!r} has an invalid storage capacity")
     allowed_access_modes = {"ReadWriteOnce", "ReadOnlyMany", "ReadWriteMany", "ReadWriteOncePod"}

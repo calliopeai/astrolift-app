@@ -131,6 +131,9 @@ class VolumeMount:
     volume description. ``secret_refs`` maps the key expected by the CSI
     driver to a reference in the install secrets backend; plaintext values
     are resolved only while materializing the consumer namespace Secret.
+    ``secret_literals`` carries required non-secret identity fields, such as
+    an Azure storage account name, that the CSI driver expects in that same
+    Secret. Drivers must never place credentials in ``secret_literals``.
     """
 
     name: str
@@ -144,6 +147,7 @@ class VolumeMount:
     volume_handle: str = ""
     volume_attributes: dict[str, str] = field(default_factory=dict)
     secret_refs: dict[str, str] = field(default_factory=dict)
+    secret_literals: dict[str, str] = field(default_factory=dict)
     mount_options: list[str] = field(default_factory=list)
     read_only: bool = False
     capacity: str = "1Gi"
@@ -163,7 +167,7 @@ class VolumeMount:
         if self.source_kind == VolumeSourceKind.EXISTING_PVC:
             if not self.claim_name or not self.claim_namespace:
                 raise ValueError("existing_pvc managed volume requires claim_name and claim_namespace")
-            if self.csi_driver or self.volume_handle or self.secret_refs:
+            if self.csi_driver or self.volume_handle or self.secret_refs or self.secret_literals:
                 raise ValueError("existing_pvc managed volume cannot declare CSI fields")
         elif self.source_kind == VolumeSourceKind.CSI:
             if not self.csi_driver or not self.volume_handle:
@@ -179,6 +183,10 @@ class VolumeMount:
             raise ValueError("managed volume has an unsupported Kubernetes access mode")
         if any(not key or not ref for key, ref in self.secret_refs.items()):
             raise ValueError("managed volume secret_refs must map non-empty keys to backend references")
+        if any(not key or not value for key, value in self.secret_literals.items()):
+            raise ValueError("managed volume secret_literals must map non-empty keys to non-secret values")
+        if self.secret_refs.keys() & self.secret_literals.keys():
+            raise ValueError("managed volume secret refs and literals cannot define the same key")
         if any(not key or not value for key, value in self.volume_attributes.items()):
             raise ValueError("managed volume attributes must map non-empty keys to non-empty values")
         if any(not value for value in (*self.mount_options, *self.workload_names, *self.container_names)):
