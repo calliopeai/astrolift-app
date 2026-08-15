@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from types import SimpleNamespace
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -243,9 +244,14 @@ def test_project_resource_mcp_lifecycle_reuses_control_plane_workflows(
     permission_resolver.grant(Permission.PROJECT_READ)
     permission_resolver.grant(Permission.PROJECT_UPDATE)
     starts = []
+
+    def _record_start(name, args, **kwargs):
+        starts.append((name, args, kwargs))
+        return SimpleNamespace(enqueued=True, run_id=f"run-{len(starts)}")
+
     monkeypatch.setattr(
         "astrolift_workflows.client.start_workflow",
-        lambda name, args, **kwargs: starts.append((name, args, kwargs)),
+        _record_start,
     )
 
     _, clusters = _call(
