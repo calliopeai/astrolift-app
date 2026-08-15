@@ -79,6 +79,46 @@ if the API server stops responding for more than 2 consecutive polls.
 
 ---
 
+## Shared kube-prometheus access boundary
+
+The Kubernetes bootstrap installs one shared kube-prometheus-stack. Project
+observability bundles may declare monitors, rules, and Grafana dashboards, but
+they do not own or delete that shared data plane.
+
+Prometheus contains metrics for every selected project, so its raw query API is
+not a tenant boundary. Astrolift omits `PROMETHEUS_URL` and `METRICS_ENDPOINT`
+from workload bindings by default. Alertmanager can mutate alerts and silences;
+its endpoint is operator-only and is never included in a workload binding.
+Bootstrap NetworkPolicies admit Alertmanager traffic only from
+`astrolift-system` and admit Prometheus traffic from `astrolift-system` plus
+explicitly trusted namespaces.
+
+An operator who accepts cluster-wide metric visibility for a trusted workload
+must complete both controls:
+
+1. Set provider config
+   `kube_prometheus_allow_workload_prometheus_access=true`.
+2. Apply the operator-owned namespace label:
+
+   ```bash
+   kubectl label namespace <project-namespace> \
+     astrolift.io/trusted-observability-access=true
+   ```
+
+The driver refuses to emit a Prometheus binding unless both controls are
+present. Tenant roles must not have permission to set labels on Namespace
+objects. Removing either the provider setting or namespace label revokes the
+supported access path. The cluster CNI must enforce Kubernetes NetworkPolicy;
+otherwise the predictable internal Service DNS names are not a security
+boundary and raw access must be blocked by an equivalent provider firewall or
+service mesh policy.
+
+Grafana remains in workload bindings for dashboard navigation but carries no
+credentials. Keep Grafana authentication and authorization enabled at its own
+ingress or service boundary.
+
+---
+
 ## Rotate cluster credentials
 
 When the kubeconfig or service account token used by Astrolift expires

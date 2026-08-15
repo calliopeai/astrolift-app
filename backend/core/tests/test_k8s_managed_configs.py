@@ -49,7 +49,6 @@ def _cluster(**provider_overrides):
         "kserve_namespace": "models-system",
         "kube_prometheus_namespace": "observability-system",
         "kube_prometheus_prometheus_url": "https://prometheus.example.test",
-        "kube_prometheus_alertmanager_url": "https://alerts.example.test",
         "kube_prometheus_grafana_url": "https://grafana.example.test",
         "kube_prometheus_allowed_target_namespaces": ["shared-exporters"],
         "seaweed_namespace": "storage-system",
@@ -459,10 +458,11 @@ def test_k8s_operator_defaults_are_exposed_in_provider_schema() -> None:
         "kube_prometheus_alertmanager_service_name",
         "kube_prometheus_grafana_service_name",
         "kube_prometheus_prometheus_url",
-        "kube_prometheus_alertmanager_url",
         "kube_prometheus_grafana_url",
         "kube_prometheus_verify_crds",
         "kube_prometheus_verify_services",
+        "kube_prometheus_verify_selection",
+        "kube_prometheus_allow_workload_prometheus_access",
         "kube_prometheus_allow_cross_namespace",
         "kube_prometheus_allowed_target_namespaces",
         "kube_prometheus_allow_custom_rules",
@@ -477,8 +477,6 @@ def test_k8s_operator_defaults_are_exposed_in_provider_schema() -> None:
         "kube_prometheus_max_rules",
         "kube_prometheus_max_dashboards",
         "kube_prometheus_max_dashboard_bytes",
-        "kube_prometheus_dashboard_label_key",
-        "kube_prometheus_dashboard_label_value",
         "s3_existing_namespace",
         "s3_existing_allowed_endpoint_hosts",
         "s3_existing_allowed_credential_path_prefixes",
@@ -603,6 +601,7 @@ def test_kube_prometheus_config_preserves_install_policy(monkeypatch) -> None:
             kube_prometheus_allow_custom_rules=True,
             kube_prometheus_allow_custom_dashboards=True,
             kube_prometheus_allow_honor_labels=True,
+            kube_prometheus_allow_workload_prometheus_access=True,
             kube_prometheus_min_scrape_interval_seconds=5,
             kube_prometheus_max_monitors=12,
             kube_prometheus_max_samples_per_scrape=25000,
@@ -614,13 +613,13 @@ def test_kube_prometheus_config_preserves_install_policy(monkeypatch) -> None:
 
     assert config.monitoring_namespace == "observability-system"
     assert config.prometheus_url == "https://prometheus.example.test"
-    assert config.alertmanager_url == "https://alerts.example.test"
     assert config.grafana_url == "https://grafana.example.test"
     assert config.allowed_target_namespaces == ("shared-exporters",)
     assert config.allow_cross_namespace is True
     assert config.allow_custom_rules is True
     assert config.allow_custom_dashboards is True
     assert config.allow_honor_labels is True
+    assert config.allow_workload_prometheus_access is True
     assert config.min_scrape_interval_seconds == 5
     assert config.max_monitors == 12
     assert config.max_samples_per_scrape == 25000
@@ -741,7 +740,6 @@ def test_kube_prometheus_is_an_executable_preview_catalog_entry() -> None:
         "METRICS_ENDPOINT",
         "DASHBOARD_URL",
         "PROMETHEUS_URL",
-        "ALERTMANAGER_URL",
         "GRAFANA_URL",
         "OBSERVABILITY_NAMESPACE",
         "OBSERVABILITY_BUNDLE",

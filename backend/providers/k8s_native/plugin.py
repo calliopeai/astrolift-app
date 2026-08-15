@@ -423,21 +423,30 @@ PLUGIN = ProviderPlugin(
             "kube_prometheus_namespace": {"type": "string", "default": "astrolift-system"},
             "kube_prometheus_prometheus_service_name": {
                 "type": "string",
-                "default": "astrolift-kube-prometheus-stack-prometheus",
+                "default": "astrolift-kube-prometheus-prometheus",
             },
             "kube_prometheus_alertmanager_service_name": {
                 "type": "string",
-                "default": "astrolift-kube-prometheus-stack-alertmanager",
+                "default": "astrolift-kube-prometheus-alertmanager",
             },
             "kube_prometheus_grafana_service_name": {
                 "type": "string",
                 "default": "astrolift-kube-prometheus-stack-grafana",
             },
             "kube_prometheus_prometheus_url": {"type": "string"},
-            "kube_prometheus_alertmanager_url": {"type": "string"},
             "kube_prometheus_grafana_url": {"type": "string"},
             "kube_prometheus_verify_crds": {"type": "boolean", "default": True},
             "kube_prometheus_verify_services": {"type": "boolean", "default": True},
+            "kube_prometheus_verify_selection": {"type": "boolean", "default": True},
+            "kube_prometheus_allow_workload_prometheus_access": {
+                "type": "boolean",
+                "default": False,
+                "description": (
+                    "Trusted-operator opt-in that exposes the shared, cluster-wide Prometheus query endpoint to "
+                    "workload bindings whose namespace the cluster operator also labels "
+                    "astrolift.io/trusted-observability-access=true. Alertmanager is never exposed."
+                ),
+            },
             "kube_prometheus_allow_cross_namespace": {"type": "boolean", "default": False},
             "kube_prometheus_allowed_target_namespaces": {
                 "type": "array",
@@ -476,11 +485,6 @@ PLUGIN = ProviderPlugin(
                 "minimum": 1024,
                 "default": 512000,
             },
-            "kube_prometheus_dashboard_label_key": {
-                "type": "string",
-                "default": "grafana_dashboard",
-            },
-            "kube_prometheus_dashboard_label_value": {"type": "string", "default": "1"},
             "s3_existing_namespace": {
                 "type": "string",
                 "description": "Optional fixed namespace for external S3 adoption records.",

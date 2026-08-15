@@ -1951,7 +1951,6 @@ MATRIX = AvailabilityMatrix(
                 "METRICS_ENDPOINT",
                 "DASHBOARD_URL",
                 "PROMETHEUS_URL",
-                "ALERTMANAGER_URL",
                 "GRAFANA_URL",
                 "OBSERVABILITY_NAMESPACE",
                 "OBSERVABILITY_BUNDLE",

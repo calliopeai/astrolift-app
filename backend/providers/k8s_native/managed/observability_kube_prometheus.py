@@ -40,6 +40,9 @@ _COMPONENT = "astrolift.io/component"
 _CHILDREN = "astrolift.io/children"
 _DELETION_PROTECTION = "astrolift.io/deletion-protection"
 _ROOT_KIND = "v1/ConfigMap"
+_DASHBOARD_LABEL_KEY = "grafana_dashboard"
+_DASHBOARD_LABEL_VALUE = "1"
+_PROMETHEUS_ACCESS_LABEL = "astrolift.io/trusted-observability-access"
 _REQUIRED_CRDS = (
     "prometheuses.monitoring.coreos.com",
     "prometheusrules.monitoring.coreos.com",
@@ -87,14 +90,15 @@ _RULE_FIELDS = {"alert", "record", "expr", "for", "keep_firing_for", "labels", "
 class KubePrometheusConfig:
     cluster_driver: Any = None
     monitoring_namespace: str = "astrolift-system"
-    prometheus_service_name: str = "astrolift-kube-prometheus-stack-prometheus"
-    alertmanager_service_name: str = "astrolift-kube-prometheus-stack-alertmanager"
+    prometheus_service_name: str = "astrolift-kube-prometheus-prometheus"
+    alertmanager_service_name: str = "astrolift-kube-prometheus-alertmanager"
     grafana_service_name: str = "astrolift-kube-prometheus-stack-grafana"
     prometheus_url: str = ""
-    alertmanager_url: str = ""
     grafana_url: str = ""
     verify_crds: bool = True
     verify_services: bool = True
+    verify_selection: bool = True
+    allow_workload_prometheus_access: bool = False
     allow_cross_namespace: bool = False
     allowed_target_namespaces: tuple[str, ...] = ()
     allow_custom_rules: bool = False
@@ -109,8 +113,6 @@ class KubePrometheusConfig:
     max_rules: int = 100
     max_dashboards: int = 10
     max_dashboard_bytes: int = 512_000
-    dashboard_label_key: str = "grafana_dashboard"
-    dashboard_label_value: str = "1"
 
 
 class KubePrometheusStackDriver(ManagedServiceDriver):
@@ -347,22 +349,40 @@ class KubePrometheusStackDriver(ManagedServiceDriver):
         if root is None:
             raise ValueError("kube-prometheus bundle does not exist")
         self._preflight(parsed.cluster_id)
-        self._owner(root)
-        bundle = self._bundle_document(root)
+        owner = self._owner(root)
+        self._bundle_document(root)
+        env_vars = {
+            "OBSERVABILITY_PROVIDER": ValueRef(literal="kube-prometheus-stack"),
+            "DASHBOARD_URL": ValueRef(literal=self._dashboard_url(root, owner)),
+            "GRAFANA_URL": ValueRef(literal=self._grafana_url()),
+            "OBSERVABILITY_NAMESPACE": ValueRef(literal=parsed.namespace),
+            "OBSERVABILITY_BUNDLE": ValueRef(literal=parsed.name),
+        }
+        if self._config.allow_workload_prometheus_access:
+            namespace = self._config.cluster_driver.get_namespace(parsed.cluster_id, parsed.namespace)
+            if namespace is None or namespace.labels.get(_PROMETHEUS_ACCESS_LABEL) != "true":
+                raise ValueError(
+                    "direct Prometheus access requires the cluster operator to label the workload namespace "
+                    f"{_PROMETHEUS_ACCESS_LABEL}=true",
+                )
+            env_vars.update(
+                {
+                    "METRICS_ENDPOINT": ValueRef(literal=self._prometheus_url()),
+                    "PROMETHEUS_URL": ValueRef(literal=self._prometheus_url()),
+                },
+            )
         return Binding(
-            env_vars={
-                "OBSERVABILITY_PROVIDER": ValueRef(literal="kube-prometheus-stack"),
-                "METRICS_ENDPOINT": ValueRef(literal=bundle["prometheus_url"]),
-                "DASHBOARD_URL": ValueRef(literal=bundle["dashboard_url"]),
-                "PROMETHEUS_URL": ValueRef(literal=bundle["prometheus_url"]),
-                "ALERTMANAGER_URL": ValueRef(literal=bundle["alertmanager_url"]),
-                "GRAFANA_URL": ValueRef(literal=bundle["grafana_url"]),
-                "OBSERVABILITY_NAMESPACE": ValueRef(literal=parsed.namespace),
-                "OBSERVABILITY_BUNDLE": ValueRef(literal=parsed.name),
-            },
+            env_vars=env_vars,
             notes=(
                 "Project monitors, rules, and dashboards use the shared operator-owned kube-prometheus-stack. "
-                "The binding carries no Grafana or Prometheus credentials."
+                + (
+                    "Direct Prometheus access is enabled by trusted operator policy; the endpoint has cluster-wide "
+                    "read visibility and carries no credentials. "
+                    if self._config.allow_workload_prometheus_access
+                    else "Direct Prometheus access is denied by default. "
+                )
+                + "Alertmanager is operator-only and is never exposed to workload bindings. Grafana must enforce "
+                "authentication and authorization at its own boundary."
             ),
         )
 
@@ -382,20 +402,89 @@ class KubePrometheusStackDriver(ManagedServiceDriver):
 
     @driver_op(cloud="k8s_native", driver="kube_prometheus_stack", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
+        label_map = {
+            "type": "object",
+            "propertyNames": {"type": "string", "pattern": _LABEL_KEY.pattern, "maxLength": 253},
+            "additionalProperties": {
+                "type": "string",
+                "pattern": _LABEL_VALUE.pattern,
+                "maxLength": 63,
+            },
+        }
+        tenant_label_map = {
+            **label_map,
+            "propertyNames": {
+                "allOf": [
+                    label_map["propertyNames"],
+                    {
+                        "not": {
+                            "anyOf": [
+                                {"pattern": r"^astrolift\.io/"},
+                                {"enum": [_OWNER]},
+                            ],
+                        },
+                    },
+                ],
+            },
+        }
+        rule_metadata_map = {
+            "type": "object",
+            "propertyNames": {"not": {"pattern": r"^astrolift\.io/"}},
+            "additionalProperties": {"type": "string"},
+        }
+        selector_expression = {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["key", "operator"],
+            "properties": {
+                "key": {"type": "string", "pattern": _LABEL_KEY.pattern},
+                "operator": {"type": "string", "enum": ["In", "NotIn", "Exists", "DoesNotExist"]},
+                "values": {"type": "array", "items": {"type": "string"}},
+            },
+            "allOf": [
+                {
+                    "if": {"properties": {"operator": {"enum": ["In", "NotIn"]}}},
+                    "then": {"required": ["values"], "properties": {"values": {"minItems": 1}}},
+                },
+                {
+                    "if": {"properties": {"operator": {"enum": ["Exists", "DoesNotExist"]}}},
+                    "then": {"properties": {"values": {"maxItems": 0}}},
+                },
+            ],
+        }
+        selector = {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "match_labels": {**label_map, "minProperties": 1},
+                "match_expressions": {
+                    "type": "array",
+                    "items": selector_expression,
+                    "minItems": 1,
+                },
+            },
+            "anyOf": [
+                {"required": ["match_labels"]},
+                {"required": ["match_expressions"]},
+            ],
+        }
         endpoint = {
             "type": "object",
             "additionalProperties": False,
             "required": ["port"],
             "properties": {
-                "port": {"type": "string"},
-                "path": {"type": "string", "default": "/metrics"},
+                "port": {"type": "string", "pattern": _DNS_LABEL.pattern, "maxLength": 63},
+                "path": {
+                    "type": "string",
+                    "pattern": r"^/(?!.*(?:^|/)\.\.(?:/|$))[^?#]*$",
+                    "maxLength": 512,
+                    "default": "/metrics",
+                },
                 "scheme": {"type": "string", "enum": ["http", "https"], "default": "http"},
-                "interval": {"type": "string", "default": "30s"},
-                "scrape_timeout": {"type": "string", "default": "10s"},
+                "interval": {"type": "string", "pattern": _DURATION.pattern, "default": "30s"},
+                "scrape_timeout": {"type": "string", "pattern": _DURATION.pattern, "default": "10s"},
                 "honor_labels": {"type": "boolean", "default": False},
                 "honor_timestamps": {"type": "boolean", "default": True},
-                "sample_limit": {"type": "integer", "minimum": 1},
-                "target_limit": {"type": "integer", "minimum": 1},
             },
         }
         monitor = {
@@ -403,13 +492,51 @@ class KubePrometheusStackDriver(ManagedServiceDriver):
             "additionalProperties": False,
             "required": ["name", "selector", "endpoints"],
             "properties": {
-                "name": {"type": "string"},
-                "selector": {"type": "object"},
-                "namespace_names": {"type": "array", "items": {"type": "string"}},
-                "endpoints": {"type": "array", "items": endpoint},
-                "labels": {"type": "object", "additionalProperties": {"type": "string"}},
-                "sample_limit": {"type": "integer", "minimum": 0},
-                "target_limit": {"type": "integer", "minimum": 0},
+                "name": {"type": "string", "pattern": r"\S"},
+                "selector": selector,
+                "namespace_names": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"type": "string", "pattern": _DNS_LABEL.pattern, "maxLength": 63},
+                },
+                "endpoints": {"type": "array", "minItems": 1, "items": endpoint},
+                "labels": tenant_label_map,
+                "sample_limit": {"type": "integer", "minimum": 1},
+                "target_limit": {"type": "integer", "minimum": 1},
+            },
+        }
+        rule = {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["expr"],
+            "properties": {
+                "alert": {"type": "string", "pattern": _PROM_NAME.pattern},
+                "record": {"type": "string", "pattern": _PROM_NAME.pattern},
+                "expr": {"type": "string", "pattern": r"\S", "maxLength": 16_384},
+                "for": {"type": "string", "pattern": _DURATION.pattern},
+                "keep_firing_for": {"type": "string", "pattern": _DURATION.pattern},
+                "labels": rule_metadata_map,
+                "annotations": rule_metadata_map,
+            },
+            "oneOf": [{"required": ["alert"]}, {"required": ["record"]}],
+        }
+        rule_group = {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["name", "rules"],
+            "properties": {
+                "name": {"type": "string", "pattern": r"\S"},
+                "interval": {"type": "string", "pattern": _DURATION.pattern},
+                "rules": {"type": "array", "minItems": 1, "items": rule},
+            },
+        }
+        dashboard = {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["name", "document"],
+            "properties": {
+                "name": {"type": "string", "pattern": r"\S"},
+                "document": {"type": "object"},
             },
         }
         return {
@@ -418,8 +545,8 @@ class KubePrometheusStackDriver(ManagedServiceDriver):
             "properties": {
                 "service_monitors": {"type": "array", "items": monitor},
                 "pod_monitors": {"type": "array", "items": monitor},
-                "rule_groups": {"type": "array", "items": {"type": "object"}},
-                "dashboards": {"type": "array", "items": {"type": "object"}},
+                "rule_groups": {"type": "array", "items": rule_group},
+                "dashboards": {"type": "array", "items": dashboard},
                 "standard_rules": {"type": "boolean", "default": True},
                 "default_dashboard": {"type": "boolean", "default": True},
                 "deletion_protection": {"type": "boolean", "default": False},
@@ -431,10 +558,9 @@ class KubePrometheusStackDriver(ManagedServiceDriver):
         return BindingSchema(
             env_vars={
                 "OBSERVABILITY_PROVIDER": "Portable provider identifier",
-                "METRICS_ENDPOINT": "Portable Prometheus HTTP endpoint",
+                "METRICS_ENDPOINT": "Trusted-operator opt-in Prometheus HTTP endpoint",
                 "DASHBOARD_URL": "Portable Grafana dashboard base URL",
-                "PROMETHEUS_URL": "Prometheus HTTP endpoint",
-                "ALERTMANAGER_URL": "Alertmanager HTTP endpoint",
+                "PROMETHEUS_URL": "Trusted-operator opt-in Prometheus HTTP endpoint",
                 "GRAFANA_URL": "Grafana HTTP endpoint",
                 "OBSERVABILITY_NAMESPACE": "Project namespace containing monitoring resources",
                 "OBSERVABILITY_BUNDLE": "Project observability bundle name",
@@ -519,8 +645,8 @@ class KubePrometheusStackDriver(ManagedServiceDriver):
     def _selector(self, raw: Any) -> dict[str, Any]:
         if not isinstance(raw, dict) or set(raw) - {"match_labels", "match_expressions"}:
             raise ValueError("monitor selector must contain match_labels and/or match_expressions")
-        labels = raw.get("match_labels") or {}
-        expressions = raw.get("match_expressions") or []
+        labels = raw.get("match_labels", {})
+        expressions = raw.get("match_expressions", [])
         if not isinstance(labels, dict) or not isinstance(expressions, list) or (not labels and not expressions):
             raise ValueError("monitor selector cannot be empty")
         normalized_labels = self._metadata_labels(labels, allow_reserved=True)
@@ -530,7 +656,7 @@ class KubePrometheusStackDriver(ManagedServiceDriver):
                 raise ValueError("monitor selector expression is invalid")
             key = str(expression.get("key") or "")
             operator = str(expression.get("operator") or "")
-            values = expression.get("values") or []
+            values = expression.get("values", [])
             self._validate_label_key(key)
             if operator not in {"In", "NotIn", "Exists", "DoesNotExist"}:
                 raise ValueError("monitor selector expression operator is invalid")
@@ -739,9 +865,10 @@ class KubePrometheusStackDriver(ManagedServiceDriver):
             dashboards.insert(0, {"name": "overview", "document": self._default_dashboard(name, namespace)})
         for dashboard in dashboards:
             child_name = dns_label(name, dashboard["name"], "dashboard")
+            dashboard_uid = self._dashboard_uid(owner, dashboard["name"])
             document = copy.deepcopy(dashboard["document"])
             document.pop("id", None)
-            document["uid"] = child_name
+            document["uid"] = dashboard_uid
             document.setdefault("title", f"Astrolift · {name} · {dashboard['name']}")
             children.append(
                 {
@@ -752,24 +879,16 @@ class KubePrometheusStackDriver(ManagedServiceDriver):
                         "namespace": namespace,
                         "labels": {
                             **self._labels(owner, "grafana-dashboard"),
-                            self._config.dashboard_label_key: self._config.dashboard_label_value,
+                            _DASHBOARD_LABEL_KEY: _DASHBOARD_LABEL_VALUE,
                         },
                     },
-                    "data": {f"{dashboard['name']}.json": json.dumps(document, sort_keys=True, separators=(",", ":"))},
+                    "data": {f"{dashboard_uid}.json": json.dumps(document, sort_keys=True, separators=(",", ":"))},
                 },
             )
         refs = [self._ref(child) for child in children]
         bundle = {
             "version": 1,
             "children": refs,
-            "prometheus_url": self._prometheus_url(),
-            "alertmanager_url": self._alertmanager_url(),
-            "grafana_url": self._grafana_url(),
-            "dashboard_url": (
-                f"{self._grafana_url().rstrip('/')}/d/{dns_label(name, 'overview', 'dashboard')}"
-                if cfg["default_dashboard"]
-                else self._grafana_url()
-            ),
         }
         root = {
             "apiVersion": "v1",
@@ -881,6 +1000,54 @@ class KubePrometheusStackDriver(ManagedServiceDriver):
                     raise ValueError(
                         f"kube-prometheus-stack service {self._config.monitoring_namespace}/{service} is not installed",
                     )
+        if self._config.verify_selection:
+            prometheus = self._config.cluster_driver.get_manifest(
+                cluster_id,
+                self._config.monitoring_namespace,
+                "monitoring.coreos.com/v1/Prometheus",
+                self._config.prometheus_service_name,
+            )
+            if prometheus is None:
+                raise ValueError("kube-prometheus-stack Prometheus selection resource is not installed")
+            prometheus_spec = prometheus.get("spec")
+            if not isinstance(prometheus_spec, dict) or any(
+                prometheus_spec.get(field) != {}
+                for field in (
+                    "serviceMonitorSelector",
+                    "serviceMonitorNamespaceSelector",
+                    "podMonitorSelector",
+                    "podMonitorNamespaceSelector",
+                    "ruleSelector",
+                    "ruleNamespaceSelector",
+                )
+            ):
+                raise ValueError(
+                    "kube-prometheus-stack selectors do not watch all Astrolift project monitors and rules",
+                )
+            grafana = self._config.cluster_driver.get_manifest(
+                cluster_id,
+                self._config.monitoring_namespace,
+                "apps/v1/Deployment",
+                self._config.grafana_service_name,
+            )
+            if grafana is None or not self._grafana_sidecar_ready(grafana):
+                raise ValueError(
+                    "kube-prometheus-stack Grafana sidecar does not watch the fixed Astrolift dashboard contract",
+                )
+            for policy_name in (
+                "astrolift-prometheus-trusted-ingress",
+                "astrolift-alertmanager-operator-ingress",
+            ):
+                policy = self._config.cluster_driver.get_manifest(
+                    cluster_id,
+                    self._config.monitoring_namespace,
+                    "networking.k8s.io/v1/NetworkPolicy",
+                    policy_name,
+                )
+                if policy is None or not self._network_policy_ready(policy_name, policy):
+                    raise ValueError(
+                        f"kube-prometheus-stack access boundary {policy_name} is not installed or was weakened",
+                    )
 
     def _assert_adoptable(self, current: dict[str, Any] | None, managed_service_id: str) -> None:
         if current is None:
@@ -975,7 +1142,7 @@ class KubePrometheusStackDriver(ManagedServiceDriver):
         current: dict[str, Any] | None,
         desired: dict[str, Any],
     ) -> dict[str, Any]:
-        transition = copy.deepcopy(desired)
+        transition = copy.deepcopy(current if current is not None else desired)
         refs = self._decode_children(desired)
         if current is not None:
             refs = [*self._decode_children(current), *refs]
@@ -1073,10 +1240,85 @@ class KubePrometheusStackDriver(ManagedServiceDriver):
             raise ValueError("kube-prometheus bundle document is malformed") from exc
         if not isinstance(document, dict) or document.get("version") != 1:
             raise ValueError("kube-prometheus bundle document has an unsupported version")
-        for field in ("prometheus_url", "alertmanager_url", "grafana_url", "dashboard_url"):
-            if not isinstance(document.get(field), str) or not document[field]:
-                raise ValueError(f"kube-prometheus bundle document is missing {field}")
+        if not isinstance(document.get("children"), list):
+            raise ValueError("kube-prometheus bundle document is missing children")
         return document
+
+    @staticmethod
+    def _dashboard_uid(owner: dict[str, str], dashboard_name: str) -> str:
+        return dns_label(
+            "astrolift",
+            dns_label(owner["organization"]),
+            dns_label(owner["managed_service_id"]),
+            dashboard_name,
+            max_length=40,
+        )
+
+    def _dashboard_url(self, root: dict[str, Any], owner: dict[str, str]) -> str:
+        root_name = str((root.get("metadata") or {}).get("name") or "")
+        overview_name = dns_label(root_name, "overview", "dashboard")
+        if any(ref["kind"] == "ConfigMap" and ref["name"] == overview_name for ref in self._decode_children(root)):
+            return f"{self._grafana_url().rstrip('/')}/d/{self._dashboard_uid(owner, 'overview')}"
+        return self._grafana_url()
+
+    @staticmethod
+    def _grafana_sidecar_ready(deployment: dict[str, Any]) -> bool:
+        try:
+            containers = deployment["spec"]["template"]["spec"]["containers"]
+        except (KeyError, TypeError):
+            return False
+        if not isinstance(containers, list):
+            return False
+        for container in containers:
+            if not isinstance(container, dict):
+                continue
+            env = {str(row.get("name")): row.get("value") for row in container.get("env", []) if isinstance(row, dict)}
+            if env.get("LABEL") == _DASHBOARD_LABEL_KEY:
+                return env.get("LABEL_VALUE") == _DASHBOARD_LABEL_VALUE and env.get("NAMESPACE") == "ALL"
+        return False
+
+    @staticmethod
+    def _network_policy_ready(name: str, policy: dict[str, Any]) -> bool:
+        spec = policy.get("spec")
+        if not isinstance(spec, dict) or spec.get("policyTypes") != ["Ingress"]:
+            return False
+        ingress = spec.get("ingress")
+        if not isinstance(ingress, list) or len(ingress) != 1 or not isinstance(ingress[0], dict):
+            return False
+        sources = ingress[0].get("from")
+        monitoring_source = {
+            "namespaceSelector": {
+                "matchLabels": {"kubernetes.io/metadata.name": "astrolift-system"},
+            },
+        }
+        if name == "astrolift-alertmanager-operator-ingress":
+            return (
+                spec.get("podSelector")
+                == {
+                    "matchLabels": {
+                        "alertmanager": "astrolift-kube-prometheus-alertmanager",
+                        "app.kubernetes.io/name": "alertmanager",
+                    },
+                }
+                and sources == [monitoring_source]
+                and "ports" not in ingress[0]
+            )
+        trusted_source = {
+            "namespaceSelector": {
+                "matchLabels": {_PROMETHEUS_ACCESS_LABEL: "true"},
+            },
+        }
+        return (
+            spec.get("podSelector")
+            == {
+                "matchLabels": {
+                    "app.kubernetes.io/name": "prometheus",
+                    "prometheus": "astrolift-kube-prometheus-prometheus",
+                },
+            }
+            and sources == [monitoring_source, trusted_source]
+            and ingress[0].get("ports") == [{"port": 9090, "protocol": "TCP"}]
+        )
 
     def _labels(self, owner: dict[str, str], component: str) -> dict[str, str]:
         return {
@@ -1124,11 +1366,6 @@ class KubePrometheusStackDriver(ManagedServiceDriver):
             f"http://{self._config.prometheus_service_name}.{self._config.monitoring_namespace}.svc.cluster.local:9090"
         )
 
-    def _alertmanager_url(self) -> str:
-        return self._config.alertmanager_url or (
-            f"http://{self._config.alertmanager_service_name}.{self._config.monitoring_namespace}.svc.cluster.local:9093"
-        )
-
     def _grafana_url(self) -> str:
         return self._config.grafana_url or (
             f"http://{self._config.grafana_service_name}.{self._config.monitoring_namespace}.svc.cluster.local:80"
@@ -1165,20 +1402,20 @@ class KubePrometheusStackDriver(ManagedServiceDriver):
         ):
             if isinstance(count_value, bool) or not isinstance(count_value, int) or count_value < 0:
                 raise ValueError(f"kube-prometheus {count_field} must be a non-negative integer")
-        self._validate_label_key(self._config.dashboard_label_key)
-        if self._config.dashboard_label_key.startswith("astrolift.io/") or self._config.dashboard_label_key in {
-            _OWNER,
-            _OWNER_ID,
-            _COMPONENT,
-        }:
-            raise ValueError("kube-prometheus dashboard label key is reserved by Astrolift")
-        if len(self._config.dashboard_label_value) > 63 or not _LABEL_VALUE.fullmatch(
-            self._config.dashboard_label_value
+        for boolean_field, boolean_value in (
+            ("verify_crds", self._config.verify_crds),
+            ("verify_services", self._config.verify_services),
+            ("verify_selection", self._config.verify_selection),
+            ("allow_workload_prometheus_access", self._config.allow_workload_prometheus_access),
+            ("allow_cross_namespace", self._config.allow_cross_namespace),
+            ("allow_custom_rules", self._config.allow_custom_rules),
+            ("allow_custom_dashboards", self._config.allow_custom_dashboards),
+            ("allow_honor_labels", self._config.allow_honor_labels),
         ):
-            raise ValueError("kube-prometheus dashboard label value is invalid")
+            if not isinstance(boolean_value, bool):
+                raise ValueError(f"kube-prometheus {boolean_field} must be a boolean")
         for field, value in (
             ("prometheus_url", self._prometheus_url()),
-            ("alertmanager_url", self._alertmanager_url()),
             ("grafana_url", self._grafana_url()),
         ):
             parsed = urlsplit(value)

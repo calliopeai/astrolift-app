@@ -810,6 +810,70 @@ class K8sNativeClusterDriver(ClusterDriver):
                             "ruleNamespaceSelector": {},
                         },
                     },
+                    "extraManifests": [
+                        {
+                            "apiVersion": "networking.k8s.io/v1",
+                            "kind": "NetworkPolicy",
+                            "metadata": {"name": "astrolift-prometheus-trusted-ingress"},
+                            "spec": {
+                                "podSelector": {
+                                    "matchLabels": {
+                                        "app.kubernetes.io/name": "prometheus",
+                                        "prometheus": "astrolift-kube-prometheus-prometheus",
+                                    },
+                                },
+                                "policyTypes": ["Ingress"],
+                                "ingress": [
+                                    {
+                                        "from": [
+                                            {
+                                                "namespaceSelector": {
+                                                    "matchLabels": {
+                                                        "kubernetes.io/metadata.name": "astrolift-system",
+                                                    },
+                                                },
+                                            },
+                                            {
+                                                "namespaceSelector": {
+                                                    "matchLabels": {
+                                                        "astrolift.io/trusted-observability-access": "true",
+                                                    },
+                                                },
+                                            },
+                                        ],
+                                        "ports": [{"port": 9090, "protocol": "TCP"}],
+                                    },
+                                ],
+                            },
+                        },
+                        {
+                            "apiVersion": "networking.k8s.io/v1",
+                            "kind": "NetworkPolicy",
+                            "metadata": {"name": "astrolift-alertmanager-operator-ingress"},
+                            "spec": {
+                                "podSelector": {
+                                    "matchLabels": {
+                                        "alertmanager": "astrolift-kube-prometheus-alertmanager",
+                                        "app.kubernetes.io/name": "alertmanager",
+                                    },
+                                },
+                                "policyTypes": ["Ingress"],
+                                "ingress": [
+                                    {
+                                        "from": [
+                                            {
+                                                "namespaceSelector": {
+                                                    "matchLabels": {
+                                                        "kubernetes.io/metadata.name": "astrolift-system",
+                                                    },
+                                                },
+                                            },
+                                        ],
+                                    },
+                                ],
+                            },
+                        },
+                    ],
                 },
                 requires=["storage:rwo for Prom + Grafana PVs"],
                 options=[],

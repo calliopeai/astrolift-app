@@ -1114,13 +1114,13 @@ def _k8s_managed_config_for(
             prometheus_service_name=str(
                 pc.get(
                     "kube_prometheus_prometheus_service_name",
-                    "astrolift-kube-prometheus-stack-prometheus",
+                    "astrolift-kube-prometheus-prometheus",
                 )
             ),
             alertmanager_service_name=str(
                 pc.get(
                     "kube_prometheus_alertmanager_service_name",
-                    "astrolift-kube-prometheus-stack-alertmanager",
+                    "astrolift-kube-prometheus-alertmanager",
                 )
             ),
             grafana_service_name=str(
@@ -1130,10 +1130,13 @@ def _k8s_managed_config_for(
                 )
             ),
             prometheus_url=str(pc.get("kube_prometheus_prometheus_url", "")),
-            alertmanager_url=str(pc.get("kube_prometheus_alertmanager_url", "")),
             grafana_url=str(pc.get("kube_prometheus_grafana_url", "")),
             verify_crds=bool(pc.get("kube_prometheus_verify_crds", True)),
             verify_services=bool(pc.get("kube_prometheus_verify_services", True)),
+            verify_selection=bool(pc.get("kube_prometheus_verify_selection", True)),
+            allow_workload_prometheus_access=bool(
+                pc.get("kube_prometheus_allow_workload_prometheus_access", False),
+            ),
             allow_cross_namespace=bool(pc.get("kube_prometheus_allow_cross_namespace", False)),
             allowed_target_namespaces=tuple(
                 str(value) for value in pc.get("kube_prometheus_allowed_target_namespaces", [])
@@ -1160,10 +1163,6 @@ def _k8s_managed_config_for(
             max_rules=int(pc.get("kube_prometheus_max_rules", 100)),
             max_dashboards=int(pc.get("kube_prometheus_max_dashboards", 10)),
             max_dashboard_bytes=int(pc.get("kube_prometheus_max_dashboard_bytes", 512_000)),
-            dashboard_label_key=str(
-                pc.get("kube_prometheus_dashboard_label_key", "grafana_dashboard"),
-            ),
-            dashboard_label_value=str(pc.get("kube_prometheus_dashboard_label_value", "1")),
         )
     if pair == ("object_store", "s3_compatible_existing"):
         from k8s_native.managed.object_store_existing_s3 import ExistingS3Config
