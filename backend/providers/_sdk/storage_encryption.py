@@ -128,6 +128,15 @@ POLICIES: dict[tuple[str, str, str], EncryptionPolicy] = {
         cmek_required_for_compliance=("pci", "hipaa"),
         notes=("Spanner database CMEK is selected at creation; restored databases can select replacement keys."),
     ),
+    ("gcp", "faas", "cloud_functions_gen2"): EncryptionPolicy(
+        mode="cloud_kms",
+        cmek_supported=True,
+        cmek_required_for_compliance=("pci", "hipaa"),
+        notes=(
+            "Cloud Run functions v2 support a regional Cloud KMS key for function resources; "
+            "source artifacts and custom Artifact Registry repositories need compatible encryption policy."
+        ),
+    ),
     ("gcp", "event_stream", "managed_kafka"): EncryptionPolicy(
         mode="cloud_kms",
         cmek_supported=True,

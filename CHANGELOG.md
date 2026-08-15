@@ -12,6 +12,10 @@
   Local or Zone redundancy, provisioned performance, root-squash and encrypted
   mount controls, subnet allowlists, portable AZNFS bindings, child snapshots,
   ownership-safe reconciliation, and protected data-loss-aware teardown.
+- Add Google Cloud Run functions (Cloud Functions v2) lifecycle with Cloud
+  Build source declarations, HTTP and Eventarc triggers, Secret Manager
+  environment/volumes, scaling, private networking, Binary Authorization,
+  CMEK, authenticated IAM bindings, adoption, and guarded teardown.
 - Add Google Cloud API Gateway lifecycle with immutable OpenAPI and gRPC
   config revisions, zero-downtime gateway retargeting, backend service
   identity, revision retention, portable endpoint bindings, adoption,
