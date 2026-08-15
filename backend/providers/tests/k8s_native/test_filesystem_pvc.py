@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from astrolift_manifest.env_injection import envelope_keys_for
+
+from _sdk.availability import MATRIX
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, VolumeSourceKind
 from k8s_native.managed.filesystem_pvc import PVCConfig, RookCephFSDriver, StorageClassPVCDriver
 from k8s_native.plugin import PLUGIN
@@ -201,6 +204,45 @@ def test_dynamic_pvc_deprovision_is_data_safe_and_rejects_legacy_handle() -> Non
     assert unconfirmed_delete.retryable is False
     assert legacy.ok is False
     assert legacy.retryable is False
+
+
+def test_dynamic_pvc_binding_reports_transport_security_conservatively() -> None:
+    """#1398 — both dynamic variants must emit the canonical FILESYSTEM_TLS.
+
+    The value is ``"false"`` because the StorageClass's provisioner owns
+    in-transit encryption and the driver cannot observe it. Reporting
+    ``"true"`` for an unknown backend would tell a consumer its traffic is
+    protected when it may not be.
+    """
+    handle = ServiceHandle("filesystem/cluster-1/acme-payments/pvc-payments-shared-workspace")
+
+    for driver in (
+        StorageClassPVCDriver(config=PVCConfig(storage_class_name="standard")),
+        RookCephFSDriver(
+            config=PVCConfig(
+                storage_class_name="rook-cephfs",
+                default_access_modes=("ReadWriteMany",),
+            ),
+        ),
+    ):
+        binding = driver.binding(handle)
+
+        assert binding.env_vars["FILESYSTEM_TLS"].literal == "false"
+        assert binding.env_vars["FILESYSTEM_TLS"].secret_ref in (None, "")
+        # The declared schema has to keep pace with what binding() emits,
+        # otherwise the availability matrix and the docs go on lying.
+        assert set(driver.binding_schema().env_vars) == set(binding.env_vars)
+
+
+def test_dynamic_pvc_matrix_entries_declare_the_full_filesystem_envelope() -> None:
+    entries = {
+        entry.variant: entry
+        for entry in MATRIX.managed_services
+        if entry.kind == "filesystem" and entry.plugin_id == "k8s_native"
+    }
+
+    for variant in ("storage_class_pvc", "rook_cephfs"):
+        assert set(envelope_keys_for("filesystem")) <= set(entries[variant].binding_envs)
 
 
 def test_plugin_registers_both_dynamic_filesystem_variants() -> None:
