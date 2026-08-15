@@ -8,6 +8,11 @@
   config revisions, zero-downtime gateway retargeting, backend service
   identity, revision retention, portable endpoint bindings, adoption,
   snapshots, and guarded dependency teardown.
+- Add Memorystore for Valkey lifecycle with private PSC endpoints, IAM and
+  Preview token authentication, Secret Manager-backed two-phase token
+  rotation, TLS CA bindings, every current node type, cluster and non-cluster
+  modes, scaling, RDB/AOF persistence, CMEK, scheduled and on-demand backups,
+  exact restore, cross-instance replication, adoption, and protected teardown.
 - Add Cloud Spanner Graph lifecycle on Enterprise and Enterprise Plus with
   GoogleSQL/GQL property graphs, fixed or autoscaled capacity, atomic custom
   schemas, replay-safe DDL, CMEK, exact backups and restore, portable IAM
@@ -89,7 +94,8 @@
   stages with environment, prompt, skill, output-key defaults, configured binding
   overrides, immutable task packets, named structured outputs, and a worked example.
 - Add canonical modular agent packages, repository slice/federation discovery,
-  AGENTS.md/Langflow/Flowise imports, and authenticated MCP agent operations.
+  AGENTS.md/Langflow/Flowise imports, and authenticated MCP agent and shared
+  project-resource operations.
 - Add agent secret-reference CRUD, explicit reveal, reusable secret bundles,
   attachment precedence, provider capability reporting, and management UI.
 - Add operator kill controls, task deadlines, callback authentication, and
@@ -97,6 +103,10 @@
 
 ### Changed
 
+- Build every Azure non-cluster capability with its driver-specific config,
+  make managed-service Key Vault references unambiguous and same-vault, keep
+  legacy managed bindings readable, and fail workload rendering closed when a
+  managed credential resolves missing or empty.
 - Make project dashboards, navigation, and repository workflow detail pages
   workload-aware, graph-first, fully linked, and observable without requiring
   a configured workflow wrapper.
