@@ -51,6 +51,8 @@ def _cluster(**provider_overrides):
         "seaweed_cluster_name": "shared-store",
         "seaweed_s3_endpoint": "https://objects.example.test",
         "seaweed_s3_region": "local-1",
+        "s3_existing_allowed_endpoint_hosts": ["objects.partner.test"],
+        "s3_existing_allowed_credential_path_prefixes": ["org/object-store"],
         "mssql_namespace": "database-system",
         "mssql_storage_class_name": "database-rwo",
         "mssql_credential_path_prefix": "managed/sqlserver",
@@ -85,6 +87,7 @@ def test_every_registered_k8s_managed_driver_has_live_config(monkeypatch) -> Non
         assert config.cluster_driver is cluster_driver, (kind, variant)
         if (kind, variant) in {
             ("object_store", "seaweedfs_operator"),
+            ("object_store", "s3_compatible_existing"),
             ("mssql", "sqlserver_express"),
             ("search", "opensearch_operator"),
             ("vector_index", "opensearch_operator_vector"),
@@ -446,6 +449,12 @@ def test_k8s_operator_defaults_are_exposed_in_provider_schema() -> None:
         "kserve_allowed_serving_runtimes",
         "kserve_allowed_autoscaler_classes",
         "kserve_max_replicas",
+        "s3_existing_namespace",
+        "s3_existing_allowed_endpoint_hosts",
+        "s3_existing_allowed_credential_path_prefixes",
+        "s3_existing_allow_insecure_http",
+        "s3_existing_allow_skip_tls_verify",
+        "s3_existing_allow_endpoint_paths",
         "seaweed_namespace",
         "seaweed_cluster_name",
         "seaweed_s3_endpoint",
@@ -519,6 +528,36 @@ def test_seaweedfs_config_preserves_shared_cluster_and_secret_backend(monkeypatc
     assert config.seaweed_name == "shared-store"
     assert config.endpoint == "https://objects.example.test"
     assert config.region == "local-1"
+    assert config.cluster_driver is cluster_driver
+    assert config.secrets_backend is secrets_backend
+
+
+def test_existing_s3_config_preserves_adoption_policy_and_secret_backend(monkeypatch) -> None:
+    cluster_driver = object()
+    secrets_backend = object()
+    monkeypatch.setattr("core.cluster_observability._driver_for_cluster", lambda _cluster: cluster_driver)
+    monkeypatch.setattr(
+        "core.app_deploy.driver_for_capability", lambda _cluster, _capability: secrets_backend
+    )
+
+    config = managed_config_for(
+        "k8s_native",
+        _cluster(
+            s3_existing_namespace="external-resources",
+            s3_existing_allow_insecure_http=True,
+            s3_existing_allow_skip_tls_verify=True,
+            s3_existing_allow_endpoint_paths=True,
+        ),
+        kind="object_store",
+        variant="s3_compatible_existing",
+    )
+
+    assert config.namespace == "external-resources"
+    assert config.allowed_endpoint_hosts == ("objects.partner.test",)
+    assert config.allowed_credential_path_prefixes == ("org/object-store",)
+    assert config.allow_insecure_http is True
+    assert config.allow_skip_tls_verify is True
+    assert config.allow_endpoint_paths is True
     assert config.cluster_driver is cluster_driver
     assert config.secrets_backend is secrets_backend
 
@@ -605,18 +644,21 @@ def test_dynamic_filesystems_are_executable_preview_catalog_entries() -> None:
         assert "FILESYSTEM_TLS" not in row.binding_envs
 
 
-def test_seaweedfs_is_the_only_executable_k8s_object_store() -> None:
+def test_k8s_object_store_catalog_distinguishes_executable_and_planned_variants() -> None:
     from astrolift_services.managed_service_catalog import list_catalog
 
     rows = {row.variant: row for row in list_catalog("k8s_native") if row.kind == "object_store"}
 
     assert rows["seaweedfs_operator"].available is True
     assert rows["seaweedfs_operator"].status == "preview"
+    assert rows["seaweedfs_operator"].is_default_for_kind is True
+    assert rows["s3_compatible_existing"].available is True
+    assert rows["s3_compatible_existing"].status == "preview"
+    assert rows["s3_compatible_existing"].is_default_for_kind is False
     assert rows["minio_operator"].available is False
     assert rows["minio_operator"].status == "deprecated"
     assert "retired" in rows["minio_operator"].unavailable_reason
     assert rows["minio_aistor_operator"].available is False
-    assert rows["s3_compatible_existing"].available is False
 
 
 def test_sqlserver_express_is_an_executable_preview_catalog_entry() -> None:

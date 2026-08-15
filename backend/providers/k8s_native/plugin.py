@@ -38,6 +38,7 @@ from k8s_native.managed.mongodb_operator import MongoDBOperatorDriver
 from k8s_native.managed.mssql_express import DEFAULT_IMAGE as DEFAULT_MSSQL_IMAGE
 from k8s_native.managed.mssql_express import SQLServerExpressDriver
 from k8s_native.managed.mysql_operator import MySQLOperatorDriver
+from k8s_native.managed.object_store_existing_s3 import ExistingS3ObjectStoreDriver
 from k8s_native.managed.object_store_seaweedfs import SeaweedFSObjectStoreDriver
 from k8s_native.managed.opensearch_operator import (
     DEFAULT_BOOTSTRAP_IMAGE as DEFAULT_OPENSEARCH_BOOTSTRAP_IMAGE,
@@ -82,6 +83,7 @@ PLUGIN = ProviderPlugin(
         ("event_bus", "knative_eventing"): KnativeEventingDriver,
         ("workflow_engine", "argo_workflows"): ArgoWorkflowsDriver,
         ("model_endpoint", "kserve"): KServeDriver,
+        ("object_store", "s3_compatible_existing"): ExistingS3ObjectStoreDriver,
         ("object_store", "seaweedfs_operator"): SeaweedFSObjectStoreDriver,
         ("mssql", "sqlserver_express"): SQLServerExpressDriver,
         ("search", "opensearch_operator"): OpenSearchSearchDriver,
@@ -416,6 +418,24 @@ PLUGIN = ProviderPlugin(
                 "default": ["hpa", "none"],
             },
             "kserve_max_replicas": {"type": "integer", "minimum": 0, "default": 100},
+            "s3_existing_namespace": {
+                "type": "string",
+                "description": "Optional fixed namespace for external S3 adoption records.",
+            },
+            "s3_existing_allowed_endpoint_hosts": {
+                "type": "array",
+                "items": {"type": "string"},
+                "default": [],
+                "description": "Endpoint host or DNS-suffix allowlist; cluster Service DNS must also be explicit.",
+            },
+            "s3_existing_allowed_credential_path_prefixes": {
+                "type": "array",
+                "items": {"type": "string"},
+                "default": ["managed/object_store/{organization}"],
+            },
+            "s3_existing_allow_insecure_http": {"type": "boolean", "default": False},
+            "s3_existing_allow_skip_tls_verify": {"type": "boolean", "default": False},
+            "s3_existing_allow_endpoint_paths": {"type": "boolean", "default": False},
             "seaweed_namespace": {
                 "type": "string",
                 "default": "astrolift-storage",

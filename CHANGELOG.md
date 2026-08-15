@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add preview adoption of existing S3-compatible buckets on Kubernetes with
+  project-scoped ownership records, org-scoped external credential bundles,
+  portable S3 bindings, endpoint/TLS/path policy gates, safe update/unlink,
+  and explicit retention of the external bucket, objects, and credentials.
 - Add preview KServe 0.20 model endpoints for Kubernetes installs with the
   complete native InferenceService predictor, transformer, explainer, model,
   canary, accelerator, scheduling, scaling, and storage surface; Standard-mode
