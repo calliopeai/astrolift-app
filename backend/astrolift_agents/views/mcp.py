@@ -12,7 +12,9 @@ import dataclasses
 import json
 import logging
 import time
+import uuid
 from collections.abc import Callable
+from types import SimpleNamespace
 from typing import Any
 
 from django.conf import settings
@@ -67,10 +69,12 @@ def _token(request: HttpRequest):
     return token
 
 
-def _authorize(request: HttpRequest, scope: str, *permissions: Permission) -> None:
+def _authorize(request: HttpRequest, scopes: str | tuple[str, ...], *permissions: Permission) -> None:
     token = _token(request)
-    if not has_scope(token, scope):
-        raise McpCallError(f"API token is missing scope {scope!r}", code="permission_denied")
+    required_scopes = (scopes,) if isinstance(scopes, str) else scopes
+    for scope in required_scopes:
+        if not has_scope(token, scope):
+            raise McpCallError(f"API token is missing scope {scope!r}", code="permission_denied")
     for permission in permissions:
         try:
             check_permission(permission)
@@ -81,7 +85,8 @@ def _authorize(request: HttpRequest, scope: str, *permissions: Permission) -> No
 def _may(request: HttpRequest, meta: dict[str, Any]) -> bool:
     try:
         permissions = tuple(meta.get("permissions") or (meta.get("permission"),))
-        _authorize(request, meta["scope"], *(p for p in permissions if p is not None))
+        scopes = (meta["scope"], *meta.get("additional_scopes", ()))
+        _authorize(request, scopes, *(p for p in permissions if p is not None))
     except McpCallError:
         return False
     return True
@@ -101,6 +106,15 @@ def _team_id() -> int | None:
 
 def _iso(value) -> str | None:
     return value.isoformat() if value is not None else None
+
+
+def _public_id(value: Any, field: str) -> str:
+    raw = str(value or "").strip()
+    try:
+        uuid.UUID(raw)
+    except (AttributeError, TypeError, ValueError) as exc:
+        raise McpCallError(f"{field} must be a UUID", code="invalid_arguments") from exc
+    return raw
 
 
 def _agent_rows(org_id: int, *, project_slug: str = ""):
@@ -436,6 +450,350 @@ def _import_agent_spec(_request: HttpRequest, args: dict[str, Any]) -> dict[str,
     }
 
 
+def _project_for_request(project_id: str):
+    from astrolift_identity.models import Project
+
+    rows = Project.objects.select_related("organization", "team").filter(
+        guid=_public_id(project_id, "project_id"),
+        organization_id=_org_id(),
+        deleted_at__isnull=True,
+    )
+    team_id = _team_id()
+    if team_id is not None:
+        rows = rows.filter(team_id=team_id)
+    project = rows.first()
+    if project is None:
+        raise McpCallError("project not found", code="not_found")
+    return project
+
+
+def _project_service_for_request(managed_service_id: str):
+    from astrolift_services.models import ManagedService
+
+    rows = (
+        ManagedService.objects.select_related("project", "tenant_cluster__provider_plugin")
+        .prefetch_related(
+            "attachments__agent_environment_spec",
+            "attachments__app_environment__registered_app",
+        )
+        .filter(
+            guid=_public_id(managed_service_id, "managed_service_id"),
+            project__organization_id=_org_id(),
+            deleted_at__isnull=True,
+        )
+    )
+    team_id = _team_id()
+    if team_id is not None:
+        rows = rows.filter(project__team_id=team_id)
+    service = rows.first()
+    if service is None:
+        raise McpCallError("project managed resource not found", code="not_found")
+    return service
+
+
+def _project_attachment_for_request(attachment_id: str):
+    from astrolift_services.models import ManagedServiceAttachment
+
+    rows = ManagedServiceAttachment.objects.select_related(
+        "managed_service__project",
+        "agent_environment_spec",
+        "app_environment__registered_app",
+    ).filter(
+        guid=_public_id(attachment_id, "attachment_id"),
+        managed_service__project__organization_id=_org_id(),
+        deleted_at__isnull=True,
+    )
+    team_id = _team_id()
+    if team_id is not None:
+        rows = rows.filter(managed_service__project__team_id=team_id)
+    attachment = rows.first()
+    if attachment is None:
+        raise McpCallError("project resource attachment not found", code="not_found")
+    return attachment
+
+
+def _serialize_project_resource_attachment(row) -> dict[str, Any]:
+    if row.agent_environment_spec_id:
+        return {
+            "id": str(row.guid),
+            "consumer_kind": "agent",
+            "consumer_slug": row.agent_environment_spec.slug,
+            "environment_name": "default",
+        }
+    return {
+        "id": str(row.guid),
+        "consumer_kind": "app",
+        "consumer_slug": row.app_environment.registered_app.slug,
+        "environment_name": row.app_environment.name,
+    }
+
+
+def _serialize_project_resource(service) -> dict[str, Any]:
+    from astrolift_services.schema.types import _editable_fields_for
+
+    cluster = service.tenant_cluster
+    return {
+        "id": str(service.guid),
+        "project_id": str(service.project.guid),
+        "project_slug": service.project.slug,
+        "cluster_id": str(cluster.guid),
+        "cluster_slug": cluster.slug,
+        "provider_plugin_slug": cluster.provider_plugin.slug,
+        "name": service.name,
+        "kind": service.kind,
+        "variant": service.variant or "",
+        "environment_name": service.effective_environment_name,
+        "status": service.status,
+        "status_error": service.status_error or "",
+        "config": service.config or {},
+        "editable_fields": _editable_fields_for(service),
+        "attachments": [
+            _serialize_project_resource_attachment(row)
+            for row in service.attachments.all()
+            if row.deleted_at is None
+        ],
+        "created_at": _iso(service.created_at),
+        "updated_at": _iso(service.updated_at),
+    }
+
+
+def _serialize_catalog_item(row) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "provider_plugin_slug": row.provider_plugin_slug,
+        "kind": row.kind,
+        "variant": row.variant,
+        "display_name": row.display_name,
+        "description": row.description,
+        "status": row.status,
+        "available": row.available,
+        "unavailable_reason": row.unavailable_reason,
+        "is_default_for_kind": row.is_default_for_kind,
+        "size_options": list(row.size_options),
+        "config_schema": row.config_schema,
+        "binding_envs": list(row.binding_envs),
+        "issue_url": row.issue_url,
+    }
+
+
+def _mutation_info(request: HttpRequest):
+    return SimpleNamespace(context=SimpleNamespace(request=request, user=request.user))
+
+
+def _unwrap_project_resource_mutation(result):
+    if result.ok:
+        return result.data
+    if not result.errors:
+        raise McpCallError("project resource operation failed")
+    error = result.errors[0]
+    code = str(getattr(error.code, "value", error.code)).lower()
+    raise McpCallError(error.message, code=code)
+
+
+def _list_project_resource_clusters(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from django.db.models import Q
+
+    from astrolift_clusters.models import TenantCluster
+
+    project = _project_for_request(str(args.get("project_id") or ""))
+    rows = (
+        TenantCluster.objects.select_related("provider_plugin")
+        .filter(
+            Q(organization_id=project.organization_id) | Q(organization_id__isnull=True),
+            deleted_at__isnull=True,
+            is_active=True,
+            lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+        )
+        .order_by("name", "guid")
+    )
+    return {
+        "clusters": [
+            {
+                "id": str(row.guid),
+                "name": row.name,
+                "slug": row.slug,
+                "provider_plugin_slug": row.provider_plugin.slug,
+                "region": row.region or "",
+                "lifecycle": row.lifecycle,
+                "is_active": row.is_active,
+            }
+            for row in rows
+        ]
+    }
+
+
+def _list_project_resource_catalog(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from django.db.models import Q
+
+    from astrolift_clusters.models import TenantCluster
+    from astrolift_services.managed_service_catalog import list_catalog
+
+    project = _project_for_request(str(args.get("project_id") or ""))
+    cluster = (
+        TenantCluster.objects.select_related("provider_plugin")
+        .filter(
+            Q(organization_id=project.organization_id) | Q(organization_id__isnull=True),
+            guid=_public_id(args.get("cluster_id"), "cluster_id"),
+            deleted_at__isnull=True,
+            is_active=True,
+            lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+        )
+        .first()
+    )
+    if cluster is None:
+        raise McpCallError("cluster not found", code="not_found")
+    return {
+        "project_id": str(project.guid),
+        "cluster_id": str(cluster.guid),
+        "resources": [_serialize_catalog_item(row) for row in list_catalog(cluster.provider_plugin.slug)],
+    }
+
+
+def _list_project_resources(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from astrolift_services.models import ManagedService
+
+    project = _project_for_request(str(args.get("project_id") or ""))
+    rows = (
+        ManagedService.objects.select_related("project", "tenant_cluster__provider_plugin")
+        .prefetch_related(
+            "attachments__agent_environment_spec",
+            "attachments__app_environment__registered_app",
+        )
+        .filter(project=project, deleted_at__isnull=True)
+        .order_by("kind", "name", "guid")
+    )
+    return {
+        "project_id": str(project.guid),
+        "resources": [_serialize_project_resource(row) for row in rows],
+    }
+
+
+def _provision_project_resource(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from astrolift_graphql import GUID
+    from astrolift_services.schema.mutations import ProvisionProjectManagedServiceInput, ServicesMutation
+
+    project = _project_for_request(str(args.get("project_id") or ""))
+    result = ServicesMutation().provision_project_managed_service(
+        _mutation_info(request),
+        input=ProvisionProjectManagedServiceInput(
+            project_id=GUID(str(project.guid)),
+            cluster_id=GUID(_public_id(args.get("cluster_id"), "cluster_id")),
+            environment_name=str(args.get("environment_name") or "production"),
+            kind=str(args.get("kind") or ""),
+            name=str(args["name"]) if "name" in args else None,
+            variant=str(args["variant"]) if "variant" in args else None,
+            config=dict(args.get("config") or {}),
+            agent_environment_spec_slugs=list(args.get("agent_environment_spec_slugs") or []),
+            app_environment_ids=[
+                GUID(_public_id(value, "app_environment_ids"))
+                for value in args.get("app_environment_ids") or []
+            ],
+        ),
+    )
+    data = _unwrap_project_resource_mutation(result)
+    return _serialize_project_resource(_project_service_for_request(str(data.id)))
+
+
+def _attach_project_resource(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from astrolift_graphql import GUID
+    from astrolift_services.schema.mutations import AttachProjectManagedServiceInput, ServicesMutation
+
+    service = _project_service_for_request(str(args.get("managed_service_id") or ""))
+    result = ServicesMutation().attach_project_managed_service(
+        _mutation_info(request),
+        input=AttachProjectManagedServiceInput(
+            managed_service_id=GUID(str(service.guid)),
+            agent_environment_spec_slug=args.get("agent_environment_spec_slug"),
+            app_environment_id=(
+                GUID(_public_id(args["app_environment_id"], "app_environment_id"))
+                if "app_environment_id" in args
+                else None
+            ),
+        ),
+    )
+    data = _unwrap_project_resource_mutation(result)
+    return _serialize_project_resource_attachment(_project_attachment_for_request(str(data.id)))
+
+
+def _detach_project_resource(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from astrolift_graphql import GUID
+    from astrolift_services.schema.mutations import DetachProjectManagedServiceInput, ServicesMutation
+
+    attachment = _project_attachment_for_request(str(args.get("attachment_id") or ""))
+    result = ServicesMutation().detach_project_managed_service(
+        _mutation_info(request),
+        input=DetachProjectManagedServiceInput(attachment_id=GUID(str(attachment.guid))),
+    )
+    data = _unwrap_project_resource_mutation(result)
+    return {
+        "attachment": {
+            "id": str(data.id),
+            "consumer_kind": data.consumer_kind,
+            "consumer_slug": data.consumer_slug,
+            "environment_name": data.environment_name,
+        },
+        "detached": True,
+    }
+
+
+def _update_project_resource(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from astrolift_graphql import GUID
+    from astrolift_services.schema.mutations import ServicesMutation, UpdateManagedServiceInput
+
+    service = _project_service_for_request(str(args.get("managed_service_id") or ""))
+    result = ServicesMutation().update_project_managed_service(
+        _mutation_info(request),
+        input=UpdateManagedServiceInput(
+            id=GUID(str(service.guid)),
+            name=str(args["name"]) if "name" in args else None,
+            config=dict(args["config"]) if "config" in args else None,
+        ),
+    )
+    data = _unwrap_project_resource_mutation(result)
+    return _serialize_project_resource(_project_service_for_request(str(data.id)))
+
+
+def _reprovision_project_resource(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from astrolift_graphql import GUID
+    from astrolift_services.schema.mutations import ReprovisionManagedServiceInput, ServicesMutation
+
+    service = _project_service_for_request(str(args.get("managed_service_id") or ""))
+    result = ServicesMutation().reprovision_project_managed_service(
+        _mutation_info(request),
+        input=ReprovisionManagedServiceInput(managed_service_id=GUID(str(service.guid))),
+    )
+    data = _unwrap_project_resource_mutation(result)
+    return _serialize_project_resource(_project_service_for_request(str(data.id)))
+
+
+def _deprovision_project_resource(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from astrolift_graphql import GUID
+    from astrolift_services.schema.mutations import DeprovisionManagedServiceInput, ServicesMutation
+
+    service = _project_service_for_request(str(args.get("managed_service_id") or ""))
+    if str(args.get("confirm_managed_service_id") or "") != str(service.guid):
+        raise McpCallError(
+            "confirm_managed_service_id must exactly match managed_service_id",
+            code="precondition",
+        )
+    result = ServicesMutation().deprovision_project_managed_service(
+        _mutation_info(request),
+        input=DeprovisionManagedServiceInput(
+            id=GUID(str(service.guid)),
+            delete_data=bool(args.get("delete_data", False)),
+            force_destroy=bool(args.get("force_destroy", False)),
+        ),
+    )
+    _unwrap_project_resource_mutation(result)
+    service.refresh_from_db()
+    return {
+        "id": str(service.guid),
+        "status": service.status,
+        "delete_data": bool(args.get("delete_data", False)),
+        "force_destroy": bool(args.get("force_destroy", False)),
+    }
+
+
 _HANDLERS: dict[str, ToolHandler] = {
     "astrolift_list_agents": _list_agents,
     "astrolift_get_agent": _get_agent,
@@ -444,6 +802,15 @@ _HANDLERS: dict[str, ToolHandler] = {
     "astrolift_cancel_task": _cancel_task,
     "astrolift_sync_agent_repo": _sync_agent_repo,
     "astrolift_import_agent_spec": _import_agent_spec,
+    "astrolift_list_project_resource_clusters": _list_project_resource_clusters,
+    "astrolift_list_project_resource_catalog": _list_project_resource_catalog,
+    "astrolift_list_project_resources": _list_project_resources,
+    "astrolift_provision_project_resource": _provision_project_resource,
+    "astrolift_attach_project_resource": _attach_project_resource,
+    "astrolift_detach_project_resource": _detach_project_resource,
+    "astrolift_update_project_resource": _update_project_resource,
+    "astrolift_reprovision_project_resource": _reprovision_project_resource,
+    "astrolift_deprovision_project_resource": _deprovision_project_resource,
 }
 
 
@@ -544,7 +911,8 @@ def _tool_call(request: HttpRequest, params: dict[str, Any]) -> dict[str, Any]:
             raise McpCallError(f"unknown tool {name!r}", code="not_found")
         _validate_tool_arguments(meta, args)
         permissions = tuple(meta.get("permissions") or (meta.get("permission"),))
-        _authorize(request, meta["scope"], *(p for p in permissions if p is not None))
+        scopes = (meta["scope"], *meta.get("additional_scopes", ()))
+        _authorize(request, scopes, *(p for p in permissions if p is not None))
         payload = handler(request, args)
     except Exception as exc:
         decision = "DENY" if isinstance(exc, McpCallError) else "UNKNOWN"
@@ -733,7 +1101,8 @@ def mcp_gateway(request: HttpRequest) -> HttpResponse:
                 "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
                 "instructions": (
                     "Use Astrolift tools to inspect immutable agent packages, dispatch/kill runs, "
-                    "and sync source repos. Secret values are intentionally unavailable over MCP."
+                    "sync source repos, and manage shared project resources. Secret values are "
+                    "intentionally unavailable over MCP."
                 ),
             },
             protocol=negotiated,
