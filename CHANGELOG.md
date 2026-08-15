@@ -99,6 +99,10 @@
 
 ### Changed
 
+- Build every Azure non-cluster capability with its driver-specific config,
+  make managed-service Key Vault references unambiguous and same-vault, keep
+  legacy managed bindings readable, and fail workload rendering closed when a
+  managed credential resolves missing or empty.
 - Make project dashboards, navigation, and repository workflow detail pages
   workload-aware, graph-first, fully linked, and observable without requiring
   a configured workflow wrapper.

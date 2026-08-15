@@ -61,6 +61,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from azure.secrets_keyvault import key_vault_secret_ref
 
 KIND = "vector_index"
 
@@ -468,7 +469,7 @@ class AzureAISearchVectorDriver(ManagedServiceDriver):
                 "AZURE_AI_SEARCH_ENDPOINT": ValueRef(literal=endpoint),
                 "AZURE_AI_SEARCH_INDEX_NAME": ValueRef(literal=index_name),
                 "AZURE_AI_SEARCH_ADMIN_KEY": ValueRef(
-                    secret_ref=admin_key_secret,
+                    secret_ref=key_vault_secret_ref(self._config.keyvault_url, admin_key_secret),
                 ),
             },
             iam_grants=[
