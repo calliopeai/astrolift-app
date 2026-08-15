@@ -541,7 +541,6 @@ def test_registration_catalog_cost_and_runtime_config_are_wired() -> None:
         ("encryption_key", "cloud_kms", "CloudKMSConfig"),
         ("faas", "cloud_functions_gen2", "CloudFunctionsConfig"),
         ("filesystem", "filestore", "FilestoreConfig"),
-        ("filesystem", "filestore", "FilestoreConfig"),
         ("api_gateway", "api_gateway", "APIGatewayConfig"),
         ("event_stream", "managed_kafka", "ManagedKafkaConfig"),
         ("event_bus", "eventarc", "EventarcConfig"),

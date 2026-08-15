@@ -33,7 +33,6 @@ Executable managed services:
 - PrivateServiceConnectDriver — private_endpoint/private_service_connect
 - CloudFunctionsDriver — faas/cloud_functions_gen2
 - FilestoreDriver — filesystem/filestore
-- FilestoreDriver — filesystem/filestore
 - APIGatewayDriver — api_gateway/api_gateway
 - ManagedKafkaDriver — event_stream/managed_kafka
 - EventarcDriver — event_bus/eventarc
@@ -57,7 +56,6 @@ from gcp.managed.encryption_cloud_kms import CloudKMSDriver
 from gcp.managed.event_bus_eventarc import EventarcDriver
 from gcp.managed.event_stream_managed_kafka import ManagedKafkaDriver
 from gcp.managed.faas_cloud_functions import CloudFunctionsDriver
-from gcp.managed.filesystem_filestore import FilestoreDriver
 from gcp.managed.filesystem_filestore import FilestoreDriver
 from gcp.managed.graph_spanner import SpannerGraphDriver
 from gcp.managed.model_endpoint_vertex import VertexAIEndpointDriver
@@ -118,7 +116,6 @@ PLUGIN = ProviderPlugin(
         ("cdn", "cloud_cdn"): CloudCdnDriver,
         ("private_endpoint", "private_service_connect"): PrivateServiceConnectDriver,
         ("faas", "cloud_functions_gen2"): CloudFunctionsDriver,
-        ("filesystem", "filestore"): FilestoreDriver,
         ("filesystem", "filestore"): FilestoreDriver,
         ("api_gateway", "api_gateway"): APIGatewayDriver,
         ("event_stream", "managed_kafka"): ManagedKafkaDriver,

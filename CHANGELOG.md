@@ -2,19 +2,16 @@
 
 ## Unreleased
 
-<<<<<<< HEAD
-- Add executable Google Cloud Private Service Connect consumer endpoints for
-  regional published services and global Google APIs/VPC Service Controls,
-  with managed or external addresses, Shared VPC references, Service Directory
-  registration, global access, portable bindings, adoption, and protected
-  teardown.
-=======
 - Add executable Google Cloud CDN lifecycle support, including Cloud Storage,
   NEG, instance-group, and existing backend-service origins; safe cache policy
   controls; a managed global HTTP(S) load-balancer graph; managed or external
   TLS; Cloud Armor policies; invalidation; signed-URL key rotation; portable
   bindings; ownership/adoption; and protected deletion.
->>>>>>> origin/main
+- Add executable Google Cloud Private Service Connect consumer endpoints for
+  regional published services and global Google APIs/VPC Service Controls,
+  with managed or external addresses, Shared VPC references, Service Directory
+  registration, global access, portable bindings, adoption, and protected
+  teardown.
 
 ### Added
 
@@ -26,63 +23,6 @@
   Build source declarations, HTTP and Eventarc triggers, Secret Manager
   environment/volumes, scaling, private networking, Binary Authorization,
   CMEK, authenticated IAM bindings, adoption, and guarded teardown.
-- Add preview adoption of existing S3-compatible buckets on Kubernetes with
-  project-scoped ownership records, org-scoped external credential bundles,
-  portable S3 bindings, endpoint/TLS/path policy gates, safe update/unlink,
-  and explicit retention of the external bucket, objects, and credentials.
-- Add preview KServe 0.20 model endpoints for Kubernetes installs with the
-  complete native InferenceService predictor, transformer, explainer, model,
-  canary, accelerator, scheduling, scaling, and storage surface; Standard-mode
-  private/read-only defaults; portable REST and gRPC bindings; managed runtime
-  identity; exact-UID adoption; protected teardown; and install-level policy
-  gates for exposure, images, runtimes, storage, logging, tokens, pod security,
-  caches, deployment modes, autoscalers, and replica limits.
-- Add preview Argo Workflows 4.1 WorkflowTemplate resources for Kubernetes
-  installs with native DAG/step/template specs, managed CronWorkflows and event
-  bindings, least-privilege executor bootstrap, bounded parallelism/deadlines,
-  portable submit bindings, UID-pinned modular references, declarative
-  snapshots, run-retaining teardown, ownership-safe pruning, and install-policy
-  security gates.
-- Add preview Knative Eventing brokers for Kubernetes installs with
-  declarative Triggers, CloudEvents ingress bindings, delivery and dead-letter
-  policy, broker-class and destination guardrails, live readiness, explicit
-  adoption and ownership-safe Trigger pruning and teardown.
-- Add preview Kubernetes Gateway API 1.5 managed gateways with complete
-  listener, address, infrastructure, HTTP, gRPC, TLS, TCP, and UDP route
-  shapes; Backend TLS policies and ListenerSets; live Programmed and route
-  state; portable bindings; explicit adoption and pruning; and install-level
-  cross-namespace, extension, custom backend, and experimental-protocol
-  guardrails that preserve destination-owned ReferenceGrant boundaries.
-- Add preview Knative Serving functions for Kubernetes installs with
-  scale-to-zero presets, revision traffic splitting, private-by-default routes,
-  digest-pinned images, secret and workload controls, live readiness and route
-  bindings, install-policy guardrails, explicit adoption, and ownership-safe
-  teardown.
-- Add preview OpenSearch Operator search and vector services for Kubernetes
-  installs with OpenSearch 3.8, secure 3.x CRDs, tenant-scoped users and
-  NetworkPolicies, digest-pinned non-root vector-index bootstrapping, explicit
-  HNSW mappings, protected storage teardown, and external secret bindings.
-- Add preview Kubernetes SQL Server 2025 Express managed services with
-  non-root StatefulSets, durable PVCs, external credential bundles, encrypted
-  TDS bindings, guarded LoadBalancer exposure, safe expansion, and optional
-  crash-consistent CSI snapshots.
-- Add preview SeaweedFS Operator object storage for Kubernetes installs with
-  shared-cluster bucket reconciliation, bucket-scoped S3 IAM credentials,
-  versioning, Object Lock, quotas, placement controls, explicit anonymous
-  reads, truthful readiness, and data-safe retain/delete teardown.
-- Add Kubernetes StorageClass and Rook CephFS project volume templates with
-  consumer-namespace dynamic claims, live StorageClass/CSI preflight,
-  portable app and agent mounts, data-safe teardown, and full catalog,
-  GraphQL, and project-resource UI visibility.
-- Add portable managed-filesystem runtime attachments for applications and
-  agent Jobs, including CSI/PVC preflight, credential-reference projection,
-  provider-specific EFS/FSx/NFS mounts, owned storage cleanup, and safe mount
-  readiness metadata in the project resources UI and GraphQL API.
-- Add Google Cloud Filestore shared filesystems across Basic, Zonal,
-  Regional, and Enterprise tiers with NFSv3/v4.1, PSC and IPv6, export ACLs,
-  Kerberos directory integration, CMEK, custom performance, deletion
-  protection, replication health and promotion, native snapshots, regional
-  backups, restore, portable bindings, and adoption-safe teardown.
 - Add preview project observability bundles on a shared
   kube-prometheus-stack with namespace-scoped ServiceMonitor and PodMonitor
   targets, safe standard alerts and dashboards, policy-gated custom content,
