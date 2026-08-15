@@ -430,6 +430,12 @@ def test_binding_emits_portable_csi_envelope_and_scoped_client_grants():
         "elasticfilesystem:ClientWrite",
         "elasticfilesystem:ClientRootAccess",
     ]
+    volume = binding.pod_volume_mounts[0]
+    assert volume.name == f"efs-{FS_ID}"
+    assert volume.csi_driver == "efs.csi.aws.com"
+    assert volume.volume_handle == f"{FS_ID}::{AP_ID}"
+    assert volume.mount_path == "/workspace"
+    assert volume.mount_options == options
 
 
 def test_read_only_binding_does_not_grant_client_write():
@@ -439,6 +445,7 @@ def test_read_only_binding_does_not_grant_client_write():
     binding = driver.binding(ServiceHandle(f"filesystem/{FS_ID}"), {"read_only": True})
 
     assert binding.iam_grants[0].actions == ["elasticfilesystem:ClientMount"]
+    assert binding.pod_volume_mounts[0].read_only is True
 
 
 def test_binding_and_delete_refuse_an_external_filesystem_even_with_force():

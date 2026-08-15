@@ -2288,6 +2288,7 @@ export type AstroliftManagedDomainMutationResult = {
 };
 
 export type AstroliftManagedService = {
+  appliedConfig?: Maybe<Scalars['JSON']['output']>;
   attachments: Array<AstroliftManagedServiceAttachment>;
   clusterSlug: Scalars['String']['output'];
   config: Scalars['JSON']['output'];
@@ -2299,6 +2300,11 @@ export type AstroliftManagedService = {
   lastActionAt?: Maybe<Scalars['DateTime']['output']>;
   lastActionKind: Scalars['String']['output'];
   name: Scalars['String']['output'];
+  operationCompletedAt?: Maybe<Scalars['DateTime']['output']>;
+  operationKind: Scalars['String']['output'];
+  operationRunId: Scalars['String']['output'];
+  operationStartedAt?: Maybe<Scalars['DateTime']['output']>;
+  operationWorkflowId: Scalars['String']['output'];
   ownerScope: Scalars['String']['output'];
   projectSlug: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
@@ -2306,6 +2312,7 @@ export type AstroliftManagedService = {
   statusError: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
   variant: Scalars['String']['output'];
+  volumeBindings: Array<AstroliftManagedServiceVolumeBinding>;
 };
 
 export type AstroliftManagedServiceAttachment = {
@@ -2426,6 +2433,25 @@ export type AstroliftManagedServiceTestEmailResultMutationResult = {
   data?: Maybe<AstroliftManagedServiceTestEmailResult>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftManagedServiceVolumeBinding = {
+  accessModes: Array<Scalars['String']['output']>;
+  capacity: Scalars['String']['output'];
+  claimName: Scalars['String']['output'];
+  claimNamespace: Scalars['String']['output'];
+  containerNames: Array<Scalars['String']['output']>;
+  credentialReferenceCount: Scalars['Int']['output'];
+  csiDriver: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  mountPath: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  protocol: Scalars['String']['output'];
+  readOnly: Scalars['Boolean']['output'];
+  sourceKind: Scalars['String']['output'];
+  storageClassName: Scalars['String']['output'];
+  subPath: Scalars['String']['output'];
+  workloadNames: Array<Scalars['String']['output']>;
 };
 
 export type AstroliftManifestDiffEntry = {
@@ -11472,7 +11498,7 @@ export type ListProjectResourcesQueryVariables = Exact<{
 }>;
 
 
-export type ListProjectResourcesQuery = { astroliftProjectResourceClusters: Array<{ id: string, slug: string, name: string, providerPluginSlug: string, region: string, isActive: boolean, lifecycle: string }>, astroliftProjectManagedServices: Array<{ id: string, name: string, kind: string, variant: string, status: string, statusError: string, config: Record<string, unknown>, projectSlug: string, ownerScope: string, clusterSlug: string, environmentName: string, createdAt: string, updatedAt: string, lastActionAt?: string | null, lastActionKind: string, editableFields: Array<string>, attachments: Array<{ id: string, consumerKind: string, consumerSlug: string, environmentName: string }> }>, astroliftProjectSecretBundles: Array<{ id: string, slug: string, name: string, backendRef: string, projectSlug?: string | null, clusterSlug?: string | null, keyCount: number, keyNames: Array<string>, lastKnownKeysAt?: string | null, createdAt: string, consumers: Array<{ id: string, consumerKind: string, consumerSlug: string, environmentName: string }> }> };
+export type ListProjectResourcesQuery = { astroliftProjectResourceClusters: Array<{ id: string, slug: string, name: string, providerPluginSlug: string, region: string, isActive: boolean, lifecycle: string }>, astroliftProjectManagedServices: Array<{ id: string, name: string, kind: string, variant: string, status: string, statusError: string, config: Record<string, unknown>, appliedConfig?: Record<string, unknown> | null, operationKind: string, operationWorkflowId: string, operationRunId: string, operationStartedAt?: string | null, operationCompletedAt?: string | null, projectSlug: string, ownerScope: string, clusterSlug: string, environmentName: string, createdAt: string, updatedAt: string, lastActionAt?: string | null, lastActionKind: string, editableFields: Array<string>, attachments: Array<{ id: string, consumerKind: string, consumerSlug: string, environmentName: string }>, volumeBindings: Array<{ id: string, name: string, mountPath: string, subPath: string, sourceKind: string, protocol: string, claimName: string, claimNamespace: string, storageClassName: string, csiDriver: string, readOnly: boolean, capacity: string, accessModes: Array<string>, workloadNames: Array<string>, containerNames: Array<string>, credentialReferenceCount: number }> }>, astroliftProjectSecretBundles: Array<{ id: string, slug: string, name: string, backendRef: string, projectSlug?: string | null, clusterSlug?: string | null, keyCount: number, keyNames: Array<string>, lastKnownKeysAt?: string | null, createdAt: string, consumers: Array<{ id: string, consumerKind: string, consumerSlug: string, environmentName: string }> }> };
 
 export type ListProjectManagedServiceCatalogQueryVariables = Exact<{
   projectId: Scalars['GUID']['input'];
@@ -11488,7 +11514,7 @@ export type ListManagedServicesQueryVariables = Exact<{
 }>;
 
 
-export type ListManagedServicesQuery = { astroliftManagedServices: Array<{ id: string, kind: string, name: string, variant: string, environmentName: string, registeredAppSlug: string, status: string, statusError: string, config: Record<string, unknown>, createdAt: string, updatedAt: string, lastActionAt?: string | null, lastActionKind: string, editableFields: Array<string> }> };
+export type ListManagedServicesQuery = { astroliftManagedServices: Array<{ id: string, kind: string, name: string, variant: string, environmentName: string, registeredAppSlug: string, status: string, statusError: string, config: Record<string, unknown>, appliedConfig?: Record<string, unknown> | null, operationKind: string, operationWorkflowId: string, operationRunId: string, operationStartedAt?: string | null, operationCompletedAt?: string | null, createdAt: string, updatedAt: string, lastActionAt?: string | null, lastActionKind: string, editableFields: Array<string>, volumeBindings: Array<{ id: string, name: string, mountPath: string, subPath: string, sourceKind: string, protocol: string, claimName: string, claimNamespace: string, storageClassName: string, csiDriver: string, readOnly: boolean, capacity: string, accessModes: Array<string>, workloadNames: Array<string>, containerNames: Array<string>, credentialReferenceCount: number }> }> };
 
 export type ListManagedServiceObjectsQueryVariables = Exact<{
   managedServiceId: Scalars['GUID']['input'];
