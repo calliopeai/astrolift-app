@@ -20,6 +20,7 @@ delegation only resolves if CNPG is actually installed.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -42,13 +43,14 @@ class OperatorRequirement:
     e.g. 'helm install cnpg ...' or 'kubectl apply -f ...'."""
 
     minimum_kubernetes_version: str = "1.27"
+    minimum_operator_version: str = ""
 
 
 @dataclass(frozen=True)
 class PreflightFailure:
     requirement_id: str
     code: str
-    """missing_crd | missing_operator | k8s_too_old | unknown_variant"""
+    """missing_crd | missing_operator | operator_too_old | k8s_too_old | unknown_variant"""
 
     message: str
 
@@ -166,6 +168,38 @@ REQUIREMENTS: dict[tuple[str, str], OperatorRequirement] = {
         required_crds=(),
         install_hint=("No operator is required; provide an amd64 node pool and a dynamically provisioned StorageClass"),
     ),
+    ("search", "opensearch_operator"): OperatorRequirement(
+        operator_id="opensearch-operator",
+        display_name="OpenSearch Kubernetes Operator",
+        required_crds=(
+            "opensearchclusters.opensearch.org",
+            "opensearchusers.opensearch.org",
+            "opensearchroles.opensearch.org",
+            "opensearchuserrolebindings.opensearch.org",
+        ),
+        install_hint=(
+            "helm install opensearch-operator "
+            "opensearch-operator/opensearch-operator --version 3.0.2 "
+            "--namespace opensearch-operator-system --create-namespace"
+        ),
+        minimum_operator_version="3.0.2",
+    ),
+    ("vector_index", "opensearch_operator_vector"): OperatorRequirement(
+        operator_id="opensearch-operator",
+        display_name="OpenSearch Kubernetes Operator",
+        required_crds=(
+            "opensearchclusters.opensearch.org",
+            "opensearchusers.opensearch.org",
+            "opensearchroles.opensearch.org",
+            "opensearchuserrolebindings.opensearch.org",
+        ),
+        install_hint=(
+            "helm install opensearch-operator "
+            "opensearch-operator/opensearch-operator --version 3.0.2 "
+            "--namespace opensearch-operator-system --create-namespace"
+        ),
+        minimum_operator_version="3.0.2",
+    ),
 }
 
 
@@ -219,10 +253,11 @@ def preflight(
     # For broader CRD checks, a future iteration should expose
     # the raw CRD list from the probe; for now we use the
     # bool flags where they exist.
-    if requirement.required_crds and not _operator_present(
+    operator_present = _operator_present(
         capabilities=capabilities,
         operator_id=requirement.operator_id,
-    ):
+    )
+    if requirement.required_crds and not operator_present:
         failures.append(
             PreflightFailure(
                 requirement_id=requirement.operator_id,
@@ -235,6 +270,23 @@ def preflight(
             )
         )
         hints.append(requirement.install_hint)
+    elif operator_present and requirement.minimum_operator_version:
+        actual_version = capabilities.operator_versions.get(requirement.operator_id, "")
+        if actual_version and _semantic_version_too_old(
+            actual=actual_version,
+            minimum=requirement.minimum_operator_version,
+        ):
+            failures.append(
+                PreflightFailure(
+                    requirement_id=requirement.operator_id,
+                    code="operator_too_old",
+                    message=(
+                        f"operator {requirement.display_name!r} is {actual_version!r}; "
+                        f"version {requirement.minimum_operator_version}+ is required"
+                    ),
+                )
+            )
+            hints.append(requirement.install_hint)
 
     return PreflightReport(
         ok=not failures,
@@ -269,3 +321,17 @@ def _version_too_old(*, actual: str, minimum: str) -> bool:
     except ValueError:
         return False
     return actual_t < minimum_t
+
+
+def _semantic_version_too_old(*, actual: str, minimum: str) -> bool:
+    def parts(value: str) -> tuple[int, int, int] | None:
+        match = re.search(r"(?<![0-9])(\d+)\.(\d+)\.(\d+)(?![0-9])", value)
+        if match is None:
+            return None
+        return int(match.group(1)), int(match.group(2)), int(match.group(3))
+
+    actual_parts = parts(actual)
+    minimum_parts = parts(minimum)
+    if actual_parts is None or minimum_parts is None:
+        return False
+    return actual_parts < minimum_parts

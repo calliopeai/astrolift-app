@@ -35,6 +35,14 @@ from k8s_native.managed.mssql_express import DEFAULT_IMAGE as DEFAULT_MSSQL_IMAG
 from k8s_native.managed.mssql_express import SQLServerExpressDriver
 from k8s_native.managed.mysql_operator import MySQLOperatorDriver
 from k8s_native.managed.object_store_seaweedfs import SeaweedFSObjectStoreDriver
+from k8s_native.managed.opensearch_operator import (
+    DEFAULT_BOOTSTRAP_IMAGE as DEFAULT_OPENSEARCH_BOOTSTRAP_IMAGE,
+)
+from k8s_native.managed.opensearch_operator import DEFAULT_IMAGE as DEFAULT_OPENSEARCH_IMAGE
+from k8s_native.managed.opensearch_operator import (
+    OpenSearchSearchDriver,
+    OpenSearchVectorDriver,
+)
 from k8s_native.managed.postgres_cnpg import CNPGPostgresDriver
 from k8s_native.managed.queue_rabbitmq import RabbitMQOperatorDriver
 from k8s_native.managed.redis_operator import RedisOperatorDriver
@@ -66,6 +74,8 @@ PLUGIN = ProviderPlugin(
         ("queue", "rabbitmq_operator"): RabbitMQOperatorDriver,
         ("object_store", "seaweedfs_operator"): SeaweedFSObjectStoreDriver,
         ("mssql", "sqlserver_express"): SQLServerExpressDriver,
+        ("search", "opensearch_operator"): OpenSearchSearchDriver,
+        ("vector_index", "opensearch_operator_vector"): OpenSearchVectorDriver,
         ("filesystem", "nfs_csi"): NFSDriver,
         ("filesystem", "storage_class_pvc"): StorageClassPVCDriver,
         ("filesystem", "rook_cephfs"): RookCephFSDriver,
@@ -192,6 +202,56 @@ PLUGIN = ProviderPlugin(
                 "type": "number",
                 "minimum": 1,
                 "default": 120,
+            },
+            "opensearch_namespace": {"type": "string"},
+            "opensearch_storage_class_name": {"type": "string"},
+            "opensearch_api_version": {
+                "type": "string",
+                "enum": ["opensearch.org/v1"],
+                "default": "opensearch.org/v1",
+            },
+            "opensearch_operator_namespace": {
+                "type": "string",
+                "default": "opensearch-operator-system",
+            },
+            "opensearch_version": {"type": "string", "default": "3.8.0"},
+            "opensearch_image": {
+                "type": "string",
+                "default": DEFAULT_OPENSEARCH_IMAGE,
+            },
+            "opensearch_bootstrap_image": {
+                "type": "string",
+                "default": DEFAULT_OPENSEARCH_BOOTSTRAP_IMAGE,
+            },
+            "opensearch_credential_path_prefix": {
+                "type": "string",
+                "default": "managed/opensearch",
+            },
+            "opensearch_allow_custom_versions": {"type": "boolean", "default": False},
+            "opensearch_allow_custom_images": {"type": "boolean", "default": False},
+            "opensearch_allow_custom_bootstrap_images": {
+                "type": "boolean",
+                "default": False,
+            },
+            "opensearch_allow_custom_plugins": {"type": "boolean", "default": False},
+            "opensearch_allow_single_node": {"type": "boolean", "default": False},
+            "opensearch_allow_network_policy_disable": {
+                "type": "boolean",
+                "default": False,
+            },
+            "opensearch_http_tls_secret_name": {"type": "string"},
+            "opensearch_http_tls_ca_secret_name": {"type": "string"},
+            "opensearch_http_tls_admin_secret_name": {"type": "string"},
+            "opensearch_http_tls_admin_dns": {
+                "type": "array",
+                "items": {"type": "string"},
+                "uniqueItems": True,
+            },
+            "opensearch_http_tls_verify": {"type": "boolean", "default": False},
+            "opensearch_deletion_timeout_seconds": {
+                "type": "number",
+                "minimum": 1,
+                "default": 180,
             },
             "nfs_storage_class_name": {"type": "string"},
             "nfs_server_address": {"type": "string"},
