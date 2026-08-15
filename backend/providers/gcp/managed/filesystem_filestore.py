@@ -37,6 +37,8 @@ from _sdk.managed_service import (
     UpdateResult,
     UpdateSpec,
     ValueRef,
+    VolumeMount,
+    VolumeSourceKind,
 )
 
 KIND = "filesystem"
@@ -504,6 +506,14 @@ class FilestoreDriver(ManagedServiceDriver):
             raise FilestoreError("Filestore instance has no assigned IP address")
         endpoint = addresses[0]
         share_name = str(shares[0].get("name") or "")
+        if not share_name:
+            raise FilestoreError("Filestore instance file share has no name")
+        try:
+            capacity_gb = int(shares[0].get("capacityGb") or 0)
+        except (TypeError, ValueError) as exc:
+            raise FilestoreError("Filestore instance file share has invalid capacity") from exc
+        if capacity_gb < 1:
+            raise FilestoreError("Filestore instance file share has invalid capacity")
         protocol = str(current.get("protocol") or "NFS_V3")
         mount_path = str(cfg.get("mount_path") or "/mnt/shared")
         security_flavor = str(cfg.get("security_flavor") or "sys")
@@ -533,6 +543,24 @@ class FilestoreDriver(ManagedServiceDriver):
                 "GCP_PROJECT_ID": ValueRef(literal=self._config.project_id),
                 "GCP_LOCATION": ValueRef(literal=location),
             },
+            pod_volume_mounts=[
+                VolumeMount(
+                    name=_resource_id(f"filestore-{instance_id}"),
+                    mount_path=mount_path,
+                    source_kind=VolumeSourceKind.CSI,
+                    protocol="nfs4.1" if protocol == "NFS_V4_1" else "nfs3",
+                    csi_driver="filestore.csi.storage.gke.io",
+                    volume_handle=f"modeInstance/{location}/{instance_id}/{share_name}",
+                    volume_attributes={
+                        "ip": endpoint,
+                        "volume": share_name,
+                        "protocol": protocol,
+                    },
+                    mount_options=options,
+                    read_only=bool(cfg.get("read_only", False)),
+                    capacity=f"{capacity_gb}Gi",
+                ),
+            ],
             iam_grants=[],
             notes=(
                 "Filestore is authorized by VPC reachability and NFS export rules; "

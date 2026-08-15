@@ -254,6 +254,20 @@ def test_provision_builds_current_v1_psc_instance_and_binding(
     assert binding.env_vars["FILESYSTEM_TLS"].literal == "true"
     assert binding.env_vars["FILESYSTEM_MOUNT_OPTIONS"].literal == "vers=4.1,sec=krb5p,ro"
     assert binding.iam_grants == []
+    assert len(binding.pod_volume_mounts) == 1
+    volume = binding.pod_volume_mounts[0]
+    assert volume.csi_driver == "filestore.csi.storage.gke.io"
+    _, instance_id = _parse_handle(result.handle)
+    assert volume.volume_handle == f"modeInstance/us-central1/{instance_id}/data"
+    assert volume.volume_attributes == {
+        "ip": "10.20.30.40",
+        "volume": "data",
+        "protocol": "NFS_V4_1",
+    }
+    assert volume.mount_path == "/mnt/shared"
+    assert volume.mount_options == ["vers=4.1", "sec=krb5p", "ro"]
+    assert volume.read_only is True
+    assert volume.capacity == "1024Gi"
 
 
 def test_all_current_and_legacy_tiers_are_exposed(driver: FilestoreDriver) -> None:
