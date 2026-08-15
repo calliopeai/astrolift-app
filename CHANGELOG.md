@@ -2,11 +2,19 @@
 
 ## Unreleased
 
+<<<<<<< HEAD
+- Add executable Google Cloud Private Service Connect consumer endpoints for
+  regional published services and global Google APIs/VPC Service Controls,
+  with managed or external addresses, Shared VPC references, Service Directory
+  registration, global access, portable bindings, adoption, and protected
+  teardown.
+=======
 - Add executable Google Cloud CDN lifecycle support, including Cloud Storage,
   NEG, instance-group, and existing backend-service origins; safe cache policy
   controls; a managed global HTTP(S) load-balancer graph; managed or external
   TLS; Cloud Armor policies; invalidation; signed-URL key rotation; portable
   bindings; ownership/adoption; and protected deletion.
+>>>>>>> origin/main
 
 ### Added
 

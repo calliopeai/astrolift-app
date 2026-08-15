@@ -208,6 +208,37 @@ def test_cloud_cdn_runtime_config_preserves_operator_controls() -> None:
     assert config.poll_interval_seconds == 0.5
 
 
+def test_private_service_connect_runtime_config_preserves_operator_controls() -> None:
+    from core.cluster_observability import managed_config_for
+
+    config = managed_config_for(
+        "gcp",
+        _cluster(
+            private_service_connect_network="projects/host/global/networks/shared",
+            private_service_connect_subnetwork=("projects/host/regions/us-central1/subnetworks/apps"),
+            private_service_connect_name_prefix="smd-psc",
+            private_service_connect_labels={"team": "network"},
+            private_service_connect_deletion_protection_default=False,
+            private_service_connect_api_endpoint=("https://compute.example.test/compute/v1"),
+            private_service_connect_operation_timeout_seconds=120,
+            private_service_connect_operation_poll_interval_seconds=0.5,
+        ),
+        kind="private_endpoint",
+        variant="private_service_connect",
+    )
+    assert type(config).__name__ == "PrivateServiceConnectConfig"
+    assert config.project_id == "acme-prod"
+    assert config.region == "us-central1"
+    assert config.network == "projects/host/global/networks/shared"
+    assert config.subnetwork.endswith("/subnetworks/apps")
+    assert config.name_prefix == "smd-psc"
+    assert config.labels == {"team": "network"}
+    assert config.deletion_protection_default is False
+    assert config.api_endpoint == "https://compute.example.test/compute/v1"
+    assert config.operation_timeout_seconds == 120
+    assert config.poll_interval_seconds == 0.5
+
+
 def test_bigquery_runtime_config_preserves_operator_controls() -> None:
     from core.cluster_observability import managed_config_for
 
