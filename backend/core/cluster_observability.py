@@ -1038,6 +1038,84 @@ def _azure_managed_config_for(
             secret_name_prefix=str(pc.get("azure_openai_secret_name_prefix", "astrolift-aoai")),
         )
 
+    if pair in {
+        ("mssql", "azure_sql_database"),
+        ("mssql", "azure_sql_serverless"),
+        ("mssql", "azure_sql_hyperscale"),
+    } or (kind == "mssql" and not variant):
+        from azure.managed.mssql_sql import AzureSQLDatabaseConfig
+
+        selected_variant = variant or "azure_sql_database"
+        subnet_id = str(pc.get("mssql_virtual_network_subnet_id") or "")
+        if not subnet_id:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: Azure mssql/{selected_variant} requires "
+                "provider_config.mssql_virtual_network_subnet_id",
+            )
+        public_network_access = str(pc.get("mssql_public_network_access_default", "Enabled"))
+        if public_network_access != "Enabled":
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: Azure mssql/{selected_variant} uses VNet service-endpoint "
+                "selected-network mode; public network Disabled requires a Private Endpoint driver",
+            )
+        return AzureSQLDatabaseConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            variant=selected_variant,
+            location=location,
+            server_name_prefix=str(pc.get("mssql_server_name_prefix", "astrolift-sql")),
+            database_name_prefix=str(pc.get("mssql_database_name_prefix", "astrolift")),
+            administrator_login=str(pc.get("mssql_administrator_login", "astrolift")),
+            keyvault_url=vault_url,
+            secret_name_prefix=str(pc.get("mssql_secret_name_prefix", "astrolift-mssql")),
+            virtual_network_subnet_id=subnet_id,
+            virtual_network_rule_name=str(pc.get("mssql_virtual_network_rule_name", "astrolift-aks")),
+            ignore_missing_vnet_service_endpoint=bool(
+                pc.get("mssql_ignore_missing_vnet_service_endpoint", False),
+            ),
+            public_network_access_default=public_network_access,
+            minimal_tls_version_default=str(pc.get("mssql_minimal_tls_version_default", "1.2")),
+            backup_retention_days_default=int(pc.get("mssql_backup_retention_days_default", 7)),
+            backup_storage_redundancy_default=str(
+                pc.get("mssql_backup_storage_redundancy_default", "Geo"),
+            ),
+            auto_pause_delay_minutes_default=int(
+                pc.get("mssql_serverless_auto_pause_delay_minutes_default", 60),
+            ),
+            min_capacity_default=float(pc.get("mssql_serverless_min_capacity_default", 0.5)),
+        )
+
+    if pair == ("mssql", "azure_sql_managed_instance"):
+        from azure.managed.mssql_sql import AzureSQLManagedInstanceConfig
+
+        subnet_id = str(pc.get("mssql_managed_instance_subnet_id") or "")
+        if not subnet_id:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: Azure mssql/azure_sql_managed_instance requires "
+                "provider_config.mssql_managed_instance_subnet_id",
+            )
+        return AzureSQLManagedInstanceConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            subnet_id=subnet_id,
+            location=location,
+            instance_name_prefix=str(pc.get("mssql_managed_instance_name_prefix", "astrolift-mi")),
+            database_name_prefix=str(pc.get("mssql_database_name_prefix", "astrolift")),
+            administrator_login=str(pc.get("mssql_administrator_login", "astrolift")),
+            keyvault_url=vault_url,
+            secret_name_prefix=str(
+                pc.get("mssql_managed_instance_secret_name_prefix", "astrolift-mssql-mi"),
+            ),
+            license_type_default=str(
+                pc.get("mssql_managed_instance_license_type_default", "LicenseIncluded"),
+            ),
+            minimal_tls_version_default=str(pc.get("mssql_minimal_tls_version_default", "1.2")),
+            public_data_endpoint_enabled_default=bool(
+                pc.get("mssql_managed_instance_public_data_endpoint_enabled_default", False),
+            ),
+            backup_retention_days_default=int(pc.get("mssql_backup_retention_days_default", 7)),
+        )
+
     raise ClusterObservabilityError(
         f"cluster {cluster.slug}: no Azure managed-service config builder for "
         f"kind={kind!r}, variant={variant!r}",

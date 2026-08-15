@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add Azure SQL Database provisioned, serverless, and Hyperscale variants plus
+  Azure SQL Managed Instance with typed ARM requests, VNet/subnet isolation,
+  Key Vault-backed portable bindings, retention controls, database-copy
+  snapshot/restore, and fail-closed teardown semantics.
 - Add Microsoft.FileShares provisioned-v2 NFS lifecycle with SSD capacity,
   Local or Zone redundancy, provisioned performance, root-squash and encrypted
   mount controls, subnet allowlists, portable AZNFS bindings, child snapshots,
