@@ -70,6 +70,22 @@ def driver(fake_k8s_client: Any) -> AKSClusterDriver:
     )
 
 
+def test_filesystem_preflight_inventory(driver: AKSClusterDriver, fake_k8s_client) -> None:
+    fake_k8s_client.list.return_value = [{"metadata": {"name": "file.csi.azure.com"}}]
+
+    assert driver.list_csi_drivers("azure-prod") == ["file.csi.azure.com"]
+    assert driver.persistent_volume_claim_exists("azure-prod", "acme-api", "shared") is True
+    assert (
+        driver.get_manifest(
+            "azure-prod",
+            "storage",
+            "seaweed.seaweedfs.com/v1/Bucket",
+            "uploads",
+        )
+        == fake_k8s_client.get.return_value
+    )
+
+
 def test_apply_aggregates(
     driver: AKSClusterDriver,
     fake_k8s_client,

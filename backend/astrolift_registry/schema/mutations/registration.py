@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 import strawberry
+from _sdk.k8s_naming import app_namespace
 from django.db.models import Q
 from strawberry.types import Info
 
@@ -196,7 +197,10 @@ class RegistrationMutations:
             build_args=build_args,
             trigger_mode=trigger_mode,
             cron_expression=cron_expression,
-            k8s_namespace=f"{project.organization.slug}-{eff_slug}",
+            k8s_namespace=app_namespace(
+                organization_slug=project.organization.slug,
+                app_slug=eff_slug,
+            ),
             subdomain=eff_slug,
             requires_approval=bool(approval["requires_approval"])
             if approval["requires_approval"] is not None

@@ -2288,6 +2288,7 @@ export type AstroliftManagedDomainMutationResult = {
 };
 
 export type AstroliftManagedService = {
+  appliedConfig?: Maybe<Scalars['JSON']['output']>;
   attachments: Array<AstroliftManagedServiceAttachment>;
   clusterSlug: Scalars['String']['output'];
   config: Scalars['JSON']['output'];
@@ -2299,6 +2300,11 @@ export type AstroliftManagedService = {
   lastActionAt?: Maybe<Scalars['DateTime']['output']>;
   lastActionKind: Scalars['String']['output'];
   name: Scalars['String']['output'];
+  operationCompletedAt?: Maybe<Scalars['DateTime']['output']>;
+  operationKind: Scalars['String']['output'];
+  operationRunId: Scalars['String']['output'];
+  operationStartedAt?: Maybe<Scalars['DateTime']['output']>;
+  operationWorkflowId: Scalars['String']['output'];
   ownerScope: Scalars['String']['output'];
   projectSlug: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
@@ -2306,6 +2312,7 @@ export type AstroliftManagedService = {
   statusError: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
   variant: Scalars['String']['output'];
+  volumeBindings: Array<AstroliftManagedServiceVolumeBinding>;
 };
 
 export type AstroliftManagedServiceAttachment = {
@@ -2426,6 +2433,25 @@ export type AstroliftManagedServiceTestEmailResultMutationResult = {
   data?: Maybe<AstroliftManagedServiceTestEmailResult>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftManagedServiceVolumeBinding = {
+  accessModes: Array<Scalars['String']['output']>;
+  capacity: Scalars['String']['output'];
+  claimName: Scalars['String']['output'];
+  claimNamespace: Scalars['String']['output'];
+  containerNames: Array<Scalars['String']['output']>;
+  credentialReferenceCount: Scalars['Int']['output'];
+  csiDriver: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  mountPath: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  protocol: Scalars['String']['output'];
+  readOnly: Scalars['Boolean']['output'];
+  sourceKind: Scalars['String']['output'];
+  storageClassName: Scalars['String']['output'];
+  subPath: Scalars['String']['output'];
+  workloadNames: Array<Scalars['String']['output']>;
 };
 
 export type AstroliftManifestDiffEntry = {

@@ -30,6 +30,8 @@ from _sdk.managed_service import (
     UpdateResult,
     UpdateSpec,
     ValueRef,
+    VolumeMount,
+    VolumeSourceKind,
 )
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
 
@@ -287,6 +289,19 @@ class EFSDriver(ManagedServiceDriver):
                 "AWS_REGION": ValueRef(literal=self._config.region),
             },
             iam_grants=[Grant(file_system_arn, actions)],
+            pod_volume_mounts=[
+                VolumeMount(
+                    name=f"efs-{file_system_id}",
+                    mount_path=mount_path,
+                    source_kind=VolumeSourceKind.CSI,
+                    protocol="nfs4",
+                    csi_driver="efs.csi.aws.com",
+                    volume_handle=(f"{file_system_id}::{access_point_id}" if access_point_id else file_system_id),
+                    mount_options=options,
+                    read_only=bool(cfg.get("read_only", False)),
+                    capacity="1Gi",
+                ),
+            ],
             notes="Amazon EFS NFSv4 shared filesystem; mount through the EFS CSI driver",
         )
 

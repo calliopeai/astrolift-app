@@ -223,6 +223,35 @@ def test_resolve_materializes_all_present(monkeypatch):
     assert manifest["stringData"] == {"TOKEN_A": "AAA", "TOKEN_B": "BBB"}
 
 
+def test_resolve_materializes_selected_bundle_field(monkeypatch):
+    backend = _FakeSecrets(
+        {
+            "managed/object": {
+                "accessKey": "ACCESS",
+                "secretKey": "SECRET",
+            },
+        },
+    )
+    _patch_backend(monkeypatch, backend)
+
+    manifest = resolve_task_secret_manifest(
+        cluster=object(),
+        spec=_Spec(
+            secret_refs=[
+                {
+                    "uri": "managed/object#secretKey",
+                    "env_var": "AWS_SECRET_ACCESS_KEY",
+                },
+            ],
+        ),
+        secret_name="agent-task-t1-secrets",
+        namespace="ns",
+        task_guid="g",
+    )
+
+    assert manifest["stringData"] == {"AWS_SECRET_ACCESS_KEY": "SECRET"}
+
+
 def test_resolve_lists_every_missing_ref(monkeypatch):
     # sm:a present; sm:b absent; sm:c empty; sm:d read raises — the error
     # must list ALL three unresolvable ones (b, c, d), not just the first.
