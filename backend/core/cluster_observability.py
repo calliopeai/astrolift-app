@@ -1033,6 +1033,37 @@ def _k8s_managed_config_for(
             ),
             max_replicas=int(pc.get("kserve_max_replicas", 100)),
         )
+    if pair == ("object_store", "s3_compatible_existing"):
+        from k8s_native.managed.object_store_existing_s3 import ExistingS3Config
+
+        from core.app_deploy import AppDeployError, driver_for_capability
+
+        try:
+            secrets_backend = driver_for_capability(cluster, "secrets")
+        except AppDeployError as exc:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: cannot resolve the secrets backend required by existing S3 adoption: {exc}",
+            ) from exc
+        return ExistingS3Config(
+            cluster_driver=cluster_driver,
+            secrets_backend=secrets_backend,
+            namespace=_optional_string(pc.get("s3_existing_namespace")),
+            allowed_endpoint_hosts=tuple(
+                str(value) for value in pc.get("s3_existing_allowed_endpoint_hosts", [])
+            ),
+            allowed_credential_path_prefixes=tuple(
+                str(value)
+                for value in pc.get(
+                    "s3_existing_allowed_credential_path_prefixes",
+                    ["managed/object_store/{organization}"],
+                )
+            ),
+            allow_insecure_http=bool(pc.get("s3_existing_allow_insecure_http", False)),
+            allow_skip_tls_verify=bool(
+                pc.get("s3_existing_allow_skip_tls_verify", False),
+            ),
+            allow_endpoint_paths=bool(pc.get("s3_existing_allow_endpoint_paths", False)),
+        )
     if pair == ("object_store", "seaweedfs_operator"):
         from k8s_native.managed.object_store_seaweedfs import SeaweedFSObjectStoreConfig
 
