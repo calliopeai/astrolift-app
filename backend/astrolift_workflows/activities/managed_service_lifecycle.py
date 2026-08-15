@@ -538,6 +538,7 @@ def _sync_binding_rows(svc: Any) -> None:
                 volume_handle=volume.volume_handle,
                 volume_attributes=dict(volume.volume_attributes),
                 secret_refs=dict(volume.secret_refs),
+                secret_literals=dict(volume.secret_literals),
                 mount_options=list(volume.mount_options),
                 read_only=volume.read_only,
                 capacity=volume.capacity,

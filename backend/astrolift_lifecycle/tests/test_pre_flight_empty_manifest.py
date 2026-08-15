@@ -212,9 +212,7 @@ def test_render_attaches_active_managed_filesystem_to_workload(app, env, monkeyp
     }
     rendered = next(row for row in resources if row["kind"] == "Deployment")
     pod_spec = rendered["spec"]["template"]["spec"]
-    assert pod_spec["volumes"][0]["persistentVolumeClaim"]["claimName"].startswith(
-        "alft-fs-shared-data-"
-    )
+    assert pod_spec["volumes"][0]["persistentVolumeClaim"]["claimName"].startswith("alft-fs-shared-data-")
     assert pod_spec["containers"][0]["volumeMounts"] == [
         {"name": "shared-data", "mountPath": "/mnt/shared", "readOnly": False}
     ]
