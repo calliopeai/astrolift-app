@@ -53,12 +53,21 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
         ("object_store", "azure_blob", "AzureBlobConfig"),
         ("queue", "servicebus", "ServiceBusConfig"),
         ("queue", "azure_servicebus", "AzureServiceBusConfig"),
+        ("topic", "service_bus_topic", "AzureServiceBusConfig"),
+        ("stream", "event_hubs", "AzureEventHubsConfig"),
+        ("event_stream", "event_hubs_kafka", "AzureEventHubsConfig"),
         ("filesystem", "azure_files", "AzureFilesConfig"),
-        ("filesystem", "azure_files_classic", "AzureFilesClassicConfig"),
         ("postgres", "azure_pg_flex", "AzurePostgresConfig"),
         ("mysql", "azure_mysql_flex", "AzureMySQLConfig"),
         ("redis", "azure_cache_redis", "AzureCacheRedisConfig"),
+        ("redis", "azure_managed_redis", "AzureManagedRedisConfig"),
         ("kv_store", "cosmos", "AzureCosmosConfig"),
+        ("document_db", "cosmos_nosql", "AzureCosmosApiConfig"),
+        ("document_db", "cosmos_mongodb", "AzureCosmosApiConfig"),
+        ("graph_db", "cosmos_gremlin", "AzureCosmosApiConfig"),
+        ("wide_column", "cosmos_cassandra", "AzureCosmosApiConfig"),
+        ("kv_store", "cosmos_table", "AzureCosmosApiConfig"),
+        ("filesystem", "azure_files_classic", "AzureFilesClassicConfig"),
         ("search", "azure_ai_search_fulltext", "AzureAISearchConfig"),
         ("vector_index", "azure_ai_search_vector", "AzureAISearchVectorConfig"),
         ("time_series", "azure_monitor_prometheus", "AzureMonitorPrometheusConfig"),
@@ -125,6 +134,27 @@ def test_database_controls_are_preserved() -> None:
     assert cosmos.default_api_kind == "Gremlin"
     assert cosmos.backup_policy_default == "Periodic"
 
+    cosmos_api = managed_config_for(
+        "azure",
+        _cluster(
+            cosmos_api_account_name_prefix="smd-api",
+            cosmos_api_database_name_default="agents",
+            cosmos_api_backup_policy_default="Continuous",
+            cosmos_api_continuous_backup_tier_default="Continuous7Days",
+            cosmos_api_public_network_access_default="Enabled",
+            cosmos_api_consistency_level_default="Strong",
+            cosmos_api_secret_name_prefix="managed-cosmos",
+        ),
+        kind="graph_db",
+        variant="cosmos_gremlin",
+    )
+    assert cosmos_api.variant == "cosmos_gremlin"
+    assert cosmos_api.account_name_prefix == "smd-api"
+    assert cosmos_api.database_name_default == "agents"
+    assert cosmos_api.continuous_backup_tier_default == "Continuous7Days"
+    assert cosmos_api.public_network_access_default == "Enabled"
+    assert cosmos_api.consistency_level_default == "Strong"
+    assert cosmos_api.secret_name_prefix == "managed-cosmos"
     sql = managed_config_for(
         "azure",
         _cluster(
@@ -184,6 +214,34 @@ def test_messaging_and_search_controls_are_preserved() -> None:
     assert bus.dead_lettering_on_message_expiration is False
     assert bus.max_delivery_count == 25
     assert bus.lock_duration == "PT1M"
+
+    topic = managed_config_for(
+        "azure",
+        _cluster(servicebus_location="westus3"),
+        kind="topic",
+        variant="service_bus_topic",
+    )
+    assert topic.handle_kind == "topic"
+    assert topic.location == "westus3"
+    event_hubs = managed_config_for(
+        "azure",
+        _cluster(
+            eventhubs_namespace_name_prefix="stream",
+            eventhubs_event_hub_name_prefix="topic",
+            eventhubs_default_sku="Premium",
+            eventhubs_default_capacity=2,
+            eventhubs_default_consumer_group="workers",
+            eventhubs_public_network_access_default="Enabled",
+        ),
+        kind="event_stream",
+        variant="event_hubs_kafka",
+    )
+    assert event_hubs.variant == "event_hubs_kafka"
+    assert event_hubs.namespace_name_prefix == "stream"
+    assert event_hubs.event_hub_name_prefix == "topic"
+    assert event_hubs.default_sku == "Premium"
+    assert event_hubs.default_capacity == 2
+    assert event_hubs.default_consumer_group == "workers"
 
     files = managed_config_for(
         "azure",
@@ -266,6 +324,32 @@ def test_redis_backup_controls_are_preserved() -> None:
     assert redis.backup_storage_subscription_id == "backup-subscription"
 
 
+def test_managed_redis_controls_are_preserved() -> None:
+    redis = managed_config_for(
+        "azure",
+        _cluster(
+            managed_redis_cluster_name_prefix="smd-amr",
+            managed_redis_database_name="triage",
+            managed_redis_default_sku="MemoryOptimized_M20",
+            managed_redis_high_availability_default="Disabled",
+            managed_redis_public_network_access_default="Enabled",
+            managed_redis_clustering_policy_default="EnterpriseCluster",
+            managed_redis_eviction_policy_default="NoEviction",
+            managed_redis_secret_name_prefix="managed-amr",
+        ),
+        kind="redis",
+        variant="azure_managed_redis",
+    )
+    assert redis.cluster_name_prefix == "smd-amr"
+    assert redis.database_name == "triage"
+    assert redis.default_sku == "MemoryOptimized_M20"
+    assert redis.high_availability_default == "Disabled"
+    assert redis.public_network_access_default == "Enabled"
+    assert redis.clustering_policy_default == "EnterpriseCluster"
+    assert redis.eviction_policy_default == "NoEviction"
+    assert redis.secret_name_prefix == "managed-amr"
+
+
 def test_default_variant_selects_the_richer_azure_drivers() -> None:
     blob = managed_config_for("azure", _cluster(), kind="object_store")
     bus = managed_config_for("azure", _cluster(), kind="queue")
@@ -277,12 +361,36 @@ def test_default_variant_selects_the_richer_azure_drivers() -> None:
 
 
 @pytest.mark.parametrize(
+    ("kind", "variant"),
+    [
+        ("document_db", "cosmos_nosql"),
+        ("graph_db", "cosmos_gremlin"),
+        ("wide_column", "cosmos_cassandra"),
+    ],
+)
+def test_default_cosmos_api_variant_matches_portable_kind(kind: str, variant: str) -> None:
+    config = managed_config_for("azure", _cluster(), kind=kind)
+    assert config.variant == variant
+
+
+def test_cosmos_api_requires_key_vault_at_runtime_resolution() -> None:
+    with pytest.raises(ClusterObservabilityError, match="vault_url"):
+        managed_config_for(
+            "azure",
+            _cluster(vault_url=""),
+            kind="document_db",
+            variant="cosmos_nosql",
+        )
+
+
+@pytest.mark.parametrize(
     ("field", "kind", "variant"),
     [
         ("subscription_id", "postgres", "azure_pg_flex"),
         ("resource_group", "postgres", "azure_pg_flex"),
         ("storage_account", "object_store", "azure_blob"),
         ("servicebus_namespace", "queue", "azure_servicebus"),
+        ("servicebus_namespace", "topic", "service_bus_topic"),
         ("azure_openai_account_name", "model_endpoint", "azure_openai"),
         ("acs_communication_resource_id", "email", "azure_acs"),
         ("mssql_managed_instance_subnet_id", "mssql", "azure_sql_managed_instance"),

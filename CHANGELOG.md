@@ -2,8 +2,122 @@
 
 ## Unreleased
 
+- Add executable Google Cloud CDN lifecycle support, including Cloud Storage,
+  NEG, instance-group, and existing backend-service origins; safe cache policy
+  controls; a managed global HTTP(S) load-balancer graph; managed or external
+  TLS; Cloud Armor policies; invalidation; signed-URL key rotation; portable
+  bindings; ownership/adoption; and protected deletion.
+- Add executable Google Cloud Private Service Connect consumer endpoints for
+  regional published services and global Google APIs/VPC Service Controls,
+  with managed or external addresses, Shared VPC references, Service Directory
+  registration, global access, portable bindings, adoption, and protected
+  teardown.
+
 ### Added
 
+- Add Google Cloud Workflows lifecycle with YAML/JSON definitions, revision
+  snapshots and rollback, service identities, CMEK, environment variables,
+  call logging, execution history, invocation bindings, execution controls,
+  boundary-safe adoption, and destructive-history-aware teardown.
+- Add Azure SQL Database provisioned, serverless, and Hyperscale variants plus
+  Azure SQL Managed Instance with typed ARM requests, VNet/subnet isolation,
+  Key Vault-backed portable bindings, retention controls, database-copy
+  snapshot/restore, and fail-closed teardown semantics.
+- Add Microsoft.FileShares provisioned-v2 NFS lifecycle with SSD capacity,
+  Local or Zone redundancy, provisioned performance, root-squash and encrypted
+  mount controls, subnet allowlists, portable AZNFS bindings, child snapshots,
+  ownership-safe reconciliation, and protected data-loss-aware teardown.
+- Add Google Cloud Run functions (Cloud Functions v2) lifecycle with Cloud
+  Build source declarations, HTTP and Eventarc triggers, Secret Manager
+  environment/volumes, scaling, private networking, Binary Authorization,
+  CMEK, authenticated IAM bindings, adoption, and guarded teardown.
+- Add preview project observability bundles on a shared
+  kube-prometheus-stack with namespace-scoped ServiceMonitor and PodMonitor
+  targets, safe standard alerts and dashboards, policy-gated custom content,
+  authenticated Grafana bindings, operator-gated Prometheus query access,
+  operator-only Alertmanager, ownership-safe updates, and non-destructive teardown.
+- Add preview adoption of existing S3-compatible buckets on Kubernetes with
+  project-scoped ownership records, org-scoped external credential bundles,
+  portable S3 bindings, endpoint/TLS/path policy gates, safe update/unlink,
+  and explicit retention of the external bucket, objects, and credentials.
+- Add preview KServe 0.20 model endpoints for Kubernetes installs with the
+  complete native InferenceService predictor, transformer, explainer, model,
+  canary, accelerator, scheduling, scaling, and storage surface; Standard-mode
+  private/read-only defaults; portable REST and gRPC bindings; managed runtime
+  identity; exact-UID adoption; protected teardown; and install-level policy
+  gates for exposure, images, runtimes, storage, logging, tokens, pod security,
+  caches, deployment modes, autoscalers, and replica limits.
+- Add preview Argo Workflows 4.1 WorkflowTemplate resources for Kubernetes
+  installs with native DAG/step/template specs, managed CronWorkflows and event
+  bindings, least-privilege executor bootstrap, bounded parallelism/deadlines,
+  portable submit bindings, UID-pinned modular references, declarative
+  snapshots, run-retaining teardown, ownership-safe pruning, and install-policy
+  security gates.
+- Add preview Knative Eventing brokers for Kubernetes installs with
+  declarative Triggers, CloudEvents ingress bindings, delivery and dead-letter
+  policy, broker-class and destination guardrails, live readiness, explicit
+  adoption and ownership-safe Trigger pruning and teardown.
+- Add preview Kubernetes Gateway API 1.5 managed gateways with complete
+  listener, address, infrastructure, HTTP, gRPC, TLS, TCP, and UDP route
+  shapes; Backend TLS policies and ListenerSets; live Programmed and route
+  state; portable bindings; explicit adoption and pruning; and install-level
+  cross-namespace, extension, custom backend, and experimental-protocol
+  guardrails that preserve destination-owned ReferenceGrant boundaries.
+- Add preview Knative Serving functions for Kubernetes installs with
+  scale-to-zero presets, revision traffic splitting, private-by-default routes,
+  digest-pinned images, secret and workload controls, live readiness and route
+  bindings, install-policy guardrails, explicit adoption, and ownership-safe
+  teardown.
+- Add preview OpenSearch Operator search and vector services for Kubernetes
+  installs with OpenSearch 3.8, secure 3.x CRDs, tenant-scoped users and
+  NetworkPolicies, digest-pinned non-root vector-index bootstrapping, explicit
+  HNSW mappings, protected storage teardown, and external secret bindings.
+- Add preview Kubernetes SQL Server 2025 Express managed services with
+  non-root StatefulSets, durable PVCs, external credential bundles, encrypted
+  TDS bindings, guarded LoadBalancer exposure, safe expansion, and optional
+  crash-consistent CSI snapshots.
+- Add preview SeaweedFS Operator object storage for Kubernetes installs with
+  shared-cluster bucket reconciliation, bucket-scoped S3 IAM credentials,
+  versioning, Object Lock, quotas, placement controls, explicit anonymous
+  reads, truthful readiness, and data-safe retain/delete teardown.
+- Add Kubernetes StorageClass and Rook CephFS project volume templates with
+  consumer-namespace dynamic claims, live StorageClass/CSI preflight,
+  portable app and agent mounts, data-safe teardown, and full catalog,
+  GraphQL, and project-resource UI visibility.
+- Add portable managed-filesystem runtime attachments for applications and
+  agent Jobs, including CSI/PVC preflight, credential-reference projection,
+  provider-specific EFS/FSx/NFS mounts, owned storage cleanup, and safe mount
+  readiness metadata in the project resources UI and GraphQL API.
+- Add Google Cloud Filestore shared filesystems across Basic, Zonal,
+  Regional, and Enterprise tiers with NFSv3/v4.1, PSC and IPv6, export ACLs,
+  Kerberos directory integration, CMEK, custom performance, deletion
+  protection, replication health and promotion, native snapshots, regional
+  backups, restore, portable bindings, and adoption-safe teardown.
+- Add Google Cloud Operations observability bundles with declarative Cloud
+  Logging buckets, views, sinks, log metrics, exclusions, scopes, and saved
+  queries and Log Analytics links plus Cloud Monitoring dashboards,
+  notification channels, alert policies, nested resource groups, uptime
+  checks, metric descriptors, services, and SLOs. Preserve provider-native
+  request bodies, resolve credentials and verification codes from Secret
+  Manager, and enforce ownership-, dependency-, and data-safe teardown.
+- Add Azure Managed Redis lifecycle for Balanced, Memory Optimized,
+  Compute Optimized, and Flash Optimized tiers with TLS-only bindings,
+  Key Vault-backed access keys, persistence/modules, CMK rotation,
+  geo-replication links, additive Entra access assignments, scaling, status,
+  and fail-closed private-networking and data-preserving teardown semantics.
+- Expose Azure Service Bus topics and default subscriptions through the
+  cloud-neutral `topic/service_bus_topic` lifecycle and portable topic binding,
+  while retaining the existing queue-shaped alias.
+- Add explicit Azure Cosmos DB for NoSQL, MongoDB RU, Gremlin,
+  Cassandra, and Table API variants with API-correct resource lifecycle,
+  throughput and autoscale controls, multi-region placement, continuous or
+  periodic backup, point-in-time restore, CMK encryption, network rules,
+  Key Vault-backed portable bindings, ownership-safe reconciliation, and
+  protected teardown.
+- Add Azure Event Hubs native-stream and Kafka-compatible variants with
+  namespace/event-hub lifecycle, Entra workload bindings, consumer groups,
+  retention and compaction, Capture, scaling, networking, CMK, and guarded
+  destructive teardown.
 - Add the preview `filesystem/azure_files_classic` driver for storage-account
   Azure Files SMB/NFS shares, including network ACLs, per-protocol encryption,
   dual Key Vault-backed SMB rotation keys, snapshots, soft delete, guarded
@@ -124,6 +238,19 @@
 
 ### Changed
 
+- Apply managed-service configuration changes through durable Temporal update
+  workflows, retain the last provider-confirmed configuration, and expose the
+  current operation/run identifiers and timestamps in GraphQL and project UI.
+- Make managed-service secret bundle selectors portable across AWS Secrets
+  Manager, Google Secret Manager, Azure Key Vault, and Vault, and fail closed
+  instead of choosing an arbitrary value from a multi-key bundle.
+- Mark the archived community MinIO Operator as deprecated in the Kubernetes
+  resource catalogue and expose commercial AIStor and existing
+  S3-compatible endpoint adoption as explicit planned variants.
+- Enable every registered Azure managed-service driver in the production image
+  and lifecycle resolver, install its current management/data SDKs, preserve
+  provider controls at runtime, and fail closed when snapshot or retained-data
+  semantics cannot be fulfilled.
 - Enable every registered Azure managed-service driver in the production image
   and lifecycle resolver, install its current management/data SDKs, preserve
   provider controls at runtime, and fail closed when snapshot or retained-data
@@ -154,6 +281,10 @@
 
 ### Fixed
 
+- Probe live Kubernetes versions, CRDs, and operator releases before managed
+  service provision/update; fail closed with exact remediation, make readiness
+  timeouts terminal, and generate collision-safe names for long tenant,
+  project, application, and service identifiers.
 - Serialize Azure ownership, billing, and custom ARM tags through one
   collision-safe codec so tag names satisfy Azure restrictions and cost
   actuals group by the same `astrolift-binding` key drivers emit.

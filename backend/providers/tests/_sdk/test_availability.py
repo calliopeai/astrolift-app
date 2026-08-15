@@ -8,6 +8,7 @@ from _sdk.availability import (
     REQUIRED_ROLES,
     AvailabilityMatrix,
     DriverEntry,
+    ManagedServiceEntry,
 )
 
 
@@ -123,6 +124,25 @@ def test_has_managed_lookup() -> None:
     )
 
 
+def test_deprecated_service_is_not_runtime_available() -> None:
+    matrix = AvailabilityMatrix(
+        managed_services=(
+            ManagedServiceEntry(
+                kind="object_store",
+                variant="retired_operator",
+                plugin_id="k8s_native",
+                status="deprecated",
+            ),
+        ),
+    )
+
+    assert not matrix.has_managed(
+        plugin_id="k8s_native",
+        kind="object_store",
+        variant="retired_operator",
+    )
+
+
 def test_status_field_defaults_to_ga() -> None:
     entry = DriverEntry(role="cluster", plugin_id="aws")
     assert entry.status == "ga"
@@ -131,6 +151,54 @@ def test_status_field_defaults_to_ga() -> None:
 def test_managed_service_binding_envs_recorded() -> None:
     s3 = next(m for m in MATRIX.managed_services if m.plugin_id == "aws" and m.variant == "s3")
     assert "S3_BUCKET_NAME" in s3.binding_envs
+
+    service_bus_topic = next(
+        entry
+        for entry in MATRIX.managed_services
+        if entry.plugin_id == "azure" and entry.variant == "service_bus_topic"
+    )
+    assert service_bus_topic.status == "ga"
+    assert {"TOPIC_ARN_OR_ID", "SERVICEBUS_SUBSCRIPTION"} <= set(
+        service_bus_topic.binding_envs,
+    )
+    native = next(
+        entry for entry in MATRIX.managed_services if entry.plugin_id == "azure" and entry.variant == "event_hubs"
+    )
+    kafka = next(
+        entry for entry in MATRIX.managed_services if entry.plugin_id == "azure" and entry.variant == "event_hubs_kafka"
+    )
+    assert native.status == kafka.status == "preview"
+    assert native.issue_url == kafka.issue_url
+    assert native.issue_url.endswith("/1350")
+    assert "STREAM_NAME" in native.binding_envs
+    assert "EVENT_STREAM_BROKERS" in kafka.binding_envs
+
+    azure_files = next(m for m in MATRIX.managed_services if m.plugin_id == "azure" and m.variant == "azure_files")
+    assert azure_files.status == "preview"
+    assert "FILESYSTEM_SOURCE" in azure_files.binding_envs
+    assert "FILESYSTEM_READ_ONLY" in azure_files.binding_envs
+    assert "AZURE_RESOURCE_GROUP" in azure_files.binding_envs
+
+    classic = next(m for m in MATRIX.managed_services if m.plugin_id == "azure" and m.variant == "azure_files_classic")
+    assert classic.status == "preview"
+
+    cosmos = {
+        entry.variant: entry
+        for entry in MATRIX.managed_services
+        if entry.plugin_id == "azure" and entry.variant.startswith("cosmos_")
+    }
+    assert {
+        "cosmos_nosql",
+        "cosmos_mongodb",
+        "cosmos_gremlin",
+        "cosmos_cassandra",
+        "cosmos_table",
+    } <= set(cosmos)
+    assert all(cosmos[variant].status == "preview" for variant in cosmos)
+    assert "DOCDB_URI" in cosmos["cosmos_nosql"].binding_envs
+    assert "GRAPH_DB_URL" in cosmos["cosmos_gremlin"].binding_envs
+    assert "WIDE_COLUMN_ENDPOINT" in cosmos["cosmos_cassandra"].binding_envs
+    assert "KV_TABLE_NAME" in cosmos["cosmos_table"].binding_envs
 
     azure_files = next(m for m in MATRIX.managed_services if m.plugin_id == "azure" and m.variant == "azure_files")
     assert azure_files.status == "preview"

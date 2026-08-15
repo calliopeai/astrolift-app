@@ -12,6 +12,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 
+from _sdk.k8s_naming import app_namespace
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -107,7 +108,10 @@ def persist_imported_agent_package(*, project, package: dict, slug: str = "") ->
             name=name,
             slug=effective_slug,
             source_kind=RegisteredApp.SourceKind.DIRECT_UPLOAD,
-            k8s_namespace=f"{organization.slug}-{effective_slug}",
+            k8s_namespace=app_namespace(
+                organization_slug=organization.slug,
+                app_slug=effective_slug,
+            ),
             subdomain=effective_slug,
             build_mode=RegisteredApp.BuildMode.NONE,
             trigger_mode=RegisteredApp.TriggerMode.MANUAL,

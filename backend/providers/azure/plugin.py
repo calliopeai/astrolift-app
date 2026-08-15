@@ -16,13 +16,16 @@ Managed services:
 - BlobStorageDriver — object_store/blob
 - ServiceBusDriver — queue/servicebus
 - AzureBlobStorageDriver — object_store/azure_blob
-- AzureServiceBusDriver — queue/azure_servicebus
+- AzureServiceBusDriver — queue/azure_servicebus and topic/service_bus_topic
+- AzureEventHubsDriver — stream/event_hubs and event_stream/event_hubs_kafka
 - AzureFilesDriver — filesystem/azure_files
-- AzureFilesClassicDriver — filesystem/azure_files_classic
 - AzurePostgresFlexibleDriver — postgres/azure_pg_flex
 - AzureMySQLFlexibleDriver — mysql/azure_mysql_flex
 - AzureCacheRedisDriver — redis/azure_cache_redis
+- AzureManagedRedisDriver — redis/azure_managed_redis
 - AzureCosmosDriver — kv_store/cosmos
+- AzureCosmosApiDriver — explicit NoSQL, MongoDB, Gremlin, Cassandra, and Table API variants
+- AzureFilesClassicDriver — filesystem/azure_files_classic
 - AzureAISearchFullTextDriver — search/azure_ai_search_fulltext
 - AzureAISearchVectorDriver — vector_index/azure_ai_search_vector
 - AzureMonitorPrometheusDriver — time_series/azure_monitor_prometheus
@@ -40,8 +43,11 @@ from azure.identity_federated import AzureFederatedIdentityDriver
 from azure.ingress_appgw import AzureAppGatewayIngressDriver
 from azure.managed.cache_redis import AzureCacheRedisDriver
 from azure.managed.cosmos import AzureCosmosDriver
+from azure.managed.cosmos_api import AzureCosmosApiDriver
 from azure.managed.email_acs import AzureCommunicationEmailDriver
+from azure.managed.event_hubs import AzureEventHubsDriver
 from azure.managed.filesystem_files import AzureFilesDriver
+from azure.managed.managed_redis import AzureManagedRedisDriver
 from azure.managed.filesystem_files_classic import AzureFilesClassicDriver
 from azure.managed.model_endpoint_aoai import AzureOpenAIDriver
 from azure.managed.mssql_sql import AzureSQLDatabaseDriver, AzureSQLManagedInstanceDriver
@@ -68,12 +74,30 @@ _MANAGED_CONFIG_PROPERTIES = {
     "blob_versioning_enabled": {"type": "boolean", "default": True},
     "servicebus_queue_name_prefix": {"type": "string", "default": "astrolift"},
     "servicebus_topic_name_prefix": {"type": "string", "default": "astrolift"},
+    "servicebus_location": {
+        "type": "string",
+        "description": "Region of the operator-managed Service Bus namespace.",
+    },
     "servicebus_default_message_ttl": {"type": "string", "default": "P14D"},
     "servicebus_max_size_in_megabytes": {"type": "integer", "minimum": 1024, "default": 1024},
     "servicebus_enable_partitioning": {"type": "boolean", "default": False},
     "servicebus_dead_lettering_on_message_expiration": {"type": "boolean", "default": True},
     "servicebus_max_delivery_count": {"type": "integer", "minimum": 1, "default": 10},
     "servicebus_lock_duration": {"type": "string", "default": "PT30S"},
+    "eventhubs_namespace_name_prefix": {"type": "string", "default": "astrolift-eh"},
+    "eventhubs_event_hub_name_prefix": {"type": "string", "default": "astrolift"},
+    "eventhubs_default_sku": {
+        "type": "string",
+        "enum": ["Basic", "Standard", "Premium"],
+        "default": "Standard",
+    },
+    "eventhubs_default_capacity": {"type": "integer", "minimum": 1, "maximum": 40, "default": 1},
+    "eventhubs_default_consumer_group": {"type": "string", "default": "astrolift"},
+    "eventhubs_public_network_access_default": {
+        "type": "string",
+        "enum": ["Enabled", "Disabled", "SecuredByPerimeter"],
+        "default": "Enabled",
+    },
     "files_name_prefix": {"type": "string", "default": "astrolift-files"},
     "files_default_storage_gib": {"type": "integer", "minimum": 32, "maximum": 262144, "default": 32},
     "files_default_redundancy": {
@@ -168,6 +192,26 @@ _MANAGED_CONFIG_PROPERTIES = {
         "description": ("Non-secret HTTPS Blob container URI for Premium Redis RDB exports using managed identity."),
     },
     "redis_backup_storage_subscription_id": {"type": "string"},
+    "managed_redis_cluster_name_prefix": {"type": "string", "default": "astrolift-amr"},
+    "managed_redis_database_name": {"type": "string", "default": "default"},
+    "managed_redis_default_sku": {"type": "string", "default": "Balanced_B3"},
+    "managed_redis_high_availability_default": {
+        "type": "string",
+        "enum": ["Enabled", "Disabled"],
+        "default": "Enabled",
+    },
+    "managed_redis_public_network_access_default": {
+        "type": "string",
+        "enum": ["Enabled", "Disabled"],
+        "default": "Enabled",
+    },
+    "managed_redis_clustering_policy_default": {
+        "type": "string",
+        "enum": ["EnterpriseCluster", "OSSCluster", "NoCluster"],
+        "default": "OSSCluster",
+    },
+    "managed_redis_eviction_policy_default": {"type": "string", "default": "AllKeysLRU"},
+    "managed_redis_secret_name_prefix": {"type": "string", "default": "astrolift-amr"},
     "cosmos_account_name_prefix": {"type": "string", "default": "astrolift"},
     "cosmos_database_name_default": {"type": "string", "default": "astrolift"},
     "cosmos_default_api_kind": {
@@ -181,6 +225,29 @@ _MANAGED_CONFIG_PROPERTIES = {
         "default": "Continuous",
     },
     "cosmos_secret_name_prefix": {"type": "string", "default": "astrolift-cosmos"},
+    "cosmos_api_account_name_prefix": {"type": "string", "default": "astrolift-cosmos"},
+    "cosmos_api_database_name_default": {"type": "string", "default": "astrolift"},
+    "cosmos_api_backup_policy_default": {
+        "type": "string",
+        "enum": ["Continuous", "Periodic"],
+        "default": "Continuous",
+    },
+    "cosmos_api_continuous_backup_tier_default": {
+        "type": "string",
+        "enum": ["Continuous7Days", "Continuous30Days"],
+        "default": "Continuous30Days",
+    },
+    "cosmos_api_public_network_access_default": {
+        "type": "string",
+        "enum": ["Enabled", "Disabled", "SecuredByPerimeter"],
+        "default": "Enabled",
+    },
+    "cosmos_api_consistency_level_default": {
+        "type": "string",
+        "enum": ["Eventual", "Session", "BoundedStaleness", "Strong", "ConsistentPrefix"],
+        "default": "Session",
+    },
+    "cosmos_api_secret_name_prefix": {"type": "string", "default": "astrolift-cosmos-api"},
     "ai_search_service_name_prefix": {"type": "string", "default": "astrolift"},
     "ai_search_default_sku": {"type": "string", "default": "basic"},
     "ai_search_replica_count_default": {"type": "integer", "minimum": 1, "default": 1},
@@ -277,11 +344,20 @@ PLUGIN = ProviderPlugin(
         ("mysql", "azure_mysql_flex"): AzureMySQLFlexibleDriver,
         ("postgres", "azure_pg_flex"): AzurePostgresFlexibleDriver,
         ("redis", "azure_cache_redis"): AzureCacheRedisDriver,
+        ("redis", "azure_managed_redis"): AzureManagedRedisDriver,
         ("object_store", "azure_blob"): AzureBlobStorageDriver,
         ("queue", "azure_servicebus"): AzureServiceBusDriver,
+        ("topic", "service_bus_topic"): AzureServiceBusDriver,
+        ("stream", "event_hubs"): AzureEventHubsDriver,
+        ("event_stream", "event_hubs_kafka"): AzureEventHubsDriver,
         ("filesystem", "azure_files"): AzureFilesDriver,
         ("filesystem", "azure_files_classic"): AzureFilesClassicDriver,
         ("kv_store", "cosmos"): AzureCosmosDriver,
+        ("document_db", "cosmos_nosql"): AzureCosmosApiDriver,
+        ("document_db", "cosmos_mongodb"): AzureCosmosApiDriver,
+        ("graph_db", "cosmos_gremlin"): AzureCosmosApiDriver,
+        ("wide_column", "cosmos_cassandra"): AzureCosmosApiDriver,
+        ("kv_store", "cosmos_table"): AzureCosmosApiDriver,
         ("search", "azure_ai_search_fulltext"): AzureAISearchFullTextDriver,
         ("vector_index", "azure_ai_search_vector"): AzureAISearchVectorDriver,
         ("time_series", "azure_monitor_prometheus"): AzureMonitorPrometheusDriver,
@@ -344,7 +420,7 @@ PLUGIN = ProviderPlugin(
             },
             "servicebus_namespace": {
                 "type": "string",
-                "description": ("Service Bus namespace name for queue managed-service binding."),
+                "description": ("Service Bus namespace name for queue and topic managed-service bindings."),
             },
             **_MANAGED_CONFIG_PROPERTIES,
             "ingress_variant": {

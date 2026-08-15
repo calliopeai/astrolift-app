@@ -8,6 +8,8 @@ cluster driver's idempotent ``ensure_namespace`` first; this pins that order.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from astrolift_dispatch.spawners.k8s_job import K8sJobSpawner
 
 
@@ -34,6 +36,7 @@ class _RecordingDriver:
         self.calls: list[str] = []
         self.fail_apply = fail_apply
         self.deleted: list[dict] = []
+        self.applied: list[dict] = []
 
     def ensure_namespace(self, cluster, name, labels, annotations):
         self.calls.append(f"ensure_namespace:{name}")
@@ -41,7 +44,14 @@ class _RecordingDriver:
 
     def apply_manifests(self, cluster, namespace, manifests):
         self.calls.append(f"apply_manifests:{namespace}")
+        self.applied.extend(manifests)
         return _FailedApplyResult() if self.fail_apply else _ApplyResult()
+
+    def list_csi_drivers(self, _cluster):
+        return ["smb.csi.k8s.io"]
+
+    def persistent_volume_claim_exists(self, _cluster, _namespace, _name):
+        return True
 
     def delete_manifests(self, cluster, namespace, manifests):
         self.calls.append(f"delete_manifests:{namespace}")
@@ -163,9 +173,164 @@ def test_terminal_cleanup_deletes_only_temporary_secret(monkeypatch):
 
     monkeypatch.setattr(cm, "_driver_for_cluster", lambda _c: driver, raising=False)
     monkeypatch.setattr(cm, "_context_for_cluster", lambda _c: _Ctx(), raising=False)
+    monkeypatch.setattr(
+        "astrolift_dispatch.spawners.k8s_job._task_for_external_id",
+        lambda _external_id: None,
+    )
 
     spawner = K8sJobSpawner(cluster=object(), namespace="astrolift-agents-steadymd")
     spawner.cleanup_task_secret("agent-task-complete")
 
     assert [item["kind"] for item in driver.deleted] == ["Secret"]
     assert driver.deleted[0]["metadata"]["name"] == "agent-task-complete-secrets"
+
+
+def test_stop_kills_job_before_attachment_recovery(monkeypatch):
+    driver = _RecordingDriver()
+    import core.cluster_management as cm
+
+    monkeypatch.setattr(cm, "_driver_for_cluster", lambda _c: driver, raising=False)
+    monkeypatch.setattr(cm, "_context_for_cluster", lambda _c: _Ctx(), raising=False)
+    monkeypatch.setattr(
+        "astrolift_dispatch.spawners.k8s_job._task_for_external_id",
+        lambda _external_id: (_ for _ in ()).throw(RuntimeError("database unavailable")),
+    )
+    spawner = K8sJobSpawner(cluster=object(), namespace="astrolift-agents-steadymd")
+
+    try:
+        spawner.stop("agent-task-restarted")
+    except RuntimeError as exc:
+        assert str(exc) == (
+            "Job agent-task-restarted was deleted but filesystem cleanup failed: database unavailable"
+        )
+    else:  # pragma: no cover - the recovery failure must remain visible
+        raise AssertionError("stop should surface attachment recovery failure")
+
+    assert [item["kind"] for item in driver.deleted] == ["Job", "Secret"]
+
+
+def test_agent_filesystem_mount_materializes_credentials_and_owned_storage(monkeypatch):
+    driver = _RecordingDriver()
+    import core.cluster_management as cm
+
+    monkeypatch.setattr(cm, "_driver_for_cluster", lambda _c: driver, raising=False)
+    monkeypatch.setattr(cm, "_context_for_cluster", lambda _c: _Ctx(), raising=False)
+    import astrolift_dispatch.agent_secrets as agent_secrets
+    import astrolift_dispatch.brief_injector as brief_injector
+    import astrolift_dispatch.snapshot_injector as snapshot_injector
+    import astrolift_services.filesystem_bindings as filesystem_bindings
+
+    binding = SimpleNamespace(
+        guid="019fffff-1111-7111-8111-111111111111",
+        name="shared-files",
+        mount_path="/workspace",
+        sub_path="",
+        source_kind="csi",
+        protocol="smb3",
+        claim_name="",
+        claim_namespace="",
+        csi_driver="smb.csi.k8s.io",
+        volume_handle="files.internal##share",
+        volume_attributes={"source": "//files.internal/share"},
+        secret_refs={"username": "secret/fsx#username", "password": "secret/fsx#password"},
+        mount_options=["vers=3.0"],
+        read_only=False,
+        capacity="100Gi",
+        access_modes=["ReadWriteMany"],
+        workload_names=[],
+        container_names=[],
+        managed_service=SimpleNamespace(
+            guid="019fffff-2222-7222-8222-222222222222",
+            kind="filesystem",
+            name="shared",
+        ),
+    )
+    monkeypatch.setattr(filesystem_bindings, "agent_volume_bindings", lambda _spec: [binding])
+    monkeypatch.setattr(
+        agent_secrets,
+        "resolve_secrets_backend",
+        lambda _cluster: SimpleNamespace(
+            get=lambda ref: {
+                "secret/fsx": {"username": "agent-user", "password": "not-persisted"},
+            }[ref],
+        ),
+    )
+    monkeypatch.setattr(brief_injector, "inject_brief_into_job_spec", lambda m, t: m)
+    monkeypatch.setattr(snapshot_injector, "inject_snapshot_into_job_spec", lambda m, t: m)
+
+    spawner = K8sJobSpawner(cluster=object(), namespace="astrolift-agents-steadymd")
+    result = spawner.spawn(_Task())
+
+    assert result.ok, result.error
+    assert [item["kind"] for item in driver.applied] == [
+        "Secret",
+        "PersistentVolume",
+        "PersistentVolumeClaim",
+        "Job",
+    ]
+    assert driver.applied[0]["stringData"] == {
+        "password": "not-persisted",
+        "username": "agent-user",
+    }
+    job = driver.applied[-1]
+    pod_spec = job["spec"]["template"]["spec"]
+    assert pod_spec["volumes"][0]["name"] == "shared-files"
+    assert pod_spec["containers"][0]["volumeMounts"][0]["mountPath"] == "/workspace"
+
+    spawner.stop(result.external_id)
+
+    assert [item["kind"] for item in driver.deleted] == [
+        "Job",
+        "Secret",
+        "Secret",
+        "PersistentVolumeClaim",
+        "PersistentVolume",
+    ]
+
+
+def test_agent_existing_claim_is_referenced_but_never_deleted(monkeypatch):
+    driver = _RecordingDriver()
+    import core.cluster_management as cm
+
+    monkeypatch.setattr(cm, "_driver_for_cluster", lambda _c: driver, raising=False)
+    monkeypatch.setattr(cm, "_context_for_cluster", lambda _c: _Ctx(), raising=False)
+    import astrolift_dispatch.brief_injector as brief_injector
+    import astrolift_dispatch.snapshot_injector as snapshot_injector
+    import astrolift_services.filesystem_bindings as filesystem_bindings
+
+    binding = SimpleNamespace(
+        guid="019fffff-1111-7111-8111-111111111111",
+        name="existing-files",
+        mount_path="/workspace",
+        sub_path="",
+        source_kind="existing_pvc",
+        protocol="pvc",
+        claim_name="operator-owned-pvc",
+        claim_namespace="astrolift-agents-steadymd",
+        csi_driver="",
+        volume_handle="",
+        volume_attributes={},
+        secret_refs={},
+        mount_options=[],
+        read_only=True,
+        capacity="1Gi",
+        access_modes=["ReadWriteMany"],
+        workload_names=[],
+        container_names=[],
+        managed_service=SimpleNamespace(
+            guid="019fffff-2222-7222-8222-222222222222",
+            kind="filesystem",
+            name="existing",
+        ),
+    )
+    monkeypatch.setattr(filesystem_bindings, "agent_volume_bindings", lambda _spec: [binding])
+    monkeypatch.setattr(brief_injector, "inject_brief_into_job_spec", lambda m, t: m)
+    monkeypatch.setattr(snapshot_injector, "inject_snapshot_into_job_spec", lambda m, t: m)
+
+    spawner = K8sJobSpawner(cluster=object(), namespace="astrolift-agents-steadymd")
+    result = spawner.spawn(_Task())
+    spawner.stop(result.external_id)
+
+    assert result.ok, result.error
+    assert [item["kind"] for item in driver.applied] == ["Job"]
+    assert [item["kind"] for item in driver.deleted] == ["Job", "Secret"]

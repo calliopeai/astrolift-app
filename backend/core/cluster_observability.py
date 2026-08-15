@@ -119,8 +119,10 @@ def namespace_for_app(app: Any) -> str:
     explicit = (getattr(app, "k8s_namespace", "") or "").strip()
     if explicit:
         return explicit
+    from _sdk.k8s_naming import app_namespace
+
     org_slug = getattr(getattr(app, "organization", None), "slug", "") or ""
-    return f"{org_slug}-{app.slug}"
+    return app_namespace(organization_slug=org_slug, app_slug=str(app.slug))
 
 
 def _auth_for_cluster(cluster: TenantCluster) -> Any:
@@ -337,6 +339,27 @@ def _gcp_managed_config_for(
         )
 
     pair = (kind, variant)
+    if pair == ("faas", "cloud_functions_gen2") or (kind == "faas" and not variant):
+        from gcp.managed.faas_cloud_functions import CloudFunctionsConfig
+
+        return CloudFunctionsConfig(
+            project_id=project_id,
+            region=str(pc.get("cloud_functions_region") or region),
+            function_name_prefix=str(pc.get("cloud_functions_name_prefix", "astrolift")),
+            api_endpoint=str(
+                pc.get("cloud_functions_api_endpoint", "https://cloudfunctions.googleapis.com/v2"),
+            ),
+            deletion_protection_default=bool(
+                pc.get("cloud_functions_deletion_protection_default", True),
+            ),
+            operation_timeout_seconds=float(
+                pc.get("cloud_functions_operation_timeout_seconds", 1800),
+            ),
+            poll_interval_seconds=float(
+                pc.get("cloud_functions_operation_poll_interval_seconds", 5),
+            ),
+        )
+
     if pair == ("api_gateway", "api_gateway") or (kind == "api_gateway" and not variant):
         from gcp.managed.api_gateway import APIGatewayConfig
 
@@ -421,6 +444,43 @@ def _gcp_managed_config_for(
             ),
             location=str(pc.get("gcs_location", region or "US")),
             storage_class=str(pc.get("gcs_storage_class", "STANDARD")),
+        )
+
+    if pair == ("filesystem", "filestore") or (kind == "filesystem" and not variant):
+        from gcp.managed.filesystem_filestore import FilestoreConfig
+
+        return FilestoreConfig(
+            project_id=project_id,
+            location=str(pc.get("filestore_location") or region),
+            network=str(pc.get("filestore_network") or pc.get("network") or ac.get("network") or ""),
+            instance_name_prefix=str(
+                pc.get("filestore_instance_name_prefix", "astrolift"),
+            ),
+            share_name_default=str(pc.get("filestore_share_name_default", "data")),
+            tier_default=str(pc.get("filestore_tier_default", "REGIONAL")),
+            protocol_default=str(pc.get("filestore_protocol_default", "NFS_V3")),
+            connect_mode_default=str(
+                pc.get("filestore_connect_mode_default", "PRIVATE_SERVICE_CONNECT"),
+            ),
+            reserved_ip_range=str(pc.get("filestore_reserved_ip_range", "")),
+            psc_endpoint_project=str(pc.get("filestore_psc_endpoint_project", "")),
+            kms_key_name=str(
+                pc.get("filestore_kms_key_name") or pc.get("kms_key") or "",
+            ),
+            deletion_protection_default=bool(
+                pc.get("filestore_deletion_protection_default", True),
+            ),
+            backup_location=str(pc.get("filestore_backup_location", "")),
+            backup_kms_key=str(pc.get("filestore_backup_kms_key", "")),
+            api_endpoint=str(
+                pc.get("filestore_api_endpoint", "https://file.googleapis.com/v1"),
+            ),
+            operation_timeout_seconds=float(
+                pc.get("filestore_operation_timeout_seconds", 3600),
+            ),
+            poll_interval_seconds=float(
+                pc.get("filestore_operation_poll_interval_seconds", 5),
+            ),
         )
 
     if pair == ("queue", "pubsub") or (kind == "queue" and not variant):
@@ -510,6 +570,81 @@ def _gcp_managed_config_for(
                 pc.get("spanner_operation_poll_interval_seconds", 2),
             ),
             adopt_existing_instance=bool(pc.get("spanner_adopt_existing_instance", False)),
+        )
+
+    if pair == ("workflow_engine", "workflows") or (kind == "workflow_engine" and not variant):
+        from gcp.managed.workflow_workflows import WorkflowsConfig
+
+        return WorkflowsConfig(
+            project_id=project_id,
+            region=region,
+            workflow_name_prefix=str(pc.get("workflows_name_prefix", "astrolift")),
+            deletion_protection_default=bool(
+                pc.get("workflows_deletion_protection_default", True),
+            ),
+            call_log_level_default=str(
+                pc.get("workflows_call_log_level_default", "LOG_ERRORS_ONLY"),
+            ),
+            execution_history_level_default=str(
+                pc.get(
+                    "workflows_execution_history_level_default",
+                    "EXECUTION_HISTORY_BASIC",
+                ),
+            ),
+            api_endpoint=str(
+                pc.get("workflows_api_endpoint", "https://workflows.googleapis.com/v1"),
+            ),
+            executions_api_endpoint=str(
+                pc.get(
+                    "workflow_executions_api_endpoint",
+                    "https://workflowexecutions.googleapis.com/v1",
+                ),
+            ),
+            operation_timeout_seconds=float(
+                pc.get("workflows_operation_timeout_seconds", 900),
+            ),
+            poll_interval_seconds=float(
+                pc.get("workflows_operation_poll_interval_seconds", 2),
+            ),
+        )
+
+    if pair == ("observability", "cloud_operations") or (kind == "observability" and not variant):
+        from gcp.managed.observability_cloud_operations import CloudOperationsConfig
+
+        return CloudOperationsConfig(
+            project_id=project_id,
+            location=str(pc.get("cloud_operations_location") or "global"),
+            name_prefix=str(
+                pc.get("cloud_operations_name_prefix", "astrolift-observability"),
+            ),
+            retention_days_default=int(
+                pc.get("cloud_operations_retention_days_default", 30),
+            ),
+            deletion_protection_default=bool(
+                pc.get("cloud_operations_deletion_protection_default", True),
+            ),
+            secret_id_prefix=str(pc.get("secret_id_prefix", "astrolift")),
+            logging_api_endpoint=str(
+                pc.get(
+                    "cloud_operations_logging_api_endpoint",
+                    "https://logging.googleapis.com",
+                ),
+            ),
+            monitoring_api_endpoint=str(
+                pc.get(
+                    "cloud_operations_monitoring_api_endpoint",
+                    "https://monitoring.googleapis.com",
+                ),
+            ),
+            request_timeout_seconds=float(
+                pc.get("cloud_operations_request_timeout_seconds", 30),
+            ),
+            operation_timeout_seconds=float(
+                pc.get("cloud_operations_operation_timeout_seconds", 900),
+            ),
+            operation_poll_interval_seconds=float(
+                pc.get("cloud_operations_operation_poll_interval_seconds", 2),
+            ),
         )
 
     if pair == ("postgres", "cloudsql") or (kind == "postgres" and not variant):
@@ -761,6 +896,75 @@ def _gcp_managed_config_for(
             ),
         )
 
+    if pair == ("cdn", "cloud_cdn") or (kind == "cdn" and not variant):
+        from gcp.managed.cdn_cloud import CloudCdnConfig
+
+        return CloudCdnConfig(
+            project_id=project_id,
+            name_prefix=str(pc.get("cloud_cdn_name_prefix", "astrolift")),
+            deletion_protection_default=bool(
+                pc.get("cloud_cdn_deletion_protection_default", True),
+            ),
+            cache_mode_default=str(
+                pc.get("cloud_cdn_cache_mode_default", "CACHE_ALL_STATIC"),
+            ),
+            default_ttl_seconds=int(pc.get("cloud_cdn_default_ttl_seconds", 3600)),
+            max_ttl_seconds=int(pc.get("cloud_cdn_max_ttl_seconds", 86400)),
+            client_ttl_seconds=int(pc.get("cloud_cdn_client_ttl_seconds", 3600)),
+            serve_while_stale_seconds=int(
+                pc.get("cloud_cdn_serve_while_stale_seconds", 86400),
+            ),
+            invalidation_role=str(
+                pc.get("cloud_cdn_invalidation_role", "roles/compute.loadBalancerAdmin"),
+            ),
+            api_endpoint=str(
+                pc.get(
+                    "cloud_cdn_api_endpoint",
+                    "https://compute.googleapis.com/compute/v1",
+                ),
+            ),
+            operation_timeout_seconds=float(
+                pc.get("cloud_cdn_operation_timeout_seconds", 900),
+            ),
+            poll_interval_seconds=float(
+                pc.get("cloud_cdn_operation_poll_interval_seconds", 2),
+            ),
+        )
+
+    if pair == ("private_endpoint", "private_service_connect") or (
+        kind == "private_endpoint" and not variant
+    ):
+        from gcp.managed.private_endpoint_psc import PrivateServiceConnectConfig
+
+        return PrivateServiceConnectConfig(
+            project_id=project_id,
+            region=region,
+            network=str(pc.get("private_service_connect_network", "")),
+            subnetwork=str(pc.get("private_service_connect_subnetwork", "")),
+            name_prefix=str(pc.get("private_service_connect_name_prefix", "astrolift")),
+            labels={
+                str(key): str(value)
+                for key, value in dict(
+                    pc.get("private_service_connect_labels") or {},
+                ).items()
+            },
+            deletion_protection_default=bool(
+                pc.get("private_service_connect_deletion_protection_default", True),
+            ),
+            api_endpoint=str(
+                pc.get(
+                    "private_service_connect_api_endpoint",
+                    "https://compute.googleapis.com/compute/v1",
+                ),
+            ),
+            operation_timeout_seconds=float(
+                pc.get("private_service_connect_operation_timeout_seconds", 900),
+            ),
+            poll_interval_seconds=float(
+                pc.get("private_service_connect_operation_poll_interval_seconds", 2),
+            ),
+        )
+
     if pair in {
         ("search", "gcp_elastic_cloud"),
         ("email", "gcp_thirdparty"),
@@ -777,6 +981,530 @@ def _gcp_managed_config_for(
 
 def _optional_string(value: Any) -> str | None:
     return str(value) if value not in (None, "") else None
+
+
+def _k8s_managed_config_for(
+    cluster: TenantCluster,
+    *,
+    kind: str,
+    variant: str,
+    provider_config: dict[str, Any],
+) -> Any:
+    """Build live in-cluster driver configs with the cluster mutator attached."""
+
+    cluster_driver = _driver_for_cluster(cluster)
+    pc = provider_config
+    pair = (kind, variant)
+
+    if pair == ("postgres", "cnpg"):
+        from k8s_native.managed.postgres_cnpg import CNPGConfig
+
+        return CNPGConfig(
+            cluster_driver=cluster_driver,
+            operator_namespace=str(pc.get("cnpg_operator_namespace", "cnpg-system")),
+            storage_class=str(pc.get("cnpg_storage_class", "")),
+            backup_object_store_url=str(pc.get("cnpg_backup_url", "")),
+        )
+    if pair == ("redis", "operator"):
+        from k8s_native.managed.redis_operator import RedisOperatorConfig
+
+        return RedisOperatorConfig(
+            cluster_driver=cluster_driver,
+            storage_class=str(pc.get("redis_storage_class", "")),
+            persistent=bool(pc.get("redis_persistent", True)),
+        )
+    if pair == ("mysql", "operator"):
+        from k8s_native.managed.mysql_operator import MySQLOperatorConfig
+
+        return MySQLOperatorConfig(
+            operator_brand=str(pc.get("mysql_operator_brand", "percona")),
+            storage_class=_optional_string(pc.get("mysql_storage_class")),
+            namespace=_optional_string(pc.get("mysql_namespace")),
+            backup_url=_optional_string(pc.get("mysql_backup_url")),
+            cluster_driver=cluster_driver,
+        )
+    if pair == ("document_db", "mongodb_operator"):
+        from k8s_native.managed.mongodb_operator import MongoDBOperatorConfig
+
+        return MongoDBOperatorConfig(
+            storage_class=_optional_string(pc.get("mongodb_storage_class")),
+            namespace=_optional_string(pc.get("mongodb_namespace")),
+            backup_url=_optional_string(pc.get("mongodb_backup_url")),
+            cluster_driver=cluster_driver,
+        )
+    if pair == ("event_stream", "kafka_strimzi"):
+        from k8s_native.managed.event_stream_strimzi import StrimziKafkaConfig
+
+        return StrimziKafkaConfig(
+            storage_class=_optional_string(pc.get("kafka_storage_class")),
+            namespace=_optional_string(pc.get("kafka_namespace")),
+            cluster_driver=cluster_driver,
+        )
+    if pair == ("event_stream", "nats"):
+        from k8s_native.managed.event_stream_nats import NATSConfig
+
+        return NATSConfig(
+            storage_class=_optional_string(pc.get("nats_storage_class")),
+            namespace=_optional_string(pc.get("nats_namespace")),
+            enable_jetstream=bool(pc.get("nats_enable_jetstream", True)),
+            cluster_driver=cluster_driver,
+        )
+    if pair == ("queue", "rabbitmq_operator"):
+        from k8s_native.managed.queue_rabbitmq import RabbitMQOperatorConfig
+
+        return RabbitMQOperatorConfig(
+            storage_class=_optional_string(pc.get("rabbitmq_storage_class")),
+            namespace=_optional_string(pc.get("rabbitmq_namespace")),
+            cluster_driver=cluster_driver,
+        )
+    if pair == ("faas", "knative_service"):
+        from k8s_native.managed.faas_knative import KnativeServiceConfig
+
+        return KnativeServiceConfig(
+            cluster_driver=cluster_driver,
+            namespace=_optional_string(pc.get("knative_namespace")),
+            allow_public=bool(pc.get("knative_allow_public", False)),
+            allow_tagged_images=bool(pc.get("knative_allow_tagged_images", False)),
+            allow_unsafe_pod_spec=bool(
+                pc.get("knative_allow_unsafe_pod_spec", False),
+            ),
+            default_port=int(pc.get("knative_default_port", 8080)),
+            default_timeout_seconds=int(
+                pc.get("knative_default_timeout_seconds", 300),
+            ),
+            default_container_concurrency=int(
+                pc.get("knative_default_container_concurrency", 0),
+            ),
+        )
+    if pair == ("api_gateway", "gateway_api"):
+        from k8s_native.managed.api_gateway import GatewayAPIConfig
+
+        return GatewayAPIConfig(
+            cluster_driver=cluster_driver,
+            namespace=_optional_string(pc.get("gateway_api_namespace")),
+            gateway_class_name=str(pc.get("gateway_api_class_name", "")),
+            allow_class_override=bool(pc.get("gateway_api_allow_class_override", False)),
+            allow_cross_namespace_routes=bool(
+                pc.get("gateway_api_allow_cross_namespace_routes", False),
+            ),
+            allow_cross_namespace_backends=bool(
+                pc.get("gateway_api_allow_cross_namespace_backends", False),
+            ),
+            allow_cross_namespace_certificates=bool(
+                pc.get("gateway_api_allow_cross_namespace_certificates", False),
+            ),
+            allow_custom_backends=bool(pc.get("gateway_api_allow_custom_backends", False)),
+            allow_extension_refs=bool(pc.get("gateway_api_allow_extension_refs", False)),
+            allow_experimental_routes=bool(
+                pc.get("gateway_api_allow_experimental_routes", False),
+            ),
+            allow_listener_sets=bool(pc.get("gateway_api_allow_listener_sets", False)),
+        )
+    if pair == ("event_bus", "knative_eventing"):
+        from k8s_native.managed.event_bus_knative import KnativeEventingConfig
+
+        allowed_classes = pc.get(
+            "knative_eventing_allowed_broker_classes",
+            [
+                "MTChannelBasedBroker",
+                "ChannelBasedBroker",
+                "Kafka",
+                "RabbitMQBroker",
+            ],
+        )
+        return KnativeEventingConfig(
+            cluster_driver=cluster_driver,
+            namespace=_optional_string(pc.get("knative_eventing_namespace")),
+            broker_class=str(
+                pc.get("knative_eventing_broker_class", "MTChannelBasedBroker"),
+            ),
+            broker_config=pc.get("knative_eventing_broker_config"),
+            allow_class_override=bool(
+                pc.get("knative_eventing_allow_class_override", False),
+            ),
+            allow_config_override=bool(
+                pc.get("knative_eventing_allow_config_override", False),
+            ),
+            allow_external_subscribers=bool(
+                pc.get("knative_eventing_allow_external_subscribers", False),
+            ),
+            allow_cross_namespace_subscribers=bool(
+                pc.get(
+                    "knative_eventing_allow_cross_namespace_subscribers",
+                    False,
+                ),
+            ),
+            allow_alpha_delivery_fields=bool(
+                pc.get("knative_eventing_allow_alpha_delivery_fields", False),
+            ),
+            allowed_broker_classes=tuple(str(value) for value in allowed_classes),
+        )
+    if pair == ("workflow_engine", "argo_workflows"):
+        from k8s_native.managed.workflow_argo import ArgoWorkflowsConfig
+
+        return ArgoWorkflowsConfig(
+            cluster_driver=cluster_driver,
+            namespace=_optional_string(pc.get("argo_workflows_namespace")),
+            watch_all_namespaces=bool(
+                pc.get("argo_workflows_watch_all_namespaces", True),
+            ),
+            managed_namespaces=tuple(str(value) for value in pc.get("argo_workflows_managed_namespaces", [])),
+            argo_server_url=str(pc.get("argo_workflows_server_url", "")),
+            service_account_name=str(
+                pc.get("argo_workflows_service_account_name", "argo-workflow"),
+            ),
+            allow_service_account_override=bool(
+                pc.get("argo_workflows_allow_service_account_override", False),
+            ),
+            allowed_service_accounts=tuple(
+                str(value) for value in pc.get("argo_workflows_allowed_service_accounts", [])
+            ),
+            allow_workflow_template_refs=bool(
+                pc.get("argo_workflows_allow_workflow_template_refs", False),
+            ),
+            allow_cluster_template_refs=bool(
+                pc.get("argo_workflows_allow_cluster_template_refs", False),
+            ),
+            trusted_workflow_template_uids={
+                str(key): str(value)
+                for key, value in dict(
+                    pc.get("argo_workflows_trusted_template_uids", {}),
+                ).items()
+            },
+            allow_resource_templates=bool(
+                pc.get("argo_workflows_allow_resource_templates", False),
+            ),
+            allow_executor_plugins=bool(
+                pc.get("argo_workflows_allow_executor_plugins", False),
+            ),
+            allow_external_http_templates=bool(
+                pc.get("argo_workflows_allow_external_http_templates", False),
+            ),
+            allow_host_access=bool(
+                pc.get("argo_workflows_allow_host_access", False),
+            ),
+            allow_privileged_pods=bool(
+                pc.get("argo_workflows_allow_privileged_pods", False),
+            ),
+            allow_pod_spec_patch=bool(
+                pc.get("argo_workflows_allow_pod_spec_patch", False),
+            ),
+            allow_tagged_images=bool(
+                pc.get("argo_workflows_allow_tagged_images", False),
+            ),
+            allowed_image_prefixes=tuple(
+                str(value) for value in pc.get("argo_workflows_allowed_image_prefixes", [])
+            ),
+            default_parallelism=int(
+                pc.get("argo_workflows_default_parallelism", 10),
+            ),
+            max_parallelism=int(pc.get("argo_workflows_max_parallelism", 50)),
+            default_active_deadline_seconds=int(
+                pc.get("argo_workflows_default_active_deadline_seconds", 3600),
+            ),
+            max_active_deadline_seconds=int(
+                pc.get("argo_workflows_max_active_deadline_seconds", 86400),
+            ),
+            default_ttl_seconds=int(
+                pc.get("argo_workflows_default_ttl_seconds", 86400),
+            ),
+            max_ttl_seconds=int(
+                pc.get("argo_workflows_max_ttl_seconds", 604800),
+            ),
+        )
+    if pair == ("model_endpoint", "kserve"):
+        from k8s_native.managed.model_endpoint_kserve import KServeConfig
+
+        return KServeConfig(
+            cluster_driver=cluster_driver,
+            namespace=_optional_string(pc.get("kserve_namespace")),
+            default_deployment_mode=str(
+                pc.get("kserve_default_deployment_mode", "Standard"),
+            ),
+            allowed_deployment_modes=tuple(
+                str(value) for value in pc.get("kserve_allowed_deployment_modes", ["Standard"])
+            ),
+            service_account_name=str(pc.get("kserve_service_account_name", "kserve-model")),
+            allow_service_account_override=bool(
+                pc.get("kserve_allow_service_account_override", False),
+            ),
+            allowed_service_accounts=tuple(
+                str(value) for value in pc.get("kserve_allowed_service_accounts", [])
+            ),
+            allow_service_account_token=bool(
+                pc.get("kserve_allow_service_account_token", False),
+            ),
+            allow_public=bool(pc.get("kserve_allow_public", False)),
+            allow_writable_storage=bool(pc.get("kserve_allow_writable_storage", False)),
+            allow_custom_containers=bool(pc.get("kserve_allow_custom_containers", False)),
+            allow_tagged_images=bool(pc.get("kserve_allow_tagged_images", False)),
+            allowed_image_prefixes=tuple(str(value) for value in pc.get("kserve_allowed_image_prefixes", [])),
+            allowed_storage_uri_schemes=tuple(
+                str(value)
+                for value in pc.get(
+                    "kserve_allowed_storage_uri_schemes",
+                    ["s3", "gs", "hf", "pvc", "oci", "oci+native"],
+                )
+            ),
+            allow_external_storage_urls=bool(
+                pc.get("kserve_allow_external_storage_urls", False),
+            ),
+            allowed_external_storage_hosts=tuple(
+                str(value) for value in pc.get("kserve_allowed_external_storage_hosts", [])
+            ),
+            allow_external_logger_urls=bool(
+                pc.get("kserve_allow_external_logger_urls", False),
+            ),
+            allowed_external_logger_hosts=tuple(
+                str(value) for value in pc.get("kserve_allowed_external_logger_hosts", [])
+            ),
+            allow_privileged_pods=bool(pc.get("kserve_allow_privileged_pods", False)),
+            allow_host_access=bool(pc.get("kserve_allow_host_access", False)),
+            allow_local_model_cache=bool(pc.get("kserve_allow_local_model_cache", False)),
+            allowed_model_formats=tuple(str(value) for value in pc.get("kserve_allowed_model_formats", [])),
+            allowed_serving_runtimes=tuple(
+                str(value) for value in pc.get("kserve_allowed_serving_runtimes", [])
+            ),
+            allowed_autoscaler_classes=tuple(
+                str(value) for value in pc.get("kserve_allowed_autoscaler_classes", ["hpa", "none"])
+            ),
+            max_replicas=int(pc.get("kserve_max_replicas", 100)),
+        )
+    if pair == ("observability", "kube_prometheus_stack"):
+        from k8s_native.managed.observability_kube_prometheus import KubePrometheusConfig
+
+        return KubePrometheusConfig(
+            cluster_driver=cluster_driver,
+            monitoring_namespace=str(pc.get("kube_prometheus_namespace", "astrolift-system")),
+            prometheus_service_name=str(
+                pc.get(
+                    "kube_prometheus_prometheus_service_name",
+                    "astrolift-kube-prometheus-prometheus",
+                )
+            ),
+            alertmanager_service_name=str(
+                pc.get(
+                    "kube_prometheus_alertmanager_service_name",
+                    "astrolift-kube-prometheus-alertmanager",
+                )
+            ),
+            grafana_service_name=str(
+                pc.get(
+                    "kube_prometheus_grafana_service_name",
+                    "astrolift-kube-prometheus-stack-grafana",
+                )
+            ),
+            prometheus_url=str(pc.get("kube_prometheus_prometheus_url", "")),
+            grafana_url=str(pc.get("kube_prometheus_grafana_url", "")),
+            verify_crds=bool(pc.get("kube_prometheus_verify_crds", True)),
+            verify_services=bool(pc.get("kube_prometheus_verify_services", True)),
+            verify_selection=bool(pc.get("kube_prometheus_verify_selection", True)),
+            allow_workload_prometheus_access=bool(
+                pc.get("kube_prometheus_allow_workload_prometheus_access", False),
+            ),
+            allow_cross_namespace=bool(pc.get("kube_prometheus_allow_cross_namespace", False)),
+            allowed_target_namespaces=tuple(
+                str(value) for value in pc.get("kube_prometheus_allowed_target_namespaces", [])
+            ),
+            allow_custom_rules=bool(pc.get("kube_prometheus_allow_custom_rules", False)),
+            allow_custom_dashboards=bool(
+                pc.get("kube_prometheus_allow_custom_dashboards", False),
+            ),
+            allow_honor_labels=bool(pc.get("kube_prometheus_allow_honor_labels", False)),
+            min_scrape_interval_seconds=int(
+                pc.get("kube_prometheus_min_scrape_interval_seconds", 15),
+            ),
+            max_monitors=int(pc.get("kube_prometheus_max_monitors", 20)),
+            max_endpoints_per_monitor=int(
+                pc.get("kube_prometheus_max_endpoints_per_monitor", 10),
+            ),
+            max_samples_per_scrape=int(
+                pc.get("kube_prometheus_max_samples_per_scrape", 50_000),
+            ),
+            max_targets_per_monitor=int(
+                pc.get("kube_prometheus_max_targets_per_monitor", 100),
+            ),
+            max_rule_groups=int(pc.get("kube_prometheus_max_rule_groups", 20)),
+            max_rules=int(pc.get("kube_prometheus_max_rules", 100)),
+            max_dashboards=int(pc.get("kube_prometheus_max_dashboards", 10)),
+            max_dashboard_bytes=int(pc.get("kube_prometheus_max_dashboard_bytes", 512_000)),
+        )
+    if pair == ("object_store", "s3_compatible_existing"):
+        from k8s_native.managed.object_store_existing_s3 import ExistingS3Config
+
+        from core.app_deploy import AppDeployError, driver_for_capability
+
+        try:
+            secrets_backend = driver_for_capability(cluster, "secrets")
+        except AppDeployError as exc:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: cannot resolve the secrets backend required by existing S3 adoption: {exc}",
+            ) from exc
+        return ExistingS3Config(
+            cluster_driver=cluster_driver,
+            secrets_backend=secrets_backend,
+            namespace=_optional_string(pc.get("s3_existing_namespace")),
+            allowed_endpoint_hosts=tuple(
+                str(value) for value in pc.get("s3_existing_allowed_endpoint_hosts", [])
+            ),
+            allowed_credential_path_prefixes=tuple(
+                str(value)
+                for value in pc.get(
+                    "s3_existing_allowed_credential_path_prefixes",
+                    ["managed/object_store/{organization}"],
+                )
+            ),
+            allow_insecure_http=bool(pc.get("s3_existing_allow_insecure_http", False)),
+            allow_skip_tls_verify=bool(
+                pc.get("s3_existing_allow_skip_tls_verify", False),
+            ),
+            allow_endpoint_paths=bool(pc.get("s3_existing_allow_endpoint_paths", False)),
+        )
+    if pair == ("object_store", "seaweedfs_operator"):
+        from k8s_native.managed.object_store_seaweedfs import SeaweedFSObjectStoreConfig
+
+        from core.app_deploy import AppDeployError, driver_for_capability
+
+        try:
+            secrets_backend = driver_for_capability(cluster, "secrets")
+        except AppDeployError as exc:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: cannot resolve the secrets backend required by SeaweedFS: {exc}",
+            ) from exc
+        return SeaweedFSObjectStoreConfig(
+            namespace=str(pc.get("seaweed_namespace", "astrolift-storage")),
+            seaweed_name=str(pc.get("seaweed_cluster_name", "astrolift-object-store")),
+            endpoint=str(pc.get("seaweed_s3_endpoint", "")),
+            endpoint_scheme=str(pc.get("seaweed_s3_scheme", "http")),
+            endpoint_port=int(pc.get("seaweed_s3_port", 8333)),
+            region=str(pc.get("seaweed_s3_region", "us-east-1")),
+            credential_path_prefix=str(
+                pc.get("seaweed_credential_path_prefix", "managed/object_store"),
+            ),
+            verify_crds=bool(pc.get("seaweed_verify_crds", True)),
+            deletion_timeout_seconds=float(
+                pc.get("seaweed_deletion_timeout_seconds", 120),
+            ),
+            cluster_driver=cluster_driver,
+            secrets_backend=secrets_backend,
+        )
+    if pair == ("mssql", "sqlserver_express"):
+        from k8s_native.managed.mssql_express import DEFAULT_IMAGE, SQLServerExpressConfig
+
+        from core.app_deploy import AppDeployError, driver_for_capability
+
+        try:
+            secrets_backend = driver_for_capability(cluster, "secrets")
+        except AppDeployError as exc:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: cannot resolve the secrets backend required by SQL Server Express: {exc}",
+            ) from exc
+        return SQLServerExpressConfig(
+            cluster_driver=cluster_driver,
+            secrets_backend=secrets_backend,
+            namespace=_optional_string(pc.get("mssql_namespace")),
+            storage_class_name=str(pc.get("mssql_storage_class_name", "")),
+            image=str(pc.get("mssql_image", DEFAULT_IMAGE)),
+            credential_path_prefix=str(pc.get("mssql_credential_path_prefix", "managed/mssql")),
+            allow_custom_images=bool(pc.get("mssql_allow_custom_images", False)),
+            allow_load_balancer=bool(pc.get("mssql_allow_load_balancer", False)),
+            allow_network_policy_disable=bool(
+                pc.get("mssql_allow_network_policy_disable", False),
+            ),
+            volume_snapshot_class=str(pc.get("mssql_volume_snapshot_class", "")),
+            allow_crash_consistent_snapshots=bool(
+                pc.get("mssql_allow_crash_consistent_snapshots", False),
+            ),
+            deletion_timeout_seconds=float(pc.get("mssql_deletion_timeout_seconds", 120)),
+        )
+    if pair in {
+        ("search", "opensearch_operator"),
+        ("vector_index", "opensearch_operator_vector"),
+    }:
+        from k8s_native.managed.opensearch_operator import (
+            CURRENT_API_VERSION,
+            DEFAULT_BOOTSTRAP_IMAGE,
+            DEFAULT_IMAGE,
+            DEFAULT_VERSION,
+            OpenSearchOperatorConfig,
+        )
+
+        from core.app_deploy import AppDeployError, driver_for_capability
+
+        try:
+            secrets_backend = driver_for_capability(cluster, "secrets")
+        except AppDeployError as exc:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: cannot resolve the secrets backend required by OpenSearch: {exc}",
+            ) from exc
+        return OpenSearchOperatorConfig(
+            cluster_driver=cluster_driver,
+            secrets_backend=secrets_backend,
+            namespace=_optional_string(pc.get("opensearch_namespace")),
+            storage_class_name=str(pc.get("opensearch_storage_class_name", "")),
+            api_version=str(pc.get("opensearch_api_version", CURRENT_API_VERSION)),
+            operator_namespace=str(pc.get("opensearch_operator_namespace", "opensearch-operator-system")),
+            version=str(pc.get("opensearch_version", DEFAULT_VERSION)),
+            image=str(pc.get("opensearch_image", DEFAULT_IMAGE)),
+            bootstrap_image=str(pc.get("opensearch_bootstrap_image", DEFAULT_BOOTSTRAP_IMAGE)),
+            credential_path_prefix=str(pc.get("opensearch_credential_path_prefix", "managed/opensearch")),
+            allow_custom_versions=bool(pc.get("opensearch_allow_custom_versions", False)),
+            allow_custom_images=bool(pc.get("opensearch_allow_custom_images", False)),
+            allow_custom_bootstrap_images=bool(pc.get("opensearch_allow_custom_bootstrap_images", False)),
+            allow_custom_plugins=bool(pc.get("opensearch_allow_custom_plugins", False)),
+            allow_single_node=bool(pc.get("opensearch_allow_single_node", False)),
+            allow_network_policy_disable=bool(pc.get("opensearch_allow_network_policy_disable", False)),
+            http_tls_secret_name=str(pc.get("opensearch_http_tls_secret_name", "")),
+            http_tls_ca_secret_name=str(pc.get("opensearch_http_tls_ca_secret_name", "")),
+            http_tls_admin_secret_name=str(pc.get("opensearch_http_tls_admin_secret_name", "")),
+            http_tls_admin_dns=tuple(str(value) for value in pc.get("opensearch_http_tls_admin_dns", [])),
+            http_tls_verify=bool(pc.get("opensearch_http_tls_verify", False)),
+            deletion_timeout_seconds=float(pc.get("opensearch_deletion_timeout_seconds", 180)),
+        )
+    if pair in {
+        ("filesystem", "nfs_csi"),
+        ("filesystem", "nfs_subdir_provisioner"),
+    }:
+        from k8s_native.managed.filesystem_nfs import NFSConfig
+
+        return NFSConfig(
+            storage_class_name=str(
+                pc.get("nfs_storage_class_name", pc.get("filesystem_storage_class_name", "")),
+            ),
+            server_address=str(pc.get("nfs_server_address", "")),
+            server_export=str(pc.get("nfs_server_export", "/export")),
+            namespace=_optional_string(pc.get("nfs_namespace")),
+            cluster_driver=cluster_driver,
+        )
+    if pair in {
+        ("filesystem", "storage_class_pvc"),
+        ("filesystem", "rook_cephfs"),
+    }:
+        from k8s_native.managed.filesystem_pvc import PVCConfig
+
+        if pair[1] == "rook_cephfs":
+            default_class = "rook-cephfs"
+            default_csi = "rook-ceph.cephfs.csi.ceph.com"
+            default_modes = ("ReadWriteMany",)
+            prefix = "rook_cephfs"
+        else:
+            default_class = ""
+            default_csi = ""
+            default_modes = ("ReadWriteOnce",)
+            prefix = "filesystem_pvc"
+        raw_modes = pc.get(f"{prefix}_access_modes", default_modes)
+        if isinstance(raw_modes, str):
+            raw_modes = [raw_modes]
+        return PVCConfig(
+            storage_class_name=str(pc.get(f"{prefix}_storage_class_name", default_class)),
+            cluster_driver=cluster_driver,
+            csi_driver=str(pc.get(f"{prefix}_csi_driver", default_csi)),
+            default_access_modes=tuple(str(value) for value in raw_modes),
+        )
+    raise ClusterObservabilityError(
+        f"cluster {cluster.slug}: no Kubernetes managed-service config builder for "
+        f"kind={kind!r}, variant={variant!r}",
+    )
 
 
 def _azure_managed_config_for(
@@ -863,12 +1591,16 @@ def _azure_managed_config_for(
             enable_partitioning=bool(pc.get("servicebus_enable_partitioning", False)),
         )
 
-    if pair == ("queue", "azure_servicebus") or (kind == "queue" and not variant):
+    servicebus_topic_pairs = {
+        ("queue", "azure_servicebus"),
+        ("topic", "service_bus_topic"),
+    }
+    if pair in servicebus_topic_pairs or (kind in {"queue", "topic"} and not variant):
         from azure.managed.queue_servicebus import AzureServiceBusConfig
 
         if not servicebus_namespace:
             raise ClusterObservabilityError(
-                f"cluster {cluster.slug}: Azure queue/azure_servicebus requires "
+                f"cluster {cluster.slug}: Azure {kind}/{variant or ('service_bus_topic' if kind == 'topic' else 'azure_servicebus')} requires "
                 "provider_config.servicebus_namespace",
             )
         return AzureServiceBusConfig(
@@ -876,6 +1608,8 @@ def _azure_managed_config_for(
             resource_group=resource_group,
             namespace_name=servicebus_namespace,
             topic_name_prefix=str(pc.get("servicebus_topic_name_prefix", "astrolift")),
+            handle_kind="topic" if kind == "topic" else "queue",
+            location=str(pc.get("servicebus_location", location)),
             default_message_ttl=str(pc.get("servicebus_default_message_ttl", "P14D")),
             max_size_in_megabytes=int(pc.get("servicebus_max_size_in_megabytes", 1024)),
             enable_partitioning=bool(pc.get("servicebus_enable_partitioning", False)),
@@ -884,6 +1618,29 @@ def _azure_managed_config_for(
             ),
             max_delivery_count=int(pc.get("servicebus_max_delivery_count", 10)),
             lock_duration=str(pc.get("servicebus_lock_duration", "PT30S")),
+        )
+
+    event_hubs_pairs = {
+        ("stream", "event_hubs"),
+        ("event_stream", "event_hubs_kafka"),
+    }
+    if pair in event_hubs_pairs or (kind in {"stream", "event_stream"} and not variant):
+        from azure.managed.event_hubs import AzureEventHubsConfig
+
+        resolved_variant = variant or ("event_hubs_kafka" if kind == "event_stream" else "event_hubs")
+        return AzureEventHubsConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            variant=resolved_variant,
+            location=location,
+            namespace_name_prefix=str(pc.get("eventhubs_namespace_name_prefix", "astrolift-eh")),
+            event_hub_name_prefix=str(pc.get("eventhubs_event_hub_name_prefix", "astrolift")),
+            default_sku=str(pc.get("eventhubs_default_sku", "Standard")),
+            default_capacity=int(pc.get("eventhubs_default_capacity", 1)),
+            default_consumer_group=str(pc.get("eventhubs_default_consumer_group", "astrolift")),
+            public_network_access_default=str(
+                pc.get("eventhubs_public_network_access_default", "Enabled"),
+            ),
         )
 
     if pair == ("filesystem", "azure_files") or (kind == "filesystem" and not variant):
@@ -993,6 +1750,65 @@ def _azure_managed_config_for(
             backup_policy_default=str(pc.get("cosmos_backup_policy_default", "Continuous")),
             keyvault_url=vault_url,
             secret_name_prefix=str(pc.get("cosmos_secret_name_prefix", "astrolift-cosmos")),
+        )
+
+    cosmos_api_pairs = {
+        ("document_db", "cosmos_nosql"),
+        ("document_db", "cosmos_mongodb"),
+        ("graph_db", "cosmos_gremlin"),
+        ("wide_column", "cosmos_cassandra"),
+        ("kv_store", "cosmos_table"),
+    }
+    default_cosmos_api_variants = {
+        "document_db": "cosmos_nosql",
+        "graph_db": "cosmos_gremlin",
+        "wide_column": "cosmos_cassandra",
+    }
+    if pair in cosmos_api_pairs or (kind in default_cosmos_api_variants and not variant):
+        from azure.managed.cosmos_api import AzureCosmosApiConfig
+
+        if not vault_url:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: Azure {kind}/{variant or default_cosmos_api_variants[kind]} "
+                "requires provider_config.vault_url",
+            )
+        resolved_variant = variant or default_cosmos_api_variants[kind]
+        return AzureCosmosApiConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            variant=resolved_variant,
+            location=location,
+            account_name_prefix=str(
+                pc.get(
+                    "cosmos_api_account_name_prefix",
+                    pc.get("cosmos_account_name_prefix", "astrolift-cosmos"),
+                ),
+            ),
+            database_name_default=str(
+                pc.get(
+                    "cosmos_api_database_name_default",
+                    pc.get("cosmos_database_name_default", "astrolift"),
+                ),
+            ),
+            backup_policy_default=str(
+                pc.get(
+                    "cosmos_api_backup_policy_default",
+                    pc.get("cosmos_backup_policy_default", "Continuous"),
+                ),
+            ),
+            continuous_backup_tier_default=str(
+                pc.get("cosmos_api_continuous_backup_tier_default", "Continuous30Days"),
+            ),
+            public_network_access_default=str(
+                pc.get("cosmos_api_public_network_access_default", "Enabled"),
+            ),
+            consistency_level_default=str(
+                pc.get("cosmos_api_consistency_level_default", "Session"),
+            ),
+            keyvault_url=vault_url,
+            secret_name_prefix=str(
+                pc.get("cosmos_api_secret_name_prefix", "astrolift-cosmos-api"),
+            ),
         )
 
     if pair == ("search", "azure_ai_search_fulltext") or (kind == "search" and not variant):
@@ -1164,6 +1980,32 @@ def _azure_managed_config_for(
             backup_retention_days_default=int(pc.get("mssql_backup_retention_days_default", 7)),
         )
 
+    if pair == ("redis", "azure_managed_redis"):
+        from azure.managed.managed_redis import AzureManagedRedisConfig
+
+        return AzureManagedRedisConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            location=location,
+            cluster_name_prefix=str(pc.get("managed_redis_cluster_name_prefix", "astrolift-amr")),
+            database_name=str(pc.get("managed_redis_database_name", "default")),
+            default_sku=str(pc.get("managed_redis_default_sku", "Balanced_B3")),
+            high_availability_default=str(
+                pc.get("managed_redis_high_availability_default", "Enabled"),
+            ),
+            public_network_access_default=str(
+                pc.get("managed_redis_public_network_access_default", "Enabled"),
+            ),
+            clustering_policy_default=str(
+                pc.get("managed_redis_clustering_policy_default", "OSSCluster"),
+            ),
+            eviction_policy_default=str(
+                pc.get("managed_redis_eviction_policy_default", "AllKeysLRU"),
+            ),
+            keyvault_url=vault_url,
+            secret_name_prefix=str(pc.get("managed_redis_secret_name_prefix", "astrolift-amr")),
+        )
+
     raise ClusterObservabilityError(
         f"cluster {cluster.slug}: no Azure managed-service config builder for "
         f"kind={kind!r}, variant={variant!r}",
@@ -1202,6 +2044,14 @@ def managed_config_for(
             provider_config=pc,
             auth_config=ac,
             region=region,
+        )
+
+    if plugin_slug == "k8s_native":
+        return _k8s_managed_config_for(
+            cluster,
+            kind=kind,
+            variant=variant,
+            provider_config=pc,
         )
 
     if plugin_slug == "azure":

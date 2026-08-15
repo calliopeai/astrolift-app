@@ -376,13 +376,14 @@ class KubernetesDynamicClient:
             raise ValueError(f"manifest for {kind} is missing metadata.name")
 
         resource = self._resource_for(api_version, kind)
+        request_namespace = namespace if bool(getattr(resource, "namespaced", namespace is not None)) else None
 
         # Snapshot pre-state so we can classify the outcome.
         pre_existed = False
         pre_generation: int | None = None
         current: Any = None
         try:
-            current = resource.get(name=name, namespace=namespace)
+            current = resource.get(name=name, namespace=request_namespace)
             pre_existed = True
             pre_generation = self._to_dict(current).get("metadata", {}).get("generation")
         except DynNotFound:
@@ -390,7 +391,7 @@ class KubernetesDynamicClient:
 
         apply_kwargs: dict[str, Any] = {
             "body": manifest,
-            "namespace": namespace,
+            "namespace": request_namespace,
             "field_manager": "astrolift",
             "force_conflicts": force_conflicts,
         }
@@ -440,8 +441,9 @@ class KubernetesDynamicClient:
 
         api_version, resolved_kind = split_kind(kind)
         resource = self._resource_for(api_version, resolved_kind)
+        request_namespace = namespace if bool(getattr(resource, "namespaced", namespace is not None)) else None
         try:
-            obj = resource.get(name=name, namespace=namespace)
+            obj = resource.get(name=name, namespace=request_namespace)
         except DynNotFound:
             return None
         return self._to_dict(obj)
@@ -459,7 +461,8 @@ class KubernetesDynamicClient:
         self._refresh_token()
         api_version, resolved_kind = split_kind(kind)
         resource = self._resource_for(api_version, resolved_kind)
-        obj = resource.get(namespace=namespace)
+        request_namespace = namespace if bool(getattr(resource, "namespaced", namespace is not None)) else None
+        obj = resource.get(namespace=request_namespace)
         return self._to_dict(obj).get("items", []) or []
 
     def delete(
@@ -468,6 +471,7 @@ class KubernetesDynamicClient:
         kind: str,
         namespace: str | None,
         name: str,
+        propagation_policy: str | None = None,
     ) -> bool:
         """Delete a resource by ``kind``/``namespace``/``name``.
 
@@ -480,8 +484,19 @@ class KubernetesDynamicClient:
 
         api_version, resolved_kind = split_kind(kind)
         resource = self._resource_for(api_version, resolved_kind)
+        request_namespace = namespace if bool(getattr(resource, "namespaced", namespace is not None)) else None
         try:
-            resource.delete(name=name, namespace=namespace)
+            kwargs: dict[str, Any] = {
+                "name": name,
+                "namespace": request_namespace,
+            }
+            if propagation_policy:
+                kwargs["body"] = {
+                    "apiVersion": "v1",
+                    "kind": "DeleteOptions",
+                    "propagationPolicy": propagation_policy,
+                }
+            resource.delete(**kwargs)
         except DynNotFound:
             return False
         return True

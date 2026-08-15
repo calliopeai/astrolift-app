@@ -35,9 +35,24 @@ def test_managed_services_have_full_364_set() -> None:
     keys = set(PLUGIN.managed_service_drivers.keys())
     assert ("postgres", "azure_pg_flex") in keys
     assert ("redis", "azure_cache_redis") in keys
+    assert ("redis", "azure_managed_redis") in keys
     assert ("object_store", "azure_blob") in keys
     assert ("queue", "azure_servicebus") in keys
+    assert ("topic", "service_bus_topic") in keys
+    assert ("stream", "event_hubs") in keys
+    assert ("event_stream", "event_hubs_kafka") in keys
     assert ("filesystem", "azure_files") in keys
+
+
+def test_managed_services_register_explicit_cosmos_api_variants() -> None:
+    keys = set(PLUGIN.managed_service_drivers)
+    assert {
+        ("document_db", "cosmos_nosql"),
+        ("document_db", "cosmos_mongodb"),
+        ("graph_db", "cosmos_gremlin"),
+        ("wide_column", "cosmos_cassandra"),
+        ("kv_store", "cosmos_table"),
+    } <= keys
     assert ("filesystem", "azure_files_classic") in keys
 
 
@@ -58,8 +73,11 @@ def test_managed_runtime_controls_are_exposed_in_provider_schema() -> None:
     expected = {
         "storage_account",
         "servicebus_namespace",
+        "servicebus_location",
         "blob_versioning_enabled",
         "servicebus_dead_lettering_on_message_expiration",
+        "eventhubs_default_sku",
+        "eventhubs_public_network_access_default",
         "files_allowed_subnet_ids",
         "files_classic_default_protocol",
         "files_classic_default_sku",
@@ -68,6 +86,10 @@ def test_managed_runtime_controls_are_exposed_in_provider_schema() -> None:
         "mysql_backup_retention_days",
         "redis_minimum_tls_version_default",
         "cosmos_default_api_kind",
+        "cosmos_api_account_name_prefix",
+        "cosmos_api_continuous_backup_tier_default",
+        "cosmos_api_public_network_access_default",
+        "cosmos_api_consistency_level_default",
         "ai_search_public_network_access_default",
         "ai_search_vector_algorithm_default",
         "monitor_public_network_access_default",
@@ -81,13 +103,14 @@ def test_astrolift_azure_package_extends_official_sdk_namespace() -> None:
     """The local ``azure`` package must not shadow Microsoft's SDKs."""
     from azure.identity import DefaultAzureCredential
     from azure.mgmt.cosmosdb import CosmosDBManagementClient
+    from azure.mgmt.eventhub import EventHubManagementClient
     from azure.mgmt.fileshares import FileSharesMgmtClient
     from azure.mgmt.mysqlflexibleservers import MySQLManagementClient
     from azure.mgmt.postgresqlflexibleservers import PostgreSQLManagementClient
     from azure.mgmt.resource.locks import ManagementLockClient
-    from azure.mgmt.storage import StorageManagementClient
     from azure.search.documents.indexes import SearchIndexClient
     from azure.storage.blob import BlobServiceClient
+    from azure.mgmt.storage import StorageManagementClient
     from azure.storage.fileshare import ShareClient
 
     assert all(
@@ -95,13 +118,14 @@ def test_astrolift_azure_package_extends_official_sdk_namespace() -> None:
         for value in (
             DefaultAzureCredential,
             CosmosDBManagementClient,
+            EventHubManagementClient,
             FileSharesMgmtClient,
             MySQLManagementClient,
             PostgreSQLManagementClient,
             ManagementLockClient,
-            StorageManagementClient,
             SearchIndexClient,
             BlobServiceClient,
+            StorageManagementClient,
             ShareClient,
         )
     )
@@ -113,6 +137,7 @@ def test_registered_managed_drivers_target_current_sdk_operation_groups() -> Non
     from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
     from azure.mgmt.communication import CommunicationServiceManagementClient
     from azure.mgmt.cosmosdb import CosmosDBManagementClient
+    from azure.mgmt.eventhub import EventHubManagementClient
     from azure.mgmt.fileshares import FileSharesMgmtClient
     from azure.mgmt.loganalytics import LogAnalyticsManagementClient
     from azure.mgmt.monitor import MonitorManagementClient
@@ -185,14 +210,31 @@ def test_registered_managed_drivers_target_current_sdk_operation_groups() -> Non
                     "get",
                     "list_connection_strings",
                 },
-                "cassandra_resources": {"begin_create_update_cassandra_keyspace"},
-                "gremlin_resources": {"begin_create_update_gremlin_database"},
+                "cassandra_resources": {
+                    "begin_create_update_cassandra_keyspace",
+                    "begin_update_cassandra_keyspace_throughput",
+                    "get_cassandra_keyspace",
+                },
+                "gremlin_resources": {
+                    "begin_create_update_gremlin_database",
+                    "begin_update_gremlin_database_throughput",
+                    "get_gremlin_database",
+                },
                 "mongo_db_resources": {
                     "begin_create_update_mongo_db_database",
                     "begin_update_mongo_db_database_throughput",
+                    "get_mongo_db_database",
                 },
-                "sql_resources": {"begin_create_update_sql_database"},
-                "table_resources": {"begin_create_update_table"},
+                "sql_resources": {
+                    "begin_create_update_sql_database",
+                    "begin_update_sql_database_throughput",
+                    "get_sql_database",
+                },
+                "table_resources": {
+                    "begin_create_update_table",
+                    "begin_update_table_throughput",
+                    "get_table",
+                },
             },
         ),
         (
@@ -234,6 +276,20 @@ def test_registered_managed_drivers_target_current_sdk_operation_groups() -> Non
                 "queues": {"create_or_update", "delete", "get"},
                 "topics": {"create_or_update", "delete", "get"},
                 "subscriptions": {"create_or_update", "delete"},
+            },
+        ),
+        (
+            EventHubManagementClient(credential, subscription_id),
+            {
+                "namespaces": {
+                    "begin_create_or_update",
+                    "begin_delete",
+                    "create_or_update_network_rule_set",
+                    "get",
+                    "update",
+                },
+                "event_hubs": {"create_or_update", "delete", "get"},
+                "consumer_groups": {"create_or_update", "delete", "get"},
             },
         ),
         (

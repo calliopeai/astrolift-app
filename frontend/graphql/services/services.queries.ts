@@ -94,6 +94,12 @@ export const LIST_PROJECT_RESOURCES = gql`
       status
       statusError
       config
+      appliedConfig
+      operationKind
+      operationWorkflowId
+      operationRunId
+      operationStartedAt
+      operationCompletedAt
       projectSlug
       ownerScope
       clusterSlug
@@ -108,6 +114,24 @@ export const LIST_PROJECT_RESOURCES = gql`
         consumerKind
         consumerSlug
         environmentName
+      }
+      volumeBindings {
+        id
+        name
+        mountPath
+        subPath
+        sourceKind
+        protocol
+        claimName
+        claimNamespace
+        storageClassName
+        csiDriver
+        readOnly
+        capacity
+        accessModes
+        workloadNames
+        containerNames
+        credentialReferenceCount
       }
     }
     astroliftProjectSecretBundles(projectId: $projectId) {
@@ -164,11 +188,35 @@ export const LIST_MANAGED_SERVICES = gql`
       status
       statusError
       config
+      appliedConfig
+      operationKind
+      operationWorkflowId
+      operationRunId
+      operationStartedAt
+      operationCompletedAt
       createdAt
       updatedAt
       lastActionAt
       lastActionKind
       editableFields
+      volumeBindings {
+        id
+        name
+        mountPath
+        subPath
+        sourceKind
+        protocol
+        claimName
+        claimNamespace
+        storageClassName
+        csiDriver
+        readOnly
+        capacity
+        accessModes
+        workloadNames
+        containerNames
+        credentialReferenceCount
+      }
     }
   }
 `;

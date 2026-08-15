@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import strawberry
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from strawberry.types import Info
@@ -50,7 +51,7 @@ from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
 
-def _project_service_for_caller(service_id):
+def _project_service_rows_for_caller(service_id):
     rows = (
         ManagedService.objects.select_related("project", "tenant_cluster")
         .prefetch_related(
@@ -66,7 +67,11 @@ def _project_service_for_caller(service_id):
     tenant = get_current_tenant()
     if tenant is not None and tenant.team_id is not None:
         rows = rows.filter(project__team_id=tenant.team_id)
-    return rows.first()
+    return rows
+
+
+def _project_service_for_caller(service_id):
+    return _project_service_rows_for_caller(service_id).first()
 
 
 def _workflow_actor(info: Info):
@@ -121,6 +126,37 @@ def _start_project_service_deprovision(
             )
         ],
         workflow_id=f"DeprovisionManagedServiceWorkflow-{svc.guid}",
+    )
+
+
+def _start_service_update(info: Info, svc: ManagedService) -> None:
+    from astrolift_workflows.client import start_workflow
+    from astrolift_workflows.inputs import UpdateManagedServiceInput as UpdateInput
+
+    workflow_id = f"UpdateManagedServiceWorkflow-{svc.guid}"
+    handle = start_workflow(
+        "UpdateManagedServiceWorkflow",
+        args=[UpdateInput(managed_service_id=svc.pk, actor=_workflow_actor(info))],
+        workflow_id=workflow_id,
+    )
+    if not handle.enqueued:
+        raise RuntimeError("Temporal workflow runtime is disabled; update was not enqueued")
+    svc.operation_run_id = str(handle.run_id or "")
+    svc.save(update_fields=["operation_run_id", "updated_at", "version"])
+
+
+def _mark_update_enqueue_failed(svc: ManagedService, exc: Exception) -> None:
+    svc.status = ManagedService.Status.FAILED
+    svc.status_error = f"could not enqueue managed-service update: {exc}"[:4000]
+    svc.operation_completed_at = timezone.now()
+    svc.save(
+        update_fields=[
+            "status",
+            "status_error",
+            "operation_completed_at",
+            "updated_at",
+            "version",
+        ],
     )
 
 
@@ -394,38 +430,70 @@ class ManagedServiceMutations:
         info: Info,
         input: UpdateManagedServiceInput,
     ) -> MutationResultType[ManagedServiceType]:
-        svc = _project_service_for_caller(input.id)
-        if svc is None:
-            return gql_failure(ErrorCode.NOT_FOUND.value, "project managed service not found")
-        resource_changed = False
-        if input.config is not None:
-            from astrolift_services.schema.types import _editable_fields_for
+        config_changed = False
+        name_changed = False
+        with transaction.atomic():
+            # The scoped queryset joins nullable app/agent relationships for
+            # authorization and rendering. Lock only the service row: Postgres
+            # rejects FOR UPDATE against the nullable side of an outer join.
+            svc = _project_service_rows_for_caller(input.id).select_for_update(of=("self",)).first()
+            if svc is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "project managed service not found")
+            incoming = dict(input.config) if input.config is not None else None
+            if incoming is not None and incoming != (svc.config or {}):
+                from astrolift_services.schema.types import _editable_fields_for
 
-            editable = _editable_fields_for(svc)
-            incoming = dict(input.config)
-            if editable != ["*"]:
-                changed = {
-                    key
-                    for key in set(incoming) | set(svc.config or {})
-                    if incoming.get(key) != (svc.config or {}).get(key)
-                }
-                blocked = changed - set(editable)
-                if blocked:
+                editable = _editable_fields_for(svc)
+                if editable != ["*"]:
+                    changed = {
+                        key
+                        for key in set(incoming) | set(svc.config or {})
+                        if incoming.get(key) != (svc.config or {}).get(key)
+                    }
+                    blocked = changed - set(editable)
+                    if blocked:
+                        return gql_failure(
+                            ErrorCode.VALIDATION.value,
+                            f"fields {sorted(blocked)} require reprovision",
+                            field="config",
+                        )
+                if svc.status != ManagedService.Status.ACTIVE:
                     return gql_failure(
-                        ErrorCode.VALIDATION.value,
-                        f"fields {sorted(blocked)} require reprovision",
-                        field="config",
+                        ErrorCode.PRECONDITION.value,
+                        f"managed service is {svc.status}; wait for it to become active",
+                        field="id",
                     )
-            if incoming != (svc.config or {}):
+                if not svc.backend_ref:
+                    return gql_failure(
+                        ErrorCode.PRECONDITION.value,
+                        "managed service has no backend resource; reprovision it instead",
+                        field="id",
+                    )
+                if svc.applied_config is None:
+                    svc.applied_config = dict(svc.config or {})
                 svc.config = incoming
-                resource_changed = True
-        if input.name is not None and input.name.strip() != svc.name:
-            svc.name = input.name.strip()
-            resource_changed = True
-        if resource_changed:
-            svc.status = ManagedService.Status.PENDING
-            svc.save(update_fields=["name", "config", "status", "updated_at", "version"])
-            _start_project_service_provision(info, svc)
+                svc.status = ManagedService.Status.UPDATING
+                svc.status_error = ""
+                svc.operation_kind = "update"
+                svc.operation_workflow_id = f"UpdateManagedServiceWorkflow-{svc.guid}"
+                svc.operation_run_id = ""
+                svc.operation_started_at = timezone.now()
+                svc.operation_completed_at = None
+                config_changed = True
+            if input.name is not None and input.name.strip() != svc.name:
+                svc.name = input.name.strip()
+                name_changed = True
+            if config_changed or name_changed:
+                svc.save()
+        if config_changed:
+            try:
+                _start_service_update(info, svc)
+            except Exception as exc:  # noqa: BLE001
+                _mark_update_enqueue_failed(svc, exc)
+                return gql_failure(
+                    ErrorCode.INTERNAL.value,
+                    "managed-service update could not be enqueued",
+                )
         return gql_success(managed_service_to_type(svc))
 
     @strawberry.field
@@ -593,60 +661,85 @@ class ManagedServiceMutations:
         info: Info,
         input: UpdateManagedServiceInput,
     ) -> MutationResultType[ManagedServiceType]:
-        svc = (
-            ManagedService.objects.select_related(
-                "app_environment__tenant_cluster__provider_plugin",
-                "registered_app",
+        config_changed = False
+        name_changed = False
+        with transaction.atomic():
+            svc = (
+                # ``app_environment`` is nullable for project services. Lock
+                # only the desired-state row, not nullable joined relations.
+                ManagedService.objects.select_for_update(of=("self",))
+                .select_related(
+                    "app_environment__tenant_cluster__provider_plugin",
+                    "registered_app",
+                )
+                .filter(
+                    guid=str(input.id),
+                    registered_app__organization_id=_caller_org_id(),
+                    deleted_at__isnull=True,
+                )
+                .first()
             )
-            .filter(
-                guid=str(input.id),
-                registered_app__organization_id=_caller_org_id(),
-                deleted_at__isnull=True,
-            )
-            .first()
-        )
-        if svc is None:
-            return gql_failure(
-                ErrorCode.NOT_FOUND.value,
-                "managed service not found",
-            )
-        if input.config is not None:
-            from astrolift_services.schema.types import _editable_fields_for
+            if svc is None:
+                return gql_failure(
+                    ErrorCode.NOT_FOUND.value,
+                    "managed service not found",
+                )
+            incoming = dict(input.config) if input.config is not None else None
+            if incoming is not None and incoming != (svc.config or {}):
+                from astrolift_services.schema.types import _editable_fields_for
 
-            editable = _editable_fields_for(svc)
-            if editable != ["*"]:
-                incoming_keys = set(dict(input.config).keys())
-                current_keys = set((svc.config or {}).keys())
-                changed_keys = {
-                    k
-                    for k in incoming_keys | current_keys
-                    if dict(input.config).get(k) != (svc.config or {}).get(k)
-                }
-                blocked = changed_keys - set(editable)
-                if blocked:
+                editable = _editable_fields_for(svc)
+                if editable != ["*"]:
+                    changed_keys = {
+                        key
+                        for key in set(incoming) | set(svc.config or {})
+                        if incoming.get(key) != (svc.config or {}).get(key)
+                    }
+                    blocked = changed_keys - set(editable)
+                    if blocked:
+                        return gql_failure(
+                            ErrorCode.VALIDATION.value,
+                            f"fields {sorted(blocked)} cannot be changed in-place; "
+                            "use reprovisionManagedService to apply them",
+                            field="config",
+                        )
+                if svc.status != ManagedService.Status.ACTIVE:
                     return gql_failure(
-                        ErrorCode.VALIDATION.value,
-                        f"fields {sorted(blocked)} cannot be changed in-place; "
-                        "use reprovisionManagedService to apply them",
-                        field="config",
+                        ErrorCode.PRECONDITION.value,
+                        f"managed service is {svc.status}; wait for it to become active",
+                        field="id",
                     )
-        if input.name is not None:
-            svc.name = input.name.strip()
-        if input.config is not None:
-            svc.config = dict(input.config)
-        # Re-applying config kicks the workflow back to UPDATING;
-        # the workflow loop will roll it forward to ACTIVE.
-        if svc.status == ManagedService.Status.ACTIVE:
-            svc.status = ManagedService.Status.UPDATING
-        svc.save(
-            update_fields=[
-                "name",
-                "config",
-                "status",
-                "updated_at",
-                "version",
-            ]
-        )
+                if not svc.backend_ref:
+                    return gql_failure(
+                        ErrorCode.PRECONDITION.value,
+                        "managed service has no backend resource; reprovision it instead",
+                        field="id",
+                    )
+                if svc.applied_config is None:
+                    svc.applied_config = dict(svc.config or {})
+                svc.config = incoming
+                svc.status = ManagedService.Status.UPDATING
+                svc.status_error = ""
+                svc.operation_kind = "update"
+                svc.operation_workflow_id = f"UpdateManagedServiceWorkflow-{svc.guid}"
+                svc.operation_run_id = ""
+                svc.operation_started_at = timezone.now()
+                svc.operation_completed_at = None
+                config_changed = True
+            if input.name is not None and input.name.strip() != svc.name:
+                svc.name = input.name.strip()
+                name_changed = True
+            if config_changed or name_changed:
+                svc.save()
+        if config_changed:
+            try:
+                _start_service_update(info, svc)
+            except Exception as exc:  # noqa: BLE001
+                _mark_update_enqueue_failed(svc, exc)
+                return gql_failure(
+                    ErrorCode.INTERNAL.value,
+                    "managed-service update could not be enqueued",
+                )
         return gql_success(managed_service_to_type(svc))
 
     @strawberry.field
