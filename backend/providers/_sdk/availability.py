@@ -1253,9 +1253,24 @@ MATRIX = AvailabilityMatrix(
             kind="event_stream",
             variant="managed_kafka",
             plugin_id="gcp",
-            status="planned",
-            description="Google Cloud Managed Service for Apache Kafka",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            description=(
+                "Google Managed Kafka clusters, topics, ACLs, consumer offsets, "
+                "Schema Registry, Connect clusters, and connectors"
+            ),
+            binding_envs=(
+                "EVENT_STREAM_BROKERS",
+                "EVENT_STREAM_TLS",
+                "EVENT_STREAM_AUTH_MECHANISM",
+                "EVENT_STREAM_CLIENT_CERT",
+                "EVENT_STREAM_CLIENT_KEY",
+                "EVENT_STREAM_CA_CERT",
+                "GCP_MANAGED_KAFKA_CLUSTER",
+                "GCP_MANAGED_KAFKA_BOOTSTRAP",
+                "GCP_MANAGED_KAFKA_SCHEMA_REGISTRY",
+                "SCHEMA_REGISTRY_URL",
+                "GOOGLE_CLOUD_PROJECT",
+                "GOOGLE_CLOUD_REGION",
+            ),
         ),
         ManagedServiceEntry(
             kind="faas",
