@@ -36,6 +36,7 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
             "resourceGroups/rg-platform-prod/providers/"
             "Microsoft.Communication/communicationServices/platform-prod"
         ),
+        "apim_publisher_email": "platform@example.com",
     }
     provider_config.update(provider_overrides)
     return SimpleNamespace(
@@ -79,6 +80,7 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
         ("mssql", "azure_sql_serverless", "AzureSQLDatabaseConfig"),
         ("mssql", "azure_sql_hyperscale", "AzureSQLDatabaseConfig"),
         ("mssql", "azure_sql_managed_instance", "AzureSQLManagedInstanceConfig"),
+        ("api_gateway", "api_management", "AzureAPIMConfig"),
     ],
 )
 def test_every_registered_azure_managed_service_has_runtime_config(
@@ -381,6 +383,58 @@ def test_managed_redis_controls_are_preserved() -> None:
     assert redis.secret_name_prefix == "managed-amr"
 
 
+def test_api_management_controls_are_preserved() -> None:
+    config = managed_config_for(
+        "azure",
+        _cluster(
+            apim_publisher_email="apim@example.com",
+            apim_publisher_name="Platform API",
+            apim_service_name_prefix="smd",
+            apim_allowed_skus=["StandardV2", "Premium"],
+            apim_max_capacity=6,
+            apim_allowed_policy_kinds=["backend", "cors", "managed_identity"],
+            apim_allowed_backend_host_suffixes=[".internal.example.com"],
+            apim_allowed_backend_identity_resources=["api://backend"],
+            apim_allowed_user_assigned_identity_ids=["/subscriptions/sub/resourceGroups/rg/providers/id"],
+            apim_allowed_subnet_ids=["/subscriptions/sub/resourceGroups/rg/providers/subnet"],
+            apim_allowed_custom_domain_suffixes=[".example.com"],
+            apim_allowed_key_vault_secret_prefixes=["https://vault.vault.azure.net/secrets/apim-"],
+            apim_allow_internal_network=True,
+            apim_allow_custom_domains=True,
+            apim_allow_subscriptions=True,
+            apim_allow_child_pruning=True,
+            apim_allow_adoption=True,
+            apim_deletion_protection_default=False,
+            apim_max_apis=25,
+            apim_max_routes_per_api=40,
+            apim_max_backends=15,
+            apim_max_subscriptions=5,
+        ),
+        kind="api_gateway",
+        variant="api_management",
+    )
+    assert config.publisher_email == "apim@example.com"
+    assert config.publisher_name == "Platform API"
+    assert config.service_name_prefix == "smd"
+    assert config.allowed_skus == ("StandardV2", "Premium")
+    assert config.max_capacity == 6
+    assert config.allowed_policy_kinds == ("backend", "cors", "managed_identity")
+    assert config.allowed_backend_host_suffixes == (".internal.example.com",)
+    assert config.allowed_backend_identity_resources == ("api://backend",)
+    assert config.allow_internal_network is True
+    assert config.allow_custom_domains is True
+    assert config.allow_subscriptions is True
+    assert config.allow_child_pruning is True
+    assert config.allow_adoption is True
+    assert config.deletion_protection_default is False
+    assert (config.max_apis, config.max_routes_per_api, config.max_backends, config.max_subscriptions) == (
+        25,
+        40,
+        15,
+        5,
+    )
+
+
 def test_default_variant_selects_the_richer_azure_drivers() -> None:
     blob = managed_config_for("azure", _cluster(), kind="object_store")
     bus = managed_config_for("azure", _cluster(), kind="queue")
@@ -391,6 +445,8 @@ def test_default_variant_selects_the_richer_azure_drivers() -> None:
     sql = managed_config_for("azure", _cluster(), kind="mssql")
     assert type(sql).__name__ == "AzureSQLDatabaseConfig"
     assert sql.variant == "azure_sql_database"
+    gateway = managed_config_for("azure", _cluster(), kind="api_gateway")
+    assert type(gateway).__name__ == "AzureAPIMConfig"
 
 
 @pytest.mark.parametrize(
@@ -428,6 +484,7 @@ def test_cosmos_api_requires_key_vault_at_runtime_resolution() -> None:
         ("acs_communication_resource_id", "email", "azure_acs"),
         ("mssql_managed_instance_subnet_id", "mssql", "azure_sql_managed_instance"),
         ("mssql_virtual_network_subnet_id", "mssql", "azure_sql_database"),
+        ("apim_publisher_email", "api_gateway", "api_management"),
     ],
 )
 def test_required_install_controls_fail_before_driver_construction(

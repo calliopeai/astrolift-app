@@ -2040,6 +2040,75 @@ def _azure_managed_config_for(
             secret_name_prefix=str(pc.get("managed_redis_secret_name_prefix", "astrolift-amr")),
         )
 
+    if pair == ("api_gateway", "api_management") or (kind == "api_gateway" and not variant):
+        from azure.managed.api_management import AzureAPIMConfig
+
+        publisher_email = str(pc.get("apim_publisher_email") or "")
+        if not publisher_email:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: Azure api_gateway/api_management requires "
+                "provider_config.apim_publisher_email",
+            )
+        return AzureAPIMConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            location=location,
+            publisher_email=publisher_email,
+            publisher_name=str(pc.get("apim_publisher_name", "Astrolift")),
+            service_name_prefix=str(pc.get("apim_service_name_prefix", "astrolift")),
+            allowed_skus=tuple(
+                str(value)
+                for value in pc.get(
+                    "apim_allowed_skus",
+                    ["Developer", "Basic", "Standard", "Premium"],
+                )
+            ),
+            max_capacity=int(pc.get("apim_max_capacity", 4)),
+            allowed_policy_kinds=tuple(
+                str(value) for value in pc.get("apim_allowed_policy_kinds", ["backend", "cors"])
+            ),
+            allowed_backend_host_suffixes=tuple(
+                str(value)
+                for value in pc.get(
+                    "apim_allowed_backend_host_suffixes",
+                    [".azurecontainerapps.io", ".azurewebsites.net"],
+                )
+            ),
+            allowed_backend_identity_resources=tuple(
+                str(value) for value in pc.get("apim_allowed_backend_identity_resources", [])
+            ),
+            allowed_user_assigned_identity_ids=tuple(
+                str(value) for value in pc.get("apim_allowed_user_assigned_identity_ids", [])
+            ),
+            allowed_subnet_ids=tuple(str(value) for value in pc.get("apim_allowed_subnet_ids", [])),
+            allowed_custom_domain_suffixes=tuple(
+                str(value) for value in pc.get("apim_allowed_custom_domain_suffixes", [])
+            ),
+            allowed_key_vault_secret_prefixes=tuple(
+                str(value) for value in pc.get("apim_allowed_key_vault_secret_prefixes", [])
+            ),
+            allow_internal_network=bool(pc.get("apim_allow_internal_network", False)),
+            allow_custom_domains=bool(pc.get("apim_allow_custom_domains", False)),
+            allow_subscriptions=bool(pc.get("apim_allow_subscriptions", False)),
+            allow_child_pruning=bool(pc.get("apim_allow_child_pruning", False)),
+            allow_adoption=bool(pc.get("apim_allow_adoption", False)),
+            deletion_protection_default=bool(
+                pc.get("apim_deletion_protection_default", True),
+            ),
+            max_apis=int(pc.get("apim_max_apis", 50)),
+            max_routes_per_api=int(pc.get("apim_max_routes_per_api", 100)),
+            max_backends=int(pc.get("apim_max_backends", 50)),
+            max_subscriptions=int(pc.get("apim_max_subscriptions", 25)),
+            api_endpoint=str(
+                pc.get("apim_api_endpoint", "https://management.azure.com"),
+            ),
+            request_timeout_seconds=float(pc.get("apim_request_timeout_seconds", 30)),
+            operation_timeout_seconds=float(
+                pc.get("apim_operation_timeout_seconds", 3600),
+            ),
+            poll_interval_seconds=float(pc.get("apim_poll_interval_seconds", 5)),
+        )
+
     raise ClusterObservabilityError(
         f"cluster {cluster.slug}: no Azure managed-service config builder for "
         f"kind={kind!r}, variant={variant!r}",
