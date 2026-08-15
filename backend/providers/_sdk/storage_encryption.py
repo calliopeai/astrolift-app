@@ -137,6 +137,15 @@ POLICIES: dict[tuple[str, str, str], EncryptionPolicy] = {
             "NFSv4.1 with Kerberos krb5p; NFSv3 is not encrypted in transit."
         ),
     ),
+    ("gcp", "event_bus", "eventarc"): EncryptionPolicy(
+        mode="cloud_kms",
+        cmek_supported=True,
+        cmek_required_for_compliance=("pci", "hipaa"),
+        notes=(
+            "Eventarc Advanced buses, pipelines, Google API sources, and partner channels "
+            "support CMEK. Eventarc Standard transport encryption is provider managed."
+        ),
+    ),
     ("gcp", "redis", "memorystore_valkey"): EncryptionPolicy(
         mode="cloud_kms",
         cmek_supported=True,
