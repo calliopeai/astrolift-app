@@ -29,6 +29,7 @@ Executable managed services:
 - CloudSQLServerDriver — mssql/cloudsql_sqlserver
 - SpannerGraphDriver — graph_db/spanner_graph
 - WorkflowsDriver — workflow_engine/workflows
+- CloudFunctionsDriver — faas/cloud_functions_gen2
 - APIGatewayDriver — api_gateway/api_gateway
 - ManagedKafkaDriver — event_stream/managed_kafka
 - EventarcDriver — event_bus/eventarc
@@ -50,6 +51,7 @@ from gcp.managed.email_thirdparty import GCPEmailStubDriver
 from gcp.managed.encryption_cloud_kms import CloudKMSDriver
 from gcp.managed.event_bus_eventarc import EventarcDriver
 from gcp.managed.event_stream_managed_kafka import ManagedKafkaDriver
+from gcp.managed.faas_cloud_functions import CloudFunctionsDriver
 from gcp.managed.graph_spanner import SpannerGraphDriver
 from gcp.managed.model_endpoint_vertex import VertexAIEndpointDriver
 from gcp.managed.mssql_cloudsql import CloudSQLServerDriver
@@ -105,6 +107,7 @@ PLUGIN = ProviderPlugin(
         ("mssql", "cloudsql_sqlserver"): CloudSQLServerDriver,
         ("graph_db", "spanner_graph"): SpannerGraphDriver,
         ("workflow_engine", "workflows"): WorkflowsDriver,
+        ("faas", "cloud_functions_gen2"): CloudFunctionsDriver,
         ("api_gateway", "api_gateway"): APIGatewayDriver,
         ("event_stream", "managed_kafka"): ManagedKafkaDriver,
         ("event_bus", "eventarc"): EventarcDriver,
@@ -194,6 +197,32 @@ PLUGIN = ProviderPlugin(
                 "type": "string",
                 "default": "astrolift",
                 "description": "Prefix for platform-managed Pub/Sub topics.",
+            },
+            "cloud_functions_region": {
+                "type": "string",
+                "description": "Cloud Run functions region; falls back to the cluster region.",
+            },
+            "cloud_functions_name_prefix": {
+                "type": "string",
+                "default": "astrolift",
+            },
+            "cloud_functions_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "cloud_functions_api_endpoint": {
+                "type": "string",
+                "default": "https://cloudfunctions.googleapis.com/v2",
+            },
+            "cloud_functions_operation_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 1800,
+            },
+            "cloud_functions_operation_poll_interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 5,
             },
             "api_gateway_region": {
                 "type": "string",

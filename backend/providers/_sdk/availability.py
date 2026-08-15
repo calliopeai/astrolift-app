@@ -1274,9 +1274,18 @@ MATRIX = AvailabilityMatrix(
             kind="faas",
             variant="cloud_functions_gen2",
             plugin_id="gcp",
-            status="planned",
-            description="Cloud Run functions (2nd gen)",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            description=(
+                "Cloud Run functions (2nd gen) with Cloud Build source, HTTP or Eventarc triggers, "
+                "Secret Manager, scaling, private networking, Binary Authorization, and CMEK"
+            ),
+            binding_envs=(
+                "FUNCTION_NAME",
+                "FUNCTION_URL",
+                "GCP_CLOUD_FUNCTION_NAME",
+                "GCP_CLOUD_FUNCTION_URL",
+                "GOOGLE_CLOUD_PROJECT",
+                "GOOGLE_CLOUD_REGION",
+            ),
         ),
         ManagedServiceEntry(
             kind="api_gateway",
