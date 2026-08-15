@@ -185,6 +185,65 @@ class ManagedServiceBinding(BaseCoreModel):
         ]
 
 
+class ManagedServiceVolumeBinding(BaseCoreModel):
+    """Durable, credential-free workload attachment for a filesystem."""
+
+    class SourceKind(models.TextChoices):
+        EXISTING_PVC = "existing_pvc"
+        CSI = "csi"
+
+    managed_service = models.ForeignKey(
+        "astrolift_services.ManagedService",
+        related_name="volume_bindings",
+        on_delete=models.CASCADE,
+    )
+    name = models.CharField(max_length=63)
+    mount_path = models.CharField(max_length=512)
+    sub_path = models.CharField(max_length=512, blank=True, default="")
+    source_kind = models.CharField(max_length=32, choices=SourceKind.choices)
+    protocol = models.CharField(max_length=32)
+    claim_name = models.CharField(max_length=253, blank=True, default="")
+    claim_namespace = models.CharField(max_length=253, blank=True, default="")
+    csi_driver = models.CharField(max_length=253, blank=True, default="")
+    volume_handle = models.CharField(max_length=1024, blank=True, default="")
+    volume_attributes = models.JSONField(default=dict, blank=True)
+    secret_refs = models.JSONField(default=dict, blank=True)
+    mount_options = models.JSONField(default=list, blank=True)
+    read_only = models.BooleanField(default=False)
+    capacity = models.CharField(max_length=32, default="1Gi")
+    access_modes = models.JSONField(default=list, blank=True)
+    workload_names = models.JSONField(default=list, blank=True)
+    container_names = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["managed_service", "name"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="msvc_volume_name_unique_active",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        source_kind="existing_pvc",
+                        claim_name__gt="",
+                        claim_namespace__gt="",
+                        csi_driver="",
+                        volume_handle="",
+                    )
+                    | models.Q(
+                        source_kind="csi",
+                        csi_driver__gt="",
+                        volume_handle__gt="",
+                        claim_name="",
+                        claim_namespace="",
+                    )
+                ),
+                name="msvc_volume_source_fields_valid",
+            ),
+        ]
+
+
 class ManagedServiceAttachment(BaseCoreModel):
     """Attach one project-owned service to an app env or agent recipe."""
 

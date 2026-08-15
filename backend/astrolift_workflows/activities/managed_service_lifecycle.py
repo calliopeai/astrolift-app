@@ -486,26 +486,65 @@ def _managed_binding_for(svc: Any) -> Any:
 
 
 def _sync_binding_rows(svc: Any) -> None:
-    """(Re)create ``ManagedServiceBinding`` rows from the driver's connection
-    envelope. Idempotent: clears existing rows for the service first so a
-    finalize retry doesn't duplicate them."""
-    from astrolift_services.models import ManagedServiceBinding
+    """Atomically replace the driver's environment and volume envelopes."""
+    from _sdk.managed_service import VolumeMount
+    from django.db import transaction
+
+    from astrolift_services.models import (
+        ManagedServiceBinding,
+        ManagedServiceVolumeBinding,
+    )
 
     binding = _managed_binding_for(svc)
     if binding is None:
         return
     env_vars = getattr(binding, "env_vars", {}) or {}
+    volume_mounts = list(getattr(binding, "pod_volume_mounts", ()) or ())
 
-    ManagedServiceBinding.objects.filter(managed_service=svc).delete()
-    for env_key, value_ref in env_vars.items():
-        secret_ref = getattr(value_ref, "secret_ref", None)
-        literal = getattr(value_ref, "literal", None)
-        ManagedServiceBinding.objects.create(
-            managed_service=svc,
-            env_key=env_key,
-            env_value_ref=secret_ref if secret_ref else (literal or ""),
-            is_secret=bool(secret_ref),
-        )
+    if volume_mounts and str(getattr(svc, "kind", "")) not in {"filesystem", "nfs"}:
+        raise ValueError("only filesystem managed services may emit pod volume mounts")
+
+    names: set[str] = set()
+    for volume in volume_mounts:
+        if not isinstance(volume, VolumeMount):
+            raise TypeError("managed-service pod_volume_mounts must contain VolumeMount values")
+        if volume.name in names:
+            raise ValueError(f"managed-service binding emitted duplicate volume name {volume.name!r}")
+        names.add(volume.name)
+
+    with transaction.atomic():
+        ManagedServiceBinding.objects.filter(managed_service=svc).delete()
+        ManagedServiceVolumeBinding.objects.filter(managed_service=svc).delete()
+        for env_key, value_ref in env_vars.items():
+            secret_ref = getattr(value_ref, "secret_ref", None)
+            literal = getattr(value_ref, "literal", None)
+            ManagedServiceBinding.objects.create(
+                managed_service=svc,
+                env_key=env_key,
+                env_value_ref=secret_ref if secret_ref else (literal or ""),
+                is_secret=bool(secret_ref),
+            )
+        for volume in volume_mounts:
+            ManagedServiceVolumeBinding.objects.create(
+                managed_service=svc,
+                name=volume.name,
+                mount_path=volume.mount_path,
+                sub_path=volume.sub_path or "",
+                source_kind=str(volume.source_kind),
+                protocol=volume.protocol,
+                claim_name=volume.claim_name,
+                claim_namespace=volume.claim_namespace,
+                csi_driver=volume.csi_driver,
+                volume_handle=volume.volume_handle,
+                volume_attributes=dict(volume.volume_attributes),
+                secret_refs=dict(volume.secret_refs),
+                mount_options=list(volume.mount_options),
+                read_only=volume.read_only,
+                capacity=volume.capacity,
+                access_modes=list(volume.access_modes),
+                workload_names=list(volume.workload_names),
+                container_names=list(volume.container_names),
+            )
 
 
 @activity.defn(name="astrolift.managed_service.finalize_provision")
