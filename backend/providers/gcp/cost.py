@@ -68,6 +68,13 @@ SERVICE_ID_BY_VARIANT: dict[tuple[str, str], str] = {
     ("compute", "node_hour"): "6F81-5844-456A",  # Compute Engine
 }
 
+# Newer Google services can ship before their immutable Cloud Billing service
+# ID is published in product documentation. Resolve those ids from the same
+# authoritative Catalog API instead of hard-coding a guessed identifier.
+SERVICE_DISPLAY_NAME_BY_VARIANT: dict[tuple[str, str], str] = {
+    ("event_stream", "managed_kafka"): "Managed Service for Apache Kafka",
+}
+
 CATALOG_BASE = "https://cloudbilling.googleapis.com/v1/services"
 
 
@@ -98,16 +105,41 @@ class GCPCostEstimator(CostEstimator):
         # should share one fetch.
         self._sku_cache: dict[str, tuple[float, list[Any]]] = {}
         self._sku_lock = threading.Lock()
+        self._service_id_cache: dict[tuple[str, str], str] = {}
 
     @driver_op(cloud="gcp", driver="cost", heartbeat=False)
     def supported(self, *, kind: str, variant: str) -> bool:
-        return (kind, variant) in SERVICE_ID_BY_VARIANT
+        pair = (kind, variant)
+        return pair in SERVICE_ID_BY_VARIANT or pair in SERVICE_DISPLAY_NAME_BY_VARIANT
 
     @driver_op(cloud="gcp", driver="cost")
     def estimate(self, request: CostEstimateRequest) -> CostResult:
-        service_id = SERVICE_ID_BY_VARIANT.get(
-            (request.kind, request.variant),
-        )
+        pair = (request.kind, request.variant)
+        service_id = SERVICE_ID_BY_VARIANT.get(pair) or self._service_id_cache.get(pair)
+        if service_id is None and pair in SERVICE_DISPLAY_NAME_BY_VARIANT:
+            display_name = SERVICE_DISPLAY_NAME_BY_VARIANT[pair]
+            try:
+                service_id = next(
+                    (
+                        str(getattr(service, "name", "") or "").rsplit("/", 1)[-1]
+                        for service in self._client.list_services()
+                        if str(getattr(service, "display_name", "") or "") == display_name
+                    ),
+                    "",
+                )
+            except Exception as exc:
+                return CostEstimateUnavailable(
+                    request=request,
+                    reason="api_error",
+                    message=f"Catalog service lookup failed: {exc}",
+                )
+            if not service_id:
+                return CostEstimateUnavailable(
+                    request=request,
+                    reason="service_not_found",
+                    message=f"Cloud Billing Catalog has no service named {display_name!r}",
+                )
+            self._service_id_cache[pair] = service_id
         if service_id is None:
             return CostEstimateUnavailable(
                 request=request,
