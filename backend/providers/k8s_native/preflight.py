@@ -153,6 +153,20 @@ REQUIREMENTS: dict[tuple[str, str], OperatorRequirement] = {
             "releases/download/v1.5.0/standard-install.yaml; then install a conformant GatewayClass controller"
         ),
     ),
+    ("event_bus", "knative_eventing"): OperatorRequirement(
+        operator_id="knative-eventing",
+        display_name="Knative Eventing",
+        required_crds=(
+            "brokers.eventing.knative.dev",
+            "triggers.eventing.knative.dev",
+        ),
+        install_hint=(
+            "helm repo add knative-operator https://knative.github.io/operator && "
+            "helm install knative-operator knative-operator/knative-operator "
+            "--namespace knative-operator --create-namespace; then create an "
+            "operator.knative.dev/v1beta1 KnativeEventing resource"
+        ),
+    ),
     ("filesystem", "nfs_csi"): OperatorRequirement(
         operator_id="nfs-csi",
         display_name="NFS CSI Driver",

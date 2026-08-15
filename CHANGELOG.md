@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add preview Knative Eventing brokers for Kubernetes installs with
+  declarative Triggers, CloudEvents ingress bindings, delivery and dead-letter
+  policy, broker-class and destination guardrails, live readiness, explicit
+  adoption and ownership-safe Trigger pruning and teardown.
 - Add preview Kubernetes Gateway API 1.5 managed gateways with complete
   listener, address, infrastructure, HTTP, gRPC, TLS, TCP, and UDP route
   shapes; Backend TLS policies and ListenerSets; live Programmed and route

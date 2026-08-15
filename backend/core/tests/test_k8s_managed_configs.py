@@ -44,6 +44,7 @@ def _cluster(**provider_overrides):
         "knative_namespace": "functions-system",
         "gateway_api_namespace": "gateway-system",
         "gateway_api_class_name": "envoy-gateway",
+        "knative_eventing_namespace": "eventing-system",
         "seaweed_namespace": "storage-system",
         "seaweed_cluster_name": "shared-store",
         "seaweed_s3_endpoint": "https://objects.example.test",
@@ -175,6 +176,48 @@ def test_gateway_api_config_preserves_install_security_policy(monkeypatch) -> No
     assert config.allow_listener_sets is True
 
 
+def test_knative_eventing_config_preserves_install_security_policy(monkeypatch) -> None:
+    cluster_driver = object()
+    monkeypatch.setattr("core.cluster_observability._driver_for_cluster", lambda _cluster: cluster_driver)
+
+    config = managed_config_for(
+        "k8s_native",
+        _cluster(
+            knative_eventing_broker_class="Kafka",
+            knative_eventing_broker_config={
+                "apiVersion": "v1",
+                "kind": "ConfigMap",
+                "name": "kafka-broker-config",
+                "namespace": "knative-eventing",
+            },
+            knative_eventing_allow_class_override=True,
+            knative_eventing_allow_config_override=True,
+            knative_eventing_allow_external_subscribers=True,
+            knative_eventing_allow_cross_namespace_subscribers=True,
+            knative_eventing_allow_alpha_delivery_fields=True,
+            knative_eventing_allowed_broker_classes=["Kafka"],
+        ),
+        kind="event_bus",
+        variant="knative_eventing",
+    )
+
+    assert config.cluster_driver is cluster_driver
+    assert config.namespace == "eventing-system"
+    assert config.broker_class == "Kafka"
+    assert config.broker_config == {
+        "apiVersion": "v1",
+        "kind": "ConfigMap",
+        "name": "kafka-broker-config",
+        "namespace": "knative-eventing",
+    }
+    assert config.allow_class_override is True
+    assert config.allow_config_override is True
+    assert config.allow_external_subscribers is True
+    assert config.allow_cross_namespace_subscribers is True
+    assert config.allow_alpha_delivery_fields is True
+    assert config.allowed_broker_classes == ("Kafka",)
+
+
 def test_unknown_k8s_managed_pair_fails_closed(monkeypatch) -> None:
     monkeypatch.setattr("core.cluster_observability._driver_for_cluster", lambda _cluster: object())
 
@@ -221,6 +264,15 @@ def test_k8s_operator_defaults_are_exposed_in_provider_schema() -> None:
         "gateway_api_allow_extension_refs",
         "gateway_api_allow_experimental_routes",
         "gateway_api_allow_listener_sets",
+        "knative_eventing_namespace",
+        "knative_eventing_broker_class",
+        "knative_eventing_broker_config",
+        "knative_eventing_allow_class_override",
+        "knative_eventing_allow_config_override",
+        "knative_eventing_allow_external_subscribers",
+        "knative_eventing_allow_cross_namespace_subscribers",
+        "knative_eventing_allow_alpha_delivery_fields",
+        "knative_eventing_allowed_broker_classes",
         "seaweed_namespace",
         "seaweed_cluster_name",
         "seaweed_s3_endpoint",

@@ -912,6 +912,45 @@ def _k8s_managed_config_for(
             ),
             allow_listener_sets=bool(pc.get("gateway_api_allow_listener_sets", False)),
         )
+    if pair == ("event_bus", "knative_eventing"):
+        from k8s_native.managed.event_bus_knative import KnativeEventingConfig
+
+        allowed_classes = pc.get(
+            "knative_eventing_allowed_broker_classes",
+            [
+                "MTChannelBasedBroker",
+                "ChannelBasedBroker",
+                "Kafka",
+                "RabbitMQBroker",
+            ],
+        )
+        return KnativeEventingConfig(
+            cluster_driver=cluster_driver,
+            namespace=_optional_string(pc.get("knative_eventing_namespace")),
+            broker_class=str(
+                pc.get("knative_eventing_broker_class", "MTChannelBasedBroker"),
+            ),
+            broker_config=pc.get("knative_eventing_broker_config"),
+            allow_class_override=bool(
+                pc.get("knative_eventing_allow_class_override", False),
+            ),
+            allow_config_override=bool(
+                pc.get("knative_eventing_allow_config_override", False),
+            ),
+            allow_external_subscribers=bool(
+                pc.get("knative_eventing_allow_external_subscribers", False),
+            ),
+            allow_cross_namespace_subscribers=bool(
+                pc.get(
+                    "knative_eventing_allow_cross_namespace_subscribers",
+                    False,
+                ),
+            ),
+            allow_alpha_delivery_fields=bool(
+                pc.get("knative_eventing_allow_alpha_delivery_fields", False),
+            ),
+            allowed_broker_classes=tuple(str(value) for value in allowed_classes),
+        )
     if pair == ("object_store", "seaweedfs_operator"):
         from k8s_native.managed.object_store_seaweedfs import SeaweedFSObjectStoreConfig
 
