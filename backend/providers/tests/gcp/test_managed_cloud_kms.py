@@ -540,6 +540,7 @@ def test_registration_catalog_cost_and_runtime_config_are_wired() -> None:
         ("model_endpoint", "vertex_ai", "VertexAIEndpointConfig"),
         ("encryption_key", "cloud_kms", "CloudKMSConfig"),
         ("faas", "cloud_functions_gen2", "CloudFunctionsConfig"),
+        ("event_stream", "managed_kafka", "ManagedKafkaConfig"),
         ("event_bus", "eventarc", "EventarcConfig"),
     ],
 )
@@ -559,6 +560,39 @@ def test_every_executable_gcp_driver_has_a_runtime_config(
     config = managed_config_for("gcp", cluster, kind=kind, variant=variant)
     assert type(config).__name__ == class_name
     assert config.project_id == "acme-prod"
+
+
+def test_managed_kafka_runtime_config_preserves_operator_controls() -> None:
+    from core.cluster_observability import managed_config_for
+
+    from gcp.managed.event_stream_managed_kafka import ManagedKafkaConfig
+
+    cluster = SimpleNamespace(
+        slug="gcp-prod",
+        region="us-central1",
+        provider_config={
+            "project_id": "acme-prod",
+            "managed_kafka_location": "us-east1",
+            "managed_kafka_cluster_id_prefix": "events",
+            "managed_kafka_subnet_names": ["subnet-a", "subnet-b"],
+            "managed_kafka_deletion_protection_default": False,
+            "managed_kafka_api_endpoint": "https://kafka.example.test/v1",
+            "managed_kafka_operation_timeout_seconds": 321,
+            "managed_kafka_operation_poll_interval_seconds": 0.25,
+        },
+        auth_config={},
+    )
+
+    assert managed_config_for("gcp", cluster, kind="event_stream", variant="managed_kafka") == ManagedKafkaConfig(
+        project_id="acme-prod",
+        location="us-east1",
+        cluster_id_prefix="events",
+        subnet_names=("subnet-a", "subnet-b"),
+        api_endpoint="https://kafka.example.test/v1",
+        deletion_protection_default=False,
+        operation_timeout_seconds=321,
+        poll_interval_seconds=0.25,
+    )
 
 
 def test_eventarc_runtime_config_preserves_all_operator_controls() -> None:

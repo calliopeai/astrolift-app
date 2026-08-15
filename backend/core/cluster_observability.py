@@ -358,6 +358,28 @@ def _gcp_managed_config_for(
             ),
         )
 
+    if pair == ("event_stream", "managed_kafka") or (kind == "event_stream" and not variant):
+        from gcp.managed.event_stream_managed_kafka import ManagedKafkaConfig
+
+        return ManagedKafkaConfig(
+            project_id=project_id,
+            location=str(pc.get("managed_kafka_location") or region),
+            cluster_id_prefix=str(pc.get("managed_kafka_cluster_id_prefix", "astrolift")),
+            subnet_names=tuple(str(item) for item in pc.get("managed_kafka_subnet_names", ())),
+            api_endpoint=str(
+                pc.get("managed_kafka_api_endpoint", "https://managedkafka.googleapis.com/v1"),
+            ),
+            deletion_protection_default=bool(
+                pc.get("managed_kafka_deletion_protection_default", True),
+            ),
+            operation_timeout_seconds=float(
+                pc.get("managed_kafka_operation_timeout_seconds", 1800),
+            ),
+            poll_interval_seconds=float(
+                pc.get("managed_kafka_operation_poll_interval_seconds", 5),
+            ),
+        )
+
     if pair == ("event_bus", "eventarc") or (kind == "event_bus" and not variant):
         from gcp.managed.event_bus_eventarc import EventarcConfig
 
