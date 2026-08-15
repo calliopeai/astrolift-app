@@ -53,6 +53,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from azure.secrets_keyvault import key_vault_secret_ref
 
 KIND = "kv_store"
 
@@ -540,10 +541,10 @@ class AzureCosmosDriver(ManagedServiceDriver):
                 "COSMOS_ENDPOINT": ValueRef(literal=endpoint),
                 "COSMOS_DATABASE_NAME": ValueRef(literal=database_name),
                 "COSMOS_CONNECTION_STRING": ValueRef(
-                    secret_ref=primary_conn,
+                    secret_ref=key_vault_secret_ref(self._config.keyvault_url, primary_conn),
                 ),
                 "COSMOS_READONLY_CONNECTION_STRING": ValueRef(
-                    secret_ref=readonly_conn,
+                    secret_ref=key_vault_secret_ref(self._config.keyvault_url, readonly_conn),
                 ),
             },
             iam_grants=[

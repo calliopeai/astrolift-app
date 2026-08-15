@@ -662,6 +662,7 @@ def test_binding_returns_connection_envelope(
         assert key in env
     assert env["MODEL_ENDPOINT_PROVIDER"].literal == "azure_openai"
     assert env["AZURE_OPENAI_API_KEY"].secret_ref is not None
+    assert env["AZURE_OPENAI_API_KEY"].secret_ref.startswith("azure-kv://kv.vault.azure.net/secrets/")
     assert env["AZURE_OPENAI_API_KEY"].literal is None
     assert env["AZURE_OPENAI_ENDPOINT"].literal.endswith(
         ".openai.azure.com",

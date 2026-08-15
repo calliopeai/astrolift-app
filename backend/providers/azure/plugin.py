@@ -19,6 +19,7 @@ Managed services:
 - AzureServiceBusDriver — queue/azure_servicebus
 - AzureEventGridDriver — event_bus/event_grid
 - AzureEventGridNamespaceDriver — event_bus/event_grid_namespace
+- AzureFilesDriver — filesystem/azure_files
 - AzurePostgresFlexibleDriver — postgres/azure_pg_flex
 - AzureMySQLFlexibleDriver — mysql/azure_mysql_flex
 - AzureCacheRedisDriver — redis/azure_cache_redis
@@ -40,6 +41,7 @@ from azure.managed.cosmos import AzureCosmosDriver
 from azure.managed.email_acs import AzureCommunicationEmailDriver
 from azure.managed.event_grid import AzureEventGridDriver
 from azure.managed.event_grid_namespace import AzureEventGridNamespaceDriver
+from azure.managed.filesystem_files import AzureFilesDriver
 from azure.managed.model_endpoint_aoai import AzureOpenAIDriver
 from azure.managed.mysql_flexible import AzureMySQLFlexibleDriver
 from azure.managed.object_store_blob import (
@@ -90,6 +92,21 @@ _MANAGED_CONFIG_PROPERTIES = {
         "maximum": 40,
         "default": 1,
     },
+    "files_name_prefix": {"type": "string", "default": "astrolift-files"},
+    "files_default_storage_gib": {"type": "integer", "minimum": 32, "maximum": 262144, "default": 32},
+    "files_default_redundancy": {
+        "type": "string",
+        "enum": ["Local", "Zone"],
+        "default": "Local",
+    },
+    "files_default_root_squash": {
+        "type": "string",
+        "enum": ["NoRootSquash", "RootSquash", "AllSquash"],
+        "default": "RootSquash",
+    },
+    "files_encryption_in_transit_required_default": {"type": "boolean", "default": True},
+    "files_allowed_subnet_ids": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "files_deletion_protection_default": {"type": "boolean", "default": True},
     "postgres_server_name_prefix": {"type": "string", "default": "astrolift"},
     "postgres_engine_version": {"type": "string", "default": "16"},
     "postgres_backup_retention_days": {"type": "integer", "minimum": 1, "maximum": 35, "default": 7},
@@ -200,6 +217,7 @@ PLUGIN = ProviderPlugin(
         ("queue", "azure_servicebus"): AzureServiceBusDriver,
         ("event_bus", "event_grid"): AzureEventGridDriver,
         ("event_bus", "event_grid_namespace"): AzureEventGridNamespaceDriver,
+        ("filesystem", "azure_files"): AzureFilesDriver,
         ("kv_store", "cosmos"): AzureCosmosDriver,
         ("search", "azure_ai_search_fulltext"): AzureAISearchFullTextDriver,
         ("vector_index", "azure_ai_search_vector"): AzureAISearchVectorDriver,
@@ -236,9 +254,22 @@ PLUGIN = ProviderPlugin(
                 "type": "string",
                 "description": ("ACR registry name (without .azurecr.io suffix)."),
             },
+            "acr_sku": {
+                "type": "string",
+                "enum": ["Basic", "Standard", "Premium"],
+                "default": "Standard",
+            },
+            "acr_admin_enabled": {"type": "boolean", "default": False},
+            "acr_immutable_tags": {"type": "boolean", "default": True},
             "vault_url": {
                 "type": "string",
                 "description": ("Key Vault URL (https://<name>.vault.azure.net)."),
+            },
+            "keyvault_secret_name_prefix": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9-]{1,100}$",
+                "default": "astrolift",
+                "description": "Namespace prefix for logical secret-bundle paths.",
             },
             "storage_account": {
                 "type": "string",
@@ -261,6 +292,22 @@ PLUGIN = ProviderPlugin(
             "akv_secret_id_for_tls": {
                 "type": "string",
                 "description": ("Key Vault secret ID for the TLS cert (PFX). AGIC reads this via SSL profile."),
+            },
+            "managed_cert_name_prefix": {
+                "type": "string",
+                "default": "astrolift",
+            },
+            "notification_hubs_namespace": {"type": "string"},
+            "notification_hub_name": {"type": "string"},
+            "notification_hubs_api_version": {
+                "type": "string",
+                "default": "2020-06",
+            },
+            "notification_hubs_timeout_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 120,
+                "default": 10,
             },
         },
     },
