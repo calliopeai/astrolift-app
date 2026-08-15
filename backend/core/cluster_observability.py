@@ -119,8 +119,10 @@ def namespace_for_app(app: Any) -> str:
     explicit = (getattr(app, "k8s_namespace", "") or "").strip()
     if explicit:
         return explicit
+    from _sdk.k8s_naming import app_namespace
+
     org_slug = getattr(getattr(app, "organization", None), "slug", "") or ""
-    return f"{org_slug}-{app.slug}"
+    return app_namespace(organization_slug=org_slug, app_slug=str(app.slug))
 
 
 def _auth_for_cluster(cluster: TenantCluster) -> Any:
@@ -867,6 +869,250 @@ def _k8s_managed_config_for(
             namespace=_optional_string(pc.get("rabbitmq_namespace")),
             cluster_driver=cluster_driver,
         )
+    if pair == ("faas", "knative_service"):
+        from k8s_native.managed.faas_knative import KnativeServiceConfig
+
+        return KnativeServiceConfig(
+            cluster_driver=cluster_driver,
+            namespace=_optional_string(pc.get("knative_namespace")),
+            allow_public=bool(pc.get("knative_allow_public", False)),
+            allow_tagged_images=bool(pc.get("knative_allow_tagged_images", False)),
+            allow_unsafe_pod_spec=bool(
+                pc.get("knative_allow_unsafe_pod_spec", False),
+            ),
+            default_port=int(pc.get("knative_default_port", 8080)),
+            default_timeout_seconds=int(
+                pc.get("knative_default_timeout_seconds", 300),
+            ),
+            default_container_concurrency=int(
+                pc.get("knative_default_container_concurrency", 0),
+            ),
+        )
+    if pair == ("api_gateway", "gateway_api"):
+        from k8s_native.managed.api_gateway import GatewayAPIConfig
+
+        return GatewayAPIConfig(
+            cluster_driver=cluster_driver,
+            namespace=_optional_string(pc.get("gateway_api_namespace")),
+            gateway_class_name=str(pc.get("gateway_api_class_name", "")),
+            allow_class_override=bool(pc.get("gateway_api_allow_class_override", False)),
+            allow_cross_namespace_routes=bool(
+                pc.get("gateway_api_allow_cross_namespace_routes", False),
+            ),
+            allow_cross_namespace_backends=bool(
+                pc.get("gateway_api_allow_cross_namespace_backends", False),
+            ),
+            allow_cross_namespace_certificates=bool(
+                pc.get("gateway_api_allow_cross_namespace_certificates", False),
+            ),
+            allow_custom_backends=bool(pc.get("gateway_api_allow_custom_backends", False)),
+            allow_extension_refs=bool(pc.get("gateway_api_allow_extension_refs", False)),
+            allow_experimental_routes=bool(
+                pc.get("gateway_api_allow_experimental_routes", False),
+            ),
+            allow_listener_sets=bool(pc.get("gateway_api_allow_listener_sets", False)),
+        )
+    if pair == ("event_bus", "knative_eventing"):
+        from k8s_native.managed.event_bus_knative import KnativeEventingConfig
+
+        allowed_classes = pc.get(
+            "knative_eventing_allowed_broker_classes",
+            [
+                "MTChannelBasedBroker",
+                "ChannelBasedBroker",
+                "Kafka",
+                "RabbitMQBroker",
+            ],
+        )
+        return KnativeEventingConfig(
+            cluster_driver=cluster_driver,
+            namespace=_optional_string(pc.get("knative_eventing_namespace")),
+            broker_class=str(
+                pc.get("knative_eventing_broker_class", "MTChannelBasedBroker"),
+            ),
+            broker_config=pc.get("knative_eventing_broker_config"),
+            allow_class_override=bool(
+                pc.get("knative_eventing_allow_class_override", False),
+            ),
+            allow_config_override=bool(
+                pc.get("knative_eventing_allow_config_override", False),
+            ),
+            allow_external_subscribers=bool(
+                pc.get("knative_eventing_allow_external_subscribers", False),
+            ),
+            allow_cross_namespace_subscribers=bool(
+                pc.get(
+                    "knative_eventing_allow_cross_namespace_subscribers",
+                    False,
+                ),
+            ),
+            allow_alpha_delivery_fields=bool(
+                pc.get("knative_eventing_allow_alpha_delivery_fields", False),
+            ),
+            allowed_broker_classes=tuple(str(value) for value in allowed_classes),
+        )
+    if pair == ("workflow_engine", "argo_workflows"):
+        from k8s_native.managed.workflow_argo import ArgoWorkflowsConfig
+
+        return ArgoWorkflowsConfig(
+            cluster_driver=cluster_driver,
+            namespace=_optional_string(pc.get("argo_workflows_namespace")),
+            watch_all_namespaces=bool(
+                pc.get("argo_workflows_watch_all_namespaces", True),
+            ),
+            managed_namespaces=tuple(str(value) for value in pc.get("argo_workflows_managed_namespaces", [])),
+            argo_server_url=str(pc.get("argo_workflows_server_url", "")),
+            service_account_name=str(
+                pc.get("argo_workflows_service_account_name", "argo-workflow"),
+            ),
+            allow_service_account_override=bool(
+                pc.get("argo_workflows_allow_service_account_override", False),
+            ),
+            allowed_service_accounts=tuple(
+                str(value) for value in pc.get("argo_workflows_allowed_service_accounts", [])
+            ),
+            allow_workflow_template_refs=bool(
+                pc.get("argo_workflows_allow_workflow_template_refs", False),
+            ),
+            allow_cluster_template_refs=bool(
+                pc.get("argo_workflows_allow_cluster_template_refs", False),
+            ),
+            trusted_workflow_template_uids={
+                str(key): str(value)
+                for key, value in dict(
+                    pc.get("argo_workflows_trusted_template_uids", {}),
+                ).items()
+            },
+            allow_resource_templates=bool(
+                pc.get("argo_workflows_allow_resource_templates", False),
+            ),
+            allow_executor_plugins=bool(
+                pc.get("argo_workflows_allow_executor_plugins", False),
+            ),
+            allow_external_http_templates=bool(
+                pc.get("argo_workflows_allow_external_http_templates", False),
+            ),
+            allow_host_access=bool(
+                pc.get("argo_workflows_allow_host_access", False),
+            ),
+            allow_privileged_pods=bool(
+                pc.get("argo_workflows_allow_privileged_pods", False),
+            ),
+            allow_pod_spec_patch=bool(
+                pc.get("argo_workflows_allow_pod_spec_patch", False),
+            ),
+            allow_tagged_images=bool(
+                pc.get("argo_workflows_allow_tagged_images", False),
+            ),
+            allowed_image_prefixes=tuple(
+                str(value) for value in pc.get("argo_workflows_allowed_image_prefixes", [])
+            ),
+            default_parallelism=int(
+                pc.get("argo_workflows_default_parallelism", 10),
+            ),
+            max_parallelism=int(pc.get("argo_workflows_max_parallelism", 50)),
+            default_active_deadline_seconds=int(
+                pc.get("argo_workflows_default_active_deadline_seconds", 3600),
+            ),
+            max_active_deadline_seconds=int(
+                pc.get("argo_workflows_max_active_deadline_seconds", 86400),
+            ),
+            default_ttl_seconds=int(
+                pc.get("argo_workflows_default_ttl_seconds", 86400),
+            ),
+            max_ttl_seconds=int(
+                pc.get("argo_workflows_max_ttl_seconds", 604800),
+            ),
+        )
+    if pair == ("model_endpoint", "kserve"):
+        from k8s_native.managed.model_endpoint_kserve import KServeConfig
+
+        return KServeConfig(
+            cluster_driver=cluster_driver,
+            namespace=_optional_string(pc.get("kserve_namespace")),
+            default_deployment_mode=str(
+                pc.get("kserve_default_deployment_mode", "Standard"),
+            ),
+            allowed_deployment_modes=tuple(
+                str(value) for value in pc.get("kserve_allowed_deployment_modes", ["Standard"])
+            ),
+            service_account_name=str(pc.get("kserve_service_account_name", "kserve-model")),
+            allow_service_account_override=bool(
+                pc.get("kserve_allow_service_account_override", False),
+            ),
+            allowed_service_accounts=tuple(
+                str(value) for value in pc.get("kserve_allowed_service_accounts", [])
+            ),
+            allow_service_account_token=bool(
+                pc.get("kserve_allow_service_account_token", False),
+            ),
+            allow_public=bool(pc.get("kserve_allow_public", False)),
+            allow_writable_storage=bool(pc.get("kserve_allow_writable_storage", False)),
+            allow_custom_containers=bool(pc.get("kserve_allow_custom_containers", False)),
+            allow_tagged_images=bool(pc.get("kserve_allow_tagged_images", False)),
+            allowed_image_prefixes=tuple(str(value) for value in pc.get("kserve_allowed_image_prefixes", [])),
+            allowed_storage_uri_schemes=tuple(
+                str(value)
+                for value in pc.get(
+                    "kserve_allowed_storage_uri_schemes",
+                    ["s3", "gs", "hf", "pvc", "oci", "oci+native"],
+                )
+            ),
+            allow_external_storage_urls=bool(
+                pc.get("kserve_allow_external_storage_urls", False),
+            ),
+            allowed_external_storage_hosts=tuple(
+                str(value) for value in pc.get("kserve_allowed_external_storage_hosts", [])
+            ),
+            allow_external_logger_urls=bool(
+                pc.get("kserve_allow_external_logger_urls", False),
+            ),
+            allowed_external_logger_hosts=tuple(
+                str(value) for value in pc.get("kserve_allowed_external_logger_hosts", [])
+            ),
+            allow_privileged_pods=bool(pc.get("kserve_allow_privileged_pods", False)),
+            allow_host_access=bool(pc.get("kserve_allow_host_access", False)),
+            allow_local_model_cache=bool(pc.get("kserve_allow_local_model_cache", False)),
+            allowed_model_formats=tuple(str(value) for value in pc.get("kserve_allowed_model_formats", [])),
+            allowed_serving_runtimes=tuple(
+                str(value) for value in pc.get("kserve_allowed_serving_runtimes", [])
+            ),
+            allowed_autoscaler_classes=tuple(
+                str(value) for value in pc.get("kserve_allowed_autoscaler_classes", ["hpa", "none"])
+            ),
+            max_replicas=int(pc.get("kserve_max_replicas", 100)),
+        )
+    if pair == ("object_store", "s3_compatible_existing"):
+        from k8s_native.managed.object_store_existing_s3 import ExistingS3Config
+
+        from core.app_deploy import AppDeployError, driver_for_capability
+
+        try:
+            secrets_backend = driver_for_capability(cluster, "secrets")
+        except AppDeployError as exc:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: cannot resolve the secrets backend required by existing S3 adoption: {exc}",
+            ) from exc
+        return ExistingS3Config(
+            cluster_driver=cluster_driver,
+            secrets_backend=secrets_backend,
+            namespace=_optional_string(pc.get("s3_existing_namespace")),
+            allowed_endpoint_hosts=tuple(
+                str(value) for value in pc.get("s3_existing_allowed_endpoint_hosts", [])
+            ),
+            allowed_credential_path_prefixes=tuple(
+                str(value)
+                for value in pc.get(
+                    "s3_existing_allowed_credential_path_prefixes",
+                    ["managed/object_store/{organization}"],
+                )
+            ),
+            allow_insecure_http=bool(pc.get("s3_existing_allow_insecure_http", False)),
+            allow_skip_tls_verify=bool(
+                pc.get("s3_existing_allow_skip_tls_verify", False),
+            ),
+            allow_endpoint_paths=bool(pc.get("s3_existing_allow_endpoint_paths", False)),
+        )
     if pair == ("object_store", "seaweedfs_operator"):
         from k8s_native.managed.object_store_seaweedfs import SeaweedFSObjectStoreConfig
 
@@ -923,6 +1169,50 @@ def _k8s_managed_config_for(
                 pc.get("mssql_allow_crash_consistent_snapshots", False),
             ),
             deletion_timeout_seconds=float(pc.get("mssql_deletion_timeout_seconds", 120)),
+        )
+    if pair in {
+        ("search", "opensearch_operator"),
+        ("vector_index", "opensearch_operator_vector"),
+    }:
+        from k8s_native.managed.opensearch_operator import (
+            CURRENT_API_VERSION,
+            DEFAULT_BOOTSTRAP_IMAGE,
+            DEFAULT_IMAGE,
+            DEFAULT_VERSION,
+            OpenSearchOperatorConfig,
+        )
+
+        from core.app_deploy import AppDeployError, driver_for_capability
+
+        try:
+            secrets_backend = driver_for_capability(cluster, "secrets")
+        except AppDeployError as exc:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: cannot resolve the secrets backend required by OpenSearch: {exc}",
+            ) from exc
+        return OpenSearchOperatorConfig(
+            cluster_driver=cluster_driver,
+            secrets_backend=secrets_backend,
+            namespace=_optional_string(pc.get("opensearch_namespace")),
+            storage_class_name=str(pc.get("opensearch_storage_class_name", "")),
+            api_version=str(pc.get("opensearch_api_version", CURRENT_API_VERSION)),
+            operator_namespace=str(pc.get("opensearch_operator_namespace", "opensearch-operator-system")),
+            version=str(pc.get("opensearch_version", DEFAULT_VERSION)),
+            image=str(pc.get("opensearch_image", DEFAULT_IMAGE)),
+            bootstrap_image=str(pc.get("opensearch_bootstrap_image", DEFAULT_BOOTSTRAP_IMAGE)),
+            credential_path_prefix=str(pc.get("opensearch_credential_path_prefix", "managed/opensearch")),
+            allow_custom_versions=bool(pc.get("opensearch_allow_custom_versions", False)),
+            allow_custom_images=bool(pc.get("opensearch_allow_custom_images", False)),
+            allow_custom_bootstrap_images=bool(pc.get("opensearch_allow_custom_bootstrap_images", False)),
+            allow_custom_plugins=bool(pc.get("opensearch_allow_custom_plugins", False)),
+            allow_single_node=bool(pc.get("opensearch_allow_single_node", False)),
+            allow_network_policy_disable=bool(pc.get("opensearch_allow_network_policy_disable", False)),
+            http_tls_secret_name=str(pc.get("opensearch_http_tls_secret_name", "")),
+            http_tls_ca_secret_name=str(pc.get("opensearch_http_tls_ca_secret_name", "")),
+            http_tls_admin_secret_name=str(pc.get("opensearch_http_tls_admin_secret_name", "")),
+            http_tls_admin_dns=tuple(str(value) for value in pc.get("opensearch_http_tls_admin_dns", [])),
+            http_tls_verify=bool(pc.get("opensearch_http_tls_verify", False)),
+            deletion_timeout_seconds=float(pc.get("opensearch_deletion_timeout_seconds", 180)),
         )
     if pair in {
         ("filesystem", "nfs_csi"),

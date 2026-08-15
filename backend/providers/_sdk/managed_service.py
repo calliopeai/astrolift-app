@@ -68,6 +68,9 @@ class UpdateResult:
     handle: str
     message: str
     errors: list[str] = field(default_factory=list)
+    retryable: bool = True
+    """Provider failures are retryable by default for compatibility with
+    existing drivers. Permanent validation/safety refusals opt out."""
 
 
 @dataclass(frozen=True)

@@ -468,7 +468,9 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
 
     manifest, app, env, d, env_from = await sync_to_async(_gather)()
 
-    namespace = app.k8s_namespace or f"{app.organization.slug}-{app.slug}"
+    from core.app_deploy import namespace_for_app
+
+    namespace = namespace_for_app(app)
     resources = _render(
         manifest,
         app_slug=app.slug,

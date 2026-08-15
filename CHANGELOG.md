@@ -4,6 +4,42 @@
 
 ### Added
 
+- Add preview adoption of existing S3-compatible buckets on Kubernetes with
+  project-scoped ownership records, org-scoped external credential bundles,
+  portable S3 bindings, endpoint/TLS/path policy gates, safe update/unlink,
+  and explicit retention of the external bucket, objects, and credentials.
+- Add preview KServe 0.20 model endpoints for Kubernetes installs with the
+  complete native InferenceService predictor, transformer, explainer, model,
+  canary, accelerator, scheduling, scaling, and storage surface; Standard-mode
+  private/read-only defaults; portable REST and gRPC bindings; managed runtime
+  identity; exact-UID adoption; protected teardown; and install-level policy
+  gates for exposure, images, runtimes, storage, logging, tokens, pod security,
+  caches, deployment modes, autoscalers, and replica limits.
+- Add preview Argo Workflows 4.1 WorkflowTemplate resources for Kubernetes
+  installs with native DAG/step/template specs, managed CronWorkflows and event
+  bindings, least-privilege executor bootstrap, bounded parallelism/deadlines,
+  portable submit bindings, UID-pinned modular references, declarative
+  snapshots, run-retaining teardown, ownership-safe pruning, and install-policy
+  security gates.
+- Add preview Knative Eventing brokers for Kubernetes installs with
+  declarative Triggers, CloudEvents ingress bindings, delivery and dead-letter
+  policy, broker-class and destination guardrails, live readiness, explicit
+  adoption and ownership-safe Trigger pruning and teardown.
+- Add preview Kubernetes Gateway API 1.5 managed gateways with complete
+  listener, address, infrastructure, HTTP, gRPC, TLS, TCP, and UDP route
+  shapes; Backend TLS policies and ListenerSets; live Programmed and route
+  state; portable bindings; explicit adoption and pruning; and install-level
+  cross-namespace, extension, custom backend, and experimental-protocol
+  guardrails that preserve destination-owned ReferenceGrant boundaries.
+- Add preview Knative Serving functions for Kubernetes installs with
+  scale-to-zero presets, revision traffic splitting, private-by-default routes,
+  digest-pinned images, secret and workload controls, live readiness and route
+  bindings, install-policy guardrails, explicit adoption, and ownership-safe
+  teardown.
+- Add preview OpenSearch Operator search and vector services for Kubernetes
+  installs with OpenSearch 3.8, secure 3.x CRDs, tenant-scoped users and
+  NetworkPolicies, digest-pinned non-root vector-index bootstrapping, explicit
+  HNSW mappings, protected storage teardown, and external secret bindings.
 - Add preview Kubernetes SQL Server 2025 Express managed services with
   non-root StatefulSets, durable PVCs, external credential bundles, encrypted
   TDS bindings, guarded LoadBalancer exposure, safe expansion, and optional
@@ -129,6 +165,9 @@
 
 ### Changed
 
+- Apply managed-service configuration changes through durable Temporal update
+  workflows, retain the last provider-confirmed configuration, and expose the
+  current operation/run identifiers and timestamps in GraphQL and project UI.
 - Make managed-service secret bundle selectors portable across AWS Secrets
   Manager, Google Secret Manager, Azure Key Vault, and Vault, and fail closed
   instead of choosing an arbitrary value from a multi-key bundle.
@@ -161,6 +200,10 @@
 
 ### Fixed
 
+- Probe live Kubernetes versions, CRDs, and operator releases before managed
+  service provision/update; fail closed with exact remediation, make readiness
+  timeouts terminal, and generate collision-safe names for long tenant,
+  project, application, and service identifiers.
 - Make GKE workload identity reconcile project IAM roles on every deploy,
   annotate workload ServiceAccounts with canonical length-safe Google service
   accounts, include attached project resources, and reject inert raw grants.

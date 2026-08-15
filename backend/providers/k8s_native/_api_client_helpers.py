@@ -30,6 +30,30 @@ from __future__ import annotations
 from typing import Any
 
 
+def get_server_version_dict(api_client: Any, *, timeout_seconds: int = 10) -> dict[str, Any]:
+    """Read the apiserver ``/version`` document through the same explicit
+    bearer-auth path used by the other management probes."""
+    response = api_client.call_api(
+        "/version",
+        "GET",
+        path_params={},
+        query_params=[],
+        header_params={
+            "Accept": api_client.select_header_accept(["application/json"]),
+        },
+        body=None,
+        post_params=[],
+        files={},
+        response_type="object",
+        auth_settings=["BearerToken"],
+        async_req=False,
+        _return_http_data_only=True,
+        _preload_content=True,
+        _request_timeout=timeout_seconds,
+    )
+    return dict(response or {})
+
+
 def list_cluster_crd_names(api_client: Any, *, timeout_seconds: int = 10) -> list[str]:
     """List CRD names via low-level call_api — used by the capability
     probe.  Equivalent to
@@ -89,6 +113,38 @@ def list_namespaced_pod_dicts(
         "GET",
         path_params={"namespace": namespace},
         query_params=query_params,
+        header_params={
+            "Accept": api_client.select_header_accept(["application/json"]),
+        },
+        body=None,
+        post_params=[],
+        files={},
+        response_type="object",
+        auth_settings=["BearerToken"],
+        async_req=False,
+        _return_http_data_only=True,
+        _preload_content=True,
+    )
+    return list((response or {}).get("items") or [])
+
+
+def list_cluster_pod_dicts(
+    api_client: Any,
+    *,
+    timeout_seconds: int = 10,
+) -> list[dict[str, Any]]:
+    """List pods across all namespaces through the explicit bearer-auth path.
+
+    Capability discovery uses this for operators whose controller namespace is
+    configurable.  The platform ClusterRole already grants cluster-wide pod
+    listing; callers still treat an unavailable/forbidden read as an empty
+    optional discovery result.
+    """
+    response = api_client.call_api(
+        "/api/v1/pods",
+        "GET",
+        path_params={},
+        query_params=[("timeoutSeconds", timeout_seconds)],
         header_params={
             "Accept": api_client.select_header_accept(["application/json"]),
         },

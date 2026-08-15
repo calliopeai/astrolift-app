@@ -96,8 +96,17 @@ class ManagedService(BaseCoreModel):
     name = models.CharField(max_length=128, blank=True, default="")
     variant = models.CharField(max_length=64, blank=True, default="")
     config = models.JSONField(default=dict, blank=True)
+    # Desired config can move ahead of the real resource while an asynchronous
+    # update runs. Keep the last provider-confirmed config separately so the UI,
+    # retries, and operators never mistake requested state for applied state.
+    applied_config = models.JSONField(null=True, blank=True, default=None)
     status = models.CharField(max_length=32, choices=Status.choices, default=Status.PENDING)
     status_error = models.TextField(blank=True, default="")
+    operation_kind = models.CharField(max_length=32, blank=True, default="")
+    operation_workflow_id = models.CharField(max_length=512, blank=True, default="")
+    operation_run_id = models.CharField(max_length=128, blank=True, default="")
+    operation_started_at = models.DateTimeField(null=True, blank=True)
+    operation_completed_at = models.DateTimeField(null=True, blank=True)
     connection_secret_ref = models.CharField(max_length=512, blank=True, default="")
     # Provider-side resource handle (e.g. "rds/<instance-id>",
     # "object_store/<bucket>") returned by the driver's provision() and

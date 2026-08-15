@@ -471,6 +471,31 @@ def test_delete_returns_true_on_success() -> None:
     fake_resource.delete.assert_called_with(name="x", namespace="ns")
 
 
+def test_delete_forwards_orphan_propagation_policy() -> None:
+    client = _make_client()
+    fake_resource = MagicMock()
+    _install_fake_dynamic(client, fake_resource)
+
+    assert (
+        client.delete(
+            kind="argoproj.io/v1alpha1/CronWorkflow",
+            namespace="ns",
+            name="hourly",
+            propagation_policy="Orphan",
+        )
+        is True
+    )
+    fake_resource.delete.assert_called_once_with(
+        name="hourly",
+        namespace="ns",
+        body={
+            "apiVersion": "v1",
+            "kind": "DeleteOptions",
+            "propagationPolicy": "Orphan",
+        },
+    )
+
+
 def test_delete_ignores_namespace_for_cluster_scoped_resource() -> None:
     client = _make_client()
     fake_resource = MagicMock(namespaced=False)

@@ -2288,6 +2288,7 @@ export type AstroliftManagedDomainMutationResult = {
 };
 
 export type AstroliftManagedService = {
+  appliedConfig?: Maybe<Scalars['JSON']['output']>;
   attachments: Array<AstroliftManagedServiceAttachment>;
   clusterSlug: Scalars['String']['output'];
   config: Scalars['JSON']['output'];
@@ -2299,6 +2300,11 @@ export type AstroliftManagedService = {
   lastActionAt?: Maybe<Scalars['DateTime']['output']>;
   lastActionKind: Scalars['String']['output'];
   name: Scalars['String']['output'];
+  operationCompletedAt?: Maybe<Scalars['DateTime']['output']>;
+  operationKind: Scalars['String']['output'];
+  operationRunId: Scalars['String']['output'];
+  operationStartedAt?: Maybe<Scalars['DateTime']['output']>;
+  operationWorkflowId: Scalars['String']['output'];
   ownerScope: Scalars['String']['output'];
   projectSlug: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];

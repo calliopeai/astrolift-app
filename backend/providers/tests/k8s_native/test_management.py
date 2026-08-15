@@ -50,6 +50,7 @@ class FakeManagementBackend:
     crds: list[str] = field(default_factory=list)
     pods_by_namespace: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     storage_classes: list[str] = field(default_factory=list)
+    kubernetes_version: str = "1.30.7"
     apply_raises_on: set[str] = field(default_factory=set)
     """Set of ``Kind/name`` refs the apply call should raise on."""
 
@@ -77,6 +78,9 @@ class FakeManagementBackend:
     def list_cluster_crds(self, *, auth: ClusterAuth) -> list[str]:
         return list(self.crds)
 
+    def get_server_version(self, *, auth: ClusterAuth) -> str:
+        return self.kubernetes_version
+
     def list_namespaced_pods(
         self,
         *,
@@ -85,6 +89,10 @@ class FakeManagementBackend:
         label_selector: str | None = None,
     ) -> list[dict[str, Any]]:
         return list(self.pods_by_namespace.get(namespace, []))
+
+    def list_cluster_pods(self, *, auth: ClusterAuth) -> list[dict[str, Any]]:
+        del auth
+        return [{**pod, "namespace": namespace} for namespace, pods in self.pods_by_namespace.items() for pod in pods]
 
     def list_storage_classes(self, *, auth: ClusterAuth) -> list[str]:
         return list(self.storage_classes)
@@ -176,6 +184,194 @@ def test_probe_returns_default_shape_on_empty_cluster():
     assert caps["external_dns"] == {"installed": False, "provider": None}
     assert caps["metrics_server"] is False
     assert caps["prometheus"] is False
+    assert caps["kubernetes_version"] == "1.30.7"
+    assert caps["installed_crds"] == []
+
+
+def test_probe_inventories_opensearch_crds_and_chart_version():
+    crds = [
+        "opensearchclusters.opensearch.org",
+        "opensearchusers.opensearch.org",
+        "opensearchroles.opensearch.org",
+        "opensearchuserrolebindings.opensearch.org",
+    ]
+    backend = FakeManagementBackend(
+        crds=crds,
+        pods_by_namespace={
+            "opensearch-operator-system": [
+                {
+                    "name": "opensearch-operator-controller-manager-abc",
+                    "labels": {
+                        "app.kubernetes.io/name": "opensearch-operator",
+                        "helm.sh/chart": "opensearch-operator-3.0.2",
+                    },
+                    "image": "opensearchproject/opensearch-operator:3.0.0-alpha1",
+                }
+            ]
+        },
+    )
+
+    caps = probe_cluster_capabilities(backend=backend, cluster=_ctx())
+
+    assert caps["installed_crds"] == sorted(crds)
+    assert caps["operator_versions"]["opensearch-operator"] == "opensearch-operator-3.0.2"
+    assert caps["managed_service_operators"]["opensearch-operator"] == {
+        "installed": True,
+        "version": "opensearch-operator-3.0.2",
+        "required_crds": crds,
+        "missing_crds": [],
+    }
+
+
+def test_probe_inventories_argo_workflows_v4_controller() -> None:
+    crds = [
+        "workflows.argoproj.io",
+        "workflowtemplates.argoproj.io",
+        "cronworkflows.argoproj.io",
+        "workfloweventbindings.argoproj.io",
+    ]
+    backend = FakeManagementBackend(
+        crds=crds,
+        pods_by_namespace={
+            "argo": [
+                {
+                    "name": "workflow-controller-abc",
+                    "labels": {
+                        "app.kubernetes.io/name": "workflow-controller",
+                        "app.kubernetes.io/version": "v4.1.1",
+                    },
+                    "image": "quay.io/argoproj/workflow-controller:v4.1.1",
+                },
+            ],
+        },
+    )
+
+    caps = probe_cluster_capabilities(backend=backend, cluster=_ctx())
+
+    assert caps["operator_versions"]["argo-workflows"] == "v4.1.1"
+    assert caps["managed_service_operators"]["argo-workflows"] == {
+        "installed": True,
+        "version": "v4.1.1",
+        "required_crds": crds,
+        "missing_crds": [],
+    }
+
+
+def test_probe_finds_argo_controller_in_custom_namespace_and_ignores_server_only() -> None:
+    crds = [
+        "workflows.argoproj.io",
+        "workflowtemplates.argoproj.io",
+        "cronworkflows.argoproj.io",
+        "workfloweventbindings.argoproj.io",
+    ]
+    custom = FakeManagementBackend(
+        crds=crds,
+        pods_by_namespace={
+            "tenant-automation": [
+                {
+                    "name": "workflow-controller-custom",
+                    "labels": {"app.kubernetes.io/version": "v4.1.2"},
+                    "image": "quay.io/argoproj/workflow-controller:v4.1.2",
+                },
+            ],
+        },
+    )
+    server_only = FakeManagementBackend(
+        crds=crds,
+        pods_by_namespace={
+            "argo": [
+                {
+                    "name": "argo-server",
+                    "labels": {"app.kubernetes.io/version": "v4.1.2"},
+                    "image": "quay.io/argoproj/argocli:v4.1.2",
+                },
+            ],
+        },
+    )
+
+    custom_caps = probe_cluster_capabilities(backend=custom, cluster=_ctx())
+    server_caps = probe_cluster_capabilities(backend=server_only, cluster=_ctx())
+
+    assert custom_caps["operator_versions"]["argo-workflows"] == "v4.1.2"
+    assert "argo-workflows" not in server_caps["operator_versions"]
+
+
+def test_probe_inventories_kserve_controller_in_default_or_custom_namespace() -> None:
+    crds = [
+        "inferenceservices.serving.kserve.io",
+        "servingruntimes.serving.kserve.io",
+        "clusterservingruntimes.serving.kserve.io",
+        "clusterstoragecontainers.serving.kserve.io",
+    ]
+    default = FakeManagementBackend(
+        crds=crds,
+        pods_by_namespace={
+            "kserve": [
+                {
+                    "name": "kserve-controller-manager-abc",
+                    "labels": {
+                        "app.kubernetes.io/name": "kserve-controller-manager",
+                        "app.kubernetes.io/version": "v0.20.0",
+                    },
+                    "image": "kserve/kserve-controller:v0.20.0",
+                },
+            ],
+        },
+    )
+    custom = FakeManagementBackend(
+        crds=crds,
+        pods_by_namespace={
+            "ml-platform": [
+                {
+                    "name": "kserve-controller-manager-custom",
+                    "labels": {"app.kubernetes.io/version": "v0.20.1"},
+                    "image": "kserve/kserve-controller:v0.20.1",
+                },
+            ],
+        },
+    )
+
+    default_caps = probe_cluster_capabilities(backend=default, cluster=_ctx())
+    custom_caps = probe_cluster_capabilities(backend=custom, cluster=_ctx())
+
+    assert default_caps["operator_versions"]["kserve"] == "v0.20.0"
+    assert default_caps["managed_service_operators"]["kserve"] == {
+        "installed": True,
+        "version": "v0.20.0",
+        "required_crds": crds,
+        "missing_crds": [],
+    }
+    assert custom_caps["operator_versions"]["kserve"] == "v0.20.1"
+
+
+def test_platform_namespace_operator_version_ignores_unrelated_charts():
+    required = [
+        "opensearchclusters.opensearch.org",
+        "opensearchusers.opensearch.org",
+        "opensearchroles.opensearch.org",
+        "opensearchuserrolebindings.opensearch.org",
+    ]
+    backend = FakeManagementBackend(
+        crds=required,
+        pods_by_namespace={
+            "astrolift-system": [
+                {
+                    "name": "cert-manager-abc",
+                    "labels": {"helm.sh/chart": "cert-manager-v1.16.2"},
+                    "image": "quay.io/jetstack/cert-manager-controller:v1.16.2",
+                },
+                {
+                    "name": "opensearch-operator-controller-manager-abc",
+                    "labels": {"helm.sh/chart": "opensearch-operator-3.0.2"},
+                    "image": "opensearchproject/opensearch-operator:3.0.0-alpha1",
+                },
+            ]
+        },
+    )
+
+    caps = probe_cluster_capabilities(backend=backend, cluster=_ctx())
+
+    assert caps["operator_versions"]["opensearch-operator"] == "opensearch-operator-3.0.2"
 
 
 def test_probe_detects_cert_manager_via_crd_and_version_from_pod_image():

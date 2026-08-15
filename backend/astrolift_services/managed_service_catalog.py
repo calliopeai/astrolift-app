@@ -32,6 +32,7 @@ _SIZED_KINDS = {
     "time_series",
     "model_endpoint",
     "event_stream",
+    "faas",
     "filesystem",
     "graph_db",
     "wide_column",
@@ -50,6 +51,7 @@ _DEFAULT_VARIANTS: dict[tuple[str, str], str] = {
     ("azure", "object_store"): "azure_blob",
     ("azure", "queue"): "azure_servicebus",
     ("k8s_native", "event_stream"): "kafka_strimzi",
+    ("k8s_native", "object_store"): "seaweedfs_operator",
 }
 
 
