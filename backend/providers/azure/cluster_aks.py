@@ -332,6 +332,16 @@ class AKSClusterDriver(ClusterDriver):
         return self._k8s(cluster).get(kind="PersistentVolumeClaim", namespace=namespace, name=name) is not None
 
     @driver_op(cloud="azure", driver="cluster")
+    def get_manifest(
+        self,
+        cluster: str,
+        namespace: str | None,
+        kind: str,
+        name: str,
+    ) -> dict[str, Any] | None:
+        return self._k8s(cluster).get(kind=kind, namespace=namespace, name=name)
+
+    @driver_op(cloud="azure", driver="cluster")
     def get_workload_status(self, cluster, namespace, kind, name):
         client = self._k8s(cluster)
         try:

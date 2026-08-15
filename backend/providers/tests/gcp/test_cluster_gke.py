@@ -75,6 +75,15 @@ def test_filesystem_preflight_inventory(driver: GKEClusterDriver, fake_k8s_clien
 
     assert driver.list_csi_drivers("gcp-prod") == ["filestore.csi.storage.gke.io"]
     assert driver.persistent_volume_claim_exists("gcp-prod", "acme-api", "shared") is True
+    assert (
+        driver.get_manifest(
+            "gcp-prod",
+            "storage",
+            "seaweed.seaweedfs.com/v1/Bucket",
+            "uploads",
+        )
+        == fake_k8s_client.get.return_value
+    )
 
 
 def test_apply_aggregates_outcomes(
