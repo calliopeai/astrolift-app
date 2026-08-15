@@ -33,6 +33,7 @@ from k8s_native.managed.event_stream_strimzi import StrimziKafkaDriver
 from k8s_native.managed.faas_knative import KnativeServiceDriver
 from k8s_native.managed.filesystem_nfs import NFSDriver
 from k8s_native.managed.filesystem_pvc import RookCephFSDriver, StorageClassPVCDriver
+from k8s_native.managed.model_endpoint_kserve import KServeDriver
 from k8s_native.managed.mongodb_operator import MongoDBOperatorDriver
 from k8s_native.managed.mssql_express import DEFAULT_IMAGE as DEFAULT_MSSQL_IMAGE
 from k8s_native.managed.mssql_express import SQLServerExpressDriver
@@ -80,6 +81,7 @@ PLUGIN = ProviderPlugin(
         ("api_gateway", "gateway_api"): GatewayAPIDriver,
         ("event_bus", "knative_eventing"): KnativeEventingDriver,
         ("workflow_engine", "argo_workflows"): ArgoWorkflowsDriver,
+        ("model_endpoint", "kserve"): KServeDriver,
         ("object_store", "seaweedfs_operator"): SeaweedFSObjectStoreDriver,
         ("mssql", "sqlserver_express"): SQLServerExpressDriver,
         ("search", "opensearch_operator"): OpenSearchSearchDriver,
@@ -347,6 +349,73 @@ PLUGIN = ProviderPlugin(
                 "minimum": 0,
                 "default": 604800,
             },
+            "kserve_namespace": {
+                "type": "string",
+                "description": ("Optional fixed namespace; otherwise each model endpoint uses its project namespace."),
+            },
+            "kserve_default_deployment_mode": {
+                "type": "string",
+                "enum": ["Standard", "Knative", "ModelMesh"],
+                "default": "Standard",
+            },
+            "kserve_allowed_deployment_modes": {
+                "type": "array",
+                "items": {"type": "string", "enum": ["Standard", "Knative", "ModelMesh"]},
+                "default": ["Standard"],
+            },
+            "kserve_service_account_name": {"type": "string", "default": "kserve-model"},
+            "kserve_allow_service_account_override": {"type": "boolean", "default": False},
+            "kserve_allowed_service_accounts": {
+                "type": "array",
+                "items": {"type": "string"},
+                "default": [],
+            },
+            "kserve_allow_service_account_token": {"type": "boolean", "default": False},
+            "kserve_allow_public": {"type": "boolean", "default": False},
+            "kserve_allow_writable_storage": {"type": "boolean", "default": False},
+            "kserve_allow_custom_containers": {"type": "boolean", "default": False},
+            "kserve_allow_tagged_images": {"type": "boolean", "default": False},
+            "kserve_allowed_image_prefixes": {
+                "type": "array",
+                "items": {"type": "string"},
+                "default": [],
+            },
+            "kserve_allowed_storage_uri_schemes": {
+                "type": "array",
+                "items": {"type": "string"},
+                "default": ["s3", "gs", "hf", "pvc", "oci", "oci+native"],
+            },
+            "kserve_allow_external_storage_urls": {"type": "boolean", "default": False},
+            "kserve_allowed_external_storage_hosts": {
+                "type": "array",
+                "items": {"type": "string"},
+                "default": [],
+            },
+            "kserve_allow_external_logger_urls": {"type": "boolean", "default": False},
+            "kserve_allowed_external_logger_hosts": {
+                "type": "array",
+                "items": {"type": "string"},
+                "default": [],
+            },
+            "kserve_allow_privileged_pods": {"type": "boolean", "default": False},
+            "kserve_allow_host_access": {"type": "boolean", "default": False},
+            "kserve_allow_local_model_cache": {"type": "boolean", "default": False},
+            "kserve_allowed_model_formats": {
+                "type": "array",
+                "items": {"type": "string"},
+                "default": [],
+            },
+            "kserve_allowed_serving_runtimes": {
+                "type": "array",
+                "items": {"type": "string"},
+                "default": [],
+            },
+            "kserve_allowed_autoscaler_classes": {
+                "type": "array",
+                "items": {"type": "string", "enum": ["hpa", "keda", "external", "none"]},
+                "default": ["hpa", "none"],
+            },
+            "kserve_max_replicas": {"type": "integer", "minimum": 0, "default": 100},
             "seaweed_namespace": {
                 "type": "string",
                 "default": "astrolift-storage",

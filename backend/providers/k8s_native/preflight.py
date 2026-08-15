@@ -182,6 +182,24 @@ REQUIREMENTS: dict[tuple[str, str], OperatorRequirement] = {
         ),
         minimum_operator_version="4.1.0",
     ),
+    ("model_endpoint", "kserve"): OperatorRequirement(
+        operator_id="kserve",
+        display_name="KServe",
+        required_crds=(
+            "inferenceservices.serving.kserve.io",
+            "servingruntimes.serving.kserve.io",
+            "clusterservingruntimes.serving.kserve.io",
+            "clusterstoragecontainers.serving.kserve.io",
+        ),
+        install_hint=(
+            "helm install kserve-crd oci://ghcr.io/kserve/charts/kserve-crd --version v0.20.0 "
+            "--namespace kserve --create-namespace && helm install kserve "
+            "oci://ghcr.io/kserve/charts/kserve-resources --version v0.20.0 --namespace kserve "
+            "--set kserve.controller.deploymentMode=Standard"
+        ),
+        minimum_kubernetes_version="1.32.0",
+        minimum_operator_version="0.20.0",
+    ),
     ("filesystem", "nfs_csi"): OperatorRequirement(
         operator_id="nfs-csi",
         display_name="NFS CSI Driver",
