@@ -33,6 +33,7 @@ def test_managed_services_have_object_store_and_queue() -> None:
     assert ("mssql", "cloudsql_sqlserver") in keys
     assert ("graph_db", "spanner_graph") in keys
     assert ("filesystem", "filestore") in keys
+    assert ("api_gateway", "api_gateway") in keys
     assert ("event_stream", "managed_kafka") in keys
     assert ("event_bus", "eventarc") in keys
     assert ("redis", "memorystore_valkey") in keys
@@ -149,6 +150,21 @@ def test_filestore_operator_controls_are_exposed() -> None:
         "filestore_api_endpoint",
         "filestore_operation_timeout_seconds",
         "filestore_operation_poll_interval_seconds",
+    ):
+        assert field in properties
+
+
+def test_api_gateway_operator_controls_are_exposed() -> None:
+    properties = PLUGIN.config_schema["properties"]
+    for field in (
+        "api_gateway_region",
+        "api_gateway_api_id_prefix",
+        "api_gateway_gateway_id_prefix",
+        "api_gateway_config_id_prefix",
+        "api_gateway_deletion_protection_default",
+        "api_gateway_api_endpoint",
+        "api_gateway_operation_timeout_seconds",
+        "api_gateway_operation_poll_interval_seconds",
     ):
         assert field in properties
 

@@ -61,6 +61,10 @@
   Kerberos directory integration, CMEK, custom performance, deletion
   protection, replication health and promotion, native snapshots, regional
   backups, restore, portable bindings, and adoption-safe teardown.
+- Add Google Cloud API Gateway lifecycle with immutable OpenAPI and gRPC
+  config revisions, zero-downtime gateway retargeting, backend service
+  identity, revision retention, portable endpoint bindings, adoption,
+  snapshots, and guarded dependency teardown.
 - Add Google Managed Service for Apache Kafka lifecycle across clusters,
   topics, ACLs, consumer offsets, Schema Registry, Connect clusters and
   connectors, including PSC networking, CMEK, mTLS, IAM/portable bindings,
@@ -204,6 +208,9 @@
   service provision/update; fail closed with exact remediation, make readiness
   timeouts terminal, and generate collision-safe names for long tenant,
   project, application, and service identifiers.
+- Serialize Azure ownership, billing, and custom ARM tags through one
+  collision-safe codec so tag names satisfy Azure restrictions and cost
+  actuals group by the same `astrolift-binding` key drivers emit.
 - Make GKE workload identity reconcile project IAM roles on every deploy,
   annotate workload ServiceAccounts with canonical length-safe Google service
   accounts, include attached project resources, and reject inert raw grants.
