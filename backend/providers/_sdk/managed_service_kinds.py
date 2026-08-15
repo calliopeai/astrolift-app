@@ -91,7 +91,11 @@ KINDS = KindCatalog(
                 "MSSQL_USER",
                 "MSSQL_PASSWORD",
             ),
-            binding_envs_optional=("MSSQL_ENCRYPT", "DATABASE_URL"),
+            binding_envs_optional=(
+                "MSSQL_ENCRYPT",
+                "MSSQL_TRUST_SERVER_CERTIFICATE",
+                "DATABASE_URL",
+            ),
             snapshot_supported=True,
             cross_region_replicate_supported=True,
         ),

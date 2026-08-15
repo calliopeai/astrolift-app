@@ -31,6 +31,8 @@ from k8s_native.managed.event_stream_strimzi import StrimziKafkaDriver
 from k8s_native.managed.filesystem_nfs import NFSDriver
 from k8s_native.managed.filesystem_pvc import RookCephFSDriver, StorageClassPVCDriver
 from k8s_native.managed.mongodb_operator import MongoDBOperatorDriver
+from k8s_native.managed.mssql_express import DEFAULT_IMAGE as DEFAULT_MSSQL_IMAGE
+from k8s_native.managed.mssql_express import SQLServerExpressDriver
 from k8s_native.managed.mysql_operator import MySQLOperatorDriver
 from k8s_native.managed.object_store_seaweedfs import SeaweedFSObjectStoreDriver
 from k8s_native.managed.postgres_cnpg import CNPGPostgresDriver
@@ -63,6 +65,7 @@ PLUGIN = ProviderPlugin(
         ("event_stream", "nats"): NATSDriver,
         ("queue", "rabbitmq_operator"): RabbitMQOperatorDriver,
         ("object_store", "seaweedfs_operator"): SeaweedFSObjectStoreDriver,
+        ("mssql", "sqlserver_express"): SQLServerExpressDriver,
         ("filesystem", "nfs_csi"): NFSDriver,
         ("filesystem", "storage_class_pvc"): StorageClassPVCDriver,
         ("filesystem", "rook_cephfs"): RookCephFSDriver,
@@ -162,6 +165,30 @@ PLUGIN = ProviderPlugin(
             },
             "seaweed_verify_crds": {"type": "boolean", "default": True},
             "seaweed_deletion_timeout_seconds": {
+                "type": "number",
+                "minimum": 1,
+                "default": 120,
+            },
+            "mssql_namespace": {"type": "string"},
+            "mssql_storage_class_name": {"type": "string"},
+            "mssql_image": {
+                "type": "string",
+                "default": DEFAULT_MSSQL_IMAGE,
+                "description": "Pinned Microsoft SQL Server 2025 Express container image.",
+            },
+            "mssql_credential_path_prefix": {
+                "type": "string",
+                "default": "managed/mssql",
+            },
+            "mssql_allow_custom_images": {"type": "boolean", "default": False},
+            "mssql_allow_load_balancer": {"type": "boolean", "default": False},
+            "mssql_allow_network_policy_disable": {"type": "boolean", "default": False},
+            "mssql_volume_snapshot_class": {"type": "string"},
+            "mssql_allow_crash_consistent_snapshots": {
+                "type": "boolean",
+                "default": False,
+            },
+            "mssql_deletion_timeout_seconds": {
                 "type": "number",
                 "minimum": 1,
                 "default": 120,

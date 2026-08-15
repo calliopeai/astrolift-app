@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add preview Kubernetes SQL Server 2025 Express managed services with
+  non-root StatefulSets, durable PVCs, external credential bundles, encrypted
+  TDS bindings, guarded LoadBalancer exposure, safe expansion, and optional
+  crash-consistent CSI snapshots.
 - Add preview SeaweedFS Operator object storage for Kubernetes installs with
   shared-cluster bucket reconciliation, bucket-scoped S3 IAM credentials,
   versioning, Object Lock, quotas, placement controls, explicit anonymous

@@ -45,6 +45,9 @@ def _cluster(**provider_overrides):
         "seaweed_cluster_name": "shared-store",
         "seaweed_s3_endpoint": "https://objects.example.test",
         "seaweed_s3_region": "local-1",
+        "mssql_namespace": "database-system",
+        "mssql_storage_class_name": "database-rwo",
+        "mssql_credential_path_prefix": "managed/sqlserver",
         "nfs_storage_class_name": "nfs-rwx",
         "filesystem_pvc_storage_class_name": "standard-rwo",
         "rook_cephfs_storage_class_name": "rook-shared",
@@ -71,7 +74,10 @@ def test_every_registered_k8s_managed_driver_has_live_config(monkeypatch) -> Non
     for kind, variant in PLUGIN.managed_service_drivers:
         config = managed_config_for("k8s_native", _cluster(), kind=kind, variant=variant)
         assert config.cluster_driver is cluster_driver, (kind, variant)
-        if (kind, variant) == ("object_store", "seaweedfs_operator"):
+        if (kind, variant) in {
+            ("object_store", "seaweedfs_operator"),
+            ("mssql", "sqlserver_express"),
+        }:
             assert config.secrets_backend is secrets_backend
 
 
@@ -138,6 +144,16 @@ def test_k8s_operator_defaults_are_exposed_in_provider_schema() -> None:
         "seaweed_credential_path_prefix",
         "seaweed_verify_crds",
         "seaweed_deletion_timeout_seconds",
+        "mssql_namespace",
+        "mssql_storage_class_name",
+        "mssql_image",
+        "mssql_credential_path_prefix",
+        "mssql_allow_custom_images",
+        "mssql_allow_load_balancer",
+        "mssql_allow_network_policy_disable",
+        "mssql_volume_snapshot_class",
+        "mssql_allow_crash_consistent_snapshots",
+        "mssql_deletion_timeout_seconds",
         "nfs_storage_class_name",
         "nfs_server_address",
         "nfs_server_export",
@@ -176,6 +192,35 @@ def test_seaweedfs_config_preserves_shared_cluster_and_secret_backend(monkeypatc
     assert config.secrets_backend is secrets_backend
 
 
+def test_mssql_config_preserves_install_policy_and_secret_backend(monkeypatch) -> None:
+    cluster_driver = object()
+    secrets_backend = object()
+    monkeypatch.setattr("core.cluster_observability._driver_for_cluster", lambda _cluster: cluster_driver)
+    monkeypatch.setattr(
+        "core.app_deploy.driver_for_capability", lambda _cluster, _capability: secrets_backend
+    )
+
+    config = managed_config_for(
+        "k8s_native",
+        _cluster(
+            mssql_allow_load_balancer=True,
+            mssql_allow_network_policy_disable=True,
+            mssql_volume_snapshot_class="database-snapshots",
+        ),
+        kind="mssql",
+        variant="sqlserver_express",
+    )
+
+    assert config.namespace == "database-system"
+    assert config.storage_class_name == "database-rwo"
+    assert config.credential_path_prefix == "managed/sqlserver"
+    assert config.allow_load_balancer is True
+    assert config.allow_network_policy_disable is True
+    assert config.volume_snapshot_class == "database-snapshots"
+    assert config.cluster_driver is cluster_driver
+    assert config.secrets_backend is secrets_backend
+
+
 def test_dynamic_filesystems_are_executable_preview_catalog_entries() -> None:
     from astrolift_services.managed_service_catalog import list_catalog
 
@@ -201,3 +246,23 @@ def test_seaweedfs_is_the_only_executable_k8s_object_store() -> None:
     assert "retired" in rows["minio_operator"].unavailable_reason
     assert rows["minio_aistor_operator"].available is False
     assert rows["s3_compatible_existing"].available is False
+
+
+def test_sqlserver_express_is_an_executable_preview_catalog_entry() -> None:
+    from astrolift_services.managed_service_catalog import list_catalog
+
+    rows = {row.variant: row for row in list_catalog("k8s_native") if row.kind == "mssql"}
+
+    row = rows["sqlserver_express"]
+    assert row.available is True
+    assert row.status == "preview"
+    assert set(row.binding_envs) == {
+        "MSSQL_HOST",
+        "MSSQL_PORT",
+        "MSSQL_DB",
+        "MSSQL_USER",
+        "MSSQL_PASSWORD",
+        "MSSQL_ENCRYPT",
+        "MSSQL_TRUST_SERVER_CERTIFICATE",
+        "DATABASE_URL",
+    }

@@ -160,6 +160,12 @@ REQUIREMENTS: dict[tuple[str, str], OperatorRequirement] = {
         ),
         install_hint=("Install the Rook Ceph operator, create a CephFilesystem, and create its CephFS StorageClass"),
     ),
+    ("mssql", "sqlserver_express"): OperatorRequirement(
+        operator_id="sqlserver-express",
+        display_name="SQL Server 2025 Express",
+        required_crds=(),
+        install_hint=("No operator is required; provide an amd64 node pool and a dynamically provisioned StorageClass"),
+    ),
 }
 
 

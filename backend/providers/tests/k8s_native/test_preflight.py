@@ -96,6 +96,16 @@ def test_nats_preflight_passes_with_no_operator_required() -> None:
     assert report.ok is True
 
 
+def test_sqlserver_express_preflight_requires_no_operator() -> None:
+    caps = ClusterCapabilities(cluster_id="x", kubernetes_version="1.30")
+
+    report = preflight(kind="mssql", variant="sqlserver_express", capabilities=caps)
+
+    assert report.ok is True
+    assert report.install_hints == []
+    assert "amd64" in REQUIREMENTS[("mssql", "sqlserver_express")].install_hint
+
+
 def test_all_registered_requirements_have_install_hints() -> None:
     """Every requirement entry must surface a hint — operators
     rely on these to fix failures fast."""
