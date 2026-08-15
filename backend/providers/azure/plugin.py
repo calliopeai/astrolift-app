@@ -118,9 +118,22 @@ PLUGIN = ProviderPlugin(
                 "type": "string",
                 "description": ("ACR registry name (without .azurecr.io suffix)."),
             },
+            "acr_sku": {
+                "type": "string",
+                "enum": ["Basic", "Standard", "Premium"],
+                "default": "Standard",
+            },
+            "acr_admin_enabled": {"type": "boolean", "default": False},
+            "acr_immutable_tags": {"type": "boolean", "default": True},
             "vault_url": {
                 "type": "string",
                 "description": ("Key Vault URL (https://<name>.vault.azure.net)."),
+            },
+            "keyvault_secret_name_prefix": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9-]{1,100}$",
+                "default": "astrolift",
+                "description": "Namespace prefix for logical secret-bundle paths.",
             },
             "storage_account": {
                 "type": "string",
@@ -142,6 +155,22 @@ PLUGIN = ProviderPlugin(
             "akv_secret_id_for_tls": {
                 "type": "string",
                 "description": ("Key Vault secret ID for the TLS cert (PFX). AGIC reads this via SSL profile."),
+            },
+            "managed_cert_name_prefix": {
+                "type": "string",
+                "default": "astrolift",
+            },
+            "notification_hubs_namespace": {"type": "string"},
+            "notification_hub_name": {"type": "string"},
+            "notification_hubs_api_version": {
+                "type": "string",
+                "default": "2020-06",
+            },
+            "notification_hubs_timeout_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 120,
+                "default": 10,
             },
         },
     },

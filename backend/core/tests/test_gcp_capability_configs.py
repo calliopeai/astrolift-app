@@ -106,6 +106,7 @@ def test_unknown_gcp_capability_fails_instead_of_using_gke_config() -> None:
         ("mysql", "cloudsql"),
         ("mssql", "cloudsql_sqlserver"),
         ("redis", "memorystore"),
+        ("redis", "memorystore_valkey"),
     ],
 )
 def test_gcp_managed_credentials_share_cluster_secret_prefix(
@@ -327,3 +328,67 @@ def test_workflows_runtime_config_preserves_operator_controls() -> None:
     assert config.executions_api_endpoint == "https://executions.example.test/v1"
     assert config.operation_timeout_seconds == 300
     assert config.poll_interval_seconds == 0.5
+
+
+def test_memorystore_valkey_runtime_config_preserves_operator_controls() -> None:
+    from core.cluster_observability import managed_config_for
+
+    config = managed_config_for(
+        "gcp",
+        _cluster(
+            memorystore_valkey_network="projects/acme-prod/global/networks/cache",
+            memorystore_valkey_instance_name_prefix="smd-valkey",
+            memorystore_valkey_engine_version="VALKEY_9_1",
+            memorystore_valkey_node_type="HIGHMEM_XLARGE",
+            memorystore_valkey_mode="CLUSTER_DISABLED",
+            memorystore_valkey_shard_count=1,
+            memorystore_valkey_replica_count=3,
+            memorystore_valkey_authorization_mode="AUTH_DISABLED",
+            memorystore_valkey_token_auth_user="smd_app",
+            memorystore_valkey_token_auth_rotation_generation=4,
+            memorystore_valkey_token_auth_retire_generation=3,
+            memorystore_valkey_transit_encryption_default=False,
+            memorystore_valkey_persistence_mode="AOF",
+            memorystore_valkey_automated_backup_default=False,
+            memorystore_valkey_backup_retention_days=90,
+            memorystore_valkey_deletion_protection_default=False,
+            memorystore_valkey_kms_key="projects/p/locations/r/keyRings/k/cryptoKeys/v",
+            memorystore_valkey_server_ca_mode="CUSTOMER_MANAGED_CAS_CA",
+            memorystore_valkey_server_ca_pool="projects/p/locations/us-central1/caPools/valkey",
+            memorystore_valkey_secret_manager_prefix="smd/valkey",
+            memorystore_valkey_allow_preview_features=True,
+            memorystore_valkey_api_endpoint="https://memorystore.example.test/v1beta",
+            memorystore_valkey_operation_timeout_seconds=900,
+            memorystore_valkey_poll_interval_seconds=1,
+            memorystore_valkey_adopt_existing_instance=True,
+        ),
+        kind="redis",
+        variant="memorystore_valkey",
+    )
+    assert type(config).__name__ == "MemorystoreValkeyConfig"
+    assert config.project_id == "acme-prod" and config.region == "us-central1"
+    assert config.network.endswith("/networks/cache")
+    assert config.instance_name_prefix == "smd-valkey"
+    assert config.engine_version == "VALKEY_9_1"
+    assert config.node_type == "HIGHMEM_XLARGE"
+    assert config.mode == "CLUSTER_DISABLED"
+    assert config.shard_count == 1 and config.replica_count == 3
+    assert config.authorization_mode == "AUTH_DISABLED"
+    assert config.token_auth_user == "smd_app"
+    assert config.token_auth_rotation_generation == 4
+    assert config.token_auth_retire_generation == 3
+    assert config.transit_encryption_default is False
+    assert config.persistence_mode == "AOF"
+    assert config.automated_backup_default is False
+    assert config.backup_retention_days == 90
+    assert config.deletion_protection_default is False
+    assert config.kms_key.endswith("/cryptoKeys/v")
+    assert config.server_ca_mode == "CUSTOMER_MANAGED_CAS_CA"
+    assert config.server_ca_pool.endswith("/caPools/valkey")
+    assert config.secret_manager_prefix == "smd/valkey"
+    assert config.secret_id_prefix == "smd"
+    assert config.allow_preview_features is True
+    assert config.api_endpoint.endswith("/v1beta")
+    assert config.operation_timeout_seconds == 900
+    assert config.poll_interval_seconds == 1
+    assert config.adopt_existing_instance is True

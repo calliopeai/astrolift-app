@@ -9,6 +9,8 @@ from astrolift_identity.api_tokens import (
     SCOPE_MCP_DISPATCH,
     SCOPE_MCP_READ,
     SCOPE_MCP_WRITE,
+    SCOPE_PROJECT_WRITE,
+    SCOPE_READ_APPS,
 )
 from core.permissions import Permission
 
@@ -114,6 +116,125 @@ MCP_TOOL_META: dict[str, dict[str, Any]] = {
             required=("format", "payload"),
         ),
     },
+    "astrolift_list_project_resource_clusters": {
+        "description": "List managed clusters that can host shared resources for a project.",
+        "scope": SCOPE_MCP_READ,
+        "additional_scopes": (SCOPE_READ_APPS,),
+        "permission": Permission.PROJECT_READ,
+        "inputSchema": _schema({"project_id": {"type": "string"}}, required=("project_id",)),
+    },
+    "astrolift_list_project_resource_catalog": {
+        "description": (
+            "List available and planned managed-resource variants and configuration schemas "
+            "for a project's target cluster."
+        ),
+        "scope": SCOPE_MCP_READ,
+        "additional_scopes": (SCOPE_READ_APPS,),
+        "permission": Permission.PROJECT_READ,
+        "inputSchema": _schema(
+            {
+                "project_id": {"type": "string"},
+                "cluster_id": {"type": "string"},
+            },
+            required=("project_id", "cluster_id"),
+        ),
+    },
+    "astrolift_list_project_resources": {
+        "description": (
+            "List a project's shared managed resources, lifecycle state, and app/agent attachments."
+        ),
+        "scope": SCOPE_MCP_READ,
+        "additional_scopes": (SCOPE_READ_APPS,),
+        "permission": Permission.PROJECT_READ,
+        "inputSchema": _schema({"project_id": {"type": "string"}}, required=("project_id",)),
+    },
+    "astrolift_provision_project_resource": {
+        "description": (
+            "Provision a shared managed resource and optionally attach project app or agent consumers."
+        ),
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_PROJECT_WRITE,),
+        "permission": Permission.PROJECT_UPDATE,
+        "inputSchema": _schema(
+            {
+                "project_id": {"type": "string"},
+                "cluster_id": {"type": "string"},
+                "kind": {"type": "string"},
+                "name": {"type": "string"},
+                "variant": {"type": "string"},
+                "environment_name": {"type": "string"},
+                "config": {"type": "object"},
+                "agent_environment_spec_slugs": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+                "app_environment_ids": {"type": "array", "items": {"type": "string"}},
+            },
+            required=("project_id", "cluster_id", "kind"),
+        ),
+    },
+    "astrolift_attach_project_resource": {
+        "description": "Attach a shared resource to exactly one project app environment or agent spec.",
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_PROJECT_WRITE,),
+        "permission": Permission.PROJECT_UPDATE,
+        "inputSchema": _schema(
+            {
+                "managed_service_id": {"type": "string"},
+                "agent_environment_spec_slug": {"type": "string"},
+                "app_environment_id": {"type": "string"},
+            },
+            required=("managed_service_id",),
+        ),
+    },
+    "astrolift_detach_project_resource": {
+        "description": "Detach one app or agent consumer from a shared managed resource.",
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_PROJECT_WRITE,),
+        "permission": Permission.PROJECT_UPDATE,
+        "inputSchema": _schema({"attachment_id": {"type": "string"}}, required=("attachment_id",)),
+    },
+    "astrolift_update_project_resource": {
+        "description": (
+            "Update a shared resource's name or in-place-editable configuration and reconcile it."
+        ),
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_PROJECT_WRITE,),
+        "permission": Permission.PROJECT_UPDATE,
+        "inputSchema": _schema(
+            {
+                "managed_service_id": {"type": "string"},
+                "name": {"type": "string"},
+                "config": {"type": "object"},
+            },
+            required=("managed_service_id",),
+        ),
+    },
+    "astrolift_reprovision_project_resource": {
+        "description": "Start a full reprovision cycle for an existing shared managed resource.",
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_PROJECT_WRITE,),
+        "permission": Permission.PROJECT_UPDATE,
+        "inputSchema": _schema({"managed_service_id": {"type": "string"}}, required=("managed_service_id",)),
+    },
+    "astrolift_deprovision_project_resource": {
+        "description": (
+            "Destructively deprovision a shared resource. Echo its exact ID in "
+            "confirm_managed_service_id; delete_data and force_destroy default false."
+        ),
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_PROJECT_WRITE,),
+        "permission": Permission.PROJECT_UPDATE,
+        "inputSchema": _schema(
+            {
+                "managed_service_id": {"type": "string"},
+                "confirm_managed_service_id": {"type": "string"},
+                "delete_data": {"type": "boolean"},
+                "force_destroy": {"type": "boolean"},
+            },
+            required=("managed_service_id", "confirm_managed_service_id"),
+        ),
+    },
 }
 
 
@@ -126,7 +247,7 @@ def mcp_contract_document() -> dict[str, Any]:
             {
                 "name": name,
                 "description": meta["description"],
-                "required_scopes": [meta["scope"]],
+                "required_scopes": [meta["scope"], *meta.get("additional_scopes", ())],
                 "required_permissions": [str(value) for value in permissions if value is not None],
                 "inputSchema": meta["inputSchema"],
             }

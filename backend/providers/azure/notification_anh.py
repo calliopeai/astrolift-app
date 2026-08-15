@@ -44,7 +44,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
@@ -75,7 +75,7 @@ class AzureNotificationHubsConfig:
     """Notification hub name within the namespace."""
 
     shared_access_key_name: str
-    shared_access_key: str
+    shared_access_key: str = field(repr=False)
     """Shared-access policy name + key. The driver derives a SAS
     token from these on each call. The key must have ``Listen +
     Send + Manage`` rights for installation create + delete."""
