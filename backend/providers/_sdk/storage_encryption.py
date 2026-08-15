@@ -128,6 +128,24 @@ POLICIES: dict[tuple[str, str, str], EncryptionPolicy] = {
         cmek_required_for_compliance=("pci", "hipaa"),
         notes=("Spanner database CMEK is selected at creation; restored databases can select replacement keys."),
     ),
+    ("gcp", "workflow_engine", "workflows"): EncryptionPolicy(
+        mode="cloud_kms",
+        cmek_supported=True,
+        cmek_required_for_compliance=("pci", "hipaa"),
+        notes=(
+            "Cloud Workflows source, environment, and execution data can use a regional CMEK; "
+            "older revisions retain the keys recorded by Google."
+        ),
+    ),
+    ("gcp", "faas", "cloud_functions_gen2"): EncryptionPolicy(
+        mode="cloud_kms",
+        cmek_supported=True,
+        cmek_required_for_compliance=("pci", "hipaa"),
+        notes=(
+            "Cloud Run functions v2 support a regional Cloud KMS key for function resources; "
+            "source artifacts and custom Artifact Registry repositories need compatible encryption policy."
+        ),
+    ),
     ("gcp", "filesystem", "filestore"): EncryptionPolicy(
         mode="cloud_kms",
         cmek_supported=True,
