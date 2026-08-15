@@ -262,3 +262,33 @@ def test_secret_resolution_errors_do_not_disclose_backend_refs_or_provider_detai
 
     assert "sensitive/provider/path" not in str(caught.value)
     assert "sensitive diagnostic" not in str(caught.value)
+
+
+def test_secret_resolution_selects_bundle_fields_portably() -> None:
+    binding = _binding(
+        secret_refs={
+            "username": "shared/files#client_user",
+            "password": "shared/files#client_password",
+        },
+    )
+
+    class _BundleBackend:
+        calls: list[str] = []
+
+        def get(self, ref):
+            self.calls.append(ref)
+            return {"client_user": "agent-user", "client_password": "agent-password"}
+
+    backend = _BundleBackend()
+    resources = resolve_binding_secret_manifests(
+        [binding],
+        secrets_backend=backend,
+        namespace="acme-api",
+        consumer_key="environment-guid",
+    )
+
+    assert backend.calls == ["shared/files", "shared/files"]
+    assert resources[0]["stringData"] == {
+        "password": "agent-password",
+        "username": "agent-user",
+    }
