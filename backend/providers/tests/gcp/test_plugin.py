@@ -33,6 +33,7 @@ def test_managed_services_have_object_store_and_queue() -> None:
     assert ("mssql", "cloudsql_sqlserver") in keys
     assert ("graph_db", "spanner_graph") in keys
     assert ("private_endpoint", "private_service_connect") in keys
+    assert ("faas", "cloud_functions_gen2") in keys
     assert ("api_gateway", "api_gateway") in keys
     assert ("event_stream", "managed_kafka") in keys
     assert ("event_bus", "eventarc") in keys
@@ -142,6 +143,19 @@ def test_private_service_connect_operator_controls_are_exposed() -> None:
         "private_service_connect_api_endpoint",
         "private_service_connect_operation_timeout_seconds",
         "private_service_connect_operation_poll_interval_seconds",
+    ):
+        assert field in properties
+
+
+def test_cloud_functions_operator_controls_are_exposed() -> None:
+    properties = PLUGIN.config_schema["properties"]
+    for field in (
+        "cloud_functions_region",
+        "cloud_functions_name_prefix",
+        "cloud_functions_deletion_protection_default",
+        "cloud_functions_api_endpoint",
+        "cloud_functions_operation_timeout_seconds",
+        "cloud_functions_operation_poll_interval_seconds",
     ):
         assert field in properties
 
