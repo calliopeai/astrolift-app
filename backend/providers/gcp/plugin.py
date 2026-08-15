@@ -18,6 +18,7 @@ Executable managed services:
 - AlloyDBPostgresDriver — postgres/alloydb
 - CloudSQLMySQLDriver — mysql/cloudsql
 - MemorystoreRedisDriver — redis/memorystore
+- MemorystoreValkeyDriver — redis/memorystore_valkey
 - BigtableDriver — kv_store/bigtable
 - VertexMatchingEngineDriver — vector_index/vertex_matching_engine
 - GCPManagedPrometheusDriver — time_series/gcp_managed_prometheus
@@ -53,6 +54,7 @@ from gcp.managed.postgres_alloydb import AlloyDBPostgresDriver
 from gcp.managed.postgres_cloudsql import CloudSQLPostgresDriver
 from gcp.managed.queue_pubsub import PubSubDriver
 from gcp.managed.redis_memorystore import MemorystoreRedisDriver
+from gcp.managed.redis_memorystore_valkey import MemorystoreValkeyDriver
 from gcp.managed.search_elastic_cloud import GCPElasticCloudStubDriver
 from gcp.managed.timeseries_managed_prometheus import GCPManagedPrometheusDriver
 from gcp.managed.topic_pubsub import PubSubTopicDriver
@@ -84,6 +86,7 @@ PLUGIN = ProviderPlugin(
         ("postgres", "alloydb"): AlloyDBPostgresDriver,
         ("mysql", "cloudsql"): CloudSQLMySQLDriver,
         ("redis", "memorystore"): MemorystoreRedisDriver,
+        ("redis", "memorystore_valkey"): MemorystoreValkeyDriver,
         ("kv_store", "bigtable"): BigtableDriver,
         ("search", "gcp_elastic_cloud"): GCPElasticCloudStubDriver,
         ("vector_index", "vertex_matching_engine"): VertexMatchingEngineDriver,
@@ -483,6 +486,140 @@ PLUGIN = ProviderPlugin(
                 "type": "string",
                 "default": "astrolift/memorystore",
                 "description": "Logical path prefix for Memorystore authentication and URL secrets.",
+            },
+            "memorystore_valkey_network": {
+                "type": "string",
+                "description": "PSC consumer VPC resource name; defaults to the project's default network.",
+            },
+            "memorystore_valkey_instance_name_prefix": {
+                "type": "string",
+                "default": "astrolift",
+            },
+            "memorystore_valkey_engine_version": {
+                "type": "string",
+                "enum": ["VALKEY_7_2", "VALKEY_8_0", "VALKEY_9_0", "VALKEY_9_1"],
+                "default": "VALKEY_9_0",
+            },
+            "memorystore_valkey_node_type": {
+                "type": "string",
+                "enum": [
+                    "SHARED_CORE_NANO",
+                    "CUSTOM_PICO",
+                    "CUSTOM_MICRO",
+                    "CUSTOM_MINI",
+                    "STANDARD_SMALL",
+                    "STANDARD_LARGE",
+                    "HIGHCPU_MEDIUM",
+                    "HIGHMEM_MEDIUM",
+                    "HIGHMEM_XLARGE",
+                    "HIGHMEM_2XLARGE",
+                ],
+                "default": "HIGHMEM_MEDIUM",
+            },
+            "memorystore_valkey_mode": {
+                "type": "string",
+                "enum": ["CLUSTER", "CLUSTER_DISABLED"],
+                "default": "CLUSTER",
+            },
+            "memorystore_valkey_shard_count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 250,
+                "default": 1,
+            },
+            "memorystore_valkey_replica_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 5,
+                "default": 1,
+            },
+            "memorystore_valkey_authorization_mode": {
+                "type": "string",
+                "enum": ["IAM_AUTH", "TOKEN_AUTH", "AUTH_DISABLED"],
+                "default": "IAM_AUTH",
+            },
+            "memorystore_valkey_token_auth_user": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,62}$",
+                "default": "default",
+            },
+            "memorystore_valkey_token_auth_rotation_generation": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 1,
+            },
+            "memorystore_valkey_token_auth_retire_generation": {
+                "type": "integer",
+                "minimum": 0,
+                "default": 0,
+            },
+            "memorystore_valkey_secret_manager_prefix": {
+                "type": "string",
+                "default": "astrolift/memorystore-valkey",
+                "description": "Logical Secret Manager prefix for Valkey TOKEN_AUTH credentials.",
+            },
+            "memorystore_valkey_transit_encryption_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "memorystore_valkey_persistence_mode": {
+                "type": "string",
+                "enum": ["DISABLED", "RDB", "AOF"],
+                "default": "RDB",
+            },
+            "memorystore_valkey_automated_backup_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "memorystore_valkey_backup_retention_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 365,
+                "default": 35,
+            },
+            "memorystore_valkey_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "memorystore_valkey_kms_key": {
+                "type": "string",
+                "description": "Optional Cloud KMS key resource name for data at rest.",
+            },
+            "memorystore_valkey_server_ca_mode": {
+                "type": "string",
+                "enum": [
+                    "",
+                    "GOOGLE_MANAGED_PER_INSTANCE_CA",
+                    "GOOGLE_MANAGED_SHARED_CA",
+                    "CUSTOMER_MANAGED_CAS_CA",
+                ],
+                "default": "",
+            },
+            "memorystore_valkey_server_ca_pool": {
+                "type": "string",
+                "description": "Optional same-region Certificate Authority Service CA pool.",
+            },
+            "memorystore_valkey_allow_preview_features": {
+                "type": "boolean",
+                "default": False,
+            },
+            "memorystore_valkey_api_endpoint": {
+                "type": "string",
+                "default": "https://memorystore.googleapis.com/v1",
+            },
+            "memorystore_valkey_operation_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 1800,
+            },
+            "memorystore_valkey_poll_interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 3,
+            },
+            "memorystore_valkey_adopt_existing_instance": {
+                "type": "boolean",
+                "default": False,
             },
         },
     },
