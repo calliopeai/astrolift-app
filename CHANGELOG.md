@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add a steering channel into a running agent task: `sendAgentTaskInput`
+  queues a follow-up prompt against an `AgentTask`, and the runner consumes
+  it at its next turn boundary through the state callback it already posts.
+  Deny-by-default behind the new `agent_task.send_input` permission,
+  fail-closed org scoping, audited, and delivered at most once in order.
+
 - Add executable Google Cloud CDN lifecycle support, including Cloud Storage,
   NEG, instance-group, and existing backend-service origins; safe cache policy
   controls; a managed global HTTP(S) load-balancer graph; managed or external

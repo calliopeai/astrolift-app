@@ -26,6 +26,11 @@ PERMISSIONS: dict[str, dict[str, str]] = {
         "resource": "agent_env_spec",
         "verb": "update",
     },
+    "agent_task.send_input": {
+        "slug": "agent_task.send_input",
+        "resource": "agent_task",
+        "verb": "send_input",
+    },
     "agent_task.watch": {"slug": "agent_task.watch", "resource": "agent_task", "verb": "watch"},
     "api_token.create": {"slug": "api_token.create", "resource": "api_token", "verb": "create"},
     "api_token.revoke": {"slug": "api_token.revoke", "resource": "api_token", "verb": "revoke"},

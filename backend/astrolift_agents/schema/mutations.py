@@ -42,6 +42,7 @@ from astrolift_agents.schema.types import (
     AgentSecretBundleType,
     AgentSecretRevealType,
     AgentSecretStatusType,
+    AgentTaskInputMessageType,
     AgentTaskType,
     OrgSkillRepoType,
     SkillType,
@@ -50,6 +51,7 @@ from astrolift_agents.schema.types import (
     agent_run_spec_to_type,
     agent_secret_bundle_attachment_to_type,
     agent_secret_bundle_to_type,
+    agent_task_input_message_to_type,
     agent_task_to_type,
     org_skill_repo_to_type,
     skill_to_type,
@@ -390,6 +392,35 @@ def _dispatch_actor(info: Info):
     if tenant and tenant.actor_user_id:
         return Actor(kind="user", user_id=tenant.actor_user_id, display="")
     return Actor(kind="system", display="system")
+
+
+def _input_author(info: Info) -> tuple[object | None, str]:
+    """Resolve ``(user, display_label)`` for a queued steering message.
+
+    Module-level on purpose: this is called from a ROOT mutation resolver,
+    where Strawberry binds ``self`` to the schema root value (``None``), so
+    a ``self._helper()`` would pass a direct-invocation test and then raise
+    ``AttributeError`` on every real request.
+
+    Prefers the authenticated request user, falls back to the tenant
+    context's actor id (API-token callers carry an actor without a request
+    user), then to no author at all — an automation caller still gets to
+    queue a message, it is just labelled ``system``.
+    """
+    request = getattr(info.context, "request", None)
+    user = getattr(request, "user", None) if request else None
+    if user is not None and getattr(user, "is_authenticated", False):
+        label = getattr(user, "username", "") or getattr(user, "email", "") or ""
+        return user, label
+    tenant = get_current_tenant()
+    actor_user_id = tenant.actor_user_id if tenant else None
+    if actor_user_id:
+        from django.contrib.auth import get_user_model
+
+        actor = get_user_model().objects.filter(pk=actor_user_id).first()
+        if actor is not None:
+            return actor, (getattr(actor, "username", "") or getattr(actor, "email", "") or "")
+    return None, "system"
 
 
 # ---------------------------------------------------------------------------
@@ -1588,6 +1619,66 @@ class AgentsMutation:
                 f"task could not be cancelled: {cancelled['error']} (current status: {task.status})",
             )
         return gql_success(None)
+
+    @strawberry.field
+    @mutation_audit(
+        action="agents.task.send_input",
+        target=lambda self, info, task_id, message: ("AgentTask", str(task_id)),
+    )
+    @require_permission(Permission.AGENT_TASK_SEND_INPUT)
+    @tenant_scoped()
+    def send_agent_task_input(
+        self, info: Info, task_id: strawberry.ID, message: str
+    ) -> MutationResultType[AgentTaskInputMessageType]:
+        """Queue a follow-up prompt for a RUNNING AgentTask (#1390).
+
+        The steering channel is queued, not duplex: the message is persisted
+        against the task and the runner consumes it at its next turn
+        boundary (the point one harness invocation finishes and the runner
+        decides whether to run another). Nothing is pushed into the pod
+        here, so this returns as soon as the message is durable — an
+        ``ok: true`` means "queued", not "the agent has read it". Poll
+        ``deliveredAt`` on the returned message for that.
+
+        Deny-by-default behind ``agent_task.send_input``, the operator-grade
+        write sibling of the passive ``agent_task.watch``. Tenancy is
+        explicit: ``@tenant_scoped`` only asserts a tenant exists, so the
+        task fetch carries its own ``organization_id`` filter and another
+        org's task guid reads as NOT_FOUND — indistinguishable from a guid
+        that does not exist, so the mutation leaks no existence.
+        """
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        if org_pk is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+
+        task = AgentTask.objects.filter(
+            guid=str(task_id), organization_id=org_pk, deleted_at__isnull=True
+        ).first()
+        if task is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "task not found", field="taskId")
+
+        from astrolift_agents.services.agent_task_input import (
+            AgentTaskInputError,
+            queue_agent_task_input,
+        )
+
+        author, author_label = _input_author(info)
+        try:
+            queued = queue_agent_task_input(
+                task=task,
+                message=message,
+                author=author,
+                author_label=author_label,
+            )
+        except AgentTaskInputError as exc:
+            code = {
+                "validation": ErrorCode.VALIDATION.value,
+                "precondition": ErrorCode.PRECONDITION.value,
+            }.get(exc.code, ErrorCode.INTERNAL.value)
+            return gql_failure(code, exc.message, field=exc.field or None)
+
+        return gql_success(agent_task_input_message_to_type(queued))
 
     @strawberry.field
     @mutation_audit(

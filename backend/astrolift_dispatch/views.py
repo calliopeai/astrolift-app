@@ -462,12 +462,32 @@ def agent_checkin(request: HttpRequest, task_id: str) -> JsonResponse:
 def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
     """Heartbeat and result callback from thread-mode agents.
 
-    Body: {status, result?, partial?, error?, continue?}
+    Body: {status, result?, partial?, error?, continue?, input_intent?}
 
     A terminal ``status`` of "completed"/"failed" records the outcome and
     transitions the task. ``running`` (or an omitted status) is a heartbeat;
     unknown values are rejected. The response carries ``continue`` — false
     tells the agent to stop (the task is no longer RUNNING).
+
+    Steering channel (#1390). ``input_intent`` is how the runner asks for
+    queued follow-up prompts on the state callback it already posts, so the
+    steering channel needs no second transport, no poll loop and no extra
+    credential:
+
+    * omitted — a plain heartbeat. No queue work at all, so the frequent
+      heartbeat path costs exactly what it costs today.
+    * ``"peek"`` — response gains ``pending_input_count``; nothing is
+      marked delivered. This is what a runner whose harness cannot accept a
+      follow-up prompt sends, so the message stays visibly queued instead
+      of being silently consumed and dropped.
+    * ``"consume"`` — response gains ``pending_input_count`` AND
+      ``pending_input``: the next ordered batch, marked delivered in the
+      same transaction. At-most-once by construction.
+
+    ``pending_input`` entries are ``{id, message, author, created_at}``.
+    Input is only ever handed out for a RUNNING task — a terminal callback
+    consumes nothing, so a message queued against a run that is finishing
+    is not lost to a dying pod.
     """
     try:
         content_length = int(request.META.get("CONTENT_LENGTH") or 0)
@@ -500,6 +520,9 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
     new_status = body.get("status")
     if new_status not in {None, "running", "completed", "failed"}:
         return JsonResponse({"error": f"invalid callback status: {new_status!r}"}, status=400)
+    input_intent = body.get("input_intent")
+    if input_intent not in {None, "peek", "consume"}:
+        return JsonResponse({"error": f"invalid input_intent: {input_intent!r}"}, status=400)
     finding = body.get("finding")
     if finding is not None:
         if not isinstance(finding, dict):
@@ -608,7 +631,53 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
         },
     )
 
-    return JsonResponse({"ok": True, "continue": task.status == AgentTask.Status.RUNNING})
+    payload = {"ok": True, "continue": task.status == AgentTask.Status.RUNNING}
+    payload.update(_steering_input_payload(task, input_intent))
+    return JsonResponse(payload)
+
+
+def _steering_input_payload(task: AgentTask, input_intent: str | None) -> dict:
+    """Queued follow-up prompts for the state-callback response (#1390).
+
+    Returns ``{}`` for a plain heartbeat so the common path adds no query.
+    Only a RUNNING task is served: a terminal callback has no next turn to
+    consume at, and claiming there would mark messages delivered into a
+    pod that is on its way out.
+    """
+    if input_intent is None:
+        return {}
+    if task.status != AgentTask.Status.RUNNING:
+        return {"pending_input_count": 0, **({"pending_input": []} if input_intent == "consume" else {})}
+
+    from astrolift_agents.services.agent_task_input import (
+        claim_pending_input,
+        pending_input_count,
+        serialize_pending_input,
+    )
+
+    if input_intent == "peek":
+        return {"pending_input_count": pending_input_count(task)}
+
+    claimed = claim_pending_input(task)
+    if claimed:
+        # The genuine agent-signal path, captured the same way the cancel
+        # signal is (#1216/#1217): this is control-plane-observed input
+        # crossing into the pod, not just another Control API call.
+        record_interaction(
+            task,
+            kind=AgentInteraction.Kind.SIGNAL,
+            name="input",
+            detail={
+                "count": len(claimed),
+                "message_ids": [str(row.guid) for row in claimed],
+            },
+        )
+    return {
+        "pending_input": serialize_pending_input(claimed),
+        # What is STILL queued after this claim, so a runner that hit the
+        # batch cap knows to come back at the next turn boundary.
+        "pending_input_count": pending_input_count(task),
+    }
 
 
 # ---------------------------------------------------------------------------
