@@ -28,6 +28,7 @@ Executable managed services:
 - FirestoreNativeDriver — document_db/firestore_native
 - CloudSQLServerDriver — mssql/cloudsql_sqlserver
 - SpannerGraphDriver — graph_db/spanner_graph
+- WorkflowsDriver — workflow_engine/workflows
 - CloudFunctionsDriver — faas/cloud_functions_gen2
 - APIGatewayDriver — api_gateway/api_gateway
 - ManagedKafkaDriver — event_stream/managed_kafka
@@ -66,6 +67,7 @@ from gcp.managed.timeseries_managed_prometheus import GCPManagedPrometheusDriver
 from gcp.managed.topic_pubsub import PubSubTopicDriver
 from gcp.managed.vector_vertex import VertexMatchingEngineDriver
 from gcp.managed.warehouse_bigquery import BigQueryWarehouseDriver
+from gcp.managed.workflow_workflows import WorkflowsDriver
 from gcp.notification_fcm import FCMNotificationDriver
 from gcp.registry_artifact import ArtifactRegistryDriver
 from gcp.secrets import GCPSecretsBackend
@@ -104,6 +106,7 @@ PLUGIN = ProviderPlugin(
         ("document_db", "firestore_native"): FirestoreNativeDriver,
         ("mssql", "cloudsql_sqlserver"): CloudSQLServerDriver,
         ("graph_db", "spanner_graph"): SpannerGraphDriver,
+        ("workflow_engine", "workflows"): WorkflowsDriver,
         ("faas", "cloud_functions_gen2"): CloudFunctionsDriver,
         ("api_gateway", "api_gateway"): APIGatewayDriver,
         ("event_stream", "managed_kafka"): ManagedKafkaDriver,
@@ -422,6 +425,51 @@ PLUGIN = ProviderPlugin(
             "spanner_adopt_existing_instance": {
                 "type": "boolean",
                 "default": False,
+            },
+            "workflows_name_prefix": {
+                "type": "string",
+                "default": "astrolift",
+            },
+            "workflows_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "workflows_call_log_level_default": {
+                "type": "string",
+                "enum": [
+                    "CALL_LOG_LEVEL_UNSPECIFIED",
+                    "LOG_ALL_CALLS",
+                    "LOG_ERRORS_ONLY",
+                    "LOG_NONE",
+                ],
+                "default": "LOG_ERRORS_ONLY",
+            },
+            "workflows_execution_history_level_default": {
+                "type": "string",
+                "enum": [
+                    "EXECUTION_HISTORY_LEVEL_UNSPECIFIED",
+                    "EXECUTION_HISTORY_BASIC",
+                    "EXECUTION_HISTORY_DETAILED",
+                ],
+                "default": "EXECUTION_HISTORY_BASIC",
+            },
+            "workflows_api_endpoint": {
+                "type": "string",
+                "default": "https://workflows.googleapis.com/v1",
+            },
+            "workflow_executions_api_endpoint": {
+                "type": "string",
+                "default": "https://workflowexecutions.googleapis.com/v1",
+            },
+            "workflows_operation_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 900,
+            },
+            "workflows_operation_poll_interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 2,
             },
             "cloudsql_private_network": {
                 "type": "string",
