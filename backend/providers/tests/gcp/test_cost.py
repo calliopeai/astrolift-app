@@ -257,6 +257,7 @@ def test_service_id_table_covers_core_kinds() -> None:
     assert ("topic", "pubsub_topic") in SERVICE_ID_BY_VARIANT
     assert ("warehouse", "bigquery") in SERVICE_ID_BY_VARIANT
     assert ("document_db", "firestore_native") in SERVICE_ID_BY_VARIANT
+    assert ("event_bus", "eventarc") in SERVICE_ID_BY_VARIANT
     assert ("postgres", "cloudsql") in SERVICE_ID_BY_VARIANT
     assert ("filesystem", "filestore") in SERVICE_ID_BY_VARIANT
 
