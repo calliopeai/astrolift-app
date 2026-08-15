@@ -925,6 +925,50 @@ def _k8s_managed_config_for(
             deletion_timeout_seconds=float(pc.get("mssql_deletion_timeout_seconds", 120)),
         )
     if pair in {
+        ("search", "opensearch_operator"),
+        ("vector_index", "opensearch_operator_vector"),
+    }:
+        from k8s_native.managed.opensearch_operator import (
+            CURRENT_API_VERSION,
+            DEFAULT_BOOTSTRAP_IMAGE,
+            DEFAULT_IMAGE,
+            DEFAULT_VERSION,
+            OpenSearchOperatorConfig,
+        )
+
+        from core.app_deploy import AppDeployError, driver_for_capability
+
+        try:
+            secrets_backend = driver_for_capability(cluster, "secrets")
+        except AppDeployError as exc:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: cannot resolve the secrets backend required by OpenSearch: {exc}",
+            ) from exc
+        return OpenSearchOperatorConfig(
+            cluster_driver=cluster_driver,
+            secrets_backend=secrets_backend,
+            namespace=_optional_string(pc.get("opensearch_namespace")),
+            storage_class_name=str(pc.get("opensearch_storage_class_name", "")),
+            api_version=str(pc.get("opensearch_api_version", CURRENT_API_VERSION)),
+            operator_namespace=str(pc.get("opensearch_operator_namespace", "opensearch-operator-system")),
+            version=str(pc.get("opensearch_version", DEFAULT_VERSION)),
+            image=str(pc.get("opensearch_image", DEFAULT_IMAGE)),
+            bootstrap_image=str(pc.get("opensearch_bootstrap_image", DEFAULT_BOOTSTRAP_IMAGE)),
+            credential_path_prefix=str(pc.get("opensearch_credential_path_prefix", "managed/opensearch")),
+            allow_custom_versions=bool(pc.get("opensearch_allow_custom_versions", False)),
+            allow_custom_images=bool(pc.get("opensearch_allow_custom_images", False)),
+            allow_custom_bootstrap_images=bool(pc.get("opensearch_allow_custom_bootstrap_images", False)),
+            allow_custom_plugins=bool(pc.get("opensearch_allow_custom_plugins", False)),
+            allow_single_node=bool(pc.get("opensearch_allow_single_node", False)),
+            allow_network_policy_disable=bool(pc.get("opensearch_allow_network_policy_disable", False)),
+            http_tls_secret_name=str(pc.get("opensearch_http_tls_secret_name", "")),
+            http_tls_ca_secret_name=str(pc.get("opensearch_http_tls_ca_secret_name", "")),
+            http_tls_admin_secret_name=str(pc.get("opensearch_http_tls_admin_secret_name", "")),
+            http_tls_admin_dns=tuple(str(value) for value in pc.get("opensearch_http_tls_admin_dns", [])),
+            http_tls_verify=bool(pc.get("opensearch_http_tls_verify", False)),
+            deletion_timeout_seconds=float(pc.get("opensearch_deletion_timeout_seconds", 180)),
+        )
+    if pair in {
         ("filesystem", "nfs_csi"),
         ("filesystem", "nfs_subdir_provisioner"),
     }:

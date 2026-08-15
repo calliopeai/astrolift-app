@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add preview OpenSearch Operator search and vector services for Kubernetes
+  installs with OpenSearch 3.8, secure 3.x CRDs, tenant-scoped users and
+  NetworkPolicies, digest-pinned non-root vector-index bootstrapping, explicit
+  HNSW mappings, protected storage teardown, and external secret bindings.
 - Add preview Kubernetes SQL Server 2025 Express managed services with
   non-root StatefulSets, durable PVCs, external credential bundles, encrypted
   TDS bindings, guarded LoadBalancer exposure, safe expansion, and optional

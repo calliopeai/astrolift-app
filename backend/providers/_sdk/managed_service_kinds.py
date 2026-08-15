@@ -187,14 +187,25 @@ KINDS = KindCatalog(
                 "VECTOR_ENDPOINT",
                 "VECTOR_INDEX_NAME",
             ),
-            binding_envs_optional=("VECTOR_API_KEY", "VECTOR_NAMESPACE"),
+            binding_envs_optional=(
+                "VECTOR_API_KEY",
+                "VECTOR_NAMESPACE",
+                "VECTOR_USERNAME",
+                "VECTOR_PASSWORD",
+                "VECTOR_TLS_VERIFY",
+            ),
             snapshot_supported=True,
         ),
         ManagedServiceKind(
             name="search",
             description=("Full-text search index (Elasticsearch / OpenSearch / Typesense / Meilisearch)"),
             binding_envs_required=("SEARCH_ENDPOINT",),
-            binding_envs_optional=("SEARCH_USER", "SEARCH_PASSWORD", "SEARCH_INDEX_PREFIX"),
+            binding_envs_optional=(
+                "SEARCH_USER",
+                "SEARCH_PASSWORD",
+                "SEARCH_INDEX_PREFIX",
+                "SEARCH_TLS_VERIFY",
+            ),
             snapshot_supported=True,
         ),
         ManagedServiceKind(

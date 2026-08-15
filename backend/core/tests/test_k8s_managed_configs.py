@@ -48,6 +48,9 @@ def _cluster(**provider_overrides):
         "mssql_namespace": "database-system",
         "mssql_storage_class_name": "database-rwo",
         "mssql_credential_path_prefix": "managed/sqlserver",
+        "opensearch_namespace": "search-system",
+        "opensearch_storage_class_name": "search-rwo",
+        "opensearch_credential_path_prefix": "managed/search",
         "nfs_storage_class_name": "nfs-rwx",
         "filesystem_pvc_storage_class_name": "standard-rwo",
         "rook_cephfs_storage_class_name": "rook-shared",
@@ -77,6 +80,8 @@ def test_every_registered_k8s_managed_driver_has_live_config(monkeypatch) -> Non
         if (kind, variant) in {
             ("object_store", "seaweedfs_operator"),
             ("mssql", "sqlserver_express"),
+            ("search", "opensearch_operator"),
+            ("vector_index", "opensearch_operator_vector"),
         }:
             assert config.secrets_backend is secrets_backend
 
@@ -154,6 +159,26 @@ def test_k8s_operator_defaults_are_exposed_in_provider_schema() -> None:
         "mssql_volume_snapshot_class",
         "mssql_allow_crash_consistent_snapshots",
         "mssql_deletion_timeout_seconds",
+        "opensearch_namespace",
+        "opensearch_storage_class_name",
+        "opensearch_api_version",
+        "opensearch_operator_namespace",
+        "opensearch_version",
+        "opensearch_image",
+        "opensearch_bootstrap_image",
+        "opensearch_credential_path_prefix",
+        "opensearch_allow_custom_versions",
+        "opensearch_allow_custom_images",
+        "opensearch_allow_custom_bootstrap_images",
+        "opensearch_allow_custom_plugins",
+        "opensearch_allow_single_node",
+        "opensearch_allow_network_policy_disable",
+        "opensearch_http_tls_secret_name",
+        "opensearch_http_tls_ca_secret_name",
+        "opensearch_http_tls_admin_secret_name",
+        "opensearch_http_tls_admin_dns",
+        "opensearch_http_tls_verify",
+        "opensearch_deletion_timeout_seconds",
         "nfs_storage_class_name",
         "nfs_server_address",
         "nfs_server_export",
@@ -221,6 +246,46 @@ def test_mssql_config_preserves_install_policy_and_secret_backend(monkeypatch) -
     assert config.secrets_backend is secrets_backend
 
 
+@pytest.mark.parametrize(
+    ("kind", "variant"),
+    [
+        ("search", "opensearch_operator"),
+        ("vector_index", "opensearch_operator_vector"),
+    ],
+)
+def test_opensearch_config_preserves_install_policy_and_secret_backend(
+    monkeypatch,
+    kind,
+    variant,
+) -> None:
+    cluster_driver = object()
+    secrets_backend = object()
+    monkeypatch.setattr("core.cluster_observability._driver_for_cluster", lambda _cluster: cluster_driver)
+    monkeypatch.setattr(
+        "core.app_deploy.driver_for_capability", lambda _cluster, _capability: secrets_backend
+    )
+
+    config = managed_config_for(
+        "k8s_native",
+        _cluster(
+            opensearch_allow_single_node=True,
+            opensearch_allow_custom_plugins=True,
+            opensearch_operator_namespace="search-operator",
+        ),
+        kind=kind,
+        variant=variant,
+    )
+
+    assert config.namespace == "search-system"
+    assert config.storage_class_name == "search-rwo"
+    assert config.credential_path_prefix == "managed/search"
+    assert config.operator_namespace == "search-operator"
+    assert config.allow_single_node is True
+    assert config.allow_custom_plugins is True
+    assert config.cluster_driver is cluster_driver
+    assert config.secrets_backend is secrets_backend
+
+
 def test_dynamic_filesystems_are_executable_preview_catalog_entries() -> None:
     from astrolift_services.managed_service_catalog import list_catalog
 
@@ -266,3 +331,23 @@ def test_sqlserver_express_is_an_executable_preview_catalog_entry() -> None:
         "MSSQL_TRUST_SERVER_CERTIFICATE",
         "DATABASE_URL",
     }
+
+
+def test_opensearch_variants_are_executable_preview_catalog_entries() -> None:
+    from astrolift_services.managed_service_catalog import list_catalog
+
+    rows = {
+        (row.kind, row.variant): row
+        for row in list_catalog("k8s_native")
+        if row.kind in {"search", "vector_index"}
+    }
+
+    search = rows[("search", "opensearch_operator")]
+    vector = rows[("vector_index", "opensearch_operator_vector")]
+    assert search.available is True
+    assert search.status == "preview"
+    assert "SEARCH_TLS_VERIFY" in search.binding_envs
+    assert vector.available is True
+    assert vector.status == "preview"
+    assert "VECTOR_USERNAME" in vector.binding_envs
+    assert "VECTOR_PASSWORD" in vector.binding_envs

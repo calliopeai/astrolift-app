@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from _sdk.cluster_capabilities import ClusterCapabilities
+from k8s_native.managed.opensearch_operator import MINIMUM_OPERATOR_VERSION
 from k8s_native.preflight import REQUIREMENTS, preflight
 
 
@@ -104,6 +105,46 @@ def test_sqlserver_express_preflight_requires_no_operator() -> None:
     assert report.ok is True
     assert report.install_hints == []
     assert "amd64" in REQUIREMENTS[("mssql", "sqlserver_express")].install_hint
+
+
+def test_opensearch_preflight_requires_secure_operator_release() -> None:
+    assert REQUIREMENTS[("search", "opensearch_operator")].minimum_operator_version == MINIMUM_OPERATOR_VERSION
+    assert (
+        REQUIREMENTS[("vector_index", "opensearch_operator_vector")].minimum_operator_version
+        == MINIMUM_OPERATOR_VERSION
+    )
+    missing = ClusterCapabilities(cluster_id="x", kubernetes_version="1.30")
+    stale = ClusterCapabilities(
+        cluster_id="x",
+        kubernetes_version="1.30",
+        operator_versions={"opensearch-operator": "2.8.4"},
+    )
+    current = ClusterCapabilities(
+        cluster_id="x",
+        kubernetes_version="1.30",
+        operator_versions={"opensearch-operator": "opensearch-operator-3.0.2"},
+    )
+
+    missing_report = preflight(
+        kind="search",
+        variant="opensearch_operator",
+        capabilities=missing,
+    )
+    stale_report = preflight(
+        kind="vector_index",
+        variant="opensearch_operator_vector",
+        capabilities=stale,
+    )
+    current_report = preflight(
+        kind="vector_index",
+        variant="opensearch_operator_vector",
+        capabilities=current,
+    )
+
+    assert missing_report.failures[0].code == "missing_operator"
+    assert stale_report.failures[0].code == "operator_too_old"
+    assert "3.0.2" in stale_report.install_hints[0]
+    assert current_report.ok is True
 
 
 def test_all_registered_requirements_have_install_hints() -> None:
