@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from astrolift_manifest.env_injection import envelope_keys_for
 
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, SnapshotHandle, UpdateSpec
 from azure.managed.filesystem_files_classic import (
@@ -293,6 +294,9 @@ def test_smb_provisions_hardened_account_share_keys_and_binding() -> None:
     assert binding.env_vars["FILESYSTEM_PASSWORD"].secret_ref == f"astrolift-files-{account}-primary"
     assert binding.env_vars["FILESYSTEM_PASSWORD_SECONDARY"].secret_ref.endswith("-secondary")
     assert len(binding.iam_grants) == 2
+    # #1003: SMB and NFS populate FILESYSTEM_TLS on separate branches, so the
+    # canonical envelope is checked on both.
+    assert set(envelope_keys_for("filesystem")) <= set(binding.env_vars)
 
     volume = binding.pod_volume_mounts[0]
     assert volume.mount_path == "/mnt/shared"
@@ -340,6 +344,7 @@ def test_nfs_requires_premium_uses_network_auth_and_aznfs_shape() -> None:
     assert "notls" in str(binding.env_vars["FILESYSTEM_MOUNT_OPTIONS"].literal)
     assert "FILESYSTEM_PASSWORD" not in binding.env_vars
     assert binding.iam_grants == []
+    assert set(envelope_keys_for("filesystem")) <= set(binding.env_vars)
 
     volume = binding.pod_volume_mounts[0]
     assert volume.csi_driver == "file.csi.azure.com"

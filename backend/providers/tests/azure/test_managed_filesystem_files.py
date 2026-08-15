@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from astrolift_manifest.env_injection import envelope_keys_for
 
 from _sdk.managed_service import (
     DeprovisionSpec,
@@ -290,6 +291,9 @@ def test_provisions_top_level_nfs_share_and_emits_portable_binding() -> None:
     assert binding.env_vars["FILESYSTEM_READ_ONLY"].literal == "true"
     assert binding.iam_grants == []
     assert "AZNFS" in binding.notes
+    # #1003: only the canonical envelope keys reach a workload's environment,
+    # so a driver that drops one binds successfully and then no-ops at runtime.
+    assert set(envelope_keys_for("filesystem")) <= set(binding.env_vars)
 
     assert len(binding.pod_volume_mounts) == 1
     volume = binding.pod_volume_mounts[0]
