@@ -1,7 +1,8 @@
-import core.fields.uuid_v7
 import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
+
+import core.fields.uuid_v7
 
 
 class Migration(migrations.Migration):
