@@ -27,6 +27,7 @@ Managed services:
 - AzureManagedRedisDriver — redis/azure_managed_redis
 - AzureCosmosDriver — kv_store/cosmos
 - AzureCosmosApiDriver — explicit NoSQL, MongoDB, Gremlin, Cassandra, and Table API variants
+- AzureFilesClassicDriver — filesystem/azure_files_classic
 - AzureAISearchFullTextDriver — search/azure_ai_search_fulltext
 - AzureAISearchVectorDriver — vector_index/azure_ai_search_vector
 - AzureMonitorPrometheusDriver — time_series/azure_monitor_prometheus
@@ -50,6 +51,7 @@ from azure.managed.event_grid import AzureEventGridDriver
 from azure.managed.event_grid_namespace import AzureEventGridNamespaceDriver
 from azure.managed.event_hubs import AzureEventHubsDriver
 from azure.managed.filesystem_files import AzureFilesDriver
+from azure.managed.filesystem_files_classic import AzureFilesClassicDriver
 from azure.managed.managed_redis import AzureManagedRedisDriver
 from azure.managed.model_endpoint_aoai import AzureOpenAIDriver
 from azure.managed.mssql_sql import AzureSQLDatabaseDriver, AzureSQLManagedInstanceDriver
@@ -135,6 +137,54 @@ _MANAGED_CONFIG_PROPERTIES = {
     "files_encryption_in_transit_required_default": {"type": "boolean", "default": True},
     "files_allowed_subnet_ids": {"type": "array", "minItems": 1, "items": {"type": "string"}},
     "files_deletion_protection_default": {"type": "boolean", "default": True},
+    "files_classic_account_name_prefix": {
+        "type": "string",
+        "pattern": "^[a-z0-9]{3,14}$",
+        "default": "astroliftfs",
+    },
+    "files_classic_share_name_prefix": {
+        "type": "string",
+        "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$",
+        "maxLength": 50,
+        "default": "astrolift-files",
+    },
+    "files_classic_default_protocol": {
+        "type": "string",
+        "enum": ["SMB", "NFS"],
+        "default": "SMB",
+    },
+    "files_classic_default_sku": {
+        "type": "string",
+        "enum": [
+            "Standard_LRS",
+            "Standard_GRS",
+            "Standard_RAGRS",
+            "Standard_ZRS",
+            "Standard_GZRS",
+            "Standard_RAGZRS",
+            "Premium_LRS",
+            "Premium_ZRS",
+        ],
+        "default": "Standard_LRS",
+    },
+    "files_classic_default_quota_gib": {"type": "integer", "minimum": 1, "maximum": 102400, "default": 100},
+    "files_classic_default_access_tier": {
+        "type": "string",
+        "enum": ["TransactionOptimized", "Hot", "Cool", "Premium"],
+        "default": "TransactionOptimized",
+    },
+    "files_classic_soft_delete_retention_days": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 365,
+        "default": 14,
+    },
+    "files_classic_allow_public_access_default": {"type": "boolean", "default": False},
+    "files_classic_secret_name_prefix": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9-]{1,92}$",
+        "default": "astrolift-files",
+    },
     "postgres_server_name_prefix": {"type": "string", "default": "astrolift"},
     "postgres_engine_version": {"type": "string", "default": "16"},
     "postgres_backup_retention_days": {"type": "integer", "minimum": 1, "maximum": 35, "default": 7},
@@ -327,6 +377,7 @@ PLUGIN = ProviderPlugin(
         ("event_bus", "event_grid"): AzureEventGridDriver,
         ("event_bus", "event_grid_namespace"): AzureEventGridNamespaceDriver,
         ("filesystem", "azure_files"): AzureFilesDriver,
+        ("filesystem", "azure_files_classic"): AzureFilesClassicDriver,
         ("kv_store", "cosmos"): AzureCosmosDriver,
         ("document_db", "cosmos_nosql"): AzureCosmosApiDriver,
         ("document_db", "cosmos_mongodb"): AzureCosmosApiDriver,

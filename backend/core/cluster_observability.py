@@ -1675,6 +1675,30 @@ def _azure_managed_config_for(
             deletion_protection_default=bool(pc.get("files_deletion_protection_default", True)),
         )
 
+    if pair == ("filesystem", "azure_files_classic"):
+        from azure.managed.filesystem_files_classic import AzureFilesClassicConfig
+
+        return AzureFilesClassicConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            location=location,
+            account_name_prefix=str(pc.get("files_classic_account_name_prefix", "astroliftfs")),
+            share_name_prefix=str(pc.get("files_classic_share_name_prefix", "astrolift-files")),
+            default_protocol=str(pc.get("files_classic_default_protocol", "SMB")),
+            default_sku=str(pc.get("files_classic_default_sku", "Standard_LRS")),
+            default_quota_gib=int(pc.get("files_classic_default_quota_gib", 100)),
+            default_access_tier=str(pc.get("files_classic_default_access_tier", "TransactionOptimized")),
+            default_root_squash=str(pc.get("files_default_root_squash", "RootSquash")),
+            encryption_in_transit_required_default=bool(
+                pc.get("files_encryption_in_transit_required_default", True),
+            ),
+            allowed_subnet_ids=tuple(str(value) for value in pc.get("files_allowed_subnet_ids", []) or []),
+            allow_public_access_default=bool(pc.get("files_classic_allow_public_access_default", False)),
+            soft_delete_retention_days=int(pc.get("files_classic_soft_delete_retention_days", 14)),
+            deletion_protection_default=bool(pc.get("files_deletion_protection_default", True)),
+            keyvault_url=vault_url,
+            secret_name_prefix=str(pc.get("files_classic_secret_name_prefix", "astrolift-files")),
+        )
     if pair == ("event_bus", "event_grid_namespace"):
         from azure.managed.event_grid_namespace import AzureEventGridNamespaceConfig
 

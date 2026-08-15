@@ -180,7 +180,7 @@ def test_managed_service_binding_envs_recorded() -> None:
     assert "AZURE_RESOURCE_GROUP" in azure_files.binding_envs
 
     classic = next(m for m in MATRIX.managed_services if m.plugin_id == "azure" and m.variant == "azure_files_classic")
-    assert classic.status == "planned"
+    assert classic.status == "preview"
 
     cosmos = {
         entry.variant: entry
@@ -222,7 +222,8 @@ def test_managed_service_binding_envs_recorded() -> None:
     assert "AZURE_RESOURCE_GROUP" in azure_files.binding_envs
 
     classic = next(m for m in MATRIX.managed_services if m.plugin_id == "azure" and m.variant == "azure_files_classic")
-    assert classic.status == "planned"
+    assert classic.status == "preview"
+    assert "FILESYSTEM_PASSWORD_SECONDARY" in classic.binding_envs
 
 
 def test_managed_service_keys_are_unique() -> None:

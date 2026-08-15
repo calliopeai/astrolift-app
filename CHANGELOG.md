@@ -125,6 +125,10 @@
   bindings, push destinations, event and advanced filters, batching, retries,
   dead-lettering, selected-network controls, identity delivery, and guarded
   destructive teardown.
+- Add the preview `filesystem/azure_files_classic` driver for storage-account
+  Azure Files SMB/NFS shares, including network ACLs, per-protocol encryption,
+  dual Key Vault-backed SMB rotation keys, snapshots, soft delete, guarded
+  teardown, and portable mount metadata.
 - Add Azure SQL Database provisioned, serverless, and Hyperscale variants plus
   Azure SQL Managed Instance with typed ARM requests, VNet/subnet isolation,
   Key Vault-backed portable bindings, retention controls, database-copy
