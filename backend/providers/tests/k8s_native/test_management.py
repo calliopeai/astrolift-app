@@ -296,6 +296,54 @@ def test_probe_finds_argo_controller_in_custom_namespace_and_ignores_server_only
     assert "argo-workflows" not in server_caps["operator_versions"]
 
 
+def test_probe_inventories_kserve_controller_in_default_or_custom_namespace() -> None:
+    crds = [
+        "inferenceservices.serving.kserve.io",
+        "servingruntimes.serving.kserve.io",
+        "clusterservingruntimes.serving.kserve.io",
+        "clusterstoragecontainers.serving.kserve.io",
+    ]
+    default = FakeManagementBackend(
+        crds=crds,
+        pods_by_namespace={
+            "kserve": [
+                {
+                    "name": "kserve-controller-manager-abc",
+                    "labels": {
+                        "app.kubernetes.io/name": "kserve-controller-manager",
+                        "app.kubernetes.io/version": "v0.20.0",
+                    },
+                    "image": "kserve/kserve-controller:v0.20.0",
+                },
+            ],
+        },
+    )
+    custom = FakeManagementBackend(
+        crds=crds,
+        pods_by_namespace={
+            "ml-platform": [
+                {
+                    "name": "kserve-controller-manager-custom",
+                    "labels": {"app.kubernetes.io/version": "v0.20.1"},
+                    "image": "kserve/kserve-controller:v0.20.1",
+                },
+            ],
+        },
+    )
+
+    default_caps = probe_cluster_capabilities(backend=default, cluster=_ctx())
+    custom_caps = probe_cluster_capabilities(backend=custom, cluster=_ctx())
+
+    assert default_caps["operator_versions"]["kserve"] == "v0.20.0"
+    assert default_caps["managed_service_operators"]["kserve"] == {
+        "installed": True,
+        "version": "v0.20.0",
+        "required_crds": crds,
+        "missing_crds": [],
+    }
+    assert custom_caps["operator_versions"]["kserve"] == "v0.20.1"
+
+
 def test_platform_namespace_operator_version_ignores_unrelated_charts():
     required = [
         "opensearchclusters.opensearch.org",

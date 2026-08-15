@@ -46,6 +46,7 @@ def _cluster(**provider_overrides):
         "gateway_api_class_name": "envoy-gateway",
         "knative_eventing_namespace": "eventing-system",
         "argo_workflows_namespace": "workflows-system",
+        "kserve_namespace": "models-system",
         "seaweed_namespace": "storage-system",
         "seaweed_cluster_name": "shared-store",
         "seaweed_s3_endpoint": "https://objects.example.test",
@@ -281,6 +282,68 @@ def test_argo_workflows_config_preserves_install_security_policy(monkeypatch) ->
     assert config.max_ttl_seconds == 86400
 
 
+def test_kserve_config_preserves_install_security_policy(monkeypatch) -> None:
+    cluster_driver = object()
+    monkeypatch.setattr("core.cluster_observability._driver_for_cluster", lambda _cluster: cluster_driver)
+
+    config = managed_config_for(
+        "k8s_native",
+        _cluster(
+            kserve_default_deployment_mode="Knative",
+            kserve_allowed_deployment_modes=["Standard", "Knative"],
+            kserve_service_account_name="model-runner",
+            kserve_allow_service_account_override=True,
+            kserve_allowed_service_accounts=["model-runner", "gpu-runner"],
+            kserve_allow_service_account_token=True,
+            kserve_allow_public=True,
+            kserve_allow_writable_storage=True,
+            kserve_allow_custom_containers=True,
+            kserve_allow_tagged_images=True,
+            kserve_allowed_image_prefixes=["registry.example.test/models"],
+            kserve_allowed_storage_uri_schemes=["s3", "https"],
+            kserve_allow_external_storage_urls=True,
+            kserve_allowed_external_storage_hosts=["models.example.test"],
+            kserve_allow_external_logger_urls=True,
+            kserve_allowed_external_logger_hosts=["logs.example.test"],
+            kserve_allow_privileged_pods=True,
+            kserve_allow_host_access=True,
+            kserve_allow_local_model_cache=True,
+            kserve_allowed_model_formats=["sklearn"],
+            kserve_allowed_serving_runtimes=["sklearn-runtime"],
+            kserve_allowed_autoscaler_classes=["hpa", "keda"],
+            kserve_max_replicas=12,
+        ),
+        kind="model_endpoint",
+        variant="kserve",
+    )
+
+    assert config.cluster_driver is cluster_driver
+    assert config.namespace == "models-system"
+    assert config.default_deployment_mode == "Knative"
+    assert config.allowed_deployment_modes == ("Standard", "Knative")
+    assert config.service_account_name == "model-runner"
+    assert config.allow_service_account_override is True
+    assert config.allowed_service_accounts == ("model-runner", "gpu-runner")
+    assert config.allow_service_account_token is True
+    assert config.allow_public is True
+    assert config.allow_writable_storage is True
+    assert config.allow_custom_containers is True
+    assert config.allow_tagged_images is True
+    assert config.allowed_image_prefixes == ("registry.example.test/models",)
+    assert config.allowed_storage_uri_schemes == ("s3", "https")
+    assert config.allow_external_storage_urls is True
+    assert config.allowed_external_storage_hosts == ("models.example.test",)
+    assert config.allow_external_logger_urls is True
+    assert config.allowed_external_logger_hosts == ("logs.example.test",)
+    assert config.allow_privileged_pods is True
+    assert config.allow_host_access is True
+    assert config.allow_local_model_cache is True
+    assert config.allowed_model_formats == ("sklearn",)
+    assert config.allowed_serving_runtimes == ("sklearn-runtime",)
+    assert config.allowed_autoscaler_classes == ("hpa", "keda")
+    assert config.max_replicas == 12
+
+
 def test_unknown_k8s_managed_pair_fails_closed(monkeypatch) -> None:
     monkeypatch.setattr("core.cluster_observability._driver_for_cluster", lambda _cluster: object())
 
@@ -359,6 +422,30 @@ def test_k8s_operator_defaults_are_exposed_in_provider_schema() -> None:
         "argo_workflows_max_active_deadline_seconds",
         "argo_workflows_default_ttl_seconds",
         "argo_workflows_max_ttl_seconds",
+        "kserve_namespace",
+        "kserve_default_deployment_mode",
+        "kserve_allowed_deployment_modes",
+        "kserve_service_account_name",
+        "kserve_allow_service_account_override",
+        "kserve_allowed_service_accounts",
+        "kserve_allow_service_account_token",
+        "kserve_allow_public",
+        "kserve_allow_writable_storage",
+        "kserve_allow_custom_containers",
+        "kserve_allow_tagged_images",
+        "kserve_allowed_image_prefixes",
+        "kserve_allowed_storage_uri_schemes",
+        "kserve_allow_external_storage_urls",
+        "kserve_allowed_external_storage_hosts",
+        "kserve_allow_external_logger_urls",
+        "kserve_allowed_external_logger_hosts",
+        "kserve_allow_privileged_pods",
+        "kserve_allow_host_access",
+        "kserve_allow_local_model_cache",
+        "kserve_allowed_model_formats",
+        "kserve_allowed_serving_runtimes",
+        "kserve_allowed_autoscaler_classes",
+        "kserve_max_replicas",
         "seaweed_namespace",
         "seaweed_cluster_name",
         "seaweed_s3_endpoint",

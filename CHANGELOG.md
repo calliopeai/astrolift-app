@@ -4,6 +4,13 @@
 
 ### Added
 
+- Add preview KServe 0.20 model endpoints for Kubernetes installs with the
+  complete native InferenceService predictor, transformer, explainer, model,
+  canary, accelerator, scheduling, scaling, and storage surface; Standard-mode
+  private/read-only defaults; portable REST and gRPC bindings; managed runtime
+  identity; exact-UID adoption; protected teardown; and install-level policy
+  gates for exposure, images, runtimes, storage, logging, tokens, pod security,
+  caches, deployment modes, autoscalers, and replica limits.
 - Add preview Argo Workflows 4.1 WorkflowTemplate resources for Kubernetes
   installs with native DAG/step/template specs, managed CronWorkflows and event
   bindings, least-privilege executor bootstrap, bounded parallelism/deadlines,

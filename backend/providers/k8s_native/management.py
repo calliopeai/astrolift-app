@@ -501,6 +501,7 @@ PROBE_NAMESPACES: tuple[str, ...] = (
     "rook-ceph",
     "opensearch-operator-system",
     "argo",
+    "kserve",
 )
 
 
@@ -514,6 +515,7 @@ _OPERATOR_NAMESPACES: dict[str, tuple[str, ...]] = {
     "rook-ceph-operator": ("rook-ceph",),
     "opensearch-operator": ("opensearch-operator-system",),
     "argo-workflows": ("argo", "*"),
+    "kserve": ("kserve", "*"),
 }
 
 _OPERATOR_POD_TOKENS: dict[str, tuple[str, ...]] = {
@@ -526,6 +528,7 @@ _OPERATOR_POD_TOKENS: dict[str, tuple[str, ...]] = {
     "rook-ceph-operator": ("rook-ceph",),
     "opensearch-operator": ("opensearch-operator",),
     "argo-workflows": ("workflow-controller",),
+    "kserve": ("kserve-controller-manager", "kserve-controller"),
 }
 
 

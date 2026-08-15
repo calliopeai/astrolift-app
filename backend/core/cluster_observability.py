@@ -1024,6 +1024,64 @@ def _k8s_managed_config_for(
                 pc.get("argo_workflows_max_ttl_seconds", 604800),
             ),
         )
+    if pair == ("model_endpoint", "kserve"):
+        from k8s_native.managed.model_endpoint_kserve import KServeConfig
+
+        return KServeConfig(
+            cluster_driver=cluster_driver,
+            namespace=_optional_string(pc.get("kserve_namespace")),
+            default_deployment_mode=str(
+                pc.get("kserve_default_deployment_mode", "Standard"),
+            ),
+            allowed_deployment_modes=tuple(
+                str(value) for value in pc.get("kserve_allowed_deployment_modes", ["Standard"])
+            ),
+            service_account_name=str(pc.get("kserve_service_account_name", "kserve-model")),
+            allow_service_account_override=bool(
+                pc.get("kserve_allow_service_account_override", False),
+            ),
+            allowed_service_accounts=tuple(
+                str(value) for value in pc.get("kserve_allowed_service_accounts", [])
+            ),
+            allow_service_account_token=bool(
+                pc.get("kserve_allow_service_account_token", False),
+            ),
+            allow_public=bool(pc.get("kserve_allow_public", False)),
+            allow_writable_storage=bool(pc.get("kserve_allow_writable_storage", False)),
+            allow_custom_containers=bool(pc.get("kserve_allow_custom_containers", False)),
+            allow_tagged_images=bool(pc.get("kserve_allow_tagged_images", False)),
+            allowed_image_prefixes=tuple(str(value) for value in pc.get("kserve_allowed_image_prefixes", [])),
+            allowed_storage_uri_schemes=tuple(
+                str(value)
+                for value in pc.get(
+                    "kserve_allowed_storage_uri_schemes",
+                    ["s3", "gs", "hf", "pvc", "oci", "oci+native"],
+                )
+            ),
+            allow_external_storage_urls=bool(
+                pc.get("kserve_allow_external_storage_urls", False),
+            ),
+            allowed_external_storage_hosts=tuple(
+                str(value) for value in pc.get("kserve_allowed_external_storage_hosts", [])
+            ),
+            allow_external_logger_urls=bool(
+                pc.get("kserve_allow_external_logger_urls", False),
+            ),
+            allowed_external_logger_hosts=tuple(
+                str(value) for value in pc.get("kserve_allowed_external_logger_hosts", [])
+            ),
+            allow_privileged_pods=bool(pc.get("kserve_allow_privileged_pods", False)),
+            allow_host_access=bool(pc.get("kserve_allow_host_access", False)),
+            allow_local_model_cache=bool(pc.get("kserve_allow_local_model_cache", False)),
+            allowed_model_formats=tuple(str(value) for value in pc.get("kserve_allowed_model_formats", [])),
+            allowed_serving_runtimes=tuple(
+                str(value) for value in pc.get("kserve_allowed_serving_runtimes", [])
+            ),
+            allowed_autoscaler_classes=tuple(
+                str(value) for value in pc.get("kserve_allowed_autoscaler_classes", ["hpa", "none"])
+            ),
+            max_replicas=int(pc.get("kserve_max_replicas", 100)),
+        )
     if pair == ("object_store", "seaweedfs_operator"):
         from k8s_native.managed.object_store_seaweedfs import SeaweedFSObjectStoreConfig
 
