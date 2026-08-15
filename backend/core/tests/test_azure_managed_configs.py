@@ -21,6 +21,16 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
             "virtualNetworks/platform/subnets/aks"
         ],
         "azure_openai_account_name": "platform-prod-ai",
+        "mssql_managed_instance_subnet_id": (
+            "/subscriptions/00000000-1111-2222-3333-444444444444/"
+            "resourceGroups/rg-platform-prod/providers/Microsoft.Network/"
+            "virtualNetworks/platform/subnets/sql-mi"
+        ),
+        "mssql_virtual_network_subnet_id": (
+            "/subscriptions/00000000-1111-2222-3333-444444444444/"
+            "resourceGroups/rg-platform-prod/providers/Microsoft.Network/"
+            "virtualNetworks/platform/subnets/aks"
+        ),
         "acs_communication_resource_id": (
             "/subscriptions/00000000-1111-2222-3333-444444444444/"
             "resourceGroups/rg-platform-prod/providers/"
@@ -55,6 +65,10 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
         ("time_series", "azure_monitor_prometheus", "AzureMonitorPrometheusConfig"),
         ("email", "azure_acs", "AzureCommunicationEmailConfig"),
         ("model_endpoint", "azure_openai", "AzureOpenAIConfig"),
+        ("mssql", "azure_sql_database", "AzureSQLDatabaseConfig"),
+        ("mssql", "azure_sql_serverless", "AzureSQLDatabaseConfig"),
+        ("mssql", "azure_sql_hyperscale", "AzureSQLDatabaseConfig"),
+        ("mssql", "azure_sql_managed_instance", "AzureSQLManagedInstanceConfig"),
     ],
 )
 def test_every_registered_azure_managed_service_has_runtime_config(
@@ -111,6 +125,41 @@ def test_database_controls_are_preserved() -> None:
     assert cosmos.database_name_default == "triage"
     assert cosmos.default_api_kind == "Gremlin"
     assert cosmos.backup_policy_default == "Periodic"
+
+    sql = managed_config_for(
+        "azure",
+        _cluster(
+            mssql_server_name_prefix="smd-sql",
+            mssql_database_name_prefix="tenant",
+            mssql_backup_retention_days_default=28,
+            mssql_backup_storage_redundancy_default="Zone",
+            mssql_serverless_auto_pause_delay_minutes_default=720,
+            mssql_serverless_min_capacity_default=1.0,
+        ),
+        kind="mssql",
+        variant="azure_sql_serverless",
+    )
+    assert sql.variant == "azure_sql_serverless"
+    assert sql.server_name_prefix == "smd-sql"
+    assert sql.database_name_prefix == "tenant"
+    assert sql.backup_retention_days_default == 28
+    assert sql.backup_storage_redundancy_default == "Zone"
+    assert sql.auto_pause_delay_minutes_default == 720
+    assert sql.min_capacity_default == 1.0
+    assert sql.virtual_network_subnet_id.endswith("/aks")
+
+    managed_instance = managed_config_for(
+        "azure",
+        _cluster(
+            mssql_managed_instance_name_prefix="smd-mi",
+            mssql_managed_instance_license_type_default="BasePrice",
+        ),
+        kind="mssql",
+        variant="azure_sql_managed_instance",
+    )
+    assert managed_instance.instance_name_prefix == "smd-mi"
+    assert managed_instance.subnet_id.endswith("/sql-mi")
+    assert managed_instance.license_type_default == "BasePrice"
 
 
 def test_messaging_and_search_controls_are_preserved() -> None:
@@ -228,6 +277,9 @@ def test_default_variant_selects_the_richer_azure_drivers() -> None:
     assert type(blob).__name__ == "AzureBlobConfig"
     assert type(bus).__name__ == "AzureServiceBusConfig"
     assert type(event_bus).__name__ == "AzureEventGridConfig"
+    sql = managed_config_for("azure", _cluster(), kind="mssql")
+    assert type(sql).__name__ == "AzureSQLDatabaseConfig"
+    assert sql.variant == "azure_sql_database"
 
 
 @pytest.mark.parametrize(
@@ -239,6 +291,8 @@ def test_default_variant_selects_the_richer_azure_drivers() -> None:
         ("servicebus_namespace", "queue", "azure_servicebus"),
         ("azure_openai_account_name", "model_endpoint", "azure_openai"),
         ("acs_communication_resource_id", "email", "azure_acs"),
+        ("mssql_managed_instance_subnet_id", "mssql", "azure_sql_managed_instance"),
+        ("mssql_virtual_network_subnet_id", "mssql", "azure_sql_database"),
     ],
 )
 def test_required_install_controls_fail_before_driver_construction(
@@ -262,4 +316,14 @@ def test_unknown_azure_variant_fails_closed() -> None:
             _cluster(),
             kind="filesystem",
             variant="not-shipped",
+        )
+
+
+def test_sql_database_disabled_public_endpoint_requires_private_endpoint_driver() -> None:
+    with pytest.raises(ClusterObservabilityError, match="requires a Private Endpoint driver"):
+        managed_config_for(
+            "azure",
+            _cluster(mssql_public_network_access_default="Disabled"),
+            kind="mssql",
+            variant="azure_sql_database",
         )

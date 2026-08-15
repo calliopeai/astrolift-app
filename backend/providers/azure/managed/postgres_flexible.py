@@ -53,6 +53,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from azure.managed.tags import arm_tags_for as tags_for
 from azure.secrets_keyvault import key_vault_secret_ref
 
 KIND = "postgres"
@@ -145,29 +146,6 @@ class AzurePostgresConfig:
     secret_client: Any | None = None
     """Injected ``SecretClient`` for tests. Production builds let
     the driver construct one against ``keyvault_url``."""
-
-
-def tags_for(spec: ProvisionSpec) -> dict[str, str]:
-    """Standard Azure tag set the platform applies to every
-    managed-service resource. Mirrors the MySQL-Flex driver's
-    ``tags_for`` helper to keep the cross-driver shape identical."""
-    base = {
-        "astrolift.io/managed-by": "platform",
-        "astrolift.io/organization": spec.organization_slug,
-        "astrolift.io/app": spec.app_slug,
-        "astrolift.io/environment": spec.environment_name,
-        "astrolift.io/cluster": spec.tenant_cluster_id,
-        "astrolift.io/isolation": spec.isolation,
-    }
-    # Per-binding cost-attribution keys (#438). Azure allows the
-    # slash + dot form so keys stay identical to the canonical
-    # platform schema.
-    if spec.binding_id:
-        base["astrolift.io/binding"] = spec.binding_id
-    if spec.managed_service_id:
-        base["astrolift.io/managed_service_id"] = spec.managed_service_id
-    base.update({f"astrolift.io/extra/{k}": v for k, v in (spec.tags or {}).items()})
-    return base
 
 
 class AzurePostgresFlexibleDriver(ManagedServiceDriver):

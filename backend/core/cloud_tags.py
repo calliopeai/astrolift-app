@@ -16,8 +16,8 @@ Three layers:
 * **Per-cloud serialization** (``to_aws`` / ``to_gcp`` / ``to_azure``)
   — each cloud has its own rules (AWS allows mixed case + most
   symbols; GCP requires lowercase + hyphen + 63-char limit; Azure
-  is case-insensitive with relaxed char set). Caller doesn't worry
-  about it.
+  is case-insensitive but forbids several characters, including ``/``).
+  Caller doesn't worry about it.
 * **Required-tag enforcement** (``MIN_REQUIRED_KEYS``) — a CI test
   in the providers repo asserts every freshly-provisioned cloud
   resource carries these. Catches plugin authors who forgot to
@@ -39,6 +39,8 @@ from __future__ import annotations
 import dataclasses
 import re
 from collections.abc import Mapping
+
+from _sdk.azure_tags import serialize_azure_arm_tags
 
 # Reserved namespace. Operators set custom tags on resources via
 # their own keys; the platform owns ``astrolift.io/*``.
@@ -173,11 +175,6 @@ _GCP_VALUE_MAX = 63
 _GCP_INVALID_VALUE = re.compile(r"[^a-z0-9_-]")
 
 
-# Azure tags: keys case-insensitive, [a-zA-Z0-9 _.\-:/], 512-char.
-# Values 256-char.
-_AZURE_VALUE_MAX = 256
-
-
 def _truncate(value: str, max_len: int) -> str:
     return value[:max_len]
 
@@ -221,10 +218,15 @@ def _gcp_normalize(s: str) -> str:
 
 
 def to_azure(tags: CloudTagSet) -> dict[str, str]:
-    """Azure-format tag dict. Keys + values left as-is;
-    truncated to limits."""
+    """Azure-format tag dict with valid, collision-safe ARM names.
+
+    ARM forbids ``<>%&\\?/`` in tag names, so canonical
+    ``astrolift.io/app`` becomes ``astrolift-app``. Values that exceed Azure's
+    limit fail closed instead of being silently truncated.
+    """
     raw = tags.as_canonical_dict()
-    return {k: _truncate(v, _AZURE_VALUE_MAX) for k, v in raw.items()}
+    platform = {key: value for key, value in raw.items() if key.startswith(f"{PLATFORM_NAMESPACE}/")}
+    return serialize_azure_arm_tags(platform, custom_tags=tags.extra)
 
 
 # ---- enforcement helpers -------------------------------------------

@@ -240,8 +240,8 @@ def test_provision_topic_carries_user_metadata(
     driver.provision(_spec())
     create = fake_client.topics_obj.create_calls[0]
     metadata = create["parameters"]["userMetadata"]
-    assert "astrolift.io/managed-by=platform" in metadata
-    assert "astrolift.io/app=api" in metadata
+    assert "astrolift-managed-by=platform" in metadata
+    assert "astrolift-app=api" in metadata
 
 
 def test_provision_default_message_ttl_passed_through(
