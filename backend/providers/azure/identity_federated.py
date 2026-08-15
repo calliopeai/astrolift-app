@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.azure_tags import serialize_azure_arm_tags
 from _sdk.identity import WorkloadIdentityDriver
 from azure._errors import NotFoundError, map_api_error
 
@@ -102,9 +103,9 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
                 resource_name=name,
                 parameters={
                     "location": "global",
-                    "tags": {
-                        "astrolift.io/managed-by": "platform",
-                    },
+                    "tags": serialize_azure_arm_tags(
+                        {"astrolift.io/managed-by": "platform"},
+                    ),
                 },
             )
         except Exception as exc:
