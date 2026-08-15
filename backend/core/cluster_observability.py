@@ -757,6 +757,35 @@ def _k8s_managed_config_for(
             cluster_driver=cluster_driver,
             secrets_backend=secrets_backend,
         )
+    if pair == ("mssql", "sqlserver_express"):
+        from k8s_native.managed.mssql_express import DEFAULT_IMAGE, SQLServerExpressConfig
+
+        from core.app_deploy import AppDeployError, driver_for_capability
+
+        try:
+            secrets_backend = driver_for_capability(cluster, "secrets")
+        except AppDeployError as exc:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: cannot resolve the secrets backend required by SQL Server Express: {exc}",
+            ) from exc
+        return SQLServerExpressConfig(
+            cluster_driver=cluster_driver,
+            secrets_backend=secrets_backend,
+            namespace=_optional_string(pc.get("mssql_namespace")),
+            storage_class_name=str(pc.get("mssql_storage_class_name", "")),
+            image=str(pc.get("mssql_image", DEFAULT_IMAGE)),
+            credential_path_prefix=str(pc.get("mssql_credential_path_prefix", "managed/mssql")),
+            allow_custom_images=bool(pc.get("mssql_allow_custom_images", False)),
+            allow_load_balancer=bool(pc.get("mssql_allow_load_balancer", False)),
+            allow_network_policy_disable=bool(
+                pc.get("mssql_allow_network_policy_disable", False),
+            ),
+            volume_snapshot_class=str(pc.get("mssql_volume_snapshot_class", "")),
+            allow_crash_consistent_snapshots=bool(
+                pc.get("mssql_allow_crash_consistent_snapshots", False),
+            ),
+            deletion_timeout_seconds=float(pc.get("mssql_deletion_timeout_seconds", 120)),
+        )
     if pair in {
         ("filesystem", "nfs_csi"),
         ("filesystem", "nfs_subdir_provisioner"),
