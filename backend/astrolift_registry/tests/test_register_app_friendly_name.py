@@ -45,8 +45,8 @@ def _info():
     return SimpleNamespace(context=SimpleNamespace(user=None, request=None))
 
 
-def _scaffold():
-    org = Organization.objects.create(name="Acme", slug="acme")
+def _scaffold(*, org_slug: str = "acme"):
+    org = Organization.objects.create(name="Acme", slug=org_slug)
     team = Team.objects.create(organization=org, name="Eng", slug="eng")
     project = Project.objects.create(organization=org, team=team, name="Demo", slug="demo")
     [plugin] = ProviderPlugin.objects.bulk_create(
@@ -146,3 +146,26 @@ def test_register_app_generated_slugs_are_unique_per_org(permission_resolver):
             slugs.add(result.data.slug)
 
     assert len(slugs) == 8
+
+
+def test_register_app_hashes_overlong_namespace_without_losing_identity(permission_resolver):
+    org, project = _scaffold(org_slug="organization-" + "a" * 28)
+    permission_resolver.grant(Permission.APP_CREATE)
+    app_slug = "application-" + "b" * 28
+
+    with _ctx(org):
+        result = RegistryMutation().register_app(
+            _info(),
+            input=RegisterAppInput(
+                project_id=str(project.guid),
+                name="Long App",
+                slug=app_slug,
+                source_repo="acme/long-app",
+            ),
+        )
+
+    assert result.ok, result.errors
+    namespace = RegisteredApp.objects.get(slug=app_slug).k8s_namespace
+    assert len(namespace) <= 63
+    assert re.fullmatch(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?", namespace)
+    assert namespace != f"{org.slug}-{app_slug}"

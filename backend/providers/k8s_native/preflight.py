@@ -247,32 +247,59 @@ def preflight(
             )
         )
 
-    # CRDs are typically the strongest signal an operator is up.
-    # The probe in cluster_capabilities populates per-operator
-    # bool flags (cnpg_installed, gateway_api_installed, etc.).
-    # For broader CRD checks, a future iteration should expose
-    # the raw CRD list from the probe; for now we use the
-    # bool flags where they exist.
-    operator_present = _operator_present(
-        capabilities=capabilities,
-        operator_id=requirement.operator_id,
-    )
-    if requirement.required_crds and not operator_present:
-        failures.append(
-            PreflightFailure(
-                requirement_id=requirement.operator_id,
-                code="missing_operator",
-                message=(
-                    f"operator {requirement.display_name!r} not "
-                    f"detected on cluster {capabilities.cluster_id!r}; "
-                    f"install via: {requirement.install_hint}"
-                ),
+    # A live raw CRD inventory is authoritative and lets us identify the exact
+    # missing API instead of reducing several failure modes to "operator not
+    # found". Legacy callers without that inventory retain their older boolean
+    # and operator-version fallback during rollout.
+    operator_present = True
+    if requirement.required_crds:
+        if capabilities.crd_inventory_probed:
+            missing_crds = sorted(set(requirement.required_crds) - set(capabilities.installed_crds))
+            operator_present = not missing_crds
+            for crd in missing_crds:
+                failures.append(
+                    PreflightFailure(
+                        requirement_id=requirement.operator_id,
+                        code="missing_crd",
+                        message=(
+                            f"cluster {capabilities.cluster_id!r} is missing required CRD {crd!r} "
+                            f"for {requirement.display_name}"
+                        ),
+                    )
+                )
+        else:
+            operator_present = _operator_present(
+                capabilities=capabilities,
+                operator_id=requirement.operator_id,
             )
-        )
-        hints.append(requirement.install_hint)
-    elif operator_present and requirement.minimum_operator_version:
+            if not operator_present:
+                failures.append(
+                    PreflightFailure(
+                        requirement_id=requirement.operator_id,
+                        code="missing_operator",
+                        message=(
+                            f"operator {requirement.display_name!r} not detected on cluster {capabilities.cluster_id!r}"
+                        ),
+                    )
+                )
+        if not operator_present:
+            hints.append(requirement.install_hint)
+
+    if operator_present and requirement.minimum_operator_version:
         actual_version = capabilities.operator_versions.get(requirement.operator_id, "")
-        if actual_version and _semantic_version_too_old(
+        if not actual_version:
+            failures.append(
+                PreflightFailure(
+                    requirement_id=requirement.operator_id,
+                    code="operator_version_unknown",
+                    message=(
+                        f"could not determine {requirement.display_name} version; "
+                        f"version {requirement.minimum_operator_version}+ is required"
+                    ),
+                )
+            )
+            hints.append(requirement.install_hint)
+        elif _semantic_version_too_old(
             actual=actual_version,
             minimum=requirement.minimum_operator_version,
         ):
@@ -293,6 +320,40 @@ def preflight(
         variant_key=key,
         failures=failures,
         install_hints=hints,
+    )
+
+
+def capabilities_from_payload(*, cluster_id: str, payload: dict[str, object]) -> ClusterCapabilities:
+    """Convert the persisted/live management probe payload into the typed
+    preflight contract without losing the raw CRD inventory."""
+    from _sdk.cluster_capabilities import ClusterCapabilities
+
+    operators = payload.get("managed_service_operators")
+    nested_versions = {
+        str(operator_id): str(details.get("version") or "")
+        for operator_id, details in (operators.items() if isinstance(operators, dict) else [])
+        if isinstance(details, dict) and details.get("version")
+    }
+    raw_versions = payload.get("operator_versions")
+    operator_versions = {
+        str(key): str(value) for key, value in (raw_versions.items() if isinstance(raw_versions, dict) else []) if value
+    }
+    operator_versions.update(nested_versions)
+    installed_crds_value = payload.get("installed_crds")
+    installed_crd_values = (
+        installed_crds_value if isinstance(installed_crds_value, (list, tuple, set, frozenset)) else ()
+    )
+    inventory_probed = installed_crd_values is installed_crds_value
+    installed_crds = frozenset(str(value) for value in installed_crd_values)
+    cert_manager = payload.get("cert_manager")
+    return ClusterCapabilities(
+        cluster_id=cluster_id,
+        kubernetes_version=str(payload.get("kubernetes_version") or ""),
+        cnpg_installed="clusters.postgresql.cnpg.io" in installed_crds,
+        cert_manager_installed=bool(isinstance(cert_manager, dict) and cert_manager.get("installed")),
+        operator_versions=operator_versions,
+        installed_crds=installed_crds,
+        crd_inventory_probed=inventory_probed,
     )
 
 

@@ -26,6 +26,11 @@ export type AstroliftManagedService = Pick<
   | "variant"
   | "status"
   | "statusError"
+  | "operationKind"
+  | "operationWorkflowId"
+  | "operationRunId"
+  | "operationStartedAt"
+  | "operationCompletedAt"
   | "environmentName"
   | "registeredAppSlug"
   | "projectSlug"
@@ -41,6 +46,7 @@ export type AstroliftManagedService = Pick<
 > & {
   /** JSON scalar — opaque shape; callers cast as needed. */
   config: Record<string, unknown>;
+  appliedConfig: Record<string, unknown> | null;
 };
 
 export interface AstroliftProjectSecretBundle {

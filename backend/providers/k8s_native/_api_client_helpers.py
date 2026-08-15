@@ -30,6 +30,30 @@ from __future__ import annotations
 from typing import Any
 
 
+def get_server_version_dict(api_client: Any, *, timeout_seconds: int = 10) -> dict[str, Any]:
+    """Read the apiserver ``/version`` document through the same explicit
+    bearer-auth path used by the other management probes."""
+    response = api_client.call_api(
+        "/version",
+        "GET",
+        path_params={},
+        query_params=[],
+        header_params={
+            "Accept": api_client.select_header_accept(["application/json"]),
+        },
+        body=None,
+        post_params=[],
+        files={},
+        response_type="object",
+        auth_settings=["BearerToken"],
+        async_req=False,
+        _return_http_data_only=True,
+        _preload_content=True,
+        _request_timeout=timeout_seconds,
+    )
+    return dict(response or {})
+
+
 def list_cluster_crd_names(api_client: Any, *, timeout_seconds: int = 10) -> list[str]:
     """List CRD names via low-level call_api — used by the capability
     probe.  Equivalent to

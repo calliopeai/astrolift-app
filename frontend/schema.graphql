@@ -2296,6 +2296,12 @@ type AstroliftManagedService {
   status: String!
   statusError: String!
   config: JSON!
+  appliedConfig: JSON
+  operationKind: String!
+  operationWorkflowId: String!
+  operationRunId: String!
+  operationStartedAt: DateTime
+  operationCompletedAt: DateTime
   registeredAppSlug: String!
   projectSlug: String!
   ownerScope: String!

@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import logging
 import random
+import re
 import string
 import time
 from dataclasses import dataclass, field
@@ -77,6 +78,10 @@ Job lands in clusters that ship the v1.25+ default policy."""
 
 
 _DEFAULT_CAPABILITIES: dict[str, Any] = {
+    "kubernetes_version": "",
+    "installed_crds": [],
+    "managed_service_operators": {},
+    "operator_versions": {},
     "cert_manager": {
         "installed": False,
         "version": None,
@@ -128,6 +133,9 @@ class ManagementBackend(Protocol):
     def list_cluster_crds(self, *, auth: ClusterAuth) -> list[str]:
         """Return CRD names (e.g. ``certificates.cert-manager.io``).
         Empty list when the apiserver responds but reports no CRDs."""
+
+    def get_server_version(self, *, auth: ClusterAuth) -> str:
+        """Return the live Kubernetes version (for example ``1.30.7``)."""
 
     def list_namespaced_pods(
         self,
@@ -478,7 +486,101 @@ PROBE_NAMESPACES: tuple[str, ...] = (
     "contour",
     "traefik",
     "haproxy-ingress",
+    # Managed-service operators. Their CRDs are the authoritative presence
+    # signal; pods provide the release/chart version for compatibility gates.
+    "cnpg-system",
+    "redis-operator",
+    "pxc-operator",
+    "psmdb-operator",
+    "kafka",
+    "strimzi-system",
+    "rabbitmq-system",
+    "rook-ceph",
+    "opensearch-operator-system",
 )
+
+
+_OPERATOR_NAMESPACES: dict[str, tuple[str, ...]] = {
+    "cnpg": ("cnpg-system",),
+    "redis-operator": ("redis-operator",),
+    "percona-xtradb-cluster": ("pxc-operator",),
+    "psmdb-operator": ("psmdb-operator",),
+    "strimzi-cluster-operator": ("kafka", "strimzi-system"),
+    "rabbitmq-cluster-operator": ("rabbitmq-system",),
+    "rook-ceph-operator": ("rook-ceph",),
+    "opensearch-operator": ("opensearch-operator-system",),
+}
+
+_OPERATOR_POD_TOKENS: dict[str, tuple[str, ...]] = {
+    "cnpg": ("cnpg", "cloudnative-pg"),
+    "redis-operator": ("redis-operator",),
+    "percona-xtradb-cluster": ("pxc-operator", "percona-xtradb"),
+    "psmdb-operator": ("psmdb-operator", "percona-server-mongodb"),
+    "strimzi-cluster-operator": ("strimzi",),
+    "rabbitmq-cluster-operator": ("rabbitmq",),
+    "rook-ceph-operator": ("rook-ceph",),
+    "opensearch-operator": ("opensearch-operator",),
+}
+
+
+def _pod_matches_operator(pod: dict[str, Any], operator_id: str) -> bool:
+    labels = pod.get("labels", {}) or {}
+    searchable = " ".join(
+        [
+            str(pod.get("name", "")),
+            str(pod.get("image", "")),
+            *(str(value) for value in labels.values()),
+        ]
+    ).lower()
+    return any(token in searchable for token in _OPERATOR_POD_TOKENS.get(operator_id, (operator_id,)))
+
+
+def _operator_version(pods: Sequence[dict[str, Any]]) -> str:
+    """Prefer Helm/app release labels over container image tags.
+
+    An operator image can carry an application alpha tag while the chart is
+    the supported release we gate on (OpenSearch is a concrete example).
+    """
+    for pod in pods:
+        labels = pod.get("labels", {}) or {}
+        for key in ("helm.sh/chart", "app.kubernetes.io/version"):
+            value = str(labels.get(key, "") or "")
+            if re.search(r"(?<![0-9])\d+\.\d+\.\d+(?![0-9])", value):
+                return value
+    for pod in pods:
+        image = str(pod.get("image", "") or "")
+        if re.search(r"(?<![0-9])\d+\.\d+\.\d+(?![0-9])", image):
+            return image.rsplit(":", 1)[-1]
+    return ""
+
+
+def _managed_service_operator_inventory(
+    *,
+    crds: Sequence[str],
+    pods_by_namespace: dict[str, list[dict[str, Any]]],
+) -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
+    from k8s_native.preflight import REQUIREMENTS
+
+    crd_set = set(crds)
+    platform_pods = pods_by_namespace.get(ASTROLIFT_NAMESPACE, [])
+    inventory: dict[str, dict[str, Any]] = {}
+    versions: dict[str, str] = {}
+    requirements_by_operator = {req.operator_id: req for req in REQUIREMENTS.values() if req.required_crds}
+    for operator_id, requirement in sorted(requirements_by_operator.items()):
+        pods = [pod for pod in platform_pods if _pod_matches_operator(pod, operator_id)]
+        for namespace in _OPERATOR_NAMESPACES.get(operator_id, ()):
+            pods.extend(pods_by_namespace.get(namespace, []))
+        missing_crds = sorted(set(requirement.required_crds) - crd_set)
+        version = _operator_version(pods)
+        if version:
+            versions[operator_id] = version
+        inventory[operator_id] = {
+            "installed": not missing_crds,
+            "version": version or None,
+            "required_crds": list(requirement.required_crds),
+            "missing_crds": missing_crds,
+        }
+    return inventory, versions
 
 
 def probe_cluster_capabilities(
@@ -496,6 +598,8 @@ def probe_cluster_capabilities(
     """
     auth = cluster.to_auth()
     crds = backend.list_cluster_crds(auth=auth)
+    version_probe = getattr(backend, "get_server_version", None)
+    kubernetes_version = str(version_probe(auth=auth) if callable(version_probe) else "")
     pods_by_namespace: dict[str, list[dict[str, Any]]] = {}
     for ns in PROBE_NAMESPACES:
         try:
@@ -557,6 +661,10 @@ def probe_cluster_capabilities(
         or p.get("labels", {}).get("app.kubernetes.io/name", "") in {"prometheus", "kube-prometheus-stack"}
     ]
     metrics_server, prometheus = _classify_metrics_and_prom(augmented)
+    operator_inventory, operator_versions = _managed_service_operator_inventory(
+        crds=crds,
+        pods_by_namespace=pods_by_namespace,
+    )
 
     # Auto-discover Prometheus pod IP for direct VPC-native queries from
     # the ECS control plane. Stored in capabilities["prometheus_endpoint"]
@@ -597,6 +705,10 @@ def probe_cluster_capabilities(
                 break
 
     return {
+        "kubernetes_version": kubernetes_version,
+        "installed_crds": sorted(set(crds)),
+        "managed_service_operators": operator_inventory,
+        "operator_versions": operator_versions,
         "cert_manager": cert_manager,
         "ingress": ingress,
         "storage_classes": list(storage_classes),
@@ -834,6 +946,18 @@ class LiveManagementBackend:
         from k8s_native.observability import build_api_client
 
         return list_cluster_crd_names(build_api_client(auth))
+
+    def get_server_version(self, *, auth: ClusterAuth) -> str:
+        from k8s_native._api_client_helpers import get_server_version_dict
+        from k8s_native.observability import build_api_client
+
+        payload = get_server_version_dict(build_api_client(auth))
+        git_version = str(payload.get("gitVersion", "") or "").lstrip("v")
+        if git_version:
+            return git_version
+        major = re.sub(r"\D", "", str(payload.get("major", "") or ""))
+        minor = re.sub(r"\D", "", str(payload.get("minor", "") or ""))
+        return ".".join(part for part in (major, minor) if part)
 
     def list_namespaced_pods(
         self,

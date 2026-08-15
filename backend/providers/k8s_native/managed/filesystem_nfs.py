@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.k8s_naming import app_namespace, dns_label
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -313,16 +314,17 @@ class NFSDriver(ManagedServiceDriver):
         }
 
     def _pvc_name(self, *, spec: ProvisionSpec) -> str:
-        parts = ["nfs", spec.app_slug, spec.environment_name]
-        if spec.service_handle_hint:
-            parts.append(spec.service_handle_hint)
-        clean = "-".join(p for p in parts if p).lower()
-        clean = "".join(c if c.isalnum() or c == "-" else "-" for c in clean)
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        return clean.strip("-")[:63]
+        return dns_label(
+            "nfs",
+            spec.app_slug,
+            spec.environment_name,
+            spec.service_handle_hint,
+        )
 
     def _namespace_for(self, *, spec: ProvisionSpec) -> str:
         if self._config.namespace:
             return self._config.namespace
-        return f"{spec.organization_slug}-{spec.app_slug}".lower()
+        return app_namespace(
+            organization_slug=spec.organization_slug,
+            app_slug=spec.app_slug,
+        )

@@ -53,7 +53,12 @@ def namespace_for_app(app: RegisteredApp) -> str:
     """
     if app.k8s_namespace:
         return str(app.k8s_namespace)
-    return f"{app.organization.slug}-{app.slug}"
+    from _sdk.k8s_naming import app_namespace
+
+    return app_namespace(
+        organization_slug=str(app.organization.slug),
+        app_slug=str(app.slug),
+    )
 
 
 def workload_identity_role_name(app: RegisteredApp) -> str:

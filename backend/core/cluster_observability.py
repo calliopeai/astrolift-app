@@ -119,8 +119,10 @@ def namespace_for_app(app: Any) -> str:
     explicit = (getattr(app, "k8s_namespace", "") or "").strip()
     if explicit:
         return explicit
+    from _sdk.k8s_naming import app_namespace
+
     org_slug = getattr(getattr(app, "organization", None), "slug", "") or ""
-    return f"{org_slug}-{app.slug}"
+    return app_namespace(organization_slug=org_slug, app_slug=str(app.slug))
 
 
 def _auth_for_cluster(cluster: TenantCluster) -> Any:

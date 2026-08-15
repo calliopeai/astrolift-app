@@ -94,6 +94,12 @@ export const LIST_PROJECT_RESOURCES = gql`
       status
       statusError
       config
+      appliedConfig
+      operationKind
+      operationWorkflowId
+      operationRunId
+      operationStartedAt
+      operationCompletedAt
       projectSlug
       ownerScope
       clusterSlug
@@ -182,6 +188,12 @@ export const LIST_MANAGED_SERVICES = gql`
       status
       statusError
       config
+      appliedConfig
+      operationKind
+      operationWorkflowId
+      operationRunId
+      operationStartedAt
+      operationCompletedAt
       createdAt
       updatedAt
       lastActionAt
