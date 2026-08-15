@@ -32,6 +32,7 @@ Executable managed services:
 - CloudCdnDriver — cdn/cloud_cdn
 - PrivateServiceConnectDriver — private_endpoint/private_service_connect
 - CloudFunctionsDriver — faas/cloud_functions_gen2
+- FilestoreDriver — filesystem/filestore
 - APIGatewayDriver — api_gateway/api_gateway
 - ManagedKafkaDriver — event_stream/managed_kafka
 - EventarcDriver — event_bus/eventarc
@@ -55,6 +56,7 @@ from gcp.managed.encryption_cloud_kms import CloudKMSDriver
 from gcp.managed.event_bus_eventarc import EventarcDriver
 from gcp.managed.event_stream_managed_kafka import ManagedKafkaDriver
 from gcp.managed.faas_cloud_functions import CloudFunctionsDriver
+from gcp.managed.filesystem_filestore import FilestoreDriver
 from gcp.managed.graph_spanner import SpannerGraphDriver
 from gcp.managed.model_endpoint_vertex import VertexAIEndpointDriver
 from gcp.managed.mssql_cloudsql import CloudSQLServerDriver
@@ -114,6 +116,7 @@ PLUGIN = ProviderPlugin(
         ("cdn", "cloud_cdn"): CloudCdnDriver,
         ("private_endpoint", "private_service_connect"): PrivateServiceConnectDriver,
         ("faas", "cloud_functions_gen2"): CloudFunctionsDriver,
+        ("filesystem", "filestore"): FilestoreDriver,
         ("api_gateway", "api_gateway"): APIGatewayDriver,
         ("event_stream", "managed_kafka"): ManagedKafkaDriver,
         ("event_bus", "eventarc"): EventarcDriver,
@@ -294,6 +297,73 @@ PLUGIN = ProviderPlugin(
                 "type": "string",
                 "default": "astrolift",
                 "description": "Prefix for platform-managed GCS buckets.",
+            },
+            "filestore_location": {
+                "type": "string",
+                "description": "Default Filestore zone or region; falls back to the cluster region.",
+            },
+            "filestore_network": {
+                "type": "string",
+                "description": "VPC network name or full resource name used by Filestore instances.",
+            },
+            "filestore_instance_name_prefix": {
+                "type": "string",
+                "default": "astrolift",
+            },
+            "filestore_share_name_default": {
+                "type": "string",
+                "default": "data",
+            },
+            "filestore_tier_default": {
+                "type": "string",
+                "enum": [
+                    "BASIC_HDD",
+                    "BASIC_SSD",
+                    "ENTERPRISE",
+                    "HIGH_SCALE_SSD",
+                    "PREMIUM",
+                    "REGIONAL",
+                    "STANDARD",
+                    "ZONAL",
+                ],
+                "default": "REGIONAL",
+            },
+            "filestore_protocol_default": {
+                "type": "string",
+                "enum": ["NFS_V3", "NFS_V4_1"],
+                "default": "NFS_V3",
+            },
+            "filestore_connect_mode_default": {
+                "type": "string",
+                "enum": [
+                    "DIRECT_PEERING",
+                    "PRIVATE_SERVICE_ACCESS",
+                    "PRIVATE_SERVICE_CONNECT",
+                ],
+                "default": "PRIVATE_SERVICE_CONNECT",
+            },
+            "filestore_reserved_ip_range": {"type": "string"},
+            "filestore_psc_endpoint_project": {"type": "string"},
+            "filestore_kms_key_name": {"type": "string"},
+            "filestore_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "filestore_backup_location": {"type": "string"},
+            "filestore_backup_kms_key": {"type": "string"},
+            "filestore_api_endpoint": {
+                "type": "string",
+                "default": "https://file.googleapis.com/v1",
+            },
+            "filestore_operation_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 3600,
+            },
+            "filestore_operation_poll_interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 5,
             },
             "pubsub_topic_prefix": {
                 "type": "string",

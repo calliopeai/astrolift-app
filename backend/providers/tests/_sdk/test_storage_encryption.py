@@ -26,6 +26,7 @@ def test_every_data_variant_has_policy() -> None:
         ("gcp", "graph_db", "spanner_graph"),
         ("gcp", "workflow_engine", "workflows"),
         ("gcp", "faas", "cloud_functions_gen2"),
+        ("gcp", "filesystem", "filestore"),
         ("gcp", "event_stream", "managed_kafka"),
         ("gcp", "event_bus", "eventarc"),
         ("azure", "object_store", "blob"),

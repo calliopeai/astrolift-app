@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from _sdk._telemetry import driver_op, maybe_heartbeat
 from _sdk.cluster import (
@@ -181,6 +181,8 @@ class K8sNativeClusterDriver(ClusterDriver):
         cluster: str,
         namespace: str,
         manifests: list[dict[str, Any]],
+        *,
+        propagation_policy: str | None = None,
     ) -> DeleteResult:
         client = self._k8s(cluster)
         deleted: list[str] = []
@@ -195,7 +197,12 @@ class K8sNativeClusterDriver(ClusterDriver):
             name = manifest.get("metadata", {}).get("name", "")
             ref = f"{kind}/{name}"
             try:
-                client.delete(kind=kind, namespace=namespace, name=name)
+                client.delete(
+                    kind=kind,
+                    namespace=namespace,
+                    name=name,
+                    propagation_policy=propagation_policy,
+                )
                 deleted.append(ref)
             except _NotFound:
                 not_found.append(ref)
@@ -296,9 +303,46 @@ class K8sNativeClusterDriver(ClusterDriver):
                 StorageClassInfo(
                     name=meta.get("name", ""),
                     is_default=(ann.get("storageclass.kubernetes.io/is-default-class") == "true"),
+                    provisioner=str(sc.get("provisioner") or ""),
+                    reclaim_policy=str(sc.get("reclaimPolicy") or "Delete"),
                 )
             )
         return out
+
+    @driver_op(cloud="k8s_native", driver="cluster")
+    def list_csi_drivers(self, cluster: str) -> list[str]:
+        client = self._k8s(cluster)
+        return sorted(
+            str((row.get("metadata", {}) or {}).get("name") or "")
+            for row in client.list(kind="storage.k8s.io/v1/CSIDriver")
+            if (row.get("metadata", {}) or {}).get("name")
+        )
+
+    @driver_op(cloud="k8s_native", driver="cluster")
+    def persistent_volume_claim_exists(self, cluster: str, namespace: str, name: str) -> bool:
+        return self._k8s(cluster).get(kind="PersistentVolumeClaim", namespace=namespace, name=name) is not None
+
+    @driver_op(cloud="k8s_native", driver="cluster")
+    def get_manifest(
+        self,
+        cluster: str,
+        namespace: str | None,
+        kind: str,
+        name: str,
+    ) -> dict[str, Any] | None:
+        return self._k8s(cluster).get(kind=kind, namespace=namespace, name=name)
+
+    @driver_op(cloud="k8s_native", driver="cluster")
+    def list_manifests(
+        self,
+        cluster: str,
+        namespace: str | None,
+        kind: str,
+    ) -> list[dict[str, Any]]:
+        return cast(
+            "list[dict[str, Any]]",
+            self._k8s(cluster).list(kind=kind, namespace=namespace),
+        )
 
     # ---- workload status ------------------------------------------
 

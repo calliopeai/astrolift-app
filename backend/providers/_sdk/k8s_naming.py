@@ -1,0 +1,56 @@
+"""Deterministic, collision-resistant Kubernetes DNS-label naming.
+
+Short canonical names remain byte-for-byte compatible with the historical
+``"-".join(parts)`` convention. Names that require normalization or truncation
+receive a stable hash suffix so two distinct long/unsafe inputs cannot collapse
+onto the same Kubernetes object.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import re
+
+_UNSAFE = re.compile(r"[^a-z0-9-]+")
+_DASH_RUN = re.compile(r"-+")
+_DNS_LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?")
+
+
+def dns_label(*parts: object, max_length: int = 63, hash_length: int = 10) -> str:
+    """Compose an RFC 1123 DNS label from ``parts``.
+
+    A suffix is added only when normalization changes identity or the result is
+    too long. This preserves deployed short names while making truncation and
+    unsafe-character folding collision resistant.
+    """
+    if max_length < hash_length + 2 or max_length > 63:
+        raise ValueError("max_length must leave room for a label and hash and cannot exceed 63")
+    rendered_parts: list[str] = []
+    for part in parts:
+        if part is None:
+            continue
+        rendered = str(part).strip()
+        if rendered:
+            rendered_parts.append(rendered)
+    raw = "-".join(rendered_parts)
+    normalized = _DASH_RUN.sub("-", _UNSAFE.sub("-", raw.lower())).strip("-")
+    if not normalized:
+        raise ValueError("could not derive a Kubernetes DNS label")
+    canonical_raw = raw.strip("-")
+    changed_identity = normalized != canonical_raw
+    if not changed_identity and len(normalized) <= max_length:
+        return normalized
+
+    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:hash_length]
+    prefix = normalized[: max_length - hash_length - 1].rstrip("-")
+    if not prefix:
+        prefix = "x"
+    value = f"{prefix}-{digest}"
+    if len(value) > max_length or _DNS_LABEL.fullmatch(value) is None:
+        raise ValueError("could not derive a valid Kubernetes DNS label")
+    return value
+
+
+def app_namespace(*, organization_slug: str, app_slug: str) -> str:
+    """Canonical per-app/project namespace, safe for maximum-length slugs."""
+    return dns_label(organization_slug, app_slug)
