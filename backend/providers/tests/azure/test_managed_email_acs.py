@@ -678,6 +678,7 @@ def test_binding_returns_connection_envelope(
         assert key in env
     assert env["EMAIL_PROVIDER"].literal == "azure_acs"
     assert env["EMAIL_API_KEY"].secret_ref is not None
+    assert env["EMAIL_API_KEY"].secret_ref.startswith("azure-kv://kv.vault.azure.net/secrets/")
     assert env["EMAIL_API_KEY"].literal is None
     assert env["ACS_CONNECTION_STRING"].secret_ref is not None
     assert env["ACS_MAILER_ENDPOINT"].literal == ("https://acme.communication.azure.com")

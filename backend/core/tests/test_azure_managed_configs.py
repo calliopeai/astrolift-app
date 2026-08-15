@@ -15,6 +15,11 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
         "vault_url": "https://platform-prod.vault.azure.net",
         "storage_account": "platformprod",
         "servicebus_namespace": "platform-prod-bus",
+        "files_allowed_subnet_ids": [
+            "/subscriptions/00000000-1111-2222-3333-444444444444/"
+            "resourceGroups/rg-network/providers/Microsoft.Network/"
+            "virtualNetworks/platform/subnets/aks"
+        ],
         "azure_openai_account_name": "platform-prod-ai",
         "acs_communication_resource_id": (
             "/subscriptions/00000000-1111-2222-3333-444444444444/"
@@ -40,6 +45,7 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
         ("queue", "azure_servicebus", "AzureServiceBusConfig"),
         ("stream", "event_hubs", "AzureEventHubsConfig"),
         ("event_stream", "event_hubs_kafka", "AzureEventHubsConfig"),
+        ("filesystem", "azure_files", "AzureFilesConfig"),
         ("postgres", "azure_pg_flex", "AzurePostgresConfig"),
         ("mysql", "azure_mysql_flex", "AzureMySQLConfig"),
         ("redis", "azure_cache_redis", "AzureCacheRedisConfig"),
@@ -150,6 +156,27 @@ def test_messaging_and_search_controls_are_preserved() -> None:
     assert event_hubs.default_sku == "Premium"
     assert event_hubs.default_capacity == 2
     assert event_hubs.default_consumer_group == "workers"
+
+    files = managed_config_for(
+        "azure",
+        _cluster(
+            files_name_prefix="smd-files",
+            files_default_storage_gib=256,
+            files_default_redundancy="Zone",
+            files_default_root_squash="AllSquash",
+            files_encryption_in_transit_required_default=False,
+            files_deletion_protection_default=False,
+        ),
+        kind="filesystem",
+        variant="azure_files",
+    )
+    assert files.name_prefix == "smd-files"
+    assert files.default_storage_gib == 256
+    assert files.default_redundancy == "Zone"
+    assert files.default_root_squash == "AllSquash"
+    assert files.encryption_in_transit_required_default is False
+    assert files.allowed_subnet_ids[0].endswith("/subnets/aks")
+    assert files.deletion_protection_default is False
 
     search = managed_config_for(
         "azure",
