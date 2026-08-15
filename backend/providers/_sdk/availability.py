@@ -35,6 +35,7 @@ _AWS_EVENTING_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1285"
 _AWS_PLATFORM_RESOURCES_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1286"
 _CROSS_CLOUD_PARITY_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1287"
 _AZURE_EVENT_GRID_CERTIFICATION_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1354"
+_AZURE_EVENT_GRID_NAMESPACE_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1355"
 
 
 @dataclass(frozen=True)
@@ -1565,6 +1566,27 @@ MATRIX = AvailabilityMatrix(
                 "EVENT_GRID_TOPIC_ENDPOINT",
                 "EVENT_GRID_TOPIC_RESOURCE_ID",
                 "EVENT_GRID_INPUT_SCHEMA",
+            ),
+        ),
+        ManagedServiceEntry(
+            kind="event_bus",
+            variant="event_grid_namespace",
+            plugin_id="azure",
+            status="preview",
+            description="Azure Event Grid Standard namespace topic with pull and push delivery",
+            issue_url=_AZURE_EVENT_GRID_NAMESPACE_ISSUE,
+            binding_envs=(
+                "EVENT_BUS_NAME",
+                "EVENT_BUS_ARN",
+                "EVENT_BUS_REGION",
+                "EVENT_BUS_ENDPOINT",
+                "EVENT_GRID_NAMESPACE",
+                "EVENT_GRID_NAMESPACE_HOSTNAME",
+                "EVENT_GRID_NAMESPACE_TOPIC",
+                "EVENT_GRID_NAMESPACE_PUBLISH_ENDPOINT",
+                "EVENT_GRID_NAMESPACE_SUBSCRIPTION",
+                "EVENT_GRID_NAMESPACE_RECEIVE_ENDPOINT",
+                "EVENT_GRID_NAMESPACE_ACCESS_KEY",
             ),
         ),
         ManagedServiceEntry(

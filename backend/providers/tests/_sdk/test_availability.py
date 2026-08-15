@@ -139,6 +139,15 @@ def test_managed_service_binding_envs_recorded() -> None:
     assert event_grid.issue_url.endswith("/1354")
     assert "EVENT_BUS_ENDPOINT" in event_grid.binding_envs
 
+    event_grid_namespace = next(
+        entry
+        for entry in MATRIX.managed_services
+        if entry.plugin_id == "azure" and entry.variant == "event_grid_namespace"
+    )
+    assert event_grid_namespace.status == "preview"
+    assert event_grid_namespace.issue_url.endswith("/1355")
+    assert "EVENT_GRID_NAMESPACE_RECEIVE_ENDPOINT" in event_grid_namespace.binding_envs
+
     azure_files = next(m for m in MATRIX.managed_services if m.plugin_id == "azure" and m.variant == "azure_files")
     assert azure_files.status == "preview"
     assert "FILESYSTEM_SOURCE" in azure_files.binding_envs

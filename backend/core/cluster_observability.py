@@ -895,6 +895,27 @@ def _azure_managed_config_for(
             deletion_protection_default=bool(pc.get("files_deletion_protection_default", True)),
         )
 
+    if pair == ("event_bus", "event_grid_namespace"):
+        from azure.managed.event_grid_namespace import AzureEventGridNamespaceConfig
+
+        if not vault_url:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: Azure event_bus/event_grid_namespace requires "
+                "provider_config.keyvault_url",
+            )
+        return AzureEventGridNamespaceConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            keyvault_url=vault_url,
+            location=location,
+            namespace_name_prefix=str(pc.get("eventgrid_namespace_name_prefix", "astrolift-egns")),
+            topic_name_prefix=str(pc.get("eventgrid_namespace_topic_name_prefix", "events")),
+            secret_name_prefix=str(
+                pc.get("eventgrid_namespace_secret_name_prefix", "event-grid-namespace"),
+            ),
+            default_capacity=int(pc.get("eventgrid_namespace_default_capacity", 1)),
+        )
+
     if pair == ("postgres", "azure_pg_flex") or (kind == "postgres" and not variant):
         from azure.managed.postgres_flexible import AzurePostgresConfig
 

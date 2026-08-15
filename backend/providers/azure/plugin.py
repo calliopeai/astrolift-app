@@ -18,6 +18,7 @@ Managed services:
 - AzureBlobStorageDriver — object_store/azure_blob
 - AzureServiceBusDriver — queue/azure_servicebus
 - AzureEventGridDriver — event_bus/event_grid
+- AzureEventGridNamespaceDriver — event_bus/event_grid_namespace
 - AzureFilesDriver — filesystem/azure_files
 - AzurePostgresFlexibleDriver — postgres/azure_pg_flex
 - AzureMySQLFlexibleDriver — mysql/azure_mysql_flex
@@ -39,6 +40,7 @@ from azure.managed.cache_redis import AzureCacheRedisDriver
 from azure.managed.cosmos import AzureCosmosDriver
 from azure.managed.email_acs import AzureCommunicationEmailDriver
 from azure.managed.event_grid import AzureEventGridDriver
+from azure.managed.event_grid_namespace import AzureEventGridNamespaceDriver
 from azure.managed.filesystem_files import AzureFilesDriver
 from azure.managed.model_endpoint_aoai import AzureOpenAIDriver
 from azure.managed.mysql_flexible import AzureMySQLFlexibleDriver
@@ -80,6 +82,15 @@ _MANAGED_CONFIG_PROPERTIES = {
         "type": "string",
         "enum": ["Enabled", "Disabled"],
         "default": "Enabled",
+    },
+    "eventgrid_namespace_name_prefix": {"type": "string", "default": "astrolift-egns"},
+    "eventgrid_namespace_topic_name_prefix": {"type": "string", "default": "events"},
+    "eventgrid_namespace_secret_name_prefix": {"type": "string", "default": "event-grid-namespace"},
+    "eventgrid_namespace_default_capacity": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 40,
+        "default": 1,
     },
     "files_name_prefix": {"type": "string", "default": "astrolift-files"},
     "files_default_storage_gib": {"type": "integer", "minimum": 32, "maximum": 262144, "default": 32},
@@ -205,6 +216,7 @@ PLUGIN = ProviderPlugin(
         ("object_store", "azure_blob"): AzureBlobStorageDriver,
         ("queue", "azure_servicebus"): AzureServiceBusDriver,
         ("event_bus", "event_grid"): AzureEventGridDriver,
+        ("event_bus", "event_grid_namespace"): AzureEventGridNamespaceDriver,
         ("filesystem", "azure_files"): AzureFilesDriver,
         ("kv_store", "cosmos"): AzureCosmosDriver,
         ("search", "azure_ai_search_fulltext"): AzureAISearchFullTextDriver,

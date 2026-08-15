@@ -44,6 +44,7 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
         ("queue", "servicebus", "ServiceBusConfig"),
         ("queue", "azure_servicebus", "AzureServiceBusConfig"),
         ("event_bus", "event_grid", "AzureEventGridConfig"),
+        ("event_bus", "event_grid_namespace", "AzureEventGridNamespaceConfig"),
         ("filesystem", "azure_files", "AzureFilesConfig"),
         ("postgres", "azure_pg_flex", "AzurePostgresConfig"),
         ("mysql", "azure_mysql_flex", "AzureMySQLConfig"),
@@ -149,6 +150,22 @@ def test_messaging_and_search_controls_are_preserved() -> None:
     assert event_grid.topic_name_prefix == "platform-events"
     assert event_grid.default_input_schema == "EventGridSchema"
     assert event_grid.public_network_access_default == "Enabled"
+
+    event_grid_namespace = managed_config_for(
+        "azure",
+        _cluster(
+            eventgrid_namespace_name_prefix="platform-egns",
+            eventgrid_namespace_topic_name_prefix="platform-events",
+            eventgrid_namespace_secret_name_prefix="egns",
+            eventgrid_namespace_default_capacity=4,
+        ),
+        kind="event_bus",
+        variant="event_grid_namespace",
+    )
+    assert event_grid_namespace.namespace_name_prefix == "platform-egns"
+    assert event_grid_namespace.topic_name_prefix == "platform-events"
+    assert event_grid_namespace.secret_name_prefix == "egns"
+    assert event_grid_namespace.default_capacity == 4
 
     files = managed_config_for(
         "azure",
