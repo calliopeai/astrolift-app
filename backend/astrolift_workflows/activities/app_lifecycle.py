@@ -982,6 +982,10 @@ def _update_secrets_sync(deployment_id: int) -> int:
                         raw_value = str(next(iter(resolved.values())))
                     else:
                         raw_value = str(resolved)
+                    if not raw_value:
+                        raise AppDeployError(
+                            f"binding {svc.kind}/{svc.name}#{env_key} resolved to an empty secret value",
+                        )
                 else:
                     raw_value = binding.env_value_ref
                 bindings_data[env_key] = base64.b64encode(

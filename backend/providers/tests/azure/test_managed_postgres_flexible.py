@@ -642,6 +642,8 @@ def test_binding_returns_connection_envelope(
     ):
         assert key in env
     assert env["DATABASE_PASSWORD"].secret_ref is not None
+    assert env["DATABASE_PASSWORD"].secret_ref.startswith("azure-kv://kv.vault.azure.net/secrets/")
+    assert env["DATABASE_URL"].secret_ref.startswith("azure-kv://kv.vault.azure.net/secrets/")
     assert env["DATABASE_PASSWORD"].literal is None
     assert env["DATABASE_HOST"].literal is not None
     assert env["DATABASE_HOST"].literal.endswith(

@@ -73,6 +73,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from azure.managed.tags import arm_tags_for as tags_for
+from azure.secrets_keyvault import key_vault_secret_ref
 
 KIND = "email"
 
@@ -409,12 +410,14 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
         env_vars = {
             # Canonical contract envs (managed_service_kinds.py)
             "EMAIL_PROVIDER": ValueRef(literal="azure_acs"),
-            "EMAIL_API_KEY": ValueRef(secret_ref=connection_secret),
+            "EMAIL_API_KEY": ValueRef(
+                secret_ref=key_vault_secret_ref(self._config.keyvault_url, connection_secret),
+            ),
             "EMAIL_FROM_ADDRESS": ValueRef(literal=from_address),
             "EMAIL_REGION": ValueRef(literal=self._config.location),
             # ACS-flavoured aliases the task spec asks for.
             "ACS_CONNECTION_STRING": ValueRef(
-                secret_ref=connection_secret,
+                secret_ref=key_vault_secret_ref(self._config.keyvault_url, connection_secret),
             ),
             "ACS_FROM_ADDRESS": ValueRef(literal=from_address),
             "ACS_MAILER_ENDPOINT": ValueRef(literal=mailer_endpoint),

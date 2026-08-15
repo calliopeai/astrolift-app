@@ -8,7 +8,12 @@ from dataclasses import dataclass
 import pytest
 
 from azure._errors import NotFoundError
-from azure.secrets_keyvault import KeyVaultConfig, KeyVaultSecretsBackend
+from azure.secrets_keyvault import (
+    KeyVaultConfig,
+    KeyVaultReferenceError,
+    KeyVaultSecretsBackend,
+    key_vault_secret_ref,
+)
 
 
 class _NotFound(Exception):
@@ -113,6 +118,24 @@ def test_get_non_json_wraps_as_value(
     assert result == {"value": "plain-string"}
 
 
+def test_explicit_managed_reference_reads_exactly_once_and_selects_field(
+    backend: KeyVaultSecretsBackend,
+    fake_client: FakeSecretClient,
+) -> None:
+    fake_client.secrets["astrolift-pg-orders-master"] = json.dumps({"password": "secret", "user": "app"})
+    ref = "azure-kv://acmeprod.vault.azure.net/secrets/astrolift-pg-orders-master#password"
+    assert backend.get(ref) == {"password": "secret"}
+
+
+def test_explicit_reference_rejects_foreign_vault_and_malformed_path(
+    backend: KeyVaultSecretsBackend,
+) -> None:
+    with pytest.raises(KeyVaultReferenceError, match="different vault"):
+        backend.get("azure-kv://foreign.vault.azure.net/secrets/astrolift-pg-orders-master")
+    with pytest.raises(KeyVaultReferenceError, match="must be"):
+        backend.get("azure-kv://acmeprod.vault.azure.net/keys/not-a-secret")
+
+
 def test_delete_raises_not_found_for_missing(
     backend: KeyVaultSecretsBackend,
 ) -> None:
@@ -140,6 +163,45 @@ def test_secret_name_canonicalization() -> None:
     assert backend._secret_name("/a/b/c") == "astrolift-a--b--c"
     # Bad chars get scrubbed
     assert backend._secret_name("a@b!c") == "astrolift-a-b-c"
+    # Already-materialized managed-service rows carry physical names.
+    assert backend._secret_name("astrolift-pg-orders-master") == "astrolift-pg-orders-master"
+    # A logical path with a slash remains namespaced even if its first segment
+    # resembles the physical prefix.
+    assert backend._secret_name("/astrolift/orders") == "astrolift-astrolift--orders"
+
+
+def test_custom_managed_prefix_is_an_explicit_legacy_allowlist(fake_client: FakeSecretClient) -> None:
+    backend = KeyVaultSecretsBackend(
+        config=KeyVaultConfig(
+            vault_url="https://x.vault.azure.net",
+            client=fake_client,
+            managed_secret_name_prefixes=("customer-db",),
+        ),
+    )
+    assert backend._secret_name("customer-db-orders-master") == "customer-db-orders-master"
+    assert backend._secret_name("untrusted-orders-master") == "astrolift-untrusted-orders-master"
+
+
+@pytest.mark.parametrize(
+    "vault_url",
+    [
+        "http://x.vault.azure.net",
+        "https://user@x.vault.azure.net",
+        "https://x.vault.azure.net/secrets",
+        "https://x.vault.azure.net?redirect=foreign",
+    ],
+)
+def test_config_rejects_unsafe_vault_origins(vault_url: str) -> None:
+    with pytest.raises(KeyVaultReferenceError, match="HTTPS origin"):
+        KeyVaultConfig(vault_url=vault_url, client=FakeSecretClient())
+
+
+def test_key_vault_secret_ref_is_unambiguous_and_validated() -> None:
+    assert key_vault_secret_ref("https://kv.vault.azure.net/", "astrolift-pg-orders-master") == (
+        "azure-kv://kv.vault.azure.net/secrets/astrolift-pg-orders-master"
+    )
+    with pytest.raises(KeyVaultReferenceError, match="secret name"):
+        key_vault_secret_ref("https://kv.vault.azure.net", "bad/name")
 
 
 def test_list_filters_by_prefix(

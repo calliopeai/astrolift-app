@@ -55,6 +55,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from azure.managed.tags import arm_tags_for as tags_for
+from azure.secrets_keyvault import key_vault_secret_ref
 
 KIND = "model_endpoint"
 
@@ -462,7 +463,9 @@ class AzureOpenAIDriver(ManagedServiceDriver):
             "AZURE_OPENAI_API_VERSION": ValueRef(
                 literal=self._config.api_version,
             ),
-            "AZURE_OPENAI_API_KEY": ValueRef(secret_ref=api_key_secret),
+            "AZURE_OPENAI_API_KEY": ValueRef(
+                secret_ref=key_vault_secret_ref(self._config.keyvault_url, api_key_secret),
+            ),
             "AZURE_OPENAI_MODEL_NAME": ValueRef(literal=model_name),
         }
         account_resource_id = (

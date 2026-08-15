@@ -660,6 +660,7 @@ def test_binding_returns_connection_envelope(
     assert env["COSMOS_ENDPOINT"].literal is not None
     assert env["COSMOS_ENDPOINT"].literal.startswith("https://")
     assert env["COSMOS_CONNECTION_STRING"].secret_ref is not None
+    assert env["COSMOS_CONNECTION_STRING"].secret_ref.startswith("azure-kv://kv.vault.azure.net/secrets/")
     assert env["COSMOS_CONNECTION_STRING"].literal is None
 
 

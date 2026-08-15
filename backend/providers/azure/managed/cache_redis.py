@@ -43,6 +43,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from azure.managed.tags import arm_tags_for as tags_for
+from azure.secrets_keyvault import key_vault_secret_ref
 
 KIND = "redis"
 
@@ -444,12 +445,17 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
             "REDIS_HOST": ValueRef(literal=host),
             "REDIS_PORT": ValueRef(literal=str(ssl_port)),
             "REDIS_TLS": ValueRef(literal="1"),
-            "REDIS_AUTH_TOKEN": ValueRef(secret_ref=primary_secret),
+            "REDIS_AUTH_TOKEN": ValueRef(
+                secret_ref=key_vault_secret_ref(self._config.keyvault_url, primary_secret),
+            ),
             "REDIS_SECONDARY_AUTH_TOKEN": ValueRef(
-                secret_ref=secondary_secret,
+                secret_ref=key_vault_secret_ref(self._config.keyvault_url, secondary_secret),
             ),
             "REDIS_URL": ValueRef(
-                secret_ref=self._url_secret_for(cache_name=cache_name),
+                secret_ref=key_vault_secret_ref(
+                    self._config.keyvault_url,
+                    self._url_secret_for(cache_name=cache_name),
+                ),
             ),
         }
         if non_ssl_port:
