@@ -1489,7 +1489,9 @@ class RegistryQuery:
             .first()
         )
         env_name = env.name if env else (environment_name or "preview")
-        namespace = app.k8s_namespace or f"{app.organization.slug}-{app.slug}"
+        from core.app_deploy import namespace_for_app
+
+        namespace = namespace_for_app(app)
         image = image_tag or "preview"
 
         # Apps registered before the wizard's manifest step shipped, or
@@ -1639,7 +1641,9 @@ class RegistryQuery:
             .first()
         )
         env_name = env.name if env else (environment_name or "preview")
-        namespace = app.k8s_namespace or f"{app.organization.slug}-{app.slug}"
+        from core.app_deploy import namespace_for_app
+
+        namespace = namespace_for_app(app)
         image = image_tag or "preview"
 
         prior = _previous_deployment_for(app=app, environment=env, current_image_tag=image)

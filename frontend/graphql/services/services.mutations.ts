@@ -162,6 +162,12 @@ const MANAGED_SERVICE_FIELDS = `
   status
   statusError
   config
+  appliedConfig
+  operationKind
+  operationWorkflowId
+  operationRunId
+  operationStartedAt
+  operationCompletedAt
   registeredAppSlug
   projectSlug
   ownerScope

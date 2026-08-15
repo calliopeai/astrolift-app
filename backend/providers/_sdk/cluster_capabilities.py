@@ -54,6 +54,13 @@ class ClusterCapabilities:
     {'cnpg': 'v1.22.0', 'cert-manager': 'v1.14.0'}). Probe fills
     this in for visibility."""
 
+    installed_crds: frozenset[str] = field(default_factory=frozenset)
+    """Exact CRD names observed by the most recent live probe."""
+
+    crd_inventory_probed: bool = False
+    """Distinguishes an empty live inventory from legacy capability rows
+    that predate raw CRD collection."""
+
     notes: list[str] = field(default_factory=list)
 
 
@@ -107,6 +114,8 @@ def probe_capabilities(
         cert_manager_installed=("certificates.cert-manager.io" in crd_names),
         external_secrets_installed=("externalsecrets.external-secrets.io" in crd_names),
         external_dns_installed=(any("external-dns" in d for d in deployment_names)),
+        installed_crds=frozenset(crd_names),
+        crd_inventory_probed=True,
     )
 
 

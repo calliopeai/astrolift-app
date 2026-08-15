@@ -54,6 +54,7 @@ azure = [
     "azure-mgmt-mysqlflexibleservers>=1.0",
     "azure-mgmt-postgresqlflexibleservers>=2.0",
     "azure-mgmt-redis>=14.4",
+    "azure-mgmt-redisenterprise>=3.1",
     "azure-mgmt-resource-locks>=1.0.0b1",
     "azure-mgmt-search>=9.1",
     "azure-mgmt-servicebus>=8.2",
@@ -89,6 +90,10 @@ dev = [
     # tests/_sdk/test_telemetry.py exercises the real registry; the
     # runtime import in _sdk/_telemetry.py is optional (try/except).
     "prometheus-client>=0.20",
+    # Driver config_schema() output is asserted to be a well-formed JSON
+    # Schema, and sample configs are validated against it. Test-only: no
+    # driver imports jsonschema at runtime.
+    "jsonschema>=4.23",
     "moto[s3,iam,sts,ec2,eks,route53,acm,ecr,secretsmanager,ssm,sqs,sns,dynamodb,elasticache,rds,efs]>=5.0",
     # Bounded like the backend lint job's ruff pin — ruff moves rules and
     # formatter output across minors, so an open pin re-breaks CI on every

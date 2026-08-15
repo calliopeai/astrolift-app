@@ -163,6 +163,12 @@ class ManagedServiceType:
     status: str
     status_error: str
     config: JSON
+    applied_config: JSON | None
+    operation_kind: str
+    operation_workflow_id: str
+    operation_run_id: str
+    operation_started_at: dt.datetime | None
+    operation_completed_at: dt.datetime | None
     registered_app_slug: str
     project_slug: str
     owner_scope: str
@@ -174,6 +180,7 @@ class ManagedServiceType:
     last_action_kind: str = ""
     editable_fields: list[str] = strawberry.field(default_factory=list)
     attachments: list[ManagedServiceAttachmentType] = strawberry.field(default_factory=list)
+    volume_bindings: list[ManagedServiceVolumeBindingType] = strawberry.field(default_factory=list)
     """Config keys the driver accepts via ``update()`` without full
     reprovision. ``["*"]`` means all fields; ``[]`` means all changes
     require ``reprovisionManagedService``."""
@@ -203,6 +210,28 @@ class ManagedServiceAttachmentType:
     consumer_kind: str
     consumer_slug: str
     environment_name: str
+
+
+@strawberry.type(name="AstroliftManagedServiceVolumeBinding")
+class ManagedServiceVolumeBindingType:
+    """Credential-free runtime mount metadata for a managed filesystem."""
+
+    id: GUID
+    name: str
+    mount_path: str
+    sub_path: str
+    source_kind: str
+    protocol: str
+    claim_name: str
+    claim_namespace: str
+    storage_class_name: str
+    csi_driver: str
+    read_only: bool
+    capacity: str
+    access_modes: list[str]
+    workload_names: list[str]
+    container_names: list[str]
+    credential_reference_count: int
 
 
 @strawberry.type(name="AstroliftManagedServiceConnectionKey")
@@ -831,6 +860,12 @@ def managed_service_to_type(svc, *, resolve_editable_fields: bool = False) -> Ma
         status=svc.status,
         status_error=svc.status_error or "",
         config=svc.config or {},
+        applied_config=svc.applied_config,
+        operation_kind=svc.operation_kind or "",
+        operation_workflow_id=svc.operation_workflow_id or "",
+        operation_run_id=svc.operation_run_id or "",
+        operation_started_at=svc.operation_started_at,
+        operation_completed_at=svc.operation_completed_at,
         registered_app_slug=svc.registered_app.slug if svc.registered_app_id else "",
         project_slug=svc.project.slug if svc.project_id else "",
         owner_scope=svc.owner_scope,
@@ -842,6 +877,11 @@ def managed_service_to_type(svc, *, resolve_editable_fields: bool = False) -> Ma
         last_action_kind=svc.last_action_kind or "",
         editable_fields=editable,
         attachments=[managed_service_attachment_to_type(row) for row in svc.attachments.all()],
+        volume_bindings=[
+            managed_service_volume_binding_to_type(row)
+            for row in svc.volume_bindings.all()
+            if row.deleted_at is None
+        ],
     )
 
 
@@ -877,4 +917,25 @@ def managed_service_attachment_to_type(row) -> ManagedServiceAttachmentType:
         consumer_kind="app",
         consumer_slug=row.app_environment.registered_app.slug,
         environment_name=row.app_environment.name,
+    )
+
+
+def managed_service_volume_binding_to_type(row) -> ManagedServiceVolumeBindingType:
+    return ManagedServiceVolumeBindingType(
+        id=GUID(str(row.guid)),
+        name=row.name,
+        mount_path=row.mount_path,
+        sub_path=row.sub_path or "",
+        source_kind=row.source_kind,
+        protocol=row.protocol,
+        claim_name=row.claim_name or "",
+        claim_namespace=row.claim_namespace or "",
+        storage_class_name=row.storage_class_name or "",
+        csi_driver=row.csi_driver or "",
+        read_only=row.read_only,
+        capacity=row.capacity,
+        access_modes=list(row.access_modes or []),
+        workload_names=list(row.workload_names or []),
+        container_names=list(row.container_names or []),
+        credential_reference_count=len(row.secret_refs or {}),
     )

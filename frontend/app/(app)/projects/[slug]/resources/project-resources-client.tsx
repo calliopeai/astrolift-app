@@ -407,6 +407,22 @@ export function ProjectResourcesClient({ slug }: { slug: string }) {
                 {service.statusError && (
                   <p className="text-danger-fg mt-2 text-xs">{service.statusError}</p>
                 )}
+                {service.operationKind && (
+                  <div className="text-muted-foreground mt-2 space-y-0.5 text-xs">
+                    <p>
+                      Last operation: <span className="font-medium">{service.operationKind}</span>
+                      {service.operationCompletedAt
+                        ? ` · completed ${new Date(service.operationCompletedAt).toLocaleString()}`
+                        : " · running"}
+                    </p>
+                    {service.operationWorkflowId && (
+                      <p className="truncate font-mono" title={service.operationWorkflowId}>
+                        {service.operationWorkflowId}
+                        {service.operationRunId ? ` · ${service.operationRunId}` : ""}
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div className="mt-3 flex flex-wrap gap-1">
                   {service.attachments.map((attachment) => (
                     <Badge key={attachment.id} variant="outline">
@@ -417,6 +433,35 @@ export function ProjectResourcesClient({ slug }: { slug: string }) {
                     <span className="text-muted-foreground text-xs">Not attached yet</span>
                   )}
                 </div>
+                {service.volumeBindings.length > 0 && (
+                  <div className="bg-muted/30 mt-3 space-y-2 rounded-md border p-3">
+                    <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
+                      Runtime mounts
+                    </p>
+                    {service.volumeBindings.map((binding) => (
+                      <div
+                        key={binding.id}
+                        className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
+                      >
+                        <code>{binding.mountPath}</code>
+                        <Badge variant="outline">{binding.protocol}</Badge>
+                        <span className="text-muted-foreground">
+                          {binding.sourceKind === "csi"
+                            ? binding.csiDriver
+                            : binding.sourceKind === "dynamic_pvc"
+                              ? `StorageClass ${binding.storageClassName}`
+                              : `${binding.claimNamespace}/${binding.claimName}`}
+                        </span>
+                        {binding.readOnly && <Badge variant="secondary">read only</Badge>}
+                        {binding.credentialReferenceCount > 0 && (
+                          <span className="text-muted-foreground">
+                            {binding.credentialReferenceCount} credential refs
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {canUpdate && (
                   <div className="mt-3 flex justify-end gap-2">
                     <Button size="sm" variant="ghost" onClick={() => setConsumerService(service)}>

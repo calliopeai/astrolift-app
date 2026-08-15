@@ -3,7 +3,8 @@
 Walks every PLUGIN registered via the `astrolift.providers`
 entry-point and confirms the availability matrix has a matching
 entry for each driver + managed-service. The reverse direction also holds
-for executable entries; planned roadmap entries need no installed driver.
+for executable entries; roadmap and retired catalogue entries need no installed
+driver.
 
 Drift is a deploy-time bug — silent omission of an executable matrix entry
 hides a capability from the bind validator; a stale matrix entry
@@ -134,7 +135,7 @@ def check_matrix(
                 )
             )
     for entry in matrix.managed_services:
-        if entry.status == "planned":
+        if entry.status in {"planned", "deprecated"}:
             continue
         plugin = plugin_index.get(entry.plugin_id)
         if plugin is None:

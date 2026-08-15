@@ -8,6 +8,7 @@ import enum
 from collections.abc import Iterable
 
 import strawberry
+from _sdk.k8s_naming import app_namespace
 from django.db import models
 
 from astrolift_graphql import GUID
@@ -1425,7 +1426,7 @@ def _namespace_for_workload(workload) -> str:
     org_slug = (getattr(getattr(app, "organization", None), "slug", "") or "").strip()
     if not org_slug:
         return ""
-    return f"{org_slug}-{app.slug}"
+    return app_namespace(organization_slug=org_slug, app_slug=str(app.slug))
 
 
 def _in_cluster_service_fqdn(workload) -> str:

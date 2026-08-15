@@ -29,6 +29,8 @@ from _sdk.managed_service import (
     UpdateResult,
     UpdateSpec,
     ValueRef,
+    VolumeMount,
+    VolumeSourceKind,
 )
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
 
@@ -295,9 +297,20 @@ class FSxDriver(ManagedServiceDriver):
                 env_vars["FILESYSTEM_PASSWORD"] = ValueRef(
                     secret_ref=str(cfg["mount_password_secret_ref"]),
                 )
+        volume_mount = self._volume_mount(
+            file_system_id=file_system_id,
+            file_system=file_system,
+            endpoint=endpoint,
+            protocol=protocol,
+            source=source,
+            options=options,
+            mount_path=mount_path,
+            cfg=cfg,
+        )
         return Binding(
             env_vars=env_vars,
-            notes=f"{self.display_name} shared filesystem; use a compatible CSI or host mount driver",
+            pod_volume_mounts=[volume_mount],
+            notes=f"{self.display_name} shared filesystem mounted through its Kubernetes CSI driver",
         )
 
     @driver_op(
@@ -399,6 +412,7 @@ class FSxDriver(ManagedServiceDriver):
                 "mount_name": {"type": "string"},
                 "share_name": {"type": "string", "default": "share"},
                 "tls": {"type": "boolean", "default": True},
+                "read_only": {"type": "boolean", "default": False},
                 "deletion_protection": {"type": "boolean", "default": True},
             },
             "additionalProperties": False,
@@ -435,6 +449,7 @@ class FSxDriver(ManagedServiceDriver):
             "mount_name",
             "share_name",
             "tls",
+            "read_only",
             "deletion_protection",
         ]
 
@@ -670,7 +685,63 @@ class FSxDriver(ManagedServiceDriver):
         share = str(cfg.get("share_name") or "share").strip("\\/")
         if not share:
             raise ManagedServiceError("FSx for Windows share_name cannot be empty")
+        if not any(option.startswith("vers=") for option in options):
+            options.append("vers=3.0")
         return "smb3", f"\\\\{endpoint}\\{share}", options
+
+    def _volume_mount(
+        self,
+        *,
+        file_system_id: str,
+        file_system: dict[str, Any],
+        endpoint: str,
+        protocol: str,
+        source: str,
+        options: list[str],
+        mount_path: str,
+        cfg: dict[str, Any],
+    ) -> VolumeMount:
+        common = {
+            "name": f"fsx-{file_system_id}",
+            "mount_path": mount_path,
+            "source_kind": VolumeSourceKind.CSI,
+            "protocol": protocol,
+            "mount_options": options,
+            "read_only": bool(cfg.get("read_only", False)),
+            "capacity": f"{int(file_system.get('StorageCapacity') or 1)}Gi",
+        }
+        if self.file_system_type == "LUSTRE":
+            mount_name = str(
+                cfg.get("mount_name") or (file_system.get("LustreConfiguration") or {}).get("MountName") or ""
+            )
+            return VolumeMount(
+                **common,
+                csi_driver="fsx.csi.aws.com",
+                volume_handle=file_system_id,
+                volume_attributes={"dnsname": endpoint, "mountname": mount_name},
+            )
+        if self.file_system_type == "OPENZFS":
+            _, _, share = source.partition(":")
+            return VolumeMount(
+                **common,
+                csi_driver="nfs.csi.k8s.io",
+                volume_handle=f"{endpoint}#{share}#",
+                volume_attributes={"server": endpoint, "share": share},
+            )
+        username_ref = str(cfg.get("mount_username_secret_ref") or "")
+        password_ref = str(cfg.get("mount_password_secret_ref") or "")
+        if not username_ref or not password_ref:
+            raise ManagedServiceError(
+                "FSx for Windows workload attachment requires mount_username_secret_ref and mount_password_secret_ref",
+            )
+        share = source.rsplit("\\", 1)[-1]
+        return VolumeMount(
+            **common,
+            csi_driver="smb.csi.k8s.io",
+            volume_handle=f"{endpoint}##{share}",
+            volume_attributes={"source": f"//{endpoint}/{share}"},
+            secret_refs={"username": username_ref, "password": password_ref},
+        )
 
     def _validate_config(
         self,
@@ -691,7 +762,7 @@ class FSxDriver(ManagedServiceDriver):
                 return f"{field} must be an object"
             if field in cfg and _contains_plaintext_password(cfg[field]):
                 return f"{field} cannot contain plaintext password fields; use a Secrets Manager reference"
-        for field in ("tls", "deletion_protection"):
+        for field in ("tls", "read_only", "deletion_protection"):
             if field in cfg and not isinstance(cfg[field], bool):
                 return f"{field} must be a boolean"
         for field in ("subnet_ids", "security_group_ids", "mount_options"):

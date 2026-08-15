@@ -26,6 +26,7 @@ from astrolift_services.models import (
     ManagedService,
     ManagedServiceAttachment,
     ManagedServiceBinding,
+    ManagedServiceVolumeBinding,
     SecretBundle,
 )
 from astrolift_services.schema.mutations import (
@@ -541,6 +542,41 @@ def test_project_resource_mutation_denies_without_project_update(permission_reso
         )
     assert result.ok is False
     assert result.errors[0].code == ErrorCode.PERMISSION_DENIED.value
+
+
+def test_project_resource_query_exposes_mount_readiness_without_secret_refs(permission_resolver):
+    graph = _graph("volume-query")
+    service = ManagedService.objects.create(
+        project=graph.project,
+        tenant_cluster=graph.cluster,
+        kind=ManagedService.Kind.FILESYSTEM,
+        name="shared-files",
+        status=ManagedService.Status.ACTIVE,
+    )
+    ManagedServiceVolumeBinding.objects.create(
+        managed_service=service,
+        name="shared-files",
+        mount_path="/mnt/shared",
+        source_kind=ManagedServiceVolumeBinding.SourceKind.CSI,
+        protocol="smb3",
+        csi_driver="smb.csi.k8s.io",
+        volume_handle="files.example##share",
+        secret_refs={"username": "secret/path#username", "password": "secret/path#password"},
+        access_modes=["ReadWriteMany"],
+    )
+    permission_resolver.grant(Permission.PROJECT_READ)
+
+    with _tenant(graph):
+        rows = ServicesQuery().astrolift_project_managed_services(
+            _info(), project_id=GUID(str(graph.project.guid))
+        )
+
+    assert len(rows) == 1
+    mount = rows[0].volume_bindings[0]
+    assert mount.mount_path == "/mnt/shared"
+    assert mount.csi_driver == "smb.csi.k8s.io"
+    assert mount.credential_reference_count == 2
+    assert "secret/path" not in repr(mount)
 
 
 def test_project_resource_graphql_is_scoped_to_the_active_team(permission_resolver):

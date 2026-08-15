@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any, Protocol
 
 
@@ -66,6 +68,9 @@ class UpdateResult:
     handle: str
     message: str
     errors: list[str] = field(default_factory=list)
+    retryable: bool = True
+    """Provider failures are retryable by default for compatibility with
+    existing drivers. Permanent validation/safety refusals opt out."""
 
 
 @dataclass(frozen=True)
@@ -114,11 +119,100 @@ class ValueRef:
     secret_ref: str | None = None
 
 
+class VolumeSourceKind(StrEnum):
+    """Portable Kubernetes attachment strategy for a managed filesystem."""
+
+    EXISTING_PVC = "existing_pvc"
+    CSI = "csi"
+    DYNAMIC_PVC = "dynamic_pvc"
+
+
 @dataclass(frozen=True)
 class VolumeMount:
+    """A managed filesystem attachment, never a credential container.
+
+    Drivers emit either a claim they already provisioned or a static CSI
+    volume description. ``secret_refs`` maps the key expected by the CSI
+    driver to a reference in the install secrets backend; plaintext values
+    are resolved only while materializing the consumer namespace Secret.
+    ``secret_literals`` carries required non-secret identity fields, such as
+    an Azure storage account name, that the CSI driver expects in that same
+    Secret. Drivers must never place credentials in ``secret_literals``.
+    """
+
     name: str
     mount_path: str
     sub_path: str | None = None
+    source_kind: VolumeSourceKind = VolumeSourceKind.EXISTING_PVC
+    protocol: str = ""
+    claim_name: str = ""
+    claim_namespace: str = ""
+    storage_class_name: str = ""
+    csi_driver: str = ""
+    volume_handle: str = ""
+    volume_attributes: dict[str, str] = field(default_factory=dict)
+    secret_refs: dict[str, str] = field(default_factory=dict)
+    secret_literals: dict[str, str] = field(default_factory=dict)
+    mount_options: list[str] = field(default_factory=list)
+    read_only: bool = False
+    capacity: str = "1Gi"
+    access_modes: tuple[str, ...] = ("ReadWriteMany",)
+    workload_names: tuple[str, ...] = ()
+    container_names: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not re.fullmatch(r"[a-z0-9](?:[-a-z0-9]*[a-z0-9])?", self.name) or len(self.name) > 63:
+            raise ValueError("managed volume name must be a 1-63 character Kubernetes DNS label")
+        if not self.mount_path.startswith("/"):
+            raise ValueError("managed volume mount_path must be absolute")
+        if self.sub_path and (self.sub_path.startswith("/") or ".." in self.sub_path.split("/")):
+            raise ValueError("managed volume sub_path must be relative and cannot traverse parents")
+        if not self.protocol:
+            raise ValueError("managed volume protocol is required")
+        if self.source_kind == VolumeSourceKind.EXISTING_PVC:
+            if not self.claim_name or not self.claim_namespace:
+                raise ValueError("existing_pvc managed volume requires claim_name and claim_namespace")
+            if (
+                self.storage_class_name
+                or self.csi_driver
+                or self.volume_handle
+                or self.secret_refs
+                or self.secret_literals
+            ):
+                raise ValueError("existing_pvc managed volume cannot declare dynamic or CSI fields")
+        elif self.source_kind == VolumeSourceKind.CSI:
+            if not self.csi_driver or not self.volume_handle:
+                raise ValueError("csi managed volume requires csi_driver and volume_handle")
+            if self.claim_name or self.claim_namespace or self.storage_class_name:
+                raise ValueError("csi managed volume cannot declare claim or StorageClass fields")
+        elif self.source_kind == VolumeSourceKind.DYNAMIC_PVC:
+            if not self.storage_class_name:
+                raise ValueError("dynamic_pvc managed volume requires storage_class_name")
+            if self.claim_name or self.claim_namespace or self.volume_handle:
+                raise ValueError("dynamic_pvc managed volume cannot declare an existing volume locator")
+            if self.secret_refs or self.secret_literals:
+                raise ValueError("dynamic_pvc managed volume credentials belong to its StorageClass")
+        else:
+            raise ValueError(f"unsupported managed volume source kind {self.source_kind!r}")
+        if not self.capacity:
+            raise ValueError("managed volume capacity is required")
+        if not re.fullmatch(r"[1-9][0-9]*(?:[EPTGMK]i?|m)?", self.capacity):
+            raise ValueError("managed volume capacity must be a positive canonical Kubernetes quantity")
+        allowed_access_modes = {"ReadWriteOnce", "ReadOnlyMany", "ReadWriteMany", "ReadWriteOncePod"}
+        if not self.access_modes or any(mode not in allowed_access_modes for mode in self.access_modes):
+            raise ValueError("managed volume has an unsupported Kubernetes access mode")
+        if self.source_kind == VolumeSourceKind.DYNAMIC_PVC and len(self.access_modes) != 1:
+            raise ValueError("dynamic_pvc managed volume must request exactly one access mode")
+        if any(not key or not ref for key, ref in self.secret_refs.items()):
+            raise ValueError("managed volume secret_refs must map non-empty keys to backend references")
+        if any(not key or not value for key, value in self.secret_literals.items()):
+            raise ValueError("managed volume secret_literals must map non-empty keys to non-secret values")
+        if self.secret_refs.keys() & self.secret_literals.keys():
+            raise ValueError("managed volume secret refs and literals cannot define the same key")
+        if any(not key or not value for key, value in self.volume_attributes.items()):
+            raise ValueError("managed volume attributes must map non-empty keys to non-empty values")
+        if any(not value for value in (*self.mount_options, *self.workload_names, *self.container_names)):
+            raise ValueError("managed volume selectors and mount options cannot contain empty values")
 
 
 @dataclass(frozen=True)

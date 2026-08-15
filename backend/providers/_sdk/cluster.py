@@ -165,6 +165,8 @@ class NamespaceState:
 class StorageClassInfo:
     name: str
     is_default: bool
+    provisioner: str = ""
+    reclaim_policy: str = ""
 
 
 @dataclass(frozen=True)
@@ -845,6 +847,8 @@ class ClusterDriver(Protocol):
         cluster: str,
         namespace: str,
         manifests: list[dict[str, Any]],
+        *,
+        propagation_policy: str | None = None,
     ) -> DeleteResult: ...
 
     def get_namespace(self, cluster: str, name: str) -> NamespaceState | None: ...
@@ -868,6 +872,37 @@ class ClusterDriver(Protocol):
         their PVCs without the operator knowing the cluster's SC name.
         Default returns ``[]`` — a driver that can't enumerate leaves the
         claim's storageClassName unset (same as before)."""
+        return []
+
+    def list_csi_drivers(self, cluster: str) -> list[str]:
+        """Return installed ``CSIDriver.metadata.name`` values."""
+        return []
+
+    def persistent_volume_claim_exists(self, cluster: str, namespace: str, name: str) -> bool:
+        """Whether a provider-created claim exists in the consumer namespace."""
+        return False
+
+    def get_manifest(
+        self,
+        cluster: str,
+        namespace: str | None,
+        kind: str,
+        name: str,
+    ) -> dict[str, Any] | None:
+        """Return one Kubernetes object, or ``None`` when it does not exist.
+
+        ``kind`` accepts either a core kind such as ``Secret`` or the dynamic
+        client form ``group/version/Kind`` used for custom resources.
+        """
+        return None
+
+    def list_manifests(
+        self,
+        cluster: str,
+        namespace: str | None,
+        kind: str,
+    ) -> list[dict[str, Any]]:
+        """Return Kubernetes objects of ``kind`` in a namespace."""
         return []
 
     def get_workload_status(

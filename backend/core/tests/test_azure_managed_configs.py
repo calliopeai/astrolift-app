@@ -59,6 +59,7 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
         ("postgres", "azure_pg_flex", "AzurePostgresConfig"),
         ("mysql", "azure_mysql_flex", "AzureMySQLConfig"),
         ("redis", "azure_cache_redis", "AzureCacheRedisConfig"),
+        ("redis", "azure_managed_redis", "AzureManagedRedisConfig"),
         ("kv_store", "cosmos", "AzureCosmosConfig"),
         ("search", "azure_ai_search_fulltext", "AzureAISearchConfig"),
         ("vector_index", "azure_ai_search_vector", "AzureAISearchVectorConfig"),
@@ -268,6 +269,32 @@ def test_redis_backup_controls_are_preserved() -> None:
     )
     assert redis.backup_container_uri.endswith("/redis-backups")
     assert redis.backup_storage_subscription_id == "backup-subscription"
+
+
+def test_managed_redis_controls_are_preserved() -> None:
+    redis = managed_config_for(
+        "azure",
+        _cluster(
+            managed_redis_cluster_name_prefix="smd-amr",
+            managed_redis_database_name="triage",
+            managed_redis_default_sku="MemoryOptimized_M20",
+            managed_redis_high_availability_default="Disabled",
+            managed_redis_public_network_access_default="Enabled",
+            managed_redis_clustering_policy_default="EnterpriseCluster",
+            managed_redis_eviction_policy_default="NoEviction",
+            managed_redis_secret_name_prefix="managed-amr",
+        ),
+        kind="redis",
+        variant="azure_managed_redis",
+    )
+    assert redis.cluster_name_prefix == "smd-amr"
+    assert redis.database_name == "triage"
+    assert redis.default_sku == "MemoryOptimized_M20"
+    assert redis.high_availability_default == "Disabled"
+    assert redis.public_network_access_default == "Enabled"
+    assert redis.clustering_policy_default == "EnterpriseCluster"
+    assert redis.eviction_policy_default == "NoEviction"
+    assert redis.secret_name_prefix == "managed-amr"
 
 
 def test_default_variant_selects_the_richer_azure_drivers() -> None:
