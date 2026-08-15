@@ -25,6 +25,7 @@ def _binding(**overrides):
         "protocol": "nfs4",
         "claim_name": "",
         "claim_namespace": "",
+        "storage_class_name": "",
         "csi_driver": "efs.csi.aws.com",
         "volume_handle": "fs-12345678::fsap-12345678",
         "volume_attributes": {},
@@ -98,6 +99,16 @@ def test_sdk_volume_mount_rejects_invalid_kubernetes_name_and_capacity() -> None
             capacity="1 gigabyte",
         )
 
+    with pytest.raises(ValueError, match="exactly one"):
+        VolumeMount(
+            name="shared-data",
+            mount_path="/data",
+            source_kind=VolumeSourceKind.DYNAMIC_PVC,
+            protocol="pvc",
+            storage_class_name="standard",
+            access_modes=("ReadWriteOnce", "ReadOnlyMany"),
+        )
+
 
 def test_render_csi_binding_creates_owned_static_storage_without_plaintext() -> None:
     binding = _binding(
@@ -167,6 +178,108 @@ def test_existing_claim_cannot_cross_namespace() -> None:
 
     with pytest.raises(FilesystemBindingError, match="not consumer namespace"):
         render_binding_storage(binding, namespace="acme-api", consumer_key="environment-guid")
+
+
+def test_dynamic_claim_is_consumer_namespace_local_and_stable_across_runs() -> None:
+    binding = _binding(
+        source_kind="dynamic_pvc",
+        protocol="cephfs",
+        storage_class_name="rook-cephfs",
+        csi_driver="rook-ceph.cephfs.csi.ceph.com",
+        volume_handle="",
+        capacity="100Gi",
+    )
+
+    first, first_volume, _mount = render_binding_storage(
+        binding,
+        namespace="astrolift-agents-acme",
+        consumer_key="job-one",
+    )
+    second, second_volume, _mount = render_binding_storage(
+        binding,
+        namespace="astrolift-agents-acme",
+        consumer_key="job-two",
+    )
+    other, _other_volume, _mount = render_binding_storage(
+        binding,
+        namespace="acme-api",
+        consumer_key="environment-guid",
+    )
+
+    assert first == second
+    assert first_volume == second_volume
+    pvc = first[0]
+    assert pvc["kind"] == "PersistentVolumeClaim"
+    assert pvc["metadata"]["namespace"] == "astrolift-agents-acme"
+    assert pvc["spec"] == {
+        "accessModes": ["ReadWriteMany"],
+        "resources": {"requests": {"storage": "100Gi"}},
+        "storageClassName": "rook-cephfs",
+        "volumeMode": "Filesystem",
+    }
+    assert other[0]["metadata"]["name"] != pvc["metadata"]["name"]
+
+    replacement_binding = _binding(
+        guid="019fffff-4444-7444-8444-444444444444",
+        source_kind="dynamic_pvc",
+        protocol="cephfs",
+        storage_class_name="rook-cephfs",
+        csi_driver="rook-ceph.cephfs.csi.ceph.com",
+        volume_handle="",
+        capacity="100Gi",
+    )
+    replacement, _volume, _mount = render_binding_storage(
+        replacement_binding,
+        namespace="astrolift-agents-acme",
+        consumer_key="job-after-finalize-retry",
+    )
+    assert replacement[0]["metadata"]["name"] == pvc["metadata"]["name"]
+
+
+def test_dynamic_claim_preflight_checks_storage_class_and_csi_driver() -> None:
+    binding = _binding(
+        source_kind="dynamic_pvc",
+        protocol="cephfs",
+        storage_class_name="rook-cephfs",
+        csi_driver="rook-ceph.cephfs.csi.ceph.com",
+        volume_handle="",
+    )
+    driver = SimpleNamespace(
+        list_storage_classes=lambda _cluster: [
+            SimpleNamespace(
+                name="rook-cephfs",
+                provisioner="rook-ceph.cephfs.csi.ceph.com",
+            )
+        ],
+        list_csi_drivers=lambda _cluster: ["rook-ceph.cephfs.csi.ceph.com"],
+    )
+
+    preflight_bindings(
+        [binding],
+        cluster_driver=driver,
+        cluster_slug="prod",
+        namespace="astrolift-agents-acme",
+    )
+
+    driver.list_storage_classes = lambda _cluster: [SimpleNamespace(name="standard")]
+    with pytest.raises(FilesystemBindingError, match="requires StorageClass"):
+        preflight_bindings(
+            [binding],
+            cluster_driver=driver,
+            cluster_slug="prod",
+            namespace="astrolift-agents-acme",
+        )
+
+    driver.list_storage_classes = lambda _cluster: [
+        SimpleNamespace(name="rook-cephfs", provisioner="ebs.csi.aws.com")
+    ]
+    with pytest.raises(FilesystemBindingError, match="to use provisioner"):
+        preflight_bindings(
+            [binding],
+            cluster_driver=driver,
+            cluster_slug="prod",
+            namespace="astrolift-agents-acme",
+        )
 
 
 def test_inject_targets_named_workload_and_container() -> None:

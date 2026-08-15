@@ -118,6 +118,7 @@ export const LIST_PROJECT_RESOURCES = gql`
         protocol
         claimName
         claimNamespace
+        storageClassName
         csiDriver
         readOnly
         capacity
@@ -195,6 +196,7 @@ export const LIST_MANAGED_SERVICES = gql`
         protocol
         claimName
         claimNamespace
+        storageClassName
         csiDriver
         readOnly
         capacity

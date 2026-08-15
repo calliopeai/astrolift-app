@@ -154,7 +154,7 @@ def list_catalog(plugin_slug: str) -> tuple[CatalogItem, ...]:
     available_by_kind: dict[str, list[str]] = defaultdict(list)
     for kind, variant in keys:
         meta = metadata.get((kind, variant))
-        if (kind, variant) in drivers and (meta is None or meta.status != "planned"):
+        if (kind, variant) in drivers and (meta is None or meta.status in {"ga", "preview", "experimental"}):
             available_by_kind[kind].append(variant)
 
     rows: list[CatalogItem] = []
@@ -162,8 +162,10 @@ def list_catalog(plugin_slug: str) -> tuple[CatalogItem, ...]:
         meta = metadata.get((kind, variant))
         driver_cls = drivers.get((kind, variant))
         status = meta.status if meta is not None else "experimental"
-        available = driver_cls is not None and status != "planned"
-        if driver_cls is None:
+        available = driver_cls is not None and status in {"ga", "preview", "experimental"}
+        if status == "deprecated":
+            unavailable_reason = "This provider variant is deprecated or retired and cannot be provisioned."
+        elif driver_cls is None:
             unavailable_reason = "Provider driver is not installed in this control plane."
         elif status == "planned":
             unavailable_reason = "Driver is a non-provisioning stub or planned capability."

@@ -4,6 +4,14 @@
 
 ### Added
 
+- Add preview SeaweedFS Operator object storage for Kubernetes installs with
+  shared-cluster bucket reconciliation, bucket-scoped S3 IAM credentials,
+  versioning, Object Lock, quotas, placement controls, explicit anonymous
+  reads, truthful readiness, and data-safe retain/delete teardown.
+- Add Kubernetes StorageClass and Rook CephFS project volume templates with
+  consumer-namespace dynamic claims, live StorageClass/CSI preflight,
+  portable app and agent mounts, data-safe teardown, and full catalog,
+  GraphQL, and project-resource UI visibility.
 - Add portable managed-filesystem runtime attachments for applications and
   agent Jobs, including CSI/PVC preflight, credential-reference projection,
   provider-specific EFS/FSx/NFS mounts, owned storage cleanup, and safe mount
@@ -102,6 +110,12 @@
 
 ### Changed
 
+- Make managed-service secret bundle selectors portable across AWS Secrets
+  Manager, Google Secret Manager, Azure Key Vault, and Vault, and fail closed
+  instead of choosing an arbitrary value from a multi-key bundle.
+- Mark the archived community MinIO Operator as deprecated in the Kubernetes
+  resource catalogue and expose commercial AIStor and existing
+  S3-compatible endpoint adoption as explicit planned variants.
 - Make project dashboards, navigation, and repository workflow detail pages
   workload-aware, graph-first, fully linked, and observable without requiring
   a configured workflow wrapper.

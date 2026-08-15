@@ -165,6 +165,8 @@ class NamespaceState:
 class StorageClassInfo:
     name: str
     is_default: bool
+    provisioner: str = ""
+    reclaim_policy: str = ""
 
 
 @dataclass(frozen=True)
@@ -877,6 +879,20 @@ class ClusterDriver(Protocol):
     def persistent_volume_claim_exists(self, cluster: str, namespace: str, name: str) -> bool:
         """Whether a provider-created claim exists in the consumer namespace."""
         return False
+
+    def get_manifest(
+        self,
+        cluster: str,
+        namespace: str | None,
+        kind: str,
+        name: str,
+    ) -> dict[str, Any] | None:
+        """Return one Kubernetes object, or ``None`` when it does not exist.
+
+        ``kind`` accepts either a core kind such as ``Secret`` or the dynamic
+        client form ``group/version/Kind`` used for custom resources.
+        """
+        return None
 
     def get_workload_status(
         self,

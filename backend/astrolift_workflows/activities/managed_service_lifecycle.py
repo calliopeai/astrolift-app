@@ -33,6 +33,8 @@ _ALREADY_GONE_MARKERS = (
     "already deleted",
 )
 
+_DYNAMIC_PVC_VARIANTS = frozenset({"storage_class_pvc", "rook_cephfs"})
+
 
 def _service_cluster(svc):
     """Provisioning cluster for either app-private or project-owned rows."""
@@ -46,6 +48,99 @@ def _service_cluster(svc):
 def _signals_already_gone(*parts: object) -> bool:
     blob = " ".join(str(p) for p in parts if p).lower()
     return any(marker in blob for marker in _ALREADY_GONE_MARKERS)
+
+
+def _delete_dynamic_pvc_data(svc: Any, cluster: Any, *, force_destroy: bool) -> tuple[bool, str]:
+    """Delete materialized dynamic claims only after explicit data confirmation."""
+
+    from astrolift_services.filesystem_bindings import (
+        binding_resource_name,
+        storage_consumer_key,
+    )
+    from astrolift_services.models import ManagedServiceAttachment, ManagedServiceVolumeBinding
+    from core.app_deploy import namespace_for_app
+    from core.cluster_management import _context_for_cluster, _driver_for_cluster
+
+    bindings = list(
+        ManagedServiceVolumeBinding.objects.filter(
+            managed_service=svc,
+            source_kind="dynamic_pvc",
+            deleted_at__isnull=True,
+        ),
+    )
+    if not bindings:
+        return False, "dynamic filesystem has no active volume binding; refusing unverified data deletion"
+
+    attachments = list(
+        ManagedServiceAttachment.all_objects.select_related(
+            "app_environment__registered_app__organization",
+            "agent_environment_spec__organization",
+        ).filter(managed_service=svc),
+    )
+    active = [row for row in attachments if row.deleted_at is None]
+    if active and not force_destroy:
+        return (
+            False,
+            "dynamic filesystem still has active attachments; detach them or confirm force_destroy",
+        )
+
+    namespaces: set[str] = set()
+    for attachment in attachments:
+        if attachment.app_environment_id:
+            namespaces.add(namespace_for_app(attachment.app_environment.registered_app))
+        elif attachment.agent_environment_spec_id:
+            from astrolift_workflows.activities.agent_stage import _agent_namespace
+
+            namespaces.add(_agent_namespace(attachment.agent_environment_spec.organization.slug))
+    if not svc.project_id and svc.app_environment_id:
+        namespaces.add(namespace_for_app(svc.registered_app))
+    if not namespaces:
+        return True, "no materialized dynamic claims found"
+
+    driver = _driver_for_cluster(cluster)
+    cluster_slug = _context_for_cluster(cluster).slug
+    try:
+        storage_classes = {
+            str(row.name): row
+            for row in driver.list_storage_classes(cluster_slug)
+            if getattr(row, "name", "")
+        }
+    except Exception as exc:
+        return False, f"could not verify StorageClass reclaim policy: {exc}"
+    for binding in bindings:
+        storage_class = storage_classes.get(str(binding.storage_class_name))
+        if storage_class is None:
+            return False, f"StorageClass {binding.storage_class_name!r} no longer exists"
+        reclaim_policy = str(getattr(storage_class, "reclaim_policy", "") or "")
+        if reclaim_policy != "Delete":
+            return (
+                False,
+                f"StorageClass {binding.storage_class_name!r} uses reclaimPolicy "
+                f"{reclaim_policy or 'unknown'!r}; refusing to claim backing data was deleted",
+            )
+    deleted: list[str] = []
+    for namespace in sorted(namespaces):
+        stubs = []
+        for binding in bindings:
+            consumer_key = storage_consumer_key(
+                binding,
+                namespace=namespace,
+                consumer_key="deprovision",
+            )
+            name = binding_resource_name(binding, consumer_key)
+            stubs.append(
+                {
+                    "apiVersion": "v1",
+                    "kind": "PersistentVolumeClaim",
+                    "metadata": {"name": name, "namespace": namespace},
+                },
+            )
+            deleted.append(f"{namespace}/{name}")
+        result = driver.delete_manifests(cluster_slug, namespace, stubs)
+        if result is not None and not getattr(result, "ok", True):
+            detail = result.summary() if hasattr(result, "summary") else "PVC deletion failed"
+            return False, str(detail)
+    return True, f"deleted {len(deleted)} dynamic claim(s)"
 
 
 def _mark_status_sync(managed_service_id: int, status: str) -> None:
@@ -117,9 +212,29 @@ def _deprovision_sync(
     cfg = managed_config_for(plugin_slug, cluster, kind=svc.kind, variant=variant)
     driver = driver_cls(config=cfg)
 
+    dynamic_cleanup_message = ""
+    is_dynamic_pvc = svc.kind == "filesystem" and variant in _DYNAMIC_PVC_VARIANTS
+    if delete_data and is_dynamic_pvc:
+        cleanup_ok, dynamic_cleanup_message = _delete_dynamic_pvc_data(
+            svc,
+            cluster,
+            force_destroy=force_destroy,
+        )
+        if not cleanup_ok:
+            return {
+                "ok": False,
+                "message": dynamic_cleanup_message,
+                "errors": ["dynamic_pvc_cleanup_refused"],
+                "handle": svc.backend_ref or "",
+                "retryable": False,
+            }
+
     from _sdk.managed_service import DeprovisionSpec
 
-    spec = DeprovisionSpec(handle=svc.backend_ref or "", config=dict(svc.config or {}))
+    deprovision_config = dict(svc.config or {})
+    if delete_data and is_dynamic_pvc:
+        deprovision_config["_dynamic_claim_cleanup_confirmed"] = True
+    spec = DeprovisionSpec(handle=svc.backend_ref or "", config=deprovision_config)
     try:
         result = driver.deprovision(
             spec,
@@ -141,6 +256,8 @@ def _deprovision_sync(
         raise
     ok = bool(getattr(result, "ok", False))
     message = str(getattr(result, "message", ""))
+    if dynamic_cleanup_message:
+        message = f"{message}; {dynamic_cleanup_message}" if message else dynamic_cleanup_message
     errors = list(getattr(result, "errors", []) or [])
     retryable = bool(getattr(result, "retryable", True))
     if not ok and _signals_already_gone(message, *errors):
@@ -534,6 +651,7 @@ def _sync_binding_rows(svc: Any) -> None:
                 protocol=volume.protocol,
                 claim_name=volume.claim_name,
                 claim_namespace=volume.claim_namespace,
+                storage_class_name=volume.storage_class_name,
                 csi_driver=volume.csi_driver,
                 volume_handle=volume.volume_handle,
                 volume_attributes=dict(volume.volume_attributes),

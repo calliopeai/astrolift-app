@@ -7,6 +7,8 @@ import re
 from collections.abc import Iterable
 from typing import Any
 
+from _sdk.secrets import SecretReferenceError, resolve_secret_reference
+
 
 class FilesystemBindingError(ValueError):
     """A persisted volume binding cannot be attached safely."""
@@ -23,6 +25,7 @@ def preflight_bindings(
 
     rows = list(bindings)
     csi_drivers: set[str] | None = None
+    storage_classes: dict[str, Any] | None = None
     for binding in rows:
         _validate_persisted_binding(binding)
         service = binding.managed_service
@@ -77,6 +80,60 @@ def preflight_bindings(
                     f"filesystem {binding.managed_service.name!r} claim {binding.claim_name!r} does not exist "
                     f"in namespace {namespace!r}",
                 )
+        elif str(binding.source_kind) == "dynamic_pvc":
+            if storage_classes is None:
+                list_storage_classes = getattr(cluster_driver, "list_storage_classes", None)
+                if not callable(list_storage_classes):
+                    raise FilesystemBindingError(
+                        f"cluster {cluster_slug!r} cannot inventory StorageClasses; refusing dynamic claims",
+                    )
+                try:
+                    storage_classes = {
+                        str(getattr(row, "name", "") or ""): row
+                        for row in list_storage_classes(cluster_slug)
+                        if getattr(row, "name", "")
+                    }
+                except Exception as exc:
+                    raise FilesystemBindingError(
+                        f"cluster {cluster_slug!r} StorageClass preflight failed: {exc}",
+                    ) from exc
+            storage_class = storage_classes.get(str(binding.storage_class_name))
+            if storage_class is None:
+                raise FilesystemBindingError(
+                    f"filesystem {binding.managed_service.name!r} requires StorageClass "
+                    f"{binding.storage_class_name!r}, but cluster {cluster_slug!r} reports "
+                    f"{sorted(storage_classes)!r}",
+                )
+            if str(binding.csi_driver):
+                provisioner = str(getattr(storage_class, "provisioner", "") or "")
+                if not provisioner:
+                    raise FilesystemBindingError(
+                        f"filesystem {binding.managed_service.name!r} cannot verify the provisioner "
+                        f"for StorageClass {binding.storage_class_name!r}",
+                    )
+                if provisioner != str(binding.csi_driver):
+                    raise FilesystemBindingError(
+                        f"filesystem {binding.managed_service.name!r} requires StorageClass "
+                        f"{binding.storage_class_name!r} to use provisioner {binding.csi_driver!r}, "
+                        f"but it uses {provisioner!r}",
+                    )
+                if csi_drivers is None:
+                    list_csi = getattr(cluster_driver, "list_csi_drivers", None)
+                    if not callable(list_csi):
+                        raise FilesystemBindingError(
+                            f"cluster {cluster_slug!r} cannot inventory CSI drivers; refusing dynamic claims",
+                        )
+                    try:
+                        csi_drivers = set(list_csi(cluster_slug))
+                    except Exception as exc:
+                        raise FilesystemBindingError(
+                            f"cluster {cluster_slug!r} CSI-driver preflight failed: {exc}",
+                        ) from exc
+                if str(binding.csi_driver) not in csi_drivers:
+                    raise FilesystemBindingError(
+                        f"filesystem {binding.managed_service.name!r} requires CSI driver "
+                        f"{binding.csi_driver!r}, but cluster {cluster_slug!r} reports {sorted(csi_drivers)!r}",
+                    )
         else:
             raise FilesystemBindingError(
                 f"filesystem {binding.managed_service.name!r} has unsupported source {binding.source_kind!r}",
@@ -100,34 +157,27 @@ def resolve_binding_secret_manifests(
             continue
         volume_data: dict[str, str] = {str(key): str(value) for key, value in secret_literals.items()}
         for secret_key, backend_ref in sorted(secret_refs.items()):
-            raw_ref = str(backend_ref)
-            base_ref, separator, selected_field = raw_ref.partition("#")
-            query_ref = base_ref if separator else raw_ref
             try:
-                resolved = secrets_backend.get(query_ref)
+                raw_value = resolve_secret_reference(
+                    secrets_backend,
+                    str(backend_ref),
+                    default_key=str(secret_key),
+                )
+            except SecretReferenceError as exc:
+                raise FilesystemBindingError(
+                    f"filesystem binding {binding.managed_service.kind}/{binding.managed_service.name}#"
+                    f"{binding.name} credential reference is invalid or ambiguous",
+                ) from exc
             except Exception as exc:
                 raise FilesystemBindingError(
                     f"filesystem binding {binding.managed_service.kind}/{binding.managed_service.name}#"
                     f"{binding.name} could not read its credential reference",
                 ) from exc
-            if resolved is None:
+            if raw_value is None:
                 raise FilesystemBindingError(
                     f"filesystem binding {binding.managed_service.kind}/{binding.managed_service.name}#"
                     f"{binding.name} references a missing credential",
                 )
-            if isinstance(resolved, dict):
-                requested_field = selected_field or str(secret_key)
-                if requested_field in resolved:
-                    raw_value = str(resolved[requested_field])
-                elif not selected_field and len(resolved) == 1:
-                    raw_value = str(next(iter(resolved.values())))
-                else:
-                    raise FilesystemBindingError(
-                        f"filesystem binding {binding.managed_service.kind}/{binding.managed_service.name}#"
-                        f"{binding.name} credential does not contain the requested field",
-                    )
-            else:
-                raw_value = str(resolved)
             if not raw_value:
                 raise FilesystemBindingError(
                     f"filesystem binding {binding.managed_service.kind}/{binding.managed_service.name}#"
@@ -225,13 +275,27 @@ def agent_volume_bindings(spec: Any) -> list[Any]:
 
 
 def binding_resource_name(binding: Any, consumer_key: str) -> str:
-    digest = hashlib.sha256(f"{binding.guid}:{consumer_key}".encode()).hexdigest()[:12]
+    identity = str(binding.guid)
+    if str(binding.source_kind) == "dynamic_pvc":
+        # Binding rows are replaced when provisioning finalizes. Base a
+        # dynamic claim on the durable service identity so a retry/update
+        # reconciles the same PVC instead of silently orphaning its data.
+        identity = f"{binding.managed_service.guid}:{binding.name}"
+    digest = hashlib.sha256(f"{identity}:{consumer_key}".encode()).hexdigest()[:12]
     logical = re.sub(r"[^a-z0-9-]+", "-", str(binding.name).lower()).strip("-") or "volume"
     return f"alft-fs-{logical[:31]}-{digest}"[:63].rstrip("-")
 
 
 def binding_secret_name(binding: Any, consumer_key: str) -> str:
     return f"{binding_resource_name(binding, consumer_key)[:58]}-auth"
+
+
+def storage_consumer_key(binding: Any, *, namespace: str, consumer_key: str) -> str:
+    """Keep dynamically provisioned storage stable for a consumer namespace."""
+
+    if str(binding.source_kind) == "dynamic_pvc":
+        return f"namespace:{namespace}"
+    return consumer_key
 
 
 def render_binding_storage(
@@ -243,7 +307,12 @@ def render_binding_storage(
     """Return platform storage resources, pod volume, and container mount."""
 
     _validate_persisted_binding(binding)
-    name = binding_resource_name(binding, consumer_key)
+    effective_consumer_key = storage_consumer_key(
+        binding,
+        namespace=namespace,
+        consumer_key=consumer_key,
+    )
+    name = binding_resource_name(binding, effective_consumer_key)
     source_kind = str(binding.source_kind)
     pod_volume: dict[str, Any] = {"name": str(binding.name)}
     resources: list[dict[str, Any]] = []
@@ -307,6 +376,27 @@ def render_binding_storage(
             },
         }
         resources.extend((pv, pvc))
+        pod_volume["persistentVolumeClaim"] = {
+            "claimName": name,
+            "readOnly": bool(binding.read_only),
+        }
+    elif source_kind == "dynamic_pvc":
+        pvc = {
+            "apiVersion": "v1",
+            "kind": "PersistentVolumeClaim",
+            "metadata": {
+                "name": name,
+                "namespace": namespace,
+                "labels": _binding_labels(binding, effective_consumer_key),
+            },
+            "spec": {
+                "accessModes": list(binding.access_modes or ["ReadWriteOnce"]),
+                "resources": {"requests": {"storage": str(binding.capacity)}},
+                "storageClassName": str(binding.storage_class_name),
+                "volumeMode": "Filesystem",
+            },
+        }
+        resources.append(pvc)
         pod_volume["persistentVolumeClaim"] = {
             "claimName": name,
             "readOnly": bool(binding.read_only),
@@ -390,6 +480,17 @@ def _validate_persisted_binding(binding: Any) -> None:
         raise FilesystemBindingError(f"filesystem {binding.name!r} has no complete existing claim locator")
     if str(binding.source_kind) == "csi" and (not str(binding.csi_driver) or not str(binding.volume_handle)):
         raise FilesystemBindingError(f"filesystem {binding.name!r} has an incomplete CSI source")
+    if str(binding.source_kind) == "dynamic_pvc":
+        if not str(binding.storage_class_name):
+            raise FilesystemBindingError(f"filesystem {binding.name!r} has no StorageClass")
+        if binding.claim_name or binding.claim_namespace or binding.volume_handle:
+            raise FilesystemBindingError(
+                f"filesystem {binding.name!r} mixes dynamic and existing volume fields"
+            )
+        if binding.secret_refs or getattr(binding, "secret_literals", None):
+            raise FilesystemBindingError(
+                f"filesystem {binding.name!r} dynamic StorageClass credentials must be operator-managed"
+            )
     if any(not str(key) or not str(ref) for key, ref in dict(binding.secret_refs or {}).items()):
         raise FilesystemBindingError(f"filesystem {binding.name!r} has an empty credential reference")
     secret_literals = dict(getattr(binding, "secret_literals", None) or {})
@@ -403,6 +504,10 @@ def _validate_persisted_binding(binding: Any) -> None:
     access_modes = list(binding.access_modes or [])
     if not access_modes or any(str(mode) not in allowed_access_modes for mode in access_modes):
         raise FilesystemBindingError(f"filesystem {binding.name!r} has an unsupported access mode")
+    if str(binding.source_kind) == "dynamic_pvc" and len(access_modes) != 1:
+        raise FilesystemBindingError(
+            f"filesystem {binding.name!r} dynamic claim must request exactly one access mode"
+        )
 
 
 def _binding_labels(binding: Any, consumer_key: str) -> dict[str, str]:

@@ -2441,6 +2441,7 @@ type AstroliftManagedServiceVolumeBinding {
   protocol: String!
   claimName: String!
   claimNamespace: String!
+  storageClassName: String!
   csiDriver: String!
   readOnly: Boolean!
   capacity: String!

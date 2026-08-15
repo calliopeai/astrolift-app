@@ -79,6 +79,33 @@ def test_sync_persists_portable_volume_contract_without_secret_values() -> None:
     assert password.env_value_ref == "secret/fsx#password"
 
 
+def test_sync_persists_dynamic_storage_class_template() -> None:
+    service = _filesystem_service()
+    volume = VolumeMount(
+        name="shared-files",
+        mount_path="/workspace",
+        source_kind=VolumeSourceKind.DYNAMIC_PVC,
+        protocol="cephfs",
+        storage_class_name="rook-cephfs",
+        csi_driver="rook-ceph.cephfs.csi.ceph.com",
+        capacity="100Gi",
+        access_modes=("ReadWriteMany",),
+    )
+
+    with patch(
+        "astrolift_workflows.activities.managed_service_lifecycle._managed_binding_for",
+        return_value=_binding(volume),
+    ):
+        _sync_binding_rows(service)
+
+    persisted = ManagedServiceVolumeBinding.objects.get(managed_service=service)
+    assert persisted.source_kind == "dynamic_pvc"
+    assert persisted.storage_class_name == "rook-cephfs"
+    assert persisted.csi_driver == "rook-ceph.cephfs.csi.ceph.com"
+    assert persisted.claim_name == ""
+    assert persisted.volume_handle == ""
+
+
 def test_invalid_driver_reconcile_does_not_erase_last_good_bindings() -> None:
     service = _filesystem_service()
     first = VolumeMount(

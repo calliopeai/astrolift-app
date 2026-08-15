@@ -2443,6 +2443,7 @@ export type AstroliftManagedServiceVolumeBinding = {
   protocol: Scalars['String']['output'];
   readOnly: Scalars['Boolean']['output'];
   sourceKind: Scalars['String']['output'];
+  storageClassName: Scalars['String']['output'];
   subPath: Scalars['String']['output'];
   workloadNames: Array<Scalars['String']['output']>;
 };

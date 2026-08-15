@@ -113,7 +113,10 @@ class AvailabilityMatrix:
         variant: str,
     ) -> bool:
         return any(
-            m.plugin_id == plugin_id and m.kind == kind and m.variant == variant and m.status != "planned"
+            m.plugin_id == plugin_id
+            and m.kind == kind
+            and m.variant == variant
+            and m.status in {"ga", "preview", "experimental"}
             for m in self.managed_services
         )
 
@@ -1668,10 +1671,43 @@ MATRIX = AvailabilityMatrix(
         ),
         ManagedServiceEntry(
             kind="object_store",
+            variant="seaweedfs_operator",
+            plugin_id="k8s_native",
+            status="preview",
+            description="SeaweedFS Operator bucket and bucket-scoped S3 IAM identity",
+            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            binding_envs=(
+                "BUCKET_NAME",
+                "BUCKET_REGION",
+                "BUCKET_ENDPOINT",
+                "BUCKET_PREFIX",
+                "AWS_ACCESS_KEY_ID",
+                "AWS_SECRET_ACCESS_KEY",
+                "AWS_S3_FORCE_PATH_STYLE",
+            ),
+        ),
+        ManagedServiceEntry(
+            kind="object_store",
             variant="minio_operator",
             plugin_id="k8s_native",
+            status="deprecated",
+            description="Retired community MinIO Operator (catalogue visibility only)",
+            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+        ),
+        ManagedServiceEntry(
+            kind="object_store",
+            variant="minio_aistor_operator",
+            plugin_id="k8s_native",
             status="planned",
-            description="MinIO Operator tenant",
+            description="Commercial MinIO AIStor Operator tenant",
+            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+        ),
+        ManagedServiceEntry(
+            kind="object_store",
+            variant="s3_compatible_existing",
+            plugin_id="k8s_native",
+            status="planned",
+            description="Adopt an existing S3-compatible endpoint and credential bundle",
             issue_url=_CROSS_CLOUD_PARITY_ISSUE,
         ),
         ManagedServiceEntry(
@@ -1702,17 +1738,25 @@ MATRIX = AvailabilityMatrix(
             kind="filesystem",
             variant="rook_cephfs",
             plugin_id="k8s_native",
-            status="planned",
-            description="Rook CephFS shared filesystem",
+            status="preview",
+            description="Rook CephFS consumer-local RWX filesystem claims",
             issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            binding_envs=(
+                "FILESYSTEM_HANDLE",
+                "FILESYSTEM_MOUNT_PATH",
+            ),
         ),
         ManagedServiceEntry(
             kind="filesystem",
             variant="storage_class_pvc",
             plugin_id="k8s_native",
-            status="planned",
-            description="StorageClass-backed persistent volume claim",
+            status="preview",
+            description="Consumer-local StorageClass-backed persistent volume template",
             issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            binding_envs=(
+                "FILESYSTEM_HANDLE",
+                "FILESYSTEM_MOUNT_PATH",
+            ),
         ),
         ManagedServiceEntry(
             kind="event_bus",

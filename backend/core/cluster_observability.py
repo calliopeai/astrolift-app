@@ -692,6 +692,154 @@ def _optional_string(value: Any) -> str | None:
     return str(value) if value not in (None, "") else None
 
 
+def _k8s_managed_config_for(
+    cluster: TenantCluster,
+    *,
+    kind: str,
+    variant: str,
+    provider_config: dict[str, Any],
+) -> Any:
+    """Build live in-cluster driver configs with the cluster mutator attached."""
+
+    cluster_driver = _driver_for_cluster(cluster)
+    pc = provider_config
+    pair = (kind, variant)
+
+    if pair == ("postgres", "cnpg"):
+        from k8s_native.managed.postgres_cnpg import CNPGConfig
+
+        return CNPGConfig(
+            cluster_driver=cluster_driver,
+            operator_namespace=str(pc.get("cnpg_operator_namespace", "cnpg-system")),
+            storage_class=str(pc.get("cnpg_storage_class", "")),
+            backup_object_store_url=str(pc.get("cnpg_backup_url", "")),
+        )
+    if pair == ("redis", "operator"):
+        from k8s_native.managed.redis_operator import RedisOperatorConfig
+
+        return RedisOperatorConfig(
+            cluster_driver=cluster_driver,
+            storage_class=str(pc.get("redis_storage_class", "")),
+            persistent=bool(pc.get("redis_persistent", True)),
+        )
+    if pair == ("mysql", "operator"):
+        from k8s_native.managed.mysql_operator import MySQLOperatorConfig
+
+        return MySQLOperatorConfig(
+            operator_brand=str(pc.get("mysql_operator_brand", "percona")),
+            storage_class=_optional_string(pc.get("mysql_storage_class")),
+            namespace=_optional_string(pc.get("mysql_namespace")),
+            backup_url=_optional_string(pc.get("mysql_backup_url")),
+            cluster_driver=cluster_driver,
+        )
+    if pair == ("document_db", "mongodb_operator"):
+        from k8s_native.managed.mongodb_operator import MongoDBOperatorConfig
+
+        return MongoDBOperatorConfig(
+            storage_class=_optional_string(pc.get("mongodb_storage_class")),
+            namespace=_optional_string(pc.get("mongodb_namespace")),
+            backup_url=_optional_string(pc.get("mongodb_backup_url")),
+            cluster_driver=cluster_driver,
+        )
+    if pair == ("event_stream", "kafka_strimzi"):
+        from k8s_native.managed.event_stream_strimzi import StrimziKafkaConfig
+
+        return StrimziKafkaConfig(
+            storage_class=_optional_string(pc.get("kafka_storage_class")),
+            namespace=_optional_string(pc.get("kafka_namespace")),
+            cluster_driver=cluster_driver,
+        )
+    if pair == ("event_stream", "nats"):
+        from k8s_native.managed.event_stream_nats import NATSConfig
+
+        return NATSConfig(
+            storage_class=_optional_string(pc.get("nats_storage_class")),
+            namespace=_optional_string(pc.get("nats_namespace")),
+            enable_jetstream=bool(pc.get("nats_enable_jetstream", True)),
+            cluster_driver=cluster_driver,
+        )
+    if pair == ("queue", "rabbitmq_operator"):
+        from k8s_native.managed.queue_rabbitmq import RabbitMQOperatorConfig
+
+        return RabbitMQOperatorConfig(
+            storage_class=_optional_string(pc.get("rabbitmq_storage_class")),
+            namespace=_optional_string(pc.get("rabbitmq_namespace")),
+            cluster_driver=cluster_driver,
+        )
+    if pair == ("object_store", "seaweedfs_operator"):
+        from k8s_native.managed.object_store_seaweedfs import SeaweedFSObjectStoreConfig
+
+        from core.app_deploy import AppDeployError, driver_for_capability
+
+        try:
+            secrets_backend = driver_for_capability(cluster, "secrets")
+        except AppDeployError as exc:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: cannot resolve the secrets backend required by SeaweedFS: {exc}",
+            ) from exc
+        return SeaweedFSObjectStoreConfig(
+            namespace=str(pc.get("seaweed_namespace", "astrolift-storage")),
+            seaweed_name=str(pc.get("seaweed_cluster_name", "astrolift-object-store")),
+            endpoint=str(pc.get("seaweed_s3_endpoint", "")),
+            endpoint_scheme=str(pc.get("seaweed_s3_scheme", "http")),
+            endpoint_port=int(pc.get("seaweed_s3_port", 8333)),
+            region=str(pc.get("seaweed_s3_region", "us-east-1")),
+            credential_path_prefix=str(
+                pc.get("seaweed_credential_path_prefix", "managed/object_store"),
+            ),
+            verify_crds=bool(pc.get("seaweed_verify_crds", True)),
+            deletion_timeout_seconds=float(
+                pc.get("seaweed_deletion_timeout_seconds", 120),
+            ),
+            cluster_driver=cluster_driver,
+            secrets_backend=secrets_backend,
+        )
+    if pair in {
+        ("filesystem", "nfs_csi"),
+        ("filesystem", "nfs_subdir_provisioner"),
+    }:
+        from k8s_native.managed.filesystem_nfs import NFSConfig
+
+        return NFSConfig(
+            storage_class_name=str(
+                pc.get("nfs_storage_class_name", pc.get("filesystem_storage_class_name", "")),
+            ),
+            server_address=str(pc.get("nfs_server_address", "")),
+            server_export=str(pc.get("nfs_server_export", "/export")),
+            namespace=_optional_string(pc.get("nfs_namespace")),
+            cluster_driver=cluster_driver,
+        )
+    if pair in {
+        ("filesystem", "storage_class_pvc"),
+        ("filesystem", "rook_cephfs"),
+    }:
+        from k8s_native.managed.filesystem_pvc import PVCConfig
+
+        if pair[1] == "rook_cephfs":
+            default_class = "rook-cephfs"
+            default_csi = "rook-ceph.cephfs.csi.ceph.com"
+            default_modes = ("ReadWriteMany",)
+            prefix = "rook_cephfs"
+        else:
+            default_class = ""
+            default_csi = ""
+            default_modes = ("ReadWriteOnce",)
+            prefix = "filesystem_pvc"
+        raw_modes = pc.get(f"{prefix}_access_modes", default_modes)
+        if isinstance(raw_modes, str):
+            raw_modes = [raw_modes]
+        return PVCConfig(
+            storage_class_name=str(pc.get(f"{prefix}_storage_class_name", default_class)),
+            cluster_driver=cluster_driver,
+            csi_driver=str(pc.get(f"{prefix}_csi_driver", default_csi)),
+            default_access_modes=tuple(str(value) for value in raw_modes),
+        )
+    raise ClusterObservabilityError(
+        f"cluster {cluster.slug}: no Kubernetes managed-service config builder for "
+        f"kind={kind!r}, variant={variant!r}",
+    )
+
+
 def managed_config_for(
     plugin_slug: str,
     cluster: TenantCluster,
@@ -724,6 +872,14 @@ def managed_config_for(
             provider_config=pc,
             auth_config=ac,
             region=region,
+        )
+
+    if plugin_slug == "k8s_native":
+        return _k8s_managed_config_for(
+            cluster,
+            kind=kind,
+            variant=variant,
+            provider_config=pc,
         )
 
     if plugin_slug != "aws":

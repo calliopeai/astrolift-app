@@ -122,6 +122,33 @@ def test_planned_service_does_not_require_an_installed_driver() -> None:
     assert report.ok is True
 
 
+def test_deprecated_service_does_not_require_an_installed_driver() -> None:
+    plugin = _aws_plugin()
+    matrix = AvailabilityMatrix(
+        drivers=tuple(
+            DriverEntry(role=role, plugin_id="aws")
+            for role in ("cluster", "ingress", "dns", "tls", "secrets", "identity", "registry")
+        ),
+        managed_services=(
+            ManagedServiceEntry(
+                kind="object_store",
+                variant="s3",
+                plugin_id="aws",
+            ),
+            ManagedServiceEntry(
+                kind="object_store",
+                variant="retired_operator",
+                plugin_id="aws",
+                status="deprecated",
+            ),
+        ),
+    )
+
+    report = check_matrix(plugins=[plugin], matrix=matrix)
+
+    assert report.ok is True
+
+
 def test_matrix_rejects_provider_specific_unknown_kind() -> None:
     matrix = AvailabilityMatrix(
         managed_services=(

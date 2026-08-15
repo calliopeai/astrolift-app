@@ -108,6 +108,49 @@ picks them up automatically. No action required in the platform.
 
 ---
 
+## Enable shared S3-compatible object storage
+
+The `k8s_native` provider can provision project and app buckets through the
+SeaweedFS Operator. The operator and one shared `Seaweed` storage cluster are
+cluster add-ons; Astrolift manages `Bucket` and S3 IAM resources inside that
+cluster and never creates or deletes the storage engine per bucket.
+
+Install a current [SeaweedFS Operator](https://github.com/seaweedfs/seaweedfs-operator),
+enable the standalone `spec.s3` gateway on the shared `Seaweed` resource, and
+configure these provider settings:
+
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `seaweed_namespace` | `astrolift-storage` | Namespace containing the shared cluster and bucket/IAM CRs |
+| `seaweed_cluster_name` | `astrolift-object-store` | Name of the existing `Seaweed` resource |
+| `seaweed_s3_endpoint` | generated Service URL | Explicit internal or external S3 gateway URL |
+| `seaweed_s3_scheme` / `seaweed_s3_port` | `http` / `8333` | Generated Service URL transport |
+| `seaweed_s3_region` | `us-east-1` | S3 request-signing region |
+| `seaweed_credential_path_prefix` | `managed/object_store` | External secret-store path prefix for bucket credentials |
+
+The cluster's configured Vault backend must be writable. Astrolift stores each
+access-key pair as a multi-key bundle there after the SeaweedFS Operator has
+generated it in its owned Kubernetes Secret. The operator is the sole
+credential issuer, so concurrent retries cannot leave Kubernetes and Vault
+with different keys. Workloads receive field-selected Vault references;
+plaintext is resolved only during runtime secret materialization.
+
+Before applying any manifests, provisioning verifies the shared `Seaweed`
+object and the `Bucket`, `S3Identity`, `S3Credentials`, `S3Policy`, and
+`S3PolicyBinding` CRDs. A missing or older operator fails closed. Readiness is
+withheld until every resource is ready and the generated credential pair is
+synchronized into Vault. The default teardown retains the Bucket CR and data,
+removes workload ownership and public access, and revokes IAM credentials.
+Destructive teardown changes the reclaim policy to `Delete`; active Object
+Lock retention still blocks deletion even when force-destroy is requested.
+
+The archived community MinIO Operator is intentionally not an executable
+Astrolift variant. Commercial MinIO AIStor and adoption of an existing
+S3-compatible endpoint remain visible planned variants in the resource
+catalogue.
+
+---
+
 ## Decommission a cluster
 
 Decommissioning removes the cluster from Astrolift's management. It
