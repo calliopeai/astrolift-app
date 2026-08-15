@@ -128,6 +128,15 @@ POLICIES: dict[tuple[str, str, str], EncryptionPolicy] = {
         cmek_required_for_compliance=("pci", "hipaa"),
         notes=("Spanner database CMEK is selected at creation; restored databases can select replacement keys."),
     ),
+    ("gcp", "redis", "memorystore_valkey"): EncryptionPolicy(
+        mode="cloud_kms",
+        cmek_supported=True,
+        cmek_required_for_compliance=("pci", "hipaa"),
+        notes=(
+            "Memorystore for Valkey uses Private Service Connect and server-authenticated TLS by default; "
+            "CMEK protects persistence and managed backups."
+        ),
+    ),
     # Azure
     ("azure", "object_store", "blob"): EncryptionPolicy(
         mode="cloud_kms",
