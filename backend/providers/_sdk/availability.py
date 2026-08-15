@@ -1882,10 +1882,9 @@ MATRIX = AvailabilityMatrix(
             issue_url=_AZURE_FUNCTIONS_ISSUE,
             binding_envs=(
                 "FUNCTION_NAME",
+                "FUNCTION_ARN",
                 "FUNCTION_URL",
-                "FUNCTION_PROVIDER",
                 "FUNCTION_REGION",
-                "FUNCTION_RESOURCE_ID",
                 "AZURE_FUNCTION_APP_NAME",
                 "AZURE_FUNCTION_APP_URL",
                 "AZURE_FUNCTION_IDENTITY_RESOURCE_ID",

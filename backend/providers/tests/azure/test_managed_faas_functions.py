@@ -503,11 +503,35 @@ def test_status_and_binding_are_credential_free() -> None:
     status = driver.status(ServiceHandle(provisioned.handle))
     assert status.state == "available"
     binding = driver.binding(ServiceHandle(provisioned.handle))
-    assert binding.env_vars["FUNCTION_PROVIDER"].literal == "azure_functions"
     assert binding.env_vars["FUNCTION_URL"].literal is not None
     assert binding.env_vars["AZURE_FUNCTION_IDENTITY_RESOURCE_ID"].literal == IDENTITY_ID
     assert not binding.iam_grants
     assert all(value.secret_ref is None for value in binding.env_vars.values())
+
+
+def test_binding_emits_the_canonical_faas_envelope() -> None:
+    """Only keys in the platform's ``faas`` envelope are injected into a workload.
+    A driver-local name in the portable ``FUNCTION_*`` namespace would be silently
+    dropped at deploy time while every unit test still passed, so pin the contract:
+    the canonical envelope must be a subset of what ``binding()`` emits, and the
+    ARM resource ID must ride the portable locator slot rather than a private key."""
+    from astrolift_manifest.env_injection import envelope_keys_for
+
+    client = _client()
+    driver = _driver(client)
+    provisioned = driver.provision(_spec())
+    binding = driver.binding(ServiceHandle(provisioned.handle))
+    keys = set(binding.env_vars)
+
+    assert set(envelope_keys_for("faas")) <= keys, keys
+    assert binding.env_vars["FUNCTION_ARN"].literal == _site_id(client)
+    assert "FUNCTION_RESOURCE_ID" not in keys
+    assert "FUNCTION_PROVIDER" not in keys
+    # Provider-specific aliases ride alongside the envelope, never instead of it.
+    assert {"AZURE_FUNCTION_APP_NAME", "AZURE_FUNCTION_APP_URL"} <= keys
+    # Every emitted value is a plain scalar, matching the AWS/Knative siblings;
+    # no key carries a JSON-encoded list that a consumer would have to parse.
+    assert all(value.literal is None or not value.literal.startswith(("[", "{")) for value in binding.env_vars.values())
 
 
 def test_status_missing_and_failed() -> None:

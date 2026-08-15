@@ -422,14 +422,18 @@ class AzureFunctionsDriver(ManagedServiceDriver):
         return Binding(
             env_vars={
                 "FUNCTION_NAME": ValueRef(literal=name),
-                "FUNCTION_URL": ValueRef(literal=url),
-                "FUNCTION_PROVIDER": ValueRef(literal=VARIANT),
-                "FUNCTION_REGION": ValueRef(literal=str(resource.get("location") or self._config.location)),
-                "FUNCTION_RESOURCE_ID": ValueRef(
+                # FUNCTION_ARN is the portable resource-locator slot for this
+                # kind, not an AWS-only name: Knative fills it with a k8s://
+                # URI. Only the keys in the platform's faas envelope are
+                # injected into a workload, so the ARM resource ID has to land
+                # here rather than in a driver-local FUNCTION_RESOURCE_ID.
+                "FUNCTION_ARN": ValueRef(
                     literal=str(
                         resource.get("id") or self._site_resource_id(resource_group, name),
                     ),
                 ),
+                "FUNCTION_URL": ValueRef(literal=url),
+                "FUNCTION_REGION": ValueRef(literal=str(resource.get("location") or self._config.location)),
                 "AZURE_FUNCTION_APP_NAME": ValueRef(literal=name),
                 "AZURE_FUNCTION_APP_URL": ValueRef(literal=url),
                 "AZURE_FUNCTION_IDENTITY_RESOURCE_ID": ValueRef(literal=identity_id),
@@ -499,10 +503,9 @@ class AzureFunctionsDriver(ManagedServiceDriver):
         return BindingSchema(
             env_vars={
                 "FUNCTION_NAME": "Portable function application name",
+                "FUNCTION_ARN": "Portable resource locator; the Function App ARM resource ID",
                 "FUNCTION_URL": "Portable HTTPS endpoint; no function key is embedded",
-                "FUNCTION_PROVIDER": "azure_functions",
                 "FUNCTION_REGION": "Azure region",
-                "FUNCTION_RESOURCE_ID": "ARM resource ID",
                 "AZURE_FUNCTION_APP_NAME": "Azure Function App name",
                 "AZURE_FUNCTION_APP_URL": "Azure Function App HTTPS endpoint",
                 "AZURE_FUNCTION_IDENTITY_RESOURCE_ID": "Attached user-assigned managed identity",
