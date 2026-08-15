@@ -533,6 +533,42 @@ def _gcp_managed_config_for(
             adopt_existing_instance=bool(pc.get("spanner_adopt_existing_instance", False)),
         )
 
+    if pair == ("workflow_engine", "workflows") or (kind == "workflow_engine" and not variant):
+        from gcp.managed.workflow_workflows import WorkflowsConfig
+
+        return WorkflowsConfig(
+            project_id=project_id,
+            region=region,
+            workflow_name_prefix=str(pc.get("workflows_name_prefix", "astrolift")),
+            deletion_protection_default=bool(
+                pc.get("workflows_deletion_protection_default", True),
+            ),
+            call_log_level_default=str(
+                pc.get("workflows_call_log_level_default", "LOG_ERRORS_ONLY"),
+            ),
+            execution_history_level_default=str(
+                pc.get(
+                    "workflows_execution_history_level_default",
+                    "EXECUTION_HISTORY_BASIC",
+                ),
+            ),
+            api_endpoint=str(
+                pc.get("workflows_api_endpoint", "https://workflows.googleapis.com/v1"),
+            ),
+            executions_api_endpoint=str(
+                pc.get(
+                    "workflow_executions_api_endpoint",
+                    "https://workflowexecutions.googleapis.com/v1",
+                ),
+            ),
+            operation_timeout_seconds=float(
+                pc.get("workflows_operation_timeout_seconds", 900),
+            ),
+            poll_interval_seconds=float(
+                pc.get("workflows_operation_poll_interval_seconds", 2),
+            ),
+        )
+
     if pair == ("postgres", "cloudsql") or (kind == "postgres" and not variant):
         from gcp.managed.postgres_cloudsql import CloudSQLConfig
 

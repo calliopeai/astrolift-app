@@ -335,6 +335,37 @@ def test_spanner_graph_runtime_config_preserves_operator_controls() -> None:
     assert config.adopt_existing_instance is True
 
 
+def test_workflows_runtime_config_preserves_operator_controls() -> None:
+    from core.cluster_observability import managed_config_for
+
+    config = managed_config_for(
+        "gcp",
+        _cluster(
+            workflows_name_prefix="smd-flow",
+            workflows_deletion_protection_default=False,
+            workflows_call_log_level_default="LOG_NONE",
+            workflows_execution_history_level_default="EXECUTION_HISTORY_DETAILED",
+            workflows_api_endpoint="https://workflows.example.test/v1",
+            workflow_executions_api_endpoint="https://executions.example.test/v1",
+            workflows_operation_timeout_seconds=300,
+            workflows_operation_poll_interval_seconds=0.5,
+        ),
+        kind="workflow_engine",
+        variant="workflows",
+    )
+    assert type(config).__name__ == "WorkflowsConfig"
+    assert config.project_id == "acme-prod"
+    assert config.region == "us-central1"
+    assert config.workflow_name_prefix == "smd-flow"
+    assert config.deletion_protection_default is False
+    assert config.call_log_level_default == "LOG_NONE"
+    assert config.execution_history_level_default == "EXECUTION_HISTORY_DETAILED"
+    assert config.api_endpoint == "https://workflows.example.test/v1"
+    assert config.executions_api_endpoint == "https://executions.example.test/v1"
+    assert config.operation_timeout_seconds == 300
+    assert config.poll_interval_seconds == 0.5
+
+
 def test_memorystore_valkey_runtime_config_preserves_operator_controls() -> None:
     from core.cluster_observability import managed_config_for
 

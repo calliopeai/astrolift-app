@@ -10,6 +10,10 @@
 
 ### Added
 
+- Add Google Cloud Workflows lifecycle with YAML/JSON definitions, revision
+  snapshots and rollback, service identities, CMEK, environment variables,
+  call logging, execution history, invocation bindings, execution controls,
+  boundary-safe adoption, and destructive-history-aware teardown.
 - Add Google Cloud Run functions (Cloud Functions v2) lifecycle with Cloud
   Build source declarations, HTTP and Eventarc triggers, Secret Manager
   environment/volumes, scaling, private networking, Binary Authorization,

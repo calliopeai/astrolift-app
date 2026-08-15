@@ -1309,8 +1309,23 @@ MATRIX = AvailabilityMatrix(
             kind="workflow_engine",
             variant="workflows",
             plugin_id="gcp",
-            status="planned",
-            description="Google Cloud Workflows",
+            status="preview",
+            description=(
+                "Google Cloud Workflows definitions, immutable revisions, executions, "
+                "CMEK, service identity, environment, logging, history, IAM bindings, "
+                "rollback, adoption, and protected teardown"
+            ),
+            binding_envs=(
+                "WORKFLOW_ENGINE_ID",
+                "WORKFLOW_ENGINE_ARN",
+                "WORKFLOW_ENGINE_REGION",
+                "WORKFLOW_ENGINE_TYPE",
+                "GCP_WORKFLOWS_NAME",
+                "GCP_WORKFLOWS_PROJECT",
+                "GCP_WORKFLOWS_LOCATION",
+                "GCP_WORKFLOWS_EXECUTIONS_URL",
+                "GCP_WORKFLOWS_CONSOLE_URL",
+            ),
             issue_url=_CROSS_CLOUD_PARITY_ISSUE,
         ),
         ManagedServiceEntry(
