@@ -121,6 +121,7 @@ class VolumeSourceKind(StrEnum):
 
     EXISTING_PVC = "existing_pvc"
     CSI = "csi"
+    DYNAMIC_PVC = "dynamic_pvc"
 
 
 @dataclass(frozen=True)
@@ -143,6 +144,7 @@ class VolumeMount:
     protocol: str = ""
     claim_name: str = ""
     claim_namespace: str = ""
+    storage_class_name: str = ""
     csi_driver: str = ""
     volume_handle: str = ""
     volume_attributes: dict[str, str] = field(default_factory=dict)
@@ -167,11 +169,26 @@ class VolumeMount:
         if self.source_kind == VolumeSourceKind.EXISTING_PVC:
             if not self.claim_name or not self.claim_namespace:
                 raise ValueError("existing_pvc managed volume requires claim_name and claim_namespace")
-            if self.csi_driver or self.volume_handle or self.secret_refs or self.secret_literals:
-                raise ValueError("existing_pvc managed volume cannot declare CSI fields")
+            if (
+                self.storage_class_name
+                or self.csi_driver
+                or self.volume_handle
+                or self.secret_refs
+                or self.secret_literals
+            ):
+                raise ValueError("existing_pvc managed volume cannot declare dynamic or CSI fields")
         elif self.source_kind == VolumeSourceKind.CSI:
             if not self.csi_driver or not self.volume_handle:
                 raise ValueError("csi managed volume requires csi_driver and volume_handle")
+            if self.claim_name or self.claim_namespace or self.storage_class_name:
+                raise ValueError("csi managed volume cannot declare claim or StorageClass fields")
+        elif self.source_kind == VolumeSourceKind.DYNAMIC_PVC:
+            if not self.storage_class_name:
+                raise ValueError("dynamic_pvc managed volume requires storage_class_name")
+            if self.claim_name or self.claim_namespace or self.volume_handle:
+                raise ValueError("dynamic_pvc managed volume cannot declare an existing volume locator")
+            if self.secret_refs or self.secret_literals:
+                raise ValueError("dynamic_pvc managed volume credentials belong to its StorageClass")
         else:
             raise ValueError(f"unsupported managed volume source kind {self.source_kind!r}")
         if not self.capacity:
@@ -181,6 +198,8 @@ class VolumeMount:
         allowed_access_modes = {"ReadWriteOnce", "ReadOnlyMany", "ReadWriteMany", "ReadWriteOncePod"}
         if not self.access_modes or any(mode not in allowed_access_modes for mode in self.access_modes):
             raise ValueError("managed volume has an unsupported Kubernetes access mode")
+        if self.source_kind == VolumeSourceKind.DYNAMIC_PVC and len(self.access_modes) != 1:
+            raise ValueError("dynamic_pvc managed volume must request exactly one access mode")
         if any(not key or not ref for key, ref in self.secret_refs.items()):
             raise ValueError("managed volume secret_refs must map non-empty keys to backend references")
         if any(not key or not value for key, value in self.secret_literals.items()):

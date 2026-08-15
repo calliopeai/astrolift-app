@@ -165,6 +165,8 @@ class NamespaceState:
 class StorageClassInfo:
     name: str
     is_default: bool
+    provisioner: str = ""
+    reclaim_policy: str = ""
 
 
 @dataclass(frozen=True)

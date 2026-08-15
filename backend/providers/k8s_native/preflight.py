@@ -145,6 +145,21 @@ REQUIREMENTS: dict[tuple[str, str], OperatorRequirement] = {
             "--namespace nfs-provisioner --create-namespace"
         ),
     ),
+    ("filesystem", "storage_class_pvc"): OperatorRequirement(
+        operator_id="storage-class",
+        display_name="Kubernetes dynamic provisioning",
+        required_crds=(),
+        install_hint="Install a CSI provisioner and create the selected StorageClass",
+    ),
+    ("filesystem", "rook_cephfs"): OperatorRequirement(
+        operator_id="rook-ceph-operator",
+        display_name="Rook Ceph",
+        required_crds=(
+            "cephclusters.ceph.rook.io",
+            "cephfilesystems.ceph.rook.io",
+        ),
+        install_hint=("Install the Rook Ceph operator, create a CephFilesystem, and create its CephFS StorageClass"),
+    ),
 }
 
 

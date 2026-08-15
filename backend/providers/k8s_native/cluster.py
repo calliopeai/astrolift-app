@@ -296,6 +296,8 @@ class K8sNativeClusterDriver(ClusterDriver):
                 StorageClassInfo(
                     name=meta.get("name", ""),
                     is_default=(ann.get("storageclass.kubernetes.io/is-default-class") == "true"),
+                    provisioner=str(sc.get("provisioner") or ""),
+                    reclaim_policy=str(sc.get("reclaimPolicy") or "Delete"),
                 )
             )
         return out

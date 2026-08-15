@@ -191,6 +191,7 @@ class ManagedServiceVolumeBinding(BaseCoreModel):
     class SourceKind(models.TextChoices):
         EXISTING_PVC = "existing_pvc"
         CSI = "csi"
+        DYNAMIC_PVC = "dynamic_pvc"
 
     managed_service = models.ForeignKey(
         "astrolift_services.ManagedService",
@@ -204,6 +205,7 @@ class ManagedServiceVolumeBinding(BaseCoreModel):
     protocol = models.CharField(max_length=32)
     claim_name = models.CharField(max_length=253, blank=True, default="")
     claim_namespace = models.CharField(max_length=253, blank=True, default="")
+    storage_class_name = models.CharField(max_length=253, blank=True, default="")
     csi_driver = models.CharField(max_length=253, blank=True, default="")
     volume_handle = models.CharField(max_length=1024, blank=True, default="")
     volume_attributes = models.JSONField(default=dict, blank=True)
@@ -229,6 +231,7 @@ class ManagedServiceVolumeBinding(BaseCoreModel):
                         source_kind="existing_pvc",
                         claim_name__gt="",
                         claim_namespace__gt="",
+                        storage_class_name="",
                         csi_driver="",
                         volume_handle="",
                     )
@@ -238,6 +241,14 @@ class ManagedServiceVolumeBinding(BaseCoreModel):
                         volume_handle__gt="",
                         claim_name="",
                         claim_namespace="",
+                        storage_class_name="",
+                    )
+                    | models.Q(
+                        source_kind="dynamic_pvc",
+                        storage_class_name__gt="",
+                        claim_name="",
+                        claim_namespace="",
+                        volume_handle="",
                     )
                 ),
                 name="msvc_volume_source_fields_valid",

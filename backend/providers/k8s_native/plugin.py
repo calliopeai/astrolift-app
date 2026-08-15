@@ -29,6 +29,7 @@ from k8s_native.ingress import K8sIngressDriver
 from k8s_native.managed.event_stream_nats import NATSDriver
 from k8s_native.managed.event_stream_strimzi import StrimziKafkaDriver
 from k8s_native.managed.filesystem_nfs import NFSDriver
+from k8s_native.managed.filesystem_pvc import RookCephFSDriver, StorageClassPVCDriver
 from k8s_native.managed.mongodb_operator import MongoDBOperatorDriver
 from k8s_native.managed.mysql_operator import MySQLOperatorDriver
 from k8s_native.managed.postgres_cnpg import CNPGPostgresDriver
@@ -61,6 +62,8 @@ PLUGIN = ProviderPlugin(
         ("event_stream", "nats"): NATSDriver,
         ("queue", "rabbitmq_operator"): RabbitMQOperatorDriver,
         ("filesystem", "nfs_csi"): NFSDriver,
+        ("filesystem", "storage_class_pvc"): StorageClassPVCDriver,
+        ("filesystem", "rook_cephfs"): RookCephFSDriver,
     },
     config_schema={
         "type": "object",
@@ -97,6 +100,77 @@ PLUGIN = ProviderPlugin(
             },
             "cnpg_storage_class": {"type": "string"},
             "cnpg_backup_url": {"type": "string"},
+            "cnpg_operator_namespace": {"type": "string", "default": "cnpg-system"},
+            "redis_storage_class": {"type": "string"},
+            "redis_persistent": {"type": "boolean", "default": True},
+            "mysql_operator_brand": {
+                "type": "string",
+                "enum": ["percona", "oracle", "mariadb"],
+                "default": "percona",
+            },
+            "mysql_storage_class": {"type": "string"},
+            "mysql_namespace": {"type": "string"},
+            "mysql_backup_url": {"type": "string"},
+            "mongodb_storage_class": {"type": "string"},
+            "mongodb_namespace": {"type": "string"},
+            "mongodb_backup_url": {"type": "string"},
+            "kafka_storage_class": {"type": "string"},
+            "kafka_namespace": {"type": "string"},
+            "nats_storage_class": {"type": "string"},
+            "nats_namespace": {"type": "string"},
+            "nats_enable_jetstream": {"type": "boolean", "default": True},
+            "rabbitmq_storage_class": {"type": "string"},
+            "rabbitmq_namespace": {"type": "string"},
+            "nfs_storage_class_name": {"type": "string"},
+            "nfs_server_address": {"type": "string"},
+            "nfs_server_export": {"type": "string", "default": "/export"},
+            "nfs_namespace": {"type": "string"},
+            "filesystem_pvc_storage_class_name": {
+                "type": "string",
+                "description": "Default StorageClass for generic consumer-local PVCs.",
+            },
+            "filesystem_pvc_csi_driver": {
+                "type": "string",
+                "description": "Optional expected provisioner; enables fail-closed CSI verification.",
+            },
+            "filesystem_pvc_access_modes": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "uniqueItems": True,
+                "items": {
+                    "enum": [
+                        "ReadOnlyMany",
+                        "ReadWriteMany",
+                        "ReadWriteOnce",
+                        "ReadWriteOncePod",
+                    ],
+                },
+                "default": ["ReadWriteOnce"],
+            },
+            "rook_cephfs_storage_class_name": {
+                "type": "string",
+                "default": "rook-cephfs",
+            },
+            "rook_cephfs_csi_driver": {
+                "type": "string",
+                "default": "rook-ceph.cephfs.csi.ceph.com",
+            },
+            "rook_cephfs_access_modes": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "uniqueItems": True,
+                "items": {
+                    "enum": [
+                        "ReadOnlyMany",
+                        "ReadWriteMany",
+                        "ReadWriteOnce",
+                        "ReadWriteOncePod",
+                    ],
+                },
+                "default": ["ReadWriteMany"],
+            },
         },
     },
 )

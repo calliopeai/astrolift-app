@@ -218,6 +218,7 @@ class ManagedServiceVolumeBindingType:
     protocol: str
     claim_name: str
     claim_namespace: str
+    storage_class_name: str
     csi_driver: str
     read_only: bool
     capacity: str
@@ -917,6 +918,7 @@ def managed_service_volume_binding_to_type(row) -> ManagedServiceVolumeBindingTy
         protocol=row.protocol,
         claim_name=row.claim_name or "",
         claim_namespace=row.claim_namespace or "",
+        storage_class_name=row.storage_class_name or "",
         csi_driver=row.csi_driver or "",
         read_only=row.read_only,
         capacity=row.capacity,

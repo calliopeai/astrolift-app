@@ -432,7 +432,9 @@ export function ProjectResourcesClient({ slug }: { slug: string }) {
                         <span className="text-muted-foreground">
                           {binding.sourceKind === "csi"
                             ? binding.csiDriver
-                            : `${binding.claimNamespace}/${binding.claimName}`}
+                            : binding.sourceKind === "dynamic_pvc"
+                              ? `StorageClass ${binding.storageClassName}`
+                              : `${binding.claimNamespace}/${binding.claimName}`}
                         </span>
                         {binding.readOnly && <Badge variant="secondary">read only</Badge>}
                         {binding.credentialReferenceCount > 0 && (

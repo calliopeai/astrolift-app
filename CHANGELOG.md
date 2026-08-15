@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add Kubernetes StorageClass and Rook CephFS project volume templates with
+  consumer-namespace dynamic claims, live StorageClass/CSI preflight,
+  portable app and agent mounts, data-safe teardown, and full catalog,
+  GraphQL, and project-resource UI visibility.
 - Add portable managed-filesystem runtime attachments for applications and
   agent Jobs, including CSI/PVC preflight, credential-reference projection,
   provider-specific EFS/FSx/NFS mounts, owned storage cleanup, and safe mount
