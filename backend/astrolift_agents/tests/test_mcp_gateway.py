@@ -302,6 +302,12 @@ def test_project_resource_mcp_lifecycle_reuses_control_plane_workflows(
     assert starts[-1][1][0].actor.kind == "api_token"
     assert starts[-1][1][0].actor.token_id == token.pk
 
+    service = ManagedService.objects.get(guid=resource["id"])
+    service.status = ManagedService.Status.ACTIVE
+    service.backend_ref = "queue/shared-jobs"
+    service.applied_config = {"size": "small"}
+    service.save(update_fields=["status", "backend_ref", "applied_config", "updated_at", "version"])
+
     attachment_id = resource["attachments"][0]["id"]
     _, detached = _call(
         org,
