@@ -54,6 +54,8 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
         ("queue", "servicebus", "ServiceBusConfig"),
         ("queue", "azure_servicebus", "AzureServiceBusConfig"),
         ("topic", "service_bus_topic", "AzureServiceBusConfig"),
+        ("stream", "event_hubs", "AzureEventHubsConfig"),
+        ("event_stream", "event_hubs_kafka", "AzureEventHubsConfig"),
         ("filesystem", "azure_files", "AzureFilesConfig"),
         ("postgres", "azure_pg_flex", "AzurePostgresConfig"),
         ("mysql", "azure_mysql_flex", "AzureMySQLConfig"),
@@ -220,6 +222,25 @@ def test_messaging_and_search_controls_are_preserved() -> None:
     )
     assert topic.handle_kind == "topic"
     assert topic.location == "westus3"
+    event_hubs = managed_config_for(
+        "azure",
+        _cluster(
+            eventhubs_namespace_name_prefix="stream",
+            eventhubs_event_hub_name_prefix="topic",
+            eventhubs_default_sku="Premium",
+            eventhubs_default_capacity=2,
+            eventhubs_default_consumer_group="workers",
+            eventhubs_public_network_access_default="Enabled",
+        ),
+        kind="event_stream",
+        variant="event_hubs_kafka",
+    )
+    assert event_hubs.variant == "event_hubs_kafka"
+    assert event_hubs.namespace_name_prefix == "stream"
+    assert event_hubs.event_hub_name_prefix == "topic"
+    assert event_hubs.default_sku == "Premium"
+    assert event_hubs.default_capacity == 2
+    assert event_hubs.default_consumer_group == "workers"
 
     files = managed_config_for(
         "azure",

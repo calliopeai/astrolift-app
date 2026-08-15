@@ -1620,6 +1620,29 @@ def _azure_managed_config_for(
             lock_duration=str(pc.get("servicebus_lock_duration", "PT30S")),
         )
 
+    event_hubs_pairs = {
+        ("stream", "event_hubs"),
+        ("event_stream", "event_hubs_kafka"),
+    }
+    if pair in event_hubs_pairs or (kind in {"stream", "event_stream"} and not variant):
+        from azure.managed.event_hubs import AzureEventHubsConfig
+
+        resolved_variant = variant or ("event_hubs_kafka" if kind == "event_stream" else "event_hubs")
+        return AzureEventHubsConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            variant=resolved_variant,
+            location=location,
+            namespace_name_prefix=str(pc.get("eventhubs_namespace_name_prefix", "astrolift-eh")),
+            event_hub_name_prefix=str(pc.get("eventhubs_event_hub_name_prefix", "astrolift")),
+            default_sku=str(pc.get("eventhubs_default_sku", "Standard")),
+            default_capacity=int(pc.get("eventhubs_default_capacity", 1)),
+            default_consumer_group=str(pc.get("eventhubs_default_consumer_group", "astrolift")),
+            public_network_access_default=str(
+                pc.get("eventhubs_public_network_access_default", "Enabled"),
+            ),
+        )
+
     if pair == ("filesystem", "azure_files") or (kind == "filesystem" and not variant):
         from azure.managed.filesystem_files import AzureFilesConfig
 

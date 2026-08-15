@@ -17,6 +17,7 @@ Managed services:
 - ServiceBusDriver — queue/servicebus
 - AzureBlobStorageDriver — object_store/azure_blob
 - AzureServiceBusDriver — queue/azure_servicebus and topic/service_bus_topic
+- AzureEventHubsDriver — stream/event_hubs and event_stream/event_hubs_kafka
 - AzureFilesDriver — filesystem/azure_files
 - AzurePostgresFlexibleDriver — postgres/azure_pg_flex
 - AzureMySQLFlexibleDriver — mysql/azure_mysql_flex
@@ -43,6 +44,7 @@ from azure.managed.cache_redis import AzureCacheRedisDriver
 from azure.managed.cosmos import AzureCosmosDriver
 from azure.managed.cosmos_api import AzureCosmosApiDriver
 from azure.managed.email_acs import AzureCommunicationEmailDriver
+from azure.managed.event_hubs import AzureEventHubsDriver
 from azure.managed.filesystem_files import AzureFilesDriver
 from azure.managed.managed_redis import AzureManagedRedisDriver
 from azure.managed.model_endpoint_aoai import AzureOpenAIDriver
@@ -80,6 +82,20 @@ _MANAGED_CONFIG_PROPERTIES = {
     "servicebus_dead_lettering_on_message_expiration": {"type": "boolean", "default": True},
     "servicebus_max_delivery_count": {"type": "integer", "minimum": 1, "default": 10},
     "servicebus_lock_duration": {"type": "string", "default": "PT30S"},
+    "eventhubs_namespace_name_prefix": {"type": "string", "default": "astrolift-eh"},
+    "eventhubs_event_hub_name_prefix": {"type": "string", "default": "astrolift"},
+    "eventhubs_default_sku": {
+        "type": "string",
+        "enum": ["Basic", "Standard", "Premium"],
+        "default": "Standard",
+    },
+    "eventhubs_default_capacity": {"type": "integer", "minimum": 1, "maximum": 40, "default": 1},
+    "eventhubs_default_consumer_group": {"type": "string", "default": "astrolift"},
+    "eventhubs_public_network_access_default": {
+        "type": "string",
+        "enum": ["Enabled", "Disabled", "SecuredByPerimeter"],
+        "default": "Enabled",
+    },
     "files_name_prefix": {"type": "string", "default": "astrolift-files"},
     "files_default_storage_gib": {"type": "integer", "minimum": 32, "maximum": 262144, "default": 32},
     "files_default_redundancy": {
@@ -282,6 +298,8 @@ PLUGIN = ProviderPlugin(
         ("object_store", "azure_blob"): AzureBlobStorageDriver,
         ("queue", "azure_servicebus"): AzureServiceBusDriver,
         ("topic", "service_bus_topic"): AzureServiceBusDriver,
+        ("stream", "event_hubs"): AzureEventHubsDriver,
+        ("event_stream", "event_hubs_kafka"): AzureEventHubsDriver,
         ("filesystem", "azure_files"): AzureFilesDriver,
         ("kv_store", "cosmos"): AzureCosmosDriver,
         ("document_db", "cosmos_nosql"): AzureCosmosApiDriver,

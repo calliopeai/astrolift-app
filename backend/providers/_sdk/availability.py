@@ -35,6 +35,7 @@ _AWS_EVENTING_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1285"
 _AWS_PLATFORM_RESOURCES_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1286"
 _CROSS_CLOUD_PARITY_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1287"
 _AZURE_COSMOS_CERTIFICATION_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1347"
+_AZURE_EVENT_HUBS_CERTIFICATION_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1350"
 
 
 @dataclass(frozen=True)
@@ -1786,17 +1787,38 @@ MATRIX = AvailabilityMatrix(
             kind="stream",
             variant="event_hubs",
             plugin_id="azure",
-            status="planned",
+            status="preview",
             description="Azure Event Hubs namespace and event hub",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            issue_url=_AZURE_EVENT_HUBS_CERTIFICATION_ISSUE,
+            binding_envs=(
+                "STREAM_NAME",
+                "STREAM_ARN",
+                "STREAM_ENDPOINT",
+                "STREAM_REGION",
+                "EVENTHUB_NAMESPACE",
+                "EVENTHUB_NAME",
+                "EVENTHUB_FULLY_QUALIFIED_NAMESPACE",
+                "EVENTHUB_RESOURCE_ID",
+                "EVENTHUB_CONSUMER_GROUP",
+            ),
         ),
         ManagedServiceEntry(
             kind="event_stream",
             variant="event_hubs_kafka",
             plugin_id="azure",
-            status="planned",
+            status="preview",
             description="Azure Event Hubs Kafka endpoint",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            issue_url=_AZURE_EVENT_HUBS_CERTIFICATION_ISSUE,
+            binding_envs=(
+                "EVENT_STREAM_BROKERS",
+                "EVENT_STREAM_TLS",
+                "EVENT_STREAM_AUTH_MECHANISM",
+                "EVENTHUB_NAMESPACE",
+                "EVENTHUB_NAME",
+                "EVENTHUB_FULLY_QUALIFIED_NAMESPACE",
+                "EVENTHUB_RESOURCE_ID",
+                "EVENTHUB_KAFKA_TOPIC",
+            ),
         ),
         ManagedServiceEntry(
             kind="faas",

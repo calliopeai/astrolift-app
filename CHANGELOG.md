@@ -114,6 +114,10 @@
   periodic backup, point-in-time restore, CMK encryption, network rules,
   Key Vault-backed portable bindings, ownership-safe reconciliation, and
   protected teardown.
+- Add Azure Event Hubs native-stream and Kafka-compatible variants with
+  namespace/event-hub lifecycle, Entra workload bindings, consumer groups,
+  retention and compaction, Capture, scaling, networking, CMK, and guarded
+  destructive teardown.
 - Add Azure SQL Database provisioned, serverless, and Hyperscale variants plus
   Azure SQL Managed Instance with typed ARM requests, VNet/subnet isolation,
   Key Vault-backed portable bindings, retention controls, database-copy
