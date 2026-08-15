@@ -46,6 +46,7 @@ class Migration(migrations.Migration):
                 ("volume_handle", models.CharField(blank=True, default="", max_length=1024)),
                 ("volume_attributes", models.JSONField(blank=True, default=dict)),
                 ("secret_refs", models.JSONField(blank=True, default=dict)),
+                ("secret_literals", models.JSONField(blank=True, default=dict)),
                 ("mount_options", models.JSONField(blank=True, default=list)),
                 ("read_only", models.BooleanField(default=False)),
                 ("capacity", models.CharField(default="1Gi", max_length=32)),

@@ -29,6 +29,7 @@ def _binding(**overrides):
         "volume_handle": "fs-12345678::fsap-12345678",
         "volume_attributes": {},
         "secret_refs": {},
+        "secret_literals": {},
         "mount_options": ["tls"],
         "read_only": False,
         "capacity": "1Gi",
@@ -72,6 +73,18 @@ def test_sdk_volume_mount_rejects_invalid_kubernetes_name_and_capacity() -> None
             protocol="nfs4",
             csi_driver="nfs.csi.k8s.io",
             volume_handle="server#/share#",
+        )
+
+    with pytest.raises(ValueError, match="cannot define the same key"):
+        VolumeMount(
+            name="shared-data",
+            mount_path="/data",
+            source_kind=VolumeSourceKind.CSI,
+            protocol="smb3",
+            csi_driver="file.csi.azure.com",
+            volume_handle="resource-group#account#share",
+            secret_refs={"azurestorageaccountname": "secret/account-name"},
+            secret_literals={"azurestorageaccountname": "account-name"},
         )
 
     with pytest.raises(ValueError, match="Kubernetes quantity"):
@@ -291,4 +304,24 @@ def test_secret_resolution_selects_bundle_fields_portably() -> None:
     assert resources[0]["stringData"] == {
         "password": "agent-password",
         "username": "agent-user",
+    }
+
+
+def test_secret_resolution_combines_non_secret_csi_identity_with_credential_ref() -> None:
+    binding = _binding(
+        secret_refs={"azurestorageaccountkey": "azure/files#primary"},
+        secret_literals={"azurestorageaccountname": "astroliftfiles"},
+    )
+
+    backend = SimpleNamespace(get=lambda _ref: {"primary": "rotating-key"})
+    resources = resolve_binding_secret_manifests(
+        [binding],
+        secrets_backend=backend,
+        namespace="acme-api",
+        consumer_key="environment-guid",
+    )
+
+    assert resources[0]["stringData"] == {
+        "azurestorageaccountkey": "rotating-key",
+        "azurestorageaccountname": "astroliftfiles",
     }

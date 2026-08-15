@@ -208,6 +208,7 @@ class ManagedServiceVolumeBinding(BaseCoreModel):
     volume_handle = models.CharField(max_length=1024, blank=True, default="")
     volume_attributes = models.JSONField(default=dict, blank=True)
     secret_refs = models.JSONField(default=dict, blank=True)
+    secret_literals = models.JSONField(default=dict, blank=True)
     mount_options = models.JSONField(default=list, blank=True)
     read_only = models.BooleanField(default=False)
     capacity = models.CharField(max_length=32, default="1Gi")
