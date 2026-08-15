@@ -131,6 +131,14 @@ class Permission(enum.StrEnum):
     # Deny-by-default; granted to org owner/admin via the system-role
     # comprehensions over the full enum.
     AGENT_TASK_WATCH = "agent_task.watch"
+    # Queue a follow-up prompt into a RUNNING agent task's next turn
+    # (#1390 — the steering channel). Operator-grade and a *write* into a
+    # live agent, so it is deliberately separate from the passive
+    # ``agent_task.watch`` and from ``agent.dispatch`` (which authorizes
+    # starting a run, not steering one mid-flight). Deny-by-default;
+    # granted to org owner/admin only, via the system-role comprehensions
+    # over the full enum — no granular role carries it.
+    AGENT_TASK_SEND_INPUT = "agent_task.send_input"
 
     # --- Agent dispatch (spec 33, PR-1) ---------------------------
     # Dispatch a run of a registered agent ``Workload(kind=agent)`` —

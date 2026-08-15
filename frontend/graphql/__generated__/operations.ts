@@ -466,6 +466,20 @@ export type AstroliftAgentTaskDispatcher = {
   slug: Scalars['String']['output'];
 };
 
+export type AstroliftAgentTaskInputMessage = {
+  author: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  deliveredAt?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['GUID']['output'];
+  message: Scalars['String']['output'];
+};
+
+export type AstroliftAgentTaskInputMessageMutationResult = {
+  data?: Maybe<AstroliftAgentTaskInputMessage>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftAgentTaskMutationResult = {
   data?: Maybe<AstroliftAgentTask>;
   errors: Array<MutationError>;
@@ -5179,6 +5193,7 @@ export type Mutation = {
   runWorkflowDefinition: RunWorkflowDefinitionResult;
   scaleAstroliftWorkload: AstroliftWorkloadOpPayloadMutationResult;
   scaleServiceAgent: AstroliftAgentScaleResult;
+  sendAgentTaskInput: AstroliftAgentTaskInputMessageMutationResult;
   sendManagedServiceTestEmail: AstroliftManagedServiceTestEmailResultMutationResult;
   setActiveIdentityProvider: AstroliftIdentityProviderMutationResult;
   setAgentBundleSecretValue: AstroliftAgentSecretBundleMutationResult;
@@ -6513,6 +6528,12 @@ export type MutationScaleAstroliftWorkloadArgs = {
 export type MutationScaleServiceAgentArgs = {
   agentSlug: Scalars['String']['input'];
   targetReplicas: Scalars['Int']['input'];
+};
+
+
+export type MutationSendAgentTaskInputArgs = {
+  message: Scalars['String']['input'];
+  taskId: Scalars['ID']['input'];
 };
 
 

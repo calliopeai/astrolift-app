@@ -187,6 +187,28 @@ class AgentInteractionType:
     detail: JSON
 
 
+@strawberry.type(name="AstroliftAgentTaskInputMessage")
+class AgentTaskInputMessageType:
+    """A follow-up prompt queued for a running AgentTask (#1390).
+
+    The steering channel is queued, not duplex: the message sits here until
+    the runner reaches its next turn boundary (one harness invocation
+    finishing) and consumes it through the state callback. ``deliveredAt``
+    is null while it is still queued and stamped once the runner has taken
+    it — which is also the signal that a harness with no follow-up support
+    left it behind.
+    """
+
+    id: GUID
+    message: str
+    # Display label frozen at enqueue time; empty for a system/automation
+    # caller. Deliberately not a user object — the run history has to stay
+    # readable after the author is deleted.
+    author: str
+    created_at: dt.datetime
+    delivered_at: dt.datetime | None
+
+
 @strawberry.type(name="AstroliftAgentEnvironmentSpec")
 class AgentEnvironmentSpecType:
     """A reusable, org-scoped recipe for the container environment an
@@ -499,6 +521,16 @@ def agent_interaction_to_type(ixn) -> AgentInteractionType:
         status=ixn.status,
         occurred_at=ixn.occurred_at,
         detail=ixn.detail or {},
+    )
+
+
+def agent_task_input_message_to_type(msg) -> AgentTaskInputMessageType:
+    return AgentTaskInputMessageType(
+        id=GUID(str(msg.guid)),
+        message=msg.body,
+        author=msg.author_label or "",
+        created_at=msg.created_at,
+        delivered_at=msg.delivered_at,
     )
 
 
