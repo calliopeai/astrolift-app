@@ -23,6 +23,7 @@ Managed services:
 - AzureCacheRedisDriver — redis/azure_cache_redis
 - AzureManagedRedisDriver — redis/azure_managed_redis
 - AzureCosmosDriver — kv_store/cosmos
+- AzureCosmosApiDriver — explicit NoSQL, MongoDB, Gremlin, Cassandra, and Table API variants
 - AzureAISearchFullTextDriver — search/azure_ai_search_fulltext
 - AzureAISearchVectorDriver — vector_index/azure_ai_search_vector
 - AzureMonitorPrometheusDriver — time_series/azure_monitor_prometheus
@@ -40,6 +41,7 @@ from azure.identity_federated import AzureFederatedIdentityDriver
 from azure.ingress_appgw import AzureAppGatewayIngressDriver
 from azure.managed.cache_redis import AzureCacheRedisDriver
 from azure.managed.cosmos import AzureCosmosDriver
+from azure.managed.cosmos_api import AzureCosmosApiDriver
 from azure.managed.email_acs import AzureCommunicationEmailDriver
 from azure.managed.filesystem_files import AzureFilesDriver
 from azure.managed.managed_redis import AzureManagedRedisDriver
@@ -157,6 +159,29 @@ _MANAGED_CONFIG_PROPERTIES = {
         "default": "Continuous",
     },
     "cosmos_secret_name_prefix": {"type": "string", "default": "astrolift-cosmos"},
+    "cosmos_api_account_name_prefix": {"type": "string", "default": "astrolift-cosmos"},
+    "cosmos_api_database_name_default": {"type": "string", "default": "astrolift"},
+    "cosmos_api_backup_policy_default": {
+        "type": "string",
+        "enum": ["Continuous", "Periodic"],
+        "default": "Continuous",
+    },
+    "cosmos_api_continuous_backup_tier_default": {
+        "type": "string",
+        "enum": ["Continuous7Days", "Continuous30Days"],
+        "default": "Continuous30Days",
+    },
+    "cosmos_api_public_network_access_default": {
+        "type": "string",
+        "enum": ["Enabled", "Disabled", "SecuredByPerimeter"],
+        "default": "Enabled",
+    },
+    "cosmos_api_consistency_level_default": {
+        "type": "string",
+        "enum": ["Eventual", "Session", "BoundedStaleness", "Strong", "ConsistentPrefix"],
+        "default": "Session",
+    },
+    "cosmos_api_secret_name_prefix": {"type": "string", "default": "astrolift-cosmos-api"},
     "ai_search_service_name_prefix": {"type": "string", "default": "astrolift"},
     "ai_search_default_sku": {"type": "string", "default": "basic"},
     "ai_search_replica_count_default": {"type": "integer", "minimum": 1, "default": 1},
@@ -259,6 +284,11 @@ PLUGIN = ProviderPlugin(
         ("topic", "service_bus_topic"): AzureServiceBusDriver,
         ("filesystem", "azure_files"): AzureFilesDriver,
         ("kv_store", "cosmos"): AzureCosmosDriver,
+        ("document_db", "cosmos_nosql"): AzureCosmosApiDriver,
+        ("document_db", "cosmos_mongodb"): AzureCosmosApiDriver,
+        ("graph_db", "cosmos_gremlin"): AzureCosmosApiDriver,
+        ("wide_column", "cosmos_cassandra"): AzureCosmosApiDriver,
+        ("kv_store", "cosmos_table"): AzureCosmosApiDriver,
         ("search", "azure_ai_search_fulltext"): AzureAISearchFullTextDriver,
         ("vector_index", "azure_ai_search_vector"): AzureAISearchVectorDriver,
         ("time_series", "azure_monitor_prometheus"): AzureMonitorPrometheusDriver,

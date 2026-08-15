@@ -108,6 +108,12 @@
 - Expose Azure Service Bus topics and default subscriptions through the
   cloud-neutral `topic/service_bus_topic` lifecycle and portable topic binding,
   while retaining the existing queue-shaped alias.
+- Add explicit Azure Cosmos DB for NoSQL, MongoDB RU, Gremlin,
+  Cassandra, and Table API variants with API-correct resource lifecycle,
+  throughput and autoscale controls, multi-region placement, continuous or
+  periodic backup, point-in-time restore, CMK encryption, network rules,
+  Key Vault-backed portable bindings, ownership-safe reconciliation, and
+  protected teardown.
 - Add Azure SQL Database provisioned, serverless, and Hyperscale variants plus
   Azure SQL Managed Instance with typed ARM requests, VNet/subnet isolation,
   Key Vault-backed portable bindings, retention controls, database-copy
