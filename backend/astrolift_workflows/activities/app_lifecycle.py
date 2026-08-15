@@ -869,6 +869,7 @@ def _update_secrets_sync(deployment_id: int) -> int:
     from astrolift_services.models import (
         AppSecretBundleRef,
         ManagedServiceBinding,
+        ManagedServiceVolumeBinding,
     )
     from core.app_deploy import (
         AppDeployError,
@@ -982,6 +983,10 @@ def _update_secrets_sync(deployment_id: int) -> int:
                         raw_value = str(next(iter(resolved.values())))
                     else:
                         raw_value = str(resolved)
+                    if not raw_value:
+                        raise AppDeployError(
+                            f"binding {svc.kind}/{svc.name}#{env_key} resolved to an empty secret value",
+                        )
                 else:
                     raw_value = binding.env_value_ref
                 bindings_data[env_key] = base64.b64encode(
@@ -1008,6 +1013,32 @@ def _update_secrets_sync(deployment_id: int) -> int:
                 "data": bindings_data,
             },
         )
+
+        from astrolift_services.filesystem_bindings import (
+            FilesystemBindingError,
+            resolve_binding_secret_manifests,
+        )
+
+        volume_bindings = list(
+            ManagedServiceVolumeBinding.objects.filter(
+                managed_service__in=services,
+                managed_service__status__in=["active", "updating"],
+                deleted_at__isnull=True,
+            )
+            .select_related("managed_service")
+            .order_by("managed_service__name", "name"),
+        )
+        try:
+            resources.extend(
+                resolve_binding_secret_manifests(
+                    volume_bindings,
+                    secrets_backend=secrets_backend,
+                    namespace=namespace,
+                    consumer_key=str(d.app_environment.guid),
+                ),
+            )
+        except FilesystemBindingError as exc:
+            raise AppDeployError(str(exc)) from exc
 
     if not resources:
         return 0

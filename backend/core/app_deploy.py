@@ -441,7 +441,12 @@ def driver_for_target_cluster(
     return driver, ctx, namespace
 
 
-def _stamp_storage_class_for_claims(deployment: Deployment, resources: list[dict[str, Any]]) -> None:
+def _stamp_storage_class_for_claims(
+    deployment: Deployment,
+    resources: list[dict[str, Any]],
+    *,
+    cluster_override: TenantCluster | None = None,
+) -> None:
     """Stamp a ``storageClassName`` on StatefulSet volumeClaimTemplates that
     omit one, by discovering the cluster's StorageClass (#1023).
 
@@ -462,7 +467,11 @@ def _stamp_storage_class_for_claims(deployment: Deployment, resources: list[dict
     if not pending:
         return
     try:
-        driver, ctx, _ns = driver_for_deployment(deployment)
+        if cluster_override is None:
+            driver, ctx, _ns = driver_for_deployment(deployment)
+        else:
+            driver = _driver_for_cluster(cluster_override)
+            ctx = _context_for_cluster(cluster_override)
         scs = driver.list_storage_classes(ctx.slug)
     except Exception:
         log.warning("storage-class autostamp: list failed; leaving claims unset", exc_info=True)
@@ -483,7 +492,72 @@ def _stamp_storage_class_for_claims(deployment: Deployment, resources: list[dict
         vct.setdefault("spec", {})["storageClassName"] = chosen
 
 
-def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, Any]]:
+def _inject_managed_filesystem_bindings(
+    deployment: Deployment,
+    resources: list[dict[str, Any]],
+    *,
+    namespace: str,
+    cluster_override: TenantCluster | None = None,
+) -> list[dict[str, Any]]:
+    """Preflight and attach active managed filesystem bindings."""
+
+    from astrolift_services.filesystem_bindings import (
+        FilesystemBindingError,
+        inject_bindings_into_workloads,
+        preflight_bindings,
+    )
+    from astrolift_services.models import ManagedService, ManagedServiceVolumeBinding
+    from astrolift_workflows.activities.app_lifecycle import _managed_services_for_environment
+
+    service_ids = (
+        _managed_services_for_environment(deployment.app_environment)
+        .filter(
+            kind__in=[ManagedService.Kind.FILESYSTEM, ManagedService.Kind.NFS],
+            status__in=[ManagedService.Status.ACTIVE, ManagedService.Status.UPDATING],
+        )
+        .values_list("pk", flat=True)
+    )
+    bindings = list(
+        ManagedServiceVolumeBinding.objects.filter(
+            managed_service_id__in=service_ids,
+            deleted_at__isnull=True,
+        )
+        .select_related(
+            "managed_service__tenant_cluster",
+            "managed_service__app_environment__tenant_cluster",
+        )
+        .order_by("managed_service__name", "name"),
+    )
+    if not bindings:
+        return resources
+
+    if cluster_override is None:
+        cluster_driver, ctx, _ = driver_for_deployment(deployment)
+    else:
+        cluster_driver = _driver_for_cluster(cluster_override)
+        ctx = _context_for_cluster(cluster_override)
+    try:
+        preflight_bindings(
+            bindings,
+            cluster_driver=cluster_driver,
+            cluster_slug=ctx.slug,
+            namespace=namespace,
+        )
+        return inject_bindings_into_workloads(
+            resources,
+            bindings,
+            namespace=namespace,
+            consumer_key=str(deployment.app_environment.guid),
+        )
+    except FilesystemBindingError as exc:
+        raise AppDeployError(str(exc)) from exc
+
+
+def render_resources_for_deployment(
+    deployment: Deployment,
+    *,
+    cluster_override: TenantCluster | None = None,
+) -> list[dict[str, Any]]:
     """Re-render the deployment's manifests against the stored TOML.
 
     Activities call this rather than threading the render output through
@@ -548,7 +622,7 @@ def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, An
     # render_manifests Temporal activity so apply_manifests always has
     # the full resource set regardless of which code path produced it.
     managed_domain = getattr(env, "managed_domain", None)
-    cluster = getattr(env, "tenant_cluster", None)
+    cluster = cluster_override or getattr(env, "tenant_cluster", None)
     _ingress_count = 0
     if managed_domain is not None and cluster is not None:
         ingress_resources = (
@@ -565,7 +639,18 @@ def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, An
     # storageClassName and the cluster has no default-annotated SC, the PVC
     # never binds → the pod hangs Pending. Discover the cluster's SC and stamp
     # it so stateful apps bind without the operator knowing the SC name.
-    _stamp_storage_class_for_claims(deployment, resources)
+    _stamp_storage_class_for_claims(
+        deployment,
+        resources,
+        cluster_override=cluster_override,
+    )
+
+    resources = _inject_managed_filesystem_bindings(
+        deployment,
+        resources,
+        namespace=namespace,
+        cluster_override=cluster_override,
+    )
 
     # Workload identity (#1011): IAM-authed managed services run through a
     # provider-annotated Kubernetes ServiceAccount, never static credentials.
