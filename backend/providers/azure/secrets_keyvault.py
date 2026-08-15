@@ -14,6 +14,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from _sdk._telemetry import driver_op
+from _sdk.azure_tags import serialize_azure_arm_tags
 from _sdk.secrets import SecretsBackend
 from azure._errors import NotFoundError, map_api_error
 
@@ -121,9 +122,9 @@ class KeyVaultSecretsBackend(SecretsBackend):
             self._client.set_secret(
                 name=secret_name,
                 value=json.dumps(kvs),
-                tags={
-                    "astrolift_io_managed_by": "platform",
-                },
+                tags=serialize_azure_arm_tags(
+                    {"astrolift.io/managed-by": "platform"},
+                ),
             )
         except Exception as exc:
             raise map_api_error(exc) from exc

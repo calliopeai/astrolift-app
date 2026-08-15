@@ -385,9 +385,9 @@ def test_provision_tags_domain_with_astrolift_namespace(
 ) -> None:
     driver.provision(_spec())
     tags = mgmt.domains_obj.create_calls[0]["parameters"]["tags"]
-    assert tags["astrolift.io/managed-by"] == "platform"
-    assert tags["astrolift.io/app"] == "api"
-    assert tags["astrolift.io/environment"] == "prod"
+    assert tags["astrolift-managed-by"] == "platform"
+    assert tags["astrolift-app"] == "api"
+    assert tags["astrolift-env"] == "prod"
 
 
 def test_provision_explicit_domain_name(

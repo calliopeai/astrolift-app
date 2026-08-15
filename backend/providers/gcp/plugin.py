@@ -28,6 +28,7 @@ Executable managed services:
 - FirestoreNativeDriver — document_db/firestore_native
 - CloudSQLServerDriver — mssql/cloudsql_sqlserver
 - SpannerGraphDriver — graph_db/spanner_graph
+- APIGatewayDriver — api_gateway/api_gateway
 - ManagedKafkaDriver — event_stream/managed_kafka
 - EventarcDriver — event_bus/eventarc
 
@@ -41,6 +42,7 @@ from gcp.cluster_gke import GKEClusterDriver
 from gcp.dns_clouddns import CloudDNSDriver
 from gcp.identity_wi import GCPWorkloadIdentityDriver
 from gcp.ingress import GCPIngressDriver
+from gcp.managed.api_gateway import APIGatewayDriver
 from gcp.managed.bigtable import BigtableDriver
 from gcp.managed.document_firestore import FirestoreNativeDriver
 from gcp.managed.email_thirdparty import GCPEmailStubDriver
@@ -100,6 +102,7 @@ PLUGIN = ProviderPlugin(
         ("document_db", "firestore_native"): FirestoreNativeDriver,
         ("mssql", "cloudsql_sqlserver"): CloudSQLServerDriver,
         ("graph_db", "spanner_graph"): SpannerGraphDriver,
+        ("api_gateway", "api_gateway"): APIGatewayDriver,
         ("event_stream", "managed_kafka"): ManagedKafkaDriver,
         ("event_bus", "eventarc"): EventarcDriver,
     },
@@ -188,6 +191,40 @@ PLUGIN = ProviderPlugin(
                 "type": "string",
                 "default": "astrolift",
                 "description": "Prefix for platform-managed Pub/Sub topics.",
+            },
+            "api_gateway_region": {
+                "type": "string",
+                "description": "API Gateway deployment region; falls back to the cluster region.",
+            },
+            "api_gateway_api_id_prefix": {
+                "type": "string",
+                "default": "astrolift",
+            },
+            "api_gateway_gateway_id_prefix": {
+                "type": "string",
+                "default": "astrolift",
+            },
+            "api_gateway_config_id_prefix": {
+                "type": "string",
+                "default": "cfg",
+            },
+            "api_gateway_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "api_gateway_api_endpoint": {
+                "type": "string",
+                "default": "https://apigateway.googleapis.com/v1",
+            },
+            "api_gateway_operation_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 1800,
+            },
+            "api_gateway_operation_poll_interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 5,
             },
             "managed_kafka_location": {
                 "type": "string",
