@@ -71,6 +71,18 @@ def _caller_org_id() -> int | None:
     return tenant.organization_id if tenant is not None else None
 
 
+def _project_for_caller(project_id):
+    rows = Project.objects.filter(
+        guid=str(project_id),
+        organization_id=_caller_org_id(),
+        deleted_at__isnull=True,
+    )
+    tenant = get_current_tenant()
+    if tenant is not None and tenant.team_id is not None:
+        rows = rows.filter(team_id=tenant.team_id)
+    return rows.first()
+
+
 def _secret_id(*, source: str, key: str, env: str) -> str:
     return f"{source}:{env}:{key}"
 
@@ -511,14 +523,10 @@ class ServicesQuery:
     ) -> list[TenantClusterType]:
         """Managed clusters a project member may target for shared resources."""
 
-        org_id = _caller_org_id()
-        project_exists = Project.objects.filter(
-            guid=str(project_id),
-            organization_id=org_id,
-            deleted_at__isnull=True,
-        ).exists()
-        if not project_exists:
+        project = _project_for_caller(project_id)
+        if project is None:
             return []
+        org_id = project.organization_id
         rows = (
             TenantCluster.objects.filter(
                 Q(organization_id=org_id) | Q(organization_id__isnull=True),
@@ -542,13 +550,10 @@ class ServicesQuery:
     ) -> list[ManagedServiceCatalogEntryType]:
         """All executable and planned variants for the selected cluster."""
 
-        org_id = _caller_org_id()
-        if not Project.objects.filter(
-            guid=str(project_id),
-            organization_id=org_id,
-            deleted_at__isnull=True,
-        ).exists():
+        project = _project_for_caller(project_id)
+        if project is None:
             return []
+        org_id = project.organization_id
         cluster = (
             TenantCluster.objects.select_related("provider_plugin")
             .filter(
@@ -578,12 +583,7 @@ class ServicesQuery:
     ) -> list[ManagedServiceType]:
         """Project-owned shared infrastructure and its workload attachments."""
 
-        org_id = _caller_org_id()
-        project = Project.objects.filter(
-            guid=str(project_id),
-            organization_id=org_id,
-            deleted_at__isnull=True,
-        ).first()
+        project = _project_for_caller(project_id)
         if project is None:
             return []
         rows = (
@@ -608,12 +608,7 @@ class ServicesQuery:
         info: Info,
         project_id: GUID,
     ) -> list[SecretBundleType]:
-        org_id = _caller_org_id()
-        project = Project.objects.filter(
-            guid=str(project_id),
-            organization_id=org_id,
-            deleted_at__isnull=True,
-        ).first()
+        project = _project_for_caller(project_id)
         if project is None:
             return []
         rows = (

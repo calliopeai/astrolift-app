@@ -600,6 +600,7 @@ def test_binding_returns_envelope(
     ):
         assert key in env
     assert env["AZURE_AI_SEARCH_ADMIN_KEY"].secret_ref is not None
+    assert env["AZURE_AI_SEARCH_ADMIN_KEY"].secret_ref.startswith("azure-kv://kv.vault.azure.net/secrets/")
     assert env["AZURE_AI_SEARCH_ADMIN_KEY"].literal is None
     assert env["AZURE_AI_SEARCH_ENDPOINT"].literal.startswith("https://")
     assert env["AZURE_AI_SEARCH_ENDPOINT"].literal.endswith(

@@ -38,6 +38,7 @@ def test_managed_services_have_full_364_set() -> None:
     assert ("object_store", "azure_blob") in keys
     assert ("queue", "azure_servicebus") in keys
     assert ("event_bus", "event_grid") in keys
+    assert ("filesystem", "azure_files") in keys
 
 
 def test_config_schema_requires_core_fields() -> None:
@@ -61,6 +62,7 @@ def test_managed_runtime_controls_are_exposed_in_provider_schema() -> None:
         "servicebus_dead_lettering_on_message_expiration",
         "eventgrid_default_input_schema",
         "eventgrid_public_network_access_default",
+        "files_allowed_subnet_ids",
         "postgres_backup_retention_days",
         "mysql_backup_retention_days",
         "redis_minimum_tls_version_default",
@@ -79,6 +81,7 @@ def test_astrolift_azure_package_extends_official_sdk_namespace() -> None:
     from azure.identity import DefaultAzureCredential
     from azure.mgmt.cosmosdb import CosmosDBManagementClient
     from azure.mgmt.eventgrid import EventGridManagementClient
+    from azure.mgmt.fileshares import FileSharesMgmtClient
     from azure.mgmt.mysqlflexibleservers import MySQLManagementClient
     from azure.mgmt.postgresqlflexibleservers import PostgreSQLManagementClient
     from azure.mgmt.resource.locks import ManagementLockClient
@@ -91,6 +94,7 @@ def test_astrolift_azure_package_extends_official_sdk_namespace() -> None:
             DefaultAzureCredential,
             CosmosDBManagementClient,
             EventGridManagementClient,
+            FileSharesMgmtClient,
             MySQLManagementClient,
             PostgreSQLManagementClient,
             ManagementLockClient,
@@ -107,6 +111,7 @@ def test_registered_managed_drivers_target_current_sdk_operation_groups() -> Non
     from azure.mgmt.communication import CommunicationServiceManagementClient
     from azure.mgmt.cosmosdb import CosmosDBManagementClient
     from azure.mgmt.eventgrid import EventGridManagementClient
+    from azure.mgmt.fileshares import FileSharesMgmtClient
     from azure.mgmt.loganalytics import LogAnalyticsManagementClient
     from azure.mgmt.monitor import MonitorManagementClient
     from azure.mgmt.mysqlflexibleservers import MySQLManagementClient
@@ -119,6 +124,18 @@ def test_registered_managed_drivers_target_current_sdk_operation_groups() -> Non
     subscription_id = "00000000-1111-2222-3333-444444444444"
     credential = DefaultAzureCredential()
     expected = [
+        (
+            FileSharesMgmtClient(credential, subscription_id),
+            {
+                "file_shares": {"begin_create_or_update", "begin_delete", "begin_update", "get"},
+                "file_share_snapshots": {
+                    "begin_create_or_update_file_share_snapshot",
+                    "begin_delete_file_share_snapshot",
+                    "list_by_file_share",
+                },
+                "private_endpoint_connections": {"begin_delete", "list_by_file_share"},
+            },
+        ),
         (
             PostgreSQLManagementClient(credential, subscription_id),
             {
