@@ -11,6 +11,10 @@
   checks, metric descriptors, services, and SLOs. Preserve provider-native
   request bodies, resolve credentials and verification codes from Secret
   Manager, and enforce ownership-, dependency-, and data-safe teardown.
+- Add Google Managed Service for Apache Kafka lifecycle across clusters,
+  topics, ACLs, consumer offsets, Schema Registry, Connect clusters and
+  connectors, including PSC networking, CMEK, mTLS, IAM/portable bindings,
+  guarded adoption, data-loss confirmations, and integration observability.
 - Add a project-shared Google Eventarc event fabric across Advanced message
   buses, pipelines, enrollments, Google API sources, direct publishing, event
   transformation and format conversion, plus Standard triggers and partner
