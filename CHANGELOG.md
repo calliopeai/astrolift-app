@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add Google Cloud API Gateway lifecycle with immutable OpenAPI and gRPC
+  config revisions, zero-downtime gateway retargeting, backend service
+  identity, revision retention, portable endpoint bindings, adoption,
+  snapshots, and guarded dependency teardown.
 - Add Google Managed Service for Apache Kafka lifecycle across clusters,
   topics, ACLs, consumer offsets, Schema Registry, Connect clusters and
   connectors, including PSC networking, CMEK, mTLS, IAM/portable bindings,
