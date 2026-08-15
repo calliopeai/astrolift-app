@@ -47,6 +47,10 @@ def _cluster(**provider_overrides):
         "knative_eventing_namespace": "eventing-system",
         "argo_workflows_namespace": "workflows-system",
         "kserve_namespace": "models-system",
+        "kube_prometheus_namespace": "observability-system",
+        "kube_prometheus_prometheus_url": "https://prometheus.example.test",
+        "kube_prometheus_grafana_url": "https://grafana.example.test",
+        "kube_prometheus_allowed_target_namespaces": ["shared-exporters"],
         "seaweed_namespace": "storage-system",
         "seaweed_cluster_name": "shared-store",
         "seaweed_s3_endpoint": "https://objects.example.test",
@@ -449,6 +453,30 @@ def test_k8s_operator_defaults_are_exposed_in_provider_schema() -> None:
         "kserve_allowed_serving_runtimes",
         "kserve_allowed_autoscaler_classes",
         "kserve_max_replicas",
+        "kube_prometheus_namespace",
+        "kube_prometheus_prometheus_service_name",
+        "kube_prometheus_alertmanager_service_name",
+        "kube_prometheus_grafana_service_name",
+        "kube_prometheus_prometheus_url",
+        "kube_prometheus_grafana_url",
+        "kube_prometheus_verify_crds",
+        "kube_prometheus_verify_services",
+        "kube_prometheus_verify_selection",
+        "kube_prometheus_allow_workload_prometheus_access",
+        "kube_prometheus_allow_cross_namespace",
+        "kube_prometheus_allowed_target_namespaces",
+        "kube_prometheus_allow_custom_rules",
+        "kube_prometheus_allow_custom_dashboards",
+        "kube_prometheus_allow_honor_labels",
+        "kube_prometheus_min_scrape_interval_seconds",
+        "kube_prometheus_max_monitors",
+        "kube_prometheus_max_endpoints_per_monitor",
+        "kube_prometheus_max_samples_per_scrape",
+        "kube_prometheus_max_targets_per_monitor",
+        "kube_prometheus_max_rule_groups",
+        "kube_prometheus_max_rules",
+        "kube_prometheus_max_dashboards",
+        "kube_prometheus_max_dashboard_bytes",
         "s3_existing_namespace",
         "s3_existing_allowed_endpoint_hosts",
         "s3_existing_allowed_credential_path_prefixes",
@@ -562,6 +590,43 @@ def test_existing_s3_config_preserves_adoption_policy_and_secret_backend(monkeyp
     assert config.secrets_backend is secrets_backend
 
 
+def test_kube_prometheus_config_preserves_install_policy(monkeypatch) -> None:
+    cluster_driver = object()
+    monkeypatch.setattr("core.cluster_observability._driver_for_cluster", lambda _cluster: cluster_driver)
+
+    config = managed_config_for(
+        "k8s_native",
+        _cluster(
+            kube_prometheus_allow_cross_namespace=True,
+            kube_prometheus_allow_custom_rules=True,
+            kube_prometheus_allow_custom_dashboards=True,
+            kube_prometheus_allow_honor_labels=True,
+            kube_prometheus_allow_workload_prometheus_access=True,
+            kube_prometheus_min_scrape_interval_seconds=5,
+            kube_prometheus_max_monitors=12,
+            kube_prometheus_max_samples_per_scrape=25000,
+            kube_prometheus_max_targets_per_monitor=50,
+        ),
+        kind="observability",
+        variant="kube_prometheus_stack",
+    )
+
+    assert config.monitoring_namespace == "observability-system"
+    assert config.prometheus_url == "https://prometheus.example.test"
+    assert config.grafana_url == "https://grafana.example.test"
+    assert config.allowed_target_namespaces == ("shared-exporters",)
+    assert config.allow_cross_namespace is True
+    assert config.allow_custom_rules is True
+    assert config.allow_custom_dashboards is True
+    assert config.allow_honor_labels is True
+    assert config.allow_workload_prometheus_access is True
+    assert config.min_scrape_interval_seconds == 5
+    assert config.max_monitors == 12
+    assert config.max_samples_per_scrape == 25000
+    assert config.max_targets_per_monitor == 50
+    assert config.cluster_driver is cluster_driver
+
+
 def test_mssql_config_preserves_install_policy_and_secret_backend(monkeypatch) -> None:
     cluster_driver = object()
     secrets_backend = object()
@@ -659,6 +724,26 @@ def test_k8s_object_store_catalog_distinguishes_executable_and_planned_variants(
     assert rows["minio_operator"].status == "deprecated"
     assert "retired" in rows["minio_operator"].unavailable_reason
     assert rows["minio_aistor_operator"].available is False
+
+
+def test_kube_prometheus_is_an_executable_preview_catalog_entry() -> None:
+    from astrolift_services.managed_service_catalog import list_catalog
+
+    rows = {row.variant: row for row in list_catalog("k8s_native") if row.kind == "observability"}
+
+    row = rows["kube_prometheus_stack"]
+    assert row.available is True
+    assert row.status == "preview"
+    assert row.is_default_for_kind is True
+    assert set(row.binding_envs) == {
+        "OBSERVABILITY_PROVIDER",
+        "METRICS_ENDPOINT",
+        "DASHBOARD_URL",
+        "PROMETHEUS_URL",
+        "GRAFANA_URL",
+        "OBSERVABILITY_NAMESPACE",
+        "OBSERVABILITY_BUNDLE",
+    }
 
 
 def test_sqlserver_express_is_an_executable_preview_catalog_entry() -> None:

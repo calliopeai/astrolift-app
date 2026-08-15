@@ -31,6 +31,11 @@
   Build source declarations, HTTP and Eventarc triggers, Secret Manager
   environment/volumes, scaling, private networking, Binary Authorization,
   CMEK, authenticated IAM bindings, adoption, and guarded teardown.
+- Add preview project observability bundles on a shared
+  kube-prometheus-stack with namespace-scoped ServiceMonitor and PodMonitor
+  targets, safe standard alerts and dashboards, policy-gated custom content,
+  authenticated Grafana bindings, operator-gated Prometheus query access,
+  operator-only Alertmanager, ownership-safe updates, and non-destructive teardown.
 - Add preview adoption of existing S3-compatible buckets on Kubernetes with
   project-scoped ownership records, org-scoped external credential bundles,
   portable S3 bindings, endpoint/TLS/path policy gates, safe update/unlink,

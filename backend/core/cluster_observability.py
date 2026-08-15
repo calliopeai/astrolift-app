@@ -1270,6 +1270,65 @@ def _k8s_managed_config_for(
             ),
             max_replicas=int(pc.get("kserve_max_replicas", 100)),
         )
+    if pair == ("observability", "kube_prometheus_stack"):
+        from k8s_native.managed.observability_kube_prometheus import KubePrometheusConfig
+
+        return KubePrometheusConfig(
+            cluster_driver=cluster_driver,
+            monitoring_namespace=str(pc.get("kube_prometheus_namespace", "astrolift-system")),
+            prometheus_service_name=str(
+                pc.get(
+                    "kube_prometheus_prometheus_service_name",
+                    "astrolift-kube-prometheus-prometheus",
+                )
+            ),
+            alertmanager_service_name=str(
+                pc.get(
+                    "kube_prometheus_alertmanager_service_name",
+                    "astrolift-kube-prometheus-alertmanager",
+                )
+            ),
+            grafana_service_name=str(
+                pc.get(
+                    "kube_prometheus_grafana_service_name",
+                    "astrolift-kube-prometheus-stack-grafana",
+                )
+            ),
+            prometheus_url=str(pc.get("kube_prometheus_prometheus_url", "")),
+            grafana_url=str(pc.get("kube_prometheus_grafana_url", "")),
+            verify_crds=bool(pc.get("kube_prometheus_verify_crds", True)),
+            verify_services=bool(pc.get("kube_prometheus_verify_services", True)),
+            verify_selection=bool(pc.get("kube_prometheus_verify_selection", True)),
+            allow_workload_prometheus_access=bool(
+                pc.get("kube_prometheus_allow_workload_prometheus_access", False),
+            ),
+            allow_cross_namespace=bool(pc.get("kube_prometheus_allow_cross_namespace", False)),
+            allowed_target_namespaces=tuple(
+                str(value) for value in pc.get("kube_prometheus_allowed_target_namespaces", [])
+            ),
+            allow_custom_rules=bool(pc.get("kube_prometheus_allow_custom_rules", False)),
+            allow_custom_dashboards=bool(
+                pc.get("kube_prometheus_allow_custom_dashboards", False),
+            ),
+            allow_honor_labels=bool(pc.get("kube_prometheus_allow_honor_labels", False)),
+            min_scrape_interval_seconds=int(
+                pc.get("kube_prometheus_min_scrape_interval_seconds", 15),
+            ),
+            max_monitors=int(pc.get("kube_prometheus_max_monitors", 20)),
+            max_endpoints_per_monitor=int(
+                pc.get("kube_prometheus_max_endpoints_per_monitor", 10),
+            ),
+            max_samples_per_scrape=int(
+                pc.get("kube_prometheus_max_samples_per_scrape", 50_000),
+            ),
+            max_targets_per_monitor=int(
+                pc.get("kube_prometheus_max_targets_per_monitor", 100),
+            ),
+            max_rule_groups=int(pc.get("kube_prometheus_max_rule_groups", 20)),
+            max_rules=int(pc.get("kube_prometheus_max_rules", 100)),
+            max_dashboards=int(pc.get("kube_prometheus_max_dashboards", 10)),
+            max_dashboard_bytes=int(pc.get("kube_prometheus_max_dashboard_bytes", 512_000)),
+        )
     if pair == ("object_store", "s3_compatible_existing"):
         from k8s_native.managed.object_store_existing_s3 import ExistingS3Config
 
