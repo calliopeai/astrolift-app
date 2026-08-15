@@ -83,6 +83,13 @@
   Kerberos directory integration, CMEK, custom performance, deletion
   protection, replication health and promotion, native snapshots, regional
   backups, restore, portable bindings, and adoption-safe teardown.
+- Add Google Cloud Operations observability bundles with declarative Cloud
+  Logging buckets, views, sinks, log metrics, exclusions, scopes, and saved
+  queries and Log Analytics links plus Cloud Monitoring dashboards,
+  notification channels, alert policies, nested resource groups, uptime
+  checks, metric descriptors, services, and SLOs. Preserve provider-native
+  request bodies, resolve credentials and verification codes from Secret
+  Manager, and enforce ownership-, dependency-, and data-safe teardown.
 - Add Google Cloud API Gateway lifecycle with immutable OpenAPI and gRPC
   config revisions, zero-downtime gateway retargeting, backend service
   identity, revision retention, portable endpoint bindings, adoption,

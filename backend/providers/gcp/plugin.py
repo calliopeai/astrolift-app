@@ -33,6 +33,7 @@ Executable managed services:
 - PrivateServiceConnectDriver — private_endpoint/private_service_connect
 - CloudFunctionsDriver — faas/cloud_functions_gen2
 - FilestoreDriver — filesystem/filestore
+- CloudOperationsDriver — observability/cloud_operations
 - APIGatewayDriver — api_gateway/api_gateway
 - ManagedKafkaDriver — event_stream/managed_kafka
 - EventarcDriver — event_bus/eventarc
@@ -62,6 +63,7 @@ from gcp.managed.model_endpoint_vertex import VertexAIEndpointDriver
 from gcp.managed.mssql_cloudsql import CloudSQLServerDriver
 from gcp.managed.mysql_cloudsql import CloudSQLMySQLDriver
 from gcp.managed.object_store_gcs import GCSDriver
+from gcp.managed.observability_cloud_operations import CloudOperationsDriver
 from gcp.managed.postgres_alloydb import AlloyDBPostgresDriver
 from gcp.managed.postgres_cloudsql import CloudSQLPostgresDriver
 from gcp.managed.private_endpoint_psc import PrivateServiceConnectDriver
@@ -117,6 +119,7 @@ PLUGIN = ProviderPlugin(
         ("private_endpoint", "private_service_connect"): PrivateServiceConnectDriver,
         ("faas", "cloud_functions_gen2"): CloudFunctionsDriver,
         ("filesystem", "filestore"): FilestoreDriver,
+        ("observability", "cloud_operations"): CloudOperationsDriver,
         ("api_gateway", "api_gateway"): APIGatewayDriver,
         ("event_stream", "managed_kafka"): ManagedKafkaDriver,
         ("event_bus", "eventarc"): EventarcDriver,
@@ -639,6 +642,47 @@ PLUGIN = ProviderPlugin(
                 "default": 900,
             },
             "workflows_operation_poll_interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 2,
+            },
+            "cloud_operations_location": {
+                "type": "string",
+                "description": "Default Cloud Logging location; falls back to global.",
+                "default": "global",
+            },
+            "cloud_operations_name_prefix": {
+                "type": "string",
+                "default": "astrolift-observability",
+            },
+            "cloud_operations_retention_days_default": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 30,
+            },
+            "cloud_operations_deletion_protection_default": {
+                "type": "boolean",
+                "default": True,
+            },
+            "cloud_operations_logging_api_endpoint": {
+                "type": "string",
+                "default": "https://logging.googleapis.com",
+            },
+            "cloud_operations_monitoring_api_endpoint": {
+                "type": "string",
+                "default": "https://monitoring.googleapis.com",
+            },
+            "cloud_operations_request_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 30,
+            },
+            "cloud_operations_operation_timeout_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 900,
+            },
+            "cloud_operations_operation_poll_interval_seconds": {
                 "type": "number",
                 "exclusiveMinimum": 0,
                 "default": 2,

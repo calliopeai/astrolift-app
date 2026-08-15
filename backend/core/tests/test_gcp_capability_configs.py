@@ -397,6 +397,40 @@ def test_workflows_runtime_config_preserves_operator_controls() -> None:
     assert config.poll_interval_seconds == 0.5
 
 
+def test_cloud_operations_runtime_config_preserves_operator_controls() -> None:
+    from core.cluster_observability import managed_config_for
+
+    config = managed_config_for(
+        "gcp",
+        _cluster(
+            cloud_operations_location="us",
+            cloud_operations_name_prefix="smd-observability",
+            cloud_operations_retention_days_default=365,
+            cloud_operations_deletion_protection_default=False,
+            cloud_operations_logging_api_endpoint="https://logging.example.test",
+            cloud_operations_monitoring_api_endpoint="https://monitoring.example.test",
+            cloud_operations_request_timeout_seconds=9,
+            cloud_operations_operation_timeout_seconds=600,
+            cloud_operations_operation_poll_interval_seconds=0.5,
+            secret_id_prefix="smd",
+        ),
+        kind="observability",
+        variant="cloud_operations",
+    )
+    assert type(config).__name__ == "CloudOperationsConfig"
+    assert config.project_id == "acme-prod"
+    assert config.location == "us"
+    assert config.name_prefix == "smd-observability"
+    assert config.retention_days_default == 365
+    assert config.deletion_protection_default is False
+    assert config.secret_id_prefix == "smd"
+    assert config.logging_api_endpoint == "https://logging.example.test"
+    assert config.monitoring_api_endpoint == "https://monitoring.example.test"
+    assert config.request_timeout_seconds == 9
+    assert config.operation_timeout_seconds == 600
+    assert config.operation_poll_interval_seconds == 0.5
+
+
 def test_memorystore_valkey_runtime_config_preserves_operator_controls() -> None:
     from core.cluster_observability import managed_config_for
 
