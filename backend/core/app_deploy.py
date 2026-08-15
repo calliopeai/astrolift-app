@@ -557,6 +557,7 @@ def render_resources_for_deployment(
     deployment: Deployment,
     *,
     cluster_override: TenantCluster | None = None,
+    include_managed_filesystems: bool = True,
 ) -> list[dict[str, Any]]:
     """Re-render the deployment's manifests against the stored TOML.
 
@@ -645,12 +646,13 @@ def render_resources_for_deployment(
         cluster_override=cluster_override,
     )
 
-    resources = _inject_managed_filesystem_bindings(
-        deployment,
-        resources,
-        namespace=namespace,
-        cluster_override=cluster_override,
-    )
+    if include_managed_filesystems:
+        resources = _inject_managed_filesystem_bindings(
+            deployment,
+            resources,
+            namespace=namespace,
+            cluster_override=cluster_override,
+        )
 
     # Workload identity (#1011): IAM-authed managed services run through a
     # provider-annotated Kubernetes ServiceAccount, never static credentials.

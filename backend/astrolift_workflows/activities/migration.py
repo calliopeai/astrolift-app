@@ -261,7 +261,15 @@ def _drain_source_cluster_sync(
     ctx = _context_for_cluster(source)
     namespace = namespace_for_app(app)
     try:
-        resources = render_resources_for_deployment(deployment, cluster_override=source)
+        # The environment FK already points at the target by this phase. A
+        # project filesystem is deliberately cluster-bound, so re-running its
+        # mount preflight against the old source would reject the drain render.
+        # Draining only needs workload identities; omit storage attachments.
+        resources = render_resources_for_deployment(
+            deployment,
+            cluster_override=source,
+            include_managed_filesystems=False,
+        )
     except AppDeployError as exc:
         return [str(exc)]
     if not resources:

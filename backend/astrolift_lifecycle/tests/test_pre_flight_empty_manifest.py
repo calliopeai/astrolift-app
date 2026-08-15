@@ -11,6 +11,8 @@ activity attempt + a cluster-driver round-trip.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from astrolift_lifecycle.models import Deployment
@@ -169,3 +171,50 @@ def test_render_no_bindings_envfrom_without_managed_service(app, env):
         for c in d["spec"]["template"]["spec"]["containers"]:
             refs = [e.get("secretRef", {}).get("name") for e in c.get("envFrom", [])]
             assert f"astrolift-bindings-{app.slug}" not in refs
+
+
+def test_render_attaches_active_managed_filesystem_to_workload(app, env, monkeypatch):
+    from astrolift_services.models import ManagedService, ManagedServiceVolumeBinding
+    from core.app_deploy import render_resources_for_deployment
+
+    app.manifest_raw = _MANIFEST_WITH_WORKLOAD
+    app.save(update_fields=["manifest_raw"])
+    service = ManagedService.objects.create(
+        registered_app=app,
+        app_environment=env,
+        kind=ManagedService.Kind.FILESYSTEM,
+        name="shared-data",
+        variant="efs",
+        status=ManagedService.Status.ACTIVE,
+    )
+    ManagedServiceVolumeBinding.objects.create(
+        managed_service=service,
+        name="shared-data",
+        mount_path="/mnt/shared",
+        source_kind=ManagedServiceVolumeBinding.SourceKind.CSI,
+        protocol="nfs4",
+        csi_driver="efs.csi.aws.com",
+        volume_handle="fs-12345678",
+        access_modes=["ReadWriteMany"],
+    )
+    driver = SimpleNamespace(list_csi_drivers=lambda _slug: ["efs.csi.aws.com"])
+    monkeypatch.setattr(
+        "core.app_deploy.driver_for_deployment",
+        lambda _deployment: (driver, SimpleNamespace(slug=env.tenant_cluster.slug), "unused"),
+    )
+
+    resources = render_resources_for_deployment(_make_deployment(app, env))
+
+    assert {row["kind"] for row in resources} >= {
+        "Deployment",
+        "PersistentVolume",
+        "PersistentVolumeClaim",
+    }
+    rendered = next(row for row in resources if row["kind"] == "Deployment")
+    pod_spec = rendered["spec"]["template"]["spec"]
+    assert pod_spec["volumes"][0]["persistentVolumeClaim"]["claimName"].startswith(
+        "alft-fs-shared-data-"
+    )
+    assert pod_spec["containers"][0]["volumeMounts"] == [
+        {"name": "shared-data", "mountPath": "/mnt/shared", "readOnly": False}
+    ]
