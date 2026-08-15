@@ -419,7 +419,7 @@ export function ProjectResourcesClient({ slug }: { slug: string }) {
                 </div>
                 {service.volumeBindings.length > 0 && (
                   <div className="bg-muted/30 mt-3 space-y-2 rounded-md border p-3">
-                    <p className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+                    <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
                       Runtime mounts
                     </p>
                     {service.volumeBindings.map((binding) => (
