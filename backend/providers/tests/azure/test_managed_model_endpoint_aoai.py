@@ -365,8 +365,8 @@ def test_provision_tags_deployment_with_astrolift_namespace(
 ) -> None:
     driver.provision(_spec())
     tags = mgmt.deployments_obj.create_calls[0]["parameters"]["tags"]
-    assert tags["astrolift.io/managed-by"] == "platform"
-    assert tags["astrolift.io/app"] == "api"
+    assert tags["astrolift-managed-by"] == "platform"
+    assert tags["astrolift-app"] == "api"
 
 
 def test_provision_without_keyvault_returns_error() -> None:

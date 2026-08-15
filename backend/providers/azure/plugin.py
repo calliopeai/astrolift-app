@@ -27,6 +27,9 @@ Managed services:
 - AzureMonitorPrometheusDriver — time_series/azure_monitor_prometheus
 - AzureCommunicationEmailDriver — email/azure_acs
 - AzureOpenAIDriver — model_endpoint/azure_openai
+- AzureSQLDatabaseDriver — mssql/azure_sql_database,
+  mssql/azure_sql_serverless, mssql/azure_sql_hyperscale
+- AzureSQLManagedInstanceDriver — mssql/azure_sql_managed_instance
 """
 
 from _sdk.base import ProviderPlugin
@@ -39,6 +42,7 @@ from azure.managed.cosmos import AzureCosmosDriver
 from azure.managed.email_acs import AzureCommunicationEmailDriver
 from azure.managed.filesystem_files import AzureFilesDriver
 from azure.managed.model_endpoint_aoai import AzureOpenAIDriver
+from azure.managed.mssql_sql import AzureSQLDatabaseDriver, AzureSQLManagedInstanceDriver
 from azure.managed.mysql_flexible import AzureMySQLFlexibleDriver
 from azure.managed.object_store_blob import (
     AzureBlobStorageDriver,
@@ -172,6 +176,40 @@ _MANAGED_CONFIG_PROPERTIES = {
     "azure_openai_deployment_name_prefix": {"type": "string", "default": "astrolift"},
     "azure_openai_api_version": {"type": "string", "default": "2024-02-15-preview"},
     "azure_openai_secret_name_prefix": {"type": "string", "default": "astrolift-aoai"},
+    "mssql_server_name_prefix": {"type": "string", "default": "astrolift-sql"},
+    "mssql_database_name_prefix": {"type": "string", "default": "astrolift"},
+    "mssql_administrator_login": {"type": "string", "default": "astrolift"},
+    "mssql_secret_name_prefix": {"type": "string", "default": "astrolift-mssql"},
+    "mssql_virtual_network_subnet_id": {"type": "string"},
+    "mssql_virtual_network_rule_name": {"type": "string", "default": "astrolift-aks"},
+    "mssql_ignore_missing_vnet_service_endpoint": {"type": "boolean", "default": False},
+    "mssql_public_network_access_default": {
+        "type": "string",
+        "enum": ["Enabled"],
+        "default": "Enabled",
+        "description": (
+            "Azure selected-network mode used with the required VNet service-endpoint rule. "
+            "Disabled requires the separately planned Private Endpoint driver."
+        ),
+    },
+    "mssql_minimal_tls_version_default": {"type": "string", "default": "1.2"},
+    "mssql_backup_retention_days_default": {"type": "integer", "minimum": 1, "maximum": 35, "default": 7},
+    "mssql_backup_storage_redundancy_default": {
+        "type": "string",
+        "enum": ["Local", "Zone", "Geo", "GeoZone"],
+        "default": "Geo",
+    },
+    "mssql_serverless_auto_pause_delay_minutes_default": {"type": "integer", "minimum": -1, "default": 60},
+    "mssql_serverless_min_capacity_default": {"type": "number", "minimum": 0.5, "default": 0.5},
+    "mssql_managed_instance_subnet_id": {"type": "string"},
+    "mssql_managed_instance_name_prefix": {"type": "string", "default": "astrolift-mi"},
+    "mssql_managed_instance_secret_name_prefix": {"type": "string", "default": "astrolift-mssql-mi"},
+    "mssql_managed_instance_license_type_default": {
+        "type": "string",
+        "enum": ["LicenseIncluded", "BasePrice"],
+        "default": "LicenseIncluded",
+    },
+    "mssql_managed_instance_public_data_endpoint_enabled_default": {"type": "boolean", "default": False},
 }
 
 PLUGIN = ProviderPlugin(
@@ -203,6 +241,10 @@ PLUGIN = ProviderPlugin(
         ("time_series", "azure_monitor_prometheus"): AzureMonitorPrometheusDriver,
         ("email", "azure_acs"): AzureCommunicationEmailDriver,
         ("model_endpoint", "azure_openai"): AzureOpenAIDriver,
+        ("mssql", "azure_sql_database"): AzureSQLDatabaseDriver,
+        ("mssql", "azure_sql_serverless"): AzureSQLDatabaseDriver,
+        ("mssql", "azure_sql_hyperscale"): AzureSQLDatabaseDriver,
+        ("mssql", "azure_sql_managed_instance"): AzureSQLManagedInstanceDriver,
     },
     config_schema={
         "type": "object",

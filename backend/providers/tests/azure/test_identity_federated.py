@@ -27,6 +27,7 @@ class FakeUAI:
 @dataclass
 class FakeUAIs:
     identities: dict[str, FakeUAI] = field(default_factory=dict)
+    create_calls: list[dict[str, Any]] = field(default_factory=list)
 
     def create_or_update(
         self,
@@ -35,6 +36,7 @@ class FakeUAIs:
         resource_name: str,
         parameters: dict[str, Any],
     ) -> FakeUAI:
+        self.create_calls.append(parameters)
         sa = FakeUAI(name=resource_name)
         self.identities[resource_name] = sa
         return sa
@@ -115,6 +117,9 @@ def test_create_identity_role(
     client_id = driver.create_identity_role("api", permissions=[])
     assert client_id == "client-1234"
     assert "api" in fake_msi.user_assigned_identities.identities
+    assert fake_msi.user_assigned_identities.create_calls[0]["tags"] == {
+        "astrolift-managed-by": "platform",
+    }
 
 
 def test_bind_emits_workload_identity_annotation(
