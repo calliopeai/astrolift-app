@@ -1234,17 +1234,41 @@ MATRIX = AvailabilityMatrix(
             kind="event_bus",
             variant="eventarc",
             plugin_id="gcp",
-            status="planned",
-            description="Eventarc triggers and destinations",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            description=(
+                "Eventarc Advanced shared bus, pipelines, enrollments, Google API sources, "
+                "and Eventarc Standard triggers and partner channels"
+            ),
+            binding_envs=(
+                "EVENT_BUS_NAME",
+                "EVENT_BUS_ID",
+                "EVENT_BUS_REGION",
+                "EVENT_BUS_PUBLISH_URL",
+                "EVENT_BUS_PROVIDER",
+                "GOOGLE_CLOUD_PROJECT",
+            ),
         ),
         ManagedServiceEntry(
             kind="event_stream",
             variant="managed_kafka",
             plugin_id="gcp",
-            status="planned",
-            description="Google Cloud Managed Service for Apache Kafka",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            description=(
+                "Google Managed Kafka clusters, topics, ACLs, consumer offsets, "
+                "Schema Registry, Connect clusters, and connectors"
+            ),
+            binding_envs=(
+                "EVENT_STREAM_BROKERS",
+                "EVENT_STREAM_TLS",
+                "EVENT_STREAM_AUTH_MECHANISM",
+                "EVENT_STREAM_CLIENT_CERT",
+                "EVENT_STREAM_CLIENT_KEY",
+                "EVENT_STREAM_CA_CERT",
+                "GCP_MANAGED_KAFKA_CLUSTER",
+                "GCP_MANAGED_KAFKA_BOOTSTRAP",
+                "GCP_MANAGED_KAFKA_SCHEMA_REGISTRY",
+                "SCHEMA_REGISTRY_URL",
+                "GOOGLE_CLOUD_PROJECT",
+                "GOOGLE_CLOUD_REGION",
+            ),
         ),
         ManagedServiceEntry(
             kind="faas",

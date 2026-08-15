@@ -10,6 +10,7 @@ import pytest
 from _sdk.cost import CostEstimate, CostEstimateRequest, CostEstimateUnavailable
 from gcp.cost import (
     CATALOG_BASE,
+    SERVICE_DISPLAY_NAME_BY_VARIANT,
     SERVICE_ID_BY_VARIANT,
     GCPCostConfig,
     GCPCostEstimator,
@@ -52,6 +53,12 @@ class FakeBillingClient:
     def __init__(self) -> None:
         self.skus: list[FakeSku] = []
         self.raise_on_call: Exception | None = None
+        self.services: list[Any] = []
+
+    def list_services(self) -> list[Any]:
+        if self.raise_on_call is not None:
+            raise self.raise_on_call
+        return self.services
 
     def list_skus(self, *, parent: str) -> list[FakeSku]:
         if self.raise_on_call is not None:
@@ -78,6 +85,7 @@ def test_supported_known_variants(estimator: GCPCostEstimator) -> None:
     assert estimator.supported(kind="warehouse", variant="bigquery")
     assert estimator.supported(kind="postgres", variant="alloydb")
     assert estimator.supported(kind="document_db", variant="firestore_native")
+    assert estimator.supported(kind="event_stream", variant="managed_kafka")
 
 
 def test_unsupported_returns_unavailable(
@@ -257,7 +265,58 @@ def test_service_id_table_covers_core_kinds() -> None:
     assert ("topic", "pubsub_topic") in SERVICE_ID_BY_VARIANT
     assert ("warehouse", "bigquery") in SERVICE_ID_BY_VARIANT
     assert ("document_db", "firestore_native") in SERVICE_ID_BY_VARIANT
+    assert ("event_bus", "eventarc") in SERVICE_ID_BY_VARIANT
     assert ("postgres", "cloudsql") in SERVICE_ID_BY_VARIANT
+    assert SERVICE_DISPLAY_NAME_BY_VARIANT[("event_stream", "managed_kafka")] == ("Managed Service for Apache Kafka")
+
+
+def test_managed_kafka_resolves_current_billing_service_id(
+    estimator: GCPCostEstimator,
+    fake_billing: FakeBillingClient,
+) -> None:
+    fake_billing.services = [
+        type(
+            "Service",
+            (),
+            {
+                "name": "services/CURRENT-KAFKA-ID",
+                "display_name": "Managed Service for Apache Kafka",
+            },
+        )(),
+    ]
+    fake_billing.skus = [
+        FakeSku(
+            sku_id="KAFKA-DCU",
+            description="Managed Service for Apache Kafka Data Compute Units",
+            service_regions=["us-central1"],
+            pricing_info=[
+                FakePricingInfo(
+                    pricing_expression=FakeExpression(
+                        usage_unit="hour",
+                        tiered_rates=[
+                            FakeTier(
+                                unit_price=FakeUnitPrice(
+                                    nanos=90_000_000,
+                                    currency_code="USD",
+                                ),
+                            ),
+                        ],
+                    ),
+                ),
+            ],
+        ),
+    ]
+    result = estimator.estimate(
+        CostEstimateRequest(
+            kind="event_stream",
+            variant="managed_kafka",
+            region="us-central1",
+            size="custom",
+            expected_usage={"hours_per_month": 1},
+        ),
+    )
+    assert isinstance(result, CostEstimate)
+    assert "CURRENT-KAFKA-ID" in result.pricing_source_url
 
 
 # ---- compute / node_hour (#440) -----------------------------------
