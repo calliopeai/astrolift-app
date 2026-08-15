@@ -1252,17 +1252,41 @@ MATRIX = AvailabilityMatrix(
             kind="event_bus",
             variant="eventarc",
             plugin_id="gcp",
-            status="planned",
-            description="Eventarc triggers and destinations",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            description=(
+                "Eventarc Advanced shared bus, pipelines, enrollments, Google API sources, "
+                "and Eventarc Standard triggers and partner channels"
+            ),
+            binding_envs=(
+                "EVENT_BUS_NAME",
+                "EVENT_BUS_ID",
+                "EVENT_BUS_REGION",
+                "EVENT_BUS_PUBLISH_URL",
+                "EVENT_BUS_PROVIDER",
+                "GOOGLE_CLOUD_PROJECT",
+            ),
         ),
         ManagedServiceEntry(
             kind="event_stream",
             variant="managed_kafka",
             plugin_id="gcp",
-            status="planned",
-            description="Google Cloud Managed Service for Apache Kafka",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            description=(
+                "Google Managed Kafka clusters, topics, ACLs, consumer offsets, "
+                "Schema Registry, Connect clusters, and connectors"
+            ),
+            binding_envs=(
+                "EVENT_STREAM_BROKERS",
+                "EVENT_STREAM_TLS",
+                "EVENT_STREAM_AUTH_MECHANISM",
+                "EVENT_STREAM_CLIENT_CERT",
+                "EVENT_STREAM_CLIENT_KEY",
+                "EVENT_STREAM_CA_CERT",
+                "GCP_MANAGED_KAFKA_CLUSTER",
+                "GCP_MANAGED_KAFKA_BOOTSTRAP",
+                "GCP_MANAGED_KAFKA_SCHEMA_REGISTRY",
+                "SCHEMA_REGISTRY_URL",
+                "GOOGLE_CLOUD_PROJECT",
+                "GOOGLE_CLOUD_REGION",
+            ),
         ),
         ManagedServiceEntry(
             kind="faas",
@@ -1276,9 +1300,19 @@ MATRIX = AvailabilityMatrix(
             kind="api_gateway",
             variant="api_gateway",
             plugin_id="gcp",
-            status="planned",
-            description="Google Cloud API Gateway",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            description=(
+                "Google Cloud API Gateway with immutable OpenAPI/gRPC revisions, "
+                "zero-downtime gateway rollout, retention, and backend service identity"
+            ),
+            binding_envs=(
+                "API_GATEWAY_URL",
+                "API_GATEWAY_HOST",
+                "API_GATEWAY_ID",
+                "GCP_API_GATEWAY_NAME",
+                "GCP_API_CONFIG_NAME",
+                "GOOGLE_CLOUD_PROJECT",
+                "GOOGLE_CLOUD_REGION",
+            ),
         ),
         ManagedServiceEntry(
             kind="workflow_engine",

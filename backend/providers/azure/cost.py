@@ -46,9 +46,9 @@ from _sdk.cost import (
 
 log = logging.getLogger(__name__)
 
-# Tag key on Azure resources. Azure keeps the platform tag verbatim
-# (mixed case + slash allowed) per ``core.cloud_tags.to_azure``.
-AZURE_BINDING_TAG_KEY = "astrolift.io/binding"
+# ARM forbids ``/`` in tag names; the canonical
+# ``astrolift.io/binding`` key serializes to this Azure-safe form.
+AZURE_BINDING_TAG_KEY = "astrolift-binding"
 
 
 # Azure service / product names per managed-service kind/variant.
@@ -605,7 +605,7 @@ class AzureBillingActualsConfig:
 
 class AzureBillingActuals:
     """Reads actual Azure spend grouped by the
-    ``astrolift.io/binding`` tag via the Cost Management Query API.
+    ``astrolift-binding`` tag via the Cost Management Query API.
 
     Cost Management's ``Query`` endpoint accepts a ``Dimensions``
     grouping on tag names; the query returns one row per tag value

@@ -33,6 +33,9 @@ def test_managed_services_have_object_store_and_queue() -> None:
     assert ("mssql", "cloudsql_sqlserver") in keys
     assert ("graph_db", "spanner_graph") in keys
     assert ("filesystem", "filestore") in keys
+    assert ("api_gateway", "api_gateway") in keys
+    assert ("event_stream", "managed_kafka") in keys
+    assert ("event_bus", "eventarc") in keys
     assert ("redis", "memorystore_valkey") in keys
 
 
@@ -147,6 +150,49 @@ def test_filestore_operator_controls_are_exposed() -> None:
         "filestore_api_endpoint",
         "filestore_operation_timeout_seconds",
         "filestore_operation_poll_interval_seconds",
+    ):
+        assert field in properties
+
+
+def test_api_gateway_operator_controls_are_exposed() -> None:
+    properties = PLUGIN.config_schema["properties"]
+    for field in (
+        "api_gateway_region",
+        "api_gateway_api_id_prefix",
+        "api_gateway_gateway_id_prefix",
+        "api_gateway_config_id_prefix",
+        "api_gateway_deletion_protection_default",
+        "api_gateway_api_endpoint",
+        "api_gateway_operation_timeout_seconds",
+        "api_gateway_operation_poll_interval_seconds",
+    ):
+        assert field in properties
+
+
+def test_managed_kafka_operator_controls_are_exposed() -> None:
+    properties = PLUGIN.config_schema["properties"]
+    for field in (
+        "managed_kafka_location",
+        "managed_kafka_cluster_id_prefix",
+        "managed_kafka_subnet_names",
+        "managed_kafka_deletion_protection_default",
+        "managed_kafka_api_endpoint",
+        "managed_kafka_operation_timeout_seconds",
+        "managed_kafka_operation_poll_interval_seconds",
+    ):
+        assert field in properties
+
+
+def test_eventarc_operator_controls_are_exposed() -> None:
+    properties = PLUGIN.config_schema["properties"]
+    for field in (
+        "eventarc_location",
+        "eventarc_message_bus_id",
+        "eventarc_deletion_protection_default",
+        "eventarc_api_endpoint",
+        "eventarc_publishing_endpoint",
+        "eventarc_operation_timeout_seconds",
+        "eventarc_operation_poll_interval_seconds",
     ):
         assert field in properties
 

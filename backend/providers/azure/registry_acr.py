@@ -19,6 +19,7 @@ from typing import Any
 
 from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op
+from _sdk.azure_tags import serialize_azure_arm_tags
 from _sdk.registry import CiPushRole, ImageRegistryDriver, Repo, SecretSpec, Tag
 from azure._errors import NotFoundError, map_api_error
 
@@ -279,11 +280,13 @@ class ACRDriver(ImageRegistryDriver):
                 resource_name=mi_name,
                 parameters={
                     "location": self._config.location,
-                    "tags": {
-                        "astrolift.io/managed-by": "platform",
-                        "astrolift.io/scm-repo": scm_repo_full_name,
-                        "astrolift.io/registry-repo": repo,
-                    },
+                    "tags": serialize_azure_arm_tags(
+                        {
+                            "astrolift.io/managed-by": "platform",
+                            "astrolift.io/scm-repo": scm_repo_full_name,
+                            "astrolift.io/registry-repo": repo,
+                        },
+                    ),
                 },
             )
         except Exception as exc:
