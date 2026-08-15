@@ -27,6 +27,7 @@ from k8s_native.dns_external import ExternalDnsDriver
 from k8s_native.identity_projected import ProjectedSaTokenDriver
 from k8s_native.ingress import K8sIngressDriver
 from k8s_native.managed.api_gateway import GatewayAPIDriver
+from k8s_native.managed.event_bus_knative import KnativeEventingDriver
 from k8s_native.managed.event_stream_nats import NATSDriver
 from k8s_native.managed.event_stream_strimzi import StrimziKafkaDriver
 from k8s_native.managed.faas_knative import KnativeServiceDriver
@@ -76,6 +77,7 @@ PLUGIN = ProviderPlugin(
         ("queue", "rabbitmq_operator"): RabbitMQOperatorDriver,
         ("faas", "knative_service"): KnativeServiceDriver,
         ("api_gateway", "gateway_api"): GatewayAPIDriver,
+        ("event_bus", "knative_eventing"): KnativeEventingDriver,
         ("object_store", "seaweedfs_operator"): SeaweedFSObjectStoreDriver,
         ("mssql", "sqlserver_express"): SQLServerExpressDriver,
         ("search", "opensearch_operator"): OpenSearchSearchDriver,
@@ -191,6 +193,42 @@ PLUGIN = ProviderPlugin(
                 "default": False,
             },
             "gateway_api_allow_listener_sets": {"type": "boolean", "default": False},
+            "knative_eventing_namespace": {"type": "string"},
+            "knative_eventing_broker_class": {
+                "type": "string",
+                "default": "MTChannelBasedBroker",
+            },
+            "knative_eventing_broker_config": {"type": "object"},
+            "knative_eventing_allow_class_override": {
+                "type": "boolean",
+                "default": False,
+            },
+            "knative_eventing_allow_config_override": {
+                "type": "boolean",
+                "default": False,
+            },
+            "knative_eventing_allow_external_subscribers": {
+                "type": "boolean",
+                "default": False,
+            },
+            "knative_eventing_allow_cross_namespace_subscribers": {
+                "type": "boolean",
+                "default": False,
+            },
+            "knative_eventing_allow_alpha_delivery_fields": {
+                "type": "boolean",
+                "default": False,
+            },
+            "knative_eventing_allowed_broker_classes": {
+                "type": "array",
+                "items": {"type": "string"},
+                "default": [
+                    "MTChannelBasedBroker",
+                    "ChannelBasedBroker",
+                    "Kafka",
+                    "RabbitMQBroker",
+                ],
+            },
             "seaweed_namespace": {
                 "type": "string",
                 "default": "astrolift-storage",
