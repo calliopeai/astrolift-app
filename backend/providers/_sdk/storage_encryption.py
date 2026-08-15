@@ -128,6 +128,15 @@ POLICIES: dict[tuple[str, str, str], EncryptionPolicy] = {
         cmek_required_for_compliance=("pci", "hipaa"),
         notes=("Spanner database CMEK is selected at creation; restored databases can select replacement keys."),
     ),
+    ("gcp", "filesystem", "filestore"): EncryptionPolicy(
+        mode="cloud_kms",
+        cmek_supported=True,
+        cmek_required_for_compliance=("pci", "hipaa"),
+        notes=(
+            "Filestore data and backups support CMEK. In-transit privacy requires "
+            "NFSv4.1 with Kerberos krb5p; NFSv3 is not encrypted in transit."
+        ),
+    ),
     # Azure
     ("azure", "object_store", "blob"): EncryptionPolicy(
         mode="cloud_kms",

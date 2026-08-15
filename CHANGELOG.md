@@ -8,6 +8,11 @@
   agent Jobs, including CSI/PVC preflight, credential-reference projection,
   provider-specific EFS/FSx/NFS mounts, owned storage cleanup, and safe mount
   readiness metadata in the project resources UI and GraphQL API.
+- Add Google Cloud Filestore shared filesystems across Basic, Zonal,
+  Regional, and Enterprise tiers with NFSv3/v4.1, PSC and IPv6, export ACLs,
+  Kerberos directory integration, CMEK, custom performance, deletion
+  protection, replication health and promotion, native snapshots, regional
+  backups, restore, portable bindings, and adoption-safe teardown.
 - Add Cloud Spanner Graph lifecycle on Enterprise and Enterprise Plus with
   GoogleSQL/GQL property graphs, fixed or autoscaled capacity, atomic custom
   schemas, replay-safe DDL, CMEK, exact backups and restore, portable IAM

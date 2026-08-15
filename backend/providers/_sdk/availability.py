@@ -1185,9 +1185,24 @@ MATRIX = AvailabilityMatrix(
             kind="filesystem",
             variant="filestore",
             plugin_id="gcp",
-            status="planned",
-            description="Google Cloud Filestore instance",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            description=(
+                "Google Cloud Filestore with all public tiers, NFSv3/v4.1, PSC, "
+                "CMEK, backups, snapshots, and replication"
+            ),
+            binding_envs=(
+                "FILESYSTEM_HANDLE",
+                "FILESYSTEM_MOUNT_PATH",
+                "FILESYSTEM_TLS",
+                "FILESYSTEM_PROTOCOL",
+                "FILESYSTEM_ENDPOINT",
+                "FILESYSTEM_EXPORT",
+                "FILESYSTEM_MOUNT_OPTIONS",
+                "FILESTORE_INSTANCE",
+                "FILESTORE_SHARE",
+                "FILESTORE_IP",
+                "GCP_PROJECT_ID",
+                "GCP_LOCATION",
+            ),
         ),
         ManagedServiceEntry(
             kind="topic",
