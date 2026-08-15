@@ -706,7 +706,11 @@ def test_dynamic_filesystems_are_executable_preview_catalog_entries() -> None:
         assert row.available is True
         assert row.status == "preview"
         assert row.config_schema["required"] == ["storage_class_name"]
-        assert "FILESYSTEM_TLS" not in row.binding_envs
+        # #1398 — these two were the only filesystem variants not publishing
+        # FILESYSTEM_TLS. The catalog now declares the full envelope; the
+        # binding reports a conservative "false" because the StorageClass's
+        # provisioner owns transport security and the driver cannot see it.
+        assert "FILESYSTEM_TLS" in row.binding_envs
 
 
 def test_k8s_object_store_catalog_distinguishes_executable_and_planned_variants() -> None:

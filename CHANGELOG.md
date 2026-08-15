@@ -302,6 +302,18 @@
 
 ### Fixed
 
+- Emit `FILESYSTEM_TLS` from the dynamic PVC and Rook CephFS filesystem
+  bindings, the only filesystem drivers that omitted it. The value is a
+  conservative `false`: in-transit encryption belongs to the StorageClass's
+  provisioner and the driver cannot observe it, and over-reporting would tell a
+  consumer its traffic is protected when it may not be.
+- Guard the managed-service binding envelope across every registered
+  `(kind, variant)` driver in all four provider plugins, rather than three
+  hand-written AWS cases. The contract now fails a driver that emits an
+  envelope-prefixed key missing from the canonical envelope, that omits a key
+  its same-kind siblings emit, or that encodes a shared key differently from
+  them. Pre-existing divergences are recorded as exact, issue-referencing
+  ledger entries that fail on both regression and repair.
 - Attach Microsoft.FileShares NFS shares to workloads as real CSI volumes, read
   their encryption-in-transit state through the generated SDK's string enums so
   encrypted shares no longer publish `notls`, size classic Azure Files volumes

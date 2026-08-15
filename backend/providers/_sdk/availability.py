@@ -2172,6 +2172,7 @@ MATRIX = AvailabilityMatrix(
             binding_envs=(
                 "FILESYSTEM_HANDLE",
                 "FILESYSTEM_MOUNT_PATH",
+                "FILESYSTEM_TLS",
             ),
         ),
         ManagedServiceEntry(
@@ -2184,6 +2185,7 @@ MATRIX = AvailabilityMatrix(
             binding_envs=(
                 "FILESYSTEM_HANDLE",
                 "FILESYSTEM_MOUNT_PATH",
+                "FILESYSTEM_TLS",
             ),
         ),
         ManagedServiceEntry(

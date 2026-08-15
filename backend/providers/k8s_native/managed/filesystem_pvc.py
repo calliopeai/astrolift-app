@@ -206,6 +206,17 @@ class _DynamicPVCDriver(ManagedServiceDriver):
             env_vars={
                 "FILESYSTEM_HANDLE": ValueRef(literal=parsed.name),
                 "FILESYSTEM_MOUNT_PATH": ValueRef(literal=mount_path),
+                # In-transit encryption belongs to the StorageClass's
+                # provisioner, and this driver cannot observe it: the cluster
+                # inventory reports only name / default / provisioner /
+                # reclaim policy, and a provisioner string does not imply
+                # transport security (efs.csi.aws.com encrypts in transit only
+                # when the mount options say tls; the "encrypted" parameter on
+                # EBS and Ceph classes is at-rest LUKS, not transport). So the
+                # binding reports the conservative value rather than guessing.
+                # Under-reporting makes a consumer add protection it may not
+                # have needed; over-reporting makes it skip protection it did.
+                "FILESYSTEM_TLS": ValueRef(literal="false"),
             },
             pod_volume_mounts=[volume],
             notes=("A stable, consumer-namespace PVC is dynamically provisioned from the selected StorageClass"),
@@ -266,6 +277,9 @@ class _DynamicPVCDriver(ManagedServiceDriver):
             env_vars={
                 "FILESYSTEM_HANDLE": "Logical managed volume name",
                 "FILESYSTEM_MOUNT_PATH": "Mount path inside the workload container",
+                "FILESYSTEM_TLS": (
+                    "In-transit encryption; false because the StorageClass's provisioner is opaque here"
+                ),
             },
         )
 
