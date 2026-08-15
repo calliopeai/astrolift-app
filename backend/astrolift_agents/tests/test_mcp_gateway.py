@@ -12,10 +12,19 @@ from django.test import Client, RequestFactory, override_settings
 
 from astrolift_agents.models import AgentEnvironmentSpec, AgentTask, Brief
 from astrolift_agents.views.mcp import mcp_gateway
-from astrolift_identity.api_tokens import SCOPE_MCP_DISPATCH, SCOPE_MCP_READ, SCOPE_MCP_WRITE
+from astrolift_clusters.models import ProviderPlugin, TenantCluster
+from astrolift_identity.api_tokens import (
+    SCOPE_MCP_DISPATCH,
+    SCOPE_MCP_READ,
+    SCOPE_MCP_WRITE,
+    SCOPE_PROJECT_WRITE,
+    SCOPE_READ_APPS,
+)
 from astrolift_identity.models import ApiToken, Organization, Project, Team
+from astrolift_lifecycle.models import AppEnvironment
 from astrolift_operations.models import AuditEvent
 from astrolift_registry.models import AppTeamAccess, RegisteredApp, Workload
+from astrolift_services.models import ManagedService
 from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
 
@@ -105,6 +114,48 @@ def _agent(org, *, slug="triage", team=None):
     )
 
 
+def _resource_graph(org, team, *, suffix: str):
+    project = Project.objects.create(
+        organization=org,
+        team=team,
+        name=f"Resource Project {suffix}",
+        slug=f"resource-project-{suffix}",
+    )
+    ProviderPlugin.objects.bulk_create(
+        [
+            ProviderPlugin(
+                name=f"Resource Provider {suffix}",
+                slug=f"resource-provider-{suffix}",
+                version="1.0.0",
+            )
+        ]
+    )
+    plugin = ProviderPlugin.objects.get(slug=f"resource-provider-{suffix}")
+    cluster = TenantCluster.objects.create(
+        organization=org,
+        provider_plugin=plugin,
+        name=f"Resource Cluster {suffix}",
+        slug=f"resource-cluster-{suffix}",
+        region="test-1",
+        endpoint="https://cluster.example.test",
+        auth_method=TenantCluster.AuthMethod.KUBECONFIG,
+        lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+    )
+    app = RegisteredApp.objects.create(
+        organization=org,
+        team=team,
+        project=project,
+        name=f"Resource App {suffix}",
+        slug=f"resource-app-{suffix}",
+    )
+    environment = AppEnvironment.objects.create(
+        registered_app=app,
+        name="production",
+        tenant_cluster=cluster,
+    )
+    return project, cluster, app, environment
+
+
 def test_initialize_requires_api_token():
     request = RequestFactory().post(
         "/api/mcp/v1/",
@@ -129,6 +180,326 @@ def test_tool_list_is_filtered_by_scope_and_rbac(permission_resolver):
     assert "astrolift_run_agent" not in names
     assert "astrolift_cancel_task" not in names
     assert "astrolift_sync_agent_repo" not in names
+
+
+def test_project_resource_tools_are_filtered_by_read_write_scope_and_rbac(permission_resolver):
+    org = Organization.objects.create(name="MCP Resource Org", slug="mcp-resource-tools")
+    user, token = _token(org, scopes=[SCOPE_MCP_READ, SCOPE_MCP_WRITE])
+    permission_resolver.grant(Permission.PROJECT_READ)
+    permission_resolver.grant(Permission.PROJECT_UPDATE)
+
+    _, restricted = _call(org, user, token, "tools/list")
+    restricted_names = {tool["name"] for tool in restricted["result"]["tools"]}
+    assert not any("project_resource" in name for name in restricted_names)
+    _, denied = _call(
+        org,
+        user,
+        token,
+        "tools/call",
+        {
+            "name": "astrolift_provision_project_resource",
+            "arguments": {
+                "project_id": "00000000-0000-0000-0000-000000000001",
+                "cluster_id": "00000000-0000-0000-0000-000000000002",
+                "kind": "queue",
+            },
+        },
+    )
+    assert denied["result"]["structuredContent"] == {
+        "code": "permission_denied",
+        "message": "API token is missing scope 'project:write'",
+    }
+
+    token.scopes = [SCOPE_MCP_READ, SCOPE_MCP_WRITE, SCOPE_READ_APPS, SCOPE_PROJECT_WRITE]
+    token.save(update_fields=["scopes", "updated_at", "version"])
+    _, payload = _call(org, user, token, "tools/list")
+
+    names = {tool["name"] for tool in payload["result"]["tools"]}
+    assert {
+        "astrolift_list_project_resource_clusters",
+        "astrolift_list_project_resource_catalog",
+        "astrolift_list_project_resources",
+        "astrolift_provision_project_resource",
+        "astrolift_attach_project_resource",
+        "astrolift_detach_project_resource",
+        "astrolift_update_project_resource",
+        "astrolift_reprovision_project_resource",
+        "astrolift_deprovision_project_resource",
+    } <= names
+
+
+def test_project_resource_mcp_lifecycle_reuses_control_plane_workflows(
+    permission_resolver,
+    monkeypatch,
+):
+    org = Organization.objects.create(name="MCP Resource Org", slug="mcp-resource-lifecycle")
+    team = Team.objects.create(organization=org, name="Resource Team", slug="mcp-resource-team")
+    project, cluster, _app, environment = _resource_graph(org, team, suffix="lifecycle")
+    user, token = _token(
+        org,
+        team=team,
+        scopes=[SCOPE_MCP_READ, SCOPE_MCP_WRITE, SCOPE_READ_APPS, SCOPE_PROJECT_WRITE],
+    )
+    permission_resolver.grant(Permission.PROJECT_READ)
+    permission_resolver.grant(Permission.PROJECT_UPDATE)
+    starts = []
+    monkeypatch.setattr(
+        "astrolift_workflows.client.start_workflow",
+        lambda name, args, **kwargs: starts.append((name, args, kwargs)),
+    )
+
+    _, clusters = _call(
+        org,
+        user,
+        token,
+        "tools/call",
+        {
+            "name": "astrolift_list_project_resource_clusters",
+            "arguments": {"project_id": str(project.guid)},
+        },
+    )
+    assert clusters["result"]["structuredContent"]["clusters"][0]["id"] == str(cluster.guid)
+
+    _, catalog = _call(
+        org,
+        user,
+        token,
+        "tools/call",
+        {
+            "name": "astrolift_list_project_resource_catalog",
+            "arguments": {
+                "project_id": str(project.guid),
+                "cluster_id": str(cluster.guid),
+            },
+        },
+    )
+    assert catalog["result"]["isError"] is False
+    assert catalog["result"]["structuredContent"]["resources"] == []
+
+    _, provisioned = _call(
+        org,
+        user,
+        token,
+        "tools/call",
+        {
+            "name": "astrolift_provision_project_resource",
+            "arguments": {
+                "project_id": str(project.guid),
+                "cluster_id": str(cluster.guid),
+                "kind": ManagedService.Kind.QUEUE,
+                "name": "shared-jobs",
+                "variant": "test-queue",
+                "config": {"size": "small"},
+                "app_environment_ids": [str(environment.guid)],
+            },
+        },
+    )
+    resource = provisioned["result"]["structuredContent"]
+    assert provisioned["result"]["isError"] is False
+    assert resource["name"] == "shared-jobs"
+    assert resource["attachments"][0]["consumer_slug"] == _app.slug
+    assert starts[-1][0] == "ProvisionManagedServiceWorkflow"
+    assert starts[-1][1][0].actor.kind == "api_token"
+    assert starts[-1][1][0].actor.token_id == token.pk
+
+    attachment_id = resource["attachments"][0]["id"]
+    _, detached = _call(
+        org,
+        user,
+        token,
+        "tools/call",
+        {
+            "name": "astrolift_detach_project_resource",
+            "arguments": {"attachment_id": attachment_id},
+        },
+    )
+    assert detached["result"]["structuredContent"]["detached"] is True
+
+    _, attached = _call(
+        org,
+        user,
+        token,
+        "tools/call",
+        {
+            "name": "astrolift_attach_project_resource",
+            "arguments": {
+                "managed_service_id": resource["id"],
+                "app_environment_id": str(environment.guid),
+            },
+        },
+    )
+    assert attached["result"]["structuredContent"]["consumer_slug"] == _app.slug
+
+    _, updated = _call(
+        org,
+        user,
+        token,
+        "tools/call",
+        {
+            "name": "astrolift_update_project_resource",
+            "arguments": {
+                "managed_service_id": resource["id"],
+                "name": "shared-priority-jobs",
+                "config": {"size": "medium"},
+            },
+        },
+    )
+    assert updated["result"]["structuredContent"]["name"] == "shared-priority-jobs"
+
+    _, listed = _call(
+        org,
+        user,
+        token,
+        "tools/call",
+        {
+            "name": "astrolift_list_project_resources",
+            "arguments": {"project_id": str(project.guid)},
+        },
+    )
+    assert [row["id"] for row in listed["result"]["structuredContent"]["resources"]] == [resource["id"]]
+
+    _, reprovisioned = _call(
+        org,
+        user,
+        token,
+        "tools/call",
+        {
+            "name": "astrolift_reprovision_project_resource",
+            "arguments": {"managed_service_id": resource["id"]},
+        },
+    )
+    assert reprovisioned["result"]["structuredContent"]["status"] == "pending"
+
+    _, unconfirmed = _call(
+        org,
+        user,
+        token,
+        "tools/call",
+        {
+            "name": "astrolift_deprovision_project_resource",
+            "arguments": {
+                "managed_service_id": resource["id"],
+                "confirm_managed_service_id": "wrong",
+            },
+        },
+    )
+    assert unconfirmed["result"]["isError"] is True
+    assert unconfirmed["result"]["structuredContent"]["code"] == "precondition"
+
+    _, deprovisioned = _call(
+        org,
+        user,
+        token,
+        "tools/call",
+        {
+            "name": "astrolift_deprovision_project_resource",
+            "arguments": {
+                "managed_service_id": resource["id"],
+                "confirm_managed_service_id": resource["id"],
+                "delete_data": False,
+                "force_destroy": False,
+            },
+        },
+    )
+    assert deprovisioned["result"]["structuredContent"]["status"] == "deprovisioning"
+    assert starts[-1][0] == "DeprovisionManagedServiceWorkflow"
+    assert starts[-1][1][0].actor.kind == "api_token"
+
+
+def test_team_token_cannot_manage_another_teams_project_resources(
+    permission_resolver,
+    monkeypatch,
+):
+    org = Organization.objects.create(name="MCP Team Resource Org", slug="mcp-team-resources")
+    allowed_team = Team.objects.create(organization=org, name="Allowed", slug="mcp-resource-allowed")
+    hidden_team = Team.objects.create(organization=org, name="Hidden", slug="mcp-resource-hidden")
+    allowed_project, _cluster, _app, _environment = _resource_graph(
+        org,
+        allowed_team,
+        suffix="allowed",
+    )
+    hidden_project, hidden_cluster, _hidden_app, _hidden_env = _resource_graph(
+        org,
+        hidden_team,
+        suffix="hidden",
+    )
+    hidden_service = ManagedService.objects.create(
+        project=hidden_project,
+        tenant_cluster=hidden_cluster,
+        kind=ManagedService.Kind.OBJECT_STORE,
+        name="hidden-bucket",
+    )
+    user, token = _token(
+        org,
+        team=allowed_team,
+        scopes=[SCOPE_MCP_READ, SCOPE_MCP_WRITE, SCOPE_READ_APPS, SCOPE_PROJECT_WRITE],
+    )
+    permission_resolver.grant(Permission.PROJECT_READ)
+    permission_resolver.grant(Permission.PROJECT_UPDATE)
+    monkeypatch.setattr("astrolift_workflows.client.start_workflow", lambda *_a, **_k: None)
+
+    _, hidden_list = _call(
+        org,
+        user,
+        token,
+        "tools/call",
+        {
+            "name": "astrolift_list_project_resources",
+            "arguments": {"project_id": str(hidden_project.guid)},
+        },
+    )
+    _, hidden_update = _call(
+        org,
+        user,
+        token,
+        "tools/call",
+        {
+            "name": "astrolift_update_project_resource",
+            "arguments": {
+                "managed_service_id": str(hidden_service.guid),
+                "name": "stolen",
+            },
+        },
+    )
+    _, allowed_list = _call(
+        org,
+        user,
+        token,
+        "tools/call",
+        {
+            "name": "astrolift_list_project_resources",
+            "arguments": {"project_id": str(allowed_project.guid)},
+        },
+    )
+
+    assert hidden_list["result"]["structuredContent"]["code"] == "not_found"
+    assert hidden_update["result"]["structuredContent"]["code"] == "not_found"
+    assert allowed_list["result"]["isError"] is False
+    hidden_service.refresh_from_db()
+    assert hidden_service.name == "hidden-bucket"
+
+
+def test_project_resource_tools_reject_malformed_public_ids(permission_resolver):
+    org = Organization.objects.create(name="MCP Invalid Resource Org", slug="mcp-invalid-resource")
+    user, token = _token(org, scopes=[SCOPE_MCP_READ, SCOPE_READ_APPS])
+    permission_resolver.grant(Permission.PROJECT_READ)
+
+    _, payload = _call(
+        org,
+        user,
+        token,
+        "tools/call",
+        {
+            "name": "astrolift_list_project_resources",
+            "arguments": {"project_id": "not-a-uuid"},
+        },
+    )
+
+    assert payload["result"]["isError"] is True
+    assert payload["result"]["structuredContent"] == {
+        "code": "invalid_arguments",
+        "message": "project_id must be a UUID",
+    }
 
 
 def test_dispatch_only_token_can_connect_without_read_scope(permission_resolver):
@@ -536,11 +907,14 @@ def test_import_tool_previews_and_persists_only_runnable_packages(permission_res
 
 def test_streamable_http_auth_scope_tenant_and_session_run_through_middleware(permission_resolver):
     org = Organization.objects.create(name="MCP Org", slug="mcp-http")
-    _user, token = _token(org, scopes=[SCOPE_MCP_READ])
+    team = Team.objects.create(organization=org, name="HTTP Team", slug="mcp-http-team")
+    project, _cluster, _app, _environment = _resource_graph(org, team, suffix="http")
+    _user, token = _token(org, team=team, scopes=[SCOPE_MCP_READ, SCOPE_READ_APPS])
     plaintext = "alft_at_http-integration-token"
     token.token_hash = hashlib.sha256(plaintext.encode()).hexdigest()
     token.save(update_fields=["token_hash", "updated_at", "version"])
     permission_resolver.grant(Permission.AGENT_READ)
+    permission_resolver.grant(Permission.PROJECT_READ)
     client = Client()
     common = {
         "HTTP_AUTHORIZATION": f"Bearer {plaintext}",
@@ -580,11 +954,36 @@ def test_streamable_http_auth_scope_tenant_and_session_run_through_middleware(pe
     assert {tool["name"] for tool in listed.json()["result"]["tools"]} >= {
         "astrolift_list_agents",
         "astrolift_get_agent",
+        "astrolift_list_project_resources",
+    }
+
+    resources = client.post(
+        "/api/mcp/v1/",
+        data=json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": 3,
+                "method": "tools/call",
+                "params": {
+                    "name": "astrolift_list_project_resources",
+                    "arguments": {"project_id": str(project.guid)},
+                },
+            }
+        ),
+        content_type="application/json",
+        HTTP_MCP_PROTOCOL_VERSION="2025-11-25",
+        HTTP_MCP_SESSION_ID=session_id,
+        **common,
+    )
+    assert resources.status_code == 200
+    assert resources.json()["result"]["structuredContent"] == {
+        "project_id": str(project.guid),
+        "resources": [],
     }
 
     missing_session = client.post(
         "/api/mcp/v1/",
-        data=json.dumps({"jsonrpc": "2.0", "id": 3, "method": "tools/list"}),
+        data=json.dumps({"jsonrpc": "2.0", "id": 4, "method": "tools/list"}),
         content_type="application/json",
         HTTP_MCP_PROTOCOL_VERSION="2025-11-25",
         **common,
@@ -616,7 +1015,7 @@ def test_streamable_http_rejects_nonstandard_nonfinite_json():
     user, token = _token(org, scopes=[SCOPE_MCP_READ])
     request = RequestFactory().post(
         "/api/mcp/v1/",
-        data=(b'{"jsonrpc":"2.0","id":1,"method":"initialize",' b'"params":{"bad":NaN}}'),
+        data=(b'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"bad":NaN}}'),
         content_type="application/json",
         HTTP_ACCEPT="application/json, text/event-stream",
     )

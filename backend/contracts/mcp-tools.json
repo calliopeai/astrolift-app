@@ -239,6 +239,271 @@
       "required_scopes": [
         "mcp:write"
       ]
+    },
+    {
+      "description": "List managed clusters that can host shared resources for a project.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "project_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_list_project_resource_clusters",
+      "required_permissions": [
+        "project.read"
+      ],
+      "required_scopes": [
+        "mcp:read",
+        "read:apps"
+      ]
+    },
+    {
+      "description": "List available and planned managed-resource variants and configuration schemas for a project's target cluster.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "cluster_id": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "cluster_id"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_list_project_resource_catalog",
+      "required_permissions": [
+        "project.read"
+      ],
+      "required_scopes": [
+        "mcp:read",
+        "read:apps"
+      ]
+    },
+    {
+      "description": "List a project's shared managed resources, lifecycle state, and app/agent attachments.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "project_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_list_project_resources",
+      "required_permissions": [
+        "project.read"
+      ],
+      "required_scopes": [
+        "mcp:read",
+        "read:apps"
+      ]
+    },
+    {
+      "description": "Provision a shared managed resource and optionally attach project app or agent consumers.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "agent_environment_spec_slugs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "app_environment_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "cluster_id": {
+            "type": "string"
+          },
+          "config": {
+            "type": "object"
+          },
+          "environment_name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "variant": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "cluster_id",
+          "kind"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_provision_project_resource",
+      "required_permissions": [
+        "project.update"
+      ],
+      "required_scopes": [
+        "mcp:write",
+        "project:write"
+      ]
+    },
+    {
+      "description": "Attach a shared resource to exactly one project app environment or agent spec.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "agent_environment_spec_slug": {
+            "type": "string"
+          },
+          "app_environment_id": {
+            "type": "string"
+          },
+          "managed_service_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "managed_service_id"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_attach_project_resource",
+      "required_permissions": [
+        "project.update"
+      ],
+      "required_scopes": [
+        "mcp:write",
+        "project:write"
+      ]
+    },
+    {
+      "description": "Detach one app or agent consumer from a shared managed resource.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "attachment_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "attachment_id"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_detach_project_resource",
+      "required_permissions": [
+        "project.update"
+      ],
+      "required_scopes": [
+        "mcp:write",
+        "project:write"
+      ]
+    },
+    {
+      "description": "Update a shared resource's name or in-place-editable configuration and reconcile it.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "config": {
+            "type": "object"
+          },
+          "managed_service_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "managed_service_id"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_update_project_resource",
+      "required_permissions": [
+        "project.update"
+      ],
+      "required_scopes": [
+        "mcp:write",
+        "project:write"
+      ]
+    },
+    {
+      "description": "Start a full reprovision cycle for an existing shared managed resource.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "managed_service_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "managed_service_id"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_reprovision_project_resource",
+      "required_permissions": [
+        "project.update"
+      ],
+      "required_scopes": [
+        "mcp:write",
+        "project:write"
+      ]
+    },
+    {
+      "description": "Destructively deprovision a shared resource. Echo its exact ID in confirm_managed_service_id; delete_data and force_destroy default false.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "confirm_managed_service_id": {
+            "type": "string"
+          },
+          "delete_data": {
+            "type": "boolean"
+          },
+          "force_destroy": {
+            "type": "boolean"
+          },
+          "managed_service_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "managed_service_id",
+          "confirm_managed_service_id"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_deprovision_project_resource",
+      "required_permissions": [
+        "project.update"
+      ],
+      "required_scopes": [
+        "mcp:write",
+        "project:write"
+      ]
     }
   ],
   "transport": "streamable-http"
