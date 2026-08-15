@@ -539,6 +539,7 @@ def test_registration_catalog_cost_and_runtime_config_are_wired() -> None:
         ("time_series", "gcp_managed_prometheus", "GCPManagedPrometheusConfig"),
         ("model_endpoint", "vertex_ai", "VertexAIEndpointConfig"),
         ("encryption_key", "cloud_kms", "CloudKMSConfig"),
+        ("faas", "cloud_functions_gen2", "CloudFunctionsConfig"),
         ("observability", "cloud_operations", "CloudOperationsConfig"),
         ("api_gateway", "api_gateway", "APIGatewayConfig"),
         ("event_stream", "managed_kafka", "ManagedKafkaConfig"),
@@ -655,6 +656,42 @@ def test_gcp_config_requires_project_id() -> None:
     )
     with pytest.raises(ClusterObservabilityError, match="project_id"):
         managed_config_for("gcp", cluster, kind="object_store", variant="gcs")
+
+
+def test_cloud_functions_runtime_config_preserves_operator_controls() -> None:
+    from core.cluster_observability import managed_config_for
+
+    from gcp.managed.faas_cloud_functions import CloudFunctionsConfig
+
+    cluster = SimpleNamespace(
+        slug="gcp-prod",
+        region="us-central1",
+        provider_config={
+            "project_id": "acme-prod",
+            "cloud_functions_region": "us-east1",
+            "cloud_functions_name_prefix": "functions",
+            "cloud_functions_deletion_protection_default": False,
+            "cloud_functions_api_endpoint": "https://functions.example.test/v2",
+            "cloud_functions_operation_timeout_seconds": 120,
+            "cloud_functions_operation_poll_interval_seconds": 0.25,
+        },
+        auth_config={},
+    )
+    config = managed_config_for(
+        "gcp",
+        cluster,
+        kind="faas",
+        variant="cloud_functions_gen2",
+    )
+    assert config == CloudFunctionsConfig(
+        project_id="acme-prod",
+        region="us-east1",
+        function_name_prefix="functions",
+        api_endpoint="https://functions.example.test/v2",
+        deletion_protection_default=False,
+        operation_timeout_seconds=120,
+        poll_interval_seconds=0.25,
+    )
 
 
 def test_api_gateway_runtime_config_preserves_operator_controls() -> None:

@@ -2,8 +2,22 @@
 
 ## Unreleased
 
+- Add executable Google Cloud CDN lifecycle support, including Cloud Storage,
+  NEG, instance-group, and existing backend-service origins; safe cache policy
+  controls; a managed global HTTP(S) load-balancer graph; managed or external
+  TLS; Cloud Armor policies; invalidation; signed-URL key rotation; portable
+  bindings; ownership/adoption; and protected deletion.
+
 ### Added
 
+- Add Google Cloud Workflows lifecycle with YAML/JSON definitions, revision
+  snapshots and rollback, service identities, CMEK, environment variables,
+  call logging, execution history, invocation bindings, execution controls,
+  boundary-safe adoption, and destructive-history-aware teardown.
+- Add Google Cloud Run functions (Cloud Functions v2) lifecycle with Cloud
+  Build source declarations, HTTP and Eventarc triggers, Secret Manager
+  environment/volumes, scaling, private networking, Binary Authorization,
+  CMEK, authenticated IAM bindings, adoption, and guarded teardown.
 - Add Google Cloud Operations observability bundles with declarative Cloud
   Logging buckets, views, sinks, log metrics, exclusions, scopes, and saved
   queries and Log Analytics links plus Cloud Monitoring dashboards,
