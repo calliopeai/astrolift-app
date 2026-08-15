@@ -47,6 +47,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from azure.secrets_keyvault import key_vault_secret_ref
 
 KIND = "search"
 
@@ -425,16 +426,18 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
         env_vars: dict[str, ValueRef] = {
             # Canonical contract envs (managed_service_kinds.py)
             "SEARCH_URL": ValueRef(literal=endpoint),
-            "SEARCH_API_KEY": ValueRef(secret_ref=primary_secret),
+            "SEARCH_API_KEY": ValueRef(
+                secret_ref=key_vault_secret_ref(self._config.keyvault_url, primary_secret),
+            ),
             "SEARCH_INDEX_PREFIX": ValueRef(literal=index_name),
             # Azure-flavoured aliases.
             "AZURE_SEARCH_ENDPOINT": ValueRef(literal=endpoint),
             "AZURE_SEARCH_INDEX_NAME": ValueRef(literal=index_name),
             "AZURE_SEARCH_ADMIN_KEY": ValueRef(
-                secret_ref=primary_secret,
+                secret_ref=key_vault_secret_ref(self._config.keyvault_url, primary_secret),
             ),
             "AZURE_SEARCH_SECONDARY_ADMIN_KEY": ValueRef(
-                secret_ref=secondary_secret,
+                secret_ref=key_vault_secret_ref(self._config.keyvault_url, secondary_secret),
             ),
         }
         return Binding(
