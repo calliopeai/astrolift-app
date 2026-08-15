@@ -33,6 +33,7 @@ def test_managed_services_have_object_store_and_queue() -> None:
     assert ("mssql", "cloudsql_sqlserver") in keys
     assert ("graph_db", "spanner_graph") in keys
     assert ("private_endpoint", "private_service_connect") in keys
+    assert ("event_stream", "managed_kafka") in keys
     assert ("event_bus", "eventarc") in keys
     assert ("redis", "memorystore_valkey") in keys
 
@@ -140,6 +141,20 @@ def test_private_service_connect_operator_controls_are_exposed() -> None:
         "private_service_connect_api_endpoint",
         "private_service_connect_operation_timeout_seconds",
         "private_service_connect_operation_poll_interval_seconds",
+    ):
+        assert field in properties
+
+
+def test_managed_kafka_operator_controls_are_exposed() -> None:
+    properties = PLUGIN.config_schema["properties"]
+    for field in (
+        "managed_kafka_location",
+        "managed_kafka_cluster_id_prefix",
+        "managed_kafka_subnet_names",
+        "managed_kafka_deletion_protection_default",
+        "managed_kafka_api_endpoint",
+        "managed_kafka_operation_timeout_seconds",
+        "managed_kafka_operation_poll_interval_seconds",
     ):
         assert field in properties
 
