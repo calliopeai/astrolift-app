@@ -11,6 +11,10 @@
   checks, metric descriptors, services, and SLOs. Preserve provider-native
   request bodies, resolve credentials and verification codes from Secret
   Manager, and enforce ownership-, dependency-, and data-safe teardown.
+- Add Google Cloud API Gateway lifecycle with immutable OpenAPI and gRPC
+  config revisions, zero-downtime gateway retargeting, backend service
+  identity, revision retention, portable endpoint bindings, adoption,
+  snapshots, and guarded dependency teardown.
 - Add Google Managed Service for Apache Kafka lifecycle across clusters,
   topics, ACLs, consumer offsets, Schema Registry, Connect clusters and
   connectors, including PSC networking, CMEK, mTLS, IAM/portable bindings,
@@ -141,6 +145,9 @@
 
 ### Fixed
 
+- Serialize Azure ownership, billing, and custom ARM tags through one
+  collision-safe codec so tag names satisfy Azure restrictions and cost
+  actuals group by the same `astrolift-binding` key drivers emit.
 - Make GKE workload identity reconcile project IAM roles on every deploy,
   annotate workload ServiceAccounts with canonical length-safe Google service
   accounts, include attached project resources, and reject inert raw grants.

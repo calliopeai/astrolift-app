@@ -1282,9 +1282,19 @@ MATRIX = AvailabilityMatrix(
             kind="api_gateway",
             variant="api_gateway",
             plugin_id="gcp",
-            status="planned",
-            description="Google Cloud API Gateway",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            description=(
+                "Google Cloud API Gateway with immutable OpenAPI/gRPC revisions, "
+                "zero-downtime gateway rollout, retention, and backend service identity"
+            ),
+            binding_envs=(
+                "API_GATEWAY_URL",
+                "API_GATEWAY_HOST",
+                "API_GATEWAY_ID",
+                "GCP_API_GATEWAY_NAME",
+                "GCP_API_CONFIG_NAME",
+                "GOOGLE_CLOUD_PROJECT",
+                "GOOGLE_CLOUD_REGION",
+            ),
         ),
         ManagedServiceEntry(
             kind="workflow_engine",
