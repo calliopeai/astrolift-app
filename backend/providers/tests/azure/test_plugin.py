@@ -108,9 +108,9 @@ def test_astrolift_azure_package_extends_official_sdk_namespace() -> None:
     from azure.mgmt.mysqlflexibleservers import MySQLManagementClient
     from azure.mgmt.postgresqlflexibleservers import PostgreSQLManagementClient
     from azure.mgmt.resource.locks import ManagementLockClient
+    from azure.mgmt.storage import StorageManagementClient
     from azure.search.documents.indexes import SearchIndexClient
     from azure.storage.blob import BlobServiceClient
-    from azure.mgmt.storage import StorageManagementClient
     from azure.storage.fileshare import ShareClient
 
     assert all(

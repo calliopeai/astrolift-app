@@ -47,8 +47,8 @@ from azure.managed.cosmos_api import AzureCosmosApiDriver
 from azure.managed.email_acs import AzureCommunicationEmailDriver
 from azure.managed.event_hubs import AzureEventHubsDriver
 from azure.managed.filesystem_files import AzureFilesDriver
-from azure.managed.managed_redis import AzureManagedRedisDriver
 from azure.managed.filesystem_files_classic import AzureFilesClassicDriver
+from azure.managed.managed_redis import AzureManagedRedisDriver
 from azure.managed.model_endpoint_aoai import AzureOpenAIDriver
 from azure.managed.mssql_sql import AzureSQLDatabaseDriver, AzureSQLManagedInstanceDriver
 from azure.managed.mysql_flexible import AzureMySQLFlexibleDriver
