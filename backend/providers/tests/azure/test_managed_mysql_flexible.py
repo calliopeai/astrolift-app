@@ -144,7 +144,7 @@ class FakeBackupsClient:
     backups: dict[str, list[str]] = field(default_factory=dict)
     fail_next: bool = False
 
-    def begin_put(
+    def put(
         self,
         *,
         resource_group_name: str,

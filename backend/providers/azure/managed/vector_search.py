@@ -22,21 +22,17 @@ Provision flow:
 Deprovision matrix:
 
   delete_data=False, force_destroy=False (default):
-    Delete the search service via the control-plane API. Azure
-    soft-delete window (14 days) honored so the operator can
-    recover by name if they made a mistake.
+    Refuse. Azure AI Search has no service-level snapshot or
+    soft-delete API, so deleting would irreversibly discard indexes.
 
   delete_data=True, force_destroy=False:
-    Delete the search service AND drop the admin-key secret from
-    Key Vault. Soft-delete window still honored on the service.
+    Delete the search service and drop the admin-key secret.
 
   delete_data=False, force_destroy=True:
-    Delete the service AND purge it immediately (no soft-delete
-    window). The admin-key secret remains (operator may want it
-    for forensic restore).
+    Refuse for the same reason; force never bypasses data retention.
 
   delete_data=True, force_destroy=True:
-    --atomic. Service purged, admin-key secret dropped.
+    Delete the service, bypass transient guards, and drop the key.
 """
 
 from __future__ import annotations
@@ -365,6 +361,22 @@ class AzureAISearchVectorDriver(ManagedServiceDriver):
                 message=f"search service {service_name} already gone",
             )
 
+        # Azure AI Search exposes no service-level snapshot or soft-delete
+        # primitive. Keep the resource itself when data preservation was
+        # requested instead of reporting a fictional recoverable deletion.
+        if not delete_data:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=(
+                    f"search service {service_name} has no service-level "
+                    "snapshot or soft-delete path; pass delete_data=True to "
+                    "destroy it and its vector index"
+                ),
+                errors=["delete_data_required"],
+                retryable=False,
+            )
+
         try:
             self._mgmt.services.delete(
                 resource_group_name=self._config.resource_group,
@@ -378,36 +390,12 @@ class AzureAISearchVectorDriver(ManagedServiceDriver):
                 errors=[str(exc)],
             )
 
-        purged = False
-        if force_destroy:
-            # Azure AI Search supports immediate purge via the
-            # delete-purge data plane; the SDK exposes it as
-            # ``begin_delete`` on the management client when the
-            # ``deletion_options`` parameter is passed. Best-effort:
-            # treat purge support as optional and surface via the
-            # result message.
-            try:
-                self._mgmt.services.begin_delete(
-                    resource_group_name=self._config.resource_group,
-                    search_service_name=service_name,
-                    deletion_options="purge",
-                ).result()
-                purged = True
-            except Exception:
-                purged = False
-
-        if delete_data:
-            self._delete_admin_key_secret(service_name)
+        self._delete_admin_key_secret(service_name)
 
         return DeprovisionResult(
             ok=True,
             handle=spec.handle,
-            message=(
-                f"search service {service_name} delete queued "
-                f"(purged={'yes' if purged else 'soft-delete'}, "
-                f"data={'dropped' if delete_data else 'retained'}, "
-                f"force_destroy={force_destroy})"
-            ),
+            message=(f"search service {service_name} delete queued (data=dropped, force_destroy={force_destroy})"),
         )
 
     # ---- read-only ops ------------------------------------------------
@@ -482,24 +470,11 @@ class AzureAISearchVectorDriver(ManagedServiceDriver):
 
     @driver_op(cloud="azure", driver="vector_search")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
-        """Azure AI Search has no first-party snapshot API. Operators
-        export index contents via the REST 'indexes/<name>/docs/search'
-        with a paginated query; the driver returns a SnapshotHandle
-        that encodes a synthetic snapshot id for the calling workflow
-        to drive the export against the workload's REST credentials."""
-        from datetime import UTC, datetime
+        from _sdk import UnsupportedOperationError
 
-        service_name = self._service_name_from_handle(handle.handle)
-        existing = self._describe(service_name)
-        if existing is None:
-            raise AzureAISearchVectorError(
-                f"snapshot requested for missing service {service_name}",
-            )
-        stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
-        return SnapshotHandle(
-            handle=handle.handle,
-            snapshot_id=f"{service_name}-snap-{stamp}",
-            created_at=datetime.now(UTC).isoformat(),
+        raise UnsupportedOperationError(
+            "Azure AI Search has no service-level snapshot API; export the "
+            "vector index and embeddings before destructive teardown",
         )
 
     @driver_op(cloud="azure", driver="vector_search")
@@ -508,17 +483,11 @@ class AzureAISearchVectorDriver(ManagedServiceDriver):
         snapshot: SnapshotHandle,
         target: ProvisionSpec,
     ) -> ProvisionResult:
-        target_provision = self.provision(target)
-        if not target_provision.ok:
-            return target_provision
-        return ProvisionResult(
-            ok=True,
-            handle=target_provision.handle,
-            message=(
-                f"target service provisioned; restore from snapshot "
-                f"{snapshot.snapshot_id} must be driven via the "
-                f"workload's REST credentials"
-            ),
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            "Azure AI Search vector restore requires an explicit index export "
+            "and rebuild; a synthetic service marker is not restorable",
         )
 
     @driver_op(cloud="azure", driver="vector_search", heartbeat=False)

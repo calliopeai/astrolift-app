@@ -5,16 +5,14 @@ Redis path. Mirrors the AWS ElastiCache + GCP Memorystore drivers'
 lifecycle envelopes so the control plane sees consistent semantics
 across clouds. Differences that matter:
 
-* Azure Cache for Redis has a soft-delete window: deleted caches
-  remain recoverable by name for 7 days unless purged. The driver
-  honours the soft-delete window by default
-  (``force_destroy=False``) and triggers an immediate purge when
-  ``force_destroy=True``.
-* There is no per-cache deletion-protection flag on Azure Cache
-  for Redis the way there is on Postgres / MySQL Flex. The
-  ``force_destroy`` axis here covers (a) the soft-delete purge
-  and (b) treatment of ``CacheNotInDesiredState`` / mid-modify
-  errors as bypassable rather than hard-fail.
+* Azure Cache for Redis has no service-level soft-delete or purge
+  operation. ``delete_data=False`` therefore requires an explicitly
+  configured Blob container and a successful Premium-tier RDB export
+  before the cache can be removed.
+* There is no per-cache deletion-protection flag on Azure Cache for
+  Redis the way there is on Postgres / MySQL Flex. ``force_destroy``
+  only controls treatment of mid-modify errors; it never bypasses the
+  data-retention requirement.
 * Auth keys are persisted to Azure Key Vault. Azure exposes them
   via ``redis.list_keys()``; the driver reads them on provision
   and stores both primary + secondary at well-known secret names.
@@ -121,6 +119,20 @@ class AzureCacheRedisConfig:
     than emitting credentials in the clear."""
 
     secret_name_prefix: str = "astrolift-redis"
+
+    backup_container_uri: str = ""
+    """HTTPS URI of a Blob container used for Premium-tier RDB exports.
+
+    The URI must not contain a SAS query string. The cache resource uses
+    its managed identity to access the container, keeping credentials out
+    of provider configuration and operation telemetry.
+    """
+
+    backup_storage_subscription_id: str = ""
+    """Subscription that owns ``backup_container_uri``.
+
+    Defaults to the cache subscription when omitted.
+    """
 
     mgmt_client: Any | None = None
     """Injected ``RedisManagementClient`` for tests."""
@@ -286,11 +298,11 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
             )
 
         try:
-            self._mgmt.redis.update(
+            self._mgmt.redis.begin_update(
                 resource_group_name=self._config.resource_group,
                 name=cache_name,
                 parameters=body,
-            )
+            ).result()
         except Exception as exc:
             return UpdateResult(
                 ok=False,
@@ -321,37 +333,32 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
 
         existing = self._describe(cache_name)
         if existing is None:
-            self._delete_access_key_secrets(cache_name)
+            if delete_data:
+                self._delete_access_key_secrets(cache_name)
             return DeprovisionResult(
                 ok=True,
                 handle=spec.handle,
                 message=f"cache {cache_name} already gone",
             )
 
-        export_taken = False
+        retained_snapshot = ""
         if not delete_data:
-            # Azure Cache for Redis Premium supports RDB export to
-            # blob storage; we trigger an export-as-final-snapshot
-            # when the operator wants to retain the data path. For
-            # Standard-tier caches the API returns a clear error;
-            # we surface it as a soft warning rather than blocking
-            # the delete (matches the Memorystore + ElastiCache
-            # drivers' best-effort posture).
             try:
-                self._mgmt.redis.begin_export_data(
-                    resource_group_name=self._config.resource_group,
-                    name=cache_name,
-                    parameters={
-                        "prefix": f"final-{cache_name}",
-                        "container": ("https://astrolift-final-redis.blob.core.windows.net/exports"),
-                        "format": "RDB",
-                    },
-                ).result()
-                export_taken = True
-            except Exception:
-                # Best-effort: don't block delete on export failure
-                # (Standard-tier doesn't support export at all).
-                export_taken = False
+                retained_snapshot = self.snapshot(
+                    ServiceHandle(handle=spec.handle),
+                ).snapshot_id
+            except AzureCacheRedisError as exc:
+                return DeprovisionResult(
+                    ok=False,
+                    handle=spec.handle,
+                    message=(
+                        f"cache {cache_name} cannot be removed safely: "
+                        f"{exc}; configure a managed-identity backup "
+                        "container or pass delete_data=True"
+                    ),
+                    errors=["delete_data_required", str(exc)],
+                    retryable=False,
+                )
 
         try:
             poller = self._mgmt.redis.begin_delete(
@@ -375,32 +382,14 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
                 errors=[err_str],
             )
 
-        # Soft-delete window: by default Azure keeps the cache name
-        # recoverable for 7 days. force_destroy=True purges the
-        # cache immediately so the name can be re-used.
-        purged = False
-        if force_destroy:
-            try:
-                self._mgmt.redis.begin_purge(
-                    resource_group_name=self._config.resource_group,
-                    name=cache_name,
-                ).result()
-                purged = True
-            except Exception:
-                # Purge support varies by region/SDK version; treat
-                # as best-effort and surface via the message.
-                purged = False
-
-        if delete_data:
-            self._delete_access_key_secrets(cache_name)
+        self._delete_access_key_secrets(cache_name)
 
         return DeprovisionResult(
             ok=True,
             handle=spec.handle,
             message=(
                 f"cache {cache_name} delete queued "
-                f"(export={'taken' if export_taken else 'skipped'}, "
-                f"purged={'yes' if purged else 'soft-delete'}, "
+                f"(data={'dropped' if delete_data else f'retained in {retained_snapshot}'}, "
                 f"force_destroy={force_destroy})"
             ),
         )
@@ -490,8 +479,25 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
     @driver_op(cloud="azure", driver="cache_redis")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         from datetime import UTC, datetime
+        from urllib.parse import urlsplit
 
         cache_name = self._cache_name_from_handle(handle.handle)
+        container_uri = self._config.backup_container_uri.rstrip("/")
+        parsed = urlsplit(container_uri)
+        if (
+            parsed.scheme != "https"
+            or not parsed.netloc
+            or not parsed.path.strip("/")
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise AzureCacheRedisError(
+                "redis_backup_container_uri must be a non-secret HTTPS Blob container URI without query or fragment",
+            )
+        if self._describe(cache_name) is None:
+            raise AzureCacheRedisError(
+                f"snapshot requested for missing cache {cache_name}",
+            )
         stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         snap_id = f"{cache_name}-snap-{stamp}"
         try:
@@ -500,8 +506,12 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
                 name=cache_name,
                 parameters={
                     "prefix": snap_id,
-                    "container": ("https://astrolift-snap-redis.blob.core.windows.net/snapshots"),
+                    "container": container_uri,
                     "format": "RDB",
+                    "preferred_data_archive_auth_method": "ManagedIdentity",
+                    "storage_subscription_id": (
+                        self._config.backup_storage_subscription_id or self._config.subscription_id
+                    ),
                 },
             ).result()
         except Exception as exc:
@@ -520,6 +530,29 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
         snapshot: SnapshotHandle,
         target: ProvisionSpec,
     ) -> ProvisionResult:
+        from urllib.parse import urlsplit
+
+        container_uri = self._config.backup_container_uri.rstrip("/")
+        parsed = urlsplit(container_uri)
+        if (
+            parsed.scheme != "https"
+            or not parsed.netloc
+            or not parsed.path.strip("/")
+            or parsed.query
+            or parsed.fragment
+        ):
+            return ProvisionResult(
+                ok=False,
+                handle="",
+                message=(
+                    "redis_backup_container_uri must be a non-secret HTTPS Blob container URI without query or fragment"
+                ),
+                errors=["backup_container_required"],
+            )
+
+        provisioned = self.provision(target)
+        if not provisioned.ok:
+            return provisioned
         target_cache = self._cache_name_for(spec=target)
         try:
             self._mgmt.redis.begin_import_data(
@@ -527,9 +560,13 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
                 name=target_cache,
                 parameters={
                     "files": [
-                        f"https://astrolift-snap-redis.blob.core.windows.net/snapshots/{snapshot.snapshot_id}.rdb",
+                        f"{container_uri}/{snapshot.snapshot_id}.rdb",
                     ],
                     "format": "RDB",
+                    "preferred_data_archive_auth_method": "ManagedIdentity",
+                    "storage_subscription_id": (
+                        self._config.backup_storage_subscription_id or self._config.subscription_id
+                    ),
                 },
             ).result()
         except Exception as exc:
@@ -563,6 +600,13 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
                 "subnet_id": {"type": "string"},
                 "static_ip": {"type": "string"},
                 "redis_configuration": {"type": "object"},
+                "backup_container_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": (
+                        "Non-secret HTTPS Blob container URI for Premium-tier RDB export/import via managed identity."
+                    ),
+                },
             },
         }
 

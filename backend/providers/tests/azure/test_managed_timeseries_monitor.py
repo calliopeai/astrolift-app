@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 
+from _sdk import UnsupportedOperationError
 from _sdk.managed_service import (
     DeprovisionSpec,
     ProvisionSpec,
@@ -103,13 +104,13 @@ class FakeMonitorWorkspacesOps:
             raise _NotFound(azure_monitor_workspace_name)
         return self.workspaces[azure_monitor_workspace_name]
 
-    def begin_create(
+    def create(
         self,
         *,
         resource_group_name: str,
         azure_monitor_workspace_name: str,
         azure_monitor_workspace_properties: dict[str, Any],
-    ) -> FakePoller:
+    ) -> FakeMonitorWorkspace:
         self.create_calls.append(
             {
                 "name": azure_monitor_workspace_name,
@@ -128,7 +129,7 @@ class FakeMonitorWorkspacesOps:
             ),
         )
         self.workspaces[azure_monitor_workspace_name] = ws
-        return FakePoller(value=ws)
+        return ws
 
     def update(
         self,
@@ -510,10 +511,10 @@ def test_provision_surfaces_create_failure(
     def boom(**_kwargs):  # type: ignore[no-untyped-def]
         raise RuntimeError("quota exceeded")
 
-    monitor_client.azure_monitor_workspaces_obj.begin_create = boom  # type: ignore[assignment]
+    monitor_client.azure_monitor_workspaces_obj.create = boom  # type: ignore[assignment]
     result = driver.provision(_spec())
     assert not result.ok
-    assert "begin_create" in result.message
+    assert "workspaces.create" in result.message
 
 
 # ---- update -----------------------------------------------------
@@ -569,7 +570,7 @@ def test_update_resize_changes_tags(
 # ---- deprovision four-corner matrix -----------------------------
 
 
-def test_deprovision_default_keeps_linked_la(
+def test_deprovision_default_refuses_without_metric_backup(
     driver: AzureMonitorPrometheusDriver,
     monitor_client: FakeMonitorClient,
     la_client: FakeLogAnalyticsClient,
@@ -578,9 +579,10 @@ def test_deprovision_default_keeps_linked_la(
     workspace_name = provisioned.handle.split("/", 1)[1]
     la_name = f"{workspace_name}-la"
     result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle))
-    assert result.ok
-    assert "linked_log_analytics=kept" in result.message
-    assert workspace_name not in monitor_client.azure_monitor_workspaces_obj.workspaces
+    assert not result.ok
+    assert result.retryable is False
+    assert "delete_data=True" in result.message
+    assert workspace_name in monitor_client.azure_monitor_workspaces_obj.workspaces
     assert la_name in la_client.workspaces_obj.workspaces
 
 
@@ -606,7 +608,10 @@ def test_deprovision_default_refuses_with_resource_lock(
 ) -> None:
     provisioned = driver.provision(_spec())
     locks_client.management_locks_obj.locks.append(FakeLock(name="finance-lock"))
-    result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle))
+    result = driver.deprovision(
+        DeprovisionSpec(handle=provisioned.handle),
+        delete_data=True,
+    )
     assert not result.ok
     assert "resource locks" in result.message
 
@@ -619,10 +624,11 @@ def test_deprovision_force_destroy_clears_locks(
     locks_client.management_locks_obj.locks.append(FakeLock(name="finance-lock"))
     result = driver.deprovision(
         DeprovisionSpec(handle=provisioned.handle),
+        delete_data=True,
         force_destroy=True,
     )
     assert result.ok
-    assert "linked_log_analytics=kept" in result.message
+    assert "linked_log_analytics=deleted" in result.message
     assert "finance-lock" in locks_client.management_locks_obj.deleted
 
 
@@ -664,7 +670,10 @@ def test_deprovision_tears_down_dcr_and_dce(
     workspace_name = provisioned.handle.split("/", 1)[1]
     dce_name = f"{workspace_name}-dce"
     dcr_name = f"{workspace_name}-dcr"
-    result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle))
+    result = driver.deprovision(
+        DeprovisionSpec(handle=provisioned.handle),
+        delete_data=True,
+    )
     assert result.ok
     assert dce_name not in monitor_client.data_collection_endpoints_obj.dces
     assert dcr_name not in monitor_client.data_collection_rules_obj.dcrs
@@ -746,50 +755,23 @@ def test_binding_for_missing_raises(
 # ---- snapshot + restore -----------------------------------------
 
 
-def test_snapshot_returns_pit_handle(
+def test_snapshot_is_explicitly_unsupported(
     driver: AzureMonitorPrometheusDriver,
 ) -> None:
-    provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
-    assert "-pit-" in snap.snapshot_id
+    with pytest.raises(UnsupportedOperationError, match="no snapshot/restore API"):
+        driver.snapshot(ServiceHandle(handle="time_series/anything"))
 
 
-def test_snapshot_for_missing_raises(
+def test_restore_is_explicitly_unsupported(
     driver: AzureMonitorPrometheusDriver,
 ) -> None:
-    with pytest.raises(AzureMonitorPrometheusError):
-        driver.snapshot(ServiceHandle(handle="time_series/never"))
-
-
-def test_restore_provisions_target(
-    driver: AzureMonitorPrometheusDriver,
-    monitor_client: FakeMonitorClient,
-) -> None:
-    provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
-    restore_spec = _spec(service_handle_hint="metrics-restored")
-    result = driver.restore(snap, restore_spec)
-    assert result.ok
-    target_name = result.handle.split("/", 1)[1]
-    assert target_name in monitor_client.azure_monitor_workspaces_obj.workspaces
-
-
-def test_restore_surfaces_provision_failure(
-    driver: AzureMonitorPrometheusDriver,
-    monitor_client: FakeMonitorClient,
-) -> None:
-    def boom(**_kwargs):  # type: ignore[no-untyped-def]
-        raise RuntimeError("quota exceeded")
-
-    monitor_client.azure_monitor_workspaces_obj.begin_create = boom  # type: ignore[assignment]
     snap = SnapshotHandle(
         handle="time_series/some-source",
         snapshot_id="snap-1",
         created_at="2026-05-15T00:00:00+00:00",
     )
-    result = driver.restore(snap, _spec(service_handle_hint="failed"))
-    assert not result.ok
-    assert "begin_create" in result.message
+    with pytest.raises(UnsupportedOperationError, match="cannot restore"):
+        driver.restore(snap, _spec(service_handle_hint="failed"))
 
 
 # ---- naming + helpers -------------------------------------------

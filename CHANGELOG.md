@@ -19,6 +19,14 @@
   snapshots and rollback, service identities, CMEK, environment variables,
   call logging, execution history, invocation bindings, execution controls,
   boundary-safe adoption, and destructive-history-aware teardown.
+- Add Azure SQL Database provisioned, serverless, and Hyperscale variants plus
+  Azure SQL Managed Instance with typed ARM requests, VNet/subnet isolation,
+  Key Vault-backed portable bindings, retention controls, database-copy
+  snapshot/restore, and fail-closed teardown semantics.
+- Add Microsoft.FileShares provisioned-v2 NFS lifecycle with SSD capacity,
+  Local or Zone redundancy, provisioned performance, root-squash and encrypted
+  mount controls, subnet allowlists, portable AZNFS bindings, child snapshots,
+  ownership-safe reconciliation, and protected data-loss-aware teardown.
 - Add Google Cloud Run functions (Cloud Functions v2) lifecycle with Cloud
   Build source declarations, HTTP and Eventarc triggers, Secret Manager
   environment/volumes, scaling, private networking, Binary Authorization,
@@ -204,6 +212,10 @@
 - Mark the archived community MinIO Operator as deprecated in the Kubernetes
   resource catalogue and expose commercial AIStor and existing
   S3-compatible endpoint adoption as explicit planned variants.
+- Enable every registered Azure managed-service driver in the production image
+  and lifecycle resolver, install its current management/data SDKs, preserve
+  provider controls at runtime, and fail closed when snapshot or retained-data
+  semantics cannot be fulfilled.
 - Build every Azure non-cluster capability with its driver-specific config,
   make managed-service Key Vault references unambiguous and same-vault, keep
   legacy managed bindings readable, and fail workload rendering closed when a

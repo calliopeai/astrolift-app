@@ -237,21 +237,19 @@ class BlobStorageDriver(ManagedServiceDriver):
 
     @driver_op(cloud="azure", driver="object_store_blob")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
-        from datetime import UTC, datetime
+        from _sdk import UnsupportedOperationError
 
-        return SnapshotHandle(
-            handle=handle.handle,
-            snapshot_id=f"v-{datetime.now(tz=UTC).strftime('%Y%m%d-%H%M%S')}",
-            created_at=datetime.now(tz=UTC).isoformat(),
+        raise UnsupportedOperationError(
+            "Azure Blob exposes per-blob versions, not an atomic container "
+            "snapshot; retain the container for data-preserving teardown",
         )
 
     @driver_op(cloud="azure", driver="object_store_blob")
     def restore(self, snapshot, target):
-        return ProvisionResult(
-            ok=False,
-            handle="",
-            message="Blob restore via cross-account copy not implemented",
-            errors=["not_implemented"],
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            "Azure Blob container restore requires an explicit version-aware copy workflow",
         )
 
     @driver_op(cloud="azure", driver="object_store_blob", heartbeat=False)
@@ -552,16 +550,11 @@ class AzureBlobStorageDriver(ManagedServiceDriver):
 
     @driver_op(cloud="azure", driver="object_store_blob_v2")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
-        # Azure Blob versioning is account-level, not container-level;
-        # the snapshot here is a marker the workflow layer can use to
-        # record a point-in-time, matching the GCS driver's posture.
-        from datetime import UTC, datetime
+        from _sdk import UnsupportedOperationError
 
-        stamp = datetime.now(tz=UTC).strftime("%Y%m%d-%H%M%S")
-        return SnapshotHandle(
-            handle=handle.handle,
-            snapshot_id=f"v-{stamp}",
-            created_at=datetime.now(tz=UTC).isoformat(),
+        raise UnsupportedOperationError(
+            "Azure Blob exposes per-blob versions, not an atomic container "
+            "snapshot; retain the container for data-preserving teardown",
         )
 
     @driver_op(cloud="azure", driver="object_store_blob_v2")
@@ -570,14 +563,10 @@ class AzureBlobStorageDriver(ManagedServiceDriver):
         snapshot: SnapshotHandle,
         target: ProvisionSpec,
     ) -> ProvisionResult:
-        return ProvisionResult(
-            ok=False,
-            handle="",
-            message=(
-                "Blob restore via cross-container copy not implemented "
-                "in this driver -- use the platform's blob-copy tool"
-            ),
-            errors=["not_implemented"],
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            "Azure Blob container restore requires an explicit version-aware copy workflow",
         )
 
     @driver_op(cloud="azure", driver="object_store_blob_v2", heartbeat=False)

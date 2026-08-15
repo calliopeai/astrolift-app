@@ -333,20 +333,18 @@ def test_update_noop_when_nothing_to_change(
 # ---- deprovision four-corner matrix -----------------------------
 
 
-def test_deprovision_default_drains_and_deletes(
+def test_deprovision_default_refuses_to_drop_messages(
     driver: AzureServiceBusDriver,
     fake_client: FakeSBClient,
 ) -> None:
     res = driver.provision(_spec())
     topic_name = res.handle.split("/", 1)[1]
     result = driver.deprovision(DeprovisionSpec(handle=res.handle))
-    assert result.ok
-    assert "drained=yes" in result.message
-    # Subscription was set to ReceiveDisabled before the delete.
-    drain_calls = [c for c in fake_client.subs_obj.create_calls if c["parameters"].get("status") == "ReceiveDisabled"]
-    assert drain_calls
-    assert topic_name in fake_client.topics_obj.delete_calls
-    assert topic_name not in fake_client.topics_obj.topics
+    assert not result.ok
+    assert result.retryable is False
+    assert "delete_data=True" in result.message
+    assert topic_name not in fake_client.topics_obj.delete_calls
+    assert topic_name in fake_client.topics_obj.topics
 
 
 def test_deprovision_delete_data_only_skips_drain(
@@ -362,7 +360,7 @@ def test_deprovision_delete_data_only_skips_drain(
         delete_data=True,
     )
     assert result.ok
-    assert "drained=no" in result.message
+    assert "messages purged" in result.message
     drain_calls_after = len(
         [c for c in fake_client.subs_obj.create_calls if c["parameters"].get("status") == "ReceiveDisabled"],
     )
@@ -376,7 +374,10 @@ def test_deprovision_default_respects_topic_lock(
     res = driver.provision(_spec())
     topic_name = res.handle.split("/", 1)[1]
     fake_client.topics_obj.topics[topic_name].status = "Disabled"
-    result = driver.deprovision(DeprovisionSpec(handle=res.handle))
+    result = driver.deprovision(
+        DeprovisionSpec(handle=res.handle),
+        delete_data=True,
+    )
     assert not result.ok
     assert "locked" in result.message
     assert "topic_locked" in result.errors
@@ -413,7 +414,7 @@ def test_deprovision_atomic_both_flags(
         force_destroy=True,
     )
     assert result.ok
-    assert "drained=no" in result.message
+    assert "messages purged" in result.message
     assert "force_destroy=True" in result.message
     assert topic_name not in fake_client.topics_obj.topics
 

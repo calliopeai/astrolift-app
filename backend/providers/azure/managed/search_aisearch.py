@@ -10,19 +10,18 @@ binding-env shape, different operator default.
 Deprovision honours the SDK's four-corner matrix:
 
   delete_data=False, force_destroy=False (default):
-    soft-delete window respected (Azure keeps the service name
-    recoverable for ~14 days). Admin keys retained in Key Vault.
+    Refuse. Azure AI Search has no service-level snapshot or
+    soft-delete API, so deleting would irreversibly discard indexes.
 
   delete_data=True, force_destroy=False:
-    soft-delete window respected; admin keys purged from Key Vault.
+    Delete the service and purge admin keys from Key Vault.
 
   delete_data=False, force_destroy=True:
-    soft-delete window respected; admin keys retained.
-    [force_destroy is reserved for mid-modify bypass on this
-    service; the soft-delete-purge axis hooks into the same flag.]
+    Refuse for the same reason; force never bypasses data retention.
 
   delete_data=True, force_destroy=True:
-    soft-delete window purged immediately; admin keys purged.
+    Delete the service, bypass a transient mid-modify guard, and purge
+    admin keys. There is no separate purge operation.
 """
 
 from __future__ import annotations
@@ -305,19 +304,34 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
 
         existing = self._describe(service_name)
         if existing is None:
-            self._delete_admin_key_secrets(service_name)
+            if delete_data:
+                self._delete_admin_key_secrets(service_name)
             return DeprovisionResult(
                 ok=True,
                 handle=spec.handle,
                 message=f"search service {service_name} already gone",
             )
 
+        # Azure AI Search has no service-level snapshot or soft-delete API.
+        # Retaining the service is the only honest non-destructive path.
+        if not delete_data:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=(
+                    f"search service {service_name} has no service-level "
+                    "snapshot or soft-delete path; pass delete_data=True to "
+                    "destroy it and its indexes"
+                ),
+                errors=["delete_data_required"],
+                retryable=False,
+            )
+
         try:
-            poller = self._mgmt.services.begin_delete(
+            self._mgmt.services.delete(
                 resource_group_name=self._config.resource_group,
                 search_service_name=service_name,
             )
-            poller.result()
         except Exception as exc:
             err_str = str(exc)
             if not force_destroy and ("ServiceNotInDesiredState" in err_str or "FAILED_PRECONDITION" in err_str):
@@ -330,37 +344,16 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
             return DeprovisionResult(
                 ok=False,
                 handle=spec.handle,
-                message=f"begin_delete: {err_str}",
+                message=f"delete: {err_str}",
                 errors=[err_str],
             )
 
-        # Soft-delete window: Azure AI Search keeps the service name
-        # recoverable for ~14 days by default. force_destroy=True
-        # purges immediately so the name can be re-used.
-        purged = False
-        if force_destroy:
-            try:
-                self._mgmt.services.begin_purge(
-                    resource_group_name=self._config.resource_group,
-                    search_service_name=service_name,
-                ).result()
-                purged = True
-            except Exception:
-                # begin_purge isn't available in every region / SDK
-                # version. Treat as best-effort; surface via message.
-                purged = False
-
-        if delete_data:
-            self._delete_admin_key_secrets(service_name)
+        self._delete_admin_key_secrets(service_name)
 
         return DeprovisionResult(
             ok=True,
             handle=spec.handle,
-            message=(
-                f"search service {service_name} delete queued "
-                f"(purged={'yes' if purged else 'soft-delete'}, "
-                f"force_destroy={force_destroy})"
-            ),
+            message=(f"search service {service_name} and indexes deleted (force_destroy={force_destroy})"),
         )
 
     # ---- read-only ops ------------------------------------------------
@@ -451,25 +444,11 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
 
     @driver_op(cloud="azure", driver="search_aisearch")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
-        # Azure AI Search has no built-in snapshot primitive at the
-        # service level; index snapshots are managed in-app via
-        # index backups (custom flow per indexer / data source).
-        # Mirror the AWS OpenSearch driver's behaviour: return a
-        # deterministic id so the workflow layer's snapshot path
-        # gets a handle to track.
-        from datetime import UTC, datetime
+        from _sdk import UnsupportedOperationError
 
-        service_name = self._service_name_from_handle(handle.handle)
-        existing = self._describe(service_name)
-        if existing is None:
-            raise AzureAISearchError(
-                f"snapshot requested for missing service {service_name}",
-            )
-        stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
-        return SnapshotHandle(
-            handle=handle.handle,
-            snapshot_id=f"{service_name}-snap-{stamp}",
-            created_at=datetime.now(UTC).isoformat(),
+        raise UnsupportedOperationError(
+            "Azure AI Search has no service-level snapshot API; export each "
+            "index to durable storage before requesting destructive teardown",
         )
 
     @driver_op(cloud="azure", driver="search_aisearch")
@@ -478,13 +457,11 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
         snapshot: SnapshotHandle,
         target: ProvisionSpec,
     ) -> ProvisionResult:
-        provisioned = self.provision(target)
-        if not provisioned.ok:
-            return provisioned
-        return ProvisionResult(
-            ok=True,
-            handle=provisioned.handle,
-            message=(f"target service provisioned; restore snapshot {snapshot.snapshot_id} via index-rebuild workflow"),
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            "Azure AI Search restore requires an explicit index export and "
+            "index-rebuild workflow; a service handle is not a backup",
         )
 
     @driver_op(cloud="azure", driver="search_aisearch", heartbeat=False)

@@ -77,7 +77,7 @@ class FakeServersClient:
             raise _NotFound(server_name)
         return self.servers[server_name]
 
-    def begin_create(
+    def begin_create_or_update(
         self,
         *,
         resource_group_name: str,
@@ -145,7 +145,7 @@ class FakeBackupsClient:
     backups: dict[str, list[str]] = field(default_factory=dict)
     fail_next: bool = False
 
-    def begin_put(
+    def begin_create(
         self,
         *,
         resource_group_name: str,
@@ -169,7 +169,7 @@ class FakeMgmtClient:
         return self.servers_obj
 
     @property
-    def backups(self) -> FakeBackupsClient:
+    def backups_automatic_and_on_demand(self) -> FakeBackupsClient:
         return self.backups_obj
 
 
@@ -367,6 +367,19 @@ def test_provision_without_keyvault_returns_error() -> None:
     result = d.provision(_spec())
     assert not result.ok
     assert "Key Vault" in result.message
+
+
+def test_provision_refuses_to_silently_drop_extensions(
+    driver: AzurePostgresFlexibleDriver,
+    mgmt: FakeMgmtClient,
+) -> None:
+    result = driver.provision(
+        _spec(desired_extensions=["vector", "pg_trgm", "vector"]),
+    )
+    assert not result.ok
+    assert result.errors == ["unsupported_extensions", "pg_trgm", "vector"]
+    assert "refusing to silently ignore" in result.message
+    assert not mgmt.servers_obj.create_calls
 
 
 # ---- update -----------------------------------------------------
@@ -718,7 +731,7 @@ def test_restore_surfaces_error_on_failed_create(
     def boom(**_kwargs):
         raise RuntimeError("subscription quota exceeded")
 
-    mgmt.servers_obj.begin_create = boom  # type: ignore[assignment]
+    mgmt.servers_obj.begin_create_or_update = boom  # type: ignore[assignment]
 
     snap = SnapshotHandle(
         handle="postgres/some-source",

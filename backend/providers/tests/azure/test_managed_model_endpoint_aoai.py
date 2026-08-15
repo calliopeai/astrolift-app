@@ -17,6 +17,7 @@ from typing import Any
 
 import pytest
 
+from _sdk import UnsupportedOperationError
 from _sdk.managed_service import (
     DeprovisionSpec,
     ProvisionSpec,
@@ -691,34 +692,21 @@ def test_binding_for_missing_raises(
 # ---- snapshot + restore -----------------------------------------
 
 
-def test_snapshot_returns_deterministic_id(
+def test_snapshot_is_explicitly_unsupported(
     driver: AzureOpenAIDriver,
 ) -> None:
-    provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
-    deployment_name = provisioned.handle.split("/", 1)[1]
-    assert snap.snapshot_id.startswith(deployment_name)
+    with pytest.raises(UnsupportedOperationError, match="stateless configuration"):
+        driver.snapshot(ServiceHandle(handle=f"{KIND}/anything"))
 
 
-def test_snapshot_for_missing_raises(
+def test_restore_is_explicitly_unsupported(
     driver: AzureOpenAIDriver,
 ) -> None:
-    with pytest.raises(AzureOpenAIError):
-        driver.snapshot(ServiceHandle(handle=f"{KIND}/missing"))
+    from _sdk.managed_service import SnapshotHandle
 
-
-def test_restore_provisions_target_deployment(
-    driver: AzureOpenAIDriver,
-    mgmt: FakeMgmtClient,
-) -> None:
-    provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
-
-    restore_spec = _spec(service_handle_hint="restored")
-    result = driver.restore(snap, restore_spec)
-    assert result.ok
-    target_name = result.handle.split("/", 1)[1]
-    assert target_name in mgmt.deployments_obj.deployments
+    snapshot = SnapshotHandle(f"{KIND}/source", "not-a-backup", "2026-08-14T00:00:00Z")
+    with pytest.raises(UnsupportedOperationError, match="declarative spec"):
+        driver.restore(snapshot, _spec(service_handle_hint="restored"))
 
 
 # ---- naming + helpers -------------------------------------------

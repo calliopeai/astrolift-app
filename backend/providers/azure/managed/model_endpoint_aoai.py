@@ -502,23 +502,11 @@ class AzureOpenAIDriver(ManagedServiceDriver):
 
     @driver_op(cloud="azure", driver="model_endpoint_aoai")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
-        # Azure OpenAI deployments have no service-side snapshot;
-        # the deployment config is itself the "snapshot" (cheap to
-        # re-create). Return a deterministic id so the workflow
-        # layer's snapshot path gets a handle to track.
-        from datetime import UTC, datetime
+        from _sdk import UnsupportedOperationError
 
-        deployment_name = self._deployment_name_from_handle(handle.handle)
-        existing = self._describe(deployment_name)
-        if existing is None:
-            raise AzureOpenAIError(
-                f"snapshot for missing deployment {deployment_name}",
-            )
-        stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
-        return SnapshotHandle(
-            handle=handle.handle,
-            snapshot_id=f"{deployment_name}-snap-{stamp}",
-            created_at=datetime.now(UTC).isoformat(),
+        raise UnsupportedOperationError(
+            "Azure OpenAI deployments are stateless configuration and have no "
+            "snapshot API; persist the declarative deployment spec instead",
         )
 
     @driver_op(cloud="azure", driver="model_endpoint_aoai")
@@ -527,17 +515,10 @@ class AzureOpenAIDriver(ManagedServiceDriver):
         snapshot: SnapshotHandle,
         target: ProvisionSpec,
     ) -> ProvisionResult:
-        provisioned = self.provision(target)
-        if not provisioned.ok:
-            return provisioned
-        return ProvisionResult(
-            ok=True,
-            handle=provisioned.handle,
-            message=(
-                f"target deployment provisioned; snapshot "
-                f"{snapshot.snapshot_id} encodes the prior config "
-                f"shape -- re-create is the restore"
-            ),
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            "Azure OpenAI deployments are restored by reconciling their declarative spec, not from a snapshot handle",
         )
 
     @driver_op(cloud="azure", driver="model_endpoint_aoai", heartbeat=False)

@@ -13,15 +13,11 @@ Two driver classes ship from this module:
 Four-corner deprovision matrix on ``AzureServiceBusDriver``:
 
   delete_data=False, force_destroy=False (default):
-    Drain in-flight messages by setting subscription status to
-    ``ReceiveDisabled`` and waiting for active deliveries to ack;
-    then delete subscription + topic. Honours any namespace-level
-    or topic-level lock state -- refuses if locked.
+    Refuse. Service Bus has no snapshot primitive and immediately
+    deleting a disabled subscription would still discard messages.
 
   delete_data=False, force_destroy=True:
-    Drain as above but bypass topic/namespace lock state. Useful
-    when the operator has the lock but the caller workflow is
-    consciously orphaning the resource.
+    Refuse for the same reason; force never bypasses data retention.
 
   delete_data=True, force_destroy=False:
     Skip drain (in-flight messages are lost), delete subscription
@@ -147,8 +143,38 @@ class ServiceBusDriver(ManagedServiceDriver):
         delete_data: bool = False,
         force_destroy: bool = False,
     ) -> DeprovisionResult:
-        del delete_data, force_destroy
+        del force_destroy
         _, _, queue_name = spec.handle.partition("/")
+        if not delete_data:
+            try:
+                self._client.queues.get(
+                    resource_group_name=self._config.resource_group,
+                    namespace_name=self._config.namespace_name,
+                    queue_name=queue_name,
+                )
+            except Exception as exc:
+                if type(exc).__name__ == "ResourceNotFoundError":
+                    return DeprovisionResult(
+                        ok=True,
+                        handle=spec.handle,
+                        message="already gone",
+                    )
+                return DeprovisionResult(
+                    ok=False,
+                    handle=spec.handle,
+                    message=str(exc),
+                    errors=[str(exc)],
+                )
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=(
+                    f"queue {queue_name} cannot be deleted while retaining "
+                    "messages; drain it externally or pass delete_data=True"
+                ),
+                errors=["delete_data_required"],
+                retryable=False,
+            )
         try:
             self._client.queues.delete(
                 resource_group_name=self._config.resource_group,
@@ -489,6 +515,19 @@ class AzureServiceBusDriver(ManagedServiceDriver):
                 message=f"topic {topic_name} already gone",
             )
 
+        if not delete_data:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=(
+                    f"topic {topic_name} cannot be deleted while retaining "
+                    "messages; drain every subscription externally or pass "
+                    "delete_data=True"
+                ),
+                errors=["delete_data_required"],
+                retryable=False,
+            )
+
         # Lock check: namespace + topic-level locks. If the topic has
         # an active lock-state and force_destroy=False, refuse.
         if _is_locked(topic_state) and not force_destroy:
@@ -502,25 +541,6 @@ class AzureServiceBusDriver(ManagedServiceDriver):
                 ),
                 errors=["topic_locked"],
             )
-
-        # Drain phase: when delete_data=False, set the subscription to
-        # ReceiveDisabled so consumers ack everything that's already
-        # been dispatched without grabbing new work, then delete.
-        # Best-effort; failure here surfaces in the message but does
-        # not abort the delete.
-        drained = False
-        if not delete_data:
-            try:
-                self._client.subscriptions.create_or_update(
-                    resource_group_name=self._config.resource_group,
-                    namespace_name=self._config.namespace_name,
-                    topic_name=topic_name,
-                    subscription_name=sub_name,
-                    parameters={"status": "ReceiveDisabled"},
-                )
-                drained = True
-            except Exception:
-                drained = False
 
         # Subscription delete first; topic delete refuses while
         # subscriptions are attached (similar to the SNS/Pub-Sub
@@ -564,9 +584,7 @@ class AzureServiceBusDriver(ManagedServiceDriver):
             ok=True,
             handle=spec.handle,
             message=(
-                f"topic {topic_name} + subscription {sub_name} deleted "
-                f"(drained={'yes' if drained else 'no'}, "
-                f"force_destroy={force_destroy})"
+                f"topic {topic_name} + subscription {sub_name} deleted (messages purged, force_destroy={force_destroy})"
             ),
         )
 

@@ -13,6 +13,7 @@ from typing import Any
 
 import pytest
 
+from _sdk import UnsupportedOperationError
 from _sdk.managed_service import (
     DeprovisionSpec,
     ProvisionSpec,
@@ -457,7 +458,7 @@ def test_update_noop_when_nothing_to_change(
 # ---- deprovision four-corner matrix -----------------------------
 
 
-def test_deprovision_default_honors_soft_delete_keeps_secret(
+def test_deprovision_default_refuses_without_snapshot_and_keeps_secret(
     driver: AzureAISearchVectorDriver,
     mgmt: FakeMgmtClient,
     secrets_client: FakeSecretClient,
@@ -466,12 +467,10 @@ def test_deprovision_default_honors_soft_delete_keeps_secret(
     service_name = provisioned.handle.split("/", 1)[1]
     admin_secret = f"astrolift-aisearch-{service_name}-admin"
     result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle))
-    assert result.ok
-    assert "purged=soft-delete" in result.message
-    assert "data=retained" in result.message
-    assert service_name in mgmt.services_obj.delete_calls
-    assert service_name not in mgmt.services_obj.purge_calls
-    # Secret retained on data-retained path
+    assert not result.ok
+    assert result.retryable is False
+    assert "delete_data=True" in result.message
+    assert service_name not in mgmt.services_obj.delete_calls
     assert admin_secret in secrets_client.secrets
 
 
@@ -493,7 +492,7 @@ def test_deprovision_delete_data_only_drops_admin_secret(
     assert admin_secret not in secrets_client.secrets
 
 
-def test_deprovision_force_destroy_only_purges_keeps_secret(
+def test_deprovision_force_destroy_does_not_override_data_guard(
     driver: AzureAISearchVectorDriver,
     mgmt: FakeMgmtClient,
     secrets_client: FakeSecretClient,
@@ -506,10 +505,9 @@ def test_deprovision_force_destroy_only_purges_keeps_secret(
         delete_data=False,
         force_destroy=True,
     )
-    assert result.ok
-    assert "purged=yes" in result.message
-    assert "data=retained" in result.message
-    assert service_name in mgmt.services_obj.purge_calls
+    assert not result.ok
+    assert result.retryable is False
+    assert service_name not in mgmt.services_obj.delete_calls
     assert admin_secret in secrets_client.secrets
 
 
@@ -527,9 +525,8 @@ def test_deprovision_atomic_both_flags(
         force_destroy=True,
     )
     assert result.ok
-    assert "purged=yes" in result.message
     assert "data=dropped" in result.message
-    assert service_name in mgmt.services_obj.purge_calls
+    assert service_name in mgmt.services_obj.delete_calls
     assert admin_secret not in secrets_client.secrets
 
 
@@ -543,21 +540,19 @@ def test_deprovision_idempotent_when_already_gone(
     assert "already gone" in result.message
 
 
-def test_deprovision_handles_purge_unsupported_gracefully(
+def test_deprovision_does_not_depend_on_fictional_purge_api(
     driver: AzureAISearchVectorDriver,
     mgmt: FakeMgmtClient,
 ) -> None:
-    """Some regions/SDK versions reject the purge call; the driver
-    surfaces it as soft-delete in the message rather than failing
-    the whole deprovision."""
     mgmt.services_obj.purge_supported = False
     provisioned = driver.provision(_spec())
     result = driver.deprovision(
         DeprovisionSpec(handle=provisioned.handle),
+        delete_data=True,
         force_destroy=True,
     )
     assert result.ok
-    assert "purged=soft-delete" in result.message
+    assert "data=dropped" in result.message
 
 
 # ---- status -----------------------------------------------------
@@ -642,52 +637,23 @@ def test_binding_for_missing_raises(
 # ---- snapshot + restore -----------------------------------------
 
 
-def test_snapshot_creates_handle(
+def test_snapshot_is_explicitly_unsupported(
     driver: AzureAISearchVectorDriver,
 ) -> None:
-    provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
-    service_name = provisioned.handle.split("/", 1)[1]
-    assert snap.snapshot_id.startswith(service_name)
+    with pytest.raises(UnsupportedOperationError, match="no service-level snapshot"):
+        driver.snapshot(ServiceHandle(handle="vector_index/anything"))
 
 
-def test_snapshot_for_missing_raises(
+def test_restore_is_explicitly_unsupported(
     driver: AzureAISearchVectorDriver,
 ) -> None:
-    with pytest.raises(AzureAISearchVectorError):
-        driver.snapshot(ServiceHandle(handle="vector_index/never"))
-
-
-def test_restore_provisions_target_service(
-    driver: AzureAISearchVectorDriver,
-    mgmt: FakeMgmtClient,
-) -> None:
-    provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
-
-    restore_spec = _spec(service_handle_hint="rt")
-    result = driver.restore(snap, restore_spec)
-    assert result.ok
-    target_name = result.handle.split("/", 1)[1]
-    assert target_name in mgmt.services_obj.services
-
-
-def test_restore_surfaces_provision_failure(
-    driver: AzureAISearchVectorDriver,
-    mgmt: FakeMgmtClient,
-) -> None:
-    def boom(**_kwargs):
-        raise RuntimeError("quota exceeded")
-
-    mgmt.services_obj.begin_create_or_update = boom  # type: ignore[assignment]
     snap = SnapshotHandle(
         handle="vector_index/some-source",
         snapshot_id="snap-1",
         created_at="2026-05-15T00:00:00+00:00",
     )
-    result = driver.restore(snap, _spec(service_handle_hint="failed"))
-    assert not result.ok
-    assert "begin_create_or_update" in result.message
+    with pytest.raises(UnsupportedOperationError, match="explicit index export"):
+        driver.restore(snap, _spec(service_handle_hint="failed"))
 
 
 # ---- naming + helpers -------------------------------------------

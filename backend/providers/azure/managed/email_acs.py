@@ -278,12 +278,12 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
             )
 
         try:
-            self._mgmt.domains.update(
+            self._mgmt.domains.begin_update(
                 resource_group_name=self._config.resource_group,
                 email_service_name=self._config.email_service_name,
                 domain_name=domain_name,
                 parameters=body,
-            )
+            ).result()
         except Exception as exc:
             return UpdateResult(
                 ok=False,
@@ -455,19 +455,11 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
 
     @driver_op(cloud="azure", driver="email_acs")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
-        from datetime import UTC, datetime
+        from _sdk import UnsupportedOperationError
 
-        domain_name = self._domain_name_from_handle(handle.handle)
-        existing = self._describe(domain_name)
-        if existing is None:
-            raise AzureCommunicationEmailError(
-                f"snapshot requested for missing domain {domain_name}",
-            )
-        stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
-        return SnapshotHandle(
-            handle=handle.handle,
-            snapshot_id=f"{_safe(domain_name)}-snap-{stamp}",
-            created_at=datetime.now(UTC).isoformat(),
+        raise UnsupportedOperationError(
+            "Azure Communication Services email domains have no snapshot API; "
+            "retain the domain or re-provision and publish DNS records",
         )
 
     @driver_op(cloud="azure", driver="email_acs")
@@ -476,18 +468,11 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
         snapshot: SnapshotHandle,
         target: ProvisionSpec,
     ) -> ProvisionResult:
-        provisioned = self.provision(target)
-        if not provisioned.ok:
-            return provisioned
-        return ProvisionResult(
-            ok=True,
-            handle=provisioned.handle,
-            message=(
-                f"target domain provisioned; snapshot "
-                f"{snapshot.snapshot_id} captures sender attributes "
-                f"only -- DNS records must be re-published for "
-                f"CustomerManaged domains"
-            ),
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            "Azure Communication Services email domains cannot be restored "
+            "from a snapshot; re-provision and publish DNS records",
         )
 
     @driver_op(cloud="azure", driver="email_acs", heartbeat=False)
