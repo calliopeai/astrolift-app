@@ -488,8 +488,8 @@ def test_provision_tags_with_astrolift_namespace(
     result = driver.provision(_spec())
     workspace_name = result.handle.split("/", 1)[1]
     tags = monitor_client.azure_monitor_workspaces_obj.workspaces[workspace_name].tags
-    assert tags["astrolift.io/managed-by"] == "platform"
-    assert tags["astrolift.io/app"] == "api"
+    assert tags["astrolift-managed-by"] == "platform"
+    assert tags["astrolift-app"] == "api"
 
 
 def test_provision_honours_public_network_access_override(
@@ -563,7 +563,7 @@ def test_update_resize_changes_tags(
     assert result.ok
     workspace_name = provisioned.handle.split("/", 1)[1]
     tags = monitor_client.azure_monitor_workspaces_obj.workspaces[workspace_name].tags
-    assert tags["astrolift.io/ingestion-cap-millions"] == "10000"
+    assert tags["astrolift-ingestion-cap-millions"] == "10000"
 
 
 # ---- deprovision four-corner matrix -----------------------------
