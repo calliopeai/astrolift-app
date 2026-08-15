@@ -90,7 +90,8 @@
   stages with environment, prompt, skill, output-key defaults, configured binding
   overrides, immutable task packets, named structured outputs, and a worked example.
 - Add canonical modular agent packages, repository slice/federation discovery,
-  AGENTS.md/Langflow/Flowise imports, and authenticated MCP agent operations.
+  AGENTS.md/Langflow/Flowise imports, and authenticated MCP agent and shared
+  project-resource operations.
 - Add agent secret-reference CRUD, explicit reveal, reusable secret bundles,
   attachment precedence, provider capability reporting, and management UI.
 - Add operator kill controls, task deadlines, callback authentication, and
