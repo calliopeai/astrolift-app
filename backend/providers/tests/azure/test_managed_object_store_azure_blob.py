@@ -184,11 +184,21 @@ def test_provision_idempotent_on_exists(
 # ---- update -----------------------------------------------------
 
 
-def test_update_returns_no_op(driver: AzureBlobStorageDriver) -> None:
+def test_update_refuses_instead_of_reporting_a_no_op_success(
+    driver: AzureBlobStorageDriver,
+) -> None:
+    """``access_tier`` / ``public_access`` are set at provision time only.
+
+    Returning ``ok=True`` here made the update workflow record the requested
+    tier as applied while the container kept the old one (#1376).
+    """
     res = driver.provision(_spec())
-    update = driver.update(UpdateSpec(handle=res.handle))
-    assert update.ok
-    assert "operator-managed" in update.message
+    update = driver.update(UpdateSpec(handle=res.handle, config={"access_tier": "Cool"}))
+    assert update.ok is False
+    assert update.retryable is False
+    assert update.errors == ["update_not_supported_in_place"]
+    assert "reprovisionManagedService" in update.message
+    assert driver.editable_fields() == []
 
 
 # ---- deprovision four-corner matrix -----------------------------

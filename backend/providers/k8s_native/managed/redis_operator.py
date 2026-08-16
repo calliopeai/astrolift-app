@@ -26,6 +26,7 @@ from _sdk.managed_service import (
     UpdateResult,
     UpdateSpec,
     ValueRef,
+    unsupported_update,
 )
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
@@ -117,10 +118,8 @@ class RedisOperatorDriver(ManagedServiceDriver):
 
     @driver_op(cloud="k8s_native", driver="redis_operator")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        return UpdateResult(
-            ok=True,
-            handle=spec.handle,
-            message="re-call provision with new size to update",
+        return unsupported_update(
+            spec.handle, "the Redis operator reconciles size from the CRD re-applied on provision"
         )
 
     @driver_op(
@@ -264,6 +263,12 @@ class RedisOperatorDriver(ManagedServiceDriver):
                 "REDIS_URL": "Full redis:// URL",
             }
         )
+
+    def editable_fields(self) -> list[str]:
+        """No config key can be applied without a reprovision (#1376)."""
+        # persistent / memory_override land in the operator CRD, which only
+        # provision() applies to the cluster.
+        return []
 
     def _cluster_name(self, *, spec: ProvisionSpec) -> str:
         return dns_label(

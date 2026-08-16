@@ -30,6 +30,7 @@ from _sdk.managed_service import (
     UpdateResult,
     UpdateSpec,
     ValueRef,
+    unsupported_update,
 )
 from aws._errors import map_client_error
 from aws.managed._base import (
@@ -168,16 +169,7 @@ class S3Driver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="object_store_s3")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        """S3 buckets don't have 'size'; this is a no-op for now.
-        Spec acceptance: 'update_managed_service is idempotent.'"""
-        _, bucket_name = parse_handle(spec.handle)
-        return UpdateResult(
-            ok=True,
-            handle=spec.handle,
-            message=f"bucket {bucket_name} has no updatable attributes "
-            "via this driver (config changes go through "
-            "the bucket-policy editor)",
-        )
+        return unsupported_update(spec.handle, "S3 bucket attributes reconcile on provision, not in place")
 
     @driver_op(
         cloud="aws",
@@ -405,6 +397,12 @@ class S3Driver(ManagedServiceDriver):
                 "AWS_REGION": "Bucket's region",
             }
         )
+
+    def editable_fields(self) -> list[str]:
+        """No config key can be applied without a reprovision (#1376)."""
+        # versioning_override is applied while provisioning the bucket; this
+        # driver has no in-place path for it.
+        return []
 
     # ---- internals ------------------------------------------------
 

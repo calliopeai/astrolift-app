@@ -3,7 +3,8 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
-from _sdk.managed_service import UpdateResult
+from _sdk.managed_service import UpdateResult, unsupported_update
+from temporalio.exceptions import ApplicationError
 
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization, Project, Team
@@ -15,6 +16,7 @@ from astrolift_workflows.activities.managed_service_lifecycle import (
     _finalize_update_sync,
     _mark_failed_sync,
     _update_sync,
+    update_managed_service,
 )
 
 pytestmark = pytest.mark.django_db
@@ -132,6 +134,74 @@ def test_update_sync_surfaces_nonretryable_driver_refusal():
         "errors": ["immutable_field"],
         "retryable": False,
     }
+
+
+def test_update_sync_carries_an_unsupported_update_refusal_through_intact():
+    """#1376: a driver with no in-place path refuses instead of reporting success.
+
+    Fifteen drivers answered ``ok=True`` from an ``update()`` that touched
+    nothing, and finalize turns ``ok=True`` into ``applied_config = config`` plus
+    an ACTIVE row -- the platform recording a change to a resource nobody
+    touched. ``unsupported_update()`` is how a driver says so; this pins that its
+    permanent-refusal shape survives the driver -> activity boundary, because
+    that shape is what stops the retry loop below.
+    """
+    svc = _service()
+
+    class Driver:
+        def __init__(self, *, config):
+            pass
+
+        def update(self, spec):
+            return unsupported_update(spec.handle, "CNPG reconciles on provision")
+
+    with (
+        patch("astrolift_drivers.registry.plugins.get", return_value=Driver),
+        patch("core.cluster_observability.managed_config_for", return_value={}),
+    ):
+        result = _update_sync(svc.pk)
+
+    assert result["ok"] is False
+    assert result["retryable"] is False
+    assert result["errors"] == ["update_not_supported_in_place"]
+    assert result["message"] == (
+        "CNPG reconciles on provision; apply this change with reprovisionManagedService"
+    )
+    svc.refresh_from_db()
+    assert svc.applied_config == {"size": "medium", "backup_days": 7}
+    assert svc.status == ManagedService.Status.UPDATING
+
+
+@pytest.mark.parametrize(
+    ("retryable", "non_retryable"),
+    [(True, False), (False, True)],
+)
+async def test_update_activity_honours_the_driver_retryable_flag(retryable, non_retryable):
+    """A permanent refusal must not burn the workflow's 25-minute retry budget.
+
+    The activity is the only thing between ``UpdateResult`` and Temporal, so a
+    driver that says "never going to work" has to arrive as a terminal failure
+    and one that says "try again" has to stay retryable.
+    """
+    refusal = {
+        "ok": False,
+        "handle": "postgres/primary",
+        "message": "storage shrink is immutable",
+        "errors": ["immutable_field"],
+        "retryable": retryable,
+    }
+    with (
+        patch("astrolift_workflows.activities.managed_service_lifecycle.activity.heartbeat"),
+        patch(
+            "astrolift_workflows.activities.managed_service_lifecycle._update_sync",
+            return_value=refusal,
+        ),
+        pytest.raises(ApplicationError) as caught,
+    ):
+        await update_managed_service(1)
+
+    assert caught.value.non_retryable is non_retryable
+    assert "storage shrink is immutable" in str(caught.value)
 
 
 def test_finalize_update_advances_applied_config_and_resyncs_bindings():
