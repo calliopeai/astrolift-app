@@ -28,6 +28,7 @@ from _sdk.managed_service import (
     UpdateResult,
     UpdateSpec,
     ValueRef,
+    unsupported_update,
 )
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
@@ -125,11 +126,7 @@ class MongoDBOperatorDriver(ManagedServiceDriver):
 
     @driver_op(cloud="k8s_native", driver="mongodb_operator")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        return UpdateResult(
-            ok=True,
-            handle=spec.handle,
-            message="operator reconciles via re-applied CRD",
-        )
+        return unsupported_update(spec.handle, "the MongoDB operator reconciles from the CRD re-applied on provision")
 
     @driver_op(
         cloud="k8s_native",
@@ -256,6 +253,12 @@ class MongoDBOperatorDriver(ManagedServiceDriver):
                 "DOCDB_PASSWORD": "Admin password (from Secret)",
             }
         )
+
+    def editable_fields(self) -> list[str]:
+        """No config key can be applied without a reprovision (#1376)."""
+        # backup_url / storage_class land in the MongoDBCommunity CRD, which only
+        # provision() applies to the cluster.
+        return []
 
     def _render_cluster_crd(
         self,

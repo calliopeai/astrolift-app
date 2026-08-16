@@ -49,6 +49,7 @@ from _sdk.managed_service import (
     UpdateResult,
     UpdateSpec,
     ValueRef,
+    unsupported_update,
 )
 from azure.managed.tags import arm_tags_for as _tags_for
 
@@ -122,13 +123,7 @@ class ServiceBusDriver(ManagedServiceDriver):
 
     @driver_op(cloud="azure", driver="queue_servicebus")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        return UpdateResult(
-            ok=True,
-            handle=spec.handle,
-            message="Service Bus queue mutable settings via "
-            "create_or_update; size + delivery count "
-            "are operator-managed",
-        )
+        return unsupported_update(spec.handle, "Service Bus queue settings reconcile on provision, not in place")
 
     @driver_op(
         cloud="azure",
@@ -300,6 +295,13 @@ class ServiceBusDriver(ManagedServiceDriver):
                 "SERVICEBUS_ENDPOINT": "sb:// endpoint",
             }
         )
+
+    def editable_fields(self) -> list[str]:
+        """No config key can be applied without a reprovision (#1376)."""
+        # max_size_in_megabytes / enable_partitioning are applied by the
+        # create_or_update call in provision(); this driver never issues one
+        # from update(). The queue/azure_servicebus driver does.
+        return []
 
     def _queue_name(self, *, spec: ProvisionSpec) -> str:
         # Queue names: 1-260 chars; alphanumeric + . - _ /

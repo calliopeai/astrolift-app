@@ -27,6 +27,7 @@ from _sdk.managed_service import (
     UpdateResult,
     UpdateSpec,
     ValueRef,
+    unsupported_update,
 )
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
@@ -127,11 +128,7 @@ class StrimziKafkaDriver(ManagedServiceDriver):
 
     @driver_op(cloud="k8s_native", driver="event_stream_strimzi")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        return UpdateResult(
-            ok=True,
-            handle=spec.handle,
-            message="Strimzi reconciles topology updates via re-applied CRD",
-        )
+        return unsupported_update(spec.handle, "Strimzi reconciles topology from the Kafka CRD re-applied on provision")
 
     @driver_op(
         cloud="k8s_native",
@@ -289,6 +286,12 @@ class StrimziKafkaDriver(ManagedServiceDriver):
                 "EVENT_STREAM_TLS": "TLS enabled (true/false)",
             }
         )
+
+    def editable_fields(self) -> list[str]:
+        """No config key can be applied without a reprovision (#1376)."""
+        # storage_class lands in the Kafka CRD, which only provision() applies;
+        # Strimzi cannot see a change this driver never writes.
+        return []
 
     def _render_manifests(
         self,

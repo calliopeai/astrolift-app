@@ -53,6 +53,7 @@ from _sdk.managed_service import (
     UpdateResult,
     UpdateSpec,
     ValueRef,
+    unsupported_update,
 )
 
 KIND = "queue"
@@ -129,11 +130,7 @@ class PubSubDriver(ManagedServiceDriver):
 
     @driver_op(cloud="gcp", driver="queue_pubsub")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        return UpdateResult(
-            ok=True,
-            handle=spec.handle,
-            message=("pubsub mutable settings (ack_deadline, retention) via subscription patch are operator-managed"),
-        )
+        return unsupported_update(spec.handle, "Pub/Sub subscription settings reconcile on provision, not in place")
 
     @driver_op(
         cloud="gcp",
@@ -326,6 +323,12 @@ class PubSubDriver(ManagedServiceDriver):
                 "GCP_PROJECT_ID": "Project ID",
             }
         )
+
+    def editable_fields(self) -> list[str]:
+        """No config key can be applied without a reprovision (#1376)."""
+        # ack_deadline / retention would need a subscription patch, which this
+        # driver only issues while provisioning.
+        return []
 
     def _topic_id(self, *, spec: ProvisionSpec) -> str:
         parts = [
