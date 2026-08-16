@@ -193,6 +193,40 @@ def test_email_and_sms_envelopes_split_provider_from_creds():
     } <= set(sms)
 
 
+def test_envelopes_declare_the_keys_every_driver_of_the_kind_already_emits():
+    """#1401 — five envelopes were behind their drivers.
+
+    Each key here is emitted by *every* readable driver of its kind, so it was
+    portable in practice while the published ``envelope_keys`` said otherwise.
+    Adding one that some sibling does not emit is the wrong fix: it just moves
+    the divergence to #1402's subset ledger.
+    """
+    assert {"EMAIL_FROM_ADDRESS", "EMAIL_REGION"} <= set(envelope_keys_for("email"))
+    assert {
+        "ENCRYPTION_KEY_SPEC",
+        "ENCRYPTION_KEY_USAGE",
+        "ENCRYPTION_KEY_MULTI_REGION",
+    } <= set(envelope_keys_for("encryption_key"))
+    assert "MQ_AUTH_STRATEGY" in envelope_keys_for("mq")
+    assert "WORKFLOW_ENGINE_TYPE" in envelope_keys_for("workflow_engine")
+    assert {
+        "PRIVATE_ENDPOINT_DNS_NAMES",
+        "PRIVATE_ENDPOINT_NETWORK_INTERFACE_IDS",
+        "PRIVATE_ENDPOINT_SERVICE_NAME",
+        "PRIVATE_ENDPOINT_TYPE",
+    } <= set(envelope_keys_for("private_endpoint"))
+
+
+def test_private_endpoint_envelope_names_the_primary_dns_once():
+    """#1401 — the AWS, Azure and GCP drivers all set PRIVATE_ENDPOINT_DNS_NAME
+    to exactly the same value as the canonical PRIVATE_ENDPOINT_DNS. It stays a
+    driver-local alias so the portable contract carries one name per value."""
+    keys = envelope_keys_for("private_endpoint")
+
+    assert "PRIVATE_ENDPOINT_DNS" in keys
+    assert "PRIVATE_ENDPOINT_DNS_NAME" not in keys
+
+
 def test_managed_service_keys_pull_from_connection_secret():
     out = merge_env(
         managed_service_bindings=[

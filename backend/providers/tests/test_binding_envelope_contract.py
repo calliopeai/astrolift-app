@@ -169,19 +169,16 @@ _NEVER_BINDS: frozenset[tuple[str, str, str]] = frozenset(
 # ``_ENVELOPES``. Value is the exact set of offending keys for that driver.
 # https://github.com/calliopeai/astrolift-app/issues/1401
 _UNDECLARED_ENVELOPE_KEYS: dict[tuple[str, str, str], frozenset[str]] = {
+    # SES-only refinements of EMAIL_FROM_ADDRESS. azure_acs has no equivalent,
+    # so widening the envelope would only move the divergence to #1402.
     ("aws", "email", "ses"): frozenset(
         {
-            "EMAIL_FROM_ADDRESS",
             "EMAIL_FROM_ADDRESS_PREVIEW",
             "EMAIL_FROM_ADDRESS_PRODUCTION",
             "EMAIL_FROM_NAME",
-            "EMAIL_REGION",
             "EMAIL_REPLY_TO",
             "EMAIL_RETURN_PATH",
         }
-    ),
-    ("aws", "encryption_key", "kms"): frozenset(
-        {"ENCRYPTION_KEY_MULTI_REGION", "ENCRYPTION_KEY_SPEC", "ENCRYPTION_KEY_USAGE"}
     ),
     ("aws", "event_stream", "msk"): frozenset(
         {"EVENT_STREAM_AUTH_MECHANISM", "EVENT_STREAM_CA_CERT", "EVENT_STREAM_CLIENT_CERT", "EVENT_STREAM_CLIENT_KEY"}
@@ -220,26 +217,17 @@ _UNDECLARED_ENVELOPE_KEYS: dict[tuple[str, str, str], frozenset[str]] = {
         }
     ),
     ("aws", "model_endpoint", "bedrock"): frozenset({"MODEL_ENDPOINT_MODEL_ID", "MODEL_ENDPOINT_PROVIDER"}),
-    ("aws", "mq", "amazon_mq_activemq"): frozenset({"MQ_AUTH_STRATEGY"}),
-    ("aws", "mq", "amazon_mq_rabbitmq"): frozenset({"MQ_AUTH_STRATEGY"}),
     ("aws", "mysql", "rds_mysql"): frozenset(
         {"DATABASE_HOST", "DATABASE_NAME", "DATABASE_PASSWORD", "DATABASE_PORT", "DATABASE_USER"}
     ),
+    # DNS_NAME duplicates the canonical PRIVATE_ENDPOINT_DNS byte for byte in
+    # all three drivers, so it is a redundant name rather than a gap in the
+    # envelope; PREFIX_LIST_ID has no Azure Private Link equivalent.
     ("aws", "private_endpoint", "vpc_endpoint"): frozenset(
-        {
-            "PRIVATE_ENDPOINT_DNS_NAME",
-            "PRIVATE_ENDPOINT_DNS_NAMES",
-            "PRIVATE_ENDPOINT_NETWORK_INTERFACE_IDS",
-            "PRIVATE_ENDPOINT_PREFIX_LIST_ID",
-            "PRIVATE_ENDPOINT_SERVICE_NAME",
-            "PRIVATE_ENDPOINT_TYPE",
-        }
+        {"PRIVATE_ENDPOINT_DNS_NAME", "PRIVATE_ENDPOINT_PREFIX_LIST_ID"}
     ),
     ("aws", "search", "opensearch"): frozenset({"SEARCH_API_KEY", "SEARCH_URL"}),
-    ("aws", "workflow_engine", "step_functions_express"): frozenset({"WORKFLOW_ENGINE_TYPE"}),
-    ("aws", "workflow_engine", "step_functions_standard"): frozenset({"WORKFLOW_ENGINE_TYPE"}),
     ("azure", "api_gateway", "api_management"): frozenset({"API_GATEWAY_PROVIDER"}),
-    ("azure", "email", "azure_acs"): frozenset({"EMAIL_FROM_ADDRESS", "EMAIL_REGION"}),
     ("azure", "event_bus", "event_grid"): frozenset({"EVENT_BUS_ENDPOINT"}),
     ("azure", "event_bus", "event_grid_namespace"): frozenset({"EVENT_BUS_ENDPOINT"}),
     ("azure", "filesystem", "azure_files"): frozenset(
@@ -272,16 +260,7 @@ _UNDECLARED_ENVELOPE_KEYS: dict[tuple[str, str, str], frozenset[str]] = {
     ("azure", "postgres", "azure_pg_flex"): frozenset(
         {"DATABASE_HOST", "DATABASE_NAME", "DATABASE_PASSWORD", "DATABASE_PORT", "DATABASE_USER"}
     ),
-    ("azure", "private_endpoint", "private_link"): frozenset(
-        {
-            "PRIVATE_ENDPOINT_DNS_NAME",
-            "PRIVATE_ENDPOINT_DNS_NAMES",
-            "PRIVATE_ENDPOINT_NAME",
-            "PRIVATE_ENDPOINT_NETWORK_INTERFACE_IDS",
-            "PRIVATE_ENDPOINT_SERVICE_NAME",
-            "PRIVATE_ENDPOINT_TYPE",
-        }
-    ),
+    ("azure", "private_endpoint", "private_link"): frozenset({"PRIVATE_ENDPOINT_DNS_NAME", "PRIVATE_ENDPOINT_NAME"}),
     ("azure", "redis", "azure_cache_redis"): frozenset(
         {"REDIS_AUTH_TOKEN", "REDIS_PORT_NON_SSL", "REDIS_SECONDARY_AUTH_TOKEN"}
     ),
@@ -290,9 +269,6 @@ _UNDECLARED_ENVELOPE_KEYS: dict[tuple[str, str, str], frozenset[str]] = {
     ("gcp", "api_gateway", "api_gateway"): frozenset({"API_GATEWAY_HOST"}),
     ("gcp", "cdn", "cloud_cdn"): frozenset({"CDN_DOMAIN", "CDN_IP_ADDRESS", "CDN_URL"}),
     ("gcp", "document_db", "firestore_native"): frozenset({"DOCDB_AUTH_MODE"}),
-    ("gcp", "encryption_key", "cloud_kms"): frozenset(
-        {"ENCRYPTION_KEY_MULTI_REGION", "ENCRYPTION_KEY_SPEC", "ENCRYPTION_KEY_USAGE"}
-    ),
     ("gcp", "event_bus", "eventarc"): frozenset({"EVENT_BUS_ID", "EVENT_BUS_PROVIDER", "EVENT_BUS_PUBLISH_URL"}),
     # Pre-existing, and the same four keys ``aws/event_stream/msk`` diverges on.
     # Only became visible when #1400 made this driver's binding() readable.
@@ -304,18 +280,9 @@ _UNDECLARED_ENVELOPE_KEYS: dict[tuple[str, str, str], frozenset[str]] = {
     ),
     ("gcp", "model_endpoint", "vertex_ai"): frozenset({"MODEL_ENDPOINT_MODEL_ID", "MODEL_ENDPOINT_PROVIDER"}),
     ("gcp", "private_endpoint", "private_service_connect"): frozenset(
-        {
-            "PRIVATE_ENDPOINT_DNS_NAME",
-            "PRIVATE_ENDPOINT_DNS_NAMES",
-            "PRIVATE_ENDPOINT_NETWORK_INTERFACE_IDS",
-            "PRIVATE_ENDPOINT_PREFIX_LIST_ID",
-            "PRIVATE_ENDPOINT_SERVICE_NAME",
-            "PRIVATE_ENDPOINT_TYPE",
-            "PRIVATE_ENDPOINT_URL",
-        }
+        {"PRIVATE_ENDPOINT_DNS_NAME", "PRIVATE_ENDPOINT_PREFIX_LIST_ID", "PRIVATE_ENDPOINT_URL"}
     ),
     ("gcp", "redis", "memorystore_valkey"): frozenset({"REDIS_CA_CERT", "REDIS_READER_URL"}),
-    ("gcp", "workflow_engine", "workflows"): frozenset({"WORKFLOW_ENGINE_TYPE"}),
     ("k8s_native", "api_gateway", "gateway_api"): frozenset(
         {"API_GATEWAY_HOST", "API_GATEWAY_NAMESPACE", "API_GATEWAY_PORT"}
     ),
@@ -334,7 +301,6 @@ _UNDECLARED_ENVELOPE_KEYS: dict[tuple[str, str, str], frozenset[str]] = {
     ("k8s_native", "vector_index", "opensearch_operator_vector"): frozenset(
         {"VECTOR_PASSWORD", "VECTOR_TLS_VERIFY", "VECTOR_USERNAME"}
     ),
-    ("k8s_native", "workflow_engine", "argo_workflows"): frozenset({"WORKFLOW_ENGINE_TYPE"}),
 }
 
 
