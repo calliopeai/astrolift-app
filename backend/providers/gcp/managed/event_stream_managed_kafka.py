@@ -556,13 +556,17 @@ class ManagedKafkaDriver(ManagedServiceDriver):
             "GOOGLE_CLOUD_PROJECT": ValueRef(literal=self._config.project_id),
             "GOOGLE_CLOUD_REGION": ValueRef(literal=location),
         }
-        for key, env_name in (
-            ("client_certificate_secret_ref", "EVENT_STREAM_CLIENT_CERT"),
-            ("client_key_secret_ref", "EVENT_STREAM_CLIENT_KEY"),
-            ("ca_certificate_secret_ref", "EVENT_STREAM_CA_CERT"),
-        ):
-            if cfg.get(key):
-                env_vars[env_name] = ValueRef(secret_ref=str(cfg[key]))
+        # One statement per mTLS key rather than a loop over (config key, env
+        # key) pairs: a key name assembled from a loop variable is invisible to
+        # a reader and to every static consumer of this binding, including the
+        # cross-provider envelope guardrail in
+        # tests/test_binding_envelope_contract.py (#1400).
+        if cfg.get("client_certificate_secret_ref"):
+            env_vars["EVENT_STREAM_CLIENT_CERT"] = ValueRef(secret_ref=str(cfg["client_certificate_secret_ref"]))
+        if cfg.get("client_key_secret_ref"):
+            env_vars["EVENT_STREAM_CLIENT_KEY"] = ValueRef(secret_ref=str(cfg["client_key_secret_ref"]))
+        if cfg.get("ca_certificate_secret_ref"):
+            env_vars["EVENT_STREAM_CA_CERT"] = ValueRef(secret_ref=str(cfg["ca_certificate_secret_ref"]))
         project_resource = f"projects/{self._config.project_id}"
         grants = [Grant(project_resource, ["roles/managedkafka.client"])]
         registry_id = str(cfg.get("schema_registry_id") or "")
