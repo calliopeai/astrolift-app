@@ -524,6 +524,18 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
 
         return Binding(
             env_vars={
+                # Canonical postgres envelope (#1003, backfilled in #1402).
+                "POSTGRES_HOST": ValueRef(literal=host),
+                "POSTGRES_PORT": ValueRef(literal="5432"),
+                "POSTGRES_DB": ValueRef(literal="postgres"),
+                "POSTGRES_USER": ValueRef(literal="astrolift"),
+                "POSTGRES_PASSWORD": ValueRef(
+                    secret_ref=key_vault_secret_ref(self._config.keyvault_url, secret_name),
+                ),
+                # Flexible Server rejects unencrypted connections outright.
+                "POSTGRES_SSL_MODE": ValueRef(literal="require"),
+                # Pre-#1003 names, kept as aliases so workloads already bound
+                # to this driver keep the variables they read (#1401).
                 "DATABASE_HOST": ValueRef(literal=host),
                 "DATABASE_PORT": ValueRef(literal="5432"),
                 "DATABASE_NAME": ValueRef(literal="postgres"),
@@ -663,6 +675,12 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={
+                "POSTGRES_HOST": "Flexible Server FQDN",
+                "POSTGRES_PORT": "Postgres port (5432)",
+                "POSTGRES_DB": "Initial database name (postgres)",
+                "POSTGRES_USER": "Master username (astrolift)",
+                "POSTGRES_PASSWORD": "Key Vault ref to the master password",
+                "POSTGRES_SSL_MODE": "Always require; the server rejects plaintext",
                 "DATABASE_HOST": "Flexible Server FQDN",
                 "DATABASE_PORT": "Postgres port (5432)",
                 "DATABASE_NAME": "Initial database name (postgres)",

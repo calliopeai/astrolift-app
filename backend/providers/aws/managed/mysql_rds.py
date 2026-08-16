@@ -416,6 +416,14 @@ class RDSMySQLDriver(ManagedServiceDriver):
 
         return Binding(
             env_vars={
+                # Canonical mysql envelope (#1003, backfilled in #1402).
+                "MYSQL_HOST": ValueRef(literal=host),
+                "MYSQL_PORT": ValueRef(literal=port),
+                "MYSQL_DB": ValueRef(literal=db_name),
+                "MYSQL_USER": ValueRef(literal=username),
+                "MYSQL_PASSWORD": ValueRef(secret_ref=secret_name),
+                # Pre-#1003 names, kept as aliases so workloads already bound
+                # to this driver keep the variables they read (#1401).
                 "DATABASE_HOST": ValueRef(literal=host),
                 "DATABASE_PORT": ValueRef(literal=port),
                 "DATABASE_NAME": ValueRef(literal=db_name),
@@ -520,6 +528,11 @@ class RDSMySQLDriver(ManagedServiceDriver):
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={
+                "MYSQL_HOST": "RDS endpoint host",
+                "MYSQL_PORT": "RDS endpoint port (3306)",
+                "MYSQL_DB": "Initial database name",
+                "MYSQL_USER": "Master username",
+                "MYSQL_PASSWORD": "Secrets Manager ref to the master password",
                 "DATABASE_HOST": "RDS endpoint host",
                 "DATABASE_PORT": "RDS endpoint port (3306)",
                 "DATABASE_NAME": "Initial database name",

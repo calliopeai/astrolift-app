@@ -587,6 +587,26 @@ def test_status_maps_dropping_to_deprovisioning(
 # ---- binding ----------------------------------------------------
 
 
+def test_binding_emits_the_canonical_mysql_envelope(
+    driver: AzureMySQLFlexibleDriver,
+) -> None:
+    """#1402 -- this driver only had the pre-#1003 DATABASE_* names, so an app
+    that moved from Aurora MySQL to Azure Flexible Server lost every MYSQL_*."""
+    provisioned = driver.provision(_spec())
+    env = driver.binding(ServiceHandle(handle=provisioned.handle)).env_vars
+
+    assert {"MYSQL_HOST", "MYSQL_PORT", "MYSQL_DB", "MYSQL_USER", "MYSQL_PASSWORD", "DATABASE_URL"} <= set(env)
+    for canonical, legacy in (
+        ("MYSQL_HOST", "DATABASE_HOST"),
+        ("MYSQL_PORT", "DATABASE_PORT"),
+        ("MYSQL_DB", "DATABASE_NAME"),
+        ("MYSQL_USER", "DATABASE_USER"),
+    ):
+        assert env[canonical].literal == env[legacy].literal
+    assert env["MYSQL_PASSWORD"].secret_ref == env["DATABASE_PASSWORD"].secret_ref
+    assert env["MYSQL_PASSWORD"].literal is None
+
+
 def test_binding_returns_connection_envelope(
     driver: AzureMySQLFlexibleDriver,
 ) -> None:

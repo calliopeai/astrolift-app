@@ -366,6 +366,11 @@ class CloudFunctionsDriver(ManagedServiceDriver):
             env_vars={
                 "FUNCTION_NAME": ValueRef(literal=function_id),
                 "FUNCTION_URL": ValueRef(literal=uri),
+                # The rest of the faas envelope (#1402). FUNCTION_ARN is the
+                # portable resource-locator slot; on GCP that is the fully
+                # qualified Cloud Functions v2 resource name.
+                "FUNCTION_ARN": ValueRef(literal=name),
+                "FUNCTION_REGION": ValueRef(literal=region),
                 "GCP_CLOUD_FUNCTION_NAME": ValueRef(literal=name),
                 "GCP_CLOUD_FUNCTION_URL": ValueRef(literal=uri),
                 "GOOGLE_CLOUD_PROJECT": ValueRef(literal=self._config.project_id),
@@ -560,6 +565,8 @@ class CloudFunctionsDriver(ManagedServiceDriver):
             env_vars={
                 "FUNCTION_NAME": "Portable function ID",
                 "FUNCTION_URL": "Portable authenticated HTTPS endpoint",
+                "FUNCTION_ARN": "Portable resource locator; the Cloud Functions v2 resource name",
+                "FUNCTION_REGION": "Google Cloud region",
                 "GCP_CLOUD_FUNCTION_NAME": "Fully qualified Cloud Functions v2 resource name",
                 "GCP_CLOUD_FUNCTION_URL": "Cloud Run service URI",
                 "GOOGLE_CLOUD_PROJECT": "Google Cloud project ID",

@@ -639,6 +639,36 @@ def test_status_maps_dropping_to_deprovisioning(
 # ---- binding ----------------------------------------------------
 
 
+def test_binding_emits_the_canonical_postgres_envelope(
+    driver: AzurePostgresFlexibleDriver,
+) -> None:
+    """#1402 -- this driver only had the pre-#1003 DATABASE_* names, so an app
+    that moved from RDS to Azure Flexible Server lost every POSTGRES_*."""
+    provisioned = driver.provision(_spec())
+    env = driver.binding(ServiceHandle(handle=provisioned.handle)).env_vars
+
+    assert {
+        "POSTGRES_HOST",
+        "POSTGRES_PORT",
+        "POSTGRES_DB",
+        "POSTGRES_USER",
+        "POSTGRES_PASSWORD",
+        "POSTGRES_SSL_MODE",
+        "DATABASE_URL",
+    } <= set(env)
+    for canonical, legacy in (
+        ("POSTGRES_HOST", "DATABASE_HOST"),
+        ("POSTGRES_PORT", "DATABASE_PORT"),
+        ("POSTGRES_DB", "DATABASE_NAME"),
+        ("POSTGRES_USER", "DATABASE_USER"),
+    ):
+        assert env[canonical].literal == env[legacy].literal
+    assert env["POSTGRES_PASSWORD"].secret_ref == env["DATABASE_PASSWORD"].secret_ref
+    assert env["POSTGRES_PASSWORD"].literal is None
+    # Flexible Server refuses unencrypted connections, so the mode is not a guess.
+    assert env["POSTGRES_SSL_MODE"].literal == "require"
+
+
 def test_binding_returns_connection_envelope(
     driver: AzurePostgresFlexibleDriver,
 ) -> None:

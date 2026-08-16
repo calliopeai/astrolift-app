@@ -314,6 +314,11 @@ class LambdaDriver(ManagedServiceDriver):
             env_vars={
                 "FUNCTION_NAME": ValueRef(literal=function_name),
                 "FUNCTION_URL": ValueRef(literal=function_url),
+                # The rest of the faas envelope (#1402). FUNCTION_ARN is the
+                # portable resource-locator slot every other faas driver
+                # fills; on AWS it is literally an ARN.
+                "FUNCTION_ARN": ValueRef(literal=function_arn),
+                "FUNCTION_REGION": ValueRef(literal=self._config.region),
             },
             iam_grants=[
                 Grant(resource=function_arn, actions=["lambda:InvokeFunction"]),
@@ -384,6 +389,8 @@ class LambdaDriver(ManagedServiceDriver):
         return BindingSchema(
             env_vars={
                 "FUNCTION_NAME": "Lambda function name",
+                "FUNCTION_ARN": "Portable resource locator; the Lambda function ARN",
+                "FUNCTION_REGION": "AWS region",
                 "FUNCTION_URL": "Public Function URL (empty when not public)",
             }
         )

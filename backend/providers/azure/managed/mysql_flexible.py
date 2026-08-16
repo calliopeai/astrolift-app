@@ -492,6 +492,16 @@ class AzureMySQLFlexibleDriver(ManagedServiceDriver):
 
         return Binding(
             env_vars={
+                # Canonical mysql envelope (#1003, backfilled in #1402).
+                "MYSQL_HOST": ValueRef(literal=host),
+                "MYSQL_PORT": ValueRef(literal="3306"),
+                "MYSQL_DB": ValueRef(literal="mysql"),
+                "MYSQL_USER": ValueRef(literal="astrolift"),
+                "MYSQL_PASSWORD": ValueRef(
+                    secret_ref=key_vault_secret_ref(self._config.keyvault_url, secret_name),
+                ),
+                # Pre-#1003 names, kept as aliases so workloads already bound
+                # to this driver keep the variables they read (#1401).
                 "DATABASE_HOST": ValueRef(literal=host),
                 "DATABASE_PORT": ValueRef(literal="3306"),
                 "DATABASE_NAME": ValueRef(literal="mysql"),
@@ -631,6 +641,11 @@ class AzureMySQLFlexibleDriver(ManagedServiceDriver):
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={
+                "MYSQL_HOST": "Flexible Server FQDN",
+                "MYSQL_PORT": "MySQL port (3306)",
+                "MYSQL_DB": "Initial database name (mysql)",
+                "MYSQL_USER": "Master username (astrolift)",
+                "MYSQL_PASSWORD": "Key Vault ref to the master password",
                 "DATABASE_HOST": "Flexible Server FQDN",
                 "DATABASE_PORT": "MySQL port (3306)",
                 "DATABASE_NAME": "Initial database name",
