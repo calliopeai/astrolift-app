@@ -9915,10 +9915,14 @@ export type WorkflowStageExecutionType = {
   executionId: Scalars['String']['output'];
   failure?: Maybe<Scalars['JSON']['output']>;
   guid: Scalars['ID']['output'];
+  humanGateNote: Scalars['String']['output'];
+  humanGateState: Scalars['String']['output'];
   output?: Maybe<Scalars['JSON']['output']>;
+  stageApprovers: Array<Scalars['String']['output']>;
   stageGuid: Scalars['String']['output'];
   stageKind: Scalars['String']['output'];
   stageOrder: Scalars['Int']['output'];
+  stageRole: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
 };
