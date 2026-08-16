@@ -52,6 +52,7 @@ from _sdk.managed_service import (
     UpdateResult,
     UpdateSpec,
     ValueRef,
+    unsupported_update,
 )
 
 KIND = "object_store"
@@ -139,10 +140,8 @@ class GCSDriver(ManagedServiceDriver):
 
     @driver_op(cloud="gcp", driver="object_store_gcs")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        return UpdateResult(
-            ok=True,
-            handle=spec.handle,
-            message=("GCS update via lifecycle/storage_class is operator-managed"),
+        return unsupported_update(
+            spec.handle, "GCS bucket storage class and location reconcile on provision, not in place"
         )
 
     @driver_op(
@@ -357,6 +356,12 @@ class GCSDriver(ManagedServiceDriver):
                 "GCP_PROJECT_ID": "Project ID",
             }
         )
+
+    def editable_fields(self) -> list[str]:
+        """No config key can be applied without a reprovision (#1376)."""
+        # storage_class_override / location_override are applied while creating
+        # the bucket; location is immutable afterwards either way.
+        return []
 
     def _bucket_name_for(self, *, spec: ProvisionSpec) -> str:
         # GCS bucket names: 3-63 chars, lowercase letters / digits /

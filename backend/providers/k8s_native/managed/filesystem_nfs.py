@@ -37,6 +37,7 @@ from _sdk.managed_service import (
     ValueRef,
     VolumeMount,
     VolumeSourceKind,
+    unsupported_update,
 )
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
@@ -113,10 +114,8 @@ class NFSDriver(ManagedServiceDriver):
 
     @driver_op(cloud="k8s_native", driver="filesystem_nfs")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        return UpdateResult(
-            ok=True,
-            handle=spec.handle,
-            message=("PVC resize via re-applied spec; underlying CSI must support volume expansion"),
+        return unsupported_update(
+            spec.handle, "the NFS PersistentVolumeClaim is resized by re-applying its spec on provision"
         )
 
     @driver_op(
@@ -285,6 +284,13 @@ class NFSDriver(ManagedServiceDriver):
                 "FILESYSTEM_TLS": "TLS to NFS (false; NFS doesn't support TLS)",
             }
         )
+
+    def editable_fields(self) -> list[str]:
+        """No config key can be applied without a reprovision (#1376)."""
+        # Server address, export, mount options and capacity all live in the PV/PVC
+        # pair that only provision() applies. The filesystem/dynamic_pvc driver is
+        # the one with a live expansion path.
+        return []
 
     def _render_pvc(
         self,

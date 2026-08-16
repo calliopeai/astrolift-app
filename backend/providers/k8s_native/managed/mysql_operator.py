@@ -31,6 +31,7 @@ from _sdk.managed_service import (
     UpdateResult,
     UpdateSpec,
     ValueRef,
+    unsupported_update,
 )
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
@@ -140,10 +141,8 @@ class MySQLOperatorDriver(ManagedServiceDriver):
 
     @driver_op(cloud="k8s_native", driver="mysql_operator")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        return UpdateResult(
-            ok=True,
-            handle=spec.handle,
-            message=("MySQL operator reconciles size/storage updates via re-applied CRD spec"),
+        return unsupported_update(
+            spec.handle, "the MySQL operator reconciles size and storage from the CRD re-applied on provision"
         )
 
     @driver_op(
@@ -280,6 +279,12 @@ class MySQLOperatorDriver(ManagedServiceDriver):
                 "MYSQL_PASSWORD": "App password (from Secret)",
             }
         )
+
+    def editable_fields(self) -> list[str]:
+        """No config key can be applied without a reprovision (#1376)."""
+        # operator_brand / backup_url / storage_class land in the cluster CRD, which
+        # only provision() applies.
+        return []
 
     def _render_cluster_crd(
         self,

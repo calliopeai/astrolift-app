@@ -26,6 +26,7 @@ from _sdk.managed_service import (
     UpdateResult,
     UpdateSpec,
     ValueRef,
+    unsupported_update,
 )
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
@@ -122,11 +123,7 @@ class RabbitMQOperatorDriver(ManagedServiceDriver):
 
     @driver_op(cloud="k8s_native", driver="queue_rabbitmq")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        return UpdateResult(
-            ok=True,
-            handle=spec.handle,
-            message="operator reconciles via re-applied CRD",
-        )
+        return unsupported_update(spec.handle, "the RabbitMQ operator reconciles from the CRD re-applied on provision")
 
     @driver_op(
         cloud="k8s_native",
@@ -250,6 +247,12 @@ class RabbitMQOperatorDriver(ManagedServiceDriver):
                 "RABBITMQ_PASSWORD": "Default password (from Secret)",
             }
         )
+
+    def editable_fields(self) -> list[str]:
+        """No config key can be applied without a reprovision (#1376)."""
+        # storage_class lands in the RabbitmqCluster CRD, which only provision()
+        # applies to the cluster.
+        return []
 
     def _render_cluster_crd(
         self,

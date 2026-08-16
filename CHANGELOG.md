@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Stop reporting managed-service config changes as applied when the driver
+  cannot apply them. Fifteen drivers (S3, CloudFront, GCS, Pub/Sub, Blob x2,
+  Service Bus, CNPG, MySQL/MongoDB/RabbitMQ/Redis/Strimzi/NATS operators, NFS)
+  implemented `update()` as a no-op returning `ok=True` while inheriting the
+  permissive `editable_fields()` default, so the update workflow advanced
+  `appliedConfig` and returned the row to ACTIVE over an unchanged resource.
+  They now declare no editable fields, which makes `updateManagedService`
+  reject the change at the API boundary and point at `reprovisionManagedService`
+  before any workflow starts, and refuse with a permanent, non-retryable error
+  if the driver is reached anyway. A cross-provider contract test holds every
+  registered driver to it: claiming editable fields requires an `update()` that
+  can apply them, and claiming none forbids reporting success.
 - Make the binding-envelope guardrail read conditional bindings, and separate
   a value's *encoding* from its *provenance*. `binding()` bodies branch, and
   reading only the last branch mis-reported three ledgers at once: the Aurora

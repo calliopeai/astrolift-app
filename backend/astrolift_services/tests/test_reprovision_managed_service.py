@@ -366,6 +366,149 @@ def test_update_managed_service_rejects_concurrent_update(permission_resolver):
     start_wf.assert_not_called()
 
 
+def _real_plugin_scaffold(plugin_slug: str):
+    """Like ``_scaffold`` but bound to a *registered* provider plugin.
+
+    ``_scaffold`` invents a plugin slug, so no driver resolves and
+    ``_editable_fields_for`` falls back to the permissive ``["*"]``. Using the
+    real slug makes the mutation consult the real driver.
+    """
+    org = Organization.objects.create(name="Acme", slug=f"acme-{plugin_slug}")
+    team = Team.objects.create(organization=org, name="Eng", slug=f"eng-{plugin_slug}")
+    project = Project.objects.create(organization=org, team=team, name="Demo", slug=f"demo-{plugin_slug}")
+    ProviderPlugin.objects.bulk_create(
+        [
+            ProviderPlugin(
+                name=plugin_slug,
+                slug=plugin_slug,
+                version="0.0.1",
+                capabilities_manifest={},
+                config_schema={},
+            )
+        ],
+        ignore_conflicts=True,
+    )
+    cluster = TenantCluster.objects.create(
+        organization=org,
+        slug=f"cluster-{plugin_slug}",
+        name="Local",
+        provider_plugin=ProviderPlugin.objects.get(slug=plugin_slug),
+        endpoint="http://localhost:8443",
+    )
+    app = RegisteredApp.objects.create(
+        organization=org,
+        team=team,
+        project=project,
+        name="Real App",
+        slug=f"app-{plugin_slug}",
+        provisioning_status="ready",
+    )
+    env = AppEnvironment.objects.create(registered_app=app, name="production", tenant_cluster=cluster)
+    return org, app, env
+
+
+def test_update_managed_service_rejects_a_change_the_real_driver_cannot_apply(permission_resolver):
+    """#1376, end to end through the real CNPG driver.
+
+    The driver inherited the permissive ``["*"]`` while implementing
+    ``update()`` as a courtesy no-op, so a ``storage_size`` change was accepted,
+    a workflow ran, and the row came back ACTIVE with ``applied_config``
+    advanced over a Cluster CRD nobody had re-applied. Now the driver declares
+    ``editable_fields() == []`` and the change never gets past the API: no
+    workflow, no state change, and the operator is told to reprovision.
+    """
+    org, app, env = _real_plugin_scaffold("k8s_native")
+    permission_resolver.grant(Permission.APP_UPDATE)
+    svc = ManagedService.objects.create(
+        registered_app=app,
+        app_environment=env,
+        kind=ManagedService.Kind.POSTGRES,
+        variant="cnpg",
+        name="primary",
+        config={"storage_size": "10Gi"},
+        applied_config={"storage_size": "10Gi"},
+        status=ManagedService.Status.ACTIVE,
+        backend_ref="postgres/primary",
+    )
+    with (
+        _ctx(org),
+        patch("astrolift_workflows.client.start_workflow") as start_wf,
+    ):
+        result = ServicesMutation().update_managed_service(
+            _info(user=_make_user()),
+            input=UpdateManagedServiceInput(
+                id=GUID(str(svc.guid)),
+                config={"storage_size": "50Gi"},
+            ),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "VALIDATION"
+    assert result.errors[0].field == "config"
+    assert "reprovisionManagedService" in result.errors[0].message
+    start_wf.assert_not_called()
+    svc.refresh_from_db()
+    assert svc.config == {"storage_size": "10Gi"}
+    assert svc.applied_config == {"storage_size": "10Gi"}
+    assert svc.status == ManagedService.Status.ACTIVE
+    assert svc.operation_kind == ""
+
+
+def test_update_managed_service_write_does_not_clobber_a_concurrent_column_write(permission_resolver):
+    """The accepted update saves only the desired-state columns.
+
+    ``select_for_update`` locks the row against other locking writers, but the
+    update workflow's activities and ``revealManagedServiceConnection`` write
+    without taking it. A full-row ``save()`` pushed the snapshot read at the top
+    of this transaction back over their columns; a scoped one cannot.
+    """
+    org, app, env = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    svc = ManagedService.objects.create(
+        registered_app=app,
+        app_environment=env,
+        kind=ManagedService.Kind.POSTGRES,
+        name="primary",
+        config={"max_connections": 100},
+        status=ManagedService.Status.ACTIVE,
+        backend_ref="postgres/primary",
+    )
+
+    def _write_from_elsewhere(_svc):
+        # Runs inside the mutation's transaction, after it loaded the row and
+        # before it saves: the window a concurrent scoped write lands in.
+        ManagedService.objects.filter(pk=svc.pk).update(
+            backend_ref="postgres/primary-v2",
+            last_action_kind="connection.reveal",
+        )
+        return ["*"]
+
+    handle = WorkflowHandle(
+        workflow_id=f"UpdateManagedServiceWorkflow-{svc.guid}",
+        run_id="run-clobber",
+        enqueued=True,
+    )
+    with (
+        _ctx(org),
+        patch("astrolift_services.schema.types._editable_fields_for", side_effect=_write_from_elsewhere),
+        patch("astrolift_workflows.client.start_workflow", return_value=handle),
+    ):
+        result = ServicesMutation().update_managed_service(
+            _info(user=_make_user()),
+            input=UpdateManagedServiceInput(
+                id=GUID(str(svc.guid)),
+                config={"max_connections": 200},
+            ),
+        )
+
+    assert result.ok, result.errors
+    svc.refresh_from_db()
+    assert svc.backend_ref == "postgres/primary-v2"
+    assert svc.last_action_kind == "connection.reveal"
+    assert svc.config == {"max_connections": 200}
+    assert svc.status == ManagedService.Status.UPDATING
+
+
 def test_update_project_service_uses_update_workflow(permission_resolver):
     org, app, env = _scaffold()
     permission_resolver.grant(Permission.PROJECT_UPDATE)

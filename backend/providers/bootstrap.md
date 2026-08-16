@@ -97,6 +97,13 @@ A plugin does not need to implement every driver. Only implement what the target
 - Plugin classes: `<Cloud>ProviderPlugin` (e.g. `AWSProviderPlugin`).
 - Result dataclasses: `<Action>Result` (e.g. `ApplyResult`, `RolloutResult`).
 
+### Result semantics
+
+- An `ok=True` result means the backing resource now matches the spec. Never
+  return it for work the driver did not do: the platform records it as applied.
+  See [`docs/managed_service_updates.md`](docs/managed_service_updates.md) for
+  the in-place update contract and how to derive `editable_fields()`.
+
 ---
 
 ## 5. Build and Verify
