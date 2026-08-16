@@ -229,9 +229,7 @@ def test_idempotent_unpin_does_not_bump_version(
     assert preview.version == before
 
 
-def test_pin_refused_on_torn_down_preview(
-    org, app, env, actor, fake_info, permission_resolver, no_temporal
-):
+def test_pin_refused_on_torn_down_preview(org, app, env, actor, fake_info, permission_resolver, no_temporal):
     """The namespace is already gone, so a pin would protect nothing
     while reading as an active cost decision on the previews page."""
     permission_resolver.grant(Permission.APP_DEPLOY)
@@ -279,9 +277,7 @@ def test_pin_mutation_not_found(org, actor, fake_info, permission_resolver, no_t
     with _tenant_for(org, actor):
         result = mut.set_preview_pinned(
             fake_info,
-            input=SetPreviewPinnedInput(
-                id=GUID("00000000-0000-0000-0000-000000000000"), pinned=True
-            ),
+            input=SetPreviewPinnedInput(id=GUID("00000000-0000-0000-0000-000000000000"), pinned=True),
         )
 
     assert not result.ok
@@ -321,9 +317,7 @@ def test_pin_rejects_another_orgs_preview_and_writes_nothing(
     other_org = Organization.objects.create(name="Other", slug="other-test")
     mut = LifecycleMutation()
 
-    with tenant_context(
-        TenantContext(organization_id=other_org.id, actor_user_id=actor.id)
-    ):
+    with tenant_context(TenantContext(organization_id=other_org.id, actor_user_id=actor.id)):
         result = mut.set_preview_pinned(
             fake_info,
             input=SetPreviewPinnedInput(id=GUID(str(victim.guid)), pinned=True, reason="theirs"),
