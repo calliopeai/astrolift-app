@@ -180,12 +180,20 @@ def test_binding_emits_iam_grants(driver: S3Driver) -> None:
 # ---- update ---------------------------------------------------
 
 
-def test_update_returns_no_op(driver: S3Driver) -> None:
-    """S3 buckets have no updatable size attributes; spec
-    invariant: idempotent update."""
+def test_update_refuses_instead_of_reporting_a_no_op_success(driver: S3Driver) -> None:
+    """This driver applies nothing in ``update()``, so it must not claim it did.
+
+    It used to return ``ok=True``, which the update workflow records as
+    "applied" on the row (#1376). Nothing about a bucket is editable in place
+    here, so the honest answer is a permanent refusal pointing at reprovision.
+    """
     result = driver.provision(_spec())
     update = driver.update(UpdateSpec(handle=result.handle, size="medium"))
-    assert update.ok is True
+    assert update.ok is False
+    assert update.retryable is False
+    assert update.errors == ["update_not_supported_in_place"]
+    assert "reprovisionManagedService" in update.message
+    assert driver.editable_fields() == []
 
 
 # ---- deprovision ----------------------------------------------

@@ -73,6 +73,38 @@ class UpdateResult:
     existing drivers. Permanent validation/safety refusals opt out."""
 
 
+UPDATE_NOT_SUPPORTED_IN_PLACE = "update_not_supported_in_place"
+"""``UpdateResult.errors`` marker for a driver that cannot update in place."""
+
+
+def unsupported_update(handle: str, reason: str) -> UpdateResult:
+    """The refusal a driver returns when it cannot apply a config change
+    in place (#1376).
+
+    ``ok=True`` means "the backing resource now matches the spec". A
+    driver that performs no provider work must never return it: the
+    update workflow's finalize step copies the desired config onto
+    ``ManagedService.applied_config`` and flips the row to ACTIVE, so a
+    courtesy success makes the platform record a change it never made.
+    Nothing downstream can detect that, and the operator is told their
+    change landed.
+
+    ``retryable=False`` because no amount of retrying makes an in-place
+    update possible; the workflow surfaces the reason on the row's
+    ``status_error`` instead of spending its retry budget. Pair this with
+    ``editable_fields()`` returning the keys the driver really can apply
+    (``[]`` when there are none) so ``updateManagedService`` rejects the
+    change at the API boundary and this refusal is only ever the backstop.
+    """
+    return UpdateResult(
+        ok=False,
+        handle=handle,
+        message=f"{reason}; apply this change with reprovisionManagedService",
+        errors=[UPDATE_NOT_SUPPORTED_IN_PLACE],
+        retryable=False,
+    )
+
+
 @dataclass(frozen=True)
 class DeprovisionSpec:
     handle: str
@@ -345,5 +377,16 @@ class ManagedServiceDriver(Protocol):
         in-place. Return a specific list to restrict which keys the driver
         can apply live; keys NOT in the list require ``reprovisionManagedService``.
         Return ``[]`` if ALL config changes require full reprovision.
+
+        This is a promise the platform enforces on the operator's behalf:
+        ``updateManagedService`` rejects a change touching any key outside
+        the list before it starts a workflow, and everything inside the
+        list is expected to reach the provider through ``update()``. The
+        permissive ``["*"]`` default therefore only fits a driver whose
+        ``update()`` really can apply an arbitrary config key -- a driver
+        that inherits it and implements ``update()`` as a courtesy no-op
+        reports success for a change that never happened (#1376). Drivers
+        with no in-place path return ``[]`` and refuse in ``update()`` with
+        ``unsupported_update()``.
         """
         return ["*"]

@@ -45,6 +45,7 @@ from _sdk.managed_service import (
     UpdateResult,
     UpdateSpec,
     ValueRef,
+    unsupported_update,
 )
 from aws.managed._base import (
     ManagedServiceError,
@@ -231,17 +232,8 @@ class CloudFrontDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="cdn_cloudfront")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        # CloudFront config changes flow through provision's reconcile
-        # path; there is no size/scale knob to apply here.
-        _, distribution_id = parse_handle(spec.handle)
-        return UpdateResult(
-            ok=True,
-            handle=spec.handle,
-            message=(
-                f"distribution {distribution_id} has no updatable "
-                "attributes via update (config changes reconcile on "
-                "the next provision)"
-            ),
+        return unsupported_update(
+            spec.handle, "CloudFront distribution attributes reconcile on provision, not in place"
         )
 
     @driver_op(
@@ -494,6 +486,13 @@ class CloudFrontDriver(ManagedServiceDriver):
                 "CDN_INVALIDATION_ROLE": "IRSA role ARN for cache invalidation",
             }
         )
+
+    def editable_fields(self) -> list[str]:
+        """No config key can be applied without a reprovision (#1376)."""
+        # Every config key (spa, index, aliases, acm_cert_arn) is applied by
+        # rebuilding the distribution config in provision(); there is no
+        # in-place path, so nothing may be edited live.
+        return []
 
     # ---- internals ------------------------------------------------
 
