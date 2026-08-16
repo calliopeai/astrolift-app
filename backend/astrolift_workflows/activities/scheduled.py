@@ -15,9 +15,14 @@ directly without an event loop.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from temporalio import activity
+
+if TYPE_CHECKING:
+    # Type-only: the runtime import stays inside the function, since
+    # preview_gc is the Django-free module the workflow sandbox loads.
+    from astrolift_workflows.preview_gc import PreviewSnapshot
 
 log = logging.getLogger("astrolift_workflows.activities.scheduled")
 
@@ -32,7 +37,7 @@ log = logging.getLogger("astrolift_workflows.activities.scheduled")
 _FAILED_CLEANUP_REASON = "failed_stale"
 
 
-def _preview_gc_snapshot(preview) -> "PreviewSnapshot":  # noqa: F821 — see local import
+def _preview_gc_snapshot(preview) -> PreviewSnapshot:
     """Project a ``PreviewEnvironment`` row into the GC policy's
     ``PreviewSnapshot`` (#1399).
 
