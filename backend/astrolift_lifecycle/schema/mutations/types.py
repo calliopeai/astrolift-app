@@ -164,6 +164,30 @@ class ExtendPreviewTtlInputGql:
 
 
 @strawberry.input
+class SetPreviewPinnedInput:
+    """Set or clear a preview's operator pin (#1399).
+
+    One setter rather than a ``pin`` / ``unpin`` pair so the CLI's two
+    verbs and a UI toggle drive the same resolver, and so the operation
+    is idempotent: re-sending the state you already have is a no-op
+    write, not an error.
+
+    A pin exempts the preview from *both* GC rules (TTL expiry and
+    max-active eviction), which is what distinguishes it from
+    ``extendPreviewTtl`` — that only moves ``ttl_until``, in capped
+    1/7/30-day steps, on the TTL axis alone, with no inverse.
+
+    ``reason`` is free text recorded on the row and truncated to 512
+    chars. It is ignored when ``pinned`` is false: unpinning clears the
+    whole audit trail, so there is nothing for a reason to annotate.
+    """
+
+    id: GUID
+    pinned: bool
+    reason: str | None = None
+
+
+@strawberry.input
 class CreatePreviewEnvironmentInput:
     """Manually spin up a preview from a branch — no PR required (#751).
 

@@ -27,6 +27,7 @@ from astrolift_lifecycle.schema.mutations.helpers import (
 from astrolift_lifecycle.schema.mutations.types import (
     CreatePreviewEnvironmentInput,
     ExtendPreviewTtlInputGql,
+    SetPreviewPinnedInput,
     TearDownPreviewInputGql,
 )
 from astrolift_lifecycle.schema.types import (
@@ -47,6 +48,43 @@ from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
+
+
+def _set_preview_pinned_target(*args, **kwargs):
+    """``@mutation_audit`` target hook: stamp the affected preview onto
+    the audit row as ``(PreviewEnvironment, <guid>)`` so pin/unpin is
+    queryable per preview rather than only per org.
+
+    Reads the guid straight off the input (never the DB) so the target
+    is recorded even when the lookup fails closed on a cross-org guid —
+    an attempt to pin someone else's preview is exactly the row an
+    auditor wants to find. Returns ``None`` (untargeted) if the input
+    isn't shaped as expected, so a target bug can never block the audit
+    write.
+    """
+    payload = kwargs.get("input")
+    if payload is None and len(args) >= 3:
+        payload = args[2]
+    guid = getattr(payload, "id", None)
+    if not guid:
+        return None
+    return "PreviewEnvironment", str(guid)
+
+
+def _pinning_user(info: Info):
+    """Resolve the Django user row to stamp on ``pinned_by``.
+
+    ``_actor_from_request`` already encodes the precedence (request
+    user, then the tenant context's actor, then system); this turns its
+    ``user_id`` back into a row because the FK needs an instance.
+    Returns None for a system actor, which the nullable column allows.
+    """
+    actor = _actor_from_request(info)
+    if actor.kind != "user" or not actor.user_id:
+        return None
+    from django.contrib.auth import get_user_model
+
+    return get_user_model().objects.filter(pk=actor.user_id).first()
 
 
 @strawberry.type
@@ -170,6 +208,70 @@ class PreviewMutations:
             return gql_failure(ErrorCode.VALIDATION.value, str(exc))
 
         preview.save(update_fields=["ttl_until", "updated_at", "version"])
+        return gql_success(preview_to_type(preview))
+
+    @strawberry.field
+    @mutation_audit(action="preview.set_pinned", target=_set_preview_pinned_target)
+    @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
+    def set_preview_pinned(
+        self, info: Info, input: SetPreviewPinnedInput
+    ) -> MutationResultType[PreviewEnvironmentType]:
+        """Set or clear the preview's operator pin (#1399).
+
+        A pinned preview is exempt from *both* garbage-collection rules
+        the scheduled sweep applies: ``is_eligible_for_gc`` short-
+        circuits on it so TTL expiry never fires, and max-active
+        eviction filters it out of the candidate list so a newer PR
+        can't push it out. That is the whole reason this exists rather
+        than ``extendPreviewTtl``, which only moves ``ttl_until`` (TTL
+        axis only), only in capped 1/7/30-day steps, and has no inverse.
+
+        One setter, two CLI verbs. ``pinned: true`` stamps the actor,
+        timestamp and reason; ``pinned: false`` clears all three. Unpin
+        on an already-unpinned preview is a no-op success — there is
+        nothing to clear — while re-pinning refreshes the stamp, so the
+        recorded justification is always the one currently in force.
+
+        Pinning a torn-down preview is refused: the namespace is
+        already gone, so a pin would protect nothing while reading as
+        an active cost decision on the previews page. Unpinning one is
+        allowed, so operators can always clear stale state.
+        """
+        # Org-scope the by-guid lookup: PreviewEnvironment reaches the org via
+        # registered_app. Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        preview = (
+            PreviewEnvironment.objects.select_related(
+                "registered_app",
+                "pinned_by",
+            )
+            .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
+            .first()
+        )
+        if preview is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "preview environment not found")
+
+        if input.pinned and preview.status == PreviewEnvironment.Status.TORN_DOWN.value:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "cannot pin a torn-down preview",
+            )
+
+        if not input.pinned and not preview.is_pinned:
+            # Already unpinned — skip the write so an idempotent unpin
+            # doesn't bump ``version`` and lose a concurrent update.
+            return gql_success(preview_to_type(preview))
+
+        preview.set_pinned(
+            pinned=input.pinned,
+            by=_pinning_user(info) if input.pinned else None,
+            reason=input.reason or "",
+        )
+        preview.save(
+            update_fields=[*PreviewEnvironment.PIN_UPDATE_FIELDS, "updated_at", "version"],
+        )
         return gql_success(preview_to_type(preview))
 
     @strawberry.field

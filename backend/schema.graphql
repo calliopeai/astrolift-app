@@ -2809,6 +2809,10 @@ type AstroliftPreviewEnvironment {
   lastDeployedAt: DateTime
   tornDownAt: DateTime
   ttlUntil: DateTime!
+  isPinned: Boolean!
+  pinnedAt: DateTime
+  pinnedByEmail: String
+  pinReason: String!
   sourceUrl: String!
   prUrl: String!
   aggregateResources: AstroliftPreviewAggregateResources!
@@ -5229,6 +5233,7 @@ type Mutation {
   resumeAppIngress(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
   tearDownPreview(input: TearDownPreviewInputGql!): AstroliftDeploymentMutationResult!
   extendPreviewTtl(input: ExtendPreviewTtlInputGql!): AstroliftPreviewEnvironmentMutationResult!
+  setPreviewPinned(input: SetPreviewPinnedInput!): AstroliftPreviewEnvironmentMutationResult!
   createPreviewEnvironment(input: CreatePreviewEnvironmentInput!): AstroliftPreviewEnvironmentMutationResult!
   migrateAppToCluster(input: MigrateAppInputGql!): AstroliftAppEnvironmentMutationResult!
   addAppDomain(input: AddAppDomainInput!): AstroliftAppDomainMutationResult!
@@ -6427,6 +6432,12 @@ input SetNotificationPreferenceInput {
   channel: String!
   eventKind: String!
   enabled: Boolean!
+}
+
+input SetPreviewPinnedInput {
+  id: GUID!
+  pinned: Boolean!
+  reason: String = null
 }
 
 input SetRetentionPolicyInput {
