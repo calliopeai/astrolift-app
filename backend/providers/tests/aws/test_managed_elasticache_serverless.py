@@ -220,6 +220,11 @@ def test_memcached_has_distinct_portable_envelope_and_no_user_group():
     assert not ec.users and not ec.groups and not sm.values
     assert binding.env_vars["CACHE_PROTOCOL"].literal == "memcached"
     assert binding.env_vars["CACHE_PORT"].literal == "11211"
+    # CACHE_NODES is a comma-separated endpoint list for every cache driver
+    # (#1403); serverless just happens to have exactly one endpoint.
+    assert binding.env_vars["CACHE_NODES"].literal.split(",") == [
+        f"{binding.env_vars['CACHE_HOST'].literal}:11211",
+    ]
     with pytest.raises(ManagedServiceError, match="does not support snapshots"):
         subject.snapshot(ServiceHandle(result.handle))
 

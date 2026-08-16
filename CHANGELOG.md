@@ -14,6 +14,21 @@
   if the driver is reached anyway. A cross-provider contract test holds every
   registered driver to it: claiming editable fields requires an `update()` that
   can apply them, and claiming none forbids reporting success.
+- Make the binding-envelope guardrail read conditional bindings, and separate
+  a value's *encoding* from its *provenance*. `binding()` bodies branch, and
+  reading only the last branch mis-reported three ledgers at once: the Aurora
+  postgres drivers read as emitting the MySQL envelope and none of
+  `POSTGRES_*`, and every AWS/GCP Redis driver's `REDIS_URL` was recorded as
+  whichever of its secret-reference and literal branches came last in the
+  source. Guards of the form `self.<attr> == <const>` are now resolved against
+  the concrete driver class, so dead branches drop out and a key reachable on
+  no branch is not counted as emitted. A secrets-backend reference is opaque
+  rather than an encoding, so it no longer collides with `json` or a
+  delimiter-joined list. Two drivers emitted a genuinely different encoding
+  from their siblings and now match, byte-for-byte identically:
+  `aws/cache/elasticache_serverless_memcached`'s `CACHE_NODES` is a
+  comma-separated endpoint list, and `gcp/redis/memorystore_valkey`'s
+  `REDIS_CA_CERT` is a newline-joined PEM chain on both of its CA branches.
 
 - Carry human-gate state on a workflow run's stage rows.
   `workflowStageExecutions` now returns `stageRole`, `stageApprovers`,
