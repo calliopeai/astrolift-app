@@ -235,6 +235,10 @@ def test_binding_exposes_portable_contract_and_scoped_roles(
     assert binding.env_vars["FUNCTION_NAME"].literal == "billing-webhook"
     assert binding.env_vars["FUNCTION_URL"].literal == "https://billing-webhook.example.test"
     assert binding.env_vars["GCP_CLOUD_FUNCTION_NAME"].literal.endswith("/billing-webhook")
+    # #1402: the rest of the faas envelope. FUNCTION_ARN is the portable
+    # resource-locator slot, which on GCP is the fully qualified resource name.
+    assert binding.env_vars["FUNCTION_ARN"].literal == binding.env_vars["GCP_CLOUD_FUNCTION_NAME"].literal
+    assert binding.env_vars["FUNCTION_REGION"].literal == binding.env_vars["GOOGLE_CLOUD_REGION"].literal
     assert [grant.actions for grant in binding.iam_grants] == [
         ["roles/run.invoker"],
         ["roles/cloudfunctions.developer"],

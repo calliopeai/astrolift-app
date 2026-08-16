@@ -239,6 +239,33 @@ class CNPGPostgresDriver(ManagedServiceDriver):
         secret_name = f"{cluster_name}-app"
         return Binding(
             env_vars={
+                # Canonical postgres envelope (#1003, backfilled in #1402).
+                # Every value is a reference into the operator-generated
+                # Secret rather than a literal: CNPG owns and rotates it, so
+                # a snapshot taken here would be stale after the next
+                # rotation (see #1410).
+                "POSTGRES_HOST": ValueRef(
+                    secret_ref=f"{secret_name}#host",
+                ),
+                "POSTGRES_PORT": ValueRef(
+                    secret_ref=f"{secret_name}#port",
+                ),
+                "POSTGRES_DB": ValueRef(
+                    secret_ref=f"{secret_name}#dbname",
+                ),
+                "POSTGRES_USER": ValueRef(
+                    secret_ref=f"{secret_name}#user",
+                ),
+                "POSTGRES_PASSWORD": ValueRef(
+                    secret_ref=f"{secret_name}#password",
+                ),
+                # CNPG serves TLS from its own CA and the app Secret's uri
+                # does not pin a mode; require is the weakest mode that still
+                # encrypts, and matches what every other postgres driver
+                # publishes.
+                "POSTGRES_SSL_MODE": ValueRef(literal="require"),
+                # Pre-#1003 names, kept as aliases so workloads already bound
+                # to this driver keep the variables they read (#1401).
                 "DATABASE_HOST": ValueRef(
                     secret_ref=f"{secret_name}#host",
                 ),
@@ -321,6 +348,12 @@ class CNPGPostgresDriver(ManagedServiceDriver):
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={
+                "POSTGRES_HOST": "Postgres hostname",
+                "POSTGRES_PORT": "Port (5432)",
+                "POSTGRES_DB": "Initial database name",
+                "POSTGRES_USER": "Username",
+                "POSTGRES_PASSWORD": "Password",
+                "POSTGRES_SSL_MODE": "Always require; CNPG serves TLS from its own CA",
                 "DATABASE_HOST": "Postgres hostname",
                 "DATABASE_PORT": "Port (5432)",
                 "DATABASE_USER": "Username",

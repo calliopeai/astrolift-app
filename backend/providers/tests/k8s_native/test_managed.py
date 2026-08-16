@@ -117,6 +117,33 @@ def test_cnpg_binding_emits_db_env_vars() -> None:
     assert "DATABASE_PASSWORD" in binding.env_vars
 
 
+def test_cnpg_binding_emits_the_canonical_postgres_envelope() -> None:
+    """#1402 -- this driver only had the pre-#1003 DATABASE_* names, so an app
+    that moved from RDS to CNPG lost every POSTGRES_* variable it read."""
+    binding = CNPGPostgresDriver().binding(ServiceHandle(handle="postgres/api-prod-db"))
+
+    assert {
+        "POSTGRES_HOST",
+        "POSTGRES_PORT",
+        "POSTGRES_DB",
+        "POSTGRES_USER",
+        "POSTGRES_PASSWORD",
+        "POSTGRES_SSL_MODE",
+        "DATABASE_URL",
+    } <= set(binding.env_vars)
+    # Each canonical key reads the same field of the operator-generated Secret
+    # as its legacy alias, so the two never drift apart.
+    for canonical, legacy in (
+        ("POSTGRES_HOST", "DATABASE_HOST"),
+        ("POSTGRES_PORT", "DATABASE_PORT"),
+        ("POSTGRES_DB", "DATABASE_NAME"),
+        ("POSTGRES_USER", "DATABASE_USER"),
+        ("POSTGRES_PASSWORD", "DATABASE_PASSWORD"),
+    ):
+        assert binding.env_vars[canonical].secret_ref == binding.env_vars[legacy].secret_ref
+    assert binding.env_vars["POSTGRES_SSL_MODE"].literal == "require"
+
+
 def test_cnpg_provision_failure_propagates() -> None:
     cluster_driver = MagicMock()
     cluster_driver.apply_manifests.return_value = ApplyResult(

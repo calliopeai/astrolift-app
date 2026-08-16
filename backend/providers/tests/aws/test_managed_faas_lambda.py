@@ -557,6 +557,12 @@ def test_binding_env_and_invoke_grant_shape():
     binding = drv.binding(ServiceHandle(handle=f"{KIND}/{_FN}"))
     assert binding.env_vars["FUNCTION_NAME"].literal == _FN
     assert binding.env_vars["FUNCTION_URL"].literal == "https://x.lambda-url.us-east-1.on.aws/"
+    # #1402: the rest of the faas envelope. FUNCTION_ARN is the portable
+    # resource-locator slot the Azure and Knative drivers already fill, and the
+    # ARN was already in hand here -- it was only being used for the grant.
+    assert binding.env_vars["FUNCTION_ARN"].literal == binding.iam_grants[0].resource
+    assert binding.env_vars["FUNCTION_ARN"].literal.endswith(f"function:{_FN}")
+    assert binding.env_vars["FUNCTION_REGION"].literal == "us-east-1"
     assert len(binding.iam_grants) == 1
     grant = binding.iam_grants[0]
     assert grant.actions == ["lambda:InvokeFunction"]

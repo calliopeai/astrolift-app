@@ -14,6 +14,17 @@
   if the driver is reached anyway. A cross-provider contract test holds every
   registered driver to it: claiming editable fields requires an `update()` that
   can apply them, and claiming none forbids reporting success.
+- Emit the canonical connection envelope from six drivers that were missing
+  most of it. `azure/postgres/azure_pg_flex` and `k8s_native/postgres/cnpg`
+  shipped only the pre-#1003 `DATABASE_*` names and no `POSTGRES_*` at all;
+  `aws/mysql/rds_mysql` and `azure/mysql/azure_mysql_flex` likewise had no
+  `MYSQL_*`, so an app that moved between providers of the same kind silently
+  lost every variable it read. `aws/faas/lambda` and
+  `gcp/faas/cloud_functions_gen2` now emit `FUNCTION_ARN` and
+  `FUNCTION_REGION` like their Azure and Knative siblings. All six changes are
+  additive: the legacy `DATABASE_*` names stay in place as aliases reading the
+  same value, so nothing a deployed workload reads today disappears.
+
 - Publish eleven connection-envelope keys that every driver of their kind
   already emitted. `email` gains `EMAIL_FROM_ADDRESS` and `EMAIL_REGION`,
   `encryption_key` gains `ENCRYPTION_KEY_SPEC` / `_USAGE` / `_MULTI_REGION`,

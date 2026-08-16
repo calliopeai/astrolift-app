@@ -309,9 +309,7 @@ _UNDECLARED_ENVELOPE_KEYS: dict[tuple[str, str, str], frozenset[str]] = {
 # relative to the union emitted across that kind.
 # https://github.com/calliopeai/astrolift-app/issues/1402
 _ENVELOPE_SUBSET_DIVERGENCE: dict[tuple[str, str, str], frozenset[str]] = {
-    ("aws", "faas", "lambda"): frozenset({"FUNCTION_ARN", "FUNCTION_REGION"}),
     ("aws", "model_endpoint", "bedrock"): frozenset({"MODEL_DEPLOYMENT_NAME", "MODEL_REGION"}),
-    ("aws", "mysql", "rds_mysql"): frozenset({"MYSQL_DB", "MYSQL_HOST", "MYSQL_PASSWORD", "MYSQL_PORT", "MYSQL_USER"}),
     # Only MASTER_SECRET_REF: the Aurora drivers do emit the rest of the
     # postgres envelope, on the ``self._kind == "postgres"`` branch that the
     # extractor now resolves per subclass.
@@ -351,24 +349,14 @@ _ENVELOPE_SUBSET_DIVERGENCE: dict[tuple[str, str, str], frozenset[str]] = {
         }
     ),
     ("azure", "model_endpoint", "azure_openai"): frozenset({"MODEL_DEPLOYMENT_NAME", "MODEL_REGION"}),
-    ("azure", "mysql", "azure_mysql_flex"): frozenset(
-        {"MYSQL_DB", "MYSQL_HOST", "MYSQL_PASSWORD", "MYSQL_PORT", "MYSQL_USER"}
-    ),
     ("azure", "object_store", "azure_blob"): frozenset(
         {"BUCKET_ENDPOINT", "BUCKET_NAME", "BUCKET_PREFIX", "BUCKET_REGION"}
     ),
     ("azure", "object_store", "blob"): frozenset({"BUCKET_ENDPOINT", "BUCKET_NAME", "BUCKET_PREFIX", "BUCKET_REGION"}),
-    ("azure", "postgres", "azure_pg_flex"): frozenset(
-        {
-            "POSTGRES_DB",
-            "POSTGRES_HOST",
-            "POSTGRES_MASTER_SECRET_REF",
-            "POSTGRES_PASSWORD",
-            "POSTGRES_PORT",
-            "POSTGRES_SSL_MODE",
-            "POSTGRES_USER",
-        }
-    ),
+    # Only MASTER_SECRET_REF: just two of the seven postgres drivers publish a
+    # master-credential reference, and Azure Flexible Server has no equivalent
+    # of a Secrets Manager master secret to point at.
+    ("azure", "postgres", "azure_pg_flex"): frozenset({"POSTGRES_MASTER_SECRET_REF"}),
     ("azure", "queue", "azure_servicebus"): frozenset({"QUEUE_ARN_OR_ID", "QUEUE_NAME", "QUEUE_REGION", "QUEUE_URL"}),
     ("azure", "queue", "servicebus"): frozenset({"QUEUE_ARN_OR_ID", "QUEUE_NAME", "QUEUE_REGION", "QUEUE_URL"}),
     ("azure", "redis", "azure_cache_redis"): frozenset(
@@ -401,7 +389,6 @@ _ENVELOPE_SUBSET_DIVERGENCE: dict[tuple[str, str, str], frozenset[str]] = {
     # username/password to emit. Only became visible when #1400 made this
     # driver's binding() readable.
     ("gcp", "event_stream", "managed_kafka"): frozenset({"EVENT_STREAM_PASSWORD", "EVENT_STREAM_USERNAME"}),
-    ("gcp", "faas", "cloud_functions_gen2"): frozenset({"FUNCTION_ARN", "FUNCTION_REGION"}),
     ("gcp", "graph_db", "spanner_graph"): frozenset({"GRAPH_DB_PORT", "GRAPH_DB_READER_URL"}),
     ("gcp", "model_endpoint", "vertex_ai"): frozenset({"MODEL_DEPLOYMENT_NAME", "MODEL_REGION"}),
     ("gcp", "object_store", "gcs"): frozenset({"BUCKET_ENDPOINT", "BUCKET_NAME", "BUCKET_PREFIX", "BUCKET_REGION"}),
@@ -424,17 +411,7 @@ _ENVELOPE_SUBSET_DIVERGENCE: dict[tuple[str, str, str], frozenset[str]] = {
     ("k8s_native", "event_stream", "nats"): frozenset({"EVENT_STREAM_PASSWORD", "EVENT_STREAM_USERNAME"}),
     ("k8s_native", "mysql", "operator"): frozenset({"DATABASE_URL"}),
     ("k8s_native", "observability", "kube_prometheus_stack"): frozenset({"LOG_GROUP"}),
-    ("k8s_native", "postgres", "cnpg"): frozenset(
-        {
-            "POSTGRES_DB",
-            "POSTGRES_HOST",
-            "POSTGRES_MASTER_SECRET_REF",
-            "POSTGRES_PASSWORD",
-            "POSTGRES_PORT",
-            "POSTGRES_SSL_MODE",
-            "POSTGRES_USER",
-        }
-    ),
+    ("k8s_native", "postgres", "cnpg"): frozenset({"POSTGRES_MASTER_SECRET_REF"}),
     ("k8s_native", "queue", "rabbitmq_operator"): frozenset(
         {"QUEUE_ARN_OR_ID", "QUEUE_NAME", "QUEUE_REGION", "QUEUE_URL"}
     ),
@@ -496,7 +473,15 @@ _VALUE_PROVENANCE_DIVERGENCE: dict[tuple[str, str], dict[str, tuple[frozenset[st
     },
     ("mysql", "MYSQL_USER"): {
         "literal": (
-            frozenset({"aws/mysql/aurora_mysql", "aws/mysql/aurora_mysql_serverless_v2", "gcp/mysql/cloudsql"}),
+            frozenset(
+                {
+                    "aws/mysql/aurora_mysql",
+                    "aws/mysql/aurora_mysql_serverless_v2",
+                    "aws/mysql/rds_mysql",
+                    "azure/mysql/azure_mysql_flex",
+                    "gcp/mysql/cloudsql",
+                }
+            ),
             "The driver provisioned the instance and named the master user itself.",
         ),
         "secret_ref": (
@@ -542,6 +527,89 @@ _VALUE_PROVENANCE_DIVERGENCE: dict[tuple[str, str], dict[str, tuple[frozenset[st
         "literal": (
             frozenset({"azure/postgres/azure_pg_flex"}),
             "The driver created the administrator login and named it itself.",
+        ),
+        "secret_ref": (
+            frozenset({"k8s_native/postgres/cnpg"}),
+            "CNPG owns the generated -app Secret and rotates it; reading through the reference is "
+            "what keeps the binding correct across a rotation.",
+        ),
+    },
+    # Added by #1402: cnpg now emits the canonical POSTGRES_* names too, so
+    # the divergence it already had under the pre-#1003 DATABASE_* aliases
+    # shows up under the canonical names as well. Same cause, same reason.
+    ("postgres", "POSTGRES_DB"): {
+        "literal": (
+            frozenset(
+                {
+                    "aws/postgres/aurora_postgres",
+                    "aws/postgres/aurora_postgres_serverless_v2",
+                    "aws/postgres/rds",
+                    "azure/postgres/azure_pg_flex",
+                    "gcp/postgres/alloydb",
+                    "gcp/postgres/cloudsql",
+                }
+            ),
+            "The driver created the database and knows its name.",
+        ),
+        "secret_ref": (
+            frozenset({"k8s_native/postgres/cnpg"}),
+            "CNPG owns the generated -app Secret and rotates it; reading through the reference is "
+            "what keeps the binding correct across a rotation.",
+        ),
+    },
+    ("postgres", "POSTGRES_HOST"): {
+        "literal": (
+            frozenset(
+                {
+                    "aws/postgres/aurora_postgres",
+                    "aws/postgres/aurora_postgres_serverless_v2",
+                    "aws/postgres/rds",
+                    "azure/postgres/azure_pg_flex",
+                    "gcp/postgres/alloydb",
+                    "gcp/postgres/cloudsql",
+                }
+            ),
+            "The provisioning response carries the endpoint, so the driver knows it.",
+        ),
+        "secret_ref": (
+            frozenset({"k8s_native/postgres/cnpg"}),
+            "CNPG owns the generated -app Secret and rotates it; reading through the reference is "
+            "what keeps the binding correct across a rotation.",
+        ),
+    },
+    ("postgres", "POSTGRES_PORT"): {
+        "literal": (
+            frozenset(
+                {
+                    "aws/postgres/aurora_postgres",
+                    "aws/postgres/aurora_postgres_serverless_v2",
+                    "aws/postgres/rds",
+                    "azure/postgres/azure_pg_flex",
+                    "gcp/postgres/alloydb",
+                    "gcp/postgres/cloudsql",
+                }
+            ),
+            "A managed Postgres endpoint is on a port the driver already knows.",
+        ),
+        "secret_ref": (
+            frozenset({"k8s_native/postgres/cnpg"}),
+            "CNPG owns the generated -app Secret and rotates it; reading through the reference is "
+            "what keeps the binding correct across a rotation.",
+        ),
+    },
+    ("postgres", "POSTGRES_USER"): {
+        "literal": (
+            frozenset(
+                {
+                    "aws/postgres/aurora_postgres",
+                    "aws/postgres/aurora_postgres_serverless_v2",
+                    "aws/postgres/rds",
+                    "azure/postgres/azure_pg_flex",
+                    "gcp/postgres/alloydb",
+                    "gcp/postgres/cloudsql",
+                }
+            ),
+            "The driver created the master role and named it itself.",
         ),
         "secret_ref": (
             frozenset({"k8s_native/postgres/cnpg"}),
