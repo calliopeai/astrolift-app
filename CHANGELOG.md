@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Carry human-gate state on a workflow run's stage rows.
+  `workflowStageExecutions` now returns `stageRole`, `stageApprovers`,
+  `humanGateState` (`pending` / `approved` / `rejected` / `closed`, empty for
+  non-gate stages), and `humanGateNote`, so a remote client can render
+  "waiting on approval" and who it waits on as read-only platform truth
+  instead of reverse-engineering the execution's `output` JSON. The resolver
+  also fails closed with no tenant: its read scope is org UNION
+  platform-global, which for a null org matched every org-less run in the
+  install.
+
 - Add a steering channel into a running agent task: `sendAgentTaskInput`
   queues a follow-up prompt against an `AgentTask`, and the runner consumes
   it at its next turn boundary through the state callback it already posts.

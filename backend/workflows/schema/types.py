@@ -46,6 +46,22 @@ class WorkflowStageType:
         return self.agent_definition.name
 
 
+def _gate_payload(output) -> dict:
+    """The ``human_gate`` sub-object a decision is recorded under, or ``{}``.
+
+    ``record_human_gate_decision`` writes
+    ``{"human_gate": {"decision", "decided_by_user_id", "note"}}`` onto the
+    execution's ``output``. That column is free-form JSON every other stage
+    kind also writes to (a chained stage's output can be a list, a scalar,
+    or a dict whose ``human_gate`` key is the string an approved gate
+    returns downstream), so every access is guarded.
+    """
+    if not isinstance(output, dict):
+        return {}
+    payload = output.get("human_gate")
+    return payload if isinstance(payload, dict) else {}
+
+
 @strawberry_django.type(WorkflowStageExecution)
 class WorkflowStageExecutionType:
     guid: strawberry.ID
@@ -79,6 +95,54 @@ class WorkflowStageExecutionType:
     @strawberry_django.field
     def stage_order(self) -> int:
         return self.stage.order
+
+    @strawberry_django.field
+    def stage_role(self) -> str:
+        """The stage's role label — the human-readable "who does this" that
+        pairs with ``stage_kind`` when rendering a run's stage list."""
+        return self.stage.role or ""
+
+    @strawberry_django.field
+    def stage_approvers(self) -> list[str]:
+        """The stage's declared approvers (team / role slugs) — who a gate in
+        ``human_gate_state: pending`` is waiting on. Empty for a stage that
+        declares none, and for every non-gate kind."""
+        approvers = self.stage.approvers
+        if not isinstance(approvers, list):
+            return []
+        return [str(a) for a in approvers if str(a).strip()]
+
+    @strawberry_django.field
+    def human_gate_state(self) -> str:
+        """Read-only gate state for a ``human_gate`` stage; ``""`` for every
+        other stage kind.
+
+        There is no separate gate table — this execution row IS the durable
+        record (``record_human_gate_decision`` writes the outcome onto
+        ``output`` and closes the row), so the state is derived from it:
+
+        * ``pending`` — the gate is open and no decision has been recorded.
+          This describes the STAGE, so a caller rendering "waiting on
+          approval" should also check the run's own state: a run cancelled
+          or terminated while a gate was open leaves the gate row open.
+        * ``approved`` / ``rejected`` — the recorded decision. A gate that
+          runs out its timeout is recorded as ``rejected`` with
+          ``human_gate_note`` ``"gate timed out"``.
+        * ``closed`` — the row reached a terminal status with no decision
+          recorded.
+        """
+        if self.stage.kind != WorkflowStage.StageKind.HUMAN_GATE:
+            return ""
+        decision = _gate_payload(self.output).get("decision")
+        if decision in ("approved", "rejected"):
+            return str(decision)
+        return "closed" if self.is_terminal else "pending"
+
+    @strawberry_django.field
+    def human_gate_note(self) -> str:
+        """The note recorded alongside a gate decision (``"gate timed out"``
+        for an expired gate). Empty until a decision lands."""
+        return str(_gate_payload(self.output).get("note") or "")
 
     @strawberry_django.field
     def agent_run_guid(self) -> str | None:

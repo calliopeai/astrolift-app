@@ -97,9 +97,18 @@ class Query:
 
         # Org-scoped: a foreign org's run resolves to nothing (same
         # closure as workflow_stages above).
+        #
+        # Fail closed with no tenant. The shared read scope is
+        # org ∪ platform-global, which for a null org compiles to
+        # "organization_id IS NULL OR organization IS NULL" and would hand
+        # back every org-less run in the install — including, since #69, its
+        # stage roles, declared approvers, and gate state.
+        org_pk = _caller_org_pk()
+        if org_pk is None:
+            return []
         run = (
             WorkflowRun.objects.filter(workflow_id=workflow_id, run_id=run_id)
-            .filter(_org_scope_q(_caller_org_pk()))
+            .filter(_org_scope_q(org_pk))
             .first()
         )
         if not run:

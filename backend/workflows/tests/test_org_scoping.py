@@ -458,3 +458,78 @@ def test_workflow_stage_executions_cross_org_returns_empty(member, org, other_or
             _info(member), workflow_id="wfid-foreign", run_id="rid-foreign"
         )
     assert list(rows) == []
+
+
+def _seed_stage_execution(definition, *, workflow_id, run_id, organization):
+    """A foreign/org-less run carrying one real stage execution — the row an
+    unscoped reader would hand back."""
+    from astrolift_operations.models import WorkflowRun
+    from workflows.models import WorkflowStageExecution
+
+    run = WorkflowRun.objects.create(
+        workflow_kind="WorkflowDefinitionRunWorkflow",
+        workflow_definition=definition,
+        workflow_id=workflow_id,
+        run_id=run_id,
+        organization=organization,
+    )
+    return WorkflowStageExecution.objects.create(
+        workflow_run=run,
+        stage=definition.stages.get(order=0),
+        status=WorkflowStageExecution.Status.RUNNING,
+    )
+
+
+def test_workflow_stage_executions_cross_org_hides_a_seeded_row(member, org, other_org):
+    """The empty-run assertion above passes with or without scoping. Seed the
+    foreign run with a stage execution that an unscoped read WOULD return, and
+    prove the owning org still sees it (astrolift-cli#69: the rows now carry
+    stage role + declared approvers)."""
+    definition = _make_def("foreign-exec-def", organization=other_org)
+    execution = _seed_stage_execution(
+        definition, workflow_id="wfid-foreign-exec", run_id="rid-foreign-exec", organization=other_org
+    )
+
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        outsider = list(
+            _query().workflow_stage_executions(
+                _info(member), workflow_id="wfid-foreign-exec", run_id="rid-foreign-exec"
+            )
+        )
+    with _tenant_ctx(TenantContext(organization_id=other_org.id, actor_user_id=member.id)):
+        owner = list(
+            _query().workflow_stage_executions(
+                _info(member), workflow_id="wfid-foreign-exec", run_id="rid-foreign-exec"
+            )
+        )
+
+    assert outsider == []
+    assert [e.pk for e in owner] == [execution.pk]
+
+
+def test_workflow_stage_executions_without_tenant_returns_empty(member, org):
+    """Fail closed with no tenant. The read scope is org ∪ platform-global, so
+    a null org compiles to "IS NULL OR IS NULL" and would return every org-less
+    run's stage detail in the install."""
+    definition = _make_def("orgless-exec-def", organization=None)
+    _seed_stage_execution(
+        definition, workflow_id="wfid-orgless-exec", run_id="rid-orgless-exec", organization=None
+    )
+
+    with _tenant_ctx(None):
+        rows = list(
+            _query().workflow_stage_executions(
+                _info(member), workflow_id="wfid-orgless-exec", run_id="rid-orgless-exec"
+            )
+        )
+    assert rows == []
+
+    # Same org-less run stays readable to a real tenant (the platform-global
+    # carve-out this guard must not break).
+    with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
+        scoped = list(
+            _query().workflow_stage_executions(
+                _info(member), workflow_id="wfid-orgless-exec", run_id="rid-orgless-exec"
+            )
+        )
+    assert len(scoped) == 1

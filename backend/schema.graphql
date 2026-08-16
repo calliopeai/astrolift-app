@@ -7005,6 +7005,10 @@ type WorkflowStageExecutionType {
   stageGuid: String!
   stageKind: String!
   stageOrder: Int!
+  stageRole: String!
+  stageApprovers: [String!]!
+  humanGateState: String!
+  humanGateNote: String!
   agentRunGuid: String
   childWorkflowRunGuid: String
   childWorkflowDefinitionSlug: String
