@@ -35,6 +35,7 @@ from _sdk.managed_service import (
     UpdateResult,
     UpdateSpec,
     ValueRef,
+    unsupported_update,
 )
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
@@ -150,14 +151,8 @@ class CNPGPostgresDriver(ManagedServiceDriver):
 
     @driver_op(cloud="k8s_native", driver="postgres_cnpg")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        # Update path: re-apply the Cluster CRD with new size/config.
-        # CNPG operator handles rolling resize + replica scaling.
-        return UpdateResult(
-            ok=True,
-            handle=spec.handle,
-            message=(
-                "to update CNPG cluster size, call provision again with the new size — CNPG handles rolling resize"
-            ),
+        return unsupported_update(
+            spec.handle, "CNPG reconciles a rolling resize from the Cluster CRD re-applied on provision"
         )
 
     @driver_op(
@@ -334,6 +329,12 @@ class CNPGPostgresDriver(ManagedServiceDriver):
                 "DATABASE_URL": "Full postgresql:// URL",
             }
         )
+
+    def editable_fields(self) -> list[str]:
+        """No config key can be applied without a reprovision (#1376)."""
+        # version / extensions / storage_size land in the CNPG Cluster CRD, which
+        # only provision() applies; CNPG then handles the rolling resize.
+        return []
 
     # ---- internals ------------------------------------------------
 

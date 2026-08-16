@@ -56,6 +56,7 @@ from _sdk.managed_service import (
     UpdateResult,
     UpdateSpec,
     ValueRef,
+    unsupported_update,
 )
 
 KIND = "object_store"
@@ -126,10 +127,8 @@ class BlobStorageDriver(ManagedServiceDriver):
 
     @driver_op(cloud="azure", driver="object_store_blob")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        return UpdateResult(
-            ok=True,
-            handle=spec.handle,
-            message="Blob container access tier / lifecycle policies are operator-managed",
+        return unsupported_update(
+            spec.handle, "Blob container access tier and lifecycle policy reconcile on provision, not in place"
         )
 
     @driver_op(
@@ -274,6 +273,12 @@ class BlobStorageDriver(ManagedServiceDriver):
             }
         )
 
+    def editable_fields(self) -> list[str]:
+        """No config key can be applied without a reprovision (#1376)."""
+        # access_tier is set while provisioning the container; this driver has
+        # no in-place path for it.
+        return []
+
     def _container_name_for(self, *, spec: ProvisionSpec) -> str:
         # Container names: 3-63 chars, lowercase alphanumeric +
         # dashes, no consecutive dashes, no leading/trailing dash.
@@ -388,13 +393,8 @@ class AzureBlobStorageDriver(ManagedServiceDriver):
 
     @driver_op(cloud="azure", driver="object_store_blob_v2")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        return UpdateResult(
-            ok=True,
-            handle=spec.handle,
-            message=(
-                "Blob container access tier / lifecycle policies are "
-                "operator-managed via the storage-account policy editor"
-            ),
+        return unsupported_update(
+            spec.handle, "Blob container access tier and lifecycle policy reconcile on provision, not in place"
         )
 
     @driver_op(
@@ -594,6 +594,12 @@ class AzureBlobStorageDriver(ManagedServiceDriver):
                 "AZURE_BLOB_ENDPOINT": "Container HTTPS endpoint",
             }
         )
+
+    def editable_fields(self) -> list[str]:
+        """No config key can be applied without a reprovision (#1376)."""
+        # access_tier / public_access are set while provisioning the container;
+        # this driver has no in-place path for either.
+        return []
 
     # ---- internals ----------------------------------------------------
 

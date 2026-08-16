@@ -50,6 +50,24 @@ from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
+# Columns an accepted in-place update writes. Both update mutations save with
+# this scope rather than a bare ``save()``: the row is only locked against
+# other ``select_for_update`` writers, so a full-row write would push the
+# snapshot read at the top of the transaction back over whatever the update
+# workflow's activities (``backend_ref``, ``connection_secret_ref``) or
+# ``revealManagedServiceConnection`` (``last_action_at``) wrote meanwhile.
+_UPDATE_DESIRED_STATE_FIELDS = (
+    "applied_config",
+    "config",
+    "status",
+    "status_error",
+    "operation_kind",
+    "operation_workflow_id",
+    "operation_run_id",
+    "operation_started_at",
+    "operation_completed_at",
+)
+
 
 def _project_service_rows_for_caller(service_id):
     rows = (
@@ -431,7 +449,7 @@ class ManagedServiceMutations:
         input: UpdateManagedServiceInput,
     ) -> MutationResultType[ManagedServiceType]:
         config_changed = False
-        name_changed = False
+        changed_fields: list[str] = []
         with transaction.atomic():
             # The scoped queryset joins nullable app/agent relationships for
             # authorization and rendering. Lock only the service row: Postgres
@@ -480,11 +498,12 @@ class ManagedServiceMutations:
                 svc.operation_started_at = timezone.now()
                 svc.operation_completed_at = None
                 config_changed = True
+                changed_fields += _UPDATE_DESIRED_STATE_FIELDS
             if input.name is not None and input.name.strip() != svc.name:
                 svc.name = input.name.strip()
-                name_changed = True
-            if config_changed or name_changed:
-                svc.save()
+                changed_fields.append("name")
+            if changed_fields:
+                svc.save(update_fields=[*changed_fields, "updated_at", "version"])
         if config_changed:
             try:
                 _start_service_update(info, svc)
@@ -662,7 +681,7 @@ class ManagedServiceMutations:
         input: UpdateManagedServiceInput,
     ) -> MutationResultType[ManagedServiceType]:
         config_changed = False
-        name_changed = False
+        changed_fields: list[str] = []
         with transaction.atomic():
             svc = (
                 # ``app_environment`` is nullable for project services. Lock
@@ -726,11 +745,12 @@ class ManagedServiceMutations:
                 svc.operation_started_at = timezone.now()
                 svc.operation_completed_at = None
                 config_changed = True
+                changed_fields += _UPDATE_DESIRED_STATE_FIELDS
             if input.name is not None and input.name.strip() != svc.name:
                 svc.name = input.name.strip()
-                name_changed = True
-            if config_changed or name_changed:
-                svc.save()
+                changed_fields.append("name")
+            if changed_fields:
+                svc.save(update_fields=[*changed_fields, "updated_at", "version"])
         if config_changed:
             try:
                 _start_service_update(info, svc)

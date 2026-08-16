@@ -27,6 +27,7 @@ from _sdk.managed_service import (
     UpdateResult,
     UpdateSpec,
     ValueRef,
+    unsupported_update,
 )
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
@@ -96,10 +97,8 @@ class NATSDriver(ManagedServiceDriver):
 
     @driver_op(cloud="k8s_native", driver="event_stream_nats")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        return UpdateResult(
-            ok=True,
-            handle=spec.handle,
-            message="re-apply manifest to scale / reconfigure",
+        return unsupported_update(
+            spec.handle, "the NATS StatefulSet is reconciled by re-applying its manifest on provision"
         )
 
     @driver_op(
@@ -221,6 +220,12 @@ class NATSDriver(ManagedServiceDriver):
                 "EVENT_STREAM_TLS": "TLS enabled (true/false)",
             }
         )
+
+    def editable_fields(self) -> list[str]:
+        """No config key can be applied without a reprovision (#1376)."""
+        # enable_jetstream / storage_class land in the rendered StatefulSet, which
+        # only provision() applies to the cluster.
+        return []
 
     def _render_statefulset(
         self,
