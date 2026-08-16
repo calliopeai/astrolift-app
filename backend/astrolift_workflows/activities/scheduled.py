@@ -15,14 +15,61 @@ directly without an event loop.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from temporalio import activity
+
+if TYPE_CHECKING:
+    # Type-only: the runtime import stays inside the function, since
+    # preview_gc is the Django-free module the workflow sandbox loads.
+    from astrolift_workflows.preview_gc import PreviewSnapshot
 
 log = logging.getLogger("astrolift_workflows.activities.scheduled")
 
 
 # ---- Preview GC ---------------------------------------------------
+
+
+# Label for the FAILED-preview cleanup pass. Deliberately NOT an
+# ``EvictionReason``: the GC policy in ``astrolift_workflows.preview_gc``
+# only models running previews, so failed-preview cleanup is this
+# activity's own concern and doesn't belong in the policy's vocabulary.
+_FAILED_CLEANUP_REASON = "failed_stale"
+
+
+def _preview_gc_snapshot(preview) -> PreviewSnapshot:
+    """Project a ``PreviewEnvironment`` row into the GC policy's
+    ``PreviewSnapshot`` (#1399).
+
+    This is the join the policy was missing: ``preview_gc`` is a pure,
+    Django-free module (the Temporal workflow sandbox imports it), so
+    nothing there could read a row, and until now nothing outside its
+    own tests ever built a snapshot. ``is_pinned`` in particular had no
+    column behind it, which made both pin branches in the policy dead
+    code.
+
+    ``state`` is the raw model status. The policy only ever tests
+    ``== "running"``, so ``building`` (which the policy's docstring
+    calls ``pending``) and ``failed`` both correctly read as
+    not-a-GC-candidate without a translation table.
+
+    ``last_deployed_at`` falls back to ``created_at`` when null. In
+    practice a RUNNING preview always has it — the same activity that
+    flips the status stamps the timestamp — so the fallback only covers
+    rows in a state the policy ignores anyway, and ``created_at`` is
+    the right staleness anchor for a preview that never deployed.
+    """
+    from astrolift_workflows.preview_gc import PreviewSnapshot
+
+    anchor = preview.last_deployed_at or preview.created_at
+    return PreviewSnapshot(
+        preview_id=preview.pk,
+        app_id=preview.registered_app_id,
+        pr_number=preview.pr_number or 0,
+        is_pinned=bool(preview.is_pinned),
+        state=preview.status,
+        last_deployed_at_unix=int(anchor.timestamp()),
+    )
 
 
 def _gc_stale_previews_sync(stale_after_days: int) -> int:
@@ -33,21 +80,76 @@ def _gc_stale_previews_sync(stale_after_days: int) -> int:
     from astrolift_lifecycle.models import PreviewEnvironment
     from astrolift_workflows.client import start_workflow
     from astrolift_workflows.inputs import Actor, TearDownPreviewInput
+    from astrolift_workflows.preview_gc import evaluate_app_evictions
 
-    cutoff = timezone.now() - timedelta(days=stale_after_days)
-    stale = PreviewEnvironment.objects.filter(
-        status__in=[
-            PreviewEnvironment.Status.RUNNING.value,
-            PreviewEnvironment.Status.FAILED.value,
-        ],
-        deleted_at__isnull=True,
-        # Use last_deployed_at as the staleness signal; previews that
-        # were never deployed (BUILDING dangling) get caught by the
-        # status filter falling through to FAILED via the build path.
-        last_deployed_at__lt=cutoff,
+    now = timezone.now()
+    now_unix = int(now.timestamp())
+    cutoff = now - timedelta(days=stale_after_days)
+
+    # Live previews the GC can act on. BUILDING rows are excluded: they
+    # hold no cluster resources the policy counts and tearing one down
+    # mid-build races the builder.
+    rows = list(
+        PreviewEnvironment.objects.filter(
+            status__in=[
+                PreviewEnvironment.Status.RUNNING.value,
+                PreviewEnvironment.Status.FAILED.value,
+            ],
+            deleted_at__isnull=True,
+        ).select_related("registered_app")
     )
+
+    # preview pk -> reason string, deduplicated: a row can qualify on
+    # more than one axis and must only be torn down once.
+    evictions: dict[int, str] = {}
+
+    # ---- policy pass (TTL + max-active), per app ----
+    #
+    # ``max_active`` is a per-app cap, so the policy is evaluated one
+    # app at a time — a mixed-app batch would over-evict. FAILED rows
+    # ride along in each group because the policy already treats any
+    # non-running state as neither eligible nor active; passing them
+    # keeps the projection uniform.
+    by_app: dict[int, list[PreviewEnvironment]] = {}
+    for p in rows:
+        by_app.setdefault(p.registered_app_id, []).append(p)
+
+    for app_id in sorted(by_app):
+        group = by_app[app_id]
+        # Every row in the group shares one app, so any row's FK is the
+        # cap's source. Clamped to >= 1: the field is a
+        # PositiveIntegerField, and a stored 0 would make
+        # ``evaluate_max_active_evictions`` raise and take down the
+        # whole sweep for every other app. "No previews at all" is
+        # expressed by ``preview_enabled``, not by a zero cap.
+        max_active = max(1, int(getattr(group[0].registered_app, "preview_max_active", 0) or 0))
+        for decision in evaluate_app_evictions(
+            previews=[_preview_gc_snapshot(p) for p in group],
+            now_unix=now_unix,
+            ttl_days=stale_after_days,
+            max_active=max_active,
+        ):
+            evictions.setdefault(decision.preview_id, str(decision.reason))
+
+    # ---- failed-preview cleanup ----
+    #
+    # Kept outside the policy on purpose. ``is_eligible_for_gc``
+    # requires ``state == "running"``, so routing everything through the
+    # policy would silently stop reaping stale FAILED previews, which
+    # this sweep has always done. Same staleness signal as before:
+    # ``last_deployed_at`` older than the cutoff, and never-deployed
+    # rows (null) are left alone.
+    for p in rows:
+        if p.status != PreviewEnvironment.Status.FAILED.value:
+            continue
+        if p.last_deployed_at is None or p.last_deployed_at >= cutoff:
+            continue
+        evictions.setdefault(p.pk, _FAILED_CLEANUP_REASON)
+
+    by_pk = {p.pk: p for p in rows}
     n = 0
-    for p in stale.iterator():
+    for pk in sorted(evictions):
+        p = by_pk[pk]
         handle = start_workflow(
             "TearDownPreviewWorkflow",
             args=[
@@ -57,6 +159,12 @@ def _gc_stale_previews_sync(stale_after_days: int) -> int:
         )
         if handle.enqueued:
             n += 1
+            log.info(
+                "preview gc: tearing down preview=%s app=%s reason=%s",
+                p.guid,
+                p.registered_app_id,
+                evictions[pk],
+            )
     return n
 
 

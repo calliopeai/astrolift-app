@@ -11,15 +11,22 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
 from core.models.base import BaseCoreModel
 
 # Hard ceiling on the TTL extension window (#431). Anything longer is
-# either an abandoned PR (operator should pin it explicitly via a
-# different surface) or a developer-leaked preview racking up cost.
+# either an abandoned PR (operator should pin it explicitly via
+# ``setPreviewPinned`` / ``astro app previews pin``) or a
+# developer-leaked preview racking up cost.
 PREVIEW_TTL_MAX_DAYS = 30
+
+# Storage ceiling for the free-text pin reason (#1399). Matches
+# ``RegisteredApp.webhook_deploys_pause_reason`` so both operator
+# "why is this parked" fields truncate identically.
+PREVIEW_PIN_REASON_MAX_CHARS = 512
 
 # Default TTL applied at creation time when the caller doesn't pass an
 # explicit ``ttl_until``. Mirrors the stale-after threshold the UI
@@ -102,6 +109,38 @@ class PreviewEnvironment(BaseCoreModel):
         on_delete=models.SET_NULL,
     )
 
+    # Operator pin (#1399). The GC policy in
+    # ``astrolift_workflows/preview_gc.py`` has modelled a pin since #88
+    # — ``is_eligible_for_gc`` returns False for pinned rows and
+    # max-active eviction filters them out of the candidate list — but
+    # nothing could ever set one, so the policy branch was unreachable.
+    # This column is what ``PreviewSnapshot.is_pinned`` is projected
+    # from.
+    #
+    # A pin is deliberately open-ended, which is why it is not
+    # ``extendPreviewTtl``: that only moves ``ttl_until`` in capped
+    # 1/7/30-day steps, only affects the TTL axis, and has no inverse.
+    is_pinned = models.BooleanField(
+        default=False,
+        help_text=(
+            "Operator pin. Pinned previews are never auto-evicted by the "
+            "preview GC — neither by TTL nor by max_active."
+        ),
+    )
+    # Audit trail for the pin, mirroring the
+    # ``webhook_deploys_paused_*`` triple on RegisteredApp. Populated on
+    # pin, cleared on unpin, so "pinned 3h ago by X because Y" copy is
+    # always about the pin that is currently in force.
+    pinned_at = models.DateTimeField(null=True, blank=True)
+    pinned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="pinned_preview_environments",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    pin_reason = models.CharField(max_length=PREVIEW_PIN_REASON_MAX_CHARS, blank=True, default="")
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -139,3 +178,38 @@ class PreviewEnvironment(BaseCoreModel):
         proposed = anchor + timedelta(days=days)
         ceiling = now + timedelta(days=PREVIEW_TTL_MAX_DAYS)
         self.ttl_until = min(proposed, ceiling)
+
+    # Columns ``set_pinned`` writes. Callers pass this to
+    # ``save(update_fields=...)`` so the pin write never clobbers a
+    # concurrent status/TTL update on the same row.
+    PIN_UPDATE_FIELDS = ("is_pinned", "pinned_at", "pinned_by", "pin_reason")
+
+    def set_pinned(self, *, pinned: bool, by=None, reason: str = "") -> None:
+        """Set or clear the operator pin, in memory (#1399).
+
+        Does not save — the caller decides the transaction boundary and
+        passes :data:`PIN_UPDATE_FIELDS` (plus the tracking columns) to
+        ``save(update_fields=...)``.
+
+        Pinning stamps the actor / timestamp / reason. Unpinning clears
+        all three, so a later pin records fresh context rather than
+        leaving a stale "pinned by X" the UI would render as current —
+        same posture as ``resume_astrolift_app_webhook_deploys``.
+
+        Re-pinning an already-pinned preview **does** refresh the stamp.
+        That differs deliberately from the app-level webhook pause,
+        which preserves the original: a pause is an incident whose start
+        time is the interesting fact, whereas a re-pin is an operator
+        renewing an open-ended decision, usually with a new reason, and
+        the current justification is what an auditor wants.
+        """
+        if pinned:
+            self.is_pinned = True
+            self.pinned_at = timezone.now()
+            self.pinned_by = by
+            self.pin_reason = (reason or "").strip()[:PREVIEW_PIN_REASON_MAX_CHARS]
+        else:
+            self.is_pinned = False
+            self.pinned_at = None
+            self.pinned_by = None
+            self.pin_reason = ""

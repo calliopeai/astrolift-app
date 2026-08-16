@@ -2792,8 +2792,12 @@ export type AstroliftPreviewEnvironment = {
   hostname: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   isManual: Scalars['Boolean']['output'];
+  isPinned: Scalars['Boolean']['output'];
   lastDeployedAt?: Maybe<Scalars['DateTime']['output']>;
   namespace: Scalars['String']['output'];
+  pinReason: Scalars['String']['output'];
+  pinnedAt?: Maybe<Scalars['DateTime']['output']>;
+  pinnedByEmail?: Maybe<Scalars['String']['output']>;
   prNumber: Scalars['Int']['output'];
   prUrl: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
@@ -5208,6 +5212,7 @@ export type Mutation = {
   /** Toggle a public runtime feature flag (the admin 'feature flipper'). Platform-admin only. ``key`` is the public dotted key from ``astroliftServerInfo.featureFlags`` (e.g. ``zentinelle.enabled``); the backing Constance value is set and the updated flag is returned. Unknown / non-public keys are rejected with a VALIDATION error. Install-time features (``astroliftServerInfo.buildTimeFeatures``) are NOT settable here — they require a redeploy. */
   setFeatureFlag: FeatureFlagInfoMutationResult;
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
+  setPreviewPinned: AstroliftPreviewEnvironmentMutationResult;
   setProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
   setRetentionPolicy: AstroliftRetentionPolicyMutationResult;
   /** Cancel a sign request. Requires SIGNREQUEST_CHANGE_CANCEL permission. */
@@ -6605,6 +6610,11 @@ export type MutationSetFeatureFlagArgs = {
 
 export type MutationSetNotificationPreferenceArgs = {
   input: SetNotificationPreferenceInput;
+};
+
+
+export type MutationSetPreviewPinnedArgs = {
+  input: SetPreviewPinnedInput;
 };
 
 
@@ -9310,6 +9320,12 @@ export type SetNotificationPreferenceInput = {
   channel: Scalars['String']['input'];
   enabled: Scalars['Boolean']['input'];
   eventKind: Scalars['String']['input'];
+};
+
+export type SetPreviewPinnedInput = {
+  id: Scalars['GUID']['input'];
+  pinned: Scalars['Boolean']['input'];
+  reason: InputMaybe<Scalars['String']['input']>;
 };
 
 export type SetRetentionPolicyInput = {

@@ -106,6 +106,7 @@ from astrolift_lifecycle.schema.mutations.types import (  # noqa: F401
     SetDomainPathRoutesInput,
     SetDomainRedirectsInput,
     SetEnvironmentSettingInput,
+    SetPreviewPinnedInput,
     StartDeploymentInput,
     TearDownPreviewInputGql,
     TriggerDeployWorkflowInput,

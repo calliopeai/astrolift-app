@@ -507,6 +507,10 @@ def _preview_environments_qs(*, app_slug: str | None, search: str | None = None)
         "registered_app__organization",
         "registered_app__default_tenant_cluster",
         "app_environment__tenant_cluster",
+        # ``pinned_by_email`` on the type joins to the actor who placed
+        # the pin (#1399); without this the page fans out one extra
+        # query per pinned row.
+        "pinned_by",
     ).filter(registered_app__organization_id=org_id)
     if app_slug:
         qs = qs.filter(registered_app__slug=app_slug)

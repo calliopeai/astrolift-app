@@ -330,6 +330,29 @@ class PreviewEnvironmentType:
     UI surfaces a live countdown and offers 1/7/30-day extend buttons
     (capped at +30d from now)."""
 
+    is_pinned: bool
+    """Operator pin (#1399). Pinned previews are exempt from *both*
+    GC rules — the TTL sweep skips them and max-active eviction never
+    picks them as a candidate — so this outranks ``ttl_until``, which
+    only bounds the TTL axis and only in capped increments. Set via
+    ``setPreviewPinned`` / ``astro app previews pin``."""
+
+    pinned_at: dt.datetime | None
+    """When the pin currently in force was placed. Null when the
+    preview isn't pinned — unpinning clears the whole audit trail so
+    stale "pinned by X" copy can't outlive the pin it describes."""
+
+    pinned_by_email: str | None
+    """Who placed the pin. Null for a system pin, for an unpinned
+    preview, or when the user row has since been deleted (the FK is
+    ``SET_NULL``) — the UI renders "unknown" rather than a blank."""
+
+    pin_reason: str
+    """Why the preview is pinned, free text, empty when unpinned or
+    when the operator gave no reason. A pin is open-ended, so the
+    justification is the only thing standing between a parked demo
+    and an abandoned cost leak."""
+
     source_url: str
     """Public source-repo URL the operator can deep-link into to
     cross-reference the PR. Resolved from ``RegisteredApp.source_url``
@@ -920,6 +943,25 @@ def agent_run_to_type(r) -> AgentRunType:
     )
 
 
+def _pinned_by_email(p) -> str | None:
+    """Resolve the display email for whoever pinned the preview (#1399).
+
+    Reads the FK id first so an unpinned row (the common case) never
+    triggers the join. Returns None when no actor is captured — a
+    system pin, an unpinned preview, or a user row that has since been
+    deleted (``on_delete=SET_NULL`` keeps the pin but drops the actor).
+    Mirrors ``astrolift_registry.schema.types._paused_by_email``.
+    """
+    user_id = getattr(p, "pinned_by_id", None)
+    if user_id is None:
+        return None
+    user = p.pinned_by
+    if user is None:
+        return None
+    email = getattr(user, "email", "") or getattr(user, "username", "")
+    return email or None
+
+
 def preview_to_type(
     p,
     *,
@@ -966,6 +1008,10 @@ def preview_to_type(
         last_deployed_at=p.last_deployed_at,
         torn_down_at=p.torn_down_at,
         ttl_until=p.ttl_until,
+        is_pinned=bool(getattr(p, "is_pinned", False)),
+        pinned_at=getattr(p, "pinned_at", None),
+        pinned_by_email=_pinned_by_email(p),
+        pin_reason=getattr(p, "pin_reason", "") or "",
         source_url=source_url,
         pr_url=pr_url,
         aggregate_resources=aggregate_resources,
