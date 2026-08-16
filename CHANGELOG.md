@@ -308,6 +308,12 @@
 
 ### Fixed
 
+- Name the Google Managed Kafka mTLS binding keys literally instead of
+  assembling them from a loop variable. `EVENT_STREAM_CLIENT_CERT`,
+  `EVENT_STREAM_CLIENT_KEY`, and `EVENT_STREAM_CA_CERT` are now readable in the
+  source, so the driver drops out of the binding-envelope guardrail's
+  unreadable ledger and every registered driver in all four plugins is covered
+  with no exceptions. The emitted keys and values are unchanged.
 - Emit `FILESYSTEM_TLS` from the dynamic PVC and Rook CephFS filesystem
   bindings, the only filesystem drivers that omitted it. The value is a
   conservative `false`: in-transit encryption belongs to the StorageClass's

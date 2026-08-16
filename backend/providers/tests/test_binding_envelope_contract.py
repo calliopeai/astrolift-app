@@ -128,12 +128,11 @@ _RESERVED_PREFIXES: dict[str, tuple[str, ...]] = {
 
 
 # Drivers whose ``binding()`` this module cannot read statically. Each needs an
-# issue; none may be added without one.
-_UNREADABLE_BINDINGS: dict[tuple[str, str, str], str] = {
-    # Builds its env keys from a loop variable, so the key set is not
-    # statically knowable. https://github.com/calliopeai/astrolift-app/issues/1400
-    ("gcp", "event_stream", "managed_kafka"): "#1400",
-}
+# issue; none may be added without one. Empty since #1400: the one entry,
+# ``gcp/managed/event_stream_managed_kafka.py``, built its mTLS env keys from a
+# loop variable and now names them literally, so every registered driver's
+# binding() is readable and the ledgers below cover the whole registry.
+_UNREADABLE_BINDINGS: dict[tuple[str, str, str], str] = {}
 
 
 # Drivers that never return a Binding at all -- their binding() raises. They
@@ -277,6 +276,11 @@ _UNDECLARED_ENVELOPE_KEYS: dict[tuple[str, str, str], frozenset[str]] = {
         {"ENCRYPTION_KEY_MULTI_REGION", "ENCRYPTION_KEY_SPEC", "ENCRYPTION_KEY_USAGE"}
     ),
     ("gcp", "event_bus", "eventarc"): frozenset({"EVENT_BUS_ID", "EVENT_BUS_PROVIDER", "EVENT_BUS_PUBLISH_URL"}),
+    # Pre-existing, and the same four keys ``aws/event_stream/msk`` diverges on.
+    # Only became visible when #1400 made this driver's binding() readable.
+    ("gcp", "event_stream", "managed_kafka"): frozenset(
+        {"EVENT_STREAM_AUTH_MECHANISM", "EVENT_STREAM_CA_CERT", "EVENT_STREAM_CLIENT_CERT", "EVENT_STREAM_CLIENT_KEY"}
+    ),
     ("gcp", "filesystem", "filestore"): frozenset(
         {"FILESYSTEM_ENDPOINT", "FILESYSTEM_EXPORT", "FILESYSTEM_MOUNT_OPTIONS", "FILESYSTEM_PROTOCOL"}
     ),
@@ -426,6 +430,10 @@ _ENVELOPE_SUBSET_DIVERGENCE: dict[tuple[str, str, str], frozenset[str]] = {
     ("gcp", "api_gateway", "api_gateway"): frozenset({"API_GATEWAY_STAGE"}),
     ("gcp", "document_db", "firestore_native"): frozenset({"DOCDB_PASSWORD", "DOCDB_USER"}),
     ("gcp", "event_bus", "eventarc"): frozenset({"EVENT_BUS_ARN"}),
+    # Pre-existing: Managed Kafka authenticates with Google IAM, so it has no
+    # username/password to emit. Only became visible when #1400 made this
+    # driver's binding() readable.
+    ("gcp", "event_stream", "managed_kafka"): frozenset({"EVENT_STREAM_PASSWORD", "EVENT_STREAM_USERNAME"}),
     ("gcp", "faas", "cloud_functions_gen2"): frozenset({"FUNCTION_ARN", "FUNCTION_REGION"}),
     ("gcp", "graph_db", "spanner_graph"): frozenset({"GRAPH_DB_PORT", "GRAPH_DB_READER_URL"}),
     ("gcp", "model_endpoint", "vertex_ai"): frozenset({"MODEL_DEPLOYMENT_NAME", "MODEL_REGION"}),

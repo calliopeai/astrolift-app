@@ -356,15 +356,44 @@ def test_binding_emits_portable_kafka_and_schema_registry_contract(
             "schema_registry_access": "write",
             "client_certificate_secret_ref": "secret://client-cert",
             "client_key_secret_ref": "secret://client-key",
+            "ca_certificate_secret_ref": "secret://ca-cert",
         },
     )
     assert binding.env_vars["EVENT_STREAM_BROKERS"].literal == "shared-events.bootstrap.example.test:9092"
     assert binding.env_vars["EVENT_STREAM_AUTH_MECHANISM"].literal == "gcp_iam_mtls"
+    # Distinct value per slot: each mTLS config key has to reach its own env
+    # key, so a copy-pasted source expression fails here rather than shipping a
+    # certificate in place of a private key.
     assert binding.env_vars["EVENT_STREAM_CLIENT_CERT"].secret_ref == "secret://client-cert"
+    assert binding.env_vars["EVENT_STREAM_CLIENT_KEY"].secret_ref == "secret://client-key"
+    assert binding.env_vars["EVENT_STREAM_CA_CERT"].secret_ref == "secret://ca-cert"
     assert binding.env_vars["SCHEMA_REGISTRY_URL"].literal.endswith("/schemaRegistries/events_registry")
     assert binding.iam_grants[0].resource == "projects/project-1"
     assert binding.iam_grants[0].actions == ["roles/managedkafka.client"]
     assert binding.iam_grants[1].actions == ["roles/managedkafka.schemaRegistryEditor"]
+
+
+def test_binding_emits_only_the_mtls_secrets_the_config_supplies(driver: ManagedKafkaDriver) -> None:
+    """Each mTLS env key is emitted only when its own config key is set.
+
+    The three keys are populated by three separate statements (#1400), so an
+    absent slot has to stay absent rather than pick up a sibling's value.
+    """
+    result = driver.provision(replace(SPEC, config=_full_config()))
+    handle = ServiceHandle(result.handle)
+
+    none_supplied = driver.binding(handle, {})
+    assert not {"EVENT_STREAM_CLIENT_CERT", "EVENT_STREAM_CLIENT_KEY", "EVENT_STREAM_CA_CERT"} & set(
+        none_supplied.env_vars
+    )
+    # Without a client certificate the cluster is plain Google IAM, not mTLS.
+    assert none_supplied.env_vars["EVENT_STREAM_AUTH_MECHANISM"].literal == "gcp_iam"
+
+    ca_only = driver.binding(handle, {"ca_certificate_secret_ref": "secret://ca-cert"})
+    assert ca_only.env_vars["EVENT_STREAM_CA_CERT"].secret_ref == "secret://ca-cert"
+    assert "EVENT_STREAM_CLIENT_CERT" not in ca_only.env_vars
+    assert "EVENT_STREAM_CLIENT_KEY" not in ca_only.env_vars
+    assert ca_only.env_vars["EVENT_STREAM_AUTH_MECHANISM"].literal == "gcp_iam"
 
 
 def test_update_scales_cluster_and_increases_topic_partitions(
