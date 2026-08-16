@@ -261,12 +261,20 @@ class ElastiCacheServerlessDriver(ManagedServiceDriver):
         port = str(endpoint.get("Port", 11211 if self._config.engine == "memcached" else 6379))
         arn = str(cache.get("ARN", ""))
         if self._config.engine == "memcached":
+            # CACHE_NODES is a comma-separated endpoint list across every cache
+            # driver, and this driver's own binding_schema already calls it
+            # that (#1403). Serverless exposes exactly one endpoint, so the
+            # joined string is byte-identical to the bare "host:port" this used
+            # to emit -- but a consumer that splits on "," is now right about
+            # both this driver and the node-based elasticache_memcached one.
+            nodes = [f"{host}:{port}"]
+            node_list = ",".join(nodes)
             return Binding(
                 env_vars={
                     "CACHE_HOST": ValueRef(literal=host),
                     "CACHE_PORT": ValueRef(literal=port),
                     "CACHE_PROTOCOL": ValueRef(literal="memcached"),
-                    "CACHE_NODES": ValueRef(literal=f"{host}:{port}"),
+                    "CACHE_NODES": ValueRef(literal=node_list),
                     "CACHE_TLS": ValueRef(literal="1"),
                     "CACHE_RESOURCE_ARN": ValueRef(literal=arn),
                 },

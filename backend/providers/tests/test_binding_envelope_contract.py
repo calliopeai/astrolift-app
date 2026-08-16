@@ -34,6 +34,23 @@ Extraction failure is a test failure, not a skip: a driver whose ``binding()``
 this module cannot read has to be listed in ``_UNREADABLE_BINDINGS`` with an
 issue number.
 
+Reading branches (#1403)
+------------------------
+``binding()`` bodies branch. The four Aurora drivers build a completely
+different env mapping under ``if self._kind == "postgres"``; every AWS and GCP
+Redis driver writes ``REDIS_URL`` twice, once as a secrets reference and once
+as a literal; FSx only emits ``FILESYSTEM_USERNAME`` under
+``if self.file_system_type == "WINDOWS"``. Reading only the last binding
+reported whichever branch happened to be written last, which understated all
+three ledgers below -- ``aws/postgres/aurora_postgres`` read as emitting the
+MySQL envelope and none of ``POSTGRES_*``.
+
+Every binding of a key is therefore kept, tagged with the ``if`` guards it sits
+under. A guard of the form ``self.<attr> == <const>`` is resolved against the
+concrete driver class, so statically dead branches drop out and a key left with
+no reachable binding is not counted as emitted at all. Anything the guard
+resolver cannot decide stays reachable, which keeps the reading conservative.
+
 What "provider alias" means
 ---------------------------
 Drivers legitimately emit provider-native names beside the portable envelope --
@@ -68,6 +85,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from astrolift_manifest.env_injection import _ENVELOPES, envelope_keys_for
 
+from _sdk.managed_service import Binding, ValueRef
 from aws.plugin import PLUGIN as AWS_PLUGIN
 from azure.plugin import PLUGIN as AZURE_PLUGIN
 from gcp.plugin import PLUGIN as GCP_PLUGIN
@@ -171,14 +189,15 @@ _UNDECLARED_ENVELOPE_KEYS: dict[tuple[str, str, str], frozenset[str]] = {
         {"EVENT_STREAM_AUTH_MECHANISM", "EVENT_STREAM_CA_CERT", "EVENT_STREAM_CLIENT_CERT", "EVENT_STREAM_CLIENT_KEY"}
     ),
     ("aws", "filesystem", "efs"): frozenset({"FILESYSTEM_ENDPOINT", "FILESYSTEM_MOUNT_OPTIONS", "FILESYSTEM_PROTOCOL"}),
+    # No FILESYSTEM_USERNAME / FILESYSTEM_PASSWORD here: those live under
+    # ``if self.file_system_type == "WINDOWS"``, a branch the Lustre and
+    # OpenZFS variants never take.
     ("aws", "filesystem", "fsx_lustre"): frozenset(
         {
             "FILESYSTEM_ENDPOINT",
             "FILESYSTEM_MOUNT_OPTIONS",
             "FILESYSTEM_MOUNT_SOURCE",
-            "FILESYSTEM_PASSWORD",
             "FILESYSTEM_PROTOCOL",
-            "FILESYSTEM_USERNAME",
         }
     ),
     ("aws", "filesystem", "fsx_openzfs"): frozenset(
@@ -186,9 +205,7 @@ _UNDECLARED_ENVELOPE_KEYS: dict[tuple[str, str, str], frozenset[str]] = {
             "FILESYSTEM_ENDPOINT",
             "FILESYSTEM_MOUNT_OPTIONS",
             "FILESYSTEM_MOUNT_SOURCE",
-            "FILESYSTEM_PASSWORD",
             "FILESYSTEM_PROTOCOL",
-            "FILESYSTEM_USERNAME",
         }
     ),
     ("aws", "filesystem", "fsx_windows"): frozenset(
@@ -328,28 +345,11 @@ _ENVELOPE_SUBSET_DIVERGENCE: dict[tuple[str, str, str], frozenset[str]] = {
     ("aws", "faas", "lambda"): frozenset({"FUNCTION_ARN", "FUNCTION_REGION"}),
     ("aws", "model_endpoint", "bedrock"): frozenset({"MODEL_DEPLOYMENT_NAME", "MODEL_REGION"}),
     ("aws", "mysql", "rds_mysql"): frozenset({"MYSQL_DB", "MYSQL_HOST", "MYSQL_PASSWORD", "MYSQL_PORT", "MYSQL_USER"}),
-    ("aws", "postgres", "aurora_postgres"): frozenset(
-        {
-            "POSTGRES_DB",
-            "POSTGRES_HOST",
-            "POSTGRES_MASTER_SECRET_REF",
-            "POSTGRES_PASSWORD",
-            "POSTGRES_PORT",
-            "POSTGRES_SSL_MODE",
-            "POSTGRES_USER",
-        }
-    ),
-    ("aws", "postgres", "aurora_postgres_serverless_v2"): frozenset(
-        {
-            "POSTGRES_DB",
-            "POSTGRES_HOST",
-            "POSTGRES_MASTER_SECRET_REF",
-            "POSTGRES_PASSWORD",
-            "POSTGRES_PORT",
-            "POSTGRES_SSL_MODE",
-            "POSTGRES_USER",
-        }
-    ),
+    # Only MASTER_SECRET_REF: the Aurora drivers do emit the rest of the
+    # postgres envelope, on the ``self._kind == "postgres"`` branch that the
+    # extractor now resolves per subclass.
+    ("aws", "postgres", "aurora_postgres"): frozenset({"POSTGRES_MASTER_SECRET_REF"}),
+    ("aws", "postgres", "aurora_postgres_serverless_v2"): frozenset({"POSTGRES_MASTER_SECRET_REF"}),
     ("aws", "postgres", "rds"): frozenset({"POSTGRES_MASTER_SECRET_REF"}),
     ("aws", "redis", "elasticache"): frozenset({"REDIS_AUTH_MODE", "REDIS_RESOURCE_ARN"}),
     ("aws", "redis", "elasticache_valkey"): frozenset({"REDIS_AUTH_MODE", "REDIS_RESOURCE_ARN"}),
@@ -478,62 +478,135 @@ _ENVELOPE_SUBSET_DIVERGENCE: dict[tuple[str, str, str], frozenset[str]] = {
 }
 
 
-# Keys emitted by more than one driver with disagreeing value formats. Value is
-# the exact mapping of format class -> the drivers using it.
+# Keys emitted by more than one driver in disagreeing *encodings* -- a JSON
+# array against a comma-joined list, say. A consumer genuinely cannot parse
+# both, so this ledger is meant to stay empty.
 # https://github.com/calliopeai/astrolift-app/issues/1403
-_VALUE_FORMAT_DIVERGENCE: dict[tuple[str, str], dict[str, frozenset[str]]] = {
-    ("cache", "CACHE_NODES"): {
-        "join(',')": frozenset({"aws/cache/elasticache_memcached"}),
-        "scalar": frozenset({"aws/cache/elasticache_serverless_memcached"}),
-    },
+_VALUE_ENCODING_DIVERGENCE: dict[tuple[str, str], dict[str, frozenset[str]]] = {}
+
+
+# Keys emitted by more than one driver with a disagreeing answer to "is this a
+# secret?". Value is the exact mapping of provenance class -> (drivers, why the
+# difference is legitimate). Unlike the encoding ledger this one is not
+# expected to empty out: whether a value must be referenced rather than inlined
+# is a property of the provider, not of the key.
+# https://github.com/calliopeai/astrolift-app/issues/1410
+_VALUE_PROVENANCE_DIVERGENCE: dict[tuple[str, str], dict[str, tuple[frozenset[str], str]]] = {
     ("document_db", "DOCDB_URI"): {
-        "scalar": frozenset({"gcp/document_db/firestore_native", "k8s_native/document_db/mongodb_operator"}),
-        "secret_ref": frozenset({"aws/document_db/documentdb", "aws/document_db/documentdb_serverless_v2"}),
+        "literal": (
+            frozenset({"gcp/document_db/firestore_native", "k8s_native/document_db/mongodb_operator"}),
+            "Firestore authenticates with IAM and the Percona MongoDB URI names a replica set only, "
+            "so neither URI carries a credential to protect.",
+        ),
+        "secret_ref": (
+            frozenset({"aws/document_db/documentdb", "aws/document_db/documentdb_serverless_v2"}),
+            "The DocumentDB URI embeds master credentials; inlining it would put them in a "
+            "plaintext ManagedServiceBinding column.",
+        ),
     },
     ("document_db", "DOCDB_USER"): {
-        "scalar": frozenset({"aws/document_db/documentdb", "aws/document_db/documentdb_serverless_v2"}),
-        "secret_ref": frozenset({"k8s_native/document_db/mongodb_operator"}),
+        "literal": (
+            frozenset({"aws/document_db/documentdb", "aws/document_db/documentdb_serverless_v2"}),
+            "The driver chose the master username itself, so it knows the value.",
+        ),
+        "secret_ref": (
+            frozenset({"k8s_native/document_db/mongodb_operator"}),
+            "The Percona operator generates the admin username into its own Secret; the driver "
+            "cannot know the value at binding time.",
+        ),
     },
     ("filesystem", "FILESYSTEM_USERNAME"): {
-        "scalar": frozenset({"azure/filesystem/azure_files_classic"}),
-        "secret_ref": frozenset(
-            {"aws/filesystem/fsx_lustre", "aws/filesystem/fsx_openzfs", "aws/filesystem/fsx_windows"}
+        "literal": (
+            frozenset({"azure/filesystem/azure_files_classic"}),
+            "The Azure Files username is the storage account name, which is an identifier rather "
+            "than a credential -- the account key is the secret and rides FILESYSTEM_PASSWORD.",
+        ),
+        "secret_ref": (
+            frozenset({"aws/filesystem/fsx_windows"}),
+            "FSx for Windows joins an existing directory, so the mount identity arrives as a "
+            "caller-supplied secret reference the driver must pass through untouched.",
         ),
     },
     ("mysql", "MYSQL_USER"): {
-        "scalar": frozenset({"aws/mysql/aurora_mysql", "aws/mysql/aurora_mysql_serverless_v2", "gcp/mysql/cloudsql"}),
-        "secret_ref": frozenset({"k8s_native/mysql/operator"}),
+        "literal": (
+            frozenset({"aws/mysql/aurora_mysql", "aws/mysql/aurora_mysql_serverless_v2", "gcp/mysql/cloudsql"}),
+            "The driver provisioned the instance and named the master user itself.",
+        ),
+        "secret_ref": (
+            frozenset({"k8s_native/mysql/operator"}),
+            "The MySQL operator generates the app username into its own Secret; the driver cannot "
+            "know the value at binding time.",
+        ),
     },
     ("postgres", "DATABASE_HOST"): {
-        "scalar": frozenset({"azure/postgres/azure_pg_flex"}),
-        "secret_ref": frozenset({"k8s_native/postgres/cnpg"}),
+        "literal": (
+            frozenset({"azure/postgres/azure_pg_flex"}),
+            "The ARM response carries the FQDN, so the driver knows the value.",
+        ),
+        "secret_ref": (
+            frozenset({"k8s_native/postgres/cnpg"}),
+            "CNPG owns the generated -app Secret and rotates it; reading through the reference is "
+            "what keeps the binding correct across a rotation.",
+        ),
     },
     ("postgres", "DATABASE_NAME"): {
-        "scalar": frozenset({"azure/postgres/azure_pg_flex"}),
-        "secret_ref": frozenset({"k8s_native/postgres/cnpg"}),
+        "literal": (
+            frozenset({"azure/postgres/azure_pg_flex"}),
+            "The driver created the database and named it itself.",
+        ),
+        "secret_ref": (
+            frozenset({"k8s_native/postgres/cnpg"}),
+            "CNPG owns the generated -app Secret and rotates it; reading through the reference is "
+            "what keeps the binding correct across a rotation.",
+        ),
     },
     ("postgres", "DATABASE_PORT"): {
-        "scalar": frozenset({"azure/postgres/azure_pg_flex"}),
-        "secret_ref": frozenset({"k8s_native/postgres/cnpg"}),
+        "literal": (
+            frozenset({"azure/postgres/azure_pg_flex"}),
+            "Azure Flexible Server is always on 5432, so the driver hard-codes it.",
+        ),
+        "secret_ref": (
+            frozenset({"k8s_native/postgres/cnpg"}),
+            "CNPG owns the generated -app Secret and rotates it; reading through the reference is "
+            "what keeps the binding correct across a rotation.",
+        ),
     },
     ("postgres", "DATABASE_USER"): {
-        "scalar": frozenset({"azure/postgres/azure_pg_flex"}),
-        "secret_ref": frozenset({"k8s_native/postgres/cnpg"}),
+        "literal": (
+            frozenset({"azure/postgres/azure_pg_flex"}),
+            "The driver created the administrator login and named it itself.",
+        ),
+        "secret_ref": (
+            frozenset({"k8s_native/postgres/cnpg"}),
+            "CNPG owns the generated -app Secret and rotates it; reading through the reference is "
+            "what keeps the binding correct across a rotation.",
+        ),
     },
     ("redis", "REDIS_URL"): {
-        "scalar": frozenset(
-            {
-                "aws/redis/elasticache",
-                "aws/redis/elasticache_serverless_redis",
-                "aws/redis/elasticache_serverless_valkey",
-                "aws/redis/elasticache_valkey",
-                "aws/redis/memorydb",
-                "gcp/redis/memorystore",
-                "k8s_native/redis/operator",
-            }
+        "conditional": (
+            frozenset(
+                {
+                    "aws/redis/elasticache",
+                    "aws/redis/elasticache_serverless_redis",
+                    "aws/redis/elasticache_serverless_valkey",
+                    "aws/redis/elasticache_valkey",
+                    "aws/redis/memorydb",
+                    "gcp/redis/memorystore",
+                    "gcp/redis/memorystore_valkey",
+                }
+            ),
+            "These drivers already follow the platform rule: a reference when the URL embeds an "
+            "auth token, a literal when the instance has no credential to embed.",
         ),
-        "secret_ref": frozenset(
-            {"azure/redis/azure_cache_redis", "azure/redis/azure_managed_redis", "gcp/redis/memorystore_valkey"}
+        "literal": (
+            frozenset({"k8s_native/redis/operator"}),
+            "The in-cluster Redis is reached over the pod network with no auth token, so the URL "
+            "has no credential in it.",
+        ),
+        "secret_ref": (
+            frozenset({"azure/redis/azure_cache_redis", "azure/redis/azure_managed_redis"}),
+            "Azure Cache for Redis has no keyless mode, so the URL always embeds an access key and "
+            "the reference branch is the only one reachable.",
         ),
     },
 }
@@ -591,6 +664,28 @@ class _NoBinding(Exception):
 
 _MAX_DEPTH = 6
 
+_MISSING = object()
+
+
+@dataclass(frozen=True)
+class _Bound:
+    """One expression bound to a name, plus the ``if`` guards it sits under.
+
+    ``binding()`` bodies routinely bind the env mapping (or a single key)
+    more than once -- ``if self._kind == "postgres": env = {...} else: env =
+    {...}``, or ``env["REDIS_URL"] = ValueRef(secret_ref=...)`` on the
+    authenticated branch and a literal on the other. Reading only the last
+    binding reports whichever branch happens to be written last, so the
+    guards are carried alongside the expression and resolved per driver.
+    """
+
+    value: ast.expr
+    guards: tuple[tuple[ast.expr, bool], ...] = ()
+
+    @property
+    def lineno(self) -> int:
+        return getattr(self.value, "lineno", 0)
+
 
 @dataclass(frozen=True)
 class _Scope:
@@ -598,7 +693,7 @@ class _Scope:
 
     cls: type[Any]
     module: Any
-    assignments: dict[str, list[ast.expr]]
+    assignments: dict[str, list[_Bound]]
 
 
 def _function_ast(func: Any) -> ast.FunctionDef:
@@ -628,18 +723,100 @@ def _owner_of(cls: type[Any], name: str) -> type[Any]:
     raise _Unreadable(f"{cls.__name__} has no {name}()")
 
 
+def _walk_statements(
+    body: list[ast.stmt],
+    guards: tuple[tuple[ast.expr, bool], ...],
+) -> Iterator[tuple[ast.stmt, tuple[tuple[ast.expr, bool], ...]]]:
+    """Yield every statement in ``body`` with the ``if`` guards enclosing it."""
+    for node in body:
+        if isinstance(node, ast.If):
+            yield from _walk_statements(node.body, (*guards, (node.test, True)))
+            yield from _walk_statements(node.orelse, (*guards, (node.test, False)))
+            continue
+        yield node, guards
+        for _, value in ast.iter_fields(node):
+            if isinstance(value, list) and value and all(isinstance(item, ast.stmt) for item in value):
+                yield from _walk_statements(value, guards)
+
+
 def _scope_for(cls: type[Any], method: str) -> tuple[ast.FunctionDef, _Scope]:
     owner = _owner_of(cls, method)
     fn = _function_ast(owner.__dict__[method])
-    assignments: dict[str, list[ast.expr]] = {}
-    for node in ast.walk(fn):
+    assignments: dict[str, list[_Bound]] = {}
+    for node, guards in _walk_statements(fn.body, ()):
         if isinstance(node, ast.Assign):
             for target in node.targets:
                 if isinstance(target, ast.Name):
-                    assignments.setdefault(target.id, []).append(node.value)
+                    assignments.setdefault(target.id, []).append(_Bound(node.value, guards))
         elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value is not None:
-            assignments.setdefault(node.target.id, []).append(node.value)
+            assignments.setdefault(node.target.id, []).append(_Bound(node.value, guards))
     return fn, _Scope(cls=cls, module=sys.modules[owner.__module__], assignments=assignments)
+
+
+def _static_self_value(cls: type[Any], attr: str, depth: int = 0) -> Any:
+    """Resolve ``self.<attr>`` to a class-level constant on ``cls``.
+
+    Follows a trivial ``@property`` that only forwards to another attribute,
+    which is how the Aurora drivers expose their portable kind
+    (``_kind`` -> ``_portable_kind``). Anything with a real body is left
+    unresolved rather than guessed at.
+    """
+    if depth > 2:
+        return _MISSING
+    value = inspect.getattr_static(cls, attr, _MISSING)
+    if not isinstance(value, property):
+        return value
+    if value.fget is None:
+        return _MISSING
+    try:
+        returned = _sole_return(_function_ast(value.fget))
+    except _Unreadable:
+        return _MISSING
+    if isinstance(returned, ast.Attribute) and isinstance(returned.value, ast.Name) and returned.value.id == "self":
+        return _static_self_value(cls, returned.attr, depth + 1)
+    return _MISSING
+
+
+def _decide_guard(test: ast.expr, cls: type[Any]) -> bool | None:
+    """Resolve ``self.<attr> == <const>`` against ``cls``; ``None`` if unknowable.
+
+    The four Aurora drivers share one ``binding()`` that branches on
+    ``self._kind``, a class attribute of the concrete subclass. Without this
+    the postgres variants read as emitting the MySQL envelope and none of
+    ``POSTGRES_*``. Everything else stays undecided, which keeps the reading
+    conservative: an undecided branch is treated as reachable.
+    """
+    if not isinstance(test, ast.Compare) or len(test.ops) != 1 or len(test.comparators) != 1:
+        return None
+    left, op, right = test.left, test.ops[0], test.comparators[0]
+    if not (isinstance(left, ast.Attribute) and isinstance(left.value, ast.Name) and left.value.id == "self"):
+        return None
+    if not isinstance(right, ast.Constant):
+        return None
+    actual = _static_self_value(cls, left.attr)
+    if not isinstance(actual, str | int | bool):
+        return None
+    if isinstance(op, ast.Eq):
+        return actual == right.value
+    if isinstance(op, ast.NotEq):
+        return actual != right.value
+    return None
+
+
+def _is_reachable(bound: _Bound, cls: type[Any]) -> bool:
+    return all(_decide_guard(test, cls) in (None, taken) for test, taken in bound.guards)
+
+
+def _surviving(bounds: list[_Bound], cls: type[Any]) -> list[_Bound]:
+    """The bindings a driver can actually emit, in source order.
+
+    An *unguarded* binding overwrites everything written before it, so only
+    the bindings from the last unguarded one onwards survive. Guarded
+    bindings after that point are alternatives, and all of them are kept.
+    """
+    live = sorted((b for b in bounds if _is_reachable(b, cls)), key=lambda b: b.lineno)
+    last_unconditional = max((i for i, b in enumerate(live) if not b.guards), default=0)
+    return live[last_unconditional:]
 
 
 def _sole_return(func_node: ast.FunctionDef) -> ast.expr | None:
@@ -676,17 +853,34 @@ def _resolve_helper(call: ast.Call, scope: _Scope) -> tuple[ast.expr, _Scope] | 
     return None
 
 
-def _as_mapping(expr: ast.expr, scope: _Scope, depth: int = 0) -> dict[str, ast.expr]:
-    """Resolve ``expr`` to a literal ``{env key: value expression}`` mapping."""
+def _merge(into: dict[str, list[_Bound]], other: dict[str, list[_Bound]]) -> None:
+    for key, bounds in other.items():
+        into.setdefault(key, []).extend(bounds)
+
+
+def _as_mapping(
+    expr: ast.expr,
+    scope: _Scope,
+    depth: int = 0,
+    guards: tuple[tuple[ast.expr, bool], ...] = (),
+) -> dict[str, list[_Bound]]:
+    """Resolve ``expr`` to ``{env key: [every expression that can produce it]}``.
+
+    A key has more than one entry when the driver binds it on separate
+    branches -- ``ValueRef(secret_ref=...)`` when there is a credential to
+    reference and ``ValueRef(literal=...)`` when there is not, say.
+    """
     if depth > _MAX_DEPTH:
         raise _Unreadable("mapping resolution too deep")
     if isinstance(expr, ast.Dict):
-        out: dict[str, ast.expr] = {}
+        out: dict[str, list[_Bound]] = {}
         for key, value in zip(expr.keys, expr.values, strict=True):
             if key is None:  # {**other}
-                out.update(_as_mapping(value, scope, depth + 1))
+                _merge(out, _as_mapping(value, scope, depth + 1, guards))
             elif isinstance(key, ast.Constant) and isinstance(key.value, str):
-                out[key.value] = value
+                # An explicit key inside one literal is that literal's final
+                # word; it overrides anything a preceding spread contributed.
+                out[key.value] = [_Bound(value, guards)]
             else:
                 raise _Unreadable(f"non-literal env key {ast.unparse(key)}")
         return out
@@ -694,18 +888,24 @@ def _as_mapping(expr: ast.expr, scope: _Scope, depth: int = 0) -> dict[str, ast.
         bound = scope.assignments.get(expr.id)
         if not bound:
             raise _Unreadable(f"unbound env mapping {expr.id}")
-        return _as_mapping(bound[-1], scope, depth + 1)
+        surviving = _surviving(bound, scope.cls)
+        if not surviving:
+            raise _Unreadable(f"no reachable binding for env mapping {expr.id}")
+        out = {}
+        for item in surviving:
+            _merge(out, _as_mapping(item.value, scope, depth + 1, (*guards, *item.guards)))
+        return out
     if isinstance(expr, ast.Call):
         resolved = _resolve_helper(expr, scope)
         if resolved is None:
             raise _Unreadable(f"unresolvable env mapping {ast.unparse(expr.func)}")
         value, sub = resolved
-        return _as_mapping(value, sub, depth + 1)
+        return _as_mapping(value, sub, depth + 1, guards)
     raise _Unreadable(f"env mapping is a {type(expr).__name__}")
 
 
-def _binding_env_exprs(cls: type[Any]) -> tuple[dict[str, ast.expr], _Scope]:
-    """Map every env key ``binding()`` emits to the expression producing it."""
+def _binding_env_exprs(cls: type[Any]) -> tuple[dict[str, tuple[ast.expr, ...]], _Scope]:
+    """Map every env key ``binding()`` emits to the expressions producing it."""
     fn, scope = _scope_for(cls, "binding")
     calls = [
         node
@@ -716,17 +916,17 @@ def _binding_env_exprs(cls: type[Any]) -> tuple[dict[str, ast.expr], _Scope]:
         if all(isinstance(stmt, ast.Raise) for stmt in _executable_body(fn)):
             raise _NoBinding("binding() unconditionally raises")
         raise _Unreadable("binding() constructs no Binding()")
-    env: dict[str, ast.expr] = {}
+    env: dict[str, list[_Bound]] = {}
     holders: set[str] = set()
     for call in calls:
         for keyword in call.keywords:
             if keyword.arg != "env_vars":
                 continue
-            env.update(_as_mapping(keyword.value, scope))
+            _merge(env, _as_mapping(keyword.value, scope))
             if isinstance(keyword.value, ast.Name):
                 holders.add(keyword.value.id)
     # Keys added after the dict literal: env_vars["X"] = ... / .update({...})
-    for node in ast.walk(fn):
+    for node, guards in _walk_statements(fn.body, ()):
         if isinstance(node, ast.Assign):
             for target in node.targets:
                 if not isinstance(target, ast.Subscript) or not isinstance(target.value, ast.Name):
@@ -734,21 +934,52 @@ def _binding_env_exprs(cls: type[Any]) -> tuple[dict[str, ast.expr], _Scope]:
                 if target.value.id not in holders:
                     continue
                 if isinstance(target.slice, ast.Constant) and isinstance(target.slice.value, str):
-                    env[target.slice.value] = node.value
+                    env.setdefault(target.slice.value, []).append(_Bound(node.value, guards))
                 else:
                     raise _Unreadable(f"computed env key {ast.unparse(target.slice)}")
-        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-            owner = node.func.value
-            if not isinstance(owner, ast.Name) or owner.id not in holders:
-                continue
-            if node.func.attr == "update" and node.args:
-                env.update(_as_mapping(node.args[0], scope))
-    return env, scope
+            continue
+        if not isinstance(node, ast.Expr) or not isinstance(node.value, ast.Call):
+            continue
+        call = node.value
+        if not isinstance(call.func, ast.Attribute):
+            continue
+        owner = call.func.value
+        if not isinstance(owner, ast.Name) or owner.id not in holders:
+            continue
+        if call.func.attr == "update" and call.args:
+            _merge(env, _as_mapping(call.args[0], scope, guards=guards))
+    # A key whose every binding sits on a statically dead branch is not emitted
+    # by this driver at all -- ``FILESYSTEM_PASSWORD`` lives under
+    # ``if self.file_system_type == "WINDOWS"``, so the Lustre and OpenZFS
+    # variants never produce it.
+    emitted = ((key, tuple(b.value for b in _surviving(bounds, cls))) for key, bounds in env.items())
+    return {key: exprs for key, exprs in emitted if exprs}, scope
 
 
 # --------------------------------------------------------------------------
-# Value-format classification
+# Value classification: encoding and provenance are separate questions
 # --------------------------------------------------------------------------
+#
+# The original single classifier lumped ``secret_ref`` in with ``json`` and
+# ``join(',')``, which conflates two unrelated properties and produced nine of
+# the ten rows on #1403.
+#
+# * **Encoding** is what a consumer has to parse. A JSON array and a
+#   comma-joined list of the same data are incompatible; that is the
+#   ``PRIVATE_ENDPOINT_IPS`` bug and it must not differ between siblings.
+# * **Provenance** is where the value comes from. ``managed_service_lifecycle``
+#   turns ``ValueRef.secret_ref`` into ``ManagedServiceBinding.is_secret``, and
+#   ``app_lifecycle`` resolves the reference back to its raw value before the
+#   bindings Secret is written -- so the workload sees the same flat string
+#   whichever way the driver emitted it. It still matters (a credential held as
+#   a literal sits in a plaintext column, and an unresolvable reference fails
+#   the deploy), but it is not a parse hazard.
+#
+# A ``secret_ref`` therefore has no *knowable* encoding: the guardrail cannot
+# see inside the secret. It reports ``_OPAQUE`` and takes no part in the
+# encoding comparison.
+
+_OPAQUE = "opaque"
 
 
 def _is_json_container(text: str) -> bool:
@@ -762,13 +993,11 @@ def _is_json_container(text: str) -> bool:
     return True
 
 
-def _value_format(expr: ast.expr, scope: _Scope, depth: int = 0) -> str:
+def _value_encoding(expr: ast.expr, scope: _Scope, depth: int = 0) -> str:
     """Classify how a binding value is *encoded*, ignoring what it holds.
 
-    The interesting distinctions are the ones that break a consumer parsing the
-    value: a JSON array, a delimiter-joined list, a secrets-backend reference,
-    or a plain scalar. ``str(x).lower()`` and a literal ``"false"`` are both
-    scalars -- they are interchangeable for a reader.
+    ``str(x).lower()`` and a literal ``"false"`` are both scalars -- they are
+    interchangeable for a reader. A secrets-backend reference is ``_OPAQUE``.
     """
     if depth > _MAX_DEPTH:
         return "scalar"
@@ -781,11 +1010,11 @@ def _value_format(expr: ast.expr, scope: _Scope, depth: int = 0) -> str:
         if isinstance(func, ast.Name) and func.id == "ValueRef":
             keywords = {kw.arg: kw.value for kw in expr.keywords}
             if "literal" in keywords:
-                return _value_format(keywords["literal"], scope, depth + 1)
+                return _value_encoding(keywords["literal"], scope, depth + 1)
             if "secret_ref" in keywords:
-                return "secret_ref"
+                return _OPAQUE
             if expr.args:
-                return _value_format(expr.args[0], scope, depth + 1)
+                return _value_encoding(expr.args[0], scope, depth + 1)
             return "scalar"
         if isinstance(func, ast.Attribute):
             if func.attr == "dumps":
@@ -796,19 +1025,65 @@ def _value_format(expr: ast.expr, scope: _Scope, depth: int = 0) -> str:
         resolved = _resolve_helper(expr, scope)
         if resolved is not None:
             value, sub = resolved
-            return _value_format(value, sub, depth + 1)
+            return _value_encoding(value, sub, depth + 1)
         return "scalar"
     if isinstance(expr, ast.Name):
         bound = scope.assignments.get(expr.id)
         if not bound:
             return "scalar"
-        formats = {_value_format(item, scope, depth + 1) for item in bound}
+        formats = {_value_encoding(item.value, scope, depth + 1) for item in _surviving(bound, scope.cls)}
         return formats.pop() if len(formats) == 1 else "scalar"
     if isinstance(expr, ast.IfExp | ast.BoolOp):
         branches = expr.values if isinstance(expr, ast.BoolOp) else [expr.body, expr.orelse]
-        formats = {_value_format(branch, scope, depth + 1) for branch in branches} - {"scalar"}
+        formats = {_value_encoding(branch, scope, depth + 1) for branch in branches} - {"scalar"}
         return formats.pop() if len(formats) == 1 else "scalar"
     return "scalar"
+
+
+def _value_provenance(expr: ast.expr, scope: _Scope, depth: int = 0) -> str:
+    """``secret_ref`` if the value is a secrets-backend reference, else ``literal``."""
+    if depth > _MAX_DEPTH:
+        return "literal"
+    if isinstance(expr, ast.Call):
+        func = expr.func
+        if isinstance(func, ast.Name) and func.id == "ValueRef":
+            keywords = {kw.arg: kw.value for kw in expr.keywords}
+            if "secret_ref" in keywords:
+                return "secret_ref"
+            if "literal" in keywords or expr.args:
+                return "literal"
+            return "literal"
+        resolved = _resolve_helper(expr, scope)
+        if resolved is not None:
+            value, sub = resolved
+            return _value_provenance(value, sub, depth + 1)
+    if isinstance(expr, ast.Name):
+        bound = scope.assignments.get(expr.id)
+        if bound:
+            kinds = {_value_provenance(item.value, scope, depth + 1) for item in _surviving(bound, scope.cls)}
+            if len(kinds) == 1:
+                return kinds.pop()
+    if isinstance(expr, ast.IfExp):
+        kinds = {_value_provenance(branch, scope, depth + 1) for branch in (expr.body, expr.orelse)}
+        if len(kinds) == 1:
+            return kinds.pop()
+        return "conditional"
+    return "literal"
+
+
+def _driver_provenance(exprs: tuple[ast.expr, ...], scope: _Scope) -> str:
+    """One label per driver per key: ``literal``, ``secret_ref`` or ``conditional``.
+
+    ``conditional`` is the honest reading of every AWS and GCP Redis driver:
+    ``REDIS_URL`` is a reference when the URL embeds a credential and a literal
+    when it does not.
+    """
+    kinds = {_value_provenance(expr, scope) for expr in exprs}
+    if kinds == {"literal"}:
+        return "literal"
+    if kinds == {"secret_ref"}:
+        return "secret_ref"
+    return "conditional"
 
 
 # --------------------------------------------------------------------------
@@ -925,25 +1200,199 @@ def test_every_driver_for_a_kind_emits_the_same_envelope_subset(kind: str) -> No
 
 
 @pytest.mark.parametrize("kind", sorted(_ENVELOPES), ids=lambda k: k)
-def test_value_formats_agree_across_drivers_for_the_same_key(kind: str) -> None:
+def test_value_encodings_agree_across_drivers_for_the_same_key(kind: str) -> None:
     """Same key, same encoding.
 
     The ``PRIVATE_ENDPOINT_IPS`` bug was one driver comma-joining a list where
     two siblings emitted a JSON array; both sides parse, only one is right.
+    Secrets-backend references are ``_OPAQUE`` and sit this comparison out --
+    see the note above ``_value_encoding``.
     """
-    formats: dict[str, dict[str, set[str]]] = {}
+    encodings: dict[str, dict[str, set[str]]] = {}
     for driver, env, scope in _readable_drivers():
         if driver.kind != kind:
             continue
-        for key, expr in env.items():
-            formats.setdefault(key, {}).setdefault(_value_format(expr, scope), set()).add(driver.label)
+        for key, exprs in env.items():
+            for encoding in {_value_encoding(expr, scope) for expr in exprs} - {_OPAQUE}:
+                encodings.setdefault(key, {}).setdefault(encoding, set()).add(driver.label)
 
-    for key, by_format in sorted(formats.items()):
-        if len(by_format) < 2:
+    for key, by_encoding in sorted(encodings.items()):
+        if len(by_encoding) < 2:
             continue
-        actual = {name: frozenset(who) for name, who in by_format.items()}
-        assert actual == _VALUE_FORMAT_DIVERGENCE.get((kind, key), {}), (
-            f"{kind}.{key} is emitted in {len(by_format)} different value formats: "
-            + "; ".join(f"{name} by {sorted(who)}" for name, who in sorted(by_format.items()))
+        actual = {name: frozenset(who) for name, who in by_encoding.items()}
+        assert actual == _VALUE_ENCODING_DIVERGENCE.get((kind, key), {}), (
+            f"{kind}.{key} is emitted in {len(by_encoding)} different encodings: "
+            + "; ".join(f"{name} by {sorted(who)}" for name, who in sorted(by_encoding.items()))
             + ". A consumer cannot parse both."
         )
+
+
+@pytest.mark.parametrize("kind", sorted(_ENVELOPES), ids=lambda k: k)
+def test_value_provenance_agrees_across_drivers_for_the_same_key(kind: str) -> None:
+    """Same key, same answer to "is this a secret?".
+
+    Not a parse hazard -- ``app_lifecycle`` resolves a reference to its raw
+    value before the workload sees it -- but it decides whether the value is
+    stored in a plaintext column, whether ``agent_secrets`` routes it as a
+    reference, and whether a missing secret fails the deploy. Every entry in
+    the ledger names why the two sides legitimately differ.
+    """
+    provenance: dict[str, dict[str, set[str]]] = {}
+    for driver, env, scope in _readable_drivers():
+        if driver.kind != kind:
+            continue
+        for key, exprs in env.items():
+            provenance.setdefault(key, {}).setdefault(_driver_provenance(exprs, scope), set()).add(driver.label)
+
+    for key, by_provenance in sorted(provenance.items()):
+        if len(by_provenance) < 2:
+            continue
+        actual = {name: frozenset(who) for name, who in by_provenance.items()}
+        expected = {name: who for name, (who, _) in _VALUE_PROVENANCE_DIVERGENCE.get((kind, key), {}).items()}
+        assert actual == expected, (
+            f"{kind}.{key} disagrees on provenance across drivers: "
+            + "; ".join(f"{name} by {sorted(who)}" for name, who in sorted(by_provenance.items()))
+            + ". Ledger it with the reason, or make the drivers agree."
+        )
+
+
+def test_every_provenance_ledger_entry_carries_a_reason() -> None:
+    """A ledger row without a stated reason is just a skip with extra steps."""
+    for (kind, key), by_provenance in sorted(_VALUE_PROVENANCE_DIVERGENCE.items()):
+        for name, (who, reason) in sorted(by_provenance.items()):
+            assert who, f"{kind}.{key} provenance {name!r} lists no driver"
+            assert len(reason) > 20, f"{kind}.{key} provenance {name!r} needs a real reason, got {reason!r}"
+
+
+# --------------------------------------------------------------------------
+# The extractor's own contract
+# --------------------------------------------------------------------------
+#
+# Everything above is only as trustworthy as the reading below it, and the
+# branch handling is the subtle part: it decides whether
+# ``aws/postgres/aurora_postgres`` is read as emitting the postgres envelope or
+# the MySQL one. These pin it against hand-written bindings whose right answer
+# is obvious by inspection.
+
+
+class _BranchingBinding:
+    """Stand-in for the shape every Aurora driver has."""
+
+    _portable_kind = "unset"
+
+    @property
+    def _kind(self) -> str:
+        return self._portable_kind
+
+    def binding(self) -> Binding:
+        if self._kind == "postgres":
+            env = {"POSTGRES_HOST": ValueRef(literal="pg-host")}
+        else:
+            env = {"MYSQL_HOST": ValueRef(literal="my-host")}
+        return Binding(env_vars=env)
+
+
+class _PostgresFlavour(_BranchingBinding):
+    _portable_kind = "postgres"
+
+
+class _MySQLFlavour(_BranchingBinding):
+    _portable_kind = "mysql"
+
+
+class _UndecidableFlavour(_BranchingBinding):
+    """No class-level ``_portable_kind`` value the reader can resolve."""
+
+    @property
+    def _kind(self) -> str:
+        return "postgres" if self.binding else "mysql"
+
+
+class _AlternatingValue:
+    """The Redis shape: one key, a reference on one branch and a literal on the other."""
+
+    authenticated = True
+
+    def binding(self) -> Binding:
+        env = {"REDIS_HOST": ValueRef(literal="host")}
+        if self.authenticated:
+            env["REDIS_URL"] = ValueRef(secret_ref="vault://url")
+        else:
+            env["REDIS_URL"] = ValueRef(literal="redis://host:6379")
+        return Binding(env_vars=env)
+
+
+class _OverwrittenValue:
+    """An unguarded write after a guarded one wins outright."""
+
+    flag = True
+
+    def binding(self) -> Binding:
+        env = {"CACHE_NODES": ValueRef(literal="first")}
+        if self.flag:
+            env["CACHE_NODES"] = ValueRef(secret_ref="vault://second")
+        env["CACHE_NODES"] = ValueRef(literal=",".join(["third"]))
+        return Binding(env_vars=env)
+
+
+class _WindowsOnlyKey:
+    """FSx's shape: a key only reachable for one concrete variant."""
+
+    file_system_type = "LUSTRE"
+
+    def binding(self) -> Binding:
+        env = {"FILESYSTEM_HANDLE": ValueRef(literal="fs-1")}
+        if self.file_system_type == "WINDOWS":
+            env["FILESYSTEM_USERNAME"] = ValueRef(secret_ref="vault://user")
+        return Binding(env_vars=env)
+
+
+class _WindowsVariant(_WindowsOnlyKey):
+    file_system_type = "WINDOWS"
+
+
+def test_static_branch_on_a_class_attribute_picks_the_live_mapping() -> None:
+    postgres, _ = _binding_env_exprs(_PostgresFlavour)
+    mysql, _ = _binding_env_exprs(_MySQLFlavour)
+
+    assert set(postgres) == {"POSTGRES_HOST"}
+    assert set(mysql) == {"MYSQL_HOST"}
+
+
+def test_an_undecidable_branch_keeps_both_mappings() -> None:
+    """Conservative by design: an unreadable guard must not drop real keys."""
+    env, _ = _binding_env_exprs(_UndecidableFlavour)
+
+    assert set(env) == {"POSTGRES_HOST", "MYSQL_HOST"}
+
+
+def test_a_key_bound_on_both_branches_keeps_both_expressions() -> None:
+    env, scope = _binding_env_exprs(_AlternatingValue)
+
+    assert len(env["REDIS_URL"]) == 2
+    assert _driver_provenance(env["REDIS_URL"], scope) == "conditional"
+    assert _driver_provenance(env["REDIS_HOST"], scope) == "literal"
+
+
+def test_an_unguarded_rebind_discards_everything_written_before_it() -> None:
+    env, scope = _binding_env_exprs(_OverwrittenValue)
+
+    assert len(env["CACHE_NODES"]) == 1
+    assert _driver_provenance(env["CACHE_NODES"], scope) == "literal"
+    assert _value_encoding(env["CACHE_NODES"][0], scope) == "join(',')"
+
+
+def test_a_key_only_on_a_dead_branch_is_not_emitted() -> None:
+    lustre, _ = _binding_env_exprs(_WindowsOnlyKey)
+    windows, _ = _binding_env_exprs(_WindowsVariant)
+
+    assert "FILESYSTEM_USERNAME" not in lustre
+    assert "FILESYSTEM_USERNAME" in windows
+
+
+def test_a_secret_reference_has_no_knowable_encoding() -> None:
+    """Otherwise provenance leaks into the encoding comparison, which is #1403."""
+    env, scope = _binding_env_exprs(_AlternatingValue)
+    encodings = {_value_encoding(expr, scope) for expr in env["REDIS_URL"]}
+
+    assert encodings == {_OPAQUE, "scalar"}

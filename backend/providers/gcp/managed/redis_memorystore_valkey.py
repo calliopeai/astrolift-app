@@ -559,7 +559,11 @@ class MemorystoreValkeyDriver(ManagedServiceDriver):
         if tls and ca_mode == "GOOGLE_MANAGED_SHARED_CA":
             certificates = [self._valkey.get_shared_certificate_authority(self._config.region)]
             if certificates[0]:
-                env["REDIS_CA_CERT"] = ValueRef(literal=certificates[0])
+                # REDIS_CA_CERT is a newline-joined PEM chain on the other
+                # branch and in binding_schema, so join here too (#1403). The
+                # shared CA is a single certificate, so the string is
+                # byte-identical -- this only makes the contract explicit.
+                env["REDIS_CA_CERT"] = ValueRef(literal="\n".join(certificates))
         elif tls and ca_mode != "CUSTOMER_MANAGED_CAS_CA":
             ca = self._valkey.get_certificate_authority(str(current.get("name") or self._instance_name(instance_id)))
             certificates = _ca_certificates(ca)
