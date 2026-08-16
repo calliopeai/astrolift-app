@@ -362,6 +362,18 @@ _PUBLIC_ENVELOPE_KEY_SUFFIXES: tuple[str, ...] = (
     "_SASL_MECHANISM",
     "_SASL_USERNAME",
     "_TOPIC_PREFIX",
+    # #1401 widened five envelopes with keys their drivers already emitted.
+    # None of them is a credential, so reveal must not mask them: an email
+    # sender address, a KMS key spec / usage, a broker auth strategy, the
+    # workflow-engine and private-endpoint kind discriminators, and the
+    # private endpoint's DNS-name and NIC-id arrays.
+    "_ADDRESS",
+    "_SPEC",
+    "_USAGE",
+    "_STRATEGY",
+    "_TYPE",
+    "_NAMES",
+    "_IDS",
 )
 
 

@@ -97,6 +97,9 @@ _ENVELOPES: dict[str, tuple[str, ...]] = {
         "MQ_USERNAME",
         "MQ_PASSWORD",
         "MQ_PROTOCOL",
+        # #1401: emitted by every mq driver -- "simple" versus a
+        # directory-backed strategy is a broker concept, not an AWS one.
+        "MQ_AUTH_STRATEGY",
         "KAFKA_BOOTSTRAP_SERVERS",
         "KAFKA_SECURITY_PROTOCOL",
         "KAFKA_SASL_MECHANISM",
@@ -178,6 +181,9 @@ _ENVELOPES: dict[str, tuple[str, ...]] = {
         "EMAIL_API_KEY",
         "EMAIL_DOMAIN",
         "EMAIL_FROM",
+        # #1401: both email drivers emit these and neither emits EMAIL_FROM.
+        "EMAIL_FROM_ADDRESS",
+        "EMAIL_REGION",
     ),
     "sms": (
         "SMS_PROVIDER",
@@ -270,16 +276,33 @@ _ENVELOPES: dict[str, tuple[str, ...]] = {
         "WORKFLOW_ENGINE_ID",
         "WORKFLOW_ENGINE_ARN",
         "WORKFLOW_ENGINE_REGION",
+        # #1401: every workflow_engine driver on all three clouds emits this.
+        "WORKFLOW_ENGINE_TYPE",
     ),
     "encryption_key": (
         "ENCRYPTION_KEY_ID",
         "ENCRYPTION_KEY_ARN",
         "ENCRYPTION_KEY_ALIAS",
+        # #1401: both KMS drivers emit these; the concepts exist in AWS KMS and
+        # Cloud KMS alike.
+        "ENCRYPTION_KEY_SPEC",
+        "ENCRYPTION_KEY_USAGE",
+        "ENCRYPTION_KEY_MULTI_REGION",
     ),
     "private_endpoint": (
         "PRIVATE_ENDPOINT_ID",
         "PRIVATE_ENDPOINT_DNS",
         "PRIVATE_ENDPOINT_IPS",
+        # #1401: emitted by the AWS, Azure and GCP drivers alike. DNS_NAMES and
+        # NETWORK_INTERFACE_IDS are JSON arrays, the same encoding as
+        # PRIVATE_ENDPOINT_IPS. PRIVATE_ENDPOINT_DNS_NAME is deliberately NOT
+        # here: all three drivers set it to exactly the same value as
+        # PRIVATE_ENDPOINT_DNS, and the portable contract should not carry two
+        # names for one value.
+        "PRIVATE_ENDPOINT_DNS_NAMES",
+        "PRIVATE_ENDPOINT_NETWORK_INTERFACE_IDS",
+        "PRIVATE_ENDPOINT_SERVICE_NAME",
+        "PRIVATE_ENDPOINT_TYPE",
     ),
     "observability": (
         "OBSERVABILITY_PROVIDER",

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Publish eleven connection-envelope keys that every driver of their kind
+  already emitted. `email` gains `EMAIL_FROM_ADDRESS` and `EMAIL_REGION`,
+  `encryption_key` gains `ENCRYPTION_KEY_SPEC` / `_USAGE` / `_MULTI_REGION`,
+  `mq` gains `MQ_AUTH_STRATEGY`, `workflow_engine` gains
+  `WORKFLOW_ENGINE_TYPE`, and `private_endpoint` gains
+  `PRIVATE_ENDPOINT_DNS_NAMES`, `_NETWORK_INTERFACE_IDS`, `_SERVICE_NAME` and
+  `_TYPE`. They looked portable to an app author and were not: the kind's
+  published `envelope_keys`, which the service catalog serves to the UI and
+  the API and which `revealManagedServiceConnection` walks, did not list them.
+  None of the eleven is a credential, so reveal shows them unmasked.
+
 - Make the binding-envelope guardrail read conditional bindings, and separate
   a value's *encoding* from its *provenance*. `binding()` bodies branch, and
   reading only the last branch mis-reported three ledgers at once: the Aurora
