@@ -80,6 +80,7 @@ import json
 import sys
 import textwrap
 from dataclasses import dataclass
+from functools import cache
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -1199,6 +1200,38 @@ def test_every_driver_for_a_kind_emits_the_same_envelope_subset(kind: str) -> No
         )
 
 
+_Divergence = dict[tuple[str, str], dict[str, frozenset[str]]]
+
+
+@cache
+def _value_divergences() -> tuple[_Divergence, _Divergence]:
+    """``(encoding, provenance)`` divergences keyed by ``(kind, env key)``.
+
+    Only keys more than one driver disagrees about are returned, which is
+    exactly what the two ledgers hold.
+    """
+    encodings: dict[tuple[str, str], dict[str, set[str]]] = {}
+    provenance: dict[tuple[str, str], dict[str, set[str]]] = {}
+    for driver, env, scope in _readable_drivers():
+        if driver.kind not in _ENVELOPES:
+            continue
+        for key, exprs in env.items():
+            for encoding in {_value_encoding(expr, scope) for expr in exprs} - {_OPAQUE}:
+                encodings.setdefault((driver.kind, key), {}).setdefault(encoding, set()).add(driver.label)
+            provenance.setdefault((driver.kind, key), {}).setdefault(_driver_provenance(exprs, scope), set()).add(
+                driver.label
+            )
+
+    def _divergent(source: dict[tuple[str, str], dict[str, set[str]]]) -> _Divergence:
+        return {
+            subject: {name: frozenset(who) for name, who in by_class.items()}
+            for subject, by_class in source.items()
+            if len(by_class) > 1
+        }
+
+    return _divergent(encodings), _divergent(provenance)
+
+
 @pytest.mark.parametrize("kind", sorted(_ENVELOPES), ids=lambda k: k)
 def test_value_encodings_agree_across_drivers_for_the_same_key(kind: str) -> None:
     """Same key, same encoding.
@@ -1208,19 +1241,11 @@ def test_value_encodings_agree_across_drivers_for_the_same_key(kind: str) -> Non
     Secrets-backend references are ``_OPAQUE`` and sit this comparison out --
     see the note above ``_value_encoding``.
     """
-    encodings: dict[str, dict[str, set[str]]] = {}
-    for driver, env, scope in _readable_drivers():
-        if driver.kind != kind:
+    encodings, _ = _value_divergences()
+    for (subject_kind, key), by_encoding in sorted(encodings.items()):
+        if subject_kind != kind:
             continue
-        for key, exprs in env.items():
-            for encoding in {_value_encoding(expr, scope) for expr in exprs} - {_OPAQUE}:
-                encodings.setdefault(key, {}).setdefault(encoding, set()).add(driver.label)
-
-    for key, by_encoding in sorted(encodings.items()):
-        if len(by_encoding) < 2:
-            continue
-        actual = {name: frozenset(who) for name, who in by_encoding.items()}
-        assert actual == _VALUE_ENCODING_DIVERGENCE.get((kind, key), {}), (
+        assert by_encoding == _VALUE_ENCODING_DIVERGENCE.get((kind, key), {}), (
             f"{kind}.{key} is emitted in {len(by_encoding)} different encodings: "
             + "; ".join(f"{name} by {sorted(who)}" for name, who in sorted(by_encoding.items()))
             + ". A consumer cannot parse both."
@@ -1237,23 +1262,37 @@ def test_value_provenance_agrees_across_drivers_for_the_same_key(kind: str) -> N
     reference, and whether a missing secret fails the deploy. Every entry in
     the ledger names why the two sides legitimately differ.
     """
-    provenance: dict[str, dict[str, set[str]]] = {}
-    for driver, env, scope in _readable_drivers():
-        if driver.kind != kind:
+    _, provenance = _value_divergences()
+    for (subject_kind, key), by_provenance in sorted(provenance.items()):
+        if subject_kind != kind:
             continue
-        for key, exprs in env.items():
-            provenance.setdefault(key, {}).setdefault(_driver_provenance(exprs, scope), set()).add(driver.label)
-
-    for key, by_provenance in sorted(provenance.items()):
-        if len(by_provenance) < 2:
-            continue
-        actual = {name: frozenset(who) for name, who in by_provenance.items()}
         expected = {name: who for name, (who, _) in _VALUE_PROVENANCE_DIVERGENCE.get((kind, key), {}).items()}
-        assert actual == expected, (
+        assert by_provenance == expected, (
             f"{kind}.{key} disagrees on provenance across drivers: "
             + "; ".join(f"{name} by {sorted(who)}" for name, who in sorted(by_provenance.items()))
             + ". Ledger it with the reason, or make the drivers agree."
         )
+
+
+def test_no_stale_value_ledger_entries() -> None:
+    """The two value ledgers ratchet down, so a repaired key must leave them.
+
+    The per-kind assertions above only run for keys that *are* divergent, so
+    without this an entry for a key the drivers now agree on would sit there
+    unnoticed and mask the next regression on that key.
+    """
+    encodings, provenance = _value_divergences()
+
+    assert set(_VALUE_ENCODING_DIVERGENCE) == set(encodings), (
+        "stale encoding ledger entries (drivers now agree, drop them)="
+        f"{sorted(set(_VALUE_ENCODING_DIVERGENCE) - set(encodings))} "
+        f"unledgered={sorted(set(encodings) - set(_VALUE_ENCODING_DIVERGENCE))}"
+    )
+    assert set(_VALUE_PROVENANCE_DIVERGENCE) == set(provenance), (
+        "stale provenance ledger entries (drivers now agree, drop them)="
+        f"{sorted(set(_VALUE_PROVENANCE_DIVERGENCE) - set(provenance))} "
+        f"unledgered={sorted(set(provenance) - set(_VALUE_PROVENANCE_DIVERGENCE))}"
+    )
 
 
 def test_every_provenance_ledger_entry_carries_a_reason() -> None:
