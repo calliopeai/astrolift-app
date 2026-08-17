@@ -149,7 +149,29 @@ def _binding_envs(driver_cls: type | Any | None, matrix: ManagedServiceEntry | N
     return tuple(sorted(keys))
 
 
-def list_catalog(plugin_slug: str) -> tuple[CatalogItem, ...]:
+def list_catalog(plugin_slug: str, *, include_unprovisionable: bool = False) -> tuple[CatalogItem, ...]:
+    """The managed-service catalogue for one provider plugin.
+
+    By default ``planned`` rows are left out. They are roadmap metadata: no
+    driver exists and none is being installed, so the entry documents an
+    intention rather than a choice, and "planned" reads to most people as
+    "available soon".
+
+    Rows whose driver is missing are deliberately still shown, as unavailable
+    with the reason. Hiding those would mean a control plane whose plugin
+    registry failed to load, through a bad entry point, an import error in a
+    plugin, or a packaging regression, renders an *empty* catalogue rather than
+    one full of "driver is not installed". A silently empty list gives the
+    operator nothing to search for; the unavailable row names the fault.
+
+    ``deprecated`` rows stay too. An operator may already be running one and
+    needs to see it in the catalogue that describes their estate.
+
+    ``include_unprovisionable`` returns everything, for callers that need to
+    tell "not offered here" apart from "no such variant". ``resolve_variant``
+    uses it so a request for a planned variant is refused with the reason
+    rather than with "unknown variant", which reads like a typo.
+    """
     metadata = _matrix_entries(plugin_slug)
     drivers = _driver_roles(plugin_slug)
     keys = sorted(set(metadata) | set(drivers))
@@ -179,6 +201,8 @@ def list_catalog(plugin_slug: str) -> tuple[CatalogItem, ...]:
             variant == configured_default or (configured_default is None and len(variants) == 1)
         )
         description = meta.description if meta is not None else "Installed third-party provider driver."
+        if not include_unprovisionable and status == "planned":
+            continue
         rows.append(
             CatalogItem(
                 provider_plugin_slug=plugin_slug,
@@ -208,7 +232,10 @@ def resolve_variant(*, plugin_slug: str, kind: str, requested_variant: str | Non
     fail closed.
     """
 
-    rows = [row for row in list_catalog(plugin_slug) if row.kind == kind]
+    # The full list, including planned and driverless variants: an explicit
+    # request for one should be refused with the reason it is unavailable
+    # rather than with "does not support", which reads as a typo.
+    rows = [row for row in list_catalog(plugin_slug, include_unprovisionable=True) if row.kind == kind]
     if not rows:
         known_plugin = any(entry.plugin_id == plugin_slug for entry in MATRIX.managed_services) or any(
             manifest.plugin_id == plugin_slug for manifest in plugins.list()
