@@ -200,12 +200,18 @@ class CostForecastType:
 
 @strawberry.type(name="AstroliftCostBindingRow")
 class CostBindingRowType:
-    """Per-binding cost row for the per-resource attribution panel.
+    """Per-managed-service cost row for the attribution panel.
 
-    ``managed_service_binding_id`` is null when the cost row was
-    written without binding attribution (driver hasn't tagged the
-    cloud resource yet; see #432 from:backend gap on
-    ``astrolift.io/binding`` not being applied by providers).
+    ``managed_service_id`` is the grouping key. It is null only on rows
+    the platform did not provision — operator-managed or shared cloud
+    resources carrying no ``astrolift.io/managed_service_id`` tag —
+    which the panel rolls up as "Shared / untagged".
+
+    ``managed_service_binding_id`` is always null since #1418 and is
+    retained only so the field does not disappear from the contract
+    mid-flight. Rows were never attributable at binding grain: a
+    binding is one row per injected env var, and its GUID is recreated
+    on every envelope sync.
     """
 
     managed_service_binding_id: str | None
@@ -718,27 +724,32 @@ class BillingQuery:
             taken_at__gte=w.start,
             taken_at__lte=w.end,
         ).select_related(
-            "managed_service_binding__managed_service",
+            "managed_service",
             "registered_app",
         )
         if registered_app_slug:
             qs = qs.filter(registered_app__slug=registered_app_slug)
 
         currency = "USD"
-        attributed: dict[tuple[int, str], dict] = {}  # (binding_id, by) → aggregate row
+        # Grouped by managed service, not by binding (#1418): a binding
+        # is one row per injected env var, so it was never a grain the
+        # billing data could carry. Grouping on it meant every row hit
+        # the ``unattributed`` branch below and the panel rendered an
+        # empty, plausible answer.
+        attributed: dict[tuple[int, str], dict] = {}  # (service_id, by) → aggregate row
         unattributed = 0
         total = 0
         for c in qs:
             currency = c.currency
             total += int(c.amount_cents)
-            if c.managed_service_binding_id is None:
+            if c.managed_service_id is None:
                 unattributed += int(c.amount_cents)
                 continue
-            key = (c.managed_service_binding_id, c.by)
+            key = (c.managed_service_id, c.by)
             row = attributed.setdefault(
                 key,
                 {
-                    "binding": c.managed_service_binding,
+                    "service": c.managed_service,
                     "app": c.registered_app,
                     "by": c.by,
                     "amount_cents": 0,
@@ -754,11 +765,12 @@ class BillingQuery:
         )
 
         def _row(r) -> CostBindingRowType:
-            binding = r["binding"]
-            svc = getattr(binding, "managed_service", None) if binding else None
+            svc = r["service"]
             app = r["app"]
             return CostBindingRowType(
-                managed_service_binding_id=(str(binding.guid) if binding else None),
+                # Always null now. Kept so the field doesn't vanish from
+                # the contract mid-flight; rows are keyed by service.
+                managed_service_binding_id=None,
                 managed_service_id=(str(svc.guid) if svc else None),
                 managed_service_name=(svc.name if svc else None),
                 managed_service_kind=(svc.kind if svc else None),

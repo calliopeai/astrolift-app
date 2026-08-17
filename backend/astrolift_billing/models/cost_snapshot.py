@@ -56,6 +56,23 @@ class CostSnapshot(AppendOnlyMixin, models.Model):
         blank=True,
         on_delete=models.SET_NULL,
     )
+    """Legacy attribution target. Never populated by the collector:
+    a binding is one row per injected env var, so it was never the
+    grain a cloud resource could be tagged with (#1418). Kept so
+    historical rows keep their shape; new rows use
+    ``managed_service``."""
+
+    managed_service = models.ForeignKey(
+        "astrolift_services.ManagedService",
+        related_name="cost_snapshots",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    """The service the billed cloud resource belongs to, resolved from
+    the resource's ``astrolift.io/managed_service_id`` tag. NULL for
+    spend the platform did not provision (operator-managed or shared
+    resources), which the UI rolls up as "Shared / untagged"."""
     taken_at = models.DateField(db_index=True)
     by = models.CharField(max_length=32, choices=CostBy.choices)
     amount_cents = models.BigIntegerField()
@@ -72,6 +89,10 @@ class CostSnapshot(AppendOnlyMixin, models.Model):
                 fields=["organization", "managed_service_binding", "-taken_at"],
                 name="cost_org_binding_date_idx",
             ),
+            models.Index(
+                fields=["organization", "managed_service", "-taken_at"],
+                name="cost_org_msvc_date_idx",
+            ),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -79,6 +100,7 @@ class CostSnapshot(AppendOnlyMixin, models.Model):
                     "organization",
                     "registered_app",
                     "managed_service_binding",
+                    "managed_service",
                     "by",
                     "taken_at",
                     "source",

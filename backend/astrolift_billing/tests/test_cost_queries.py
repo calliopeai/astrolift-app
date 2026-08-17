@@ -113,13 +113,13 @@ def _seed_day(
     amount_cents: int,
     by: str = CostSnapshot.CostBy.WORKLOAD,
     app: RegisteredApp | None = None,
-    binding: ManagedServiceBinding | None = None,
+    service: ManagedService | None = None,
     source: str = CostSnapshot.Source.PROVIDER_ESTIMATE,
 ):
     return CostSnapshot.objects.create(
         organization=org,
         registered_app=app,
-        managed_service_binding=binding,
+        managed_service=service,
         taken_at=day,
         by=by,
         amount_cents=amount_cents,
@@ -405,9 +405,13 @@ def test_forecast_delta_pct_vs_previous_month(permission_resolver):
 # ----------------------------------------------------------------------
 
 
-def test_cost_by_binding_groups_by_binding(permission_resolver):
-    """Rows with the same ``managed_service_binding_id`` collapse
-    into one row in the attribution table."""
+def test_cost_by_binding_groups_by_service(permission_resolver):
+    """Rows for the same managed service collapse into one row in
+    the attribution table.
+
+    Grouped on ``managed_service_id`` since #1418 — the binding
+    column it used to group on is never written, so this test
+    passed against an always-empty table."""
     org, app, svc, binding = _scaffold()
     permission_resolver.grant(Permission.BILLING_READ)
     today = dt.date.today()
@@ -416,7 +420,7 @@ def test_cost_by_binding_groups_by_binding(permission_resolver):
         day=today,
         amount_cents=500,
         app=app,
-        binding=binding,
+        service=svc,
         by=CostSnapshot.CostBy.MANAGED_SERVICE,
     )
     _seed_day(
@@ -424,7 +428,7 @@ def test_cost_by_binding_groups_by_binding(permission_resolver):
         day=today - dt.timedelta(days=1),
         amount_cents=300,
         app=app,
-        binding=binding,
+        service=svc,
         by=CostSnapshot.CostBy.MANAGED_SERVICE,
     )
     with _tenant(org):
@@ -439,14 +443,15 @@ def test_cost_by_binding_groups_by_binding(permission_resolver):
 
 
 def test_cost_by_binding_separates_attributed_and_orphan(permission_resolver):
-    """Rows without a binding (driver hasn't tagged the cloud
-    resource yet) roll into ``unattributed_cents`` rather than
-    fabricating an attribution."""
-    org, app, _, binding = _scaffold()
+    """Rows the platform did not provision (no
+    ``astrolift.io/managed_service_id`` tag on the cloud resource)
+    roll into ``unattributed_cents`` rather than fabricating an
+    attribution."""
+    org, app, svc, _ = _scaffold()
     permission_resolver.grant(Permission.BILLING_READ)
     today = dt.date.today()
-    _seed_day(org=org, day=today, amount_cents=400, app=app, binding=binding)
-    _seed_day(org=org, day=today, amount_cents=600, app=app, binding=None)
+    _seed_day(org=org, day=today, amount_cents=400, app=app, service=svc)
+    _seed_day(org=org, day=today, amount_cents=600, app=app, service=None)
     with _tenant(org):
         out = BillingQuery().astrolift_cost_by_binding(_info(), window=CostWindow.D7)
     assert out.unattributed_cents == 600
@@ -459,7 +464,7 @@ def test_cost_by_binding_filters_by_app_slug(permission_resolver):
     org, app, svc, binding = _scaffold()
     permission_resolver.grant(Permission.BILLING_READ)
     today = dt.date.today()
-    _seed_day(org=org, day=today, amount_cents=100, app=app, binding=binding)
+    _seed_day(org=org, day=today, amount_cents=100, app=app, service=svc)
     # A row for an empty app slug shouldn't match when we filter.
     _seed_day(org=org, day=today, amount_cents=999, app=None)
     with _tenant(org):

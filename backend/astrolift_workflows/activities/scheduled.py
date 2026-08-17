@@ -409,12 +409,19 @@ def _capture_platform_cost_snapshot_sync() -> int:
 
     For each org, walk its managed clusters and ask each cloud's
     billing-actuals client (providers/<cloud>/cost.py)
-    for the per-binding spend over the previous calendar day. Each
-    row is keyed back to a ``ManagedServiceBinding`` via the
-    ``astrolift.io/binding`` tag stamped at provision time (#438);
-    rows whose tag is empty or doesn't match a known binding land
-    with ``managed_service_binding_id = NULL`` so the UI rolls them
-    up as "Shared / untagged".
+    for the per-service spend over the previous calendar day. Each
+    row is keyed back to a ``ManagedService`` via the
+    ``astrolift.io/managed_service_id`` tag stamped at provision time;
+    rows whose tag is empty or doesn't match a known service land
+    with ``managed_service_id = NULL`` so the UI rolls them up as
+    "Shared / untagged".
+
+    This keyed on ``astrolift.io/binding`` until #1418, which never
+    attributed a single row: no driver ever stamped that tag, because
+    a binding is one row per injected env var and its GUIDs are
+    recreated on every envelope sync. A cloud resource belongs to
+    exactly one managed service, so the service GUID is what the
+    drivers can and do stamp.
 
     A zero-amount ``OTHER`` placeholder row per org is still emitted
     when no driver returns data (or no clusters are configured) so
@@ -431,7 +438,7 @@ def _capture_platform_cost_snapshot_sync() -> int:
     try:
         from astrolift_billing.models import CostSnapshot
         from astrolift_identity.models import Organization
-        from astrolift_services.models import ManagedServiceBinding
+        from astrolift_services.models import ManagedService
     except ImportError:
         return 0
     from datetime import timedelta
@@ -454,7 +461,7 @@ def _capture_platform_cost_snapshot_sync() -> int:
             window_start=window_start,
             window_end=window_end,
             CostSnapshot=CostSnapshot,
-            ManagedServiceBinding=ManagedServiceBinding,
+            ManagedService=ManagedService,
         )
     return n
 
@@ -466,7 +473,7 @@ def _capture_org_cost_snapshot(
     window_start: Any,
     window_end: Any,
     CostSnapshot: Any,
-    ManagedServiceBinding: Any,
+    ManagedService: Any,
 ) -> int:
     """Walk one org's clusters + write per-binding cost rows.
 
@@ -475,6 +482,8 @@ def _capture_org_cost_snapshot(
     placeholder OTHER row so the trend chart x-axis stays
     continuous, even when no cloud returns data.
     """
+    from django.db.models import Q
+
     from astrolift_clusters.models import TenantCluster
 
     rows = 0
@@ -489,14 +498,20 @@ def _capture_org_cost_snapshot(
         lifecycle=TenantCluster.Lifecycle.MANAGED.value,
     ).select_related("provider_plugin")
 
-    # Cache binding GUIDs once per org so the per-row resolve is an
-    # O(1) dict hit rather than a per-row DB query.
-    bindings_by_guid: dict[str, Any] = {
-        str(b.guid): b
-        for b in ManagedServiceBinding.objects.filter(
-            managed_service__registered_app__organization=org,
+    # Cache service GUIDs once per org so the per-row resolve is an
+    # O(1) dict hit rather than a per-row DB query. A managed service
+    # is owned by exactly one of registered_app / project (model check
+    # constraint), so both ownership paths have to be in the filter —
+    # scoping to registered_app alone would drop every project-owned
+    # shared resource into the untagged bucket.
+    services_by_guid: dict[str, Any] = {
+        str(s.guid): s
+        for s in ManagedService.objects.filter(
+            Q(registered_app__organization=org) | Q(project__organization=org),
             deleted_at__isnull=True,
-        ).iterator()
+        )
+        .select_related("registered_app", "project")
+        .iterator()
     }
 
     seen_provider: set[str] = set()
@@ -524,7 +539,7 @@ def _capture_org_cost_snapshot(
             )
             continue
         try:
-            result = client.query_actuals_by_binding(
+            result = client.query_actuals_by_service(
                 start=window_start,
                 end=window_end,
             )
@@ -552,7 +567,7 @@ def _capture_org_cost_snapshot(
             taken_at=taken_at,
             provider_slug=provider_slug,
             items=result,
-            bindings_by_guid=bindings_by_guid,
+            services_by_guid=services_by_guid,
             CostSnapshot=CostSnapshot,
         )
 
@@ -563,6 +578,7 @@ def _capture_org_cost_snapshot(
         taken_at=taken_at,
         registered_app=None,
         managed_service_binding=None,
+        managed_service=None,
         by=CostSnapshot.CostBy.OTHER,
         source=CostSnapshot.Source.PLATFORM_METER,
         defaults={"amount_cents": 0, "currency": "USD"},
@@ -578,36 +594,37 @@ def _write_actuals_rows(
     taken_at: Any,
     provider_slug: str,
     items: list[Any],
-    bindings_by_guid: dict[str, Any],
+    services_by_guid: dict[str, Any],
     CostSnapshot: Any,
 ) -> int:
     """Persist one CostSnapshot row per actuals line item.
 
-    Rows whose ``binding_guid`` resolves to a known binding write
-    the FK; rows with an empty or unknown binding GUID write NULL
-    so they roll up under the "Shared / untagged" bucket. Idempotent
-    via the model's unique constraint on
-    (organization, registered_app, managed_service_binding, by,
-    taken_at, source).
+    Rows whose ``managed_service_guid`` resolves to a known service
+    write both that FK and the owning app's; rows with an empty or
+    unknown GUID write NULL for both so they roll up under the
+    "Shared / untagged" bucket. Idempotent via the model's unique
+    constraint on (organization, registered_app,
+    managed_service_binding, managed_service, by, taken_at, source).
     """
     rows = 0
     for item in items:
-        binding_guid = (getattr(item, "binding_guid", "") or "").strip()
-        binding = bindings_by_guid.get(binding_guid) if binding_guid else None
+        service_guid = (getattr(item, "managed_service_guid", "") or "").strip()
+        service = services_by_guid.get(service_guid) if service_guid else None
         registered_app = None
-        by = CostSnapshot.CostBy.MANAGED_SERVICE if binding is not None else CostSnapshot.CostBy.OTHER
-        if binding is not None:
-            registered_app = binding.managed_service.registered_app
-            if binding_guid and not bindings_by_guid.get(binding_guid) and binding_guid:
-                # Defensive: shouldn't happen given the resolve above,
-                # but skip writes whose binding belongs to a different
-                # org (multi-tenant guardrail).
-                continue
-            if registered_app.organization_id != org.id:
+        project = None
+        by = CostSnapshot.CostBy.MANAGED_SERVICE if service is not None else CostSnapshot.CostBy.OTHER
+        if service is not None:
+            registered_app = service.registered_app
+            project = service.project
+            owner = registered_app or project
+            # ``services_by_guid`` is already filtered to this org, so
+            # a mismatch here means the filter and the FK disagree —
+            # refuse the write rather than bill one tenant for
+            # another's resource.
+            if owner is None or owner.organization_id != org.id:
                 log.warning(
-                    "cost actuals: binding %s belongs to org %s, not %s — skipping",
-                    binding_guid,
-                    registered_app.organization_id,
+                    "cost actuals: managed service %s does not belong to org %s — skipping",
+                    service_guid,
                     org.id,
                 )
                 continue
@@ -616,8 +633,10 @@ def _write_actuals_rows(
         _, created = CostSnapshot.objects.get_or_create(
             organization=org,
             taken_at=taken_at,
+            project=project,
             registered_app=registered_app,
-            managed_service_binding=binding,
+            managed_service_binding=None,
+            managed_service=service,
             by=by,
             source=CostSnapshot.Source.PROVIDER_ESTIMATE,
             defaults={"amount_cents": amount_cents, "currency": currency},
@@ -629,9 +648,9 @@ def _write_actuals_rows(
             # precedence (snapshots are immutable per the model
             # docstring — corrections come as a later taken_at).
             log.debug(
-                "cost actuals: snapshot already exists for org=%s binding=%s — skipping",
+                "cost actuals: snapshot already exists for org=%s service=%s — skipping",
                 org.slug,
-                binding_guid or "<untagged>",
+                service_guid or "<untagged>",
             )
     log.info(
         "cost actuals: wrote %d row(s) for org=%s provider=%s",

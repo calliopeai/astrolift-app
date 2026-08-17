@@ -39,11 +39,19 @@ from _sdk.cost import (
 
 log = logging.getLogger(__name__)
 
-# Label key on GCP resources is GCP-normalized — slashes / dots
-# become underscores per ``core.cloud_tags.to_gcp`` ("astrolift.io/binding"
-# → "astrolift_io_binding"). The actuals client filters on this
-# normalized form when reading from the BigQuery billing export.
-GCP_BINDING_LABEL_KEY = "astrolift_io_binding"
+# Label key on GCP resources is GCP-normalized — slashes / dots become
+# underscores per ``core.cloud_tags.to_gcp``
+# ("astrolift.io/managed_service_id" → "astrolift_io_managed_service_id").
+# The actuals client filters on this normalized form when reading from
+# the BigQuery billing export.
+#
+# WARNING (#1419): GCP managed-service drivers do not agree on this
+# spelling. Four variants are in the tree and only a handful of drivers
+# write this one, so today's group-by attributes those and drops the
+# rest into the untagged bucket. Converging the drivers is tracked
+# separately; this constant is the target they converge on, because it
+# is what ``to_gcp`` produces from the canonical key.
+GCP_MANAGED_SERVICE_LABEL_KEY = "astrolift_io_managed_service_id"
 
 
 # GCP Cloud Billing service IDs.
@@ -510,13 +518,14 @@ class GCPBillingActualsConfig:
 
 
 class GCPBillingActuals:
-    """Reads actual GCP spend grouped by the ``astrolift_io_binding``
-    label via BigQuery against the billing export table.
+    """Reads actual GCP spend grouped by the
+    ``astrolift_io_managed_service_id`` label via BigQuery against the
+    billing export table.
 
     The exported schema carries a repeated ``labels`` STRUCT (key,
     value); the query unnests it, filters to our label key, and SUMs
     ``cost`` per ``value`` over the requested window. Resources with
-    no matching label fall into the ``binding_guid=""`` bucket.
+    no matching label fall into the ``managed_service_guid=""`` bucket.
 
     The query template is parameterised on (project, dataset, table)
     so a multi-project operator can run several actuals clients
@@ -529,12 +538,12 @@ class GCPBillingActuals:
     """
 
     _SQL_TEMPLATE = (
-        "SELECT lbl.value AS binding_guid, "
+        "SELECT lbl.value AS managed_service_guid, "
         "SUM(cost) AS amount, currency "
         "FROM `{project}.{dataset}.{table}` "
         "LEFT JOIN UNNEST(labels) lbl ON lbl.key = @label_key "
         "WHERE usage_start_time >= @start AND usage_start_time < @end "
-        "GROUP BY binding_guid, currency"
+        "GROUP BY managed_service_guid, currency"
     )
 
     def __init__(self, *, config: GCPBillingActualsConfig) -> None:
@@ -560,7 +569,7 @@ class GCPBillingActuals:
             self._client = bigquery.Client(project=config.project)
 
     @driver_op(cloud="gcp", driver="cost")
-    def query_actuals_by_binding(
+    def query_actuals_by_service(
         self,
         *,
         start: date,
@@ -584,7 +593,7 @@ class GCPBillingActuals:
             job = self._client.query(
                 sql,
                 job_config=_bq_job_config(
-                    label_key=GCP_BINDING_LABEL_KEY,
+                    label_key=GCP_MANAGED_SERVICE_LABEL_KEY,
                     start=start,
                     end=end,
                 ),
@@ -608,7 +617,7 @@ class GCPBillingActuals:
 
         items: list[BillingActualLineItem] = []
         for row in rows:
-            binding_guid = _row_get(row, "binding_guid") or ""
+            managed_service_guid = _row_get(row, "managed_service_guid") or ""
             amount = float(_row_get(row, "amount") or 0.0)
             row_currency = _row_get(row, "currency") or currency
             if currency and row_currency and row_currency != currency:
@@ -618,7 +627,7 @@ class GCPBillingActuals:
             cents = round(amount * 100)
             items.append(
                 BillingActualLineItem(
-                    binding_guid=binding_guid,
+                    managed_service_guid=managed_service_guid,
                     amount_cents=cents,
                     currency=row_currency or currency,
                     provider="gcp",
