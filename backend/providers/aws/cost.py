@@ -43,10 +43,15 @@ from _sdk.cost import (
 log = logging.getLogger(__name__)
 
 # Tag key the platform stamps on every provisioned cloud resource so
-# Cost Explorer's GroupBy can attribute spend back to the binding.
-# Mirrors ``core.cloud_tags.TAG_BINDING``. Defining it here keeps the
-# vendor module self-contained (no app-side imports).
-AWS_BINDING_TAG_KEY = "astrolift.io/binding"
+# Cost Explorer's GroupBy can attribute spend back to the managed
+# service that owns it. Mirrors ``core.cloud_tags.TAG_MANAGED_SVC_ID``
+# and matches what every AWS managed-service driver writes. Defining
+# it here keeps the vendor module self-contained (no app-side imports).
+#
+# Was ``astrolift.io/binding`` until #1418: no driver ever stamped it,
+# so every group came back with an empty tag value and all spend fell
+# into the untagged bucket.
+AWS_MANAGED_SERVICE_TAG_KEY = "astrolift.io/managed_service_id"
 
 
 # AWS Pricing API service codes per managed-service kind/variant.
@@ -656,7 +661,7 @@ class AWSBillingActuals:
             self._client = boto3.client("ce", region_name="us-east-1")
 
     @driver_op(cloud="aws", driver="cost")
-    def query_actuals_by_binding(
+    def query_actuals_by_service(
         self,
         *,
         start: date,
@@ -673,7 +678,7 @@ class AWSBillingActuals:
                 TimePeriod={"Start": start.isoformat(), "End": end.isoformat()},
                 Granularity="DAILY",
                 Metrics=["AmortizedCost"],
-                GroupBy=[{"Type": "TAG", "Key": AWS_BINDING_TAG_KEY}],
+                GroupBy=[{"Type": "TAG", "Key": AWS_MANAGED_SERVICE_TAG_KEY}],
             )
         except Exception as exc:
             msg = str(exc)
@@ -684,7 +689,7 @@ class AWSBillingActuals:
                 return BillingActualsUnavailable(
                     reason="not_enabled",
                     message=(
-                        f"Activate {AWS_BINDING_TAG_KEY!r} as a cost-allocation tag "
+                        f"Activate {AWS_MANAGED_SERVICE_TAG_KEY!r} as a cost-allocation tag "
                         f"in Billing → Cost allocation tags. Underlying: {exc}"
                     ),
                 )
@@ -700,9 +705,10 @@ class AWSBillingActuals:
         totals_cents: dict[str, int] = {}
         for bucket in response.get("ResultsByTime", []) or []:
             for group in bucket.get("Groups", []) or []:
-                # Keys come back as ['astrolift.io/binding$<value>']
-                # ('$' between tag key and value). Missing tags
-                # surface as ['astrolift.io/binding$'] (no value)
+                # Keys come back as
+                # ['astrolift.io/managed_service_id$<value>'] ('$'
+                # between tag key and value). Missing tags surface as
+                # ['astrolift.io/managed_service_id$'] (no value)
                 # which we map to the untagged bucket.
                 raw_key = (group.get("Keys") or [""])[0]
                 _, _, tag_value = raw_key.partition("$")
@@ -720,7 +726,7 @@ class AWSBillingActuals:
             return []
         return [
             BillingActualLineItem(
-                binding_guid=tag_value,
+                managed_service_guid=tag_value,
                 amount_cents=cents,
                 currency=currency,
                 provider="aws",

@@ -11,7 +11,7 @@ from typing import Any
 
 from _sdk.cost import BillingActualsUnavailable
 from aws.cost import (
-    AWS_BINDING_TAG_KEY,
+    AWS_MANAGED_SERVICE_TAG_KEY,
     AWSBillingActuals,
     AWSBillingActualsConfig,
 )
@@ -39,7 +39,7 @@ class _FakeCE:
 
 def _build_response(*, groups_by_tag):
     """Cost Explorer's wire shape is:
-       ResultsByTime[].Groups[].{Keys: ['astrolift.io/binding$<value>'],
+       ResultsByTime[].Groups[].{Keys: ['astrolift.io/managed_service_id$<value>'],
                                 Metrics: {AmortizedCost: {Amount: '12.34'}}}.
     Helper builds a single-day bucket from a {tag_value: amount_str} dict."""
     return {
@@ -48,7 +48,7 @@ def _build_response(*, groups_by_tag):
                 "TimePeriod": {"Start": "2026-05-15", "End": "2026-05-16"},
                 "Groups": [
                     {
-                        "Keys": [f"{AWS_BINDING_TAG_KEY}${tag_value}"],
+                        "Keys": [f"{AWS_MANAGED_SERVICE_TAG_KEY}${tag_value}"],
                         "Metrics": {"AmortizedCost": {"Amount": amount_str, "Unit": "USD"}},
                     }
                     for tag_value, amount_str in groups_by_tag.items()
@@ -71,32 +71,32 @@ def test_tagged_groups_become_line_items():
     )
     client = AWSBillingActuals(config=AWSBillingActualsConfig(ce_client=ce))
 
-    result = client.query_actuals_by_binding(
+    result = client.query_actuals_by_service(
         start=dt.date(2026, 5, 15),
         end=dt.date(2026, 5, 16),
     )
 
     assert isinstance(result, list)
-    by_guid = {i.binding_guid: i for i in result}
+    by_guid = {i.managed_service_guid: i for i in result}
     assert by_guid["binding-guid-1"].amount_cents == 1234
     assert by_guid["binding-guid-2"].amount_cents == 99
     assert all(i.provider == "aws" for i in result)
     assert all(i.currency == "USD" for i in result)
 
 
-def test_untagged_group_emits_empty_binding_guid():
+def test_untagged_group_emits_empty_managed_service_guid():
     """Resources missing the tag come back as
-    ``astrolift.io/binding$`` (empty value) → the line item carries
-    ``binding_guid=""`` so the caller buckets it as
+    ``astrolift.io/managed_service_id$`` (empty value) → the line item carries
+    ``managed_service_guid=""`` so the caller buckets it as
     Shared / untagged."""
     ce = _FakeCE(response=_build_response(groups_by_tag={"": "5.00"}))
     client = AWSBillingActuals(config=AWSBillingActualsConfig(ce_client=ce))
 
-    result = client.query_actuals_by_binding(start=dt.date(2026, 5, 15), end=dt.date(2026, 5, 16))
+    result = client.query_actuals_by_service(start=dt.date(2026, 5, 15), end=dt.date(2026, 5, 16))
 
     assert isinstance(result, list)
     assert len(result) == 1
-    assert result[0].binding_guid == ""
+    assert result[0].managed_service_guid == ""
     assert result[0].amount_cents == 500
 
 
@@ -110,7 +110,7 @@ def test_multi_day_window_sums_across_buckets():
                     "TimePeriod": {"Start": "2026-05-15", "End": "2026-05-16"},
                     "Groups": [
                         {
-                            "Keys": [f"{AWS_BINDING_TAG_KEY}$bg-1"],
+                            "Keys": [f"{AWS_MANAGED_SERVICE_TAG_KEY}$bg-1"],
                             "Metrics": {"AmortizedCost": {"Amount": "1.00"}},
                         },
                     ],
@@ -119,7 +119,7 @@ def test_multi_day_window_sums_across_buckets():
                     "TimePeriod": {"Start": "2026-05-16", "End": "2026-05-17"},
                     "Groups": [
                         {
-                            "Keys": [f"{AWS_BINDING_TAG_KEY}$bg-1"],
+                            "Keys": [f"{AWS_MANAGED_SERVICE_TAG_KEY}$bg-1"],
                             "Metrics": {"AmortizedCost": {"Amount": "2.50"}},
                         },
                     ],
@@ -129,7 +129,7 @@ def test_multi_day_window_sums_across_buckets():
     )
     client = AWSBillingActuals(config=AWSBillingActualsConfig(ce_client=ce))
 
-    result = client.query_actuals_by_binding(start=dt.date(2026, 5, 15), end=dt.date(2026, 5, 17))
+    result = client.query_actuals_by_service(start=dt.date(2026, 5, 15), end=dt.date(2026, 5, 17))
 
     assert isinstance(result, list)
     assert len(result) == 1
@@ -143,10 +143,10 @@ def test_zero_amount_rows_dropped():
     ce = _FakeCE(response=_build_response(groups_by_tag={"bg-zero": "0.00", "bg-real": "1.23"}))
     client = AWSBillingActuals(config=AWSBillingActualsConfig(ce_client=ce))
 
-    result = client.query_actuals_by_binding(start=dt.date(2026, 5, 15), end=dt.date(2026, 5, 16))
+    result = client.query_actuals_by_service(start=dt.date(2026, 5, 15), end=dt.date(2026, 5, 16))
 
     assert isinstance(result, list)
-    assert [i.binding_guid for i in result] == ["bg-real"]
+    assert [i.managed_service_guid for i in result] == ["bg-real"]
 
 
 def test_api_error_maps_to_unavailable():
@@ -155,7 +155,7 @@ def test_api_error_maps_to_unavailable():
     ce = _FakeCE(raises=RuntimeError("Cost Explorer is having a bad day"))
     client = AWSBillingActuals(config=AWSBillingActualsConfig(ce_client=ce))
 
-    result = client.query_actuals_by_binding(start=dt.date(2026, 5, 15), end=dt.date(2026, 5, 16))
+    result = client.query_actuals_by_service(start=dt.date(2026, 5, 15), end=dt.date(2026, 5, 16))
 
     assert isinstance(result, BillingActualsUnavailable)
     assert result.reason == "api_error"
@@ -166,14 +166,14 @@ def test_not_enabled_message_routed_to_not_enabled_reason():
     """When the tag isn't activated for cost allocation, AWS surfaces
     a 'not enabled' message; the client routes that to the
     `not_enabled` reason so the operator gets a clearer hint."""
-    ce = _FakeCE(raises=RuntimeError("Tag 'astrolift.io/binding' is not enabled for cost allocation"))
+    ce = _FakeCE(raises=RuntimeError("Tag 'astrolift.io/managed_service_id' is not enabled for cost allocation"))
     client = AWSBillingActuals(config=AWSBillingActualsConfig(ce_client=ce))
 
-    result = client.query_actuals_by_binding(start=dt.date(2026, 5, 15), end=dt.date(2026, 5, 16))
+    result = client.query_actuals_by_service(start=dt.date(2026, 5, 15), end=dt.date(2026, 5, 16))
 
     assert isinstance(result, BillingActualsUnavailable)
     assert result.reason == "not_enabled"
-    assert AWS_BINDING_TAG_KEY in result.message
+    assert AWS_MANAGED_SERVICE_TAG_KEY in result.message
 
 
 def test_invalid_window_rejected():
@@ -182,7 +182,7 @@ def test_invalid_window_rejected():
     ce = _FakeCE()
     client = AWSBillingActuals(config=AWSBillingActualsConfig(ce_client=ce))
 
-    result = client.query_actuals_by_binding(start=dt.date(2026, 5, 16), end=dt.date(2026, 5, 16))
+    result = client.query_actuals_by_service(start=dt.date(2026, 5, 16), end=dt.date(2026, 5, 16))
 
     assert isinstance(result, BillingActualsUnavailable)
     assert "before" in result.message
@@ -191,15 +191,15 @@ def test_invalid_window_rejected():
 
 def test_request_carries_correct_group_by_and_tag_key():
     """Lock the wire shape: the API call must group by TAG on the
-    canonical astrolift.io/binding key."""
+    canonical astrolift.io/managed_service_id key."""
     ce = _FakeCE(response={"ResultsByTime": []})
     client = AWSBillingActuals(config=AWSBillingActualsConfig(ce_client=ce))
 
-    client.query_actuals_by_binding(start=dt.date(2026, 5, 15), end=dt.date(2026, 5, 16))
+    client.query_actuals_by_service(start=dt.date(2026, 5, 15), end=dt.date(2026, 5, 16))
 
     assert len(ce.calls) == 1
     call = ce.calls[0]
-    assert call["GroupBy"] == [{"Type": "TAG", "Key": AWS_BINDING_TAG_KEY}]
+    assert call["GroupBy"] == [{"Type": "TAG", "Key": AWS_MANAGED_SERVICE_TAG_KEY}]
     assert call["TimePeriod"] == {"Start": "2026-05-15", "End": "2026-05-16"}
     assert call["Granularity"] == "DAILY"
     assert "AmortizedCost" in call["Metrics"]

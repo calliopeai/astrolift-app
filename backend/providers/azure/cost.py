@@ -47,8 +47,12 @@ from _sdk.cost import (
 log = logging.getLogger(__name__)
 
 # ARM forbids ``/`` in tag names; the canonical
-# ``astrolift.io/binding`` key serializes to this Azure-safe form.
-AZURE_BINDING_TAG_KEY = "astrolift-binding"
+# ``astrolift.io/managed_service_id`` key serializes to this
+# Azure-safe form (``core.cloud_tags.to_azure``). Drivers that build a
+# canonical dict and hand it to ``serialize_azure_arm_tags`` land on
+# this name; the two that hand-roll their own spelling do not, and are
+# tracked in #1419.
+AZURE_MANAGED_SERVICE_TAG_KEY = "astrolift-managed-service-id"
 
 
 # Azure service / product names per managed-service kind/variant.
@@ -643,7 +647,7 @@ class AzureBillingActuals:
             self._client = CostManagementClient(credential=credential)
 
     @driver_op(cloud="azure", driver="cost")
-    def query_actuals_by_binding(
+    def query_actuals_by_service(
         self,
         *,
         start: date,
@@ -673,7 +677,7 @@ class AzureBillingActuals:
                     "totalCost": {"name": "Cost", "function": "Sum"},
                 },
                 "grouping": [
-                    {"type": "TagKey", "name": AZURE_BINDING_TAG_KEY},
+                    {"type": "TagKey", "name": AZURE_MANAGED_SERVICE_TAG_KEY},
                 ],
             },
         }
@@ -715,7 +719,7 @@ class AzureBillingActuals:
                 raw_tag = row[tag_idx]
             except IndexError:
                 raw_tag = ""
-            binding_guid = _azure_normalize_tag_value(raw_tag)
+            managed_service_guid = _azure_normalize_tag_value(raw_tag)
             row_currency = currency
             if currency_idx is not None:
                 with contextlib.suppress(IndexError):
@@ -723,18 +727,18 @@ class AzureBillingActuals:
             if currency and row_currency and row_currency != currency:
                 continue
             cents = round(amount * 100)
-            key = (binding_guid, row_currency)
+            key = (managed_service_guid, row_currency)
             totals[key] = totals.get(key, 0) + cents
 
         return [
             BillingActualLineItem(
-                binding_guid=binding,
+                managed_service_guid=service_guid,
                 amount_cents=cents,
                 currency=row_currency,
                 provider="azure",
                 service="",
             )
-            for (binding, row_currency), cents in totals.items()
+            for (service_guid, row_currency), cents in totals.items()
         ]
 
 
@@ -780,9 +784,9 @@ def _azure_column_indices(
         if cost_idx is None and name_lower in {"cost", "costusd", "totalcost"}:
             cost_idx = i
         elif tag_idx is None and (
-            name_lower == AZURE_BINDING_TAG_KEY.lower()
+            name_lower == AZURE_MANAGED_SERVICE_TAG_KEY.lower()
             or name_lower == "tagvalue"
-            or AZURE_BINDING_TAG_KEY.lower() in name_lower
+            or AZURE_MANAGED_SERVICE_TAG_KEY.lower() in name_lower
         ):
             tag_idx = i
         elif currency_idx is None and name_lower == "currency":

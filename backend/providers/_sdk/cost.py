@@ -160,14 +160,22 @@ class CostEstimator(Protocol):
 
 @dataclass(frozen=True)
 class BillingActualLineItem:
-    """One billing-API row keyed back to a platform binding.
+    """One billing-API row keyed back to a platform managed service.
 
-    ``binding_guid`` is the value of the ``astrolift.io/binding`` tag
-    on the cloud resource that incurred the cost. Empty string when
-    the cloud resource carries no binding tag (operator-managed or
-    shared resources) — the cost-collector writes those rows with a
-    NULL ``CostSnapshot.managed_service_binding_id`` so they roll up
-    under the "Shared / untagged" bucket.
+    ``managed_service_guid`` is the value of the
+    ``astrolift.io/managed_service_id`` tag on the cloud resource that
+    incurred the cost. Empty string when the resource carries no such
+    tag (operator-managed or shared resources) — the cost collector
+    writes those rows with a NULL ``CostSnapshot.managed_service_id``
+    so they roll up under the "Shared / untagged" bucket.
+
+    This used to key on ``astrolift.io/binding``, which could never
+    work (#1418): ``ManagedServiceBinding`` is one row per injected
+    env var, its GUIDs are deleted and recreated on every envelope
+    sync, and the rows do not exist yet when ``provision()`` runs. A
+    cloud resource belongs to exactly one managed service, so the
+    service GUID is the only identifier that is both singular and
+    stable enough to stamp at provision time.
 
     ``amount_cents`` is integer cents in ``currency``. Drivers MUST
     convert from the billing-API's float USD to integer cents before
@@ -176,12 +184,12 @@ class BillingActualLineItem:
 
     ``provider`` and ``service`` are best-effort provenance strings
     (``"aws-rds"`` / ``"PostgreSQL"`` etc.) so the cost panel can
-    surface "which cloud / which service" alongside the binding name.
+    surface "which cloud / which service" alongside the service name.
     Drivers leave them empty when the billing API doesn't carry the
     detail.
     """
 
-    binding_guid: str
+    managed_service_guid: str
     amount_cents: int
     currency: str = "USD"
     provider: str = ""
@@ -209,30 +217,36 @@ BillingActualsResult = list[BillingActualLineItem] | BillingActualsUnavailable
 
 class BillingActualsClient(Protocol):
     """Optional driver capability — surface *actual* spend grouped by
-    the platform's ``astrolift.io/binding`` tag.
+    the platform's ``astrolift.io/managed_service_id`` tag.
 
     Drivers MUST query the live cloud billing / cost-management API.
     No hard-coded amounts, no caching beyond the per-call response.
 
     Implementations should:
     1. Issue a single API call covering the requested ``[start, end]``
-       window with a tag/label group-by on ``astrolift.io/binding``
-       (per cloud's serialization).
-    2. Sum line items per binding tag value and return one
-       :class:`BillingActualLineItem` per (binding_guid, currency)
-       pair. Rows whose tag is missing or empty are emitted with
-       ``binding_guid=""`` — the collector buckets those under
-       "Shared / untagged".
+       window with a tag/label group-by on
+       ``astrolift.io/managed_service_id`` (per cloud's serialization).
+    2. Sum line items per tag value and return one
+       :class:`BillingActualLineItem` per
+       (managed_service_guid, currency) pair. Rows whose tag is
+       missing or empty are emitted with ``managed_service_guid=""``
+       — the collector buckets those under "Shared / untagged".
     3. Return :class:`BillingActualsUnavailable` on any failure mode
        rather than raising — the collector logs and moves on so one
        broken cloud doesn't fail the snapshot for the others.
+
+    The group-by key must be the spelling this cloud's managed-service
+    drivers actually stamp. Drivers within one cloud disagreeing on
+    that spelling is the same bug as not stamping it at all: the
+    group-by names one key, and every resource tagged under a
+    different one silently lands in the untagged bucket.
 
     Date semantics: ``start`` is inclusive, ``end`` is exclusive. The
     typical caller asks for "yesterday's spend" with
     ``start=today-1, end=today``.
     """
 
-    def query_actuals_by_binding(
+    def query_actuals_by_service(
         self,
         *,
         start: date,
