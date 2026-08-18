@@ -19,6 +19,7 @@ Drivers shipped:
   OCI (Harbor / Zot / GHCR)
 - CNPGPostgresDriver (#53) — Postgres via CloudNativePG operator
 - RedisOperatorDriver (#53) — Redis via Bitnami operator
+- MemcachedDriver (#1465) — cache via an in-cluster Memcached ring
 """
 
 from _sdk.base import ProviderPlugin
@@ -27,6 +28,8 @@ from k8s_native.dns_external import ExternalDnsDriver
 from k8s_native.identity_projected import ProjectedSaTokenDriver
 from k8s_native.ingress import K8sIngressDriver
 from k8s_native.managed.api_gateway import GatewayAPIDriver
+from k8s_native.managed.cache_memcached import DEFAULT_IMAGE as DEFAULT_MEMCACHED_IMAGE
+from k8s_native.managed.cache_memcached import MemcachedDriver
 from k8s_native.managed.event_bus_knative import KnativeEventingDriver
 from k8s_native.managed.event_stream_nats import NATSDriver
 from k8s_native.managed.event_stream_strimzi import StrimziKafkaDriver
@@ -81,6 +84,7 @@ PLUGIN = ProviderPlugin(
     managed_service_drivers={
         ("postgres", "cnpg"): CNPGPostgresDriver,
         ("redis", "operator"): RedisOperatorDriver,
+        ("cache", "memcached"): MemcachedDriver,
         ("mysql", "operator"): MySQLOperatorDriver,
         ("document_db", "mongodb_operator"): MongoDBOperatorDriver,
         ("event_stream", "kafka_strimzi"): StrimziKafkaDriver,
@@ -148,6 +152,7 @@ PLUGIN = ProviderPlugin(
             "cnpg_operator_namespace": {"type": "string", "default": "cnpg-system"},
             "redis_storage_class": {"type": "string"},
             "redis_persistent": {"type": "boolean", "default": True},
+            "memcached_image": {"type": "string", "default": DEFAULT_MEMCACHED_IMAGE},
             "mysql_operator_brand": {
                 "type": "string",
                 "enum": ["percona", "oracle", "mariadb"],

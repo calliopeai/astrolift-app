@@ -28,18 +28,46 @@ Inputs (CLI flag overrides env var):
   --name              ASTROLIFT_CLUSTER_NAME             (default = slug)
   --plugin-slug       ASTROLIFT_CLUSTER_PLUGIN_SLUG      (default 'aws')
   --auth-method       ASTROLIFT_CLUSTER_AUTH_METHOD      (default 'exec_plugin')
-  --region            ASTROLIFT_CLUSTER_REGION / AWS_REGION
+  --region            ASTROLIFT_CLUSTER_REGION (AWS_REGION only when plugin_slug == 'aws';
+                      Azure / GCP take theirs from the described cluster)
   --endpoint          ASTROLIFT_CLUSTER_ENDPOINT         (explicit override)
   --ca-cert           ASTROLIFT_CLUSTER_CA_CERT          (explicit override; base64 or PEM)
-  --ingress-class     ASTROLIFT_CLUSTER_INGRESS_CLASS    (default 'alb')
+  --ingress-class     ASTROLIFT_CLUSTER_INGRESS_CLASS    (default: 'alb' on aws, 'nginx' elsewhere)
   --org-slug          ASTROLIFT_CLUSTER_ORG_SLUG         ('' / 'shared' => unscoped)
-  --auto-discover-aws ASTROLIFT_CLUSTER_AUTO_DISCOVER_AWS ('1' / 'true' to enable)
-  --aws-cluster-name  ASTROLIFT_CLUSTER_AWS_NAME / EKS_CLUSTER_NAME
 
-When --auto-discover-aws is set (and plugin_slug == 'aws'), the command
-calls eks:DescribeCluster + sts:GetCallerIdentity itself, builds the
-OIDC provider ARN deterministically (no iam:List* needed), and fills
-endpoint / ca_cert / auth_config / provider_config in.
+Per-cloud auto-discovery (#1474). Each cloud has its own enable flag and
+its own cluster-identity inputs; the flag only fires when it matches
+``--plugin-slug``, and a mismatch is an error rather than a silently
+under-configured row:
+
+  --auto-discover-aws     ASTROLIFT_CLUSTER_AUTO_DISCOVER_AWS
+  --aws-cluster-name      ASTROLIFT_CLUSTER_AWS_NAME / EKS_CLUSTER_NAME
+
+  --auto-discover-azure   ASTROLIFT_CLUSTER_AUTO_DISCOVER_AZURE
+  --azure-cluster-name    ASTROLIFT_CLUSTER_AZURE_NAME / AKS_CLUSTER_NAME
+  --azure-resource-group  ASTROLIFT_CLUSTER_AZURE_RESOURCE_GROUP / AZURE_RESOURCE_GROUP
+  --azure-subscription-id ASTROLIFT_CLUSTER_AZURE_SUBSCRIPTION_ID / AZURE_SUBSCRIPTION_ID
+
+  --auto-discover-gcp     ASTROLIFT_CLUSTER_AUTO_DISCOVER_GCP
+  --gcp-cluster-name      ASTROLIFT_CLUSTER_GCP_NAME / GKE_CLUSTER_NAME
+  --gcp-project-id        ASTROLIFT_CLUSTER_GCP_PROJECT / GOOGLE_CLOUD_PROJECT
+  --gcp-location          ASTROLIFT_CLUSTER_GCP_LOCATION (default: --region)
+
+On AWS the command calls eks:DescribeCluster + sts:GetCallerIdentity,
+builds the OIDC provider ARN deterministically (no iam:List* needed),
+and fills endpoint / ca_cert / auth_config / provider_config in.
+
+On Azure it describes the AKS managed cluster (resolving the resource
+group from the subscription when the operator did not supply one) and
+lifts the cluster CA out of the admin kubeconfig — AKS is the one cloud
+whose managed-cluster object does not carry the CA.
+
+On GCP one container.get_cluster call yields both endpoint and CA.
+
+No new auth path in any of the three: each cloud's driver already
+resolves ``exec_plugin`` rows itself (EKS via the AWS exec plugin, AKS
+via list_cluster_admin_credentials #311, GKE via a Workload Identity
+bearer #310), reading exactly the ``auth_config`` keys written here.
 
 Skips if no slug is provided (silent no-op), so startup scripts can
 include the call unconditionally.
@@ -100,8 +128,161 @@ def _discover_aws(cluster_name: str, region: str) -> dict[str, Any]:
     }
 
 
+def _azure_containerservice_client(subscription_id: str) -> Any:
+    """Production AKS management client. Swapped out in tests."""
+    from azure.identity import DefaultAzureCredential  # noqa: PLC0415 — optional cloud SDK
+    from azure.mgmt.containerservice import ContainerServiceClient  # noqa: PLC0415
+
+    return ContainerServiceClient(
+        credential=DefaultAzureCredential(),
+        subscription_id=subscription_id,
+    )
+
+
+def _resource_group_from_id(resource_id: str) -> str:
+    parts = (resource_id or "").split("/")
+    for index, part in enumerate(parts):
+        if part.lower() == "resourcegroups" and index + 1 < len(parts):
+            return parts[index + 1]
+    return ""
+
+
+def _resolve_azure_resource_group(client: Any, cluster_name: str) -> str:
+    """Find the resource group holding ``cluster_name`` by listing the
+    subscription's managed clusters.
+
+    An installer knows the AKS cluster name it just created; making it
+    also thread the resource group through is the kind of out-of-band
+    coupling the platform is supposed to absorb. Ambiguity is fatal
+    rather than resolved by picking one: AKS names are unique per
+    resource group, not per subscription.
+    """
+    groups = {
+        _resource_group_from_id(getattr(managed, "id", "") or "")
+        for managed in client.managed_clusters.list()
+        if getattr(managed, "name", "") == cluster_name
+    }
+    groups.discard("")
+    if not groups:
+        raise CommandError(
+            f"no AKS cluster named {cluster_name!r} in the subscription; "
+            "pass --azure-resource-group if the identity cannot list managed clusters",
+        )
+    if len(groups) > 1:
+        raise CommandError(
+            f"AKS cluster name {cluster_name!r} exists in resource groups {sorted(groups)}; "
+            "pass --azure-resource-group to disambiguate",
+        )
+    return groups.pop()
+
+
+def _discover_azure(
+    *,
+    subscription_id: str,
+    resource_group: str,
+    cluster_name: str,
+    client: Any | None = None,
+) -> dict[str, Any]:
+    """Describe an AKS managed cluster into the fields a TenantCluster
+    row needs to be addressable.
+
+    The CA comes out of the admin kubeconfig because the managed-cluster
+    API model does not carry it. That fetch is allowed to fail: a
+    cluster with admin credentials disabled still registers, just
+    without a pinned CA (the AKS apiserver cert chains to a public root,
+    which is what the driver's k8s client falls back to).
+    """
+    from azure.cluster_aks import (  # noqa: PLC0415 — optional cloud SDK
+        certificate_authority_from_kubeconfig,
+        kubeconfig_from_admin_credentials,
+    )
+
+    client = client or _azure_containerservice_client(subscription_id)
+    if not resource_group:
+        resource_group = _resolve_azure_resource_group(client, cluster_name)
+
+    managed = client.managed_clusters.get(
+        resource_group_name=resource_group,
+        resource_name=cluster_name,
+    )
+    fqdn = str(getattr(managed, "fqdn", "") or getattr(managed, "private_fqdn", "") or "")
+    if not fqdn:
+        raise CommandError(
+            f"AKS {resource_group}/{cluster_name} reports no fqdn; the cluster has no reachable apiserver",
+        )
+
+    oidc_profile = getattr(managed, "oidc_issuer_profile", None)
+    identity = getattr(managed, "identity", None)
+
+    ca_cert = ""
+    ca_error = ""
+    try:
+        credentials = client.managed_clusters.list_cluster_admin_credentials(
+            resource_group_name=resource_group,
+            resource_name=cluster_name,
+        )
+        ca_cert = certificate_authority_from_kubeconfig(
+            kubeconfig_from_admin_credentials(
+                credentials,
+                resource_group=resource_group,
+                cluster_name=cluster_name,
+            )
+        )
+    except Exception as exc:  # noqa: BLE001 — CA is best-effort, see docstring
+        ca_error = str(exc)
+
+    return {
+        "endpoint": fqdn if fqdn.startswith("http") else f"https://{fqdn}",
+        "ca_cert": ca_cert,
+        "ca_error": ca_error,
+        "resource_group": resource_group,
+        "location": str(getattr(managed, "location", "") or ""),
+        "tenant_id": str(getattr(identity, "tenant_id", "") or ""),
+        "oidc_issuer_url": str(getattr(oidc_profile, "issuer_url", "") or ""),
+    }
+
+
+def _gcp_container_client() -> Any:
+    """Production GKE management client. Swapped out in tests."""
+    from google.cloud import container_v1  # noqa: PLC0415 — optional cloud SDK
+
+    return container_v1.ClusterManagerClient()
+
+
+def _discover_gcp(
+    *,
+    project_id: str,
+    location: str,
+    cluster_name: str,
+    client: Any | None = None,
+) -> dict[str, Any]:
+    """Describe a GKE cluster. One call carries both endpoint and CA."""
+    client = client or _gcp_container_client()
+    resp = client.get_cluster(
+        name=f"projects/{project_id}/locations/{location}/clusters/{cluster_name}",
+    )
+    endpoint = str(getattr(resp, "endpoint", "") or "")
+    if not endpoint:
+        raise CommandError(
+            f"GKE {project_id}/{location}/{cluster_name} reports no endpoint; "
+            "a private cluster needs --endpoint passed explicitly",
+        )
+    master_auth = getattr(resp, "master_auth", None)
+    return {
+        "endpoint": endpoint if endpoint.startswith("http") else f"https://{endpoint}",
+        "ca_cert": str(getattr(master_auth, "cluster_ca_certificate", "") or ""),
+    }
+
+
+# Only AWS wants a non-default ingress class out of the box: the ALB
+# controller is what the AWS install bootstraps. Every other plugin gets
+# the model's own default, which is also what registerTenantCluster
+# writes — an 'alb' row on AKS/GKE renders ALB-only annotations.
+_DEFAULT_INGRESS_CLASS: dict[str, str] = {"aws": "alb"}
+
+
 class Command(BaseCommand):
-    help = "Upsert a TenantCluster row, optionally auto-discovering EKS values."
+    help = "Upsert a TenantCluster row, optionally auto-discovering EKS / AKS / GKE values."
 
     def add_arguments(self, parser) -> None:
         parser.add_argument("--slug", default=None)
@@ -124,6 +305,48 @@ class Command(BaseCommand):
             default=None,
             help="EKS cluster name to describe (default: --slug or EKS_CLUSTER_NAME)",
         )
+        parser.add_argument(
+            "--auto-discover-azure",
+            action="store_true",
+            default=None,
+            help="Describe the AKS managed cluster to fill Azure values automatically",
+        )
+        parser.add_argument(
+            "--azure-cluster-name",
+            default=None,
+            help="AKS cluster name to describe (default: --slug or AKS_CLUSTER_NAME)",
+        )
+        parser.add_argument(
+            "--azure-resource-group",
+            default=None,
+            help="Resource group holding the AKS cluster (default: resolved from the subscription)",
+        )
+        parser.add_argument(
+            "--azure-subscription-id",
+            default=None,
+            help="Azure subscription holding the AKS cluster",
+        )
+        parser.add_argument(
+            "--auto-discover-gcp",
+            action="store_true",
+            default=None,
+            help="Call container.get_cluster to fill GKE values automatically",
+        )
+        parser.add_argument(
+            "--gcp-cluster-name",
+            default=None,
+            help="GKE cluster name to describe (default: --slug or GKE_CLUSTER_NAME)",
+        )
+        parser.add_argument(
+            "--gcp-project-id",
+            default=None,
+            help="GCP project holding the GKE cluster",
+        )
+        parser.add_argument(
+            "--gcp-location",
+            default=None,
+            help="GKE cluster region or zone (default: --region)",
+        )
 
     def handle(self, *args, **opts) -> None:
         slug = opts["slug"] or _env("ASTROLIFT_CLUSTER_SLUG")
@@ -134,10 +357,19 @@ class Command(BaseCommand):
         name = opts["name"] or _env("ASTROLIFT_CLUSTER_NAME") or slug
         plugin_slug = opts["plugin_slug"] or _env("ASTROLIFT_CLUSTER_PLUGIN_SLUG") or "aws"
         auth_method = opts["auth_method"] or _env("ASTROLIFT_CLUSTER_AUTH_METHOD") or "exec_plugin"
-        region = opts["region"] or _env("ASTROLIFT_CLUSTER_REGION") or _env("AWS_REGION") or ""
+        region = opts["region"] or _env("ASTROLIFT_CLUSTER_REGION") or ""
+        if not region and plugin_slug == "aws":
+            # AWS_REGION is set on every control-plane task, including the
+            # ones registering an AKS or GKE cluster. Falling back to it
+            # regardless of plugin stamps 'us-east-1' on an Azure row.
+            region = _env("AWS_REGION") or ""
         endpoint = opts["endpoint"] or _env("ASTROLIFT_CLUSTER_ENDPOINT") or ""
         ca_cert = opts["ca_cert"] or _env("ASTROLIFT_CLUSTER_CA_CERT") or ""
-        ingress_class = opts["ingress_class"] or _env("ASTROLIFT_CLUSTER_INGRESS_CLASS") or "alb"
+        ingress_class = (
+            opts["ingress_class"]
+            or _env("ASTROLIFT_CLUSTER_INGRESS_CLASS")
+            or _DEFAULT_INGRESS_CLASS.get(plugin_slug, "nginx")
+        )
         org_slug = opts["org_slug"] or _env("ASTROLIFT_CLUSTER_ORG_SLUG") or ""
 
         _alb_auth_pool_arn = _env("ASTROLIFT_CLUSTER_ALB_AUTH_USER_POOL_ARN")
@@ -186,6 +418,53 @@ class Command(BaseCommand):
             opts["aws_cluster_name"] or _env("ASTROLIFT_CLUSTER_AWS_NAME") or _env("EKS_CLUSTER_NAME") or slug
         )
 
+        auto_discover_azure = opts["auto_discover_azure"]
+        if auto_discover_azure is None:
+            auto_discover_azure = _env_bool("ASTROLIFT_CLUSTER_AUTO_DISCOVER_AZURE")
+        azure_cluster_name = (
+            opts["azure_cluster_name"]
+            or _env("ASTROLIFT_CLUSTER_AZURE_NAME")
+            or _env("AKS_CLUSTER_NAME")
+            or slug
+        )
+        azure_resource_group = (
+            opts["azure_resource_group"]
+            or _env("ASTROLIFT_CLUSTER_AZURE_RESOURCE_GROUP")
+            or _env("AZURE_RESOURCE_GROUP")
+            or ""
+        )
+        azure_subscription_id = (
+            opts["azure_subscription_id"]
+            or _env("ASTROLIFT_CLUSTER_AZURE_SUBSCRIPTION_ID")
+            or _env("AZURE_SUBSCRIPTION_ID")
+            or ""
+        )
+
+        auto_discover_gcp = opts["auto_discover_gcp"]
+        if auto_discover_gcp is None:
+            auto_discover_gcp = _env_bool("ASTROLIFT_CLUSTER_AUTO_DISCOVER_GCP")
+        gcp_cluster_name = (
+            opts["gcp_cluster_name"] or _env("ASTROLIFT_CLUSTER_GCP_NAME") or _env("GKE_CLUSTER_NAME") or slug
+        )
+        gcp_project_id = (
+            opts["gcp_project_id"]
+            or _env("ASTROLIFT_CLUSTER_GCP_PROJECT")
+            or _env("GOOGLE_CLOUD_PROJECT")
+            or ""
+        )
+        gcp_location = opts["gcp_location"] or _env("ASTROLIFT_CLUSTER_GCP_LOCATION") or region
+
+        # A discovery flag aimed at the wrong plugin used to be a silent
+        # skip, which is how an operator ends up with a row that saved
+        # cleanly and cannot be addressed.
+        for flag, owner, requested in (
+            ("--auto-discover-aws", "aws", auto_discover),
+            ("--auto-discover-azure", "azure", auto_discover_azure),
+            ("--auto-discover-gcp", "gcp", auto_discover_gcp),
+        ):
+            if requested and plugin_slug != owner:
+                raise CommandError(f"{flag} requires --plugin-slug {owner}, got {plugin_slug!r}")
+
         if auth_method not in _VALID_AUTH:
             raise CommandError(f"--auth-method must be one of {sorted(_VALID_AUTH)}")
 
@@ -221,6 +500,90 @@ class Command(BaseCommand):
                 "oidc_provider_arn": discovered["oidc_provider_arn"],
                 "cluster_oidc_issuer": discovered["oidc_issuer_url"].replace("https://", "", 1),
                 "ecr_registry": f"{discovered['account_id']}.dkr.ecr.{region}.amazonaws.com",
+            }
+
+        if auto_discover_azure and plugin_slug == "azure":
+            if not azure_subscription_id:
+                raise CommandError(
+                    "--azure-subscription-id / AZURE_SUBSCRIPTION_ID required with --auto-discover-azure",
+                )
+            self.stdout.write(
+                f"Auto-discovering Azure values for AKS cluster {azure_cluster_name!r}…",
+            )
+            try:
+                discovered = _discover_azure(
+                    subscription_id=azure_subscription_id,
+                    resource_group=azure_resource_group,
+                    cluster_name=azure_cluster_name,
+                )
+            except CommandError:
+                raise
+            except Exception as exc:
+                raise CommandError(f"Azure auto-discovery failed: {exc}") from exc
+
+            azure_resource_group = discovered["resource_group"]
+            endpoint = endpoint or discovered["endpoint"]
+            ca_cert = ca_cert or discovered["ca_cert"]
+            region = region or discovered["location"]
+            if not ca_cert and discovered["ca_error"]:
+                # exec_plugin auth resolves through the same admin
+                # credentials, so a failure here usually means the row
+                # will not be able to reach the apiserver either.
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"AKS admin kubeconfig unavailable ({discovered['ca_error']}); "
+                        "registering without a pinned CA",
+                    )
+                )
+            auth_config = {
+                "subscription_id": azure_subscription_id,
+                "resource_group": azure_resource_group,
+                "cluster_name": azure_cluster_name,
+            }
+            provider_config = {
+                "subscription_id": azure_subscription_id,
+                "resource_group": azure_resource_group,
+                "cluster_name": azure_cluster_name,
+                "location": region,
+            }
+            if discovered["tenant_id"]:
+                provider_config["tenant_id"] = discovered["tenant_id"]
+            if discovered["oidc_issuer_url"]:
+                provider_config["cluster_oidc_issuer"] = discovered["oidc_issuer_url"]
+
+        if auto_discover_gcp and plugin_slug == "gcp":
+            if not gcp_project_id:
+                raise CommandError(
+                    "--gcp-project-id / GOOGLE_CLOUD_PROJECT required with --auto-discover-gcp",
+                )
+            if not gcp_location:
+                raise CommandError("--gcp-location / --region required with --auto-discover-gcp")
+            self.stdout.write(
+                f"Auto-discovering GCP values for GKE cluster {gcp_cluster_name!r} in {gcp_location}…",
+            )
+            try:
+                discovered = _discover_gcp(
+                    project_id=gcp_project_id,
+                    location=gcp_location,
+                    cluster_name=gcp_cluster_name,
+                )
+            except CommandError:
+                raise
+            except Exception as exc:
+                raise CommandError(f"GCP auto-discovery failed: {exc}") from exc
+
+            endpoint = endpoint or discovered["endpoint"]
+            ca_cert = ca_cert or discovered["ca_cert"]
+            region = region or gcp_location
+            auth_config = {
+                "project_id": gcp_project_id,
+                "location": gcp_location,
+                "cluster_name": gcp_cluster_name,
+            }
+            provider_config = {
+                "project_id": gcp_project_id,
+                "location": gcp_location,
+                "cluster_name": gcp_cluster_name,
             }
 
         # Resolve org binding. Empty / 'shared' / 'platform' => unscoped row.

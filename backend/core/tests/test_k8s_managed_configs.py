@@ -124,6 +124,29 @@ def test_dynamic_filesystem_config_preserves_operator_defaults(monkeypatch) -> N
     assert rook.csi_driver == "rook-ceph.cephfs.csi.ceph.com"
 
 
+def test_memcached_config_falls_back_to_the_driver_default_image(monkeypatch) -> None:
+    """An unset or blank cluster override must not render a StatefulSet with
+    an empty image, which fails as an unschedulable pod rather than a config
+    error."""
+    from k8s_native.managed.cache_memcached import DEFAULT_IMAGE
+
+    cluster_driver = object()
+    monkeypatch.setattr("core.cluster_observability._driver_for_cluster", lambda _cluster: cluster_driver)
+
+    default = managed_config_for("k8s_native", _cluster(), kind="cache", variant="memcached")
+    blank = managed_config_for("k8s_native", _cluster(memcached_image=""), kind="cache", variant="memcached")
+    pinned = managed_config_for(
+        "k8s_native",
+        _cluster(memcached_image="registry.internal/memcached:1.6.38-alpine"),
+        kind="cache",
+        variant="memcached",
+    )
+
+    assert default.image == DEFAULT_IMAGE
+    assert blank.image == DEFAULT_IMAGE
+    assert pinned.image == "registry.internal/memcached:1.6.38-alpine"
+
+
 def test_knative_config_preserves_install_security_policy(monkeypatch) -> None:
     cluster_driver = object()
     monkeypatch.setattr("core.cluster_observability._driver_for_cluster", lambda _cluster: cluster_driver)
@@ -366,6 +389,7 @@ def test_k8s_operator_defaults_are_exposed_in_provider_schema() -> None:
         "cnpg_backup_url",
         "redis_storage_class",
         "redis_persistent",
+        "memcached_image",
         "mysql_operator_brand",
         "mysql_storage_class",
         "mysql_namespace",

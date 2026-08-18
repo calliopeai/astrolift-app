@@ -18,21 +18,21 @@ Every gap that is left must appear in the ledger below or the guard test
 
 Opt-in kinds: `api_gateway`, `cdn`, `database_proxy`, `mq`, `sms`, `stream`, `time_series`, `warehouse`, `wide_column`.
 
-32 kinds; 19 executable on all three public clouds;
-22 reachable on every cloud once in-cluster variants count;
-4 gaps across 3 kinds.
+32 kinds; 20 executable on all three public clouds;
+24 reachable on every cloud once in-cluster variants count;
+1 gaps across 1 kinds.
 
 ## Coverage
 
 | Kind | AWS | GCP | Azure | In-cluster (k8s_native) |
 | --- | --- | --- | --- | --- |
 | `api_gateway` (opt-in) | `http_api`, `rest_api`, `websocket_api` | `api_gateway` | `api_management` | `gateway_api` |
-| `cache` | `elasticache_memcached`, `elasticache_serverless_memcached` | - | - | - |
+| `cache` | `elasticache_memcached`, `elasticache_serverless_memcached` | - | - | `memcached` |
 | `cdn` (opt-in) | `cloudfront` | `cloud_cdn` | planned: `front_door` | - |
 | `database_proxy` (opt-in) | `rds_proxy` | - | - | - |
 | `document_db` | `documentdb`, `documentdb_serverless_v2` | `firestore_native` | `cosmos_mongodb`, `cosmos_nosql` | `mongodb_operator` |
 | `email` | `ses` | planned: `gcp_thirdparty` | `azure_acs` | - |
-| `encryption_key` | `kms` | `cloud_kms` | planned: `key_vault_key` | - |
+| `encryption_key` | `kms` | `cloud_kms` | `key_vault_key` | - |
 | `event_bus` | `eventbridge` | `eventarc` | `event_grid`, `event_grid_namespace` | `knative_eventing` |
 | `event_stream` | `msk`, `msk_serverless` | `managed_kafka` | `event_hubs_kafka` | `kafka_strimzi`, `nats` |
 | `faas` | `lambda` | `cloud_functions_gen2` | `azure_functions` | `knative_service` |
@@ -65,10 +65,7 @@ Each row explains one hole above. The reference is the tracking issue.
 
 | Kind | Cloud | Classification | Reference |
 | --- | --- | --- | --- |
-| `cache` | gcp | `buildable` | https://github.com/calliopeai/astrolift-app/issues/1465 |
-| `cache` | azure | `buildable` | https://github.com/calliopeai/astrolift-app/issues/1465 |
 | `email` | gcp | `planned_variant` | https://github.com/calliopeai/astrolift-app/issues/1453 |
-| `encryption_key` | azure | `planned_variant` | https://github.com/calliopeai/astrolift-app/issues/1454 |
 
 ### Classifications
 

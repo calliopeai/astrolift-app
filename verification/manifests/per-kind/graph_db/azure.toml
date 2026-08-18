@@ -1,0 +1,53 @@
+# PER-KIND / graph_db / azure -- variant cosmos_gremlin.
+#
+# One managed service, one cloud, the full lifecycle cycle. The fixture only
+# opens live clients for postgres, redis, queue and object_store; every other
+# kind is verified by binding presence in /debug plus a clean VERIFY-CLEAN.
+# Binding envelope to assert in /debug: GRAPH_DB_URL, GRAPH_DB_ENDPOINT, GRAPH_DB_PORT, GRAPH_DB_PROTOCOL, GRAPH_DB_TLS, GRAPH_DB_AUTH_MODE, GRAPH_DB_REGION, GRAPH_DB_RESOURCE_ARN, COSMOS_ENDPOINT, COSMOS_DATABASE_NAME, COSMOS_CONNECTION_STRING, COSMOS_READONLY_CONNECTION_STRING.
+#
+# Generated from providers/_cert/collection.py -- do not hand-edit.
+name = "cert2026q3-graph-db-azure"
+
+[campaign]
+slug = "cert2026q3"
+cell = "per-kind/graph_db/azure"
+cloud = "azure"
+fixture = "calliopeai/astrolift-sample-api"
+purpose = "coverage: graph_db via cosmos_gremlin"
+
+# Operator tags the harness threads into ProvisionSpec.tags. The app name
+# carries the campaign slug as well, because no operator tag reaches an IAM
+# principal and two GCP drivers drop spec.tags outright -- see _cert/campaign.py.
+[campaign.tags]
+campaign = "cert2026q3"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+is_public = true
+replicas = 1
+cpu_request = "100m"
+cpu_limit = "500m"
+memory_request = "128Mi"
+memory_limit = "256Mi"
+
+  [[workloads.containers]]
+  name = "app"
+  is_primary = true
+  image_ref = "docker.io/calliopeai/astrolift-sample-api:main-df5ffa3"
+  port = 8080
+  command = ["python", "entrypoint.py", "web"]
+
+    [workloads.containers.env]
+    LOG_LEVEL = "info"
+    PORT = "8080"
+
+    [workloads.containers.healthcheck]
+    kind = "http"
+    value = "/health"
+    port = 8080
+
+[[managed_services]]
+kind = "graph_db"
+name = "graph-db"
+variant = "cosmos_gremlin"

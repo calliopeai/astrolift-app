@@ -39,6 +39,9 @@ from tests.azure import (
     test_managed_email_acs as email_acs_suite,
 )
 from tests.azure import (
+    test_managed_encryption_key_vault as key_vault_suite,
+)
+from tests.azure import (
     test_managed_managed_redis as managed_redis_suite,
 )
 from tests.azure import (
@@ -548,6 +551,24 @@ def _servicebus_queue_legacy() -> Live:
     )
 
 
+def _key_vault_key() -> Live:
+    vault = key_vault_suite.FakeKeyVault()
+    driver, _ = key_vault_suite._driver(vault)
+    result = driver.provision(key_vault_suite._spec())
+    assert result.ok, result.message
+    name = key_vault_suite._key_name(result.handle)
+    return Live(
+        driver=driver,
+        handle=result.handle,
+        owner="service-1",
+        read_owner=lambda: str(vault.keys[name]["tags"].get(ARM_ID_KEY, "")),
+        write_owner=lambda value: vault.keys[name]["tags"].__setitem__(ARM_ID_KEY, value),
+        exists=lambda: name in vault.keys,
+        reprovision=lambda: driver.provision(key_vault_suite._spec()),
+        update_kwargs={"config": {"enabled": False}},
+    )
+
+
 CASES: dict[str, Callable[[], Live]] = {
     "postgres_flexible": _postgres,
     "mysql_flexible": _mysql,
@@ -565,6 +586,7 @@ CASES: dict[str, Callable[[], Live]] = {
     "object_store_blob_legacy": _blob_container_legacy,
     "queue_servicebus_topic": _servicebus_topic,
     "queue_servicebus_queue_legacy": _servicebus_queue_legacy,
+    "key_vault_key": _key_vault_key,
 }
 
 
@@ -681,6 +703,7 @@ def test_every_driver_without_a_prior_check_is_covered() -> None:
         "cache_redis",
         "cosmos",
         "email_acs",
+        "key_vault_key",
         "managed_redis",
         "model_endpoint_aoai",
         "mssql_managed_instance",
