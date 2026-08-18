@@ -1,4 +1,4 @@
-.PHONY: fmt lint test typecheck verify clean
+.PHONY: fmt lint test typecheck verify clean coverage-matrix
 
 fmt:
 	ruff format .
@@ -8,6 +8,11 @@ lint:
 
 test:
 	python -m pytest tests/ -v
+
+# Regenerates docs/managed_service_coverage.md. tests/_sdk/test_coverage.py
+# fails when the committed copy drifts from the matrix.
+coverage-matrix:
+	python -m scripts.coverage_matrix
 
 typecheck:
 	mypy _sdk/ aws/ gcp/ azure/ k8s_native/
