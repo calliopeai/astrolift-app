@@ -442,3 +442,35 @@ export const AGENT_TRIGGERS = gql`
     }
   }
 `;
+
+// ---------------------------------------------------------------------------
+// Agent boxes (#128) — long-lived containers that exist to be exec'd into.
+// Defaults to the live ones; `includeEnded` also returns the settled rows so
+// an operator can see a box was idle-reaped rather than never started.
+// ---------------------------------------------------------------------------
+
+export const LIST_AGENT_BOXES = gql`
+  query ListAgentBoxes($orgId: ID!, $includeEnded: Boolean) {
+    agentBoxes(orgId: $orgId, includeEnded: $includeEnded) {
+      id
+      name
+      slug
+      status
+      agentSlug
+      environmentSpecSlug
+      image
+      idleTimeoutSeconds
+      sessionName
+      attachCommand
+      namespace
+      podName
+      ownerEmail
+      lastError
+      startedAt
+      endedAt
+      lastAttachedAt
+      createdAt
+    }
+  }
+`;
+

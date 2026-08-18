@@ -181,6 +181,33 @@ type AstroliftActivityPage {
   nextCursor: String
 }
 
+type AstroliftAgentBox {
+  id: GUID!
+  name: String!
+  slug: String!
+  status: String!
+  agentSlug: String!
+  environmentSpecSlug: String!
+  image: String!
+  idleTimeoutSeconds: Int!
+  sessionName: String!
+  attachCommand: [String!]!
+  namespace: String!
+  podName: String!
+  ownerEmail: String!
+  lastError: String!
+  createdAt: DateTime!
+  startedAt: DateTime
+  endedAt: DateTime
+  lastAttachedAt: DateTime
+}
+
+type AstroliftAgentBoxMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAgentBox
+}
+
 type AstroliftAgentDetail {
   id: GUID!
   name: String!
@@ -4709,6 +4736,13 @@ type EmailtemplatedeletedpayloadMutationResult {
   data: Emailtemplatedeletedpayload
 }
 
+input EnsureAgentBoxInput {
+  environmentSpecSlug: String! = ""
+  agentSlug: String! = ""
+  name: String! = ""
+  idleTimeoutSeconds: Int = null
+}
+
 enum EntityType {
   EMPLOYEE
   FIELDFLO
@@ -5368,6 +5402,8 @@ type Mutation {
   cancelTask(id: ID!): NoneTypeMutationResult!
   sendAgentTaskInput(taskId: ID!, message: String!): AstroliftAgentTaskInputMessageMutationResult!
   runAstroliftAgent(input: RunAstroliftAgentInput!): AstroliftAgentTaskMutationResult!
+  ensureAgentBox(input: EnsureAgentBoxInput!, orgId: ID!): AstroliftAgentBoxMutationResult!
+  destroyAgentBox(slug: String!): AstroliftAgentBoxMutationResult!
   createAgentTrigger(agentSlug: String!, scmRepo: String! = "", branchPattern: String! = "", inputMapping: JSON = null): AstroliftAgentTriggerResult!
   unbindAgentTrigger(slug: String!): AstroliftAgentTriggerResult!
   scaleServiceAgent(agentSlug: String!, targetReplicas: Int!): AstroliftAgentScaleResult!
@@ -5955,6 +5991,8 @@ type Query {
   agentTaskInteractions(orgId: ID!, taskId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentInteraction!]!
   agentTaskLogs(id: ID!, tail: Int! = 200): [String!]!
   agentEnvironmentSpecs(orgId: ID!): [AstroliftAgentEnvironmentSpec!]!
+  agentBoxes(orgId: ID!, includeEnded: Boolean! = false): [AstroliftAgentBox!]!
+  agentBox(slug: String!): AstroliftAgentBox
   agentEnvironmentSpec(slug: String!): AstroliftAgentEnvironmentSpec
   agentEnvironmentSpecSecretStatus(slug: String!): [AstroliftAgentSecretStatus!]!
   agentSecretBundles(envSpecSlug: String!): [AstroliftAgentSecretBundle!]!

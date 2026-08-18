@@ -180,6 +180,11 @@ def test_default_allowlist_is_phase_3a_yes_set():
         # advances a finished Job's run row past RUNNING/PENDING (read-only
         # cluster reads, per-run try/except, terminal rows never re-touched).
         ScheduleKind.RUN_STATUS_RECONCILE,
+        # Agent-box reaper ships active (#128) — held, an idle-reaped box
+        # would free its node while the platform kept claiming the box was
+        # attachable and left its Secret behind (read-only cluster reads,
+        # per-box try/except, an unobservable box is left untouched).
+        ScheduleKind.AGENT_BOX_REAP,
     }
     assert PHASE_3A_ACTIVE_KINDS == expected
     assert resolve_active_kinds(None) == frozenset(expected)

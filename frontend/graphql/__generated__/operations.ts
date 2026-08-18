@@ -205,6 +205,33 @@ export type AstroliftActivityPage = {
   nextCursor?: Maybe<Scalars['String']['output']>;
 };
 
+export type AstroliftAgentBox = {
+  agentSlug: Scalars['String']['output'];
+  attachCommand: Array<Scalars['String']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  endedAt?: Maybe<Scalars['DateTime']['output']>;
+  environmentSpecSlug: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  idleTimeoutSeconds: Scalars['Int']['output'];
+  image: Scalars['String']['output'];
+  lastAttachedAt?: Maybe<Scalars['DateTime']['output']>;
+  lastError: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  namespace: Scalars['String']['output'];
+  ownerEmail: Scalars['String']['output'];
+  podName: Scalars['String']['output'];
+  sessionName: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
+  startedAt?: Maybe<Scalars['DateTime']['output']>;
+  status: Scalars['String']['output'];
+};
+
+export type AstroliftAgentBoxMutationResult = {
+  data?: Maybe<AstroliftAgentBox>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftAgentDetail = {
   appSlug: Scalars['String']['output'];
   brief?: Maybe<AstroliftBrief>;
@@ -4654,6 +4681,13 @@ export type EmailtemplatedeletedpayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type EnsureAgentBoxInput = {
+  agentSlug: Scalars['String']['input'];
+  environmentSpecSlug: Scalars['String']['input'];
+  idleTimeoutSeconds: InputMaybe<Scalars['Int']['input']>;
+  name: Scalars['String']['input'];
+};
+
 export type EntityType =
   | 'COMPONENTS'
   | 'EMPLOYEE'
@@ -5045,11 +5079,13 @@ export type Mutation = {
   deprovisionManagedService: ManagedservicedeletedpayloadMutationResult;
   deprovisionProjectManagedService: ManagedservicedeletedpayloadMutationResult;
   deregisterAstroliftApp: AstroliftDeregisterAppPayloadMutationResult;
+  destroyAgentBox: AstroliftAgentBoxMutationResult;
   detachAgentSecretBundle: AstroliftAgentSecretBundleAttachmentMutationResult;
   detachProjectManagedService: AstroliftManagedServiceAttachmentMutationResult;
   detachSecretBundle: AttachmentremovedpayloadMutationResult;
   disconnectSource: AstroliftSourceConnectionMutationResult;
   elevateAdminSession: AstroliftElevatePayloadMutationResult;
+  ensureAgentBox: AstroliftAgentBoxMutationResult;
   exportAstroliftAppLogs: AstroliftAppLogExportMutationResult;
   exportAuditEvents: AstroliftAuditExportMutationResult;
   extendPreviewTtl: AstroliftPreviewEnvironmentMutationResult;
@@ -5862,6 +5898,11 @@ export type MutationDeregisterAstroliftAppArgs = {
 };
 
 
+export type MutationDestroyAgentBoxArgs = {
+  slug: Scalars['String']['input'];
+};
+
+
 export type MutationDetachAgentSecretBundleArgs = {
   attachmentId: Scalars['ID']['input'];
   envSpecSlug: Scalars['String']['input'];
@@ -5885,6 +5926,12 @@ export type MutationDisconnectSourceArgs = {
 
 export type MutationElevateAdminSessionArgs = {
   input: ElevateAdminSessionInput;
+};
+
+
+export type MutationEnsureAgentBoxArgs = {
+  input: EnsureAgentBoxInput;
+  orgId: Scalars['ID']['input'];
 };
 
 
@@ -7287,6 +7334,8 @@ export type Query = {
   ObjectStoreMetrics: Array<Array<Scalars['String']['output']>>;
   PostgresMetrics: Array<Array<Scalars['String']['output']>>;
   agent?: Maybe<AstroliftAgentDetail>;
+  agentBox?: Maybe<AstroliftAgentBox>;
+  agentBoxes: Array<AstroliftAgentBox>;
   agentEnvironmentSpec?: Maybe<AstroliftAgentEnvironmentSpec>;
   agentEnvironmentSpecSecretBundleAttachments: Array<AstroliftAgentSecretBundleAttachment>;
   agentEnvironmentSpecSecretStatus: Array<AstroliftAgentSecretStatus>;
@@ -7592,6 +7641,17 @@ export type Query = {
 export type QueryAgentArgs = {
   orgId: Scalars['ID']['input'];
   slug: Scalars['String']['input'];
+};
+
+
+export type QueryAgentBoxArgs = {
+  slug: Scalars['String']['input'];
+};
+
+
+export type QueryAgentBoxesArgs = {
+  includeEnded?: Scalars['Boolean']['input'];
+  orgId: Scalars['ID']['input'];
 };
 
 
@@ -10228,6 +10288,21 @@ export type UnbindAgentTriggerMutationVariables = Exact<{
 
 
 export type UnbindAgentTriggerMutation = { unbindAgentTrigger: { ok: boolean, message: string, slug?: string | null } };
+
+export type EnsureAgentBoxMutationVariables = Exact<{
+  input: EnsureAgentBoxInput;
+  orgId: Scalars['ID']['input'];
+}>;
+
+
+export type EnsureAgentBoxMutation = { ensureAgentBox: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, name: string, slug: string, status: string, attachCommand: Array<string>, idleTimeoutSeconds: number } | null } };
+
+export type DestroyAgentBoxMutationVariables = Exact<{
+  slug: Scalars['String']['input'];
+}>;
+
+
+export type DestroyAgentBoxMutation = { destroyAgentBox: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, slug: string, status: string } | null } };
 
 export type ListQuotasQueryVariables = Exact<{ [key: string]: never; }>;
 

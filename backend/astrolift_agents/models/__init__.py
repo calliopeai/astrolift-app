@@ -1,3 +1,4 @@
+from astrolift_agents.models.agent_box import AgentBox
 from astrolift_agents.models.agent_environment_spec import AgentEnvironmentSpec
 from astrolift_agents.models.agent_interaction import AgentInteraction, record_interaction
 from astrolift_agents.models.agent_secret_binding import (
@@ -22,6 +23,7 @@ from astrolift_agents.models.task_token import TaskToken
 from astrolift_agents.models.workflow_trigger import WorkflowSchedule, WorkflowWebhook
 
 __all__ = [
+    "AgentBox",
     "AgentEnvironmentSpec",
     "AgentInteraction",
     "AgentSecretBindingOverride",
