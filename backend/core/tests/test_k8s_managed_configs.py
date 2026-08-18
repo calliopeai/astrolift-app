@@ -825,3 +825,72 @@ def test_opensearch_variants_are_executable_preview_catalog_entries() -> None:
     assert vector.status == "preview"
     assert "VECTOR_USERNAME" in vector.binding_envs
     assert "VECTOR_PASSWORD" in vector.binding_envs
+
+
+def test_tenant_temporal_takes_its_forbidden_coordinates_from_the_live_control_plane(
+    monkeypatch, settings
+) -> None:
+    """The isolation rule is only as good as the address it compares against.
+
+    Reading the control-plane frontend and namespace from the settings the
+    platform's own Temporal client uses means an operator cannot leave a stale
+    copy in provider config and hand a tenant the control-plane Temporal.
+    """
+    monkeypatch.setattr("core.cluster_observability._driver_for_cluster", lambda _cluster: object())
+    settings.TEMPORAL_ADDRESS = "temporal-frontend.astrolift-system.svc.cluster.local:7233"
+    settings.TEMPORAL_NAMESPACE = "astrolift-control"
+
+    config = managed_config_for(
+        "k8s_native",
+        _cluster(temporal_control_plane_kubernetes_namespaces=["astrolift-system"]),
+        kind="workflow_engine",
+        variant="temporal",
+    )
+
+    assert config.control_plane.configured is True
+    assert config.control_plane.address == "temporal-frontend.astrolift-system.svc.cluster.local:7233"
+    assert config.control_plane.namespaces == ("astrolift-control",)
+    assert config.control_plane.kubernetes_namespaces == ("astrolift-system",)
+
+
+def test_tenant_temporal_refuses_to_provision_against_the_control_plane_it_was_given(
+    monkeypatch, settings
+) -> None:
+    """End to end through the real config builder, because the wiring is the guard.
+
+    A driver whose control-plane coordinates were populated from a different
+    install would pass every unit test in the provider package and still hand a
+    workload the platform's own Temporal.
+    """
+    from _sdk.managed_service import ProvisionSpec
+
+    monkeypatch.setattr("core.cluster_observability._driver_for_cluster", lambda _cluster: object())
+    # The frontend the tenant cluster would publish, written the short way an
+    # operator would: the comparison has to see through the spelling.
+    settings.TEMPORAL_ADDRESS = "web-prod-temporal-frontend.acme-web:7233"
+    settings.TEMPORAL_NAMESPACE = "default"
+
+    config = managed_config_for(
+        "k8s_native",
+        _cluster(),
+        kind="workflow_engine",
+        variant="temporal",
+    )
+    driver = PLUGIN.managed_service_drivers[("workflow_engine", "temporal")](config=config)
+    result = driver.provision(
+        ProvisionSpec(
+            organization_id="org-1",
+            organization_slug="acme",
+            app_id="app-1",
+            app_slug="web",
+            environment_id="env-1",
+            environment_name="prod",
+            tenant_cluster_id="cluster-1",
+            service_handle_hint="",
+            size="small",
+            managed_service_id="ms-1",
+        )
+    )
+
+    assert result.ok is False
+    assert result.errors == ["temporal_isolation_violation"]

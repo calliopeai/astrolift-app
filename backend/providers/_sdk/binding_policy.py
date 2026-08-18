@@ -154,6 +154,9 @@ OPERATOR_GENERATED_DRIVERS: frozenset[str] = frozenset(
         "k8s_native/mssql/sqlserver_express",
         "k8s_native/event_stream/kafka_strimzi",
         "k8s_native/search/opensearch_operator",
+        # cert-manager mints and rotates the tenant Temporal client certificate
+        # through the operator; the driver only ever sees the Secret's name.
+        "k8s_native/workflow_engine/temporal",
     }
 )
 

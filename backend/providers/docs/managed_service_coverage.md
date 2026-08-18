@@ -57,7 +57,7 @@ Opt-in kinds: `api_gateway`, `cdn`, `database_proxy`, `mq`, `sms`, `stream`, `ti
 | `vector_index` | `opensearch_serverless_vector`, `opensearch_vector` | `vertex_matching_engine` | `azure_ai_search_vector` | `opensearch_operator_vector` |
 | `warehouse` (opt-in) | `redshift`, `redshift_serverless` | `bigquery` | planned: `synapse_serverless` | - |
 | `wide_column` (opt-in) | `keyspaces` | - | `cosmos_cassandra` | - |
-| `workflow_engine` | `step_functions_express`, `step_functions_standard` | `workflows` | planned: `logic_apps` | `argo_workflows` |
+| `workflow_engine` | `step_functions_express`, `step_functions_standard` | `workflows` | planned: `logic_apps` | `argo_workflows`, `temporal` |
 
 ## Declared gaps
 
