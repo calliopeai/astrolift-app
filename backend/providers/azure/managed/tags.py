@@ -5,15 +5,16 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from _sdk.azure_tags import serialize_azure_arm_tags
+from _sdk.managed_service_tags import PLATFORM_MANAGED_SERVICE_ID_KEY, canonical_key, ownership_key
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from _sdk.managed_service import ProvisionSpec
 
-MANAGED_BY_TAG = "astrolift-managed-by"
-MANAGED_SERVICE_ID_TAG = "astrolift-managed-service-id"
-BINDING_TAG = "astrolift-binding"
+MANAGED_BY_TAG = ownership_key("azure", "managed_by")
+MANAGED_SERVICE_ID_TAG = canonical_key("azure")
+BINDING_TAG = ownership_key("azure", "binding")
 
 
 def arm_tags_for(
@@ -34,7 +35,7 @@ def arm_tags_for(
     if spec.binding_id:
         canonical["astrolift.io/binding"] = spec.binding_id
     if spec.managed_service_id:
-        canonical["astrolift.io/managed_service_id"] = spec.managed_service_id
+        canonical[PLATFORM_MANAGED_SERVICE_ID_KEY] = spec.managed_service_id
     for key, value in (platform_tags or {}).items():
         canonical_key = str(key)
         if not canonical_key.startswith("astrolift.io/"):

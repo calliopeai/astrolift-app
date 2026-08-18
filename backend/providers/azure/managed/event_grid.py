@@ -31,6 +31,8 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.managed_service_tags import read_ownership_tag
+from azure.managed.tags import arm_tags_for as tags_for
 
 KIND = "event_bus"
 VARIANT = "event_grid"
@@ -1075,14 +1077,14 @@ class AzureEventGridDriver(ManagedServiceDriver):
         self._assert_platform_owned(topic)
         tags = dict(_field(topic, "tags", default={}) or {})
         expected_binding = spec.binding_id or ""
-        actual_binding = str(tags.get("astrolift.io/binding") or "")
+        actual_binding = read_ownership_tag(tags, "binding", "azure")
         if expected_binding and expected_binding != actual_binding:
             raise AzureEventGridError("Event Grid topic is owned by a different managed-service binding")
 
     @staticmethod
     def _assert_platform_owned(topic: Any) -> None:
         tags = dict(_field(topic, "tags", default={}) or {})
-        if tags.get("astrolift.io/managed-by") != "platform":
+        if read_ownership_tag(tags, "managed_by", "azure") != "platform":
             raise AzureEventGridError("Event Grid topic name collides with a resource Astrolift does not own")
 
     def _assert_immutable_compatible(
@@ -1154,23 +1156,6 @@ class AzureEventGridDriver(ManagedServiceDriver):
     @staticmethod
     def _wait(poller: Any) -> Any:
         return poller.result() if hasattr(poller, "result") else poller
-
-
-def tags_for(spec: ProvisionSpec) -> dict[str, str]:
-    tags = {
-        "astrolift.io/managed-by": "platform",
-        "astrolift.io/organization": spec.organization_slug,
-        "astrolift.io/app": spec.app_slug,
-        "astrolift.io/environment": spec.environment_name,
-        "astrolift.io/cluster": spec.tenant_cluster_id,
-        "astrolift.io/isolation": spec.isolation,
-    }
-    if spec.binding_id:
-        tags["astrolift.io/binding"] = spec.binding_id
-    if spec.managed_service_id:
-        tags["astrolift.io/managed_service_id"] = spec.managed_service_id
-    tags.update({f"astrolift.io/extra/{key}": value for key, value in (spec.tags or {}).items()})
-    return tags
 
 
 def _generated_name(prefix: str, hint: str, seed: str, max_length: int) -> str:

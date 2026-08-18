@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, SnapshotHandle, UpdateSpec
+from _sdk.managed_service_tags import ownership_key
 from azure.managed.event_grid import (
     AzureEventGridConfig,
     AzureEventGridDriver,
@@ -232,8 +233,8 @@ def test_provision_binding_and_idempotent_reconcile() -> None:
     assert payload.disable_local_auth is True
     assert payload.minimum_tls_version_allowed == "1.2"
     assert payload.inbound_ip_rules[0].ip_mask == "10.0.0.0/24"
-    assert payload.tags["astrolift.io/binding"] == "binding-id"
-    assert payload.tags["astrolift.io/extra/owner"] == "platform"
+    assert payload.tags[ownership_key("azure", "binding")] == "binding-id"
+    assert "platform" in {value for key, value in payload.tags.items() if key.startswith("astrolift-extra-owner-")}
 
     binding = driver.binding(ServiceHandle(handle))
     assert binding.env_vars["EVENT_BUS_ENDPOINT"].literal.startswith("https://")
@@ -628,8 +629,8 @@ def test_collision_and_binding_ownership_are_rejected() -> None:
     assert not result.ok and "does not own" in result.message
 
     mgmt.topics.values["shared-topic"].tags = {
-        "astrolift.io/managed-by": "platform",
-        "astrolift.io/binding": "other-binding",
+        ownership_key("azure", "managed_by"): "platform",
+        ownership_key("azure", "binding"): "other-binding",
     }
     result = driver.provision(spec)
     assert not result.ok and "different managed-service binding" in result.message

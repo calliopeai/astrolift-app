@@ -24,6 +24,12 @@ failure than partial attribution: it orphans them.
 
 The legacy lists are deliberately explicit rather than a fuzzy match. A new
 undeclared spelling should fail the guard test, not be quietly tolerated.
+
+``OWNERSHIP_KEYS`` extends the same rules to the rest of the ownership envelope
+(managed-by, binding, org, app, env, cluster, isolation). Those keys carry no
+billing weight, but a driver that reads back a spelling it never wrote decides
+it does not own its own resource, which fails every reconcile after the first
+create (#1431).
 """
 
 from __future__ import annotations
@@ -53,11 +59,36 @@ LEGACY_KEYS: dict[str, tuple[str, ...]] = {
         "astrolift-managed-service-id",
         "x-astrolift-managed-service-id",
     ),
+    # ``astrolift.io/managed_service_id`` was written by five Azure drivers but
+    # is not listed: ARM rejects ``/`` in a tag name, so it never reached a
+    # resource and reading it would only mask the bug (#1431). Both spellings
+    # below are blob-container and file-share metadata, which does land.
     "azure": (
-        "astrolift.io/managed_service_id",
         "astrolift_io_managed_service_id",
         "astrolift_managed_service_id",
     ),
+}
+
+
+#: The rest of the ownership envelope, per cloud. Drivers read these back to
+#: decide whether a name collision is a resource they already own, and must read
+#: the string the write path actually produced. On Azure that is what
+#: ``azure/managed/tags.py::arm_tags_for`` emits after ARM serialization.
+#:
+#: There is no legacy ledger here, unlike the id above. The only other spelling
+#: ever written was the pre-serialization ``astrolift.io/<name>`` form, and ARM
+#: rejects ``/`` in a tag name, so no live resource can carry it (#1431). A
+#: spelling that does reach resources needs a ledger shaped like ``LEGACY_KEYS``.
+OWNERSHIP_KEYS: dict[str, dict[str, str]] = {
+    "azure": {
+        "managed_by": "astrolift-managed-by",
+        "binding": "astrolift-binding",
+        "org": "astrolift-org",
+        "app": "astrolift-app",
+        "env": "astrolift-env",
+        "cluster": "astrolift-cluster",
+        "isolation": "astrolift-isolation",
+    },
 }
 
 
@@ -68,9 +99,20 @@ MANAGED_SERVICE_ID_LABEL = CANONICAL_KEYS["gcp"]
 MANAGED_SERVICE_ID_TAG_AWS = CANONICAL_KEYS["aws"]
 MANAGED_SERVICE_ID_TAG_AZURE = CANONICAL_KEYS["azure"]
 
+#: The pre-serialization platform spelling, which is what ``core.cloud_tags``
+#: and ``serialize_azure_arm_tags`` take as *input*. AWS happens to ship this
+#: form unchanged; on Azure it is not a tag name at all, because ARM rejects
+#: ``/``. Named so an Azure serializer can say what it consumes without the
+#: guard scan mistaking it for a driver sending an unserialized key (#1431).
+PLATFORM_MANAGED_SERVICE_ID_KEY = "astrolift.io/managed_service_id"
+
 
 class UnknownCloud(KeyError):
     """A cloud with no declared managed-service-id key."""
+
+
+class UnknownOwnershipTag(KeyError):
+    """A cloud/field pair with no declared ownership tag key."""
 
 
 def canonical_key(cloud: str) -> str:
@@ -83,6 +125,30 @@ def canonical_key(cloud: str) -> str:
             f"declare one in providers/_sdk/managed_service_tags.py before "
             f"tagging anything, or its cost will never be attributed"
         ) from None
+
+
+def ownership_key(cloud: str, field: str) -> str:
+    """The key both sides of an ownership check must use for ``field``."""
+    try:
+        return OWNERSHIP_KEYS[cloud][field]
+    except KeyError:
+        raise UnknownOwnershipTag(
+            f"no declared {field!r} ownership tag key for cloud {cloud!r}; "
+            f"declare one in providers/_sdk/managed_service_tags.py so a driver "
+            f"cannot read back a spelling it never wrote"
+        ) from None
+
+
+def read_ownership_tag(tags: Mapping[str, str] | None, field: str, cloud: str) -> str:
+    """One ownership tag's value, or ``""`` when the resource does not carry it.
+
+    Empty means "no such tag", which an ownership check must treat as not ours,
+    never as a match against an also-empty expectation.
+    """
+    key = ownership_key(cloud, field)
+    if not tags:
+        return ""
+    return str(tags.get(key) or "")
 
 
 def readable_keys(cloud: str) -> tuple[str, ...]:
