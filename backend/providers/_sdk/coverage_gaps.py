@@ -53,18 +53,6 @@ class DeclaredGap:
 # is mandatory the moment the driver lands.
 DECLARED_GAPS: tuple[DeclaredGap, ...] = (
     DeclaredGap(
-        kind="cache",
-        cloud="gcp",
-        classification="buildable",
-        reference="https://github.com/calliopeai/astrolift-app/issues/1465",
-    ),
-    DeclaredGap(
-        kind="cache",
-        cloud="azure",
-        classification="buildable",
-        reference="https://github.com/calliopeai/astrolift-app/issues/1465",
-    ),
-    DeclaredGap(
         kind="email",
         cloud="gcp",
         classification="planned_variant",

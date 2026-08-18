@@ -14,7 +14,6 @@ from _sdk.coverage import CLOUDS, OPT_IN_TIER, coverage, gaps
 from _sdk.coverage_gaps import (
     CLASSIFICATIONS,
     DECLARED_GAPS,
-    DeclaredGap,
     describe,
     reconcile,
 )
@@ -32,19 +31,23 @@ def test_declared_gaps_match_the_live_matrix() -> None:
 
 def test_guard_catches_a_gap_dropped_from_the_ledger() -> None:
     """Deleting a row that still describes a real hole must fail: that is how
-    an unexplained gap sneaks in as a ledger edit rather than a code change."""
-    dropped = DeclaredGap(kind="cache", cloud="gcp", classification="buildable")
+    an unexplained gap sneaks in as a ledger edit rather than a code change.
+
+    Any declared row proves it, so this takes whichever is first instead of
+    naming one. Closing a gap is a routine PR and must not have to edit the
+    guard's own tests to stay green."""
+    dropped = DECLARED_GAPS[0]
     thinned = tuple(g for g in DECLARED_GAPS if (g.kind, g.cloud) != (dropped.kind, dropped.cloud))
     assert len(thinned) == len(DECLARED_GAPS) - 1
 
     report = reconcile(declared=thinned)
 
     assert not report.ok
-    assert report.undeclared == (("cache", "gcp"),)
+    assert report.undeclared == ((dropped.kind, dropped.cloud),)
     assert report.stale == ()
     message = describe(report)
-    assert "cache" in message
-    assert "'gcp'" in message
+    assert f"UNDECLARED GAP {dropped.kind}/{dropped.cloud}" in message
+    assert repr(dropped.cloud) in message
     assert "DECLARED_GAPS" in message
     assert "reference=<issue url>" in message
 
@@ -78,10 +81,11 @@ def test_guard_catches_a_new_kind_shipped_on_one_cloud_only() -> None:
 def test_guard_catches_a_stale_row_after_a_driver_lands() -> None:
     """Shipping the missing variant must force the ledger row out; otherwise
     the doc keeps telling people a closed gap is open."""
+    closed = DECLARED_GAPS[0]
     closing = ManagedServiceEntry(
-        kind="cache",
-        variant="memorystore_memcached",
-        plugin_id="gcp",
+        kind=closed.kind,
+        variant="fixture_only_variant",
+        plugin_id=closed.cloud,
         status="preview",
         description="fixture-only variant",
     )
@@ -93,10 +97,10 @@ def test_guard_catches_a_stale_row_after_a_driver_lands() -> None:
     report = reconcile(matrix=matrix)
 
     assert not report.ok
-    assert report.stale == (("cache", "gcp"),)
-    assert report.undeclared == (), "cache/azure is still declared and still open"
+    assert report.stale == ((closed.kind, closed.cloud),)
+    assert report.undeclared == (), "every other ledger row is still declared and still open"
     message = describe(report)
-    assert "STALE LEDGER ROW cache/gcp" in message
+    assert f"STALE LEDGER ROW {closed.kind}/{closed.cloud}" in message
     assert "Delete the row" in message
 
 

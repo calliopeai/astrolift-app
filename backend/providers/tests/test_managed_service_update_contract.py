@@ -375,6 +375,7 @@ def test_drivers_with_no_editable_fields_are_the_expected_set() -> None:
         ("azure", "queue", "servicebus"),
         ("gcp", "object_store", "gcs"),
         ("gcp", "queue", "pubsub"),
+        ("k8s_native", "cache", "memcached"),
         ("k8s_native", "document_db", "mongodb_operator"),
         ("k8s_native", "event_stream", "kafka_strimzi"),
         ("k8s_native", "event_stream", "nats"),
