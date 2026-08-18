@@ -261,6 +261,7 @@ def keyset_page[M](
     tiebreak_field: str = "guid",
     descending: bool = True,
     with_total: bool = True,
+    cursor_scope: str = "",
 ) -> KeysetPage[M]:
     """Walk ``qs`` one keyset page at a time.
 
@@ -272,6 +273,19 @@ def keyset_page[M](
     evaluated before the seek so it reports the whole result set rather
     than the tail. Tables render "N results" from it; pass ``False`` for
     high-volume streams where the count is not worth the scan.
+
+    ``cursor_scope`` binds a cursor to the ordering that produced it, and a
+    sortable field must pass one (#1239). A cursor carries the sort value and
+    the tiebreak, nothing that says which column the first of those came from,
+    so re-issuing it under a different sort decodes two values of the right
+    shape against the wrong column: the arity check passes and the seek clause
+    is built out of, say, a timestamp compared to a name. The page that comes
+    back is not wrong-looking, it is silently the wrong slice.
+
+    Scoping makes a sort change restart the walk from the first page, which is
+    the correct behaviour anyway: the client asked for a different order, so
+    every cursor issued under the old one describes a position that no longer
+    exists.
     """
     page_size = clamp_limit(limit, default=default_limit, maximum=max_limit)
     total = qs.count() if with_total else None
@@ -280,9 +294,9 @@ def keyset_page[M](
     qs = qs.order_by(f"{direction}{sort_field}", f"{direction}{tiebreak_field}")
 
     if cursor:
-        decoded = decode_cursor(cursor, arity=2)
-        if decoded is not None:
-            sort_value, tiebreak_value = decoded
+        decoded = decode_cursor(cursor, arity=3 if cursor_scope else 2)
+        if decoded is not None and (not cursor_scope or decoded[0] == cursor_scope):
+            sort_value, tiebreak_value = decoded[-2:]
             qs = qs.filter(
                 _seek(
                     sort_field=sort_field,
@@ -306,6 +320,10 @@ def keyset_page[M](
         # anyway would hand the client one that decodes to nothing and
         # re-serves page one forever. Truncating is the recoverable half.
         if sort_value is not None and tiebreak_value is not None:
-            next_cursor = encode_cursor(sort_value, tiebreak_value)
+            next_cursor = (
+                encode_cursor(cursor_scope, sort_value, tiebreak_value)
+                if cursor_scope
+                else encode_cursor(sort_value, tiebreak_value)
+            )
 
     return KeysetPage(rows=rows, next_cursor=next_cursor, total_count=total)

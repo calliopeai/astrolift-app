@@ -2275,6 +2275,13 @@ type AstroliftLaunchTaskResultMutationResult {
   data: AstroliftLaunchTaskResult
 }
 
+enum AstroliftListSortKey {
+  CREATED_DESC
+  CREATED_ASC
+  NAME_ASC
+  NAME_DESC
+}
+
 type AstroliftLogoutAllSessionsPayload {
   revokedCount: Int!
   keptCurrent: Boolean!
@@ -5750,9 +5757,9 @@ type Query {
   astroliftOrganization(slug: String!): AstroliftOrganization
   astroliftOrganizations: [AstroliftOrganization!]!
   astroliftTeams: [AstroliftTeam!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftTeamsPage.")
-  astroliftTeamsPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftTeamPage!
+  astroliftTeamsPage(search: String = null, sortBy: AstroliftListSortKey = null, limit: Int! = 50, after: String = null): AstroliftTeamPage!
   astroliftProjects: [AstroliftProject!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftProjectsPage.")
-  astroliftProjectsPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftProjectPage!
+  astroliftProjectsPage(search: String = null, sortBy: AstroliftListSortKey = null, limit: Int! = 50, after: String = null): AstroliftProjectPage!
   astroliftTeamSlugAvailable(slug: String!, excludeId: GUID = null): Boolean!
   astroliftProjectSlugAvailable(teamId: GUID!, slug: String!, excludeId: GUID = null): Boolean!
   astroliftNavTree: AstroliftNavTree

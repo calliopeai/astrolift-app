@@ -2274,6 +2274,12 @@ export type AstroliftLaunchTaskResultMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftListSortKey =
+  | 'CREATED_ASC'
+  | 'CREATED_DESC'
+  | 'NAME_ASC'
+  | 'NAME_DESC';
+
 export type AstroliftLogoutAllSessionsPayload = {
   keptCurrent: Scalars['Boolean']['output'];
   revokedCount: Scalars['Int']['output'];
@@ -8425,6 +8431,7 @@ export type QueryAstroliftProjectsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+  sortBy?: InputMaybe<AstroliftListSortKey>;
 };
 
 
@@ -8575,6 +8582,7 @@ export type QueryAstroliftTeamsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+  sortBy?: InputMaybe<AstroliftListSortKey>;
 };
 
 
