@@ -33,8 +33,8 @@ whichever driver used another.
 manifests/
   happy-path/{aws,gcp,azure}.toml      the certification target: web + postgres
                                        + redis + queue + object_store
-  per-kind/<kind>/{aws,gcp,azure}.toml 62 cells: 23 default-tier kinds × 3 clouds,
-                                       minus 7 with no executable variant
+  per-kind/<kind>/{aws,gcp,azure}.toml 63 cells: 23 default-tier kinds × 3 clouds,
+                                       minus 6 with no executable variant
   negative/<case>/{aws,gcp,azure}.toml 4 safety cases × 3 clouds
 ```
 
@@ -85,10 +85,17 @@ rather than a surprise.
 
 | | Families queried |
 | --- | --- |
+| AWS | RDS instances, RDS clusters, ElastiCache clusters, ElastiCache replication groups, ElastiCache serverless caches, SQS, SNS, S3, IAM roles, IAM customer-managed policies |
 | GCP | Cloud SQL, Memorystore, Pub/Sub topics, Pub/Sub subscriptions, GCS, IAM service accounts, project IAM bindings |
 | Azure | Postgres Flexible, Redis, Service Bus namespaces, Service Bus entities, storage accounts, blob containers, managed identities, role assignments |
 
-Both fail loud rather than returning a count: `ScanReport.raise_if_dirty()`
+A family is split wherever one API call cannot see the whole of it. On AWS that
+is three ElastiCache APIs for three drivers, and RDS instances separately from
+RDS clusters because `DescribeDBInstances` never returns a cluster — an Aurora,
+DocumentDB or Neptune cluster with no members left is invisible to an
+instance-only scan and still bills for storage and backups.
+
+All three fail loud rather than returning a count: `ScanReport.raise_if_dirty()`
 raises with every leftover itemized, and a resource family that could not be
 *read* fails exactly like a leftover, because an unread family is an unknown
 result, not a clean one.
@@ -101,6 +108,90 @@ offline with fakes (`backend/providers/tests/_cert/`).
 ```
 cd backend/providers && make test
 ```
+
+## The lifecycle runner
+
+`backend/providers/_cert/harness/`. Given a manifest cell it executes the spec
+43 §0.1 cycle, asserts every step, and emits the grid.
+
+```
+BUILDOUT      no app of this name may already exist · register · every declared
+              managed service reaches ACTIVE · first deploy succeeds
+VERIFY-UP     declared workloads have ready replicas · the health endpoint
+              answers 2xx over verified TLS · every binding is present in
+              /debug · /selftest connects to each service for real
+UPDATE        redeploy the second pinned image · rollback lands on the first
+              image · roll forward again
+VERIFY-UPD    the live revision is the update · nothing is still running the
+              old image · health and /selftest still pass
+TEARDOWN      deregister · the app stops being served · no binding survives it
+VERIFY-CLEAN  the cloud carries nothing owned by the campaign
+REPRODUCE     the whole thing again, unattended, with an end-state comparison
+```
+
+```
+cd backend/providers
+python -m _cert.harness --cell happy-path/aws --project-id <uuid> \
+    --update-image docker.io/calliopeai/astrolift-sample-api:main-<sha7> \
+    --region us-west-2 --i-have-credentials
+```
+
+Three properties are deliberate and each is pinned by a test.
+
+**It drives the platform, never the database or a cloud SDK.** Every step goes
+through the CLI and the GraphQL API, which is the dogfooding spec 41 intended
+and the only way a green cell says anything about what a customer hits.
+VERIFY-CLEAN is the single exception: "nothing was left behind" is a claim about
+the cloud, so it is the orphan scanner's answer, injected as a handle so the
+runner imports no cloud SDK.
+
+**Teardown runs even after the cycle has already failed.** Steps 1–4
+short-circuit on the first red; steps 5–6 always run. A cell that fails at
+BUILDOUT has usually created something first, and abandoning it on a metered
+account costs more than the defect that stranded it. When there was genuinely
+nothing to tear down, TEARDOWN reports *skipped* rather than green — the grid is
+the certification evidence, and a green step the run never exercised is the grid
+claiming coverage it does not have. VERIFY-CLEAN still runs in that case, because
+a register that failed halfway can have created cloud resources the platform
+never recorded a row for.
+
+**A failure is a sentence.** Each red carries the cell, the step and the
+assertion that did not hold, then the observed value underneath. No tracebacks:
+those are for the harness's own bugs, and they are reported with the step named
+too.
+
+### REPRODUCE, and what "end state identical" compares
+
+Step 7 has never run for any cell on any cloud. Written as a loop counter it
+never would mean anything either: two green passes prove the cycle is
+*repeatable*, and the defect the step exists for — non-idempotent teardown,
+already found by hand on AWS — hides between repeatable and *idempotent*. So the
+comparison is the deliverable, not the second run.
+
+Two fingerprints are taken per cycle, at the high-water mark after VERIFY-UP and
+at the end after VERIFY-CLEAN, and both are compared:
+
+- workloads by name and ready replica count
+- managed services by binding name, kind, variant and status
+- **every campaign-owned cloud resource at the high-water mark**, taken with the
+  same orphan scanner. At VERIFY-CLEAN its output is a defect list; at VERIFY-UP
+  the identical call is a census. This is the only place the harness can see
+  cloud-side resource *names* — `AstroliftManagedService` exposes name, kind,
+  variant and status but not `ManagedService.backend_ref`, the provider-side
+  handle — and names are exactly where a released-but-not-freed resource shows
+  up: run 2 books `…-records-2` because run 1's teardown never released the name
+- after teardown: whether the app is still served, and what survived (empty in a
+  passing run)
+- after teardown: **which families the scan actually read**. Two clean scans that
+  read different families are not the same result; one of them was partly blind
+
+Excluded on purpose, because two correct runs differ in each by construction and
+comparing them would make REPRODUCE permanently red: ids and timestamps,
+endpoints and hostnames and ARN suffixes (an RDS endpoint carries a token minted
+per creation; the identifier it derives from does not, and that is what the
+census reports), and pod names. The exclusion is a projection over named fields
+rather than a filter, so a field added to an observation later stays out of the
+comparison until somebody puts it in deliberately.
 
 ## Findings this work surfaced
 
@@ -116,7 +207,7 @@ Phase 3 will see.
    `gcp/managed/object_store_gcs.py` and `gcp/managed/queue_pubsub.py` build
    their label sets without the `astrolift-extra-*` pass every other GCP driver
    has. Fixing (1) alone would still leave buckets and topics untagged.
-3. **The spend gate refuses 50 of the 62 per-kind cells.**
+3. **The spend gate refuses most of the per-kind cells.**
    `_cert/billing.py` classifies AWS *preview* variants only, so `postgres:rds`,
    `redis:elasticache`, `queue:sqs` and `object_store:s3` — the whole AWS happy
    path — raise `UnclassifiedVariant`, and GCP and Azure have no table at all.
@@ -136,14 +227,41 @@ Phase 3 will see.
    variant"; three cells (`observability/azure`, `search/gcp`,
    `workflow_engine/azure`) can only satisfy it in principle.
 
+Building the runner surfaced four more, all of them things the switch-on gate
+has to clear.
+
+6. **There is no route for an operator tag from a manifest into a resource.**
+   Finding 1 is one link of it; the other is that `ProvisionManagedServiceInput`
+   has no `tags` field at all, so `[campaign.tags]` cannot reach the platform
+   from any surface, CLI or API. The scanners find campaign residue by app name
+   only until both are fixed.
+7. **UPDATE has no second image to roll to.** `calliopeai/astrolift-sample-api`
+   has two commits and the first one's build workflow was the thing the second
+   commit fixed, so `main-df5ffa3` is the only published tag. The runner refuses
+   rather than defaulting — campaign blocker B3 was a deploy that failed on a
+   moved tag, and a default that is not in the registry would report a fixture
+   problem as a platform defect. Publishing a second fixture tag is a Phase 2
+   prerequisite.
+8. **`astro app register` cannot read these manifests.** The CLI parses an
+   `[app] slug` / `display_name` table; the campaign manifests use the backend
+   parser's top-level `name`. That is campaign blocker B1 (manifest schema
+   unification) still open, and it is why the runner registers through
+   `registerApp` rather than the CLI.
+9. **No CLI command provisions an app-scoped managed service.**
+   `astro project resources add` covers project-scoped ones only, so the runner
+   calls `provisionManagedService` directly. The full surface-by-operation
+   ledger is in `_cert/harness/platform.py`; every GraphQL row in it is a CLI
+   gap.
+
 ## Not here
 
 - **Topology grid** (statefulset, cronjob, task, function, agent). Spec 43 §3.1
   lists it; this pass covers happy path, per-kind and negative.
-- **The AWS scanner.** Spec 43 describes it as existing. No orphan scanner is
-  committed in this repo for any cloud, so the shared report shape in
-  `orphans/model.py` is written for three clouds and AWS needs its families
-  filled in.
-- **Harness target selection and the coverage report** (spec 43 §3.2). The
-  scanners are the half that had a defined contract; the runner does not exist
-  in this repo either.
+- **A live run.** Every `Live*Inventory` adapter and `CliPlatformClient` is
+  written against the clients and commands the platform already uses and has
+  never spoken to a control plane or a cloud. Phase 2 is their first real run,
+  by design.
+- **The negative cells, through the runner.** Each one needs a precondition
+  created out of band and expects a refusal, so a cycle would report the thing
+  it is testing for as a BUILDOUT failure. `Cell.load` refuses them by name;
+  they are run by hand against the assertions in each manifest.
