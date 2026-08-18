@@ -100,6 +100,7 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
         ("faas", "azure_functions", "AzureFunctionsConfig"),
         ("api_gateway", "api_management", "AzureAPIMConfig"),
         ("private_endpoint", "private_link", "AzurePrivateEndpointConfig"),
+        ("encryption_key", "key_vault_key", "AzureKeyVaultKeyConfig"),
     ],
 )
 def test_every_registered_azure_managed_service_has_runtime_config(
@@ -574,6 +575,7 @@ def test_cosmos_api_requires_key_vault_at_runtime_resolution() -> None:
         ("apim_publisher_email", "api_gateway", "api_management"),
         ("private_link_allowed_subnet_ids", "private_endpoint", "private_link"),
         ("private_link_allowed_service_id_prefixes", "private_endpoint", "private_link"),
+        ("vault_url", "encryption_key", "key_vault_key"),
     ],
 )
 def test_required_install_controls_fail_before_driver_construction(

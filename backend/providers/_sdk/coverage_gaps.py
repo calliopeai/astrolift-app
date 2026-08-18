@@ -58,12 +58,6 @@ DECLARED_GAPS: tuple[DeclaredGap, ...] = (
         classification="planned_variant",
         reference="https://github.com/calliopeai/astrolift-app/issues/1453",
     ),
-    DeclaredGap(
-        kind="encryption_key",
-        cloud="azure",
-        classification="planned_variant",
-        reference="https://github.com/calliopeai/astrolift-app/issues/1454",
-    ),
 )
 
 
