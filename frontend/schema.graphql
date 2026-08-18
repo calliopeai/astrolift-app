@@ -5812,7 +5812,7 @@ type Query {
   astroliftAppTeamAccesses(appSlug: String!): [AstroliftAppTeamAccess!]! @deprecated(reason: "Returns every grant in one unbounded response. Use astroliftAppTeamAccessesPage.")
   astroliftAppTeamAccessesPage(appSlug: String!, search: String = null, limit: Int! = 50, after: String = null): AstroliftAppTeamAccessPage!
   astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftWorkloadsPage.")
-  astroliftWorkloadsPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftWorkloadPage!
+  astroliftWorkloadsPage(appSlug: String = null, search: String = null, kinds: [String!] = null, limit: Int! = 50, after: String = null): AstroliftWorkloadPage!
   astroliftWorkload(appSlug: String!, slug: String!): AstroliftWorkload
   astroliftWorkloadScalingStatus(appSlug: String!, workloadSlug: String!, environmentName: String = null): AstroliftWorkloadScalingStatus
   astroliftContainers(workloadSlug: String = null): [AstroliftContainer!]!

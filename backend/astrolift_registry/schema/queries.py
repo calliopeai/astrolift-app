@@ -802,7 +802,12 @@ def _app_team_accesses_qs(*, app_slug: str, search: str | None = None):
     return qs
 
 
-def _workloads_qs(*, app_slug: str | None, search: str | None = None):
+def _workloads_qs(
+    *,
+    app_slug: str | None,
+    search: str | None = None,
+    kinds: list[str] | None = None,
+):
     """Filtered, unordered workload rows for the caller's org.
 
     Shared by the list field and its paginated sibling so the two
@@ -823,6 +828,11 @@ def _workloads_qs(*, app_slug: str | None, search: str | None = None):
         qs = qs.filter(registered_app__slug=app_slug)
     if search:
         qs = qs.filter(search_q(search, "name", "slug", "kind", "registered_app__slug"))
+    if kinds:
+        # A filter, not a seek key: ``kind`` is an eight-value TextChoices and
+        # never null, so it raises none of the NOT NULL / uniqueness concerns a
+        # sort column would (#1235).
+        qs = qs.filter(kind__in=kinds)
     return qs
 
 
@@ -1292,6 +1302,7 @@ class RegistryQuery:
         info: Info,
         app_slug: str | None = None,
         search: str | None = None,
+        kinds: list[str] | None = None,
         limit: int = 50,
         after: str | None = None,
     ) -> PageType[WorkloadType]:
@@ -1307,9 +1318,22 @@ class RegistryQuery:
         workload name, slug and kind plus the owning app's slug, so the
         cross-app surfaces can narrow to one app by name without a
         second round-trip.
+
+        ``kinds`` narrows server-side, which the single-kind fleet surfaces
+        need (#1242). /functions, /tasks and the /jobs schedule list are each
+        one kind, and filtering on the client left two artefacts: ``totalCount``
+        had to be nulled out, because the server counted every workload in the
+        org rather than every function, and a page whose 25 rows happened to
+        contain none of the wanted kind rendered the empty state with Next
+        still enabled. The rows on screen were always right; the page
+        boundaries were not.
+
+        ``search`` is not a substitute. It ORs ``icontains`` across name, slug,
+        kind and the owning app's slug, so ``search="function"`` also matches a
+        service named ``function-gateway``.
         """
         page = keyset_page(
-            _workloads_qs(app_slug=app_slug, search=search),
+            _workloads_qs(app_slug=app_slug, search=search, kinds=kinds),
             cursor=after,
             limit=limit,
         )
