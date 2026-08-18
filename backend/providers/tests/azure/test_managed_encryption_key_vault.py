@@ -17,7 +17,7 @@ import pytest
 from astrolift_manifest.env_injection import envelope_keys_for
 
 from _sdk.availability import MATRIX
-from _sdk.azure_ownership import OWNERSHIP_ERROR_CODE
+from _sdk.azure_ownership import OWNERSHIP_ERROR_CODE, AzureOwnershipError
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, SnapshotHandle, UpdateSpec
 from azure.managed.encryption_key_vault import (
     _ACCESS_MODE_ROLES,
@@ -443,7 +443,7 @@ def test_status_and_binding_refuse_a_key_astrolift_did_not_create() -> None:
     vault.keys[_key_name(handle)]["tags"][MANAGED_BY_TAG] = "terraform"
 
     assert driver.status(ServiceHandle(handle)).state == "error"
-    with pytest.raises(Exception, match="carries no Astrolift astrolift-managed-by=platform"):
+    with pytest.raises(AzureOwnershipError, match="carries no Astrolift astrolift-managed-by=platform"):
         driver.binding(ServiceHandle(handle))
 
 
