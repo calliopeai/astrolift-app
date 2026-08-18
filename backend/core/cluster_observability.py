@@ -1013,6 +1013,13 @@ def _k8s_managed_config_for(
             storage_class=str(pc.get("redis_storage_class", "")),
             persistent=bool(pc.get("redis_persistent", True)),
         )
+    if pair == ("cache", "memcached"):
+        from k8s_native.managed.cache_memcached import DEFAULT_IMAGE, MemcachedConfig
+
+        return MemcachedConfig(
+            cluster_driver=cluster_driver,
+            image=str(pc.get("memcached_image") or DEFAULT_IMAGE),
+        )
     if pair == ("mysql", "operator"):
         from k8s_native.managed.mysql_operator import MySQLOperatorConfig
 
@@ -2198,6 +2205,27 @@ def _azure_managed_config_for(
             deletion_protection_default=bool(
                 pc.get("private_link_deletion_protection_default", True),
             ),
+        )
+
+    if pair == ("encryption_key", "key_vault_key") or (kind == "encryption_key" and not variant):
+        from azure.managed.encryption_key_vault import AzureKeyVaultKeyConfig
+
+        if not vault_url:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: Azure encryption_key/key_vault_key requires provider_config.vault_url",
+            )
+        return AzureKeyVaultKeyConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            vault_url=vault_url,
+            key_name_prefix=str(pc.get("key_vault_key_name_prefix", "astrolift")),
+            deletion_protection_default=bool(
+                pc.get("key_vault_key_deletion_protection_default", True),
+            ),
+            purge_on_delete_default=bool(pc.get("key_vault_key_purge_on_delete_default", False)),
+            rotation_period_default=str(pc.get("key_vault_key_rotation_period_default", "P90D")),
+            api_version=str(pc.get("key_vault_key_api_version", "7.4")),
+            request_timeout_seconds=float(pc.get("key_vault_key_request_timeout_seconds", 30)),
         )
 
     raise ClusterObservabilityError(

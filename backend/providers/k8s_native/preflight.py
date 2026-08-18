@@ -87,6 +87,15 @@ REQUIREMENTS: dict[tuple[str, str], OperatorRequirement] = {
             "helm install redis-operator ot-helm/redis-operator --namespace redis-operator --create-namespace"
         ),
     ),
+    ("cache", "memcached"): OperatorRequirement(
+        operator_id="memcached",
+        display_name="Memcached",
+        required_crds=(),  # plain StatefulSet + headless Service
+        install_hint=(
+            "No operator is required; ensure the memcached image is reachable from the cluster "
+            "and that a NetworkPolicy-enforcing CNI is installed, because Memcached has no auth"
+        ),
+    ),
     ("mysql", "operator"): OperatorRequirement(
         operator_id="percona-xtradb-cluster",
         display_name="Percona Operator for MySQL",

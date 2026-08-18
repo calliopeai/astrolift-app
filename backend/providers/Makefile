@@ -1,4 +1,4 @@
-.PHONY: fmt lint test typecheck verify clean coverage-matrix
+.PHONY: fmt lint test typecheck verify clean coverage-matrix verification-manifests
 
 fmt:
 	ruff format .
@@ -13,6 +13,11 @@ test:
 # fails when the committed copy drifts from the matrix.
 coverage-matrix:
 	python -m scripts.coverage_matrix
+
+# Regenerates verification/manifests/{happy-path,per-kind} from the campaign
+# ledger. tests/_cert/test_collection.py fails when the committed tree drifts.
+verification-manifests:
+	python -m _cert.collection
 
 typecheck:
 	mypy _sdk/ aws/ gcp/ azure/ k8s_native/

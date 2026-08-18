@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Make `cache` reachable on every cloud with an in-cluster Memcached variant,
+  `k8s_native/cache/memcached`. The kind was executable on AWS only: GCP sells
+  Memorystore for Memcached, Azure sells nothing equivalent, so one in-cluster
+  variant covers both holes instead of one of them. It emits the same envelope
+  the ElastiCache Memcached variants emit, `CACHE_NODES` included, so a
+  manifest moves between them without the app reading different variables.
+  Memcached authenticates nobody, so the driver always ships an ingress
+  NetworkPolicy scoped to the app's own namespace and its organization's agent
+  namespace; there is no switch to turn that off. The `cache/gcp` and
+  `cache/azure` rows are gone from the declared-gap ledger.
+
 - Let the exec relay reach an agent box. `/app/exec/<target>/<pod>` resolved
   its first path segment against `RegisteredApp` only, so a healthy running
   box closed the handshake with the same code a real permission denial uses
