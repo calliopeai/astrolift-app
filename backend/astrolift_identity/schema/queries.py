@@ -989,6 +989,7 @@ class IdentityQuery:
         self,
         info: Info,
         search: str | None = None,
+        sort_by: ListSortKey | None = None,
         limit: int = 50,
         after: str | None = None,
     ) -> PageType[RoleType]:
@@ -1001,7 +1002,16 @@ class IdentityQuery:
         the seeded system catalog. ``search`` matches slug, name,
         description — sort by name client-side if the table wants it.
         """
-        page = keyset_page(_roles_qs(search=search), cursor=after, limit=limit)
+        order, scope = resolve_sort(sort_by, NAMED_MODEL_SORTS)
+        page = keyset_page(
+            _roles_qs(search=search),
+            cursor=after,
+            limit=limit,
+            sort_field=order.sort_field,
+            tiebreak_field=order.tiebreak_field,
+            descending=order.descending,
+            cursor_scope=scope,
+        )
         return page.map(role_to_type)
 
     # ---- Invite-flow polish (#418) -------------------------------------
@@ -1290,6 +1300,7 @@ class IdentityQuery:
         self,
         info: Info,
         search: str | None = None,
+        sort_by: ListSortKey | None = None,
         limit: int = 50,
         after: str | None = None,
     ) -> PageType[ApiTokenType]:
@@ -1300,7 +1311,16 @@ class IdentityQuery:
         owner, its team, and ``token_last_4`` — the last four is what an
         operator has in hand when chasing a token seen in an audit log.
         """
-        page = keyset_page(_api_tokens_qs(search=search), cursor=after, limit=limit)
+        order, scope = resolve_sort(sort_by, NAMED_MODEL_SORTS)
+        page = keyset_page(
+            _api_tokens_qs(search=search),
+            cursor=after,
+            limit=limit,
+            sort_field=order.sort_field,
+            tiebreak_field=order.tiebreak_field,
+            descending=order.descending,
+            cursor_scope=scope,
+        )
         return page.map(api_token_to_type)
 
     @strawberry.field(
@@ -1318,6 +1338,7 @@ class IdentityQuery:
         self,
         info: Info,
         search: str | None = None,
+        sort_by: ListSortKey | None = None,
         limit: int = 50,
         after: str | None = None,
     ) -> PageType[PolicyType]:
@@ -1330,7 +1351,16 @@ class IdentityQuery:
         policy an operator just wrote at the top. ``search`` matches
         slug, name, description, and ``action_pattern``.
         """
-        page = keyset_page(_policies_qs(search=search), cursor=after, limit=limit)
+        order, scope = resolve_sort(sort_by, NAMED_MODEL_SORTS)
+        page = keyset_page(
+            _policies_qs(search=search),
+            cursor=after,
+            limit=limit,
+            sort_field=order.sort_field,
+            tiebreak_field=order.tiebreak_field,
+            descending=order.descending,
+            cursor_scope=scope,
+        )
         return page.map(policy_to_type)
 
     # ---- Domain allowlist --------------------------------------------

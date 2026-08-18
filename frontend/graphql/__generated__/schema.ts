@@ -7748,6 +7748,7 @@ export type QueryAstroliftApiTokensPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+  sortBy?: InputMaybe<AstroliftListSortKey>;
 };
 
 
@@ -7778,6 +7779,7 @@ export type QueryAstroliftAppDeployTokensPageArgs = {
   appSlug: Scalars['String']['input'];
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+  sortBy?: InputMaybe<AstroliftListSortKey>;
 };
 
 
@@ -8383,6 +8385,7 @@ export type QueryAstroliftPoliciesPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+  sortBy?: InputMaybe<AstroliftListSortKey>;
 };
 
 
@@ -8476,6 +8479,7 @@ export type QueryAstroliftRolesPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+  sortBy?: InputMaybe<AstroliftListSortKey>;
 };
 
 
