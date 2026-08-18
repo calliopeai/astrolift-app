@@ -40,6 +40,7 @@ from _sdk.managed_service import (
     VolumeMount,
     VolumeSourceKind,
 )
+from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
 
 KIND = "filesystem"
 _API_ROOT = "https://file.googleapis.com/v1"
@@ -1332,6 +1333,7 @@ class FilestoreDriver(ManagedServiceDriver):
             labels["astrolift-io-binding"] = _label_value(spec.binding_id)
         if spec.managed_service_id:
             labels["astrolift-io-managed-service-id"] = _label_value(spec.managed_service_id)
+            labels[MANAGED_SERVICE_ID_LABEL] = _label_value(spec.managed_service_id)
         labels.update(
             {_label_key(str(key)): _label_value(str(value)) for key, value in cfg.get("labels", {}).items()},
         )

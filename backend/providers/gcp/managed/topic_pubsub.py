@@ -25,6 +25,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
 
 KIND = "topic"
 _MUTABLE_TOPIC_FIELDS = {
@@ -891,6 +892,7 @@ def _labels_for(spec: ProvisionSpec, cfg: dict[str, Any]) -> dict[str, str]:
         labels["astrolift-binding"] = spec.binding_id
     if spec.managed_service_id:
         labels["astrolift-managed-service-id"] = spec.managed_service_id
+        labels[MANAGED_SERVICE_ID_LABEL] = spec.managed_service_id
     for key, value in dict(cfg.get("labels") or {}).items():
         labels[_label(key)] = _label(value)
     for key, value in (spec.tags or {}).items():

@@ -35,6 +35,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
 
 KIND = "event_stream"
 _API_ROOT = "https://managedkafka.googleapis.com/v1"
@@ -337,6 +338,7 @@ class ManagedKafkaDriver(ManagedServiceDriver):
         name = self._cluster_name(location, cluster_id)
         labels = self._labels(spec, cfg)
         labels.setdefault("astrolift-io-managed-service-id", _label_value(cluster_id))
+        labels.setdefault(MANAGED_SERVICE_ID_LABEL, _label_value(cluster_id))
         try:
             cluster = self._get(name, full=True)
             if cluster is None:
@@ -1616,6 +1618,7 @@ class ManagedKafkaDriver(ManagedServiceDriver):
             labels["astrolift-io-binding"] = _label_value(spec.binding_id)
         if spec.managed_service_id:
             labels["astrolift-io-managed-service-id"] = _label_value(spec.managed_service_id)
+            labels[MANAGED_SERVICE_ID_LABEL] = _label_value(spec.managed_service_id)
         labels.update(_normalized_labels(cfg.get("labels") or {}))
         return labels
 

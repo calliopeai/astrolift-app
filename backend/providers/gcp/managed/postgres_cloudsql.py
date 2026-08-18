@@ -55,6 +55,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
 from gcp.managed._secret_store import ManagedSecretStore, ManagedSecretStoreError
 
 KIND = "postgres"
@@ -683,6 +684,7 @@ def _tags_for(spec: ProvisionSpec) -> dict[str, str]:
         base["astrolift-binding"] = _sanitize(spec.binding_id)
     if spec.managed_service_id:
         base["astrolift-managed-service-id"] = _sanitize(spec.managed_service_id)
+        base[MANAGED_SERVICE_ID_LABEL] = _sanitize(spec.managed_service_id)
     for k, v in (spec.tags or {}).items():
         base[f"astrolift-extra-{_sanitize(k)}"] = _sanitize(str(v))
     return base

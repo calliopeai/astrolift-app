@@ -61,6 +61,14 @@ LEGACY_KEYS: dict[str, tuple[str, ...]] = {
 }
 
 
+#: Convenience alias for the GCP label key, which is what a driver writing a
+#: labels dict needs at the call site. Named for the cloud it belongs to so a
+#: driver cannot reach for the wrong one by autocomplete.
+MANAGED_SERVICE_ID_LABEL = CANONICAL_KEYS["gcp"]
+MANAGED_SERVICE_ID_TAG_AWS = CANONICAL_KEYS["aws"]
+MANAGED_SERVICE_ID_TAG_AZURE = CANONICAL_KEYS["azure"]
+
+
 class UnknownCloud(KeyError):
     """A cloud with no declared managed-service-id key."""
 
