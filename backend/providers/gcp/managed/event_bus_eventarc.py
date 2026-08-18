@@ -31,6 +31,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
 
 KIND = "event_bus"
 _API_ROOT = "https://eventarc.googleapis.com/v1"
@@ -1371,6 +1372,7 @@ class EventarcDriver(ManagedServiceDriver):
             labels["astrolift-io-binding"] = _label_value(spec.binding_id)
         if spec.managed_service_id:
             labels["astrolift-io-managed-service-id"] = _label_value(spec.managed_service_id)
+            labels[MANAGED_SERVICE_ID_LABEL] = _label_value(spec.managed_service_id)
         labels.update(_normalized_labels(cfg.get("labels") or {}))
         return labels
 

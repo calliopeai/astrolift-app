@@ -25,6 +25,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
 
 KIND = "faas"
 _API_ROOT = "https://cloudfunctions.googleapis.com/v2"
@@ -218,6 +219,7 @@ class CloudFunctionsDriver(ManagedServiceDriver):
         name = self._name(region, function_id)
         labels = self._labels(spec, cfg)
         labels.setdefault("astrolift-io-managed-service-id", _label_value(spec.managed_service_id or function_id))
+        labels.setdefault(MANAGED_SERVICE_ID_LABEL, _label_value(spec.managed_service_id or function_id))
         try:
             current = self._get(name)
             body = self._body(cfg, labels, partial=False)
@@ -897,6 +899,7 @@ class CloudFunctionsDriver(ManagedServiceDriver):
             labels["astrolift-io-binding"] = _label_value(spec.binding_id)
         if spec.managed_service_id:
             labels["astrolift-io-managed-service-id"] = _label_value(spec.managed_service_id)
+            labels[MANAGED_SERVICE_ID_LABEL] = _label_value(spec.managed_service_id)
         labels.update(_normalized_labels(cfg.get("labels") or {}))
         return labels
 

@@ -28,6 +28,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
 
 KIND = "api_gateway"
 _API_ROOT = "https://apigateway.googleapis.com/v1"
@@ -208,6 +209,7 @@ class APIGatewayDriver(ManagedServiceDriver):
         labels = self._labels(spec, cfg)
         service_id = _label_value(spec.managed_service_id or gateway_id)
         labels.setdefault("astrolift-io-managed-service-id", service_id)
+        labels.setdefault(MANAGED_SERVICE_ID_LABEL, service_id)
         api_name = self._api_name(api_id)
         gateway_name = self._gateway_name(region, gateway_id)
         try:
@@ -920,6 +922,7 @@ class APIGatewayDriver(ManagedServiceDriver):
             labels["astrolift-io-binding"] = _label_value(spec.binding_id)
         if spec.managed_service_id:
             labels["astrolift-io-managed-service-id"] = _label_value(spec.managed_service_id)
+            labels[MANAGED_SERVICE_ID_LABEL] = _label_value(spec.managed_service_id)
         labels.update(_normalized_labels(cfg.get("labels") or {}))
         return labels
 

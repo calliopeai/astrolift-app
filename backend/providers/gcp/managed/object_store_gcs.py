@@ -54,6 +54,7 @@ from _sdk.managed_service import (
     ValueRef,
     unsupported_update,
 )
+from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
 
 KIND = "object_store"
 
@@ -123,6 +124,7 @@ class GCSDriver(ManagedServiceDriver):
                 labels["astrolift-io-binding"] = spec.binding_id
             if spec.managed_service_id:
                 labels["astrolift-io-managed-service-id"] = spec.managed_service_id
+                labels[MANAGED_SERVICE_ID_LABEL] = spec.managed_service_id
             bucket.labels = labels
             bucket.patch()
         except Exception as exc:

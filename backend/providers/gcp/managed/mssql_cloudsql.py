@@ -29,6 +29,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
 from gcp.managed._secret_store import ManagedSecretStore, ManagedSecretStoreError
 
 KIND = "mssql"
@@ -1205,6 +1206,7 @@ def _labels(spec: ProvisionSpec) -> dict[str, str]:
         labels["astrolift-binding"] = _label_value(spec.binding_id)
     if spec.managed_service_id:
         labels["astrolift-managed-service-id"] = _label_value(spec.managed_service_id)
+        labels[MANAGED_SERVICE_ID_LABEL] = _label_value(spec.managed_service_id)
     for key, value in (spec.tags or {}).items():
         labels[f"astrolift-extra-{_label_value(key)}"[:63]] = _label_value(value)
     return labels
