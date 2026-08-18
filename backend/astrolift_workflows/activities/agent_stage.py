@@ -39,14 +39,17 @@ import asyncio
 import logging
 from typing import Any
 
+from _sdk.k8s_naming import AGENT_NAMESPACE_PREFIX, agent_namespace
 from django.utils import timezone
 from temporalio import activity
 
 log = logging.getLogger("astrolift_workflows.activities.agent_stage")
 
 # Agent stage jobs run in a dedicated per-org namespace, separate from the
-# tenant app namespaces and the pipeline namespaces.
-_AGENT_NS_PREFIX = "astrolift-agents-"
+# tenant app namespaces and the pipeline namespaces. Derived through the shared
+# helper: organization slugs allow 200 characters and a namespace allows 63, so
+# interpolating the slug produced an invalid namespace for a valid slug (#1379).
+_AGENT_NS_PREFIX = f"{AGENT_NAMESPACE_PREFIX}-"
 
 # Seconds between status polls / heartbeats while a task is non-terminal.
 _POLL_INTERVAL_SECONDS = 10
@@ -68,7 +71,7 @@ _TERMINAL_STATUSES = frozenset(
 
 
 def _agent_namespace(org_slug: str) -> str:
-    return f"{_AGENT_NS_PREFIX}{org_slug}"
+    return agent_namespace(org_slug)
 
 
 def _skill_org_or_global_q(organization: Any):

@@ -18,6 +18,7 @@ from datetime import datetime
 from typing import Any
 
 import strawberry
+from _sdk.k8s_naming import agent_namespace
 from graphql import GraphQLError
 from strawberry.types import Info
 
@@ -757,7 +758,7 @@ class AgentsQuery:
                 org_slug = (getattr(row.organization, "slug", "") or "").strip()
                 if not org_slug:
                     return None
-                namespace = f"astrolift-agents-{org_slug}"
+                namespace = agent_namespace(org_slug)
             return cluster, namespace, str(row.guid), (row.pod_name or "")
 
         resolved = _resolve()
