@@ -8678,6 +8678,7 @@ export type QueryAstroliftWorkloadsArgs = {
 export type QueryAstroliftWorkloadsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   appSlug?: InputMaybe<Scalars['String']['input']>;
+  kinds?: InputMaybe<Array<Scalars['String']['input']>>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
 };
