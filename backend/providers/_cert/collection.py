@@ -165,8 +165,7 @@ IN_CLUSTER_VARIANTS: dict[str, str] = {
 #: Cells with no manifest, and why. Inventing one would mean naming a variant
 #: the platform cannot provision, which fails at the driver lookup and teaches
 #: nobody anything.
-NOT_EXPRESSIBLE: dict[tuple[str, str], str] = {
-}
+NOT_EXPRESSIBLE: dict[tuple[str, str], str] = {}
 
 
 def default_tier_kinds() -> tuple[str, ...]:
