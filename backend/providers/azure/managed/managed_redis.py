@@ -22,6 +22,14 @@ from urllib.parse import quote
 
 from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op
+from _sdk.azure_ownership import (
+    OWNERSHIP_ERROR_CODE,
+    AzureOperation,
+    AzureOwnershipError,
+    arm_tags_of,
+    owner_of,
+    verify_azure_ownership,
+)
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -207,6 +215,8 @@ class AzureManagedRedisDriver(ManagedServiceDriver):
 
         try:
             cluster = self._describe_cluster(cluster_name)
+            if cluster is not None:
+                self._assert_owned(cluster, spec, AzureOperation.PROVISION, cluster_name)
             if cluster is None:
                 cluster = self._mgmt.redis_enterprise.begin_create(
                     resource_group_name=self._config.resource_group,
@@ -246,6 +256,8 @@ class AzureManagedRedisDriver(ManagedServiceDriver):
                 ).result()
             self._reconcile_access_policies(cluster_name, database_name, cfg)
             self._store_binding_secrets(cluster_name, database_name, cluster, database)
+        except AzureOwnershipError as exc:
+            return ProvisionResult(False, handle, str(exc), [OWNERSHIP_ERROR_CODE])
         except Exception as exc:
             return ProvisionResult(
                 False,
@@ -263,8 +275,13 @@ class AzureManagedRedisDriver(ManagedServiceDriver):
     @driver_op(cloud="azure", driver="managed_redis")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         cluster_name, database_name = self._parse_handle(spec.handle)
-        if self._describe_cluster(cluster_name) is None:
+        cluster = self._describe_cluster(cluster_name)
+        if cluster is None:
             return UpdateResult(False, spec.handle, "Azure Managed Redis cluster does not exist", ["not_found"])
+        try:
+            self._assert_owned(cluster, spec, AzureOperation.UPDATE, cluster_name)
+        except AzureOwnershipError as exc:
+            return UpdateResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
         if self._describe_database(cluster_name, database_name) is None:
             return UpdateResult(False, spec.handle, "Azure Managed Redis database does not exist", ["not_found"])
         cfg = spec.config or {}
@@ -354,6 +371,11 @@ class AzureManagedRedisDriver(ManagedServiceDriver):
     ) -> DeprovisionResult:
         cluster_name, database_name = self._parse_handle(spec.handle)
         cluster = self._describe_cluster(cluster_name)
+        if cluster is not None:
+            try:
+                self._assert_owned(cluster, spec, AzureOperation.DELETE, cluster_name)
+            except AzureOwnershipError as exc:
+                return DeprovisionResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
         if cluster is not None and not delete_data:
             return DeprovisionResult(
                 False,
@@ -863,6 +885,15 @@ class AzureManagedRedisDriver(ManagedServiceDriver):
                     ),
                 ),
             ).result()
+
+    @staticmethod
+    def _assert_owned(cluster: Any, source: object, operation: AzureOperation, cluster_name: str) -> None:
+        verify_azure_ownership(
+            arm_tags_of(cluster),
+            owner_of(source),
+            operation=operation,
+            resource=f"Azure Managed Redis cluster {cluster_name}",
+        )
 
     def _describe_cluster(self, cluster_name: str) -> Any | None:
         try:

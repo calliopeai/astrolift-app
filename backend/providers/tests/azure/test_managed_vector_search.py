@@ -47,6 +47,10 @@ class FakePoller:
         return self.value
 
 
+OWNER = "managed-service-guid"
+BINDING = "binding-guid"
+
+
 @dataclass
 class FakeSearchService:
     name: str
@@ -269,6 +273,8 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         tenant_cluster_id="azure-prod",
         service_handle_hint="v",
         size="small",
+        binding_id=BINDING,
+        managed_service_id=OWNER,
     )
     base.update(overrides)
     return ProvisionSpec(**base)
@@ -421,7 +427,7 @@ def test_update_resize(
 ) -> None:
     provisioned = driver.provision(_spec())
     result = driver.update(
-        UpdateSpec(handle=provisioned.handle, size="medium"),
+        UpdateSpec(handle=provisioned.handle, size="medium", managed_service_id=OWNER),
     )
     assert result.ok
     last = mgmt.services_obj.update_calls[-1]
@@ -437,6 +443,7 @@ def test_update_explicit_replica(
         UpdateSpec(
             handle=provisioned.handle,
             config={"replica_count": 5},
+            managed_service_id=OWNER,
         ),
     )
     assert result.ok
@@ -449,7 +456,7 @@ def test_update_noop_when_nothing_to_change(
 ) -> None:
     provisioned = driver.provision(_spec())
     before = len(mgmt.services_obj.update_calls)
-    result = driver.update(UpdateSpec(handle=provisioned.handle))
+    result = driver.update(UpdateSpec(handle=provisioned.handle, managed_service_id=OWNER))
     assert result.ok
     assert "no-op" in result.message
     assert len(mgmt.services_obj.update_calls) == before
@@ -466,7 +473,7 @@ def test_deprovision_default_refuses_without_snapshot_and_keeps_secret(
     provisioned = driver.provision(_spec())
     service_name = provisioned.handle.split("/", 1)[1]
     admin_secret = f"astrolift-aisearch-{service_name}-admin"
-    result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle))
+    result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER))
     assert not result.ok
     assert result.retryable is False
     assert "delete_data=True" in result.message
@@ -484,7 +491,7 @@ def test_deprovision_delete_data_only_drops_admin_secret(
     assert admin_secret in secrets_client.secrets
 
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
     )
     assert result.ok
@@ -501,7 +508,7 @@ def test_deprovision_force_destroy_does_not_override_data_guard(
     service_name = provisioned.handle.split("/", 1)[1]
     admin_secret = f"astrolift-aisearch-{service_name}-admin"
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=False,
         force_destroy=True,
     )
@@ -520,7 +527,7 @@ def test_deprovision_atomic_both_flags(
     service_name = provisioned.handle.split("/", 1)[1]
     admin_secret = f"astrolift-aisearch-{service_name}-admin"
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
         force_destroy=True,
     )
@@ -534,7 +541,7 @@ def test_deprovision_idempotent_when_already_gone(
     driver: AzureAISearchVectorDriver,
 ) -> None:
     result = driver.deprovision(
-        DeprovisionSpec(handle="vector_index/never-existed"),
+        DeprovisionSpec(handle="vector_index/never-existed", managed_service_id=OWNER),
     )
     assert result.ok
     assert "already gone" in result.message
@@ -547,7 +554,7 @@ def test_deprovision_does_not_depend_on_fictional_purge_api(
     mgmt.services_obj.purge_supported = False
     provisioned = driver.provision(_spec())
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
         force_destroy=True,
     )
@@ -641,7 +648,7 @@ def test_snapshot_is_explicitly_unsupported(
     driver: AzureAISearchVectorDriver,
 ) -> None:
     with pytest.raises(UnsupportedOperationError, match="no service-level snapshot"):
-        driver.snapshot(ServiceHandle(handle="vector_index/anything"))
+        driver.snapshot(ServiceHandle(handle="vector_index/anything", managed_service_id=OWNER))
 
 
 def test_restore_is_explicitly_unsupported(

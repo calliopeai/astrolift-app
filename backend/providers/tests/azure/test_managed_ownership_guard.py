@@ -54,15 +54,41 @@ def test_at_least_the_known_drivers_are_covered() -> None:
     migrated = {path.stem for path in DRIVERS if "verify_azure_ownership" in path.read_text()}
     assert migrated >= {
         "api_management",
+        "cache_redis",
+        "cosmos",
         "cosmos_api",
+        "email_acs",
         "event_grid",
         "event_grid_namespace",
         "event_hubs",
         "faas_functions",
         "filesystem_files",
         "filesystem_files_classic",
+        "managed_redis",
+        "model_endpoint_aoai",
+        "mssql_sql",
+        "mysql_flexible",
+        "object_store_blob",
+        "postgres_flexible",
         "private_endpoint",
+        "queue_servicebus",
+        "search_aisearch",
+        "timeseries_monitor",
+        "vector_search",
     }
+
+
+def test_every_lifecycle_driver_is_accounted_for() -> None:
+    """The scan is only a floor if nothing can quietly sit outside it.
+
+    ``email_obs`` is the one module under ``azure/managed`` that owns no cloud
+    resource: every method on it raises ``UnsupportedOperationError``, so it
+    provisions nothing to prove ownership of. Anything else appearing here is a
+    driver that reached main without an ownership gate.
+    """
+
+    ungated = {path.stem for path in DRIVERS if "verify_azure_ownership" not in path.read_text()}
+    assert ungated == {"email_obs"}
 
 
 def test_the_classic_share_metadata_write_path_uses_the_keys_the_gate_reads() -> None:

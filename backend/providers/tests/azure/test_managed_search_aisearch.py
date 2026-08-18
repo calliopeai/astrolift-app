@@ -50,6 +50,10 @@ class FakePoller:
         return self.value
 
 
+OWNER = "managed-service-guid"
+BINDING = "binding-guid"
+
+
 @dataclass
 class FakeSearchService:
     name: str
@@ -59,6 +63,7 @@ class FakeSearchService:
     partition_count: int = 1
     public_network_access: str = "enabled"
     properties: dict[str, Any] = field(default_factory=dict)
+    tags: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -107,6 +112,7 @@ class FakeServicesOperations:
                 "enabled",
             ),
             properties=dict(service),
+            tags=dict(service.get("tags") or {}),
         )
         self.services[search_service_name] = svc
         return FakePoller(value=svc)
@@ -236,6 +242,8 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         tenant_cluster_id="azure-prod",
         service_handle_hint="search",
         size="small",
+        binding_id=BINDING,
+        managed_service_id=OWNER,
     )
     base.update(overrides)
     return ProvisionSpec(**base)
@@ -374,7 +382,7 @@ def test_update_resize(
 ) -> None:
     provisioned = driver.provision(_spec())
     result = driver.update(
-        UpdateSpec(handle=provisioned.handle, size="medium"),
+        UpdateSpec(handle=provisioned.handle, size="medium", managed_service_id=OWNER),
     )
     assert result.ok
     last = mgmt.services_obj.update_calls[-1]
@@ -390,6 +398,7 @@ def test_update_replica_partition_counts(
         UpdateSpec(
             handle=provisioned.handle,
             config={"replica_count": 4, "partition_count": 2},
+            managed_service_id=OWNER,
         ),
     )
     assert result.ok
@@ -404,7 +413,7 @@ def test_update_noop_when_nothing_to_change(
 ) -> None:
     provisioned = driver.provision(_spec())
     before = len(mgmt.services_obj.update_calls)
-    result = driver.update(UpdateSpec(handle=provisioned.handle))
+    result = driver.update(UpdateSpec(handle=provisioned.handle, managed_service_id=OWNER))
     assert result.ok
     assert "no-op" in result.message
     assert len(mgmt.services_obj.update_calls) == before
@@ -422,7 +431,7 @@ def test_deprovision_default_refuses_without_snapshot_and_keeps_keys(
     service_name = provisioned.handle.split("/", 1)[1]
     primary = f"astrolift-search-{service_name}-primary"
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
     )
     assert not result.ok
     assert result.retryable is False
@@ -443,7 +452,7 @@ def test_deprovision_delete_data_deletes_service_and_keys(
     assert primary in secrets_client.secrets
 
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
     )
     assert result.ok
@@ -461,7 +470,7 @@ def test_deprovision_force_destroy_does_not_override_data_guard(
     service_name = provisioned.handle.split("/", 1)[1]
     primary = f"astrolift-search-{service_name}-primary"
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=False,
         force_destroy=True,
     )
@@ -480,7 +489,7 @@ def test_deprovision_atomic_both_flags(
     service_name = provisioned.handle.split("/", 1)[1]
     primary = f"astrolift-search-{service_name}-primary"
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
         force_destroy=True,
     )
@@ -493,7 +502,7 @@ def test_deprovision_idempotent_when_already_gone(
     driver: AzureAISearchFullTextDriver,
 ) -> None:
     result = driver.deprovision(
-        DeprovisionSpec(handle="search/never-existed"),
+        DeprovisionSpec(handle="search/never-existed", managed_service_id=OWNER),
     )
     assert result.ok
     assert "already gone" in result.message
@@ -510,7 +519,7 @@ def test_deprovision_treats_mid_modify_as_retryable_without_force(
 
     mgmt.services_obj.delete = boom  # type: ignore[assignment]
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
     )
     assert not result.ok
@@ -528,7 +537,7 @@ def test_deprovision_force_destroy_bypasses_mid_modify_message(
 
     mgmt.services_obj.delete = boom  # type: ignore[assignment]
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
         force_destroy=True,
     )
@@ -543,7 +552,7 @@ def test_deprovision_does_not_depend_on_fictional_purge_api(
     mgmt.services_obj.purge_supported = False
     provisioned = driver.provision(_spec())
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
         force_destroy=True,
     )
@@ -635,7 +644,7 @@ def test_snapshot_is_explicitly_unsupported(
     driver: AzureAISearchFullTextDriver,
 ) -> None:
     with pytest.raises(UnsupportedOperationError, match="no service-level snapshot"):
-        driver.snapshot(ServiceHandle(handle="search/anything"))
+        driver.snapshot(ServiceHandle(handle="search/anything", managed_service_id=OWNER))
 
 
 def test_restore_is_explicitly_unsupported(

@@ -54,6 +54,10 @@ class FakePoller:
         return self.value
 
 
+OWNER = "managed-service-guid"
+BINDING = "binding-guid"
+
+
 @dataclass
 class FakeDomain:
     name: str
@@ -61,6 +65,7 @@ class FakeDomain:
     domain_management: str = "AzureManaged"
     from_sender_domain: str = ""
     properties: dict[str, Any] = field(default_factory=dict)
+    tags: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -108,6 +113,7 @@ class FakeDomainsOperations:
             ),
             from_sender_domain=domain_name,
             properties=dict(props),
+            tags=dict(parameters.get("tags") or {}),
         )
         self.domains[domain_name] = d
         return FakePoller(value=d)
@@ -290,6 +296,8 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         tenant_cluster_id="azure-prod",
         service_handle_hint="email",
         size="small",
+        binding_id=BINDING,
+        managed_service_id=OWNER,
     )
     base.update(overrides)
     return ProvisionSpec(**base)
@@ -476,6 +484,7 @@ def test_update_user_engagement_tracking(
         UpdateSpec(
             handle=provisioned.handle,
             config={"user_engagement_tracking": "Enabled"},
+            managed_service_id=OWNER,
         ),
     )
     assert result.ok
@@ -489,7 +498,7 @@ def test_update_noop_when_nothing_to_change(
 ) -> None:
     provisioned = driver.provision(_spec())
     before = len(mgmt.domains_obj.update_calls)
-    result = driver.update(UpdateSpec(handle=provisioned.handle))
+    result = driver.update(UpdateSpec(handle=provisioned.handle, managed_service_id=OWNER))
     assert result.ok
     assert "no-op" in result.message
     assert len(mgmt.domains_obj.update_calls) == before
@@ -507,7 +516,7 @@ def test_deprovision_default_retains_domain_and_secret(
     domain_name = provisioned.handle.split("/", 1)[1]
     secret_name = f"astrolift-acs-email-{_safe(domain_name)}-connection-string"
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
     )
     assert result.ok
     assert "dns_records=preserved" in result.message
@@ -526,7 +535,7 @@ def test_deprovision_delete_data_drops_domain_and_secret(
     domain_name = provisioned.handle.split("/", 1)[1]
     secret_name = f"astrolift-acs-email-{_safe(domain_name)}-connection-string"
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
     )
     assert result.ok
@@ -544,7 +553,7 @@ def test_deprovision_force_destroy_only_retains_domain(
     domain_name = provisioned.handle.split("/", 1)[1]
     secret_name = f"astrolift-acs-email-{_safe(domain_name)}-connection-string"
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=False,
         force_destroy=True,
     )
@@ -563,7 +572,7 @@ def test_deprovision_atomic_both_flags(
     domain_name = provisioned.handle.split("/", 1)[1]
     secret_name = f"astrolift-acs-email-{_safe(domain_name)}-connection-string"
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
         force_destroy=True,
     )
@@ -577,7 +586,7 @@ def test_deprovision_idempotent_when_already_gone(
     driver: AzureCommunicationEmailDriver,
 ) -> None:
     result = driver.deprovision(
-        DeprovisionSpec(handle="email/never-existed"),
+        DeprovisionSpec(handle="email/never-existed", managed_service_id=OWNER),
     )
     assert result.ok
     assert "already gone" in result.message
@@ -594,7 +603,7 @@ def test_deprovision_respects_resource_lock_without_force(
 
     mgmt.domains_obj.begin_delete = boom  # type: ignore[assignment]
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
     )
     assert not result.ok
@@ -617,7 +626,7 @@ def test_deprovision_force_destroy_attempts_lock_removal(
         FakeLock(name="prod-lock"),
     ]
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
         force_destroy=True,
     )
@@ -712,7 +721,7 @@ def test_snapshot_is_explicitly_unsupported(
     driver: AzureCommunicationEmailDriver,
 ) -> None:
     with pytest.raises(UnsupportedOperationError, match="no snapshot API"):
-        driver.snapshot(ServiceHandle(handle="email/anything"))
+        driver.snapshot(ServiceHandle(handle="email/anything", managed_service_id=OWNER))
 
 
 def test_restore_is_explicitly_unsupported(

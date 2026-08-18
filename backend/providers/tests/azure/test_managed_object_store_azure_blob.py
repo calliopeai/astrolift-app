@@ -50,9 +50,14 @@ class FakeImmutabilityPolicy:
     policy_mode: str = "Unlocked"
 
 
+OWNER = "managed-service-guid"
+BINDING = "binding-guid"
+
+
 @dataclass
 class FakeContainerProperties:
     name: str = ""
+    metadata: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -77,7 +82,7 @@ class FakeContainer:
     def get_container_properties(self) -> FakeContainerProperties:
         if not self.created:
             raise _NotFound(self.name)
-        return FakeContainerProperties(name=self.name)
+        return FakeContainerProperties(name=self.name, metadata=dict(self.metadata))
 
     def delete_container(self) -> None:
         if not self.created:
@@ -141,6 +146,8 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         tenant_cluster_id="azure-prod",
         service_handle_hint="logs",
         size="small",
+        binding_id=BINDING,
+        managed_service_id=OWNER,
     )
     base.update(overrides)
     return ProvisionSpec(**base)
@@ -193,7 +200,7 @@ def test_update_refuses_instead_of_reporting_a_no_op_success(
     tier as applied while the container kept the old one (#1376).
     """
     res = driver.provision(_spec())
-    update = driver.update(UpdateSpec(handle=res.handle, config={"access_tier": "Cool"}))
+    update = driver.update(UpdateSpec(handle=res.handle, config={"access_tier": "Cool"}, managed_service_id=OWNER))
     assert update.ok is False
     assert update.retryable is False
     assert update.errors == ["update_not_supported_in_place"]
@@ -209,7 +216,7 @@ def test_deprovision_default_retains_container(
     fake_client: FakeBlobServiceClient,
 ) -> None:
     res = driver.provision(_spec())
-    result = driver.deprovision(DeprovisionSpec(handle=res.handle))
+    result = driver.deprovision(DeprovisionSpec(handle=res.handle, managed_service_id=OWNER))
     assert result.ok
     assert "retained" in result.message
     assert len(fake_client.containers) == 1
@@ -227,7 +234,7 @@ def test_deprovision_retain_with_force_clears_unlocked_policy(
         policy_mode="Unlocked",
     )
     result = driver.deprovision(
-        DeprovisionSpec(handle=res.handle),
+        DeprovisionSpec(handle=res.handle, managed_service_id=OWNER),
         delete_data=False,
         force_destroy=True,
     )
@@ -245,7 +252,7 @@ def test_deprovision_delete_data_only_drops_container(
 ) -> None:
     res = driver.provision(_spec())
     result = driver.deprovision(
-        DeprovisionSpec(handle=res.handle),
+        DeprovisionSpec(handle=res.handle, managed_service_id=OWNER),
         delete_data=True,
     )
     assert result.ok
@@ -265,7 +272,7 @@ def test_deprovision_delete_data_refuses_active_policy_without_force(
         policy_mode="Unlocked",
     )
     result = driver.deprovision(
-        DeprovisionSpec(handle=res.handle),
+        DeprovisionSpec(handle=res.handle, managed_service_id=OWNER),
         delete_data=True,
         force_destroy=False,
     )
@@ -288,7 +295,7 @@ def test_deprovision_delete_data_locked_policy_blocks_even_with_force(
         policy_mode="Locked",
     )
     result = driver.deprovision(
-        DeprovisionSpec(handle=res.handle),
+        DeprovisionSpec(handle=res.handle, managed_service_id=OWNER),
         delete_data=True,
         force_destroy=True,
     )
@@ -309,7 +316,7 @@ def test_deprovision_atomic_both_flags_drops_unlocked_policy_and_container(
         policy_mode="Unlocked",
     )
     result = driver.deprovision(
-        DeprovisionSpec(handle=res.handle),
+        DeprovisionSpec(handle=res.handle, managed_service_id=OWNER),
         delete_data=True,
         force_destroy=True,
     )
@@ -322,7 +329,7 @@ def test_deprovision_idempotent_when_already_gone(
     driver: AzureBlobStorageDriver,
 ) -> None:
     result = driver.deprovision(
-        DeprovisionSpec(handle="object_store/never-existed"),
+        DeprovisionSpec(handle="object_store/never-existed", managed_service_id=OWNER),
         delete_data=True,
     )
     assert result.ok
@@ -383,7 +390,7 @@ def test_binding_iam_grants_scoped_to_container_resource(
 
 def test_snapshot_is_explicitly_unsupported(driver: AzureBlobStorageDriver) -> None:
     with pytest.raises(UnsupportedOperationError, match="per-blob versions"):
-        driver.snapshot(ServiceHandle(handle="object_store/container"))
+        driver.snapshot(ServiceHandle(handle="object_store/container", managed_service_id=OWNER))
 
 
 def test_restore_is_explicitly_unsupported(

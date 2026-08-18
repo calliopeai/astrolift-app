@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
@@ -26,9 +26,20 @@ class _Exists(Exception):
     pass
 
 
+# Module scope, not fixture scope: the drivers sniff these names, so a fake
+# built outside the fixture has to raise the same thing the SDK does.
+_NotFound.__name__ = "ResourceNotFoundError"
+_Exists.__name__ = "ResourceExistsError"
+
+
+OWNER = "managed-service-guid"
+BINDING = "binding-guid"
+
+
 @dataclass
 class FakeContainerProperties:
     name: str = ""
+    metadata: dict[str, str] = field(default_factory=dict)
 
 
 class FakeContainer:
@@ -52,7 +63,7 @@ class FakeContainer:
     def get_container_properties(self) -> FakeContainerProperties:
         if not self.created:
             raise _NotFound(self.name)
-        return FakeContainerProperties(name=self.name)
+        return FakeContainerProperties(name=self.name, metadata=dict(self.metadata))
 
     def delete_container(self) -> None:
         if not self.created:
@@ -73,8 +84,6 @@ class FakeBlobServiceClient:
 
 @pytest.fixture
 def fake_client() -> FakeBlobServiceClient:
-    _NotFound.__name__ = "ResourceNotFoundError"
-    _Exists.__name__ = "ResourceExistsError"
     return FakeBlobServiceClient()
 
 
@@ -99,6 +108,8 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         tenant_cluster_id="cluster-1",
         service_handle_hint="",
         size="small",
+        binding_id=BINDING,
+        managed_service_id=OWNER,
     )
     base.update(overrides)
     return ProvisionSpec(**base)
@@ -147,7 +158,7 @@ def test_deprovision_retains_by_default(
 ) -> None:
     res = driver.provision(_spec())
     driver.deprovision(
-        DeprovisionSpec(handle=res.handle),
+        DeprovisionSpec(handle=res.handle, managed_service_id=OWNER),
         delete_data=False,
     )
     assert len(fake_client.containers) == 1
@@ -159,7 +170,7 @@ def test_deprovision_deletes_when_flag(
 ) -> None:
     res = driver.provision(_spec())
     driver.deprovision(
-        DeprovisionSpec(handle=res.handle),
+        DeprovisionSpec(handle=res.handle, managed_service_id=OWNER),
         delete_data=True,
     )
     assert fake_client.containers == {}

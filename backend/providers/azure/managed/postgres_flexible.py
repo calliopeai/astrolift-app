@@ -37,6 +37,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.azure_ownership import (
+    OWNERSHIP_ERROR_CODE,
+    AzureOperation,
+    AzureOwnershipError,
+    arm_tags_of,
+    owner_of,
+    verify_azure_ownership,
+)
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -208,6 +216,15 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
         # Probe for an existing server first -- provision is idempotent.
         existing = self._describe(server_name)
         if existing is not None:
+            try:
+                self._assert_owned(existing, spec, AzureOperation.PROVISION, server_name)
+            except AzureOwnershipError as exc:
+                return ProvisionResult(
+                    ok=False,
+                    handle="",
+                    message=str(exc),
+                    errors=[OWNERSHIP_ERROR_CODE],
+                )
             return ProvisionResult(
                 ok=True,
                 handle=self._handle_for(server_name=server_name),
@@ -308,6 +325,26 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
         server_name = self._server_name_from_handle(spec.handle)
         cfg = spec.config or {}
 
+        existing = self._describe(server_name)
+        if existing is None:
+            return UpdateResult(
+                ok=False,
+                handle=spec.handle,
+                message=f"flexible server {server_name} does not exist",
+                errors=["not_found"],
+                retryable=False,
+            )
+        try:
+            self._assert_owned(existing, spec, AzureOperation.UPDATE, server_name)
+        except AzureOwnershipError as exc:
+            return UpdateResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(exc),
+                errors=[OWNERSHIP_ERROR_CODE],
+                retryable=False,
+            )
+
         body: dict[str, Any] = {}
         sku_block: dict[str, Any] = {}
         if spec.size:
@@ -390,6 +427,17 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
                 ok=True,
                 handle=spec.handle,
                 message=f"flexible server {server_name} already gone",
+            )
+
+        try:
+            self._assert_owned(existing, spec, AzureOperation.DELETE, server_name)
+        except AzureOwnershipError as exc:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(exc),
+                errors=[OWNERSHIP_ERROR_CODE],
+                retryable=False,
             )
 
         # Subnet-delegation lock: VNet-injected servers refuse delete
@@ -580,6 +628,10 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
         from datetime import UTC, datetime
 
         server_name = self._server_name_from_handle(handle.handle)
+        existing = self._describe(server_name)
+        if existing is None:
+            raise AzurePostgresError(f"snapshot requested for missing flexible server {server_name}")
+        self._assert_owned(existing, handle, AzureOperation.SNAPSHOT, server_name)
         backup_name = f"{server_name}-snap-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
         try:
             self._mgmt.backups_automatic_and_on_demand.begin_create(
@@ -605,6 +657,17 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
     ) -> ProvisionResult:
         target_server = self._server_name_for(spec=target)
         source_server = self._server_name_from_handle(snapshot.handle)
+        existing_target = self._describe(target_server)
+        if existing_target is not None:
+            try:
+                self._assert_owned(existing_target, target, AzureOperation.RESTORE, target_server)
+            except AzureOwnershipError as exc:
+                return ProvisionResult(
+                    ok=False,
+                    handle="",
+                    message=str(exc),
+                    errors=[OWNERSHIP_ERROR_CODE],
+                )
         try:
             poller = self._mgmt.servers.begin_create_or_update(
                 resource_group_name=self._config.resource_group,
@@ -691,6 +754,20 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
         )
 
     # ---- internals ----------------------------------------------------
+
+    @staticmethod
+    def _assert_owned(
+        server: Any,
+        source: object,
+        operation: AzureOperation,
+        server_name: str,
+    ) -> None:
+        verify_azure_ownership(
+            arm_tags_of(server),
+            owner_of(source),
+            operation=operation,
+            resource=f"flexible server {server_name}",
+        )
 
     def _describe(self, server_name: str) -> Any | None:
         try:

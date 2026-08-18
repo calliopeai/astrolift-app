@@ -37,6 +37,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.azure_ownership import (
+    OWNERSHIP_ERROR_CODE,
+    AzureOperation,
+    AzureOwnershipError,
+    arm_tags_of,
+    owner_of,
+    verify_azure_ownership,
+)
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -196,6 +204,10 @@ class AzureCosmosDriver(ManagedServiceDriver):
 
         existing = self._describe(account_name)
         if existing is not None:
+            try:
+                self._assert_owned(existing, spec, AzureOperation.PROVISION, account_name)
+            except AzureOwnershipError as exc:
+                return ProvisionResult(ok=False, handle="", message=str(exc), errors=[OWNERSHIP_ERROR_CODE])
             return ProvisionResult(
                 ok=True,
                 handle=self._handle_for(account_name=account_name),
@@ -313,6 +325,26 @@ class AzureCosmosDriver(ManagedServiceDriver):
         account_name = self._account_name_from_handle(spec.handle)
         cfg = spec.config or {}
 
+        existing = self._describe(account_name)
+        if existing is None:
+            return UpdateResult(
+                ok=False,
+                handle=spec.handle,
+                message=f"cosmos account {account_name} does not exist",
+                errors=["not_found"],
+                retryable=False,
+            )
+        try:
+            self._assert_owned(existing, spec, AzureOperation.UPDATE, account_name)
+        except AzureOwnershipError as exc:
+            return UpdateResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(exc),
+                errors=[OWNERSHIP_ERROR_CODE],
+                retryable=False,
+            )
+
         body: dict[str, Any] = {}
         properties: dict[str, Any] = {}
         if "public_network_access" in cfg:
@@ -392,6 +424,17 @@ class AzureCosmosDriver(ManagedServiceDriver):
                 ok=True,
                 handle=spec.handle,
                 message=f"cosmos account {account_name} already gone",
+            )
+
+        try:
+            self._assert_owned(existing, spec, AzureOperation.DELETE, account_name)
+        except AzureOwnershipError as exc:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(exc),
+                errors=[OWNERSHIP_ERROR_CODE],
+                retryable=False,
             )
 
         # Resource-lock guard: enumerate any CanNotDelete / ReadOnly
@@ -565,6 +608,7 @@ class AzureCosmosDriver(ManagedServiceDriver):
             raise AzureCosmosError(
                 f"snapshot requested for missing account {account_name}",
             )
+        self._assert_owned(existing, handle, AzureOperation.SNAPSHOT, account_name)
         # Ensure continuous backup is on so the timestamp is restorable.
         try:
             self._ensure_continuous_backup(account_name=account_name)
@@ -587,6 +631,12 @@ class AzureCosmosDriver(ManagedServiceDriver):
     ) -> ProvisionResult:
         target_account = self._account_name_for(spec=target)
         source_account = self._account_name_from_handle(snapshot.handle)
+        existing_target = self._describe(target_account)
+        if existing_target is not None:
+            try:
+                self._assert_owned(existing_target, target, AzureOperation.RESTORE, target_account)
+            except AzureOwnershipError as exc:
+                return ProvisionResult(ok=False, handle="", message=str(exc), errors=[OWNERSHIP_ERROR_CODE])
         try:
             poller = self._mgmt.database_accounts.begin_create_or_update(
                 resource_group_name=self._config.resource_group,
@@ -671,6 +721,15 @@ class AzureCosmosDriver(ManagedServiceDriver):
         )
 
     # ---- internals ----------------------------------------------------
+
+    @staticmethod
+    def _assert_owned(account: Any, source: object, operation: AzureOperation, account_name: str) -> None:
+        verify_azure_ownership(
+            arm_tags_of(account),
+            owner_of(source),
+            operation=operation,
+            resource=f"Cosmos DB account {account_name}",
+        )
 
     def _describe(self, account_name: str) -> Any | None:
         try:

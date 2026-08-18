@@ -41,6 +41,15 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.azure_ownership import (
+    BLOB_METADATA_KEYS,
+    OWNERSHIP_ERROR_CODE,
+    AzureOperation,
+    AzureOwnershipError,
+    metadata_of,
+    owner_of,
+    verify_azure_ownership,
+)
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -100,18 +109,19 @@ class BlobStorageDriver(ManagedServiceDriver):
                 container_name,
             )
             try:
-                container_client.create_container(
-                    metadata={
-                        "astrolift_io_managed_by": "platform",
-                        "astrolift_io_organization": spec.organization_slug,
-                        "astrolift_io_app": spec.app_slug,
-                        "astrolift_io_environment": spec.environment_name,
-                    },
-                )
+                container_client.create_container(metadata=_tags_for(spec))
             except Exception as exc:
                 # ResourceExistsError = 409; idempotent
                 if type(exc).__name__ != "ResourceExistsError":
                     raise
+                _assert_container_owned(container_client, spec, AzureOperation.PROVISION, container_name)
+        except AzureOwnershipError as exc:
+            return ProvisionResult(
+                ok=False,
+                handle="",
+                message=str(exc),
+                errors=[OWNERSHIP_ERROR_CODE],
+            )
         except Exception as exc:
             return ProvisionResult(
                 ok=False,
@@ -159,7 +169,16 @@ class BlobStorageDriver(ManagedServiceDriver):
             container_client = self._client.get_container_client(
                 container_name,
             )
+            _assert_container_owned(container_client, spec, AzureOperation.DELETE, container_name)
             container_client.delete_container()
+        except AzureOwnershipError as exc:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(exc),
+                errors=[OWNERSHIP_ERROR_CODE],
+                retryable=False,
+            )
         except Exception as exc:
             if type(exc).__name__ == "ResourceNotFoundError":
                 return DeprovisionResult(
@@ -317,6 +336,33 @@ class AzureBlobConfig:
     blob_service_client: Any | None = None
 
 
+def _assert_container_owned(
+    container_client: Any,
+    source: object,
+    operation: AzureOperation,
+    container_name: str,
+) -> None:
+    """Refuse ``operation`` unless the live container's metadata proves it is ours.
+
+    A missing container is left to the caller's existing already-gone handling:
+    the read raises ``ResourceNotFoundError`` and this returns, so an idempotent
+    teardown replay still converges instead of failing closed on nothing.
+    """
+    try:
+        properties = container_client.get_container_properties()
+    except Exception as exc:
+        if type(exc).__name__ == "ResourceNotFoundError":
+            return
+        raise
+    verify_azure_ownership(
+        metadata_of(properties),
+        owner_of(source),
+        operation=operation,
+        resource=f"Blob container {container_name}",
+        keys=BLOB_METADATA_KEYS,
+    )
+
+
 def _tags_for(spec: ProvisionSpec) -> dict[str, str]:
     """Same shape as the other Azure managed-service drivers'
     ``tags_for`` helper. Container metadata uses a flattened
@@ -378,6 +424,14 @@ class AzureBlobStorageDriver(ManagedServiceDriver):
                 # ResourceExistsError = 409; idempotent
                 if type(exc).__name__ != "ResourceExistsError":
                     raise
+                _assert_container_owned(container_client, spec, AzureOperation.PROVISION, container_name)
+        except AzureOwnershipError as exc:
+            return ProvisionResult(
+                ok=False,
+                handle="",
+                message=str(exc),
+                errors=[OWNERSHIP_ERROR_CODE],
+            )
         except Exception as exc:
             return ProvisionResult(
                 ok=False,
@@ -412,6 +466,16 @@ class AzureBlobStorageDriver(ManagedServiceDriver):
     ) -> DeprovisionResult:
         container_name = self._container_name_from_handle(spec.handle)
         container_client = self._client.get_container_client(container_name)
+        try:
+            _assert_container_owned(container_client, spec, AzureOperation.DELETE, container_name)
+        except AzureOwnershipError as exc:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(exc),
+                errors=[OWNERSHIP_ERROR_CODE],
+                retryable=False,
+            )
 
         if not delete_data:
             # Safe path: contents stay. force_destroy here optionally

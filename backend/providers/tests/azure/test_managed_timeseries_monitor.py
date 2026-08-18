@@ -45,6 +45,10 @@ class FakePoller:
         return self.value
 
 
+OWNER = "managed-service-guid"
+BINDING = "binding-guid"
+
+
 @dataclass
 class FakeMonitorWorkspace:
     name: str
@@ -414,6 +418,8 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         tenant_cluster_id="azure-prod",
         service_handle_hint="metrics",
         size="small",
+        binding_id=BINDING,
+        managed_service_id=OWNER,
     )
     base.update(overrides)
     return ProvisionSpec(**base)
@@ -529,6 +535,7 @@ def test_update_public_network_access(
         UpdateSpec(
             handle=provisioned.handle,
             config={"public_network_access": "Disabled"},
+            managed_service_id=OWNER,
         ),
     )
     assert result.ok
@@ -545,6 +552,7 @@ def test_update_retention_days_patches_la(
         UpdateSpec(
             handle=provisioned.handle,
             config={"retention_days": 90},
+            managed_service_id=OWNER,
         ),
     )
     assert result.ok
@@ -559,7 +567,7 @@ def test_update_resize_changes_tags(
 ) -> None:
     provisioned = driver.provision(_spec())
     result = driver.update(
-        UpdateSpec(handle=provisioned.handle, size="xlarge"),
+        UpdateSpec(handle=provisioned.handle, size="xlarge", managed_service_id=OWNER),
     )
     assert result.ok
     workspace_name = provisioned.handle.split("/", 1)[1]
@@ -578,7 +586,7 @@ def test_deprovision_default_refuses_without_metric_backup(
     provisioned = driver.provision(_spec())
     workspace_name = provisioned.handle.split("/", 1)[1]
     la_name = f"{workspace_name}-la"
-    result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle))
+    result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER))
     assert not result.ok
     assert result.retryable is False
     assert "delete_data=True" in result.message
@@ -594,7 +602,7 @@ def test_deprovision_delete_data_only_drops_la(
     workspace_name = provisioned.handle.split("/", 1)[1]
     la_name = f"{workspace_name}-la"
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
     )
     assert result.ok
@@ -609,7 +617,7 @@ def test_deprovision_default_refuses_with_resource_lock(
     provisioned = driver.provision(_spec())
     locks_client.management_locks_obj.locks.append(FakeLock(name="finance-lock"))
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
     )
     assert not result.ok
@@ -623,7 +631,7 @@ def test_deprovision_force_destroy_clears_locks(
     provisioned = driver.provision(_spec())
     locks_client.management_locks_obj.locks.append(FakeLock(name="finance-lock"))
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
         force_destroy=True,
     )
@@ -642,7 +650,7 @@ def test_deprovision_atomic_both_flags(
     la_name = f"{workspace_name}-la"
     locks_client.management_locks_obj.locks.append(FakeLock(name="finance-lock"))
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
         force_destroy=True,
     )
@@ -656,7 +664,7 @@ def test_deprovision_idempotent_when_already_gone(
     driver: AzureMonitorPrometheusDriver,
 ) -> None:
     result = driver.deprovision(
-        DeprovisionSpec(handle="time_series/never-existed"),
+        DeprovisionSpec(handle="time_series/never-existed", managed_service_id=OWNER),
     )
     assert result.ok
     assert "already gone" in result.message
@@ -671,7 +679,7 @@ def test_deprovision_tears_down_dcr_and_dce(
     dce_name = f"{workspace_name}-dce"
     dcr_name = f"{workspace_name}-dcr"
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
     )
     assert result.ok
@@ -759,7 +767,7 @@ def test_snapshot_is_explicitly_unsupported(
     driver: AzureMonitorPrometheusDriver,
 ) -> None:
     with pytest.raises(UnsupportedOperationError, match="no snapshot/restore API"):
-        driver.snapshot(ServiceHandle(handle="time_series/anything"))
+        driver.snapshot(ServiceHandle(handle="time_series/anything", managed_service_id=OWNER))
 
 
 def test_restore_is_explicitly_unsupported(
