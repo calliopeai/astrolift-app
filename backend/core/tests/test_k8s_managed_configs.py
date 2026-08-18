@@ -829,7 +829,9 @@ def test_tenant_temporal_takes_its_forbidden_coordinates_from_the_live_control_p
     assert config.control_plane.kubernetes_namespaces == ("astrolift-system",)
 
 
-def test_tenant_temporal_refuses_to_provision_against_the_control_plane_it_was_given(monkeypatch, settings) -> None:
+def test_tenant_temporal_refuses_to_provision_against_the_control_plane_it_was_given(
+    monkeypatch, settings
+) -> None:
     """End to end through the real config builder, because the wiring is the guard.
 
     A driver whose control-plane coordinates were populated from a different
