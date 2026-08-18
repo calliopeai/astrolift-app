@@ -23,7 +23,9 @@ own ``exotic.toml`` variant does.
 
 *A cell with no executable variant gets no invented manifest.* It goes in
 :data:`NOT_EXPRESSIBLE` with the reason, and the guard test refuses an entry
-there that the availability matrix says is executable after all.
+there that the availability matrix says is executable after all. A cell whose
+cloud sells nothing but whose kind has an in-cluster variant is executable --
+see :data:`IN_CLUSTER_VARIANTS`.
 
 The negative manifests are hand-written and live outside this ledger: each one
 encodes a different refusal, and generating them from a table would hide the
@@ -37,7 +39,7 @@ from pathlib import Path
 
 from _cert.campaign import CAMPAIGN_TAG_KEY, Campaign
 from _sdk.availability import MATRIX
-from _sdk.coverage import CLOUDS, EXECUTABLE_STATUSES, OPT_IN_TIER
+from _sdk.coverage import CLOUDS, EXECUTABLE_STATUSES, IN_CLUSTER, OPT_IN_TIER
 from _sdk.managed_service_kinds import KINDS
 
 CAMPAIGN = Campaign("cert2026q3")
@@ -73,6 +75,16 @@ class Cell:
     kind: str
     cloud: str
     variant: str
+    plugin_id: str
+    """The plugin whose driver the variant belongs to. Usually ``cloud``; it is
+    ``k8s_native`` for a cell covered by an in-cluster variant, which a
+    cloud-hosted cluster can book since #1484. The cell is still filed under
+    its cloud, because what it certifies is that the kind is reachable *on that
+    cloud* -- which was the whole portability claim."""
+
+    @property
+    def is_in_cluster(self) -> bool:
+        return self.plugin_id == IN_CLUSTER
 
     @property
     def app_name(self) -> str:
@@ -131,34 +143,29 @@ VARIANTS: dict[str, dict[str, str]] = {
     "workflow_engine": {"aws": "step_functions_standard", "gcp": "workflows"},
 }
 
+#: The variant a cell falls back to when its cloud sells no managed equivalent.
+#: These are ``k8s_native`` drivers, booked on an EKS/GKE/AKS cluster through
+#: the in-cluster fallback in ``astrolift_drivers.managed_resolution`` (#1484).
+#:
+#: Five cells used to sit in :data:`NOT_EXPRESSIBLE` for exactly one reason:
+#: the driver existed and the cluster could not reach it. Now that it can, the
+#: cell is expressible and worth metering -- an in-cluster variant is the
+#: portability answer for those clouds, so certifying the kind there means
+#: certifying the variant an app would actually get.
+#:
+#: One variant per kind, deliberately: the grid proves the kind is reachable on
+#: the cloud, and a second in-cluster variant would prove the same thing twice.
+IN_CLUSTER_VARIANTS: dict[str, str] = {
+    "cache": "memcached",
+    "observability": "kube_prometheus_stack",
+    "search": "opensearch_operator",
+    "workflow_engine": "argo_workflows",
+}
+
 #: Cells with no manifest, and why. Inventing one would mean naming a variant
 #: the platform cannot provision, which fails at the driver lookup and teaches
 #: nobody anything.
-#:
-#: The last three are the interesting ones. Each has an in-cluster variant, so
-#: spec 43's exit criterion ("executable on all three clouds *or* an in-cluster
-#: variant") is arguably met -- but a manifest cannot say so. Driver lookup is
-#: ``plugins.get(<cluster plugin>, "managed:<kind>:<variant>")``, and the Azure
-#: plugin registers no ``k8s_native`` drivers, so an AKS-hosted app cannot book
-#: the in-cluster variant that covers its gap. That is a real hole in the
-#: portability story and it needs a decision before the grid can claim those
-#: three cells either way.
-NOT_EXPRESSIBLE: dict[tuple[str, str], str] = {
-    ("cache", "gcp"): "no managed variant; declared gap, in-cluster memcached is astrolift-app#1465",
-    ("cache", "azure"): "no managed variant; declared gap, in-cluster memcached is astrolift-app#1465",
-    ("observability", "azure"): (
-        "azure_monitor is status planned; kube_prometheus_stack is k8s_native only "
-        "and the azure plugin registers no in-cluster drivers"
-    ),
-    ("search", "gcp"): (
-        "gcp_elastic_cloud is status planned; opensearch_operator is k8s_native only "
-        "and the gcp plugin registers no in-cluster drivers"
-    ),
-    ("workflow_engine", "azure"): (
-        "logic_apps is status planned; argo_workflows is k8s_native only "
-        "and the azure plugin registers no in-cluster drivers"
-    ),
-}
+NOT_EXPRESSIBLE: dict[tuple[str, str], str] = {}
 
 
 def default_tier_kinds() -> tuple[str, ...]:
@@ -172,12 +179,17 @@ def default_tier_kinds() -> tuple[str, ...]:
     return tuple(sorted({entry.kind for entry in MATRIX.managed_services} - OPT_IN_TIER))
 
 
-def executable_variants(kind: str, cloud: str) -> tuple[str, ...]:
+def executable_variants(kind: str, plugin_id: str) -> tuple[str, ...]:
+    """Variants of ``kind`` that ``plugin_id`` can provision today.
+
+    ``plugin_id`` is a cloud for a managed cell and ``k8s_native`` for an
+    in-cluster one, which is why it is not named ``cloud``.
+    """
     return tuple(
         sorted(
             entry.variant
             for entry in MATRIX.managed_services
-            if entry.kind == kind and entry.plugin_id == cloud and entry.status in EXECUTABLE_STATUSES
+            if entry.kind == kind and entry.plugin_id == plugin_id and entry.status in EXECUTABLE_STATUSES
         )
     )
 
@@ -194,7 +206,7 @@ def binding_envs(cell: Cell) -> tuple[str, ...]:
         (
             e
             for e in MATRIX.managed_services
-            if e.kind == cell.kind and e.plugin_id == cell.cloud and e.variant == cell.variant
+            if e.kind == cell.kind and e.plugin_id == cell.plugin_id and e.variant == cell.variant
         ),
         None,
     )
@@ -204,12 +216,26 @@ def binding_envs(cell: Cell) -> tuple[str, ...]:
     return tuple(kind.binding_envs_required) if kind else ()
 
 
+def cell_for(kind: str, cloud: str) -> Cell | None:
+    """The square at (kind, cloud), or None when nothing can provision it.
+
+    The cloud's own managed variant is the first answer, because that is what a
+    cloud-hosted app gets by default. An in-cluster variant covers the square
+    only where the cloud sells nothing: it is the portability answer, not the
+    preferred one, and the runtime resolves it the same way round.
+    """
+    managed = VARIANTS.get(kind, {}).get(cloud)
+    if managed:
+        return Cell(kind=kind, cloud=cloud, variant=managed, plugin_id=cloud)
+    in_cluster = IN_CLUSTER_VARIANTS.get(kind)
+    if in_cluster:
+        return Cell(kind=kind, cloud=cloud, variant=in_cluster, plugin_id=IN_CLUSTER)
+    return None
+
+
 def cells() -> tuple[Cell, ...]:
     return tuple(
-        Cell(kind=kind, cloud=cloud, variant=VARIANTS[kind][cloud])
-        for kind in default_tier_kinds()
-        for cloud in CLOUDS
-        if cloud in VARIANTS.get(kind, {})
+        cell for kind in default_tier_kinds() for cloud in CLOUDS if (cell := cell_for(kind, cloud)) is not None
     )
 
 
@@ -339,13 +365,27 @@ def render_per_kind(cell: Cell) -> str:
         else "# The catalogue declares no binding envelope for this kind: the cell proves "
         "provision,\n# readiness and clean teardown, not env injection."
     )
+    in_cluster_lines = (
+        [
+            "#",
+            f"# {cell.cloud} sells no managed {cell.kind}, so this cell books the in-cluster",
+            f"# variant a portable app would actually get there. It runs on the {cell.cloud}",
+            "# cluster itself, resolved through the k8s_native fallback in",
+            "# astrolift_drivers/managed_resolution.py -- which is the thing this cell",
+            "# certifies as much as the driver is.",
+        ]
+        if cell.is_in_cluster
+        else []
+    )
     lines = [
-        f"# PER-KIND / {cell.kind} / {cell.cloud} -- variant {cell.variant}.",
+        f"# PER-KIND / {cell.kind} / {cell.cloud} -- variant {cell.variant}"
+        + (" (in-cluster)." if cell.is_in_cluster else "."),
         "#",
         "# One managed service, one cloud, the full lifecycle cycle. The fixture only",
         "# opens live clients for postgres, redis, queue and object_store; every other",
         "# kind is verified by binding presence in /debug plus a clean VERIFY-CLEAN.",
         f"{binding_line}",
+        *in_cluster_lines,
         "#",
         "# Generated from providers/_cert/collection.py -- do not hand-edit.",
         f'name = "{cell.app_name}"',

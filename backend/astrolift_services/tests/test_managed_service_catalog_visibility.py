@@ -61,13 +61,34 @@ def test_an_unavailable_row_always_says_why():
 def test_a_registry_that_loaded_nothing_does_not_render_an_empty_catalogue():
     """The failure this filter must not create. Hiding driverless rows would
     turn a broken plugin registry into a catalogue with nothing in it, and an
-    operator cannot search for what is not shown."""
+    operator cannot search for what is not shown.
+
+    A cloud catalogue is a superset of that plugin's own matrix rows rather
+    than an exact match, because a cloud-hosted cluster also books the
+    in-cluster drivers (#1484). The next test pins what the extras may be."""
     for plugin_slug in ("aws", "gcp", "azure", "k8s_native"):
-        matrix_entries = [e for e in MATRIX.managed_services if e.plugin_id == plugin_slug]
-        if not matrix_entries:
+        own = {
+            (e.kind, e.variant)
+            for e in MATRIX.managed_services
+            if e.plugin_id == plugin_slug and e.status != "planned"
+        }
+        if not own:
             continue
-        planned = len([e for e in matrix_entries if e.status == "planned"])
-        assert len(list_catalog(plugin_slug)) == len(matrix_entries) - planned, plugin_slug
+        offered = {(row.kind, row.variant) for row in list_catalog(plugin_slug)}
+
+        assert own <= offered, f"{plugin_slug} drops {sorted(own - offered)}"
+
+
+@pytest.mark.parametrize("plugin_slug", ["aws", "gcp", "azure"])
+def test_the_only_borrowed_rows_are_in_cluster_ones(plugin_slug):
+    """The catalogue widened by exactly one plugin. A row from a *different*
+    cloud would be an offer the cluster has no credentials to honour, and the
+    resolver would refuse it after the operator had already picked it."""
+    own = {(e.kind, e.variant) for e in MATRIX.managed_services if e.plugin_id == plugin_slug}
+    in_cluster = {(e.kind, e.variant) for e in MATRIX.managed_services if e.plugin_id == "k8s_native"}
+    offered = {(row.kind, row.variant) for row in list_catalog(plugin_slug)}
+
+    assert offered - own <= in_cluster, f"{plugin_slug} offers {sorted(offered - own - in_cluster)}"
 
 
 def test_deprecated_variants_stay_visible():

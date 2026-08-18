@@ -211,14 +211,17 @@ def _cdn_driver(cluster, cdn_row):
     (``cloud_cdn``) / Azure (``front_door``) cdn row resolves its own driver
     instead of silently picking CloudFront in this shared (cloud-agnostic)
     activity layer."""
-    from astrolift_drivers.registry import plugins
+    from astrolift_drivers.managed_resolution import resolve_managed_driver
     from core.cluster_observability import managed_config_for
 
-    plugin_slug = cluster.provider_plugin.slug
     variant = getattr(cdn_row, "variant", "") or "cloudfront"
-    driver_cls = plugins.get(plugin_slug, f"managed:cdn:{variant}")
-    cfg = managed_config_for(plugin_slug, cluster, kind="cdn", variant=variant)
-    return driver_cls(config=cfg)
+    resolved = resolve_managed_driver(
+        cluster_plugin_slug=cluster.provider_plugin.slug,
+        kind="cdn",
+        variant=variant,
+    )
+    cfg = managed_config_for(resolved.plugin_slug, cluster, kind="cdn", variant=variant)
+    return resolved.driver_cls(config=cfg)
 
 
 def _bucket_name(row) -> str:

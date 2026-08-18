@@ -117,6 +117,16 @@ class KindCoverage:
         once. That makes it a portability answer and not a consolation: a kind
         with one is reachable wherever Astrolift is installed, whether or not
         the underlying cloud sells a managed equivalent.
+
+        This is a claim about the runtime, and for a while it was only a claim:
+        driver lookup was scoped to the cluster's own plugin, so an app on
+        EKS/GKE/AKS could not book an in-cluster variant at all and this
+        returned True for kinds nobody could actually provision (#1484). The
+        lookup now falls back to ``k8s_native``
+        (``astrolift_drivers.managed_resolution``), and
+        ``tests/_sdk/test_coverage_runtime.py`` resolves a real driver for
+        every kind that is portable only by way of its in-cluster variant, so
+        the rule and the runtime cannot drift apart again in silence.
         """
         return self.is_cloud_portable or self.cell(IN_CLUSTER).is_executable
 

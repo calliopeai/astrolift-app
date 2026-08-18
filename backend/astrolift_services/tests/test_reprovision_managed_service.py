@@ -510,18 +510,23 @@ def test_update_managed_service_write_does_not_clobber_a_concurrent_column_write
 
 
 def test_update_project_service_uses_update_workflow(permission_resolver):
+    # storage_class_pvc rather than redis/operator: the Redis operator declares
+    # no in-place path at all (#1376), so the mutation now refuses a size
+    # change before starting anything. It used to pass here only because the
+    # driver was unreachable and the check fell open to ["*"] -- the in-cluster
+    # drivers became resolvable from a cloud-plugin cluster in #1484.
     org, app, env = _scaffold()
     permission_resolver.grant(Permission.PROJECT_UPDATE)
     svc = ManagedService.objects.create(
         project=app.project,
         tenant_cluster=env.tenant_cluster,
         environment_name="production",
-        kind=ManagedService.Kind.REDIS,
-        variant="operator",
-        name="cache",
+        kind=ManagedService.Kind.FILESYSTEM,
+        variant="storage_class_pvc",
+        name="shared",
         config={"size": "small"},
         status=ManagedService.Status.ACTIVE,
-        backend_ref="redis/cache",
+        backend_ref="filesystem/shared",
     )
     handle = WorkflowHandle(
         workflow_id=f"UpdateManagedServiceWorkflow-{svc.guid}",

@@ -225,10 +225,11 @@ def _provision_managed_services_initial_sync(
     registered_app_id: int,
     app_environment_id: int,
 ) -> list[int]:
-    from astrolift_drivers.registry import DriverNotFound, plugins
+    from astrolift_drivers.managed_resolution import resolve_managed_driver
+    from astrolift_drivers.registry import DriverNotFound
     from astrolift_services.models import ManagedService
     from core.app_deploy import AppDeployError
-    from core.cluster_observability import _config_for  # type: ignore[attr-defined]
+    from core.cluster_observability import managed_config_for
 
     rows = list(
         ManagedService.objects.filter(
@@ -247,24 +248,17 @@ def _provision_managed_services_initial_sync(
                 f"managed service {ms.pk} env has no tenant_cluster bound",
             )
         plugin_slug = cluster.provider_plugin.slug
-        # plugin_loader flattens managed-service drivers into the same
-        # plugins.get() namespace via synthetic role names — see
-        # astrolift_clusters/plugin_loader.py line ~50.
         variant = getattr(ms, "variant", "") or ""
         try:
-            driver_cls = plugins.get(plugin_slug, f"managed:{ms.kind}:{variant}")
-        except DriverNotFound:
-            # Try the empty-variant default — some plugins register
-            # ``managed:postgres:`` rather than ``managed:postgres:cnpg``.
-            try:
-                driver_cls = plugins.get(plugin_slug, f"managed:{ms.kind}:")
-            except DriverNotFound as exc:
-                raise AppDeployError(
-                    f"cluster {cluster.slug}: plugin {plugin_slug!r} has no managed-service driver "
-                    f"for kind={ms.kind!r} variant={variant!r}",
-                ) from exc
-        cfg = _config_for(plugin_slug, cluster)
-        driver = driver_cls(config=cfg)
+            resolved = resolve_managed_driver(
+                cluster_plugin_slug=plugin_slug,
+                kind=ms.kind,
+                variant=variant,
+            )
+        except DriverNotFound as exc:
+            raise AppDeployError(f"cluster {cluster.slug}: {exc}") from exc
+        cfg = managed_config_for(resolved.plugin_slug, cluster, kind=ms.kind, variant=variant)
+        driver = resolved.driver_cls(config=cfg)
         # ManagedServiceDriver.provision takes a ProvisionSpec dataclass
         # built from the ManagedService row's stored spec dict. Drivers
         # return a ProvisionResult with the external reference id, which

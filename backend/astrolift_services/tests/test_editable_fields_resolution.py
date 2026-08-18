@@ -61,11 +61,15 @@ def _clear_cache():
 
 @pytest.fixture
 def registry(monkeypatch):
-    """Point the driver lookup at a class we control."""
-    state = {"cls": _NoInPlaceUpdates, "calls": 0}
+    """Point the driver lookup at a class we control.
 
-    class DriverNotFound(Exception):
-        pass
+    Raises the real ``DriverNotFound`` rather than a stand-in, so the
+    cluster-plugin-then-k8s_native walk in ``managed_resolution`` runs for real
+    instead of the miss escaping through it (#1484).
+    """
+    from astrolift_drivers.registry import DriverNotFound
+
+    state = {"cls": _NoInPlaceUpdates, "calls": 0}
 
     def get(_slug, _role):
         state["calls"] += 1
@@ -74,7 +78,6 @@ def registry(monkeypatch):
         return state["cls"]
 
     monkeypatch.setattr("astrolift_drivers.registry.plugins", SimpleNamespace(get=get), raising=False)
-    monkeypatch.setattr("astrolift_drivers.registry.DriverNotFound", DriverNotFound, raising=False)
     return state
 
 
@@ -183,6 +186,49 @@ def test_an_impure_driver_is_constructed_rather_than_defaulted(registry, monkeyp
     are pure. If one stops being pure, it must be built properly, not silently
     reported as fully editable."""
     registry["cls"] = _NotPure
-    monkeypatch.setattr("core.cluster_observability._config_for", lambda _slug, _cluster: {}, raising=False)
+    monkeypatch.setattr(
+        "core.cluster_observability.managed_config_for",
+        lambda _slug, _cluster, **_kwargs: {},
+        raising=False,
+    )
 
     assert schema_types._editable_fields_for(_service()) == ["from_config"]
+
+
+# ---- in-cluster variants on cloud clusters (#1484) ---------------------------
+
+
+def test_an_in_cluster_variant_on_a_cloud_cluster_reports_its_own_editable_fields():
+    """The UI half of #1484.
+
+    An AKS-hosted service on an in-cluster variant resolved nothing, fell
+    through to ``["*"]``, and rendered a single ``*`` input for a driver that
+    accepts two keys. The fallback has to reach the GraphQL layer too, not only
+    the lifecycle activities."""
+    from astrolift_drivers.registry import PluginManifest, PluginRegistry
+
+    registry = PluginRegistry()
+    registry.register(
+        PluginManifest(
+            plugin_id="azure",
+            display_name="Azure",
+            version="0",
+            drivers={"managed:postgres:azure_pg_flex": _PermissiveUpdates},
+        ),
+    )
+    registry.register(
+        PluginManifest(
+            plugin_id="k8s_native",
+            display_name="Kubernetes",
+            version="0",
+            drivers={"managed:cache:memcached": _RestrictedUpdates},
+        ),
+    )
+
+    with pytest.MonkeyPatch.context() as patched:
+        patched.setattr("astrolift_drivers.registry.plugins", registry)
+        answer = schema_types._editable_fields_for(
+            _service(kind="cache", variant="memcached", plugin_slug="azure"),
+        )
+
+    assert answer == ["size", "retention_days"]

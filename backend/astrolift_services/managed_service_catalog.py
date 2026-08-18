@@ -5,6 +5,12 @@ plugin registry owns executable capability.  This module joins both sources so
 GraphQL and mutations use the same answer: every installed driver is visible,
 planned/stub entries remain discoverable, and only executable variants may be
 provisioned.
+
+Cluster-scoped, not plugin-scoped: what a cluster can book is its own plugin's
+drivers *plus* the in-cluster ones, because every tenant cluster is a
+Kubernetes cluster and the driver resolver reaches ``k8s_native`` from any of
+them (#1484).  A catalogue narrower than the resolver would refuse a variant
+the lifecycle would provision without complaint.
 """
 
 from __future__ import annotations
@@ -15,6 +21,7 @@ from typing import Any
 
 from _sdk.availability import MATRIX, ManagedServiceEntry
 
+from astrolift_drivers.managed_resolution import IN_CLUSTER_PLUGIN
 from astrolift_drivers.registry import plugins
 
 _SIZE_OPTIONS = ("small", "medium", "large", "xlarge", "custom")
@@ -103,6 +110,49 @@ def _driver_roles(plugin_slug: str) -> dict[tuple[str, str], type | Any]:
     return out
 
 
+def _bookable_on(
+    plugin_slug: str,
+) -> tuple[
+    dict[tuple[str, str], ManagedServiceEntry],
+    dict[tuple[str, str], type | Any],
+    set[tuple[str, str]],
+]:
+    """Metadata, drivers, and which of those a cluster on ``plugin_slug``
+    borrows from ``k8s_native``.
+
+    The catalogue is the offer surface in front of the runtime, so it has to
+    offer what the runtime resolves. Since #1484 a cloud-hosted cluster reaches
+    the in-cluster drivers, and a catalogue that did not say so would refuse a
+    ``createManagedService`` for a variant the activity would have provisioned
+    happily -- the gate disagreeing with the thing it gates is the shape of bug
+    #1484 already was.
+
+    Same order and same direction as
+    ``astrolift_drivers.managed_resolution``: the cluster's own plugin owns any
+    ``(kind, variant)`` it registers, and ``k8s_native`` borrows nothing back.
+    """
+    metadata = _matrix_entries(plugin_slug)
+    drivers = _driver_roles(plugin_slug)
+    # k8s_native borrows nothing back, and a plugin this control plane knows
+    # nothing about -- a separately distributed third-party one -- keeps its
+    # empty catalogue: ``resolve_variant`` reads that as "not on the contract
+    # yet" and waves the request through, so filling it with in-cluster rows
+    # would start refusing variants the plugin does implement.
+    if plugin_slug == IN_CLUSTER_PLUGIN or not (metadata or drivers):
+        return metadata, drivers, set()
+
+    in_cluster_metadata = _matrix_entries(IN_CLUSTER_PLUGIN)
+    borrowed = set()
+    for key, driver_cls in _driver_roles(IN_CLUSTER_PLUGIN).items():
+        if key in drivers:
+            continue
+        drivers[key] = driver_cls
+        borrowed.add(key)
+        if key not in metadata and key in in_cluster_metadata:
+            metadata[key] = in_cluster_metadata[key]
+    return metadata, drivers, borrowed
+
+
 def _pure_contract_method(driver_cls: type | Any, method_name: str, default: Any) -> Any:
     """Read a driver contract method without constructing cloud SDK clients.
 
@@ -172,14 +222,21 @@ def list_catalog(plugin_slug: str, *, include_unprovisionable: bool = False) -> 
     uses it so a request for a planned variant is refused with the reason
     rather than with "unknown variant", which reads like a typo.
     """
-    metadata = _matrix_entries(plugin_slug)
-    drivers = _driver_roles(plugin_slug)
+    metadata, drivers, borrowed = _bookable_on(plugin_slug)
     keys = sorted(set(metadata) | set(drivers))
     available_by_kind: dict[str, list[str]] = defaultdict(list)
+    # The pool a lone variant becomes the default from. An in-cluster variant
+    # borrowed onto a cloud that already ships its own must not turn a kind
+    # that had one obvious answer into one that demands an explicit variant --
+    # that would break every existing caller of resolve_variant that omits it.
+    # A borrowed variant becomes the default only where the cloud offers none.
+    native_by_kind: dict[str, list[str]] = defaultdict(list)
     for kind, variant in keys:
         meta = metadata.get((kind, variant))
         if (kind, variant) in drivers and (meta is None or meta.status in {"ga", "preview", "experimental"}):
             available_by_kind[kind].append(variant)
+            if (kind, variant) not in borrowed:
+                native_by_kind[kind].append(variant)
 
     rows: list[CatalogItem] = []
     for kind, variant in keys:
@@ -195,10 +252,10 @@ def list_catalog(plugin_slug: str, *, include_unprovisionable: bool = False) -> 
             unavailable_reason = "Driver is a non-provisioning stub or planned capability."
         else:
             unavailable_reason = ""
-        variants = available_by_kind.get(kind, [])
+        default_pool = native_by_kind.get(kind) or available_by_kind.get(kind, [])
         configured_default = _DEFAULT_VARIANTS.get((plugin_slug, kind))
         is_default = available and (
-            variant == configured_default or (configured_default is None and len(variants) == 1)
+            variant == configured_default or (configured_default is None and default_pool == [variant])
         )
         description = meta.description if meta is not None else "Installed third-party provider driver."
         if not include_unprovisionable and status == "planned":
