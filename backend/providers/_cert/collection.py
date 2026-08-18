@@ -96,7 +96,7 @@ class Cell:
 VARIANTS: dict[str, dict[str, str]] = {
     "cache": {"aws": "elasticache_memcached"},
     "document_db": {"aws": "documentdb", "gcp": "firestore_native", "azure": "cosmos_nosql"},
-    "email": {"aws": "ses", "azure": "azure_acs"},
+    "email": {"aws": "ses", "gcp": "smtp", "azure": "azure_acs"},
     "encryption_key": {"aws": "kms", "gcp": "cloud_kms", "azure": "key_vault_key"},
     "event_bus": {"aws": "eventbridge", "gcp": "eventarc", "azure": "event_grid"},
     "event_stream": {"aws": "msk_serverless", "gcp": "managed_kafka", "azure": "event_hubs_kafka"},
@@ -146,7 +146,6 @@ VARIANTS: dict[str, dict[str, str]] = {
 NOT_EXPRESSIBLE: dict[tuple[str, str], str] = {
     ("cache", "gcp"): "no managed variant; declared gap, in-cluster memcached is astrolift-app#1465",
     ("cache", "azure"): "no managed variant; declared gap, in-cluster memcached is astrolift-app#1465",
-    ("email", "gcp"): "gcp_thirdparty is status planned; declared gap astrolift-app#1453",
     ("observability", "azure"): (
         "azure_monitor is status planned; kube_prometheus_stack is k8s_native only "
         "and the azure plugin registers no in-cluster drivers"

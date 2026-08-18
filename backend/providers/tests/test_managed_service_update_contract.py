@@ -74,11 +74,11 @@ _UNREADABLE_UPDATES: dict[tuple[str, str, str], str] = {}
 
 
 # Drivers whose ``update()`` unconditionally raises. They cannot report a false
-# success by construction, so they take no part in the comparisons below. Both
-# are third-party stubs that raise from every lifecycle method.
+# success by construction, so they take no part in the comparisons below. The
+# one left is the Elastic Cloud stub, which raises from every lifecycle method;
+# the GCP email stub left in #1453 when the SMTP relay replaced it.
 _NEVER_RETURNS: frozenset[tuple[str, str, str]] = frozenset(
     {
-        ("gcp", "email", "gcp_thirdparty"),
         ("gcp", "search", "gcp_elastic_cloud"),
     },
 )
@@ -373,6 +373,7 @@ def test_drivers_with_no_editable_fields_are_the_expected_set() -> None:
         ("azure", "object_store", "azure_blob"),
         ("azure", "object_store", "blob"),
         ("azure", "queue", "servicebus"),
+        ("gcp", "email", "smtp"),
         ("gcp", "object_store", "gcs"),
         ("gcp", "queue", "pubsub"),
         ("k8s_native", "cache", "memcached"),

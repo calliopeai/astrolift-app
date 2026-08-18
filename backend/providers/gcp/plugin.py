@@ -37,10 +37,11 @@ Executable managed services:
 - APIGatewayDriver — api_gateway/api_gateway
 - ManagedKafkaDriver — event_stream/managed_kafka
 - EventarcDriver — event_bus/eventarc
+- SMTPRelayEmailDriver — email/smtp (vendor-neutral SMTP relay, #1453)
 
 The availability catalogue is authoritative for the remaining planned GCP
-resources. Placeholder email/search classes are registered only so callers get
-an explicit capability error; the lifecycle config factory refuses them.
+resources. The placeholder search class is registered only so callers get an
+explicit capability error; the lifecycle config factory refuses it.
 """
 
 from _sdk.base import ProviderPlugin
@@ -52,7 +53,7 @@ from gcp.managed.api_gateway import APIGatewayDriver
 from gcp.managed.bigtable import BigtableDriver
 from gcp.managed.cdn_cloud import CloudCdnDriver
 from gcp.managed.document_firestore import FirestoreNativeDriver
-from gcp.managed.email_thirdparty import GCPEmailStubDriver
+from gcp.managed.email_smtp import SMTPRelayEmailDriver
 from gcp.managed.encryption_cloud_kms import CloudKMSDriver
 from gcp.managed.event_bus_eventarc import EventarcDriver
 from gcp.managed.event_stream_managed_kafka import ManagedKafkaDriver
@@ -107,7 +108,7 @@ PLUGIN = ProviderPlugin(
         ("search", "gcp_elastic_cloud"): GCPElasticCloudStubDriver,
         ("vector_index", "vertex_matching_engine"): VertexMatchingEngineDriver,
         ("time_series", "gcp_managed_prometheus"): GCPManagedPrometheusDriver,
-        ("email", "gcp_thirdparty"): GCPEmailStubDriver,
+        ("email", "smtp"): SMTPRelayEmailDriver,
         ("model_endpoint", "vertex_ai"): VertexAIEndpointDriver,
         ("encryption_key", "cloud_kms"): CloudKMSDriver,
         ("warehouse", "bigquery"): BigQueryWarehouseDriver,
@@ -495,6 +496,55 @@ PLUGIN = ProviderPlugin(
                 "type": "number",
                 "exclusiveMinimum": 0,
                 "default": 5,
+            },
+            "smtp_host": {
+                "type": "string",
+                "description": (
+                    "Hostname of the operator's SMTP relay. Any transactional sender that speaks "
+                    "SMTP works; Astrolift binds to none of them."
+                ),
+            },
+            "smtp_port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535,
+                "default": 587,
+            },
+            "smtp_tls_mode": {
+                "type": "string",
+                "enum": ["starttls", "implicit"],
+                "default": "starttls",
+                "description": "Plaintext SMTP is not offered: the binding carries a relay password.",
+            },
+            "smtp_username_secret_ref": {
+                "type": "string",
+                "description": (
+                    "Secrets-backend reference to the relay username. A reference rather than a "
+                    "value so the driver never holds the credential."
+                ),
+            },
+            "smtp_password_secret_ref": {
+                "type": "string",
+                "description": "Secrets-backend reference to the relay password.",
+            },
+            "smtp_default_from_address": {
+                "type": "string",
+                "description": "Sender address used by any email service that does not override it.",
+            },
+            "smtp_allowed_sender_domains": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "Domains an app may send as through the shared relay. Empty means the domain of "
+                    "smtp_default_from_address and nothing else."
+                ),
+            },
+            "smtp_region": {
+                "type": "string",
+                "description": (
+                    "Operator's label for where the relay terminates, passed through to EMAIL_REGION. "
+                    "SMTP has no region of its own."
+                ),
             },
             "bigquery_location": {
                 "type": "string",

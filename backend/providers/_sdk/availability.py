@@ -41,6 +41,7 @@ _AZURE_EVENT_GRID_NAMESPACE_ISSUE = "https://github.com/calliopeai/astrolift-app
 _AZURE_FILES_CLASSIC_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1361"
 _AZURE_FUNCTIONS_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1392"
 _AZURE_PRIVATE_LINK_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1335"
+_EMAIL_SMTP_ISSUE = "https://github.com/calliopeai/astrolift-app/issues/1453"
 
 
 @dataclass(frozen=True)
@@ -1065,11 +1066,15 @@ MATRIX = AvailabilityMatrix(
         ),
         ManagedServiceEntry(
             kind="email",
-            variant="gcp_thirdparty",
+            variant="smtp",
             plugin_id="gcp",
-            status="planned",
-            description="Third-party email on GCP (stub driver)",
-            issue_url=_CROSS_CLOUD_PARITY_ISSUE,
+            status="preview",
+            description=(
+                "Vendor-neutral SMTP relay. GCP sells no first-party transactional sender and "
+                "every third-party one speaks SMTP, so the portable answer names a protocol "
+                "rather than a vendor"
+            ),
+            issue_url=_EMAIL_SMTP_ISSUE,
         ),
         ManagedServiceEntry(
             kind="model_endpoint",

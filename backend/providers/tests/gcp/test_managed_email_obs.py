@@ -2,7 +2,7 @@
 
 Every method on :class:`GcpEmailObservabilityDriver` must raise
 :class:`UnsupportedOperationError` with a message that points operators
-at the third-party provider's console.
+at the relay operator's console: SMTP defines no observability surface.
 """
 
 from __future__ import annotations
