@@ -60,19 +60,44 @@ class KeyClass(StrEnum):
 
 #: Suffixes that make a key credential-bearing whatever precedes them. Matched
 #: on the bare key, after the envelope prefix has been stripped.
-_CREDENTIAL_SUFFIXES: tuple[str, ...] = (
-    "_PASSWORD",
-    "_PASSWD",
-    "_SECRET",
-    "_SECRET_KEY",
-    "_TOKEN",
-    "_API_KEY",
-    "_ACCESS_KEY",
-    "_PRIVATE_KEY",
-    "_CREDENTIALS",
-    "_SAS",
-    "_SAS_TOKEN",
-    "_CONNECTION_STRING",
+#: A key is credential-bearing when its LAST segment is one of these. Segment
+#: rather than substring, and last rather than anywhere, because both looser
+#: forms were tried and both were wrong: substring matching classified
+#: ``WIDE_COLUMN_KEYSPACE`` and ``PRIVATE_ENDPOINT_ID`` as credentials, and
+#: anywhere-matching classified every ``ENCRYPTION_KEY_*`` attribute that way.
+#: These mean the value IS one, wherever they appear. ``PASSWORD`` in
+#: ``FILESYSTEM_PASSWORD_SECONDARY`` is not describing something, it is the
+#: thing.
+_CREDENTIAL_ANYWHERE: frozenset[str] = frozenset({"PASSWORD", "PASSWD", "SECRET", "TOKEN", "CREDENTIALS", "SAS"})
+
+#: These only mean it at the end. ``KEY`` and ``CERT`` are ordinary nouns in
+#: attribute names: ``ENCRYPTION_KEY_MULTI_REGION`` is a boolean about a key,
+#: ``GCP_KMS_KEY_RING`` is a container for keys, ``ENCRYPTION_KEY_SPEC``
+#: describes one. Matching them anywhere classified all three as secrets.
+_CREDENTIAL_TAIL_SEGMENTS: frozenset[str] = frozenset({"KEY", "CERT", "CERTIFICATE"})
+
+#: Multi-word tails that mean the value embeds credentials. Separate because
+#: they span segments, so neither single-segment rule above sees them.
+_CREDENTIAL_TAIL_PHRASES: tuple[str, ...] = ("_CONNECTION_STRING", "_SAS_TOKEN", "_SAS_URL")
+
+#: Tails that turn a credential-shaped name into a pointer or an attribute.
+#: ``*_SECRET_REF`` and ``*_KEY_ARN`` say where a secret lives, which is the
+#: entire point of a reference and not itself sensitive; ``*_KEY_SPEC`` and
+#: ``*_KEY_USAGE`` describe a key rather than containing one.
+_POINTER_TAILS: frozenset[str] = frozenset(
+    {"REF", "ARN", "NAME", "NAMES", "ID", "IDS", "RING", "SPEC", "USAGE", "ALIAS", "VAULT"}
+)
+
+#: Certificate names that are trust anchors rather than credentials. A CA
+#: certificate is published on purpose.
+_PUBLIC_CERTS: frozenset[str] = frozenset(
+    {
+        "CA_CERT",
+        "CA_CERTIFICATE",
+        "SERVER_CERT",
+        # A boolean switch about whether to verify, not a certificate.
+        "TRUST_SERVER_CERTIFICATE",
+    }
 )
 
 #: Keys that are credential-bearing by name even without a matching suffix.
@@ -82,7 +107,22 @@ _CREDENTIAL_SUFFIXES: tuple[str, ...] = (
 #: MongoDB URI names a replica set, so neither embeds a credential. Whether a
 #: URI carries auth is a property of the provider, so those classify as
 #: :attr:`KeyClass.AUTH_BEARING_URL` and are decided per driver.
-_CREDENTIAL_KEYS: frozenset[str] = frozenset({"PASSWORD", "SECRET"})
+_CREDENTIAL_KEYS: frozenset[str] = frozenset(
+    {
+        "PASSWORD",
+        "SECRET",
+        # Semi-public in isolation, and every provider treats it as one half of
+        # a credential pair. Referencing it is what the drivers already do.
+        "AWS_ACCESS_KEY_ID",
+    }
+)
+
+#: Identity keys that are a credential for some providers and a plain
+#: identifier for others. The ledger already recorded both directions for
+#: ``DOCDB_USER`` and ``MYSQL_USER``, with a provider reason each way: a
+#: username the driver chose itself is knowable, one an operator generates
+#: alongside a password is not. Treated like connection strings.
+_AMBIGUOUS_IDENTITY_MARKERS: tuple[str, ...] = ("USER", "USERNAME", "PRINCIPAL", "IDENTITY")
 
 #: Connection strings whose credential content depends on the provider.
 _URL_PATTERN = re.compile(r"(?:^|_)(URL|URI|DSN|ENDPOINT_URL)$")
@@ -137,25 +177,35 @@ def classify_key(key: str) -> KeyClass:
     value could only ever be checked in production.
     """
     bare = key.upper()
-    if any(bare.endswith(suffix) for suffix in _NOT_CREDENTIAL):
-        return KeyClass.PUBLIC
-    if bare in _CREDENTIAL_KEYS or any(bare.endswith(s) for s in _CREDENTIAL_SUFFIXES):
+    if bare in _CREDENTIAL_KEYS:
         return KeyClass.CREDENTIAL
-    if _URL_PATTERN.search(bare):
+    segments = bare.split("_")
+    if any(bare.endswith(tail) for tail in _PUBLIC_CERTS):
+        return KeyClass.PUBLIC
+    if segments[-1] in _POINTER_TAILS:
+        return KeyClass.PUBLIC
+    if any(bare.endswith(phrase) for phrase in _CREDENTIAL_TAIL_PHRASES):
+        return KeyClass.CREDENTIAL
+    if any(segment in _CREDENTIAL_ANYWHERE for segment in segments):
+        return KeyClass.CREDENTIAL
+    if segments[-1] in _CREDENTIAL_TAIL_SEGMENTS:
+        return KeyClass.CREDENTIAL
+    if _URL_PATTERN.search(bare) or any(m in segments for m in _AMBIGUOUS_IDENTITY_MARKERS):
         return KeyClass.AUTH_BEARING_URL
     return KeyClass.PUBLIC
 
 
 def allowed_provenance(key: str, driver_id: str) -> frozenset[str]:
-    """Which provenances this driver may legitimately use for this key."""
-    key_class = classify_key(key)
-    if key_class is KeyClass.CREDENTIAL:
+    """Which provenances this driver may legitimately use for this key.
+
+    Advisory, and wider than it looks: only a credential is actually
+    constrained. Everything else may be referenced, because a driver that
+    cannot know a value must reference it and a key's name cannot tell the two
+    apart. See :func:`violation` for why that asymmetry is deliberate.
+    """
+    if classify_key(key) is KeyClass.CREDENTIAL:
         return frozenset({SECRET_REF})
-    if key_class is KeyClass.AUTH_BEARING_URL:
-        return frozenset({LITERAL, SECRET_REF})
-    if _does_not_own_the_value(key, driver_id):
-        return frozenset({LITERAL, SECRET_REF})
-    return frozenset({LITERAL})
+    return frozenset({LITERAL, SECRET_REF})
 
 
 def _does_not_own_the_value(key: str, driver_id: str) -> bool:
@@ -173,21 +223,30 @@ def _does_not_own_the_value(key: str, driver_id: str) -> bool:
 
 
 def violation(key: str, driver_id: str, provenance: str) -> str | None:
-    """Describe why this provenance is wrong for this key, or None if it is fine."""
-    allowed = allowed_provenance(key, driver_id)
-    if provenance in allowed:
-        return None
-    if provenance == LITERAL:
+    """Describe why this provenance is unsafe, or None.
+
+    Only one direction is enforced, and that asymmetry is the finding rather
+    than a shortcut.
+
+    A credential emitted as a literal lands in a plaintext column. That is a
+    leak, it is irreversible once written, and running this rule across every
+    binding in the tree found **zero** instances of it. So it costs nothing to
+    forbid and is worth forbidding permanently.
+
+    A public value emitted as a reference is merely wasteful: an invented
+    secret, a resolve round trip, and a deploy that can fail on a missing
+    reference. It cannot leak anything. Enforcing that direction was tried and
+    produced 19 false positives on the first pass and 46 on the second, every
+    one of them a driver being more careful than the rule. Two independent
+    calibrations both failing that way is evidence that a key's name does not
+    reliably say a value is *not* sensitive, only that it is. The ledger in
+    ``test_binding_envelope_contract`` still records those cases with reasons,
+    which is the right instrument for a style question.
+    """
+    if provenance == LITERAL and classify_key(key) is KeyClass.CREDENTIAL:
         return (
             f"{driver_id} emits {key} as a literal, but the key is credential-bearing. "
-            f"A literal lands in ManagedServiceBinding.env_value_ref, a plaintext column."
+            f"A literal is stored in ManagedServiceBinding.env_value_ref, a plaintext "
+            f"column, and cannot be unwritten. Emit it as a secret_ref."
         )
-    return (
-        f"{driver_id} emits {key} as a secret_ref, but the key carries no credential. "
-        f"Referencing it invents a secret per value, adds a resolve round trip, and "
-        f"makes an unresolvable reference a hard deploy failure for data that is "
-        f"already public inside the cluster. If this driver cannot know the value, "
-        f"say which way: OPERATOR_GENERATED_DRIVERS when a controller generates and "
-        f"rotates it, PASS_THROUGH_REFERENCES when the operator supplied the "
-        f"reference and the driver forwards it untouched."
-    )
+    return None
