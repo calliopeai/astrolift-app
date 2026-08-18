@@ -5884,6 +5884,7 @@ type Query {
   astroliftAppHealthSummary: [AstroliftAppHealthSummary!]!
   astroliftAppDomains(appSlug: String!): [AstroliftAppDomain!]!
   astroliftAppPods(appSlug: String!, environmentName: String = null): [AstroliftAppPod!]!
+  agentBoxPods(slug: String!): [AstroliftAppPod!]!
   astroliftWorkloadPodStatusBreakdown(appSlug: String!, workloadSlug: String!, environmentName: String = null): [AstroliftWorkloadPodStatusBucket!]!
   astroliftAppDeployTokens(appSlug: String!): [AstroliftDeployToken!]! @deprecated(reason: "Caps at 100 rows with no way to reach the 101st. Use astroliftAppDeployTokensPage.")
   astroliftAppDeployTokensPage(appSlug: String!, search: String = null, sortBy: AstroliftListSortKey = null, limit: Int! = 50, after: String = null): AstroliftDeployTokenPage!

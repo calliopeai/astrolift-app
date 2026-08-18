@@ -140,6 +140,16 @@ class Permission(enum.StrEnum):
     # over the full enum — no granular role carries it.
     AGENT_TASK_SEND_INPUT = "agent_task.send_input"
 
+    # --- Agent boxes (#129) ---------------------------------------
+    # Open an interactive session inside a running ``AgentBox`` pod
+    # through the exec relay. Its own grant rather than ``app.exec_pod``
+    # for the same reason ``agent_task.watch`` is not ``app.exec_pod``:
+    # a box is an agent, not an app, and an install must be able to let
+    # a role reach the agents it may start without also handing it a
+    # shell in every application pod on the cluster. Seeded alongside
+    # ``agent.dispatch`` so "may start a box" implies "may reach it".
+    AGENT_BOX_ATTACH = "agent_box.attach"
+
     # --- Agent dispatch (spec 33, PR-1) ---------------------------
     # Dispatch a run of a registered agent ``Workload(kind=agent)`` —
     # the ``runAstroliftAgent`` mutation (Once-mode in PR-1; later modes

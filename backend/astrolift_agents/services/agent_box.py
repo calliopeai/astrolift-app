@@ -285,6 +285,10 @@ def start_agent_box(box) -> None:
     box.image = image[:512]
     box.external_id = job_name
     box.namespace = namespace
+    # Cleared, not left: a settled box restarts under its existing slug, and
+    # the pod from its previous incarnation is gone. Carrying that name would
+    # hand a client a dead pod to dial until the next sweep re-stamps it.
+    box.pod_name = ""
     box.started_at = timezone.now()
     box.ended_at = None
     box.last_error = ""
@@ -294,6 +298,7 @@ def start_agent_box(box) -> None:
             "image",
             "external_id",
             "namespace",
+            "pod_name",
             "started_at",
             "ended_at",
             "last_error",
@@ -381,11 +386,12 @@ def observe_box(box) -> str | None:
     if not box.external_id:
         return None
     cluster = resolve_agent_cluster(box.organization)
+    namespace = box.namespace or box_namespace(box)
     driver = _driver_for_cluster(cluster)
     ctx = _context_for_cluster(cluster)
     status = driver.get_workload_status(
         ctx.slug,
-        box.namespace or box_namespace(box),
+        namespace,
         "Job",
         box.external_id,
     )
@@ -400,8 +406,49 @@ def observe_box(box) -> str | None:
         # is gone and the node is free.
         return AgentBox.Status.EXPIRED.value
     if getattr(status, "ready_replicas", 0) or getattr(status, "desired_replicas", 0):
+        _record_pod_name(box, cluster=cluster, namespace=namespace)
         return AgentBox.Status.RUNNING.value
     return None
+
+
+def _record_pod_name(box, *, cluster, namespace: str) -> None:
+    """Stamp the running box's pod onto the row.
+
+    ``pod_name`` was declared, projected onto ``AstroliftAgentBox`` and
+    never written by anything, so ``astro box ls`` rendered a blank
+    column and every attach fell through to pod resolution even for a
+    box that had been warm for an hour. A stamped name lets a client
+    dial the relay directly, which is the difference between one
+    round-trip and a pod lookup the caller may not be permitted to make.
+
+    Not a substitute for pod resolution: nothing is stamped until the
+    first sweep after the pod comes up, and the name is only as fresh as
+    the last sweep. It is a fast path, and the resolver stays the
+    fallback.
+
+    ``WorkloadStatus`` carries replica counts and conditions, not pod
+    names, so this is a second driver call rather than another field off
+    the Job read. It is best-effort for the same reason the reap
+    swallows an unreachable cluster: an observability failure is not a
+    verdict about the box, and a blank name is what we already had.
+    """
+    from core.cluster_observability import list_app_pods
+
+    try:
+        pods = list_app_pods(cluster=cluster, namespace=namespace, app_slug=str(box.guid))
+    except Exception:  # noqa: BLE001 — k8s lib raises many subtypes
+        log.warning("agent_box: could not resolve a pod name for box %s", box.slug, exc_info=True)
+        return
+
+    # A box Job is backoffLimit 0 / restartPolicy Never, so there is one
+    # pod per incarnation; prefer a ready one anyway so a terminating
+    # leftover from a restart never wins.
+    chosen = next((p for p in pods if getattr(p, "ready", False)), None) or next(iter(pods), None)
+    name = (getattr(chosen, "name", "") or "")[:255]
+    if not name or name == box.pod_name:
+        return
+    box.pod_name = name
+    box.save(update_fields=["pod_name", "updated_at", "version"])
 
 
 def reap_agent_boxes() -> dict[str, int]:

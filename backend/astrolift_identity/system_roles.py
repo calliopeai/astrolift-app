@@ -69,6 +69,10 @@ _DEPLOY_OPS = (
     # same operator/developer reach as app deploys; org owner/admin
     # already get it via the full-enum comprehension.
     Permission.AGENT_DISPATCH,
+    # Attaching to an agent box (#129) rides with dispatch: a role that
+    # may start a box must be able to reach the box it started, or the
+    # box is a node it pays for and cannot use.
+    Permission.AGENT_BOX_ATTACH,
 )
 
 # Agents + Workflows module verbs (spec 34/36 Phase 0). Standalone from
@@ -109,6 +113,7 @@ _AGENT_DEVELOPER = (
     Permission.AGENT_READ,
     Permission.AGENT_CREATE,
     Permission.AGENT_DISPATCH,
+    Permission.AGENT_BOX_ATTACH,
 )
 _WORKFLOW_DEVELOPER = (
     Permission.WORKFLOW_READ,
@@ -353,6 +358,7 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             # app-deploy reach, but not create or delete them.
             Permission.AGENT_READ,
             Permission.AGENT_DISPATCH,
+            Permission.AGENT_BOX_ATTACH,
             Permission.WORKFLOW_READ,
             Permission.WORKFLOW_TRIGGER,
         ),

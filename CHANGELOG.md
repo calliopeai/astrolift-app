@@ -13,6 +13,35 @@
   namespace; there is no switch to turn that off. The `cache/gcp` and
   `cache/azure` rows are gone from the declared-gap ledger.
 
+- Let the exec relay reach an agent box. `/app/exec/<target>/<pod>` resolved
+  its first path segment against `RegisteredApp` only, so a healthy running
+  box closed the handshake with the same code a real permission denial uses
+  and the operator was told to go ask for `app.exec_pod`, which they already
+  held. The relay now resolves a box as a box — gated on the box's own
+  organization, and on a new `agent_box.attach` grant seeded wherever
+  `agent.dispatch` is, so whoever may start a box may reach it. The exec
+  backend's cluster lookup learned the same target, since the CLI resolves a
+  pod before it dials. A slug that resolves to nothing now closes 4404
+  instead of 4403, so "no such target" and "you lack the grant" stop reading
+  alike; both are still pre-accept closes, so the handshake's HTTP status is
+  unchanged. `AgentBox.last_attached_at` is finally written, when a session
+  opens. It remains advisory telemetry: idleness is still measured in-pod by
+  tmux, which sees a client detach the instant it happens.
+- Give agent-box pod resolution its own field, `agentBoxPods(slug)`, behind
+  `agent_box.attach`. Routing it through `astroliftAppPods` put it behind
+  `app.read_logs`, which `app_deployer` — the one role holding
+  `agent.dispatch` without it — does not have, so the role this ticket is
+  about could start a box, be granted attach, and still never resolve a pod
+  to dial. `require_permission` ANDs, so admitting the box grant on the app
+  resolver would have meant weakening the app-pod gate to fix a box problem.
+  `astroliftAppPods` answers for registered apps again and nothing else.
+- Write `AgentBox.pod_name`. It was declared, projected onto the GraphQL type
+  and set by nothing, so the pod column rendered blank and every attach fell
+  through pod resolution even for a box that had been warm for an hour. The
+  reaper stamps it when it observes the box running and clears it on restart,
+  so a name never outlives the pod it points at. It is a fast path, not a
+  source of truth: it is blank until the first sweep after the pod comes up,
+  and pod resolution stays the fallback.
 - Stop reporting managed-service config changes as applied when the driver
   cannot apply them. Fifteen drivers (S3, CloudFront, GCS, Pub/Sub, Blob x2,
   Service Bus, CNPG, MySQL/MongoDB/RabbitMQ/Redis/Strimzi/NATS operators, NFS)

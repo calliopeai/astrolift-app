@@ -147,6 +147,11 @@ def _list_pods_for_app(app_slug: str, *, org_id: int | None, environment_name: s
     (env-named cluster preferred → default cluster, ``namespace_for_app``).
     Returns an empty list on any kind of cluster-side failure so the
     UI stays renderable.
+
+    Apps only. An ``AgentBox`` slug is answered by ``_list_pods_for_box``
+    behind its own resolver (#129), because the two surfaces answer to
+    different grants and the callers of this one are all gated on
+    ``app.read_logs``.
     """
     app = (
         RegisteredApp.objects.select_related("organization", "default_tenant_cluster")
@@ -187,6 +192,52 @@ def _list_pods_for_app(app_slug: str, *, org_id: int | None, environment_name: s
     except Exception:  # noqa: BLE001 — k8s lib raises many subtypes
         # Cluster transient errors (timeouts, 5xx) keep the UI alive;
         # the platform-event log carries the diagnostic.
+        return []
+
+
+def _list_pods_for_box(box_slug: str, *, org_id: int | None) -> list:
+    """Live pods for an agent box (#129).
+
+    A box's pod carries ``astrolift.dev/app=<box.guid>`` — the box render
+    keys that label to the guid precisely so the platform's existing pod
+    and log surfaces find it with no box-specific selector. So the guid,
+    not the slug, is what goes to the driver here.
+
+    Org-filtered explicitly: ``@tenant_scoped`` asserts a tenant, it does
+    not filter, and a by-slug fetch that trusted the slug alone would
+    list another org's pods. Degrades to ``[]`` on every cluster-side
+    failure, exactly as the app path does.
+    """
+    from astrolift_agents.models import AgentBox
+    from astrolift_agents.services.agent_box import box_namespace
+    from astrolift_agents.services.agent_cluster import resolve_agent_cluster
+
+    box = (
+        AgentBox.objects.select_related("organization")
+        .filter(slug=box_slug, organization_id=org_id, deleted_at__isnull=True)
+        .first()
+    )
+    if box is None:
+        return []
+
+    try:
+        cluster = resolve_agent_cluster(box.organization)
+    except Exception:  # noqa: BLE001 — an org with no agent cluster has no pods
+        return []
+    if cluster is None or not getattr(cluster, "is_active", True):
+        return []
+
+    try:
+        return list(
+            list_app_pods(
+                cluster=cluster,
+                namespace=box.namespace or box_namespace(box),
+                app_slug=str(box.guid),
+            )
+        )
+    except ClusterObservabilityError:
+        return []
+    except Exception:  # noqa: BLE001 — k8s lib raises many subtypes
         return []
 
 
@@ -1503,6 +1554,32 @@ class LifecycleQuery:
         # means the rows render without chips.
         warnings = _recent_pod_warnings_for_app(app_slug, org_id=org_id, environment_name=environment_name)
         return [pod_info_to_type(p, recent_error_event=_event_to_type(warnings.get(p.name))) for p in pods]
+
+    @strawberry.field
+    @require_permission(Permission.AGENT_BOX_ATTACH)
+    @tenant_scoped()
+    def agent_box_pods(self, info: Info, slug: str) -> list[AppPodType]:
+        """Live pods for an agent box (#129).
+
+        Its own field rather than a branch inside ``astroliftAppPods``
+        because the two answer to different grants, and the caller who
+        needs this one is precisely the caller the app gate excludes.
+        ``app_deployer`` holds ``agent.dispatch`` (so it may start a box)
+        and ``agent_box.attach`` (so the relay admits it) but not
+        ``app.read_logs``. The CLI resolves a pod before it dials, so
+        routing that resolution through the app gate would leave that
+        role able to start a box it can never reach — the complaint the
+        ticket opens with, one layer down. ``require_permission`` ANDs,
+        so admitting the box grant on the app resolver would mean
+        weakening the app-pod gate to fix a box problem.
+
+        Same degrade-to-empty contract as the app surface: a retired
+        box, an org with no agent cluster, or an unreachable cluster
+        renders as "no pods" rather than erroring the client.
+        """
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        return [pod_info_to_type(p) for p in _list_pods_for_box(slug, org_id=org_id)]
 
     @strawberry.field
     @require_permission(Permission.APP_READ_LOGS)

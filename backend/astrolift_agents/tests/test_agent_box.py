@@ -147,7 +147,17 @@ def cluster(monkeypatch):
     import core.app_deploy as app_deploy
     import core.cluster_management as cluster_management
 
-    fake_cluster = SimpleNamespace(slug="fake-cluster")
+    # Carries the auth-shaped attributes too, because the pod lookup that
+    # stamps ``pod_name`` builds a real ``ClusterAuth`` out of the row.
+    fake_cluster = SimpleNamespace(
+        slug="fake-cluster",
+        auth_method="kubeconfig",
+        auth_config={},
+        endpoint="https://k8s.example.net",
+        ca_cert="",
+        default_namespace_prefix="",
+        is_active=True,
+    )
     monkeypatch.setattr(agent_cluster, "resolve_agent_cluster", lambda _org: fake_cluster)
     monkeypatch.setattr(app_deploy, "driver_for_capability", lambda _c, _cap: secrets)
     monkeypatch.setattr(cluster_management, "_driver_for_cluster", lambda _c: driver)
@@ -411,6 +421,166 @@ def test_the_reaper_leaves_a_box_it_cannot_observe_alone(org, cluster):
     assert summary["errors"] == 1
     assert box.status == AgentBox.Status.RUNNING.value
     assert cluster.driver.deleted == []
+
+
+# ---------------------------------------------------------------------------
+# pod_name — the field that was declared, projected and never written (#129)
+# ---------------------------------------------------------------------------
+
+
+class _BoxPodBackend:
+    def __init__(self, pods=None, *, explode=False):
+        self.calls: list[dict] = []
+        self._pods = list(pods if pods is not None else [_pod_info("agent-box-abc123-x9k2p")])
+        self._explode = explode
+
+    def list_pods(self, *, auth, namespace, app_slug):  # noqa: ARG002
+        self.calls.append({"namespace": namespace, "app_slug": app_slug})
+        if self._explode:
+            raise RuntimeError("connection refused")
+        return list(self._pods)
+
+
+def _pod_info(name, *, ready=True):
+    from datetime import UTC, datetime
+
+    from _sdk.cluster import PodInfo
+
+    return PodInfo(
+        name=name,
+        workload="agent-box",
+        status="Running" if ready else "Terminating",
+        phase="Running",
+        ready=ready,
+        restarts=0,
+        age=datetime.now(UTC),
+        node="ip-10-0-0-12",
+        container_statuses=[],
+    )
+
+
+@pytest.fixture
+def pod_backend():
+    from core.cluster_observability import (
+        reset_pod_backend_for_tests,
+        set_pod_backend_for_tests,
+    )
+
+    def _install(backend):
+        set_pod_backend_for_tests(backend)
+        return backend
+
+    yield _install
+    reset_pod_backend_for_tests()
+
+
+def test_the_reaper_stamps_the_running_boxs_pod_name(org, cluster, pod_backend):
+    """``pod_name`` was declared, projected onto the GraphQL type and
+    written by nothing, so ``astro box ls`` rendered a blank column and
+    every attach fell through pod resolution even for a box that had
+    been warm for an hour. The reaper is already reading this box's Job;
+    the pod it finds is the answer.
+    """
+    backend = pod_backend(_BoxPodBackend())
+    box = _box(
+        org,
+        status=AgentBox.Status.PROVISIONING,
+        external_id="agent-box-warm",
+        namespace="astrolift-agents-box-org",
+    )
+
+    summary = box_service.reap_agent_boxes()
+
+    box.refresh_from_db()
+    assert summary["running"] == 1
+    assert box.status == AgentBox.Status.RUNNING.value
+    assert box.pod_name == "agent-box-abc123-x9k2p"
+    # Keyed on the guid in the frozen namespace, matching the label the
+    # box render sets and the selector the attach path resolves with.
+    assert backend.calls == [
+        {"namespace": "astrolift-agents-box-org", "app_slug": str(box.guid)},
+    ]
+
+
+def test_a_replaced_pod_re_stamps_on_the_next_sweep(org, cluster, pod_backend):
+    """The stamp is an observation, not a fact frozen at spawn — a name
+    that outlived its pod is worse than a blank one, because a client
+    would dial it."""
+    pod_backend(_BoxPodBackend([_pod_info("agent-box-second-pod")]))
+    box = _box(
+        org,
+        status=AgentBox.Status.RUNNING,
+        external_id="agent-box-warm",
+        namespace="astrolift-agents-box-org",
+        pod_name="agent-box-first-pod",
+    )
+
+    box_service.reap_agent_boxes()
+
+    box.refresh_from_db()
+    assert box.pod_name == "agent-box-second-pod"
+
+
+def test_a_terminating_leftover_never_wins_the_stamp(org, cluster, pod_backend):
+    pod_backend(
+        _BoxPodBackend(
+            [
+                _pod_info("agent-box-dying", ready=False),
+                _pod_info("agent-box-serving"),
+            ]
+        )
+    )
+    box = _box(
+        org,
+        status=AgentBox.Status.PROVISIONING,
+        external_id="agent-box-warm",
+        namespace="astrolift-agents-box-org",
+    )
+
+    box_service.reap_agent_boxes()
+
+    box.refresh_from_db()
+    assert box.pod_name == "agent-box-serving"
+
+
+def test_a_failed_pod_lookup_is_not_a_verdict_about_the_box(org, cluster, pod_backend):
+    """Same rule the rest of the sweep follows: an observability failure
+    says nothing about whether the box is up. It must not block the
+    RUNNING transition and must not invent a name."""
+    pod_backend(_BoxPodBackend(explode=True))
+    box = _box(
+        org,
+        status=AgentBox.Status.PROVISIONING,
+        external_id="agent-box-warm",
+        namespace="astrolift-agents-box-org",
+    )
+
+    summary = box_service.reap_agent_boxes()
+
+    box.refresh_from_db()
+    assert summary["running"] == 1
+    assert box.status == AgentBox.Status.RUNNING.value
+    assert box.pod_name == ""
+
+
+def test_restarting_a_settled_box_clears_the_dead_pod_name(org, cluster):
+    """A settled box restarts under its existing slug, so the row it
+    reuses still carries the pod from its previous incarnation. Left
+    there, it is a dead pod a client would dial until the next sweep."""
+    box = _box(
+        org,
+        status=AgentBox.Status.EXPIRED,
+        external_id="agent-box-warm",
+        namespace="astrolift-agents-box-org",
+        pod_name="agent-box-from-last-time",
+        environment_spec=_spec(org),
+    )
+
+    box_service.start_agent_box(box)
+
+    box.refresh_from_db()
+    assert box.status == AgentBox.Status.PROVISIONING.value
+    assert box.pod_name == ""
 
 
 # ---------------------------------------------------------------------------
