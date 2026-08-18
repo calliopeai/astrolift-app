@@ -255,3 +255,79 @@ def test_update_preflight_blocks_driver_when_required_crd_is_missing():
     get_driver.assert_not_called()
     svc.app_environment.tenant_cluster.refresh_from_db()
     assert svc.app_environment.tenant_cluster.capabilities == payload
+
+
+def test_update_preflight_blocks_driver_when_the_operator_is_below_its_minimum():
+    """The version gate, distinct from the missing-CRD gate above (#1378).
+
+    A cluster can have every required CRD installed and still be running an
+    operator too old to reconcile them. That is the harder case to notice: the
+    apply succeeds, the operator ignores fields it does not understand, and the
+    resource sits in a state nobody asked for rather than failing.
+
+    ``opensearch_operator`` declares ``minimum_operator_version="3.0.2"``, so
+    3.0.1 with a complete CRD set must be refused before the driver is
+    resolved, and the refusal must carry the install hint.
+    """
+    svc = _service()
+    svc.kind = ManagedService.Kind.SEARCH
+    svc.variant = "opensearch_operator"
+    svc.save(update_fields=["kind", "variant", "updated_at", "version"])
+    payload = {
+        "kubernetes_version": "1.30.7",
+        # Every CRD present: this run fails on the version alone.
+        "installed_crds": [
+            "opensearchclusters.opensearch.org",
+            "opensearchusers.opensearch.org",
+            "opensearchroles.opensearch.org",
+            "opensearchuserrolebindings.opensearch.org",
+        ],
+        "operator_versions": {"opensearch-operator": "3.0.1"},
+    }
+
+    with (
+        patch("core.cluster_management.probe_cluster_capabilities_dispatch", return_value=payload),
+        patch("astrolift_drivers.registry.plugins.get") as get_driver,
+        pytest.raises(ManagedServicePreflightError) as excinfo,
+    ):
+        _update_sync(svc.pk)
+
+    message = str(excinfo.value)
+    assert "3.0.2" in message, message
+    # The operator has to be told what to do about it, not just that it failed.
+    assert "remediation:" in message, message
+    # Fail closed: nothing reached the cluster.
+    get_driver.assert_not_called()
+
+
+def test_update_preflight_passes_when_the_operator_meets_its_minimum():
+    """The gate must not be a blanket refusal: a compliant cluster proceeds.
+
+    Without this the version check could be satisfied by always raising, and
+    the test above would still pass.
+    """
+    svc = _service()
+    svc.kind = ManagedService.Kind.SEARCH
+    svc.variant = "opensearch_operator"
+    svc.save(update_fields=["kind", "variant", "updated_at", "version"])
+    payload = {
+        "kubernetes_version": "1.30.7",
+        "installed_crds": [
+            "opensearchclusters.opensearch.org",
+            "opensearchusers.opensearch.org",
+            "opensearchroles.opensearch.org",
+            "opensearchuserrolebindings.opensearch.org",
+        ],
+        "operator_versions": {"opensearch-operator": "3.0.2"},
+    }
+
+    with (
+        patch("core.cluster_management.probe_cluster_capabilities_dispatch", return_value=payload),
+        patch("astrolift_drivers.registry.plugins.get") as get_driver,
+    ):
+        get_driver.side_effect = RuntimeError("reached the driver")
+        with pytest.raises(RuntimeError, match="reached the driver"):
+            _update_sync(svc.pk)
+
+    # Preflight let it through; the failure came from the stubbed driver lookup.
+    get_driver.assert_called()
