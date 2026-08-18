@@ -14,6 +14,14 @@ from datetime import UTC, datetime
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.azure_ownership import (
+    METADATA_KEYS,
+    OWNERSHIP_ERROR_CODE,
+    AzureOperation,
+    AzureOwnershipError,
+    owner_of,
+    verify_azure_ownership,
+)
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -59,8 +67,6 @@ _PREMIUM_SKUS = {"Premium_LRS", "Premium_ZRS"}
 _SKUS = _STANDARD_SKUS | _PREMIUM_SKUS
 _STANDARD_TIERS = {"TransactionOptimized", "Hot", "Cool"}
 _SIZE_GIB = {"small": 100, "medium": 512, "large": 2048, "xlarge": 8192}
-_MANAGED_BY_TAG = "astrolift-managed-by"
-_MANAGED_SERVICE_ID_TAG = "astrolift-managed-service-id"
 _META_MANAGED_BY = "astrolift_managed_by"
 _META_MANAGED_SERVICE_ID = "astrolift_managed_service_id"
 
@@ -183,7 +189,7 @@ class AzureFilesClassicDriver(ManagedServiceDriver):
                     ),
                 )
             else:
-                self._assert_account_owned(account, spec)
+                self._assert_account_owned(account, spec, AzureOperation.PROVISION, account_name)
                 self._assert_account_immutable(account, cfg)
                 account = self._mgmt.storage_accounts.update(
                     self._config.resource_group,
@@ -200,7 +206,7 @@ class AzureFilesClassicDriver(ManagedServiceDriver):
                     self._share_parameters(spec, cfg),
                 )
             else:
-                self._assert_share_owned(share, spec)
+                self._assert_share_owned(share, spec, AzureOperation.PROVISION, share_name)
                 self._assert_share_immutable(share, cfg)
                 share = self._mgmt.file_shares.update(
                     self._config.resource_group,
@@ -210,6 +216,8 @@ class AzureFilesClassicDriver(ManagedServiceDriver):
                 )
             if protocol == "SMB":
                 self._store_account_keys(account_name)
+        except AzureOwnershipError as exc:
+            return ProvisionResult(False, handle, str(exc), [OWNERSHIP_ERROR_CODE])
         except Exception as exc:
             return ProvisionResult(False, handle, f"reconcile classic Azure Files: {exc}", [str(exc)])
         return ProvisionResult(
@@ -234,8 +242,8 @@ class AzureFilesClassicDriver(ManagedServiceDriver):
             share = self._get_share(account_name, share_name)
             if account is None or share is None:
                 return UpdateResult(False, spec.handle, "classic Azure Files share not found", ["not_found"])
-            self._assert_platform_account(account)
-            self._assert_platform_share(share)
+            self._assert_account_owned(account, spec, AzureOperation.UPDATE, account_name)
+            self._assert_share_owned(share, spec, AzureOperation.UPDATE, share_name)
             self._assert_account_immutable(account, cfg, partial=True)
             self._assert_share_immutable(share, cfg, partial=True)
             if {"allowed_subnet_ids", "allow_public_access"} & set(cfg):
@@ -253,6 +261,8 @@ class AzureFilesClassicDriver(ManagedServiceDriver):
                 )
             if "encryption_in_transit_required" in cfg:
                 self._reconcile_file_service(account_name, cfg)
+        except AzureOwnershipError as exc:
+            return UpdateResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
         except Exception as exc:
             return UpdateResult(False, spec.handle, f"update classic Azure Files: {exc}", [str(exc)])
         return UpdateResult(True, spec.handle, f"classic Azure Files share {account_name}/{share_name} updated")
@@ -279,11 +289,11 @@ class AzureFilesClassicDriver(ManagedServiceDriver):
             share = self._get_share(account_name, share_name) if account is not None else None
             if account is None:
                 return DeprovisionResult(True, spec.handle, "classic Azure Files share already gone")
-            self._assert_platform_account(account)
+            self._assert_account_owned(account, spec, AzureOperation.DELETE, account_name)
             if share is not None:
-                self._assert_platform_share(share)
-        except AzureFilesClassicError as exc:
-            return DeprovisionResult(False, spec.handle, str(exc), ["external_resource_collision"], retryable=False)
+                self._assert_share_owned(share, spec, AzureOperation.DELETE, share_name)
+        except AzureOwnershipError as exc:
+            return DeprovisionResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
         except Exception as exc:
             return DeprovisionResult(False, spec.handle, f"describe classic Azure Files: {exc}", [str(exc)])
         cfg = dict(spec.config or {})
@@ -380,8 +390,8 @@ class AzureFilesClassicDriver(ManagedServiceDriver):
         share = self._get_share(account_name, share_name)
         if account is None or share is None:
             raise AzureFilesClassicError("binding requested for missing classic Azure Files share")
-        self._assert_platform_account(account)
-        self._assert_platform_share(share)
+        self._assert_account_owned(account, handle, AzureOperation.INSPECT, account_name)
+        self._assert_share_owned(share, handle, AzureOperation.INSPECT, share_name)
         cfg = config or {}
         protocol = _string_value(_field(share, "enabled_protocols", default=self._protocol(cfg))).upper()
         mount_path = str(cfg.get("mount_path", "/mnt/shared"))
@@ -513,8 +523,8 @@ class AzureFilesClassicDriver(ManagedServiceDriver):
         share = self._get_share(account_name, share_name)
         if account is None or share is None:
             raise AzureFilesClassicError("snapshot requested for missing classic Azure Files share")
-        self._assert_platform_account(account)
-        self._assert_platform_share(share)
+        self._assert_account_owned(account, handle, AzureOperation.SNAPSHOT, account_name)
+        self._assert_share_owned(share, handle, AzureOperation.SNAPSHOT, share_name)
         protocol = _string_value(_field(share, "enabled_protocols", default="SMB")).upper()
         credential = self._account_keys(account_name)[0] if protocol == "SMB" else None
         result = self._share_client_factory(account_name, share_name, credential).create_snapshot(
@@ -788,31 +798,24 @@ class AzureFilesClassicDriver(ManagedServiceDriver):
             ],
         )
 
-    def _assert_account_owned(self, account: Any, spec: ProvisionSpec) -> None:
-        self._assert_platform_account(account)
-        tags = dict(_field(account, "tags", default={}) or {})
-        existing = str(tags.get(_MANAGED_SERVICE_ID_TAG, ""))
-        if spec.managed_service_id and existing and existing != spec.managed_service_id:
-            raise AzureFilesClassicError("classic Azure Files account belongs to another managed service")
+    @staticmethod
+    def _assert_account_owned(account: Any, source: object, operation: AzureOperation, account_name: str) -> None:
+        verify_azure_ownership(
+            dict(_field(account, "tags", default={}) or {}),
+            owner_of(source),
+            operation=operation,
+            resource=f"classic Azure Files account {account_name}",
+        )
 
     @staticmethod
-    def _assert_platform_account(account: Any) -> None:
-        tags = dict(_field(account, "tags", default={}) or {})
-        if tags.get(_MANAGED_BY_TAG) != "platform":
-            raise AzureFilesClassicError("classic Azure Files account is not owned by Astrolift")
-
-    def _assert_share_owned(self, share: Any, spec: ProvisionSpec) -> None:
-        self._assert_platform_share(share)
-        metadata = dict(_field(share, "metadata", default={}) or {})
-        existing = str(metadata.get(_META_MANAGED_SERVICE_ID, ""))
-        if spec.managed_service_id and existing and existing != spec.managed_service_id:
-            raise AzureFilesClassicError("classic Azure Files share belongs to another managed service")
-
-    @staticmethod
-    def _assert_platform_share(share: Any) -> None:
-        metadata = dict(_field(share, "metadata", default={}) or {})
-        if metadata.get(_META_MANAGED_BY) != "platform":
-            raise AzureFilesClassicError("classic Azure Files share is not owned by Astrolift")
+    def _assert_share_owned(share: Any, source: object, operation: AzureOperation, share_name: str) -> None:
+        verify_azure_ownership(
+            dict(_field(share, "metadata", default={}) or {}),
+            owner_of(source),
+            operation=operation,
+            resource=f"classic Azure Files share {share_name}",
+            keys=METADATA_KEYS,
+        )
 
     def _assert_account_immutable(self, account: Any, cfg: dict[str, Any], *, partial: bool = False) -> None:
         expected_sku = self._sku(cfg)

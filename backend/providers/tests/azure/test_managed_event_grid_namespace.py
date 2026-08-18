@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+from _sdk.azure_ownership import AzureOwnershipError
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, SnapshotHandle, UpdateSpec
 from azure.managed.event_grid_namespace import (
     AzureEventGridNamespaceConfig,
@@ -449,6 +450,7 @@ def test_partial_update_uses_existing_retention_and_uami_context() -> None:
                     },
                 ],
             },
+            managed_service_id="service-id",
         ),
     )
     assert updated.ok, updated
@@ -508,7 +510,11 @@ def test_subscription_name_collision_is_not_adopted_or_overwritten() -> None:
     mgmt.namespace_topic_event_subscriptions.values[(namespace, topic, external_name)] = external
 
     result = driver.update(
-        UpdateSpec(handle, config={"subscriptions": [{"name": "workers", "delivery_mode": "pull"}]}),
+        UpdateSpec(
+            handle,
+            config={"subscriptions": [{"name": "workers", "delivery_mode": "pull"}]},
+            managed_service_id="service-id",
+        ),
     )
 
     assert not result.ok and "not recorded as platform-owned" in result.message
@@ -535,13 +541,18 @@ def test_pruning_last_pull_subscription_deletes_and_later_recovers_access_key() 
                 "prune_subscriptions": True,
                 "confirm_message_loss": True,
             },
+            managed_service_id="service-id",
         ),
     )
     assert push_only.ok, push_only
     assert access_key_name not in secrets.values and access_key_name in secrets.deleted
 
     pull_again = driver.update(
-        UpdateSpec(handle, config={"subscriptions": [{"name": "workers-2", "delivery_mode": "pull"}]}),
+        UpdateSpec(
+            handle,
+            config={"subscriptions": [{"name": "workers-2", "delivery_mode": "pull"}]},
+            managed_service_id="service-id",
+        ),
     )
     assert pull_again.ok, pull_again
     assert secrets.values[access_key_name] == "namespace-primary-key"
@@ -683,6 +694,7 @@ def test_prune_only_removes_names_recorded_in_ownership_registry() -> None:
                 "prune_subscriptions": True,
                 "confirm_message_loss": True,
             },
+            managed_service_id="service-id",
         ),
     )
     assert result.ok, result
@@ -695,7 +707,7 @@ def test_deprovision_guards_data_external_resources_locks_and_cleans_secrets() -
     driver, mgmt, locks, secrets = _driver()
     handle = _provisioned(driver, subscriptions=[{"name": "managed", "delivery_mode": "pull"}])
     _, namespace, topic = handle.split("/")
-    retained = driver.deprovision(DeprovisionSpec(handle))
+    retained = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"))
     assert not retained.ok and retained.errors == ["delete_data_required"]
 
     external_name = "external"
@@ -703,26 +715,28 @@ def test_deprovision_guards_data_external_resources_locks_and_cleans_secrets() -
         name=external_name,
         delivery_configuration=SimpleNamespace(delivery_mode="Queue"),
     )
-    external = driver.deprovision(DeprovisionSpec(handle), delete_data=True)
+    external = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True)
     assert not external.ok and external.errors == ["external_resources_present"]
     mgmt.namespace_topic_event_subscriptions.values.pop((namespace, topic, external_name))
 
     mgmt.namespace_topics.values[(namespace, "external-topic")] = SimpleNamespace(name="external-topic")
-    external_topic = driver.deprovision(DeprovisionSpec(handle), delete_data=True)
+    external_topic = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True)
     assert not external_topic.ok and external_topic.errors == ["external_resources_present"]
     mgmt.namespace_topics.values.pop((namespace, "external-topic"))
 
     locks.management_locks.values.append(SimpleNamespace(name="protect"))
-    locked = driver.deprovision(DeprovisionSpec(handle), delete_data=True)
+    locked = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True)
     assert not locked.ok and locked.errors == ["resource_lock_present"]
     assert locks.management_locks.delete_calls == []
 
-    deleted = driver.deprovision(DeprovisionSpec(handle), delete_data=True, force_destroy=True)
+    deleted = driver.deprovision(
+        DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True, force_destroy=True
+    )
     assert deleted.ok
     assert locks.management_locks.delete_calls == ["protect"]
     assert namespace in mgmt.namespaces.delete_calls
     assert not secrets.values
-    again = driver.deprovision(DeprovisionSpec(handle), delete_data=True)
+    again = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True)
     assert again.ok and "already gone" in again.message
 
 
@@ -745,11 +759,13 @@ def test_forged_handle_cannot_update_delete_or_bind_external_namespace() -> None
         provisioning_state="Succeeded",
     )
     handle = f"event_bus/{namespace}/{topic}"
-    update = driver.update(UpdateSpec(handle, config={"capacity": 2}))
-    assert not update.ok and "does not own" in update.message
-    delete = driver.deprovision(DeprovisionSpec(handle), delete_data=True, force_destroy=True)
-    assert not delete.ok and "does not own" in delete.message
-    with pytest.raises(AzureEventGridNamespaceError, match="does not own"):
+    update = driver.update(UpdateSpec(handle, config={"capacity": 2}, managed_service_id="service-id"))
+    assert not update.ok and "carries no Astrolift astrolift-managed-by=platform" in update.message
+    delete = driver.deprovision(
+        DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True, force_destroy=True
+    )
+    assert not delete.ok and "carries no Astrolift astrolift-managed-by=platform" in delete.message
+    with pytest.raises(AzureOwnershipError, match="carries no Astrolift astrolift-managed-by=platform"):
         driver.binding(ServiceHandle(handle))
 
 
@@ -766,13 +782,14 @@ def test_immutable_drift_and_explicit_identity_removal() -> None:
         UpdateSpec(
             handle,
             config={"system_assigned_identity": False, "user_assigned_identity_resource_ids": []},
+            managed_service_id="service-id",
         ),
     )
     assert removed.ok, removed
     assert mgmt.namespaces.values[namespace].identity.type == "None"
 
     mgmt.namespaces.values[namespace].sku.name = "Basic"
-    wrong_sku = driver.update(UpdateSpec(handle, config={"capacity": 2}))
+    wrong_sku = driver.update(UpdateSpec(handle, config={"capacity": 2}, managed_service_id="service-id"))
     assert not wrong_sku.ok and "Standard is required" in wrong_sku.message
 
 
@@ -780,7 +797,7 @@ def test_status_missing_topic_updates_and_snapshot_contract() -> None:
     driver, mgmt, _, _ = _driver()
     missing = driver.status(ServiceHandle("event_bus/missing/topic"))
     assert missing.state == "deprovisioned"
-    invalid = driver.update(UpdateSpec("event_bus/missing", config={}))
+    invalid = driver.update(UpdateSpec("event_bus/missing", config={}, managed_service_id="service-id"))
     assert not invalid.ok and invalid.errors == ["invalid_handle"]
 
     handle = _provisioned(driver)
@@ -829,6 +846,7 @@ def test_schema_constructor_names_registry_recovery_and_corruption_guards() -> N
         UpdateSpec(
             first.handle,
             config={"subscriptions": [{"name": "pull", "delivery_mode": "pull"}]},
+            managed_service_id="service-id",
         ),
     )
     assert not corrupt.ok and "registry" in corrupt.message

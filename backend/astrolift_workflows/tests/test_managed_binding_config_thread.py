@@ -11,6 +11,7 @@ TypeError them.
 
 from __future__ import annotations
 
+import uuid
 from types import SimpleNamespace
 from typing import Any
 
@@ -52,6 +53,8 @@ def _svc(config: dict[str, Any] | None = None) -> SimpleNamespace:
         kind="email",
         variant="",
         config=config or {},
+        # A saved row always has one; drivers stamp it as the ownership id.
+        guid=uuid.UUID("00000000-0000-4000-8000-0000000000ab"),
     )
 
 
@@ -88,3 +91,25 @@ def test_config_blind_driver_is_called_without_config(_patched, monkeypatch) -> 
     binding = msl._managed_binding_for(_svc({"from_name": "Acme"}))
     assert binding is not None
     assert _ConfigBlindDriver.called is True
+
+
+def test_the_stamped_identity_is_the_guid_and_never_the_primary_key():
+    """What a driver writes onto the cloud resource has to be what the next
+    operation reads back (#1365).
+
+    ``guid`` is a non-null UUID with a default on the base model, so a saved row
+    always has one. A ``pk`` fallback would stamp an integer where every other
+    path stamps a UUID, and the resource would fail its own ownership check on
+    every later update and teardown -- which fail closed, so it could never be
+    removed.
+    """
+    svc = _svc()
+
+    assert msl._service_identity(svc) == "00000000-0000-4000-8000-0000000000ab"
+
+
+def test_a_row_without_a_guid_is_refused_rather_than_stamped_with_its_pk():
+    svc = SimpleNamespace(pk=42, backend_ref="email/acme.example")
+
+    with pytest.raises(RuntimeError, match="no guid"):
+        msl._service_identity(svc)

@@ -9,6 +9,13 @@ from datetime import UTC, datetime
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.azure_ownership import (
+    OWNERSHIP_ERROR_CODE,
+    AzureOperation,
+    AzureOwnershipError,
+    owner_of,
+    verify_azure_ownership,
+)
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -134,7 +141,7 @@ class AzureFilesDriver(ManagedServiceDriver):
                     ),
                 )
             else:
-                self._assert_owned(current, spec)
+                self._assert_owned(current, spec, AzureOperation.PROVISION, name)
                 self._assert_immutable(current, cfg, apply_defaults=True)
                 self._assert_downgrade_allowed(current, cfg, size=spec.size)
                 self._wait(
@@ -162,7 +169,7 @@ class AzureFilesDriver(ManagedServiceDriver):
             current = self._get(name)
             if current is None:
                 return UpdateResult(False, spec.handle, "Azure Files share not found", ["not_found"])
-            self._assert_platform_owned(current)
+            self._assert_owned(current, spec, AzureOperation.UPDATE, name)
             self._assert_immutable(current, cfg, apply_defaults=False)
             self._assert_downgrade_allowed(current, cfg, size=spec.size)
             if cfg or spec.size:
@@ -173,6 +180,8 @@ class AzureFilesDriver(ManagedServiceDriver):
                         self._update_parameters(cfg, size=spec.size, apply_defaults=False),
                     ),
                 )
+        except AzureOwnershipError as exc:
+            return UpdateResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
         except Exception as exc:
             return UpdateResult(False, spec.handle, f"update Azure Files share: {exc}", [str(exc)])
         return UpdateResult(True, spec.handle, f"Azure Files NFS share {name} reconciled")
@@ -201,13 +210,13 @@ class AzureFilesDriver(ManagedServiceDriver):
         if current is None:
             return DeprovisionResult(True, spec.handle, f"Azure Files share {name} already gone")
         try:
-            self._assert_platform_owned(current)
-        except AzureFilesError as exc:
+            self._assert_owned(current, spec, AzureOperation.DELETE, name)
+        except AzureOwnershipError as exc:
             return DeprovisionResult(
                 False,
                 spec.handle,
                 str(exc),
-                ["external_resource_collision"],
+                [OWNERSHIP_ERROR_CODE],
                 retryable=False,
             )
         cfg = dict(spec.config or {})
@@ -316,7 +325,7 @@ class AzureFilesDriver(ManagedServiceDriver):
         share = self._get(name)
         if share is None:
             raise AzureFilesError("binding requested for missing Azure Files share")
-        self._assert_platform_owned(share)
+        self._assert_owned(share, handle, AzureOperation.INSPECT, name)
         properties = _field(share, "properties")
         hostname = str(_field(properties, "host_name", default=""))
         mount_name = str(_field(properties, "mount_name", default=name))
@@ -423,7 +432,7 @@ class AzureFilesDriver(ManagedServiceDriver):
         share = self._get(name)
         if share is None:
             raise AzureFilesError("snapshot requested for missing Azure Files share")
-        self._assert_platform_owned(share)
+        self._assert_owned(share, handle, AzureOperation.SNAPSHOT, name)
         created = self._now()
         snapshot_name = f"snap-{created.strftime('%Y%m%d-%H%M%S-%f')}"
         from azure.mgmt.fileshares import models
@@ -734,18 +743,14 @@ class AzureFilesDriver(ManagedServiceDriver):
             if int(desired) < existing and _after_now(allowed_at, self._now()):
                 raise AzureFilesError(f"Azure Files {label} cannot be reduced until {allowed_at}")
 
-    def _assert_owned(self, current: Any, spec: ProvisionSpec) -> None:
-        self._assert_platform_owned(current)
-        tags = dict(_field(current, "tags", default={}) or {})
-        existing = str(tags.get(_MANAGED_SERVICE_ID_TAG, ""))
-        if spec.managed_service_id and existing and existing != spec.managed_service_id:
-            raise AzureFilesError("Azure Files resource name belongs to another managed service")
-
     @staticmethod
-    def _assert_platform_owned(current: Any) -> None:
-        tags = dict(_field(current, "tags", default={}) or {})
-        if tags.get(_MANAGED_BY_TAG) != "platform":
-            raise AzureFilesError("Azure Files share is not owned by Astrolift")
+    def _assert_owned(current: Any, source: object, operation: AzureOperation, name: str) -> None:
+        verify_azure_ownership(
+            dict(_field(current, "tags", default={}) or {}),
+            owner_of(source),
+            operation=operation,
+            resource=f"Azure Files share {name}",
+        )
 
     def _get(self, name: str) -> Any | None:
         try:

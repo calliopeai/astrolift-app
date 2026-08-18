@@ -10,6 +10,13 @@ from typing import Any
 
 from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op
+from _sdk.azure_ownership import (
+    OWNERSHIP_ERROR_CODE,
+    AzureOperation,
+    AzureOwnershipError,
+    owner_of,
+    verify_azure_ownership,
+)
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -29,8 +36,6 @@ from azure.managed.tags import arm_tags_for
 
 KIND = "private_endpoint"
 VARIANT = "private_link"
-_MANAGED_BY = "astrolift-managed-by"
-_SERVICE_ID = "astrolift-managed-service-id"
 _PROTECTION = "astrolift-deletion-protection"
 _ZONE_GROUP = "astrolift"
 _NAME = re.compile(r"^[a-z0-9](?:[-a-z0-9]{0,78}[a-z0-9])?$")
@@ -112,7 +117,7 @@ class AzurePrivateEndpointDriver(ManagedServiceDriver):
             cfg = self._normalize(spec.config)
             existing = self._get(name)
             if existing is not None:
-                self._assert_owned(existing, spec.managed_service_id)
+                self._assert_owned(existing, spec, AzureOperation.PROVISION, name)
                 self._assert_immutable(existing, cfg)
             resource = self._put(
                 name,
@@ -127,6 +132,8 @@ class AzurePrivateEndpointDriver(ManagedServiceDriver):
                 ),
             )
             self._reconcile_dns(name, cfg["private_dns_zone_ids"])
+        except AzureOwnershipError as exc:
+            return ProvisionResult(False, handle, str(exc), [OWNERSHIP_ERROR_CODE])
         except (TypeError, ValueError) as exc:
             return ProvisionResult(False, handle, str(exc), ["invalid_azure_private_endpoint_config"])
         except Exception as exc:
@@ -142,12 +149,14 @@ class AzurePrivateEndpointDriver(ManagedServiceDriver):
             existing = self._get(name)
             if existing is None:
                 return UpdateResult(False, spec.handle, "Azure Private Endpoint not found", ["not_found"])
-            self._assert_owned(existing)
+            self._assert_owned(existing, spec, AzureOperation.UPDATE, name)
             self._assert_immutable(existing, cfg)
             tags = self._tags(existing)
             tags[_PROTECTION] = str(cfg["deletion_protection"]).lower()
             resource = self._put(name, self._parameters(cfg, tags=tags))
             self._reconcile_dns(name, cfg["private_dns_zone_ids"])
+        except AzureOwnershipError as exc:
+            return UpdateResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
         except (TypeError, ValueError) as exc:
             return UpdateResult(
                 False,
@@ -179,7 +188,7 @@ class AzurePrivateEndpointDriver(ManagedServiceDriver):
             existing = self._get(name)
             if existing is None:
                 return DeprovisionResult(True, spec.handle, f"Azure Private Endpoint {name} already absent")
-            self._assert_owned(existing)
+            self._assert_owned(existing, spec, AzureOperation.DELETE, name)
             protected = self._tags(existing).get(_PROTECTION, "true").lower() == "true"
             if protected and not force_destroy:
                 return DeprovisionResult(
@@ -190,6 +199,8 @@ class AzurePrivateEndpointDriver(ManagedServiceDriver):
                     retryable=False,
                 )
             self._network.private_endpoints.begin_delete(self._config.resource_group, name).result()
+        except AzureOwnershipError as exc:
+            return DeprovisionResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
         except ValueError as exc:
             return DeprovisionResult(False, spec.handle, str(exc), ["invalid_handle"], retryable=False)
         except Exception as exc:
@@ -205,7 +216,7 @@ class AzurePrivateEndpointDriver(ManagedServiceDriver):
             resource = self._get(name)
             if resource is None:
                 return ServiceStatus(handle.handle, "deprovisioned", f"Azure Private Endpoint {name} is absent")
-            self._assert_owned(resource)
+            self._assert_owned(resource, handle, AzureOperation.INSPECT, name)
             state, ready = self._state(resource)
         except Exception as exc:
             return ServiceStatus(handle.handle, "error", f"describe Azure Private Endpoint: {exc}")
@@ -222,7 +233,7 @@ class AzurePrivateEndpointDriver(ManagedServiceDriver):
         resource = self._get(name)
         if resource is None:
             raise ValueError(f"Azure Private Endpoint {name} does not exist")
-        self._assert_owned(resource)
+        self._assert_owned(resource, handle, AzureOperation.INSPECT, name)
         properties = _properties(resource)
         resource_id = str(_value(resource, "id") or self._resource_id(name))
         dns = _list(properties, "customDnsConfigs", "custom_dns_configs")
@@ -473,12 +484,13 @@ class AzurePrivateEndpointDriver(ManagedServiceDriver):
         ):
             raise ValueError("Azure Private Endpoint target, groups, subnet, and approval mode are immutable")
 
-    def _assert_owned(self, resource: Any, managed_service_id: str = "") -> None:
-        tags = self._tags(resource)
-        if tags.get(_MANAGED_BY) != "platform":
-            raise ValueError("refusing to operate an Azure Private Endpoint not owned by Astrolift")
-        if managed_service_id and tags.get(_SERVICE_ID) != managed_service_id:
-            raise ValueError("Azure Private Endpoint name collides with another Astrolift managed service")
+    def _assert_owned(self, resource: Any, source: object, operation: AzureOperation, name: str) -> None:
+        verify_azure_ownership(
+            self._tags(resource),
+            owner_of(source),
+            operation=operation,
+            resource=f"Azure Private Endpoint {name}",
+        )
 
     def _get(self, name: str) -> Any | None:
         try:

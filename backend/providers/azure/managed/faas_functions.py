@@ -23,6 +23,13 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.azure_ownership import (
+    OWNERSHIP_ERROR_CODE,
+    AzureOperation,
+    AzureOwnershipError,
+    owner_of,
+    verify_azure_ownership,
+)
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -38,12 +45,13 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from azure.managed.tags import MANAGED_BY_TAG, MANAGED_SERVICE_ID_TAG, arm_tags_for
+from azure.managed.tags import arm_tags_for
 
 KIND = "faas"
 VARIANT = "azure_functions"
 
 _FUNCTION_NAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,58}[a-z0-9])$")
+_VARIANT_TAG = "astrolift-faas-variant"
 _CONTAINER_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$")
 _STORAGE_ACCOUNT_RE = re.compile(r"^[a-z0-9]{3,24}$")
 _UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
@@ -273,7 +281,7 @@ class AzureFunctionsDriver(ManagedServiceDriver):
         try:
             current = self._get(resource_id, self._config.site_api_version)
             if current is not None:
-                self._assert_owned(current, spec.managed_service_id)
+                self._assert_owned(current, spec, AzureOperation.PROVISION, name)
             resolved = self._resolve_dependencies(cfg)
             self._assert_plan(resolved["plan"], cfg)
             body = self._site_body(spec, cfg, resolved, current=current)
@@ -300,7 +308,7 @@ class AzureFunctionsDriver(ManagedServiceDriver):
         resource_id = self._site_resource_id(resource_group, name)
         try:
             current = self._client.get(resource_id, self._config.site_api_version)
-            self._assert_owned(current)
+            self._assert_owned(current, spec, AzureOperation.UPDATE, name)
             if spec.config.get("function_name") not in {None, name}:
                 return UpdateResult(
                     False,
@@ -361,9 +369,9 @@ class AzureFunctionsDriver(ManagedServiceDriver):
         current = self._get(resource_id, self._config.site_api_version)
         if current is not None:
             try:
-                self._assert_owned(current)
-            except Exception as exc:
-                return DeprovisionResult(False, spec.handle, str(exc), ["ownership_guard"], retryable=False)
+                self._assert_owned(current, spec, AzureOperation.DELETE, name)
+            except AzureOwnershipError as exc:
+                return DeprovisionResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
             protected = str((current.get("tags") or {}).get("astrolift-deletion-protection") or "true") == "true"
             if protected and not force_destroy:
                 return DeprovisionResult(
@@ -396,7 +404,7 @@ class AzureFunctionsDriver(ManagedServiceDriver):
                 self._site_resource_id(resource_group, name),
                 self._config.site_api_version,
             )
-            self._assert_owned(resource)
+            self._assert_owned(resource, handle, AzureOperation.INSPECT, name)
         except AzureFunctionsNotFound:
             return ServiceStatus(handle.handle, "deprovisioned", "Azure Function App does not exist")
         except Exception as exc:
@@ -413,7 +421,7 @@ class AzureFunctionsDriver(ManagedServiceDriver):
             self._site_resource_id(resource_group, name),
             self._config.site_api_version,
         )
-        self._assert_owned(resource)
+        self._assert_owned(resource, handle, AzureOperation.INSPECT, name)
         properties = dict(resource.get("properties") or {})
         hostname = str(properties.get("defaultHostName") or "")
         url = f"https://{hostname}" if hostname else ""
@@ -786,7 +794,7 @@ class AzureFunctionsDriver(ManagedServiceDriver):
             bool(cfg.get("deletion_protection", self._config.deletion_protection_default)),
         ).lower()
         tags["astrolift-deployment-mode"] = str(cfg["deployment_mode"])
-        tags["astrolift-faas-variant"] = VARIANT
+        tags[_VARIANT_TAG] = VARIANT
         return self._body(cfg, resources, tags)
 
     def _body(
@@ -1117,13 +1125,20 @@ class AzureFunctionsDriver(ManagedServiceDriver):
         except AzureFunctionsNotFound:
             return None
 
-    def _assert_owned(self, resource: dict[str, Any], expected_service_id: str = "") -> None:
+    @staticmethod
+    def _assert_owned(resource: dict[str, Any], source: object, operation: AzureOperation, name: str) -> None:
         tags = dict(resource.get("tags") or {})
-        if tags.get(MANAGED_BY_TAG) != "platform" or tags.get("astrolift-faas-variant") != VARIANT:
-            raise AzureFunctionsError("existing Function App is not Astrolift-owned")
-        actual_service_id = str(tags.get(MANAGED_SERVICE_ID_TAG) or "")
-        if expected_service_id and actual_service_id != expected_service_id:
-            raise AzureFunctionsError("existing Function App belongs to another managed service")
+        verify_azure_ownership(
+            tags,
+            owner_of(source),
+            operation=operation,
+            resource=f"Azure Function App {name}",
+        )
+        if tags.get(_VARIANT_TAG) != VARIANT:
+            raise AzureOwnershipError(
+                f"refusing to {operation} Azure Function App {name}: it carries "
+                f"{_VARIANT_TAG}={tags.get(_VARIANT_TAG) or 'unset'}, not {VARIANT}",
+            )
 
 
 def _handle(resource_group: str, name: str) -> str:

@@ -297,7 +297,7 @@ def test_reconcile_is_idempotent_partial_and_ownership_safe() -> None:
     mgmt.namespaces.values[namespace_name].tags[canonical_key("azure")] = "other"
     before = len(mgmt.namespaces.update_calls)
     rejected = driver.provision(_spec())
-    assert not rejected.ok and "refusing to adopt" in rejected.message
+    assert not rejected.ok and "belongs to managed service other, not service-id" in rejected.message
     assert len(mgmt.namespaces.update_calls) == before
 
 
@@ -423,7 +423,9 @@ def test_invalid_controls_fail_before_cloud_mutation(
 def test_update_is_partial_and_standard_partition_change_fails_closed() -> None:
     driver, mgmt, _ = _driver("event_hubs")
     provisioned = driver.provision(_spec())
-    partition = driver.update(UpdateSpec(provisioned.handle, config={"partition_count": 3}))
+    partition = driver.update(
+        UpdateSpec(provisioned.handle, config={"partition_count": 3}, managed_service_id="service-id")
+    )
     assert not partition.ok and "Premium" in partition.message
 
     updated = driver.update(
@@ -436,6 +438,7 @@ def test_update_is_partial_and_standard_partition_change_fails_closed() -> None:
                 "retention_time_in_hours": 48,
                 "consumer_groups": ["extra"],
             },
+            managed_service_id="service-id",
         ),
     )
     assert updated.ok
@@ -452,7 +455,7 @@ def test_size_update_scales_namespace_without_repartitioning_stream() -> None:
     provisioned = driver.provision(_spec())
     hub_calls = len(mgmt.event_hubs.create_calls)
 
-    updated = driver.update(UpdateSpec(provisioned.handle, size="large"))
+    updated = driver.update(UpdateSpec(provisioned.handle, size="large", managed_service_id="service-id"))
 
     assert updated.ok
     namespace_update = mgmt.namespaces.update_calls[-1]["parameters"].as_dict()
@@ -464,13 +467,13 @@ def test_capacity_update_preserves_existing_premium_tier() -> None:
     driver, mgmt, _ = _driver("event_hubs")
     provisioned = driver.provision(_spec(config={"sku": "Premium", "capacity": 2}))
 
-    updated = driver.update(UpdateSpec(provisioned.handle, config={"capacity": 3}))
+    updated = driver.update(UpdateSpec(provisioned.handle, config={"capacity": 3}, managed_service_id="service-id"))
 
     assert updated.ok
     payload = mgmt.namespaces.update_calls[-1]["parameters"].as_dict()
     assert payload["sku"] == {"name": "Premium", "tier": "Premium", "capacity": 3}
 
-    rejected = driver.update(UpdateSpec(provisioned.handle, config={"capacity": 20}))
+    rejected = driver.update(UpdateSpec(provisioned.handle, config={"capacity": 20}, managed_service_id="service-id"))
     assert not rejected.ok and "between 1 and 16" in rejected.message
 
 
@@ -498,22 +501,22 @@ def test_kafka_reconcile_refuses_namespace_without_kafka_capability() -> None:
 def test_deprovision_requires_explicit_data_loss_and_respects_locks() -> None:
     driver, mgmt, locks = _driver("event_hubs")
     provisioned = driver.provision(_spec())
-    refused = driver.deprovision(DeprovisionSpec(provisioned.handle))
+    refused = driver.deprovision(DeprovisionSpec(provisioned.handle, managed_service_id="service-id"))
     assert not refused.ok and refused.retryable is False
     assert not mgmt.namespaces.delete_calls
 
     locks.management_locks.locks = [FakeLock("protect-stream")]
-    locked = driver.deprovision(DeprovisionSpec(provisioned.handle), delete_data=True)
+    locked = driver.deprovision(DeprovisionSpec(provisioned.handle, managed_service_id="service-id"), delete_data=True)
     assert not locked.ok and "protect-stream" in locked.message
     deleted = driver.deprovision(
-        DeprovisionSpec(provisioned.handle),
+        DeprovisionSpec(provisioned.handle, managed_service_id="service-id"),
         delete_data=True,
         force_destroy=True,
     )
     assert deleted.ok
     assert locks.management_locks.deleted == ["protect-stream"]
     assert mgmt.namespaces.delete_calls
-    assert driver.deprovision(DeprovisionSpec(provisioned.handle), delete_data=True).ok
+    assert driver.deprovision(DeprovisionSpec(provisioned.handle, managed_service_id="service-id"), delete_data=True).ok
 
 
 def test_status_distinguishes_namespace_hub_and_provider_state() -> None:

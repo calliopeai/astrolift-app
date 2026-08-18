@@ -15,6 +15,13 @@ from datetime import UTC, datetime
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.azure_ownership import (
+    OWNERSHIP_ERROR_CODE,
+    AzureOperation,
+    AzureOwnershipError,
+    owner_of,
+    verify_azure_ownership,
+)
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -31,7 +38,6 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from _sdk.managed_service_tags import ownership_key, read_managed_service_id
 from azure.managed.tags import arm_tags_for as tags_for
 
 
@@ -228,7 +234,7 @@ class AzureCosmosApiDriver(ManagedServiceDriver):
                     create_update_parameters=self._account_create_parameters(spec),
                 ).result()
             else:
-                self._assert_owned(account, spec)
+                self._assert_owned(account, spec, AzureOperation.PROVISION, account_name)
                 self._assert_create_only_controls(account, cfg)
                 account = self._mgmt.database_accounts.begin_update(
                     resource_group_name=self._config.resource_group,
@@ -240,6 +246,8 @@ class AzureCosmosApiDriver(ManagedServiceDriver):
             elif any(key in cfg for key in ("throughput", "autoscale_max_throughput")):
                 self._update_throughput(account_name, resource_name, spec.size, cfg)
             self._store_connection_secrets(account_name)
+        except AzureOwnershipError as exc:
+            return ProvisionResult(False, handle, str(exc), [OWNERSHIP_ERROR_CODE])
         except Exception as exc:
             return ProvisionResult(False, handle, f"provision Cosmos API resource: {exc}", [str(exc)])
         return ProvisionResult(
@@ -283,8 +291,13 @@ class AzureCosmosApiDriver(ManagedServiceDriver):
                 f"Cosmos fields require reprovision: {', '.join(immutable)}",
                 ["reprovision_required"],
             )
-        if self._describe_account(account_name) is None or self._describe_resource(account_name, resource_name) is None:
+        account = self._describe_account(account_name)
+        if account is None or self._describe_resource(account_name, resource_name) is None:
             return UpdateResult(False, spec.handle, "Cosmos API resource does not exist", ["not_found"])
+        try:
+            self._assert_owned(account, spec, AzureOperation.UPDATE, account_name)
+        except AzureOwnershipError as exc:
+            return UpdateResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
         try:
             account_fields = {
                 "backup_policy_type",
@@ -355,6 +368,10 @@ class AzureCosmosApiDriver(ManagedServiceDriver):
                 )
             return DeprovisionResult(True, spec.handle, f"Cosmos account {account_name} already gone")
         try:
+            self._assert_owned(account, spec, AzureOperation.DELETE, account_name)
+        except AzureOwnershipError as exc:
+            return DeprovisionResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
+        try:
             locks = self._list_locks(account_name)
         except Exception as exc:
             return DeprovisionResult(False, spec.handle, f"list Cosmos resource locks: {exc}", [str(exc)])
@@ -375,7 +392,13 @@ class AzureCosmosApiDriver(ManagedServiceDriver):
         retained = ""
         if not delete_data:
             try:
-                retained = self.snapshot(ServiceHandle(spec.handle)).snapshot_id
+                retained = self.snapshot(
+                    ServiceHandle(
+                        spec.handle,
+                        binding_id=spec.binding_id,
+                        managed_service_id=spec.managed_service_id,
+                    ),
+                ).snapshot_id
             except Exception as exc:
                 return DeprovisionResult(
                     False,
@@ -457,6 +480,7 @@ class AzureCosmosApiDriver(ManagedServiceDriver):
         account = self._describe_account(account_name)
         if account is None:
             raise AzureCosmosApiError(f"snapshot requested for missing Cosmos account {account_name}")
+        self._assert_owned(account, handle, AzureOperation.SNAPSHOT, account_name)
         try:
             self._ensure_continuous_backup(account_name)
             account = self._describe_account(account_name)
@@ -502,7 +526,7 @@ class AzureCosmosApiDriver(ManagedServiceDriver):
         try:
             existing = self._describe_account(account_name)
             if existing is not None:
-                self._assert_owned(existing, target)
+                self._assert_owned(existing, target, AzureOperation.RESTORE, account_name)
                 if self._describe_resource(account_name, source_resource) is None:
                     raise AzureCosmosApiError(
                         "restore target account already exists without the expected resource",
@@ -524,6 +548,8 @@ class AzureCosmosApiDriver(ManagedServiceDriver):
                     f"restored account is missing expected resource {source_resource}",
                 )
             self._store_connection_secrets(account_name)
+        except AzureOwnershipError as exc:
+            return ProvisionResult(False, handle, str(exc), [OWNERSHIP_ERROR_CODE])
         except Exception as exc:
             return ProvisionResult(False, handle, f"restore Cosmos PITR: {exc}", [str(exc)])
         return ProvisionResult(True, handle, f"Cosmos PITR restore {account_name} is ready", ready=True)
@@ -1132,28 +1158,14 @@ class AzureCosmosApiDriver(ManagedServiceDriver):
             lock_name=lock_name,
         )
 
-    def _assert_owned(self, account: Any, spec: ProvisionSpec) -> None:
-        tags = _field(account, "tags", default={}) or {}
-        expected = spec.managed_service_id
-        actual = read_managed_service_id(tags, "azure")
-        if expected and actual != expected:
-            raise AzureCosmosApiError(
-                f"refusing to adopt Cosmos account owned by managed_service_id={actual or 'unset'}",
-            )
-        if expected:
-            return
-        expected_tags = {
-            ownership_key("azure", "org"): spec.organization_slug,
-            ownership_key("azure", "app"): spec.app_slug,
-            ownership_key("azure", "env"): spec.environment_name,
-        }
-        mismatches = [
-            f"{name}={tags.get(name) or 'unset'}" for name, value in expected_tags.items() if tags.get(name) != value
-        ]
-        if mismatches:
-            raise AzureCosmosApiError(
-                f"refusing to adopt Cosmos account with mismatched ownership tags: {', '.join(mismatches)}",
-            )
+    @staticmethod
+    def _assert_owned(account: Any, source: object, operation: AzureOperation, account_name: str) -> None:
+        verify_azure_ownership(
+            dict(_field(account, "tags", default={}) or {}),
+            owner_of(source),
+            operation=operation,
+            resource=f"Cosmos account {account_name}",
+        )
 
     def _assert_create_only_controls(self, account: Any, cfg: dict[str, Any]) -> None:
         properties = _field(account, "properties", default=None)

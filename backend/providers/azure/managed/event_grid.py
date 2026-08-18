@@ -15,6 +15,13 @@ from typing import Any
 from urllib.parse import parse_qsl, urlparse
 
 from _sdk._telemetry import driver_op
+from _sdk.azure_ownership import (
+    OWNERSHIP_ERROR_CODE,
+    AzureOperation,
+    AzureOwnershipError,
+    owner_of,
+    verify_azure_ownership,
+)
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -31,7 +38,6 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from _sdk.managed_service_tags import read_ownership_tag
 from azure.managed.tags import arm_tags_for as tags_for
 
 KIND = "event_bus"
@@ -175,7 +181,7 @@ class AzureEventGridDriver(ManagedServiceDriver):
         try:
             existing = self._topic(topic_name)
             if existing is not None:
-                self._assert_owned(existing, spec)
+                self._assert_owned(existing, spec, AzureOperation.PROVISION, topic_name)
                 self._assert_immutable_compatible(existing, cfg, apply_default=True)
                 self._wait(
                     self._mgmt.topics.begin_update(
@@ -197,6 +203,8 @@ class AzureEventGridDriver(ManagedServiceDriver):
                     ),
                 )
             self._reconcile_subscriptions(topic_name, cfg)
+        except AzureOwnershipError as exc:
+            return ProvisionResult(False, handle, str(exc), [OWNERSHIP_ERROR_CODE])
         except Exception as exc:
             return ProvisionResult(False, handle, f"reconcile Event Grid topic: {exc}", [str(exc)])
         return ProvisionResult(True, handle, f"Event Grid topic {topic_name} available", ready=True)
@@ -215,7 +223,7 @@ class AzureEventGridDriver(ManagedServiceDriver):
             topic = self._topic(topic_name)
             if topic is None:
                 return UpdateResult(False, spec.handle, f"Event Grid topic {topic_name} not found", ["not_found"])
-            self._assert_platform_owned(topic)
+            self._assert_owned(topic, spec, AzureOperation.UPDATE, topic_name)
             self._assert_immutable_compatible(topic, cfg, apply_default=False)
             self._wait(
                 self._mgmt.topics.begin_update(
@@ -226,6 +234,8 @@ class AzureEventGridDriver(ManagedServiceDriver):
             )
             if "subscriptions" in cfg or cfg.get("prune_subscriptions"):
                 self._reconcile_subscriptions(topic_name, cfg)
+        except AzureOwnershipError as exc:
+            return UpdateResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
         except Exception as exc:
             return UpdateResult(False, spec.handle, f"update Event Grid topic: {exc}", [str(exc)])
         return UpdateResult(True, spec.handle, f"Event Grid topic {topic_name} reconciled")
@@ -251,7 +261,7 @@ class AzureEventGridDriver(ManagedServiceDriver):
             topic = self._topic(topic_name)
             if topic is None:
                 return DeprovisionResult(True, spec.handle, f"Event Grid topic {topic_name} already gone")
-            self._assert_platform_owned(topic)
+            self._assert_owned(topic, spec, AzureOperation.DELETE, topic_name)
             if not delete_data:
                 return DeprovisionResult(
                     False,
@@ -292,6 +302,8 @@ class AzureEventGridDriver(ManagedServiceDriver):
                         ),
                     )
             self._wait(self._mgmt.topics.begin_delete(self._config.resource_group, topic_name))
+        except AzureOwnershipError as exc:
+            return DeprovisionResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
         except Exception as exc:
             return DeprovisionResult(False, spec.handle, f"delete Event Grid topic: {exc}", [str(exc)])
         return DeprovisionResult(
@@ -323,7 +335,7 @@ class AzureEventGridDriver(ManagedServiceDriver):
         topic = self._topic(topic_name)
         if topic is None:
             raise AzureEventGridError(f"binding requested for missing Event Grid topic {topic_name}")
-        self._assert_platform_owned(topic)
+        self._assert_owned(topic, handle, AzureOperation.INSPECT, topic_name)
         resource_id = str(_field(topic, "id", default=self._topic_resource_id(topic_name)))
         endpoint = str(_field(topic, "endpoint", default=""))
         if not endpoint:
@@ -1073,19 +1085,14 @@ class AzureEventGridDriver(ManagedServiceDriver):
     def _subscriptions(self, topic_name: str) -> list[Any]:
         return list(self._mgmt.topic_event_subscriptions.list(self._config.resource_group, topic_name))
 
-    def _assert_owned(self, topic: Any, spec: ProvisionSpec) -> None:
-        self._assert_platform_owned(topic)
-        tags = dict(_field(topic, "tags", default={}) or {})
-        expected_binding = spec.binding_id or ""
-        actual_binding = read_ownership_tag(tags, "binding", "azure")
-        if expected_binding and expected_binding != actual_binding:
-            raise AzureEventGridError("Event Grid topic is owned by a different managed-service binding")
-
     @staticmethod
-    def _assert_platform_owned(topic: Any) -> None:
-        tags = dict(_field(topic, "tags", default={}) or {})
-        if read_ownership_tag(tags, "managed_by", "azure") != "platform":
-            raise AzureEventGridError("Event Grid topic name collides with a resource Astrolift does not own")
+    def _assert_owned(topic: Any, source: object, operation: AzureOperation, topic_name: str) -> None:
+        verify_azure_ownership(
+            dict(_field(topic, "tags", default={}) or {}),
+            owner_of(source),
+            operation=operation,
+            resource=f"Event Grid topic {topic_name}",
+        )
 
     def _assert_immutable_compatible(
         self,
