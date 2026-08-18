@@ -11,6 +11,7 @@ from django.utils import timezone
 from strawberry.types import Info
 
 from astrolift_graphql import GUID, PageType, keyset_page, search_q
+from astrolift_graphql.sorting import NAMED_MODEL_SORTS, ListSortKey, resolve_sort
 from astrolift_lifecycle.models import (
     AgentRun,
     AppEnvironment,
@@ -1553,6 +1554,7 @@ class LifecycleQuery:
         info: Info,
         app_slug: str,
         search: str | None = None,
+        sort_by: ListSortKey | None = None,
         limit: int = 50,
         after: str | None = None,
     ) -> PageType[DeployTokenType]:
@@ -1567,10 +1569,15 @@ class LifecycleQuery:
         name plus the ``last 4`` / IP / user-agent forensic columns (#425)
         an operator uses to trace a token back to the runner that used it.
         """
+        order, scope = resolve_sort(sort_by, NAMED_MODEL_SORTS)
         page = keyset_page(
             _app_deploy_tokens_qs(app_slug=app_slug, search=search),
             cursor=after,
             limit=limit,
+            sort_field=order.sort_field,
+            tiebreak_field=order.tiebreak_field,
+            descending=order.descending,
+            cursor_scope=scope,
         )
         return page.map(deploy_token_to_type)
 

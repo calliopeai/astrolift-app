@@ -82,3 +82,52 @@ def test_a_cursor_from_another_order_does_not_decode_at_the_new_arity():
     unscoped = encode_cursor("acme", "guid-1")
 
     assert decode_cursor(unscoped, arity=3) is None
+
+
+# ---- the surfaces that accept it ------------------------------------------------
+
+SORTABLE_FIELDS = {
+    "astroliftTeamsPage",
+    "astroliftProjectsPage",
+    "astroliftRolesPage",
+    "astroliftPoliciesPage",
+    "astroliftApiTokensPage",
+    "astroliftAppDeployTokensPage",
+}
+
+
+def _schema_text() -> str:
+    import pathlib
+
+    for parent in pathlib.Path(__file__).resolve().parents:
+        candidate = parent / "schema.graphql"
+        if candidate.exists():
+            return candidate.read_text(encoding="utf-8")
+    pytest.skip("schema.graphql not found")
+    raise AssertionError  # unreachable, keeps the type checker happy
+
+
+def test_exactly_the_intended_fields_accept_a_sort():
+    """Pinned rather than counted loosely.
+
+    Every sortable field has to satisfy the NOT NULL sort column and not-null
+    unique tiebreak that seek pagination needs, and that is a per-model check
+    against the model, not something the enum can enforce. A field appearing
+    here without that check is how the walk starts truncating silently.
+    """
+    text = _schema_text()
+    accepting = {
+        line.strip().split("(", 1)[0] for line in text.splitlines() if "sortBy: AstroliftListSortKey" in line
+    }
+
+    assert accepting == SORTABLE_FIELDS
+
+
+def test_the_sort_argument_is_optional_everywhere():
+    """A required argument would break every existing caller, and the default
+    has to stay the order these lists already had."""
+    text = _schema_text()
+
+    for line in text.splitlines():
+        if "sortBy: AstroliftListSortKey" in line:
+            assert "sortBy: AstroliftListSortKey = null" in line, line.strip()

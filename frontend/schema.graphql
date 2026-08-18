@@ -5770,15 +5770,15 @@ type Query {
   astroliftInvitations(status: String = null): [AstroliftInvitation!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftInvitationsPage.")
   astroliftInvitationsPage(status: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftInvitationPage!
   astroliftRoles: [AstroliftRole!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftRolesPage.")
-  astroliftRolesPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftRolePage!
+  astroliftRolesPage(search: String = null, sortBy: AstroliftListSortKey = null, limit: Int! = 50, after: String = null): AstroliftRolePage!
   astroliftSearchableUsers(query: String!): [AstroliftSearchableUser!]!
   astroliftRolesICanGrant: [AstroliftRole!]!
   astroliftRoleBindings: [AstroliftRoleBinding!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftRoleBindingsPage.")
   astroliftRoleBindingsPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftRoleBindingPage!
   astroliftApiTokens: [AstroliftApiToken!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftApiTokensPage.")
-  astroliftApiTokensPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftApiTokenPage!
+  astroliftApiTokensPage(search: String = null, sortBy: AstroliftListSortKey = null, limit: Int! = 50, after: String = null): AstroliftApiTokenPage!
   astroliftPolicies: [AstroliftPolicy!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftPoliciesPage.")
-  astroliftPoliciesPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftPolicyPage!
+  astroliftPoliciesPage(search: String = null, sortBy: AstroliftListSortKey = null, limit: Int! = 50, after: String = null): AstroliftPolicyPage!
   astroliftOrganizationAllowlistDomains: [AstroliftOrganizationAllowlistedDomain!]!
   astroliftIdentityProviders: [AstroliftIdentityProvider!]!
   astroliftMyProfile: AstroliftMyProfile
@@ -5850,7 +5850,7 @@ type Query {
   astroliftAppPods(appSlug: String!, environmentName: String = null): [AstroliftAppPod!]!
   astroliftWorkloadPodStatusBreakdown(appSlug: String!, workloadSlug: String!, environmentName: String = null): [AstroliftWorkloadPodStatusBucket!]!
   astroliftAppDeployTokens(appSlug: String!): [AstroliftDeployToken!]! @deprecated(reason: "Caps at 100 rows with no way to reach the 101st. Use astroliftAppDeployTokensPage.")
-  astroliftAppDeployTokensPage(appSlug: String!, search: String = null, limit: Int! = 50, after: String = null): AstroliftDeployTokenPage!
+  astroliftAppDeployTokensPage(appSlug: String!, search: String = null, sortBy: AstroliftListSortKey = null, limit: Int! = 50, after: String = null): AstroliftDeployTokenPage!
   astroliftAppDnsRecords(appSlug: String!, environmentName: String = null): AstroliftAppDnsRecordsResult!
   astroliftAppCertificates(appSlug: String!, environmentName: String = null): AstroliftAppCertificatesResult!
   astroliftAppIdentityBinding(appSlug: String!, environmentName: String = null): AstroliftAppIdentityBindingResult!
