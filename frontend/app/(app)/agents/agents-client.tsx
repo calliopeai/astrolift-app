@@ -4,6 +4,7 @@ import { useQuery } from "@apollo/client/react";
 import {
   BarChart3Icon,
   BotIcon,
+  BoxIcon,
   BrainIcon,
   ClockIcon,
   ExternalLinkIcon,
@@ -62,6 +63,7 @@ import type {
 } from "@/graphql/agents/agents.types";
 import { LIST_PROJECTS } from "@/graphql/identity/identity.queries";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
+import { BoxesTab } from "./boxes-tab";
 import { DispatchTab } from "./dispatch-tab";
 import { useModules } from "@/graphql/user/user.hooks";
 import { FEATURE_FLAG_ZENTINELLE, useFeatureFlag } from "@/graphql/server/server.hooks";
@@ -86,6 +88,7 @@ type AgentTasksData = {
 
 type AgentTab =
   | "active"
+  | "boxes"
   | "dispatch"
   | "history"
   | "registry"
@@ -98,6 +101,7 @@ type AgentTab =
   | "compliance";
 const AGENT_TABS: readonly AgentTab[] = [
   "active",
+  "boxes",
   "dispatch",
   "history",
   "registry",
@@ -112,6 +116,7 @@ const AGENT_TABS: readonly AgentTab[] = [
 
 const TAB_LABELS: Record<AgentTab, string> = {
   active: "Active",
+  boxes: "Boxes",
   dispatch: "Dispatch",
   history: "History",
   registry: "Registry",
@@ -125,6 +130,7 @@ const TAB_LABELS: Record<AgentTab, string> = {
 };
 
 const TAB_ICONS: Partial<Record<AgentTab, React.ReactNode>> = {
+  boxes: <BoxIcon className="size-4" />,
   theatre: <MonitorPlayIcon className="size-4" />,
   metrics: <BarChart3Icon className="size-4" />,
   logs: <ScrollIcon className="size-4" />,
@@ -854,6 +860,7 @@ export function AgentsClient() {
       </div>
 
       {tab === "active" && <ActiveTab orgId={orgId} />}
+      {tab === "boxes" && <BoxesTab orgId={orgId} />}
       {tab === "dispatch" && <DispatchTab orgId={orgId} />}
       {tab === "history" && <HistoryTab orgId={orgId} />}
       {tab === "registry" && <RegistryTab orgId={orgId} />}

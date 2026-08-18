@@ -9,6 +9,7 @@ the no-op activity implementations until provider plugins ship. The
 sequence is the contract — bodies fill in.
 """
 
+from astrolift_workflows.workflows.agent_box_reap_tick import AgentBoxReapTickWorkflow
 from astrolift_workflows.workflows.agent_cron_tick import AgentCronTickWorkflow
 from astrolift_workflows.workflows.agent_loop_tick import AgentLoopTickWorkflow
 from astrolift_workflows.workflows.agent_reconcile_tick import AgentReconcileTickWorkflow
@@ -84,6 +85,7 @@ from astrolift_workflows.workflows.workflow_definition_run import (
 __all__ = [
     "UptimeProbeTickWorkflow",
     "UpdateManagedServiceWorkflow",
+    "AgentBoxReapTickWorkflow",
     "AgentCronTickWorkflow",
     "AlertEvalTickWorkflow",
     "AgentLoopTickWorkflow",

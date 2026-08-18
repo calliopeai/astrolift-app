@@ -15,6 +15,23 @@ Object.defineProperty(globalThis, "ResizeObserver", {
   },
 });
 
+// jsdom implements neither the scroll helper nor the pointer-capture API that
+// Radix's popover primitives (Select, DropdownMenu) call on mount. Without
+// them, opening any Select in a test throws and the surface can only be
+// covered by mocking the component away — which tests the mock. Same reasoning
+// as the ResizeObserver polyfill above: fix it once, globally.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = function scrollIntoView() {};
+}
+if (!Element.prototype.hasPointerCapture) {
+  Element.prototype.hasPointerCapture = function hasPointerCapture() {
+    return false;
+  };
+}
+if (!Element.prototype.releasePointerCapture) {
+  Element.prototype.releasePointerCapture = function releasePointerCapture() {};
+}
+
 // Node 25 exposes an experimental localStorage object that is unusable when
 // Vitest workers do not receive a --localstorage-file path. Pin tests to the
 // browser Storage contract so local and CI runners behave identically.

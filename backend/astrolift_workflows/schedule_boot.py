@@ -83,6 +83,12 @@ PHASE_3A_ACTIVE_KINDS: frozenset[ScheduleKind] = frozenset(
         # with per-run try/except; an unreachable cluster or torn-down Job
         # leaves the row as-is, and terminal rows are never re-touched.
         ScheduleKind.RUN_STATUS_RECONCILE,
+        # Agent-box reaping ships active — held, a box that reaped itself
+        # keeps claiming RUNNING and its plaintext-bearing Secret outlives
+        # the pod, so holding it costs correctness rather than buying safety.
+        # Same shape as the reconcile above: read-only cluster reads, per-box
+        # try/except, and an unobservable box is left alone.
+        ScheduleKind.AGENT_BOX_REAP,
         # NB: ScheduleKind.CI_WORKFLOW_RESYNC is INTENTIONALLY absent here
         # (#1211, Phase 3). Unlike the read-mostly / idempotent-SSA kinds
         # above, it does OUTBOUND writes to tenant source repos (pushes the

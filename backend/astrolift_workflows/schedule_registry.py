@@ -184,6 +184,21 @@ class ScheduleKind(StrEnum):
     already recorded, and reaches the cluster read-only to do it (sibling
     to UPTIME_PROBE among the cluster-touching sweeps)."""
 
+    AGENT_BOX_REAP = "agent_box_reap"
+    """Every 60 s — settle every live AgentBox against its k8s Job (#128).
+
+    The control-plane half of a box's idle timeout. The pod's own keep-alive
+    loop is what frees the node: it ends the tmux session when nobody is
+    attached and no pane has produced output for the timeout, and the Job
+    completes. This tick is what *notices*, stamps the row EXPIRED, and
+    deletes the per-box Secret the pod no longer needs — a plaintext-bearing
+    object must not outlive the pod it was created for. Without it a box that
+    reaped itself keeps claiming RUNNING, which is the platform lying about
+    what an operator can attach to. Safe-by-default like its RUN_STATUS_
+    RECONCILE sibling: read-only cluster reads, per-box try/except, and an
+    unreachable cluster resolves to "leave as-is" rather than to a death
+    certificate."""
+
     CI_WORKFLOW_RESYNC = "ci_workflow_resync"
     """Every 1 hr (HELD — opt-in) — recompute drift for every app with a
     managed CI workflow file and auto-push ONLY the SAFE states
@@ -413,6 +428,15 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.RUN_STATUS_RECONCILE,
         ),
         description="Reconcile ScheduledJobRun/TaskRun status from k8s Job status",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.AGENT_BOX_REAP,
+        workflow_name="AgentBoxReapTickWorkflow",
+        interval_seconds=60,
+        schedule_id=schedule_id_for(
+            kind=ScheduleKind.AGENT_BOX_REAP,
+        ),
+        description="Settle live AgentBox rows against their k8s Job (#128)",
     ),
     ScheduleDefinition(
         kind=ScheduleKind.CI_WORKFLOW_RESYNC,

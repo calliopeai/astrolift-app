@@ -101,6 +101,7 @@ from astrolift_workflows.activities import (
     provision_secrets_backend,
     prune_audit_log,
     prune_stale_sessions,
+    reap_agent_boxes_tick,
     reconcile_agent_deployments,
     reconcile_cluster_capabilities,
     reconcile_runs_tick,
@@ -139,6 +140,7 @@ from astrolift_workflows.activities.agent_stage import (
 )
 from astrolift_workflows.activities.build_image import build_image
 from astrolift_workflows.workflows import (
+    AgentBoxReapTickWorkflow,
     AgentCronTickWorkflow,
     AgentLoopTickWorkflow,
     AgentReconcileTickWorkflow,
@@ -187,6 +189,7 @@ from astrolift_workflows.workflows import (
 )
 
 WORKFLOWS = (
+    AgentBoxReapTickWorkflow,
     AgentCronTickWorkflow,
     UptimeProbeTickWorkflow,
     AlertEvalTickWorkflow,
@@ -332,6 +335,7 @@ ACTIVITIES = (
     provision_secrets_backend,
     prune_audit_log,
     prune_stale_sessions,
+    reap_agent_boxes_tick,
     reconcile_agent_deployments,
     reconcile_cluster_capabilities,
     reconcile_runs_tick,

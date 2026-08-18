@@ -1,0 +1,725 @@
+"""The agent-box, end to end (#128).
+
+``_sdk/agent_session.py`` already has its own tests for the keep-alive script.
+These are about the half that was missing: that the platform actually builds a
+pod out of it, that the env-spec secret packet reaches that pod, that a
+forgotten box stops costing money, and that none of it is reachable across
+tenants.
+
+Where a claim can be checked for real it is: the idle-timeout test runs the
+script *taken out of the rendered manifest* against a real tmux server, so it
+proves the pod spec the platform emits reaps itself — not that a shell script
+somewhere would.
+
+Resolvers are exercised by direct invocation (the agents-test convention) with
+the controllable permission resolver and a bound tenant context. The cluster,
+its driver and its secret store are in-memory fakes; the database is real.
+"""
+
+from __future__ import annotations
+
+import shutil
+import subprocess
+import time
+from types import SimpleNamespace
+
+import pytest
+from _sdk.agent_session import keepalive_script
+from _sdk.k8s_naming import agent_namespace
+
+from astrolift_agents.models import AgentBox, AgentEnvironmentSpec
+from astrolift_agents.schema.mutations import AgentsMutation, EnsureAgentBoxInput
+from astrolift_agents.schema.queries import AgentsQuery
+from astrolift_agents.services import agent_box as box_service
+from astrolift_identity.models import Organization, Team
+from astrolift_registry.models import RegisteredApp, Workload
+from core.mutations import ErrorCode
+from core.permissions import Permission
+from core.tenancy import TenantContext
+from core.tenancy import tenant_context as _tenant_ctx
+
+pytestmark = pytest.mark.django_db
+
+HAS_TMUX = shutil.which("tmux") is not None
+tmux_required = pytest.mark.skipif(not HAS_TMUX, reason="tmux not installed")
+
+
+# ---------------------------------------------------------------------------
+# Fixtures + fakes
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def info():
+    request = SimpleNamespace(user=SimpleNamespace(is_authenticated=False))
+    return SimpleNamespace(context=SimpleNamespace(user=None, request=request))
+
+
+@pytest.fixture
+def org():
+    return Organization.objects.create(name="Box Org", slug="box-org")
+
+
+@pytest.fixture
+def other_org():
+    return Organization.objects.create(name="Box Other", slug="box-other")
+
+
+@pytest.fixture
+def with_tenant_org():
+    def _enter(org, *, actor_user_id=None):
+        return _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=actor_user_id))
+
+    return _enter
+
+
+class _ApplyResult:
+    def __init__(self, ok=True, detail="apply failed"):
+        self.ok = ok
+        self._detail = detail
+
+    def summary(self):
+        return self._detail
+
+
+class _FakeDriver:
+    """Records what the platform tried to put on / take off the cluster."""
+
+    def __init__(self, *, apply_ok=True, job_conditions=None, job_missing=False):
+        self.applied: list[list[dict]] = []
+        self.deleted: list[list[dict]] = []
+        self.namespaces: list[str] = []
+        self._apply_ok = apply_ok
+        self._job_conditions = job_conditions or []
+        self._job_missing = job_missing
+
+    def ensure_namespace(self, cluster_slug, namespace, labels, annotations):
+        self.namespaces.append(namespace)
+
+    def apply_manifests(self, cluster_slug, namespace, manifests):
+        self.applied.append([dict(m) for m in manifests])
+        return _ApplyResult(ok=self._apply_ok)
+
+    def delete_manifests(self, cluster_slug, namespace, refs):
+        self.deleted.append([dict(r) for r in refs])
+        return _ApplyResult(ok=True)
+
+    def get_workload_status(self, cluster_slug, namespace, kind, name):
+        if self._job_missing:
+            raise RuntimeError("job not found")
+        from _sdk.cluster import WorkloadStatus
+
+        return WorkloadStatus(
+            kind=kind,
+            name=name,
+            namespace=namespace,
+            ready_replicas=1,
+            desired_replicas=1,
+            conditions=list(self._job_conditions),
+        )
+
+
+class _FakeSecrets:
+    def __init__(self, store=None):
+        self.store = dict(store or {})
+
+    def get(self, path):
+        return self.store.get(path)
+
+    def upsert(self, path, kvs):
+        self.store[path] = dict(kvs)
+
+    def delete(self, path):
+        self.store.pop(path, None)
+
+
+@pytest.fixture
+def cluster(monkeypatch):
+    """Wire the box runtime to an in-memory cluster + secret store.
+
+    Returns the driver and the secret backend so a test can seed the store
+    and inspect exactly which manifests were applied.
+    """
+    driver = _FakeDriver()
+    secrets = _FakeSecrets()
+
+    import astrolift_agents.services.agent_cluster as agent_cluster
+    import core.app_deploy as app_deploy
+    import core.cluster_management as cluster_management
+
+    fake_cluster = SimpleNamespace(slug="fake-cluster")
+    monkeypatch.setattr(agent_cluster, "resolve_agent_cluster", lambda _org: fake_cluster)
+    monkeypatch.setattr(app_deploy, "driver_for_capability", lambda _c, _cap: secrets)
+    monkeypatch.setattr(cluster_management, "_driver_for_cluster", lambda _c: driver)
+    monkeypatch.setattr(
+        cluster_management,
+        "_context_for_cluster",
+        lambda _c: SimpleNamespace(slug="fake-cluster"),
+    )
+    return SimpleNamespace(driver=driver, secrets=secrets, swap_driver=None)
+
+
+def _spec(org, *, slug="claude-dev", refs=None, env_vars=None, image="agent-claude:1"):
+    return AgentEnvironmentSpec.objects.create(
+        organization=org,
+        name="Claude Dev",
+        slug=slug,
+        agent_type=AgentEnvironmentSpec.AgentType.CLAUDE,
+        image_tag=image,
+        secret_refs=refs or [],
+        env_vars=env_vars or {},
+    )
+
+
+def _persistent_agent(org, *, slug="claude-box", run_mode=Workload.RunMode.PERSISTENT):
+    team = Team.objects.create(organization=org, name=f"T-{slug}", slug=f"t-{slug}")
+    app = RegisteredApp.objects.create(
+        organization=org,
+        team=team,
+        name=slug.title(),
+        slug=f"app-{slug}",
+        provisioning_status="ready",
+    )
+    return Workload.objects.create(
+        registered_app=app,
+        name=slug.title(),
+        slug=slug,
+        kind=Workload.Kind.AGENT,
+        run_mode=run_mode,
+    )
+
+
+def _box(org, **kwargs):
+    defaults = {
+        "name": "A Box",
+        "slug": "a-box",
+        "status": AgentBox.Status.PENDING,
+    }
+    defaults.update(kwargs)
+    return AgentBox.objects.create(organization=org, **defaults)
+
+
+def _ensure(info, org, with_tenant_org, **input_kwargs):
+    with with_tenant_org(org):
+        return AgentsMutation().ensure_agent_box(
+            info,
+            input=EnsureAgentBoxInput(**input_kwargs),
+            org_id=str(org.guid),
+        )
+
+
+def _job_of(applied_batch):
+    return next(m for m in applied_batch if m["kind"] == "Job")
+
+
+def _container_of(job):
+    return job["spec"]["template"]["spec"]["containers"][0]
+
+
+def _env_of(job):
+    return {e["name"]: e for e in _container_of(job)["env"]}
+
+
+# ---------------------------------------------------------------------------
+# The pod spec holds the container open
+# ---------------------------------------------------------------------------
+
+
+def test_the_rendered_container_comes_from_the_session_sdk(org):
+    """The point of the ticket: the manifest builder calls ``container_spec``.
+
+    Pinning the args against ``keepalive_script`` rather than against a copy
+    of the text is what makes this a wiring test — a manifest that grew its
+    own entrypoint would fail here.
+    """
+    from _sdk.agent_session import SessionSpec
+
+    box = _box(org, idle_timeout_seconds=120, environment_spec=_spec(org))
+    job = box_service.render_agent_box_job(
+        box=box,
+        image="agent-claude:1",
+        namespace="ns",
+        job_name="agent-box-abc",
+    )
+    container = _container_of(job)
+
+    expected = keepalive_script(
+        SessionSpec(image="agent-claude:1", session_name=box.session_name, idle_timeout_seconds=120)
+    )
+    assert container["command"] == ["/bin/sh", "-lc"]
+    assert container["args"] == [expected]
+    # tmux refuses to attach without a terminal on the other end.
+    assert container["stdin"] is True
+    assert container["tty"] is True
+
+
+def test_the_box_pod_is_not_restarted_when_the_session_ends(org):
+    """A Deployment would undo the idle timeout.
+
+    The keep-alive loop exiting has to be the end of the pod. Under a
+    restarting controller the reaped box would come straight back and burn
+    the node forever while looking healthy.
+    """
+    box = _box(org, environment_spec=_spec(org))
+    job = box_service.render_agent_box_job(box=box, image="i:1", namespace="ns", job_name="agent-box-abc")
+
+    assert job["kind"] == "Job"
+    assert job["spec"]["template"]["spec"]["restartPolicy"] == "Never"
+    assert job["spec"]["backoffLimit"] == 0
+
+
+def test_the_box_carries_no_wall_clock_deadline(org):
+    """A box is bounded by not being used, not by elapsed time.
+
+    ``activeDeadlineSeconds`` is the agent-task cap; on a box it would kill a
+    session someone was in the middle of.
+    """
+    box = _box(org, environment_spec=_spec(org))
+    job = box_service.render_agent_box_job(box=box, image="i:1", namespace="ns", job_name="agent-box-abc")
+
+    assert "activeDeadlineSeconds" not in job["spec"]
+
+
+def test_the_platforms_own_env_cannot_be_shadowed_by_a_spec(org):
+    """An env spec that sets a box variable must not win.
+
+    The box's identity env is how anything inside the pod knows which box it
+    is; letting operator config overwrite it would be a quiet lie.
+    """
+    spec = _spec(org, env_vars={"ASTROLIFT_AGENT_BOX": "0", "MY_VAR": "keep"})
+    box = _box(org, environment_spec=spec)
+    job = box_service.render_agent_box_job(box=box, image="i:1", namespace="ns", job_name="agent-box-abc")
+    env = _env_of(job)
+
+    assert env["ASTROLIFT_AGENT_BOX"]["value"] == "1"
+    assert env["ASTROLIFT_AGENT_BOX_GUID"]["value"] == str(box.guid)
+    assert env["MY_VAR"]["value"] == "keep"
+
+
+def test_the_namespace_is_bounded_for_a_maximum_length_org_slug():
+    """Never an f-string. Organization slugs allow 200 characters and a
+    namespace allows 63 (#1379), so interpolating would emit an invalid
+    namespace for a perfectly valid org."""
+    long_org = Organization.objects.create(name="Long", slug="o" * 200)
+    box = _box(long_org, slug="long-box")
+
+    namespace = box_service.box_namespace(box)
+
+    assert namespace == agent_namespace(long_org.slug)
+    assert len(namespace) <= 63
+
+
+# ---------------------------------------------------------------------------
+# The idle timeout actually fires
+# ---------------------------------------------------------------------------
+
+
+@tmux_required
+def test_the_rendered_pod_reaps_itself_when_idle(org):
+    """Run the manifest's own entrypoint and watch it end.
+
+    Not a re-test of the SDK: the script here is pulled out of the Job the
+    platform would apply, so this fails if the render ever stops threading
+    the box's idle timeout into the container that gets deployed.
+    """
+    box = _box(org, idle_timeout_seconds=1, environment_spec=_spec(org))
+    job = box_service.render_agent_box_job(box=box, image="i:1", namespace="ns", job_name="agent-box-idle")
+    script = _container_of(job)["args"][0]
+
+    socket = "astrobox-render-idle"
+    proc = subprocess.Popen(
+        ["/bin/sh", "-c", script.replace("tmux ", f"tmux -L {socket} ")],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        # POLL_SECONDS is 5, so one idle detection cycle is comfortably
+        # inside 30s; anything longer means the loop never fired.
+        assert proc.wait(timeout=30) is not None
+        still_there = subprocess.run(
+            ["tmux", "-L", socket, "has-session", "-t", box.session_name],
+            capture_output=True,
+            check=False,
+        )
+        assert still_there.returncode != 0
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+        subprocess.run(["tmux", "-L", socket, "kill-server"], capture_output=True, check=False)
+
+
+@tmux_required
+def test_a_never_reap_box_stays_up(org):
+    """The explicit opt-out has to survive the same render path."""
+    box = _box(org, idle_timeout_seconds=0, environment_spec=_spec(org))
+    job = box_service.render_agent_box_job(box=box, image="i:1", namespace="ns", job_name="agent-box-never")
+    script = _container_of(job)["args"][0]
+
+    socket = "astrobox-render-never"
+    proc = subprocess.Popen(
+        ["/bin/sh", "-c", script.replace("tmux ", f"tmux -L {socket} ")],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        time.sleep(8)
+        assert proc.poll() is None
+    finally:
+        proc.kill()
+        subprocess.run(["tmux", "-L", socket, "kill-server"], capture_output=True, check=False)
+
+
+def test_the_reaper_settles_a_box_whose_pod_has_gone(org, cluster, monkeypatch):
+    """The control-plane half. The pod frees the node; this notices.
+
+    A box left claiming RUNNING after its pod completed is the platform
+    lying about what an operator can attach to, and it strands the
+    plaintext-bearing Secret the pod was handed.
+    """
+    box = _box(
+        org,
+        status=AgentBox.Status.RUNNING,
+        external_id="agent-box-gone",
+        namespace="astrolift-agents-box-org",
+        environment_spec=_spec(org),
+    )
+    cluster.driver._job_conditions = [{"type": "Complete", "status": "True"}]
+
+    summary = box_service.reap_agent_boxes()
+
+    box.refresh_from_db()
+    assert summary["expired"] == 1
+    assert box.status == AgentBox.Status.EXPIRED.value
+    assert box.ended_at is not None
+    deleted_kinds = {ref["kind"] for batch in cluster.driver.deleted for ref in batch}
+    assert deleted_kinds == {"Job", "Secret"}
+
+
+def test_the_reaper_leaves_a_box_it_cannot_observe_alone(org, cluster):
+    """An unreachable cluster is not a death certificate."""
+    box = _box(
+        org,
+        status=AgentBox.Status.RUNNING,
+        external_id="agent-box-unknown",
+        environment_spec=_spec(org),
+    )
+    cluster.driver._job_missing = True
+
+    summary = box_service.reap_agent_boxes()
+
+    box.refresh_from_db()
+    assert summary["errors"] == 1
+    assert box.status == AgentBox.Status.RUNNING.value
+    assert cluster.driver.deleted == []
+
+
+# ---------------------------------------------------------------------------
+# The secret packet reaches the pod
+# ---------------------------------------------------------------------------
+
+
+def test_the_env_spec_secret_packet_lands_on_the_box(
+    permission_resolver, info, org, with_tenant_org, cluster
+):
+    """ANTHROPIC_API_KEY, the whole reason the box is useful.
+
+    The value belongs in a Secret applied alongside the Job; the pod spec
+    gets a reference. A value in the manifest would be readable by anyone
+    who can describe the Job.
+    """
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    cluster.secrets.store["sm:anthropic"] = {"value": "sk-live-key"}
+    _spec(org, refs=[{"uri": "sm:anthropic", "env_var": "ANTHROPIC_API_KEY"}])
+
+    result = _ensure(info, org, with_tenant_org, environment_spec_slug="claude-dev")
+
+    assert result.ok is True, result.errors
+    applied = cluster.driver.applied[0]
+    secret = next(m for m in applied if m["kind"] == "Secret")
+    job = _job_of(applied)
+
+    assert secret["stringData"]["ANTHROPIC_API_KEY"] == "sk-live-key"
+    ref = _env_of(job)["ANTHROPIC_API_KEY"]["valueFrom"]["secretKeyRef"]
+    assert ref["name"] == secret["metadata"]["name"]
+    assert ref["key"] == "ANTHROPIC_API_KEY"
+    assert "sk-live-key" not in str(job)
+
+
+def test_a_box_whose_key_is_missing_refuses_to_start(
+    permission_resolver, info, org, with_tenant_org, cluster
+):
+    """Better a failed button than a warm box that dies on first prompt."""
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    _spec(org, refs=[{"uri": "sm:anthropic", "env_var": "ANTHROPIC_API_KEY"}])
+
+    result = _ensure(info, org, with_tenant_org, environment_spec_slug="claude-dev")
+
+    assert result.ok is False
+    assert "ANTHROPIC_API_KEY" in result.errors[0].message
+    assert cluster.driver.applied == []
+    assert AgentBox.objects.get(organization=org).status == AgentBox.Status.FAILED.value
+
+
+# ---------------------------------------------------------------------------
+# ensureAgentBox — the button
+# ---------------------------------------------------------------------------
+
+
+def test_ensure_starts_a_box_and_returns_how_to_attach(
+    permission_resolver, info, org, with_tenant_org, cluster
+):
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    _spec(org)
+
+    result = _ensure(info, org, with_tenant_org, environment_spec_slug="claude-dev")
+
+    assert result.ok is True, result.errors
+    assert result.data.status == AgentBox.Status.PROVISIONING.value
+    assert result.data.attach_command == ["tmux", "new-session", "-A", "-s", "astrolift"]
+    assert result.data.namespace == agent_namespace(org.slug)
+    assert cluster.driver.namespaces == [agent_namespace(org.slug)]
+
+
+def test_pressing_the_button_twice_attaches_rather_than_spending_a_second_node(
+    permission_resolver, info, org, with_tenant_org, cluster
+):
+    """Ensure semantics. The IDE re-clicks; the org must not grow boxes."""
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    _spec(org)
+
+    first = _ensure(info, org, with_tenant_org, environment_spec_slug="claude-dev")
+    second = _ensure(info, org, with_tenant_org, environment_spec_slug="claude-dev")
+
+    assert first.data.slug == second.data.slug
+    assert AgentBox.objects.filter(organization=org).count() == 1
+    # Only the first press applied anything to the cluster.
+    assert len(cluster.driver.applied) == 1
+
+
+def test_re_ensuring_a_reaped_box_restarts_it_under_the_same_address(
+    permission_resolver, info, org, with_tenant_org, cluster
+):
+    """The slug is what an IDE remembers. Idle-reaping must not invalidate it."""
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    _spec(org)
+    first = _ensure(info, org, with_tenant_org, environment_spec_slug="claude-dev")
+    box = AgentBox.objects.get(slug=first.data.slug)
+    box.status = AgentBox.Status.EXPIRED
+    box.save()
+
+    second = _ensure(info, org, with_tenant_org, environment_spec_slug="claude-dev")
+
+    assert second.ok is True, second.errors
+    assert second.data.slug == first.data.slug
+    assert second.data.status == AgentBox.Status.PROVISIONING.value
+    assert AgentBox.objects.filter(organization=org).count() == 1
+    assert len(cluster.driver.applied) == 2
+
+
+def test_ensure_is_denied_without_the_dispatch_grant(
+    permission_resolver, info, org, with_tenant_org, cluster
+):
+    """Deny-by-default, and the gate runs before anything is created."""
+    _spec(org)
+
+    result = _ensure(info, org, with_tenant_org, environment_spec_slug="claude-dev")
+
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.PERMISSION_DENIED.value
+    assert AgentBox.objects.count() == 0
+    assert cluster.driver.applied == []
+
+
+def test_ensure_needs_something_to_run(permission_resolver, info, org, with_tenant_org, cluster):
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+
+    result = _ensure(info, org, with_tenant_org)
+
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.VALIDATION.value
+    assert AgentBox.objects.count() == 0
+
+
+def test_a_batch_agent_is_not_silently_turned_into_a_box(
+    permission_resolver, info, org, with_tenant_org, cluster
+):
+    """The run mode is the gate.
+
+    Boxing a ``once`` agent behind the operator's back would change what
+    they configured into something that holds a node.
+    """
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    _spec(org)
+    _persistent_agent(org, slug="batch-bot", run_mode=Workload.RunMode.ONCE)
+
+    result = _ensure(info, org, with_tenant_org, agent_slug="batch-bot", environment_spec_slug="claude-dev")
+
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.VALIDATION.value
+    assert "persistent" in result.errors[0].message
+    assert AgentBox.objects.count() == 0
+
+
+def test_a_persistent_agent_backs_a_box(permission_resolver, info, org, with_tenant_org, cluster):
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    _spec(org)
+    workload = _persistent_agent(org, slug="claude-box")
+
+    result = _ensure(info, org, with_tenant_org, agent_slug="claude-box", environment_spec_slug="claude-dev")
+
+    assert result.ok is True, result.errors
+    assert result.data.agent_slug == workload.slug
+
+
+def test_a_negative_idle_timeout_is_refused_and_points_at_the_sentinel(
+    permission_resolver, info, org, with_tenant_org, cluster
+):
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    _spec(org)
+
+    result = _ensure(info, org, with_tenant_org, environment_spec_slug="claude-dev", idle_timeout_seconds=-1)
+
+    assert result.ok is False
+    assert "0" in result.errors[0].message
+    assert AgentBox.objects.count() == 0
+
+
+# ---------------------------------------------------------------------------
+# destroyAgentBox
+# ---------------------------------------------------------------------------
+
+
+def test_destroy_kills_the_pod_and_soft_deletes_the_row(
+    permission_resolver, info, org, with_tenant_org, cluster
+):
+    """Soft delete, per the platform rule — the row is history, not garbage."""
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    _spec(org)
+    created = _ensure(info, org, with_tenant_org, environment_spec_slug="claude-dev")
+
+    with with_tenant_org(org):
+        result = AgentsMutation().destroy_agent_box(info, slug=created.data.slug)
+
+    assert result.ok is True, result.errors
+    assert not AgentBox.objects.filter(slug=created.data.slug).exists()
+    row = AgentBox.all_objects.get(slug=created.data.slug)
+    assert row.deleted_at is not None
+    assert row.status == AgentBox.Status.STOPPED.value
+    deleted_kinds = {ref["kind"] for batch in cluster.driver.deleted for ref in batch}
+    assert deleted_kinds == {"Job", "Secret"}
+
+
+def test_destroy_is_denied_without_the_dispatch_grant(
+    permission_resolver, info, org, with_tenant_org, cluster
+):
+    box = _box(org, status=AgentBox.Status.RUNNING, external_id="agent-box-x")
+
+    with with_tenant_org(org):
+        result = AgentsMutation().destroy_agent_box(info, slug=box.slug)
+
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.PERMISSION_DENIED.value
+    box.refresh_from_db()
+    assert box.deleted_at is None
+    assert cluster.driver.deleted == []
+
+
+# ---------------------------------------------------------------------------
+# Tenancy — nothing here is reachable across orgs
+# ---------------------------------------------------------------------------
+
+
+def test_another_orgs_box_is_not_readable(permission_resolver, info, org, other_org, with_tenant_org):
+    """``@tenant_scoped`` asserts a tenant exists; it does not filter. The
+    resolver's own organization filter is what keeps this closed."""
+    permission_resolver.grant(Permission.AGENT_READ)
+    theirs = _box(other_org, slug="their-box", status=AgentBox.Status.RUNNING)
+
+    with with_tenant_org(org):
+        one = AgentsQuery().agent_box(info, slug=theirs.slug)
+        listed = AgentsQuery().agent_boxes(info, org_id=str(org.guid))
+
+    assert one is None
+    assert listed == []
+
+
+def test_another_orgs_box_cannot_be_destroyed(
+    permission_resolver, info, org, other_org, with_tenant_org, cluster
+):
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    theirs = _box(other_org, slug="their-box", status=AgentBox.Status.RUNNING, external_id="job-x")
+
+    with with_tenant_org(org):
+        result = AgentsMutation().destroy_agent_box(info, slug=theirs.slug)
+
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.NOT_FOUND.value
+    theirs.refresh_from_db()
+    assert theirs.deleted_at is None
+    assert theirs.status == AgentBox.Status.RUNNING.value
+    assert cluster.driver.deleted == []
+
+
+def test_a_box_cannot_be_ensured_from_another_orgs_env_spec(
+    permission_resolver, info, org, other_org, with_tenant_org, cluster
+):
+    """Otherwise a foreign slug would pull that org's secret refs into a pod
+    running in this one."""
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    _spec(other_org, slug="their-spec")
+
+    result = _ensure(info, org, with_tenant_org, environment_spec_slug="their-spec")
+
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.NOT_FOUND.value
+    assert AgentBox.objects.count() == 0
+    assert cluster.driver.applied == []
+
+
+def test_a_box_cannot_be_ensured_from_another_orgs_agent(
+    permission_resolver, info, org, other_org, with_tenant_org, cluster
+):
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    _spec(org)
+    _persistent_agent(other_org, slug="their-agent")
+
+    result = _ensure(info, org, with_tenant_org, agent_slug="their-agent", environment_spec_slug="claude-dev")
+
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.NOT_FOUND.value
+    assert AgentBox.objects.count() == 0
+
+
+def test_ensuring_into_another_org_by_id_is_refused(
+    permission_resolver, info, org, other_org, with_tenant_org, cluster
+):
+    """The org_id argument must agree with the caller's active tenant."""
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    _spec(other_org, slug="their-spec")
+
+    with with_tenant_org(org):
+        result = AgentsMutation().ensure_agent_box(
+            info,
+            input=EnsureAgentBoxInput(environment_spec_slug="their-spec"),
+            org_id=str(other_org.guid),
+        )
+
+    assert result.ok is False
+    assert result.errors[0].code == ErrorCode.PERMISSION_DENIED.value
+    assert AgentBox.objects.count() == 0
+
+
+def test_the_list_shows_live_boxes_and_can_include_the_settled_ones(
+    permission_resolver, info, org, with_tenant_org
+):
+    """A settled box is history; the default question is "what is warm"."""
+    permission_resolver.grant(Permission.AGENT_READ)
+    _box(org, slug="warm-box", status=AgentBox.Status.RUNNING)
+    _box(org, slug="cold-box", status=AgentBox.Status.EXPIRED)
+
+    with with_tenant_org(org):
+        live = AgentsQuery().agent_boxes(info, org_id=str(org.guid))
+        everything = AgentsQuery().agent_boxes(info, org_id=str(org.guid), include_ended=True)
+
+    assert [b.slug for b in live] == ["warm-box"]
+    assert {b.slug for b in everything} == {"warm-box", "cold-box"}

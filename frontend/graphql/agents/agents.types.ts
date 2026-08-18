@@ -2,6 +2,7 @@ import type {
   AgentRunFamily as GeneratedAgentRunFamily,
   AgentRunMode as GeneratedAgentRunMode,
   AgentRunSpecInput as GeneratedAgentRunSpecInput,
+  AstroliftAgentBox as GeneratedAgentBox,
   AstroliftAgentDetail as GeneratedAgentDetail,
   AstroliftAgentEnvironmentSpec as GeneratedAgentEnvironmentSpec,
   AstroliftAgentInteraction as GeneratedAgentInteraction,
@@ -357,4 +358,41 @@ export type AgentTriggersData = {
 export type AgentTriggersVars = {
   orgId: string;
   agentSlug: string;
+};
+
+// ---------------------------------------------------------------------------
+// Agent boxes (#128)
+// ---------------------------------------------------------------------------
+
+export type AstroliftAgentBox = Pick<
+  GeneratedAgentBox,
+  | "id"
+  | "name"
+  | "slug"
+  | "status"
+  | "agentSlug"
+  | "environmentSpecSlug"
+  | "image"
+  | "idleTimeoutSeconds"
+  | "sessionName"
+  | "attachCommand"
+  | "namespace"
+  | "podName"
+  | "ownerEmail"
+  | "lastError"
+  | "startedAt"
+  | "endedAt"
+  | "lastAttachedAt"
+  | "createdAt"
+>;
+
+// Hand-typed for the same reason as the feeds above: agents.queries.ts is
+// excluded from codegen operation typing (see codegen.ts).
+export type AgentBoxesData = {
+  agentBoxes: AstroliftAgentBox[];
+};
+
+export type AgentBoxesVars = {
+  orgId: string;
+  includeEnded?: boolean;
 };
