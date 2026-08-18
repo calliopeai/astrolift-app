@@ -32,6 +32,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.managed_service_tags import read_ownership_tag
 from azure.managed.event_grid import (
     _ADVANCED_FILTER_MODELS,
     _NO_VALUE_FILTERS,
@@ -46,8 +47,8 @@ from azure.managed.event_grid import (
     _validate_advanced_filter,
     _validate_delivery_attribute,
     _validate_resource_name,
-    tags_for,
 )
+from azure.managed.tags import arm_tags_for as tags_for
 
 KIND = "event_bus"
 VARIANT = "event_grid_namespace"
@@ -1221,14 +1222,14 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
         self._assert_platform_owned(namespace)
         tags = dict(_field(namespace, "tags", default={}) or {})
         expected = spec.binding_id or ""
-        actual = str(tags.get("astrolift.io/binding") or "")
+        actual = read_ownership_tag(tags, "binding", "azure")
         if expected and expected != actual:
             raise AzureEventGridNamespaceError("Event Grid namespace is owned by another managed-service binding")
 
     @staticmethod
     def _assert_platform_owned(namespace: Any) -> None:
         tags = dict(_field(namespace, "tags", default={}) or {})
-        if tags.get("astrolift.io/managed-by") != "platform":
+        if read_ownership_tag(tags, "managed_by", "azure") != "platform":
             raise AzureEventGridNamespaceError(
                 "Event Grid namespace name collides with a resource Astrolift does not own",
             )

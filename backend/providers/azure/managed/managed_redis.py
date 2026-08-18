@@ -38,6 +38,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from azure.managed.tags import arm_tags_for as tags_for
 
 KIND = "redis"
 DEFAULT_DATABASE_NAME = "default"
@@ -161,23 +162,6 @@ class AzureManagedRedisConfig:
             raise ValueError("high_availability_default must be Enabled or Disabled")
         if self.minimum_tls_version_default != "1.2":
             raise ValueError("Azure Managed Redis requires minimum TLS 1.2")
-
-
-def tags_for(spec: ProvisionSpec) -> dict[str, str]:
-    tags = {
-        "astrolift.io/managed-by": "platform",
-        "astrolift.io/organization": spec.organization_slug,
-        "astrolift.io/app": spec.app_slug,
-        "astrolift.io/environment": spec.environment_name,
-        "astrolift.io/cluster": spec.tenant_cluster_id,
-        "astrolift.io/isolation": spec.isolation,
-    }
-    if spec.binding_id:
-        tags["astrolift.io/binding"] = spec.binding_id
-    if spec.managed_service_id:
-        tags["astrolift.io/managed_service_id"] = spec.managed_service_id
-    tags.update({f"astrolift.io/extra/{key}": value for key, value in (spec.tags or {}).items()})
-    return tags
 
 
 class AzureManagedRedisDriver(ManagedServiceDriver):
