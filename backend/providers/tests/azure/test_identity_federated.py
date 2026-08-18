@@ -129,6 +129,7 @@ class FakeRoleAssignments:
     create_calls: list[tuple[str, str, dict[str, Any]]] = field(default_factory=list)
     deleted: list[tuple[str, str]] = field(default_factory=list)
     list_error: Exception | None = None
+    conflict_on_create: bool = False
 
     def create(
         self,
@@ -140,8 +141,18 @@ class FakeRoleAssignments:
         props = parameters["properties"]
         self.create_calls.append((scope, role_assignment_name, props))
         key = (scope, role_assignment_name)
-        if key in self.assignments:
+        # ARM answers RoleAssignmentExists both when the name is taken and when
+        # the same (principal, role, scope) is already granted under any other
+        # name, so the fake conflicts on both.
+        if key in self.assignments or self.conflict_on_create:
             raise _Exists(role_assignment_name)
+        for existing in self.assignments.values():
+            if (
+                existing.scope == scope
+                and existing.principal_id == props["principalId"]
+                and existing.role_definition_id == props["roleDefinitionId"]
+            ):
+                raise _Exists(role_assignment_name)
         self.assignments[key] = FakeAssignment(
             name=role_assignment_name,
             scope=scope,
@@ -517,6 +528,69 @@ def test_existing_assignment_under_our_name_bound_elsewhere_is_a_hard_error(
 
     with pytest.raises(AzureRoleAssignmentError, match="another party's assignment"):
         driver.create_identity_role("api", permissions=[_permission(_BLOB_ROLE, _CONTAINER_SCOPE)])
+
+
+def test_operator_grant_of_the_same_role_and_scope_is_accepted_not_duplicated(
+    driver: AzureFederatedIdentityDriver,
+    fake_authz: FakeAuthz,
+) -> None:
+    # Brownfield subscription: the operator already granted exactly what the
+    # app declares, under a name of their own. ARM refuses the duplicate, and
+    # the workload is authorized, so the reconcile must converge instead of
+    # failing every deploy forever.
+    operator = fake_authz.role_assignments.seed(
+        FakeAssignment(
+            name=str(uuid.uuid4()),
+            scope=_CONTAINER_SCOPE,
+            role_definition_id=_role_definition_id(_BLOB_ROLE),
+            principal_id="principal-9999",
+            description="granted by hand before onboarding",
+        ),
+    )
+
+    driver.create_identity_role("api", permissions=[_permission(_BLOB_ROLE, _CONTAINER_SCOPE)])
+
+    assert fake_authz.role_assignments.assignments == {(operator.scope, operator.name): operator}
+
+    # Accepting their assignment is not adopting it: dropping the grant leaves
+    # the operator's row alone, because its name is not one we can re-derive.
+    driver.create_identity_role("api", permissions=[])
+
+    assert fake_authz.role_assignments.deleted == []
+    assert fake_authz.role_assignments.assignments == {(operator.scope, operator.name): operator}
+
+
+def test_conflict_with_no_matching_assignment_is_raised_not_swallowed(
+    driver: AzureFederatedIdentityDriver,
+    fake_authz: FakeAuthz,
+) -> None:
+    # A conflict we cannot explain by an existing equivalent grant means the
+    # workload may hold no authorization at all; report it.
+    fake_authz.role_assignments.conflict_on_create = True
+
+    with pytest.raises(ProviderError):
+        driver.create_identity_role("api", permissions=[_permission(_BLOB_ROLE, _CONTAINER_SCOPE)])
+
+
+def test_aws_policy_statements_are_refused_by_the_azure_driver(
+    driver: AzureFederatedIdentityDriver,
+    fake_authz: FakeAuthz,
+) -> None:
+    # The original bug: AWS-shaped statements reached this driver and were
+    # dropped, so the binding reported ready while granting nothing.
+    with pytest.raises(AzureGrantContractError):
+        driver.create_identity_role(
+            "api",
+            permissions=[
+                {
+                    "Effect": "Allow",
+                    "Action": ["s3:GetObject", "s3:PutObject"],
+                    "Resource": "arn:aws:s3:::astrolift-data/*",
+                },
+            ],
+        )
+
+    assert fake_authz.role_assignments.create_calls == []
 
 
 def test_nothing_is_deleted_when_the_assignment_listing_fails(

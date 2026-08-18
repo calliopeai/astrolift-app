@@ -312,12 +312,13 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
             # The name is derived from (scope, role, principal), so an existing
             # assignment under it is the same grant — unless someone else took
             # the name for a different grant, which must not pass as ours.
-            self._assert_not_foreign(
+            self._resolve_existing_assignment(
                 authz=authz,
                 scope=scope,
                 assignment_name=assignment_name,
                 identity=identity,
                 role_definition_guid=role_definition_guid,
+                cause=exc,
             )
 
     def _prune_role_assignments(
@@ -364,7 +365,7 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
                     continue
                 raise map_api_error(exc) from exc
 
-    def _assert_not_foreign(
+    def _resolve_existing_assignment(
         self,
         *,
         authz: Any,
@@ -372,14 +373,35 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
         assignment_name: str,
         identity: AzureManagedIdentity,
         role_definition_guid: str,
+        cause: Exception,
     ) -> None:
+        """Decide what an existing-assignment conflict actually means.
+
+        Azure answers 409 in two different situations. Our derived name may be
+        taken — the idempotent retry, unless the assignment under it expresses
+        a different grant. Or the operator already granted this exact
+        ``(principal, role, scope)`` under a name of their own, in which case
+        the workload is authorized and re-deriving the name would conflict on
+        every future reconcile. That assignment stays theirs: pruning only
+        removes names it can re-derive, so accepting it here never gives us a
+        licence to delete it later.
+        """
         try:
             existing = authz.role_assignments.get(
                 scope=scope,
                 role_assignment_name=assignment_name,
             )
         except Exception as exc:
-            raise map_api_error(exc) from exc
+            if type(exc).__name__ != "ResourceNotFoundError":
+                raise map_api_error(exc) from exc
+            if self._grant_already_assigned(
+                authz=authz,
+                identity=identity,
+                role_definition_guid=role_definition_guid,
+                scope=scope,
+            ):
+                return
+            raise map_api_error(cause) from cause
         props = _assignment_properties(existing)
         principal_id = str(getattr(props, "principal_id", "") or "")
         guid = str(getattr(props, "role_definition_id", "") or "").rsplit("/", 1)[-1].lower()
@@ -389,6 +411,36 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
                 f"principal {principal_id!r} to role {guid!r}; refusing to treat another "
                 "party's assignment as this workload's grant",
             )
+
+    def _grant_already_assigned(
+        self,
+        *,
+        authz: Any,
+        identity: AzureManagedIdentity,
+        role_definition_guid: str,
+        scope: str,
+    ) -> bool:
+        """Is this exact grant already on the principal under another name?"""
+        try:
+            existing = list(
+                authz.role_assignments.list_for_subscription(
+                    filter=f"principalId eq '{identity.principal_id}'",
+                ),
+            )
+        except Exception:
+            # An unreadable listing proves nothing; let the caller surface the
+            # original conflict rather than assume the grant is in place.
+            return False
+        target = scope.rstrip("/").lower()
+        for assignment in existing:
+            props = _assignment_properties(assignment)
+            if str(getattr(props, "principal_id", "") or "") != identity.principal_id:
+                continue
+            guid = str(getattr(props, "role_definition_id", "") or "").rsplit("/", 1)[-1].lower()
+            found = str(getattr(props, "scope", "") or "").rstrip("/").lower()
+            if guid == role_definition_guid.lower() and found == target:
+                return True
+        return False
 
     def _authorization_client(self) -> Any:
         if self._authz is None:
