@@ -54,3 +54,27 @@ def dns_label(*parts: object, max_length: int = 63, hash_length: int = 10) -> st
 def app_namespace(*, organization_slug: str, app_slug: str) -> str:
     """Canonical per-app/project namespace, safe for maximum-length slugs."""
     return dns_label(organization_slug, app_slug)
+
+
+AGENT_NAMESPACE_PREFIX = "astrolift-agents"
+
+
+def agent_namespace(organization_slug: str) -> str:
+    """Canonical per-organization namespace for agent workloads.
+
+    Organization slugs allow 200 characters and a Kubernetes namespace allows
+    63, so the f-string this replaces produced an invalid namespace for a valid
+    slug, breaking agent dispatch and any NetworkPolicy selecting on it (#1379).
+
+    Every caller must derive the name the same way. The two that matter most
+    are not the ones creating the namespace but the managed-service drivers
+    building NetworkPolicy namespace selectors: a selector computed differently
+    from the namespace it is meant to match silently selects nothing, which
+    fails as a connectivity problem rather than a naming one.
+
+    Byte-for-byte identical to the old ``f"astrolift-agents-{slug}"`` for every
+    slug short enough to have produced a valid namespace, so nothing deployed
+    needs migrating. Names only change where the old form could not have
+    worked.
+    """
+    return dns_label(AGENT_NAMESPACE_PREFIX, organization_slug)

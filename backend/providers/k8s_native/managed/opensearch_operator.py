@@ -25,7 +25,7 @@ from typing import Any
 
 from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op, maybe_heartbeat
-from _sdk.k8s_naming import app_namespace, dns_label
+from _sdk.k8s_naming import agent_namespace, app_namespace, dns_label
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -1162,7 +1162,7 @@ class _OpenSearchOperatorDriver(ManagedServiceDriver):
                     {
                         "namespaceSelector": {
                             "matchLabels": {
-                                "kubernetes.io/metadata.name": f"astrolift-agents-{organization.lower()}",
+                                "kubernetes.io/metadata.name": agent_namespace(organization),
                             }
                         }
                     },
