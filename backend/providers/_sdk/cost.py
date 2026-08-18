@@ -133,6 +133,13 @@ class CostEstimator(Protocol):
     rule-of-thumb formulas. Stale or hand-maintained price tables
     drift silently and erode operator trust in the preview.
 
+    A service's catalog listing covers far more than the resource
+    being estimated (other engines, editions, redundancy modes,
+    storage classes), so step 1 is a per-variant selection, not a
+    filter-and-sum. ``_sdk.cost_skus`` carries the cloud-agnostic
+    machinery for it: declare one component per billable dimension
+    and it resolves each to exactly one catalog row or refuses.
+
     Implementations should:
     1. Translate (kind, variant, size, expected_usage) into the
        relevant cloud pricing-catalog SKU(s).
