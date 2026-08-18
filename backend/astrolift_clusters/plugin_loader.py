@@ -24,6 +24,7 @@ import logging
 from importlib.metadata import entry_points
 from typing import Any
 
+from astrolift_drivers.managed_resolution import managed_role
 from astrolift_drivers.registry import PluginManifest, plugins
 
 logger = logging.getLogger(__name__)
@@ -42,13 +43,16 @@ def _adapt(plugin_id: str, plugin_obj: Any) -> PluginManifest:
         ``managed:<kind>:<variant>`` in the driver dict. That keeps every
         capability addressable through the same ``plugins.get(id, role)``
         path the control plane already uses; the catalog code can split
-        them back apart if it cares.
+        them back apart if it cares. Callers go through
+        ``astrolift_drivers.managed_resolution.resolve_managed_driver``
+        rather than ``plugins.get`` directly, because a cloud-hosted
+        cluster also reaches the ``k8s_native`` drivers (#1484).
       - SDK has no version field; we default to "0.0.0" and let the
         DB-side row carry whatever the operator stamps.
     """
     drivers: dict[str, Any] = dict(plugin_obj.drivers)
     for (kind, variant), driver_cls in getattr(plugin_obj, "managed_service_drivers", {}).items():
-        drivers[f"managed:{kind}:{variant}"] = driver_cls
+        drivers[managed_role(kind, variant)] = driver_cls
 
     capabilities = tuple(sorted(plugin_obj.drivers.keys()))
 

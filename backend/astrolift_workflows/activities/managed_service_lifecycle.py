@@ -248,7 +248,8 @@ def _deprovision_sync(
     delete_data: bool,
     force_destroy: bool,
 ) -> dict[str, Any]:
-    from astrolift_drivers.registry import DriverNotFound, plugins
+    from astrolift_drivers.managed_resolution import resolve_managed_driver
+    from astrolift_drivers.registry import DriverNotFound
     from astrolift_services.models import ManagedService
     from core.cluster_observability import managed_config_for
 
@@ -277,18 +278,16 @@ def _deprovision_sync(
     plugin_slug = cluster.provider_plugin.slug
     variant = getattr(svc, "variant", "") or ""
     try:
-        driver_cls = plugins.get(plugin_slug, f"managed:{svc.kind}:{variant}")
-    except DriverNotFound:
-        try:
-            driver_cls = plugins.get(plugin_slug, f"managed:{svc.kind}:")
-        except DriverNotFound as exc:
-            raise RuntimeError(
-                f"cluster {cluster.slug}: plugin {plugin_slug!r} has no managed-service driver "
-                f"for kind={svc.kind!r} variant={variant!r}",
-            ) from exc
+        resolved = resolve_managed_driver(
+            cluster_plugin_slug=plugin_slug,
+            kind=svc.kind,
+            variant=variant,
+        )
+    except DriverNotFound as exc:
+        raise RuntimeError(f"cluster {cluster.slug}: {exc}") from exc
 
-    cfg = managed_config_for(plugin_slug, cluster, kind=svc.kind, variant=variant)
-    driver = driver_cls(config=cfg)
+    cfg = managed_config_for(resolved.plugin_slug, cluster, kind=svc.kind, variant=variant)
+    driver = resolved.driver_cls(config=cfg)
 
     dynamic_cleanup_message = ""
     is_dynamic_pvc = svc.kind == "filesystem" and variant in _DYNAMIC_PVC_VARIANTS
@@ -463,7 +462,8 @@ async def mark_managed_service_provisioning(
 
 
 def _provision_sync(managed_service_id: int) -> dict[str, Any]:
-    from astrolift_drivers.registry import DriverNotFound, plugins
+    from astrolift_drivers.managed_resolution import resolve_managed_driver
+    from astrolift_drivers.registry import DriverNotFound
     from astrolift_services.models import ManagedService
     from core.cluster_observability import managed_config_for
 
@@ -483,20 +483,16 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
     variant = getattr(svc, "variant", "") or ""
     _run_managed_service_preflight(svc, cluster)
     try:
-        driver_cls = plugins.get(plugin_slug, f"managed:{svc.kind}:{variant}")
-    except DriverNotFound:
-        # Some plugins register the empty-variant default
-        # (``managed:postgres:`` rather than ``managed:postgres:rds``).
-        try:
-            driver_cls = plugins.get(plugin_slug, f"managed:{svc.kind}:")
-        except DriverNotFound as exc:
-            raise RuntimeError(
-                f"cluster {cluster.slug}: plugin {plugin_slug!r} has no managed-service driver "
-                f"for kind={svc.kind!r} variant={variant!r}",
-            ) from exc
+        resolved = resolve_managed_driver(
+            cluster_plugin_slug=plugin_slug,
+            kind=svc.kind,
+            variant=variant,
+        )
+    except DriverNotFound as exc:
+        raise RuntimeError(f"cluster {cluster.slug}: {exc}") from exc
 
-    cfg = managed_config_for(plugin_slug, cluster, kind=svc.kind, variant=variant)
-    driver = driver_cls(config=cfg)
+    cfg = managed_config_for(resolved.plugin_slug, cluster, kind=svc.kind, variant=variant)
+    driver = resolved.driver_cls(config=cfg)
 
     from _sdk.managed_service import ProvisionSpec
 
@@ -533,7 +529,8 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
 
 
 def _update_sync(managed_service_id: int) -> dict[str, Any]:
-    from astrolift_drivers.registry import DriverNotFound, plugins
+    from astrolift_drivers.managed_resolution import resolve_managed_driver
+    from astrolift_drivers.registry import DriverNotFound
     from astrolift_services.models import ManagedService
     from core.cluster_observability import managed_config_for
 
@@ -551,18 +548,16 @@ def _update_sync(managed_service_id: int) -> dict[str, Any]:
     variant = getattr(svc, "variant", "") or ""
     _run_managed_service_preflight(svc, cluster)
     try:
-        driver_cls = plugins.get(plugin_slug, f"managed:{svc.kind}:{variant}")
-    except DriverNotFound:
-        try:
-            driver_cls = plugins.get(plugin_slug, f"managed:{svc.kind}:")
-        except DriverNotFound as exc:
-            raise ValueError(
-                f"cluster {cluster.slug}: plugin {plugin_slug!r} has no managed-service "
-                f"driver for kind={svc.kind!r} variant={variant!r}",
-            ) from exc
+        resolved = resolve_managed_driver(
+            cluster_plugin_slug=plugin_slug,
+            kind=svc.kind,
+            variant=variant,
+        )
+    except DriverNotFound as exc:
+        raise ValueError(f"cluster {cluster.slug}: {exc}") from exc
 
-    cfg = managed_config_for(plugin_slug, cluster, kind=svc.kind, variant=variant)
-    driver = driver_cls(config=cfg)
+    cfg = managed_config_for(resolved.plugin_slug, cluster, kind=svc.kind, variant=variant)
+    driver = resolved.driver_cls(config=cfg)
 
     from _sdk.managed_service import UpdateSpec
 
@@ -642,7 +637,8 @@ async def provision_managed_service(
 def _check_ready_sync(managed_service_id: int, handle: str) -> str:
     """Return the driver-reported readiness state for the backend resource
     (provisioning | available | updating | error | deprovisioned ...)."""
-    from astrolift_drivers.registry import DriverNotFound, plugins
+    from astrolift_drivers.managed_resolution import resolve_managed_driver
+    from astrolift_drivers.registry import DriverNotFound
     from astrolift_services.models import ManagedService
     from core.cluster_observability import managed_config_for
 
@@ -656,14 +652,15 @@ def _check_ready_sync(managed_service_id: int, handle: str) -> str:
     plugin_slug = cluster.provider_plugin.slug
     variant = getattr(svc, "variant", "") or ""
     try:
-        driver_cls = plugins.get(plugin_slug, f"managed:{svc.kind}:{variant}")
+        resolved = resolve_managed_driver(
+            cluster_plugin_slug=plugin_slug,
+            kind=svc.kind,
+            variant=variant,
+        )
     except DriverNotFound:
-        try:
-            driver_cls = plugins.get(plugin_slug, f"managed:{svc.kind}:")
-        except DriverNotFound:
-            return "available"
-    cfg = managed_config_for(plugin_slug, cluster, kind=svc.kind, variant=variant)
-    driver = driver_cls(config=cfg)
+        return "available"
+    cfg = managed_config_for(resolved.plugin_slug, cluster, kind=svc.kind, variant=variant)
+    driver = resolved.driver_cls(config=cfg)
     status_method = getattr(driver, "status", None)
     if not callable(status_method):
         return "available"
@@ -757,7 +754,8 @@ def _managed_binding_for(svc: Any) -> Any:
     identity activity (reads ``iam_grants``) so both resolve the driver the
     same way.
     """
-    from astrolift_drivers.registry import DriverNotFound, plugins
+    from astrolift_drivers.managed_resolution import resolve_managed_driver
+    from astrolift_drivers.registry import DriverNotFound
     from core.cluster_observability import managed_config_for
 
     if not svc.backend_ref:
@@ -768,14 +766,15 @@ def _managed_binding_for(svc: Any) -> Any:
     plugin_slug = cluster.provider_plugin.slug
     variant = getattr(svc, "variant", "") or ""
     try:
-        driver_cls = plugins.get(plugin_slug, f"managed:{svc.kind}:{variant}")
+        resolved = resolve_managed_driver(
+            cluster_plugin_slug=plugin_slug,
+            kind=svc.kind,
+            variant=variant,
+        )
     except DriverNotFound:
-        try:
-            driver_cls = plugins.get(plugin_slug, f"managed:{svc.kind}:")
-        except DriverNotFound:
-            return None
-    cfg = managed_config_for(plugin_slug, cluster, kind=svc.kind, variant=variant)
-    driver = driver_cls(config=cfg)
+        return None
+    cfg = managed_config_for(resolved.plugin_slug, cluster, kind=svc.kind, variant=variant)
+    driver = resolved.driver_cls(config=cfg)
 
     binding_method = getattr(driver, "binding", None)
     if not callable(binding_method):

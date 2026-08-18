@@ -46,7 +46,7 @@ def test_every_default_tier_cell_has_a_manifest_or_a_declared_reason():
         (kind, cloud)
         for kind in collection.default_tier_kinds()
         for cloud in CLOUDS
-        if cloud not in collection.VARIANTS.get(kind, {}) and (kind, cloud) not in collection.NOT_EXPRESSIBLE
+        if collection.cell_for(kind, cloud) is None and (kind, cloud) not in collection.NOT_EXPRESSIBLE
     ]
 
     assert not missing, "default-tier cells with neither a manifest nor an entry in NOT_EXPRESSIBLE: " + ", ".join(
@@ -56,9 +56,14 @@ def test_every_default_tier_cell_has_a_manifest_or_a_declared_reason():
 
 def test_no_cell_is_excused_that_the_matrix_says_is_executable():
     """A stale excuse is worse than no manifest: it reads as a known gap long
-    after the variant shipped."""
+    after the variant shipped.
+
+    An in-cluster variant counts, because a cloud-hosted cluster can book one
+    (#1484). Five cells were excused on the strength of the runtime not being
+    able to reach the driver that covered them; that is now a manifest, not an
+    excuse."""
     stale = [
-        (kind, cloud) for (kind, cloud) in collection.NOT_EXPRESSIBLE if collection.executable_variants(kind, cloud)
+        (kind, cloud) for (kind, cloud) in collection.NOT_EXPRESSIBLE if collection.cell_for(kind, cloud) is not None
     ]
 
     assert not stale, "NOT_EXPRESSIBLE claims a hole the availability matrix does not have: " + ", ".join(
@@ -66,24 +71,44 @@ def test_no_cell_is_excused_that_the_matrix_says_is_executable():
     )
 
 
-def test_every_chosen_variant_is_executable_on_its_cloud():
+def test_every_chosen_variant_is_executable_on_the_plugin_that_owns_it():
     """A manifest naming a planned variant fails at driver lookup, which teaches
-    nobody anything about the cloud."""
+    nobody anything about the cloud.
+
+    Checked against the cell's own plugin: an in-cluster cell's variant has to
+    be executable on ``k8s_native``, not on the cloud the cell is filed under.
+    """
     wrong = [
-        f"{kind}/{cloud}:{variant}"
-        for kind, per_cloud in collection.VARIANTS.items()
-        for cloud, variant in per_cloud.items()
-        if variant not in collection.executable_variants(kind, cloud)
+        f"{cell.kind}/{cell.cloud}:{cell.variant} (via {cell.plugin_id})"
+        for cell in collection.cells()
+        if cell.variant not in collection.executable_variants(cell.kind, cell.plugin_id)
     ]
 
     assert not wrong, "variants that are not executable per the availability matrix: " + ", ".join(sorted(wrong))
+
+
+def test_an_in_cluster_cell_is_only_used_where_the_cloud_sells_nothing():
+    """The in-cluster variant is the portability answer, not the preferred one.
+    A cell that took ``memcached`` on a cloud with ElastiCache would certify a
+    path no app on that cloud is routed down."""
+    misrouted = [
+        f"{cell.kind}/{cell.cloud}"
+        for cell in collection.cells()
+        if cell.is_in_cluster and collection.executable_variants(cell.kind, cell.cloud)
+    ]
+
+    assert not misrouted, "in-cluster cells on clouds that ship a managed variant: " + ", ".join(sorted(misrouted))
 
 
 def test_opt_in_kinds_are_outside_the_campaign():
     """Spec 43 scopes the campaign to the guaranteed cross-cloud surface. An
     opt-in kind here would spend metered time on something the platform does not
     promise."""
-    booked = {kind for kind in collection.VARIANTS} | {kind for kind, _ in collection.NOT_EXPRESSIBLE}
+    booked = (
+        set(collection.VARIANTS)
+        | set(collection.IN_CLUSTER_VARIANTS)
+        | {kind for kind, _ in collection.NOT_EXPRESSIBLE}
+    )
 
     assert not booked & OPT_IN_TIER
 
@@ -109,14 +134,17 @@ def test_the_committed_manifests_match_a_fresh_render():
 
 def test_the_grid_is_the_size_the_ledger_claims():
     """Pins the shape of the metered run: 23 default-tier kinds across three
-    clouds, minus the six cells with no executable variant.
+    clouds, minus the one cell with no executable variant.
 
     ``encryption_key/azure`` moved out of the excused set when #1454 landed the
     Key Vault key driver; #1480's ledger was written against the tree before
-    it."""
+    it. Five more moved out with #1484, which let a cloud-hosted cluster book
+    the in-cluster variant that already covered them -- five extra metered
+    cells is the price of the portability claim being true."""
     assert len(collection.default_tier_kinds()) == 23
-    assert len(collection.cells()) == 63
-    assert len(collection.NOT_EXPRESSIBLE) == 6
+    assert len(collection.cells()) == 68
+    assert len(collection.NOT_EXPRESSIBLE) == 1
+    assert sum(1 for cell in collection.cells() if cell.is_in_cluster) == 5
 
 
 # ---- every manifest is real ---------------------------------------------------

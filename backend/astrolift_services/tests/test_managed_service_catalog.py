@@ -92,6 +92,88 @@ def test_known_provider_rejects_a_kind_outside_its_catalog():
         resolve_variant(plugin_slug="aws", kind="not-a-kind", requested_variant=None)
 
 
+# ---- in-cluster variants on a cloud cluster (#1484) --------------------------
+
+
+class _MemcachedDriver:
+    def __init__(self):
+        raise AssertionError("catalogue discovery must not construct drivers")
+
+    def config_schema(self):
+        return {"type": "object", "properties": {}}
+
+    def binding_schema(self):
+        return BindingSchema(env_vars={"CACHE_URL": "Memcached endpoint"})
+
+
+@pytest.fixture
+def _azure_plus_in_cluster(monkeypatch):
+    """An Azure cluster with the in-cluster plugin also loaded, which is every
+    control plane: the plugins are installed together, they were just never
+    reachable from one another."""
+    monkeypatch.setattr(
+        plugins,
+        "_plugins",
+        {
+            "azure": PluginManifest(
+                plugin_id="azure",
+                display_name="Azure",
+                version="test",
+                drivers={"managed:postgres:azure_pg_flex": _RdsDriver},
+            ),
+            "k8s_native": PluginManifest(
+                plugin_id="k8s_native",
+                display_name="Kubernetes",
+                version="test",
+                drivers={
+                    "managed:cache:memcached": _MemcachedDriver,
+                    "managed:postgres:cnpg": _MemcachedDriver,
+                },
+            ),
+        },
+    )
+
+
+def test_the_catalogue_offers_what_the_runtime_can_resolve(_azure_plus_in_cluster):
+    """The gate has to agree with the thing it gates.
+
+    ``createManagedService`` calls ``resolve_variant`` before any activity
+    runs, so a catalogue scoped to the cluster's own plugin refuses a variant
+    the lifecycle would provision without complaint -- which leaves #1484 fixed
+    in the runtime and still broken through the API."""
+    resolved = resolve_variant(plugin_slug="azure", kind="cache", requested_variant="memcached")
+
+    assert resolved.available
+    assert resolved.id == "azure:cache:memcached"
+
+
+def test_an_in_cluster_variant_is_the_default_only_where_the_cloud_sells_nothing(
+    _azure_plus_in_cluster,
+):
+    """Azure ships no cache, so Memcached is the answer for that kind. Azure
+    does ship postgres, so CNPG is offered but must not displace it -- a
+    borrowed variant turning a kind that had one obvious answer into one that
+    demands an explicit variant would break every caller that omits it."""
+    by_id = {row.id: row for row in list_catalog("azure")}
+
+    assert by_id["azure:cache:memcached"].is_default_for_kind
+    assert by_id["azure:postgres:cnpg"].available
+    assert not by_id["azure:postgres:cnpg"].is_default_for_kind
+    assert (
+        resolve_variant(plugin_slug="azure", kind="postgres", requested_variant=None).variant
+        == "azure_pg_flex"
+    )
+
+
+def test_the_in_cluster_plugin_borrows_nothing_back(_azure_plus_in_cluster):
+    """One-way, exactly as the driver resolver is. A vanilla cluster offering
+    Azure Database would be an offer nobody can honour."""
+    variants = {row.id for row in list_catalog("k8s_native")}
+
+    assert "k8s_native:postgres:cnpg" in variants
+    assert not any(row.endswith("azure_pg_flex") for row in variants)
+
+
 def test_portable_model_kind_enum_covers_the_full_provider_matrix():
     model_kinds = {value for value, _label in ManagedService.Kind.choices}
     catalog_kinds = {entry.kind for entry in MATRIX.managed_services}

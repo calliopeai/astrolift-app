@@ -858,7 +858,8 @@ def _editable_fields_for(svc) -> list[str]:
     offering an edit that is then refused.
     """
     try:
-        from astrolift_drivers.registry import DriverNotFound, plugins
+        from astrolift_drivers.managed_resolution import resolve_managed_driver
+        from astrolift_drivers.registry import DriverNotFound
 
         cluster = svc.effective_cluster
         if cluster is None:
@@ -874,22 +875,30 @@ def _editable_fields_for(svc) -> list[str]:
             return list(cached)
 
         try:
-            driver_cls = plugins.get(plugin.slug, f"managed:{svc.kind}:{variant}")
+            resolved = resolve_managed_driver(
+                cluster_plugin_slug=plugin.slug,
+                kind=svc.kind,
+                variant=variant,
+            )
         except DriverNotFound:
-            try:
-                driver_cls = plugins.get(plugin.slug, f"managed:{svc.kind}:")
-            except DriverNotFound:
-                return ["*"]
+            return ["*"]
 
-        result = _editable_fields_uncached(driver_cls)
+        result = _editable_fields_uncached(resolved.driver_cls)
         if result is None:
             # A driver whose editable_fields is not pure after all. Build it
             # properly rather than reporting the permissive default, which is
             # the bug this function exists to fix.
             try:
-                from core.cluster_observability import _config_for  # type: ignore[attr-defined]
+                from core.cluster_observability import managed_config_for
 
-                driver = driver_cls(config=_config_for(plugin.slug, cluster))
+                driver = resolved.driver_cls(
+                    config=managed_config_for(
+                        resolved.plugin_slug,
+                        cluster,
+                        kind=svc.kind,
+                        variant=variant,
+                    ),
+                )
                 raw = driver.editable_fields()
                 result = list(raw) if raw is not None else ["*"]
             except Exception:  # noqa: BLE001

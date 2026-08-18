@@ -2244,6 +2244,15 @@ def managed_config_for(
     """Build a managed-service DRIVER config from the cluster's install
     settings (#1002).
 
+    ``plugin_slug`` is the plugin the *driver* came from, which is not always
+    the cluster's own: an in-cluster variant booked on an EKS/GKE/AKS cluster
+    resolves out of ``k8s_native`` (#1484), and it needs the ``k8s_native``
+    branch below. That branch attaches whatever ``ClusterDriver`` the cluster
+    actually has, so an in-cluster service on AKS drives AKS. Callers get the
+    right slug from ``resolve_managed_driver(...).plugin_slug``; passing
+    ``cluster.provider_plugin.slug`` blindly would hand a Memcached driver an
+    Azure config.
+
     Distinct from :func:`_config_for`, which builds the *cluster* driver
     config (EKSConfig …). Managed-service drivers (RDS, ElastiCache, S3)
     take their own ``*Config`` dataclass. Every field is read from the

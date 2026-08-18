@@ -32,6 +32,7 @@ from _sdk.cluster import (
     PodLogLine,
     RegionInfo,
     RolloutResult,
+    StorageClassInfo,
     TeardownReport,
     WorkloadStatus,
     classify_apply_error,
@@ -331,6 +332,29 @@ class GKEClusterDriver(ClusterDriver):
                 return
             time.sleep(2)
         raise TimeoutError(f"namespace {name} did not delete within 10m")
+
+    @driver_op(cloud="gcp", driver="cluster")
+    def list_storage_classes(self, cluster: str) -> list[StorageClassInfo]:
+        # The SDK default returns [], which reads as "this cluster has no
+        # StorageClasses" rather than "this driver cannot enumerate them".
+        # In-cluster stateful drivers (OpenSearch, SQL Server Express,
+        # storage_class_pvc) refuse to provision on that answer, so a GKE
+        # cluster could not book them once #1484 made them reachable.
+        client = self._k8s(cluster)
+        return [
+            StorageClassInfo(
+                name=(sc.get("metadata", {}) or {}).get("name", ""),
+                is_default=(
+                    ((sc.get("metadata", {}) or {}).get("annotations", {}) or {}).get(
+                        "storageclass.kubernetes.io/is-default-class",
+                    )
+                    == "true"
+                ),
+                provisioner=str(sc.get("provisioner") or ""),
+                reclaim_policy=str(sc.get("reclaimPolicy") or "Delete"),
+            )
+            for sc in client.list(kind="storage.k8s.io/v1/StorageClass")
+        ]
 
     @driver_op(cloud="gcp", driver="cluster")
     def list_csi_drivers(self, cluster: str) -> list[str]:

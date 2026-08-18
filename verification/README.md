@@ -33,8 +33,11 @@ whichever driver used another.
 manifests/
   happy-path/{aws,gcp,azure}.toml      the certification target: web + postgres
                                        + redis + queue + object_store
-  per-kind/<kind>/{aws,gcp,azure}.toml 63 cells: 23 default-tier kinds × 3 clouds,
-                                       minus 6 with no executable variant
+  per-kind/<kind>/{aws,gcp,azure}.toml 68 cells: 23 default-tier kinds × 3 clouds,
+                                       minus 1 with no executable variant. Five
+                                       book an in-cluster variant, because that
+                                       is what a portable app gets on a cloud
+                                       that sells no managed equivalent.
   negative/<case>/{aws,gcp,azure}.toml 4 safety cases × 3 clouds
 ```
 
@@ -219,13 +222,18 @@ Phase 3 will see.
    and `postgres_cloudsql.py` have none. The collision and untagged-teardown
    cells are predicted RED on AWS and GCP for that reason, recorded in each
    manifest's `known_gap`.
-5. **An in-cluster variant cannot cover a cloud's gap from a manifest.** Driver
-   lookup is `plugins.get(<cluster plugin>, "managed:<kind>:<variant>")` and
-   neither the Azure nor the GCP plugin registers any `k8s_native` driver, so an
-   AKS-hosted app cannot book `kube_prometheus_stack` or `argo_workflows`. Spec
-   43's exit criterion allows "executable on all three clouds *or* an in-cluster
-   variant"; three cells (`observability/azure`, `search/gcp`,
-   `workflow_engine/azure`) can only satisfy it in principle.
+5. ~~**An in-cluster variant cannot cover a cloud's gap from a manifest.**~~
+   Fixed in astrolift-app#1484. Driver lookup was
+   `plugins.get(<cluster plugin>, "managed:<kind>:<variant>")` and no cloud
+   plugin registers a `k8s_native` driver, so an AKS-hosted app could not book
+   `kube_prometheus_stack` or `argo_workflows` and spec 43's exit criterion
+   ("executable on all three clouds *or* an in-cluster variant") held only in
+   principle. Resolution now falls back to `k8s_native`
+   (`astrolift_drivers/managed_resolution.py`), and the five cells that were
+   excused for this reason — `cache/{gcp,azure}`, `observability/azure`,
+   `search/gcp`, `workflow_engine/azure` — are generated manifests like any
+   other. They are metered like any other too, which is what makes the
+   portability claim evidence rather than an argument.
 
 Building the runner surfaced four more, all of them things the switch-on gate
 has to clear.
