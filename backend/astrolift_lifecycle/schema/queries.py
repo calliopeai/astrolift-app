@@ -148,10 +148,10 @@ def _list_pods_for_app(app_slug: str, *, org_id: int | None, environment_name: s
     Returns an empty list on any kind of cluster-side failure so the
     UI stays renderable.
 
-    An ``AgentBox`` slug resolves here too (#129). The CLI's exec path
-    calls this surface to turn ``--app <slug>`` into a pod name before it
-    dials the relay, so a box invisible to pod resolution cannot be
-    attached to even once the relay admits it.
+    Apps only. An ``AgentBox`` slug is answered by ``_list_pods_for_box``
+    behind its own resolver (#129), because the two surfaces answer to
+    different grants and the callers of this one are all gated on
+    ``app.read_logs``.
     """
     app = (
         RegisteredApp.objects.select_related("organization", "default_tenant_cluster")
@@ -159,7 +159,7 @@ def _list_pods_for_app(app_slug: str, *, org_id: int | None, environment_name: s
         .first()
     )
     if app is None:
-        return _list_pods_for_box(app_slug, org_id=org_id)
+        return []
 
     cluster = None
     if environment_name:
@@ -1554,6 +1554,32 @@ class LifecycleQuery:
         # means the rows render without chips.
         warnings = _recent_pod_warnings_for_app(app_slug, org_id=org_id, environment_name=environment_name)
         return [pod_info_to_type(p, recent_error_event=_event_to_type(warnings.get(p.name))) for p in pods]
+
+    @strawberry.field
+    @require_permission(Permission.AGENT_BOX_ATTACH)
+    @tenant_scoped()
+    def agent_box_pods(self, info: Info, slug: str) -> list[AppPodType]:
+        """Live pods for an agent box (#129).
+
+        Its own field rather than a branch inside ``astroliftAppPods``
+        because the two answer to different grants, and the caller who
+        needs this one is precisely the caller the app gate excludes.
+        ``app_deployer`` holds ``agent.dispatch`` (so it may start a box)
+        and ``agent_box.attach`` (so the relay admits it) but not
+        ``app.read_logs``. The CLI resolves a pod before it dials, so
+        routing that resolution through the app gate would leave that
+        role able to start a box it can never reach — the complaint the
+        ticket opens with, one layer down. ``require_permission`` ANDs,
+        so admitting the box grant on the app resolver would mean
+        weakening the app-pod gate to fix a box problem.
+
+        Same degrade-to-empty contract as the app surface: a retired
+        box, an org with no agent cluster, or an unreachable cluster
+        renders as "no pods" rather than erroring the client.
+        """
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        return [pod_info_to_type(p) for p in _list_pods_for_box(slug, org_id=org_id)]
 
     @strawberry.field
     @require_permission(Permission.APP_READ_LOGS)

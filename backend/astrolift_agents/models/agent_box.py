@@ -101,6 +101,10 @@ class AgentBox(NamedBaseCoreModel):
     # AgentTask stores it (#891): a recomputed guess can miss the pod.
     external_id = models.CharField(max_length=255, blank=True, default="")
     namespace = models.CharField(max_length=255, blank=True, default="")
+    # Observed, not frozen: the reaper stamps it when it sees the Job's pod
+    # running and clears it on restart (#129). A fast path for clients, never
+    # the source of truth — it is blank until the first sweep after the pod
+    # comes up, so anything that needs a pod now still resolves one.
     pod_name = models.CharField(max_length=255, blank=True, default="")
     started_at = models.DateTimeField(null=True, blank=True)
     ended_at = models.DateTimeField(null=True, blank=True)

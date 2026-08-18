@@ -31,12 +31,23 @@ from core.schema.exec_ws import (
     _check_box_attach_permission,
     _check_box_in_tenant,
     _record_box_attach,
+    get_exec_backend,
     set_exec_backend,
 )
 
 # ---- shared scaffolding ---------------------------------------------
 
 BOX_PATH = "/app/exec/box-claude-dev-u7/agent-box-abc123-x9k2p"
+
+
+@pytest.fixture(autouse=True)
+def _restore_exec_backend():
+    """The exec backend is a process global, and most tests here swap it.
+    Left installed, the recording stub is what a later module's
+    'the backend is the stub or the real driver' assertion sees."""
+    previous = get_exec_backend()
+    yield
+    set_exec_backend(previous)
 
 
 class _RecordingBackend(ExecBackend):
