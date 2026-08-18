@@ -127,6 +127,18 @@ def split_kind(kind: str) -> tuple[str, str]:
     return api_version, kind
 
 
+class PreconditionFailedError(Exception):
+    """A conditional delete was refused because the object changed.
+
+    The apiserver answers 409 when a delete carries a UID or
+    resourceVersion precondition that no longer matches, which means the
+    object under this name is not the one the caller validated ownership
+    on. It is a concurrency/ownership conflict, never a transient error:
+    retrying it unconditionally would delete the replacement, which is
+    exactly the race the precondition exists to prevent.
+    """
+
+
 class NotFoundError(Exception):
     """Raised by the helper when a resource doesn't exist.
 
@@ -472,33 +484,63 @@ class KubernetesDynamicClient:
         namespace: str | None,
         name: str,
         propagation_policy: str | None = None,
+        uid: str | None = None,
+        resource_version: str | None = None,
     ) -> bool:
         """Delete a resource by ``kind``/``namespace``/``name``.
 
         Returns ``True`` if the apiserver accepted the delete,
         ``False`` if the resource was already gone (404 is swallowed
         so callers can drive idempotent teardown loops).
+
+        ``uid`` and ``resource_version`` become ``DeleteOptions.preconditions``
+        and close a read/delete race. A caller that validated ownership with a
+        GET and then deletes by name alone will delete whatever holds that name
+        at delete time, which need not be the object it inspected: names are
+        reused, and a reconciler recreating a resource between the two calls is
+        an ordinary event rather than an exotic one.
+
+        Passing the UID from the validated GET makes the apiserver refuse in
+        that case with 409, raised here as :class:`PreconditionFailedError`.
+        ``resource_version`` narrows it further, to "unchanged since I looked",
+        which is stricter than most teardowns want but right for a reconciler
+        deleting something it just measured.
         """
         self._refresh_token()
+        from kubernetes.dynamic.exceptions import ConflictError as DynConflict
         from kubernetes.dynamic.exceptions import NotFoundError as DynNotFound
 
         api_version, resolved_kind = split_kind(kind)
         resource = self._resource_for(api_version, resolved_kind)
         request_namespace = namespace if bool(getattr(resource, "namespaced", namespace is not None)) else None
+        preconditions: dict[str, str] = {}
+        if uid:
+            preconditions["uid"] = uid
+        if resource_version:
+            preconditions["resourceVersion"] = resource_version
         try:
             kwargs: dict[str, Any] = {
                 "name": name,
                 "namespace": request_namespace,
             }
-            if propagation_policy:
-                kwargs["body"] = {
-                    "apiVersion": "v1",
-                    "kind": "DeleteOptions",
-                    "propagationPolicy": propagation_policy,
-                }
+            if propagation_policy or preconditions:
+                body: dict[str, Any] = {"apiVersion": "v1", "kind": "DeleteOptions"}
+                if propagation_policy:
+                    body["propagationPolicy"] = propagation_policy
+                if preconditions:
+                    body["preconditions"] = preconditions
+                kwargs["body"] = body
             resource.delete(**kwargs)
         except DynNotFound:
             return False
+        except DynConflict as exc:
+            if not preconditions:
+                raise
+            raise PreconditionFailedError(
+                f"{kind}/{name} changed between the ownership read and the delete "
+                f"(preconditions {preconditions}); refusing to delete whatever holds "
+                f"that name now"
+            ) from exc
         return True
 
     def get_namespace(self, *, name: str) -> dict[str, Any] | None:

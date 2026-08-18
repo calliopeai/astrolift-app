@@ -144,13 +144,23 @@ class DeleteResult:
     deleted: list[str]
     not_found: list[str]
     errors: list[str]
+    conflicts: list[str] = field(default_factory=list)
+    """Refs whose conditional delete was refused because the object changed
+    between the ownership read and the delete (#1389).
+
+    Separate from ``errors`` because the correct response differs. An error may
+    be worth retrying; a conflict must not be retried as an unconditional
+    name-only delete, since the object under that name is no longer the one
+    ownership was validated on. Counted in ``ok`` so a caller that only checks
+    ``ok`` still fails closed.
+    """
 
     @property
     def ok(self) -> bool:
-        return len(self.errors) == 0
+        return len(self.errors) == 0 and len(self.conflicts) == 0
 
     def summary(self) -> list[str]:
-        return list(self.errors)
+        return list(self.errors) + list(self.conflicts)
 
 
 @dataclass(frozen=True)
