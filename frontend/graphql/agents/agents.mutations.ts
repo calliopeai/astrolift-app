@@ -635,3 +635,48 @@ export const UNBIND_AGENT_TRIGGER = gql`
     }
   }
 `;
+
+// ---------------------------------------------------------------------------
+// Agent boxes (#128). `ensureAgentBox` is idempotent: pressing the button again
+// returns the box already running rather than spending a second node, so the
+// UI can call it unconditionally and treat the response as "here is your box".
+// ---------------------------------------------------------------------------
+
+export const ENSURE_AGENT_BOX = gql`
+  mutation EnsureAgentBox($input: EnsureAgentBoxInput!, $orgId: ID!) {
+    ensureAgentBox(input: $input, orgId: $orgId) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        name
+        slug
+        status
+        attachCommand
+        idleTimeoutSeconds
+      }
+    }
+  }
+`;
+
+export const DESTROY_AGENT_BOX = gql`
+  mutation DestroyAgentBox($slug: String!) {
+    destroyAgentBox(slug: $slug) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        status
+      }
+    }
+  }
+`;

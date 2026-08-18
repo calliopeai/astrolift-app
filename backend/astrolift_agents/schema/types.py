@@ -241,6 +241,72 @@ class AgentEnvironmentSpecType:
     updated_at: dt.datetime
 
 
+@strawberry.type(name="AstroliftAgentBox")
+class AgentBoxType:
+    """One warm pod that exists to be attached to (#128).
+
+    Not an AgentTask: a task is dispatched, does a thing and ends, and its
+    interesting fields are about its outcome. A box has no outcome. What a
+    caller needs from it is where it is, whether it is attachable yet, and
+    the command that lands them inside it.
+
+    ``attach_command`` is returned rather than assembled by each client so
+    the tmux invocation lives in one place. It is ``new-session -A``, which
+    attaches to the session if it exists and creates it if it does not, so a
+    client racing the pod's own keep-alive loop attaches instead of erroring.
+    """
+
+    id: GUID
+    name: str
+    slug: str
+    status: str
+    # The agent / spec the box was ensured from. Either may be empty: a box
+    # ensured from a spec alone has no agent, which is the path the IDE
+    # button takes since it knows a runtime, not a registered workload.
+    agent_slug: str
+    environment_spec_slug: str
+    image: str
+    # Seconds of no attached client *and* no pane output before the in-pod
+    # loop ends the session. ``0`` means never reap.
+    idle_timeout_seconds: int
+    session_name: str
+    # What to run under ``astro exec --app <slug> --`` to join the session.
+    attach_command: list[str]
+    namespace: str
+    pod_name: str
+    # Non-empty only on a box that failed to start or whose teardown did not
+    # complete; it is the sentence an operator needs, not a stack trace.
+    last_error: str
+    created_at: dt.datetime
+    started_at: dt.datetime | None
+    ended_at: dt.datetime | None
+    last_attached_at: dt.datetime | None
+
+
+def agent_box_to_type(box) -> AgentBoxType:
+    from astrolift_agents.services.agent_box import box_attach_command
+
+    return AgentBoxType(
+        id=GUID(str(box.guid)),
+        name=box.name,
+        slug=box.slug,
+        status=box.status,
+        agent_slug=(box.agent_definition.slug if box.agent_definition_id is not None else ""),
+        environment_spec_slug=(box.environment_spec.slug if box.environment_spec_id is not None else ""),
+        image=box.image or "",
+        idle_timeout_seconds=int(box.idle_timeout_seconds),
+        session_name=box.session_name,
+        attach_command=box_attach_command(box),
+        namespace=box.namespace or "",
+        pod_name=box.pod_name or "",
+        last_error=box.last_error or "",
+        created_at=box.created_at,
+        started_at=box.started_at,
+        ended_at=box.ended_at,
+        last_attached_at=box.last_attached_at,
+    )
+
+
 @strawberry.type(name="AstroliftAgentSecretStatus")
 class AgentSecretStatusType:
     """Presence metadata for one AgentEnvironmentSpec secret ref — never the

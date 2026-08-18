@@ -7,6 +7,7 @@ through the canonical ``astrolift_drivers.registry`` interface so
 workflow code stays free of Django + driver imports.
 """
 
+from astrolift_workflows.activities.agent_box_reap import reap_agent_boxes_tick
 from astrolift_workflows.activities.alert_eval import evaluate_alerts_tick
 from astrolift_workflows.activities.app_deregister import (
     delete_app_source_webhook,
@@ -179,6 +180,7 @@ from astrolift_workflows.activities.workload_identity import (
 )
 
 __all__ = [
+    "reap_agent_boxes_tick",
     "evaluate_alerts_tick",
     "reconcile_runs_tick",
     "resync_ci_workflows_tick",
