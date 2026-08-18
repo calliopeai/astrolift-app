@@ -169,6 +169,11 @@ OPERATOR_GENERATED_DRIVERS: frozenset[str] = frozenset(
 #: rest of its envelope.
 PASS_THROUGH_REFERENCES: dict[str, frozenset[str]] = {
     "aws/filesystem/fsx_windows": frozenset({"FILESYSTEM_USERNAME", "FILESYSTEM_PASSWORD"}),
+    # An SMTP relay cannot mint an account with a third party, so the operator
+    # supplies the credentials as references and the driver forwards them
+    # untouched. ``SMTP_USERNAME`` is the one the rule alone would let it
+    # inline, and it cannot: it never sees the value.
+    "gcp/email/smtp": frozenset({"EMAIL_API_KEY", "SMTP_USERNAME", "SMTP_PASSWORD"}),
 }
 
 

@@ -33,8 +33,8 @@ whichever driver used another.
 manifests/
   happy-path/{aws,gcp,azure}.toml      the certification target: web + postgres
                                        + redis + queue + object_store
-  per-kind/<kind>/{aws,gcp,azure}.toml 63 cells: 23 default-tier kinds × 3 clouds,
-                                       minus 6 with no executable variant
+  per-kind/<kind>/{aws,gcp,azure}.toml 64 cells: 23 default-tier kinds × 3 clouds,
+                                       minus 5 with no executable variant
   negative/<case>/{aws,gcp,azure}.toml 4 safety cases × 3 clouds
 ```
 

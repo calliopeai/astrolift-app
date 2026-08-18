@@ -629,11 +629,9 @@ def test_eventarc_runtime_config_preserves_all_operator_controls() -> None:
     )
 
 
-@pytest.mark.parametrize(
-    ("kind", "variant"),
-    [("search", "gcp_elastic_cloud"), ("email", "gcp_thirdparty")],
-)
-def test_placeholder_gcp_drivers_remain_unprovisionable(kind: str, variant: str) -> None:
+def test_placeholder_gcp_drivers_remain_unprovisionable() -> None:
+    """``email``/``gcp_thirdparty`` left this list in #1453 when the SMTP relay
+    replaced it; Elastic Cloud is still a catalogue row with no driver."""
     from core.cluster_observability import ClusterObservabilityError, managed_config_for
 
     cluster = SimpleNamespace(
@@ -643,7 +641,64 @@ def test_placeholder_gcp_drivers_remain_unprovisionable(kind: str, variant: str)
         auth_config={},
     )
     with pytest.raises(ClusterObservabilityError, match="planned placeholder"):
-        managed_config_for("gcp", cluster, kind=kind, variant=variant)
+        managed_config_for("gcp", cluster, kind="search", variant="gcp_elastic_cloud")
+
+
+def test_email_smtp_config_is_built_from_the_operator_relay_settings() -> None:
+    """The operator channel: the relay endpoint and its credential references
+    come off the cluster's provider_config, never off the app manifest, because
+    one relay serves every app on the install."""
+    from core.cluster_observability import managed_config_for
+
+    from gcp.managed.email_smtp import SMTPRelayConfig
+
+    cluster = SimpleNamespace(
+        slug="gcp-prod",
+        region="us-central1",
+        provider_config={
+            "project_id": "acme-prod",
+            "smtp_host": "smtp.relay.example",
+            "smtp_port": 465,
+            "smtp_tls_mode": "implicit",
+            "smtp_username_secret_ref": "managed/email/acme/username",
+            "smtp_password_secret_ref": "managed/email/acme/password",
+            "smtp_default_from_address": "noreply@acme.example",
+            "smtp_allowed_sender_domains": ["acme.example", " "],
+            "smtp_region": "eu-west",
+        },
+        auth_config={},
+    )
+
+    assert managed_config_for("gcp", cluster, kind="email", variant="smtp") == SMTPRelayConfig(
+        host="smtp.relay.example",
+        username_secret_ref="managed/email/acme/username",
+        password_secret_ref="managed/email/acme/password",
+        default_from_address="noreply@acme.example",
+        port=465,
+        tls_mode="implicit",
+        allowed_sender_domains=("acme.example",),
+        region="eu-west",
+    )
+
+
+def test_email_smtp_config_refuses_a_half_configured_relay() -> None:
+    """A relay missing its password reference would otherwise build a driver
+    that fails at bind time, long after the operator could connect the two."""
+    from core.cluster_observability import ClusterObservabilityError, managed_config_for
+
+    cluster = SimpleNamespace(
+        slug="gcp-prod",
+        region="us-central1",
+        provider_config={
+            "project_id": "acme-prod",
+            "smtp_host": "smtp.relay.example",
+            "smtp_username_secret_ref": "managed/email/acme/username",
+        },
+        auth_config={},
+    )
+
+    with pytest.raises(ClusterObservabilityError, match="smtp_password_secret_ref"):
+        managed_config_for("gcp", cluster, kind="email", variant="smtp")
 
 
 def test_gcp_config_requires_project_id() -> None:

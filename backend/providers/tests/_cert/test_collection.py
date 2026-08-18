@@ -109,14 +109,15 @@ def test_the_committed_manifests_match_a_fresh_render():
 
 def test_the_grid_is_the_size_the_ledger_claims():
     """Pins the shape of the metered run: 23 default-tier kinds across three
-    clouds, minus the six cells with no executable variant.
+    clouds, minus the five cells with no executable variant.
 
     ``encryption_key/azure`` moved out of the excused set when #1454 landed the
     Key Vault key driver; #1480's ledger was written against the tree before
-    it."""
+    it. ``email/gcp`` followed when #1453 landed the vendor-neutral SMTP
+    relay."""
     assert len(collection.default_tier_kinds()) == 23
-    assert len(collection.cells()) == 63
-    assert len(collection.NOT_EXPRESSIBLE) == 6
+    assert len(collection.cells()) == 64
+    assert len(collection.NOT_EXPRESSIBLE) == 5
 
 
 # ---- every manifest is real ---------------------------------------------------

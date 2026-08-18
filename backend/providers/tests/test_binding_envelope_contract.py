@@ -157,10 +157,10 @@ _UNREADABLE_BINDINGS: dict[tuple[str, str, str], str] = {}
 
 # Drivers that never return a Binding at all -- their binding() raises. They
 # emit no envelope by construction and take no part in the cross-driver
-# comparisons, so the set is pinned here to keep that from spreading.
+# comparisons, so the set is pinned here to keep that from spreading. The GCP
+# email stub left the set in #1453 when the SMTP relay replaced it.
 _NEVER_BINDS: frozenset[tuple[str, str, str]] = frozenset(
     {
-        ("gcp", "email", "gcp_thirdparty"),
         ("gcp", "search", "gcp_elastic_cloud"),
     },
 )

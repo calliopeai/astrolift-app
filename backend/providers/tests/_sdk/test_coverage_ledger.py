@@ -3,6 +3,12 @@
 The first test is the guard itself. The rest prove the guard can fail: a
 guard that only ever confirms today's state would pass forever while
 portability quietly narrowed.
+
+``DECLARED_GAPS`` is empty since #1453 closed the last default-tier gap, so
+the failure-mode tests build the ledger row they need instead of borrowing a
+real one. That is the stronger form anyway: they now prove the guard's
+behaviour rather than the current contents of the ledger, and closing or
+opening a gap no longer edits the guard's own tests.
 """
 
 from __future__ import annotations
@@ -14,9 +20,33 @@ from _sdk.coverage import CLOUDS, OPT_IN_TIER, coverage, gaps
 from _sdk.coverage_gaps import (
     CLASSIFICATIONS,
     DECLARED_GAPS,
+    DeclaredGap,
     describe,
     reconcile,
 )
+
+_FIXTURE_KIND = "ledger_db"
+_FIXTURE_CLOUD = "gcp"
+
+
+def _matrix_with(*entries: ManagedServiceEntry) -> AvailabilityMatrix:
+    return AvailabilityMatrix(
+        drivers=MATRIX.drivers,
+        managed_services=(*MATRIX.managed_services, *entries),
+    )
+
+
+def _one_cloud_kind() -> AvailabilityMatrix:
+    """A kind executable on AWS only, so it owns exactly two open gaps."""
+    return _matrix_with(
+        ManagedServiceEntry(
+            kind=_FIXTURE_KIND,
+            variant="qldb",
+            plugin_id="aws",
+            description="fixture-only kind",
+        ),
+    )
+
 
 if TYPE_CHECKING:
     import pytest
@@ -29,25 +59,33 @@ def test_declared_gaps_match_the_live_matrix() -> None:
     assert report.ok, describe(report)
 
 
+def test_the_default_tier_surface_has_no_open_gaps() -> None:
+    """The #1447 exit state, asserted rather than described. Every kind in the
+    guaranteed cross-cloud surface is now reachable on all three clouds, which
+    is what makes an empty ledger the right answer instead of a missing one."""
+    assert gaps() == ()
+    assert DECLARED_GAPS == ()
+
+
 def test_guard_catches_a_gap_dropped_from_the_ledger() -> None:
     """Deleting a row that still describes a real hole must fail: that is how
-    an unexplained gap sneaks in as a ledger edit rather than a code change.
+    an unexplained gap sneaks in as a ledger edit rather than a code change."""
+    matrix = _one_cloud_kind()
+    declared = (
+        DeclaredGap(kind=_FIXTURE_KIND, cloud="azure", classification="buildable"),
+        DeclaredGap(kind=_FIXTURE_KIND, cloud=_FIXTURE_CLOUD, classification="buildable"),
+    )
+    assert reconcile(matrix=matrix, declared=declared).ok, "both fixture holes start declared"
 
-    Any declared row proves it, so this takes whichever is first instead of
-    naming one. Closing a gap is a routine PR and must not have to edit the
-    guard's own tests to stay green."""
-    dropped = DECLARED_GAPS[0]
-    thinned = tuple(g for g in DECLARED_GAPS if (g.kind, g.cloud) != (dropped.kind, dropped.cloud))
-    assert len(thinned) == len(DECLARED_GAPS) - 1
-
-    report = reconcile(declared=thinned)
+    thinned = tuple(g for g in declared if g.cloud != _FIXTURE_CLOUD)
+    report = reconcile(matrix=matrix, declared=thinned)
 
     assert not report.ok
-    assert report.undeclared == ((dropped.kind, dropped.cloud),)
+    assert report.undeclared == ((_FIXTURE_KIND, _FIXTURE_CLOUD),)
     assert report.stale == ()
     message = describe(report)
-    assert f"UNDECLARED GAP {dropped.kind}/{dropped.cloud}" in message
-    assert repr(dropped.cloud) in message
+    assert f"UNDECLARED GAP {_FIXTURE_KIND}/{_FIXTURE_CLOUD}" in message
+    assert repr(_FIXTURE_CLOUD) in message
     assert "DECLARED_GAPS" in message
     assert "reference=<issue url>" in message
 
@@ -55,20 +93,7 @@ def test_guard_catches_a_gap_dropped_from_the_ledger() -> None:
 def test_guard_catches_a_new_kind_shipped_on_one_cloud_only() -> None:
     """The regression this exists to stop: a kind lands on AWS, the other two
     clouds are never covered, nobody declares why."""
-    invented = (
-        ManagedServiceEntry(
-            kind="ledger_db",
-            variant="qldb",
-            plugin_id="aws",
-            description="fixture-only kind",
-        ),
-    )
-    matrix = AvailabilityMatrix(
-        drivers=MATRIX.drivers,
-        managed_services=(*MATRIX.managed_services, *invented),
-    )
-
-    report = reconcile(matrix=matrix)
+    report = reconcile(matrix=_one_cloud_kind())
 
     assert not report.ok
     assert report.undeclared == (("ledger_db", "azure"), ("ledger_db", "gcp"))
@@ -80,43 +105,29 @@ def test_guard_catches_a_new_kind_shipped_on_one_cloud_only() -> None:
 
 def test_guard_catches_a_stale_row_after_a_driver_lands() -> None:
     """Shipping the missing variant must force the ledger row out; otherwise
-    the doc keeps telling people a closed gap is open."""
-    closed = DECLARED_GAPS[0]
-    closing = ManagedServiceEntry(
-        kind=closed.kind,
-        variant="fixture_only_variant",
-        plugin_id=closed.cloud,
-        status="preview",
-        description="fixture-only variant",
-    )
-    matrix = AvailabilityMatrix(
-        drivers=MATRIX.drivers,
-        managed_services=(*MATRIX.managed_services, closing),
-    )
+    the doc keeps telling people a closed gap is open.
 
-    report = reconcile(matrix=matrix)
+    The whole of #1453: ``email``/``gcp`` was declared, the SMTP relay landed,
+    and the guard is what refuses to let the explanation outlive the hole."""
+    declared = (DeclaredGap(kind="email", cloud="gcp", classification="buildable"),)
+
+    report = reconcile(declared=declared)
 
     assert not report.ok
-    assert report.stale == ((closed.kind, closed.cloud),)
-    assert report.undeclared == (), "every other ledger row is still declared and still open"
+    assert report.stale == (("email", "gcp"),)
+    assert report.undeclared == (), "no other hole is open in the live matrix"
     message = describe(report)
-    assert f"STALE LEDGER ROW {closed.kind}/{closed.cloud}" in message
+    assert "STALE LEDGER ROW email/gcp" in message
     assert "Delete the row" in message
 
 
 def test_guard_reports_both_directions_at_once() -> None:
     """One run can be wrong both ways. The report must carry both, or fixing
     the first failure hides the second until the next push."""
-    matrix = AvailabilityMatrix(
-        drivers=MATRIX.drivers,
-        managed_services=(
-            *MATRIX.managed_services,
-            ManagedServiceEntry(kind="ledger_db", variant="qldb", plugin_id="aws"),
-            ManagedServiceEntry(kind="email", variant="workspace_smtp", plugin_id="gcp"),
-        ),
+    report = reconcile(
+        matrix=_one_cloud_kind(),
+        declared=(DeclaredGap(kind="email", cloud="gcp", classification="buildable"),),
     )
-
-    report = reconcile(matrix=matrix)
 
     assert set(report.undeclared) == {("ledger_db", "azure"), ("ledger_db", "gcp")}
     assert report.stale == (("email", "gcp"),)
