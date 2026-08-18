@@ -45,6 +45,7 @@ from _sdk.cluster import (
 )
 from _sdk.k8s_dynamic_client import KubernetesDynamicClient
 from _sdk.k8s_dynamic_client import NotFoundError as _NotFound
+from _sdk.k8s_dynamic_client import PreconditionFailedError as _PreconditionFailed
 from k8s_native.management import (
     ManagementBackend,
     default_management_backend,
@@ -188,30 +189,44 @@ class K8sNativeClusterDriver(ClusterDriver):
         deleted: list[str] = []
         not_found: list[str] = []
         errors: list[str] = []
+        conflicts: list[str] = []
         for manifest in manifests:
             api_version = manifest.get("apiVersion", "")
             kind_bare = manifest.get("kind", "")
             # For CRDs (apiVersion is "group/version") construct the
             # "group/version/Kind" form that split_kind accepts.
             kind = f"{api_version}/{kind_bare}" if "/" in api_version else kind_bare
-            name = manifest.get("metadata", {}).get("name", "")
+            meta = manifest.get("metadata", {}) or {}
+            name = meta.get("name", "")
             ref = f"{kind}/{name}"
+            # A caller that validated ownership with a GET passes the metadata
+            # it read back in. Deleting by name alone would remove whatever
+            # holds the name at delete time, which need not be the object that
+            # was inspected (#1389). Absent here, the delete stays name-only,
+            # so callers that never did an ownership read are unaffected.
             try:
                 client.delete(
                     kind=kind,
                     namespace=namespace,
                     name=name,
                     propagation_policy=propagation_policy,
+                    uid=meta.get("uid") or None,
+                    resource_version=meta.get("resourceVersion") or None,
                 )
                 deleted.append(ref)
             except _NotFound:
                 not_found.append(ref)
+            except _PreconditionFailed as exc:
+                # Never fall back to an unconditional delete: the object under
+                # this name is not the one ownership was validated on.
+                conflicts.append(f"{ref}: {exc}")
             except Exception as exc:
                 errors.append(f"{ref}: {exc}")
         return DeleteResult(
             deleted=deleted,
             not_found=not_found,
             errors=errors,
+            conflicts=conflicts,
         )
 
     # ---- namespaces -----------------------------------------------
