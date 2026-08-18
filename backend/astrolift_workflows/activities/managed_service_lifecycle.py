@@ -55,9 +55,21 @@ def _service_identity(svc: Any) -> str:
     Every spec handed to a driver carries it, not just ``ProvisionSpec``, so an
     update or a teardown can prove the resource behind a deterministic name is
     still the one this row created (#1365).
+
+    ``guid`` and nothing else. It is a non-null UUID with a default on the base
+    model, so a saved row always has one. Falling back to ``pk`` would stamp an
+    integer where every other path stamps a UUID, and the resource would then
+    fail its own ownership check on the next update or teardown forever, which
+    fails closed and is therefore permanent.
     """
 
-    return str(getattr(svc, "guid", "") or svc.pk)
+    guid = str(getattr(svc, "guid", "") or "")
+    if not guid:
+        raise RuntimeError(
+            f"managed service {getattr(svc, 'pk', '?')} has no guid, so a driver "
+            f"cannot stamp an identity the next operation could verify"
+        )
+    return guid
 
 
 def _signals_already_gone(*parts: object) -> bool:
