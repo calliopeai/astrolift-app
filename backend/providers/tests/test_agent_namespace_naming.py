@@ -99,7 +99,13 @@ def test_case_differences_do_not_collapse_silently():
 
 def test_every_call_site_derives_the_same_name():
     """The NetworkPolicy failure mode. Selectors are built in the provider
-    subtree and the namespace is created in the app; both go through here."""
+    subtree and the namespace is created in the app; both go through here.
+
+    Skipped in the providers job, which runs standalone and deliberately does
+    not install the app's dependencies. It runs in the app shards, which is
+    where both sides of the boundary are importable at once.
+    """
+    pytest.importorskip("temporalio", reason="providers tests run without the app installed")
     from astrolift_workflows.activities import agent_stage
 
     for slug in ("acme", "a" * 46, "a" * 47, "a" * 200, "Weird_Org.Name"):
