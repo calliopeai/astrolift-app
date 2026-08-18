@@ -2217,9 +2217,6 @@ def _azure_managed_config_for(
             ),
             purge_on_delete_default=bool(pc.get("key_vault_key_purge_on_delete_default", False)),
             rotation_period_default=str(pc.get("key_vault_key_rotation_period_default", "P90D")),
-            rotation_notify_before_expiry_default=str(
-                pc.get("key_vault_key_rotation_notify_before_expiry_default", "P30D"),
-            ),
             api_version=str(pc.get("key_vault_key_api_version", "7.4")),
             request_timeout_seconds=float(pc.get("key_vault_key_request_timeout_seconds", 30)),
         )

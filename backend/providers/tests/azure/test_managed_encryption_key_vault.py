@@ -173,9 +173,10 @@ def test_provision_creates_the_key_with_an_ownership_envelope_and_a_rotation_pol
     assert create["attributes"] == {"enabled": True}
     assert create["tags"][MANAGED_BY_TAG] == "platform"
     assert create["tags"][OWNER_TAG] == "service-1"
-    policy = vault.policies[name]
-    assert {row["action"]["type"] for row in policy["lifetimeActions"]} == {"Rotate", "Notify"}
-    assert policy["attributes"]["expiryTime"] == "P90D"
+    rotate = vault.policies[name]["lifetimeActions"]
+    assert rotate == [{"trigger": {"timeAfterCreate": "P90D"}, "action": {"type": "Rotate"}}], (
+        "rotation must trigger on time-after-create; time-before-expiry never fires for a key with no expiration date"
+    )
     assert driver.status(ServiceHandle(handle)).state == "available"
 
 
@@ -221,9 +222,9 @@ def test_turning_rotation_on_writes_a_rotate_action_and_then_settles() -> None:
     vault.calls.clear()
     driver.update(UpdateSpec(result.handle, config={"rotation_period": "P30D"}, managed_service_id="service-1"))
 
-    policy = vault.policies[name]
-    assert policy["attributes"]["expiryTime"] == "P30D"
-    assert {row["action"]["type"] for row in policy["lifetimeActions"]} == {"Rotate", "Notify"}
+    assert vault.policies[name]["lifetimeActions"] == [
+        {"trigger": {"timeAfterCreate": "P30D"}, "action": {"type": "Rotate"}},
+    ]
     assert ("rotation", name) not in vault.calls, "a settled policy was rewritten"
 
 
@@ -265,7 +266,7 @@ def test_provision_refuses_an_immutable_shape_change_instead_of_reusing_the_old_
         ({"key_size": 1024}, "key_size must be one of"),
         ({"key_operations": ["encrypt", "encrypt"]}, "key_operations must be"),
         ({"key_operations": ["derive"]}, "key_operations must be"),
-        ({"rotation_period": "P14D"}, "at least 28 days"),
+        ({"rotation_period": "P3D"}, "at least 7 days"),
         ({"rotation_period": "90 days"}, "ISO 8601 duration"),
         ({"access_mode": "root"}, "access_mode must be one of"),
         (
@@ -543,7 +544,6 @@ def test_registration_catalog_and_runtime_config_are_wired() -> None:
             "key_vault_key_deletion_protection_default": False,
             "key_vault_key_purge_on_delete_default": True,
             "key_vault_key_rotation_period_default": "P180D",
-            "key_vault_key_rotation_notify_before_expiry_default": "P14D",
             "key_vault_key_api_version": "7.5",
             "key_vault_key_request_timeout_seconds": 45,
         },
@@ -559,7 +559,6 @@ def test_registration_catalog_and_runtime_config_are_wired() -> None:
         deletion_protection_default=False,
         purge_on_delete_default=True,
         rotation_period_default="P180D",
-        rotation_notify_before_expiry_default="P14D",
         api_version="7.5",
         request_timeout_seconds=45.0,
     )

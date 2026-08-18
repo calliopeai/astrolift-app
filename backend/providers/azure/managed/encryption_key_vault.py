@@ -79,9 +79,10 @@ _KEY_OPERATIONS = ("decrypt", "encrypt", "sign", "unwrapKey", "verify", "wrapKey
 _SIGNING_OPERATIONS = frozenset({"sign", "verify"})
 _WRAPPING_OPERATIONS = frozenset({"decrypt", "encrypt", "unwrapKey", "wrapKey"})
 
-#: Azure's minimum rotation interval. A shorter policy is rejected by the
-#: service, so it is rejected here instead of after a create call.
-_MIN_ROTATION_DAYS = 28
+#: Azure's documented floor for a rotation trigger, "seven days from creation".
+#: A shorter policy is rejected by the service, so it is rejected here rather
+#: than after the key already exists.
+_MIN_ROTATION_DAYS = 7
 
 #: Azure has no per-operation crypto roles the way AWS policy actions and GCP
 #: Cloud KMS roles do; these four built-ins are the whole vocabulary a key
@@ -105,7 +106,6 @@ _CONFIG_FIELDS = frozenset(
         "not_before",
         "rotation_enabled",
         "rotation_period",
-        "rotation_notify_before_expiry",
         "access_mode",
         "deletion_protection",
         "purge_on_delete",
@@ -130,7 +130,6 @@ class AzureKeyVaultKeyConfig:
     deletion_protection_default: bool = True
     purge_on_delete_default: bool = False
     rotation_period_default: str = "P90D"
-    rotation_notify_before_expiry_default: str = "P30D"
     api_version: str = "7.4"
     request_timeout_seconds: float = 30.0
     client: Any = None
@@ -466,15 +465,10 @@ class AzureKeyVaultKeyDriver(ManagedServiceDriver):
                     "type": "string",
                     "pattern": _ISO_DURATION.pattern,
                     "description": (
-                        f"ISO 8601 duration between automatic rotations, at least {_MIN_ROTATION_DAYS} days "
-                        "(for example P90D)."
+                        f"ISO 8601 duration from a version's creation to its automatic rotation, at "
+                        f"least {_MIN_ROTATION_DAYS} days (for example P90D)."
                     ),
                     "default": self._config.rotation_period_default,
-                },
-                "rotation_notify_before_expiry": {
-                    "type": "string",
-                    "pattern": _ISO_DURATION.pattern,
-                    "default": self._config.rotation_notify_before_expiry_default,
                 },
                 "access_mode": {
                     "type": "string",
@@ -516,7 +510,6 @@ class AzureKeyVaultKeyDriver(ManagedServiceDriver):
             "not_before",
             "purge_on_delete",
             "rotation_enabled",
-            "rotation_notify_before_expiry",
             "rotation_period",
         ]
 
@@ -579,12 +572,8 @@ class AzureKeyVaultKeyDriver(ManagedServiceDriver):
         if not isinstance(rotation_enabled, bool):
             raise ValueError("rotation_enabled must be a boolean")
         rotation_period = str(raw.get("rotation_period") or self._config.rotation_period_default)
-        notify = str(raw.get("rotation_notify_before_expiry") or self._config.rotation_notify_before_expiry_default)
-        if rotation_enabled:
-            if _duration_days(rotation_period, field="rotation_period") < _MIN_ROTATION_DAYS:
-                raise ValueError(f"rotation_period must be at least {_MIN_ROTATION_DAYS} days")
-            if _duration_days(notify, field="rotation_notify_before_expiry") < 1:
-                raise ValueError("rotation_notify_before_expiry must be at least one day")
+        if rotation_enabled and _duration_days(rotation_period, field="rotation_period") < _MIN_ROTATION_DAYS:
+            raise ValueError(f"rotation_period must be at least {_MIN_ROTATION_DAYS} days")
 
         access_mode = str(raw.get("access_mode") or "use")
         if access_mode not in _ACCESS_MODE_ROLES:
@@ -603,7 +592,6 @@ class AzureKeyVaultKeyDriver(ManagedServiceDriver):
             "not_before": not_before,
             "rotation_enabled": rotation_enabled,
             "rotation_period": rotation_period,
-            "rotation_notify_before_expiry": notify,
             "access_mode": access_mode,
         }
 
@@ -747,20 +735,18 @@ class AzureKeyVaultKeyDriver(ManagedServiceDriver):
         return updated
 
     def _reconcile_rotation(self, name: str, cfg: dict[str, Any]) -> None:
+        # Rotate on time-after-create rather than time-before-expiry: the
+        # latter only fires when the key itself carries an expiration date, so
+        # a key without one would silently never rotate.
         desired: dict[str, Any] = {"lifetimeActions": []}
         if cfg["rotation_enabled"]:
             desired = {
                 "lifetimeActions": [
                     {
-                        "trigger": {"timeBeforeExpiry": cfg["rotation_notify_before_expiry"]},
+                        "trigger": {"timeAfterCreate": cfg["rotation_period"]},
                         "action": {"type": "Rotate"},
                     },
-                    {
-                        "trigger": {"timeBeforeExpiry": cfg["rotation_notify_before_expiry"]},
-                        "action": {"type": "Notify"},
-                    },
                 ],
-                "attributes": {"expiryTime": cfg["rotation_period"]},
             }
         try:
             current = self._keys.get_rotation_policy(name)
@@ -786,14 +772,14 @@ def _attributes(cfg: dict[str, Any]) -> dict[str, Any]:
     return attributes
 
 
-def _rotation_shape(policy: dict[str, Any]) -> tuple[str, str]:
-    """The rotation decision Astrolift owns: whether a key rotates, and when.
+def _rotation_shape(policy: dict[str, Any]) -> str:
+    """The rotation decision Astrolift owns: when a key rotates, or never.
 
     Compared rather than the whole policy because Key Vault echoes back an id,
-    created/updated stamps, and a default Notify action of its own. A raw
-    equality check would therefore see drift on every reconcile and rewrite the
-    policy forever, which is loudest on the rotation-off path where the service
-    keeps re-adding that Notify.
+    created/updated stamps, and a Notify action of its own. A raw equality check
+    would therefore see drift on every reconcile and rewrite the policy forever,
+    which is loudest on the rotation-off path where the service keeps putting
+    that Notify back.
     """
     rotate = next(
         (
@@ -804,12 +790,9 @@ def _rotation_shape(policy: dict[str, Any]) -> tuple[str, str]:
         None,
     )
     if rotate is None:
-        return ("", "")
+        return ""
     trigger = rotate.get("trigger") or {}
-    return (
-        str((policy.get("attributes") or {}).get("expiryTime") or ""),
-        str(trigger.get("timeBeforeExpiry") or trigger.get("timeAfterCreate") or ""),
-    )
+    return str(trigger.get("timeAfterCreate") or trigger.get("timeBeforeExpiry") or "")
 
 
 def _is_enabled(key: dict[str, Any]) -> bool:

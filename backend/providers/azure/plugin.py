@@ -530,11 +530,6 @@ _MANAGED_CONFIG_PROPERTIES = {
         "pattern": "^P(?:\\d+Y)?(?:\\d+M)?(?:\\d+D)?$",
         "default": "P90D",
     },
-    "key_vault_key_rotation_notify_before_expiry_default": {
-        "type": "string",
-        "pattern": "^P(?:\\d+Y)?(?:\\d+M)?(?:\\d+D)?$",
-        "default": "P30D",
-    },
     "key_vault_key_api_version": {"type": "string", "default": "7.4"},
     "key_vault_key_request_timeout_seconds": {
         "type": "number",
