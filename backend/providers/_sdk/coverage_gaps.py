@@ -52,23 +52,30 @@ class DeclaredGap:
 # row is how you take responsibility for narrowing portability; deleting one
 # is mandatory the moment the driver lands.
 DECLARED_GAPS: tuple[DeclaredGap, ...] = (
-    DeclaredGap(kind="cache", cloud="gcp", classification="buildable"),
-    DeclaredGap(kind="cache", cloud="azure", classification="no_cloud_equivalent"),
-    DeclaredGap(kind="cdn", cloud="azure", classification="planned_variant"),
-    DeclaredGap(kind="database_proxy", cloud="gcp", classification="no_cloud_equivalent"),
-    DeclaredGap(kind="database_proxy", cloud="azure", classification="no_cloud_equivalent"),
-    DeclaredGap(kind="email", cloud="gcp", classification="planned_variant"),
-    DeclaredGap(kind="encryption_key", cloud="azure", classification="planned_variant"),
-    DeclaredGap(kind="mq", cloud="gcp", classification="no_cloud_equivalent"),
-    DeclaredGap(kind="mq", cloud="azure", classification="no_cloud_equivalent"),
-    DeclaredGap(kind="observability", cloud="azure", classification="planned_variant"),
-    DeclaredGap(kind="search", cloud="gcp", classification="planned_variant"),
-    DeclaredGap(kind="sms", cloud="gcp", classification="no_cloud_equivalent"),
-    DeclaredGap(kind="sms", cloud="azure", classification="planned_variant"),
-    DeclaredGap(kind="stream", cloud="gcp", classification="no_cloud_equivalent"),
-    DeclaredGap(kind="warehouse", cloud="azure", classification="planned_variant"),
-    DeclaredGap(kind="wide_column", cloud="gcp", classification="taxonomy"),
-    DeclaredGap(kind="workflow_engine", cloud="azure", classification="planned_variant"),
+    DeclaredGap(
+        kind="cache",
+        cloud="gcp",
+        classification="buildable",
+        reference="https://github.com/calliopeai/astrolift-app/issues/1465",
+    ),
+    DeclaredGap(
+        kind="cache",
+        cloud="azure",
+        classification="buildable",
+        reference="https://github.com/calliopeai/astrolift-app/issues/1465",
+    ),
+    DeclaredGap(
+        kind="email",
+        cloud="gcp",
+        classification="planned_variant",
+        reference="https://github.com/calliopeai/astrolift-app/issues/1453",
+    ),
+    DeclaredGap(
+        kind="encryption_key",
+        cloud="azure",
+        classification="planned_variant",
+        reference="https://github.com/calliopeai/astrolift-app/issues/1454",
+    ),
 )
 
 

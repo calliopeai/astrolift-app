@@ -33,6 +33,18 @@ gap can be declared against."""
 
 IN_CLUSTER = "k8s_native"
 
+#: Kinds deliberately outside the default catalogue. Their drivers stay in the
+#: tree and keep working for anyone who opts in; they are not part of the
+#: surface Astrolift guarantees across clouds, so their coverage holes are not
+#: tracked as work.
+#:
+#: ``cdn`` is the one worth explaining: the capability is not lost. CloudFront
+#: ships with the ``static_site`` topology, so a CDN arrives with the thing
+#: that needs one rather than being a resource a manifest asks for.
+OPT_IN_TIER: frozenset[str] = frozenset(
+    {"cdn", "database_proxy", "mq", "sms", "stream", "warehouse", "wide_column"},
+)
+
 COLUMNS: tuple[str, ...] = (*CLOUDS, IN_CLUSTER)
 
 
@@ -77,6 +89,17 @@ class KindCoverage:
         """Executable on every public cloud."""
         return not self.missing_clouds
 
+    @property
+    def is_portable(self) -> bool:
+        """Reachable on every cloud, by a managed variant or an in-cluster one.
+
+        We run the cluster, so an in-cluster variant is parity everywhere at
+        once. That makes it a portability answer and not a consolation: a kind
+        with one is reachable wherever Astrolift is installed, whether or not
+        the underlying cloud sells a managed equivalent.
+        """
+        return self.is_cloud_portable or self.cell(IN_CLUSTER).is_executable
+
 
 def coverage(matrix: AvailabilityMatrix = MATRIX) -> tuple[KindCoverage, ...]:
     """Every kind in the matrix, kind-sorted, with a cell per column."""
@@ -106,5 +129,19 @@ def gaps(matrix: AvailabilityMatrix = MATRIX) -> tuple[tuple[str, str], ...]:
     A gap needs a cloud that already proves the kind is a cloud-managed
     shape. A kind nobody ships on any cloud is a catalogue entry, not a
     portability trap, so it yields no gaps.
+
+    Two further exclusions, both because a gap is meant to name something an
+    app can trip over rather than an asymmetry in the table:
+
+    * A kind with an in-cluster variant is reachable on every cloud already,
+      so its missing managed variants are polish. See :attr:`is_portable`.
+    * A kind in :data:`OPT_IN_TIER` is opt-in. Its driver still works;
+      it is simply not part of the surface Astrolift guarantees across clouds,
+      so a hole in it is a choice rather than a defect.
     """
-    return tuple((row.kind, cloud) for row in coverage(matrix) if row.covered_clouds for cloud in row.missing_clouds)
+    return tuple(
+        (row.kind, cloud)
+        for row in coverage(matrix)
+        if row.covered_clouds and not row.is_portable and row.kind not in OPT_IN_TIER
+        for cloud in row.missing_clouds
+    )

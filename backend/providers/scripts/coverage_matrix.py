@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from _sdk.coverage import CLOUDS, COLUMNS, IN_CLUSTER, KindCoverage, coverage, gaps
+from _sdk.coverage import CLOUDS, COLUMNS, IN_CLUSTER, OPT_IN_TIER, KindCoverage, coverage, gaps
 from _sdk.coverage_gaps import CLASSIFICATIONS, DECLARED_GAPS
 
 OUTPUT = Path(__file__).resolve().parents[1] / "docs" / "managed_service_coverage.md"
@@ -40,11 +40,19 @@ def _cell(row: KindCoverage, plugin_id: str) -> str:
     return _EMPTY
 
 
+def _kind(row: KindCoverage) -> str:
+    """Opt-in rows are marked in place: their empty cells are a catalogue
+    choice, and unmarked they read as unowned work."""
+    return f"`{row.kind}` (opt-in)" if row.kind in OPT_IN_TIER else f"`{row.kind}`"
+
+
 def render() -> str:
     rows = coverage()
     computed = gaps()
-    portable = [r for r in rows if r.is_cloud_portable]
+    on_every_cloud = [r for r in rows if r.is_cloud_portable]
+    reachable = [r for r in rows if r.is_portable]
     gap_kinds = sorted({kind for kind, _ in computed})
+    opt_in = ", ".join(f"`{kind}`" for kind in sorted(OPT_IN_TIER))
 
     out: list[str] = [
         "# Managed-Service Cross-Cloud Coverage",
@@ -54,11 +62,21 @@ def render() -> str:
         "",
         "Executable means status `ga`, `preview`, or `experimental`: a binding can be",
         "provisioned from it today. `planned` is roadmap metadata and `deprecated` is on",
-        "its way out; neither counts as coverage. A kind missing from a cloud that other",
-        "clouds ship is a portability gap, and every gap must appear in the ledger below",
-        "or the guard test (`tests/_sdk/test_coverage_ledger.py`) fails.",
+        "its way out; neither counts as coverage.",
         "",
-        f"{len(rows)} kinds; {len(portable)} executable on all three public clouds; "
+        "A kind is a portability gap when another cloud already ships it, no in-cluster",
+        "variant covers the rest, and the kind is part of the default catalogue. An",
+        "in-cluster variant is parity everywhere at once, so a kind that has one is",
+        "reachable wherever Astrolift is installed. Opt-in kinds, marked in the table,",
+        "are outside the default catalogue: their drivers work, they are just not part",
+        "of the guaranteed cross-cloud surface, so their empty cells are not gaps.",
+        "Every gap that is left must appear in the ledger below or the guard test",
+        "(`tests/_sdk/test_coverage_ledger.py`) fails.",
+        "",
+        f"Opt-in kinds: {opt_in}.",
+        "",
+        f"{len(rows)} kinds; {len(on_every_cloud)} executable on all three public clouds;",
+        f"{len(reachable)} reachable on every cloud once in-cluster variants count;",
         f"{len(computed)} gaps across {len(gap_kinds)} kinds.",
         "",
         "## Coverage",
@@ -68,7 +86,7 @@ def render() -> str:
     ]
     for row in rows:
         cells = " | ".join(_cell(row, plugin_id) for plugin_id in COLUMNS)
-        out.append(f"| `{row.kind}` | {cells} |")
+        out.append(f"| {_kind(row)} | {cells} |")
 
     out += [
         "",

@@ -5,11 +5,22 @@ from `_sdk/availability.py` -- do not hand-edit.
 
 Executable means status `ga`, `preview`, or `experimental`: a binding can be
 provisioned from it today. `planned` is roadmap metadata and `deprecated` is on
-its way out; neither counts as coverage. A kind missing from a cloud that other
-clouds ship is a portability gap, and every gap must appear in the ledger below
-or the guard test (`tests/_sdk/test_coverage_ledger.py`) fails.
+its way out; neither counts as coverage.
 
-32 kinds; 19 executable on all three public clouds; 17 gaps across 13 kinds.
+A kind is a portability gap when another cloud already ships it, no in-cluster
+variant covers the rest, and the kind is part of the default catalogue. An
+in-cluster variant is parity everywhere at once, so a kind that has one is
+reachable wherever Astrolift is installed. Opt-in kinds, marked in the table,
+are outside the default catalogue: their drivers work, they are just not part
+of the guaranteed cross-cloud surface, so their empty cells are not gaps.
+Every gap that is left must appear in the ledger below or the guard test
+(`tests/_sdk/test_coverage_ledger.py`) fails.
+
+Opt-in kinds: `cdn`, `database_proxy`, `mq`, `sms`, `stream`, `warehouse`, `wide_column`.
+
+32 kinds; 19 executable on all three public clouds;
+22 reachable on every cloud once in-cluster variants count;
+4 gaps across 3 kinds.
 
 ## Coverage
 
@@ -17,8 +28,8 @@ or the guard test (`tests/_sdk/test_coverage_ledger.py`) fails.
 | --- | --- | --- | --- | --- |
 | `api_gateway` | `http_api`, `rest_api`, `websocket_api` | `api_gateway` | `api_management` | `gateway_api` |
 | `cache` | `elasticache_memcached`, `elasticache_serverless_memcached` | - | - | - |
-| `cdn` | `cloudfront` | `cloud_cdn` | planned: `front_door` | - |
-| `database_proxy` | `rds_proxy` | - | - | - |
+| `cdn` (opt-in) | `cloudfront` | `cloud_cdn` | planned: `front_door` | - |
+| `database_proxy` (opt-in) | `rds_proxy` | - | - | - |
 | `document_db` | `documentdb`, `documentdb_serverless_v2` | `firestore_native` | `cosmos_mongodb`, `cosmos_nosql` | `mongodb_operator` |
 | `email` | `ses` | planned: `gcp_thirdparty` | `azure_acs` | - |
 | `encryption_key` | `kms` | `cloud_kms` | planned: `key_vault_key` | - |
@@ -29,7 +40,7 @@ or the guard test (`tests/_sdk/test_coverage_ledger.py`) fails.
 | `graph_db` | `neptune`, `neptune_serverless` | `spanner_graph` | `cosmos_gremlin` | - |
 | `kv_store` | `dynamodb` | `bigtable` | `cosmos`, `cosmos_table` | - |
 | `model_endpoint` | `bedrock` | `vertex_ai` | `azure_openai` | `kserve` |
-| `mq` | `amazon_mq_activemq`, `amazon_mq_rabbitmq` | - | - | - |
+| `mq` (opt-in) | `amazon_mq_activemq`, `amazon_mq_rabbitmq` | - | - | - |
 | `mssql` | `rds_sqlserver_enterprise`, `rds_sqlserver_express`, `rds_sqlserver_standard`, `rds_sqlserver_web` | `cloudsql_sqlserver` | `azure_sql_database`, `azure_sql_hyperscale`, `azure_sql_managed_instance`, `azure_sql_serverless` | `sqlserver_express` |
 | `mysql` | `aurora_mysql`, `aurora_mysql_serverless_v2`, `rds_mysql` | `cloudsql` | `azure_mysql_flex` | `operator` |
 | `object_store` | `s3` | `gcs` | `azure_blob`, `blob` | `s3_compatible_existing`, `seaweedfs_operator`, `minio_operator` (deprecated) |
@@ -39,13 +50,13 @@ or the guard test (`tests/_sdk/test_coverage_ledger.py`) fails.
 | `queue` | `sqs` | `pubsub` | `azure_servicebus`, `servicebus` | `rabbitmq_operator` |
 | `redis` | `elasticache`, `elasticache_serverless_redis`, `elasticache_serverless_valkey`, `elasticache_valkey`, `memorydb` | `memorystore`, `memorystore_valkey` | `azure_cache_redis`, `azure_managed_redis` | `operator` |
 | `search` | `opensearch`, `opensearch_serverless` | planned: `gcp_elastic_cloud` | `azure_ai_search_fulltext` | `opensearch_operator` |
-| `sms` | `sns_sms` | - | planned: `communication_services_sms` | - |
-| `stream` | `firehose`, `kinesis` | - | `event_hubs` | - |
+| `sms` (opt-in) | `sns_sms` | - | planned: `communication_services_sms` | - |
+| `stream` (opt-in) | `firehose`, `kinesis` | - | `event_hubs` | - |
 | `time_series` | `timestream` | `gcp_managed_prometheus` | `azure_monitor_prometheus` | - |
 | `topic` | `sns_fifo`, `sns_standard` | `pubsub_topic` | `service_bus_topic` | - |
 | `vector_index` | `opensearch_serverless_vector`, `opensearch_vector` | `vertex_matching_engine` | `azure_ai_search_vector` | `opensearch_operator_vector` |
-| `warehouse` | `redshift`, `redshift_serverless` | `bigquery` | planned: `synapse_serverless` | - |
-| `wide_column` | `keyspaces` | - | `cosmos_cassandra` | - |
+| `warehouse` (opt-in) | `redshift`, `redshift_serverless` | `bigquery` | planned: `synapse_serverless` | - |
+| `wide_column` (opt-in) | `keyspaces` | - | `cosmos_cassandra` | - |
 | `workflow_engine` | `step_functions_express`, `step_functions_standard` | `workflows` | planned: `logic_apps` | `argo_workflows` |
 
 ## Declared gaps
@@ -54,23 +65,10 @@ Each row explains one hole above. The reference is the tracking issue.
 
 | Kind | Cloud | Classification | Reference |
 | --- | --- | --- | --- |
-| `cache` | gcp | `buildable` | - |
-| `cache` | azure | `no_cloud_equivalent` | - |
-| `cdn` | azure | `planned_variant` | - |
-| `database_proxy` | gcp | `no_cloud_equivalent` | - |
-| `database_proxy` | azure | `no_cloud_equivalent` | - |
-| `email` | gcp | `planned_variant` | - |
-| `encryption_key` | azure | `planned_variant` | - |
-| `mq` | gcp | `no_cloud_equivalent` | - |
-| `mq` | azure | `no_cloud_equivalent` | - |
-| `observability` | azure | `planned_variant` | - |
-| `search` | gcp | `planned_variant` | - |
-| `sms` | gcp | `no_cloud_equivalent` | - |
-| `sms` | azure | `planned_variant` | - |
-| `stream` | gcp | `no_cloud_equivalent` | - |
-| `warehouse` | azure | `planned_variant` | - |
-| `wide_column` | gcp | `taxonomy` | - |
-| `workflow_engine` | azure | `planned_variant` | - |
+| `cache` | gcp | `buildable` | https://github.com/calliopeai/astrolift-app/issues/1465 |
+| `cache` | azure | `buildable` | https://github.com/calliopeai/astrolift-app/issues/1465 |
+| `email` | gcp | `planned_variant` | https://github.com/calliopeai/astrolift-app/issues/1453 |
+| `encryption_key` | azure | `planned_variant` | https://github.com/calliopeai/astrolift-app/issues/1454 |
 
 ### Classifications
 
