@@ -11,6 +11,10 @@ from astrolift_services.models.secret_change_proposal import (
     SecretChangeProposal,
 )
 from astrolift_services.models.secret_metadata import AppSecretMetadata
+from astrolift_services.models.workload_identity_grant import (
+    WorkloadIdentityGrant,
+    grant_state_for,
+)
 
 __all__ = [
     "AppSecretBundleRef",
@@ -24,4 +28,6 @@ __all__ = [
     "SecretBundle",
     "SecretChangeApproval",
     "SecretChangeProposal",
+    "WorkloadIdentityGrant",
+    "grant_state_for",
 ]

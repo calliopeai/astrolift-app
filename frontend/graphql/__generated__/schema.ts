@@ -2337,11 +2337,13 @@ export type AstroliftManagedDomainMutationResult = {
 export type AstroliftManagedService = {
   appliedConfig?: Maybe<Scalars['JSON']['output']>;
   attachments: Array<AstroliftManagedServiceAttachment>;
+  bindingReady: Scalars['Boolean']['output'];
   clusterSlug: Scalars['String']['output'];
   config: Scalars['JSON']['output'];
   createdAt: Scalars['DateTime']['output'];
   editableFields: Array<Scalars['String']['output']>;
   environmentName: Scalars['String']['output'];
+  grantState: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   kind: Scalars['String']['output'];
   lastActionAt?: Maybe<Scalars['DateTime']['output']>;
@@ -2360,6 +2362,7 @@ export type AstroliftManagedService = {
   updatedAt: Scalars['DateTime']['output'];
   variant: Scalars['String']['output'];
   volumeBindings: Array<AstroliftManagedServiceVolumeBinding>;
+  workloadIdentityGrants: Array<AstroliftWorkloadIdentityGrant>;
 };
 
 export type AstroliftManagedServiceAttachment = {
@@ -3977,6 +3980,22 @@ export type AstroliftWorkload = {
   storageClass: Scalars['String']['output'];
   storageSize: Scalars['String']['output'];
   volumes: Scalars['JSON']['output'];
+};
+
+export type AstroliftWorkloadIdentityGrant = {
+  appliedAt?: Maybe<Scalars['DateTime']['output']>;
+  assignmentName: Scalars['String']['output'];
+  environmentName: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  identityRoleName: Scalars['String']['output'];
+  lastAttemptedAt?: Maybe<Scalars['DateTime']['output']>;
+  managedServiceId: Scalars['GUID']['output'];
+  providerPluginSlug: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+  roleDefinitionId: Scalars['String']['output'];
+  roleName: Scalars['String']['output'];
+  scope: Scalars['String']['output'];
+  state: Scalars['String']['output'];
 };
 
 export type AstroliftWorkloadManifest = {
@@ -7558,6 +7577,7 @@ export type Query = {
   astroliftWorkflowInstances: AstroliftWorkflowInstancePage;
   astroliftWorkflowRuns: Array<AstroliftWorkflowRun>;
   astroliftWorkload?: Maybe<AstroliftWorkload>;
+  astroliftWorkloadIdentityGrants: Array<AstroliftWorkloadIdentityGrant>;
   astroliftWorkloadManifest?: Maybe<AstroliftWorkloadManifest>;
   astroliftWorkloadPodStatusBreakdown: Array<AstroliftWorkloadPodStatusBucket>;
   astroliftWorkloadResourceUsage?: Maybe<AstroliftWorkloadResourceUsage>;
@@ -8718,6 +8738,13 @@ export type QueryAstroliftWorkflowRunsArgs = {
 export type QueryAstroliftWorkloadArgs = {
   appSlug: Scalars['String']['input'];
   slug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftWorkloadIdentityGrantsArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  unappliedOnly?: Scalars['Boolean']['input'];
 };
 
 

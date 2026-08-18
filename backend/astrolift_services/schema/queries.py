@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import strawberry
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from strawberry.types import Info
 
 from astrolift_clusters.models import TenantCluster
@@ -21,6 +21,7 @@ from astrolift_services.models import (
     ManagedService,
     SecretBundle,
     SecretChangeProposal,
+    WorkloadIdentityGrant,
 )
 from astrolift_services.schema.types import (
     AppSecretBundleAttachmentType,
@@ -46,12 +47,14 @@ from astrolift_services.schema.types import (
     SecretHistoryActorType,
     SecretHistoryEntryType,
     TemplateSendStatPointType,
+    WorkloadIdentityGrantType,
     attachment_to_type,
     managed_service_catalog_entry_to_type,
     managed_service_to_type,
     secret_bundle_to_type,
     secret_change_proposal_to_type,
     secret_editor_from_user,
+    workload_identity_grant_to_type,
 )
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
@@ -492,7 +495,14 @@ def _managed_services_qs(
         return ManagedService.objects.none()
     qs = (
         ManagedService.objects.select_related("registered_app", "app_environment")
-        .prefetch_related("attachments", "volume_bindings")
+        .prefetch_related(
+            "attachments",
+            "volume_bindings",
+            Prefetch(
+                "workload_identity_grants",
+                queryset=WorkloadIdentityGrant.objects.select_related("app_environment"),
+            ),
+        )
         .filter(
             registered_app__slug=app_slug,
             registered_app__organization_id=org_id,
@@ -599,6 +609,10 @@ class ServicesQuery:
                 "attachments__agent_environment_spec",
                 "attachments__app_environment__registered_app",
                 "volume_bindings",
+                Prefetch(
+                    "workload_identity_grants",
+                    queryset=WorkloadIdentityGrant.objects.select_related("app_environment"),
+                ),
             )
             .filter(project=project, deleted_at__isnull=True)
             .order_by("kind", "name", "guid")
@@ -887,6 +901,48 @@ class ServicesQuery:
             limit=limit,
         )
         return page.map(managed_service_to_type)
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_workload_identity_grants(
+        self,
+        info: Info,
+        app_slug: str,
+        environment_name: str | None = None,
+        unapplied_only: bool = False,
+    ) -> list[WorkloadIdentityGrantType]:
+        """Every grant an app's bindings depend on, and its state (#1367).
+
+        The per-binding view hangs off ``astroliftManagedServices``; this is
+        the flat one a CLI wants when the question is "can this app reach its
+        data plane yet", which is answered by the grants across every binding
+        at once rather than by any single service row.
+
+        ``unappliedOnly`` narrows to the grants that are actually holding the
+        app back — the seconds-long propagating ones included, since "not yet"
+        and "rejected" are both reasons a pod is still 403ing.
+        """
+        org_id = _caller_org_id()
+        if org_id is None:
+            return []
+        # Scoped through the environment, not the service: a project-owned
+        # service is granted into each consuming app's identity and carries no
+        # registered_app of its own, so scoping by the service would silently
+        # drop exactly the grants a shared resource contributes. A null org
+        # already returned above — deny-by-default (#1042 / #1183).
+        qs = WorkloadIdentityGrant.objects.select_related(
+            "managed_service",
+            "app_environment",
+        ).filter(
+            app_environment__registered_app__slug=app_slug,
+            app_environment__registered_app__organization_id=org_id,
+        )
+        if environment_name:
+            qs = qs.filter(app_environment__name=environment_name)
+        if unapplied_only:
+            qs = qs.filter(state__in=WorkloadIdentityGrant.UNAPPLIED_STATES)
+        return [workload_identity_grant_to_type(row) for row in qs.order_by("scope", "role_name")]
 
     @strawberry.field
     @require_permission(Permission.APP_READ)

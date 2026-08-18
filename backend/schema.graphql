@@ -2362,6 +2362,9 @@ type AstroliftManagedService {
   editableFields: [String!]!
   attachments: [AstroliftManagedServiceAttachment!]!
   volumeBindings: [AstroliftManagedServiceVolumeBinding!]!
+  grantState: String!
+  bindingReady: Boolean!
+  workloadIdentityGrants: [AstroliftWorkloadIdentityGrant!]!
 }
 
 type AstroliftManagedServiceAttachment {
@@ -4017,6 +4020,22 @@ type AstroliftWorkload {
   registeredAppSlug: String!
   inClusterServiceFqdn: String!
   volumes: JSON!
+}
+
+type AstroliftWorkloadIdentityGrant {
+  id: GUID!
+  managedServiceId: GUID!
+  environmentName: String!
+  providerPluginSlug: String!
+  identityRoleName: String!
+  roleName: String!
+  roleDefinitionId: String!
+  scope: String!
+  assignmentName: String!
+  state: String!
+  reason: String!
+  lastAttemptedAt: DateTime
+  appliedAt: DateTime
 }
 
 type AstroliftWorkloadManifest {
@@ -5942,6 +5961,7 @@ type Query {
   astroliftAppSecretBundleAttachments(appSlug: String!, environmentName: String = null): [AstroliftAppSecretBundleAttachment!]!
   astroliftManagedServices(appSlug: String!, environmentName: String = null): [AstroliftManagedService!]! @deprecated(reason: "Unbounded, and applies no ordering at all — row order is whatever Postgres returns. Use astroliftManagedServicesPage.")
   astroliftManagedServicesPage(appSlug: String!, environmentName: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftManagedServicePage!
+  astroliftWorkloadIdentityGrants(appSlug: String!, environmentName: String = null, unappliedOnly: Boolean! = false): [AstroliftWorkloadIdentityGrant!]!
   astroliftManagedServiceObjects(managedServiceId: GUID!, limit: Int! = 10): AstroliftManagedServiceObjects
   astroliftManagedServiceQueueDepth(managedServiceId: GUID!): AstroliftManagedServiceQueueDepth
   astroliftEmailServiceDetail(managedServiceId: GUID!): AstroliftEmailServiceDetail

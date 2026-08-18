@@ -5,6 +5,42 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+GRANT_PENDING = "pending"
+"""The assignment is declared and attempted but not confirmed by the cloud.
+
+Normal for the seconds an ARM role assignment takes to settle; not an error.
+"""
+
+GRANT_APPLIED = "applied"
+"""The cloud confirmed the assignment exists and expresses this grant."""
+
+GRANT_FAILED = "failed"
+"""The attempt was rejected. ``reason`` carries the cloud's answer."""
+
+
+@dataclass(frozen=True)
+class GrantAssignment:
+    """One authorization the workload identity must hold, and its state.
+
+    A federated credential proves who a pod is; a grant assignment is the
+    separate object that says what it may touch, and it can lag or fail on
+    its own. Reporting a binding ready while one of these is unapplied is
+    the failure #1367 exists to end, so every assignment carries its own
+    state and, when it is not applied, the reason.
+    """
+
+    role_definition_id: str
+    role_name: str
+    scope: str
+    assignment_name: str
+    """Provider-side stable name of the assignment; empty when the attempt
+    never reached the point of deriving one."""
+
+    state: str
+    """``pending`` | ``applied`` | ``failed``."""
+
+    reason: str = ""
+
 
 @dataclass(frozen=True)
 class IdentityBinding:
@@ -54,6 +90,18 @@ class WorkloadIdentityDriver(Protocol):
     def attach_policy(self, role: str, policy: str) -> None: ...
 
     def delete_identity_role(self, role: str) -> None: ...
+
+    def grant_assignments(self) -> list[GrantAssignment]:
+        """Per-assignment state left by the last ``create_identity_role``.
+
+        Empty by default, and that is the honest answer on AWS and GCP: the
+        grants there *are* the identity's own policy document / role list,
+        written by the same call that creates the identity, so there is no
+        second object that can be pending or fail on its own. Azure writes
+        one ``Microsoft.Authorization/roleAssignments`` per grant and
+        overrides this so the control plane can persist their state (#1367).
+        """
+        return []
 
     # ---- observability reads (default: not implemented) --------------
     #
