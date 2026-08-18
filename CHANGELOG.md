@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Let the exec relay reach an agent box. `/app/exec/<target>/<pod>` resolved
+  its first path segment against `RegisteredApp` only, so a healthy running
+  box closed the handshake with the same code a real permission denial uses
+  and the operator was told to go ask for `app.exec_pod`, which they already
+  held. The relay now resolves a box as a box — gated on the box's own
+  organization, and on a new `agent_box.attach` grant seeded wherever
+  `agent.dispatch` is, so whoever may start a box may reach it. Pod
+  resolution and the exec backend's cluster lookup learned the same target,
+  since the CLI turns `--app <slug>` into a pod name before it dials.
+  A slug that resolves to nothing now closes 4404 instead of 4403, so
+  "no such target" and "you lack the grant" stop reading alike; both are
+  still pre-accept closes, so the handshake's HTTP status is unchanged.
+  `AgentBox.last_attached_at` is finally written, when a session opens. It
+  remains advisory telemetry: idleness is still measured in-pod by tmux,
+  which sees a client detach the instant it happens.
 - Stop reporting managed-service config changes as applied when the driver
   cannot apply them. Fifteen drivers (S3, CloudFront, GCS, Pub/Sub, Blob x2,
   Service Bus, CNPG, MySQL/MongoDB/RabbitMQ/Redis/Strimzi/NATS operators, NFS)

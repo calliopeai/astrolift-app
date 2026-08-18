@@ -104,7 +104,9 @@ class AgentBox(NamedBaseCoreModel):
     pod_name = models.CharField(max_length=255, blank=True, default="")
     started_at = models.DateTimeField(null=True, blank=True)
     ended_at = models.DateTimeField(null=True, blank=True)
-    # Last time the platform handed someone an attach command for this box.
+    # Last time someone opened a session inside this box through the exec
+    # relay (#129), which is the closest the control plane gets to "when did
+    # someone last ask for a way in".
     # Advisory only: real idleness is measured inside the pod from tmux pane
     # activity, because a detached agent that is working is not idle and the
     # control plane cannot see that from out here.

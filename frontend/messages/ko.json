@@ -1773,6 +1773,7 @@
         "statusDenied": "Permission denied — your role does not include app.exec_pod.",
         "statusError": "Terminal error — see the log line above for details.",
         "authExpired": "Session expired — sign in again to resume.",
+        "targetGone": "That target no longer exists — it may have been removed.",
         "untilThen": "Or run {cli} locally — the CLI uses the same backend protocol.",
         "install": "Install the CLI",
         "manageTokens": "Manage deploy tokens",

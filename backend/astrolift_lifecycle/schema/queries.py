@@ -147,6 +147,11 @@ def _list_pods_for_app(app_slug: str, *, org_id: int | None, environment_name: s
     (env-named cluster preferred → default cluster, ``namespace_for_app``).
     Returns an empty list on any kind of cluster-side failure so the
     UI stays renderable.
+
+    An ``AgentBox`` slug resolves here too (#129). The CLI's exec path
+    calls this surface to turn ``--app <slug>`` into a pod name before it
+    dials the relay, so a box invisible to pod resolution cannot be
+    attached to even once the relay admits it.
     """
     app = (
         RegisteredApp.objects.select_related("organization", "default_tenant_cluster")
@@ -154,7 +159,7 @@ def _list_pods_for_app(app_slug: str, *, org_id: int | None, environment_name: s
         .first()
     )
     if app is None:
-        return []
+        return _list_pods_for_box(app_slug, org_id=org_id)
 
     cluster = None
     if environment_name:
@@ -187,6 +192,52 @@ def _list_pods_for_app(app_slug: str, *, org_id: int | None, environment_name: s
     except Exception:  # noqa: BLE001 — k8s lib raises many subtypes
         # Cluster transient errors (timeouts, 5xx) keep the UI alive;
         # the platform-event log carries the diagnostic.
+        return []
+
+
+def _list_pods_for_box(box_slug: str, *, org_id: int | None) -> list:
+    """Live pods for an agent box (#129).
+
+    A box's pod carries ``astrolift.dev/app=<box.guid>`` — the box render
+    keys that label to the guid precisely so the platform's existing pod
+    and log surfaces find it with no box-specific selector. So the guid,
+    not the slug, is what goes to the driver here.
+
+    Org-filtered explicitly: ``@tenant_scoped`` asserts a tenant, it does
+    not filter, and a by-slug fetch that trusted the slug alone would
+    list another org's pods. Degrades to ``[]`` on every cluster-side
+    failure, exactly as the app path does.
+    """
+    from astrolift_agents.models import AgentBox
+    from astrolift_agents.services.agent_box import box_namespace
+    from astrolift_agents.services.agent_cluster import resolve_agent_cluster
+
+    box = (
+        AgentBox.objects.select_related("organization")
+        .filter(slug=box_slug, organization_id=org_id, deleted_at__isnull=True)
+        .first()
+    )
+    if box is None:
+        return []
+
+    try:
+        cluster = resolve_agent_cluster(box.organization)
+    except Exception:  # noqa: BLE001 — an org with no agent cluster has no pods
+        return []
+    if cluster is None or not getattr(cluster, "is_active", True):
+        return []
+
+    try:
+        return list(
+            list_app_pods(
+                cluster=cluster,
+                namespace=box.namespace or box_namespace(box),
+                app_slug=str(box.guid),
+            )
+        )
+    except ClusterObservabilityError:
+        return []
+    except Exception:  # noqa: BLE001 — k8s lib raises many subtypes
         return []
 
 

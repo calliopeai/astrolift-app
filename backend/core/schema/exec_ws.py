@@ -20,24 +20,50 @@ Frame protocol (JSON-line for control, raw bytes for stream):
       {"type": "ready"}                 ← session opened, ready for stdin
       {"type": "replay", "lines": [...]}← stdout/stderr ring buffer for reconnect
 
+Two kinds of thing answer to the first path segment. Usually it is a
+``RegisteredApp`` slug. It may also be an ``AgentBox`` slug (#129): a box
+is a warm pod that exists to be attached to, and this relay is the only
+way in that does not hand the operator direct cluster access. The relay
+resolves the slug to whichever kind owns it *before* it decides which
+grant to demand — a box is authorized as a box, never by widening the
+app path's tenancy check to admit one.
+
 Auth re-uses the cookie-aware resolution from ws_views: the user must be
-authenticated, scoped to a tenant that owns the referenced app, and hold
-the ``app.exec_pod`` permission. Misses close with the right WS code:
+authenticated, scoped to a tenant that owns the target, and hold the
+grant that target's kind requires — ``app.exec_pod`` for an app,
+``agent_box.attach`` for a box. Misses close with the right WS code:
 
   4401 — unauthenticated
-  4403 — tenant mismatch OR ``app.exec_pod`` denied
-  4404 — path is not a valid /app/exec/<app>/<workload>
+  4403 — the caller lacks the grant for this target's kind
+  4404 — nothing to exec into: the path is not a valid
+         /app/exec/<target>/<workload>, or no app and no box in the
+         caller's tenant answers to <target>
+
+4403 and 4404 are deliberately distinct (#129). They used to be the same
+code, so a slug the relay could not resolve — a box, before this module
+knew what one was — reached the operator as "you lack app.exec_pod",
+which sent them to an administrator for a grant they already held. A
+target belonging to *another* tenant closes 4404 alongside one that
+never existed, because confirming existence across a tenant boundary is
+itself a leak.
+
+Every one of these closes happens **before** ``websocket.accept``, which
+is what makes the ASGI server reject the handshake at HTTP level with a
+403. The CLI keys its error message off that status rather than off the
+WS code, so the pre-accept ordering is load-bearing: moving any of these
+closes after accept would silently change what ``astro exec`` prints.
 
 Production wiring: the connection-time backend resolution looks up the
-app's ``default_tenant_cluster`` (or per-environment cluster) and calls
-``driver.exec_in_pod(...)`` via the ``astrolift-providers`` SDK. The
-backend factory is swappable so tests can stand up a recording fake
+app's ``default_tenant_cluster`` (or per-environment cluster), or for a
+box the org's agent cluster plus the namespace frozen on the row, and
+calls ``driver.exec_in_pod(...)`` via the ``astrolift-providers`` SDK.
+The backend factory is swappable so tests can stand up a recording fake
 without touching the kubernetes client.
 
-Audit: every successful ``open`` frame emits an ``app.exec_pod.opened``
-``Event`` carrying the actor, app, pod, container, and command. The
-log/event row is the single source-of-truth for who got an interactive
-shell where.
+Audit: every successful ``open`` frame emits an ``Event`` carrying the
+actor, target, pod, container, and command — ``app.exec_pod.opened`` for
+an app, ``agent_box.attached`` for a box. The log/event row is the
+single source-of-truth for who got an interactive shell where.
 """
 
 from __future__ import annotations
@@ -163,6 +189,12 @@ def get_exec_backend() -> ExecBackend:
 # ---- Auth + tenant resolution ---------------------------------------
 
 
+# What the first path segment turned out to name. The relay needs this
+# before it can pick a grant, an audit event type, or a cluster.
+TARGET_APP = "app"
+TARGET_BOX = "box"
+
+
 @sync_to_async
 def _check_app_in_tenant(*, app_slug: str, tenant_org_id) -> bool:
     from astrolift_registry.models import RegisteredApp
@@ -177,14 +209,46 @@ def _check_app_in_tenant(*, app_slug: str, tenant_org_id) -> bool:
 
 
 @sync_to_async
-def _check_exec_permission(*, tenant_org_id, actor_user_id) -> bool:
-    """Resolver-entry permission check — deny-by-default. Returns True
-    iff the resolved tenant + user holds ``app.exec_pod``."""
-    from core.permissions import (
-        Permission,
-        PermissionDenied,
-        check_permission,
-    )
+def _check_box_in_tenant(*, box_slug: str, tenant_org_id) -> bool:
+    """Does a live agent box in *this* tenant answer to ``box_slug``?
+
+    Filtered on the organization explicitly: ``@tenant_scoped`` asserts a
+    tenant, it does not filter, so a by-slug fetch that trusts the slug
+    alone would hand one org a session inside another org's pod.
+    """
+    from astrolift_agents.models import AgentBox
+
+    if not tenant_org_id:
+        return False
+    return AgentBox.objects.filter(
+        slug=box_slug,
+        organization_id=tenant_org_id,
+        deleted_at__isnull=True,
+    ).exists()
+
+
+async def _resolve_exec_target(*, target_slug: str, tenant_org_id) -> str | None:
+    """Which kind of thing ``target_slug`` names inside the caller's
+    tenant, or None when nothing does.
+
+    Apps win a slug collision: they are the surface every existing client
+    addresses, and a box slug is platform-derived (``box-<agent>-u<id>``)
+    so it cannot be chosen to shadow one.
+    """
+    if await _check_app_in_tenant(app_slug=target_slug, tenant_org_id=tenant_org_id):
+        return TARGET_APP
+    if await _check_box_in_tenant(box_slug=target_slug, tenant_org_id=tenant_org_id):
+        return TARGET_BOX
+    return None
+
+
+def _holds(permission, *, tenant_org_id, actor_user_id) -> bool:
+    """Deny-by-default check of one permission for the resolved tenant.
+
+    Also installs the tenant context the backend's cluster resolution
+    reads back out of the contextvar once the handshake is through.
+    """
+    from core.permissions import PermissionDenied, check_permission
     from core.tenancy import TenantContext, set_current_tenant
 
     if not tenant_org_id:
@@ -196,10 +260,37 @@ def _check_exec_permission(*, tenant_org_id, actor_user_id) -> bool:
         ),
     )
     try:
-        check_permission(Permission.APP_EXEC_POD)
+        check_permission(permission)
     except PermissionDenied:
         return False
     return True
+
+
+@sync_to_async
+def _check_exec_permission(*, tenant_org_id, actor_user_id) -> bool:
+    """Resolver-entry permission check — deny-by-default. Returns True
+    iff the resolved tenant + user holds ``app.exec_pod``."""
+    from core.permissions import Permission
+
+    return _holds(
+        Permission.APP_EXEC_POD,
+        tenant_org_id=tenant_org_id,
+        actor_user_id=actor_user_id,
+    )
+
+
+@sync_to_async
+def _check_box_attach_permission(*, tenant_org_id, actor_user_id) -> bool:
+    """Deny-by-default gate on ``agent_box.attach`` — the box-shaped
+    counterpart to ``app.exec_pod``. See the permission's own comment
+    for why attaching an agent is not authorized by an app grant."""
+    from core.permissions import Permission
+
+    return _holds(
+        Permission.AGENT_BOX_ATTACH,
+        tenant_org_id=tenant_org_id,
+        actor_user_id=actor_user_id,
+    )
 
 
 @sync_to_async
@@ -249,6 +340,58 @@ def _audit_exec_open(
         logger.exception("exec_ws: audit emission failed")
 
 
+@sync_to_async
+def _record_box_attach(
+    *,
+    box_slug: str,
+    pod_name: str,
+    container: str,
+    command: list[str],
+    tenant_org_id,
+    actor_user_id,
+) -> None:
+    """Audit row + ``last_attached_at`` stamp for a box session (#129).
+
+    Both are best-effort for the same reason the app audit is: a writer
+    hiccup must not cost the operator the session they just opened.
+    Dropping the stamp is safe because it is advisory telemetry for the
+    operator surface — "when did someone last ask for a way in". It is
+    *not* what reaps the box. Real idleness is measured inside the pod,
+    where tmux can see an attached client the instant it detaches; a
+    control-plane timestamp cannot, and a missed write here would reap
+    somebody sitting right there.
+    """
+    from django.utils import timezone
+
+    from astrolift_agents.models import AgentBox
+    from core.events import Event
+
+    try:
+        box = AgentBox.objects.filter(
+            slug=box_slug,
+            organization_id=tenant_org_id,
+            deleted_at__isnull=True,
+        ).first()
+        Event.emit(
+            "agent_box.attached",
+            payload={
+                "box_slug": box_slug,
+                "pod_name": pod_name,
+                "container": container,
+                "command": [str(c)[:512] for c in (command or [])][:32],
+            },
+            resource_kind="agent_box",
+            resource_id=box_slug,
+            actor_user_id=actor_user_id,
+            organization_id=tenant_org_id,
+        )
+        if box is not None:
+            box.last_attached_at = timezone.now()
+            box.save(update_fields=["last_attached_at", "updated_at", "version"])
+    except Exception:  # noqa: BLE001
+        logger.exception("exec_ws: box attach record failed")
+
+
 # ---- Path parser -----------------------------------------------------
 
 
@@ -275,11 +418,11 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
         await send({"type": "websocket.close", "code": 4400})
         return
 
-    target = _parse_target_id(scope.get("path", ""))
-    if target is None:
+    parsed = _parse_target_id(scope.get("path", ""))
+    if parsed is None:
         await send({"type": "websocket.close", "code": 4404})
         return
-    app_slug, workload_slug = target
+    app_slug, workload_slug = parsed
 
     from core.schema.ws_auth import (
         _bearer_from_scope,
@@ -309,21 +452,35 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
 
     org_id = getattr(tenant, "organization_id", None) if tenant else None
     actor_user_id = getattr(tenant, "actor_user_id", None) if tenant else None
-    if not await _check_app_in_tenant(
-        app_slug=app_slug,
+
+    # Resolve *what* the slug names before asking whether the caller may
+    # have it, so an unknown or foreign slug reports 4404 rather than
+    # borrowing the permission code and reading as a missing grant.
+    target = await _resolve_exec_target(
+        target_slug=app_slug,
         tenant_org_id=org_id,
-    ):
-        await send({"type": "websocket.close", "code": 4403})
+    )
+    if target is None:
+        await send({"type": "websocket.close", "code": 4404})
         return
 
-    # Deny-by-default permission gate. ``app.exec_pod`` is the
-    # operator-shell-into-pod capability. RBAC seeds grant it to org
-    # owners + cluster operators; everyone else is denied at the
-    # handshake so the frontend never sees the terminal pane.
-    if not await _check_exec_permission(
-        tenant_org_id=org_id,
-        actor_user_id=actor_user_id,
-    ):
+    # Deny-by-default permission gate, per target kind. ``app.exec_pod``
+    # is the operator-shell-into-pod capability for applications;
+    # ``agent_box.attach`` is its counterpart for an agent box. RBAC
+    # seeds grant them to different sets of roles, and the denial lands
+    # at the handshake so the frontend never sees the terminal pane.
+    granted = (
+        await _check_box_attach_permission(
+            tenant_org_id=org_id,
+            actor_user_id=actor_user_id,
+        )
+        if target == TARGET_BOX
+        else await _check_exec_permission(
+            tenant_org_id=org_id,
+            actor_user_id=actor_user_id,
+        )
+    )
+    if not granted:
         await send({"type": "websocket.close", "code": 4403})
         return
 
@@ -401,14 +558,24 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
                     send_error=_send_error,
                     tty=tty,
                 )
-                await _audit_exec_open(
-                    app_slug=app_slug,
-                    workload_slug=workload_slug,
-                    container=container,
-                    command=command,
-                    tenant_org_id=org_id,
-                    actor_user_id=actor_user_id,
-                )
+                if target == TARGET_BOX:
+                    await _record_box_attach(
+                        box_slug=app_slug,
+                        pod_name=workload_slug,
+                        container=container,
+                        command=command,
+                        tenant_org_id=org_id,
+                        actor_user_id=actor_user_id,
+                    )
+                else:
+                    await _audit_exec_open(
+                        app_slug=app_slug,
+                        workload_slug=workload_slug,
+                        container=container,
+                        command=command,
+                        tenant_org_id=org_id,
+                        actor_user_id=actor_user_id,
+                    )
                 # Signal the frontend that the backend handshake
                 # succeeded and stdin will now be accepted. Lets the
                 # client clear any "connecting…" banner before the
