@@ -24,6 +24,13 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 
 from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op
+from _sdk.azure_ownership import (
+    OWNERSHIP_ERROR_CODE,
+    AzureOperation,
+    AzureOwnershipError,
+    owner_of,
+    verify_azure_ownership,
+)
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -315,10 +322,12 @@ class AzureAPIMDriver(ManagedServiceDriver):
         existing = self._get(path)
         try:
             if existing is not None:
-                self._assert_owned_or_adoptable(existing, spec, cfg)
+                self._assert_owned_or_adoptable(existing, spec, cfg, service_name)
             body = self._service_body(spec, cfg, existing)
             service = self._api.put(path, body)
             self._reconcile_children(service_name, cfg)
+        except AzureOwnershipError as exc:
+            return ProvisionResult(False, "", str(exc), [OWNERSHIP_ERROR_CODE])
         except Exception as exc:
             return ProvisionResult(False, "", f"provision API Management: {exc}", [str(exc)])
         service = service or self._api.get(path)
@@ -358,10 +367,12 @@ class AzureAPIMDriver(ManagedServiceDriver):
                 ["invalid_api_management_config"],
             )
         try:
-            self._assert_owned(existing)
+            self._assert_owned(existing, spec, AzureOperation.UPDATE, service_name)
             body = self._update_body(existing, cfg)
             self._api.put(path, body)
             self._reconcile_children(service_name, cfg, only_declared=True)
+        except AzureOwnershipError as exc:
+            return UpdateResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
         except Exception as exc:
             return UpdateResult(False, spec.handle, f"update API Management: {exc}", [str(exc)])
         return UpdateResult(True, spec.handle, f"API Management {service_name} reconciled")
@@ -406,7 +417,7 @@ class AzureAPIMDriver(ManagedServiceDriver):
                 retryable=False,
             )
         try:
-            self._assert_owned(existing)
+            self._assert_owned(existing, spec, AzureOperation.DELETE, service_name)
             tags = _tags(existing)
             if tags.get(_ADOPTED_TAG) == "true" and not cfg.get("delete_adopted"):
                 return DeprovisionResult(
@@ -417,6 +428,8 @@ class AzureAPIMDriver(ManagedServiceDriver):
                     retryable=False,
                 )
             self._api.delete(path)
+        except AzureOwnershipError as exc:
+            return DeprovisionResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
         except Exception as exc:
             return DeprovisionResult(False, spec.handle, f"delete API Management: {exc}", [str(exc)])
         return DeprovisionResult(True, spec.handle, f"API Management {service_name} deleted")
@@ -426,7 +439,7 @@ class AzureAPIMDriver(ManagedServiceDriver):
         try:
             service_name = self._parse_handle(handle.handle)
             service = self._api.get(self._service_path(service_name))
-            self._assert_owned(service)
+            self._assert_owned(service, handle, AzureOperation.INSPECT, service_name)
         except AzureAPIMNotFound:
             return ServiceStatus(handle.handle, "deprovisioned", "API Management service does not exist")
         except Exception as exc:
@@ -450,7 +463,7 @@ class AzureAPIMDriver(ManagedServiceDriver):
         del config
         service_name = self._parse_handle(handle.handle)
         service = self._api.get(self._service_path(service_name))
-        self._assert_owned(service)
+        self._assert_owned(service, handle, AzureOperation.INSPECT, service_name)
         properties = dict(service.get("properties") or {})
         endpoint = str(properties.get("gatewayUrl") or f"https://{service_name}.azure-api.net")
         return Binding(
@@ -1205,19 +1218,35 @@ class AzureAPIMDriver(ManagedServiceDriver):
         resource: dict[str, Any],
         spec: ProvisionSpec,
         cfg: dict[str, Any],
+        service_name: str,
     ) -> None:
-        owner = _ownership(resource)
-        expected = self._owner(spec)
-        if owner == expected:
+        # ``adopt_existing`` is the driver's pre-existing, doubly opt-in
+        # adoption path: an install policy must allow it and the operator must
+        # ask for it, and the result is stamped ``astrolift-adopted``. It stays
+        # as-is until #1365's authorized adoption operation replaces it; the
+        # shared verifier governs every other route to a mutation.
+        if cfg.get("adopt_existing") and not _ownership(resource):
             return
-        if owner and owner != expected:
-            raise AzureAPIMError("API Management service belongs to another managed-service row")
-        if not cfg.get("adopt_existing"):
-            raise AzureAPIMError("API Management name collision requires adopt_existing=true")
+        try:
+            self._assert_owned(resource, spec, AzureOperation.PROVISION, service_name)
+        except AzureOwnershipError as exc:
+            if _ownership(resource):
+                raise
+            raise AzureOwnershipError(f"{exc}; adopting it requires adopt_existing=true") from exc
 
-    def _assert_owned(self, resource: dict[str, Any]) -> None:
-        if not _ownership(resource):
-            raise AzureAPIMError("API Management service lacks Astrolift ownership tags")
+    @staticmethod
+    def _assert_owned(
+        resource: dict[str, Any],
+        source: object,
+        operation: AzureOperation,
+        service_name: str,
+    ) -> None:
+        verify_azure_ownership(
+            _tags(resource),
+            owner_of(source),
+            operation=operation,
+            resource=f"API Management service {service_name}",
+        )
 
     def _service_name(self, spec: ProvisionSpec, cfg: dict[str, Any]) -> str:
         explicit = str(cfg.get("service_name") or "")

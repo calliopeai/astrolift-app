@@ -359,13 +359,13 @@ def test_foreign_collision_and_immutable_changes_are_rejected_before_put() -> No
 
     collision = driver.provision(_spec())
 
-    assert collision.ok is False and "collides" in collision.message
+    assert collision.ok is False and "belongs to managed service other, not service-1" in collision.message
     assert len(network.private_endpoints.puts) == count
 
     network.private_endpoints.objects[name]["tags"]["astrolift-managed-service-id"] = "service-1"
     changed = dict(_spec().config)
     changed["group_ids"] = ["dfs"]
-    update = driver.update(UpdateSpec(result.handle, config=changed))
+    update = driver.update(UpdateSpec(result.handle, config=changed, managed_service_id="service-1"))
     assert update.ok is False and "immutable" in update.message
     assert len(network.private_endpoints.puts) == count
 
@@ -377,7 +377,7 @@ def test_update_reconciles_dns_and_deletion_protection() -> None:
     updated_cfg["private_dns_zone_ids"] = []
     updated_cfg["deletion_protection"] = False
 
-    updated = driver.update(UpdateSpec(result.handle, config=updated_cfg))
+    updated = driver.update(UpdateSpec(result.handle, config=updated_cfg, managed_service_id="service-1"))
 
     assert updated.ok
     assert network.private_endpoints.puts[-1][2]["tags"]["astrolift-deletion-protection"] == "false"
@@ -402,17 +402,17 @@ def test_deletion_protection_ownership_and_idempotent_teardown() -> None:
     driver, network = _driver()
     result = driver.provision(_spec())
 
-    protected = driver.deprovision(DeprovisionSpec(result.handle))
+    protected = driver.deprovision(DeprovisionSpec(result.handle, managed_service_id="service-1"))
     assert protected.ok is False and protected.errors == ["deletion_protection_enabled"]
 
     name = result.handle.split("/", 1)[1]
     network.private_endpoints.objects[name]["tags"]["astrolift-managed-by"] = "foreign"
-    foreign = driver.deprovision(DeprovisionSpec(result.handle), force_destroy=True)
-    assert foreign.ok is False and "not owned" in foreign.message
+    foreign = driver.deprovision(DeprovisionSpec(result.handle, managed_service_id="service-1"), force_destroy=True)
+    assert foreign.ok is False and "carries no Astrolift astrolift-managed-by=platform" in foreign.message
 
     network.private_endpoints.objects[name]["tags"]["astrolift-managed-by"] = "platform"
-    removed = driver.deprovision(DeprovisionSpec(result.handle), force_destroy=True)
-    repeated = driver.deprovision(DeprovisionSpec(result.handle), force_destroy=True)
+    removed = driver.deprovision(DeprovisionSpec(result.handle, managed_service_id="service-1"), force_destroy=True)
+    repeated = driver.deprovision(DeprovisionSpec(result.handle, managed_service_id="service-1"), force_destroy=True)
     assert removed.ok and repeated.ok
 
 

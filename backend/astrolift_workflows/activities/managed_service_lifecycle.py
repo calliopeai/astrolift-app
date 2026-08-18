@@ -49,6 +49,17 @@ def _service_cluster(svc):
     return getattr(env, "tenant_cluster", None)
 
 
+def _service_identity(svc: Any) -> str:
+    """The id drivers stamp onto the cloud resource and check before mutating it.
+
+    Every spec handed to a driver carries it, not just ``ProvisionSpec``, so an
+    update or a teardown can prove the resource behind a deterministic name is
+    still the one this row created (#1365).
+    """
+
+    return str(getattr(svc, "guid", "") or svc.pk)
+
+
 def _signals_already_gone(*parts: object) -> bool:
     blob = " ".join(str(p) for p in parts if p).lower()
     return any(marker in blob for marker in _ALREADY_GONE_MARKERS)
@@ -289,7 +300,11 @@ def _deprovision_sync(
     deprovision_config = dict(svc.config or {})
     if delete_data and is_dynamic_pvc:
         deprovision_config["_dynamic_claim_cleanup_confirmed"] = True
-    spec = DeprovisionSpec(handle=svc.backend_ref or "", config=deprovision_config)
+    spec = DeprovisionSpec(
+        handle=svc.backend_ref or "",
+        config=deprovision_config,
+        managed_service_id=_service_identity(svc),
+    )
     try:
         result = driver.deprovision(
             spec,
@@ -491,7 +506,7 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
         service_handle_hint=svc.name or svc.kind,
         size=str(svc_config.get("size", "small")),
         config=svc_config,
-        managed_service_id=str(getattr(svc, "guid", "") or svc.pk),
+        managed_service_id=_service_identity(svc),
     )
     result = driver.provision(spec)
     return {
@@ -545,6 +560,7 @@ def _update_sync(managed_service_id: int) -> dict[str, Any]:
             handle=svc.backend_ref,
             size=str(desired["size"]) if "size" in desired else None,
             config=desired,
+            managed_service_id=_service_identity(svc),
         ),
     )
     return {
@@ -641,7 +657,8 @@ def _check_ready_sync(managed_service_id: int, handle: str) -> str:
         return "available"
     from _sdk.managed_service import ServiceHandle
 
-    return str(getattr(status_method(ServiceHandle(handle=handle)), "state", "available"))
+    probe = ServiceHandle(handle=handle, managed_service_id=_service_identity(svc))
+    return str(getattr(status_method(probe), "state", "available"))
 
 
 @activity.defn(name="astrolift.managed_service.check_ready")
@@ -753,7 +770,7 @@ def _managed_binding_for(svc: Any) -> Any:
         return None
     from _sdk.managed_service import ServiceHandle
 
-    handle = ServiceHandle(handle=svc.backend_ref)
+    handle = ServiceHandle(handle=svc.backend_ref, managed_service_id=_service_identity(svc))
     # Thread the operator-supplied ``ManagedService.config`` into the
     # binding so config-driven binding fields render (#1038): the SES
     # driver folds ``from_name``/``reply_to``/``return_path``/

@@ -8,6 +8,13 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.azure_ownership import (
+    OWNERSHIP_ERROR_CODE,
+    AzureOperation,
+    AzureOwnershipError,
+    owner_of,
+    verify_azure_ownership,
+)
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -24,7 +31,6 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from _sdk.managed_service_tags import ownership_key, read_managed_service_id
 from azure.managed.tags import arm_tags_for as tags_for
 
 
@@ -131,7 +137,7 @@ class AzureEventHubsDriver(ManagedServiceDriver):
                 existing_validation = self._validate({"sku": self._sku_name(namespace), **cfg})
                 if existing_validation:
                     raise AzureEventHubsError(existing_validation)
-                self._assert_owned(namespace, spec)
+                self._assert_owned(namespace, spec, AzureOperation.PROVISION, namespace_name)
                 self._assert_create_only(namespace, cfg)
                 update = self._namespace_update_parameters(
                     cfg,
@@ -165,6 +171,8 @@ class AzureEventHubsDriver(ManagedServiceDriver):
                 cfg,
                 sku=effective_sku,
             )
+        except AzureOwnershipError as exc:
+            return ProvisionResult(False, handle, str(exc), [OWNERSHIP_ERROR_CODE])
         except Exception as exc:
             return ProvisionResult(False, handle, f"provision Event Hubs resource: {exc}", [str(exc)])
         return ProvisionResult(
@@ -197,6 +205,10 @@ class AzureEventHubsDriver(ManagedServiceDriver):
         existing_hub = self._describe_event_hub(namespace_name, event_hub_name)
         if namespace is None or existing_hub is None:
             return UpdateResult(False, spec.handle, "Event Hubs resource does not exist", ["not_found"])
+        try:
+            self._assert_owned(namespace, spec, AzureOperation.UPDATE, namespace_name)
+        except AzureOwnershipError as exc:
+            return UpdateResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
         existing_validation = self._validate({"sku": self._sku_name(namespace), **cfg})
         if existing_validation:
             return UpdateResult(
@@ -288,8 +300,13 @@ class AzureEventHubsDriver(ManagedServiceDriver):
         force_destroy: bool = False,
     ) -> DeprovisionResult:
         namespace_name, event_hub_name = self._parse_handle(spec.handle)
-        if self._describe_namespace(namespace_name) is None:
+        namespace = self._describe_namespace(namespace_name)
+        if namespace is None:
             return DeprovisionResult(True, spec.handle, f"Event Hubs namespace {namespace_name} already gone")
+        try:
+            self._assert_owned(namespace, spec, AzureOperation.DELETE, namespace_name)
+        except AzureOwnershipError as exc:
+            return DeprovisionResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
         if not delete_data:
             return DeprovisionResult(
                 False,
@@ -902,28 +919,14 @@ class AzureEventHubsDriver(ManagedServiceDriver):
                 return None
             raise
 
-    def _assert_owned(self, namespace: Any, spec: ProvisionSpec) -> None:
-        tags = _field(namespace, "tags", default={}) or {}
-        expected = spec.managed_service_id
-        actual = read_managed_service_id(tags, "azure")
-        if expected and actual != expected:
-            raise AzureEventHubsError(
-                f"refusing to adopt Event Hubs namespace owned by managed_service_id={actual or 'unset'}",
-            )
-        if expected:
-            return
-        expected_tags = {
-            ownership_key("azure", "org"): spec.organization_slug,
-            ownership_key("azure", "app"): spec.app_slug,
-            ownership_key("azure", "env"): spec.environment_name,
-        }
-        mismatches = [
-            f"{key}={tags.get(key) or 'unset'}" for key, value in expected_tags.items() if tags.get(key) != value
-        ]
-        if mismatches:
-            raise AzureEventHubsError(
-                f"refusing to adopt Event Hubs namespace with mismatched ownership tags: {', '.join(mismatches)}",
-            )
+    @staticmethod
+    def _assert_owned(namespace: Any, source: object, operation: AzureOperation, namespace_name: str) -> None:
+        verify_azure_ownership(
+            dict(_field(namespace, "tags", default={}) or {}),
+            owner_of(source),
+            operation=operation,
+            resource=f"Event Hubs namespace {namespace_name}",
+        )
 
     def _assert_create_only(self, namespace: Any, cfg: dict[str, Any]) -> None:
         if "sku" in cfg and self._sku_name(namespace) != str(cfg["sku"]):

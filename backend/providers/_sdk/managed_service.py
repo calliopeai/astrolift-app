@@ -60,6 +60,12 @@ class UpdateSpec:
     handle: str
     size: str | None = None
     config: dict[str, Any] = field(default_factory=dict)
+    # The same identity ``ProvisionSpec`` stamps onto the cloud resource, so a
+    # driver can prove the thing behind ``handle`` is still the thing it
+    # created before mutating it (#1365). A handle is only a name, and names
+    # collide.
+    binding_id: str = ""
+    managed_service_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -113,6 +119,8 @@ class DeprovisionSpec:
     # idempotent "already gone" path where the live resource that carried
     # them no longer exists. Other drivers ignore it.
     config: dict[str, Any] = field(default_factory=dict)
+    binding_id: str = ""
+    managed_service_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -134,6 +142,8 @@ class DeprovisionResult:
 @dataclass(frozen=True)
 class ServiceHandle:
     handle: str
+    binding_id: str = ""
+    managed_service_id: str = ""
 
 
 @dataclass(frozen=True)

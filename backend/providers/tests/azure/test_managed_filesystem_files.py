@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 from astrolift_manifest.env_injection import envelope_keys_for
 
+from _sdk.azure_ownership import AzureOwnershipError
 from _sdk.managed_service import (
     DeprovisionSpec,
     ProvisionSpec,
@@ -278,7 +279,7 @@ def test_provisions_top_level_nfs_share_and_emits_portable_binding() -> None:
     assert share.properties.public_access_properties.allowed_subnets == [SUBNET_ID]
 
     binding = driver.binding(
-        ServiceHandle(handle),
+        ServiceHandle(handle, managed_service_id="service-id"),
         {"mount_path": "/data", "mount_options": ["actimeo=30"], "read_only": True},
     )
     assert binding.env_vars["FILESYSTEM_HANDLE"].literal == share.id
@@ -339,7 +340,7 @@ def test_unencrypted_binding_adds_notls_and_missing_hostname_fails() -> None:
     driver, mgmt, _ = _driver(encryption_in_transit_required_default=False)
     handle = _provisioned(driver)
     name = handle.split("/")[1]
-    binding = driver.binding(ServiceHandle(handle))
+    binding = driver.binding(ServiceHandle(handle, managed_service_id="service-id"))
     assert binding.env_vars["FILESYSTEM_TLS"].literal == "false"
     assert "notls" in binding.env_vars["FILESYSTEM_MOUNT_OPTIONS"].literal
     # notls is an AZNFS mount-helper flag that plain mount.nfs rejects, so it
@@ -348,7 +349,7 @@ def test_unencrypted_binding_adds_notls_and_missing_hostname_fails() -> None:
 
     mgmt.file_shares.values[name].properties.host_name = ""
     with pytest.raises(AzureFilesError, match="no mount hostname"):
-        driver.binding(ServiceHandle(handle))
+        driver.binding(ServiceHandle(handle, managed_service_id="service-id"))
 
 
 def test_binding_reads_sdk_enum_encryption_state() -> None:
@@ -364,7 +365,7 @@ def test_binding_reads_sdk_enum_encryption_state() -> None:
     assert str(SdkEncryptionInTransit.ENABLED) != SdkEncryptionInTransit.ENABLED.value
     share.properties.nfs_protocol_properties.encryption_in_transit_required = SdkEncryptionInTransit.ENABLED
 
-    binding = driver.binding(ServiceHandle(handle))
+    binding = driver.binding(ServiceHandle(handle, managed_service_id="service-id"))
     assert binding.env_vars["FILESYSTEM_TLS"].literal == "true"
     assert "notls" not in binding.env_vars["FILESYSTEM_MOUNT_OPTIONS"].literal
 
@@ -381,11 +382,11 @@ def test_binding_refuses_a_share_without_usable_provisioned_capacity() -> None:
 
     properties.provisioned_storage_gi_b = 0
     with pytest.raises(AzureFilesError, match="invalid provisioned capacity"):
-        driver.binding(ServiceHandle(handle))
+        driver.binding(ServiceHandle(handle, managed_service_id="service-id"))
 
     properties.provisioned_storage_gi_b = "unbounded"
     with pytest.raises(AzureFilesError, match="invalid provisioned capacity"):
-        driver.binding(ServiceHandle(handle))
+        driver.binding(ServiceHandle(handle, managed_service_id="service-id"))
 
 
 def test_provision_is_idempotent_and_refuses_foreign_collision() -> None:
@@ -399,7 +400,7 @@ def test_provision_is_idempotent_and_refuses_foreign_collision() -> None:
     name = first.handle.split("/")[1]
     mgmt.file_shares.values[name].tags = {"owner": "external"}
     collision = driver.provision(_spec())
-    assert not collision.ok and "not owned" in collision.message
+    assert not collision.ok and "carries no Astrolift astrolift-managed-by=platform" in collision.message
 
 
 def test_generated_names_keep_the_identity_digest_with_long_prefixes() -> None:
@@ -420,7 +421,7 @@ def test_managed_service_identity_collision_is_not_adopted() -> None:
 
     result = driver.provision(_spec())
 
-    assert not result.ok and "another managed service" in result.message
+    assert not result.ok and "belongs to managed service other-service, not service-id" in result.message
 
 
 def test_partial_update_changes_only_mutable_fields() -> None:
@@ -435,6 +436,7 @@ def test_partial_update_changes_only_mutable_fields() -> None:
                 "root_squash": "NoRootSquash",
                 "allowed_subnet_ids": [SUBNET_ID],
             },
+            managed_service_id="service-id",
         ),
     )
     assert updated.ok, updated
@@ -449,12 +451,12 @@ def test_partial_update_changes_only_mutable_fields() -> None:
 def test_update_size_mapping_and_immutable_drift_fail_closed() -> None:
     driver, mgmt, _ = _driver()
     handle = _provisioned(driver, provisioned_storage_gib=256)
-    sized = driver.update(UpdateSpec(handle, size="large"))
+    sized = driver.update(UpdateSpec(handle, size="large", managed_service_id="service-id"))
     assert sized.ok, sized
     name = handle.split("/")[1]
     assert mgmt.file_shares.values[name].properties.provisioned_storage_gi_b == 1024
 
-    immutable = driver.update(UpdateSpec(handle, config={"redundancy": "Zone"}))
+    immutable = driver.update(UpdateSpec(handle, config={"redundancy": "Zone"}, managed_service_id="service-id"))
     assert not immutable.ok and "immutable" in immutable.message
 
 
@@ -467,8 +469,10 @@ def test_downgrade_cooldown_is_checked_before_cloud_mutation() -> None:
     properties.provisioned_io_per_sec_next_allowed_downgrade = NOW + timedelta(days=2)
     previous_calls = len(mgmt.file_shares.update_calls)
 
-    storage = driver.update(UpdateSpec(handle, config={"provisioned_storage_gib": 512}))
-    iops = driver.update(UpdateSpec(handle, config={"provisioned_iops": 4000}))
+    storage = driver.update(
+        UpdateSpec(handle, config={"provisioned_storage_gib": 512}, managed_service_id="service-id")
+    )
+    iops = driver.update(UpdateSpec(handle, config={"provisioned_iops": 4000}, managed_service_id="service-id"))
 
     assert not storage.ok and "cannot be reduced until" in storage.message
     assert not iops.ok and "cannot be reduced until" in iops.message
@@ -539,20 +543,20 @@ def test_status_reports_lifecycle_missing_and_invalid_handles() -> None:
     driver, mgmt, _ = _driver()
     handle = _provisioned(driver)
     name = handle.split("/")[1]
-    assert driver.status(ServiceHandle(handle)).state == "available"
+    assert driver.status(ServiceHandle(handle, managed_service_id="service-id")).state == "available"
     mgmt.file_shares.values[name].properties.provisioning_state = "Updating"
-    assert driver.status(ServiceHandle(handle)).state == "updating"
+    assert driver.status(ServiceHandle(handle, managed_service_id="service-id")).state == "updating"
     mgmt.file_shares.values.pop(name)
-    assert driver.status(ServiceHandle(handle)).state == "deprovisioned"
-    assert driver.status(ServiceHandle("bad/handle/shape")).state == "error"
-    invalid = driver.update(UpdateSpec("bad/handle/shape"))
+    assert driver.status(ServiceHandle(handle, managed_service_id="service-id")).state == "deprovisioned"
+    assert driver.status(ServiceHandle("bad/handle/shape", managed_service_id="service-id")).state == "error"
+    invalid = driver.update(UpdateSpec("bad/handle/shape", managed_service_id="service-id"))
     assert not invalid.ok and invalid.errors == ["invalid_handle"]
 
 
 def test_snapshot_is_native_but_portable_restore_fails_honestly() -> None:
     driver, mgmt, _ = _driver()
     handle = _provisioned(driver)
-    snapshot = driver.snapshot(ServiceHandle(handle))
+    snapshot = driver.snapshot(ServiceHandle(handle, managed_service_id="service-id"))
     assert snapshot.snapshot_id == "snap-20260814-120000-000000"
     call = mgmt.file_share_snapshots.create_calls[0]
     assert call["resource"].properties.initiator_id == "astrolift"
@@ -567,26 +571,26 @@ def test_snapshot_and_binding_refuse_missing_or_unowned_shares() -> None:
     handle = _provisioned(driver)
     name = handle.split("/")[1]
     mgmt.file_shares.values[name].tags = {}
-    with pytest.raises(AzureFilesError, match="not owned"):
-        driver.snapshot(ServiceHandle(handle))
-    with pytest.raises(AzureFilesError, match="not owned"):
-        driver.binding(ServiceHandle(handle))
+    with pytest.raises(AzureOwnershipError, match="carries no Astrolift astrolift-managed-by=platform"):
+        driver.snapshot(ServiceHandle(handle, managed_service_id="service-id"))
+    with pytest.raises(AzureOwnershipError, match="carries no Astrolift astrolift-managed-by=platform"):
+        driver.binding(ServiceHandle(handle, managed_service_id="service-id"))
 
     mgmt.file_shares.values.pop(name)
     with pytest.raises(AzureFilesError, match="missing"):
-        driver.snapshot(ServiceHandle(handle))
+        driver.snapshot(ServiceHandle(handle, managed_service_id="service-id"))
     with pytest.raises(AzureFilesError, match="missing"):
-        driver.binding(ServiceHandle(handle))
+        driver.binding(ServiceHandle(handle, managed_service_id="service-id"))
 
 
 def test_deprovision_requires_guard_and_explicit_data_loss() -> None:
     driver, mgmt, _ = _driver()
     handle = _provisioned(driver)
-    protected = driver.deprovision(DeprovisionSpec(handle))
+    protected = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"))
     assert not protected.ok and protected.errors == ["deletion_protection_enabled"]
 
     retained = driver.deprovision(
-        DeprovisionSpec(handle, config={"deletion_protection": False}),
+        DeprovisionSpec(handle, config={"deletion_protection": False}, managed_service_id="service-id"),
     )
     assert not retained.ok and retained.errors == ["retained_filesystem_data_requires_delete_data"]
     assert not mgmt.file_shares.delete_calls
@@ -597,26 +601,26 @@ def test_deprovision_guards_locks_and_private_endpoint_connections() -> None:
     handle = _provisioned(driver)
     name = handle.split("/")[1]
     locks.management_locks.values = [SimpleNamespace(name="protect")]
-    locked = driver.deprovision(DeprovisionSpec(handle), delete_data=True)
+    locked = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True)
     assert not locked.ok and locked.errors == ["resource_lock_present"]
     assert not locks.management_locks.delete_calls
 
     locks.management_locks.values = []
     mgmt.private_endpoint_connections.values[name] = [SimpleNamespace(name="private-link")]
-    connected = driver.deprovision(DeprovisionSpec(handle), delete_data=True)
+    connected = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True)
     assert not connected.ok and connected.errors == ["private_endpoint_connections_present"]
 
 
 def test_deprovision_converges_when_listed_child_snapshot_disappears(monkeypatch: pytest.MonkeyPatch) -> None:
     driver, mgmt, _ = _driver(deletion_protection_default=False)
     handle = _provisioned(driver)
-    driver.snapshot(ServiceHandle(handle))
+    driver.snapshot(ServiceHandle(handle, managed_service_id="service-id"))
 
     def disappeared(*args: Any, **kwargs: Any) -> Poller:
         raise ResourceNotFoundError("snapshot already gone")
 
     monkeypatch.setattr(mgmt.file_share_snapshots, "begin_delete_file_share_snapshot", disappeared)
-    result = driver.deprovision(DeprovisionSpec(handle), delete_data=True)
+    result = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True)
     assert result.ok
     assert not mgmt.file_shares.values
 
@@ -628,7 +632,9 @@ def test_deprovision_reports_transient_describe_failures(monkeypatch: pytest.Mon
         raise RuntimeError("control plane unavailable")
 
     monkeypatch.setattr(mgmt.file_shares, "get", unavailable)
-    result = driver.deprovision(DeprovisionSpec("filesystem/valid-share"), delete_data=True)
+    result = driver.deprovision(
+        DeprovisionSpec("filesystem/valid-share", managed_service_id="service-id"), delete_data=True
+    )
     assert not result.ok and result.retryable
     assert "control plane unavailable" in result.message
 
@@ -639,10 +645,10 @@ def test_force_deprovision_removes_guards_snapshots_and_converges() -> None:
     name = handle.split("/")[1]
     locks.management_locks.values = [SimpleNamespace(name="protect")]
     mgmt.private_endpoint_connections.values[name] = [SimpleNamespace(name="private-link")]
-    snapshot = driver.snapshot(ServiceHandle(handle))
+    snapshot = driver.snapshot(ServiceHandle(handle, managed_service_id="service-id"))
 
     deleted = driver.deprovision(
-        DeprovisionSpec(handle),
+        DeprovisionSpec(handle, managed_service_id="service-id"),
         delete_data=True,
         force_destroy=True,
     )
@@ -651,7 +657,9 @@ def test_force_deprovision_removes_guards_snapshots_and_converges() -> None:
     assert mgmt.private_endpoint_connections.delete_calls == [(name, "private-link")]
     assert mgmt.file_share_snapshots.delete_calls == [(name, snapshot.snapshot_id)]
     assert mgmt.file_shares.delete_calls == [name]
-    again = driver.deprovision(DeprovisionSpec(handle), delete_data=True, force_destroy=True)
+    again = driver.deprovision(
+        DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True, force_destroy=True
+    )
     assert again.ok and "already gone" in again.message
 
 
@@ -660,7 +668,7 @@ def test_deprovision_refuses_unowned_resource() -> None:
     handle = _provisioned(driver)
     name = handle.split("/")[1]
     mgmt.file_shares.values[name].tags = {}
-    result = driver.deprovision(DeprovisionSpec(handle), delete_data=True)
+    result = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True)
     assert not result.ok and result.errors == ["external_resource_collision"]
 
 

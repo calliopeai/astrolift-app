@@ -400,10 +400,10 @@ def test_foreign_resource_and_owner_collision_are_not_adopted() -> None:
     site = _site(client)
     site["tags"]["astrolift-managed-by"] = "terraform"
     foreign = driver.provision(_spec())
-    assert not foreign.ok and "not Astrolift-owned" in foreign.message
+    assert not foreign.ok and "carries no Astrolift astrolift-managed-by=platform" in foreign.message
     site["tags"]["astrolift-managed-by"] = "platform"
     wrong_owner = driver.provision(_spec(managed_service_id="other-managed-id"))
-    assert not wrong_owner.ok and "another managed service" in wrong_owner.message
+    assert not wrong_owner.ok and "belongs to managed service managed-id, not other-managed-id" in wrong_owner.message
 
 
 def test_role_assignment_collision_is_rejected() -> None:
@@ -421,7 +421,9 @@ def test_package_update_requires_uri_and_digest_together() -> None:
     client = _client()
     driver = _driver(client)
     provisioned = driver.provision(_spec())
-    result = driver.update(UpdateSpec(handle=provisioned.handle, config={"package_uri": "https://x"}))
+    result = driver.update(
+        UpdateSpec(handle=provisioned.handle, config={"package_uri": "https://x"}, managed_service_id="managed-id")
+    )
     assert not result.ok
     assert "updated together" in result.message
 
@@ -438,6 +440,7 @@ def test_package_update_deploys_then_stamps_digest() -> None:
         UpdateSpec(
             handle=provisioned.handle,
             config={"package_uri": uri, "package_sha256": NEXT_DIGEST},
+            managed_service_id="managed-id",
         ),
     )
     assert result.ok
@@ -467,7 +470,11 @@ def test_update_resolves_dependencies_allowlisted_in_another_resource_group() ->
     driver = _driver(client, allowed_storage_resource_ids=(shared,))
     provisioned = driver.provision(_spec(_zip_config(host_storage_resource_id=shared)))
     assert provisioned.ok
-    updated = driver.update(UpdateSpec(handle=provisioned.handle, config={"environment": {"APP_MODE": "batch"}}))
+    updated = driver.update(
+        UpdateSpec(
+            handle=provisioned.handle, config={"environment": {"APP_MODE": "batch"}}, managed_service_id="managed-id"
+        )
+    )
     assert updated.ok, updated.message
 
     container_client = _client()
@@ -483,7 +490,9 @@ def test_update_resolves_dependencies_allowlisted_in_another_resource_group() ->
     )
     assert container.ok
     container_updated = container_driver.update(
-        UpdateSpec(handle=container.handle, config={"environment": {"APP_MODE": "batch"}}),
+        UpdateSpec(
+            handle=container.handle, config={"environment": {"APP_MODE": "batch"}}, managed_service_id="managed-id"
+        ),
     )
     assert container_updated.ok, container_updated.message
 
@@ -499,7 +508,11 @@ def test_update_rejects_unknown_dependency_name_with_an_honest_identifier() -> N
     for item in settings:
         if item["name"] == "AzureWebJobsStorage__accountName":
             item["value"] = "rogueaccount"
-    result = driver.update(UpdateSpec(handle=provisioned.handle, config={"environment": {"APP_MODE": "batch"}}))
+    result = driver.update(
+        UpdateSpec(
+            handle=provisioned.handle, config={"environment": {"APP_MODE": "batch"}}, managed_service_id="managed-id"
+        )
+    )
     assert not result.ok
     assert "not allowed" in result.message
 
@@ -508,7 +521,9 @@ def test_update_rejects_function_rename() -> None:
     client = _client()
     driver = _driver(client)
     provisioned = driver.provision(_spec())
-    result = driver.update(UpdateSpec(provisioned.handle, config={"function_name": "different"}))
+    result = driver.update(
+        UpdateSpec(provisioned.handle, config={"function_name": "different"}, managed_service_id="managed-id")
+    )
     assert not result.ok
     assert "immutable" in result.message
 
@@ -565,9 +580,11 @@ def test_deprovision_protection_and_force_cleanup() -> None:
     cfg = _zip_config()
     driver = _driver(client)
     provisioned = driver.provision(_spec(cfg))
-    protected = driver.deprovision(DeprovisionSpec(provisioned.handle, cfg))
+    protected = driver.deprovision(DeprovisionSpec(provisioned.handle, cfg, managed_service_id="managed-id"))
     assert not protected.ok and not protected.retryable
-    forced = driver.deprovision(DeprovisionSpec(provisioned.handle, cfg), force_destroy=True)
+    forced = driver.deprovision(
+        DeprovisionSpec(provisioned.handle, cfg, managed_service_id="managed-id"), force_destroy=True
+    )
     assert forced.ok
     assert not any("/Microsoft.Web/sites/" in key for key in client.resources)
     assert not _role_ids(client)
@@ -581,7 +598,7 @@ def test_deprovision_never_removes_roles_before_site_delete_succeeds() -> None:
     driver = _driver(client)
     provisioned = driver.provision(_spec(cfg))
     client.fail_delete_site = True
-    result = driver.deprovision(DeprovisionSpec(provisioned.handle, cfg))
+    result = driver.deprovision(DeprovisionSpec(provisioned.handle, cfg, managed_service_id="managed-id"))
     assert not result.ok and "site locked" in result.message
     assert len(_role_ids(client)) == 3
 
@@ -592,13 +609,15 @@ def test_deprovision_missing_site_cleans_roles_from_stored_config() -> None:
     driver = _driver(client)
     provisioned = driver.provision(_spec(cfg))
     del client.resources[_site_id(client)]
-    result = driver.deprovision(DeprovisionSpec(provisioned.handle, cfg))
+    result = driver.deprovision(DeprovisionSpec(provisioned.handle, cfg, managed_service_id="managed-id"))
     assert result.ok
     assert not _role_ids(client)
 
 
 def test_missing_site_without_stored_config_fails_closed_on_role_cleanup() -> None:
-    result = _driver().deprovision(DeprovisionSpec("faas/rg-functions/missing"), force_destroy=True)
+    result = _driver().deprovision(
+        DeprovisionSpec("faas/rg-functions/missing", managed_service_id="managed-id"), force_destroy=True
+    )
     assert not result.ok
     assert "stored config" in result.message
 

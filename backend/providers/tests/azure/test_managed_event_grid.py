@@ -8,8 +8,9 @@ from typing import Any
 
 import pytest
 
+from _sdk.azure_ownership import AzureOwnershipError
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, SnapshotHandle, UpdateSpec
-from _sdk.managed_service_tags import ownership_key
+from _sdk.managed_service_tags import canonical_key, ownership_key
 from azure.managed.event_grid import (
     AzureEventGridConfig,
     AzureEventGridDriver,
@@ -567,6 +568,7 @@ def test_prune_is_explicit_and_only_removes_managed_subscriptions() -> None:
                 "prune_subscriptions": True,
                 "confirm_message_loss": True,
             },
+            managed_service_id="service-id",
         ),
     )
     assert result.ok, result
@@ -585,14 +587,14 @@ def test_deprovision_four_corner_guards_locks_and_external_subscriptions() -> No
     )
     topic_name = handle.split("/", 1)[1]
 
-    retained = driver.deprovision(DeprovisionSpec(handle))
+    retained = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"))
     assert not retained.ok and retained.errors == ["delete_data_required"]
 
     locks.management_locks.values.append(SimpleNamespace(name="protect"))
-    locked = driver.deprovision(DeprovisionSpec(handle), delete_data=True)
+    locked = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True)
     assert not locked.ok and locked.errors == ["resource_lock_present"]
     forced_with_lock = driver.deprovision(
-        DeprovisionSpec(handle),
+        DeprovisionSpec(handle, managed_service_id="service-id"),
         delete_data=False,
         force_destroy=True,
     )
@@ -604,15 +606,17 @@ def test_deprovision_four_corner_guards_locks_and_external_subscriptions() -> No
         name=external_name,
         labels=[],
     )
-    external = driver.deprovision(DeprovisionSpec(handle), delete_data=True)
+    external = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True)
     assert not external.ok and external.errors == ["external_subscriptions_present"]
 
-    deleted = driver.deprovision(DeprovisionSpec(handle), delete_data=True, force_destroy=True)
+    deleted = driver.deprovision(
+        DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True, force_destroy=True
+    )
     assert deleted.ok
     assert locks.management_locks.delete_calls == ["protect"]
     assert topic_name in mgmt.topics.delete_calls
     assert (topic_name, external_name) in mgmt.topic_event_subscriptions.delete_calls
-    again = driver.deprovision(DeprovisionSpec(handle), delete_data=True)
+    again = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True)
     assert again.ok and "already gone" in again.message
 
 
@@ -626,14 +630,15 @@ def test_collision_and_binding_ownership_are_rejected() -> None:
         endpoint="https://example.com",
     )
     result = driver.provision(spec)
-    assert not result.ok and "does not own" in result.message
+    assert not result.ok and "carries no Astrolift astrolift-managed-by=platform" in result.message
 
     mgmt.topics.values["shared-topic"].tags = {
         ownership_key("azure", "managed_by"): "platform",
+        canonical_key("azure"): "service-id",
         ownership_key("azure", "binding"): "other-binding",
     }
     result = driver.provision(spec)
-    assert not result.ok and "different managed-service binding" in result.message
+    assert not result.ok and "belongs to binding other-binding, not binding-id" in result.message
 
 
 def test_forged_handle_cannot_update_delete_or_bind_an_external_topic() -> None:
@@ -646,11 +651,15 @@ def test_forged_handle_cannot_update_delete_or_bind_an_external_topic() -> None:
         provisioning_state="Succeeded",
     )
     handle = "event_bus/external-topic"
-    update = driver.update(UpdateSpec(handle, config={"minimum_tls_version_allowed": "1.2"}))
-    assert not update.ok and "does not own" in update.message
-    delete = driver.deprovision(DeprovisionSpec(handle), delete_data=True, force_destroy=True)
-    assert not delete.ok and "does not own" in delete.message
-    with pytest.raises(AzureEventGridError, match="does not own"):
+    update = driver.update(
+        UpdateSpec(handle, config={"minimum_tls_version_allowed": "1.2"}, managed_service_id="service-id")
+    )
+    assert not update.ok and "carries no Astrolift astrolift-managed-by=platform" in update.message
+    delete = driver.deprovision(
+        DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True, force_destroy=True
+    )
+    assert not delete.ok and "carries no Astrolift astrolift-managed-by=platform" in delete.message
+    with pytest.raises(AzureOwnershipError, match="carries no Astrolift astrolift-managed-by=platform"):
         driver.binding(ServiceHandle(handle))
 
 
@@ -658,9 +667,13 @@ def test_immutable_schema_drift_and_explicit_identity_removal() -> None:
     driver, mgmt, _ = _driver()
     handle = _provisioned(driver, topic_user_assigned_identity_resource_ids=[UAMI_ID])
     topic_name = handle.split("/", 1)[1]
-    partial = driver.update(UpdateSpec(handle, config={"minimum_tls_version_allowed": "1.2"}))
+    partial = driver.update(
+        UpdateSpec(handle, config={"minimum_tls_version_allowed": "1.2"}, managed_service_id="service-id")
+    )
     assert partial.ok, partial
-    changed = driver.update(UpdateSpec(handle, config={"input_schema": "EventGridSchema"}))
+    changed = driver.update(
+        UpdateSpec(handle, config={"input_schema": "EventGridSchema"}, managed_service_id="service-id")
+    )
     assert not changed.ok and "reprovision required" in changed.message
 
     removed = driver.update(
@@ -670,6 +683,7 @@ def test_immutable_schema_drift_and_explicit_identity_removal() -> None:
                 "system_assigned_identity": False,
                 "topic_user_assigned_identity_resource_ids": [],
             },
+            managed_service_id="service-id",
         ),
     )
     assert removed.ok, removed
@@ -709,9 +723,9 @@ def test_full_reconcile_removes_omitted_identity_and_reserves_ownership_label() 
 
 def test_status_update_missing_invalid_handle_and_snapshot_contract() -> None:
     driver, mgmt, _ = _driver()
-    missing = driver.update(UpdateSpec("event_bus/missing-topic", config={}))
+    missing = driver.update(UpdateSpec("event_bus/missing-topic", config={}, managed_service_id="service-id"))
     assert not missing.ok and missing.errors == ["not_found"]
-    invalid = driver.update(UpdateSpec("topic/nope", config={}))
+    invalid = driver.update(UpdateSpec("topic/nope", config={}, managed_service_id="service-id"))
     assert not invalid.ok and invalid.errors == ["invalid_handle"]
 
     handle = _provisioned(driver)
@@ -754,3 +768,45 @@ def test_generated_names_are_stable_distinct_and_within_azure_limits() -> None:
     third_driver, _, _ = _driver()
     third = third_driver.provision(changed)
     assert third.handle != first.handle
+
+
+def test_teardown_refuses_a_topic_another_binding_owns_and_deletes_nothing() -> None:
+    """Deterministic names collide; a handle is not a proof of ownership (#1365).
+
+    Before the shared verifier, ``deprovision`` only checked that Astrolift had
+    made the topic at all, so a row whose name resolved onto a *sibling*
+    binding's topic deleted it. The identity now travels on ``DeprovisionSpec``
+    and both markers have to agree.
+    """
+
+    driver, mgmt, _ = _driver()
+    provisioned = driver.provision(_spec())
+    topic_name = provisioned.handle.split("/", 1)[1]
+    mgmt.topics.values[topic_name].tags[ownership_key("azure", "binding")] = "another-binding"
+
+    refused = driver.deprovision(
+        DeprovisionSpec(provisioned.handle, binding_id="binding-id", managed_service_id="service-id"),
+        delete_data=True,
+        force_destroy=True,
+    )
+
+    assert not refused.ok
+    assert refused.retryable is False
+    assert refused.errors == ["external_resource_collision"]
+    assert "belongs to binding another-binding, not binding-id" in refused.message
+    assert mgmt.topics.delete_calls == []
+    assert topic_name in mgmt.topics.values
+
+
+def test_teardown_of_our_own_topic_stays_idempotent_across_retries() -> None:
+    """The gate is a pure tag comparison, so replaying our own delete converges."""
+
+    driver, mgmt, _ = _driver()
+    provisioned = driver.provision(_spec())
+    spec = DeprovisionSpec(provisioned.handle, binding_id="binding-id", managed_service_id="service-id")
+
+    first = driver.deprovision(spec, delete_data=True, force_destroy=True)
+    second = driver.deprovision(spec, delete_data=True, force_destroy=True)
+
+    assert first.ok and second.ok
+    assert len(mgmt.topics.delete_calls) == 1

@@ -16,6 +16,13 @@ from typing import Any
 from urllib.parse import parse_qsl, urlparse
 
 from _sdk._telemetry import driver_op
+from _sdk.azure_ownership import (
+    OWNERSHIP_ERROR_CODE,
+    AzureOperation,
+    AzureOwnershipError,
+    owner_of,
+    verify_azure_ownership,
+)
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -32,7 +39,6 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from _sdk.managed_service_tags import read_ownership_tag
 from azure.managed.event_grid import (
     _ADVANCED_FILTER_MODELS,
     _NO_VALUE_FILTERS,
@@ -181,7 +187,7 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
                     ),
                 )
             else:
-                self._assert_owned(namespace, spec)
+                self._assert_owned(namespace, spec, AzureOperation.PROVISION, namespace_name)
                 self._assert_namespace_immutable(namespace, cfg, apply_defaults=True)
                 namespace = self._wait(
                     self._mgmt.namespaces.begin_update(
@@ -212,6 +218,8 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
                 )
             registry = self._reconcile_subscriptions(namespace_name, topic_name, cfg)
             self._sync_access_key(namespace_name, registry)
+        except AzureOwnershipError as exc:
+            return ProvisionResult(False, handle, str(exc), [OWNERSHIP_ERROR_CODE])
         except Exception as exc:
             return ProvisionResult(False, handle, f"reconcile Event Grid namespace topic: {exc}", [str(exc)])
         return ProvisionResult(
@@ -241,7 +249,7 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
                 return UpdateResult(
                     False, spec.handle, f"Event Grid namespace {namespace_name} not found", ["not_found"]
                 )
-            self._assert_platform_owned(namespace)
+            self._assert_owned(namespace, spec, AzureOperation.UPDATE, namespace_name)
             topic = self._topic(namespace_name, topic_name)
             if topic is None:
                 return UpdateResult(
@@ -273,6 +281,8 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
             if "subscriptions" in cfg or cfg.get("prune_subscriptions"):
                 registry = self._reconcile_subscriptions(namespace_name, topic_name, effective_cfg)
                 self._sync_access_key(namespace_name, registry)
+        except AzureOwnershipError as exc:
+            return UpdateResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
         except Exception as exc:
             return UpdateResult(False, spec.handle, f"update Event Grid namespace topic: {exc}", [str(exc)])
         return UpdateResult(True, spec.handle, f"Event Grid namespace topic {namespace_name}/{topic_name} reconciled")
@@ -299,7 +309,7 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
             if namespace is None:
                 self._delete_secrets(namespace_name, topic_name)
                 return DeprovisionResult(True, spec.handle, f"Event Grid namespace {namespace_name} already gone")
-            self._assert_platform_owned(namespace)
+            self._assert_owned(namespace, spec, AzureOperation.DELETE, namespace_name)
             if not delete_data:
                 return DeprovisionResult(
                     False,
@@ -362,6 +372,8 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
                 )
             self._wait(self._mgmt.namespaces.begin_delete(self._config.resource_group, namespace_name))
             self._delete_secrets(namespace_name, topic_name)
+        except AzureOwnershipError as exc:
+            return DeprovisionResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
         except Exception as exc:
             return DeprovisionResult(False, spec.handle, f"delete Event Grid namespace topic: {exc}", [str(exc)])
         return DeprovisionResult(
@@ -398,7 +410,7 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
         namespace = self._namespace(namespace_name)
         if namespace is None:
             raise AzureEventGridNamespaceError(f"binding requested for missing Event Grid namespace {namespace_name}")
-        self._assert_platform_owned(namespace)
+        self._assert_owned(namespace, handle, AzureOperation.INSPECT, namespace_name)
         if self._topic(namespace_name, topic_name) is None:
             raise AzureEventGridNamespaceError(f"binding requested for missing Event Grid namespace topic {topic_name}")
         hostname = self._hostname(namespace)
@@ -1218,21 +1230,14 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
             ),
         )
 
-    def _assert_owned(self, namespace: Any, spec: ProvisionSpec) -> None:
-        self._assert_platform_owned(namespace)
-        tags = dict(_field(namespace, "tags", default={}) or {})
-        expected = spec.binding_id or ""
-        actual = read_ownership_tag(tags, "binding", "azure")
-        if expected and expected != actual:
-            raise AzureEventGridNamespaceError("Event Grid namespace is owned by another managed-service binding")
-
     @staticmethod
-    def _assert_platform_owned(namespace: Any) -> None:
-        tags = dict(_field(namespace, "tags", default={}) or {})
-        if read_ownership_tag(tags, "managed_by", "azure") != "platform":
-            raise AzureEventGridNamespaceError(
-                "Event Grid namespace name collides with a resource Astrolift does not own",
-            )
+    def _assert_owned(namespace: Any, source: object, operation: AzureOperation, namespace_name: str) -> None:
+        verify_azure_ownership(
+            dict(_field(namespace, "tags", default={}) or {}),
+            owner_of(source),
+            operation=operation,
+            resource=f"Event Grid namespace {namespace_name}",
+        )
 
     def _assert_namespace_immutable(self, namespace: Any, cfg: dict[str, Any], *, apply_defaults: bool) -> None:
         sku = _field(namespace, "sku")

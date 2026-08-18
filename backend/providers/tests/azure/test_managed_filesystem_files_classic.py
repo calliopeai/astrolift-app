@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 from astrolift_manifest.env_injection import envelope_keys_for
 
+from _sdk.azure_ownership import AzureOwnershipError
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, SnapshotHandle, UpdateSpec
 from azure.managed.filesystem_files_classic import (
     AzureFilesClassicConfig,
@@ -288,7 +289,7 @@ def test_smb_provisions_hardened_account_share_keys_and_binding() -> None:
 
     assert secrets.values[f"astrolift-files-{account}-primary"] == f"{account}-primary"
     assert secrets.values[f"astrolift-files-{account}-secondary"] == f"{account}-secondary"
-    binding = driver.binding(ServiceHandle(handle))
+    binding = driver.binding(ServiceHandle(handle, managed_service_id="service-id"))
     assert binding.env_vars["FILESYSTEM_SOURCE"].literal == f"//{account}.file.core.windows.net/{share}"
     assert binding.env_vars["FILESYSTEM_PROTOCOL"].literal == "smb3.1.1"
     assert binding.env_vars["FILESYSTEM_PASSWORD"].secret_ref == f"astrolift-files-{account}-primary"
@@ -337,7 +338,7 @@ def test_nfs_requires_premium_uses_network_auth_and_aznfs_shape() -> None:
     assert file_share.root_squash.value == "AllSquash"
     assert secrets.values == {}
 
-    binding = driver.binding(ServiceHandle(handle))
+    binding = driver.binding(ServiceHandle(handle, managed_service_id="service-id"))
     assert binding.env_vars["FILESYSTEM_SOURCE"].literal == (f"{account}.file.core.windows.net:/{account}/{share}")
     assert binding.env_vars["FILESYSTEM_PROTOCOL"].literal == "nfs4.1"
     assert binding.env_vars["FILESYSTEM_TLS"].literal == "false"
@@ -371,11 +372,11 @@ def test_binding_refuses_a_share_without_a_usable_quota() -> None:
 
     stored.share_quota = 0
     with pytest.raises(AzureFilesClassicError, match="invalid quota"):
-        driver.binding(ServiceHandle(handle))
+        driver.binding(ServiceHandle(handle, managed_service_id="service-id"))
 
     stored.share_quota = "unlimited"
     with pytest.raises(AzureFilesClassicError, match="invalid quota"):
-        driver.binding(ServiceHandle(handle))
+        driver.binding(ServiceHandle(handle, managed_service_id="service-id"))
 
 
 def test_provision_is_idempotent_and_refuses_account_or_share_collision() -> None:
@@ -389,11 +390,16 @@ def test_provision_is_idempotent_and_refuses_account_or_share_collision() -> Non
     _, account, share = first.handle.split("/")
     mgmt.storage_accounts.values[account].tags["astrolift-managed-service-id"] = "foreign"
     rejected = driver.provision(_spec())
-    assert not rejected.ok and "another managed service" in rejected.message
+    assert (
+        not rejected.ok and "account astroliftfs9b342b4ce9: it belongs to managed service foreign" in rejected.message
+    )
     mgmt.storage_accounts.values[account].tags["astrolift-managed-service-id"] = "service-id"
     mgmt.file_shares.values[(account, share)].metadata["astrolift_managed_service_id"] = "foreign"
     rejected = driver.provision(_spec())
-    assert not rejected.ok and "another managed service" in rejected.message
+    assert (
+        not rejected.ok
+        and "share astrolift-files-shared-files-9b342b4ce9: it belongs to managed service foreign" in rejected.message
+    )
 
 
 def test_partial_update_changes_network_quota_tier_and_encryption() -> None:
@@ -408,6 +414,7 @@ def test_partial_update_changes_network_quota_tier_and_encryption() -> None:
                 "allow_public_access": True,
                 "encryption_in_transit_required": False,
             },
+            managed_service_id="service-id",
         ),
     )
     assert updated.ok
@@ -422,15 +429,15 @@ def test_partial_update_changes_network_quota_tier_and_encryption() -> None:
 def test_snapshot_uses_ephemeral_account_key_and_requires_ownership() -> None:
     driver, mgmt, _, share_factory = _driver()
     handle = _provisioned(driver)
-    snapshot = driver.snapshot(ServiceHandle(handle))
+    snapshot = driver.snapshot(ServiceHandle(handle, managed_service_id="service-id"))
     assert snapshot.snapshot_id == "2026-08-14T15:00:00.0000000Z"
     _, account, share = handle.split("/")
     assert share_factory.calls == [(account, share, f"{account}-primary")]
     assert share_factory.client.snapshots == [{"astrolift_managed_by": "platform"}]
 
     mgmt.file_shares.values[(account, share)].metadata.clear()
-    with pytest.raises(AzureFilesClassicError, match="not owned"):
-        driver.snapshot(ServiceHandle(handle))
+    with pytest.raises(AzureOwnershipError, match="carries no Astrolift astrolift_managed_by=platform"):
+        driver.snapshot(ServiceHandle(handle, managed_service_id="service-id"))
 
 
 def test_nfs_snapshot_uses_control_plane_identity_not_disabled_shared_key() -> None:
@@ -440,7 +447,7 @@ def test_nfs_snapshot_uses_control_plane_identity_not_disabled_shared_key() -> N
         default_access_tier="Premium",
     )
     handle = _provisioned(driver, paid_bursting=True)
-    snapshot = driver.snapshot(ServiceHandle(handle))
+    snapshot = driver.snapshot(ServiceHandle(handle, managed_service_id="service-id"))
     assert snapshot.snapshot_id == "2026-08-14T15:00:00.0000000Z"
     _, account, share = handle.split("/")
     assert share_factory.calls == [(account, share, None)]
@@ -449,10 +456,10 @@ def test_nfs_snapshot_uses_control_plane_identity_not_disabled_shared_key() -> N
 def test_deprovision_guards_data_parent_account_and_secrets() -> None:
     driver, mgmt, secrets, _ = _driver(deletion_protection_default=False)
     handle = _provisioned(driver)
-    retained = driver.deprovision(DeprovisionSpec(handle))
+    retained = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"))
     assert not retained.ok and retained.errors == ["retained_filesystem_data_requires_delete_data"]
 
-    removed = driver.deprovision(DeprovisionSpec(handle), delete_data=True)
+    removed = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True)
     assert removed.ok
     assert mgmt.file_shares.delete_calls[-1][2] == "snapshots"
     assert len(secrets.deleted) == 2
@@ -467,7 +474,7 @@ def test_deprovision_guards_data_parent_account_and_secrets() -> None:
     )
     nfs_handle = _provisioned(nfs)
     deleted = nfs.deprovision(
-        DeprovisionSpec(nfs_handle, config={"delete_storage_account": True}),
+        DeprovisionSpec(nfs_handle, config={"delete_storage_account": True}, managed_service_id="service-id"),
         delete_data=True,
         force_destroy=True,
     )
@@ -482,7 +489,7 @@ def test_deprovision_retry_finishes_secret_and_parent_cleanup_after_share_is_gon
     _, account, share = handle.split("/")
     mgmt.file_shares.values.pop((account, share))
 
-    retried = driver.deprovision(DeprovisionSpec(handle), delete_data=True)
+    retried = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True)
     assert retried.ok
     assert secrets.values == {}
     assert len(secrets.deleted) == 2
@@ -497,7 +504,7 @@ def test_deprovision_retry_finishes_secret_and_parent_cleanup_after_share_is_gon
     _, nfs_account, nfs_share = nfs_handle.split("/")
     nfs_mgmt.file_shares.values.pop((nfs_account, nfs_share))
     parent_retry = nfs.deprovision(
-        DeprovisionSpec(nfs_handle, config={"delete_storage_account": True}),
+        DeprovisionSpec(nfs_handle, config={"delete_storage_account": True}, managed_service_id="service-id"),
         delete_data=True,
         force_destroy=True,
     )
@@ -509,7 +516,7 @@ def test_storagev2_parent_account_delete_is_refused_even_with_force() -> None:
     driver, mgmt, _, _ = _driver(deletion_protection_default=False)
     handle = _provisioned(driver)
     result = driver.deprovision(
-        DeprovisionSpec(handle, config={"delete_storage_account": True}),
+        DeprovisionSpec(handle, config={"delete_storage_account": True}, managed_service_id="service-id"),
         delete_data=True,
         force_destroy=True,
     )
@@ -537,7 +544,7 @@ def test_filestorage_parent_delete_refuses_another_share_before_mutation() -> No
     )
     mgmt.file_shares.values[(account, "operator-share")] = foreign
     result = driver.deprovision(
-        DeprovisionSpec(handle, config={"delete_storage_account": True}),
+        DeprovisionSpec(handle, config={"delete_storage_account": True}, managed_service_id="service-id"),
         delete_data=True,
         force_destroy=True,
     )
@@ -549,11 +556,13 @@ def test_filestorage_parent_delete_refuses_another_share_before_mutation() -> No
 def test_deletion_protection_and_unowned_resources_fail_before_mutation() -> None:
     driver, mgmt, _, _ = _driver()
     handle = _provisioned(driver)
-    protected = driver.deprovision(DeprovisionSpec(handle), delete_data=True)
+    protected = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True)
     assert not protected.ok and protected.errors == ["deletion_protection_enabled"]
     _, account, _ = handle.split("/")
     mgmt.storage_accounts.values[account].tags.clear()
-    foreign = driver.deprovision(DeprovisionSpec(handle), delete_data=True, force_destroy=True)
+    foreign = driver.deprovision(
+        DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True, force_destroy=True
+    )
     assert not foreign.ok and foreign.errors == ["external_resource_collision"]
     assert mgmt.file_shares.delete_calls == []
 
@@ -561,15 +570,15 @@ def test_deletion_protection_and_unowned_resources_fail_before_mutation() -> Non
 def test_status_binding_missing_restore_and_handle_errors_are_honest() -> None:
     driver, _, _, _ = _driver()
     handle = _provisioned(driver)
-    assert driver.status(ServiceHandle(handle)).state == "available"
-    assert driver.status(ServiceHandle("filesystem/bad")).state == "error"
+    assert driver.status(ServiceHandle(handle, managed_service_id="service-id")).state == "available"
+    assert driver.status(ServiceHandle("filesystem/bad", managed_service_id="service-id")).state == "error"
     restore = driver.restore(
         SnapshotHandle(handle, "snapshot", NOW.isoformat()),
         _spec(),
     )
     assert not restore.ok and restore.errors == ["restore_not_supported"]
     with pytest.raises(AzureFilesClassicError, match="handle"):
-        driver.binding(ServiceHandle("filesystem/bad"))
+        driver.binding(ServiceHandle("filesystem/bad", managed_service_id="service-id"))
 
 
 @pytest.mark.parametrize(

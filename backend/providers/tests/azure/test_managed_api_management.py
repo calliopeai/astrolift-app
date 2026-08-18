@@ -385,6 +385,7 @@ def test_update_reconciles_and_prunes_only_owned_prefix_children(
                 "subscriptions": _declaration()["subscriptions"],
                 "prune_children": True,
             },
+            managed_service_id="managed-id",
         ),
     )
     assert update.ok
@@ -405,7 +406,7 @@ def test_collision_requires_adoption_and_marks_service(
         "tags": {"owner": "customer"},
     }
     denied = driver.provision(replace(SPEC, config=_declaration()))
-    assert not denied.ok and "adopt_existing" in denied.message
+    assert not denied.ok and "adopting it requires adopt_existing=true" in denied.message
     adopted = driver.provision(replace(SPEC, config=_declaration(adopt_existing=True)))
     assert adopted.ok
     assert client.resources[SERVICE_PATH]["tags"]["astrolift-adopted"] == "true"
@@ -417,10 +418,13 @@ def test_foreign_owned_collision_is_never_reassigned(
 ) -> None:
     client.resources[SERVICE_PATH] = {
         "properties": {"provisioningState": "Succeeded"},
-        "tags": {"astrolift-managed-service-id": "someone-else"},
+        "tags": {
+            "astrolift-managed-by": "platform",
+            "astrolift-managed-service-id": "someone-else",
+        },
     }
     result = driver.provision(replace(SPEC, config=_declaration(adopt_existing=True)))
-    assert not result.ok and "another managed-service" in result.message
+    assert not result.ok and "belongs to managed service someone-else, not managed-id" in result.message
 
 
 def test_teardown_is_protected_and_adoption_aware(
@@ -428,14 +432,14 @@ def test_teardown_is_protected_and_adoption_aware(
     client: FakeAPIMClient,
 ) -> None:
     result = driver.provision(replace(SPEC, config=_declaration()))
-    protected = driver.deprovision(DeprovisionSpec(result.handle, _declaration()))
+    protected = driver.deprovision(DeprovisionSpec(result.handle, _declaration(), managed_service_id="managed-id"))
     assert not protected.ok and protected.errors == ["deletion_protection_enabled"]
     no_force = driver.deprovision(
-        DeprovisionSpec(result.handle, _declaration(deletion_protection=False)),
+        DeprovisionSpec(result.handle, _declaration(deletion_protection=False), managed_service_id="managed-id"),
     )
     assert not no_force.ok and no_force.errors == ["force_destroy_required"]
     deleted = driver.deprovision(
-        DeprovisionSpec(result.handle, _declaration(deletion_protection=False)),
+        DeprovisionSpec(result.handle, _declaration(deletion_protection=False), managed_service_id="managed-id"),
         force_destroy=True,
     )
     assert deleted.ok and SERVICE_PATH not in client.resources
@@ -452,14 +456,13 @@ def test_adopted_teardown_requires_delete_adopted(
     }
     result = driver.provision(replace(SPEC, config=_declaration(adopt_existing=True)))
     blocked = driver.deprovision(
-        DeprovisionSpec(result.handle, _declaration(deletion_protection=False)),
+        DeprovisionSpec(result.handle, _declaration(deletion_protection=False), managed_service_id="managed-id"),
         force_destroy=True,
     )
     assert not blocked.ok and blocked.errors == ["delete_adopted_required"]
     deleted = driver.deprovision(
         DeprovisionSpec(
-            result.handle,
-            _declaration(deletion_protection=False, delete_adopted=True),
+            result.handle, _declaration(deletion_protection=False, delete_adopted=True), managed_service_id="managed-id"
         ),
         force_destroy=True,
     )

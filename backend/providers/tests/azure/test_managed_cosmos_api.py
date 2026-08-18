@@ -368,7 +368,7 @@ def test_reconcile_refuses_foreign_account_before_mutation() -> None:
     rejected = driver.provision(_spec())
 
     assert not rejected.ok
-    assert "refusing to adopt" in rejected.message
+    assert "belongs to managed service other, not service-id" in rejected.message
     assert not mgmt.database_accounts.update_calls
 
 
@@ -497,7 +497,9 @@ def test_update_and_restore_without_key_vault_fail_before_cloud_mutation() -> No
         ),
     )
 
-    updated = driver.update(UpdateSpec(handle="document_db/account/data", size="medium"))
+    updated = driver.update(
+        UpdateSpec(handle="document_db/account/data", size="medium", managed_service_id="service-id")
+    )
     restored = driver.restore(
         SnapshotHandle(
             "document_db/source/astrolift",
@@ -533,6 +535,7 @@ def test_update_uses_variant_specific_throughput_operation(variant: str) -> None
             handle=provisioned.handle,
             size="medium",
             config={"consistency_level": "Eventual"},
+            managed_service_id="service-id",
         ),
     )
 
@@ -553,7 +556,9 @@ def test_update_supports_autoscale_and_propagates_provider_failure() -> None:
     group = mgmt.groups[PROFILES["cosmos_table"].operation_group]
     group.throughput_error = RuntimeError("throughput rejected")
     result = driver.update(
-        UpdateSpec(handle=provisioned.handle, config={"autoscale_max_throughput": 5000}),
+        UpdateSpec(
+            handle=provisioned.handle, config={"autoscale_max_throughput": 5000}, managed_service_id="service-id"
+        ),
     )
     assert not result.ok
     assert "throughput rejected" in result.message
@@ -574,14 +579,18 @@ def test_update_supports_autoscale_and_propagates_provider_failure() -> None:
 def test_update_rejects_create_only_fields(variant: str, field: str, value: Any) -> None:
     driver, _, _, _ = _driver(variant)
     provisioned = driver.provision(_spec())
-    result = driver.update(UpdateSpec(handle=provisioned.handle, config={field: value}))
+    result = driver.update(
+        UpdateSpec(handle=provisioned.handle, config={field: value}, managed_service_id="service-id")
+    )
     assert not result.ok
     assert "reprovision" in result.message
 
 
 def test_update_missing_resource_fails_closed() -> None:
     driver, _, _, _ = _driver("cosmos_nosql")
-    result = driver.update(UpdateSpec(handle="document_db/missing/data", size="medium"))
+    result = driver.update(
+        UpdateSpec(handle="document_db/missing/data", size="medium", managed_service_id="service-id")
+    )
     assert not result.ok
     assert "does not exist" in result.message
 
@@ -602,7 +611,7 @@ def test_binding_matches_portable_kind_and_keeps_credentials_secret(
 ) -> None:
     driver, _, _, _ = _driver(variant)
     provisioned = driver.provision(_spec())
-    binding = driver.binding(ServiceHandle(provisioned.handle))
+    binding = driver.binding(ServiceHandle(provisioned.handle, managed_service_id="service-id"))
 
     assert expected <= set(binding.env_vars)
     assert {
@@ -619,28 +628,31 @@ def test_binding_matches_portable_kind_and_keeps_credentials_secret(
 
 def test_status_distinguishes_missing_account_resource_and_provider_state() -> None:
     driver, mgmt, _, _ = _driver("cosmos_nosql")
-    assert driver.status(ServiceHandle("document_db/missing/data")).state == "deprovisioned"
+    assert (
+        driver.status(ServiceHandle("document_db/missing/data", managed_service_id="service-id")).state
+        == "deprovisioned"
+    )
     provisioned = driver.provision(_spec())
     account_name, resource_name = provisioned.handle.split("/")[1:]
     group = mgmt.groups[PROFILES["cosmos_nosql"].operation_group]
     group.resources.remove((account_name, resource_name))
-    assert driver.status(ServiceHandle(provisioned.handle)).state == "error"
+    assert driver.status(ServiceHandle(provisioned.handle, managed_service_id="service-id")).state == "error"
     group.resources.add((account_name, resource_name))
     mgmt.database_accounts.accounts[account_name].provisioning_state = "Deleting"
-    assert driver.status(ServiceHandle(provisioned.handle)).state == "deprovisioning"
+    assert driver.status(ServiceHandle(provisioned.handle, managed_service_id="service-id")).state == "deprovisioning"
 
 
 def test_non_404_describe_error_is_not_misreported_as_missing() -> None:
     driver, mgmt, _, _ = _driver("cosmos_nosql")
     mgmt.database_accounts.get_error = RuntimeError("control plane unavailable")
     with pytest.raises(RuntimeError, match="control plane unavailable"):
-        driver.status(ServiceHandle("document_db/account/data"))
+        driver.status(ServiceHandle("document_db/account/data", managed_service_id="service-id"))
 
 
 def test_snapshot_enables_continuous_backup_and_uses_instance_id() -> None:
     driver, mgmt, _, _ = _driver("cosmos_nosql")
     provisioned = driver.provision(_spec())
-    snapshot = driver.snapshot(ServiceHandle(provisioned.handle))
+    snapshot = driver.snapshot(ServiceHandle(provisioned.handle, managed_service_id="service-id"))
 
     assert snapshot.snapshot_id == "restorable-instance-1|cosmos_nosql|astrolift"
     update = mgmt.database_accounts.update_calls[-1]["parameters"].as_dict()
@@ -655,7 +667,7 @@ def test_snapshot_refuses_when_provider_omits_instance_id() -> None:
     provisioned = driver.provision(_spec())
     mgmt.database_accounts.accounts[provisioned.handle.split("/")[1]].instance_id = ""
     with pytest.raises(AzureCosmosApiError, match="instance_id"):
-        driver.snapshot(ServiceHandle(provisioned.handle))
+        driver.snapshot(ServiceHandle(provisioned.handle, managed_service_id="service-id"))
 
 
 def test_restore_uses_exact_pitr_source_and_is_retry_idempotent() -> None:
@@ -728,11 +740,11 @@ def test_deprovision_refuses_locks_and_lock_listing_failures() -> None:
     driver, mgmt, locks, _ = _driver("cosmos_nosql")
     provisioned = driver.provision(_spec())
     locks.management_locks.locks = [FakeLock("protect-data")]
-    refused = driver.deprovision(DeprovisionSpec(provisioned.handle), delete_data=True)
+    refused = driver.deprovision(DeprovisionSpec(provisioned.handle, managed_service_id="service-id"), delete_data=True)
     assert not refused.ok and "protect-data" in refused.message
     assert not mgmt.database_accounts.delete_calls
     locks.management_locks.list_error = RuntimeError("locks API unavailable")
-    failed = driver.deprovision(DeprovisionSpec(provisioned.handle), delete_data=True)
+    failed = driver.deprovision(DeprovisionSpec(provisioned.handle, managed_service_id="service-id"), delete_data=True)
     assert not failed.ok and "locks API unavailable" in failed.message
     assert not mgmt.database_accounts.delete_calls
 
@@ -742,7 +754,7 @@ def test_force_deprovision_waits_for_secret_cleanup() -> None:
     provisioned = driver.provision(_spec())
     locks.management_locks.locks = [FakeLock("protect-data")]
     result = driver.deprovision(
-        DeprovisionSpec(provisioned.handle),
+        DeprovisionSpec(provisioned.handle, managed_service_id="service-id"),
         delete_data=True,
         force_destroy=True,
     )
@@ -755,13 +767,13 @@ def test_force_deprovision_waits_for_secret_cleanup() -> None:
 def test_data_preserving_deprovision_records_pitr_and_backup_failure_is_safe() -> None:
     driver, _, _, _ = _driver("cosmos_nosql")
     provisioned = driver.provision(_spec())
-    result = driver.deprovision(DeprovisionSpec(provisioned.handle))
+    result = driver.deprovision(DeprovisionSpec(provisioned.handle, managed_service_id="service-id"))
     assert result.ok and "retained_pitr=restorable-instance-1" in result.message
 
     second_driver, second_mgmt, _, _ = _driver("cosmos_nosql")
     second = second_driver.provision(_spec())
     second_mgmt.database_accounts.update_error = RuntimeError("backup unavailable")
-    failed = second_driver.deprovision(DeprovisionSpec(second.handle))
+    failed = second_driver.deprovision(DeprovisionSpec(second.handle, managed_service_id="service-id"))
     assert not failed.ok and failed.retryable is False
     assert not second_mgmt.database_accounts.delete_calls
 
@@ -770,18 +782,22 @@ def test_delete_and_secret_cleanup_failures_are_independently_retryable() -> Non
     driver, mgmt, _, secrets = _driver("cosmos_nosql")
     provisioned = driver.provision(_spec())
     mgmt.database_accounts.delete_error = RuntimeError("delete unavailable")
-    failed_delete = driver.deprovision(DeprovisionSpec(provisioned.handle), delete_data=True)
+    failed_delete = driver.deprovision(
+        DeprovisionSpec(provisioned.handle, managed_service_id="service-id"), delete_data=True
+    )
     assert not failed_delete.ok
     assert secrets.values
 
     mgmt.database_accounts.delete_error = None
     secrets.delete_error = RuntimeError("vault unavailable")
-    failed_cleanup = driver.deprovision(DeprovisionSpec(provisioned.handle), delete_data=True)
+    failed_cleanup = driver.deprovision(
+        DeprovisionSpec(provisioned.handle, managed_service_id="service-id"), delete_data=True
+    )
     assert not failed_cleanup.ok
     assert "account deleted" in failed_cleanup.message
 
     secrets.delete_error = None
-    retried = driver.deprovision(DeprovisionSpec(provisioned.handle), delete_data=True)
+    retried = driver.deprovision(DeprovisionSpec(provisioned.handle, managed_service_id="service-id"), delete_data=True)
     assert retried.ok
     assert not secrets.values
 
@@ -901,4 +917,4 @@ def test_long_resource_and_secret_names_are_bounded_and_collision_resistant() ->
 def test_invalid_handle_fails_explicitly() -> None:
     driver, _, _, _ = _driver("cosmos_nosql")
     with pytest.raises(AzureCosmosApiError, match="invalid cosmos_nosql handle"):
-        driver.binding(ServiceHandle("kv_store/wrong"))
+        driver.binding(ServiceHandle("kv_store/wrong", managed_service_id="service-id"))
