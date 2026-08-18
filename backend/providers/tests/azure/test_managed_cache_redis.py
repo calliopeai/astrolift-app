@@ -47,10 +47,15 @@ class FakePoller:
         return self.value
 
 
+OWNER = "managed-service-guid"
+BINDING = "binding-guid"
+
+
 @dataclass
 class FakeCache:
     name: str
     provisioning_state: str = "Succeeded"
+    tags: dict[str, str] = field(default_factory=dict)
     host_name: str = ""
     ssl_port: int = 6380
     port: int = 0
@@ -97,6 +102,7 @@ class FakeRedisOperations:
             port=6379 if parameters.get("enable_non_ssl_port") else 0,
             sku=dict(parameters.get("sku", {})),
             properties=dict(parameters),
+            tags=dict(parameters.get("tags") or {}),
         )
         self.caches[name] = cache
         return FakePoller(value=cache)
@@ -253,6 +259,8 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         tenant_cluster_id="azure-prod",
         service_handle_hint="redis",
         size="small",
+        binding_id=BINDING,
+        managed_service_id=OWNER,
     )
     base.update(overrides)
     return ProvisionSpec(**base)
@@ -389,7 +397,7 @@ def test_update_resize(
 ) -> None:
     provisioned = driver.provision(_spec())
     result = driver.update(
-        UpdateSpec(handle=provisioned.handle, size="medium"),
+        UpdateSpec(handle=provisioned.handle, size="medium", managed_service_id=OWNER),
     )
     assert result.ok
     last = mgmt.redis_obj.update_calls[-1]
@@ -405,6 +413,7 @@ def test_update_minimum_tls_version(
         UpdateSpec(
             handle=provisioned.handle,
             config={"minimum_tls_version": "1.2"},
+            managed_service_id=OWNER,
         ),
     )
     assert result.ok
@@ -418,7 +427,7 @@ def test_update_noop_when_nothing_to_change(
 ) -> None:
     provisioned = driver.provision(_spec())
     before = len(mgmt.redis_obj.update_calls)
-    result = driver.update(UpdateSpec(handle=provisioned.handle))
+    result = driver.update(UpdateSpec(handle=provisioned.handle, managed_service_id=OWNER))
     assert result.ok
     assert "no-op" in result.message
     assert len(mgmt.redis_obj.update_calls) == before
@@ -433,7 +442,7 @@ def test_deprovision_default_refuses_without_guaranteed_snapshot(
 ) -> None:
     provisioned = driver.provision(_spec())
     cache_name = provisioned.handle.split("/", 1)[1]
-    result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle))
+    result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER))
     assert not result.ok
     assert result.retryable is False
     assert "delete_data=True" in result.message
@@ -447,7 +456,7 @@ def test_deprovision_delete_data_only_skips_export(
     provisioned = driver.provision(_spec())
     cache_name = provisioned.handle.split("/", 1)[1]
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
     )
     assert result.ok
@@ -464,7 +473,7 @@ def test_deprovision_exports_before_safe_delete(
     provisioned = backup_driver.provision(_spec(size="xlarge"))
     cache_name = provisioned.handle.split("/", 1)[1]
     result = backup_driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
     )
     assert result.ok
     assert "data=retained in" in result.message
@@ -482,7 +491,7 @@ def test_deprovision_force_destroy_does_not_override_data_guard(
     provisioned = driver.provision(_spec())
     cache_name = provisioned.handle.split("/", 1)[1]
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=False,
         force_destroy=True,
     )
@@ -498,7 +507,7 @@ def test_deprovision_atomic_both_flags(
     provisioned = driver.provision(_spec())
     cache_name = provisioned.handle.split("/", 1)[1]
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
         force_destroy=True,
     )
@@ -511,7 +520,7 @@ def test_deprovision_idempotent_when_already_gone(
     driver: AzureCacheRedisDriver,
 ) -> None:
     result = driver.deprovision(
-        DeprovisionSpec(handle="redis/never-existed"),
+        DeprovisionSpec(handle="redis/never-existed", managed_service_id=OWNER),
     )
     assert result.ok
     assert "already gone" in result.message
@@ -529,7 +538,7 @@ def test_deprovision_with_data_delete_drops_access_key_secrets(
     assert secondary in secrets_client.secrets
 
     driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
     )
     assert primary not in secrets_client.secrets
@@ -544,7 +553,7 @@ def test_deprovision_keeps_secrets_on_data_retained_path(
     cache_name = provisioned.handle.split("/", 1)[1]
     primary = f"astrolift-redis-{cache_name}-primary"
 
-    driver.deprovision(DeprovisionSpec(handle=provisioned.handle))
+    driver.deprovision(DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER))
     assert primary in secrets_client.secrets
 
 
@@ -554,7 +563,7 @@ def test_deprovision_guard_does_not_attempt_unsupported_export(
 ) -> None:
     mgmt.redis_obj.export_supported = False
     provisioned = driver.provision(_spec())
-    result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle))
+    result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER))
     assert not result.ok
     assert result.retryable is False
     assert not mgmt.redis_obj.export_calls
@@ -571,7 +580,7 @@ def test_deprovision_treats_mid_modify_as_retryable_without_force(
 
     mgmt.redis_obj.begin_delete = boom  # type: ignore[assignment]
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
     )
     assert not result.ok
@@ -589,7 +598,7 @@ def test_deprovision_force_destroy_bypasses_mid_modify(
 
     mgmt.redis_obj.begin_delete = boom  # type: ignore[assignment]
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
         force_destroy=True,
     )
@@ -699,7 +708,7 @@ def test_snapshot_creates_handle(
     mgmt: FakeMgmtClient,
 ) -> None:
     provisioned = backup_driver.provision(_spec())
-    snap = backup_driver.snapshot(ServiceHandle(handle=provisioned.handle))
+    snap = backup_driver.snapshot(ServiceHandle(handle=provisioned.handle, managed_service_id=OWNER))
     cache_name = provisioned.handle.split("/", 1)[1]
     assert snap.snapshot_id.startswith(cache_name)
     assert mgmt.redis_obj.export_calls
@@ -712,7 +721,7 @@ def test_snapshot_surfaces_driver_error(
     provisioned = backup_driver.provision(_spec())
     mgmt.redis_obj.export_supported = False
     with pytest.raises(AzureCacheRedisError):
-        backup_driver.snapshot(ServiceHandle(handle=provisioned.handle))
+        backup_driver.snapshot(ServiceHandle(handle=provisioned.handle, managed_service_id=OWNER))
 
 
 def test_restore_from_snapshot_creates_new_cache(
@@ -720,7 +729,7 @@ def test_restore_from_snapshot_creates_new_cache(
     mgmt: FakeMgmtClient,
 ) -> None:
     provisioned = backup_driver.provision(_spec())
-    snap = backup_driver.snapshot(ServiceHandle(handle=provisioned.handle))
+    snap = backup_driver.snapshot(ServiceHandle(handle=provisioned.handle, managed_service_id=OWNER))
 
     restore_spec = _spec(service_handle_hint="restored")
     result = backup_driver.restore(snap, restore_spec)
@@ -763,7 +772,7 @@ def test_snapshot_rejects_sas_in_provider_config(
     )
     provisioned = driver.provision(_spec())
     with pytest.raises(AzureCacheRedisError, match="non-secret HTTPS"):
-        driver.snapshot(ServiceHandle(handle=provisioned.handle))
+        driver.snapshot(ServiceHandle(handle=provisioned.handle, managed_service_id=OWNER))
 
 
 # ---- naming + helpers -------------------------------------------

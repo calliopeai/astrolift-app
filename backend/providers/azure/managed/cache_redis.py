@@ -24,6 +24,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.azure_ownership import (
+    OWNERSHIP_ERROR_CODE,
+    AzureOperation,
+    AzureOwnershipError,
+    arm_tags_of,
+    owner_of,
+    verify_azure_ownership,
+)
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -190,6 +198,10 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
 
         existing = self._describe(cache_name)
         if existing is not None:
+            try:
+                self._assert_owned(existing, spec, AzureOperation.PROVISION, cache_name)
+            except AzureOwnershipError as exc:
+                return ProvisionResult(ok=False, handle="", message=str(exc), errors=[OWNERSHIP_ERROR_CODE])
             return ProvisionResult(
                 ok=True,
                 handle=self._handle_for(cache_name=cache_name),
@@ -268,6 +280,26 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
         cache_name = self._cache_name_from_handle(spec.handle)
         cfg = spec.config or {}
 
+        existing = self._describe(cache_name)
+        if existing is None:
+            return UpdateResult(
+                ok=False,
+                handle=spec.handle,
+                message=f"cache {cache_name} does not exist",
+                errors=["not_found"],
+                retryable=False,
+            )
+        try:
+            self._assert_owned(existing, spec, AzureOperation.UPDATE, cache_name)
+        except AzureOwnershipError as exc:
+            return UpdateResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(exc),
+                errors=[OWNERSHIP_ERROR_CODE],
+                retryable=False,
+            )
+
         body: dict[str, Any] = {}
         if spec.size:
             sku_name = cfg.get("sku_name") or _SIZE_TO_SKU.get(spec.size)
@@ -341,11 +373,26 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
                 message=f"cache {cache_name} already gone",
             )
 
+        try:
+            self._assert_owned(existing, spec, AzureOperation.DELETE, cache_name)
+        except AzureOwnershipError as exc:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(exc),
+                errors=[OWNERSHIP_ERROR_CODE],
+                retryable=False,
+            )
+
         retained_snapshot = ""
         if not delete_data:
             try:
                 retained_snapshot = self.snapshot(
-                    ServiceHandle(handle=spec.handle),
+                    ServiceHandle(
+                        handle=spec.handle,
+                        binding_id=spec.binding_id,
+                        managed_service_id=spec.managed_service_id,
+                    ),
                 ).snapshot_id
             except AzureCacheRedisError as exc:
                 return DeprovisionResult(
@@ -494,10 +541,12 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
             raise AzureCacheRedisError(
                 "redis_backup_container_uri must be a non-secret HTTPS Blob container URI without query or fragment",
             )
-        if self._describe(cache_name) is None:
+        existing = self._describe(cache_name)
+        if existing is None:
             raise AzureCacheRedisError(
                 f"snapshot requested for missing cache {cache_name}",
             )
+        self._assert_owned(existing, handle, AzureOperation.SNAPSHOT, cache_name)
         stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         snap_id = f"{cache_name}-snap-{stamp}"
         try:
@@ -625,6 +674,15 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
         )
 
     # ---- internals ----------------------------------------------------
+
+    @staticmethod
+    def _assert_owned(cache: Any, source: object, operation: AzureOperation, cache_name: str) -> None:
+        verify_azure_ownership(
+            arm_tags_of(cache),
+            owner_of(source),
+            operation=operation,
+            resource=f"Azure Cache for Redis {cache_name}",
+        )
 
     def _describe(self, cache_name: str) -> Any | None:
         try:

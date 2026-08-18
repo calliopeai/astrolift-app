@@ -56,6 +56,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.azure_ownership import (
+    OWNERSHIP_ERROR_CODE,
+    AzureOperation,
+    AzureOwnershipError,
+    arm_tags_of,
+    owner_of,
+    verify_azure_ownership,
+)
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -207,6 +215,10 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
 
         existing = self._describe(domain_name)
         if existing is not None:
+            try:
+                self._assert_owned(existing, spec, AzureOperation.PROVISION, domain_name)
+            except AzureOwnershipError as exc:
+                return ProvisionResult(ok=False, handle="", message=str(exc), errors=[OWNERSHIP_ERROR_CODE])
             self._store_connection_string(domain_name=domain_name)
             return ProvisionResult(
                 ok=True,
@@ -265,6 +277,26 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
         domain_name = self._domain_name_from_handle(spec.handle)
         cfg = spec.config or {}
 
+        existing = self._describe(domain_name)
+        if existing is None:
+            return UpdateResult(
+                ok=False,
+                handle=spec.handle,
+                message=f"acs email domain {domain_name} does not exist",
+                errors=["not_found"],
+                retryable=False,
+            )
+        try:
+            self._assert_owned(existing, spec, AzureOperation.UPDATE, domain_name)
+        except AzureOwnershipError as exc:
+            return UpdateResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(exc),
+                errors=[OWNERSHIP_ERROR_CODE],
+                retryable=False,
+            )
+
         body: dict[str, Any] = {}
         if cfg.get("user_engagement_tracking"):
             body.setdefault("properties", {})
@@ -320,6 +352,17 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
                 ok=True,
                 handle=spec.handle,
                 message=f"acs email domain {domain_name} already gone",
+            )
+
+        try:
+            self._assert_owned(existing, spec, AzureOperation.DELETE, domain_name)
+        except AzureOwnershipError as exc:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(exc),
+                errors=[OWNERSHIP_ERROR_CODE],
+                retryable=False,
             )
 
         if not delete_data:
@@ -517,6 +560,15 @@ class AzureCommunicationEmailDriver(ManagedServiceDriver):
         )
 
     # ---- internals ----------------------------------------------------
+
+    @staticmethod
+    def _assert_owned(domain: Any, source: object, operation: AzureOperation, domain_name: str) -> None:
+        verify_azure_ownership(
+            arm_tags_of(domain),
+            owner_of(source),
+            operation=operation,
+            resource=f"ACS email domain {domain_name}",
+        )
 
     def _describe(self, domain_name: str) -> Any | None:
         try:

@@ -35,6 +35,10 @@ from azure.managed.postgres_flexible import (
     _generate_master_password,
 )
 
+OWNER = "managed-service-guid"
+BINDING = "binding-guid"
+
+
 # ---- fakes ------------------------------------------------------
 
 
@@ -63,6 +67,7 @@ class FakeServer:
     delegated_subnet_resource_id: str = ""
     fully_qualified_domain_name: str = ""
     properties: dict[str, Any] = field(default_factory=dict)
+    tags: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -100,6 +105,7 @@ class FakeServersClient:
             ),
             fully_qualified_domain_name=(f"{server_name}.postgres.database.azure.com"),
             properties=dict(props),
+            tags=dict(parameters.get("tags") or {}),
         )
         self.servers[server_name] = srv
         return FakePoller(value=srv)
@@ -230,6 +236,8 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         tenant_cluster_id="azure-prod",
         service_handle_hint="pg",
         size="small",
+        binding_id=BINDING,
+        managed_service_id=OWNER,
     )
     base.update(overrides)
     return ProvisionSpec(**base)
@@ -391,7 +399,7 @@ def test_update_resize(
 ) -> None:
     provisioned = driver.provision(_spec())
     result = driver.update(
-        UpdateSpec(handle=provisioned.handle, size="medium"),
+        UpdateSpec(managed_service_id=OWNER, handle=provisioned.handle, size="medium"),
     )
     assert result.ok
     assert mgmt.servers_obj.update_calls
@@ -408,6 +416,7 @@ def test_update_engine_version(
         UpdateSpec(
             handle=provisioned.handle,
             config={"engine_version": "15"},
+            managed_service_id=OWNER,
         ),
     )
     assert result.ok
@@ -421,7 +430,7 @@ def test_update_noop_when_nothing_to_change(
 ) -> None:
     provisioned = driver.provision(_spec())
     before = len(mgmt.servers_obj.update_calls)
-    result = driver.update(UpdateSpec(handle=provisioned.handle))
+    result = driver.update(UpdateSpec(managed_service_id=OWNER, handle=provisioned.handle))
     assert result.ok
     assert "no-op" in result.message
     assert len(mgmt.servers_obj.update_calls) == before
@@ -435,7 +444,7 @@ def test_deprovision_default_takes_snapshot_respects_protection(
 ) -> None:
     provisioned = driver.provision(_spec())
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(managed_service_id=OWNER, handle=provisioned.handle),
     )
     assert not result.ok
     assert "deletion_protection" in result.message
@@ -450,7 +459,7 @@ def test_deprovision_delete_data_only_skips_snapshot(
     )
     server_name = provisioned.handle.split("/", 1)[1]
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(managed_service_id=OWNER, handle=provisioned.handle),
         delete_data=True,
     )
     assert result.ok
@@ -467,7 +476,7 @@ def test_deprovision_default_with_protection_off_takes_snapshot(
     )
     server_name = provisioned.handle.split("/", 1)[1]
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(managed_service_id=OWNER, handle=provisioned.handle),
     )
     assert result.ok
     assert "snapshot=taken" in result.message
@@ -480,7 +489,7 @@ def test_deprovision_force_destroy_disables_protection(
 ) -> None:
     provisioned = driver.provision(_spec())
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(managed_service_id=OWNER, handle=provisioned.handle),
         delete_data=False,
         force_destroy=True,
     )
@@ -500,7 +509,7 @@ def test_deprovision_atomic_both_flags(
 ) -> None:
     provisioned = driver.provision(_spec())
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(managed_service_id=OWNER, handle=provisioned.handle),
         delete_data=True,
         force_destroy=True,
     )
@@ -513,7 +522,7 @@ def test_deprovision_idempotent_when_already_gone(
     driver: AzurePostgresFlexibleDriver,
 ) -> None:
     result = driver.deprovision(
-        DeprovisionSpec(handle="postgres/never-existed"),
+        DeprovisionSpec(managed_service_id=OWNER, handle="postgres/never-existed"),
     )
     assert result.ok
     assert "already gone" in result.message
@@ -533,7 +542,7 @@ def test_deprovision_respects_delegated_subnet_lock(
             },
         ),
     )
-    result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle))
+    result = driver.deprovision(DeprovisionSpec(managed_service_id=OWNER, handle=provisioned.handle))
     assert not result.ok
     assert "delegated subnet" in result.message
     assert "delegated_subnet_lock" in result.errors
@@ -553,7 +562,7 @@ def test_deprovision_force_destroy_bypasses_subnet_lock(
         ),
     )
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(managed_service_id=OWNER, handle=provisioned.handle),
         delete_data=True,
         force_destroy=True,
     )
@@ -572,7 +581,7 @@ def test_deprovision_with_data_delete_drops_master_password_secret(
     assert secret_name in secrets_client.secrets
 
     driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(managed_service_id=OWNER, handle=provisioned.handle),
         delete_data=True,
     )
     assert secret_name not in secrets_client.secrets
@@ -589,7 +598,7 @@ def test_deprovision_keeps_secret_on_data_retained_path(
     server_name = provisioned.handle.split("/", 1)[1]
     secret_name = f"astrolift-pg-{server_name}-master"
 
-    driver.deprovision(DeprovisionSpec(handle=provisioned.handle))
+    driver.deprovision(DeprovisionSpec(managed_service_id=OWNER, handle=provisioned.handle))
     assert secret_name in secrets_client.secrets
 
 
@@ -601,7 +610,7 @@ def test_deprovision_surfaces_backup_failure(
         _spec(config={"deletion_protection": False}),
     )
     mgmt.backups_obj.fail_next = True
-    result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle))
+    result = driver.deprovision(DeprovisionSpec(managed_service_id=OWNER, handle=provisioned.handle))
     assert not result.ok
     assert "final backup" in result.message
     assert provisioned.handle.split("/", 1)[1] in mgmt.servers_obj.servers
@@ -722,7 +731,7 @@ def test_snapshot_creates_handle(
     mgmt: FakeMgmtClient,
 ) -> None:
     provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
+    snap = driver.snapshot(ServiceHandle(managed_service_id=OWNER, handle=provisioned.handle))
     server_name = provisioned.handle.split("/", 1)[1]
     assert snap.snapshot_id.startswith(server_name)
     assert snap.snapshot_id in mgmt.backups_obj.backups[server_name]
@@ -735,7 +744,7 @@ def test_snapshot_surfaces_driver_error(
     provisioned = driver.provision(_spec())
     mgmt.backups_obj.fail_next = True
     with pytest.raises(AzurePostgresError):
-        driver.snapshot(ServiceHandle(handle=provisioned.handle))
+        driver.snapshot(ServiceHandle(managed_service_id=OWNER, handle=provisioned.handle))
 
 
 def test_restore_from_snapshot_creates_new_server(
@@ -743,7 +752,7 @@ def test_restore_from_snapshot_creates_new_server(
     mgmt: FakeMgmtClient,
 ) -> None:
     provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
+    snap = driver.snapshot(ServiceHandle(managed_service_id=OWNER, handle=provisioned.handle))
 
     restore_spec = _spec(service_handle_hint="restored")
     result = driver.restore(snap, restore_spec)

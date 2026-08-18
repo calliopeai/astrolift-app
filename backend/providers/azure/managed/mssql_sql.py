@@ -19,6 +19,14 @@ from urllib.parse import quote
 
 from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op
+from _sdk.azure_ownership import (
+    OWNERSHIP_ERROR_CODE,
+    AzureOperation,
+    AzureOwnershipError,
+    arm_tags_of,
+    owner_of,
+    verify_azure_ownership,
+)
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -182,6 +190,15 @@ class _AzureSQLBase:
         else:
             self._secrets = None
 
+    @staticmethod
+    def _assert_owned(resource: Any, source: object, operation: AzureOperation, name: str) -> None:
+        verify_azure_ownership(
+            arm_tags_of(resource),
+            owner_of(source),
+            operation=operation,
+            resource=f"Azure SQL {name}",
+        )
+
     def _secret_value(self, name: str) -> str:
         if self._secrets is None:
             raise AzureSQLError("Azure SQL driver requires a Key Vault")
@@ -226,7 +243,12 @@ class AzureSQLDatabaseDriver(_AzureSQLBase, ManagedServiceDriver):
         server_name = self._server_name_for(spec)
         database_name = self._database_name_for(spec)
         handle = self._handle_for(server_name, database_name)
-        if self._describe_database(server_name, database_name) is not None:
+        existing_database = self._describe_database(server_name, database_name)
+        if existing_database is not None:
+            try:
+                self._assert_owned(existing_database, spec, AzureOperation.PROVISION, f"{server_name}/{database_name}")
+            except AzureOwnershipError as exc:
+                return ProvisionResult(False, handle, str(exc), [OWNERSHIP_ERROR_CODE])
             try:
                 self._ensure_vnet_rule(server_name)
                 self._apply_retention(server_name, database_name, spec.config or {})
@@ -292,8 +314,13 @@ class AzureSQLDatabaseDriver(_AzureSQLBase, ManagedServiceDriver):
     @driver_op(cloud="azure", driver="mssql_sql_database")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         server_name, database_name = self._parse_handle(spec.handle)
-        if self._describe_database(server_name, database_name) is None:
+        database = self._describe_database(server_name, database_name)
+        if database is None:
             return UpdateResult(False, spec.handle, "Azure SQL database does not exist", ["not_found"])
+        try:
+            self._assert_owned(database, spec, AzureOperation.UPDATE, f"{server_name}/{database_name}")
+        except AzureOwnershipError as exc:
+            return UpdateResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
         cfg = spec.config or {}
         sku = None
         property_values: dict[str, Any] = {}
@@ -343,12 +370,14 @@ class AzureSQLDatabaseDriver(_AzureSQLBase, ManagedServiceDriver):
         force_destroy: bool = False,
     ) -> DeprovisionResult:
         server_name, database_name = self._parse_handle(spec.handle)
-        if self._describe_database(server_name, database_name) is None:
+        database = self._describe_database(server_name, database_name)
+        if database is None:
             try:
                 server_deleted = self._cleanup_after_database_delete(
                     server_name,
                     database_name,
                     delete_server_if_empty=delete_data,
+                    owner=spec,
                 )
             except Exception as exc:
                 return DeprovisionResult(
@@ -362,6 +391,10 @@ class AzureSQLDatabaseDriver(_AzureSQLBase, ManagedServiceDriver):
                 spec.handle,
                 f"Azure SQL database {server_name}/{database_name} already gone (server_deleted={server_deleted})",
             )
+        try:
+            self._assert_owned(database, spec, AzureOperation.DELETE, f"{server_name}/{database_name}")
+        except AzureOwnershipError as exc:
+            return DeprovisionResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
         snapshot_id = ""
         if not delete_data:
             try:
@@ -386,6 +419,7 @@ class AzureSQLDatabaseDriver(_AzureSQLBase, ManagedServiceDriver):
                 server_name,
                 database_name,
                 delete_server_if_empty=delete_data,
+                owner=spec,
             )
         except Exception as exc:
             return DeprovisionResult(
@@ -441,8 +475,10 @@ class AzureSQLDatabaseDriver(_AzureSQLBase, ManagedServiceDriver):
     @driver_op(cloud="azure", driver="mssql_sql_database")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         server_name, database_name = self._parse_handle(handle.handle)
-        if self._describe_database(server_name, database_name) is None:
+        database = self._describe_database(server_name, database_name)
+        if database is None:
             raise AzureSQLError(f"snapshot requested for missing Azure SQL database {server_name}/{database_name}")
+        self._assert_owned(database, handle, AzureOperation.SNAPSHOT, f"{server_name}/{database_name}")
         created = datetime.now(UTC)
         snapshot_id = self._copy_database(server_name, database_name, prefix="snap", created=created)
         return SnapshotHandle(handle.handle, snapshot_id, created.isoformat())
@@ -461,7 +497,12 @@ class AzureSQLDatabaseDriver(_AzureSQLBase, ManagedServiceDriver):
         server_name = self._server_name_for(target)
         database_name = self._database_name_for(target)
         handle = self._handle_for(server_name, database_name)
-        if self._describe_database(server_name, database_name) is not None:
+        existing_target = self._describe_database(server_name, database_name)
+        if existing_target is not None:
+            try:
+                self._assert_owned(existing_target, target, AzureOperation.RESTORE, f"{server_name}/{database_name}")
+            except AzureOwnershipError as exc:
+                return ProvisionResult(False, handle, str(exc), [OWNERSHIP_ERROR_CODE])
             return ProvisionResult(
                 True, handle, f"Azure SQL restore target {server_name}/{database_name} already exists"
             )
@@ -715,6 +756,7 @@ class AzureSQLDatabaseDriver(_AzureSQLBase, ManagedServiceDriver):
         database_name: str,
         *,
         delete_server_if_empty: bool,
+        owner: object,
     ) -> bool:
         # Complete cleanup after a partially successful prior attempt. The
         # per-database DSN must never outlive its database.
@@ -725,6 +767,15 @@ class AzureSQLDatabaseDriver(_AzureSQLBase, ManagedServiceDriver):
         if server is not None and self._user_databases(server_name):
             return False
         if server is not None:
+            # Skip rather than raise: the database this call follows is already
+            # deleted, so failing here would strand the row with nothing an
+            # operator could retry. Leaving a logical server the platform
+            # cannot prove it owns is the conservative half of that trade, and
+            # the caller reports server_deleted=False.
+            try:
+                self._assert_owned(server, owner, AzureOperation.DELETE, f"logical server {server_name}")
+            except AzureOwnershipError:
+                return False
             self._mgmt.servers.begin_delete(
                 resource_group_name=self._config.resource_group,
                 server_name=server_name,
@@ -825,6 +876,11 @@ class AzureSQLManagedInstanceDriver(_AzureSQLBase, ManagedServiceDriver):
         database_name = self._database_name_for(spec)
         handle = self._handle_for(instance_name, database_name)
         instance = self._describe_instance(instance_name)
+        if instance is not None:
+            try:
+                self._assert_owned(instance, spec, AzureOperation.PROVISION, f"Managed Instance {instance_name}")
+            except AzureOwnershipError as exc:
+                return ProvisionResult(False, handle, str(exc), [OWNERSHIP_ERROR_CODE])
         if instance is None:
             from azure.mgmt.sql.models import ManagedInstance, ManagedInstanceProperties, Sku
 
@@ -896,8 +952,13 @@ class AzureSQLManagedInstanceDriver(_AzureSQLBase, ManagedServiceDriver):
     @driver_op(cloud="azure", driver="mssql_managed_instance")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         instance_name, _ = self._parse_handle(spec.handle)
-        if self._describe_instance(instance_name) is None:
+        instance = self._describe_instance(instance_name)
+        if instance is None:
             return UpdateResult(False, spec.handle, "Azure SQL Managed Instance does not exist", ["not_found"])
+        try:
+            self._assert_owned(instance, spec, AzureOperation.UPDATE, f"Managed Instance {instance_name}")
+        except AzureOwnershipError as exc:
+            return UpdateResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
         cfg = spec.config or {}
         sku = None
         property_values: dict[str, Any] = {}
@@ -947,7 +1008,8 @@ class AzureSQLManagedInstanceDriver(_AzureSQLBase, ManagedServiceDriver):
         force_destroy: bool = False,
     ) -> DeprovisionResult:
         instance_name, database_name = self._parse_handle(spec.handle)
-        if self._describe_instance(instance_name) is None:
+        instance = self._describe_instance(instance_name)
+        if instance is None:
             try:
                 self._delete_secret(self._password_secret(instance_name))
                 self._delete_secret(self._url_secret(instance_name, database_name))
@@ -959,6 +1021,10 @@ class AzureSQLManagedInstanceDriver(_AzureSQLBase, ManagedServiceDriver):
                     [str(exc)],
                 )
             return DeprovisionResult(True, spec.handle, f"Azure SQL Managed Instance {instance_name} already gone")
+        try:
+            self._assert_owned(instance, spec, AzureOperation.DELETE, f"Managed Instance {instance_name}")
+        except AzureOwnershipError as exc:
+            return DeprovisionResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
         if not delete_data:
             return DeprovisionResult(
                 False,

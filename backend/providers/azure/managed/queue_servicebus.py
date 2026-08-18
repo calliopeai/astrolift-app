@@ -34,6 +34,13 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.azure_ownership import (
+    OWNERSHIP_ERROR_CODE,
+    AzureOperation,
+    AzureOwnershipError,
+    owner_of,
+    verify_azure_ownership,
+)
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -51,6 +58,7 @@ from _sdk.managed_service import (
     ValueRef,
     unsupported_update,
 )
+from azure.managed.tags import BINDING_TAG, MANAGED_BY_TAG, MANAGED_SERVICE_ID_TAG
 from azure.managed.tags import arm_tags_for as _tags_for
 
 KIND = "queue"
@@ -95,6 +103,31 @@ class ServiceBusDriver(ManagedServiceDriver):
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         queue_name = self._queue_name(spec=spec)
         try:
+            existing = self._client.queues.get(
+                resource_group_name=self._config.resource_group,
+                namespace_name=self._config.namespace_name,
+                queue_name=queue_name,
+            )
+        except Exception as exc:
+            if type(exc).__name__ != "ResourceNotFoundError":
+                return ProvisionResult(
+                    ok=False,
+                    handle="",
+                    message=f"get_queue: {exc}",
+                    errors=[str(exc)],
+                )
+            existing = None
+        if existing is not None:
+            try:
+                _assert_owned(existing, spec, AzureOperation.PROVISION, f"queue {queue_name}")
+            except AzureOwnershipError as exc:
+                return ProvisionResult(
+                    ok=False,
+                    handle="",
+                    message=str(exc),
+                    errors=[OWNERSHIP_ERROR_CODE],
+                )
+        try:
             self._client.queues.create_or_update(
                 resource_group_name=self._config.resource_group,
                 namespace_name=self._config.namespace_name,
@@ -106,6 +139,7 @@ class ServiceBusDriver(ManagedServiceDriver):
                     "lock_duration": "PT30S",
                     "max_delivery_count": 10,
                     "dead_lettering_on_message_expiration": True,
+                    "userMetadata": _user_metadata(spec),
                 },
             )
         except Exception as exc:
@@ -168,6 +202,35 @@ class ServiceBusDriver(ManagedServiceDriver):
                     "messages; drain it externally or pass delete_data=True"
                 ),
                 errors=["delete_data_required"],
+                retryable=False,
+            )
+        try:
+            queue = self._client.queues.get(
+                resource_group_name=self._config.resource_group,
+                namespace_name=self._config.namespace_name,
+                queue_name=queue_name,
+            )
+        except Exception as exc:
+            if type(exc).__name__ == "ResourceNotFoundError":
+                return DeprovisionResult(
+                    ok=True,
+                    handle=spec.handle,
+                    message="already gone",
+                )
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(exc),
+                errors=[str(exc)],
+            )
+        try:
+            _assert_owned(queue, spec, AzureOperation.DELETE, f"queue {queue_name}")
+        except AzureOwnershipError as exc:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(exc),
+                errors=[OWNERSHIP_ERROR_CODE],
                 retryable=False,
             )
         try:
@@ -400,6 +463,17 @@ class AzureServiceBusDriver(ManagedServiceDriver):
         topic_name = self._topic_name(spec=spec)
         sub_name = self._default_sub_name(topic_name=topic_name)
         cfg = spec.config or {}
+        existing = self._topic_state(topic_name)
+        if existing is not None:
+            try:
+                _assert_owned(existing, spec, AzureOperation.PROVISION, f"topic {topic_name}")
+            except AzureOwnershipError as exc:
+                return ProvisionResult(
+                    ok=False,
+                    handle="",
+                    message=str(exc),
+                    errors=[OWNERSHIP_ERROR_CODE],
+                )
         try:
             self._client.topics.create_or_update(
                 resource_group_name=self._config.resource_group,
@@ -475,6 +549,26 @@ class AzureServiceBusDriver(ManagedServiceDriver):
         topic_name = self._topic_name_from_handle(spec.handle)
         cfg = spec.config or {}
 
+        existing = self._topic_state(topic_name)
+        if existing is None:
+            return UpdateResult(
+                ok=False,
+                handle=spec.handle,
+                message=f"topic {topic_name} does not exist",
+                errors=["not_found"],
+                retryable=False,
+            )
+        try:
+            _assert_owned(existing, spec, AzureOperation.UPDATE, f"topic {topic_name}")
+        except AzureOwnershipError as exc:
+            return UpdateResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(exc),
+                errors=[OWNERSHIP_ERROR_CODE],
+                retryable=False,
+            )
+
         topic_body: dict[str, Any] = {}
         if "max_size_in_megabytes" in cfg:
             topic_body["max_size_in_megabytes"] = int(cfg["max_size_in_megabytes"])
@@ -531,6 +625,17 @@ class AzureServiceBusDriver(ManagedServiceDriver):
                 ok=True,
                 handle=spec.handle,
                 message=f"topic {topic_name} already gone",
+            )
+
+        try:
+            _assert_owned(topic_state, spec, AzureOperation.DELETE, f"topic {topic_name}")
+        except AzureOwnershipError as exc:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(exc),
+                errors=[OWNERSHIP_ERROR_CODE],
+                retryable=False,
             )
 
         if not delete_data:
@@ -794,12 +899,59 @@ class AzureServiceBusDriver(ManagedServiceDriver):
 # ----- module-level helpers --------------------------------------------
 
 
+def _ownership_envelope(resource: Any) -> dict[str, str]:
+    """Unpack the ``userMetadata`` blob back into the tag map it encodes.
+
+    Service Bus entities take no ARM tags, so ``_user_metadata`` packs the same
+    envelope every other Azure driver writes as tags into a ``k=v;`` string.
+    Decoding it here keeps the ownership *decision* in the shared verifier;
+    only the transport differs.
+    """
+    blob = _field(resource, "user_metadata", "userMetadata", default="")
+    envelope: dict[str, str] = {}
+    for entry in str(blob or "").split(";"):
+        key, sep, value = entry.partition("=")
+        if sep and key:
+            envelope[key] = value
+    return envelope
+
+
+def _assert_owned(resource: Any, source: object, operation: AzureOperation, name: str) -> None:
+    verify_azure_ownership(
+        _ownership_envelope(resource),
+        owner_of(source),
+        operation=operation,
+        resource=f"Service Bus {name}",
+    )
+
+
+def _field(value: Any, *names: str, default: Any = None) -> Any:
+    for name in names:
+        if isinstance(value, dict):
+            if name in value:
+                return value[name]
+            continue
+        found = getattr(value, name, None)
+        if found is not None:
+            return found
+    return default
+
+
 def _user_metadata(spec: ProvisionSpec) -> str:
     """Service Bus topic ``userMetadata`` is a free-form string,
     capped at 1024 chars. We pack the astrolift tag set as a
-    sorted ``k=v;`` blob so operators can grep for ownership."""
-    items = sorted(_tags_for(spec).items())
-    blob = ";".join(f"{k}={v}" for k, v in items)
+    sorted ``k=v;`` blob so operators can grep for ownership.
+
+    The ownership keys lead, ahead of the descriptive and custom tags, because
+    the 1024-char cap truncates the tail: a long custom tag set must not be able
+    to chop the identity marker off the end. A resource whose identity was
+    truncated fails its own ownership check on every later update and teardown,
+    which fails closed into a resource the platform can no longer remove.
+    """
+    tags = _tags_for(spec)
+    leading = [key for key in (MANAGED_BY_TAG, MANAGED_SERVICE_ID_TAG, BINDING_TAG) if key in tags]
+    ordered = leading + sorted(key for key in tags if key not in leading)
+    blob = ";".join(f"{key}={tags[key]}" for key in ordered)
     return blob[:1024]
 
 

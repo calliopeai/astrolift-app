@@ -49,12 +49,17 @@ class FakePoller:
         return self.value
 
 
+OWNER = "managed-service-guid"
+BINDING = "binding-guid"
+
+
 @dataclass
 class FakeDeployment:
     name: str
     sku: dict[str, Any] = field(default_factory=dict)
     properties: dict[str, Any] = field(default_factory=dict)
     provisioning_state: str = "Succeeded"
+    tags: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -97,6 +102,7 @@ class FakeDeploymentsOperations:
             sku=dict(deployment.get("sku", {})),
             properties=dict(deployment.get("properties", {})),
             provisioning_state="Succeeded",
+            tags=dict(deployment.get("tags") or {}),
         )
         self.deployments[deployment_name] = d
         return FakePoller(value=d)
@@ -266,6 +272,8 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         tenant_cluster_id="azure-prod",
         service_handle_hint="model",
         size="small",
+        binding_id=BINDING,
+        managed_service_id=OWNER,
     )
     base.update(overrides)
     return ProvisionSpec(**base)
@@ -413,7 +421,7 @@ def test_update_resize_bumps_capacity(
 ) -> None:
     provisioned = driver.provision(_spec())
     result = driver.update(
-        UpdateSpec(handle=provisioned.handle, size="large"),
+        UpdateSpec(handle=provisioned.handle, size="large", managed_service_id=OWNER),
     )
     assert result.ok
     last = mgmt.deployments_obj.update_calls[-1]
@@ -429,6 +437,7 @@ def test_update_model_version_passes_through(
         UpdateSpec(
             handle=provisioned.handle,
             config={"model_version": "0301"},
+            managed_service_id=OWNER,
         ),
     )
     assert result.ok
@@ -442,7 +451,7 @@ def test_update_noop_when_nothing_to_change(
 ) -> None:
     provisioned = driver.provision(_spec())
     before = len(mgmt.deployments_obj.update_calls)
-    result = driver.update(UpdateSpec(handle=provisioned.handle))
+    result = driver.update(UpdateSpec(handle=provisioned.handle, managed_service_id=OWNER))
     assert result.ok
     assert "no-op" in result.message
     assert len(mgmt.deployments_obj.update_calls) == before
@@ -460,7 +469,7 @@ def test_deprovision_default_keeps_api_key(
     deployment_name = provisioned.handle.split("/", 1)[1]
     secret = f"astrolift-aoai-aoai-acme-{deployment_name}-key"
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
     )
     assert result.ok
     assert "api_key=retained" in result.message
@@ -478,7 +487,7 @@ def test_deprovision_delete_data_purges_api_key(
     assert secret in secrets_client.secrets
 
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
     )
     assert result.ok
@@ -495,7 +504,7 @@ def test_deprovision_refuses_with_resource_lock(
         locks=["some-lock"],
     )
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
     )
     assert not result.ok
     assert "resource lock" in result.message
@@ -510,7 +519,7 @@ def test_deprovision_force_destroy_bypasses_resource_lock(
         locks=["some-lock"],
     )
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         force_destroy=True,
     )
     assert result.ok
@@ -525,7 +534,7 @@ def test_deprovision_refuses_when_studio_workflow_references(
         refs=["ai-studio-flow-1", "ai-studio-flow-2"],
     )
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
     )
     assert not result.ok
     assert "Studio" in result.message
@@ -541,7 +550,7 @@ def test_deprovision_force_destroy_bypasses_studio_reference(
         refs=["ai-studio-flow-1"],
     )
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         force_destroy=True,
     )
     assert result.ok
@@ -562,7 +571,7 @@ def test_deprovision_atomic_both_flags(
         refs=["flow"],
     )
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
         force_destroy=True,
     )
@@ -574,7 +583,7 @@ def test_deprovision_idempotent_when_already_gone(
     driver: AzureOpenAIDriver,
 ) -> None:
     result = driver.deprovision(
-        DeprovisionSpec(handle=f"{KIND}/never-existed"),
+        DeprovisionSpec(handle=f"{KIND}/never-existed", managed_service_id=OWNER),
     )
     assert result.ok
     assert "already gone" in result.message
@@ -591,7 +600,7 @@ def test_deprovision_surfaces_delete_failure(
 
     mgmt.deployments_obj.begin_delete = boom  # type: ignore[assignment]
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         force_destroy=True,
     )
     assert not result.ok
@@ -696,7 +705,7 @@ def test_snapshot_is_explicitly_unsupported(
     driver: AzureOpenAIDriver,
 ) -> None:
     with pytest.raises(UnsupportedOperationError, match="stateless configuration"):
-        driver.snapshot(ServiceHandle(handle=f"{KIND}/anything"))
+        driver.snapshot(ServiceHandle(handle=f"{KIND}/anything", managed_service_id=OWNER))
 
 
 def test_restore_is_explicitly_unsupported(

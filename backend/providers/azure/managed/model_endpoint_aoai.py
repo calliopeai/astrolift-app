@@ -38,6 +38,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.azure_ownership import (
+    OWNERSHIP_ERROR_CODE,
+    AzureOperation,
+    AzureOwnershipError,
+    arm_tags_of,
+    owner_of,
+    verify_azure_ownership,
+)
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -189,6 +197,10 @@ class AzureOpenAIDriver(ManagedServiceDriver):
 
         existing = self._describe(deployment_name)
         if existing is not None:
+            try:
+                self._assert_owned(existing, spec, AzureOperation.PROVISION, deployment_name)
+            except AzureOwnershipError as exc:
+                return ProvisionResult(ok=False, handle="", message=str(exc), errors=[OWNERSHIP_ERROR_CODE])
             return ProvisionResult(
                 ok=True,
                 handle=self._handle_for(deployment_name=deployment_name),
@@ -270,6 +282,26 @@ class AzureOpenAIDriver(ManagedServiceDriver):
     def update(self, spec: UpdateSpec) -> UpdateResult:
         deployment_name = self._deployment_name_from_handle(spec.handle)
         cfg = spec.config or {}
+
+        existing = self._describe(deployment_name)
+        if existing is None:
+            return UpdateResult(
+                ok=False,
+                handle=spec.handle,
+                message=f"aoai deployment {deployment_name} does not exist",
+                errors=["not_found"],
+                retryable=False,
+            )
+        try:
+            self._assert_owned(existing, spec, AzureOperation.UPDATE, deployment_name)
+        except AzureOwnershipError as exc:
+            return UpdateResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(exc),
+                errors=[OWNERSHIP_ERROR_CODE],
+                retryable=False,
+            )
 
         sku_body: dict[str, Any] = {}
         if spec.size:
@@ -357,6 +389,17 @@ class AzureOpenAIDriver(ManagedServiceDriver):
                 ok=True,
                 handle=spec.handle,
                 message=f"aoai deployment {deployment_name} already gone",
+            )
+
+        try:
+            self._assert_owned(existing, spec, AzureOperation.DELETE, deployment_name)
+        except AzureOwnershipError as exc:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(exc),
+                errors=[OWNERSHIP_ERROR_CODE],
+                retryable=False,
             )
 
         if not force_destroy:
@@ -563,6 +606,15 @@ class AzureOpenAIDriver(ManagedServiceDriver):
         )
 
     # ---- internals ----------------------------------------------------
+
+    @staticmethod
+    def _assert_owned(deployment: Any, source: object, operation: AzureOperation, deployment_name: str) -> None:
+        verify_azure_ownership(
+            arm_tags_of(deployment),
+            owner_of(source),
+            operation=operation,
+            resource=f"Azure OpenAI deployment {deployment_name}",
+        )
 
     def _describe(self, deployment_name: str) -> Any | None:
         try:

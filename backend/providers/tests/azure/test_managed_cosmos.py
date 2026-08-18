@@ -63,6 +63,10 @@ class FakeConnectionStrings:
     connection_strings: list[FakeConnectionStringEntry]
 
 
+OWNER = "managed-service-guid"
+BINDING = "binding-guid"
+
+
 @dataclass
 class FakeAccount:
     name: str
@@ -70,6 +74,7 @@ class FakeAccount:
     document_endpoint: str = ""
     properties: dict[str, Any] = field(default_factory=dict)
     kind: str = "MongoDB"
+    tags: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -105,6 +110,7 @@ class FakeDatabaseAccountsClient:
             document_endpoint=(f"https://{account_name}.documents.azure.com:443/"),
             properties=dict(create_update_parameters.get("properties", {})),
             kind=kind,
+            tags=dict(create_update_parameters.get("tags") or {}),
         )
         self.accounts[account_name] = acct
         return FakePoller(value=acct)
@@ -307,6 +313,8 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         tenant_cluster_id="azure-prod",
         service_handle_hint="kv",
         size="small",
+        binding_id=BINDING,
+        managed_service_id=OWNER,
     )
     base.update(overrides)
     return ProvisionSpec(**base)
@@ -455,7 +463,7 @@ def test_update_throughput(
 ) -> None:
     provisioned = driver.provision(_spec())
     result = driver.update(
-        UpdateSpec(handle=provisioned.handle, size="medium"),
+        UpdateSpec(handle=provisioned.handle, size="medium", managed_service_id=OWNER),
     )
     assert result.ok
     updates = mgmt.mongo_db_resources_obj.throughput_updates
@@ -472,6 +480,7 @@ def test_update_public_network_access(
         UpdateSpec(
             handle=provisioned.handle,
             config={"public_network_access": "Disabled"},
+            managed_service_id=OWNER,
         ),
     )
     assert result.ok
@@ -485,7 +494,7 @@ def test_update_noop_when_nothing_to_change(
 ) -> None:
     provisioned = driver.provision(_spec())
     before = len(mgmt.database_accounts_obj.update_calls)
-    result = driver.update(UpdateSpec(handle=provisioned.handle))
+    result = driver.update(UpdateSpec(handle=provisioned.handle, managed_service_id=OWNER))
     assert result.ok
     assert "no-op" in result.message
     assert len(mgmt.database_accounts_obj.update_calls) == before
@@ -500,7 +509,7 @@ def test_deprovision_default_retains_via_continuous_backup(
 ) -> None:
     provisioned = driver.provision(_spec())
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
     )
     assert result.ok
     assert "continuous_backup=retained" in result.message
@@ -519,7 +528,7 @@ def test_deprovision_backup_failure_does_not_delete_account(
         raise RuntimeError("continuous backup unavailable")
 
     mgmt.database_accounts_obj.begin_update = boom  # type: ignore[assignment]
-    result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle))
+    result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER))
     assert not result.ok
     assert result.retryable is False
     assert "continuous backup" in result.message
@@ -533,7 +542,7 @@ def test_deprovision_delete_data_skips_backup_enable(
 ) -> None:
     provisioned = driver.provision(_spec())
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
     )
     assert result.ok
@@ -551,7 +560,7 @@ def test_deprovision_refuses_when_lock_present(
         FakeLock(name="prod-lock", level="CanNotDelete"),
     )
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
     )
     assert not result.ok
     assert "resource locks" in result.message
@@ -567,7 +576,7 @@ def test_deprovision_force_destroy_clears_lock(
         FakeLock(name="prod-lock", level="CanNotDelete"),
     )
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         force_destroy=True,
     )
     assert result.ok
@@ -579,7 +588,7 @@ def test_deprovision_atomic_both_flags(
 ) -> None:
     provisioned = driver.provision(_spec())
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
         force_destroy=True,
     )
@@ -592,7 +601,7 @@ def test_deprovision_idempotent_when_already_gone(
     driver: AzureCosmosDriver,
 ) -> None:
     result = driver.deprovision(
-        DeprovisionSpec(handle="kv_store/never-existed"),
+        DeprovisionSpec(handle="kv_store/never-existed", managed_service_id=OWNER),
     )
     assert result.ok
     assert "already gone" in result.message
@@ -608,7 +617,7 @@ def test_deprovision_with_data_delete_drops_conn_secrets(
     assert primary in secrets_client.secrets
 
     driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER),
         delete_data=True,
     )
     assert primary not in secrets_client.secrets
@@ -623,7 +632,7 @@ def test_deprovision_keeps_secrets_on_retain_path(
     account_name = provisioned.handle.split("/", 1)[1]
     primary = f"astrolift-cosmos-{account_name}-primary"
 
-    driver.deprovision(DeprovisionSpec(handle=provisioned.handle))
+    driver.deprovision(DeprovisionSpec(handle=provisioned.handle, managed_service_id=OWNER))
     # When the data path is being retained, the conn-string secrets
     # remain in Key Vault so a restore-from-PITR has credentials.
     assert primary in secrets_client.secrets
@@ -710,7 +719,7 @@ def test_snapshot_returns_point_in_time_handle(
     mgmt: FakeMgmtClient,
 ) -> None:
     provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
+    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle, managed_service_id=OWNER))
     account_name = provisioned.handle.split("/", 1)[1]
     assert snap.snapshot_id.startswith(account_name)
     assert "pit" in snap.snapshot_id
@@ -722,7 +731,7 @@ def test_snapshot_surfaces_error_on_missing_account(
     driver: AzureCosmosDriver,
 ) -> None:
     with pytest.raises(AzureCosmosError):
-        driver.snapshot(ServiceHandle(handle="kv_store/never"))
+        driver.snapshot(ServiceHandle(handle="kv_store/never", managed_service_id=OWNER))
 
 
 def test_restore_creates_target_account(
@@ -730,7 +739,7 @@ def test_restore_creates_target_account(
     mgmt: FakeMgmtClient,
 ) -> None:
     provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
+    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle, managed_service_id=OWNER))
 
     restore_spec = _spec(service_handle_hint="restored")
     result = driver.restore(snap, restore_spec)

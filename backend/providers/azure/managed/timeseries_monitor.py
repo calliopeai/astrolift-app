@@ -45,6 +45,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.azure_ownership import (
+    OWNERSHIP_ERROR_CODE,
+    AzureOperation,
+    AzureOwnershipError,
+    arm_tags_of,
+    owner_of,
+    verify_azure_ownership,
+)
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -180,6 +188,10 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
 
         existing = self._describe(workspace_name)
         if existing is not None:
+            try:
+                self._assert_owned(existing, spec, AzureOperation.PROVISION, workspace_name)
+            except AzureOwnershipError as exc:
+                return ProvisionResult(ok=False, handle="", message=str(exc), errors=[OWNERSHIP_ERROR_CODE])
             return ProvisionResult(
                 ok=True,
                 handle=self._handle_for(workspace_name=workspace_name),
@@ -347,6 +359,26 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
         workspace_name = self._workspace_name_from_handle(spec.handle)
         cfg = spec.config or {}
 
+        existing = self._describe(workspace_name)
+        if existing is None:
+            return UpdateResult(
+                ok=False,
+                handle=spec.handle,
+                message=f"azure monitor workspace {workspace_name} does not exist",
+                errors=["not_found"],
+                retryable=False,
+            )
+        try:
+            self._assert_owned(existing, spec, AzureOperation.UPDATE, workspace_name)
+        except AzureOwnershipError as exc:
+            return UpdateResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(exc),
+                errors=[OWNERSHIP_ERROR_CODE],
+                retryable=False,
+            )
+
         tags_patch: dict[str, str] = {}
         if spec.size:
             tags_patch["astrolift-ingestion-cap-millions"] = str(
@@ -437,6 +469,17 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
                 ok=True,
                 handle=spec.handle,
                 message=(f"azure monitor workspace {workspace_name} already gone"),
+            )
+
+        try:
+            self._assert_owned(existing, spec, AzureOperation.DELETE, workspace_name)
+        except AzureOwnershipError as exc:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(exc),
+                errors=[OWNERSHIP_ERROR_CODE],
+                retryable=False,
             )
 
         if not delete_data:
@@ -673,6 +716,15 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
         )
 
     # ---- internals ----------------------------------------------------
+
+    @staticmethod
+    def _assert_owned(workspace: Any, source: object, operation: AzureOperation, workspace_name: str) -> None:
+        verify_azure_ownership(
+            arm_tags_of(workspace),
+            owner_of(source),
+            operation=operation,
+            resource=f"Azure Monitor workspace {workspace_name}",
+        )
 
     def _describe(self, workspace_name: str) -> Any | None:
         try:

@@ -19,6 +19,7 @@ from _sdk.managed_service import (
     ServiceHandle,
     UpdateSpec,
 )
+from _sdk.managed_service_tags import canonical_key
 from azure.managed.queue_servicebus import (
     KIND,
     AzureServiceBusConfig,
@@ -36,11 +37,16 @@ class _NotFound(Exception):
 _NotFound.__name__ = "ResourceNotFoundError"
 
 
+OWNER = "managed-service-guid"
+BINDING = "binding-guid"
+
+
 @dataclass
 class FakeTopic:
     name: str
     parameters: dict[str, Any] = field(default_factory=dict)
     status: str = "Active"
+    user_metadata: str = ""
 
 
 @dataclass
@@ -70,8 +76,13 @@ class FakeTopics:
         existing = self.topics.get(topic_name)
         if existing is not None:
             existing.parameters.update(parameters)
+            existing.user_metadata = str(parameters.get("userMetadata", existing.user_metadata))
             return existing
-        topic = FakeTopic(name=topic_name, parameters=dict(parameters))
+        topic = FakeTopic(
+            name=topic_name,
+            parameters=dict(parameters),
+            user_metadata=str(parameters.get("userMetadata", "")),
+        )
         self.topics[topic_name] = topic
         return topic
 
@@ -196,6 +207,8 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         tenant_cluster_id="azure-prod",
         service_handle_hint="events",
         size="small",
+        binding_id=BINDING,
+        managed_service_id=OWNER,
     )
     base.update(overrides)
     return ProvisionSpec(**base)
@@ -309,6 +322,7 @@ def test_update_passes_size_changes_through(
         UpdateSpec(
             handle=res.handle,
             config={"max_size_in_megabytes": 2048},
+            managed_service_id=OWNER,
         ),
     )
     assert update.ok
@@ -324,7 +338,7 @@ def test_update_noop_when_nothing_to_change(
 ) -> None:
     res = driver.provision(_spec())
     before = len(fake_client.topics_obj.create_calls)
-    result = driver.update(UpdateSpec(handle=res.handle))
+    result = driver.update(UpdateSpec(handle=res.handle, managed_service_id=OWNER))
     assert result.ok
     assert "no-op" in result.message
     assert len(fake_client.topics_obj.create_calls) == before
@@ -339,7 +353,7 @@ def test_deprovision_default_refuses_to_drop_messages(
 ) -> None:
     res = driver.provision(_spec())
     topic_name = res.handle.split("/", 1)[1]
-    result = driver.deprovision(DeprovisionSpec(handle=res.handle))
+    result = driver.deprovision(DeprovisionSpec(handle=res.handle, managed_service_id=OWNER))
     assert not result.ok
     assert result.retryable is False
     assert "delete_data=True" in result.message
@@ -356,7 +370,7 @@ def test_deprovision_delete_data_only_skips_drain(
         [c for c in fake_client.subs_obj.create_calls if c["parameters"].get("status") == "ReceiveDisabled"],
     )
     result = driver.deprovision(
-        DeprovisionSpec(handle=res.handle),
+        DeprovisionSpec(handle=res.handle, managed_service_id=OWNER),
         delete_data=True,
     )
     assert result.ok
@@ -375,7 +389,7 @@ def test_deprovision_default_respects_topic_lock(
     topic_name = res.handle.split("/", 1)[1]
     fake_client.topics_obj.topics[topic_name].status = "Disabled"
     result = driver.deprovision(
-        DeprovisionSpec(handle=res.handle),
+        DeprovisionSpec(handle=res.handle, managed_service_id=OWNER),
         delete_data=True,
     )
     assert not result.ok
@@ -393,7 +407,7 @@ def test_deprovision_force_destroy_bypasses_topic_lock(
     topic_name = res.handle.split("/", 1)[1]
     fake_client.topics_obj.topics[topic_name].status = "Disabled"
     result = driver.deprovision(
-        DeprovisionSpec(handle=res.handle),
+        DeprovisionSpec(handle=res.handle, managed_service_id=OWNER),
         delete_data=True,
         force_destroy=True,
     )
@@ -409,7 +423,7 @@ def test_deprovision_atomic_both_flags(
     res = driver.provision(_spec())
     topic_name = res.handle.split("/", 1)[1]
     result = driver.deprovision(
-        DeprovisionSpec(handle=res.handle),
+        DeprovisionSpec(handle=res.handle, managed_service_id=OWNER),
         delete_data=True,
         force_destroy=True,
     )
@@ -423,7 +437,7 @@ def test_deprovision_idempotent_when_already_gone(
     driver: AzureServiceBusDriver,
 ) -> None:
     result = driver.deprovision(
-        DeprovisionSpec(handle="queue/never-existed"),
+        DeprovisionSpec(handle="queue/never-existed", managed_service_id=OWNER),
     )
     assert result.ok
     assert "already gone" in result.message
@@ -499,7 +513,7 @@ def test_binding_iam_grants_split_sender_and_receiver(
 
 def test_snapshot_raises(driver: AzureServiceBusDriver) -> None:
     with pytest.raises(AzureServiceBusError):
-        driver.snapshot(ServiceHandle(handle="queue/x"))
+        driver.snapshot(ServiceHandle(handle="queue/x", managed_service_id=OWNER))
 
 
 def test_restore_raises(driver: AzureServiceBusDriver) -> None:
@@ -637,3 +651,31 @@ def test_config_rejects_unknown_handle_kind(fake_client: FakeSBClient) -> None:
             handle_kind="event_bus",
             client=fake_client,
         )
+
+
+def test_a_large_custom_tag_set_cannot_truncate_the_identity_marker(
+    driver: AzureServiceBusDriver,
+    fake_client: FakeSBClient,
+) -> None:
+    """``userMetadata`` is capped at 1024 chars and the cap cuts the tail.
+
+    Ownership travels in that blob, so an operator with a big custom tag set
+    could push the managed-service id past the cap. The resource would then
+    fail its own ownership check forever: teardown refuses, and there is no
+    adoption path to recover it.
+    """
+    noisy = _spec(tags={f"team-label-{index:03d}": "x" * 40 for index in range(40)})
+
+    provisioned = driver.provision(noisy)
+    assert provisioned.ok, provisioned.message
+
+    topic_name = provisioned.handle.split("/", 1)[1]
+    metadata = fake_client.topics_obj.topics[topic_name].user_metadata
+    assert len(metadata) <= 1024
+    assert f"{canonical_key('azure')}={OWNER}" in metadata
+
+    torn_down = driver.deprovision(
+        DeprovisionSpec(provisioned.handle, managed_service_id=OWNER),
+        delete_data=True,
+    )
+    assert torn_down.ok, torn_down.message

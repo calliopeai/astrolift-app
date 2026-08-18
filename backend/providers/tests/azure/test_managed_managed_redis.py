@@ -53,6 +53,7 @@ class FakeRedisEnterprise:
         cluster = SimpleNamespace(
             host_name=f"{cluster_name}.eastus.redis.azure.net",
             provisioning_state="Succeeded",
+            tags=dict(parameters.tags or {}),
         )
         self.owner.clusters[cluster_name] = cluster
         return Poller(cluster)
@@ -422,6 +423,7 @@ def test_update_scales_cluster_updates_database_and_refreshes_secrets() -> None:
                 "eviction_policy": "AllKeysLFU",
                 "persistence": {"aof_enabled": True, "aof_frequency": "1s"},
             },
+            managed_service_id="managed-service-id",
         ),
     )
 
@@ -450,6 +452,7 @@ def test_partial_update_does_not_silently_downsize_or_reset_database_shape() -> 
                     "userAssignedIdentities/redis-cmk"
                 ),
             },
+            managed_service_id="managed-service-id",
         ),
     )
 
@@ -471,7 +474,9 @@ def test_immutable_database_shape_requires_reprovision() -> None:
     driver, management, _, handle = _provisioned()
     management.calls.clear()
 
-    result = driver.update(UpdateSpec(handle=handle, config={"clustering_policy": "NoCluster"}))
+    result = driver.update(
+        UpdateSpec(handle=handle, config={"clustering_policy": "NoCluster"}, managed_service_id="managed-service-id")
+    )
 
     assert not result.ok
     assert result.errors == ["reprovision_required"]
@@ -492,7 +497,9 @@ def test_provision_reconciliation_rejects_clustering_policy_drift() -> None:
 
 def test_update_reports_missing_resource() -> None:
     driver, _, _ = _driver()
-    result = driver.update(UpdateSpec(handle="redis/missing/default", size="medium"))
+    result = driver.update(
+        UpdateSpec(handle="redis/missing/default", size="medium", managed_service_id="managed-service-id")
+    )
     assert not result.ok
     assert result.errors == ["not_found"]
 
@@ -544,7 +551,7 @@ def test_default_teardown_refuses_unverifiable_data_loss() -> None:
     driver, management, _, handle = _provisioned()
     management.calls.clear()
 
-    result = driver.deprovision(DeprovisionSpec(handle))
+    result = driver.deprovision(DeprovisionSpec(handle, managed_service_id="managed-service-id"))
 
     assert not result.ok and not result.retryable
     assert result.errors == ["data_preserving_teardown_unsupported"]
@@ -555,7 +562,7 @@ def test_destructive_teardown_deletes_database_cluster_and_all_secrets() -> None
     driver, management, secrets, handle = _provisioned()
     management.calls.clear()
 
-    result = driver.deprovision(DeprovisionSpec(handle), delete_data=True)
+    result = driver.deprovision(DeprovisionSpec(handle, managed_service_id="managed-service-id"), delete_data=True)
 
     assert result.ok
     assert [call[0] for call in management.calls if call[0].endswith("delete")] == [
@@ -572,7 +579,7 @@ def test_idempotent_teardown_does_not_hide_secret_cleanup_failure() -> None:
     management.clusters.pop(cluster_name)
     secrets.fail_delete = True
 
-    result = driver.deprovision(DeprovisionSpec(handle), delete_data=True)
+    result = driver.deprovision(DeprovisionSpec(handle, managed_service_id="managed-service-id"), delete_data=True)
 
     assert not result.ok
     assert "credential cleanup failed" in result.message
@@ -588,7 +595,7 @@ def test_idempotent_teardown_requires_the_configured_secret_backend() -> None:
         ),
     )
     result = driver.deprovision(
-        DeprovisionSpec("redis/already-gone/default"),
+        DeprovisionSpec("redis/already-gone/default", managed_service_id="managed-service-id"),
         delete_data=True,
     )
     assert not result.ok

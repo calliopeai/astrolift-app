@@ -16,6 +16,9 @@ from azure.managed.mssql_sql import (
     AzureSQLManagedInstanceDriver,
 )
 
+OWNER = "managed-service-guid"
+BINDING = "binding-guid"
+
 
 def _param(value: Any, name: str, default: Any = None) -> Any:
     if isinstance(value, dict):
@@ -210,6 +213,7 @@ class FakeManagedInstances:
             name=managed_instance_name,
             state="Ready",
             fully_qualified_domain_name=f"{managed_instance_name}.private.database.windows.net",
+            tags=_param(parameters, "tags", {}),
         )
         self.rows[managed_instance_name] = row
         return Poller(row)
@@ -297,6 +301,8 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         "tenant_cluster_id": "azure-prod",
         "service_handle_hint": "orders",
         "size": "small",
+        "binding_id": BINDING,
+        "managed_service_id": OWNER,
     }
     values.update(overrides)
     return ProvisionSpec(**values)
@@ -431,7 +437,7 @@ def test_sql_database_key_vault_names_are_bounded_and_collision_safe() -> None:
 def test_sql_database_snapshot_is_an_actual_database_copy_and_restores() -> None:
     driver, mgmt, _ = _database_driver()
     source = driver.provision(_spec())
-    snapshot = driver.snapshot(ServiceHandle(source.handle))
+    snapshot = driver.snapshot(ServiceHandle(source.handle, managed_service_id=OWNER))
     copy_call = mgmt.databases.create_calls[-1]
     assert copy_call["parameters"].create_mode == "Copy"
     assert snapshot.snapshot_id.endswith(copy_call["database"])
@@ -445,7 +451,7 @@ def test_sql_database_non_destructive_delete_fails_closed_if_copy_fails() -> Non
     driver, mgmt, _ = _database_driver()
     result = driver.provision(_spec())
     mgmt.databases.fail_copy = True
-    deleted = driver.deprovision(DeprovisionSpec(result.handle))
+    deleted = driver.deprovision(DeprovisionSpec(result.handle, managed_service_id=OWNER))
     assert not deleted.ok
     assert "copy failed" in deleted.message
     assert not mgmt.databases.delete_calls
@@ -455,7 +461,7 @@ def test_sql_database_non_destructive_delete_preserves_copy_and_server() -> None
     driver, mgmt, secret_client = _database_driver()
     result = driver.provision(_spec())
     server_name = result.handle.split("/")[1]
-    deleted = driver.deprovision(DeprovisionSpec(result.handle))
+    deleted = driver.deprovision(DeprovisionSpec(result.handle, managed_service_id=OWNER))
     assert deleted.ok
     assert "retained_copy=" in deleted.message
     assert server_name in mgmt.servers.rows
@@ -467,7 +473,7 @@ def test_sql_database_non_destructive_delete_preserves_copy_and_server() -> None
 def test_sql_database_destructive_delete_removes_empty_server_and_secrets() -> None:
     driver, mgmt, secret_client = _database_driver()
     result = driver.provision(_spec())
-    deleted = driver.deprovision(DeprovisionSpec(result.handle), delete_data=True)
+    deleted = driver.deprovision(DeprovisionSpec(result.handle, managed_service_id=OWNER), delete_data=True)
     assert deleted.ok
     assert mgmt.servers.delete_calls
     assert not secret_client.values
@@ -477,11 +483,11 @@ def test_sql_database_delete_retries_failed_secret_cleanup_idempotently() -> Non
     driver, mgmt, secret_client = _database_driver()
     result = driver.provision(_spec())
     secret_client.fail_delete = True
-    first = driver.deprovision(DeprovisionSpec(result.handle), delete_data=True)
+    first = driver.deprovision(DeprovisionSpec(result.handle, managed_service_id=OWNER), delete_data=True)
     assert not first.ok
     assert not mgmt.databases.rows
     secret_client.fail_delete = False
-    second = driver.deprovision(DeprovisionSpec(result.handle), delete_data=True)
+    second = driver.deprovision(DeprovisionSpec(result.handle, managed_service_id=OWNER), delete_data=True)
     assert second.ok
     assert mgmt.servers.delete_calls
     assert not secret_client.values
@@ -491,7 +497,7 @@ def test_sql_database_update_resizes_and_changes_retention() -> None:
     driver, mgmt, _ = _database_driver()
     result = driver.provision(_spec())
     updated = driver.update(
-        UpdateSpec(result.handle, size="medium", config={"backup_retention_days": 14}),
+        UpdateSpec(result.handle, managed_service_id=OWNER, size="medium", config={"backup_retention_days": 14}),
     )
     assert updated.ok
     assert mgmt.databases.update_calls[-1]["parameters"].sku.capacity == 4
@@ -549,7 +555,7 @@ def test_managed_instance_binding_and_status() -> None:
 def test_managed_instance_non_destructive_teardown_refuses_without_snapshot() -> None:
     driver, mgmt, _ = _mi_driver()
     result = driver.provision(_spec())
-    deleted = driver.deprovision(DeprovisionSpec(result.handle))
+    deleted = driver.deprovision(DeprovisionSpec(result.handle, managed_service_id=OWNER))
     assert not deleted.ok
     assert deleted.retryable is False
     assert not mgmt.managed_instances.delete_calls
@@ -558,7 +564,7 @@ def test_managed_instance_non_destructive_teardown_refuses_without_snapshot() ->
 def test_managed_instance_destructive_teardown_is_explicit() -> None:
     driver, mgmt, secrets_client = _mi_driver()
     result = driver.provision(_spec())
-    deleted = driver.deprovision(DeprovisionSpec(result.handle), delete_data=True)
+    deleted = driver.deprovision(DeprovisionSpec(result.handle, managed_service_id=OWNER), delete_data=True)
     assert deleted.ok
     assert mgmt.managed_databases.delete_calls
     assert mgmt.managed_instances.delete_calls
@@ -569,11 +575,11 @@ def test_managed_instance_delete_retries_failed_secret_cleanup_idempotently() ->
     driver, mgmt, secret_client = _mi_driver()
     result = driver.provision(_spec())
     secret_client.fail_delete = True
-    first = driver.deprovision(DeprovisionSpec(result.handle), delete_data=True)
+    first = driver.deprovision(DeprovisionSpec(result.handle, managed_service_id=OWNER), delete_data=True)
     assert not first.ok
     assert not mgmt.managed_instances.rows
     secret_client.fail_delete = False
-    second = driver.deprovision(DeprovisionSpec(result.handle), delete_data=True)
+    second = driver.deprovision(DeprovisionSpec(result.handle, managed_service_id=OWNER), delete_data=True)
     assert second.ok
     assert not secret_client.values
 
@@ -637,7 +643,7 @@ def test_azure_sql_typed_models_serialize_to_arm_property_shape() -> None:
             exclude_readonly=True,
         ),
     )
-    assert database_driver.update(UpdateSpec(provisioned_database.handle, size="medium")).ok
+    assert database_driver.update(UpdateSpec(provisioned_database.handle, managed_service_id=OWNER, size="medium")).ok
     update_payload = json.loads(
         json.dumps(
             database_mgmt.databases.update_calls[0]["parameters"],
@@ -645,7 +651,7 @@ def test_azure_sql_typed_models_serialize_to_arm_property_shape() -> None:
             exclude_readonly=True,
         ),
     )
-    snapshot = database_driver.snapshot(ServiceHandle(provisioned_database.handle))
+    snapshot = database_driver.snapshot(ServiceHandle(provisioned_database.handle, managed_service_id=OWNER))
     copy_payload = json.loads(
         json.dumps(
             database_mgmt.databases.create_calls[-1]["parameters"],
@@ -681,7 +687,7 @@ def test_azure_sql_typed_models_serialize_to_arm_property_shape() -> None:
             exclude_readonly=True,
         ),
     )
-    assert mi_driver.update(UpdateSpec(provisioned_mi.handle, size="medium")).ok
+    assert mi_driver.update(UpdateSpec(provisioned_mi.handle, managed_service_id=OWNER, size="medium")).ok
     mi_update_payload = json.loads(
         json.dumps(
             mi_mgmt.managed_instances.update_calls[0]["parameters"],

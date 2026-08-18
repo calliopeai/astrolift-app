@@ -41,6 +41,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
+from _sdk.azure_ownership import (
+    OWNERSHIP_ERROR_CODE,
+    AzureOperation,
+    AzureOwnershipError,
+    arm_tags_of,
+    owner_of,
+    verify_azure_ownership,
+)
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -194,6 +202,10 @@ class AzureAISearchVectorDriver(ManagedServiceDriver):
 
         existing = self._describe(service_name)
         if existing is not None:
+            try:
+                self._assert_owned(existing, spec, AzureOperation.PROVISION, service_name)
+            except AzureOwnershipError as exc:
+                return ProvisionResult(ok=False, handle="", message=str(exc), errors=[OWNERSHIP_ERROR_CODE])
             return ProvisionResult(
                 ok=True,
                 handle=self._handle_for(service_name=service_name),
@@ -290,6 +302,26 @@ class AzureAISearchVectorDriver(ManagedServiceDriver):
         service_name = self._service_name_from_handle(spec.handle)
         cfg = spec.config or {}
 
+        existing = self._describe(service_name)
+        if existing is None:
+            return UpdateResult(
+                ok=False,
+                handle=spec.handle,
+                message=f"search service {service_name} does not exist",
+                errors=["not_found"],
+                retryable=False,
+            )
+        try:
+            self._assert_owned(existing, spec, AzureOperation.UPDATE, service_name)
+        except AzureOwnershipError as exc:
+            return UpdateResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(exc),
+                errors=[OWNERSHIP_ERROR_CODE],
+                retryable=False,
+            )
+
         body: dict[str, Any] = {}
         if spec.size:
             sku = _SIZE_TO_SKU.get(spec.size)
@@ -359,6 +391,17 @@ class AzureAISearchVectorDriver(ManagedServiceDriver):
                 ok=True,
                 handle=spec.handle,
                 message=f"search service {service_name} already gone",
+            )
+
+        try:
+            self._assert_owned(existing, spec, AzureOperation.DELETE, service_name)
+        except AzureOwnershipError as exc:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(exc),
+                errors=[OWNERSHIP_ERROR_CODE],
+                retryable=False,
             )
 
         # Azure AI Search exposes no service-level snapshot or soft-delete
@@ -540,6 +583,15 @@ class AzureAISearchVectorDriver(ManagedServiceDriver):
         )
 
     # ---- internals ----------------------------------------------------
+
+    @staticmethod
+    def _assert_owned(service: Any, source: object, operation: AzureOperation, service_name: str) -> None:
+        verify_azure_ownership(
+            arm_tags_of(service),
+            owner_of(source),
+            operation=operation,
+            resource=f"Azure AI Search vector service {service_name}",
+        )
 
     def _describe(self, service_name: str) -> Any | None:
         try:

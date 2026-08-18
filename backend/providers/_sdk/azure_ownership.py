@@ -88,6 +88,17 @@ METADATA_KEYS = AzureOwnershipKeys(
     managed_service_id="astrolift_managed_service_id",
 )
 
+#: Blob-container metadata keys, a third spelling again: the flattened
+#: ``astrolift_io_<name>`` form ``azure/managed/object_store_blob.py`` writes.
+#: ``read_managed_service_id`` already declares
+#: ``astrolift_io_managed_service_id`` as a legacy Azure spelling, so the id
+#: below is only here to name the surface rather than to widen the read.
+BLOB_METADATA_KEYS = AzureOwnershipKeys(
+    managed_by="astrolift_io_managed_by",
+    binding="astrolift_io_binding",
+    managed_service_id="astrolift_io_managed_service_id",
+)
+
 #: Backwards-compatible aliases for the ARM names.
 MANAGED_BY_TAG = ARM_TAG_KEYS.managed_by
 BINDING_TAG = ARM_TAG_KEYS.binding
@@ -133,6 +144,32 @@ class AzureOwner:
 
     managed_service_id: str = ""
     binding_id: str = ""
+
+
+def metadata_of(resource: object) -> dict[str, str]:
+    """The ``metadata`` map off a blob container or file share properties body."""
+    if resource is None:
+        return {}
+    meta = resource.get("metadata") if isinstance(resource, dict) else getattr(resource, "metadata", None)
+    if not meta:
+        return {}
+    return {str(key): str(value) for key, value in dict(meta).items()}
+
+
+def arm_tags_of(resource: object) -> dict[str, str]:
+    """The ARM ``tags`` map off whatever shape a describe call returned.
+
+    Azure mgmt clients hand back generated models; the driver fakes and a few
+    REST passthroughs hand back plain bodies. Reading the envelope wrong is
+    indistinguishable from an absent envelope, and an absent envelope refuses,
+    so this lives next to the rule instead of being retyped per driver.
+    """
+    if resource is None:
+        return {}
+    tags = resource.get("tags") if isinstance(resource, dict) else getattr(resource, "tags", None)
+    if not tags:
+        return {}
+    return {str(key): str(value) for key, value in dict(tags).items()}
 
 
 def owner_of(spec: object) -> AzureOwner:

@@ -22,10 +22,19 @@ class _NotFound(Exception):
     pass
 
 
+# Module scope, not fixture scope: the driver sniffs this name, so a fake built
+# outside the fixture has to raise the same thing the SDK does.
+_NotFound.__name__ = "ResourceNotFoundError"
+
+OWNER = "managed-service-guid"
+BINDING = "binding-guid"
+
+
 @dataclass
 class FakeQueue:
     name: str
     parameters: dict[str, Any] = field(default_factory=dict)
+    user_metadata: str = ""
 
 
 @dataclass
@@ -40,7 +49,11 @@ class FakeQueues:
         queue_name: str,
         parameters: dict[str, Any],
     ) -> FakeQueue:
-        q = FakeQueue(name=queue_name, parameters=dict(parameters))
+        q = FakeQueue(
+            name=queue_name,
+            parameters=dict(parameters),
+            user_metadata=str(parameters.get("userMetadata", "")),
+        )
         self.queues[queue_name] = q
         return q
 
@@ -78,7 +91,6 @@ class FakeSBClient:
 
 @pytest.fixture
 def fake_client() -> FakeSBClient:
-    _NotFound.__name__ = "ResourceNotFoundError"
     return FakeSBClient()
 
 
@@ -105,6 +117,8 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         tenant_cluster_id="cluster-1",
         service_handle_hint="",
         size="small",
+        binding_id=BINDING,
+        managed_service_id=OWNER,
     )
     base.update(overrides)
     return ProvisionSpec(**base)
@@ -146,7 +160,7 @@ def test_deprovision_deletes_queue(
 ) -> None:
     res = driver.provision(_spec())
     driver.deprovision(
-        DeprovisionSpec(handle=res.handle),
+        DeprovisionSpec(handle=res.handle, managed_service_id=OWNER),
         delete_data=True,
     )
     assert fake_client.queues_obj.queues == {}
@@ -157,7 +171,7 @@ def test_deprovision_refuses_to_drop_messages_by_default(
     fake_client: FakeSBClient,
 ) -> None:
     res = driver.provision(_spec())
-    deprov = driver.deprovision(DeprovisionSpec(handle=res.handle))
+    deprov = driver.deprovision(DeprovisionSpec(handle=res.handle, managed_service_id=OWNER))
     assert not deprov.ok
     assert deprov.retryable is False
     assert "delete_data=True" in deprov.message
@@ -169,10 +183,10 @@ def test_deprovision_idempotent_when_already_gone(
 ) -> None:
     res = driver.provision(_spec())
     driver.deprovision(
-        DeprovisionSpec(handle=res.handle),
+        DeprovisionSpec(handle=res.handle, managed_service_id=OWNER),
         delete_data=True,
     )
-    deprov = driver.deprovision(DeprovisionSpec(handle=res.handle))
+    deprov = driver.deprovision(DeprovisionSpec(handle=res.handle, managed_service_id=OWNER))
     assert deprov.ok
 
 
@@ -192,7 +206,7 @@ def test_binding_envs_and_iam_grants(driver: ServiceBusDriver) -> None:
 
 def test_snapshot_raises(driver: ServiceBusDriver) -> None:
     with pytest.raises(NotImplementedError):
-        driver.snapshot(ServiceHandle(handle="queue/x"))
+        driver.snapshot(ServiceHandle(handle="queue/x", managed_service_id=OWNER))
 
 
 def test_queue_name_canonicalization(driver: ServiceBusDriver) -> None:
