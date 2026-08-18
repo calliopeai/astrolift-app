@@ -110,6 +110,112 @@ def test_gcp_permissions_fail_closed_for_raw_permission():
         _permissions_from_bindings(bindings, plugin_slug="gcp")
 
 
+# ---- azure grant translation (#1367) ------------------------------------
+
+_BLOB_SCOPE = (
+    "/subscriptions/sub-1/resourceGroups/rg/providers/Microsoft.Storage"
+    "/storageAccounts/acct/blobServices/default/containers/data"
+)
+_QUEUE_SCOPE = (
+    "/subscriptions/sub-1/resourceGroups/rg/providers/Microsoft.ServiceBus/namespaces/ns/queues/jobs"
+)
+
+
+def test_azure_permissions_resolve_roles_at_the_declared_scope():
+    bindings = [
+        _Binding(
+            iam_grants=[_Grant(resource=_BLOB_SCOPE, actions=["Storage Blob Data Contributor"])],
+        ),
+        _Binding(
+            iam_grants=[
+                _Grant(
+                    resource=_QUEUE_SCOPE,
+                    actions=["Azure Service Bus Data Sender", "Azure Service Bus Data Receiver"],
+                ),
+            ],
+        ),
+    ]
+
+    assert _permissions_from_bindings(bindings, plugin_slug="azure") == [
+        {
+            "role_definition_id": "ba92f5b4-2d11-453d-a403-e96b0029c9fe",
+            "role_name": "Storage Blob Data Contributor",
+            "scope": _BLOB_SCOPE,
+        },
+        {
+            "role_definition_id": "69a216fc-b8fb-44d8-bc22-1f3c2cd27a39",
+            "role_name": "Azure Service Bus Data Sender",
+            "scope": _QUEUE_SCOPE,
+        },
+        {
+            "role_definition_id": "4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0",
+            "role_name": "Azure Service Bus Data Receiver",
+            "scope": _QUEUE_SCOPE,
+        },
+    ]
+
+
+def test_azure_never_emits_an_aws_policy_statement():
+    # The bug this closes: Azure received Effect/Action/Resource dicts that no
+    # Azure API can consume, so the binding reported ready with no grant.
+    bindings = [
+        _Binding(iam_grants=[_Grant(resource=_BLOB_SCOPE, actions=["Storage Blob Data Reader"])]),
+    ]
+    perms = _permissions_from_bindings(bindings, plugin_slug="azure")
+    assert perms and all(set(p) == {"role_definition_id", "role_name", "scope"} for p in perms)
+
+
+def test_azure_deduplicates_the_same_role_and_scope_across_bindings():
+    grant = _Grant(resource=_BLOB_SCOPE, actions=["Storage Blob Data Contributor"])
+    bindings = [_Binding(iam_grants=[grant]), _Binding(iam_grants=[grant])]
+    assert len(_permissions_from_bindings(bindings, plugin_slug="azure")) == 1
+
+
+def test_azure_control_plane_grants_produce_no_workload_role():
+    # Key Vault material reaches the pod as a projected Secret; a role
+    # assignment for it would be over-permission, not least privilege.
+    bindings = [
+        _Binding(
+            iam_grants=[
+                _Grant(
+                    resource="astrolift-pg-primary-password",
+                    actions=["Microsoft.KeyVault/vaults/secrets/getSecret"],
+                ),
+                _Grant(
+                    resource="/subscriptions/sub-1/resourceGroups/rg/providers"
+                    "/Microsoft.DBforPostgreSQL/flexibleServers/pg",
+                    actions=["Microsoft.DBforPostgreSQL/flexibleServers/read"],
+                ),
+            ],
+        ),
+    ]
+    assert _permissions_from_bindings(bindings, plugin_slug="azure") == []
+
+
+def test_azure_unclassified_management_action_fails_closed():
+    bindings = [
+        _Binding(
+            iam_grants=[
+                _Grant(resource=_BLOB_SCOPE, actions=["Microsoft.Storage/storageAccounts/write"]),
+            ],
+        ),
+    ]
+    with pytest.raises(ValueError, match="granting the workload nothing"):
+        _permissions_from_bindings(bindings, plugin_slug="azure")
+
+
+def test_azure_role_grant_on_a_non_arm_scope_fails_closed():
+    bindings = [
+        _Binding(
+            iam_grants=[
+                _Grant(resource="astrolift-blob-secret", actions=["Storage Blob Data Reader"]),
+            ],
+        ),
+    ]
+    with pytest.raises(ValueError, match="ARM resource scope"):
+        _permissions_from_bindings(bindings, plugin_slug="azure")
+
+
 # ---- render post-process ------------------------------------------------
 
 
