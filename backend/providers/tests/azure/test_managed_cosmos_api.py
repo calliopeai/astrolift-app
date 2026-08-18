@@ -13,6 +13,7 @@ from _sdk.managed_service import (
     SnapshotHandle,
     UpdateSpec,
 )
+from _sdk.managed_service_tags import canonical_key, ownership_key
 from azure.managed.cosmos_api import (
     PROFILES,
     AzureCosmosApiConfig,
@@ -312,7 +313,7 @@ def test_provision_uses_exact_api_operation_and_typed_models(
     assert payload["properties"]["locations"] == [
         {"locationName": "eastus2", "failoverPriority": 0, "isZoneRedundant": False},
     ]
-    assert payload["tags"]["astrolift.io/managed_service_id"] == "service-id"
+    assert payload["tags"][canonical_key("azure")] == "service-id"
     capabilities = {item["name"] for item in payload["properties"].get("capabilities", [])}
     assert capabilities == ({capability} if capability else set())
     group = mgmt.groups[PROFILES[variant].operation_group]
@@ -352,7 +353,7 @@ def test_reconcile_is_idempotent_and_does_not_reset_account_defaults() -> None:
     assert first.ok and second.ok and first.handle == second.handle
     assert len(mgmt.database_accounts.create_calls) == 1
     update = mgmt.database_accounts.update_calls[-1]["parameters"].as_dict()
-    assert update["tags"]["astrolift.io/managed_service_id"] == "service-id"
+    assert update["tags"][canonical_key("azure")] == "service-id"
     assert update.get("properties", {}) == {}
     group = mgmt.groups[PROFILES["cosmos_nosql"].operation_group]
     assert sum(name == PROFILES["cosmos_nosql"].create_method for name, _ in group.calls) == 1
@@ -362,7 +363,7 @@ def test_reconcile_refuses_foreign_account_before_mutation() -> None:
     driver, mgmt, _, _ = _driver("cosmos_nosql")
     result = driver.provision(_spec())
     account_name = result.handle.split("/")[1]
-    mgmt.database_accounts.accounts[account_name].tags["astrolift.io/managed_service_id"] = "other"
+    mgmt.database_accounts.accounts[account_name].tags[canonical_key("azure")] = "other"
 
     rejected = driver.provision(_spec())
 
@@ -376,7 +377,7 @@ def test_reconcile_without_service_id_checks_ownership_tags() -> None:
     driver, mgmt, _, _ = _driver("cosmos_nosql")
     result = driver.provision(spec)
     account_name = result.handle.split("/")[1]
-    mgmt.database_accounts.accounts[account_name].tags["astrolift.io/app"] = "foreign"
+    mgmt.database_accounts.accounts[account_name].tags[ownership_key("azure", "app")] = "foreign"
     assert not driver.provision(spec).ok
 
 

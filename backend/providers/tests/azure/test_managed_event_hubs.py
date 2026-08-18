@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, SnapshotHandle, UpdateSpec
+from _sdk.managed_service_tags import canonical_key
 from azure.managed.event_hubs import (
     AzureEventHubsConfig,
     AzureEventHubsDriver,
@@ -278,7 +279,7 @@ def test_provision_and_binding_match_portable_profile(
     payload = mgmt.namespaces.create_calls[0]["parameters"].as_dict()
     assert payload["properties"]["kafkaEnabled"] is (variant == "event_hubs_kafka")
     assert payload["properties"]["disableLocalAuth"] is True
-    assert payload["tags"]["astrolift.io/managed_service_id"] == "service-id"
+    assert payload["tags"][canonical_key("azure")] == "service-id"
 
 
 def test_reconcile_is_idempotent_partial_and_ownership_safe() -> None:
@@ -289,11 +290,11 @@ def test_reconcile_is_idempotent_partial_and_ownership_safe() -> None:
     assert len(mgmt.namespaces.create_calls) == 1
     assert len(mgmt.event_hubs.create_calls) == 1
     update = mgmt.namespaces.update_calls[-1]["parameters"].as_dict()
-    assert update["tags"]["astrolift.io/managed_service_id"] == "service-id"
+    assert update["tags"][canonical_key("azure")] == "service-id"
     assert update.get("properties", {}) == {}
 
     namespace_name = first.handle.split("/")[1]
-    mgmt.namespaces.values[namespace_name].tags["astrolift.io/managed_service_id"] = "other"
+    mgmt.namespaces.values[namespace_name].tags[canonical_key("azure")] = "other"
     before = len(mgmt.namespaces.update_calls)
     rejected = driver.provision(_spec())
     assert not rejected.ok and "refusing to adopt" in rejected.message

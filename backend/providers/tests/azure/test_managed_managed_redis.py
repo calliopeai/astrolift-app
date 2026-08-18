@@ -15,6 +15,7 @@ from _sdk.managed_service import (
     SnapshotHandle,
     UpdateSpec,
 )
+from _sdk.managed_service_tags import ownership_key
 from azure.managed.managed_redis import (
     MANAGED_REDIS_SKUS,
     AzureManagedRedisConfig,
@@ -281,7 +282,7 @@ def test_provision_creates_cluster_database_and_key_vault_binding() -> None:
     assert cluster.public_network_access == "Enabled"
     assert cluster.identity.type == "UserAssigned"
     assert cluster.encryption.customer_managed_key_encryption.key_encryption_key_url.endswith("/version")
-    assert cluster.tags["astrolift.io/binding"] == "binding-id"
+    assert cluster.tags[ownership_key("azure", "binding")] == "binding-id"
     database_call = next(call for call in management.calls if call[0] == "database.create")
     database = database_call[-1]
     assert database.client_protocol == "Encrypted"

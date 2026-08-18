@@ -24,6 +24,8 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.managed_service_tags import ownership_key, read_managed_service_id
+from azure.managed.tags import arm_tags_for as tags_for
 
 
 @dataclass(frozen=True)
@@ -80,23 +82,6 @@ class AzureEventHubsConfig:
             raise ValueError("Event Hubs default capacity must be between 1 and 40")
         if self.public_network_access_default not in {"Enabled", "Disabled", "SecuredByPerimeter"}:
             raise ValueError("unsupported Event Hubs public network access default")
-
-
-def tags_for(spec: ProvisionSpec) -> dict[str, str]:
-    tags = {
-        "astrolift.io/managed-by": "platform",
-        "astrolift.io/organization": spec.organization_slug,
-        "astrolift.io/app": spec.app_slug,
-        "astrolift.io/environment": spec.environment_name,
-        "astrolift.io/cluster": spec.tenant_cluster_id,
-        "astrolift.io/isolation": spec.isolation,
-    }
-    if spec.binding_id:
-        tags["astrolift.io/binding"] = spec.binding_id
-    if spec.managed_service_id:
-        tags["astrolift.io/managed_service_id"] = spec.managed_service_id
-    tags.update({f"astrolift.io/extra/{key}": value for key, value in (spec.tags or {}).items()})
-    return tags
 
 
 class AzureEventHubsDriver(ManagedServiceDriver):
@@ -920,7 +905,7 @@ class AzureEventHubsDriver(ManagedServiceDriver):
     def _assert_owned(self, namespace: Any, spec: ProvisionSpec) -> None:
         tags = _field(namespace, "tags", default={}) or {}
         expected = spec.managed_service_id
-        actual = str(tags.get("astrolift.io/managed_service_id") or "")
+        actual = read_managed_service_id(tags, "azure")
         if expected and actual != expected:
             raise AzureEventHubsError(
                 f"refusing to adopt Event Hubs namespace owned by managed_service_id={actual or 'unset'}",
@@ -928,9 +913,9 @@ class AzureEventHubsDriver(ManagedServiceDriver):
         if expected:
             return
         expected_tags = {
-            "astrolift.io/organization": spec.organization_slug,
-            "astrolift.io/app": spec.app_slug,
-            "astrolift.io/environment": spec.environment_name,
+            ownership_key("azure", "org"): spec.organization_slug,
+            ownership_key("azure", "app"): spec.app_slug,
+            ownership_key("azure", "env"): spec.environment_name,
         }
         mismatches = [
             f"{key}={tags.get(key) or 'unset'}" for key, value in expected_tags.items() if tags.get(key) != value
