@@ -179,10 +179,20 @@ class Workload(NamedBaseCoreModel):
         #   loop     → continuous re-dispatch with a concurrency cap (PR-6).
         #   schedule → cron-driven (PR-4, reads ``run_cron_expression``).
         #   trigger  → bound to a webhook / event / condition (PR-6).
+        # And the mode that is not a trigger at all:
+        #   persistent → nothing dispatches it. The agent runs as a warm
+        #             pod holding a tmux session so a human or the relay can
+        #             attach to it (#128). Distinct from ``service``: a
+        #             service runs the agent as its entrypoint and serves
+        #             traffic, whereas a box runs nothing in particular and
+        #             exists to be exec'd into. Instances are ``AgentBox``
+        #             rows, not ``AgentTask`` rows, because a box has no
+        #             completion to report.
         ONCE = "once"
         LOOP = "loop"
         SCHEDULE = "schedule"
         TRIGGER = "trigger"
+        PERSISTENT = "persistent"
 
     run_family = models.CharField(
         max_length=16,

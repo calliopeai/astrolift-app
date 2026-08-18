@@ -23,6 +23,7 @@ from graphql import GraphQLError
 from strawberry.types import Info
 
 from astrolift_agents.models import (
+    AgentBox,
     AgentEnvironmentSpec,
     AgentInteraction,
     AgentSecretBundleRef,
@@ -34,6 +35,7 @@ from astrolift_agents.models import (
     ToolDef,
 )
 from astrolift_agents.schema.types import (
+    AgentBoxType,
     AgentDetailType,
     AgentEnvironmentSpecType,
     AgentInteractionType,
@@ -52,6 +54,7 @@ from astrolift_agents.schema.types import (
     ScanAgentManifestsResultType,
     SkillType,
     ToolDefType,
+    agent_box_to_type,
     agent_detail_to_type,
     agent_env_spec_to_type,
     agent_interaction_to_type,
@@ -792,6 +795,50 @@ class AgentsQuery:
             "slug"
         )[:200]
         return [agent_env_spec_to_type(s) for s in qs]
+
+    @strawberry.field
+    @require_permission(Permission.AGENT_READ)
+    @tenant_scoped()
+    def agent_boxes(
+        self, info: Info, org_id: strawberry.ID, include_ended: bool = False
+    ) -> list[AgentBoxType]:
+        """The org's agent-boxes, warm ones first (#128).
+
+        The default question an operator or an IDE is asking is "what can I
+        attach to", so a settled box is left out unless asked for: it is
+        history, and listing it beside live boxes invites attaching to
+        something that no longer exists. ``include_ended`` brings the
+        reaped/stopped/failed rows back for the "why did my box go away"
+        case.
+        """
+        org_pk = _caller_org_id(info, org_id)
+        qs = AgentBox.objects.filter(organization_id=org_pk, deleted_at__isnull=True)
+        if not include_ended:
+            qs = qs.filter(status__in=sorted(AgentBox.LIVE_STATUSES))
+        qs = qs.select_related("organization", "agent_definition", "environment_spec").order_by(
+            "-created_at"
+        )[:200]
+        return [agent_box_to_type(b) for b in qs]
+
+    @strawberry.field
+    @require_permission(Permission.AGENT_READ)
+    @tenant_scoped()
+    def agent_box(self, info: Info, slug: str) -> AgentBoxType | None:
+        """One box by slug, scoped to the caller's org.
+
+        The slug is what a client stores between sessions, so this is the
+        lookup an IDE polls while a box provisions. Another org's box
+        resolves to null rather than an error, so the surface leaks no
+        existence.
+        """
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        row = (
+            AgentBox.objects.filter(slug=slug, organization_id=org_pk, deleted_at__isnull=True)
+            .select_related("organization", "agent_definition", "environment_spec")
+            .first()
+        )
+        return agent_box_to_type(row) if row is not None else None
 
     @strawberry.field
     @require_permission(Permission.AGENT_ENV_SPEC_READ)

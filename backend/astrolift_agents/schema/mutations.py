@@ -34,6 +34,7 @@ from astrolift_agents.models import (
     ToolDef,
 )
 from astrolift_agents.schema.types import (
+    AgentBoxType,
     AgentEnvironmentSpecType,
     AgentRunFamily,
     AgentRunMode,
@@ -47,6 +48,7 @@ from astrolift_agents.schema.types import (
     OrgSkillRepoType,
     SkillType,
     ToolDefType,
+    agent_box_to_type,
     agent_env_spec_to_type,
     agent_run_spec_to_type,
     agent_secret_bundle_attachment_to_type,
@@ -175,6 +177,29 @@ class RunAstroliftAgentInput:
     # coerces None -> {}.
     trigger_payload: JSON | None = None
     timeout_seconds: int | None = None
+
+
+@strawberry.input
+class EnsureAgentBoxInput:
+    """Ask for a warm agent-box, getting the one you already have (#128).
+
+    Ensure semantics rather than create: the IDE's button sends this on every
+    press, and the org must not grow a node per press. Everything here is
+    optional except that *something* has to say what to run — an
+    ``agent_slug`` naming a ``run_mode: persistent`` agent, an
+    ``environment_spec_slug`` naming the image and secret packet, or both.
+
+    ``idle_timeout_seconds`` is applied when the box is first created and
+    when a settled one is restarted; it is seconds of no attached client
+    *and* no pane output, so an agent working while its operator is away
+    keeps its box. ``0`` is the explicit never-reap sentinel — a real choice
+    an operator makes, not an empty field that happens to mean forever.
+    """
+
+    environment_spec_slug: str = ""
+    agent_slug: str = ""
+    name: str = ""
+    idle_timeout_seconds: int | None = None
 
 
 @strawberry.input
@@ -392,6 +417,26 @@ def _dispatch_actor(info: Info):
     if tenant and tenant.actor_user_id:
         return Actor(kind="user", user_id=tenant.actor_user_id, display="")
     return Actor(kind="system", display="system")
+
+
+def _box_owner(info: Info):
+    """The user an ensured box belongs to, or ``None``.
+
+    Module-level rather than a method: this is called from a ROOT mutation
+    resolver, where Strawberry binds ``self`` to the root value (``None``),
+    so ``self._helper()`` would pass a direct-invocation test and then raise
+    on every real request.
+
+    ``None`` is a legitimate answer — a box ensured by an API token has no
+    human owner and is still an org resource. It only ever widens the ensure
+    key, so an unowned box is shared across the org rather than leaking one
+    person's session to another.
+    """
+    request = getattr(info.context, "request", None)
+    user = getattr(request, "user", None) if request else None
+    if user is not None and getattr(user, "is_authenticated", False):
+        return user
+    return None
 
 
 def _input_author(info: Info) -> tuple[object | None, str]:
@@ -1754,6 +1799,104 @@ class AgentsMutation:
             )
 
         return gql_success(agent_task_to_type(task))
+
+    @strawberry.field
+    @mutation_audit(
+        action="agents.box.ensure",
+        target=lambda self, info, input, org_id=None: (
+            "AgentBox",
+            input.agent_slug or input.environment_spec_slug,
+        ),
+    )
+    @require_permission(Permission.AGENT_DISPATCH)
+    @tenant_scoped()
+    def ensure_agent_box(
+        self, info: Info, input: EnsureAgentBoxInput, org_id: strawberry.ID
+    ) -> MutationResultType[AgentBoxType]:
+        """Hand back a warm agent-box, starting one only if there isn't one (#128).
+
+        The one call behind the IDE's button and behind ``astro box ensure``.
+        It is deliberately not ``createAgentBox``: the button is pressed again
+        every time someone wants their agent, and each press must attach to
+        the box they already have. Two presses racing must also not produce
+        two boxes, which is why the slug is derived from the request rather
+        than generated — the live-slug uniqueness constraint is what settles
+        the race, in the database, rather than a check-then-create that a
+        second request can slip between.
+
+        A settled box (idle-reaped, stopped, failed) is restarted under its
+        existing slug, so the address a client stored keeps working across a
+        reaping. Behind ``agent.dispatch``, the same grant that authorizes
+        running an agent — a box is a running agent that happens to wait.
+        """
+        org, err = _resolve_org(org_id)
+        if err is not None:
+            return err
+
+        from astrolift_agents.services.agent_box import (
+            AgentBoxEnsureError,
+            AgentBoxError,
+            ensure_agent_box,
+        )
+
+        try:
+            box = ensure_agent_box(
+                organization=org,
+                environment_spec_slug=input.environment_spec_slug,
+                agent_slug=input.agent_slug,
+                name=input.name,
+                idle_timeout_seconds=input.idle_timeout_seconds,
+                owner=_box_owner(info),
+            )
+        except AgentBoxEnsureError as exc:
+            code = {
+                "validation": ErrorCode.VALIDATION.value,
+                "not_found": ErrorCode.NOT_FOUND.value,
+                "precondition": ErrorCode.PRECONDITION.value,
+            }.get(exc.code, ErrorCode.INTERNAL.value)
+            return gql_failure(code, exc.message, field=exc.field or None)
+        except AgentBoxError as exc:
+            # The box row exists and is stamped FAILED with this message, so
+            # a failed press is visible in the list rather than vanishing.
+            return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
+
+        return gql_success(agent_box_to_type(box))
+
+    @strawberry.field
+    @mutation_audit(
+        action="agents.box.destroy",
+        target=lambda self, info, slug: ("AgentBox", slug),
+    )
+    @require_permission(Permission.AGENT_DISPATCH)
+    @tenant_scoped()
+    def destroy_agent_box(self, info: Info, slug: str) -> MutationResultType[AgentBoxType]:
+        """Tear a box down now rather than waiting for it to go idle.
+
+        The cluster objects go first and the row is soft-deleted after, so a
+        retired box can never leave a pod running that nothing is watching.
+        Org-filtered explicitly — ``@tenant_scoped`` asserts a tenant exists,
+        it does not filter — so another org's slug reads as NOT_FOUND,
+        indistinguishable from a slug that was never used.
+        """
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        if org_pk is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+
+        from astrolift_agents.models import AgentBox
+        from astrolift_agents.services.agent_box import destroy_agent_box
+
+        box = (
+            AgentBox.objects.filter(slug=slug, organization_id=org_pk).select_related("organization").first()
+        )
+        if box is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "agent box not found", field="slug")
+
+        payload = agent_box_to_type(box)
+        destroy_agent_box(box, by=_box_owner(info))
+        payload.status = box.status
+        payload.ended_at = box.ended_at
+        return gql_success(payload)
 
     @strawberry.field
     @require_permission(Permission.APP_UPDATE)

@@ -16,7 +16,7 @@ of the guaranteed cross-cloud surface, so their empty cells are not gaps.
 Every gap that is left must appear in the ledger below or the guard test
 (`tests/_sdk/test_coverage_ledger.py`) fails.
 
-Opt-in kinds: `cdn`, `database_proxy`, `mq`, `sms`, `stream`, `warehouse`, `wide_column`.
+Opt-in kinds: `api_gateway`, `cdn`, `database_proxy`, `mq`, `sms`, `stream`, `time_series`, `warehouse`, `wide_column`.
 
 32 kinds; 20 executable on all three public clouds;
 23 reachable on every cloud once in-cluster variants count;
@@ -26,7 +26,7 @@ Opt-in kinds: `cdn`, `database_proxy`, `mq`, `sms`, `stream`, `warehouse`, `wide
 
 | Kind | AWS | GCP | Azure | In-cluster (k8s_native) |
 | --- | --- | --- | --- | --- |
-| `api_gateway` | `http_api`, `rest_api`, `websocket_api` | `api_gateway` | `api_management` | `gateway_api` |
+| `api_gateway` (opt-in) | `http_api`, `rest_api`, `websocket_api` | `api_gateway` | `api_management` | `gateway_api` |
 | `cache` | `elasticache_memcached`, `elasticache_serverless_memcached` | - | - | - |
 | `cdn` (opt-in) | `cloudfront` | `cloud_cdn` | planned: `front_door` | - |
 | `database_proxy` (opt-in) | `rds_proxy` | - | - | - |
@@ -52,7 +52,7 @@ Opt-in kinds: `cdn`, `database_proxy`, `mq`, `sms`, `stream`, `warehouse`, `wide
 | `search` | `opensearch`, `opensearch_serverless` | planned: `gcp_elastic_cloud` | `azure_ai_search_fulltext` | `opensearch_operator` |
 | `sms` (opt-in) | `sns_sms` | - | planned: `communication_services_sms` | - |
 | `stream` (opt-in) | `firehose`, `kinesis` | - | `event_hubs` | - |
-| `time_series` | `timestream` | `gcp_managed_prometheus` | `azure_monitor_prometheus` | - |
+| `time_series` (opt-in) | `timestream` | `gcp_managed_prometheus` | `azure_monitor_prometheus` | - |
 | `topic` | `sns_fifo`, `sns_standard` | `pubsub_topic` | `service_bus_topic` | - |
 | `vector_index` | `opensearch_serverless_vector`, `opensearch_vector` | `vertex_matching_engine` | `azure_ai_search_vector` | `opensearch_operator_vector` |
 | `warehouse` (opt-in) | `redshift`, `redshift_serverless` | `bigquery` | planned: `synapse_serverless` | - |

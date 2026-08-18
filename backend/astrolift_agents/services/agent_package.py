@@ -37,6 +37,11 @@ RESERVED_AGENT_ENVIRONMENT_NAMES = frozenset(
         "AGENT_PROMPT",
         "AGENT_SYSTEM",
         "AGENT_TASK_ID",
+        # An agent-box's identity env (#128). A box's own variables are how
+        # anything inside the pod knows which box it is; a spec that set them
+        # would make the pod lie about itself.
+        "ASTROLIFT_AGENT_BOX",
+        "ASTROLIFT_AGENT_BOX_GUID",
         "ASTROLIFT_BRIEF_HASH",
         "ASTROLIFT_BRIEF_ID",
         "ASTROLIFT_CLUSTER_KEY",
@@ -47,6 +52,7 @@ RESERVED_AGENT_ENVIRONMENT_NAMES = frozenset(
         "ASTROLIFT_SNAPSHOT_INTERVAL",
         "ASTROLIFT_SNAPSHOT_URL",
         "ASTROLIFT_TASK_ID",
+        "ASTROLIFT_TMUX_SESSION",
         "ASTROLIFT_TRIGGER_PAYLOAD",
         "ASTROLIFT_WORKSPACE",
     }
