@@ -1,0 +1,61 @@
+# NEGATIVE / foreign-binding-collision / azure -- provision onto a name another binding owns.
+#
+# A derived name is not a proof of ownership. Provisioning over a resource
+# that answers to the same name but carries a different binding's identity is
+# how a customer's database gets adopted, reconfigured, or deleted by someone
+# else's app. The platform must refuse before any mutating call, and the
+# resource must come out of the run byte-identical.
+#
+# Hand-authored: each negative cell encodes a different refusal, and a
+# generated table would hide the only part worth reading.
+name = "cert2026q3-neg-collision-azure"
+
+[campaign]
+slug = "cert2026q3"
+cell = "negative/foreign-binding-collision/azure"
+cloud = "azure"
+fixture = "calliopeai/astrolift-sample-api"
+purpose = "safety: fail-closed ownership on provision"
+
+[campaign.tags]
+campaign = "cert2026q3"
+
+[campaign.negative]
+case = "foreign-binding-collision"
+expect = "refused"
+error_code = "external_resource_collision"
+precondition = "Provision this manifest. Drop the platform's ManagedService record without deprovisioning, so the server survives with the first binding's identity tag. Register and provision the manifest again: org, app, environment and handle hint are unchanged, so the driver derives the same name and meets a resource owned by a binding that no longer exists."
+assert = "provision returns ok=false carrying the error code above, and it does so before any create, update or delete call reaches the cloud"
+assert_untouched = "SKU, storage, parameter group, tags and identity tag all match the pre-run read exactly; no maintenance event was scheduled"
+known_gap = "azure/managed/postgres_flexible.py gates every mutating path through _sdk/azure_ownership.py, so this is the cell that should be GREEN first."
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+is_public = true
+replicas = 1
+cpu_request = "100m"
+cpu_limit = "500m"
+memory_request = "128Mi"
+memory_limit = "256Mi"
+
+  [[workloads.containers]]
+  name = "app"
+  is_primary = true
+  image_ref = "docker.io/calliopeai/astrolift-sample-api:main-df5ffa3"
+  port = 8080
+  command = ["python", "entrypoint.py", "web"]
+
+    [workloads.containers.env]
+    LOG_LEVEL = "info"
+    PORT = "8080"
+
+    [workloads.containers.healthcheck]
+    kind = "http"
+    value = "/health"
+    port = 8080
+
+[[managed_services]]
+kind = "postgres"
+name = "records"
+variant = "azure_pg_flex"

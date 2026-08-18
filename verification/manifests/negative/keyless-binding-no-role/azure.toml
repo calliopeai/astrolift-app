@@ -1,0 +1,60 @@
+# NEGATIVE / keyless-binding-no-role / azure -- a keyless binding whose grant never lands.
+#
+# Keyless bindings carry no credential: the pod's identity is the credential,
+# and it is worth nothing until a role assignment exists. A binding that
+# reports ready without one hands the app a 403 at its first real request,
+# in production, at whatever hour the first request arrives. The deploy must
+# fail while someone is still watching it.
+#
+# Hand-authored: each negative cell encodes a different refusal, and a
+# generated table would hide the only part worth reading.
+name = "cert2026q3-neg-keyless-azure"
+
+[campaign]
+slug = "cert2026q3"
+cell = "negative/keyless-binding-no-role/azure"
+cloud = "azure"
+fixture = "calliopeai/astrolift-sample-api"
+purpose = "safety: a grant that never landed must not report ready"
+
+[campaign.tags]
+campaign = "cert2026q3"
+
+[campaign.negative]
+case = "keyless-binding-no-role"
+expect = "deploy_fails_loudly"
+precondition = "Withhold Microsoft.Authorization/roleAssignments/write (the User Access Administrator half of the install) from the control-plane principal for the duration of the cell, so the bucket is created, the identity is created, and the grant between them cannot be."
+assert = "the binding surfaces pending or failed with the missing grant named, and the deployment reports failed"
+assert_not = "no binding reports ready, no workload reports running, and the failure is not deferred to the first request the app makes"
+assert_clean = "restoring the grant and re-running reconciles to green without an operator deleting anything by hand"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+is_public = true
+replicas = 1
+cpu_request = "100m"
+cpu_limit = "500m"
+memory_request = "128Mi"
+memory_limit = "256Mi"
+
+  [[workloads.containers]]
+  name = "app"
+  is_primary = true
+  image_ref = "docker.io/calliopeai/astrolift-sample-api:main-df5ffa3"
+  port = 8080
+  command = ["python", "entrypoint.py", "web"]
+
+    [workloads.containers.env]
+    LOG_LEVEL = "info"
+    PORT = "8080"
+
+    [workloads.containers.healthcheck]
+    kind = "http"
+    value = "/health"
+    port = 8080
+
+[[managed_services]]
+kind = "object_store"
+name = "archive"
+variant = "azure_blob"

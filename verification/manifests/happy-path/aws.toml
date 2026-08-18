@@ -1,0 +1,90 @@
+# HAPPY PATH / aws -- the certification target (spec 43 §1).
+#
+# Deploy a web app with a database, a cache, a queue and object storage;
+# update it; tear it down. GREEN twice, unattended, on all three clouds is
+# what certifies the beta. Everything else in this collection is coverage.
+#
+# Books postgres:rds, redis:elasticache, queue:sqs, object_store:s3.
+# VERIFY-UP is the fixture's /selftest: it opens a real client against each
+# of the four, so a binding that reached the pod but does not work is red.
+#
+# Generated from providers/_cert/collection.py -- do not hand-edit.
+name = "cert2026q3-happy-aws"
+
+[campaign]
+slug = "cert2026q3"
+cell = "happy-path/aws"
+cloud = "aws"
+fixture = "calliopeai/astrolift-sample-api"
+purpose = "certification target: full lifecycle over four managed services"
+
+# Operator tags the harness threads into ProvisionSpec.tags. The app name
+# carries the campaign slug as well, because no operator tag reaches an IAM
+# principal and two GCP drivers drop spec.tags outright -- see _cert/campaign.py.
+[campaign.tags]
+campaign = "cert2026q3"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+is_public = true
+replicas = 2
+cpu_request = "100m"
+cpu_limit = "500m"
+memory_request = "128Mi"
+memory_limit = "256Mi"
+
+  [[workloads.containers]]
+  name = "app"
+  is_primary = true
+  image_ref = "docker.io/calliopeai/astrolift-sample-api:main-df5ffa3"
+  port = 8080
+  command = ["python", "entrypoint.py", "web"]
+
+    [workloads.containers.env]
+    LOG_LEVEL = "info"
+    PORT = "8080"
+
+    [workloads.containers.healthcheck]
+    kind = "http"
+    value = "/health"
+    port = 8080
+
+[[workloads]]
+name = "worker"
+kind = "deployment"
+replicas = 1
+cpu_request = "100m"
+cpu_limit = "500m"
+memory_request = "128Mi"
+memory_limit = "256Mi"
+
+  [[workloads.containers]]
+  name = "worker"
+  is_primary = true
+  image_ref = "docker.io/calliopeai/astrolift-sample-api:main-df5ffa3"
+  port = 0
+  command = ["python", "entrypoint.py", "worker"]
+
+    [workloads.containers.env]
+    LOG_LEVEL = "info"
+
+[[managed_services]]
+kind = "postgres"
+name = "records"
+variant = "rds"
+
+[[managed_services]]
+kind = "redis"
+name = "cache"
+variant = "elasticache"
+
+[[managed_services]]
+kind = "queue"
+name = "jobs"
+variant = "sqs"
+
+[[managed_services]]
+kind = "object_store"
+name = "archive"
+variant = "s3"
