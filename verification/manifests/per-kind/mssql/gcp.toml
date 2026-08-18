@@ -1,0 +1,53 @@
+# PER-KIND / mssql / gcp -- variant cloudsql_sqlserver.
+#
+# One managed service, one cloud, the full lifecycle cycle. The fixture only
+# opens live clients for postgres, redis, queue and object_store; every other
+# kind is verified by binding presence in /debug plus a clean VERIFY-CLEAN.
+# Binding envelope to assert in /debug: MSSQL_HOST, MSSQL_PORT, MSSQL_DB, MSSQL_USER, MSSQL_PASSWORD, MSSQL_ENCRYPT, DATABASE_URL, GCP_CLOUDSQL_INSTANCE, GCP_CLOUDSQL_CONNECTION_NAME.
+#
+# Generated from providers/_cert/collection.py -- do not hand-edit.
+name = "cert2026q3-mssql-gcp"
+
+[campaign]
+slug = "cert2026q3"
+cell = "per-kind/mssql/gcp"
+cloud = "gcp"
+fixture = "calliopeai/astrolift-sample-api"
+purpose = "coverage: mssql via cloudsql_sqlserver"
+
+# Operator tags the harness threads into ProvisionSpec.tags. The app name
+# carries the campaign slug as well, because no operator tag reaches an IAM
+# principal and two GCP drivers drop spec.tags outright -- see _cert/campaign.py.
+[campaign.tags]
+campaign = "cert2026q3"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+is_public = true
+replicas = 1
+cpu_request = "100m"
+cpu_limit = "500m"
+memory_request = "128Mi"
+memory_limit = "256Mi"
+
+  [[workloads.containers]]
+  name = "app"
+  is_primary = true
+  image_ref = "docker.io/calliopeai/astrolift-sample-api:main-df5ffa3"
+  port = 8080
+  command = ["python", "entrypoint.py", "web"]
+
+    [workloads.containers.env]
+    LOG_LEVEL = "info"
+    PORT = "8080"
+
+    [workloads.containers.healthcheck]
+    kind = "http"
+    value = "/health"
+    port = 8080
+
+[[managed_services]]
+kind = "mssql"
+name = "mssql"
+variant = "cloudsql_sqlserver"

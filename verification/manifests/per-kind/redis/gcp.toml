@@ -1,0 +1,53 @@
+# PER-KIND / redis / gcp -- variant memorystore.
+#
+# One managed service, one cloud, the full lifecycle cycle. The fixture only
+# opens live clients for postgres, redis, queue and object_store; every other
+# kind is verified by binding presence in /debug plus a clean VERIFY-CLEAN.
+# Binding envelope to assert in /debug: REDIS_HOST, REDIS_PORT, REDIS_USER, REDIS_PASSWORD, REDIS_TLS, REDIS_URL, REDIS_AUTH_MODE, REDIS_RESOURCE_ARN.
+#
+# Generated from providers/_cert/collection.py -- do not hand-edit.
+name = "cert2026q3-redis-gcp"
+
+[campaign]
+slug = "cert2026q3"
+cell = "per-kind/redis/gcp"
+cloud = "gcp"
+fixture = "calliopeai/astrolift-sample-api"
+purpose = "coverage: redis via memorystore"
+
+# Operator tags the harness threads into ProvisionSpec.tags. The app name
+# carries the campaign slug as well, because no operator tag reaches an IAM
+# principal and two GCP drivers drop spec.tags outright -- see _cert/campaign.py.
+[campaign.tags]
+campaign = "cert2026q3"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+is_public = true
+replicas = 1
+cpu_request = "100m"
+cpu_limit = "500m"
+memory_request = "128Mi"
+memory_limit = "256Mi"
+
+  [[workloads.containers]]
+  name = "app"
+  is_primary = true
+  image_ref = "docker.io/calliopeai/astrolift-sample-api:main-df5ffa3"
+  port = 8080
+  command = ["python", "entrypoint.py", "web"]
+
+    [workloads.containers.env]
+    LOG_LEVEL = "info"
+    PORT = "8080"
+
+    [workloads.containers.healthcheck]
+    kind = "http"
+    value = "/health"
+    port = 8080
+
+[[managed_services]]
+kind = "redis"
+name = "redis"
+variant = "memorystore"

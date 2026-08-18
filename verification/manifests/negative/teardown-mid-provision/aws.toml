@@ -1,0 +1,60 @@
+# NEGATIVE / teardown-mid-provision / aws -- deprovision while the server is still creating.
+#
+# The window between 'the cloud has started making it' and 'the platform knows
+# its handle' is where orphans are born: a create in flight, a record that
+# does not name it yet, and a teardown that finds nothing to delete. Postgres
+# is the kind that makes the window minutes wide on all three clouds, which is
+# what makes this cell repeatable rather than lucky.
+#
+# Hand-authored: each negative cell encodes a different refusal, and a
+# generated table would hide the only part worth reading.
+name = "cert2026q3-neg-midprovision-aws"
+
+[campaign]
+slug = "cert2026q3"
+cell = "negative/teardown-mid-provision/aws"
+cloud = "aws"
+fixture = "calliopeai/astrolift-sample-api"
+purpose = "safety: an interrupted provision converges with no residue"
+
+[campaign.tags]
+campaign = "cert2026q3"
+
+[campaign.negative]
+case = "teardown-mid-provision"
+expect = "converges"
+precondition = "Issue deprovision while the server is still creating and has no endpoint: after the provision activity returns its handle, before the readiness poll reports available."
+assert = "the workflow reaches a terminal state without operator input, whether it waits for the create to settle and then destroys, or refuses and retries until it can"
+assert_clean = "no server, no platform record, no staged credential in the secret backend, and no firewall rule or subnet delegation left behind; a second teardown is a no-op rather than an error"
+assert_scan = "the per-cloud orphan scan for this campaign is clean afterwards, which is the only assertion here that can catch a resource the platform never recorded"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+is_public = true
+replicas = 1
+cpu_request = "100m"
+cpu_limit = "500m"
+memory_request = "128Mi"
+memory_limit = "256Mi"
+
+  [[workloads.containers]]
+  name = "app"
+  is_primary = true
+  image_ref = "docker.io/calliopeai/astrolift-sample-api:main-df5ffa3"
+  port = 8080
+  command = ["python", "entrypoint.py", "web"]
+
+    [workloads.containers.env]
+    LOG_LEVEL = "info"
+    PORT = "8080"
+
+    [workloads.containers.healthcheck]
+    kind = "http"
+    value = "/health"
+    port = 8080
+
+[[managed_services]]
+kind = "postgres"
+name = "records"
+variant = "rds"
