@@ -10,11 +10,13 @@ import pytest
 from _sdk.cost import CostEstimate, CostEstimateRequest, CostEstimateUnavailable
 from gcp.cost import (
     CATALOG_BASE,
+    LEGACY_SUM_VARIANTS,
     SERVICE_DISPLAY_NAME_BY_VARIANT,
     SERVICE_ID_BY_VARIANT,
     GCPCostConfig,
     GCPCostEstimator,
 )
+from gcp.cost_plans import has_plan
 
 
 @dataclass
@@ -269,6 +271,110 @@ def test_service_id_table_covers_core_kinds() -> None:
     assert ("postgres", "cloudsql") in SERVICE_ID_BY_VARIANT
     assert ("filesystem", "filestore") in SERVICE_ID_BY_VARIANT
     assert SERVICE_DISPLAY_NAME_BY_VARIANT[("event_stream", "managed_kafka")] == ("Managed Service for Apache Kafka")
+
+
+# ---- SKU-plan audit ratchet (#1318) -------------------------------
+
+
+def test_every_mapped_variant_is_plan_backed_or_audited_legacy() -> None:
+    """Every managed-service mapping must be accounted for: either it
+    has a SKU plan, or it is one of the variants the #1318 audit
+    recorded as still summing its whole service."""
+    mapped = set(SERVICE_ID_BY_VARIANT) | set(SERVICE_DISPLAY_NAME_BY_VARIANT)
+    mapped.discard(("compute", "node_hour"))
+
+    unaccounted = {
+        pair for pair in mapped if not has_plan(kind=pair[0], variant=pair[1]) and pair not in LEGACY_SUM_VARIANTS
+    }
+    assert unaccounted == set()
+    # The legacy list only ever shrinks: no entry may outlive its
+    # mapping, and none may double as a plan-backed variant.
+    assert mapped >= LEGACY_SUM_VARIANTS
+    assert not any(has_plan(kind=kind, variant=variant) for kind, variant in LEGACY_SUM_VARIANTS)
+
+
+def test_cloud_sql_variants_are_plan_backed() -> None:
+    for pair in (
+        ("postgres", "cloudsql"),
+        ("mysql", "cloudsql"),
+        ("mssql", "cloudsql_sqlserver"),
+    ):
+        assert pair in SERVICE_ID_BY_VARIANT
+        assert has_plan(kind=pair[0], variant=pair[1])
+
+
+def test_new_mapping_without_a_plan_is_refused_not_summed(
+    estimator: GCPCostEstimator,
+    fake_billing: FakeBillingClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The ratchet has teeth at runtime, not just in this test file:
+    mapping a service id without writing a plan yields no estimate."""
+    monkeypatch.setitem(SERVICE_ID_BY_VARIANT, ("timeseries", "new_service"), "0000-0000-0000")
+    fake_billing.skus = [
+        FakeSku(
+            sku_id="ANY",
+            description="Some New Service SKU",
+            service_regions=["us-central1"],
+            pricing_info=[
+                FakePricingInfo(
+                    pricing_expression=FakeExpression(
+                        usage_unit="hour",
+                        tiered_rates=[
+                            FakeTier(unit_price=FakeUnitPrice(units=1, currency_code="USD")),
+                        ],
+                    ),
+                ),
+            ],
+        ),
+    ]
+    result = estimator.estimate(
+        CostEstimateRequest(
+            kind="timeseries",
+            variant="new_service",
+            region="us-central1",
+            size="custom",
+        )
+    )
+    assert isinstance(result, CostEstimateUnavailable)
+    assert result.reason == "unsupported"
+    assert not estimator.supported(kind="timeseries", variant="new_service")
+
+
+def test_legacy_sum_estimate_is_labelled_approximate(
+    estimator: GCPCostEstimator,
+    fake_billing: FakeBillingClient,
+) -> None:
+    """Until a variant gets a plan its number is a sum of everything
+    in the service, and the estimate has to say so."""
+    fake_billing.skus = [
+        FakeSku(
+            sku_id="SKU-001",
+            description="Standard Storage US",
+            service_regions=["us-central1"],
+            pricing_info=[
+                FakePricingInfo(
+                    pricing_expression=FakeExpression(
+                        usage_unit="gibibyte month",
+                        tiered_rates=[
+                            FakeTier(unit_price=FakeUnitPrice(nanos=20_000_000, currency_code="USD")),
+                        ],
+                    ),
+                ),
+            ],
+        ),
+    ]
+    result = estimator.estimate(
+        CostEstimateRequest(
+            kind="object_store",
+            variant="gcs",
+            region="us-central1",
+            size="custom",
+            expected_usage={"storage_gb_month": 1000.0},
+        )
+    )
+    assert isinstance(result, CostEstimate)
+    assert any("APPROXIMATE" in note for note in result.notes)
 
 
 def test_managed_kafka_resolves_current_billing_service_id(

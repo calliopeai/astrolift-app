@@ -36,6 +36,8 @@ from _sdk.cost import (
     CostLineItem,
     CostResult,
 )
+from _sdk.cost_skus import CatalogPrice, SkuSelectionError, select_line_items
+from gcp.cost_plans import PlanUnavailable, has_plan, plan_for
 
 log = logging.getLogger(__name__)
 
@@ -61,6 +63,8 @@ SERVICE_ID_BY_VARIANT: dict[tuple[str, str], str] = {
     ("topic", "pubsub_topic"): "A1E8-BE35-7EBC",  # Pub/Sub
     ("warehouse", "bigquery"): "24E6-581D-38E5",  # BigQuery
     ("postgres", "cloudsql"): "9662-B51E-5089",  # Cloud SQL
+    ("mysql", "cloudsql"): "9662-B51E-5089",  # Cloud SQL
+    ("mssql", "cloudsql_sqlserver"): "9662-B51E-5089",  # Cloud SQL
     ("postgres", "alloydb"): "70A4-7A89-3F8F",  # AlloyDB
     ("redis", "memorystore"): "F25A-3A0D-5DDB",  # Memorystore
     ("nosql", "firestore"): "F17B-412E-CB64",  # Firestore
@@ -82,6 +86,31 @@ SERVICE_ID_BY_VARIANT: dict[tuple[str, str], str] = {
 SERVICE_DISPLAY_NAME_BY_VARIANT: dict[tuple[str, str], str] = {
     ("event_stream", "managed_kafka"): "Managed Service for Apache Kafka",
 }
+
+# Variants still priced by summing every region-matching SKU in their
+# Catalog service. That is over-counting by construction — each of
+# these services bills on several dimensions the resource may not even
+# use — and the #1318 audit froze the list here so it can only shrink:
+# a variant leaves once ``gcp.cost_plans`` grows a plan for it, and a
+# newly mapped variant without a plan is refused rather than summed.
+LEGACY_SUM_VARIANTS: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("object_store", "gcs"),
+        ("queue", "pubsub"),
+        ("topic", "pubsub_topic"),
+        ("warehouse", "bigquery"),
+        ("postgres", "alloydb"),
+        ("redis", "memorystore"),
+        ("nosql", "firestore"),
+        ("document_db", "firestore_native"),
+        ("nosql", "bigtable"),
+        ("kv_store", "bigtable"),
+        ("encryption_key", "cloud_kms"),
+        ("filesystem", "filestore"),
+        ("event_bus", "eventarc"),
+        ("event_stream", "managed_kafka"),
+    }
+)
 
 CATALOG_BASE = "https://cloudbilling.googleapis.com/v1/services"
 
@@ -118,11 +147,45 @@ class GCPCostEstimator(CostEstimator):
     @driver_op(cloud="gcp", driver="cost", heartbeat=False)
     def supported(self, *, kind: str, variant: str) -> bool:
         pair = (kind, variant)
-        return pair in SERVICE_ID_BY_VARIANT or pair in SERVICE_DISPLAY_NAME_BY_VARIANT
+        if pair not in SERVICE_ID_BY_VARIANT and pair not in SERVICE_DISPLAY_NAME_BY_VARIANT:
+            return False
+        # A mapped service id is not a pricing path on its own (#1318):
+        # the variant needs a SKU plan, or a place on the frozen legacy
+        # list. Compute walks its own CPU/RAM SKUs.
+        if pair == ("compute", "node_hour"):
+            return True
+        return has_plan(kind=kind, variant=variant) or pair in LEGACY_SUM_VARIANTS
 
     @driver_op(cloud="gcp", driver="cost")
     def estimate(self, request: CostEstimateRequest) -> CostResult:
         pair = (request.kind, request.variant)
+        if pair == ("compute", "node_hour"):
+            return self._estimate_compute_node_hour(
+                request=request,
+                service_id=SERVICE_ID_BY_VARIANT[pair],
+            )
+
+        # Resolve the SKU plan before touching the network: a request
+        # the plan refuses is refused either way, so the Catalog
+        # lookup would be a wasted round trip.
+        plan = plan_for(request) if has_plan(kind=request.kind, variant=request.variant) else None
+        if isinstance(plan, PlanUnavailable):
+            return CostEstimateUnavailable(
+                request=request,
+                reason=plan.reason,
+                message=plan.message,
+            )
+        if plan is None and pair not in LEGACY_SUM_VARIANTS:
+            return CostEstimateUnavailable(
+                request=request,
+                reason="unsupported",
+                message=(
+                    f"({request.kind!r}, {request.variant!r}) has no Cloud Billing Catalog "
+                    "SKU plan; add one in gcp.cost_plans rather than summing every SKU in "
+                    "the service (#1318)"
+                ),
+            )
+
         service_id = SERVICE_ID_BY_VARIANT.get(pair) or self._service_id_cache.get(pair)
         if service_id is None and pair in SERVICE_DISPLAY_NAME_BY_VARIANT:
             display_name = SERVICE_DISPLAY_NAME_BY_VARIANT[pair]
@@ -155,16 +218,8 @@ class GCPCostEstimator(CostEstimator):
                 message=(f"no GCP Catalog service ID for ({request.kind!r}, {request.variant!r})"),
             )
 
-        if request.kind == "compute" and request.variant == "node_hour":
-            return self._estimate_compute_node_hour(
-                request=request,
-                service_id=service_id,
-            )
-
         try:
-            skus = self._client.list_skus(
-                parent=f"services/{service_id}",
-            )
+            skus = self._fetch_skus(service_id=service_id)
         except Exception as exc:
             # #616 -- log the Catalog API failure so the cost-estimate
             # dead-zone has a debuggable trace. Without this the
@@ -185,27 +240,37 @@ class GCPCostEstimator(CostEstimator):
                 message=f"Catalog API call failed: {exc}",
             )
 
-        line_items = self._extract_line_items(
-            skus=skus,
-            request=request,
-        )
-        if not line_items:
-            return CostEstimateUnavailable(
+        if plan is None:
+            return self._estimate_by_summing_service(
                 request=request,
-                reason="sku_not_found",
-                message=(f"no SKUs matched region {request.region!r} in service {service_id}"),
+                service_id=service_id,
+                skus=skus,
             )
 
-        total = sum(item.monthly_amount for item in line_items)
+        selection = select_line_items(
+            plan=plan,
+            prices=self._catalog_prices(skus=skus, currency=request.currency),
+            region=request.region,
+            currency=request.currency,
+        )
+        if isinstance(selection, SkuSelectionError):
+            return CostEstimateUnavailable(
+                request=request,
+                reason=selection.reason,
+                message=(f"{selection.message} [service {service_id}]"),
+            )
+
+        total = sum(item.monthly_amount for item in selection)
         return CostEstimate(
             request=request,
-            line_items=line_items,
+            line_items=selection,
             monthly_total=round(total, 2),
             currency=request.currency,
             pricing_source_url=(f"{CATALOG_BASE}/{service_id}/skus"),
             pricing_fetched_at=datetime.now(tz=UTC).isoformat(),
             notes=[
                 "GCP Cloud Catalog returns list price; CUDs and sustained-use discounts are not applied.",
+                *plan.notes,
             ],
         )
 
@@ -243,7 +308,7 @@ class GCPCostEstimator(CostEstimator):
             )
 
         try:
-            skus = self._fetch_compute_skus(service_id=service_id)
+            skus = self._fetch_skus(service_id=service_id)
         except Exception as exc:
             return CostEstimateUnavailable(
                 request=request,
@@ -316,15 +381,15 @@ class GCPCostEstimator(CostEstimator):
             ],
         )
 
-    def _fetch_compute_skus(
+    def _fetch_skus(
         self,
         *,
         service_id: str,
     ) -> list[Any]:
-        """Return the full list of Compute Engine SKUs, cached by
+        """Return the full SKU list for a Catalog service, cached by
         service ID. The Catalog client paginates internally; we
         materialize into a list once so the matcher can walk it
-        twice (once for CPU, once for RAM)."""
+        several times (CPU, RAM, storage, licence, ...)."""
         ttl = self._config.cache_ttl_seconds
         now = datetime.now(tz=UTC).timestamp()
 
@@ -419,9 +484,56 @@ class GCPCostEstimator(CostEstimator):
                 best = candidate
         return best
 
-    # ---- managed-service path (existing) ------------------------------
+    # ---- legacy sum-the-service path (#1318 audit) ----------------------
 
-    def _extract_line_items(
+    def _estimate_by_summing_service(
+        self,
+        *,
+        request: CostEstimateRequest,
+        service_id: str,
+        skus: Any,
+    ) -> CostResult:
+        """Sum every region-matching SKU in the service.
+
+        This is what every GCP managed-service estimate used to do,
+        and it is wrong for any service that bills on more than one
+        dimension — which, per the #1318 audit, is all of them: a
+        Cloud Storage estimate lands on storage classes plus
+        operations plus retrieval, a Bigtable estimate on nodes plus
+        storage. The variants still on this path are frozen in
+        ``LEGACY_SUM_VARIANTS``; each needs its own plan in
+        ``gcp.cost_plans``, and no new variant may join them.
+
+        Until then the estimate carries the caveat in its notes rather
+        than presenting the sum as a considered figure.
+        """
+        line_items = self._legacy_line_items(skus=skus, request=request)
+        if not line_items:
+            return CostEstimateUnavailable(
+                request=request,
+                reason="sku_not_found",
+                message=(f"no SKUs matched region {request.region!r} in service {service_id}"),
+            )
+
+        total = sum(item.monthly_amount for item in line_items)
+        return CostEstimate(
+            request=request,
+            line_items=line_items,
+            monthly_total=round(total, 2),
+            currency=request.currency,
+            pricing_source_url=(f"{CATALOG_BASE}/{service_id}/skus"),
+            pricing_fetched_at=datetime.now(tz=UTC).isoformat(),
+            notes=[
+                "GCP Cloud Catalog returns list price; CUDs and sustained-use discounts are not applied.",
+                (
+                    f"APPROXIMATE: sums all {len(line_items)} region-matching SKUs in service "
+                    f"{service_id}, including ones this resource does not use. "
+                    f"({request.kind}, {request.variant}) has no SKU plan yet (#1318)."
+                ),
+            ],
+        )
+
+    def _legacy_line_items(
         self,
         *,
         skus: Any,
@@ -494,6 +606,49 @@ class GCPCostEstimator(CostEstimator):
         if "hour" in unit_lower:
             return unit_price * usage.get("hours_per_month", 720.0)
         return unit_price
+
+    # ---- managed-service path ------------------------------------------
+
+    def _catalog_prices(
+        self,
+        *,
+        skus: Any,
+        currency: str,
+    ) -> list[CatalogPrice]:
+        """Project Catalog SKUs into the cloud-agnostic row the shared
+        selector matches on.
+
+        ``category`` carries the structured facets (``usage_type`` in
+        particular) that keep committed-use and preemptible rates out
+        of an on-demand preview; rows without a price in the requested
+        currency are dropped here rather than defaulting to zero.
+        """
+        prices: list[CatalogPrice] = []
+        for sku in skus:
+            pricing_info_list = list(getattr(sku, "pricing_info", []) or [])
+            if not pricing_info_list:
+                continue
+            tiered = pricing_info_list[0].pricing_expression
+            unit_price = self._first_tier_price(tiered=tiered, currency=currency)
+            if unit_price is None:
+                continue
+            category = getattr(sku, "category", None)
+            prices.append(
+                CatalogPrice(
+                    sku_id=getattr(sku, "sku_id", "") or getattr(sku, "name", ""),
+                    description=getattr(sku, "description", "") or "",
+                    unit_price=unit_price,
+                    currency=currency,
+                    usage_unit=getattr(tiered, "usage_unit", "") or "",
+                    regions=tuple(getattr(sku, "service_regions", []) or []),
+                    attributes={
+                        "resource_family": str(getattr(category, "resource_family", "") or ""),
+                        "resource_group": str(getattr(category, "resource_group", "") or ""),
+                        "usage_type": str(getattr(category, "usage_type", "") or ""),
+                    },
+                )
+            )
+        return prices
 
 
 # ---- billing actuals (#502) ---------------------------------------
