@@ -263,6 +263,7 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
 
   const commandKey = JSON.stringify(command ?? []);
   const authExpiredLabel = t("authExpired");
+  const targetGoneLabel = t("targetGone");
 
   const buildWsUrl = React.useCallback((): string => {
     const wsOrigin = process.env.NEXT_PUBLIC_WS_ORIGIN;
@@ -418,6 +419,14 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
         setErrorMessage(authExpiredLabel);
         return;
       }
+      // 4404 = the relay has no such target (bad URL, or an app/box that
+      // is gone or belongs to another tenant). Reconnecting cannot make
+      // one appear, so stop rather than spin the backoff loop forever.
+      if (event.code === 4404) {
+        setState("error");
+        setErrorMessage(targetGoneLabel);
+        return;
+      }
       // Clean exit (1000) on session end → leave the terminal in
       // a closed state and let the operator re-open manually.
       if (event.code === 1000 && backoffRef.current === INITIAL_BACKOFF_MS) {
@@ -426,7 +435,15 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
       }
       scheduleReconnect();
     };
-  }, [buildWsUrl, container, command, flushStdinBuffer, scheduleReconnect, authExpiredLabel]);
+  }, [
+    buildWsUrl,
+    container,
+    command,
+    flushStdinBuffer,
+    scheduleReconnect,
+    authExpiredLabel,
+    targetGoneLabel,
+  ]);
 
   React.useEffect(() => {
     connectRef.current = connect;

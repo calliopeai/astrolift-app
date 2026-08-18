@@ -134,7 +134,7 @@ def test_the_committed_manifests_match_a_fresh_render():
 
 def test_the_grid_is_the_size_the_ledger_claims():
     """Pins the shape of the metered run: 23 default-tier kinds across three
-    clouds, minus the one cell with no executable variant.
+    clouds, and no cell left without one.
 
     ``encryption_key/azure`` moved out of the excused set when #1454 landed the
     Key Vault key driver; #1480's ledger was written against the tree before
@@ -142,8 +142,8 @@ def test_the_grid_is_the_size_the_ledger_claims():
     the in-cluster variant that already covered them -- five extra metered
     cells is the price of the portability claim being true."""
     assert len(collection.default_tier_kinds()) == 23
-    assert len(collection.cells()) == 68
-    assert len(collection.NOT_EXPRESSIBLE) == 1
+    assert len(collection.cells()) == 69
+    assert len(collection.NOT_EXPRESSIBLE) == 0
     assert sum(1 for cell in collection.cells() if cell.is_in_cluster) == 5
 
 

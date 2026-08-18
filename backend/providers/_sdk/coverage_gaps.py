@@ -51,14 +51,12 @@ class DeclaredGap:
 # Every row here is a gap that exists right now and is understood. Adding a
 # row is how you take responsibility for narrowing portability; deleting one
 # is mandatory the moment the driver lands.
-DECLARED_GAPS: tuple[DeclaredGap, ...] = (
-    DeclaredGap(
-        kind="email",
-        cloud="gcp",
-        classification="planned_variant",
-        reference="https://github.com/calliopeai/astrolift-app/issues/1453",
-    ),
-)
+#
+# Empty since #1453 closed ``email``/``gcp``, the last default-tier gap from
+# the #1447 sweep. Empty is the intended steady state, not a signal that the
+# ledger stopped being used: ``reconcile()`` still runs on every push and the
+# first kind that ships on one cloud without the others reopens a row here.
+DECLARED_GAPS: tuple[DeclaredGap, ...] = ()
 
 
 @dataclass(frozen=True)

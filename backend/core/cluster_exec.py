@@ -68,6 +68,9 @@ def _resolve_target(*, app_slug: str, workload_slug: str | None) -> dict | None:
     target. Mirrors :func:`astrolift_lifecycle.schema.subscriptions.
     LifecycleSubscription.astrolift_on_app_log._resolve`.
 
+    Handles both kinds of target the relay admits: a ``RegisteredApp``
+    slug, or an ``AgentBox`` slug (#129).
+
     Returns ``None`` if the app has no cluster wired — the dispatcher
     sends an error frame + exit code 2 so the UI renders the right
     'no runtime' state.
@@ -92,7 +95,7 @@ def _resolve_target(*, app_slug: str, workload_slug: str | None) -> dict | None:
         .first()
     )
     if app is None:
-        return None
+        return _resolve_box_target(box_slug=app_slug, org_id=org_id)
 
     cluster = None
     if workload_slug:
@@ -115,6 +118,41 @@ def _resolve_target(*, app_slug: str, workload_slug: str | None) -> dict | None:
     return {
         "cluster": cluster,
         "namespace": namespace_for_app(app),
+    }
+
+
+def _resolve_box_target(*, box_slug: str, org_id: int) -> dict | None:
+    """Cluster + namespace for an agent box (#129).
+
+    A box has no ``AppEnvironment`` and no ``default_tenant_cluster``; it
+    runs on the org's agent cluster, in the namespace frozen on the row
+    at spawn. The namespace is read rather than recomputed for the same
+    reason the row stores it: a recomputed guess can miss the pod.
+
+    Org-filtered explicitly — ``@tenant_scoped`` asserts a tenant, it
+    does not filter, so a by-slug fetch has to fail closed on its own.
+    """
+    from astrolift_agents.models import AgentBox
+    from astrolift_agents.services.agent_box import box_namespace
+    from astrolift_agents.services.agent_cluster import resolve_agent_cluster
+
+    box = (
+        AgentBox.objects.select_related("organization")
+        .filter(slug=box_slug, organization_id=org_id, deleted_at__isnull=True)
+        .first()
+    )
+    if box is None:
+        return None
+    try:
+        cluster = resolve_agent_cluster(box.organization)
+    except Exception:  # noqa: BLE001 — no cluster reads as 'no runtime'
+        logger.exception("cluster_exec: no agent cluster for box %s", box_slug)
+        return None
+    if not getattr(cluster, "is_active", True):
+        return None
+    return {
+        "cluster": cluster,
+        "namespace": box.namespace or box_namespace(box),
     }
 
 

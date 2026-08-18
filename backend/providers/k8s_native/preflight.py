@@ -191,6 +191,26 @@ REQUIREMENTS: dict[tuple[str, str], OperatorRequirement] = {
         ),
         minimum_operator_version="4.1.0",
     ),
+    ("workflow_engine", "temporal"): OperatorRequirement(
+        operator_id="temporal-operator",
+        display_name="Temporal Operator",
+        # CNPG and cert-manager are listed because this driver provisions its
+        # own persistence and its own client certificate rather than binding a
+        # separate managed postgres; without either CRD the TemporalCluster
+        # reconciles into a server with no store and no way to authenticate.
+        required_crds=(
+            "temporalclusters.temporal.io",
+            "temporalnamespaces.temporal.io",
+            "temporalclusterclients.temporal.io",
+            "clusters.postgresql.cnpg.io",
+            "certificates.cert-manager.io",
+        ),
+        install_hint=(
+            "kubectl apply --server-side -f https://github.com/alexandrainst/temporal-operator/"
+            "releases/latest/download/temporal-operator.yaml; CloudNativePG and cert-manager must "
+            "already be installed"
+        ),
+    ),
     ("model_endpoint", "kserve"): OperatorRequirement(
         operator_id="kserve",
         display_name="KServe",

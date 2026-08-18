@@ -7335,6 +7335,7 @@ export type Query = {
   PostgresMetrics: Array<Array<Scalars['String']['output']>>;
   agent?: Maybe<AstroliftAgentDetail>;
   agentBox?: Maybe<AstroliftAgentBox>;
+  agentBoxPods: Array<AstroliftAppPod>;
   agentBoxes: Array<AstroliftAgentBox>;
   agentEnvironmentSpec?: Maybe<AstroliftAgentEnvironmentSpec>;
   agentEnvironmentSpecSecretBundleAttachments: Array<AstroliftAgentSecretBundleAttachment>;
@@ -7645,6 +7646,11 @@ export type QueryAgentArgs = {
 
 
 export type QueryAgentBoxArgs = {
+  slug: Scalars['String']['input'];
+};
+
+
+export type QueryAgentBoxPodsArgs = {
   slug: Scalars['String']['input'];
 };
 

@@ -108,7 +108,7 @@ class Cell:
 VARIANTS: dict[str, dict[str, str]] = {
     "cache": {"aws": "elasticache_memcached"},
     "document_db": {"aws": "documentdb", "gcp": "firestore_native", "azure": "cosmos_nosql"},
-    "email": {"aws": "ses", "azure": "azure_acs"},
+    "email": {"aws": "ses", "gcp": "smtp", "azure": "azure_acs"},
     "encryption_key": {"aws": "kms", "gcp": "cloud_kms", "azure": "key_vault_key"},
     "event_bus": {"aws": "eventbridge", "gcp": "eventarc", "azure": "event_grid"},
     "event_stream": {"aws": "msk_serverless", "gcp": "managed_kafka", "azure": "event_hubs_kafka"},
@@ -166,7 +166,6 @@ IN_CLUSTER_VARIANTS: dict[str, str] = {
 #: the platform cannot provision, which fails at the driver lookup and teaches
 #: nobody anything.
 NOT_EXPRESSIBLE: dict[tuple[str, str], str] = {
-    ("email", "gcp"): "gcp_thirdparty is status planned; declared gap astrolift-app#1453",
 }
 
 

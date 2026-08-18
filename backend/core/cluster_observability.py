@@ -965,10 +965,35 @@ def _gcp_managed_config_for(
             ),
         )
 
-    if pair in {
-        ("search", "gcp_elastic_cloud"),
-        ("email", "gcp_thirdparty"),
-    }:
+    if pair == ("email", "smtp") or (kind == "email" and not variant):
+        from gcp.managed.email_smtp import SMTPRelayConfig
+
+        required = {
+            "smtp_host": str(pc.get("smtp_host") or ""),
+            "smtp_username_secret_ref": str(pc.get("smtp_username_secret_ref") or ""),
+            "smtp_password_secret_ref": str(pc.get("smtp_password_secret_ref") or ""),
+            "smtp_default_from_address": str(pc.get("smtp_default_from_address") or ""),
+        }
+        missing = sorted(key for key, value in required.items() if not value)
+        if missing:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: GCP email/smtp requires provider_config."
+                + ", provider_config.".join(missing),
+            )
+        return SMTPRelayConfig(
+            host=required["smtp_host"],
+            username_secret_ref=required["smtp_username_secret_ref"],
+            password_secret_ref=required["smtp_password_secret_ref"],
+            default_from_address=required["smtp_default_from_address"],
+            port=int(pc.get("smtp_port", 587)),
+            tls_mode=str(pc.get("smtp_tls_mode", "starttls")),
+            allowed_sender_domains=tuple(
+                str(domain) for domain in (pc.get("smtp_allowed_sender_domains") or ()) if str(domain).strip()
+            ),
+            region=str(pc.get("smtp_region", "")),
+        )
+
+    if pair == ("search", "gcp_elastic_cloud"):
         raise ClusterObservabilityError(
             f"cluster {cluster.slug}: GCP managed service {kind!r}/{variant!r} is a planned "
             "placeholder and cannot be provisioned",
@@ -1218,6 +1243,33 @@ def _k8s_managed_config_for(
             max_ttl_seconds=int(
                 pc.get("argo_workflows_max_ttl_seconds", 604800),
             ),
+        )
+    if pair == ("workflow_engine", "temporal"):
+        from django.conf import settings
+        from k8s_native.managed._temporal_isolation import ControlPlaneTemporal
+        from k8s_native.managed.workflow_temporal import (
+            DEFAULT_POSTGRES_IMAGE,
+            DEFAULT_SERVER_VERSION,
+            TemporalConfig,
+        )
+
+        # The coordinates the driver must never collide with are read from the
+        # settings the control plane's own Temporal client uses, not from
+        # provider config an operator fills in by hand. A hand-copied address
+        # can go stale; this one cannot be wrong without the control plane
+        # itself being pointed somewhere else.
+        return TemporalConfig(
+            cluster_driver=cluster_driver,
+            control_plane=ControlPlaneTemporal(
+                address=str(settings.TEMPORAL_ADDRESS),
+                namespaces=(str(settings.TEMPORAL_NAMESPACE),),
+                kubernetes_namespaces=tuple(
+                    str(value) for value in pc.get("temporal_control_plane_kubernetes_namespaces", [])
+                ),
+            ),
+            server_version=str(pc.get("temporal_server_version", DEFAULT_SERVER_VERSION)),
+            postgres_image=str(pc.get("temporal_postgres_image", DEFAULT_POSTGRES_IMAGE)),
+            storage_class=str(pc.get("temporal_storage_class", "")),
         )
     if pair == ("model_endpoint", "kserve"):
         from k8s_native.managed.model_endpoint_kserve import KServeConfig

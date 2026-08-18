@@ -33,8 +33,8 @@ whichever driver used another.
 manifests/
   happy-path/{aws,gcp,azure}.toml      the certification target: web + postgres
                                        + redis + queue + object_store
-  per-kind/<kind>/{aws,gcp,azure}.toml 68 cells: 23 default-tier kinds × 3 clouds,
-                                       minus 1 with no executable variant. Five
+  per-kind/<kind>/{aws,gcp,azure}.toml 69 cells: 23 default-tier kinds × 3 clouds,
+                                       with none left out. Five
                                        book an in-cluster variant, because that
                                        is what a portable app gets on a cloud
                                        that sells no managed equivalent.
