@@ -47,6 +47,37 @@ def test_the_gcp_and_aws_campaign_keys_match_their_driver_conventions():
     assert campaign_keys("gcp") == ("astrolift-extra-campaign",)
 
 
+def test_the_aws_keys_are_what_the_aws_tag_builder_actually_emits():
+    """AWS has a single write path, so the read side can be pinned against it
+    directly rather than by pattern -- the same argument as recomputing the
+    Azure key through the serializer instead of transcribing it.
+
+    ``tags`` is populated here even though the provision path does not thread
+    operator tags through yet: this pins the campaign-key spelling against the
+    day it does, which is what makes fixing that a one-line change rather than a
+    silent scanner regression."""
+    from _sdk.managed_service import ProvisionSpec
+    from aws.managed._base import tags_for
+
+    spec = ProvisionSpec(
+        organization_id="org-1",
+        organization_slug="conflict",
+        app_id="app-1",
+        app_slug=f"{CAMPAIGN.slug}-happy-aws",
+        environment_id="env-1",
+        environment_name="production",
+        tenant_cluster_id="cluster-1",
+        service_handle_hint="records",
+        size="small",
+        tags={CAMPAIGN_TAG_KEY: CAMPAIGN.slug},
+    )
+    written = {tag["Key"]: tag["Value"] for tag in tags_for(spec)}
+
+    assert app_keys("aws")[0] in written
+    assert campaign_keys("aws")[0] in written
+    assert match(CAMPAIGN, "aws", tags=written) is not None
+
+
 _APP_KEY_PATTERN = re.compile(r"^astrolift[._/-]?(?:io)?[._/-]?app$")
 
 
@@ -76,19 +107,21 @@ def _app_key_spellings(cloud: str) -> dict[str, list[str]]:
     return found
 
 
-@pytest.mark.parametrize("cloud", ["gcp", "azure"])
+@pytest.mark.parametrize("cloud", ["aws", "gcp", "azure"])
 def test_the_scanner_reads_every_app_key_spelling_the_drivers_write(cloud):
     """The app slug is the handle that works today, because operator tags do not
     reach every driver. Drivers spell it four ways on GCP; a scanner that knows
     three of them silently skips whichever family uses the fourth."""
     declared = set(app_keys(cloud))
     written = _app_key_spellings(cloud)
-    # ``astrolift.io/app`` is the pre-serialization input to the Azure and AWS
-    # tag builders, never a key that lands on a resource, so it is not a
-    # spelling the scanner has to read back.
-    undeclared = {
-        key: sorted(paths) for key, paths in written.items() if key not in declared and key != "astrolift.io/app"
-    }
+    # On Azure ``astrolift.io/app`` is the pre-serialization input to the ARM
+    # tag builder and never a key that lands on a resource, so it is not a
+    # spelling the scanner has to read back. On AWS the same literal *is* the
+    # written key -- ``aws/managed/_base.py::tags_for`` emits it verbatim, and
+    # AWS tag keys permit the dot and the slash -- so it must stay declared
+    # there rather than excused.
+    exempt = {"astrolift.io/app"} if cloud == "azure" else set()
+    undeclared = {key: sorted(paths) for key, paths in written.items() if key not in declared and key not in exempt}
 
     assert not undeclared, (
         f"{cloud} drivers write app-key spellings the orphan scanner does not read: {undeclared}. "
