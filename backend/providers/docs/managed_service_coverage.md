@@ -18,9 +18,9 @@ Every gap that is left must appear in the ledger below or the guard test
 
 Opt-in kinds: `cdn`, `database_proxy`, `mq`, `sms`, `stream`, `warehouse`, `wide_column`.
 
-32 kinds; 19 executable on all three public clouds;
-22 reachable on every cloud once in-cluster variants count;
-4 gaps across 3 kinds.
+32 kinds; 20 executable on all three public clouds;
+23 reachable on every cloud once in-cluster variants count;
+3 gaps across 2 kinds.
 
 ## Coverage
 
@@ -32,7 +32,7 @@ Opt-in kinds: `cdn`, `database_proxy`, `mq`, `sms`, `stream`, `warehouse`, `wide
 | `database_proxy` (opt-in) | `rds_proxy` | - | - | - |
 | `document_db` | `documentdb`, `documentdb_serverless_v2` | `firestore_native` | `cosmos_mongodb`, `cosmos_nosql` | `mongodb_operator` |
 | `email` | `ses` | planned: `gcp_thirdparty` | `azure_acs` | - |
-| `encryption_key` | `kms` | `cloud_kms` | planned: `key_vault_key` | - |
+| `encryption_key` | `kms` | `cloud_kms` | `key_vault_key` | - |
 | `event_bus` | `eventbridge` | `eventarc` | `event_grid`, `event_grid_namespace` | `knative_eventing` |
 | `event_stream` | `msk`, `msk_serverless` | `managed_kafka` | `event_hubs_kafka` | `kafka_strimzi`, `nats` |
 | `faas` | `lambda` | `cloud_functions_gen2` | `azure_functions` | `knative_service` |
@@ -68,7 +68,6 @@ Each row explains one hole above. The reference is the tracking issue.
 | `cache` | gcp | `buildable` | https://github.com/calliopeai/astrolift-app/issues/1465 |
 | `cache` | azure | `buildable` | https://github.com/calliopeai/astrolift-app/issues/1465 |
 | `email` | gcp | `planned_variant` | https://github.com/calliopeai/astrolift-app/issues/1453 |
-| `encryption_key` | azure | `planned_variant` | https://github.com/calliopeai/astrolift-app/issues/1454 |
 
 ### Classifications
 

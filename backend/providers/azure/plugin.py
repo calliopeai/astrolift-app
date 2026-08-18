@@ -38,6 +38,7 @@ Managed services:
 - AzureSQLManagedInstanceDriver — mssql/azure_sql_managed_instance
 - AzureAPIMDriver — api_gateway/api_management
 - AzureFunctionsDriver — faas/azure_functions
+- AzureKeyVaultKeyDriver — encryption_key/key_vault_key
 """
 
 from _sdk.base import ProviderPlugin
@@ -50,6 +51,7 @@ from azure.managed.cache_redis import AzureCacheRedisDriver
 from azure.managed.cosmos import AzureCosmosDriver
 from azure.managed.cosmos_api import AzureCosmosApiDriver
 from azure.managed.email_acs import AzureCommunicationEmailDriver
+from azure.managed.encryption_key_vault import AzureKeyVaultKeyDriver
 from azure.managed.event_grid import AzureEventGridDriver
 from azure.managed.event_grid_namespace import AzureEventGridNamespaceDriver
 from azure.managed.event_hubs import AzureEventHubsDriver
@@ -516,6 +518,30 @@ _MANAGED_CONFIG_PROPERTIES = {
     "private_link_max_group_ids": {"type": "integer", "minimum": 1, "maximum": 64, "default": 8},
     "private_link_max_private_dns_zones": {"type": "integer", "minimum": 0, "maximum": 64, "default": 8},
     "private_link_deletion_protection_default": {"type": "boolean", "default": True},
+    "key_vault_key_name_prefix": {
+        "type": "string",
+        "pattern": "^[0-9a-zA-Z-]{1,127}$",
+        "default": "astrolift",
+    },
+    "key_vault_key_deletion_protection_default": {"type": "boolean", "default": True},
+    "key_vault_key_purge_on_delete_default": {"type": "boolean", "default": False},
+    "key_vault_key_rotation_period_default": {
+        "type": "string",
+        "pattern": "^P(?:\\d+Y)?(?:\\d+M)?(?:\\d+D)?$",
+        "default": "P90D",
+    },
+    "key_vault_key_rotation_notify_before_expiry_default": {
+        "type": "string",
+        "pattern": "^P(?:\\d+Y)?(?:\\d+M)?(?:\\d+D)?$",
+        "default": "P30D",
+    },
+    "key_vault_key_api_version": {"type": "string", "default": "7.4"},
+    "key_vault_key_request_timeout_seconds": {
+        "type": "number",
+        "minimum": 1,
+        "maximum": 120,
+        "default": 30,
+    },
 }
 
 PLUGIN = ProviderPlugin(
@@ -565,6 +591,7 @@ PLUGIN = ProviderPlugin(
         ("faas", "azure_functions"): AzureFunctionsDriver,
         ("api_gateway", "api_management"): AzureAPIMDriver,
         ("private_endpoint", "private_link"): AzurePrivateEndpointDriver,
+        ("encryption_key", "key_vault_key"): AzureKeyVaultKeyDriver,
     },
     config_schema={
         "type": "object",

@@ -2200,6 +2200,30 @@ def _azure_managed_config_for(
             ),
         )
 
+    if pair == ("encryption_key", "key_vault_key") or (kind == "encryption_key" and not variant):
+        from azure.managed.encryption_key_vault import AzureKeyVaultKeyConfig
+
+        if not vault_url:
+            raise ClusterObservabilityError(
+                f"cluster {cluster.slug}: Azure encryption_key/key_vault_key requires provider_config.vault_url",
+            )
+        return AzureKeyVaultKeyConfig(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            vault_url=vault_url,
+            key_name_prefix=str(pc.get("key_vault_key_name_prefix", "astrolift")),
+            deletion_protection_default=bool(
+                pc.get("key_vault_key_deletion_protection_default", True),
+            ),
+            purge_on_delete_default=bool(pc.get("key_vault_key_purge_on_delete_default", False)),
+            rotation_period_default=str(pc.get("key_vault_key_rotation_period_default", "P90D")),
+            rotation_notify_before_expiry_default=str(
+                pc.get("key_vault_key_rotation_notify_before_expiry_default", "P30D"),
+            ),
+            api_version=str(pc.get("key_vault_key_api_version", "7.4")),
+            request_timeout_seconds=float(pc.get("key_vault_key_request_timeout_seconds", 30)),
+        )
+
     raise ClusterObservabilityError(
         f"cluster {cluster.slug}: no Azure managed-service config builder for "
         f"kind={kind!r}, variant={variant!r}",
