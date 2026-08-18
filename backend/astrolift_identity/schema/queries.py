@@ -19,6 +19,7 @@ from django.db.models import Q
 from strawberry.types import Info
 
 from astrolift_graphql import GUID, PageType, keyset_page, search_q
+from astrolift_graphql.sorting import NAMED_MODEL_SORTS, ListSortKey, resolve_sort
 from astrolift_identity.models import (
     ApiToken,
     IdentityProvider,
@@ -410,6 +411,7 @@ class IdentityQuery:
         self,
         info: Info,
         search: str | None = None,
+        sort_by: ListSortKey | None = None,
         limit: int = 50,
         after: str | None = None,
     ) -> PageType[TeamType]:
@@ -421,7 +423,16 @@ class IdentityQuery:
         unordered, so newest-first is the first stable order this
         surface has had. ``search`` matches slug, name, description.
         """
-        page = keyset_page(_teams_qs(search=search), cursor=after, limit=limit)
+        order, scope = resolve_sort(sort_by, NAMED_MODEL_SORTS)
+        page = keyset_page(
+            _teams_qs(search=search),
+            cursor=after,
+            limit=limit,
+            sort_field=order.sort_field,
+            tiebreak_field=order.tiebreak_field,
+            descending=order.descending,
+            cursor_scope=scope,
+        )
         return page.map(team_to_type)
 
     @strawberry.field(
@@ -439,6 +450,7 @@ class IdentityQuery:
         self,
         info: Info,
         search: str | None = None,
+        sort_by: ListSortKey | None = None,
         limit: int = 50,
         after: str | None = None,
     ) -> PageType[ProjectType]:
@@ -449,7 +461,16 @@ class IdentityQuery:
         project's own slug / name / description plus the owning team's
         slug and name, because operators navigate projects by team.
         """
-        page = keyset_page(_projects_qs(search=search), cursor=after, limit=limit)
+        order, scope = resolve_sort(sort_by, NAMED_MODEL_SORTS)
+        page = keyset_page(
+            _projects_qs(search=search),
+            cursor=after,
+            limit=limit,
+            sort_field=order.sort_field,
+            tiebreak_field=order.tiebreak_field,
+            descending=order.descending,
+            cursor_scope=scope,
+        )
         return page.map(project_to_type)
 
     @strawberry.field
