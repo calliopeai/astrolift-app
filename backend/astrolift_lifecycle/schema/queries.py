@@ -491,7 +491,12 @@ def _command_runs_qs(*, app_slug: str | None, search: str | None = None):
     return qs
 
 
-def _preview_environments_qs(*, app_slug: str | None, search: str | None = None):
+def _preview_environments_qs(
+    *,
+    app_slug: str | None,
+    search: str | None = None,
+    statuses: list[str] | None = None,
+):
     """Filtered, unordered preview stream for the caller's org.
 
     Shared by the list field and its paginated sibling; ordering is
@@ -515,6 +520,12 @@ def _preview_environments_qs(*, app_slug: str | None, search: str | None = None)
     ).filter(registered_app__organization_id=org_id)
     if app_slug:
         qs = qs.filter(registered_app__slug=app_slug)
+    if statuses:
+        # The Previews tab's status pills (#1241). The default view is
+        # "everything except torn_down", which is a negation and had no
+        # expression at all before this, so the migration to server pagination
+        # had to drop the pills rather than page a client-side predicate.
+        qs = qs.filter(status__in=statuses)
     if search:
         qs = qs.filter(
             search_q(
@@ -1202,6 +1213,7 @@ class LifecycleQuery:
         info: Info,
         app_slug: str | None = None,
         search: str | None = None,
+        statuses: list[str] | None = None,
         limit: int = 50,
         after: str | None = None,
     ) -> PageType[PreviewEnvironmentType]:
@@ -1217,7 +1229,7 @@ class LifecycleQuery:
         branch, hostname, commit, and status.
         """
         page = keyset_page(
-            _preview_environments_qs(app_slug=app_slug, search=search),
+            _preview_environments_qs(app_slug=app_slug, search=search, statuses=statuses),
             cursor=after,
             limit=limit,
         )

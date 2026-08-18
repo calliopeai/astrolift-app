@@ -266,12 +266,17 @@ def _roles_qs(*, search: str | None = None):
     return qs
 
 
-def _role_bindings_qs(*, search: str | None = None):
+def _role_bindings_qs(*, search: str | None = None, app_slug: str | None = None):
     """Org-wide role bindings, filtered and unordered.
 
     Shared by the list field and its paginated sibling. Ordering is
     left to ``keyset_page`` — note the seek column is ``granted_at``
     (the grant's own clock), not ``created_at``.
+
+    ``app_slug`` narrows to the bindings scoped to one app, which the app
+    Members tab is built around (#1241). Without it that surface paged the
+    whole org and the app's three rows landed on page seven, so the operator
+    saw empty pages and concluded the app had no members.
     """
     from core.tenancy import get_current_tenant
 
@@ -280,6 +285,19 @@ def _role_bindings_qs(*, search: str | None = None):
     if org_id is None:
         return RoleBinding.objects.none()
     qs = RoleBinding.objects.select_related("user", "role").filter(_org_scope_q(org_id))
+    if app_slug:
+        # scope_id is a generic BigInt rather than a FK, so the app has to be
+        # resolved to its pk first. Deny-by-default: an unknown slug matches
+        # nothing rather than falling through to the org-wide list, which
+        # would show every binding on a page titled with one app's name.
+        from astrolift_registry.models import RegisteredApp
+
+        app_id = (
+            RegisteredApp.objects.filter(organization_id=org_id, slug=app_slug)
+            .values_list("id", flat=True)
+            .first()
+        )
+        qs = qs.filter(scope_kind=RoleBinding.ScopeKind.APP, scope_id=app_id or 0)
     term = (search or "").strip()
     if term:
         qs = qs.filter(
@@ -1254,6 +1272,7 @@ class IdentityQuery:
         self,
         info: Info,
         search: str | None = None,
+        app_slug: str | None = None,
         limit: int = 50,
         after: str | None = None,
     ) -> PageType[RoleBindingType]:
@@ -1273,7 +1292,7 @@ class IdentityQuery:
         pagination it is decorating.
         """
         page = keyset_page(
-            _role_bindings_qs(search=search),
+            _role_bindings_qs(search=search, app_slug=app_slug),
             cursor=after,
             limit=limit,
             sort_field="granted_at",

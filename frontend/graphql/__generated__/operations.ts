@@ -8399,6 +8399,7 @@ export type QueryAstroliftPreviewEnvironmentsPageArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+  statuses?: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 
@@ -8470,6 +8471,7 @@ export type QueryAstroliftRenderedManifestArgs = {
 
 export type QueryAstroliftRoleBindingsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
+  appSlug?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
 };
