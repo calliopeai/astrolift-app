@@ -69,6 +69,61 @@ if TYPE_CHECKING:
 _AKS_KUBECONFIG_TTL_SECONDS = 50 * 60
 
 
+def kubeconfig_from_admin_credentials(
+    result: Any,
+    *,
+    resource_group: str,
+    cluster_name: str,
+) -> str:
+    """Pull the kubeconfig YAML out of a
+    ``managed_clusters.list_cluster_admin_credentials`` response.
+
+    Shared with the operator-side cluster-registration command (#1474),
+    which needs the same blob to lift the cluster CA out of it: AKS is
+    the one cloud whose managed-cluster object does not carry the CA.
+    """
+    kubeconfigs = getattr(result, "kubeconfigs", None) or []
+    if not kubeconfigs:
+        raise ClusterAuthError(
+            f"AKS {resource_group}/{cluster_name}: list_cluster_admin_credentials returned no kubeconfigs",
+        )
+    raw = getattr(kubeconfigs[0], "value", None)
+    if raw is None:
+        raise ClusterAuthError(
+            f"AKS {resource_group}/{cluster_name}: list_cluster_admin_credentials kubeconfig.value is empty",
+        )
+    # Azure returns ``value`` as bytes (the kubeconfig YAML) on
+    # the real SDK; some fakes return str directly. Some operator
+    # tooling also base64-encodes the blob — be tolerant of both.
+    if isinstance(raw, bytes):
+        try:
+            return raw.decode("utf-8")
+        except UnicodeDecodeError:
+            try:
+                return base64.b64decode(raw).decode("utf-8")
+            except Exception as exc:
+                raise ClusterAuthError(
+                    f"AKS {resource_group}/{cluster_name}: kubeconfig blob is neither UTF-8 nor base64-UTF-8",
+                ) from exc
+    return str(raw)
+
+
+def certificate_authority_from_kubeconfig(blob: str) -> str:
+    """``certificate-authority-data`` (base64 DER) from a kubeconfig
+    blob, or ``""`` when no cluster entry carries one."""
+    import yaml
+
+    try:
+        doc = yaml.safe_load(blob) or {}
+    except Exception as exc:
+        raise ClusterAuthError(f"kubeconfig blob is not parseable YAML: {exc}") from exc
+    for entry in doc.get("clusters") or []:
+        data = ((entry or {}).get("cluster") or {}).get("certificate-authority-data")
+        if data:
+            return str(data)
+    return ""
+
+
 # ``_NotFound`` is aliased to the shared helper's ``NotFoundError`` at
 # the top-of-file imports so existing ``except _NotFound`` clauses keep
 # catching what the wrapper raises after the #567 fix.
@@ -922,31 +977,11 @@ class AKSClusterDriver(ClusterDriver):
                 f"AKS {resource_group}/{cluster_name}: list_cluster_admin_credentials failed: {mapped}",
             ) from exc
 
-        kubeconfigs = getattr(result, "kubeconfigs", None) or []
-        if not kubeconfigs:
-            raise ClusterAuthError(
-                f"AKS {resource_group}/{cluster_name}: list_cluster_admin_credentials returned no kubeconfigs",
-            )
-        raw = getattr(kubeconfigs[0], "value", None)
-        if raw is None:
-            raise ClusterAuthError(
-                f"AKS {resource_group}/{cluster_name}: list_cluster_admin_credentials kubeconfig.value is empty",
-            )
-        # Azure returns ``value`` as bytes (the kubeconfig YAML) on
-        # the real SDK; some fakes return str directly. Some operator
-        # tooling also base64-encodes the blob — be tolerant of both.
-        if isinstance(raw, bytes):
-            try:
-                blob = raw.decode("utf-8")
-            except UnicodeDecodeError:
-                try:
-                    blob = base64.b64decode(raw).decode("utf-8")
-                except Exception as exc:
-                    raise ClusterAuthError(
-                        f"AKS {resource_group}/{cluster_name}: kubeconfig blob is neither UTF-8 nor base64-UTF-8",
-                    ) from exc
-        else:
-            blob = str(raw)
+        blob = kubeconfig_from_admin_credentials(
+            result,
+            resource_group=resource_group,
+            cluster_name=cluster_name,
+        )
 
         self._kubeconfig_cache[key] = (
             now + _AKS_KUBECONFIG_TTL_SECONDS,
