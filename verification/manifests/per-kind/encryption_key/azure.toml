@@ -1,0 +1,53 @@
+# PER-KIND / encryption_key / azure -- variant key_vault_key.
+#
+# One managed service, one cloud, the full lifecycle cycle. The fixture only
+# opens live clients for postgres, redis, queue and object_store; every other
+# kind is verified by binding presence in /debug plus a clean VERIFY-CLEAN.
+# Binding envelope to assert in /debug: ENCRYPTION_KEY_ID, ENCRYPTION_KEY_ARN, ENCRYPTION_KEY_ALIAS, ENCRYPTION_KEY_SPEC, ENCRYPTION_KEY_USAGE, ENCRYPTION_KEY_MULTI_REGION, AZURE_KEY_VAULT_URL, AZURE_KEY_VAULT_NAME, AZURE_KEY_VAULT_KEY_NAME, AZURE_KEY_VAULT_KEY_ID, AZURE_KEY_VAULT_KEY_VERSION, AZURE_KEY_VAULT_KEY_TYPE.
+#
+# Generated from providers/_cert/collection.py -- do not hand-edit.
+name = "cert2026q3-encryption-key-azure"
+
+[campaign]
+slug = "cert2026q3"
+cell = "per-kind/encryption_key/azure"
+cloud = "azure"
+fixture = "calliopeai/astrolift-sample-api"
+purpose = "coverage: encryption_key via key_vault_key"
+
+# Operator tags the harness threads into ProvisionSpec.tags. The app name
+# carries the campaign slug as well, because no operator tag reaches an IAM
+# principal and two GCP drivers drop spec.tags outright -- see _cert/campaign.py.
+[campaign.tags]
+campaign = "cert2026q3"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+is_public = true
+replicas = 1
+cpu_request = "100m"
+cpu_limit = "500m"
+memory_request = "128Mi"
+memory_limit = "256Mi"
+
+  [[workloads.containers]]
+  name = "app"
+  is_primary = true
+  image_ref = "docker.io/calliopeai/astrolift-sample-api:main-df5ffa3"
+  port = 8080
+  command = ["python", "entrypoint.py", "web"]
+
+    [workloads.containers.env]
+    LOG_LEVEL = "info"
+    PORT = "8080"
+
+    [workloads.containers.healthcheck]
+    kind = "http"
+    value = "/health"
+    port = 8080
+
+[[managed_services]]
+kind = "encryption_key"
+name = "encryption-key"
+variant = "key_vault_key"
